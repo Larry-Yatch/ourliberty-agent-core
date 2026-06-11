@@ -4,6 +4,81 @@
 
 ---
 
+## Iteration ~1523 — 2026-06-11 21:04Z UTC (interactive, Tier 1, consecutive_clean 0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Tier-4 alert (unreviewed-merge:475, standing pattern). 9/9 services active. Forge building `test-jail-pr4-acceptance-proof-001` (worktree mtime 20:56Z, in-flight). 0 open PRs. 2 new alerts since watermark. Inline repair: `alert_triage_state.py triage-alert` drops `last_claimed_line`/`triage_decisions` on write — repaired.
+
+**VERIFY-BEFORE-REASSERT (iter ~1522 watch items):**
+- **wt-ccd-s5 auto-cleaned at ~22:03Z?** — Current time 21:04Z. NOT yet at GC threshold (mtime 17:31Z UTC → 4h = 21:31Z threshold → healer next run 22:03Z). Still on track. ✅ [blue] carry.
+- **APPROVAL_REQUEST worktree-cleanup-merged-pr-reap-001**: `beacon-pending-approvals.json` checked — only `unreg-approval-2dbbe7bb4d4b` present. Routing gap PERSISTS. G-rule 1/3. [blue] carry.
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: 1307 lines. Prior watermark: L1303. 2 new alerts at L1304–L1305:
+- L1304 (`unreviewed-merge:475`, 20:50:29Z): PR #475 (`perf(gate): mtime-filter outside-jail tripwire, fast-follow #474`) merged by Larry-Yatch without Mirror review. Triage: Tier-4 (never-silence, known standing pattern). No DM — Larry self-merged, knows action. Tier-reset fired. Added to standing unreviewed-merge list.
+- L1305 (`sync-blocked:auto-commit-push-failed`, 20:52:55Z): sync.service auto-commit push failed; rolled back; self-heals on next tick. Triage: Tier-3 (known-pattern silence). Resolved. No tier-reset.
+- **Watermark advance: L1303 → L1305.** ⚠️ Bug found: `alert_triage_state.py triage-alert` drops `last_claimed_line` and `triage_decisions` from alert-triage.json on write. Repaired inline (restored L1303 history + new watermark L1305, triage_decisions=18 entries). G-rule `alert-triage-watermark-loss-on-write` **1/3**.
+
+**Check 1 — Log noise:** `journalctl` blocked (requires approval in interactive session). No distress signals in recent larry-alerts stream since watermark. ✅ Nominal (limited scan).
+
+**Check 2 — Telegram sweep:** Last Larry directive: 19:59Z ("what do you think?") answered by Beacon 20:00Z. No orphaned directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `[INFO] no stalls detected` (21:00Z). ✅ Nominal.
+
+**Check 4 — Pending directives:** No Larry directives in last 24h without chain artifact. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing known, G-rule dispatched iter ~1416. [blue] carry. ✅
+
+**Check A — Source repo:** Session gitStatus: main, clean. Latest commit `598c3a9 Pulse cycle 20260611T205352Z` (20:53:52Z). ✅ Nominal. (Note: sync.service push failed at 20:52:55Z before wrapper commit; wrapper commit likely pushed independently — unable to verify origin state with git commands blocked in this session.)
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-11T20:52:55Z (~12 min at cycle time), status=error (`sync-blocked:auto-commit-push-failed`). Within 2h threshold. Alert classified Tier-3/silence above. Self-healing per sync service message. ✅ Nominal.
+
+**Check C — Agent liveness:** `systemctl is-active` → 9/9 active (beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api, cycle). ✅ Nominal.
+
+**Check E — PRs:** `gh pr list` → 0 open PRs. Forge inbox has `test-jail-pr4-acceptance-proof-001.json` (in-flight, worktree active mtime 20:56Z). ✅ Nominal.
+
+**Conditional checks (Thursday 2026-06-11 UTC):** Check I (Sunday only) → skip. Check III (next eligible 2026-06-25) → skip. Checks VIII/IX/X (Monday) → skip. ✅
+
+**Credential rotation:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). ✅ Nominal.
+
+**New G-rule finding:**
+- `alert-triage-watermark-loss-on-write` **1/3**: `alert_triage_state.py triage-alert` writes per-alert lifecycle entries but drops `last_claimed_line` and `triage_decisions` from the file on each atomic rewrite. Future Pulse iters will re-claim already-processed alerts (no watermark → unbounded re-scan). Repaired inline this iter. At 3/3: dispatch to Forge for fix in `alert_triage_state.py` (preserve top-level fields on write).
+
+**Actions taken:**
+1. `alert_triage_state.py triage-alert --alert-id unreviewed-merge:475 ...` → Tier-4 triaged ✅
+2. `alert_triage_state.py triage-alert --alert-id sync-blocked:...` → Tier-3 resolved ✅
+3. Repaired `alert-triage.json`: restored `last_claimed_line=1305` + `triage_decisions=18 entries` (data lost by script). ✅
+4. `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0, last_signal_at=21:04:20Z. ✅
+5. `cycle_prime_ledger.py append --tier 1 --kind intervention --template alert-triage-watermark-repair` → row written. ✅
+6. No DMs sent — Tier-4 unreviewed-merge is standing pattern; no new [yellow]/[red] findings.
+
+**Standing findings (updated):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). Pending Larry. [carry]
+- [blue] wt-ccd-s5 — GC at 22:03Z. [blue] carry.
+- [blue] G-rule `approval_request_not_extracted_from_depth1_beacon_result` — 1/3. [carry]
+- [blue] G-rule Pulse-envelope-format — 1/3. [carry]
+- [blue] G-rule `alert-triage-watermark-loss-on-write` — **1/3** (new this iter).
+- [blue] heal-stale-daemon-code-state.json MISSING — G-rule dispatched iter ~1416. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 5/34 shelf cards. 1/3 G-rule. [carry]
+- [blue] cycle.timer G-rule 3/3 → Beacon consumed. [carry]
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464, 465, 467, 468, 466, 470, 471, 472, 473, **475**) — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] Various G-rule carries: silence-missions-card-gc 001, heal-pipeline-stall heartbeat 3/3 deferred, auto-restart-failed 1/3, completion-DM 1/3, auto-retry source=auto-retry 1/3, dispatch-branch-cleanup:summary 2/3, Check-C-launcher-liveness APPROVAL_REQUEST pending, alert-triage-durable-watermark-001 parked, retry-exhausted-on-shipped-task 2/3, retry_exhausted:post-merge-install-drift 1/3, sentinel-inbox-stall-ignores-inflight 2/3, F24b JSON malformation 2/3, bughunt-gate-soak Phase 2 pending, health-check-notify-script-missing G-rule 3/3 dispatched, Check IX GITHUB_TOKEN missing.
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+
+**Watch items for iter ~1524:**
+- **wt-ccd-s5**: GC expected at 22:03Z. If persists past 22:10Z → escalate.
+- **test-jail-pr4-acceptance-proof-001**: Forge building. Expect PR to open within ~30–60 min from 20:56Z start.
+- **APPROVAL_REQUEST worktree-cleanup-merged-pr-reap-001**: routing gap G-rule 1/3. Watch for recurrence.
+- **alert-triage-watermark-loss-on-write**: G-rule 1/3. Watch for recurrence on next triage-alert call.
+
+**PRIME DIRECTIVE:** 1 intervention (alert-triage-watermark-repair). Running total: interventions≈793, systemic_fixes≈24, ratio≈33.0, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0.
+
+---
+
 ## Iteration ~1522 — 2026-06-11 20:50Z UTC (interactive, Tier 1, consecutive_clean 0)
 
 **Trigger:** Larry direct invocation (`/cycle`).
