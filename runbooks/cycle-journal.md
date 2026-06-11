@@ -4,6 +4,110 @@
 
 ---
 
+## Iteration 1410 — 2026-06-11 06:34Z UTC (interactive, Tier 1, consecutive_clean 0→0)
+
+**Health:** ⚠️ Signal. Check 3 found `retry_exhausted:post-merge-install-drift-trigger-001` (L1470 filed by healer, route=escalate). `build-post-merge-install-drift-trigger-001.json` absent from Forge inbox — task processed/exhausted between iters. Forge active: 1 worktree (headless-approval-dedup-wedge-002 build). cycle.timer still stuck (Trigger: n/a). Check A: dirty tree (agents/beacon/captures.json modified — Beacon routine write). 9/9 services active. 5 Forge inbox items. **Tier 1, consecutive_clean 0→0 (Check 3 tier-reset).**
+
+**VERIFY-BEFORE-REASSERT (iter 1409 watch items):**
+- transcript-not-persisted: **0 new occurrences** (L1469→1470 window: only L1470 is retry_exhausted from healer, not transcript). 21 total (L1438–1466). Sync at 05:51Z; PR #447 deploys at ~07:51Z. Carry.
+- cycle.timer: **CONFIRMED still stuck** — `systemctl status ourliberty-cycle.timer` shows `Trigger: n/a`. Expected self-resolution at ~07:51Z sync. Standing.
+- build-fix-headless-002: `build-fix-headless-approval-dedup-spawn-failure-wedge-002.json` still in inbox (Jun 10 22:45Z, ~7h47m). Active Forge worktree confirms it's being built. Healer clean.
+- PR #449 (test-jail PR-0): still open, needs Mirror review. Carry.
+- heal-stale-daemon-code:auto-restarted at 2/3: no new occurrence this iter (0 new heal-stale-daemon-code alerts). Still 2/3.
+
+**Check 0 — Alert triage (larry-alerts.jsonl):**
+- Total lines at scan start: 1469. Watermark was 1469 (iter 1409). **0 new lines at Check 0 time.**
+- L1470 fired DURING Check 3 (heal-pipeline-stall healer execution): `pipeline-stall:retry-exhausted:post-merge-install-drift-trigger-001`, route=escalate. Captured in Check 3. **Watermark advance to 1470.**
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message 00:16 MDT (06:16Z) — dashboard question, answered in iter 1409. No new directives. Test-fixture log entries at 00:28 MDT (heal-x / fixed-something / routine-x patterns) — known fixture leak per memory, not real signals. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → all active inbox tasks FORGE_NO_PR_SKIP (all have existing PRs or preflight_exit). **NEW: `alerted: retry_exhausted:post-merge-install-drift-trigger-001`** (L1470, route=escalate). Outbox archive shows 2 attempts: original (Jun 10 22:42Z) + retry `.1.json` (Jun 11 06:24Z). Budget exhausted. `build-post-merge-install-drift-trigger-001.json` removed from inbox (not in .archive or .invalid; likely removed by retry mechanism at exhaustion). This task was for post-merge Forge processing of PR #447; the code change itself deploys independently via sync at ~07:51Z. → `ask-then-do` + `tier-reset`. L1470 route=escalate means outbox-notifier will DM Larry.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` MISSING/EMPTY. No orphan directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing pattern unchanged. ✅ Nominal.
+
+**Check A — Source repo:** Session gitStatus: `M agents/beacon/captures.json` — dirty tree. `never-auto` per spec. Context: Beacon bot is active and writes captures.json as part of normal operation; modified between last cycle commit (06:25:58Z) and this session start. All prior cycles reported clean; this is a transient dirty state from Beacon's writes. G-rule candidate: **1/3** if pattern persists across cycle boundaries. Not escalating to Larry given routine-write context; noting for tracking.
+
+**Check B — Sync health:** `last_sync=05:51:21Z` (42min at 06:33Z). Within 2h threshold. Next expected sync ~07:51Z with PR #447 install-drift fix. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active: beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, chain-event-shipper ✅, dashboard-api ✅, cycle.service ✅. Active Forge worktree: `wt-forge-fix-headless-approval-dedup-spawn-failure-wedge-00` (build of headless-wedge-002 task in progress). ✅ Nominal.
+
+**Check E — PRs:** gh blocked (interactive session). PR #449 carried from iter 1409 — opened 06:13Z, needs Mirror review. PR age now ~21min. Still within nominal range (< 30min threshold). Watch for Mirror trigger.
+
+**Check H — Inboxes:**
+- Forge: **5 items** (down from 6 in iter 1409):
+  - `build-fix-headless-approval-dedup-spawn-failure-wedge-002.json` — ~7h47m (Jun 10 22:45Z). Forge worktree active. Carry.
+  - `ccd-s2-no-session-revision-route.json` — preflight. Carry.
+  - `fix-reaper-handoff-guard-checks-liveness-002.json` — preflight. Carry.
+  - `fix-test-bootstrap-per-module-001.json` — preflight. Carry.
+  - `marker-error-ccd-s1-envelope-builder-1.json` — stale retry (PR #446 merged). Self-resolving. Carry.
+  - `build-post-merge-install-drift-trigger-001.json` — GONE (retry exhausted; task removed from inbox). 
+- Beacon/Mirror/Pulse: EMPTY ✅.
+
+**§5.0 bug-hunt gate:**
+- audit_due_nudge.py: `no committed audit baseline; no-op`. ✅
+- distill_detector.py: `no un-distilled audits; no-op`. ✅
+- audit_cadence_signal.py: `no post-seed decision-grade distill artifacts yet; no-op`. ✅
+
+**Conditional checks:**
+- Check I (Thursday 2026-06-11): weekday-gate skip. ✅
+- Check III: next eligible 2026-06-14 (Sunday). Skip. ✅
+- Credential rotations: 0 overdue. Nearest: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). ✅
+
+**G-rule tracking:**
+- **`transcript-not-persisted` (3/3 DISPATCHED iter 1396):** 0 new occurrences. **21 total** (lines 1438–1466). PR #447 fix deploys ~07:51Z. Monitor 2 iters post-sync.
+- **`heal-stale-daemon-code:auto-restarted` (2/3):** 0 new occurrences this iter. Still 2/3.
+- **`retry_exhausted:*` (1/3 — NEW iter 1410):** L1470 `retry_exhausted:post-merge-install-drift-trigger-001`. First occurrence of this G-rule class.
+- **`Check A dirty-tree:captures.json` (1/3 — NEW iter 1410):** First occurrence of Beacon writes making the tree dirty at cycle time.
+- All other G-rules: carry from iter 1409 unchanged.
+
+**Actions taken:**
+1. Recorded cycle tier: consecutive_clean 0→0 (tier-reset, Check 3 signal) at 06:33:59Z via `scripts/cycle_tier_state.py record --checks-clean false`. ✅
+2. Appended PRIME DIRECTIVE ledger row: kind=intervention, template=check-3-retry-exhausted, detail=post-merge-install-drift-trigger-001, iter=1410. ✅
+3. No auto-fix allow-list actions executed.
+
+**PRIME DIRECTIVE:** 1 intervention row this iter (Check 3 — retry_exhausted finding, healer-routed DM to Larry). Running total: interventions=774, systemic_fixes=20, verification_pending=9, ratio=26.7, trend=stable.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0.
+
+**Standing findings (carry with updates):**
+- [yellow] `transcript-not-persisted` regression: G-rule 3/3 DISPATCHED iter 1396. **21 total** (lines 1438–1466). PR #445 + PR #447 merged. fix-test-bootstrap-per-module-001 in Forge inbox (third prong). Fix deploys ~07:51Z. Monitor.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter 1378. Carry pending Beacon/Forge.
+- [blue] `retry_exhausted:post-merge-install-drift-trigger-001` — 1/3. L1470 filed (route=escalate). Larry will DM via outbox-notifier. Watch for 2nd/3rd occurrence → dispatch.
+- [blue] Check A dirty-tree:captures.json — 1/3. New this iter. Watch if Beacon writes continue making tree dirty at cycle time.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3 dispatched. Confirmed still stuck. Expect self-resolution at ~07:51Z sync.
+- [blue] heal-stale-daemon-code:auto-restarted — **2/3**. Watch for 3rd → G-rule dispatch.
+- [blue] unreviewed-merge:448 same pattern as :434, :445. Actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] PR #449 (test-jail PR-0, Larry-authored) open — awaiting Mirror review.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred (Forge queue busy).
+- [blue] G-rule `auto-restart-failed:*` — 1/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter 1251. Carry.
+- [blue] G-rule `heal-pipeline-stall retry-exhausted on shipped task` — 1/3. Carry.
+
+**Watch items for iter 1411:**
+- transcript-not-persisted: ~07:51Z sync deploys PR #447. Watch for 0 new alerts post-sync → G-rule resolution path.
+- cycle.timer: watch for restoration (`Trigger: n/a` → populated) after ~07:51Z sync. If still stuck post-sync, escalate [yellow] — PR #447 may not cover this path.
+- Forge worktree build-headless-wedge-002: watch for PR to appear from Forge build in progress.
+- retry_exhausted:post-merge-install-drift-trigger-001 at 1/3: note if pattern recurs for other tasks.
+- Check A dirty-tree:captures.json at 1/3: if present again next cycle, investigate whether captures.json should be gitignored or committed by Beacon itself.
+- heal-stale-daemon-code:auto-restarted at 2/3: one more → G-rule dispatch.
+- PR #449 (test-jail PR-0): newly opened. Mirror review trigger is the expected next event.
+
+---
+
 ## Iteration 1409 — 2026-06-11 06:23Z UTC (interactive, Tier 1, consecutive_clean 2→0)
 
 **Health:** ⚠️ Signal. 1 new alert (heal-stale-daemon-code auto-restart of outbox-notifier, G-rule 2/3). Larry Telegram question at 06:16Z re: dashboard idle — answered via DM. 1 open PR (#449, 5min old, nominal). 6 Forge inbox tasks unchanged. 9/9 services active. **Tier 1, consecutive_clean 2→0 (Check 2 tier-reset).**
