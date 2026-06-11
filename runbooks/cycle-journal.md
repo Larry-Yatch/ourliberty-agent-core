@@ -4,6 +4,91 @@
 
 ---
 
+## Iteration ~1518 — 2026-06-11 20:12Z UTC (interactive, Tier 1, consecutive_clean 2→0, Check A transient dirty-tree auto-healed)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Drift (Check A, transient) — `agents/beacon/captures.json` modified at 20:00:50Z by Beacon bot, dirty at conversation start (20:02:59Z). Auto-committed by GC healer at 20:08:19Z. All mandatory checks clean. Forge PID 1860848 alive on test-jail-pr3-gate-hardening-001 (~14 min in). Orphaned worktree `wt-forge-ccd-s5-doctrine-and-handling-shapes` age 2.5h — **NARRATIVE CORRECTION: reaper not broken, 4h threshold not yet reached; auto-cleanup expected ~22:03Z**.
+
+**VERIFY-BEFORE-REASSERT (iter ~1517 watch items):**
+- **Forge test-jail-pr3-gate-hardening-001 PID 1860848**: ✅ STILL IN-FLIGHT. PID 1860848 confirmed alive via `ps`. Task file present in Forge inbox. cleanup-stale-worktrees excluded `wt-forge-test-jail-pr3-gate-hardening-001` as in-flight (20:03:10Z log). Watch for PR open.
+- **Orphaned worktree `wt-forge-ccd-s5-doctrine-and-handling-shapes`**: VERIFIED PRESENT. cleanup-stale-worktrees ran at 20:03:10Z: "Keeping ... (age: 2.5h)". **Reaper is NOT broken** — service correctly applying 4h threshold. Worktree was created ~17:33Z; eligible for cleanup at ~21:33Z; next healer run at 22:03:10Z MDT. **DOWNGRADE from [yellow] to [blue].** Drop "Pending Larry" — no human action needed; auto-resolution at 22:03Z.
+- **Tier de-escalation (consecutive_clean=2)**: BLOCKED — Check A finding (dirty tree at cycle start) passed `--checks-clean false`; consecutive_clean 2→0 per `cycle_tier_state.py record`. Stays Tier 1.
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: 1303 lines (watermark L1303 — unchanged from iter ~1517). No new alerts since last iter. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** `beacon-pending-approvals.json` MISSING (no pending approvals). No new Larry directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected`. ✅ Nominal.
+
+**Check 4 — Pending directives / Inboxes:**
+- Forge: `test-jail-pr3-gate-hardening-001.json` — in-flight (PID 1860848, started 19:57:39Z, ~14 min elapsed). ✅ Active.
+- Pulse: EMPTY ✅ | Beacon: EMPTY ✅ | Mirror: EMPTY ✅
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing known. [blue] ✅
+
+**Check A — Source repo:** Session gitStatus at conversation start (20:02:59Z): `M agents/beacon/captures.json`. captures.json mtime=20:00:50Z (Beacon bot modification during iter ~1517). GC healer ran at 19:58:08Z (commit=nothing — modification happened AFTER); next run at 20:08:16Z → `commit=committed`. **Auto-resolved at 20:08:19Z.** ⚠️ Finding noted; no Pulse action (GC healer is the systemic fix). Tier state recorded `--checks-clean false`; consecutive_clean 2→0.
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-11T19:52:50Z, status=no-change, commit=6b8ad917. Elapsed ~10 min. ✅ Fresh.
+
+**Check C — Agent liveness:** Verified active: beacon-bot, chain-event-shipper, dashboard-api, forge-bot, mirror-bot, pulse-bot (this session). `ourliberty-agent-core-health.service`: FAILED since 19:42:35Z (stale — `sync_freshness` error from 18:52:40Z push, now resolved). clean_tree=OK at 19:42:35Z confirmed. Next health check timer: 20:12:35Z — expected to pass (push resolved, no dirty tree). cleanup-stale-worktrees ran at 20:03:10Z: removed 0, kept 4. ✅ Nominal (no agent down).
+
+**Check E — PRs:** `gh pr list --state open` → `[]`. No open PRs. ✅ Nominal.
+
+**Conditional checks:** Thursday 2026-06-11 — Check I (Sun/Mon/Wed/Fri) → skip. Check VIII/IX/X (Monday) → skip. Check III: next eligible 2026-06-25. ✅
+
+**Actions taken:**
+1. Alert watermark: L1303 unchanged (no new alerts). ✅
+2. Tier state: `cycle_tier_state.py record --checks-clean false` → consecutive_clean 2→0, Tier 1. ✅
+3. No PRIME DIRECTIVE intervention recorded (dirty tree auto-healed by GC healer; no Pulse action). ✅
+4. No DMs sent — no new [yellow] or [red] findings.
+
+**Standing findings (updated):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] **Check III threshold proposals** — 2 high-attention (beacon Δ92%, forge Δ64%), 2 minor. `approve threshold-update-2026-06-11`. Pending Larry.
+- ~~[yellow] **Orphaned worktree `wt-forge-ccd-s5-doctrine-and-handling-shapes`** (Reaper not catching it, pending Larry)~~ → **DOWNGRADED to [blue]**: reaper correctly applying 4h threshold; auto-cleanup expected 22:03:10Z. No Larry action needed. Prior "Reaper not catching it" narrative was premature — this was never a bug.
+- [blue] **Forge: test-jail-pr3-gate-hardening-001** — PID 1860848 active (started 19:57:39Z). Watch for PR open.
+- [blue] **Orphaned worktree `wt-forge-ccd-s5-doctrine-and-handling-shapes`** — age 2.5h at 20:03Z; 4h threshold at ~21:33Z; healer runs hourly at :03. Auto-cleanup at 22:03:10Z.
+- [blue] **agent-core-health.service** FAILED — stale (push error resolved 19:52:50Z). Next health check 20:12:35Z, expected to pass.
+- [blue] alert-triage watermark L1303.
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry.
+- [blue] catalog-accuracy-drift — 5/34 shelf cards drifted. 1/3 G-rule.
+- [blue] cycle.timer G-rule 3/3 dispatched; Beacon consumed. Carry.
+- [blue] heal-stale-daemon-code:auto-restarted — G-rule dispatched iter ~1416. Carry.
+- [blue] heal-stale-daemon-code-state.json MISSING — standing known.
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464, 465, 467, 468, 466, 470, 471, 472) — 18 total. Actor-exemption pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred.
+- [blue] G-rule `auto-restart-failed:*` — 1/3.
+- [blue] G-rule completion-DM delivery failure — 1/3.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` — 1/3.
+- [blue] G-rule dispatch-branch-cleanup:summary — 2/3.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] `retry-exhausted-on-shipped-task` — 2/3. Carry.
+- [blue] `retry_exhausted:post-merge-install-drift-trigger-001` — 1/3.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter ~1251.
+- [blue] `sentinel-inbox-stall-ignores-inflight` — 2/3 G-rule.
+- [blue] G-rule `actor-exemption-config 3/3` — APPROVAL_REQUEST pending `go: actor-exemption-config`.
+- [blue] G-rule `cycle-timer checkpoint 3/3` — pending `go: cycle-timer checkpoint`.
+- [blue] F24b: JSON malformation in dispatch envelopes — 2/3 G-rule. Watch for 3rd.
+- [blue] Check III gate discrepancy — carry.
+- [blue] inbox_watcher fixture contamination (real-paid-001 / ../../../../etc/pwned) — 1/3 G-rule. Carry.
+
+**Watch items for iter ~1519:**
+- **Forge test-jail-pr3-gate-hardening-001 PID 1860848**: PR opened? Marker emitted? (PR-3 is complex gate hardening — allow several hours.)
+- **Orphaned worktree `wt-forge-ccd-s5-doctrine-and-handling-shapes`**: Auto-cleaned at 22:03:10Z? (healer next run.)
+- **agent-core-health.service**: Did it pass at 20:12:35Z?
+- **Tier de-escalation**: consecutive_clean reset to 0. Next 3 clean iters → Tier 2 promotion.
+
+**PRIME DIRECTIVE:** Check A transient finding (auto-healed by GC healer; no Pulse intervention). Running total unchanged: interventions=794, systemic_fixes=23, verification_pending=10, ratio≈34.5, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean 2→0.
+
+---
+
 ## Iteration ~1517 — 2026-06-11 20:00Z UTC (interactive, Tier 1, consecutive_clean 1→2)
 
 **Trigger:** Larry direct invocation (`/cycle`).
