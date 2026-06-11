@@ -1274,8 +1274,20 @@ def run_once(
     return counts
 
 
-def main() -> int:
+def main(argv: Optional[list[str]] = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    # `--triggered` (alias `--once`) is the post-merge sync hook: sync_agent_core.sh
+    # invokes it within one sync cycle (<=1h) when a merged commit touched a
+    # systemd/*.service|*.timer, so a new/changed unit installs without waiting for
+    # the 12h timer. It runs exactly ONE run_once() tick and honors every gate
+    # unchanged (kill-switch, install-drift allowlist, healer_enabled env, re-DM
+    # dedup) — there is no dry_run_override, so OURLIBERTY_INSTALL_DRIFT_HEALER_ENABLED
+    # still decides remediate-vs-dry-run. The distinct log line keeps triggered runs
+    # auditable against the timer runs. The 12h timer remains the backstop.
+    triggered = bool(argv) and argv[0] in ('--triggered', '--once')
     try:
+        if triggered:
+            log('triggered run (post-merge sync hook): single tick')
         run_once()
         return 0
     except Exception as e:  # noqa: BLE001

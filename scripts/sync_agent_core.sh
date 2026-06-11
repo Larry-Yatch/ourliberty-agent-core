@@ -472,6 +472,33 @@ if [ "$OLD_HEAD" != "$NEW_HEAD" ] && [ -f "$MANIFEST_CLI" ]; then
     fi
 fi
 
+# ── Step 7b: Install/reconcile systemd units when a unit file changed ──
+# post-merge-install-drift-trigger-001 (2026-06-11): heal_systemd_install_drift
+# only installs repo units to /etc/systemd/system/ on its 12h timer, so a new or
+# changed systemd/*.service|*.timer sits on disk up to 12h before install — the
+# RUNNING unit keeps stale config (e.g. an old ReadWritePaths) and agents fail to
+# persist transcripts (PR #438). Fire the healer in --triggered mode within this
+# sync cycle (<=1h) when this sync's diff touched a unit file. We force
+# OURLIBERTY_INSTALL_DRIFT_HEALER_ENABLED=true (mirroring the timer .service env)
+# so it REMEDIATES rather than dry-runs; all other gates (kill-switch, allowlist,
+# re-DM dedup) still apply. Non-fatal: a healer error is a WARN and sync continues;
+# the 12h timer stays as the backstop.
+INSTALL_DRIFT_HEALER="${SCRIPTS_DIR}/heal_systemd_install_drift.py"
+if [ "$OLD_HEAD" != "$NEW_HEAD" ] && [ -f "$INSTALL_DRIFT_HEALER" ]; then
+    UNIT_CHANGED_PATHS="$(cd "$REPO_DIR" && git diff --name-only "$OLD_HEAD" "$NEW_HEAD" 2>/dev/null || true)"
+    if printf '%s\n' "$UNIT_CHANGED_PATHS" | grep -Eq '^systemd/.*\.(service|timer)$'; then
+        log "Install-drift trigger: a systemd unit file changed this sync; running healer (--triggered)."
+        if OURLIBERTY_INSTALL_DRIFT_HEALER_ENABLED=true \
+            python3 "$INSTALL_DRIFT_HEALER" --triggered; then
+            log "Install-drift trigger: healer tick complete."
+        else
+            log "  WARN: install-drift healer (--triggered) exited non-zero; the 12h timer remains the backstop."
+        fi
+    else
+        log "Install-drift trigger: no systemd unit file changed this sync; skipping."
+    fi
+fi
+
 # ── Step 8: Cleanup old backups (keep last 5) ──────────────────────
 if [ -d "$BACKUP_ROOT" ]; then
     BACKUP_COUNT=$(ls -1d "${BACKUP_ROOT}"/*/ 2>/dev/null | wc -l)
