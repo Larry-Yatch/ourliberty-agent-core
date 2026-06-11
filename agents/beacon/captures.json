@@ -230,6 +230,22 @@
       },
       "last_touched": "2026-06-11T17:47:05.211097+00:00",
       "promoted_to": null
+    },
+    {
+      "id": "cap-test-jail-pr-4-ready-for-go-after-pr-3-lands-447f",
+      "title": "test-jail PR-4 ready for go (after PR-3 lands)",
+      "note": "PR-3 (gate hardening) dispatched+building as test-jail-pr3-gate-hardening-001. PR-4 REMAINING awaits your go: (a) docs sweep \u2014 bare 'unittest discover' prescriptions to the blessed entrypoint, esp docs/test-suite-green-brief.md's source-.env.larry recipe; (b) H18 leak-residue reconciliation runbook; (c) end-to-end deliberate-leak validation (a leaking test must fail under ALL invocation shapes on droplet+Mac = the acceptance property). NEW ops: one-time 'sudo apt install bubblewrap' on the droplet to ARM the Layer-C hard wall (droplet has no bwrap + userns disabled, so the wall ships best-effort/auto-arming until then). Mac phantom purge already DONE. Recommend: let PR-3 land+soak, then ship PR-4 as one closing PR + install bubblewrap.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ol-work",
+        "branch": "fix/install-drift-activate",
+        "captured_at": "2026-06-11T20:00:50.396933+00:00"
+      },
+      "last_touched": "2026-06-11T20:00:50.396933+00:00",
+      "promoted_to": null
     }
   ]
 }
