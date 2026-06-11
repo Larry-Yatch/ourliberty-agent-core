@@ -773,6 +773,28 @@ INTENT_ACTION_BLOCKS = {
         'mechanically resolve, escalate to Larry as a one-line binary (never '
         'the raw checks), per your escalation discipline.'
     ),
+    # S2 (chain-context-durability M2) — a code-review REVIEW_REVISION whose
+    # envelope carries no `forge_build_session_id` (the PR #412 class: a
+    # heal-rebuilt envelope that necessarily dropped the build session) has no
+    # Forge conversation to `--resume`. Instead of dead-ending in a broadcast
+    # "reconcile manually" Larry alert, route it to Beacon for autonomous
+    # re-dispatch with a fresh task_id — symmetric with the dag-preflight-
+    # revision self-heal above. Agent-to-agent routing signal, NOT a Larry
+    # decision.
+    'code-review-revision-no-session': (
+        'Mirror requested REVISION on PR `{pr_url}` for task `{task_id}`, but '
+        'the envelope carries no `forge_build_session_id` — there is no Forge '
+        'build session to `--resume` (the PR #412 class: a heal-rebuilt '
+        'envelope that dropped the session). This is an agent-to-agent routing '
+        'signal, NOT a Larry decision. Re-dispatch Forge with a FRESH task_id '
+        "to apply Mirror's findings (below) to the EXISTING PR branch "
+        '`{branch}` — a new build session that updates the SAME PR, exactly '
+        'the manual recovery performed for PR #412. Emit a standard '
+        'APPROVAL_REQUEST marker (target_agent: forge) whose prompt carries '
+        'the findings + the existing branch/PR so Forge commits onto the same '
+        'branch rather than opening a new PR. Escalate to Larry only for a '
+        'genuine scope/values decision, or if the re-dispatch itself fails.'
+    ),
 }
 
 # D3.5 5a-followup: per-intent DM templates for chain-completion DMs to Larry.
@@ -3815,40 +3837,56 @@ def _dm_larry_no_session_revision(
         )
 
 
-def _alert_no_session_revision_broadcast(
+def _route_no_session_revision_to_beacon(
     data: dict[str, Any], decision: dict[str, Any],
     routing_source: Optional[str],
 ) -> None:
-    """Broadcast a Larry alert for a no-session REVIEW_REVISION when the
-    chat-targeted DM path can't fire.
+    """Route a no-session code-review REVISION to Beacon for autonomous
+    re-dispatch (S2 — chain-context-durability M2).
 
-    Chain discipline v3 GAP 1. Complements `_dm_larry_no_session_revision`
-    (which targets a specific chat_id when source='larry'). This variant
-    uses `larry_alerts.append_alert` so the rejection reaches Larry via
-    the broadcast bot sweep when routing was via Beacon or there's no
-    chat_id on the envelope. Subject keys on task_id so the per-subject
-    60-min cooldown doesn't suppress genuinely-different rejections.
+    When Mirror's REVIEW_REVISION lands on an envelope with no
+    `forge_build_session_id` (the PR #412 class: a heal-rebuilt envelope
+    that necessarily dropped the build session, or any externally-authored
+    PR routed without a Forge session), there is no Forge conversation to
+    `--resume`. Rather than dead-ending in a broadcast "reconcile manually"
+    Larry alert, write an inter-agent `code-review-revision-no-session`
+    notify to Beacon's inbox so a Beacon session re-dispatches Forge with a
+    FRESH task_id that applies Mirror's findings to the existing PR branch —
+    symmetric with the dag-preflight-revision self-heal in
+    `_handle_mirror_dag_preflight_result`.
+
+    Mirrors that template: build the notify via `build_notify_prompt` +
+    `build_chain_envelope` (M1) + `safe_write_inbox(target_agent='beacon')`,
+    keyed on a deterministic filename so re-processing the same Mirror
+    outbox overwrites the pending notify (atomic same-path write) rather
+    than duplicating it. The raw verdict is an agent-to-agent routing
+    signal, NOT a Larry decision, so the happy path does NOT DM Larry; only
+    a notify-write FAILURE (the autonomous path broke) DMs him.
     """
     task_id = data.get('task_id') or 'unknown'
     payload = decision.get('payload') or {}
-    pr_url = data.get('pr_url') or (
+    pr_url_value = data.get('pr_url') or (
         payload.get('pr_url') if isinstance(payload, dict) else None
-    ) or '(no pr_url)'
+    )
+    pr_url = pr_url_value or '(no pr_url)'
     branch = data.get('branch') or '(branch unknown)'
     summary = payload.get('summary') or payload.get('reason') or ''
     findings = payload.get('findings')
 
+    # Serialize Mirror's findings into the notify body so Beacon's
+    # re-dispatch prompt can carry them verbatim to the fresh Forge build.
     body_lines = [
-        f'Mirror requested revision on {pr_url} (task `{task_id}`).',
-        f'No Forge build session on envelope (routing_source={routing_source!r}); '
-        f'auto-resume cannot fire — chain protocol assumes Forge owns the build '
-        f'session. Externally-authored PR needs manual reconciliation.',
+        f'Mirror requested REVISION on {pr_url} (task `{task_id}`).',
+        f'No forge_build_session_id on envelope (routing_source='
+        f'{routing_source!r}) — heal-rebuilt / externally-authored PR with no '
+        f'Forge session to --resume. Re-dispatch Forge with a fresh task_id '
+        f'to apply these findings to branch `{branch}` (same PR).',
     ]
     if summary:
         body_lines.append(f'Summary: {summary}')
     if isinstance(findings, list) and findings:
         body_lines.append('Findings:')
-        for i, f in enumerate(findings[:5], 1):
+        for i, f in enumerate(findings, 1):
             if isinstance(f, dict):
                 sev = f.get('severity', '?')
                 file_ref = f.get('file', '?')
@@ -3858,27 +3896,80 @@ def _alert_no_session_revision_broadcast(
                 body_lines.append(f'  {i}. [{sev}] {loc} — {desc}')
             else:
                 body_lines.append(f'  {i}. {f}')
-        if len(findings) > 5:
-            body_lines.append(f'  … and {len(findings) - 5} more')
-    message = '\n'.join(body_lines)
+    body_snippet = '\n'.join(body_lines)
 
-    suggested_action = (
-        f'Forge built this PR outside the dispatch chain — apply Mirror\'s '
-        f'revisions manually on branch `{branch}`, or re-dispatch via Beacon '
-        f'with a fresh task_id to thread a new forge_build_session_id.'
+    notify_source = 'mirror-result'
+    notify_prompt = build_notify_prompt(
+        intent='code-review-revision-no-session',
+        sender='mirror',
+        task_id=task_id,
+        success=True,
+        output=body_snippet,
+        intent_kwargs={'pr_url': pr_url, 'branch': branch},
     )
+    notify_base = {
+        'task_id': f'notify-no-session-revision-{task_id}',
+        'prompt': notify_prompt,
+        'source': notify_source,
+        'intent': 'code-review-revision-no-session',
+        'original_task_id': task_id,
+        'branch': branch,
+        '_notify_depth': _current_notify_depth(data) + 1,
+    }
+    # Carry the recoverable chain context so Beacon's re-dispatch has what it
+    # needs (M1). forge_build_session_id is the field that's missing by
+    # definition here → explicit DROP. pr_url is resolved explicitly because
+    # it may live on Mirror's marker payload, not just the envelope.
+    notify_task = build_chain_envelope(
+        notify_base,
+        data,
+        carry={
+            'target_repo': CARRY,
+            'pr_url': pr_url_value,
+            'forge_build_session_id': DROP,
+            'reply_chat_id': CARRY,
+            'revision_count': CARRY,
+            'replan_count': CARRY,
+            'max_replans': CARRY,
+        },
+    )
+    # Deterministic filename keyed on task_id: re-processing the same Mirror
+    # outbox overwrites the pending notify rather than duplicating it.
+    notify_filename = f'notify-no-session-revision-{task_id}.json'
     try:
+        dest = safe_write_inbox.safe_write_inbox(
+            target_agent='beacon',
+            task_dict=notify_task,
+            source_agent=notify_source,
+            filename=notify_filename,
+        )
+        log(
+            f'NO_SESSION_REVISION task={task_id}; routed '
+            f'code-review-revision-no-session notify to beacon '
+            f'(file={dest.name}) for autonomous fresh-task_id re-dispatch'
+        )
+    except (
+        safe_write_inbox.DispatchRejected,
+        safe_write_inbox.RoutingDenied,
+    ) as e:
+        # The autonomous path broke — Beacon won't self-heal this round. That
+        # IS Larry-actionable (protocol failure), so DM him rather than drop
+        # the REVISION silently.
         larry_alerts.append_alert(
             source='outbox-notifier',
             severity='warning',
-            message=message,
-            subject=f'no-session-revision:{task_id}',
-            suggested_action=suggested_action,
+            message=(
+                f'Mirror REVISION on PR {pr_url} (task `{task_id}`) has no '
+                f'Forge build session and could not be routed to Beacon '
+                f'({type(e).__name__}: {e}). Re-dispatch Forge manually with '
+                f'a fresh task_id to apply Mirror\'s findings to branch '
+                f'`{branch}`.\n\n{body_snippet}'
+            ),
+            subject=f'no-session-revision-route-failed:{task_id}',
         )
-    except Exception as e:  # noqa: BLE001 — daemon-never-wedge
         log(
-            f'no-session revision broadcast alert raised for task {task_id}: '
-            f'{type(e).__name__}: {e}',
+            f'NO_SESSION_REVISION task={task_id}; FAILED to route notify to '
+            f'beacon: {type(e).__name__}: {e}; DMed Larry',
             'WARN',
         )
 
@@ -3926,21 +4017,16 @@ def _dispatch_revision_to_forge(
         if routing_source == 'larry' and isinstance(chat_id, int):
             _dm_larry_no_session_revision(data, decision, chat_id)
             return
-        # Chain discipline v3 GAP 1 (2026-05-26): the chat-targeted DM path
-        # above can't fire when routing_source != 'larry' (e.g. Beacon
-        # dispatched the revision) or there's no reply_chat_id on the
-        # envelope. The original WARN-only fallthrough was silent today on
-        # `feedback_claude_as_forge_boundaries`. Broadcast a per-task alert
-        # via larry_alerts so the rejection isn't invisible until manual
-        # log inspection. Healer Check 6 covers any escape from this path.
-        _alert_no_session_revision_broadcast(data, decision, routing_source)
-        log(
-            f'REVIEW_REVISION on task {task_id} has no forge_build_session_id '
-            f'(routing_source={routing_source!r}, chat_id={chat_id!r}); '
-            f'revision dispatch would have no session to --resume — skipping. '
-            f'Broadcast alert queued for manual re-dispatch.',
-            'WARN',
-        )
+        # S2 (chain-context-durability M2): the chat-targeted DM path above
+        # can't fire when routing_source != 'larry' (e.g. Beacon dispatched
+        # the revision, or a heal-rebuilt envelope — the PR #412 class) or
+        # there's no reply_chat_id. Instead of dead-ending in a broadcast
+        # "reconcile manually" Larry alert, route the REVISION to Beacon's
+        # inbox so she re-dispatches Forge with a fresh task_id that applies
+        # Mirror's findings to the existing PR branch — symmetric with the
+        # dag-preflight-revision self-heal. The route helper logs its own
+        # success/failure and only DMs Larry if the route itself fails.
+        _route_no_session_revision_to_beacon(data, decision, routing_source)
         return
 
     target_repo = data.get('target_repo')
@@ -7804,7 +7890,28 @@ def process_outbox(outbox_file: Path) -> str:
         # `not larry_direct` gate, which is what caused Forge's PROCEED on
         # task-17's larry-direct preflight to silently skip build-phase
         # dispatch (Larry had to manually bridge the build envelope).
-        if not larry_direct:
+        #
+        # chain-context-durability S2 (M2): when a Mirror REVIEW_REVISION
+        # carries no forge_build_session_id, `_dispatch_revision_to_forge`
+        # (below) routes an actionable `code-review-revision-no-session`
+        # notify to Beacon for a fresh-task_id re-dispatch instead of
+        # resuming a (non-existent) build session. Suppress THIS generic
+        # back-leg notify in that case: its body says "revision
+        # auto-dispatched to Forge, just journal," which is factually false
+        # (no dispatch happened) and would double up with the no-session
+        # route notify. The route notify is the sole, accurate Beacon signal.
+        # Only the genuine revision-dispatch path is suppressed — an
+        # auto_promoted / budget_exhausted REVISION downgrades to
+        # review-escalate (intent override above) and keeps its back-leg
+        # notify, since no no-session route fires for it.
+        suppress_no_session_backleg = (
+            marker_decision['marker_type'] == 'review_revision'
+            and agent == 'mirror'
+            and not marker_decision.get('auto_promoted')
+            and not marker_decision.get('budget_exhausted')
+            and not data.get('forge_build_session_id')
+        )
+        if not larry_direct and not suppress_no_session_backleg:
             notify_filename = f'notify-{outbox_file.stem}.json'
             try:
                 dest = safe_write_inbox.safe_write_inbox(
