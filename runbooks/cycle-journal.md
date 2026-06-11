@@ -4,6 +4,105 @@
 
 ---
 
+## Iteration 1398 — 2026-06-11 02:40Z UTC (interactive, Tier 1→2)
+
+**Health:** ✅ All checks nominal. 3 new alerts (lines 1445–1447), all Tier-3 silenced. park-the-nudge sequence COMPLETE — PR #442 MERGED 02:40:47Z + PR #443 MERGED 02:41:28Z (both Mirror PASS → auto-merge). 0 open PRs. **Tier de-escalation: 3 consecutive clean Tier-1 iters → Tier 2.**
+
+**VERIFY-BEFORE-REASSERT (iter 1397 watch items):**
+- install-drift timer 06:00Z June 11: **CONFIRMED** — `ourliberty-heal-systemd-install-drift.timer` NEXT=Thu 2026-06-11 00:00:00 MDT = 06:00:00 UTC, ~3h 19min left at scan. ✅ On schedule.
+- PR #442 30-min threshold 02:43Z: **RESOLVED** — PR #442 MERGED at 02:40:47Z (Mirror PASS at 02:40:43Z → auto-merge before threshold). ✅
+- PR #443 30-min threshold 02:46Z: **RESOLVED** — PR #443 MERGED at 02:41:28Z (Mirror PASS at 02:41:23Z, retry 1/3 succeeded → auto-merge before threshold). ✅
+- park-the-nudge sequence: **COMPLETE** — All 3 PRs merged (#441 at 02:34Z, #442 at 02:40Z, #443 at 02:41Z). ✅ Closed.
+- Beacon install-drift dispatch: Larry action still pending — say "dispatch the install-drift trigger fix" in Beacon chat. Carry.
+- Sync: last_sync=2026-06-11T01:50:22Z (50 min old at scan), expires ~03:50Z. ✅ Nominal.
+- Tier 1, consecutive_clean=2: this iter clean → consecutive_clean 2→3 → Tier 2 de-escalation. ✅
+
+**Check 0 — Alert triage (lines 1445–1447, 3 new):**
+- **Line 1445** (02:35:41Z): `agent-runner-forge` / `transcript-not-persisted:tier2` / route=escalate / CRITICAL. 7th occurrence. Same PR #438 unit install gap. G-rule 3/3 DISPATCHED iter 1396; Beacon spec ready; install-drift auto-heals 06:00Z June 11. **Tier-3** known pattern — silence + journal. No tier-reset. ✅
+- **Line 1446** (02:35:41Z): `agent-runner-forge` / `transcript-not-persisted:tier1` / route=escalate / CRITICAL. 8th occurrence. Same pattern. **Tier-3** — silence. No tier-reset. ✅
+- **Line 1447** (02:37:12Z): `agent-runner-pulse` / `transcript-not-persisted:tier1` / route=escalate / CRITICAL. 9th occurrence. Same pattern. **Tier-3** — silence. No tier-reset. ✅
+- **Watermark: advance to line 1447 / agent-runner-pulse:transcript-not-persisted:tier1 / 2026-06-11T02:37:12Z**
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon-pending-approvals.json pending=[]. No new Larry directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall state: 0 active stalls. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals empty. No orphan directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING → standing pattern, unchanged. ✅
+
+**Check A — Source repo:** agent-core-sync.json: branch=main, status=no-change, HEAD=5717f2c (last sync 01:50Z). ✅ Nominal. (Note: git status denied in interactive session hook; inferred from sync state.)
+
+**Check B — Sync health:** last_sync=2026-06-11T01:50:22Z (50 min old at 02:40Z scan), expires ~03:50Z. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active+running: beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, chain-event-shipper ✅, dashboard-api ✅, cycle.service ✅. ✅ Nominal.
+
+**Check E — PRs:**
+- **PR #442 "feat(capture): add allowlisted first-class label":** MERGED ✅ at 02:40:47Z — Mirror PASS (session=b1a3c509) at 02:40:43Z → auto-merge + worktree teardown. park-the-nudge step 2/3.
+- **PR #443 "chore(alerts): translation entry":** MERGED ✅ at 02:41:28Z — Mirror PASS (session=6a3d01a6, retry 1/3 succeeded) at 02:41:23Z → auto-merge + worktree teardown. park-the-nudge step 3/3.
+- **ourliberty-agent-core:** 0 open PRs. ✅
+- **ourliberty-dashboard:** 0 open PRs. ✅
+
+**Check H — Inboxes:**
+- Forge: EMPTY ✅.
+- Beacon: `notify-add-tier-fallback-alert-translation-001.json` (PR #443 completion notify, fresh). ✅
+- Mirror: EMPTY ✅ (both review tasks processed + worktrees torn down).
+- Pulse: EMPTY ✅.
+
+**Conditional checks:**
+- Check I (Thursday 2026-06-11): weekday-gate skip (not Mon/Wed/Fri/Sun). ✅
+- Check III: next eligible 2026-06-14 (Sunday). Skip. ✅
+- §5.0 bug-hunt gate: no-op. ✅
+- Credential rotations: 0 overdue, 0 upcoming within 60d. ✅
+- install-drift timer: NEXT=06:00:00Z June 11, ~3h 19min left. ✅
+
+**G-rule tracking:**
+- **`unknown-task transcript-not-persisted`: 3/3 DISPATCHED (iter 1396).** Lines 1445–1447 = 3 more occurrences (now 9 total since lines 1438–1447). All same root cause (PR #438 unit install gap). G-rule dispatch stands. Auto-heal 06:00Z. Carry pending heal confirmation.
+- **park-the-nudge sequence: COMPLETE** ✅ — PR #441 + #442 + #443 all merged. Closed.
+- **test-fixture-batch-in-bot-log (3/3 DISPATCHED iter 1378):** Carry pending Beacon/Forge.
+- **auto-restart-failed:* (1/3):** No new occurrence. Carry.
+- **wedged-review-silent-wt (2/3):** No new occurrence. Carry.
+- All other G-rules: carry from iter 1397 unchanged.
+
+**Actions taken:**
+1. Recorded cycle tier state: consecutive_clean 2→3 at Tier 1 → **de-escalate to Tier 2** via `scripts/cycle_tier_state.py record --checks-clean true` at 02:43:00Z. Tier 1→2 confirmed.
+2. No auto-fix actions executed (all checks nominal; PRs merged by outbox-notifier auto-merge path, not by Pulse).
+3. No dispatches this iter.
+
+**PRIME DIRECTIVE:** 0 intended new rows this iter (all Tier-3 silences + nominal checks). Running total: interventions≈770, systemic_fixes=20, verification_pending=9, ratio≈38.5, trend=stable.
+**Tier end-of-iter:** 1→2 de-escalation (consecutive_clean 2→3 → de-escalate; reset to 0). `cycle_tier_state.py record --checks-clean true` → tier promoted 1→2 at 02:43:00Z.
+
+**Standing findings (carry with updates):**
+- [yellow] `transcript-not-persisted` regression: G-rule 3/3 DISPATCHED iter 1396. 9 total occurrences (lines 1438–1447). Beacon spec ready; Larry needs to say **"dispatch the install-drift trigger fix"** in Beacon chat to emit the APPROVAL_REQUEST marker. Auto-heals 06:00Z June 11 regardless.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter 1378. Carry pending Beacon/Forge.
+- [blue] unreviewed-merge:434 DM'd. Actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred (Forge queue busy).
+- [blue] G-rule `auto-restart-failed:*` — 1/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter 1251. Carry.
+- [blue] Beacon spec-ready (install-drift trigger fix): Larry action pending — say "dispatch the install-drift trigger fix" in Beacon chat.
+
+**Watch items for iter 1399:**
+- install-drift timer: fires 06:00Z June 11 (~3h 19min from scan). If confirmed → transcript-not-persisted G-rule auto-resolved; PR #438 unit changes installed.
+- Beacon install-drift dispatch: Larry action pending (say "dispatch the install-drift trigger fix" in Beacon chat).
+- Sync: next push ~03:50Z.
+- Tier 2 cadence (15-min window). No PRs open; nominal expected.
+
+---
+
 ## Iteration 1397 — 2026-06-11 02:33Z UTC (interactive, Tier 1)
 
 **Health:** ✅ All checks nominal. 4 new alerts (lines 1441–1444), all Tier-3 silenced. PR #441 merged at 02:34Z. PRs #442/#443 active in pipeline with Mirror reviews in flight. Install-drift on schedule 06:00Z. **Consecutive clean: 1→2.**
