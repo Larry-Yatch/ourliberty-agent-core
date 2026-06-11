@@ -4,6 +4,113 @@
 
 ---
 
+## Iteration 1411 — 2026-06-11 06:42Z UTC (interactive, Tier 1, consecutive_clean 0→1)
+
+**Health:** ✅ Nominal. 1 new alert (L1471: medic diagnostic for retry-exhausted, Tier 3 known-pattern). All 5 mandatory checks clean. 9/9 services active. 5 Forge inbox items. 1 open PR (#449, ~29min). **Tier 1, consecutive_clean 0→1.**
+
+**VERIFY-BEFORE-REASSERT (iter 1410 watch items):**
+- transcript-not-persisted: **0 new occurrences** (watermark at 1471; L1471 is medic diagnostic, not transcript). 21 total (L1438–1466). PR #447 not yet synced; deploy ~07:51Z. Carry.
+- cycle.timer: **NEW DETAIL** — `LastTriggerUSec=2026-06-11T06:37:00Z`. Healer's daemon-reload+restart at 06:00Z gave ONE timer fire at 06:37Z (matching commit `342857f` at 06:36:57Z). But `NextElapseUSecMonotonic=infinity` persists — repeating schedule not restored. Still stuck for future fires. G-rule 3/3 dispatched. Carry.
+- build-fix-headless-002: worktree `wt-forge-fix-headless-approval-dedup-spawn-failure-wedge-00` exists (created Jun 10 22:42, last modified Jun 11 00:01 = ~6.5h stale). No new PR. Healer: FORGE_NO_PR_SKIP. Age now ~8h. Watch.
+- retry_exhausted:post-merge-install-drift-trigger-001 at 1/3: L1471 is medic auto-diagnosis correlated to L1470 — same event, not a new occurrence. Suppressed on cooldown in Check 3. Still 1/3.
+- Check A dirty-tree:captures.json at 1/3: session gitStatus shows CLEAN. GC healer committed it (`9c73234 chore(missions): GC healer — commit captures.json delta`). G-rule may self-resolve — watch next iter.
+- heal-stale-daemon-code:auto-restarted at 2/3: 0 new occurrences. Still 2/3.
+- PR #449: still open (~29min), reviewDecision=empty. Approaching 30-min threshold. ✅
+
+**Check 0 — Alert triage (larry-alerts.jsonl):**
+- Total lines: 1471. Watermark was 1470 (iter 1410). **1 new line.**
+- **L1471** (06:32:33Z): `medic`/`medic-diagnosis` — auto-diagnosed L1470 (retry-exhausted:post-merge-install-drift-trigger-001); DM'd Larry at chat_id=7998341473. Diagnosis: worktree never created; task consumed from inbox; PR #447 merged 06:00Z but not yet synced; Beacon notify leg finished. Risk flagged: if PR #447 changed systemd unit files, post-merge install steps didn't run. Classification: **Tier 3** — medic diagnostic notifications are part of the normal healing loop; Larry already DM'd by medic. Journal note only, no re-DM. No tier-reset.
+- **Watermark: advance to 1471 / medic:medic-diagnosis / 2026-06-11T06:32:33Z.**
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot.log last modified 06:40Z. Last Larry message: 06:23Z (iter 1409, dashboard question answered). No new directives. TIER2_FALLBACK_ATTEMPT entries (auth_401/rate_limit, 06:33–06:39Z) = known by-design pattern; heal_pipeline_stall confirms "SKIPPED by-design, auto-remediated". ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → all 5 Forge inbox tasks FORGE_NO_PR_SKIP (preflight_exit or pr_exists). `retry_exhausted:post-merge-install-drift-trigger-001` suppressed on cooldown. 0 new alerts fired. ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` MISSING/EMPTY. No orphan directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing pattern unchanged. ✅
+
+**Check A — Source repo:** Session gitStatus: clean (main, up to date). captures.json committed by GC healer. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-11T05:51:21Z (~51min at 06:42Z). Within 2h threshold. Next sync ~07:51Z. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active+running. cycle.timer: `NextElapseUSecMonotonic=infinity` but `LastTriggerUSec=06:37:00Z` — healer gave one-shot fire at 06:37Z; repeating schedule not restored. Standing condition. ✅ Services healthy.
+
+**Check E — PRs:** 1 open PR.
+- **PR #449** ("fix(tests): stop the remaining live test->production leaks (test-jail PR-0)") — author=Larry-Yatch, created 06:13:59Z (~29min at check). UNKNOWN mergeable, reviewDecision=empty. Approaching 30-min threshold. ✅
+
+**Check H — Inboxes:**
+- Forge: **5 items** (down from 6 — build-post-merge-install-drift-trigger-001 removed):
+  - `build-fix-headless-approval-dedup-spawn-failure-wedge-002.json` — Jun 10 22:45 (~8h). Worktree exists, modified Jun 11 00:01 (~6.5h stale), no PR. Healer FORGE_NO_PR_SKIP. Watch for 10h mark.
+  - `ccd-s2-no-session-revision-route.json` — Jun 10 23:50 (~6.9h). Preflight. Carry.
+  - `fix-reaper-handoff-guard-checks-liveness-002.json` — Jun 10 23:14 (~7.5h). Preflight. Carry.
+  - `fix-test-bootstrap-per-module-001.json` — Jun 10 23:46 (~6.9h). Preflight. Carry.
+  - `marker-error-ccd-s1-envelope-builder-1.json` — Jun 10 23:16 (~7.5h). Stale retry (PR #446 merged). Self-resolving. Carry.
+- Beacon/Mirror/Pulse: EMPTY ✅.
+
+**§5.0 bug-hunt gate:**
+- audit_due_nudge.py: `no committed audit baseline; no-op.` ✅
+- distill_detector.py: `no un-distilled audits; no-op.` ✅
+- audit_cadence_signal.py: script MISSING (no-op, carry). ✅
+
+**Conditional checks:**
+- Check I (Thursday 2026-06-11): weekday-gate skip. ✅
+- Check III: next eligible 2026-06-14 (Sunday). Skip. ✅
+- Credential rotations: credential_rotation_check.py MISSING. Prior: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). ✅
+
+**G-rule tracking:**
+- **`transcript-not-persisted` (3/3 DISPATCHED iter 1396):** 0 new occurrences. **21 total** (L1438–1466). PR #447 deploys ~07:51Z. Monitor.
+- **`heal-stale-daemon-code:auto-restarted` (2/3):** 0 new occurrences. Still 2/3.
+- **`retry_exhausted:*` (1/3):** L1471 medic correlated to L1470 — no new occurrence. Still 1/3.
+- **`Check A dirty-tree:captures.json` (1/3):** clean this iter (GC healer committed). May self-resolve. Watch next iter.
+- All other G-rules: carry from iter 1410 unchanged.
+
+**Actions taken:**
+1. Recorded cycle tier: consecutive_clean 0→1 (clean iter) via `scripts/cycle_tier_state.py record --checks-clean true` at 06:42Z. ✅
+2. Alert watermark advanced to L1471.
+3. No auto-fix allow-list actions executed.
+
+**PRIME DIRECTIVE:** 0 new rows this iter (all checks nominal). Running total: interventions=774, systemic_fixes=20, verification_pending=9, ratio=26.7, trend=stable.
+**Tier end-of-iter:** Tier 1, consecutive_clean=1.
+
+**Standing findings (carry with updates):**
+- [yellow] `transcript-not-persisted` regression: G-rule 3/3 DISPATCHED iter 1396. **21 total** (L1438–1466). PR #447 fix deploys ~07:51Z. Monitor.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter 1378. Carry pending Beacon/Forge.
+- [blue] `retry_exhausted:post-merge-install-drift-trigger-001` — 1/3. L1470 filed; medic diagnosed + DM'd Larry (L1471). Cooldown suppressed. Watch for 2nd/3rd.
+- [blue] cycle.timer stuck — G-rule 3/3 dispatched. Healer gave one-shot fire at 06:37Z (timer ran once) but NextElapseUSecMonotonic=infinity persists. Expect self-resolution ~07:51Z sync.
+- [blue] heal-stale-daemon-code:auto-restarted — **2/3**. Watch for 3rd → G-rule dispatch.
+- [blue] build-fix-headless-002: worktree ~8h old, stale (~6.5h since last write), no PR. Healer clean. Escalate if healer flags or >10h.
+- [blue] PR #449 (test-jail PR-0, Larry-authored) open — ~29min, approaching 30-min threshold. Mirror review trigger expected.
+- [blue] Check A dirty-tree:captures.json — 1/3. Clean this iter. May self-resolve — watch.
+- [blue] unreviewed-merge:448 — actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred (Forge queue busy).
+- [blue] G-rule `auto-restart-failed:*` — 1/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter 1251. Carry.
+- [blue] G-rule `heal-pipeline-stall retry-exhausted on shipped task` — 1/3. Carry.
+
+**Watch items for iter 1412:**
+- PR #449: at ~29min entering 30-min threshold territory. If no Mirror review next iter → approaching stale; escalate at 30–60min.
+- cycle.timer: watch for `NextElapseUSecMonotonic` populated after ~07:51Z sync. If still stuck post-sync, escalate [yellow] — PR #447 may not cover this path.
+- build-fix-headless-002: ~8h+ worktree, stale write. Flag at 10h or if healer escalates.
+- transcript-not-persisted: 0 occurrences since L1466. At ~07:51Z sync PR #447 deploys — verify 0 new alerts post-sync → G-rule resolution path.
+- captures.json G-rule 1/3: if clean again next iter → may reset to 0/3. If dirty → 2/3, investigate whether gitignore is warranted.
+- medic diagnosis watch: post ~07:51Z sync, verify PR #447 doesn't require unit install steps that the failed post-merge trigger was supposed to handle.
+
+---
+
 ## Iteration 1410 — 2026-06-11 06:34Z UTC (interactive, Tier 1, consecutive_clean 0→0)
 
 **Health:** ⚠️ Signal. Check 3 found `retry_exhausted:post-merge-install-drift-trigger-001` (L1470 filed by healer, route=escalate). `build-post-merge-install-drift-trigger-001.json` absent from Forge inbox — task processed/exhausted between iters. Forge active: 1 worktree (headless-approval-dedup-wedge-002 build). cycle.timer still stuck (Trigger: n/a). Check A: dirty tree (agents/beacon/captures.json modified — Beacon routine write). 9/9 services active. 5 Forge inbox items. **Tier 1, consecutive_clean 0→0 (Check 3 tier-reset).**
