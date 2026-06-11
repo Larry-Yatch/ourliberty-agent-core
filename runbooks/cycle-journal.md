@@ -4,6 +4,105 @@
 
 ---
 
+## Iteration ~1492 — 2026-06-11 16:46Z UTC (interactive, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Tier 1 — Forge PID 1669068 stuck post-merge (ccd-s4) [yellow] carry; PR #457 mirror-review FAILURE [yellow] carry; inbox-watcher stall [yellow] carry. All other checks nominal.
+
+**VERIFY-BEFORE-REASSERT (iter ~1491 watch items):**
+- PID 1669068: **CONFIRMED STILL RUNNING** (`ps -p 1669068`: elapsed ~03:46, 1.8% CPU at 16:46Z). Re-escalation threshold 17:08Z — ~22 min remaining. [yellow] carry.
+- PR #457: **CONFIRMED OPEN** — updatedAt=08:13:19Z, unchanged. `fix-reaper-handoff-guard-descope-003.json` in Forge inbox (Larry-approved 16:31Z). Blocked by inbox-watcher stall. 24h threshold 2026-06-12 08:13Z. [yellow] carry.
+- Sync: last_sync=2026-06-11T15:52:16Z (~54m at 16:46Z). 2h threshold ~17:52Z. ✅ Within threshold.
+- Inbox-watcher stall: **CONFIRMED PERSISTING** — `journalctl -u ourliberty-inbox-watcher.service --since "30 minutes ago"` → `-- No entries --`. Service active per systemctl. [yellow] carry.
+- F24b: No new dispatch attempts. Still 2/3.
+- dispatch-branch-cleanup:summary: still 2/3 — no new L1279+.
+
+**Check 0 — Alert triage:** Total lines: 1278 (watermark L1278 from iter ~1491; +0 new). ✅ Nominal. No advance.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message: "Is this related to the fix we just launched?" at 16:32:45Z — Beacon replied confirming reaper-fix context at 16:33:59Z. L1278 delivered 16:39:02Z. No new Larry messages since then. Re-escalation threshold 17:08Z (~22 min remaining). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected`. ✅ Nominal.
+
+**Check 4 — Pending directives / Inboxes:**
+- Forge: 3 items — `build-ccd-s4-healer-recover-then-alert.json` (07:00) + `ccd-s5-doctrine-and-handling-shapes.json` (07:50) + `fix-reaper-handoff-guard-descope-003.json` (16:31Z, Larry-approved). All blocked by inbox-watcher stall. Unchanged.
+- Beacon: EMPTY ✅ | Mirror: EMPTY ✅ | Pulse: EMPTY ✅
+- All Larry directives in last 24h have matching chain artifacts. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — standing known. ✅ Known.
+
+**Check A — Source repo:** branch=main, clean (session gitStatus: HEAD=84350f8 "Pulse cycle 20260611T164422Z"). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-11T15:52:16Z (~54m at 16:46Z), status=no-change. 2h threshold ~17:52Z. ✅ Within threshold.
+
+**Check C — Agent liveness:** All 4 services active (inbox-watcher, beacon-bot, forge-bot, mirror-bot). Inbox-watcher active but log-silent (stall persisting). PID 1669068 still running (~03:46 elapsed at 16:46Z). Re-escalation threshold 17:08Z (~22 min). [yellow] carry.
+
+**Check E — PRs:**
+- **PR #457** (`fix(reaper): release handoff guard`) — OPEN, reviewDecision="" (FAILURE context from prior iter unchanged), updatedAt=08:13:19Z. Age ~8h33m at 16:46Z. No autoMerge. Resolution path active: `fix-reaper-handoff-guard-descope-003.json` in Forge inbox (Larry-approved 16:31Z). 24h threshold 2026-06-12 08:13Z. [yellow] carry.
+- No other open PRs. ✅
+
+**Check H — Forge digest:** Open: 1 — PR #457 (~8h33m). 3 Forge inbox items blocked by inbox-watcher stall. No new merges since PR #464 at 15:14Z. ✅
+
+**§5.0 bug-hunt gate:** `audit_due_nudge.py` → `no committed audit baseline; no-op`. `distill_detector.py` → `no un-distilled audits; no-op`. `audit_cadence_signal.py` → `no post-seed decision-grade distill artifacts yet; no-op`. ✅
+
+**Conditional checks:** Thursday 2026-06-11 — Check I (Sun/Mon/Wed/Fri only) → skip. Check VIII/IX/X (Monday-only) → skip. Check III: next eligible 2026-06-25. ✅ Credential rotations: SUPABASE_SERVICE_ROLE_KEY ~72d. No 60d trigger. ✅
+
+**Actions taken:** None. All carry items verified, no new thresholds crossed this iter.
+
+**Standing findings:**
+- [yellow] **Forge PID 1669068 stuck post-merge** — ccd-s4 worktree deleted; blocks ccd-s5 + descope-003. Pulse DM L1278 delivered 16:39:02Z. Re-escalation threshold 17:08Z (~22 min at 16:46Z). Awaiting Larry's `kill 1669068`.
+- [yellow] **Inbox-watcher stall** — subprocess polling task output `bcibessul` indefinitely. Confirmed persisting. `sudo systemctl restart ourliberty-inbox-watcher.service` recommended. L1278 delivered. Ask-then-do; no re-DM this iter.
+- [yellow] **PR #457 mirror-review FAILURE** — OPEN (~8h33m). Resolution path: `fix-reaper-handoff-guard-descope-003.json` queued in Forge inbox. Blocked by stall. 24h threshold 2026-06-12 08:13Z.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter ~1378. Carry.
+- [yellow] **Check III threshold proposals** — 2 high-attention (beacon Δ92%, forge Δ64%), 2 minor. `approve threshold-update-2026-06-11`. Pending Larry.
+- [blue] `build-ccd-s4-healer-recover-then-alert.json` — stale Forge inbox. Clears when inbox-watcher restarts.
+- [blue] `ccd-s5-doctrine-and-handling-shapes.json` — Forge inbox. Pending inbox-watcher restart.
+- [blue] `fix-reaper-handoff-guard-descope-003.json` — Forge inbox (Larry-approved 16:31Z). Pending inbox-watcher restart.
+- [blue] fix-build-background-poll-idiom-001 — not yet dispatched. Watch for Beacon.
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry.
+- [blue] catalog-accuracy-drift — 5/34 shelf cards drifted. 1/3 G-rule.
+- [blue] alert-triage watermark L1278.
+- [blue] sync-push-rebase-fallback-001 — 1/3 G-rule.
+- [blue] cycle.timer G-rule 3/3 dispatched; Beacon consumed. Carry.
+- [blue] heal-stale-daemon-code:auto-restarted — G-rule dispatched iter ~1416.
+- [blue] heal-stale-daemon-code-state.json MISSING — standing known.
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464) — Tier-4 (never-silence; actor-exemption pending `go: actor-exemption-config`).
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred.
+- [blue] G-rule `auto-restart-failed:*` — 1/3.
+- [blue] G-rule completion-DM delivery failure — 1/3.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` — 1/3.
+- [blue] **G-rule dispatch-branch-cleanup:summary — 2/3** (no change this iter).
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] `retry-exhausted-on-shipped-task` — 2/3. Carry.
+- [blue] `retry_exhausted:post-merge-install-drift-trigger-001` — 1/3.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter ~1251.
+- [blue] `sentinel-inbox-stall-ignores-inflight` — 2/3 G-rule.
+- [blue] G-rule `actor-exemption-config 3/3` — APPROVAL_REQUEST pending `go: actor-exemption-config`.
+- [blue] G-rule `cycle-timer checkpoint 3/3` — pending `go: cycle-timer checkpoint`.
+- [blue] F24b: JSON malformation in dispatch envelopes — 2/3 G-rule.
+- [blue] Check III gate discrepancy — carry.
+
+**Watch items for iter ~1493:**
+- PID 1669068: Re-escalation threshold 17:08Z. Send DM if still running at threshold (~22 min).
+- Inbox-watcher stall: Check if Larry acted on L1278 restart recommendation.
+- Sync: last_sync=15:52:16Z. 2h threshold ~17:52Z — trigger ff+sync if crossed and repo clean.
+- PR #457: FAILURE, 24h threshold 2026-06-12 08:13Z.
+- F24b: Watch for 3rd occurrence if any envelopes dispatched.
+- dispatch-branch-cleanup:summary: 2/3 G-rule — watch for 3rd.
+
+**PRIME DIRECTIVE:** No new interventions this iter (no new actionable findings; all items carry). Prime ledger: appended iter_clean row (iter=1492, tier=1); iter_clean 48→49. Running total: interventions=788, systemic_fixes=21, verification_pending=10, iter_clean=49, ratio≈37.52, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0 (Forge PID 1669068 stuck + PR #457 FAILURE + inbox-watcher stall).
+
+---
+
 ## Iteration ~1491 — 2026-06-11 16:40Z UTC (interactive, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry direct invocation (`/cycle`). Note: automated iter ~1490 session ran at ~16:34Z, sent DM L1278 (subject=forge-inbox-watcher-stall-blocks-approved-descope-003, delivered 16:39Z), but did not write a journal entry.
