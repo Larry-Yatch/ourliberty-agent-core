@@ -4,6 +4,114 @@
 
 ---
 
+## Iteration ~1472 — 2026-06-11 14:16Z UTC (interactive, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry direct invocation.
+
+**Health:** ✅ Nominal. 1 new alert: Check III threshold proposals (4 proposals, 2 high-attention) — queued for Larry approval via DM. PR #457 now MERGEABLE [yellow] standing. 9/9 services active. Tier 1, consecutive_clean 0→0.
+
+**VERIFY-BEFORE-REASSERT (iter ~1471 watch items):**
+- `build-ccd-s4-healer-recover-then-alert.json` in Forge inbox: **STILL PRESENT** — carry. [blue]
+- `ccd-s5-doctrine-and-handling-shapes.json` in Forge inbox: **STILL PRESENT** — carry. [blue]
+- Beacon inbox: **EMPTY** ✅ (notify-ccd-s4 consumed; resolved iter ~1470).
+- fix-build-background-poll-idiom-001: **NOT YET in Forge inbox** — carry. [blue]
+- PR #457 Larry response: **STILL PENDING** — now `MERGEABLE` (was `UNKNOWN`, CI resolved). No reviews, no autoMerge. ~6h03m standing. [yellow] carry.
+- APPROVAL_REQUEST `wedged-forge-exit-fix-direction-20260611`: **STILL PENDING** — beacon-pending-approvals.json MISSING (standing). [yellow] carry.
+
+**Check 0 — Alert triage:** Total lines: 1265. Prior watermark: L1264. **1 new alert** — L1265: Check III threshold proposal (`source: "pulse"`, `route: "escalate"`, ts=14:06:35Z). Triage: Tier 2 (guarded — prod config, threshold changes). outbox_notifier route=escalate will DM Larry with 4 proposals. No Pulse-direct dispatch. Watermark advanced to L1265. tier-reset: YES. ⚠️ Tier-2 alert claimed.
+
+**Check III output (from L1265 alert, artifact check-iii-2026-06-11.json, as_of=14:06:35Z, applied=false):**
+- **(beacon, _default): 2147s → 172s** (n=307, median=35s, p90=172s, p99=529s) — **[high-attention: regime-change-suspected, Δ=92%]**
+- **(forge, _default): 3436s → 1233s** (n=33, median=175s, p90=1233s, p99=1964s) — **[high-attention: regime-change-suspected, Δ=64%]**
+- **(mirror, _default): 488s → 520s** (n=172, median=330s, p90=519s, p99=1149s) — loosen 7%
+- **(pulse, _default): 262s → 248s** (n=50, median=127s, p90=247s, p99=518s) — tighten 5%
+- Approval path: `approve threshold-update-2026-06-11` on Telegram → Beacon → Forge config-only PR.
+- [blue] Gate discrepancy: iter ~1471 computed "next eligible 2026-06-14" (14d from 2026-05-31 prior run); Check III ran at 14:06Z on Thursday June 11 (11d since prior). Automated cycle at 14:00Z likely used `--force` or a gate diverged from prompt logic. Proposals are valid regardless. Noting for awareness; no action needed from Pulse.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry inbound: 02:39 MDT (08:39Z UTC, ~5h37m ago). No new directives since iter ~1471. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected` (FORGE_NO_PR_SKIP for 24 known tasks). ✅ Nominal.
+
+**Check 4 — Pending directives / Inboxes:**
+- Forge: 2 items — `build-ccd-s4-healer-recover-then-alert.json` (post-build cleanup; known carry) + `ccd-s5-doctrine-and-handling-shapes.json` (CCD-S5 docs PR; expected). ✅ Normal active build state.
+- Beacon: EMPTY ✅
+- Mirror: EMPTY ✅
+- Pulse: EMPTY ✅
+No orphan directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — standing known. ✅ Known. Last auto-restart: 13:16Z (outbox-notifier; carried from prior iters).
+
+**Check A — Source repo:** branch=main, clean (session gitStatus; HEAD=7ea773b "Pulse cycle 20260611T141228Z"). ✅ Nominal. Note: two automated cycle commits since iter ~1471 (52cf94d at 14:00Z, 7ea773b at 14:12Z) — wrapper-driven, no journal entries visible, likely cycle-timer runs with no new findings to record.
+
+**Check B — Sync health:** last_sync=2026-06-11T13:52:16Z (~24 min ago at check time), status=no-change (commit 79290fe). ✅ Within 2h threshold.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active/running. ✅ Nominal.
+
+**Check E — PRs:**
+- **PR #457** (`fix(reaper): release handoff guard on ownership/merged/worktree-deleted`) — OPEN, now **MERGEABLE** (CI resolved; was UNKNOWN transient), no reviews, no autoMerge. Created 08:13:19Z (~6h03m). [yellow] carry. Auto-merge NOT applied — outstanding Mirror escalation (`_candidate_owns_build_dispatch` non-functional) requires Larry's response first. DM delivered iter ~1462.
+
+**§5.0 bug-hunt gate:** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal → no-op. ✅
+
+**Conditional checks:** Thursday 2026-06-11 — Check I (Sun/Mon/Wed/Fri only) → skip. ✅ Check III: already ran at 14:06Z (processed in Check 0 above). ✅ Credential rotations: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). No 60d trigger. ✅
+
+**G-rule tracking:**
+- All G-rules carry from iter ~1471 unchanged. No new occurrences this iter.
+- unreviewed-merge set unchanged: (454, 456, 453, 448, 458, 459, 460, 461, 462, 463) — G-rule 3/3 DISPATCHED, Tier-3 known.
+
+**Actions taken:** Check 0 watermark advanced L1264 → L1265 (1 new Tier-2 alert claimed: Check III threshold proposal). No auto-fix actions.
+
+**Standing findings (carry with updates):**
+- [yellow] **PR #457 Mirror escalation** — `_candidate_owns_build_dispatch` non-functional. DM delivered iter ~1462. Now **MERGEABLE** (CI resolved from UNKNOWN transient). Larry's response needed before auto-merge. ~6h03m standing.
+- [yellow] **APPROVAL_REQUEST `wedged-forge-exit-fix-direction-20260611`** — Beacon DM sent (iter 1451). Pending Larry response (APPROVE/REJECT). beacon-pending-approvals.json MISSING.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter 1378. Carry pending Beacon/Forge.
+- [yellow] **Check III threshold proposals** (NEW) — 2 high-attention (beacon Δ92%, forge Δ64%), 2 minor (mirror +7%, pulse -5%). DM in-flight via route=escalate. Approval: `approve threshold-update-2026-06-11`. Pending Larry.
+- [blue] **CCD-S5 `ccd-s5-doctrine-and-handling-shapes.json`** — in Forge inbox. Watch for preflight → PR (docs-only).
+- [blue] **fix-build-background-poll-idiom-001** — not yet dispatched. Watch for Beacon dispatch now Forge queue has CCD-S5.
+- [blue] `build-ccd-s4-healer-recover-then-alert.json` — Forge post-build cleanup still present. Watch for clearance.
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry.
+- [blue] catalog-accuracy-drift — 5/34 shelf cards drifted. 1/3 G-rule.
+- [blue] alert-triage watermark MISSING (beacon-pending-approvals.json MISSING — standing).
+- [blue] sync-push-rebase-fallback-001 — 1/3 G-rule.
+- [blue] cycle.timer G-rule 3/3 dispatched; Beacon consumed. Carry.
+- [blue] heal-stale-daemon-code:auto-restarted — G-rule dispatched iter 1416. Count tracked by G-rule.
+- [blue] heal-stale-daemon-code-state.json MISSING — standing (known, post-PR #460 one-shot done).
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463) — Tier-3 known pattern. G-rule 3/3 DISPATCHED.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred (Forge queue busy).
+- [blue] G-rule `auto-restart-failed:*` — 1/3.
+- [blue] G-rule completion-DM delivery failure — 1/3.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` — 1/3.
+- [blue] G-rule dispatch-branch-cleanup:summary — 1/3.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] `retry-exhausted-on-shipped-task` → 2/3. Carry.
+- [blue] `retry_exhausted:post-merge-install-drift-trigger-001` — 1/3.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter 1251.
+- [blue] `sentinel-inbox-stall-ignores-inflight` — 2/3 G-rule.
+- [blue] G-rule `actor-exemption-config 3/3` — APPROVAL_REQUEST pending.
+- [blue] G-rule `cycle-timer checkpoint 3/3` — pending `go: cycle-timer checkpoint`.
+- [blue] F24-empty-prompt-envelope-rejected — 1/3 G-rule. Carry.
+- [blue] Check III gate discrepancy — ran 11d after prior run (June 11) vs expected June 14; possible --force in automated cycle. Proposals valid. Noting for awareness.
+
+**Watch items for iter ~1473:**
+- CCD-S5 `ccd-s5-doctrine-and-handling-shapes.json`: Watch for Forge preflight → PR.
+- `build-ccd-s4-healer-recover-then-alert.json`: Watch for Forge post-build cleanup clearance.
+- fix-build-background-poll-idiom-001: Watch for Beacon dispatch.
+- PR #457: Larry response still needed. Now MERGEABLE — recheck.
+- APPROVAL_REQUEST `wedged-forge-exit-fix-direction-20260611`: Larry response.
+- Check III threshold proposals: Larry approval `approve threshold-update-2026-06-11`.
+
+**PRIME DIRECTIVE:** 1 new intervention this iter (Check 0 Tier-2 alert: Check III proposal claimed + watermark advanced). Running total: interventions=785, systemic_fixes=21, verification_pending=10, ratio≈37.4, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0 (Check 0 Tier-2 alert → tier-reset).
+
+---
+
 ## Iteration ~1471 — 2026-06-11 13:59Z UTC (interactive, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry direct invocation.
