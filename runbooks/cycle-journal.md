@@ -90925,3 +90925,91 @@ New watermark: **2026-06-10T17:05:59Z / pulse:ccd-s1-identity-resolution-2026061
 - **fix-headless-approval-dedup-spawn-failure-wedge-002** — confirm first-run fix captured in PR.
 
 **Tier end-of-iter:** 1 (consecutive_clean=0).
+
+---
+
+## Iteration 1420 — 2026-06-11 08:27Z UTC (interactive, Tier 1)
+
+**Note:** Automated cycles 1417–1419 ran after iter 1416 (07:44Z), updating MEMORY.md only. Key resolutions since iter 1416: PR #454 MERGED 08:11:45Z ✅, PR #455 MERGED 08:11:56Z ✅, PR #456 MERGED 08:01:35Z ✅. Session-start gitStatus: branch=main, clean, HEAD=f4eefa6.
+
+**Health:** ⚠️ Attention — Beacon auth failure (primary 401 + TIER2_FALLBACK_FAILED 08:11Z UTC); Larry's "Is Forge stuck again?" (02:19Z MDT / 08:19Z UTC) unanswered; ccd-s2 worktree stale 38+ min, no PR. PR #457 and #458 newly open, monitoring.
+**Tier state:** 1 (consecutive_clean=0; non-clean findings this iter)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Prior watermark: L1483. Current count: 1489 lines (+6 new).
+- L1484: heal-wedged-review-sessions wedge-reaped (07:46Z) → **Tier 3**. ✅
+- L1485: sync.service sync-blocked:auto-commit-push-failed (07:51Z) → Session HEAD > sync.json commit; wrapper push succeeded. **Tier 3** known-pattern. ✅
+- L1486: heal-pipeline-stall mirror-pass-unmerged:PR#455 (07:53Z) → VERIFY: PR #455 MERGED 08:11:56Z. False positive. **Tier 3**. ✅
+- L1487: medic (07:55Z) — diagnoses L1486 (stale). **Tier 3**. ✅
+- L1488: heal-unreviewed-merge-detector unreviewed-merge:456 (08:05Z) → G-rule ongoing, APPROVAL_REQUEST queued. **Tier 3**. ✅
+- L1489: heal-unreviewed-merge-detector unreviewed-merge:454 (08:15Z) → Same G-rule. **Tier 3**. ✅
+- New watermark: **L1489 / heal-unreviewed-merge-detector:unreviewed-merge:454 / 2026-06-11T08:15:43Z**
+- Triage: 0 dispatches, 6 Tier-3 silences. ✅ Nominal.
+
+**Check 1 — Log noise:** journalctl priority warning since 90 min → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:**
+- Larry 01:37–02:08Z MDT: Forge stuck (self-recovered 01:52Z MDT), PR454/455 questions — all resolved ✅.
+- **Larry 02:19Z MDT (08:19Z UTC): "Is Forge stuck again?" — NO Beacon response logged.** Auth errors 08:11Z: primary 401 + TIER2_FALLBACK_FAILED. Bot alive (alert delivered 08:16Z) but Claude invocations failing. → `ask-then-do` + `tier-reset`. Escalation written.
+
+**Check 3 — Pipeline stall:**
+- `mirror_pass_unmerged:fix-test-bootstrap-per-module-001` in suppression dict (ts=07:53Z) → VERIFY: PR #455 MERGED 08:11:56Z — resolved. ✅
+- **wt-forge-ccd-s2-no-session-revision-route:** last modified 07:49Z UTC (38+ min), no PR, dashboard showing stuck per Larry 02:19Z MDT → suspected stall. `ask-then-do` + `tier-reset`. Escalation written.
+- wt-forge-ccd-s1-envelope-builder: PAUSED (APPROVAL_REQUEST pending). By design.
+- wt-forge-fix-reaper-handoff-guard-checks-liveness-002: PR #457 created 08:13Z. ✅
+
+**Check 4 — Inboxes:** beacon: empty ✅. forge: 4 items (active builds/queued). ✅. mirror: empty ✅. pulse: empty ✅.
+
+**Check 5 — Stale daemon:** ABSENT. ✅ Nominal.
+
+**Check A — Source repo:** Session-start gitStatus: main, clean, HEAD=f4eefa6. ✅ Nominal.
+
+**Check B — Sync health:** sync.json status=error (07:51Z UTC, commit=2cd8bf65). Session HEAD f4eefa6 > sync.json commit — MEMORY known-pattern, self-heals. ✅ Nominal.
+
+**Check C — Agent liveness:** Core services (5/5) ✅. Beacon-bot alive (alert delivered 08:16Z); auth errors block Claude. Forge: 3 worktrees, PR #457 created ✅.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- PR #454, #455, #456: **ALL CLOSED ✅** — merged 08:11:45Z, 08:11:56Z, 08:01:35Z respectively.
+- **PR #457** — OPEN, MERGEABLE (08:13Z), forge/fix-reaper. reviewDecision="". 30-min threshold ~08:43Z. [blue] Monitor.
+- **PR #458** — OPEN, MERGEABLE (08:21Z), "Harden chain-event client build (code-review follow-up to #454)." reviewDecision="". [blue] Monitor.
+
+**Periodic/conditional (Thursday):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Credential rotation:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). ✅ Nominal.
+
+**Verify-before-reassert on carried-forward standings:**
+- Forge stuck on dashboard (iter 1416): **RESOLVED** — self-recovered 01:52Z MDT. ✅
+- fix-headless-approval-dedup-spawn-failure-wedge-002: **RESOLVED** — PR #450 merged 07:06Z. ✅
+- ccd-s1-envelope-builder PAUSED: CONFIRMED — worktree present, APPROVAL_REQUEST pending.
+- Tier 2 weekly probe (auth_401): CONFIRMED ACTIVE — TIER2_FALLBACK_FAILED 08:11Z UTC.
+- G-rule actor-exemption-config: New occurrences L1488/L1489 (PR #454, #456 Larry-direct merges).
+- bughunt-gate-soak, health-check-notify-script-missing, Check IX GITHUB_TOKEN: carry [yellow].
+
+**Actions taken:** Updated alert-triage.json watermark → L1489. Appended 2 intervention rows to cycle-prime-ledger.jsonl. Recorded tier-reset (cycle-tier.json). Wrote 2 escalations to pulse-escalations.json.
+**Dispatches:** None.
+
+**PRIME DIRECTIVE:** +2 interventions (Beacon auth + unanswered Larry; Forge ccd-s2 suspected stall). interventions≈771, systemic_fixes=20, ratio≈38.6.
+
+**Standing findings:**
+- [yellow] **Beacon auth failure — Larry unanswered** — primary 401 + TIER2_FALLBACK_FAILED 08:11Z UTC. "Is Forge stuck again?" (02:19Z MDT) unanswered. Action: rotate tokens per `docs/runbooks/rotate-claude-setup-tokens.md`.
+- [yellow] **Forge ccd-s2 suspected stall** — wt stale 38+ min (07:49Z UTC last mod), no PR. ccd-s1 PAUSED (APPROVAL_REQUEST ccd-s1-identity-resolution pending).
+- [yellow] **bughunt-gate-soak** — Phase 2 decision pending Larry.
+- [yellow] **health-check-notify-script-missing** — G-rule 3/3; Forge PR pending.
+- [yellow] **Tier 2 weekly probe (auth_401)** — Action: `docs/runbooks/rotate-claude-setup-tokens.md`.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api POST → 500.
+- [blue] **PR #457** — OPEN, MERGEABLE, 30-min auto-merge threshold ~08:43Z UTC.
+- [blue] **PR #458** — OPEN, MERGEABLE, code-review follow-up to #454.
+- [blue] **ccd-s1-envelope-builder PAUSED** — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry.
+- [blue] **G-rule cycle-timer checkpoint 3/3** — pending `go: cycle-timer checkpoint`.
+- [blue] **G-rule actor-exemption-config 3/3** — pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001** — pending Larry sign-off.
+- [blue] **sync-push-rebase-fallback-001** — self-recovering.
+
+**Watch items for next iter (1421):**
+- **PR #457** — auto-merge threshold ~08:43Z UTC; watch for Mirror dispatch.
+- **PR #458** — watch for Mirror dispatch.
+- **Beacon auth** — if still silent by next interactive iter, escalate [red].
+- **ccd-s2 stall** — if worktree still stale + no PR by next iter, escalate harder.
+- **fix-test-bootstrap-preserve-usersite-001** — queued since 02:15Z; watch for build start.
+
+**Tier end-of-iter:** 1 (consecutive_clean=0 — non-clean: Beacon auth failure + Forge ccd-s2 stall).
