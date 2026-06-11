@@ -29,6 +29,7 @@ if str(_REPO_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_REPO_SCRIPTS))
 
 import agent_runner as ar  # noqa: E402
+import larry_alerts  # noqa: E402
 
 
 def _ok_response(text='ok', session_id='sid-new'):
@@ -162,6 +163,9 @@ class ConcurrencyRunningLogTest(unittest.TestCase):
             mock.patch('agent_runner.subprocess.run',
                        side_effect=lambda cmd, **kw: mock.Mock(
                            returncode=0, stdout=_ok_response(), stderr='')),
+            # #438 transcript check: success with a mock session id would
+            # write a REAL critical alert to the live larry-alerts ledger
+            mock.patch.object(larry_alerts, 'append_alert'),
             mock.patch.object(ar, 'quarantine_parent_claude_md_poison'),
             mock.patch.object(ar, 'scrub_tmp_identity_landmines'),
             mock.patch('agent_runner.time.sleep'),

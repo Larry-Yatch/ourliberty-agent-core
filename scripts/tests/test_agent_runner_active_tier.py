@@ -27,6 +27,7 @@ if str(_REPO_SCRIPTS) not in sys.path:
 
 import agent_runner as ar  # noqa: E402
 import active_tier  # noqa: E402
+import larry_alerts  # noqa: E402
 
 
 def _ok_response(text='ok', session_id='sid-new'):
@@ -89,9 +90,19 @@ class RunClaudeActiveTierEnvTest(unittest.TestCase):
         # Working dir must exist for Popen's cwd= arg
         self.workdir = self.root / 'work'
         self.workdir.mkdir(parents=True, exist_ok=True)
+        # Sandbox ar.log's write-time resolution so un-mocked log() calls
+        # (incl. the #438 TRANSCRIPT_NOT_PERSISTED ERROR) never land in the
+        # real ~/agents/logs/forge.log.
+        self._prev_log_dir = os.environ.get('OURLIBERTY_LOG_DIR')
+        os.environ['OURLIBERTY_LOG_DIR'] = str(self.root / 'logs')
+        (self.root / 'logs').mkdir(parents=True, exist_ok=True)
 
     def tearDown(self):
         import os
+        if self._prev_log_dir is None:
+            os.environ.pop('OURLIBERTY_LOG_DIR', None)
+        else:
+            os.environ['OURLIBERTY_LOG_DIR'] = self._prev_log_dir
         if self._prev_root is None:
             os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
         else:
@@ -149,6 +160,9 @@ class RunClaudeActiveTierEnvTest(unittest.TestCase):
             mock.patch.object(ar, '_mark_paused_on_tier1'),
             # ledger I/O — no-op so tests don't touch ~/agents
             mock.patch.object(ar, 'append_rate_limit_event'),
+            # #438 transcript check: success with a mock session id would
+            # write a REAL critical alert to the live larry-alerts ledger
+            mock.patch.object(larry_alerts, 'append_alert'),
             # CLAUDE.md poison guard + landmine scrub — irrelevant here
             mock.patch.object(ar, 'quarantine_parent_claude_md_poison'),
             mock.patch.object(ar, 'scrub_tmp_identity_landmines'),
@@ -238,9 +252,19 @@ class ResumeNoFallbackRefusalTest(unittest.TestCase):
         os.environ['OURLIBERTY_AGENTS_ROOT'] = str(self.root)
         self.workdir = self.root / 'work'
         self.workdir.mkdir(parents=True, exist_ok=True)
+        # Sandbox ar.log's write-time resolution so un-mocked log() calls
+        # (incl. the #438 TRANSCRIPT_NOT_PERSISTED ERROR) never land in the
+        # real ~/agents/logs/forge.log.
+        self._prev_log_dir = os.environ.get('OURLIBERTY_LOG_DIR')
+        os.environ['OURLIBERTY_LOG_DIR'] = str(self.root / 'logs')
+        (self.root / 'logs').mkdir(parents=True, exist_ok=True)
 
     def tearDown(self):
         import os
+        if self._prev_log_dir is None:
+            os.environ.pop('OURLIBERTY_LOG_DIR', None)
+        else:
+            os.environ['OURLIBERTY_LOG_DIR'] = self._prev_log_dir
         if self._prev_root is None:
             os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
         else:
@@ -276,6 +300,7 @@ class ResumeNoFallbackRefusalTest(unittest.TestCase):
             mock.patch.object(ar, '_dm_tier2_unavailable'),
             mock.patch.object(ar, '_mark_paused_on_tier1'),
             mock.patch.object(ar, 'append_rate_limit_event'),
+            mock.patch.object(larry_alerts, 'append_alert'),
             mock.patch.object(ar, 'quarantine_parent_claude_md_poison'),
             mock.patch.object(ar, 'scrub_tmp_identity_landmines'),
             mock.patch('agent_runner.time.sleep'),
@@ -314,9 +339,19 @@ class AuthCircuitBreakerTest(unittest.TestCase):
         os.environ['OURLIBERTY_AGENTS_ROOT'] = str(self.root)
         self.workdir = self.root / 'work'
         self.workdir.mkdir(parents=True, exist_ok=True)
+        # Sandbox ar.log's write-time resolution so un-mocked log() calls
+        # (incl. the #438 TRANSCRIPT_NOT_PERSISTED ERROR) never land in the
+        # real ~/agents/logs/forge.log.
+        self._prev_log_dir = os.environ.get('OURLIBERTY_LOG_DIR')
+        os.environ['OURLIBERTY_LOG_DIR'] = str(self.root / 'logs')
+        (self.root / 'logs').mkdir(parents=True, exist_ok=True)
 
     def tearDown(self):
         import os
+        if self._prev_log_dir is None:
+            os.environ.pop('OURLIBERTY_LOG_DIR', None)
+        else:
+            os.environ['OURLIBERTY_LOG_DIR'] = self._prev_log_dir
         if self._prev_root is None:
             os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
         else:
@@ -372,6 +407,7 @@ class AuthCircuitBreakerTest(unittest.TestCase):
             mock.patch.object(ar, '_dm_tier2_unavailable'),
             mock.patch.object(ar, '_mark_paused_on_tier1'),
             mock.patch.object(ar, 'append_rate_limit_event'),
+            mock.patch.object(larry_alerts, 'append_alert'),
             mock.patch.object(ar, 'quarantine_parent_claude_md_poison'),
             mock.patch.object(ar, 'scrub_tmp_identity_landmines'),
             mock.patch('agent_runner.time.sleep'),
@@ -436,6 +472,7 @@ class AuthCircuitBreakerTest(unittest.TestCase):
             mock.patch.object(ar, '_dm_tier2_unavailable'),
             mock.patch.object(ar, '_mark_paused_on_tier1'),
             mock.patch.object(ar, 'append_rate_limit_event'),
+            mock.patch.object(larry_alerts, 'append_alert'),
             mock.patch.object(ar, 'quarantine_parent_claude_md_poison'),
             mock.patch.object(ar, 'scrub_tmp_identity_landmines'),
             mock.patch('agent_runner.time.sleep'),
@@ -500,6 +537,7 @@ class AuthCircuitBreakerTest(unittest.TestCase):
             mock.patch.object(ar, '_dm_tier2_unavailable'),
             mock.patch.object(ar, '_mark_paused_on_tier1'),
             mock.patch.object(ar, 'append_rate_limit_event'),
+            mock.patch.object(larry_alerts, 'append_alert'),
             mock.patch.object(ar, 'quarantine_parent_claude_md_poison'),
             mock.patch.object(ar, 'scrub_tmp_identity_landmines'),
             mock.patch('agent_runner.time.sleep'),
@@ -535,9 +573,19 @@ class TierFailureLogTaggingTest(unittest.TestCase):
         os.environ['OURLIBERTY_AGENTS_ROOT'] = str(self.root)
         self.workdir = self.root / 'work'
         self.workdir.mkdir(parents=True, exist_ok=True)
+        # Sandbox ar.log's write-time resolution so un-mocked log() calls
+        # (incl. the #438 TRANSCRIPT_NOT_PERSISTED ERROR) never land in the
+        # real ~/agents/logs/forge.log.
+        self._prev_log_dir = os.environ.get('OURLIBERTY_LOG_DIR')
+        os.environ['OURLIBERTY_LOG_DIR'] = str(self.root / 'logs')
+        (self.root / 'logs').mkdir(parents=True, exist_ok=True)
 
     def tearDown(self):
         import os
+        if self._prev_log_dir is None:
+            os.environ.pop('OURLIBERTY_LOG_DIR', None)
+        else:
+            os.environ['OURLIBERTY_LOG_DIR'] = self._prev_log_dir
         if self._prev_root is None:
             os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
         else:
@@ -587,6 +635,7 @@ class TierFailureLogTaggingTest(unittest.TestCase):
             mock.patch.object(ar, '_dm_tier2_unavailable'),
             mock.patch.object(ar, '_mark_paused_on_tier1'),
             mock.patch.object(ar, 'append_rate_limit_event'),
+            mock.patch.object(larry_alerts, 'append_alert'),
             mock.patch.object(ar, 'quarantine_parent_claude_md_poison'),
             mock.patch.object(ar, 'scrub_tmp_identity_landmines'),
             mock.patch('agent_runner.time.sleep'),

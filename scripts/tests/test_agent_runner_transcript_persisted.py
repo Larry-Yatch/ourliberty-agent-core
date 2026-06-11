@@ -178,9 +178,20 @@ class RunClaudeTranscriptCheckIntegrationTest(unittest.TestCase):
         state = self.root / 'blackboard' / 'active-tier.json'
         state.parent.mkdir(parents=True, exist_ok=True)
         state.write_text(json.dumps({'tier': 'tier1'}))
+        # Sandbox ar.log's write-time resolution: this class drives run_claude
+        # without mocking ar.log, so its 'Running'/'Completed' lines (and the
+        # intentional TRANSCRIPT_NOT_PERSISTED ERROR) must not land in the
+        # real ~/agents/logs/forge.log.
+        self._prev_log_dir = os.environ.get('OURLIBERTY_LOG_DIR')
+        os.environ['OURLIBERTY_LOG_DIR'] = str(self.root / 'logs')
+        (self.root / 'logs').mkdir(parents=True, exist_ok=True)
 
     def tearDown(self):
         import os
+        if self._prev_log_dir is None:
+            os.environ.pop('OURLIBERTY_LOG_DIR', None)
+        else:
+            os.environ['OURLIBERTY_LOG_DIR'] = self._prev_log_dir
         if self._prev_root is None:
             os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
         else:

@@ -38,6 +38,7 @@ if str(_REPO_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_REPO_SCRIPTS))
 
 import agent_runner as ar  # noqa: E402
+import larry_alerts  # noqa: E402
 
 
 _TIER1_TOKEN = 'FAKE-oauth-setuptoken-tier1-not-a-real-key-xxxxxxxxxxxxxxxx'
@@ -109,6 +110,14 @@ class _RunClaudeHarness(unittest.TestCase):
         self._prev_env_file = os.environ.get('OURLIBERTY_CREDENTIALS_ENV_FILE')
         os.environ['OURLIBERTY_CREDENTIALS_ENV_FILE'] = str(
             self.root / 'no-such.env')
+        # Sandbox ar.log's write-time resolution: most tests here don't mock
+        # ar.log, so without this the 'Running'/'Completed' lines (and the
+        # #438 TRANSCRIPT_NOT_PERSISTED ERROR) land in the real
+        # ~/agents/logs/forge.log. Distinct attr name so it can't collide
+        # with TokenValueNeverLoggedTest's own _prev_log_dir handling.
+        self._harness_prev_log_dir = os.environ.get('OURLIBERTY_LOG_DIR')
+        os.environ['OURLIBERTY_LOG_DIR'] = str(self.root / 'logs')
+        (self.root / 'logs').mkdir(parents=True, exist_ok=True)
         self.workdir = self.root / 'work'
         self.workdir.mkdir(parents=True, exist_ok=True)
 
@@ -121,6 +130,7 @@ class _RunClaudeHarness(unittest.TestCase):
             ('CLAUDE_CODE_OAUTH_TOKEN_TIER1', self._prev_t1),
             ('CLAUDE_CODE_OAUTH_TOKEN_TIER2', self._prev_t2),
             ('OURLIBERTY_CREDENTIALS_ENV_FILE', self._prev_env_file),
+            ('OURLIBERTY_LOG_DIR', self._harness_prev_log_dir),
         ):
             if prev is None:
                 os.environ.pop(name, None)
@@ -170,6 +180,10 @@ class _RunClaudeHarness(unittest.TestCase):
             mock.patch.object(ar, '_dm_tier2_unavailable'),
             mock.patch.object(ar, '_mark_paused_on_tier1'),
             mock.patch.object(ar, 'append_rate_limit_event'),
+            # #438 transcript check: a successful run with a mock session id
+            # has no transcript on disk, so the check would write a REAL
+            # critical alert to ~/agents/blackboard/larry-alerts.jsonl.
+            mock.patch.object(larry_alerts, 'append_alert'),
             mock.patch.object(ar, 'quarantine_parent_claude_md_poison'),
             mock.patch.object(ar, 'scrub_tmp_identity_landmines'),
             mock.patch('agent_runner.time.sleep'),
@@ -382,6 +396,7 @@ class ResumeNoFallbackRefusalStaysIntactTest(_RunClaudeHarness):
             mock.patch.object(ar, '_dm_tier2_unavailable'),
             mock.patch.object(ar, '_mark_paused_on_tier1'),
             mock.patch.object(ar, 'append_rate_limit_event'),
+            mock.patch.object(larry_alerts, 'append_alert'),
             mock.patch.object(ar, 'quarantine_parent_claude_md_poison'),
             mock.patch.object(ar, 'scrub_tmp_identity_landmines'),
             mock.patch('agent_runner.time.sleep'),
