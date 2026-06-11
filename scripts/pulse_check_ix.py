@@ -186,14 +186,20 @@ def _parse_iso_or_log_ts(s: str) -> Optional[datetime]:
     if raw.endswith('Z'):
         raw = raw[:-1] + '+00:00'
     if ' ' in raw and 'T' not in raw:
-        # outbox-notifier shape: "2026-05-13 10:31:58" — assume UTC.
-        raw = raw.replace(' ', 'T') + '+00:00'
+        # outbox-notifier shape: "2026-05-13 10:31:58" — naive HOST-LOCAL.
+        # outbox_notifier writes it via datetime.now() (no tz) and the
+        # droplet runs America/Denver; leave it naive so astimezone() below
+        # reads it in the system zone instead of assuming UTC (which skewed
+        # the trailing-7d window ~6h into the past).
+        raw = raw.replace(' ', 'T')
     try:
         dt = datetime.fromisoformat(raw)
     except ValueError:
         return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+    # A naive value here is the outbox-notifier shape above: host-local, so
+    # astimezone() interprets it in the system zone (same host that wrote
+    # the log). Aware values (beacon-bot -0600, UTC alert/chain_event ts)
+    # are normalized to the same instant.
     return dt.astimezone(timezone.utc)
 
 

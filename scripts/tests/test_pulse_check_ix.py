@@ -22,8 +22,10 @@ except ImportError:  # discover loads this module top-level (no package parent)
     import _bootstrap  # noqa: F401
 
 import json
+import os
 import sys
 import tempfile
+import time
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -37,6 +39,31 @@ from dashboard_api import _kebab_case  # noqa: E402
 
 
 NOW = datetime(2026, 5, 25, 12, 0, tzinfo=timezone.utc)  # Monday
+
+
+class _DenverTZ(unittest.TestCase):
+    """Base for tests that parse naive outbox-notifier timestamps.
+
+    outbox_notifier writes its `[YYYY-MM-DD HH:MM:SS]` prefix via
+    datetime.now() (no tz) — naive HOST-LOCAL, and the droplet runs
+    America/Denver. _parse_iso_or_log_ts now reads naive values in the
+    system zone, so pin TZ to make naive→UTC deterministic across dev
+    machines.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self._tz_orig = os.environ.get('TZ')
+        os.environ['TZ'] = 'America/Denver'
+        time.tzset()
+
+    def tearDown(self):
+        if self._tz_orig is None:
+            os.environ.pop('TZ', None)
+        else:
+            os.environ['TZ'] = self._tz_orig
+        time.tzset()
+        super().tearDown()
 
 
 def _probe(hours_ago: float, text: str) -> p9.StatusProbe:
@@ -244,7 +271,41 @@ class TestSignalAlertIgnored(unittest.TestCase):
 # ---------------- signal 2.4: rescue-burden ----------------
 
 
-class TestParseOutboxNotifierLog(unittest.TestCase):
+class TestParseLogTs(_DenverTZ):
+    """_parse_iso_or_log_ts normalizes every supported shape to UTC.
+
+    The regression: the naive outbox-notifier shape was assumed UTC, which
+    skewed each event ~6h into the past and clipped the trailing-7d window.
+    Naive values are now read as host-local (the droplet's America/Denver).
+    """
+
+    def test_naive_outbox_shape_read_as_local(self):
+        # 00:00:23 MDT (-06:00) == 06:00:23 UTC. Assuming UTC put the event
+        # 6h in the past, dropping it from the trailing-7d window.
+        dt = p9._parse_iso_or_log_ts('2026-06-11 00:00:23')
+        self.assertEqual(dt.isoformat(), '2026-06-11T06:00:23+00:00')
+
+    def test_extract_line_ts_naive_outbox_shape(self):
+        line = '[2026-06-11 00:00:23] [notifier] [INFO] queued completion DM'
+        dt = p9._extract_line_ts(line)
+        self.assertEqual(dt.isoformat(), '2026-06-11T06:00:23+00:00')
+
+    def test_beacon_bot_offset_normalized_to_utc(self):
+        # Already aware (-0600); fix leaves the instant unchanged.
+        dt = p9._parse_iso_or_log_ts('2026-06-11T00:00:23-0600')
+        self.assertEqual(dt.isoformat(), '2026-06-11T06:00:23+00:00')
+
+    def test_aware_utc_shapes_unchanged(self):
+        for raw in ('2026-06-11T06:00:23+00:00', '2026-06-11T06:00:23Z'):
+            dt = p9._parse_iso_or_log_ts(raw)
+            self.assertEqual(dt.isoformat(), '2026-06-11T06:00:23+00:00')
+
+    def test_garbage_returns_none(self):
+        self.assertIsNone(p9._parse_iso_or_log_ts('not-a-timestamp'))
+        self.assertIsNone(p9._parse_iso_or_log_ts(''))
+
+
+class TestParseOutboxNotifierLog(_DenverTZ):
 
     def test_extracts_clarification_exhausted_events_in_window(self):
         ts_in_a = (NOW - timedelta(hours=12)).strftime('%Y-%m-%d %H:%M:%S')
