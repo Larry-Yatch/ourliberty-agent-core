@@ -33,6 +33,7 @@ import importlib
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -94,10 +95,24 @@ class _GhRouter:
         self.pr_state: dict[tuple[str, int], str] = {}
         # repo -> list[dict] of open PRs (number, createdAt, headRefName)
         self.open_prs: dict[str, list[dict]] = {}
+        # fix-auto-merge-freshness-revalidation — baseRefOid (base-branch tip)
+        # + headRefOid per PR, consumed by the release-path freshness gate.
+        # Defaults are STABLE per repo/PR, so unless a test deliberately moves
+        # the base between hold-time and release-time, base_moved == False and
+        # the freshness gate is a no-op (preserves pre-feature release
+        # behavior). A test simulates "blocker merged, main moved" by mutating
+        # pr_base for the held PR before the release pass.
+        self.pr_base: dict[tuple[str, int], str] = {}
+        self.pr_head: dict[tuple[str, int], str] = {}
         # Recorded `gh pr merge` shell-outs
         self.merge_calls: list[tuple[str, int]] = []
 
-    def __call__(self, cmd, capture_output=True, text=True, timeout=None):
+    def __call__(self, cmd, capture_output=True, text=True, timeout=None,
+                 **kwargs):
+        # **kwargs absorbs cwd= (and any future kw) from non-gh shell-outs
+        # like worktree teardown's `git -C ... worktree remove`, so they
+        # route through the fixture (returncode=1, 'not gh') instead of
+        # raising TypeError that the daemon-never-wedge guards swallow.
         # All callers pass a list[str] cmd starting with 'gh'.
         if not cmd or cmd[0] != 'gh':
             return _CompletedProc(stdout='', stderr='not gh', returncode=1)
@@ -119,6 +134,14 @@ class _GhRouter:
                 )
             if 'state' in json_fields.split(','):
                 payload['state'] = self.pr_state.get((repo, pr_n), 'OPEN')
+            if 'baseRefOid' in json_fields.split(','):
+                payload['baseRefOid'] = self.pr_base.get(
+                    (repo, pr_n), 'base000000000000',
+                )
+            if 'headRefOid' in json_fields.split(','):
+                payload['headRefOid'] = self.pr_head.get(
+                    (repo, pr_n), f'head{pr_n:012d}',
+                )
             return _CompletedProc(
                 stdout=json.dumps(payload), stderr='', returncode=0,
             )
@@ -290,6 +313,173 @@ class SingleBlockerHoldReleaseTest(SerializerTestBase):
         self.assertIn((REPO, 112), self.gh.merge_calls)
         # Queue is now empty.
         self.assertEqual(self.on._load_auto_merge_queue(), [])
+
+
+class StaleApprovalRevalidationTest(SerializerTestBase):
+    """fix-auto-merge-freshness-revalidation — a held PR whose approval
+    predates a base change must be re-validated against CURRENT main before
+    its auto-merge fires.
+
+    Models the 2026-06-11 PR #455 incident: #455 passed Mirror review, was
+    HELD ~6h behind overlapping #454, then auto-fired 11s after #454 merged
+    on its now-stale approval — landing a +13-test regression that
+    mergeable=CLEAN never caught. The freshness gate re-runs the regression
+    gate against the moved base and blocks the stale merge.
+    """
+
+    BLOCKER = 454
+    HELD = 455
+    FILE = 'scripts/agent_runner.py'
+
+    def setUp(self):
+        super().setUp()
+        # Force the regression re-run ON regardless of the real repo config,
+        # so the guard is exercised hermetically. tearDown's
+        # _invalidate_loop_bounds_cache() clears this.
+        self.on._LOOP_BOUNDS_CACHE['config'] = {
+            'auto_merge_queue': {'revalidate_regression_on_release': True},
+        }
+
+    def _hold_behind_blocker(self, chat_id=777):
+        """Drive HELD's review-pass so it holds behind BLOCKER on overlap.
+        Returns the captured approval-time base SHA.
+        """
+        self.gh.pr_base[(REPO, self.HELD)] = 'baseAAAA00000000'
+        self.gh.open_prs[REPO] = [
+            {'number': self.BLOCKER, 'createdAt': '2026-06-11T02:00:00Z',
+             'headRefName': 'fix-454'},
+        ]
+        self.gh.pr_files[(REPO, self.BLOCKER)] = [self.FILE]
+        self.gh.pr_mergeable[(REPO, self.BLOCKER)] = 'MERGEABLE'
+        self.gh.pr_mergeable[(REPO, self.HELD)] = 'MERGEABLE'
+        r = self._attempt(self.HELD, changed_files=[self.FILE], chat_id=chat_id)
+        self.assertEqual(r['merge_outcome'], 'held_for_blocker')
+        self.assertEqual(r['blocker_pr_number'], self.BLOCKER)
+        queue = self.on._load_auto_merge_queue()
+        self.assertEqual(queue[0]['approved_base_sha'], 'baseAAAA00000000')
+        return 'baseAAAA00000000'
+
+    def _merge_blocker(self):
+        """Merge BLOCKER (first-attempt path) — triggers the release pass."""
+        self.gh.open_prs[REPO] = []
+        r = self._attempt(self.BLOCKER, changed_files=[self.FILE])
+        self.assertEqual(r['merge_outcome'], 'merged')
+
+    def test_regression_on_moved_base_blocks_stale_auto_merge(self):
+        """THE incident: held approval, base moves, regression gate now BLOCKs
+        → the held PR must NOT auto-fire; route Larry back to re-review.
+        """
+        self._hold_behind_blocker(chat_id=777)
+        # Blocker merges → main moves. HELD is still mergeable=CLEAN (the
+        # regression is semantic, not a textual conflict) but a fresh
+        # regression gate against the new main fails.
+        self.gh.pr_base[(REPO, self.HELD)] = 'baseBBBB99999999'  # base moved
+        self.on._RELEASE_REGRESSION_GATE_FN_OVERRIDE = (
+            lambda repo, pr, base, head: 'block'
+        )
+        self._merge_blocker()
+
+        # The stale approval must NOT have auto-merged HELD.
+        self.assertNotIn((REPO, self.HELD), self.gh.merge_calls)
+        # It is pulled from the queue (not silently stranded, not re-fired).
+        self.assertEqual(self.on._load_auto_merge_queue(), [])
+        # Larry is routed back to re-review/rebase.
+        notifs = [a for a in self._read_alerts()
+                  if a.get('intent') == 'auto_merge_stale_revalidation']
+        self.assertEqual(len(notifs), 1)
+        self.assertEqual(notifs[0]['chat_id'], 777)
+        self.assertIn('re-validation against current main failed',
+                      notifs[0]['message'])
+
+    def test_clean_revalidation_on_moved_base_merges(self):
+        """Held approval, base moves, but the regression gate PASSes against
+        current main → the merge proceeds (no over-block).
+        """
+        self._hold_behind_blocker()
+        self.gh.pr_base[(REPO, self.HELD)] = 'baseBBBB99999999'  # base moved
+        self.on._RELEASE_REGRESSION_GATE_FN_OVERRIDE = (
+            lambda repo, pr, base, head: 'pass'
+        )
+        self._merge_blocker()
+        self.assertIn((REPO, self.HELD), self.gh.merge_calls)
+        self.assertEqual(self.on._load_auto_merge_queue(), [])
+
+    def test_unchanged_base_skips_regression_gate_and_merges(self):
+        """When the base did NOT move since approval, the (expensive)
+        regression gate is not consulted at all — the pre-hold approval is
+        still valid and the merge fires.
+        """
+        self._hold_behind_blocker()
+        # Base stays 'baseAAAA...' (blocker closed without moving HELD's base,
+        # or the merge didn't touch HELD's mergebase). Override would BLOCK if
+        # consulted — assert it is NOT.
+        calls = []
+        self.on._RELEASE_REGRESSION_GATE_FN_OVERRIDE = (
+            lambda repo, pr, base, head: calls.append((pr, base, head)) or 'block'
+        )
+        self._merge_blocker()
+        self.assertEqual(calls, [], 'regression gate must be skipped when base unchanged')
+        self.assertIn((REPO, self.HELD), self.gh.merge_calls)
+        self.assertEqual(self.on._load_auto_merge_queue(), [])
+
+    def test_unknown_mergeable_at_release_defers_then_revalidates_on_retry(self):
+        """The ~11s-after-blocker-merge race: GitHub still reports
+        mergeable=UNKNOWN at release. The PR must DEFER (re-queue behind its
+        merged blocker) rather than merge blind — and the sweep retry must
+        STILL re-validate (no bypass) before merging.
+        """
+        self._hold_behind_blocker()
+        self.gh.pr_base[(REPO, self.HELD)] = 'baseBBBB99999999'  # base moved
+        # GitHub hasn't recomputed mergeability yet.
+        self.gh.pr_mergeable[(REPO, self.HELD)] = 'UNKNOWN'
+        self.on._RELEASE_REGRESSION_GATE_FN_OVERRIDE = (
+            lambda repo, pr, base, head: 'block'  # would block IF reached
+        )
+        self._merge_blocker()
+
+        # Not merged; re-queued behind the (merged) blocker for a sweep retry.
+        self.assertNotIn((REPO, self.HELD), self.gh.merge_calls)
+        queue = self.on._load_auto_merge_queue()
+        self.assertEqual(len(queue), 1)
+        self.assertEqual(queue[0]['pr_number'], self.HELD)
+        self.assertEqual(queue[0]['blocker_pr_number'], self.BLOCKER)
+
+        # GitHub finishes recomputing (now MERGEABLE) and the code is in fact
+        # clean against current main — the sweep retry re-validates and merges.
+        self.gh.pr_mergeable[(REPO, self.HELD)] = 'MERGEABLE'
+        self.on._RELEASE_REGRESSION_GATE_FN_OVERRIDE = (
+            lambda repo, pr, base, head: 'pass'
+        )
+        self.on._auto_merge_queue_sweep()
+        self.assertIn((REPO, self.HELD), self.gh.merge_calls)
+        self.assertEqual(self.on._load_auto_merge_queue(), [])
+
+    def test_release_defer_preserves_stale_queue_watchdog_clock(self):
+        """A transient defer on release must NOT reset queued_at /
+        watchdog_dm_sent — else a PR stuck in a persistent-UNKNOWN re-defer
+        loop would reset its age every sweep and the stale-queue watchdog
+        would NEVER fire (silent strand).
+        """
+        self._hold_behind_blocker()
+        held = self.on._load_auto_merge_queue()[0]
+        original_queued_at = held['queued_at']
+        # Pretend the watchdog already DMed once for this held entry.
+        self.on._queue_update_entry(self.HELD, REPO, {'watchdog_dm_sent': True})
+
+        # Base moves, but GitHub keeps reporting UNKNOWN → release defers.
+        self.gh.pr_base[(REPO, self.HELD)] = 'baseBBBB99999999'
+        self.gh.pr_mergeable[(REPO, self.HELD)] = 'UNKNOWN'
+        self._merge_blocker()
+
+        self.assertNotIn((REPO, self.HELD), self.gh.merge_calls)
+        q = self.on._load_auto_merge_queue()
+        self.assertEqual(len(q), 1)
+        self.assertEqual(q[0]['pr_number'], self.HELD)
+        # Watchdog clock survived the re-queue (NOT reset to now / False).
+        self.assertEqual(q[0]['queued_at'], original_queued_at)
+        self.assertTrue(q[0]['watchdog_dm_sent'])
+        # And the merged blocker is preserved so the sweep re-releases it.
+        self.assertEqual(q[0]['blocker_pr_number'], self.BLOCKER)
 
 
 class ChainedBlockersTest(SerializerTestBase):
@@ -570,6 +760,88 @@ class FindOverlapBlockerTest(SerializerTestBase):
         self.gh.pr_files[(REPO, 999)] = [FILE]
         blocker = self.on._find_overlap_blocker(999, REPO, [FILE])
         self.assertIsNone(blocker)
+
+
+class ReleaseRegressionGateRunnerTest(unittest.TestCase):
+    """fix-auto-merge-freshness-revalidation — the PRODUCTION regression
+    runner `_run_release_regression_gate` (override OFF). Pins the
+    exit-code→verdict mapping and the fail-closed / skip / error branches
+    that the freshness guard's safety depends on.
+    """
+
+    def setUp(self):
+        import outbox_notifier as on
+        self.on = on
+        on._reset_auto_merge_queue_state()  # ensure override is None
+        self._orig_canon = on._canonical_repo_for_coords
+        self._tmp = tempfile.TemporaryDirectory()
+        self._repo = Path(self._tmp.name)
+
+    def tearDown(self):
+        self.on._canonical_repo_for_coords = self._orig_canon
+        self.on._reset_auto_merge_queue_state()
+        self._tmp.cleanup()
+
+    def _set_repo(self, path):
+        self.on._canonical_repo_for_coords = lambda coords: path
+
+    def _make_python_repo(self):
+        (self._repo / 'scripts' / 'tests').mkdir(parents=True, exist_ok=True)
+        return self._repo
+
+    def test_unresolvable_repo_is_error(self):
+        self._set_repo(None)
+        verdict = self.on._run_release_regression_gate(REPO, 5, 'b', 'h')
+        self.assertEqual(verdict, 'error')
+
+    def test_missing_sha_is_error(self):
+        self._set_repo(self._make_python_repo())
+        self.assertEqual(
+            self.on._run_release_regression_gate(REPO, 5, None, 'h'), 'error')
+        self.assertEqual(
+            self.on._run_release_regression_gate(REPO, 5, 'b', None), 'error')
+
+    def test_repo_without_scripts_tests_skips(self):
+        # Repo exists but has no scripts/tests — gate N/A → skip (merge).
+        self._set_repo(self._repo)
+        verdict = self.on._run_release_regression_gate(REPO, 5, 'base', 'head')
+        self.assertEqual(verdict, 'skip')
+
+    def _run_with_returncode(self, rc):
+        """Drive the runner with a python suite present, stubbing subprocess so
+        `git fetch` succeeds and the test_regression_check shell-out returns
+        exit code `rc`."""
+        self._set_repo(self._make_python_repo())
+
+        def _stub(cmd, capture_output=True, text=True, timeout=None):
+            if cmd[:2] == ['git', '-C'] or (len(cmd) > 1 and cmd[1] == '-C'):
+                return _CompletedProc(returncode=0)  # fetch: succeed
+            return _CompletedProc(stdout='{}', returncode=rc)  # the gate run
+
+        with mock.patch.object(self.on.subprocess, 'run', side_effect=_stub):
+            return self.on._run_release_regression_gate(REPO, 5, 'base', 'head')
+
+    def test_exit_zero_is_pass(self):
+        self.assertEqual(self._run_with_returncode(0), 'pass')
+
+    def test_exit_one_is_block(self):
+        self.assertEqual(self._run_with_returncode(1), 'block')
+
+    def test_exit_two_is_error(self):
+        self.assertEqual(self._run_with_returncode(2), 'error')
+
+    def test_runner_timeout_is_error(self):
+        self._set_repo(self._make_python_repo())
+
+        def _stub(cmd, capture_output=True, text=True, timeout=None):
+            if len(cmd) > 1 and cmd[1] == '-C':
+                return _CompletedProc(returncode=0)  # fetch ok
+            raise subprocess.TimeoutExpired(cmd, timeout or 1)
+
+        with mock.patch.object(self.on.subprocess, 'run', side_effect=_stub):
+            verdict = self.on._run_release_regression_gate(
+                REPO, 5, 'base', 'head')
+        self.assertEqual(verdict, 'error')
 
 
 if __name__ == '__main__':

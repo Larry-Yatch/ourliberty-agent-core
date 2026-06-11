@@ -8284,11 +8284,35 @@ class ReviewPassDmAwaitsMergeOutcomeTest(unittest.TestCase):
         def _changed_files_stub(repo, pr):
             return self._changed_files_responses.get(pr, [])
 
+        # fix-auto-merge-freshness-revalidation — the release path re-validates
+        # held merges via _gh_pr_merge_freshness. Stub it with a STABLE base
+        # (base_sha never moves between hold-time capture and release), so
+        # base_moved == False and the regression gate is never consulted —
+        # these tests' release behavior is identical to pre-feature. (The
+        # freshness gate's block/defer logic is covered hermetically in
+        # test_auto_merge_serializer.StaleApprovalRevalidationTest.)
+        self._freshness_base_sha = 'base-stable-0000'
+        # Release-path mergeable is its OWN dial, decoupled from
+        # _mergeable_status_responses (which _mergeable_stub pops): Gate 2 is
+        # skipped on the release path, so reading the popped list here would be
+        # an accidental ordering coupling. Tests wanting a specific
+        # release-time mergeable set _freshness_mergeable directly.
+        self._freshness_mergeable = 'mergeable'
+
+        def _freshness_stub(repo, pr):
+            return {
+                'mergeable': self._freshness_mergeable,
+                'merge_state': 'CLEAN',
+                'base_sha': self._freshness_base_sha,
+                'head_sha': f'head{pr}',
+            }
+
         self._patches = [
             mock.patch.object(on, '_gh_pr_mergeable_status', _mergeable_stub),
             mock.patch.object(on, '_find_overlap_blocker', _overlap_stub),
             mock.patch.object(on, '_gh_pr_is_open', _is_open_stub),
             mock.patch.object(on, '_gh_pr_changed_files', _changed_files_stub),
+            mock.patch.object(on, '_gh_pr_merge_freshness', _freshness_stub),
         ]
         for p in self._patches:
             p.start()

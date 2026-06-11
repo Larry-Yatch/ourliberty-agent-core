@@ -79,7 +79,10 @@
   },
   "auto_merge_queue": {
     "watchdog_dm_hours": 24,
-    "_note": "D3.5 5d-prime serializer watchdog. When a PR sits in the auto-merge queue (held behind an overlapping in-flight PR) for longer than this, the notifier sweep DMs Larry once. Raise during planned multi-day absences so the queue doesn't spam him; lower during high-throughput periods. Read by outbox_notifier._load_auto_merge_watchdog_hours_from_config; cache invalidates on daemon restart."
+    "revalidate_regression_on_release": true,
+    "release_regression_timeout_per_sha_s": 600,
+    "_note": "D3.5 5d-prime serializer watchdog. When a PR sits in the auto-merge queue (held behind an overlapping in-flight PR) for longer than this, the notifier sweep DMs Larry once. Raise during planned multi-day absences so the queue doesn't spam him; lower during high-throughput periods. Read by outbox_notifier._load_auto_merge_watchdog_hours_from_config; cache invalidates on daemon restart.",
+    "_note_revalidate": "fix-auto-merge-freshness-revalidation (2026-06-11). When a HELD auto-merge is released (its overlapping blocker merged, so main moved under the pre-hold approval), the release path re-validates against CURRENT main before merging: re-confirm mergeable, and — when the base actually moved since approval — re-run the regression gate (test_regression_check.py). A regressing/conflicting/unverifiable PR is NOT auto-merged; Larry is DMed to re-review/rebase. Motivated by the 2026-06-11 PR #455 incident (held ~6h, fired 11s after the blocker merged on a stale approval, landed a +13-test regression that mergeable=CLEAN didn't catch). revalidate_regression_on_release gates the (expensive) regression re-run — leave true; set false ONLY as an emergency escape hatch (the cheap mergeable re-confirm still runs). release_regression_timeout_per_sha_s bounds the inline test_regression_check.py shell-out per SHA so a hung suite can't wedge the notifier poll loop (holds are rare, so this fires infrequently); a timeout fails closed (the merge is held, not fired). Read by outbox_notifier._load_revalidate_regression_on_release_from_config / _load_release_regression_timeout_per_sha_s_from_config."
   },
   "tier1_quota": {
     "max_5h_token_threshold": 10000000,
@@ -189,6 +192,11 @@
     {
       "date": "2026-06-01",
       "change": "Opus 4.8 fleet roll-forward (post-Beacon-pilot). Remaining claude-opus-4-7 ROUTING values -> claude-opus-4-8: default.inbox_model, forge.inbox_model, mirror.inbox_model, pulse.fallback_model, aide.fallback_model, scout.inbox_model, compass.inbox_model. Beacon already on 4.8 (pilot). Sonnet chat/routine models unchanged. Larry's call: roll forward on the no-regression basis (a same-family 4.7->4.8 bump shows on hard tasks, not routine chat; Beacon ran clean ~2 days). Forge/Mirror (auto-merge chain) to be watched via objective chain metrics (CLARIFY rounds / revision counts / Mirror PASS-vs-ESCALATE rates), not vibes. Requires inbox-watcher restart: load_models() runs once at daemon startup (inbox_watcher.py:778), so the in-memory config is fixed until restart. _history/_note prose mentions of claude-opus-4-7 intentionally left as historical record.",
+      "author": "Claude (via Larry's session)"
+    },
+    {
+      "date": "2026-06-11",
+      "change": "fix-auto-merge-freshness-revalidation: add auto_merge_queue.revalidate_regression_on_release=true + release_regression_timeout_per_sha_s=600. When a HELD auto-merge is released (its overlapping blocker merged, so main moved under the pre-hold approval), outbox_notifier now re-validates against CURRENT main before firing — re-confirm mergeable, and (only when the base actually moved since approval) re-run the regression gate (test_regression_check.py). A regressing/conflicting/unverifiable PR is held, NOT merged, and Larry is DMed to re-review/rebase. Motivated by the 2026-06-11 PR #455 incident: passed Mirror review, held ~6h behind #454, auto-fired 11s after #454 merged on its ~6h-stale approval, landing a +13-test regression (HOME-swap bootstrap hid ~/.local user-site, broke import fastapi) that mergeable=CLEAN never catches. revalidate_regression_on_release is the gate (leave true; false is an emergency escape hatch — the cheap mergeable re-confirm still runs); release_regression_timeout_per_sha_s bounds the inline regression shell-out so a hung suite can't wedge the notifier poll loop (timeout fails closed = held). Read via _load_revalidate_regression_on_release_from_config / _load_release_regression_timeout_per_sha_s_from_config.",
       "author": "Claude (via Larry's session)"
     }
   ]
