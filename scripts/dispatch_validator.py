@@ -83,6 +83,12 @@ ALLOWED_SOURCES = {
 #   - dag-preflight-revision: Mirror returned REVISION on a build-sequence
 #     DAG preflight; notify routed to Beacon for autonomous amend +
 #     re-dispatch (symmetric with the PASS auto-activate path).
+#
+# chain-context-durability S2 (M2) adds the no-session code-review self-heal:
+#   - code-review-revision-no-session: Mirror returned REVISION on a PR whose
+#     envelope carries no forge_build_session_id (the PR #412 class); notify
+#     routed to Beacon for autonomous fresh-task_id re-dispatch instead of a
+#     broadcast manual-reconcile Larry alert.
 ALLOWED_INTENTS = {
     'ack-proceed',
     'clarify',
@@ -98,6 +104,7 @@ ALLOWED_INTENTS = {
     'review-emergency-halt',
     'replan-request',
     'dag-preflight-revision',
+    'code-review-revision-no-session',
 }
 
 # D3.5 commit 5a — Mirror review chain. `review` is the Mirror dispatch

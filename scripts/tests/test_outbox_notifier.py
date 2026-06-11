@@ -3218,7 +3218,16 @@ class MirrorMarkerRoutingTest(unittest.TestCase):
         self.assertNotIn('merge', [e[0] for e in _MIRROR_STATUS_CALL_LOG])
 
     def test_review_revision_notifies_beacon_with_finding_count(self):
-        body = _mirror_outbox_body(_mirror_revision_marker(confidence='high'))
+        # forge_build_session_id present → the genuine with-session revision
+        # path: the back-leg review-revision notify fires (and Forge gets an
+        # auto-resume dispatch). Without a session this would instead route
+        # the S2 no-session notify to Beacon (covered separately in
+        # RevisionLoopTest.test_review_revision_missing_forge_session_routes_to_beacon).
+        body = _mirror_outbox_body(
+            _mirror_revision_marker(confidence='high'),
+            forge_build_session_id='forge-build-sess-rev',
+            pr_url=PR_URL_FIXTURE,
+        )
         f = self._write_mirror_outbox('real-rev.json', body)
         result = on.process_outbox(f)
         self.assertEqual(result, 'notified-marker')
@@ -4400,17 +4409,82 @@ class RevisionLoopTest(unittest.TestCase):
         # Budget-exhausted reason is in the prompt body
         self.assertIn('budget', notify['prompt'].lower())
 
-    def test_review_revision_missing_forge_session_skips_dispatch(self):
-        # Defensive: if forge_build_session_id propagation broke somewhere
-        # upstream, the dispatch should skip rather than write a bogus task.
+    def test_review_revision_missing_forge_session_routes_to_beacon(self):
+        # S2 (chain-context-durability M2): a REVISION with no
+        # forge_build_session_id (the PR #412 class — heal-rebuilt envelope,
+        # source='beacon') must NOT write a Forge revision task, and must NOT
+        # dead-end in a broadcast manual-reconcile Larry alert. Instead it
+        # routes a code-review-revision-no-session notify to Beacon's inbox
+        # for autonomous fresh-task_id re-dispatch.
         body = self._mirror_revision_outbox()
         body.pop('forge_build_session_id', None)
         f = self._write_outbox('mirror', 'real-no-session.json', body)
         on.process_outbox(f)
+
+        # No bogus Forge revision task (no session to --resume).
         revisions = list(
             (on.INBOXES_ROOT / 'forge').glob('revision-*.json')
         )
         self.assertEqual(revisions, [])
+
+        # Beacon got the no-session route notify.
+        notifies = list(
+            (on.INBOXES_ROOT / 'beacon').glob(
+                'notify-no-session-revision-*.json'
+            )
+        )
+        self.assertEqual(len(notifies), 1)
+        notify = json.loads(notifies[0].read_text())
+        self.assertEqual(notify['intent'], 'code-review-revision-no-session')
+        self.assertEqual(notify['source'], 'mirror-result')
+        self.assertEqual(notify['original_task_id'], 'prod-loop')
+        self.assertEqual(notify['branch'], 'forge/prod-loop')
+        self.assertEqual(notify['target_repo'], 'ourliberty-agent-core')
+        # Beacon's prompt carries the existing PR + findings so she can
+        # re-dispatch Forge onto the same branch.
+        self.assertIn('https://github.com/x/y/pull/77', notify['prompt'])
+        self.assertIn('fresh', notify['prompt'].lower())
+        self.assertIn('Missing validation', notify['prompt'])
+        # The missing session field must NOT be propagated (explicit DROP).
+        self.assertNotIn('forge_build_session_id', notify)
+
+        # Mirror focus: emits a Beacon notify, NOT a warning-severity Larry DM.
+        self.assertFalse(self._la.ALERTS_FILE.exists())
+
+    def test_no_session_revision_route_idempotent_on_reprocess(self):
+        # Re-processing the same Mirror outbox (notifier crash between write
+        # and archive) overwrites the pending Beacon notify rather than
+        # writing a duplicate — deterministic filename keyed on task_id.
+        body = self._mirror_revision_outbox()
+        body.pop('forge_build_session_id', None)
+        f = self._write_outbox('mirror', 'real-no-session.json', body)
+        on.process_outbox(f)
+        f2 = self._write_outbox('mirror', 'real-no-session.json', body)
+        on.process_outbox(f2)
+        notifies = list(
+            (on.INBOXES_ROOT / 'beacon').glob(
+                'notify-no-session-revision-*.json'
+            )
+        )
+        self.assertEqual(len(notifies), 1)
+
+    def test_no_session_revision_pass_branch_unchanged(self):
+        # Regression guard: a normal REVISION WITH a forge_build_session_id
+        # still dispatches to Forge and does NOT route to Beacon's no-session
+        # path. The S2 change only touches the no-session fallthrough.
+        body = self._mirror_revision_outbox()
+        f = self._write_outbox('mirror', 'prod-loop.json', body)
+        on.process_outbox(f)
+        revisions = list(
+            (on.INBOXES_ROOT / 'forge').glob('revision-prod-loop-*.json')
+        )
+        self.assertEqual(len(revisions), 1)
+        no_session_notifies = list(
+            (on.INBOXES_ROOT / 'beacon').glob(
+                'notify-no-session-revision-*.json'
+            )
+        )
+        self.assertEqual(no_session_notifies, [])
 
     def test_revision_dispatch_idempotent_on_reprocess(self):
         body = self._mirror_revision_outbox()
@@ -9967,12 +10041,15 @@ class NoSessionRevisionDmTest(unittest.TestCase):
         # Next-step instruction included.
         self.assertIn('Mirror review', body)
 
-    # ---------------- no-session + larry + no chat_id → defensive skip ----------------
+    # ---------------- no-session + larry + no chat_id → Beacon route (S2 M2) ----------------
 
-    def test_no_session_larry_source_without_chat_id_queues_broadcast_alert(self):
-        # Chain discipline v3 GAP 1 (2026-05-26): when there's no chat_id to
-        # target a notification at, fall back to broadcast `append_alert`
-        # so Larry still sees the rejection on the next bot sweep.
+    def test_no_session_larry_source_without_chat_id_routes_to_beacon(self):
+        # S2 (chain-context-durability M2): superseded the v3-GAP-1 broadcast
+        # alert. When routing_source='larry' but there's no chat_id to target
+        # a DM at, the chat-targeted `_dm_larry_no_session_revision` path
+        # can't fire. Instead of dead-ending in a broadcast manual-reconcile
+        # Larry alert, route a code-review-revision-no-session notify to
+        # Beacon for autonomous fresh-task_id re-dispatch.
         data = _good_outbox(
             agent='mirror', source='larry', task_id='real-no-chat',
             phase='review', target_repo='ourliberty-agent-core',
@@ -9988,27 +10065,38 @@ class NoSessionRevisionDmTest(unittest.TestCase):
             }],
         )
         on._dispatch_revision_to_forge(data, decision)
+        # No bogus Forge revision task (no session to --resume).
         revisions = list(
             (on.INBOXES_ROOT / 'forge').glob('revision-*.json')
         )
         self.assertEqual(revisions, [])
-        alerts = self._read_alerts()
-        self.assertEqual(len(alerts), 1)
-        rec = alerts[0]
-        self.assertEqual(rec.get('severity'), 'warning')
-        self.assertNotEqual(rec.get('kind'), 'notification')  # broadcast, not chat-targeted
-        self.assertIn('real-no-chat', rec.get('subject', ''))
-        self.assertIn('No Forge build session', rec.get('message', ''))
-        self.assertIn('Add validation.', rec.get('message', ''))
+        # Beacon got the no-session route notify instead of a Larry alert.
+        notifies = list(
+            (on.INBOXES_ROOT / 'beacon').glob(
+                'notify-no-session-revision-*.json'
+            )
+        )
+        self.assertEqual(len(notifies), 1)
+        notify = json.loads(notifies[0].read_text())
+        self.assertEqual(notify['intent'], 'code-review-revision-no-session')
+        self.assertEqual(notify['source'], 'mirror-result')
+        self.assertEqual(notify['original_task_id'], 'real-no-chat')
+        self.assertEqual(notify['branch'], 'feat/claude-direct')
+        self.assertIn(PR_URL_FIXTURE, notify['prompt'])
+        self.assertIn('Add validation.', notify['prompt'])
+        self.assertNotIn('forge_build_session_id', notify)
+        # No warning-severity Larry alert (self-heal, not a dead-end).
+        self.assertEqual(self._read_alerts(), [])
 
-    # ---------------- no-session + source!='larry' → broadcast alert (v3 GAP 1) ----------------
+    # ---------------- no-session + source!='larry' → Beacon route (S2 M2) ----------------
 
-    def test_no_session_non_larry_source_queues_broadcast_alert(self):
-        # Chain discipline v3 GAP 1 (2026-05-26): when routing-source is
-        # not 'larry' (e.g. Beacon dispatched the revision), the
-        # chat-targeted `_dm_larry_no_session_revision` path cannot fire.
-        # The original WARN-only fallthrough was silent today on the
-        # `feedback_claude_as_forge_boundaries` PR. Must now broadcast.
+    def test_no_session_non_larry_source_routes_to_beacon(self):
+        # S2 (chain-context-durability M2): the PR #412 class — a heal-rebuilt
+        # / Beacon-dispatched envelope with no forge_build_session_id. The
+        # chat-targeted `_dm_larry_no_session_revision` path can't fire
+        # (routing_source != 'larry'). Superseding the v3-GAP-1 broadcast
+        # alert, route a code-review-revision-no-session notify to Beacon for
+        # autonomous fresh-task_id re-dispatch.
         data = _good_outbox(
             agent='mirror', source='beacon', task_id='real-prop-bug',
             phase='review', target_repo='ourliberty-agent-core',
@@ -10024,14 +10112,22 @@ class NoSessionRevisionDmTest(unittest.TestCase):
             (on.INBOXES_ROOT / 'forge').glob('revision-*.json')
         )
         self.assertEqual(revisions, [])
-        # Broadcast alert queued (v3 GAP 1 fix).
-        alerts = self._read_alerts()
-        self.assertEqual(len(alerts), 1)
-        rec = alerts[0]
-        self.assertEqual(rec.get('severity'), 'warning')
-        self.assertNotEqual(rec.get('kind'), 'notification')
-        self.assertIn('real-prop-bug', rec.get('subject', ''))
-        self.assertIn('beacon', rec.get('message', ''))
+        # Beacon route notify queued (supersedes the v3 GAP 1 broadcast).
+        notifies = list(
+            (on.INBOXES_ROOT / 'beacon').glob(
+                'notify-no-session-revision-*.json'
+            )
+        )
+        self.assertEqual(len(notifies), 1)
+        notify = json.loads(notifies[0].read_text())
+        self.assertEqual(notify['intent'], 'code-review-revision-no-session')
+        self.assertEqual(notify['original_task_id'], 'real-prop-bug')
+        self.assertEqual(notify['branch'], 'forge/real-prop-bug')
+        self.assertEqual(notify['target_repo'], 'ourliberty-agent-core')
+        # routing_source threaded into the body so Beacon knows the origin.
+        self.assertIn('beacon', notify['prompt'])
+        # No warning-severity Larry alert (self-heal, not a dead-end).
+        self.assertEqual(self._read_alerts(), [])
 
     # ---------------- DM body rendering: multi/single/empty findings ----------------
 
