@@ -4,6 +4,110 @@
 
 ---
 
+## Iteration ~1499 — 2026-06-11 17:32Z UTC (interactive, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Tier 1 — Mirror review of fix-reaper PR #457 IN PROGRESS. All other checks nominal.
+
+**VERIFY-BEFORE-REASSERT (iter ~1498 watch items):**
+- `build-fix-reaper-handoff-guard-descope-003`: **COMPLETED** ✅ — Forge task finished at 17:31:05Z (1110s, $1.95, attempt=1/5). PR #457 updated: title now `fix(reaper): release handoff guard on merged-PR/worktree-deleted (drop non-functional ownership signal)`, `updatedAt=17:30:51Z`, `mergeable=MERGEABLE`.
+- Mirror review of fix-reaper: **STARTED** ✅ — `wt-mirror-fix-reaper-handoff-guard-descope-003` created 17:31:09Z. Mirror running as of 17:31:11Z. Expected ~30-60 min → ~18:01-18:31Z.
+- Mirror review of ccd-s5 (`wt-mirror-ccd-s5-doctrine-and-handling-shapes`): **COMPLETED** ✅ — Mirror PASS at 17:27:59Z ($0.59). Beacon notify-ccd-s5 completed at 17:28:37Z ($0.27). PR #465 MERGED.
+- PR #465: **MERGED** ✅ — `docs(beacon): S5 — no-session code-review REVISION handling shape + recover-or-route rule` merged. State=MERGED confirmed via `gh pr view 465`.
+- PR #457: **UPDATED** — now MERGEABLE (17:30:51Z). Mirror review IN PROGRESS. [yellow] carry.
+- Sync: last_sync=16:52:19Z (~38 min at 17:30Z). 2h threshold ~18:52Z. ✅ Good.
+- `build-ccd-s5-doctrine-and-handling-shapes.json` stale envelope: **PROCESSED** ✅ — Forge resumed session ecabdd47-9a7 at 17:31:12Z, completed 17:32:07Z (55s, $0.19). Beacon notify-ccd-s5 (second instance) started 17:32:17Z — watch for duplicate DM pattern.
+- beacon-pending-approvals.json: Not checked this iter; pending fix-reaper merge.
+
+**Check 0 — Alert triage:** larry-alerts.jsonl total lines: 1282 (watermark L1282 — no new entries). ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** New Larry directive at 17:30:42Z: `"check the last 5 dms you sent me and tell me if we have to act on any of them"`. Directed at Beacon bot. Beacon running; will handle autonomously. Too fresh (<1 min at scan time) to classify as orphan. beacon-bot rate_limit lines in log: test fixture contamination (TIER_ONE_MARKER / "resets 11:30am" / "TIER 2 distinct") — standing known per MEMORY. ✅ Nominal (journal note: new Larry directive noted; Beacon handles).
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `0 new alert(s) fired, 0 recovered, 2 suppressed` (retry-exhausted:ccd-s4 on cooldown; tier2_fallback:beacon-bot:rate_limit on cooldown + auto-remediated). ✅ Nominal.
+
+**Check 4 — Pending directives / Inboxes:**
+- Forge: `build-fix-reaper-handoff-guard-descope-003.json` completed (archive pending); `build-ccd-s5-doctrine-and-handling-shapes.json` completed (archive pending).
+- Mirror: `review-fix-reaper-handoff-guard-descope-003` ACTIVE (started 17:31:11Z).
+- Beacon: `notify-fix-reaper-handoff-guard-descope-003` COMPLETED (17:31:47Z); `notify-ccd-s5-doctrine-and-handling-shapes` second instance RUNNING (17:32:17Z).
+- Pulse: EMPTY ✅
+- All Larry directives in last 24h have matching chain artifacts. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — standing known. ✅ Known.
+
+**Check A — Source repo:** On main, clean, up to date with origin/main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-11T16:52:19Z (~38 min at 17:30Z), status=no-change. 2h threshold ~18:52Z. ✅ Good.
+
+**Check C — Agent liveness:** All 4 services active (inbox-watcher, beacon-bot, forge-bot, mirror-bot). Inbox-watcher last log 17:32:17Z. ✅ Nominal.
+
+**Check E — PRs:**
+- **PR #457** (`fix(reaper): release handoff guard on merged-PR/worktree-deleted`) — OPEN, MERGEABLE (17:30:51Z), reviewDecision="" (Mirror IN PROGRESS since 17:31:11Z). [yellow] watch.
+- No other open PRs. PR #465 confirmed MERGED. ✅
+
+**Check H — Forge digest:** Open: 1 — PR #457 (Mirror review active). `build-fix-reaper-handoff-guard-descope-003` COMPLETED. `build-ccd-s5` COMPLETED (session resume). ✅
+
+**§5.0 bug-hunt gate:** Conditional; no script found. No-op. ✅
+
+**Conditional checks:** Thursday 2026-06-11 — Check I (Sun/Mon/Wed/Fri only) → skip. Check VIII/IX/X (Monday-only) → skip. Check III: next eligible 2026-06-25. ✅ Credential rotations: SUPABASE_SERVICE_ROLE_KEY ~72d. No 60d trigger. ✅
+
+**Actions taken:** None. All active processes running normally; chain advancing without intervention.
+
+**KEY CLOSURES this iter:**
+- ✅ **PR #465 MERGED** (`docs(beacon): S5`) — Mirror PASS 17:27:59Z → Beacon notify 17:28:37Z → merged.
+- ✅ **`fix-reaper-handoff-guard-descope-003` build COMPLETED** (17:31:05Z, 1110s, $1.95). PR #457 updated.
+- ✅ **Beacon `notify-fix-reaper-handoff-guard-descope-003`** COMPLETED (17:31:47Z, $0.28).
+- ✅ **`build-ccd-s5` stale envelope** processed cleanly by Forge session-resume (17:32:07Z, 55s, $0.19).
+
+**Standing findings:**
+- [yellow] **PR #457** — OPEN, MERGEABLE, Mirror review IN PROGRESS (17:31:11Z). Expected PASS ~18:01-18:31Z. 24h threshold 2026-06-12 08:13Z.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter ~1378. Carry.
+- [yellow] **Check III threshold proposals** — 2 high-attention (beacon Δ92%, forge Δ64%), 2 minor. `approve threshold-update-2026-06-11`. Pending Larry.
+- [blue] `notify-ccd-s5-doctrine-and-handling-shapes` second Beacon instance (17:32:17Z) — watch for duplicate DM to Larry. 1/3 G-rule if it recurs.
+- [blue] alert-triage watermark L1282.
+- [blue] fix-build-background-poll-idiom-001 — not yet dispatched. Watch for Beacon.
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry.
+- [blue] catalog-accuracy-drift — 5/34 shelf cards drifted. 1/3 G-rule.
+- [blue] sync-push-rebase-fallback-001 — 1/3 G-rule.
+- [blue] cycle.timer G-rule 3/3 dispatched; Beacon consumed. Carry.
+- [blue] heal-stale-daemon-code:auto-restarted — G-rule dispatched iter ~1416.
+- [blue] heal-stale-daemon-code-state.json MISSING — standing known.
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464, 465) — Tier-4 (never-silence; actor-exemption pending `go: actor-exemption-config`). Added 465.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred.
+- [blue] G-rule `auto-restart-failed:*` — 1/3.
+- [blue] G-rule completion-DM delivery failure — 1/3.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` — 1/3.
+- [blue] G-rule dispatch-branch-cleanup:summary — 2/3.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] `retry-exhausted-on-shipped-task` — 2/3. Carry.
+- [blue] `retry_exhausted:post-merge-install-drift-trigger-001` — 1/3.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter ~1251.
+- [blue] `sentinel-inbox-stall-ignores-inflight` — 2/3 G-rule.
+- [blue] G-rule `actor-exemption-config 3/3` — APPROVAL_REQUEST pending `go: actor-exemption-config`.
+- [blue] G-rule `cycle-timer checkpoint 3/3` — pending `go: cycle-timer checkpoint`.
+- [blue] F24b: JSON malformation in dispatch envelopes — 2/3 G-rule. Watch for 3rd.
+- [blue] Check III gate discrepancy — carry.
+
+**Watch items for iter ~1500:**
+- Mirror review of fix-reaper (`wt-mirror-fix-reaper-handoff-guard-descope-003`): Started 17:31:11Z. Expected ~30-60 min → ~18:01-18:31Z. Watch for reviewDecision on PR #457.
+- PR #457: Once Mirror PASS, check auto-merge eligibility (>30 min clean+green policy).
+- `notify-ccd-s5` second Beacon instance: watch for completion and whether it triggers a duplicate DM.
+- Sync: 2h threshold ~18:52Z — trigger ff+sync if crossed and repo clean.
+- Larry directive (17:30:42Z): Beacon should respond about last 5 DMs. Verify Beacon handled it in next iter.
+
+**PRIME DIRECTIVE:** No new Pulse interventions this iter. PR #465 closure + fix-reaper build completion are chain-driven outcomes, not Pulse interventions. Prime ledger: appended iter_clean (iter=~1499, tier=1). iter_clean 55→56. Running total: interventions=789, systemic_fixes=22, verification_pending=10, iter_clean=56, ratio≈35.86, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0 (PR #457 Mirror review in-flight).
+
+---
+
 ## Iteration ~1498 — 2026-06-11 17:23Z UTC (interactive, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry direct invocation (`/cycle`).
