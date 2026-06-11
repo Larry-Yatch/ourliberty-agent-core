@@ -176,6 +176,14 @@ class ComputeVerdictTest(_IsolatedAgentsRoot):
 # -------------------- collect_failures_at_sha (test-runner branch) --------------------
 
 class RunTestsInDirTest(_IsolatedAgentsRoot):
+    def setUp(self):
+        super().setUp()
+        # The droplet hard wall (item 3) is exercised in its own test class; here
+        # we test the suite-run path in isolation, so disable the wall (return []).
+        p = patch.object(trc, '_discover_wall_prefix', return_value=[])
+        p.start()
+        self.addCleanup(p.stop)
+
     def test_returns_failure_set_on_normal_run(self):
         completed = _completed(
             stdout=_unittest_output([('test_a', 'scripts.tests.test_x.T')]),
@@ -350,45 +358,230 @@ class MainCliAnalysisFailTest(_IsolatedAgentsRoot):
         self.assertIn('timed out', stderr.getvalue())
 
 
-# -------------------- HEAD optimization --------------------
+# -------------------- gate never runs in-place (item 1 — M2/M3) --------------------
 
-class CurrentHeadOptimizationTest(_IsolatedAgentsRoot):
-    def test_skips_worktree_when_sha_matches_head(self):
-        """When the requested SHA equals the worktree's current HEAD,
-        the helper must NOT create a tmp worktree (perf + safety)."""
-        sha = 'a' * 40
+class GateAlwaysMaterializesWorktreeTest(_IsolatedAgentsRoot):
+    """The gate must NEVER run the suite in the live checkout — always a
+    disposable worktree, for BOTH parent and head SHAs, even when the SHA
+    equals the current HEAD (item 1 closes M2; prevents M3's auto-commit of
+    cwd-relative test residue onto origin/main and mid-run code-swap)."""
+
+    def _collect_with_mocks(self, sha: str, repo_root: Path):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_parent = Path(tmp)
-            with patch.object(trc, 'current_head_sha', return_value=sha), \
-                 patch.object(trc, 'add_worktree') as add_mock, \
+            with patch.object(trc, 'add_worktree') as add_mock, \
                  patch.object(trc, 'remove_worktree') as rm_mock, \
-                 patch.object(trc, 'run_tests_in_dir', return_value=set()) as run_mock:
-                result = trc.collect_failures_at_sha(
-                    sha, Path('/tmp/repo'), 60, tmp_parent,
-                )
-        self.assertEqual(result, set())
-        add_mock.assert_not_called()
-        rm_mock.assert_not_called()
-        run_mock.assert_called_once()
-        # the workdir passed to run_tests_in_dir is the repo root itself
-        self.assertEqual(run_mock.call_args.args[0], Path('/tmp/repo'))
+                 patch.object(trc, 'run_tests_in_dir', return_value=set()) as run_mock, \
+                 patch.object(trc, 'scan_real_tree_for_sentinel') as scan_mock:
+                trc.collect_failures_at_sha(sha, repo_root, 60, tmp_parent)
+        return add_mock, rm_mock, run_mock, scan_mock
 
-    def test_creates_worktree_when_sha_differs_from_head(self):
-        sha = 'b' * 40
-        with tempfile.TemporaryDirectory() as tmp:
-            tmp_parent = Path(tmp)
-            with patch.object(trc, 'current_head_sha', return_value='c' * 40), \
-                 patch.object(trc, 'add_worktree') as add_mock, \
-                 patch.object(trc, 'remove_worktree') as rm_mock, \
-                 patch.object(trc, 'run_tests_in_dir', return_value=set()) as run_mock:
-                trc.collect_failures_at_sha(
-                    sha, Path('/tmp/repo'), 60, tmp_parent,
-                )
+    def test_materializes_worktree_even_when_sha_is_head(self):
+        # Resolve a SHA and point repo_root at THIS repo so the SHA genuinely is
+        # the live HEAD — the old fast path would have run in place here.
+        repo_root = Path(trc.__file__).resolve().parents[1]
+        head = subprocess.run(
+            ['git', '-C', str(repo_root), 'rev-parse', 'HEAD'],
+            capture_output=True, text=True,
+        ).stdout.strip()
+        add_mock, rm_mock, run_mock, _ = self._collect_with_mocks(head, repo_root)
         add_mock.assert_called_once()
         rm_mock.assert_called_once()
         run_mock.assert_called_once()
-        # the workdir is the tmp worktree path, not the repo root
-        self.assertNotEqual(run_mock.call_args.args[0], Path('/tmp/repo'))
+        # run_tests_in_dir is NEVER handed the live checkout as its workdir.
+        self.assertNotEqual(run_mock.call_args.args[0], repo_root)
+
+    def test_worktree_path_is_under_tmp_parent(self):
+        sha = 'b' * 40
+        add_mock, _, run_mock, _ = self._collect_with_mocks(sha, Path('/tmp/repo'))
+        # The dest passed to add_worktree and the workdir handed to the runner
+        # are the same gate worktree, nested under the mkdtemp parent.
+        worktree_dest = add_mock.call_args.args[2]
+        self.assertEqual(run_mock.call_args.args[0], worktree_dest)
+
+    def test_worktree_naming_cannot_match_healer_kill_pattern(self):
+        """The healers SIGKILL processes whose cwd starts with /tmp/wt-main-
+        (M9). The gate worktree path must never match that prefix and must stay
+        under the test-regression-check- mkdtemp parent."""
+        captured = {}
+
+        def fake_add(repo_root, sha, dest):
+            captured['dest'] = dest
+
+        with tempfile.TemporaryDirectory(prefix='test-regression-check-') as tmp:
+            tmp_parent = Path(tmp)
+            with patch.object(trc, 'add_worktree', side_effect=fake_add), \
+                 patch.object(trc, 'remove_worktree'), \
+                 patch.object(trc, 'run_tests_in_dir', return_value=set()), \
+                 patch.object(trc, 'scan_real_tree_for_sentinel'):
+                trc.collect_failures_at_sha('a' * 40, Path('/tmp/repo'), 60, tmp_parent)
+
+        dest = str(captured['dest'])
+        self.assertFalse(
+            dest.startswith('/tmp/wt-main-'),
+            f'gate worktree {dest} matches the healers kill prefix',
+        )
+        self.assertIn('test-regression-check-', dest)
+        self.assertIn('gate-wt-', dest)
+
+
+# -------------------- subtractive env (item 2 — M4/H12) --------------------
+
+class SubtractiveSandboxEnvTest(_IsolatedAgentsRoot):
+    """build_sandbox_env must STRIP live credential families and pin external
+    API URLs to a dead port, while still SETTING the OURLIBERTY_* sandbox keys
+    + the run sentinel."""
+
+    def _base_with_creds(self) -> dict:
+        return {
+            'PATH': '/usr/bin',
+            'HOME': '/home/larry',
+            'LANG': 'C.UTF-8',
+            'SUPABASE_URL': 'https://live.supabase.co',
+            'SUPABASE_SERVICE_ROLE_KEY': 'live-service-role',
+            'TELEGRAM_BOT_TOKEN': 'live-bot-token',
+            'TELEGRAM_BOT_TOKEN_TIER2': 'live-bot-token-2',
+            'GH_TOKEN': 'gho_live',
+            'GITHUB_TOKEN': 'ghp_live',
+            'ANTHROPIC_API_KEY': 'sk-ant-live',
+            'CLAUDE_CODE_OAUTH_TOKEN': 'oauth-live',
+            'OL_DASHBOARD_API_URL': 'https://api.ourliberty.dev',
+            'DASHBOARD_API_URL': 'https://api.ourliberty.dev',
+        }
+
+    def test_strips_every_credential_family(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = trc.build_sandbox_env(Path(tmp), base_env=self._base_with_creds())
+        for cred in (
+            'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY',
+            'TELEGRAM_BOT_TOKEN', 'TELEGRAM_BOT_TOKEN_TIER2',
+            'GH_TOKEN', 'GITHUB_TOKEN',
+            'ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN',
+        ):
+            self.assertNotIn(cred, env, f'{cred} was NOT stripped from the gate env')
+
+    def test_preserves_toolchain_vars(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = trc.build_sandbox_env(Path(tmp), base_env=self._base_with_creds())
+        for keep in ('PATH', 'HOME', 'LANG'):
+            self.assertIn(keep, env, f'{keep} must be preserved for the toolchain')
+
+    def test_pins_api_urls_to_dead_port(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = trc.build_sandbox_env(Path(tmp), base_env=self._base_with_creds())
+        for var in ('OL_DASHBOARD_API_URL', 'DASHBOARD_API_URL'):
+            self.assertEqual(env[var], trc._DEAD_API_URL)
+
+    def test_still_sets_sandbox_keys_and_sentinel(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = trc.build_sandbox_env(Path(tmp), base_env=self._base_with_creds())
+        self.assertEqual(env['OURLIBERTY_AGENTS_ROOT'], tmp)
+        self.assertEqual(env['OURLIBERTY_DISABLE_LIVE_EMIT'], '1')
+        self.assertTrue(
+            env['OURLIBERTY_TEST_RUN_SENTINEL'].startswith(
+                trc._TEST_RUN_SENTINEL_PREFIX,
+            ),
+        )
+
+
+# -------------------- outside-jail tripwire (item 4 — H10) --------------------
+
+class OutsideJailTripwireTest(_IsolatedAgentsRoot):
+    """The parent-process sentinel scan of the REAL tree blocks (exit 2) on a
+    confirmed leak, fails-open on scan-infra errors, and covers outboxes/."""
+
+    def test_outboxes_is_scanned(self):
+        self.assertIn('outboxes', trc._TRIPWIRE_SUBDIRS)
+
+    def test_clean_tree_does_not_raise(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fake_agents = Path(tmp) / 'agents'
+            for sub in trc._TRIPWIRE_SUBDIRS:
+                (fake_agents / sub).mkdir(parents=True, exist_ok=True)
+            (fake_agents / 'logs' / 'benign.log').write_text('nothing to see\n')
+            with patch.object(trc, 'REAL_AGENTS', fake_agents):
+                trc.scan_real_tree_for_sentinel('OL-TEST-RUN-SENTINEL-deadbeef')
+
+    def test_sentinel_hit_raises_analysis_error(self):
+        sentinel = 'OL-TEST-RUN-SENTINEL-' + 'cafe' * 8
+        with tempfile.TemporaryDirectory() as tmp:
+            fake_agents = Path(tmp) / 'agents'
+            (fake_agents / 'outboxes').mkdir(parents=True, exist_ok=True)
+            leaked = fake_agents / 'outboxes' / 'leaked.json'
+            leaked.write_text(f'{{"sentinel": "{sentinel}"}}\n')
+            with patch.object(trc, 'REAL_AGENTS', fake_agents):
+                with self.assertRaises(trc.AnalysisError):
+                    trc.scan_real_tree_for_sentinel(sentinel)
+
+    def test_collect_failures_raises_on_real_tree_leak(self):
+        """End-to-end through collect_failures_at_sha: a sentinel-bearing file in
+        the (monkeypatched) real tree yields AnalysisError, which main() maps to
+        exit 2."""
+        sentinel = 'OL-TEST-RUN-SENTINEL-' + 'beef' * 8
+        fixed_env = {'OURLIBERTY_TEST_RUN_SENTINEL': sentinel}
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_parent = Path(tmp) / 'gate'
+            tmp_parent.mkdir()
+            fake_agents = Path(tmp) / 'agents'
+            (fake_agents / 'blackboard').mkdir(parents=True, exist_ok=True)
+            (fake_agents / 'blackboard' / 'larry-alerts.jsonl').write_text(
+                f'leak {sentinel}\n',
+            )
+            with patch.object(trc, 'build_sandbox_env', return_value=fixed_env), \
+                 patch.object(trc, 'add_worktree'), \
+                 patch.object(trc, 'remove_worktree'), \
+                 patch.object(trc, 'run_tests_in_dir', return_value=set()), \
+                 patch.object(trc, 'REAL_AGENTS', fake_agents):
+                with self.assertRaises(trc.AnalysisError):
+                    trc.collect_failures_at_sha(
+                        'a' * 40, Path('/tmp/repo'), 60, tmp_parent,
+                    )
+
+    def test_scan_infra_error_fails_open(self):
+        """A scan that can't read a dir logs a warning and does NOT block."""
+        with tempfile.TemporaryDirectory() as tmp:
+            fake_agents = Path(tmp) / 'agents'
+            (fake_agents / 'state').mkdir(parents=True, exist_ok=True)
+            with patch.object(trc, 'REAL_AGENTS', fake_agents), \
+                 patch.object(Path, 'rglob', side_effect=OSError('boom')):
+                # Must not raise — fail-open on infra error.
+                trc.scan_real_tree_for_sentinel('OL-TEST-RUN-SENTINEL-x')
+
+
+# -------------------- hard-wall fall-through (item 3) --------------------
+
+class HardWallFallThroughTest(_IsolatedAgentsRoot):
+    """When no namespace primitive is available, the wall logs a warning and
+    returns [] (run unwalled) — wall-absence must NEVER block a PR."""
+
+    def test_falls_through_to_unwalled_with_warning(self):
+        stderr = io.StringIO()
+        with patch.object(trc.shutil, 'which', return_value=None), \
+             patch.object(trc, '_probe', return_value=False):
+            with redirect_stderr(stderr):
+                prefix = trc._discover_wall_prefix(Path('/tmp/wt'))
+        self.assertEqual(prefix, [])
+        self.assertIn('hard wall unavailable', stderr.getvalue())
+
+    def test_bwrap_prefix_when_probe_passes(self):
+        with patch.object(trc.shutil, 'which', return_value='/usr/bin/bwrap'), \
+             patch.object(trc, '_probe', return_value=True):
+            prefix = trc._discover_wall_prefix(Path('/tmp/wt'))
+        self.assertEqual(prefix[0], '/usr/bin/bwrap')
+        self.assertIn('--ro-bind', prefix)
+        self.assertEqual(prefix[-1], '--')
+
+    def test_run_tests_completes_when_wall_unavailable(self):
+        """run_tests_in_dir must complete normally (no exit 2) when the wall is
+        unavailable — the discover command runs unwrapped."""
+        completed = _completed(stdout=_unittest_output(), returncode=0)
+        with patch.object(trc, '_discover_wall_prefix', return_value=[]) as wall_mock, \
+             patch.object(trc.subprocess, 'run', return_value=completed) as run_mock:
+            result = trc.run_tests_in_dir(Path('/tmp/x'), 60, Path('/tmp/iso'))
+        self.assertEqual(result, set())
+        wall_mock.assert_called_once()
+        # No wall prefix => the discover command is the first positional arg.
+        self.assertEqual(run_mock.call_args.args[0][0], 'python3')
 
 
 # -------------------- resolve_sha --------------------

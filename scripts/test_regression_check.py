@@ -58,6 +58,8 @@ import argparse
 import json
 import os
 import re
+import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -69,6 +71,45 @@ AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'
 
 DEFAULT_TIMEOUT_PER_SHA_S = 300
 TEST_DISCOVERY_TARGET = 'scripts.tests'
+
+# Real (non-jailed) tree paths, captured from the gate's OWN process at module
+# load. The gate parent never swaps HOME, so Path.home() here is the real HOME —
+# unlike the per-process jail HOME PR-1's _bootstrap mints INSIDE the suite. Two
+# consumers rely on these being the REAL paths: the droplet hard wall (item 3 —
+# the RO-bind targets) and the outside-jail tripwire (item 4 — the sentinel scan
+# of the production tree). Resolved as module globals so meta-tests can monkey-
+# patch them to a tmp tree without touching the real one.
+REAL_HOME = Path.home()
+REAL_AGENTS = REAL_HOME / 'agents'
+REAL_WORKTREES = REAL_HOME / 'agent-worktrees'
+
+# Credential families stripped from the discover subprocess env (item 2 — fixes
+# M4/H12). Under the Forge/Mirror systemd units (EnvironmentFile=.env.larry) the
+# gate would otherwise pipe live SUPABASE service-role keys, Telegram bot tokens,
+# durable claude tokens, and gh tokens INTO the "most sandboxed" vector. Composes
+# with PR-2's choke guards: a stripped cred turns a guard-miss from a live write
+# into a missing-auth error (and the choke guard turns it into a loud
+# TestIsolationBreach first). This is the Layer-A credential list (constraint 6).
+_STRIP_ENV_EXACT = frozenset({'GH_TOKEN', 'GITHUB_TOKEN'})
+_STRIP_ENV_PREFIXES = (
+    'SUPABASE_', 'TELEGRAM_', 'ANTHROPIC_', 'CLAUDE_CODE_OAUTH_',
+)
+# External-service URL vars pinned to a dead localhost port so an escaped
+# prod-API POST connection-refuses instead of hitting live (constraint 6).
+_DEAD_API_URL = 'http://127.0.0.1:1'
+_DEAD_API_URL_VARS = ('OL_DASHBOARD_API_URL', 'DASHBOARD_API_URL')
+
+# Subdirs of the REAL agents tree the outside-jail tripwire scans for a run's
+# sentinel (item 4). INCLUDES outboxes/ — H10 verified the #428 runtime tripwire
+# wrongly omits it, and outboxes/ was the 2026-05-13 burn path.
+_TRIPWIRE_SUBDIRS = ('logs', 'inboxes', 'blackboard', 'state', 'outboxes')
+
+_WALL_UNAVAILABLE_WARNING = (
+    'test_regression_check: WARNING — droplet hard wall unavailable: bwrap '
+    'missing and unprivileged userns disabled; relying on Layers A+B + gate '
+    'cred-strip. Install bubblewrap (sudo apt-get install bubblewrap) to arm '
+    'the per-process read-only bind around the real ~/agents + ~/agent-worktrees.'
+)
 
 EXIT_PASS = 0
 EXIT_BLOCK = 1
@@ -159,6 +200,18 @@ def build_sandbox_env(
     """
     env = dict(os.environ if base_env is None else base_env)
 
+    # Subtractive env (item 2 — M4/H12): drop live credential families so the
+    # gate never pipes them into the test subprocess. Prefix-match the families,
+    # exact-match the standalone token vars.
+    for key in list(env):
+        if key in _STRIP_ENV_EXACT or any(
+            key.startswith(prefix) for prefix in _STRIP_ENV_PREFIXES
+        ):
+            del env[key]
+    # Pin external-service API URLs to a dead port so an escaped POST refuses.
+    for key in _DEAD_API_URL_VARS:
+        env[key] = _DEAD_API_URL
+
     if isolated_agents_root is None:
         sandbox_root = Path(tempfile.mkdtemp(prefix='ourliberty-gate-sandbox-'))
     else:
@@ -179,10 +232,74 @@ def build_sandbox_env(
     return env
 
 
+def _probe(cmd: list[str]) -> bool:
+    """Run ``cmd`` and return True iff it exits 0. Never raises — a probe that
+    can't run is treated as "primitive unavailable" (fall through)."""
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, timeout=10,
+        )
+    except (subprocess.SubprocessError, OSError):
+        return False
+    return result.returncode == 0
+
+
+def _unshare_wall_prefix(ro_targets: list[Path]) -> list[str]:
+    """Build an ``unshare`` argv prefix that enters a user+mount namespace,
+    bind-then-remount-ro each real tree, then execs the wrapped command.
+
+    Kept for kernels where unprivileged userns is enabled; on TODAY's droplet
+    the probe fails (userns disabled) so this path is never taken."""
+    mount_steps = []
+    for target in ro_targets:
+        quoted = shlex.quote(str(target))
+        mount_steps.append(f'mount --bind {quoted} {quoted}')
+        mount_steps.append(f'mount -o remount,ro,bind {quoted} {quoted}')
+    inner = (' && '.join(mount_steps) + ' && exec "$@"') if mount_steps else 'exec "$@"'
+    return ['unshare', '--user', '--map-root-user', '--mount',
+            'sh', '-c', inner, 'sh']
+
+
+def _discover_wall_prefix(workdir: Path) -> list[str]:
+    """Return an argv prefix that wraps the discover subprocess so the REAL
+    ~/agents + ~/agent-worktrees are READ-ONLY for that process (item 3).
+
+    Capability-detecting best-effort, tried in order: (a) bwrap, (b) unshare
+    user+mount namespace, (c) fall through — log a loud warning and return []
+    (run UNWALLED). The wall is additive defense-in-depth #4; it must NEVER
+    block a PR because the sandbox primitive is absent, so every failure path
+    degrades to () rather than raising.
+    """
+    ro_targets = [p for p in (REAL_AGENTS, REAL_WORKTREES) if p.exists()]
+
+    # (a) bubblewrap: --dev-bind / / keeps the whole fs read-write (TMPDIR, the
+    # tmp worktree, the parent .git, bytecode, python3/git/bash exec all work),
+    # then the two --ro-bind overlays wall only the two real trees.
+    bwrap = shutil.which('bwrap')
+    if bwrap:
+        bwrap_prefix = [bwrap, '--dev-bind', '/', '/', '--chdir', str(workdir)]
+        for target in ro_targets:
+            bwrap_prefix += ['--ro-bind', str(target), str(target)]
+        if _probe(bwrap_prefix + ['--', '/bin/true']):
+            return bwrap_prefix + ['--']
+
+    # (b) unshare user+mount namespace (probe runs the SAME bind+remount-ro on
+    # the real targets, so a passing probe guarantees the real mounts succeed —
+    # protecting the green path from a half-built wall).
+    unshare_prefix = _unshare_wall_prefix(ro_targets)
+    if _probe(unshare_prefix + ['/bin/true']):
+        return unshare_prefix
+
+    # (c) no namespace primitive (today's droplet; always macOS): warn + unwalled.
+    print(_WALL_UNAVAILABLE_WARNING, file=sys.stderr)
+    return []
+
+
 def run_tests_in_dir(
     workdir: Path,
     timeout_s: int,
     isolated_agents_root: Optional[Path] = None,
+    env: Optional[dict] = None,
 ) -> set[str]:
     """Invoke the unittest suite inside ``workdir`` and return the failure set.
 
@@ -193,12 +310,23 @@ def run_tests_in_dir(
 
     The subprocess env is built by ``build_sandbox_env`` so the #412 sandbox
     and #428 live-emit guard engage even though ``unittest discover`` never runs
-    ``scripts/tests/__init__.py``.
+    ``scripts/tests/__init__.py``. ``collect_failures_at_sha`` builds the env
+    itself (so it can surface the run's sentinel for the outside-jail tripwire)
+    and passes it in via ``env``; when omitted a fresh one is minted here.
+
+    The discover subprocess is optionally wrapped by ``_discover_wall_prefix``
+    (item 3) so an escaped write to the REAL agents trees becomes a loud EROFS
+    failure; the wall degrades to a warning + unwalled run when no namespace
+    primitive is available, so it never blocks a PR.
     """
-    env = build_sandbox_env(isolated_agents_root)
+    if env is None:
+        env = build_sandbox_env(isolated_agents_root)
+    wall_prefix = _discover_wall_prefix(workdir)
+    discover_cmd = ['python3', '-m', 'unittest', 'discover',
+                    '-s', 'scripts/tests', '-v']
     try:
         result = subprocess.run(
-            ['python3', '-m', 'unittest', 'discover', '-s', 'scripts/tests', '-v'],
+            wall_prefix + discover_cmd,
             cwd=str(workdir),
             capture_output=True, text=True, timeout=timeout_s,
             env=env,
@@ -268,17 +396,50 @@ def remove_worktree(repo_root: Path, dest: Path) -> None:
         pass
 
 
-def current_head_sha(repo_root: Path) -> Optional[str]:
-    try:
-        result = subprocess.run(
-            ['git', '-C', str(repo_root), 'rev-parse', 'HEAD'],
-            capture_output=True, text=True, timeout=10,
-        )
-    except (subprocess.SubprocessError, OSError):
-        return None
-    if result.returncode != 0:
-        return None
-    return result.stdout.strip() or None
+def scan_real_tree_for_sentinel(sentinel: str) -> None:
+    """Outside-jail tripwire (item 4 — H10). Scan the REAL agents tree for any
+    file containing THIS run's sentinel and raise AnalysisError (exit 2) on a
+    hit — a sentinel-bearing file in the real tree means a test process escaped
+    every isolation layer and wrote production, which is a legitimate block.
+
+    Runs in the gate's PARENT process (real HOME), so unlike the #428 runtime
+    tripwire — which under PR-1's per-process HOME swap scans the JAIL home and
+    is vacuously green forever — this sees the real tree. Scans absolute real
+    paths from ``REAL_AGENTS`` (a module global so meta-tests can monkeypatch
+    it to a tmp tree).
+
+    Fail-open on scan-infra errors (missing dir, permission): a scan that can't
+    complete logs a warning and does NOT block; only an actual sentinel hit
+    blocks. Cheap — a handful of dirs, well within the per-SHA budget.
+    """
+    needle = sentinel.encode()
+    for sub in _TRIPWIRE_SUBDIRS:
+        root = REAL_AGENTS / sub
+        if not root.exists():
+            continue
+        try:
+            for path in root.rglob('*'):
+                if not path.is_file():
+                    continue
+                try:
+                    data = path.read_bytes()
+                except OSError:
+                    continue
+                if needle in data:
+                    raise AnalysisError(
+                        f'PRODUCTION LEAK DETECTED: test-run sentinel {sentinel!r} '
+                        f'found in real-tree file {path} — a test process wrote the '
+                        f'real {REAL_AGENTS} tree despite every isolation layer. '
+                        f'Failing the gate (exit 2); this is a confirmed leak.'
+                    )
+        except AnalysisError:
+            raise
+        except OSError as exc:
+            print(
+                f'test_regression_check: WARNING — outside-jail tripwire scan of '
+                f'{root} failed ({exc}); skipping (fail-open on scan infra error).',
+                file=sys.stderr,
+            )
 
 
 def collect_failures_at_sha(
@@ -289,28 +450,39 @@ def collect_failures_at_sha(
 ) -> set[str]:
     """Run the suite at ``sha`` and return the failing-test-id set.
 
-    Optimization: if ``sha`` equals the current HEAD of ``repo_root``, run
-    in place (no tmp worktree). Otherwise materialize a detached worktree
-    at ``sha`` inside ``tmp_parent`` and run there.
+    Always (item 1 — M2/M3) materializes a disposable detached worktree at
+    ``sha`` inside ``tmp_parent`` and runs there — never in the live checkout,
+    so cwd-relative test residue can't be auto-committed to origin/main by the
+    pulse/sync timers and a mid-run ``checkout main``/ff-pull can't swap the
+    code under the suite. ``OURLIBERTY_AGENTS_ROOT`` is redirected to a per-SHA
+    tmp directory so tests that touch agents-state paths don't pollute prod.
 
-    In both cases, ``OURLIBERTY_AGENTS_ROOT`` is redirected to a per-SHA
-    tmp directory so tests that touch agents-state paths don't pollute
-    prod.
+    The sandbox env is built HERE (not inside run_tests_in_dir) so this parent
+    process knows the run's exact sentinel and can scan the REAL tree for it
+    after the suite (item 4 — the outside-jail tripwire).
     """
     isolated_root = tmp_parent / f'agents-root-{sha[:12]}'
     for sub in ('logs', 'state', 'blackboard', 'inboxes', 'outboxes'):
         (isolated_root / sub).mkdir(parents=True, exist_ok=True)
 
-    head = current_head_sha(repo_root)
-    if head and head == sha:
-        return run_tests_in_dir(repo_root, timeout_s, isolated_root)
+    env = build_sandbox_env(isolated_root)
+    sentinel = env['OURLIBERTY_TEST_RUN_SENTINEL']
 
-    worktree_path = tmp_parent / f'wt-{sha[:12]}'
+    # Worktree dir prefixed ``gate-wt-`` and kept NESTED under the
+    # ``test-regression-check-`` mkdtemp parent (item 5 — M9). Absolute path is
+    # /tmp/test-regression-check-XXXX/gate-wt-<sha>, which can never start with
+    # /tmp/wt-main- — the cwd-prefix the zombie/wedged-session healers SIGKILL.
+    worktree_path = tmp_parent / f'gate-wt-{sha[:12]}'
     add_worktree(repo_root, sha, worktree_path)
     try:
-        return run_tests_in_dir(worktree_path, timeout_s, isolated_root)
+        failures = run_tests_in_dir(
+            worktree_path, timeout_s, isolated_root, env=env,
+        )
     finally:
         remove_worktree(repo_root, worktree_path)
+
+    scan_real_tree_for_sentinel(sentinel)
+    return failures
 
 
 def compute_verdict(parent: set[str], head: set[str]) -> dict:
