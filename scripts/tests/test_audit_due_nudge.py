@@ -4,6 +4,11 @@
 Covers the pure threshold logic (evaluate) and the firing contract (fire once per audit
 anchor; no-op when already nagged; re-arm when a newer audit lands; fail-open).
 """
+
+try:  # engage the test sandbox before any production import reads env/paths
+    from . import _bootstrap  # noqa: F401
+except ImportError:  # discover loads this module top-level (no package parent)
+    import _bootstrap  # noqa: F401
 import os, sys, json, tempfile, pathlib, unittest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))

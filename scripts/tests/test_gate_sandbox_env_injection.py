@@ -26,12 +26,19 @@ Structure (a self-spawning probe so the meta-test is fully self-contained):
     ledger (the live client is None), and writes the observations to a JSON file
     the outer test reads back.
 
-The control test (``test_without_injection_sandbox_does_not_engage``) runs the
-SAME discover with the un-injected env and shows the sandbox does NOT engage —
-so the positive assertions are load-bearing: revert build_sandbox_env's
-injection and the positive test fails.
+The second test (``test_per_module_bootstrap_engages_without_injection``) runs
+the SAME discover with the un-injected env and shows the sandbox STILL engages —
+because every test_*.py imports ``scripts/tests/_bootstrap.py`` as its first
+import, arming the sandbox AT IMPORT regardless of loader. So there are two
+independent guards: the gate's env injection AND the per-module bootstrap; this
+test proves the bootstrap alone is ledger-safe even if the injection is reverted.
 """
 from __future__ import annotations
+
+try:  # engage the test sandbox before any production import reads env/paths
+    from . import _bootstrap  # noqa: F401
+except ImportError:  # discover loads this module top-level (no package parent)
+    import _bootstrap  # noqa: F401
 
 import json
 import os
@@ -195,23 +202,30 @@ class GateSandboxEngagesTest(unittest.TestCase):
             str(Path(observed['OURLIBERTY_AGENTS_ROOT']) / 'logs'),
         )
 
-    def test_without_injection_sandbox_does_not_engage(self):
-        """Control: the SAME production invocation WITHOUT build_sandbox_env's
-        injection leaves the sandbox vars unset — because discover never runs
-        scripts/tests/__init__.py. This is the failing-state the positive test
-        guards against; revert the injection and the positive test sees this and
-        fails. SUPABASE creds are dropped here so the no-DISABLE_LIVE_EMIT run
-        still can't build a live client — the control never risks the ledger."""
+    def test_per_module_bootstrap_engages_without_injection(self):
+        """Second line of defense: the SAME production invocation WITHOUT
+        build_sandbox_env's injection STILL arms the sandbox — because every
+        test_*.py imports scripts/tests/_bootstrap.py as its first import, and
+        that import engages the sandbox AT IMPORT regardless of loader (discover
+        never runs __init__.py, but it does import the test module, which imports
+        _bootstrap). So even with the gate's env injection reverted, the
+        DISABLE_LIVE_EMIT guard + run sentinel are present and the ledger is
+        safe. SUPABASE creds are dropped so nothing can build a live client even
+        before _bootstrap sets DISABLE_LIVE_EMIT."""
         home = tempfile.mkdtemp(prefix='ol-gate-home-noinject-')
         self.addCleanup(_rmtree, home)
 
         env = self._scrubbed_base_env(drop_supabase=True)
         observed = self._run_discover(env, home)
 
-        # __init__ didn't run and nothing injected the vars => they're absent.
-        self.assertIsNone(observed['OURLIBERTY_DISABLE_LIVE_EMIT'])
-        self.assertIsNone(observed['OURLIBERTY_TEST_RUN_SENTINEL'])
-        # And with creds dropped the control is itself ledger-safe.
+        # _bootstrap engaged at import even though __init__ never ran and nothing
+        # injected the env: the per-module import is the load-bearing guard.
+        self.assertEqual(observed['OURLIBERTY_DISABLE_LIVE_EMIT'], '1')
+        self.assertTrue(
+            observed['OURLIBERTY_TEST_RUN_SENTINEL'].startswith(_SENTINEL_PREFIX),
+            f'sentinel not in canonical form: {observed["OURLIBERTY_TEST_RUN_SENTINEL"]!r}',
+        )
+        # Live emit disabled => no real chain_events client, zero ledger hits.
         self.assertIs(observed['_live_client_built'], False)
         self.assertEqual(observed['_burst_real_ledger_hits'], 0)
 
