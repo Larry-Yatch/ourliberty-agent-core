@@ -87481,3 +87481,80 @@ New watermark: **2026-06-10T17:05:59Z / pulse:ccd-s1-identity-resolution-2026061
 - **CCD s1 worktree `wt-forge-ccd-s1-envelope-builder`** — should remain paused until APPROVAL_REQUEST resolved.
 
 **Tier end-of-iter:** 1 (consecutive_clean=0).
+
+---
+
+## Iteration 1392 — 2026-06-11 00:44Z UTC (interactive, Tier 1)
+
+**Note:** Automated cycles 1336–1391 ran after iter 1335 (17:12Z June 10), updating MEMORY.md only. Last MEMORY update: iter 1388 at 00:12Z June 11. Recent commits: 032416a PR #440 merged (fix(cycle): record_iter_result wiring), then automated cycles 1389–1391 at 00:21Z/00:29Z/00:36Z.
+
+**Health:** ✅ Nominal — all checks nominal or Tier-3 known-patterns. PR #440 merged ✅ (cycle-tier record_iter_result wiring active; confirmed via cycle-tier.json last_updated=00:36Z). Standing: transcript-not-persisted install-gap auto-heals 06:00Z June 11 (~5h), PR #439 spec-branch open (no-auto-review by design).
+**Tier state:** 1 (consecutive_clean=0 at start; this iter CLEAN → consecutive_clean=1 at end)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Prior watermark (MEMORY iter 1388): line 1428 / `agent-runner-forge:transcript-not-persisted:tier1` / 2026-06-11T00:10:35Z
+- Current count: **1432 lines** (+4 new)
+- New alerts (lines 1429–1432):
+  - `agent-runner-pulse transcript-not-persisted:tier1` (00:15:25Z, CRITICAL): Same install-gap as iter 1388 (PR #438 units not installed in /etc/systemd/system/ until 06:00Z healer). DM already sent iter 1388. → **Tier 3** (known-pattern, auto-heal pending). ✅
+  - `pulse transcript-not-persisted:post-pr438-unit-install-gap` (00:18:02Z, WARNING): Known root-cause diagnosis. → **Tier 3**. ✅
+  - `heal-pipeline-stall pipeline-stall:unrouted-pr:PR#439` (00:20:05Z, WARNING): PR #439 is a spec-branch (`spec/pulse-parked-nudge-routing`), Larry-authored; MEMORY iter 1388 notes "no auto-review by design." → **Tier 3** (known-pattern). ✅
+  - `medic notification` (00:21:56Z): Medic diagnosis of the PR #439 alert. → **Tier 3**. ✅
+- All 4 alerts delivered to Larry by beacon (idx=1428–1431, 18:19–18:24 MDT). ✅
+- New watermark: **1432 / medic:notification / 2026-06-11T00:21:56Z**
+- Triage: 0 actions, 0 dispatches, 4 Tier-3 silences. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry directive (15:52 MDT / 21:52Z June 10): "reject: Newer solution in process — superseded by fix-tier1-classifier-envelope-not-content-scan" — closes the stale APPROVAL_REQUEST; PR #435 is the superseding fix (already merged). beacon-pending-approvals.json: MISSING (no pending approvals). No orphaned directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** Healer active (last alert fired 00:20:05Z). heal-pipeline-stall-state.json: 31 non-suppressed entries; all are either (a) for PRs #412/418/420 that have merged (stale history, GC will suppress), or (b) `unrouted_open_pr:PR#439` (spec-branch no-auto-review by design). No genuine active stalls. ✅ Nominal.
+
+**Check 4 — Pending directives / Inboxes:** beacon: 0, forge: 0, mirror: 0, pulse: 0. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT (one-shot healer completed). ✅ Nominal.
+
+**Check A — Source repo (VERIFY-BEFORE-REASSERT):** Session-start gitStatus: branch=main, clean tree. PR #440 commit (032416a) in git log. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: status=success, last_sync=2026-06-10T23:50:19Z (~54 min ago, within 2h threshold). ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 systemd services active: beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api, cycle.timer. ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-agent-core: PR #439** — OPEN, MERGEABLE, reviewDecision="", branch `spec/pulse-parked-nudge-routing`, Larry-authored. Spec document (park-the-nudge routing). No-auto-review by design. [blue] carry.
+- **ourliberty-dashboard: 0 open.** ✅
+
+**Periodic/conditional (Thursday 2026-06-11 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Credential rotation (§4.6):** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). ✅ Nominal.
+
+**Verify-before-reassert on carried-forward standings:**
+- `transcript-not-persisted install-gap`: CONFIRMED active (new pulse alert 00:15Z + medic 00:21Z). Root cause: /etc/systemd/system/ units have pre-PR-#438 ReadWritePaths. Auto-heals 06:00Z June 11 (~5h). DM sent iter 1388. [yellow] carry.
+- `PR #440 fix(cycle): record_iter_result`: **CLOSED ✅** — merged (commit 032416a); cycle-tier.json last_updated=00:36:13Z confirms wiring active.
+- `PR #439 spec: park-the-nudge`: CONFIRMED OPEN MERGEABLE. No-auto-review by design. [blue] carry.
+- `fix-tier1-classifier-envelope-not-content-scan APPROVAL_REQUEST`: **CLOSED ✅** — Larry's rejection 21:52Z June 10; PR #435 (merged) is the superseding fix.
+- `bughunt-gate-soak`: Phase 2 decision pending Larry. [yellow] carry (not re-verified; known pending).
+- `health-check-notify-script-missing`: G-rule 3/3 dispatched; Forge PR pending. [yellow] carry.
+- `Tier 2 weekly probe (auth_401)`: Not re-tested. [yellow] carry. Action on Larry: `docs/runbooks/rotate-claude-setup-tokens.md`.
+- `Check IX GITHUB_TOKEN`: Not tested. [yellow] carry.
+- `sync-push-rebase-fallback-001`: sync.json success 23:50Z; no new occurrence. [blue] carry.
+- `G-rule cycle-timer checkpoint 3/3`: [blue] carry — pending `go: cycle-timer checkpoint`.
+- `G-rule actor-exemption-config 3/3`: [blue] carry — pending `go: actor-exemption-config`.
+
+**Actions taken:** None.
+**Dispatches:** None.
+
+**PRIME DIRECTIVE:** 0 new interventions, 0 new systemic fixes. Script-authoritative per MEMORY iter 1388: interventions=768, systemic_fixes=19, ratio≈40.4, trend=stable.
+
+**Standing findings:**
+- [yellow] **transcript-not-persisted install-gap** — auto-heals 06:00Z June 11 (~5h). DM already sent. No new action.
+- [yellow] **bughunt-gate-soak** — Phase 2 decision pending Larry.
+- [yellow] **health-check-notify-script-missing** — G-rule 3/3; Forge PR pending.
+- [yellow] **Tier 2 weekly probe (auth_401)** — Action on Larry: `docs/runbooks/rotate-claude-setup-tokens.md`.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api POST → 500.
+- [blue] **PR #439 spec: park-the-nudge** — OPEN, MERGEABLE, no-auto-review by design. Larry can merge directly or dispatch Mirror review.
+- [blue] **APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001`** — pending Larry sign-off.
+- [blue] **G-rule cycle-timer checkpoint 3/3** — pending `go: cycle-timer checkpoint`.
+- [blue] **G-rule actor-exemption-config 3/3** — pending `go: actor-exemption-config`.
+- [blue] **sync-push-rebase-fallback-001** — self-recovering; root fix APPROVAL_REQUEST open.
+
+**Tier end-of-iter:** 1 (consecutive_clean=1 — this iter clean, all findings Tier-3 or nominal).
