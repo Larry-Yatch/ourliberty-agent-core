@@ -4,6 +4,110 @@
 
 ---
 
+## Iteration 1443 — 2026-06-11 11:21Z UTC (interactive, Tier 1, consecutive_clean 0→0)
+
+**Health:** ⚠️ Drift (carry). PR #457 [yellow] standing — DM delivered 11:11:49Z, awaiting Larry. fix-test-bootstrap-preserve **new session** PID 1612678 (started 11:17:50Z, ~4min, post-inbox-watcher-restart re-dispatch). 3 new heal-stale-daemon-code auto-restart alerts: all route=digest, processed by Beacon ✅. All 6 mandatory + additive checks nominal. 9/9 bots active. Sync fresh. **Tier 1, consecutive_clean 0→0.**
+
+**VERIFY-BEFORE-REASSERT (iter 1442 watch items):**
+- PR #457 Larry response: **STILL PENDING** — mergeable=MERGEABLE (confirmed stable), autoMergeRequest=null, reviewDecision="". DM delivered 11:11:49Z. At check (~11:21Z): ~3h8min since creation (08:13Z). [yellow] carry.
+- fix-test-bootstrap-preserve-usersite-001: **NEW SESSION** — old PID 1593506 completed between 11:15Z–11:17Z (gone from ps). heal-stale-daemon-code restarted inbox-watcher at 11:16:22Z; watcher re-dispatched task. New Forge session PID 1612678 started 11:17:50Z, ~4min elapsed, no PR yet (normal for early session). ✅ In progress.
+- ccd-s3-derivable-context-backfill.json: **STILL QUEUED** — Forge running fix-test-bootstrap first. ✅
+- fix-build-background-task-output-visibility-001 (08:27Z): **STILL QUEUED** — ~2h54min at check. Queued behind fix-test-bootstrap. ✅
+- Sync: last_sync=2026-06-11T10:51:36Z, ~30min old at check. ✅ On track (next expected ~12:51Z).
+
+**Check 0 — Alert triage (larry-alerts.jsonl):**
+- Total lines: 1249 (was 1246 at iter 1442, +3 new lines).
+- New lines (1247–1249): all `auto-restarted:*` from heal-stale-daemon-code (11:16:14–22Z), triggered by PR #460 deploy updating outbox_notifier.py + dispatch_validator.py:
+  - `auto-restarted:ourliberty-outbox-notifier.service` — route=digest, Beacon confirmed `idx=1246 route=digest; skipping DM` at 05:16:15. ✅
+  - `auto-restarted:ourliberty-beacon-bot.service` — route=digest, Beacon confirmed `idx=1247 route=digest; skipping DM` at 05:21:18. ✅
+  - `auto-restarted:ourliberty-inbox-watcher.service` — route=digest, Beacon confirmed `idx=1248 route=digest; skipping DM` at 05:21:18. ✅
+- All 3 Tier-3 known-pattern (successful healer enforcement; G-rule for this pattern already dispatched iter 1416). No new dispatches needed.
+- `alert-triage.json last_claimed_line` MISSING — standing. APPROVAL_REQUEST `alert-triage-durable-watermark-001` carries.
+- **0 new external alerts requiring action.** ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last real Beacon log: 05:21:18-0600 (11:21:18Z) — auto-restart digest routing. Trailing test-fixture entries at 04:52:48-0600 confirmed mocks per MEMORY. No Larry directives in last 4h. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected`. fix-test-bootstrap (new PID, ~4min): no stall window yet. ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` MISSING — standing. No Larry directives in last 24h. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing. Healer itself is alive (fired 3 auto-restarts this iter). ✅ Nominal.
+
+**Check A — Source repo:** branch=main, clean (session gitStatus from wrapper at 11:18:31Z). Latest commit: `4f47ae7 Pulse cycle 20260611T111831Z`. ✅ Nominal.
+
+**Check B — Sync health:** status=no-change, last_sync=2026-06-11T10:51:36Z, ~30min old at check. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active (confirmed: beacon-bot, chain-event-shipper, cycle.service, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot). 1 active Forge session: PID 1612678 (fix-test-bootstrap, 11:17:50Z). ✅ Nominal.
+
+**Check E — PRs:** 1 open PR.
+- **PR #457** (`fix(reaper): release handoff guard on ownership/merged/worktree-deleted`, branch `forge/fix-reaper-handoff-guard-checks-liveness-002`) — mergeable=MERGEABLE, autoMergeRequest=null, reviewDecision="". Created 08:13:19Z (~3h8min at check). DM delivered 11:11:49Z. [yellow] carry.
+
+**Check H — Inboxes:**
+- Forge: **4 items**:
+  - `build-ccd-s1-envelope-builder.json` — FORGE_NO_PR_SKIP (pr=#446). Standing.
+  - `ccd-s3-derivable-context-backfill.json` — queued (source=beacon, 11:10Z).
+  - `fix-build-background-task-output-visibility-001.json` — 08:27Z (~2h54min). Queued.
+  - `fix-test-bootstrap-preserve-usersite-001.json` — **IN-FLIGHT** (PID 1612678, 11:17:50Z). In progress.
+- Beacon/Mirror/Pulse: EMPTY ✅.
+
+**§5.0 bug-hunt gate:** no committed audit baseline; no un-distilled audits. ✅ No-op.
+
+**Conditional checks:**
+- Check I (Thursday 2026-06-11): weekday-gate skip. ✅
+- Check III: next eligible 2026-06-14 (Sunday). Skip. ✅
+- Credential rotations: outside 60d window. ✅
+
+**G-rule tracking:** No new occurrences this iter. All G-rules carry from iter 1442 unchanged. Note: `heal-stale-daemon-code:auto-restarted` G-rule DISPATCHED iter 1416 — these 3 new occurrences don't advance count, dispatch already in-flight.
+
+**Actions taken:**
+1. Tier state: consecutive_clean 0→0 via `scripts/cycle_tier_state.py record --checks-clean false` (PR #457 escalation standing). Tier 1. ✅
+2. No auto-fix allow-list actions executed.
+
+**PRIME DIRECTIVE:** 0 new rows this iter. Running total (script-authoritative from iter 1441): interventions=781, systemic_fixes=21, verification_pending=9, ratio=37.19, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0.
+
+**Standing findings (carry with updates):**
+- [yellow] **PR #457 Mirror escalation** — `_candidate_owns_build_dispatch` non-functional in production. DM delivered 11:11:49Z. Larry's response needed.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter 1378. Carry pending Beacon/Forge.
+- [blue] fix-test-bootstrap-preserve-usersite-001 — Forge NEW SESSION (PID 1612678, 11:17:50Z, ~4min). Post inbox-watcher restart re-dispatch. Monitor for PR open.
+- [blue] ccd-s3-derivable-context-backfill.json — queued (source=beacon, 11:10Z). After fix-test-bootstrap.
+- [blue] fix-build-background-task-output-visibility-001 — Forge inbox, 08:27Z (~2h54min). Queued.
+- [blue] build-ccd-s1-envelope-builder.json — FORGE_NO_PR_SKIP (pr=#446). Standing.
+- [blue] catalog-accuracy-drift — 5/34 shelf cards drifted. route=digest. **1/3 G-rule.** Monitor.
+- [blue] alert-triage watermark discrepancy — alert-triage.json MISSING. APPROVAL_REQUEST `alert-triage-durable-watermark-001` carries.
+- [blue] sync-push-rebase-fallback-001 — 1/3 G-rule. Carry.
+- [blue] cycle.timer stuck — G-rule 3/3 dispatched; Beacon consumed. Standing.
+- [blue] heal-stale-daemon-code:auto-restarted — G-RULE DISPATCHED iter 1416, Beacon consumed. 3 new occurrences this iter (post-PR-460 deploy) — normal healer enforcement. Monitor for spec.
+- [blue] heal-stale-daemon-code-state.json MISSING — standing.
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460) — actor=Larry-Yatch, Tier-3 known pattern. G-rule actor-exemption-config 3/3 DISPATCHED. Carry.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred (Forge queue busy). Carry.
+- [blue] G-rule `auto-restart-failed:*` — 1/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter 1251. Carry.
+- [blue] G-rule `heal-pipeline-stall retry-exhausted on shipped task` — 1/3. Carry.
+- [blue] `retry_exhausted:post-merge-install-drift-trigger-001` — 1/3. Carry.
+
+**Watch items for iter 1444:**
+- PR #457: mergeable=MERGEABLE, DM delivered. Watch for Larry response; once approved, enable auto-merge.
+- fix-test-bootstrap-preserve (PID 1612678, 11:17:50Z): new session after inbox-watcher restart; expect PR ~11:35–11:50Z (allowing for fresh start). Monitor.
+- ccd-s3-derivable-context-backfill.json: will dispatch after fix-test-bootstrap completes.
+- fix-build-background-task-output-visibility: still queued.
+- Sync: next expected ~12:51Z.
+
+---
+
 ## Iteration 1442 — 2026-06-11 11:15Z UTC (interactive, Tier 1, consecutive_clean 0→0)
 
 **Health:** ⚠️ Drift (carry). PR #457 [yellow] standing — DM delivered 11:11:49Z, awaiting Larry. fix-test-bootstrap-preserve Forge in-flight (~19min, no PR yet, normal). ccd-s3-derivable-context-backfill.json NEW in Forge inbox (source=beacon, 11:10Z). All 6 mandatory + additive checks nominal. 9/9 bots active. Sync fresh. **Tier 1, consecutive_clean 0→0.**
