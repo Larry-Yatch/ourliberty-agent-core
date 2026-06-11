@@ -711,6 +711,10 @@ class TestKnownEventTypesContract(unittest.TestCase):
         # added by the N6 digest generator (approvals-queue-rework spec),
         # push-emitted by scripts/ceo_digest_generator.py. The
         # needs_attention type was added by promote_alerts.py (push-emitted for promoted escalations).
+        # The desktop_session_start/active/done types were added by Missions v2
+        # Phase 0 (missions-v2-phase0-desktop-session-feed.md), push-emitted by
+        # desktop Claude Code sessions via the droplet ingest endpoint
+        # (POST /api/ingest/desktop-session → chain_event_emit.emit_event).
         spec_listed = {
             'session_start', 'session_done', 'marker_emit', 'auto_merge',
             'marker_error', 'cost_budget', 'review_request',
@@ -722,6 +726,8 @@ class TestKnownEventTypesContract(unittest.TestCase):
             'review_pass', 'review_revision', 'review_escalate',
             'ceo_digest',
             'needs_attention',
+            'desktop_session_start', 'desktop_session_active',
+            'desktop_session_done',
         }
         self.assertEqual(ces.KNOWN_EVENT_TYPES, frozenset(spec_listed))
 
