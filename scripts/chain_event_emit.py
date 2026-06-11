@@ -105,12 +105,9 @@ def _get_client():
     # in outbox_notifier blocks this synchronous upsert for supabase-py's
     # multi-tens-of-seconds default — and because those emits run inside the
     # single-threaded notifier's process_outbox loop, one stall serializes ALL
-    # agents' notifications behind it. See ces.build_client_options.
-    options = ces.build_client_options()
-    if options is not None:
-        _CLIENT = create_client(url, key, options=options)
-    else:
-        _CLIENT = create_client(url, key)
+    # agents' notifications behind it. ces.build_client falls back to an
+    # un-pinned client (never raises into emit_event) on supabase-py drift.
+    _CLIENT = ces.build_client(create_client, url, key)
     return _CLIENT
 
 

@@ -21,7 +21,6 @@ except ImportError:  # discover loads this module top-level (no package parent)
 
 import logging
 import sys
-import types
 import unittest
 from pathlib import Path
 from typing import Any
@@ -31,9 +30,13 @@ from unittest.mock import MagicMock
 _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_REPO_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_REPO_SCRIPTS))
+_TESTS_DIR = Path(__file__).resolve().parent
+if str(_TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_TESTS_DIR))
 
 import chain_event_emit as cee  # noqa: E402
 import chain_event_shipper as ces  # noqa: E402
+from _fake_supabase import make_fake_supabase  # noqa: E402
 
 
 class _RecordingClient:
@@ -291,35 +294,6 @@ class TestClearApprovalRequest(unittest.TestCase):
             cee.reset_client_for_testing()
 
 
-class _FakeClientOptions:
-    """Stand-in for supabase-py's ClientOptions capturing the timeout kwarg."""
-
-    def __init__(self, postgrest_client_timeout=None, **kwargs):
-        self.postgrest_client_timeout = postgrest_client_timeout
-        self.extra = kwargs
-
-
-def _make_fake_supabase(capture: dict[str, Any]) -> types.ModuleType:
-    """Build a fake ``supabase`` module recording create_client's args.
-
-    Resolves both lookups _get_client makes: ``from supabase import
-    create_client`` and (via ces.build_client_options) ``from supabase import
-    ClientOptions``.
-    """
-    mod = types.ModuleType('supabase')
-
-    def _fake_create_client(url, key, options=None, **kwargs):
-        capture['url'] = url
-        capture['key'] = key
-        capture['options'] = options
-        capture['extra_kwargs'] = kwargs
-        return object()  # opaque stand-in client; never network-touched
-
-    mod.create_client = _fake_create_client  # type: ignore[attr-defined]
-    mod.ClientOptions = _FakeClientOptions  # type: ignore[attr-defined]
-    return mod
-
-
 @unittest.skipIf(
     'pytest' in sys.modules,
     'conftest autouse fixture neutralizes _get_client under pytest; run via '
@@ -346,17 +320,22 @@ class TestGetClientPinsTimeout(unittest.TestCase):
                 cee.os.environ[k] = v
         cee.reset_client_for_testing()
 
-    def test_get_client_passes_postgrest_timeout_option(self):
-        capture: dict[str, Any] = {}
-        fake = _make_fake_supabase(capture)
+    def _build_client(self, fake) -> Any:
+        """Lift the test-isolation guards and build a client against `fake`.
+
+        The fake create_client makes this safe (no network). tearDown restores
+        the guards even if an assertion fails mid-block.
+        """
         with mock.patch.dict(sys.modules, {'supabase': fake}):
-            # Lift the test-isolation guards so _get_client actually builds a
-            # client (the fake create_client makes that safe — no network).
             cee.os.environ.pop('OURLIBERTY_DISABLE_LIVE_EMIT', None)
             cee.os.environ.pop('PYTEST_CURRENT_TEST', None)
             cee.os.environ['SUPABASE_URL'] = 'https://example.supabase.co'
             cee.os.environ['SUPABASE_SERVICE_ROLE_KEY'] = 'svc-role-key'
-            client = cee._get_client()
+            return cee._get_client()
+
+    def test_get_client_passes_postgrest_timeout_option(self):
+        capture: dict[str, Any] = {}
+        client = self._build_client(make_fake_supabase(capture))
         self.assertIsNotNone(client)
         self.assertEqual(capture.get('url'), 'https://example.supabase.co')
         # The whole point: an options object carrying the shipper's timeout.
@@ -366,6 +345,16 @@ class TestGetClientPinsTimeout(unittest.TestCase):
         self.assertEqual(
             options.postgrest_client_timeout, ces.SUPABASE_TIMEOUT_SEC)
         self.assertEqual(ces.SUPABASE_TIMEOUT_SEC, 15)
+
+    def test_get_client_degrades_when_create_client_rejects_options(self):
+        # supabase-py whose create_client signature doesn't accept options=:
+        # _get_client must fall back to an un-pinned client, NOT raise into
+        # emit_event (which calls _get_client outside its try/except).
+        capture: dict[str, Any] = {}
+        client = self._build_client(
+            make_fake_supabase(capture, reject_options=True))
+        self.assertIsNotNone(client)  # fell back rather than raising
+        self.assertIsNone(capture.get('options'))  # bare create_client(url, key)
 
 
 if __name__ == '__main__':
