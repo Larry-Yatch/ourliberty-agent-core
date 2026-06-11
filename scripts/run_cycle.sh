@@ -53,6 +53,13 @@ trap 'rm -f "$LOCK_FILE"; log "lock released"' EXIT
 # Idempotency anchor: ~/agents/state/cycle-last-run.flag mtime. Even if the
 # clock skews or systemd fires faster than expected, we never invoke /cycle
 # more than once per Tier-1 window (Mirror review focus #5 + #8).
+#
+# One-writer invariant: this wrapper ONLY reads tier state. The per-iter
+# `record` that advances/resets the tier lives in the cycle prompt
+# (runbooks/cycle-prompt.md § 13.1) so it fires in both systemd and
+# interactive /cycle modes and has direct access to checks_clean. Do NOT add
+# a `record` call here — two writers per iter double-count consecutive_clean
+# and promote a tier early.
 TIER_STATE_FLAG="${LOCK_DIR}/cycle-last-run.flag"
 TIER_STATE_JSON=$(python3 "${HOME}/agent-core/scripts/cycle_tier_state.py" read 2>>"$LOG_FILE" || echo '{"tier":1}')
 CURRENT_TIER=$(echo "$TIER_STATE_JSON" | python3 -c 'import json,sys; d=json.loads(sys.stdin.read() or "{}"); print(d.get("tier",1))' 2>>"$LOG_FILE" || echo 1)

@@ -65,7 +65,7 @@ Field semantics:
 - `consecutive_clean` — integer ≥ 0. Count of consecutive iters at the current tier that returned clean across all 5 mandatory checks (§ 3) plus all additive checks (§ 4). De-escalation trigger is `consecutive_clean >= 3`.
 - `last_signal_at` — ISO 8601 UTC timestamp of the most recent non-clean iter (the iter that last forced Tier 1). `null` if there has never been a signal. Used for auditing + for Check III's threshold-tuning.
 
-**Read/write semantics.** `cycle_tier_state.py` (PR-β) exposes `get_current_tier()`, `record_iter_result(checks_clean: bool)`, and `advance_tier()`. The cycle script calls `get_current_tier()` at iter start and `record_iter_result()` after Section 4 (journal write) but before Section 7 (end-of-cycle). Writes are atomic (tmp-then-rename) so a mid-write crash leaves the prior state intact.
+**Read/write semantics.** `cycle_tier_state.py` exposes `read_tier_state()` (CLI `read`), `record_iter_result(checks_clean: bool)` (CLI `record`), `advance_tier()`, and `reset_to_tier_1()`. The cycle wrapper (`run_cycle.sh`) calls the `read` subcommand at iter start for the cadence-window gate. Pulse (this prompt) calls the `record` subcommand once per iter after § 13 (journal write) but before § 16 (end the cycle) — see the executable step in § 13.1. The wrapper never records; that is the one-writer invariant (§ 13.1). Writes are atomic (tmp-then-rename) so a mid-write crash leaves the prior state intact.
 
 **Cycle-prompt edits interacting with mid-execution sessions.** When PR-β ships, an edit to `cycle-prompt.md` does NOT take effect on a Pulse session currently mid-execution — the session has already loaded the old prompt into context. The new prompt becomes load-bearing on the **next** cycle process spawn. This is why § 8 (Phase 4 verification window) anchors prompt-edit verification on fresh-process-spawn rather than dispatch time.
 
@@ -1623,6 +1623,18 @@ Append to `runbooks/cycle-journal.md`:
 - **`Leverage proposals:`** — one-line summary of any pipeline-driver proposals from § 7. Use `no proposals this iter (pipeline busy)` if § 7 conditions weren't met, or `N/A (Tier 3, skipped)` if the driver doesn't run at this tier. Example: `Leverage proposals: 1 — dispatch PR-α₂ now (alpha-1 merged)`.
 
 Keep entries terse. The journal is for the next reader, not for narration.
+
+#### 13.1 Record the iter result into the tier state machine
+
+After writing the journal entry, record this iter's outcome into the tier state machine (`~/agents/state/cycle-tier.json`) so the cadence tier de-escalates during quiet periods and snaps back to Tier 1 on any signal (§ 2.2). Run this EXACTLY ONCE per iter:
+
+```
+python3 ~/agent-core/scripts/cycle_tier_state.py record --checks-clean <true|false>
+```
+
+Set `--checks-clean true` iff ALL 5 mandatory checks (§ 3) AND all additive checks (§ 4) returned clean this iter — i.e. pure `nominal` / journal-note-only with no finding. Any non-empty finding in those checks → `--checks-clean false`, which forces Tier 1 and stamps `last_signal_at` (§ 2.3). The § 5 conditional / periodic checks do NOT gate this value (§ 2.3).
+
+This is the SINGLE per-iter write to the tier state — the **one-writer invariant**. `run_cycle.sh` only *reads* the tier at the top of each fire for the cadence-window gate; it deliberately does NOT record. Do not add a second `record` call anywhere (wrapper or prompt), or `consecutive_clean` double-increments and a tier promotes early. Running this CLI is a runtime state write under `~/agents/state/` (not a git operation), so it is exempt from the no-`git commit` invariant in § 16.
 
 ### 14. Write the actions log
 
