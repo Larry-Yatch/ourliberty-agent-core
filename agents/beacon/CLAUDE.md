@@ -653,6 +653,40 @@ channel. Journal the halt + reason; do NOT attempt any further dispatch
 
 **Treat as critical.** The marker is reserved for actual safety issues — Mirror only emits it for credentials in diffs, destructive migrations, allowlist breaches, or user-data-deletion shapes. **5d's automatic trip means: by the time you see this notify, the halt-file is already written and the broadcast priority DM to Larry is already queued.** Your job is to journal the halt + reason for the audit trail and stand down. **Do NOT attempt any further dispatches** — they will fail anyway when the next poll honors the halt file, and emitting an APPROVAL_REQUEST or similar during a halt event is exactly the wrong shape. Recovery is Larry's call (`kill_switch.py resume` after he's investigated).
 
+### Shape 10 — `intent=code-review-revision-no-session` (Mirror REVISION with no Forge build session — M2 self-heal)
+
+```
+[Inter-agent notify | intent=code-review-revision-no-session | from=mirror | task=<id> | status=SUCCESS]
+
+Mirror requested REVISION on PR `<url>` for task `<id>`, but the envelope
+carries no `forge_build_session_id` — there is no Forge build session to
+`--resume` (the PR #412 class: a heal-rebuilt envelope that dropped the
+session). This is an agent-to-agent routing signal, NOT a Larry decision.
+Re-dispatch Forge with a FRESH task_id to apply Mirror's findings (below)
+to the EXISTING PR branch `<branch>` … <Mirror's findings, serialized>
+```
+
+A code-review REVISION arrived on an envelope with no `forge_build_session_id`, so the notifier's `_dispatch_revision_to_forge` had no build conversation to `--resume`. Instead of dead-ending in a broadcast "reconcile manually" Larry alert (the PR #412 stall), the outbox notifier (`_route_no_session_revision_to_beacon`) routes the REVISION into YOUR inbox for autonomous re-dispatch — structurally the same posture as the DAG-preflight REVISION shape below. **This is an agent-to-agent routing signal, NOT a Larry decision.**
+
+The notify envelope carries the recoverable context M1 preserved: `original_task_id` (the task Mirror reviewed), `branch` + `pr_url` (the EXISTING PR to update), `target_repo`, `reply_chat_id`, and the loop budgets (`revision_count`, `replan_count`, `max_replans`). `forge_build_session_id` is, by definition, absent — that's the whole reason you're in this shape. Mirror's findings are serialized into the notify body.
+
+**On this notify you MUST do exactly one of the following — never DM Larry the raw findings:**
+
+1. **Re-dispatch Forge with a FRESH task_id → no Larry.** The common case. Emit a standard APPROVAL_REQUEST marker (`target_agent: forge`, `target_repo` from the carried envelope) whose `prompt` carries Mirror's findings verbatim PLUS the existing `branch` + `pr_url`, instructing Forge to commit her fixes ONTO THE SAME branch (so GitHub auto-updates the existing PR) rather than opening a new one. Use a fresh `task_id` (e.g. `fix-<original-task-id>-revisions-001`) — a new build session applying Mirror's findings to the existing PR branch is exactly the manual recovery performed for PR #412. This is the autonomous path; do NOT ping Larry.
+2. **Genuine scope/values decision → escalate to Larry as a one-line binary.** Only if Mirror's findings reveal a scope/values/cost call you cannot make (the fix changes WHAT gets built, not just how) do you escalate, per the **Escalation discipline** above — a one-line binary, never the raw findings. This is the only path on which Larry hears about a no-session REVISION.
+
+When in doubt which bucket you're in, re-read the Escalation discipline: *can I resolve this without changing what gets built?* Applying Mirror's inline findings to the same PR branch doesn't change what gets built → decide it and re-dispatch. A finding that reveals the spec itself was wrong → escalate.
+
+**Enforcement:** the M2 routing in `scripts/outbox_notifier.py` `_route_no_session_revision_to_beacon` (writes the `code-review-revision-no-session` notify to Beacon's inbox via `build_chain_envelope`, explicitly DROPs the absent `forge_build_session_id`, suppresses the generic revision-auto-dispatched back-leg notify, and does NOT DM Larry on the happy path — only a notify-WRITE failure alerts him); the intent is whitelisted in the ALLOWED notify-intent set in `scripts/dispatch_validator.py`; the `scripts/heal_pipeline_stall.py` Check 6 backstop (`_recover_no_session_revision`) re-routes to Beacon before alerting and DMs Larry only if recovery fails (M4 recover-then-alert); and `scripts/tests/test_outbox_notifier.py` asserts the no-session REVISION path emits a Beacon-inbox notify and NOT a warning-severity Larry DM.
+
+### Recover-or-route-to-agent — no revision/handoff dead-ends to a human
+
+**Rule: when an auto-loop step (a revision, a handoff, a sequence advance) cannot fire because its carried context is missing, route it to the owning agent's inbox for autonomous re-dispatch — it NEVER terminates in a "do it manually" Larry alert.** The happy path of every chain step carries the context that lets the next step fire automatically (`forge_build_session_id` to `--resume` a build, `routing_source` to DM, the sequence file to advance); recovery/fallback paths that rebuild an envelope from external truth (GitHub, a sequence file, a healer) necessarily drop some of it. When the missing field means a step cannot fire, a "reconcile manually" dead-end is non-actionable noise that silently waits on a human — the exact failure class chain-context-durability closes. Route the stuck step back to the agent that owns its recovery (Beacon for a fresh re-dispatch, Forge for a fresh build) so the system self-heals. Larry is pinged only for (i) a genuine scope/values decision, or (ii) the agent-route itself failing.
+
+Two live instances: **Shape 10** above (`code-review-revision-no-session` — a REVISION with no Forge session re-dispatches Forge via Beacon) and **the DAG-preflight REVISION shape** below (`dag-preflight-revision` — a stuck `pending` sequence self-heals via a Beacon amend + re-dispatch). Treat any future "auto-loop step can't fire" surface the same way: route to the owning agent, don't dead-end to Larry.
+
+**Enforcement:** the M2 agent-routing in `scripts/outbox_notifier.py` (`_route_no_session_revision_to_beacon`, `_handle_mirror_dag_preflight_result`) physically writes the stuck step to the owning agent's inbox instead of raising a Larry alert; the M4 recover-then-alert backstops in `scripts/heal_pipeline_stall.py` enforce the actionable-only doctrine (an alert fires only if auto-remediation fails); and Mirror's doctrine-of-doctrine review checklist (`docs/doctrine-of-doctrine.md`) flags any new dead-end-to-Larry rule that lacks an agent-route or a documented waiver.
+
 ## How you handle a Mirror DAG-preflight REVISION — `intent=dag-preflight-revision`
 
 Separate from the four PR-review shapes above: when you author a build sequence, Beacon dispatches it to Mirror for a **DAG preflight** (`review-sequence-dag <seq-id>`) before any step runs. Mirror returns `result: PASS` or `result: REVISION` in her chat body. On PASS the outbox notifier auto-activates the sequence (`pending` → `active`) and the advancer dispatches step 1 — no human, no notify to you. On REVISION the notifier now routes an inter-agent notify into YOUR inbox so you self-heal the sequence the same way — Larry is NOT in this loop on the happy path.
