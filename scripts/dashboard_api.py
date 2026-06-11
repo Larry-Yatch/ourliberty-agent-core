@@ -1624,6 +1624,18 @@ def _reader_system_worktrees(
 # the rest => failed. Used by BOTH the in_review derivation (a review_request
 # with no later terminal event is still awaiting a verdict) and done_today
 # (today's terminal events only).
+#
+# LIVENESS CAVEAT (forge-queue-in-review-lane): in production only
+# preflight_reject is push-emitted with agent='forge' today. auto_merge /
+# marker_error / cost_budget were designed to arrive via the shipper's
+# outbox-notifier.log source, which is dead (parser can't read the
+# notifier's line shape) — and even once that parser is fixed, those log
+# lines carry no agent= kv, so they'd land as agent='notifier' and still
+# not match the .eq('agent','forge') fetch. Until producers emit them with
+# correct agent attribution, in_review closure rests on Mirror's verdict
+# rows (below) and done_today's 'failed' outcomes rest on preflight_reject
+# alone. Tests that seed agent='forge' auto_merge rows pin the intended
+# contract, not current production reality.
 _QUEUE_TERMINAL_EVENT_TYPES = (
     'auto_merge', 'marker_error', 'preflight_reject',
     'cost_budget', 'review_escalate',
@@ -1695,34 +1707,53 @@ def _reader_agent_queue_building(
     return out
 
 
+# Fetch window for the agent-queue lanes. done_today only needs today;
+# in_review needs the active-review horizon (hours to a few days). The bound
+# keeps the unpaginated PostgREST read under its row cap as chain_events
+# grows (review_request & co. are never retention-pruned) and doubles as an
+# age-out: a review_request whose review died without any closing event
+# (wedged session reaped pre-verdict, dropped best-effort verdict emit)
+# falls out of the lane after this many days instead of ghosting forever.
+_QUEUE_EVENTS_WINDOW_DAYS = 14
+
+
 def _fetch_chain_events_for_agent(
     supabase_client: Any, agent: str,
-) -> list[dict[str, Any]]:
-    """Pull this agent's chain_events rows for the in_review / done_today
-    lanes. Returns [] when the client is None (test env / no creds) or on
-    any query error — the endpoint degrades to empty review/done lanes
-    rather than 500ing.
+) -> Optional[list[dict[str, Any]]]:
+    """Pull this agent's recent chain_events rows for the in_review /
+    done_today lanes (bounded to _QUEUE_EVENTS_WINDOW_DAYS).
+
+    Returns None when the client is None (test env / no creds) or on any
+    query error — callers degrade the affected lanes to empty rather than
+    500ing. None vs [] matters for in_review: deriving with genuinely-empty
+    verdict rows is fine, but deriving after a FAILED verdict fetch would
+    resurrect every open review_request as a phantom lane entry.
 
     `payload` is selected so the WORKER done_today lane can read
     `payload.success` / `payload.message`; the builder derivations ignore it.
     """
     if supabase_client is None:
-        return []
+        return None
+    cutoff = (
+        datetime.now(timezone.utc)
+        - timedelta(days=_QUEUE_EVENTS_WINDOW_DAYS)
+    ).isoformat()
     try:
         resp = (
             supabase_client.table('chain_events')
             .select('agent,event_type,task_id,pr_url,ts,payload')
             .eq('agent', agent)
+            .gte('ts', cutoff)
             .execute()
         )
     except Exception:  # noqa: BLE001 — never 500 on a read-only dashboard lane
-        return []
+        return None
     return list(getattr(resp, 'data', None) or [])
 
 
 def _derive_in_review(
     rows: list[dict[str, Any]],
-    verdict_rows: Optional[list[dict[str, Any]]] = None,
+    verdict_rows: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """IN_REVIEW lane: a task whose latest `review_request` has no later
     closing event for the same task_id. `since` = that review_request ts.
@@ -1730,7 +1761,10 @@ def _derive_in_review(
     Closing events come from two row sets, mirroring `_derive_done_today`'s
     attribution split: the agent's own terminal events (`rows`,
     _QUEUE_TERMINAL_EVENT_TYPES) and Mirror's review verdicts
-    (`verdict_rows`, _QUEUE_VERDICT_EVENT_TYPES) joined by task_id."""
+    (`verdict_rows`, _QUEUE_VERDICT_EVENT_TYPES) joined by task_id.
+    `verdict_rows` is required, not defaulted: deriving without it silently
+    regresses to a lane nothing can close — the caller decides whether a
+    missing fetch means [] (no verdicts) or skip-the-lane (fetch failed)."""
     by_task: dict[str, list[dict[str, Any]]] = {}
     for r in rows:
         tid = r.get('task_id')
@@ -1738,7 +1772,7 @@ def _derive_in_review(
             continue
         by_task.setdefault(tid, []).append(r)
     verdicts_by_task: dict[str, list[dict[str, Any]]] = {}
-    for r in verdict_rows or []:
+    for r in verdict_rows:
         tid = r.get('task_id')
         if not tid or r.get('event_type') not in _QUEUE_VERDICT_EVENT_TYPES:
             continue
@@ -1756,17 +1790,16 @@ def _derive_in_review(
                 latest_rr, latest_rr_dt = e, dt
         if latest_rr is None:
             continue
-        closers = [
-            e for e in evs
-            if e.get('event_type') in _QUEUE_TERMINAL_EVENT_TYPES
-        ] + verdicts_by_task.get(tid, [])
-        has_later_closer = False
-        for e in closers:
+
+        def _later_than_request(e: dict[str, Any]) -> bool:
             dt = _ts_to_dt(e.get('ts'))
-            if dt is not None and dt > latest_rr_dt:
-                has_later_closer = True
-                break
-        if has_later_closer:
+            return dt is not None and dt > latest_rr_dt
+
+        if any(_later_than_request(e) for e in evs
+               if e.get('event_type') in _QUEUE_TERMINAL_EVENT_TYPES):
+            continue
+        if any(_later_than_request(e)
+               for e in verdicts_by_task.get(tid, ())):
             continue
         out.append({
             'task_id': tid,
@@ -1839,6 +1872,9 @@ def _derive_done_today(
         if dt is None:
             continue
         et = r.get('event_type')
+        # Per-type outcome mapping over the same verdict set the in_review
+        # lane closes on (_QUEUE_VERDICT_EVENT_TYPES) — keep the two in sync
+        # or a task can vanish from in_review without ever landing here.
         if et == 'review_pass':
             add(r, dt, 'merged', et)
         elif et in ('review_revision', 'review_escalate'):
@@ -2000,6 +2036,15 @@ def _reader_agent_queue(
             rows if agent == 'mirror'
             else _fetch_chain_events_for_agent(supabase_client, 'mirror')
         )
+        # None = fetch failed (vs [] = no rows). in_review needs BOTH row
+        # sets to be trustworthy: deriving with a failed verdict fetch would
+        # resurrect every open review_request as a phantom entry, so the
+        # lane degrades to [] for this poll instead. done_today keeps its
+        # original degrade-to-empty-inputs behavior.
+        in_review = (
+            [] if rows is None or verdict_rows is None
+            else _derive_in_review(rows, verdict_rows)
+        )
         return {
             'agent': agent,
             'archetype': archetype,
@@ -2007,10 +2052,10 @@ def _reader_agent_queue(
             'building': _reader_agent_queue_building(
                 agents_root, worktrees_root, agent, now=now,
             ),
-            'in_review': _derive_in_review(rows, verdict_rows),
+            'in_review': in_review,
             'active': [],
             'done_today': _derive_done_today(
-                rows, verdict_rows, agent, now=now,
+                rows or [], verdict_rows or [], agent, now=now,
             ),
             'captured_at': _now_utc_iso(now),
         }
@@ -2023,7 +2068,7 @@ def _reader_agent_queue(
         'building': [],
         'in_review': [],
         'active': _reader_agent_queue_active(agents_root, agent, now=now),
-        'done_today': _derive_worker_done_today(rows, agent, now=now),
+        'done_today': _derive_worker_done_today(rows or [], agent, now=now),
         'captured_at': _now_utc_iso(now),
     }
 

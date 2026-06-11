@@ -40,6 +40,7 @@ import safe_write_inbox as swi      # noqa: E402
 # monkeypatches of on.AGENTS_ROOT / on.LOG_FILE / ... still override on top.
 _AGENTS_ROOT_BACKUP = None
 _AGENTS_ROOT_TMPDIR = None
+_LIVE_EMIT_BACKUP = None
 
 # build-mirror-review-status — shared ordered call log. The inert status
 # override (installed in setUpModule) and per-class merge overrides both
@@ -61,10 +62,19 @@ def _inert_mirror_review_status(data, marker_decision):
 
 
 def setUpModule():  # noqa: N802 — unittest hook name
-    global _AGENTS_ROOT_BACKUP, _AGENTS_ROOT_TMPDIR
+    global _AGENTS_ROOT_BACKUP, _AGENTS_ROOT_TMPDIR, _LIVE_EMIT_BACKUP
     _AGENTS_ROOT_BACKUP = os.environ.get('OURLIBERTY_AGENTS_ROOT')
     _AGENTS_ROOT_TMPDIR = tempfile.mkdtemp(prefix='outbox-notifier-test-')
     os.environ['OURLIBERTY_AGENTS_ROOT'] = _AGENTS_ROOT_TMPDIR
+    # forge-queue-in-review-lane: review dispatches now push-emit a chain
+    # event via chain_event_emit. Under `unittest discover` (which never
+    # runs tests/__init__.py — the verified #428 gap) nothing else sets the
+    # guard, and a shell with SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY sourced
+    # (any droplet session) would build a LIVE client and upsert fixture
+    # rows into the real chain_events table. Force the kill-switch for the
+    # whole module; tests that exercise emit behavior mock emit_event.
+    _LIVE_EMIT_BACKUP = os.environ.get('OURLIBERTY_DISABLE_LIVE_EMIT')
+    os.environ['OURLIBERTY_DISABLE_LIVE_EMIT'] = '1'
     for sub in ('logs', 'state', 'blackboard', 'inboxes', 'outboxes'):
         Path(_AGENTS_ROOT_TMPDIR, sub).mkdir(exist_ok=True)
     importlib.reload(swi)  # swi follows OURLIBERTY_AGENTS_ROOT too (prod-write isolation)
@@ -80,6 +90,10 @@ def tearDownModule():  # noqa: N802 — unittest hook name
         os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
     else:
         os.environ['OURLIBERTY_AGENTS_ROOT'] = _AGENTS_ROOT_BACKUP
+    if _LIVE_EMIT_BACKUP is None:
+        os.environ.pop('OURLIBERTY_DISABLE_LIVE_EMIT', None)
+    else:
+        os.environ['OURLIBERTY_DISABLE_LIVE_EMIT'] = _LIVE_EMIT_BACKUP
     if _AGENTS_ROOT_TMPDIR:
         shutil.rmtree(_AGENTS_ROOT_TMPDIR, ignore_errors=True)
     importlib.reload(swi)  # swi follows OURLIBERTY_AGENTS_ROOT too (prod-write isolation)

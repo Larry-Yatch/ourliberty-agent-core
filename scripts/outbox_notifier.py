@@ -1618,15 +1618,17 @@ def _emit_review_request_chain_event(
     Best-effort + ADDITIVE: emit_event logs WARN and returns False on
     Supabase outage; the review dispatch itself never depends on the row
     landing. A lost row only means the task skips the in_review lane
-    visually until the verdict lands. Same daemon-never-wedge invariant as
-    the sibling emit helpers.
+    visually until the verdict lands. The same display-only loss happens if
+    the daemon dies between the inbox write and this emit: re-processing
+    hits the idempotency presence check (which fires before the dispatch
+    try-block) and skips both — accepted, the lane is a view, not state.
+    Same daemon-never-wedge invariant as the sibling emit helpers.
     """
     chain_payload = {
         'agent': 'forge',
         'task_id': task_id,
         'revision_count': revision_count,
         'replan_count': replan_count,
-        'dispatched_by': 'outbox-notifier',
     }
     try:
         chain_event_emit.emit_event(
