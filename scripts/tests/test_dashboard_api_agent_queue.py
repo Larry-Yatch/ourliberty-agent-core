@@ -68,27 +68,32 @@ class _Resp:
 
 class _ChainEventsClient:
     """Answers the dashboard's chain_events read chain:
-    table('chain_events').select(cols).eq('agent', agent).execute().
+    table('chain_events').select(cols).eq('agent', agent).gte('ts', cutoff)
+    .execute().
 
     Pre-seeded with a flat list of rows; execute() filters by the eq('agent')
-    predicate and then projects each row to EXACTLY the selected columns when
-    cols != '*'. Honoring the projection is deliberate: the WHERE clause runs
-    against full rows (like Postgres) but the result only carries the selected
-    columns, so a query that forgets to select a column the deriver depends on
-    fails here the same way it fails in production. (This is the flaw that let
-    PR #303 ship done_today broken — the prior stub returned full rows, so the
-    missing 'agent' column went unnoticed.)
+    and gte('ts') predicates and then projects each row to EXACTLY the
+    selected columns when cols != '*'. Honoring the projection is deliberate:
+    the WHERE clause runs against full rows (like Postgres) but the result
+    only carries the selected columns, so a query that forgets to select a
+    column the deriver depends on fails here the same way it fails in
+    production. (This is the flaw that let PR #303 ship done_today broken —
+    the prior stub returned full rows, so the missing 'agent' column went
+    unnoticed.) The gte filter compares ISO-8601 UTC strings
+    lexicographically, same outcome as Postgres timestamptz ordering.
     """
 
     def __init__(self, rows: Optional[list[dict[str, Any]]] = None):
         self.rows = rows or []
         self._table: Optional[str] = None
         self._filters: dict[str, Any] = {}
+        self._gte: dict[str, Any] = {}
         self._cols: str = '*'
 
     def table(self, name: str):
         self._table = name
         self._filters = {}
+        self._gte = {}
         self._cols = '*'
         return self
 
@@ -100,13 +105,30 @@ class _ChainEventsClient:
         self._filters[col] = val
         return self
 
+    def gte(self, col: str, val: Any):
+        self._gte[col] = val
+        return self
+
     def execute(self):
         agent = self._filters.get('agent')
         data = [r for r in self.rows if r.get('agent') == agent]
+        for col, val in self._gte.items():
+            data = [r for r in data
+                    if r.get(col) is not None and r.get(col) >= val]
         if self._cols != '*':
             keep = [c.strip() for c in self._cols.split(',')]
             data = [{k: r.get(k) for k in keep} for r in data]
         return _Resp(data)
+
+
+class _MirrorFetchFailsClient(_ChainEventsClient):
+    """Forge fetch succeeds, mirror fetch raises — the partial-outage shape
+    the in_review lane must degrade on (not flood with phantom entries)."""
+
+    def execute(self):
+        if self._filters.get('agent') == 'mirror':
+            raise RuntimeError('transient supabase error')
+        return super().execute()
 
 
 # ---------- fixtures ----------
@@ -315,6 +337,96 @@ class InReviewLaneTest(_Base):
         r = c.get('/api/system/agent-queue', headers=AUTH)
         ids = [x['task_id'] for x in r.json()['in_review']]
         self.assertEqual(ids, ['taskA'])
+
+    def test_mirror_verdict_closes_entry(self):
+        # forge-queue-in-review-lane: Mirror's verdict rides agent='mirror'
+        # rows — the forge fetch never sees it. The verdict join (by
+        # task_id) must close the entry, else every reviewed task sits in
+        # the lane forever (auto_merge & co. never land in forge's rows).
+        now = datetime.now(timezone.utc)
+        rows = [
+            {'agent': 'forge', 'task_id': 'taskC',
+             'event_type': 'review_request', 'pr_url': 'https://pr/C',
+             'ts': (now - timedelta(minutes=30)).isoformat()},
+            {'agent': 'mirror', 'task_id': 'taskC',
+             'event_type': 'review_pass', 'pr_url': 'https://pr/C',
+             'ts': (now - timedelta(minutes=5)).isoformat()},
+        ]
+        c = _client(self.agents_root, self.worktrees_root,
+                    _ChainEventsClient(rows))
+        r = c.get('/api/system/agent-queue', headers=AUTH)
+        self.assertEqual(r.json()['in_review'], [])
+
+    def test_rerun_review_request_after_verdict_reopens(self):
+        # REVISION closes the first entry; the re-review dispatch emits a
+        # fresh review_request and the task re-enters the lane with the
+        # new `since`.
+        now = datetime.now(timezone.utc)
+        rerun_ts = (now - timedelta(minutes=10)).isoformat()
+        rows = [
+            {'agent': 'forge', 'task_id': 'taskD',
+             'event_type': 'review_request', 'pr_url': 'https://pr/D',
+             'ts': (now - timedelta(minutes=30)).isoformat()},
+            {'agent': 'mirror', 'task_id': 'taskD',
+             'event_type': 'review_revision', 'pr_url': 'https://pr/D',
+             'ts': (now - timedelta(minutes=20)).isoformat()},
+            {'agent': 'forge', 'task_id': 'taskD',
+             'event_type': 'review_request', 'pr_url': 'https://pr/D',
+             'ts': rerun_ts},
+        ]
+        c = _client(self.agents_root, self.worktrees_root,
+                    _ChainEventsClient(rows))
+        r = c.get('/api/system/agent-queue', headers=AUTH)
+        in_review = r.json()['in_review']
+        self.assertEqual([x['task_id'] for x in in_review], ['taskD'])
+        self.assertEqual(in_review[0]['since'], rerun_ts)
+
+    def test_unrelated_mirror_rows_do_not_close(self):
+        # A verdict for a DIFFERENT task and a non-verdict mirror event for
+        # the SAME task must both leave the entry open.
+        now = datetime.now(timezone.utc)
+        rows = [
+            {'agent': 'forge', 'task_id': 'taskE',
+             'event_type': 'review_request', 'pr_url': 'https://pr/E',
+             'ts': (now - timedelta(minutes=30)).isoformat()},
+            {'agent': 'mirror', 'task_id': 'taskF',
+             'event_type': 'review_pass', 'pr_url': 'https://pr/F',
+             'ts': (now - timedelta(minutes=5)).isoformat()},
+            {'agent': 'mirror', 'task_id': 'taskE',
+             'event_type': 'session_done', 'pr_url': None,
+             'ts': (now - timedelta(minutes=5)).isoformat()},
+        ]
+        c = _client(self.agents_root, self.worktrees_root,
+                    _ChainEventsClient(rows))
+        r = c.get('/api/system/agent-queue', headers=AUTH)
+        ids = [x['task_id'] for x in r.json()['in_review']]
+        self.assertEqual(ids, ['taskE'])
+
+    def test_mirror_fetch_failure_degrades_lane_to_empty(self):
+        # Forge fetch OK, mirror (verdict) fetch raises: deriving anyway
+        # would resurrect every open review_request with nothing able to
+        # close it. The lane must degrade to [] for this poll, not flood.
+        c = _client(self.agents_root, self.worktrees_root,
+                    _MirrorFetchFailsClient(self._rows()))
+        r = c.get('/api/system/agent-queue', headers=AUTH)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['in_review'], [])
+
+    def test_review_request_outside_window_ages_out(self):
+        # A review_request older than _QUEUE_EVENTS_WINDOW_DAYS is excluded
+        # by the fetch cutoff — a review that died without any closing event
+        # (wedged session, dropped verdict emit) must not ghost forever.
+        now = datetime.now(timezone.utc)
+        ancient = now - timedelta(days=da._QUEUE_EVENTS_WINDOW_DAYS + 1)
+        rows = [
+            {'agent': 'forge', 'task_id': 'taskGhost',
+             'event_type': 'review_request', 'pr_url': 'https://pr/G',
+             'ts': ancient.isoformat()},
+        ]
+        c = _client(self.agents_root, self.worktrees_root,
+                    _ChainEventsClient(rows))
+        r = c.get('/api/system/agent-queue', headers=AUTH)
+        self.assertEqual(r.json()['in_review'], [])
 
 
 # ==================== done_today lane ====================

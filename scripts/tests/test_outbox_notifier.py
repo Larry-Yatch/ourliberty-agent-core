@@ -40,6 +40,7 @@ import safe_write_inbox as swi      # noqa: E402
 # monkeypatches of on.AGENTS_ROOT / on.LOG_FILE / ... still override on top.
 _AGENTS_ROOT_BACKUP = None
 _AGENTS_ROOT_TMPDIR = None
+_LIVE_EMIT_BACKUP = None
 
 # build-mirror-review-status — shared ordered call log. The inert status
 # override (installed in setUpModule) and per-class merge overrides both
@@ -61,10 +62,19 @@ def _inert_mirror_review_status(data, marker_decision):
 
 
 def setUpModule():  # noqa: N802 — unittest hook name
-    global _AGENTS_ROOT_BACKUP, _AGENTS_ROOT_TMPDIR
+    global _AGENTS_ROOT_BACKUP, _AGENTS_ROOT_TMPDIR, _LIVE_EMIT_BACKUP
     _AGENTS_ROOT_BACKUP = os.environ.get('OURLIBERTY_AGENTS_ROOT')
     _AGENTS_ROOT_TMPDIR = tempfile.mkdtemp(prefix='outbox-notifier-test-')
     os.environ['OURLIBERTY_AGENTS_ROOT'] = _AGENTS_ROOT_TMPDIR
+    # forge-queue-in-review-lane: review dispatches now push-emit a chain
+    # event via chain_event_emit. Under `unittest discover` (which never
+    # runs tests/__init__.py — the verified #428 gap) nothing else sets the
+    # guard, and a shell with SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY sourced
+    # (any droplet session) would build a LIVE client and upsert fixture
+    # rows into the real chain_events table. Force the kill-switch for the
+    # whole module; tests that exercise emit behavior mock emit_event.
+    _LIVE_EMIT_BACKUP = os.environ.get('OURLIBERTY_DISABLE_LIVE_EMIT')
+    os.environ['OURLIBERTY_DISABLE_LIVE_EMIT'] = '1'
     for sub in ('logs', 'state', 'blackboard', 'inboxes', 'outboxes'):
         Path(_AGENTS_ROOT_TMPDIR, sub).mkdir(exist_ok=True)
     importlib.reload(swi)  # swi follows OURLIBERTY_AGENTS_ROOT too (prod-write isolation)
@@ -80,6 +90,10 @@ def tearDownModule():  # noqa: N802 — unittest hook name
         os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
     else:
         os.environ['OURLIBERTY_AGENTS_ROOT'] = _AGENTS_ROOT_BACKUP
+    if _LIVE_EMIT_BACKUP is None:
+        os.environ.pop('OURLIBERTY_DISABLE_LIVE_EMIT', None)
+    else:
+        os.environ['OURLIBERTY_DISABLE_LIVE_EMIT'] = _LIVE_EMIT_BACKUP
     if _AGENTS_ROOT_TMPDIR:
         shutil.rmtree(_AGENTS_ROOT_TMPDIR, ignore_errors=True)
     importlib.reload(swi)  # swi follows OURLIBERTY_AGENTS_ROOT too (prod-write isolation)
@@ -9562,6 +9576,203 @@ class BeaconHeadlessApprovalRequestTest(unittest.TestCase):
         forge_tasks = list((on.INBOXES_ROOT / 'forge').glob('*.json'))
         self.assertEqual(forge_tasks, [])
 
+    # ---------------- dedup-wedge override (2026-06-11, mirrors PR #403) ----------------
+    #
+    # A stale archived Forge preflight task `<task_id>.json` must NOT
+    # permanently block re-dispatch when the prior attempt was a DEFINITIVE
+    # non-run (spawn-failure / identity-mismatch reject, no PR). The override
+    # fires ONLY on a determinable non-run; in-flight / completed work keeps
+    # the conservative skip. ccd-s1 (identity-reject) is the regression case.
+
+    def _seed_inbox_archive(self, task_id, where='.archive'):
+        """Plant the stale `<task_id>.json` in Forge's inbox archive/.invalid."""
+        d = on.INBOXES_ROOT / 'forge' / where
+        d.mkdir(parents=True, exist_ok=True)
+        (d / f'{task_id}.json').write_text('{}')
+
+    def _seed_outbox_result(self, task_id, body, suffix='.1'):
+        """Plant a Forge RESULT envelope in Forge's outbox archive."""
+        d = on.OUTBOXES_ROOT / 'forge' / '.archive'
+        d.mkdir(parents=True, exist_ok=True)
+        f = d / f'{task_id}{suffix}.json'
+        f.write_text(json.dumps(body))
+        return f
+
+    def _identity_reject_result(self, task_id):
+        # ccd-s1 shape: identity drew BEACON instead of FORGE; the worker
+        # emitted the single IDENTITY_MISMATCH line and stopped — no PR.
+        return {
+            'task_id': task_id,
+            'agent': 'forge',
+            'source': 'beacon',
+            'phase': 'preflight',
+            'exit_code': 0,
+            'result': 'IDENTITY_MISMATCH: expected=forge loaded=beacon',
+            'error': None,
+            'duration_sec': 8.3,
+            'pr_url': None,
+            'completed_at': '2026-06-10T12:15:00.000000+00:00',
+        }
+
+    def _spawn_failure_result(self, task_id):
+        return {
+            'task_id': task_id,
+            'agent': 'forge',
+            'source': 'beacon',
+            'phase': 'preflight',
+            'exit_code': -1,
+            'result': 'All retries exhausted',
+            'error': 'All retries exhausted',
+            'duration_sec': None,
+            'pr_url': None,
+            'completed_at': '2026-06-10T12:15:00.000000+00:00',
+        }
+
+    def _completed_result(self, task_id):
+        return {
+            'task_id': task_id,
+            'agent': 'forge',
+            'source': 'beacon',
+            'phase': 'build',
+            'exit_code': 0,
+            'result': (
+                'PR opened: '
+                'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/410'
+                '\n\nImplemented the change.'
+            ),
+            'error': None,
+            'duration_sec': 142.5,
+            'pr_url': None,
+            'completed_at': '2026-06-10T13:00:00.000000+00:00',
+        }
+
+    def _genuine_reject_result(self, task_id):
+        # A legitimate preflight REJECT (spec not buildable): exit 0, no PR,
+        # NO identity-mismatch token. Must stay deduped — re-dispatch would
+        # just re-REJECT.
+        return {
+            'task_id': task_id,
+            'agent': 'forge',
+            'source': 'beacon',
+            'phase': 'preflight',
+            'exit_code': 0,
+            'result': (
+                '=== REJECT ===\n{"task_id": "ccd-s1", "reason": "spec '
+                'references a file that does not exist"}\n=== END_REJECT ==='
+            ),
+            'error': None,
+            'duration_sec': 21.0,
+            'pr_url': None,
+            'completed_at': '2026-06-10T12:20:00.000000+00:00',
+        }
+
+    def test_dedup_overridden_on_identity_reject(self):
+        # ccd-s1 regression: prior attempt was an IDENTITY_MISMATCH reject
+        # (no PR, no real work). The stale archived task file must NOT wedge
+        # the retry — the override re-dispatches.
+        task_id = 'ccd-s1'
+        self._seed_inbox_archive(task_id)
+        self._seed_outbox_result(task_id, self._identity_reject_result(task_id))
+        body = self._headless_outbox(marker_text=self._marker(task_id=task_id))
+        f = self._write_outbox('beacon', 'larry-ccd-s1.json', body)
+        status = on.process_outbox(f)
+        self.assertEqual(status, 'headless-approval-dispatched')
+        # A fresh live preflight task was written despite the stale archive.
+        self.assertTrue((on.INBOXES_ROOT / 'forge' / f'{task_id}.json').exists())
+        self.assertIn('HEADLESS_DEDUP_OVERRIDE', on.LOG_FILE.read_text())
+
+    def test_dedup_overridden_on_spawn_failure(self):
+        task_id = 'ccd-s1'
+        self._seed_inbox_archive(task_id)
+        self._seed_outbox_result(task_id, self._spawn_failure_result(task_id))
+        body = self._headless_outbox(marker_text=self._marker(task_id=task_id))
+        f = self._write_outbox('beacon', 'larry-spawnfail.json', body)
+        status = on.process_outbox(f)
+        self.assertEqual(status, 'headless-approval-dispatched')
+        self.assertTrue((on.INBOXES_ROOT / 'forge' / f'{task_id}.json').exists())
+        self.assertIn('HEADLESS_DEDUP_OVERRIDE', on.LOG_FILE.read_text())
+
+    def test_dedup_override_fires_from_invalid_dir(self):
+        # The wedge artifact can also live in .invalid/ (a validator-rejected
+        # prior dispatch). The override must fire from there too.
+        task_id = 'ccd-s1'
+        self._seed_inbox_archive(task_id, where='.invalid')
+        self._seed_outbox_result(task_id, self._identity_reject_result(task_id))
+        body = self._headless_outbox(marker_text=self._marker(task_id=task_id))
+        f = self._write_outbox('beacon', 'larry-invalid.json', body)
+        on.process_outbox(f)
+        self.assertTrue((on.INBOXES_ROOT / 'forge' / f'{task_id}.json').exists())
+        self.assertIn('HEADLESS_DEDUP_OVERRIDE', on.LOG_FILE.read_text())
+
+    def test_dedup_still_skips_when_prior_completed(self):
+        # A prior attempt that opened a PR is real work — re-dispatch must
+        # NOT fire; the dedup keeps its skip.
+        task_id = 'ccd-s1'
+        self._seed_inbox_archive(task_id)
+        self._seed_outbox_result(task_id, self._completed_result(task_id))
+        body = self._headless_outbox(marker_text=self._marker(task_id=task_id))
+        f = self._write_outbox('beacon', 'larry-done.json', body)
+        on.process_outbox(f)
+        self.assertFalse((on.INBOXES_ROOT / 'forge' / f'{task_id}.json').exists())
+        self.assertNotIn('HEADLESS_DEDUP_OVERRIDE', on.LOG_FILE.read_text())
+
+    def test_dedup_still_skips_on_genuine_reject(self):
+        # A legitimate REJECT (exit 0, no PR, no identity-mismatch token) is
+        # NOT a non-run — re-dispatch would just re-REJECT. Must stay deduped.
+        task_id = 'ccd-s1'
+        self._seed_inbox_archive(task_id)
+        self._seed_outbox_result(task_id, self._genuine_reject_result(task_id))
+        body = self._headless_outbox(marker_text=self._marker(task_id=task_id))
+        f = self._write_outbox('beacon', 'larry-reject.json', body)
+        on.process_outbox(f)
+        self.assertFalse((on.INBOXES_ROOT / 'forge' / f'{task_id}.json').exists())
+        self.assertNotIn('HEADLESS_DEDUP_OVERRIDE', on.LOG_FILE.read_text())
+
+    def test_dedup_skips_when_no_terminal_result(self):
+        # Notifier crashed mid-flight: the inbox artifact is archived but NO
+        # terminal result exists. The override must NOT fire (conservative).
+        task_id = 'ccd-s1'
+        self._seed_inbox_archive(task_id)
+        body = self._headless_outbox(marker_text=self._marker(task_id=task_id))
+        f = self._write_outbox('beacon', 'larry-crash.json', body)
+        on.process_outbox(f)
+        self.assertFalse((on.INBOXES_ROOT / 'forge' / f'{task_id}.json').exists())
+        self.assertNotIn('HEADLESS_DEDUP_OVERRIDE', on.LOG_FILE.read_text())
+
+    def test_dedup_live_inbox_always_skips(self):
+        # A task currently in the LIVE inbox is in-flight; even with a prior
+        # non-run result present, never double-dispatch it.
+        task_id = 'ccd-s1'
+        live_dir = on.INBOXES_ROOT / 'forge'
+        live_dir.mkdir(parents=True, exist_ok=True)
+        (live_dir / f'{task_id}.json').write_text('{"phase": "preflight"}')
+        self._seed_outbox_result(task_id, self._identity_reject_result(task_id))
+        body = self._headless_outbox(marker_text=self._marker(task_id=task_id))
+        f = self._write_outbox('beacon', 'larry-inflight.json', body)
+        on.process_outbox(f)
+        # Exactly the one we planted; no second write, no override.
+        self.assertEqual(len(list(live_dir.glob(f'{task_id}.json'))), 1)
+        self.assertNotIn('HEADLESS_DEDUP_OVERRIDE', on.LOG_FILE.read_text())
+
+    def test_non_run_helper_defensive(self):
+        # Missing archive dir -> False.
+        self.assertFalse(on._prior_dispatch_was_definitive_non_run('no-such'))
+        # Corrupt envelope -> False (parse error is conservative).
+        d = on.OUTBOXES_ROOT / 'forge' / '.archive'
+        d.mkdir(parents=True, exist_ok=True)
+        (d / 'corrupt.1.json').write_text('{not valid json')
+        self.assertFalse(on._prior_dispatch_was_definitive_non_run('corrupt'))
+        # Prefix-collision guard: a result for `<task>-v2` must not match.
+        self._seed_outbox_result(
+            'pfx-v2', self._spawn_failure_result('pfx-v2')
+        )
+        self.assertFalse(on._prior_dispatch_was_definitive_non_run('pfx'))
+        # Positive cases.
+        self._seed_outbox_result('sf', self._spawn_failure_result('sf'))
+        self.assertTrue(on._prior_dispatch_was_definitive_non_run('sf'))
+        self._seed_outbox_result('im', self._identity_reject_result('im'))
+        self.assertTrue(on._prior_dispatch_was_definitive_non_run('im'))
+
 
 class NoSessionRevisionDmTest(unittest.TestCase):
     """Chain-gap #6 (observed 2026-05-20 on PR #59).
@@ -10896,6 +11107,117 @@ class ReconcileMissedMirrorReviewsTest(unittest.TestCase):
         on._reconcile_missed_mirror_reviews()
         self.assertEqual(
             list((on.INBOXES_ROOT / 'mirror').glob('review-*.json')), [])
+
+
+class ReviewRequestChainEventTest(unittest.TestCase):
+    """forge-queue-in-review-lane: review dispatches push-emit a
+    `review_request` chain_event (agent='forge') so the dashboard's
+    in_review lane populates. The emit fires ONLY on a successful inbox
+    write — idempotent skips and rejected dispatches emit nothing — and
+    an emit failure never breaks the dispatch itself."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT', 'BLACKBOARD',
+            'LOG_FILE', 'DEAD_LETTER_STATE', 'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        on.ensure_dirs()
+        self.captured: list[dict] = []
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        self._tmp.cleanup()
+
+    def _fake_emit(self, **kwargs):
+        self.captured.append(kwargs)
+        return True
+
+    def _data(self):
+        return {
+            'task_id': 'real-rr1',
+            'target_repo': 'ourliberty-agent-core',
+            'branch': 'forge/real-rr1',
+        }
+
+    PR = 'https://github.com/x/y/pull/9'
+
+    def test_first_dispatch_emits_review_request(self):
+        with mock.patch.object(on.chain_event_emit, 'emit_event',
+                               self._fake_emit):
+            on._dispatch_mirror_review(self._data(), self.PR)
+        # The dispatch itself wrote the review task...
+        self.assertEqual(
+            len(list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))), 1)
+        # ...and exactly one review_request event rode along.
+        self.assertEqual(len(self.captured), 1)
+        ev = self.captured[0]
+        self.assertEqual(ev['event_type'], 'review_request')
+        self.assertEqual(ev['agent'], 'forge')
+        self.assertEqual(ev['task_id'], 'real-rr1')
+        self.assertEqual(ev['pr_url'], self.PR)
+        self.assertEqual(ev['payload']['revision_count'], 0)
+        self.assertEqual(ev['payload']['replan_count'], 0)
+
+    def test_rerun_dispatch_emits_with_round_number(self):
+        data = self._data()
+        data['pr_url'] = self.PR
+        with mock.patch.object(on.chain_event_emit, 'emit_event',
+                               self._fake_emit):
+            on._dispatch_mirror_review_rerun(data, 2, 'fixed the findings')
+        self.assertEqual(len(self.captured), 1)
+        ev = self.captured[0]
+        self.assertEqual(ev['event_type'], 'review_request')
+        self.assertEqual(ev['agent'], 'forge')
+        self.assertEqual(ev['pr_url'], self.PR)
+        self.assertEqual(ev['payload']['revision_count'], 2)
+
+    def test_idempotent_skip_does_not_emit(self):
+        inbox = on.INBOXES_ROOT / 'mirror'
+        inbox.mkdir(parents=True, exist_ok=True)
+        (inbox / 'review-real-rr1.json').write_text('{}')
+        with mock.patch.object(on.chain_event_emit, 'emit_event',
+                               self._fake_emit):
+            on._dispatch_mirror_review(self._data(), self.PR)
+        self.assertEqual(self.captured, [])
+
+    def test_rejected_dispatch_does_not_emit(self):
+        with mock.patch.object(
+            swi, 'safe_write_inbox',
+            side_effect=swi.DispatchRejected('denied by validator'),
+        ), mock.patch.object(on.chain_event_emit, 'emit_event',
+                             self._fake_emit):
+            on._dispatch_mirror_review(self._data(), self.PR)
+        self.assertEqual(self.captured, [])
+
+    def test_emit_failure_does_not_break_dispatch(self):
+        def _raise(**_):
+            raise RuntimeError('supabase blew up')
+
+        with mock.patch.object(on.chain_event_emit, 'emit_event', _raise):
+            # Must not propagate — daemon-never-wedge.
+            on._dispatch_mirror_review(self._data(), self.PR)
+        self.assertEqual(
+            len(list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))), 1)
 
 
 if __name__ == '__main__':
