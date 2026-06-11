@@ -15,6 +15,7 @@ Run:
 from __future__ import annotations
 
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -75,6 +76,28 @@ class _NoopGuard:
         return 0
 
 
+def _pin_log_dir(tc, root):
+    """Route agent_runner.log()'s write-time OURLIBERTY_LOG_DIR resolution
+    into the test's tmp tree so un-mocked log() calls (incl. the #438
+    TRANSCRIPT_NOT_PERSISTED ERROR) can't land in the real ~/agents/logs/.
+    Guards the bare `python3 -m unittest` invocation — the discover gate
+    (#436) pins this process-wide, but direct runs have no other layer.
+    Restore registers via addCleanup, not tearDown: unittest skips tearDown
+    when setUp raises (e.g. the mkdir below), but cleanups still run.
+    """
+    prev = os.environ.get('OURLIBERTY_LOG_DIR')
+
+    def _restore():
+        if prev is None:
+            os.environ.pop('OURLIBERTY_LOG_DIR', None)
+        else:
+            os.environ['OURLIBERTY_LOG_DIR'] = prev
+
+    tc.addCleanup(_restore)
+    os.environ['OURLIBERTY_LOG_DIR'] = str(root / 'logs')
+    (root / 'logs').mkdir(parents=True, exist_ok=True)
+
+
 class RunClaudeActiveTierEnvTest(unittest.TestCase):
     """Verify that ``env['HOME']`` follows active-tier state across both
     the primary and fallback subprocess invocations."""
@@ -90,19 +113,10 @@ class RunClaudeActiveTierEnvTest(unittest.TestCase):
         # Working dir must exist for Popen's cwd= arg
         self.workdir = self.root / 'work'
         self.workdir.mkdir(parents=True, exist_ok=True)
-        # Sandbox ar.log's write-time resolution so un-mocked log() calls
-        # (incl. the #438 TRANSCRIPT_NOT_PERSISTED ERROR) never land in the
-        # real ~/agents/logs/forge.log.
-        self._prev_log_dir = os.environ.get('OURLIBERTY_LOG_DIR')
-        os.environ['OURLIBERTY_LOG_DIR'] = str(self.root / 'logs')
-        (self.root / 'logs').mkdir(parents=True, exist_ok=True)
+        _pin_log_dir(self, self.root)
 
     def tearDown(self):
         import os
-        if self._prev_log_dir is None:
-            os.environ.pop('OURLIBERTY_LOG_DIR', None)
-        else:
-            os.environ['OURLIBERTY_LOG_DIR'] = self._prev_log_dir
         if self._prev_root is None:
             os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
         else:
@@ -252,19 +266,10 @@ class ResumeNoFallbackRefusalTest(unittest.TestCase):
         os.environ['OURLIBERTY_AGENTS_ROOT'] = str(self.root)
         self.workdir = self.root / 'work'
         self.workdir.mkdir(parents=True, exist_ok=True)
-        # Sandbox ar.log's write-time resolution so un-mocked log() calls
-        # (incl. the #438 TRANSCRIPT_NOT_PERSISTED ERROR) never land in the
-        # real ~/agents/logs/forge.log.
-        self._prev_log_dir = os.environ.get('OURLIBERTY_LOG_DIR')
-        os.environ['OURLIBERTY_LOG_DIR'] = str(self.root / 'logs')
-        (self.root / 'logs').mkdir(parents=True, exist_ok=True)
+        _pin_log_dir(self, self.root)
 
     def tearDown(self):
         import os
-        if self._prev_log_dir is None:
-            os.environ.pop('OURLIBERTY_LOG_DIR', None)
-        else:
-            os.environ['OURLIBERTY_LOG_DIR'] = self._prev_log_dir
         if self._prev_root is None:
             os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
         else:
@@ -339,19 +344,10 @@ class AuthCircuitBreakerTest(unittest.TestCase):
         os.environ['OURLIBERTY_AGENTS_ROOT'] = str(self.root)
         self.workdir = self.root / 'work'
         self.workdir.mkdir(parents=True, exist_ok=True)
-        # Sandbox ar.log's write-time resolution so un-mocked log() calls
-        # (incl. the #438 TRANSCRIPT_NOT_PERSISTED ERROR) never land in the
-        # real ~/agents/logs/forge.log.
-        self._prev_log_dir = os.environ.get('OURLIBERTY_LOG_DIR')
-        os.environ['OURLIBERTY_LOG_DIR'] = str(self.root / 'logs')
-        (self.root / 'logs').mkdir(parents=True, exist_ok=True)
+        _pin_log_dir(self, self.root)
 
     def tearDown(self):
         import os
-        if self._prev_log_dir is None:
-            os.environ.pop('OURLIBERTY_LOG_DIR', None)
-        else:
-            os.environ['OURLIBERTY_LOG_DIR'] = self._prev_log_dir
         if self._prev_root is None:
             os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
         else:
@@ -573,19 +569,10 @@ class TierFailureLogTaggingTest(unittest.TestCase):
         os.environ['OURLIBERTY_AGENTS_ROOT'] = str(self.root)
         self.workdir = self.root / 'work'
         self.workdir.mkdir(parents=True, exist_ok=True)
-        # Sandbox ar.log's write-time resolution so un-mocked log() calls
-        # (incl. the #438 TRANSCRIPT_NOT_PERSISTED ERROR) never land in the
-        # real ~/agents/logs/forge.log.
-        self._prev_log_dir = os.environ.get('OURLIBERTY_LOG_DIR')
-        os.environ['OURLIBERTY_LOG_DIR'] = str(self.root / 'logs')
-        (self.root / 'logs').mkdir(parents=True, exist_ok=True)
+        _pin_log_dir(self, self.root)
 
     def tearDown(self):
         import os
-        if self._prev_log_dir is None:
-            os.environ.pop('OURLIBERTY_LOG_DIR', None)
-        else:
-            os.environ['OURLIBERTY_LOG_DIR'] = self._prev_log_dir
         if self._prev_root is None:
             os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
         else:

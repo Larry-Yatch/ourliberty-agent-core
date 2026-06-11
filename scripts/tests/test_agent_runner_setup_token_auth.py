@@ -88,6 +88,28 @@ class _NoopGuard:
         return 0
 
 
+def _pin_log_dir(tc, root):
+    """Route agent_runner.log()'s write-time OURLIBERTY_LOG_DIR resolution
+    into the test's tmp tree so un-mocked log() calls (incl. the #438
+    TRANSCRIPT_NOT_PERSISTED ERROR) can't land in the real ~/agents/logs/.
+    Guards the bare `python3 -m unittest` invocation — the discover gate
+    (#436) pins this process-wide, but direct runs have no other layer.
+    Restore registers via addCleanup, not tearDown: unittest skips tearDown
+    when setUp raises (e.g. the mkdir below), but cleanups still run.
+    """
+    prev = os.environ.get('OURLIBERTY_LOG_DIR')
+
+    def _restore():
+        if prev is None:
+            os.environ.pop('OURLIBERTY_LOG_DIR', None)
+        else:
+            os.environ['OURLIBERTY_LOG_DIR'] = prev
+
+    tc.addCleanup(_restore)
+    os.environ['OURLIBERTY_LOG_DIR'] = str(root / 'logs')
+    (root / 'logs').mkdir(parents=True, exist_ok=True)
+
+
 class _RunClaudeHarness(unittest.TestCase):
     """Common scaffolding: per-test agents-root, tier-state writer, and
     run_claude driver that returns the captured Popen + subprocess.run env
@@ -110,14 +132,10 @@ class _RunClaudeHarness(unittest.TestCase):
         self._prev_env_file = os.environ.get('OURLIBERTY_CREDENTIALS_ENV_FILE')
         os.environ['OURLIBERTY_CREDENTIALS_ENV_FILE'] = str(
             self.root / 'no-such.env')
-        # Sandbox ar.log's write-time resolution: most tests here don't mock
-        # ar.log, so without this the 'Running'/'Completed' lines (and the
-        # #438 TRANSCRIPT_NOT_PERSISTED ERROR) land in the real
-        # ~/agents/logs/forge.log. Distinct attr name so it can't collide
-        # with TokenValueNeverLoggedTest's own _prev_log_dir handling.
-        self._harness_prev_log_dir = os.environ.get('OURLIBERTY_LOG_DIR')
-        os.environ['OURLIBERTY_LOG_DIR'] = str(self.root / 'logs')
-        (self.root / 'logs').mkdir(parents=True, exist_ok=True)
+        # Most tests here don't mock ar.log — without the pin the
+        # 'Running'/'Completed' lines (and the #438 TRANSCRIPT_NOT_PERSISTED
+        # ERROR) land in the real ~/agents/logs/forge.log.
+        _pin_log_dir(self, self.root)
         self.workdir = self.root / 'work'
         self.workdir.mkdir(parents=True, exist_ok=True)
 
@@ -130,7 +148,6 @@ class _RunClaudeHarness(unittest.TestCase):
             ('CLAUDE_CODE_OAUTH_TOKEN_TIER1', self._prev_t1),
             ('CLAUDE_CODE_OAUTH_TOKEN_TIER2', self._prev_t2),
             ('OURLIBERTY_CREDENTIALS_ENV_FILE', self._prev_env_file),
-            ('OURLIBERTY_LOG_DIR', self._harness_prev_log_dir),
         ):
             if prev is None:
                 os.environ.pop(name, None)
@@ -425,21 +442,9 @@ class TokenValueNeverLoggedTest(_RunClaudeHarness):
 
     def setUp(self):
         super().setUp()
-        # Pin OURLIBERTY_LOG_DIR to a fresh per-test directory so the scan
-        # below sees ONLY what this test produced. Order-independent: works
-        # whether or not earlier tests left OURLIBERTY_LOG_DIR set (the
-        # full-discovery suite has tests that unset it).
+        # The harness already pins OURLIBERTY_LOG_DIR to this exact per-test
+        # path (and creates it); keep only the handle the scan below globs.
         self.log_dir = self.root / 'logs'
-        self.log_dir.mkdir(parents=True, exist_ok=True)
-        self._prev_log_dir = os.environ.get('OURLIBERTY_LOG_DIR')
-        os.environ['OURLIBERTY_LOG_DIR'] = str(self.log_dir)
-
-    def tearDown(self):
-        if self._prev_log_dir is None:
-            os.environ.pop('OURLIBERTY_LOG_DIR', None)
-        else:
-            os.environ['OURLIBERTY_LOG_DIR'] = self._prev_log_dir
-        super().tearDown()
 
     def test_neither_tier_token_appears_in_log_file(self):
         self._write_state('tier1')

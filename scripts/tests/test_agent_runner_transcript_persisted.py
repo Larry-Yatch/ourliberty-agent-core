@@ -20,6 +20,7 @@ Run:
 from __future__ import annotations
 
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -45,6 +46,28 @@ def _transcript_path(home: Path, cwd: str, session_id: str) -> Path:
     '/' replaced by '-'."""
     slug = cwd.replace('/', '-')
     return home / '.claude' / 'projects' / slug / (session_id + '.jsonl')
+
+
+def _pin_log_dir(tc, root):
+    """Route agent_runner.log()'s write-time OURLIBERTY_LOG_DIR resolution
+    into the test's tmp tree so un-mocked log() calls (incl. the intentional
+    TRANSCRIPT_NOT_PERSISTED ERROR) can't land in the real ~/agents/logs/.
+    Guards the bare `python3 -m unittest` invocation — the discover gate
+    (#436) pins this process-wide, but direct runs have no other layer.
+    Restore registers via addCleanup, not tearDown: unittest skips tearDown
+    when setUp raises (e.g. the mkdir below), but cleanups still run.
+    """
+    prev = os.environ.get('OURLIBERTY_LOG_DIR')
+
+    def _restore():
+        if prev is None:
+            os.environ.pop('OURLIBERTY_LOG_DIR', None)
+        else:
+            os.environ['OURLIBERTY_LOG_DIR'] = prev
+
+    tc.addCleanup(_restore)
+    os.environ['OURLIBERTY_LOG_DIR'] = str(root / 'logs')
+    (root / 'logs').mkdir(parents=True, exist_ok=True)
 
 
 class VerifyTranscriptPersistedUnitTest(unittest.TestCase):
@@ -178,20 +201,11 @@ class RunClaudeTranscriptCheckIntegrationTest(unittest.TestCase):
         state = self.root / 'blackboard' / 'active-tier.json'
         state.parent.mkdir(parents=True, exist_ok=True)
         state.write_text(json.dumps({'tier': 'tier1'}))
-        # Sandbox ar.log's write-time resolution: this class drives run_claude
-        # without mocking ar.log, so its 'Running'/'Completed' lines (and the
-        # intentional TRANSCRIPT_NOT_PERSISTED ERROR) must not land in the
-        # real ~/agents/logs/forge.log.
-        self._prev_log_dir = os.environ.get('OURLIBERTY_LOG_DIR')
-        os.environ['OURLIBERTY_LOG_DIR'] = str(self.root / 'logs')
-        (self.root / 'logs').mkdir(parents=True, exist_ok=True)
+        # This class drives run_claude without mocking ar.log.
+        _pin_log_dir(self, self.root)
 
     def tearDown(self):
         import os
-        if self._prev_log_dir is None:
-            os.environ.pop('OURLIBERTY_LOG_DIR', None)
-        else:
-            os.environ['OURLIBERTY_LOG_DIR'] = self._prev_log_dir
         if self._prev_root is None:
             os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
         else:
@@ -256,6 +270,53 @@ class RunClaudeTranscriptCheckIntegrationTest(unittest.TestCase):
         self.assertTrue(success)
         self.assertEqual(ret_sid, sid)
         alert.assert_not_called()
+
+
+class RealAppendAlertSeamTest(unittest.TestCase):
+    """Drive the REAL larry_alerts.append_alert (paths patched into a tmp
+    tree) through _verify_transcript_persisted and assert the ledger line
+    lands.
+
+    Every other run_claude suite mocks append_alert away, and production
+    wraps the call in ``except Exception: pass`` — so without this test a
+    signature drift in append_alert (renamed kwarg, new required arg) would
+    pass every suite while silently killing the #438 critical alert in
+    production. The path globals are patched as module attributes because
+    larry_alerts freezes them from Path.home() at import; env vars cannot
+    redirect them.
+    """
+
+    def test_missing_transcript_lands_real_ledger_line(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name)
+        alerts_file = root / 'blackboard' / 'larry-alerts.jsonl'
+
+        with mock.patch.object(larry_alerts, 'ALERTS_FILE', alerts_file), \
+                mock.patch.object(larry_alerts, 'COOLDOWN_ROOT',
+                                  root / 'state' / 'alert-cooldown'), \
+                mock.patch.object(larry_alerts, 'SILENCE_ROOT',
+                                  root / 'state' / 'alert-silenced'), \
+                mock.patch.object(ar, 'log'):
+            result = ar._verify_transcript_persisted(
+                'forge', str(root / 'home'), 'tier2',
+                '/home/larry/agent-worktrees/wt-forge-demo',
+                'sess-gone-0123', task_stem='demo-task',
+            )
+
+        self.assertFalse(result)
+        lines = alerts_file.read_text().strip().splitlines()
+        self.assertEqual(
+            len(lines), 1,
+            'the real append_alert must land exactly one ledger line — '
+            'zero means the call raised and was swallowed by the '
+            'except-pass in _verify_transcript_persisted',
+        )
+        rec = json.loads(lines[0])
+        self.assertEqual(rec['source'], 'agent-runner-forge')
+        self.assertEqual(rec['severity'], 'critical')
+        self.assertEqual(rec['subject'], 'transcript-not-persisted:tier2')
+        self.assertEqual(rec['route'], 'escalate')
 
 
 if __name__ == '__main__':
