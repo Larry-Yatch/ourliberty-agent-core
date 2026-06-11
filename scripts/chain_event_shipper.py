@@ -461,16 +461,24 @@ def make_event(
     cost_usd: Optional[float] = None,
     payload: Optional[dict[str, Any]] = None,
     source: str = '',
+    id_extra: Optional[str] = None,
 ) -> Optional[ChainEvent]:
     """Build a ChainEvent, validating event_type against KNOWN_EVENT_TYPES.
 
     Returns None if event_type is unknown — caller logs WARN; the row is
     never sent to Supabase. The weekly audit healer separately catches any
     unknown types that DO land (hot-patched code, drift, etc.).
+
+    ``id_extra`` feeds compute_event_id's disambiguator: log timestamps have
+    1-second resolution, so without it two distinct same-task lines in the
+    same second (AUTO_MERGE outcome=failed + retry outcome=merged) collide
+    on the PK and ON CONFLICT DO NOTHING silently drops the second — the
+    advancer's merge gate would then never see the merged row. Callers with
+    higher-resolution timestamps omit it and hash exactly as before.
     """
     if event_type not in KNOWN_EVENT_TYPES:
         return None
-    event_id = compute_event_id(task_id, event_type, ts)
+    event_id = compute_event_id(task_id, event_type, ts, extra=id_extra)
     return ChainEvent(
         event_id=event_id, ts=ts, agent=agent, task_id=task_id,
         event_type=event_type, pr_url=pr_url, cost_usd=cost_usd,
@@ -676,9 +684,13 @@ def parse_log_line(line: str) -> Optional[ChainEvent]:
     payload = {k: v for k, v in kv.items()
                if k not in ('task', 'task_id', 'agent', 'pr', 'cost_usd')}
     payload['raw_keyword'] = keyword
+    # id_extra=rest: re-reading the same line after a cursor rewind still
+    # dedups (identical rest → identical id), while two different lines for
+    # the same task in the same second (1s log resolution) stay distinct.
     return make_event(
         agent=agent, event_type=event_type, ts=ts, task_id=task_id,
         pr_url=pr_url, cost_usd=cost, payload=payload, source='outbox_log',
+        id_extra=rest,
     )
 
 

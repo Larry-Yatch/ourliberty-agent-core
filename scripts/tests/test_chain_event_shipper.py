@@ -339,6 +339,22 @@ class TestParseLogLine(unittest.TestCase):
         self.assertIsNotNone(ev)
         self.assertEqual(ev.ts, '2026-05-25T19:42:13+00:00')
 
+    def test_same_second_distinct_outcomes_get_distinct_event_ids(self):
+        # Log timestamps have 1-second resolution. Without the id_extra
+        # disambiguator, a failed merge + a retry succeeding in the same
+        # second hash to the same event_id and ON CONFLICT DO NOTHING drops
+        # the merged row — the advancer's gate then never sees the merge.
+        base = '[2026-06-11 00:00:23] [notifier] [INFO] AUTO_MERGE task=t1 '
+        failed = ces.parse_log_line(
+            base + 'pr=https://example/pr/1 outcome=failed reason=x agent=forge\n')
+        merged = ces.parse_log_line(
+            base + 'pr=https://example/pr/1 outcome=merged agent=forge\n')
+        self.assertNotEqual(failed.event_id, merged.event_id)
+        # Re-reading the identical line (cursor rewind) still dedups.
+        replay = ces.parse_log_line(
+            base + 'pr=https://example/pr/1 outcome=merged agent=forge\n')
+        self.assertEqual(merged.event_id, replay.event_id)
+
     def test_non_event_line_returns_none(self):
         line = '[2026-06-11 00:00:23] [notifier] [INFO] random log no keyword\n'
         self.assertIsNone(ces.parse_log_line(line))
