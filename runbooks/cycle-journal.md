@@ -4,6 +4,111 @@
 
 ---
 
+## Iteration ~1481 — 2026-06-11 15:25Z UTC (interactive, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Tier 1 — PR #457 UNKNOWN carry ([yellow]); 1 new Tier-4 alert (unreviewed-merge:464, DM pre-delivered by outbox notifier). G-rule post-merge-stale-inbox-file dispatch double-rejected (JSON malformation). All other checks nominal.
+
+**VERIFY-BEFORE-REASSERT (iter ~1479 watch items):**
+- PR #464: **CONFIRMED MERGED** at 15:15Z UTC (Larry-direct). unreviewed-merge:464 alert L1268 delivered by outbox notifier at 15:18Z UTC (idx=1267). ✅ Closed.
+- PR #457: **STILL OPEN/UNKNOWN** — confirmed via `gh pr list`. Age ~7h10m. [yellow] carry. 24h threshold: 2026-06-12 08:13Z.
+- `build-ccd-s4-healer-recover-then-alert.json` in Forge inbox: **STILL PRESENT** (mtime Jun 11 07:00). Pipeline stall healer FORGE_NO_PR_SKIP (reason=pr_exists match=branch pr=#463). G-rule 3/3 dispatch: **DOUBLE-REJECTED** by Beacon (.invalid). See G-rule tracking.
+- Iter ~1480 post-merge-stale dispatch (corrected re-dispatch): **REJECTED** — `cycle-finding-post-merge-stale-inbox-file-20260611T152000Z.json` in Beacon .invalid, reason "json: Extra data: line 1 column 12 (char 11)". Envelope JSON malformation; systemic fix dispatch blocked.
+
+**Correction — unreviewed-merge classification:** Prior journal entries (iters ~1477, ~1479) treated `unreviewed-merge:*` as Tier-3 silence. **This was incorrect.** `alert-translations.json` carries `never_silence: true` for `heal-unreviewed-merge-detector/unreviewed-merge`. Triage script confirms **Tier-4** (ask/surface; never-silence). The actor-exemption-config (pending `go: actor-exemption-config`) would create a proper Tier-3 exemption; until then, correct classification is Tier-4. Correcting journal going forward.
+
+**Check 0 — Alert triage:** Total lines: 1268 (+1 since L1267).
+- L1268 (`heal-unreviewed-merge-detector`): `unreviewed-merge:464` — **Tier-4** (never-silence=true; actor-exemption pending). DM pre-delivered by outbox notifier at 15:18Z UTC (idx=1267). Triage row recorded. Watermark L1267→L1268. Tier-reset applied.
+- 0 open untriaged alerts.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last bot delivery: idx=1267 (unreviewed-merge:464) at 15:18Z UTC. No new Larry directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected` (FORGE_NO_PR_SKIP for 19 known tasks including ccd-s4 skipped as pr_exists=PR#463 merged). ✅ Nominal.
+
+**Check 4 — Pending directives / Inboxes:**
+- Forge: 2 items — `build-ccd-s4-healer-recover-then-alert.json` (07:00, stale post-#463) + `ccd-s5-doctrine-and-handling-shapes.json` (07:50). Normal build state; healer already FORGE_NO_PR_SKIP on stale item.
+- Beacon: EMPTY (both post-merge-stale dispatches → .invalid, JSON malformation). Mirror: EMPTY ✅ | Pulse: EMPTY ✅
+✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — standing known. ✅ Known.
+
+**Check A — Source repo:** branch=main, clean (session gitStatus; HEAD=a6d221d "Pulse cycle 20260611T151948Z"). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-11T14:52:15Z (~29 min ago), status=no-change. ✅ Within 2h threshold.
+
+**Check C — Agent liveness:** 9/9 services active (beacon-bot, chain-event-shipper, cycle, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot). ✅ Nominal.
+
+**Check E — PRs:**
+- **PR #457** (`fix(reaper): release handoff guard`) — OPEN, UNKNOWN. Age ~7h10m. No autoMerge. [yellow] carry. 24h threshold 2026-06-12 08:13Z.
+- **PR #464** (`refactor(tz)`) — MERGED 15:15Z (Larry-direct). ✅ Closed.
+
+**Check H — Forge digest:**
+- Open: 1 — PR #457 (~7h10m, UNKNOWN).
+- Merged in last 4h: PR #464 (15:15Z, Larry-direct). ✅ Nominal.
+
+**§5.0 bug-hunt gate:** no committed audit baseline, no-op. ✅
+
+**Conditional checks:** Thursday 2026-06-11 — Check I (Sun/Mon/Wed/Fri only) → skip. Check III: last ran 14:06Z (iter ~1472); next eligible 2026-06-25. ✅ Credential rotations: SUPABASE_SERVICE_ROLE_KEY due ~72d. No 60d trigger. ✅
+
+**G-rule tracking:**
+- **post-merge-stale-inbox-file** G-rule 3/3: Both dispatch attempts to Beacon REJECTED (.invalid, JSON malformation "Extra data: line 1 column 12"). Stale file harmless (pipeline healer FORGE_NO_PR_SKIP). Systemic fix dispatch blocked by F24b.
+- **F24b — dispatch envelope JSON malformation**: 2/3 (iter ~1480 first re-dispatch + this iter's second re-dispatch both rejected for JSON syntax errors). At 3/3: dispatch Forge brief to fix envelope writer. Note: F24b prevents post-merge-stale-inbox-file G-rule from landing — two independent bugs compounding.
+- All other G-rules carry from iter ~1479 unchanged.
+
+**Actions taken:**
+- Check 0: Triaged L1268 (Tier-4, unreviewed-merge:464). Advanced alert-triage watermark L1267→L1268.
+
+**Standing findings:**
+- [yellow] **PR #457 CI UNKNOWN** — OPEN, `mergeStateStatus=UNKNOWN` (~7h10m). Direct Larry decision: merge or close. 24h threshold: 2026-06-12 08:13Z.
+- [yellow] **F24b + post-merge-stale-inbox-file blocked** — dispatch envelopes failing JSON validation; G-rule 3/3 dispatch double-rejected. At 3/3 of F24b: Forge brief needed.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter ~1378. Carry.
+- [yellow] **Check III threshold proposals** — 2 high-attention (beacon Δ92%, forge Δ64%), 2 minor. `approve threshold-update-2026-06-11`. Pending Larry.
+- [blue] `build-ccd-s4-healer-recover-then-alert.json` — stale in Forge inbox. Harmless. F24b blocks systemic dispatch.
+- [blue] `ccd-s5-doctrine-and-handling-shapes.json` — Forge inbox. Watch for CCD-S5 PR.
+- [blue] fix-build-background-poll-idiom-001 — not yet dispatched. Watch for Beacon.
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry.
+- [blue] catalog-accuracy-drift — 5/34 shelf cards drifted. 1/3 G-rule.
+- [blue] alert-triage watermark L1268. ✅
+- [blue] sync-push-rebase-fallback-001 — 1/3 G-rule.
+- [blue] cycle.timer G-rule 3/3 dispatched; Beacon consumed. Carry.
+- [blue] heal-stale-daemon-code:auto-restarted — G-rule dispatched iter ~1416.
+- [blue] heal-stale-daemon-code-state.json MISSING — standing known.
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464) — Tier-4 (never-silence; actor-exemption pending `go: actor-exemption-config`).
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred.
+- [blue] G-rule `auto-restart-failed:*` — 1/3.
+- [blue] G-rule completion-DM delivery failure — 1/3.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` — 1/3.
+- [blue] G-rule dispatch-branch-cleanup:summary — 1/3.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] `retry-exhausted-on-shipped-task` — 2/3. Carry.
+- [blue] `retry_exhausted:post-merge-install-drift-trigger-001` — 1/3.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter ~1251.
+- [blue] `sentinel-inbox-stall-ignores-inflight` — 2/3 G-rule.
+- [blue] G-rule `actor-exemption-config 3/3` — APPROVAL_REQUEST pending `go: actor-exemption-config`.
+- [blue] G-rule `cycle-timer checkpoint 3/3` — pending `go: cycle-timer checkpoint`.
+- [blue] F24b: JSON malformation in dispatch envelopes — **2/3 G-rule**.
+- [blue] Check III gate discrepancy — ran 11d after prior run.
+
+**Watch items for iter ~1482:**
+- PR #457: OPEN/UNKNOWN. Nudge Larry if >24h by 2026-06-12 08:13Z.
+- Sync: last_sync=14:52:15Z (~29m). If >2h at next iter, trigger ff+sync.
+- F24b: Watch for 3rd occurrence — then Forge dispatch for envelope writer fix.
+- Beacon: EMPTY — watch for Beacon to process any incoming CCD-S5 notify.
+
+**PRIME DIRECTIVE:** +1 intervention this iter (Check 0, Tier-4 unreviewed-merge:464 triage). Running total: interventions=786, systemic_fixes=21, verification_pending=10, iter_clean=48, ratio≈37.43, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0 (Tier-4 alert + PR #457 UNKNOWN).
+
+---
+
 ## Iter ~1480 dead-letter response — 2026-06-11 15:20Z UTC
 
 **Trigger:** Inter-agent notify — dead-letter for `cycle-finding-post-merge-stale-inbox-file-20260611T151439Z` (dispatched by iter ~1480 cycle).
