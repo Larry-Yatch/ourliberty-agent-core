@@ -4,6 +4,106 @@
 
 ---
 
+## Iteration ~1473 — 2026-06-11 14:26Z UTC (interactive, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry direct invocation.
+
+**Health:** ⚠️ Drift — PR #457 CI state degraded CLEAN→UNSTABLE since iter ~1472 narrative. All mandatory checks otherwise nominal. 9/9 services active. Tier 1, consecutive_clean 0→0.
+
+**VERIFY-BEFORE-REASSERT (iter ~1472 watch items):**
+- `build-ccd-s4-healer-recover-then-alert.json` in Forge inbox: **STILL PRESENT** — carry. [blue]
+- `ccd-s5-doctrine-and-handling-shapes.json` in Forge inbox: **STILL PRESENT** — carry. [blue]
+- fix-build-background-poll-idiom-001: **NOT YET in Forge inbox** — carry. [blue]
+- PR #457 Larry response: **STILL PENDING** — now MERGEABLE/UNSTABLE (`mergeStateStatus=UNSTABLE`; iter ~1472 noted "CI resolved/MERGEABLE" — re-verified this iter: CI check now failing/unstable). [yellow] carry (downgrade noted).
+- APPROVAL_REQUEST `wedged-forge-exit-fix-direction-20260611`: **beacon-pending-approvals.json MISSING** — carry. [yellow]
+- Check III threshold proposals: **PENDING Larry approval** — carry. [yellow]
+
+**Check 0 — Alert triage:** Total lines: 1265. Prior watermark: L1265 (from iter ~1472). **0 new alerts** since last watermark. ✅ Nominal. Watermark unchanged.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry inbound: 02:39 MDT (08:39Z UTC, ~5h47m ago at check time). Last beacon bot delivery: idx=1264 at 08:08 MDT (threshold-proposal-2026-06-11). Beacon bot log: HTTP 429/502 errors at 08:00 MDT (transient, normal retry pattern) — bot recovered and delivered. No new Larry directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected` (FORGE_NO_PR_SKIP for 24 known tasks). ✅ Nominal.
+
+**Check 4 — Pending directives / Inboxes:**
+- Forge: 2 items — `build-ccd-s4-healer-recover-then-alert.json` (known carry) + `ccd-s5-doctrine-and-handling-shapes.json` (CCD-S5; dispatched iter ~1471). ✅ Normal active build state.
+- Beacon: EMPTY ✅
+- Mirror: EMPTY ✅
+- Pulse: EMPTY ✅
+No orphan directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — standing known. ✅ Known.
+
+**Check A — Source repo:** branch=main, clean (session gitStatus; HEAD=c341f90 "Pulse cycle 20260611T142155Z"). ✅ Nominal. Three automated cycle commits landed since iter ~1471 (52cf94d, 7ea773b, c341f90) — wrapper-driven, expected.
+
+**Check B — Sync health:** last_sync=2026-06-11T13:52:16Z (~34 min ago at check time), status=no-change (commit 79290fe). ✅ Within 2h threshold.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active/running. ✅ Nominal.
+
+**Check E — PRs:**
+- **PR #457** (`fix(reaper): release handoff guard on ownership/merged/worktree-deleted`) — OPEN, `merge=MERGEABLE state=UNSTABLE` (CI check failing; iter ~1472 narrative said "CI resolved/CLEAN" — re-verified this iter via `gh pr view 457 --json mergeStateStatus`: `UNSTABLE`). No reviews, no autoMerge. Age ~370 min (~6h10m). [yellow] carry. UNSTABLE is a regression from iter ~1472's CLEAN read; outstanding Mirror escalation (`_candidate_owns_build_dispatch` non-functional) means no auto-merge regardless. Noting for Larry: CI may need a re-run or rebase.
+
+**§5.0 bug-hunt gate:** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal → no-op. ✅
+
+**Conditional checks:** Thursday 2026-06-11 — Check I (Sun/Mon/Wed/Fri only) → skip. Check III: ran at 14:06Z (iter ~1472); next eligible 2026-06-25 (14d). ✅ Credential rotations: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). No 60d trigger. ✅
+
+**G-rule tracking:**
+- All G-rules carry from iter ~1472 unchanged. No new occurrences this iter.
+- unreviewed-merge set unchanged: (454, 456, 453, 448, 458, 459, 460, 461, 462, 463) — G-rule 3/3 DISPATCHED, Tier-3 known.
+
+**Actions taken:** None — observation-only iter. No auto-fix conditions met.
+
+**Standing findings (carry with updates):**
+- [yellow] **PR #457 CI UNSTABLE** — `mergeStateStatus=UNSTABLE` (regression from iter ~1472 CLEAN). `_candidate_owns_build_dispatch` Mirror escalation outstanding. Larry response still needed. ~6h10m standing. CI may need re-run or rebase.
+- [yellow] **APPROVAL_REQUEST `wedged-forge-exit-fix-direction-20260611`** — Beacon DM sent (iter ~1451). Pending Larry response. beacon-pending-approvals.json MISSING.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter ~1378. Carry pending Beacon/Forge.
+- [yellow] **Check III threshold proposals** — 2 high-attention (beacon Δ92%, forge Δ64%), 2 minor (mirror +7%, pulse -5%). DM delivered iter ~1472. Approval: `approve threshold-update-2026-06-11`. Pending Larry.
+- [blue] **CCD-S5 `ccd-s5-doctrine-and-handling-shapes.json`** — in Forge inbox. Watch for preflight → PR.
+- [blue] **fix-build-background-poll-idiom-001** — not yet dispatched. Watch for Beacon dispatch.
+- [blue] `build-ccd-s4-healer-recover-then-alert.json` — Forge post-build cleanup still present. Watch for clearance.
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry.
+- [blue] catalog-accuracy-drift — 5/34 shelf cards drifted. 1/3 G-rule.
+- [blue] alert-triage watermark MISSING (beacon-pending-approvals.json MISSING — standing).
+- [blue] sync-push-rebase-fallback-001 — 1/3 G-rule.
+- [blue] cycle.timer G-rule 3/3 dispatched; Beacon consumed. Carry.
+- [blue] heal-stale-daemon-code:auto-restarted — G-rule dispatched iter ~1416. Count tracked by G-rule.
+- [blue] heal-stale-daemon-code-state.json MISSING — standing (known, post-PR #460 one-shot done).
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463) — Tier-3 known pattern. G-rule 3/3 DISPATCHED.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred (Forge queue busy).
+- [blue] G-rule `auto-restart-failed:*` — 1/3.
+- [blue] G-rule completion-DM delivery failure — 1/3.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` — 1/3.
+- [blue] G-rule dispatch-branch-cleanup:summary — 1/3.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] `retry-exhausted-on-shipped-task` → 2/3. Carry.
+- [blue] `retry_exhausted:post-merge-install-drift-trigger-001` — 1/3.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter ~1251.
+- [blue] `sentinel-inbox-stall-ignores-inflight` — 2/3 G-rule.
+- [blue] G-rule `actor-exemption-config 3/3` — APPROVAL_REQUEST pending.
+- [blue] G-rule `cycle-timer checkpoint 3/3` — pending `go: cycle-timer checkpoint`.
+- [blue] F24-empty-prompt-envelope-rejected — 1/3 G-rule. Carry.
+- [blue] Check III gate discrepancy — ran 11d after prior run (June 11) vs expected June 14; proposals valid. Carry.
+
+**Watch items for iter ~1474:**
+- PR #457: CI UNSTABLE — recheck; Larry response still needed.
+- CCD-S5 `ccd-s5-doctrine-and-handling-shapes.json`: Watch for Forge preflight → PR.
+- `build-ccd-s4-healer-recover-then-alert.json`: Watch for Forge clearance.
+- fix-build-background-poll-idiom-001: Watch for Beacon dispatch.
+- APPROVAL_REQUEST `wedged-forge-exit-fix-direction-20260611`: Larry response.
+- Check III: Larry approval `approve threshold-update-2026-06-11`.
+
+**PRIME DIRECTIVE:** 0 new interventions this iter. Running total: interventions=785, systemic_fixes=21, verification_pending=10, ratio≈37.4, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0 (PR #457 UNSTABLE state change → non-clean).
+
+---
+
 ## Iteration ~1472 — 2026-06-11 14:16Z UTC (interactive, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry direct invocation.
