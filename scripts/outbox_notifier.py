@@ -356,6 +356,37 @@ AUTO_MERGE_QUEUE_VERSION = 1
 # config if he's away for a known-long stretch.
 DEFAULT_AUTO_MERGE_WATCHDOG_HOURS = 24
 
+# fix-auto-merge-freshness-revalidation (2026-06-11) — a held auto-merge
+# fires on a STALE approval. The 2026-06-11 incident: PR #455 passed Mirror
+# review, then its auto-merge was HELD ~6h behind overlapping PR #454. When
+# #454 merged (08:11:45Z), #455's auto-merge fired 11s later on its now
+# ~6h-old approval — landing a real regression (+13 test failures under
+# `python3 -m unittest discover -s scripts/tests`) that a fresh regression-
+# gate run against the NEW main would have caught. mergeable=CLEAN did not
+# catch it: the regression was semantic (a HOME-swap bootstrap hid Python
+# user-site), not a textual conflict. So the release path now re-validates
+# freshness against CURRENT main — re-confirm mergeable + re-run the
+# regression gate against the moved base — before trusting the pre-hold
+# approval. A stale/conflicting/regressing PR is NOT auto-merged; it's
+# pulled from the queue and Larry is DMed to re-review/rebase.
+#
+# Config key `auto_merge_queue.revalidate_regression_on_release` (default
+# True) gates the regression re-run; the cheap mergeable re-confirm always
+# runs. `auto_merge_queue.release_regression_timeout_per_sha_s` bounds the
+# inline `test_regression_check.py` shell-out so a stuck suite can't wedge
+# the notifier poll loop indefinitely (holds are rare, so this fires
+# infrequently, but it MUST stay bounded).
+DEFAULT_REVALIDATE_REGRESSION_ON_RELEASE = True
+DEFAULT_RELEASE_REGRESSION_TIMEOUT_PER_SHA_S = 600
+
+# Test seam (mirrors _AUTO_MERGE_FN_OVERRIDE). When set, replaces the real
+# `test_regression_check.py` shell-out in `_revalidate_held_merge_before_fire`
+# so serializer tests exercise the freshness guard without a real ~10-min
+# regression run. The override receives
+# (repo_coords, pr_number, base_sha, head_sha) and returns one of
+# 'pass' | 'block' | 'error'. Production leaves this None.
+_RELEASE_REGRESSION_GATE_FN_OVERRIDE: Optional[Any] = None
+
 # `gh pr view --json mergeable` returns one of MERGEABLE / CONFLICTING /
 # UNKNOWN (UNKNOWN = GitHub still computing). Map to the gate's tri-state.
 _GH_MERGEABLE_TO_GATE_STATUS = {
@@ -463,6 +494,59 @@ def _load_auto_merge_watchdog_hours_from_config() -> int:
     raw = block.get('watchdog_dm_hours')
     if not isinstance(raw, int) or raw <= 0:
         return DEFAULT_AUTO_MERGE_WATCHDOG_HOURS
+    return raw
+
+
+def _load_revalidate_regression_on_release_from_config() -> bool:
+    """Return `auto_merge_queue.revalidate_regression_on_release`.
+
+    fix-auto-merge-freshness-revalidation. Gates the inline regression
+    re-run on the held-merge release path. Defaults to
+    `DEFAULT_REVALIDATE_REGRESSION_ON_RELEASE` (=True) — the guard is ON in
+    production so the PR #455 stale-approval class can't recur. Set to
+    False only as an emergency escape hatch (e.g. the regression runner is
+    itself broken and blocking legitimate releases); the cheap mergeable
+    re-confirm still runs even when this is off.
+    """
+    if 'config' not in _LOOP_BOUNDS_CACHE:
+        try:
+            cfg = json.loads(_MODELS_CONFIG_PATH.read_text())
+        except (OSError, json.JSONDecodeError):
+            cfg = {}
+        _LOOP_BOUNDS_CACHE['config'] = cfg
+    cfg = _LOOP_BOUNDS_CACHE['config']
+    block = cfg.get('auto_merge_queue') if isinstance(cfg, dict) else None
+    if not isinstance(block, dict):
+        return DEFAULT_REVALIDATE_REGRESSION_ON_RELEASE
+    raw = block.get('revalidate_regression_on_release')
+    if not isinstance(raw, bool):
+        return DEFAULT_REVALIDATE_REGRESSION_ON_RELEASE
+    return raw
+
+
+def _load_release_regression_timeout_per_sha_s_from_config() -> int:
+    """Return `auto_merge_queue.release_regression_timeout_per_sha_s`.
+
+    fix-auto-merge-freshness-revalidation. Per-SHA wall-clock bound for the
+    inline `test_regression_check.py` shell-out on the release path. Falls
+    back to `DEFAULT_RELEASE_REGRESSION_TIMEOUT_PER_SHA_S` (=600s). Bounds
+    how long a release re-validation can block the notifier poll loop — a
+    stuck/hung suite trips the timeout and the gate fails closed (treated as
+    'error' → held, NOT merged) rather than wedging the daemon.
+    """
+    if 'config' not in _LOOP_BOUNDS_CACHE:
+        try:
+            cfg = json.loads(_MODELS_CONFIG_PATH.read_text())
+        except (OSError, json.JSONDecodeError):
+            cfg = {}
+        _LOOP_BOUNDS_CACHE['config'] = cfg
+    cfg = _LOOP_BOUNDS_CACHE['config']
+    block = cfg.get('auto_merge_queue') if isinstance(cfg, dict) else None
+    if not isinstance(block, dict):
+        return DEFAULT_RELEASE_REGRESSION_TIMEOUT_PER_SHA_S
+    raw = block.get('release_regression_timeout_per_sha_s')
+    if not isinstance(raw, int) or raw <= 0:
+        return DEFAULT_RELEASE_REGRESSION_TIMEOUT_PER_SHA_S
     return raw
 
 
@@ -959,6 +1043,23 @@ _REVIEW_PASS_DM_VARIANTS: dict[str, str] = {
         'Rebase manually: gh pr checkout {pr_number} && git fetch origin '
         '&& git rebase origin/main && git push --force-with-lease'
     ),
+    # fix-auto-merge-freshness-revalidation — a held PR's approval went
+    # stale when its blocker merged (main moved), and the release-path
+    # re-validation against current main failed (regression or unverifiable).
+    # The canonical closing DM is `_dm_larry_stale_revalidation` (fired in
+    # the gate) and `_maybe_dm_larry` is suppressed for this outcome; this
+    # variant is the render-pipeline fallback so the body never degrades to
+    # a misleading "auto-merged" message.
+    'held_stale_regression': (
+        'Mirror approved PR {pr_url} on task `{task_id}`, but that approval '
+        'predates a base change.\n'
+        'Summary: {summary}\n'
+        'Auto-merge HELD: re-validation against current main failed — '
+        '{regression_detail}.\n'
+        'Rebase + re-review before merging: gh pr checkout {pr_number} && '
+        'git fetch origin && git rebase origin/main && git push '
+        '--force-with-lease'
+    ),
 }
 
 
@@ -1093,6 +1194,8 @@ def _render_dm_message(intent: str, decision: dict[str, Any]) -> Optional[str]:
         # fix-review-pass-dm-await-merge-outcome — overlap files for the
         # serializer-hold DM body so Larry sees WHICH files collided.
         'overlap_files': '?',
+        # fix-auto-merge-freshness-revalidation — stale-release detail.
+        'regression_detail': '?',
     }
     findings = payload.get('findings')
     if isinstance(findings, list):
@@ -1104,7 +1207,7 @@ def _render_dm_message(intent: str, decision: dict[str, Any]) -> Optional[str]:
     if isinstance(merge_result, dict):
         for k in (
             'merge_outcome', 'merge_reason', 'pr_number', 'repo_coords',
-            'blocker_pr_number', 'overlap_files',
+            'blocker_pr_number', 'overlap_files', 'regression_detail',
         ):
             v = merge_result.get(k)
             if v is not None:
@@ -1152,7 +1255,13 @@ def _maybe_dm_larry(
     #     would be a duplicate.
     if intent == 'review-pass':
         merge_outcome = decision.get('merge_outcome')
-        if merge_outcome in ('deferred_unknown', 'held_conflict'):
+        # held_stale_regression — fix-auto-merge-freshness-revalidation: the
+        # canonical closing DM is `_dm_larry_stale_revalidation`, fired in the
+        # gate; a second DM here would duplicate it (same pairing as
+        # held_conflict / `_dm_larry_rebase_needed`).
+        if merge_outcome in (
+            'deferred_unknown', 'held_conflict', 'held_stale_regression',
+        ):
             log(
                 f'review-pass closing DM suppressed (outcome='
                 f'{merge_outcome}); final DM fires on retry/conflict '
@@ -5212,8 +5321,9 @@ def _teardown_worktrees_for_task(task_id: str, repo_coords: str) -> None:
 
 def _reset_auto_merge_queue_state() -> None:
     """Test helper — wipe the in-process serializer state between cases."""
-    global _AUTO_MERGE_QUEUE_FAIL_CLOSED
+    global _AUTO_MERGE_QUEUE_FAIL_CLOSED, _RELEASE_REGRESSION_GATE_FN_OVERRIDE
     _AUTO_MERGE_QUEUE_FAIL_CLOSED = False
+    _RELEASE_REGRESSION_GATE_FN_OVERRIDE = None
     _WATCHDOG_DMED_PRS.clear()
 
 
@@ -5430,6 +5540,68 @@ def _gh_pr_mergeable_status(repo_coords: str, pr_number: int) -> str:
     if not isinstance(raw, str):
         return 'unknown'
     return _GH_MERGEABLE_TO_GATE_STATUS.get(raw.upper(), 'unknown')
+
+
+def _gh_pr_merge_freshness(
+    repo_coords: str, pr_number: int,
+) -> Optional[dict[str, Any]]:
+    """Fetch the live freshness fields for a held PR about to merge.
+
+    fix-auto-merge-freshness-revalidation. One `gh pr view` carrying every
+    field the release-path re-validation needs, so it doesn't fan out into
+    multiple round-trips:
+
+        {
+          'mergeable':    'mergeable' | 'conflicting' | 'unknown',
+          'merge_state':  <raw mergeStateStatus, e.g. 'CLEAN'/'BEHIND'/'DIRTY'>,
+          'base_sha':     <current base-branch (main) tip OID>,
+          'head_sha':     <PR head commit OID>,
+        }
+
+    Returns None on any transport error / non-zero exit / parse failure —
+    the caller treats None as "couldn't confirm freshness", which fails
+    closed (the PR is NOT auto-merged on a stale approval we can't verify).
+    `mergeable` reuses the same MERGEABLE/CONFLICTING/UNKNOWN → tri-state map
+    as `_gh_pr_mergeable_status`; `base_sha`/`head_sha` are GitHub's
+    baseRefOid/headRefOid (baseRefOid tracks main's tip, so comparing it to
+    the SHA recorded when the PR was held tells us whether the base moved).
+    """
+    try:
+        proc = subprocess.run(
+            ['gh', 'pr', 'view', str(pr_number),
+             '--repo', repo_coords,
+             '--json', 'mergeable,mergeStateStatus,baseRefOid,headRefOid'],
+            capture_output=True, text=True, timeout=_AUTO_MERGE_TIMEOUT_S,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        log(
+            f'gh pr view {pr_number} ({repo_coords}) freshness lookup '
+            f'FAILED: {type(e).__name__}: {e}',
+            'WARN',
+        )
+        return None
+    if proc.returncode != 0:
+        log(
+            f'gh pr view {pr_number} ({repo_coords}) freshness lookup exit='
+            f'{proc.returncode}: {(proc.stderr or "").strip()[:200]}',
+            'WARN',
+        )
+        return None
+    try:
+        data = json.loads(proc.stdout or '{}')
+    except (ValueError, json.JSONDecodeError):
+        return None
+    raw_mergeable = data.get('mergeable')
+    mergeable = (
+        _GH_MERGEABLE_TO_GATE_STATUS.get(raw_mergeable.upper(), 'unknown')
+        if isinstance(raw_mergeable, str) else 'unknown'
+    )
+    return {
+        'mergeable': mergeable,
+        'merge_state': data.get('mergeStateStatus'),
+        'base_sha': data.get('baseRefOid'),
+        'head_sha': data.get('headRefOid'),
+    }
 
 
 def _gh_open_prs_for_repo(repo_coords: str) -> list[dict[str, Any]]:
@@ -5665,6 +5837,73 @@ def _dm_larry_rebase_needed(
         pass
 
 
+def _dm_larry_stale_revalidation(
+    pr_url: str,
+    pr_number: int,
+    repo_coords: str,
+    task_id: str,
+    chat_id: Optional[int],
+    detail: str,
+    summary: str = '',
+) -> None:
+    """Closing DM for a held auto-merge that FAILED freshness re-validation.
+
+    fix-auto-merge-freshness-revalidation. The PR was held behind a blocker
+    that has since merged (main moved underneath the pre-hold approval), and
+    the release-path re-validation against CURRENT main found a regression
+    (or couldn't confirm freshness). The auto-merge was refused and the PR
+    pulled from the queue. This DM routes Larry back to re-review/rebase
+    rather than letting the stale approval merge a regression — the PR #455
+    lesson.
+
+    Canonical closing DM for the `held_stale_regression` outcome;
+    `_maybe_dm_larry` is suppressed for that outcome to avoid a duplicate
+    (mirrors the `held_conflict` / `_dm_larry_rebase_needed` pairing).
+    `detail` is the human-readable reason ("regression: +N new failing
+    tests" or "could not re-validate: <why>"). Best-effort + idempotent;
+    never raises into the caller (daemon-never-wedge).
+    """
+    rebase_cmd = (
+        f'gh pr checkout {pr_number} --repo {repo_coords} && '
+        f'git fetch origin && git rebase origin/main && '
+        f'git push --force-with-lease'
+    )
+    summary_line = f'Summary: {summary}\n' if summary else ''
+    body = (
+        f'Mirror approved PR {pr_url} on task `{task_id}`, but that approval '
+        f'predates a base change (an overlapping PR merged while this one was '
+        f'held).\n'
+        f'{summary_line}'
+        f'Auto-merge HELD: re-validation against current main failed — '
+        f'{detail}.\n'
+        f'Not auto-merging on the stale approval. Rebase + re-review before '
+        f'merging: {rebase_cmd}'
+    )
+    if isinstance(chat_id, int):
+        try:
+            larry_alerts.append_notification(
+                source='outbox-notifier',
+                intent='auto_merge_stale_revalidation',
+                message=body,
+                chat_id=chat_id,
+                task_id=task_id,
+            )
+            return
+        except Exception:  # noqa: BLE001 — daemon-never-wedge on DM failure
+            pass
+    # No targeted chat (sweep-release path often has no envelope context) —
+    # broadcast via append_alert so the held-stale PR is still surfaced.
+    try:
+        larry_alerts.append_alert(
+            source='outbox-notifier',
+            severity='warning',
+            message=body,
+            subject=f'auto-merge-stale-revalidation:{repo_coords}:{pr_number}',
+        )
+    except Exception:  # noqa: BLE001 — daemon-never-wedge
+        pass
+
+
 def _dm_larry_queue_stale(entry: dict[str, Any]) -> None:
     """Watchdog DM: queue entry older than watchdog_dm_hours. One-shot
     per entry (gated on the on-disk `watchdog_dm_sent` flag).
@@ -5705,6 +5944,350 @@ def _dm_larry_queue_stale(entry: dict[str, Any]) -> None:
         pass
 
 
+def _run_release_regression_gate(
+    repo_coords: str,
+    pr_number: int,
+    base_sha: Optional[str],
+    head_sha: Optional[str],
+) -> str:
+    """Re-run the regression gate for a held PR against CURRENT main.
+
+    fix-auto-merge-freshness-revalidation. Returns one of:
+      - 'pass'  — head introduces no new test failures vs current main.
+      - 'block' — head introduces ≥1 regression vs current main.
+      - 'skip'  — the regression gate doesn't apply to this repo (no
+        `scripts/tests` suite — test_regression_check runs `unittest
+        discover -s scripts/tests`, so e.g. the TS dashboard can't be
+        measured). Caller proceeds on the mergeable re-confirm alone rather
+        than false-blocking every held release in a non-python repo.
+      - 'error' — couldn't analyze (repo not configured/resolvable, SHA
+        missing locally, runner timeout/crash). Treated as fail-closed by
+        the caller (don't auto-merge on an approval we can't re-validate).
+
+    Honors `_RELEASE_REGRESSION_GATE_FN_OVERRIDE` (test seam) so unit tests
+    exercise the freshness guard without a real ~10-min `test_regression_
+    check.py` run. In production it resolves the repo's local checkout via
+    `_canonical_repo_for_coords`, best-effort fetches the PR head + base so
+    the runner's `git rev-parse` can resolve them, then shells out to
+    `test_regression_check.py --parent-sha <current-main> --head-sha
+    <pr-head>` bounded by a config timeout (so a hung suite can't wedge the
+    notifier poll loop — it trips the timeout and returns 'error').
+    """
+    override = _RELEASE_REGRESSION_GATE_FN_OVERRIDE
+    if override is not None:
+        try:
+            verdict = override(repo_coords, pr_number, base_sha, head_sha)
+        except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+            log(
+                f'release regression-gate override raised for '
+                f'pr=#{pr_number} ({repo_coords}): {type(e).__name__}: {e}',
+                'WARN',
+            )
+            return 'error'
+        return (verdict if verdict in ('pass', 'block', 'skip', 'error')
+                else 'error')
+
+    if not base_sha or not head_sha:
+        log(
+            f'release regression-gate for pr=#{pr_number} ({repo_coords}): '
+            f'missing base/head SHA (base={base_sha!r} head={head_sha!r}); '
+            f'cannot re-validate',
+            'WARN',
+        )
+        return 'error'
+    repo_root = _canonical_repo_for_coords(repo_coords)
+    if repo_root is None or not repo_root.exists():
+        log(
+            f'release regression-gate for pr=#{pr_number} ({repo_coords}): '
+            f'no local checkout configured (repo_paths); cannot re-validate',
+            'WARN',
+        )
+        return 'error'
+    # test_regression_check discovers `scripts/tests`; a repo without that
+    # suite (e.g. the TS dashboard) can't be measured by this gate. Skip
+    # rather than fail-closed — false-blocking every held release in a
+    # non-python repo would be pure toil; the mergeable re-confirm still ran.
+    if not (repo_root / 'scripts' / 'tests').is_dir():
+        log(
+            f'release regression-gate for pr=#{pr_number} ({repo_coords}): '
+            f'no scripts/tests suite in {repo_root}; regression re-check N/A '
+            f'(proceeding on mergeable re-confirm)',
+        )
+        return 'skip'
+
+    # Best-effort: ensure the PR head + current base objects are present
+    # locally so test_regression_check's `git rev-parse` resolves them. The
+    # notifier's clone auto-pulls main, but a forge/* PR branch may not be
+    # fetched; refs/pull/<N>/head is GitHub's stable PR-head ref. Failures
+    # here are swallowed — a still-missing SHA surfaces as 'error' below.
+    for fetch_args in (['origin', 'main'], ['origin', f'pull/{pr_number}/head']):
+        try:
+            subprocess.run(
+                ['git', '-C', str(repo_root), 'fetch', '--quiet', *fetch_args],
+                capture_output=True, text=True, timeout=_AUTO_MERGE_TIMEOUT_S,
+            )
+        except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+            pass
+
+    script = Path(__file__).resolve().parent / 'test_regression_check.py'
+    timeout_per_sha = _load_release_regression_timeout_per_sha_s_from_config()
+    # test_regression_check runs the two SHAs sequentially; bound the whole
+    # shell-out at ~2x per-SHA plus worktree-setup slack.
+    total_timeout = timeout_per_sha * 2 + 120
+    try:
+        proc = subprocess.run(
+            [sys.executable, str(script),
+             '--parent-sha', base_sha,
+             '--head-sha', head_sha,
+             '--repo-root', str(repo_root),
+             '--timeout-per-sha', str(timeout_per_sha),
+             '--output', 'json'],
+            capture_output=True, text=True, timeout=total_timeout,
+        )
+    except subprocess.TimeoutExpired:
+        log(
+            f'release regression-gate for pr=#{pr_number} ({repo_coords}) '
+            f'TIMED OUT after {total_timeout}s; failing closed (held)',
+            'WARN',
+        )
+        return 'error'
+    except (FileNotFoundError, OSError) as e:
+        log(
+            f'release regression-gate for pr=#{pr_number} ({repo_coords}) '
+            f'could not run: {type(e).__name__}: {e}; failing closed (held)',
+            'WARN',
+        )
+        return 'error'
+    if proc.returncode == 0:
+        return 'pass'
+    if proc.returncode == 1:
+        return 'block'
+    log(
+        f'release regression-gate for pr=#{pr_number} ({repo_coords}) '
+        f'analysis failed (exit {proc.returncode}): '
+        f'{(proc.stderr or "").strip()[:200]}; failing closed (held)',
+        'WARN',
+    )
+    return 'error'
+
+
+def _revalidate_held_merge_before_fire(
+    pr_url: str,
+    repo_coords: str,
+    pr_number: int,
+    task_id: str,
+    summary: str,
+    chat_id: Optional[int],
+    changed_files: Optional[list[str]],
+    release_entry: dict[str, Any],
+) -> Optional[dict[str, Any]]:
+    """Freshness gate for a held auto-merge whose hold just cleared.
+
+    fix-auto-merge-freshness-revalidation. Returns None when the PR is
+    still safe to merge on its existing approval (caller proceeds to fire
+    `_auto_merge_pr`). Returns a non-merge merge_result dict when the merge
+    must NOT fire — the approval went stale and the PR now conflicts with /
+    regresses against / can't be re-validated against CURRENT main. The
+    caller returns that dict instead of merging.
+
+    `release_entry` is the ORIGINAL queue entry being released (its
+    `approved_base_sha`, `blocker_pr_number`, `queued_at`, `watchdog_dm_sent`
+    are read here and on the defer re-queue so the stale-queue watchdog clock
+    survives transient re-defers).
+
+    Decision matrix (all checks against CURRENT main, NOT the pre-hold base):
+      - freshness lookup fails (transient gh)        → DEFER (re-queue)
+      - mergeable == CONFLICTING                     → BLOCK (held_conflict)
+      - mergeable == UNKNOWN (GitHub recomputing —   → DEFER (re-queue)
+        the exact post-base-move race)
+      - base did NOT move since approval, OR the     → MERGE (return None)
+        regression re-run is disabled by config
+      - regression gate PASS                         → MERGE (return None)
+      - regression gate BLOCK / ERROR                → BLOCK (held_stale_regression)
+
+    DEFER re-queues the entry with its (now-merged) blocker preserved so the
+    sweep's blocker-resolution pass re-releases and re-validates it next
+    tick — transient signals retry instead of stranding the PR. A defer is
+    only safe when the entry's blocker is known; otherwise it fails closed
+    (BLOCK). BLOCK fires the canonical closing DM here and is suppressed in
+    `_maybe_dm_larry` to avoid a duplicate (mirrors held_conflict). The
+    fail-closed bias is deliberate: a false hold costs Larry a manual merge;
+    a false pass is the PR #455 regression-on-main incident.
+    """
+    approved_base_sha = release_entry.get('approved_base_sha')
+    fresh = _gh_pr_merge_freshness(repo_coords, pr_number)
+    if fresh is None:
+        # Transient gh failure — can't confirm anything. Retry next sweep.
+        return _defer_held_revalidation(
+            pr_url, repo_coords, pr_number, task_id, summary, chat_id,
+            changed_files, release_entry,
+            reason='freshness lookup failed (transient gh error)',
+        )
+
+    mergeable = fresh.get('mergeable')
+    if mergeable == 'conflicting':
+        _dm_larry_rebase_needed(
+            pr_url, pr_number, repo_coords, task_id, chat_id, summary,
+        )
+        log(
+            f'AUTO_MERGE_HELD_STALE_CONFLICT task={task_id} pr={pr_url} '
+            f'(mergeable=CONFLICTING against current main on release; '
+            f'DMed Larry rebase command, NOT merging stale approval)',
+            'WARN',
+        )
+        return {
+            'merge_outcome': 'held_conflict',
+            'merge_reason': 'mergeable=CONFLICTING against current main; '
+                            'manual rebase required',
+            'pr_number': pr_number,
+            'repo_coords': repo_coords,
+        }
+    if mergeable == 'unknown':
+        # GitHub hasn't recomputed mergeability since the base moved (the
+        # ~11s-after-blocker-merge race from the incident). Don't strand or
+        # merge blind — retry on the next sweep release pass.
+        return _defer_held_revalidation(
+            pr_url, repo_coords, pr_number, task_id, summary, chat_id,
+            changed_files, release_entry,
+            reason='mergeable=UNKNOWN (GitHub recomputing post-base-move)',
+        )
+
+    # mergeable == 'mergeable': no textual conflict. The semantic check is
+    # the regression gate — but only run it when the base actually moved
+    # since approval (else the pre-hold approval is still valid). An unknown
+    # approval base is treated as "assume moved" (conservative).
+    current_base = fresh.get('base_sha')
+    base_moved = (not approved_base_sha) or (current_base != approved_base_sha)
+    if not base_moved:
+        log(
+            f'AUTO_MERGE_RELEASE_FRESH task={task_id} pr={pr_url} '
+            f'(base unchanged since approval @ {approved_base_sha[:12] if approved_base_sha else "?"}; '
+            f'merging on still-valid approval)',
+        )
+        return None
+    if not _load_revalidate_regression_on_release_from_config():
+        log(
+            f'AUTO_MERGE_RELEASE_REVALIDATE_DISABLED task={task_id} '
+            f'pr={pr_url} (base moved but regression re-run disabled via '
+            f'config; merging on mergeable re-confirm only)',
+            'WARN',
+        )
+        return None
+
+    verdict = _run_release_regression_gate(
+        repo_coords, pr_number, current_base, fresh.get('head_sha'),
+    )
+    if verdict in ('pass', 'skip'):
+        log(
+            f'AUTO_MERGE_RELEASE_REVALIDATED task={task_id} pr={pr_url} '
+            f'(regression gate {verdict} against current main @ '
+            f'{current_base[:12] if current_base else "?"}; merging)',
+        )
+        return None
+    if verdict == 'block':
+        detail = 'a regression against current main (new failing tests)'
+    else:  # 'error'
+        detail = 'could not re-validate against current main (analysis failed)'
+    _dm_larry_stale_revalidation(
+        pr_url, pr_number, repo_coords, task_id, chat_id, detail, summary,
+    )
+    log(
+        f'AUTO_MERGE_HELD_STALE_REGRESSION task={task_id} pr={pr_url} '
+        f'verdict={verdict} (held approval went stale when base moved '
+        f'{approved_base_sha} -> {current_base}; NOT merging — {detail})',
+        'WARN',
+    )
+    return {
+        'merge_outcome': 'held_stale_regression',
+        'merge_reason': f'release re-validation failed: {detail}',
+        'pr_number': pr_number,
+        'repo_coords': repo_coords,
+        'regression_detail': detail,
+    }
+
+
+def _defer_held_revalidation(
+    pr_url: str,
+    repo_coords: str,
+    pr_number: int,
+    task_id: str,
+    summary: str,
+    chat_id: Optional[int],
+    changed_files: Optional[list[str]],
+    release_entry: dict[str, Any],
+    *,
+    reason: str,
+) -> dict[str, Any]:
+    """Re-queue a held PR whose release-path re-validation hit a TRANSIENT
+    signal, so the next sweep's blocker-resolution pass re-releases and
+    re-validates it. Keeps the (now-merged) blocker on the entry so it
+    routes through `_queue_release` (which re-validates) rather than the
+    UNKNOWN-defer pass (which would bypass re-validation).
+
+    CRITICAL: preserve the ORIGINAL `queued_at` + `watchdog_dm_sent` from
+    `release_entry` across re-queues. The stale-queue watchdog (sweep Pass-3)
+    ages off `queued_at`; resetting it every defer would reset the clock each
+    sweep tick, so a PR stuck in a persistent-UNKNOWN / persistent-transient
+    defer loop would NEVER trip the watchdog DM — a silent strand, the exact
+    failure the watchdog exists to catch. With the original timestamp
+    preserved, a genuinely-stuck release ages out and surfaces to Larry.
+
+    Fails closed to held_stale_regression when the entry's blocker is
+    unknown — without it there's no safe retry route, and merging blind
+    would reopen the hole.
+    """
+    release_blocker_pr = release_entry.get('blocker_pr_number')
+    if not isinstance(release_blocker_pr, int):
+        detail = f'could not re-validate against current main ({reason})'
+        _dm_larry_stale_revalidation(
+            pr_url, pr_number, repo_coords, task_id, chat_id, detail, summary,
+        )
+        log(
+            f'AUTO_MERGE_HELD_STALE_NORETRY task={task_id} pr={pr_url} '
+            f'({reason}; no blocker to re-queue behind — failing closed, '
+            f'NOT merging)',
+            'WARN',
+        )
+        return {
+            'merge_outcome': 'held_stale_regression',
+            'merge_reason': f'release re-validation deferred with no retry '
+                            f'route: {reason}',
+            'pr_number': pr_number,
+            'repo_coords': repo_coords,
+            'regression_detail': detail,
+        }
+    entry = {
+        'pr_number': pr_number,
+        'task_id': task_id,
+        'repo': repo_coords,
+        'pr_url': pr_url,
+        'changed_files': list(changed_files or []),
+        # Preserve the original queue timestamp + watchdog flag so the
+        # stale-queue watchdog clock survives repeated transient re-defers.
+        'queued_at': release_entry.get(
+            'queued_at', datetime.now(timezone.utc).isoformat(),
+        ),
+        # Keep the merged blocker so sweep Pass-2 re-releases -> re-validates.
+        'blocker_pr_number': release_blocker_pr,
+        'watchdog_dm_sent': release_entry.get('watchdog_dm_sent', False),
+        'unknown_attempts': 0,
+        'reply_chat_id': chat_id,
+        'summary': summary,
+        'approved_base_sha': release_entry.get('approved_base_sha'),
+    }
+    _queue_push(entry)
+    log(
+        f'AUTO_MERGE_RELEASE_DEFERRED task={task_id} pr={pr_url} '
+        f'({reason}; re-queued behind #{release_blocker_pr} for sweep retry)',
+    )
+    return {
+        'merge_outcome': 'deferred_unknown',
+        'merge_reason': f'release re-validation deferred: {reason}',
+        'pr_number': pr_number,
+        'repo_coords': repo_coords,
+    }
+
+
 def _attempt_auto_merge_with_gates(
     pr_url: str,
     repo_coords: str,
@@ -5715,6 +6298,8 @@ def _attempt_auto_merge_with_gates(
     changed_files: Optional[list[str]],
     *,
     second_attempt_on_unknown: bool = False,
+    revalidate_freshness: bool = False,
+    release_entry: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """Run both serializer gates then (if both pass) fire `_auto_merge_pr`.
 
@@ -5724,9 +6309,25 @@ def _attempt_auto_merge_with_gates(
       - 'held_conflict'     (gate 2 hit, DM fired, NOT queued)
       - 'deferred_unknown'  (gate 2 = UNKNOWN, first attempt; queued for retry)
       - 'held_fail_closed'  (queue file corrupt; never call _auto_merge_pr)
+      - 'held_stale_regression'  (release-path freshness gate hit: a held
+        approval went stale when the base moved, and the PR now regresses
+        against / can't be re-validated against current main; DM fired,
+        NOT merged — fix-auto-merge-freshness-revalidation)
 
     `second_attempt_on_unknown=True` makes UNKNOWN proceed to the merge
     shell-out (per spec: "let git be the authority on the second attempt").
+
+    `revalidate_freshness=True` (set by `_queue_release`) marks this as a
+    HELD-merge release: the approving Mirror review predates the current
+    main (the blocker merged underneath it). Before firing the merge on
+    that stale approval, re-validate against CURRENT main — re-confirm
+    mergeable and (when the base actually moved) re-run the regression
+    gate. `release_entry` is the original queue entry being released — its
+    `approved_base_sha` (base tip the approval was against), merged
+    `blocker_pr_number`, and `queued_at`/`watchdog_dm_sent` (so a transient
+    re-validation defer can re-queue for the next sweep's release pass
+    WITHOUT resetting the stale-queue watchdog clock). The 2026-06-11 PR
+    #455 incident is the motivating case.
     """
     # Test-bypass: existing D3.5 5d tests assert merge-outcome rendering
     # via _AUTO_MERGE_FN_OVERRIDE without mocking the gate's gh calls.
@@ -5782,6 +6383,16 @@ def _attempt_auto_merge_with_gates(
     if blocker is not None:
         # Push (or update) the queue entry. Idempotent on (pr_number, repo).
         existing = _queue_remove_pr(pr_number, repo_coords)
+        # fix-auto-merge-freshness-revalidation: snapshot the base-branch tip
+        # the approval is effectively against, so the release path can later
+        # tell whether main moved (blocker merged) and a regression re-check
+        # is owed. Preserved across re-queues; one cheap gh call, only when a
+        # PR is actually held (rare). None on lookup failure — the release
+        # path treats "unknown approval base" as "assume the base moved".
+        approved_base = (existing or {}).get('approved_base_sha')
+        if approved_base is None:
+            approved_base = (_gh_pr_merge_freshness(repo_coords, pr_number)
+                             or {}).get('base_sha')
         entry = {
             'pr_number': pr_number,
             'task_id': task_id,
@@ -5797,6 +6408,7 @@ def _attempt_auto_merge_with_gates(
             'unknown_attempts': (existing or {}).get('unknown_attempts', 0),
             'reply_chat_id': chat_id,
             'summary': summary,
+            'approved_base_sha': approved_base,
         }
         _queue_push(entry)
         log(
@@ -5813,57 +6425,91 @@ def _attempt_auto_merge_with_gates(
             'overlap_files': _format_overlap_files(changed_files),
         }
 
-    # Gate 2 — mergeable status.
-    status = _gh_pr_mergeable_status(repo_coords, pr_number)
-    if status == 'conflicting':
-        _queue_remove_pr(pr_number, repo_coords)  # clear if it was queued
-        _dm_larry_rebase_needed(
-            pr_url, pr_number, repo_coords, task_id, chat_id, summary,
+    # Gate 2 — mergeable status. SKIPPED on the release path
+    # (revalidate_freshness=True): the freshness gate below re-confirms
+    # mergeable against CURRENT main with base-movement awareness and fully
+    # supersedes Gate 2 for held releases. Running Gate 2 here too would let
+    # its UNKNOWN-defer branch (blocker_pr_number=None) re-queue the entry
+    # onto the sweep's UNKNOWN-retry pass — which proceeds to merge WITHOUT
+    # re-validation, reopening the stale-approval hole. fix-auto-merge-
+    # freshness-revalidation.
+    if not revalidate_freshness:
+        status = _gh_pr_mergeable_status(repo_coords, pr_number)
+        if status == 'conflicting':
+            _queue_remove_pr(pr_number, repo_coords)  # clear if it was queued
+            _dm_larry_rebase_needed(
+                pr_url, pr_number, repo_coords, task_id, chat_id, summary,
+            )
+            log(
+                f'AUTO_MERGE_SKIPPED_CONFLICTING task={task_id} pr={pr_url} '
+                f'(mergeable=CONFLICTING; DMed Larry rebase command)',
+                'WARN',
+            )
+            return {
+                'merge_outcome': 'held_conflict',
+                'merge_reason': 'mergeable=CONFLICTING; manual rebase required',
+                'pr_number': pr_number,
+                'repo_coords': repo_coords,
+            }
+        if status == 'unknown' and not second_attempt_on_unknown:
+            # First UNKNOWN — queue with no blocker, increment attempts counter.
+            existing = _queue_remove_pr(pr_number, repo_coords)
+            entry = {
+                'pr_number': pr_number,
+                'task_id': task_id,
+                'repo': repo_coords,
+                'pr_url': pr_url,
+                'changed_files': changed_files,
+                'queued_at': (existing or {}).get(
+                    'queued_at',
+                    datetime.now(timezone.utc).isoformat(),
+                ),
+                # blocker_pr_number=None signals "deferred for UNKNOWN" to the
+                # sweep; on next sweep, this entry retries with
+                # second_attempt_on_unknown=True.
+                'blocker_pr_number': None,
+                'watchdog_dm_sent': (existing or {}).get('watchdog_dm_sent', False),
+                'unknown_attempts': (existing or {}).get('unknown_attempts', 0) + 1,
+                'reply_chat_id': chat_id,
+                'summary': summary,
+            }
+            _queue_push(entry)
+            log(
+                f'AUTO_MERGE_DEFERRED_UNKNOWN task={task_id} pr={pr_url} '
+                f'(mergeable=UNKNOWN; retry on next sweep)',
+            )
+            return {
+                'merge_outcome': 'deferred_unknown',
+                'merge_reason': 'mergeable=UNKNOWN; deferred one tick',
+                'pr_number': pr_number,
+                'repo_coords': repo_coords,
+            }
+
+    # fix-auto-merge-freshness-revalidation — held-merge freshness gate.
+    # Gate 1 passed (no overlapping in-flight blocker), but if this fire is
+    # the RELEASE of a held PR (its blocker merged, so main moved under a
+    # now-stale approval), re-validate against CURRENT main before trusting
+    # that approval. This is the release path's mergeable + regression
+    # authority (Gate 2 was skipped above). A stale/conflicting/regressing
+    # PR is NOT auto-merged; it's routed back to Larry (held_conflict /
+    # held_stale_regression) or deferred for the next sweep (transient). The
+    # first-attempt path leaves `revalidate_freshness` False (its approval is
+    # fresh, Gate 2 already ran) and is unaffected.
+    if revalidate_freshness and release_entry is not None:
+        revalidation = _revalidate_held_merge_before_fire(
+            pr_url=pr_url,
+            repo_coords=repo_coords,
+            pr_number=pr_number,
+            task_id=task_id,
+            summary=summary,
+            chat_id=chat_id,
+            changed_files=changed_files,
+            release_entry=release_entry,
         )
-        log(
-            f'AUTO_MERGE_SKIPPED_CONFLICTING task={task_id} pr={pr_url} '
-            f'(mergeable=CONFLICTING; DMed Larry rebase command)',
-            'WARN',
-        )
-        return {
-            'merge_outcome': 'held_conflict',
-            'merge_reason': 'mergeable=CONFLICTING; manual rebase required',
-            'pr_number': pr_number,
-            'repo_coords': repo_coords,
-        }
-    if status == 'unknown' and not second_attempt_on_unknown:
-        # First UNKNOWN — queue with no blocker, increment attempts counter.
-        existing = _queue_remove_pr(pr_number, repo_coords)
-        entry = {
-            'pr_number': pr_number,
-            'task_id': task_id,
-            'repo': repo_coords,
-            'pr_url': pr_url,
-            'changed_files': changed_files,
-            'queued_at': (existing or {}).get(
-                'queued_at',
-                datetime.now(timezone.utc).isoformat(),
-            ),
-            # blocker_pr_number=None signals "deferred for UNKNOWN" to the
-            # sweep; on next sweep, this entry retries with
-            # second_attempt_on_unknown=True.
-            'blocker_pr_number': None,
-            'watchdog_dm_sent': (existing or {}).get('watchdog_dm_sent', False),
-            'unknown_attempts': (existing or {}).get('unknown_attempts', 0) + 1,
-            'reply_chat_id': chat_id,
-            'summary': summary,
-        }
-        _queue_push(entry)
-        log(
-            f'AUTO_MERGE_DEFERRED_UNKNOWN task={task_id} pr={pr_url} '
-            f'(mergeable=UNKNOWN; retry on next sweep)',
-        )
-        return {
-            'merge_outcome': 'deferred_unknown',
-            'merge_reason': 'mergeable=UNKNOWN; deferred one tick',
-            'pr_number': pr_number,
-            'repo_coords': repo_coords,
-        }
+        if revalidation is not None:
+            # Block (DM already fired) or defer (entry re-queued) — either
+            # way, do NOT fire the merge on the stale approval.
+            return revalidation
 
     # Both gates pass (or second UNKNOWN attempt) — fire the merge.
     _queue_remove_pr(pr_number, repo_coords)  # clear queue if retrying
@@ -5940,6 +6586,11 @@ def _queue_release(merged_pr_number: int, repo_coords: str) -> None:
             continue
         # Remove first so the gate re-check sees a clean queue.
         _queue_remove_pr(pr_number, repo)
+        # fix-auto-merge-freshness-revalidation: this is a HELD-merge release
+        # — the blocker (`merged_pr_number`) just merged, so main moved under
+        # the pre-hold approval. Mark it for freshness re-validation and pass
+        # the snapshotted approval base + the merged blocker so the gate can
+        # detect base movement and (on a transient defer) re-queue for retry.
         result = _attempt_auto_merge_with_gates(
             pr_url=entry.get('pr_url') or '',
             repo_coords=repo,
@@ -5949,6 +6600,11 @@ def _queue_release(merged_pr_number: int, repo_coords: str) -> None:
             chat_id=entry.get('reply_chat_id'),
             changed_files=entry.get('changed_files') or [],
             second_attempt_on_unknown=False,
+            revalidate_freshness=True,
+            # The full original entry — carries approved_base_sha, the merged
+            # blocker, and queued_at/watchdog_dm_sent so a transient re-validation
+            # defer re-queues without resetting the stale-queue watchdog clock.
+            release_entry=entry,
         )
         outcome = result.get('merge_outcome')
         log(
