@@ -2069,6 +2069,57 @@
       "proposed_at": "2026-06-12T12:33:19.733501+00:00",
       "orphan_branch": null,
       "orphan_last_activity_ts": "2026-06-12T12:31:19.687391+00:00"
+    },
+    {
+      "id": "proposed-p3-dashboard-proposed-lane-002",
+      "name": "P3 Dashboard Proposed Lane 002",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `p3-dashboard-proposed-lane-002`. Last activity 2026-06-12T13:47:06.600981+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "p3-dashboard-proposed-lane-002"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T13:49:59.775710+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-12T13:47:06.600981+00:00"
+    },
+    {
+      "id": "proposed-p3-dashboard-proposed-lane-redispatch-20260612T132800Z",
+      "name": "P3 Dashboard Proposed Lane Redispatch 20260612T132800Z",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `p3-dashboard-proposed-lane-redispatch-20260612T132800Z`. Last activity 2026-06-12T13:47:05.224814+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "p3-dashboard-proposed-lane-redispatch-20260612T132800Z"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T13:49:59.775710+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-12T13:47:05.224814+00:00"
+    },
+    {
+      "id": "proposed-failure:commit-failed",
+      "name": "Failure Commit Failed",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `failure:commit-failed`. Last activity 2026-06-12T13:50:04.243389+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "failure:commit-failed"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T14:05:07.414127+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-12T13:50:04.243389+00:00"
     }
   ]
 }
