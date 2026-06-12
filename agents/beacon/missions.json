@@ -1983,6 +1983,23 @@
       "proposed_at": "2026-06-12T06:15:09.727315+00:00",
       "orphan_branch": null,
       "orphan_last_activity_ts": "2026-06-02T19:01:36.923823+00:00"
+    },
+    {
+      "id": "proposed-harden-approval-tab-direction-ask-coverage",
+      "name": "Harden Approval Tab Direction Ask Coverage",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `harden-approval-tab-direction-ask-coverage`. Last activity 2026-06-04T06:21:59.10768+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "harden-approval-tab-direction-ask-coverage"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:30:16.072570+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-04T06:21:59.10768+00:00"
     }
   ]
 }
