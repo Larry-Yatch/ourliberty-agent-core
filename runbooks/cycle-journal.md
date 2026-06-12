@@ -4,6 +4,134 @@
 
 ---
 
+## Iteration ~1545 — 2026-06-12 02:50Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ New finding (dag-preflight-missions-v2-phase3 second preflight stranded, Beacon direction-ask written). 4/4 bots alive. 0 open PRs. 2 new alerts (both Tier 3 informational). All mandatory checks clean. Tier 1 maintained, consecutive_clean=0.
+
+**VERIFY-BEFORE-REASSERT (iter ~1544 watch items + between-cycle notes):**
+- **Beacon inbox (3 tasks)**:
+  - `approval-request-depth1-extraction-fix-direction-ask-20260612T023000Z` → PROCESSED (in beacon/.archive). Both ARs registered per between-cycle note at 02:40Z: `fix-alert-triage-watermark-durability-001` + `fix-depth1-pulse-approval-extraction-001`. ✅ CLOSED.
+  - `notify-dag-revision-missions-v2-phase3` → PROCESSED (in beacon/.archive at 02:42Z). Beacon emitted AR for dag-preflight second preflight (phase: routing-signal, target: mirror). AR NOT auto-extracted by outbox_notifier — source='mirror-result' not in extraction allowlist. Second preflight STRANDED. See finding below.
+  - `f24b-envelope-schema-fix-direction-ask-20260612T024743Z` → PROCESSED (in beacon/.archive at ~02:52Z, between-cycle note). Beacon specced `pulse-envelope-builder-001`. AR registered manually via `heal_unregistered_approval.register_approval()`. ✅
+- **fix-alert-triage-watermark-durability-001**: VERIFIED REGISTERED — `beacon-pending-approvals.json` pending, Forge preflight phase. ✅ [blue updated: registered]
+- **fix-depth1-pulse-approval-extraction-001**: VERIFIED REGISTERED — `beacon-pending-approvals.json` pending, Forge preflight phase. ✅ [blue new/registered]
+- **pulse-envelope-builder-001**: VERIFIED REGISTERED (between-cycle ~02:52Z via manual registration). `beacon-pending-approvals.json` pending. ✅ [blue new]
+- **G-rule F24b (Pulse-envelope-format)**: 02:47Z between-cycle note: 024400Z envelope (iter ~1544's dispatch) was rejected — source='pulse-g-rule' + intent='direction-ask' both invalid. 4th invalid envelope of this pattern class. No counter increment (re-dispatch attempt, not independent failure). G-rule remains 3/3 DISPATCHED; pulse_envelope_builder.py fix specced (pulse-envelope-builder-001). [blue updated]
+- **dag-preflight-missions-v2-phase3 second preflight**: STRANDED — see finding below. [updated]
+- **sentinel-inbox-stall-respect-inflight-001**: beacon-pending-approvals.json = 3 entries; dag-preflight not registered yet. [blue carry/unverifiable]
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: **1317 lines** (+2 from L1315 watermark). New:
+- L1316 (02:40Z): `source=beacon, intent=approval-recovered` — informational confirmation that fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001 landed on Larry's Approvals tab. **Tier 3 (known-pattern: agent result notification; no action needed from Pulse).** Claimed.
+- L1317: likely from `heal_unregistered_approval` registering pulse-envelope-builder-001 AR. Tier 3 informational. Claimed.
+`alert-triage.json` last_claimed_line: MISSING (standing; fix-alert-triage-watermark-durability-001 in Forge preflight). ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot log: last Beacon session completed 02:48Z (active session processing f24b+dag-revision tasks). No new Larry messages since "Go" at 19:57 MDT Jun 11. All directives tracked. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → 0 new stalls, 1 suppressed (cooldown: `missions-v2-phase3`). ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json`: 3 pending approvals (all registered, all on Larry's Approvals tab):
+- `fix-alert-triage-watermark-durability-001` — Forge preflight, pending Larry
+- `fix-depth1-pulse-approval-extraction-001` — Forge preflight, pending Larry
+- `pulse-envelope-builder-001` — Forge preflight, trust_policy pending (likely auto-dispatches)
+✅ Properly registered; no orphan directives.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing known, G-rule dispatched iter ~1416. [blue] carry.
+
+**Check A — Source repo:** Session-start gitStatus: branch=main, clean (head=792f976 Pulse cycle 20260612T024731Z). ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-12T01:53:19Z (~57 min at check time), status=no-change. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 4/4 bots alive: `beacon_telegram_bot.py` (PID 1843738) + 3× `agent_telegram_bot.py` (PIDs 1843739/40/44). Active Beacon session (PID 1992709, started 02:48Z, 6% CPU) processing f24b + dag-revision tasks. ✅ Nominal.
+
+**Check D — Inboxes:** Forge: EMPTY. Mirror: EMPTY. Pulse: EMPTY. Beacon: `dag-preflight-missions-v2-phase3-reregister-20260612T025716Z.json` (fresh, written this iter). ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs (ourliberty-agent-core). ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** no-op. ✅
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I already fired in iter ~1543 today (02:31Z). SKIP. Check III (next eligible 2026-06-25) → skip.
+
+**Credential rotation:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~71d). Outside 60-day DM window. ✅
+
+**Key finding this iter:**
+
+**dag-preflight-missions-v2-phase3 second preflight STRANDED (extraction gap: source='mirror-result'):** Beacon processed backstop `notify-dag-revision-missions-v2-phase3` at 02:42Z and emitted a well-formed APPROVAL_REQUEST (task_id: dag-preflight-missions-v2-phase3, target_agent: mirror, task_type: code-review, phase: routing-signal). Beacon outbox result has `source: 'mirror-result'` — apparently also absent from outbox_notifier's extraction allowlist (same root cause as the `source='pulse'` gap that `fix-depth1-pulse-approval-extraction-001` addresses). Mirror inbox EMPTY; beacon-pending-approvals.json has no dag-preflight entry. Missions-v2-phase3 pipeline stalled at dag-preflight second review since ~02:00Z (~58 min). Scope implication: `fix-depth1-pulse-approval-extraction-001` Forge preflight may need to broaden scope to cover `source='mirror-result'` (and other non-covered source values) in addition to `source='pulse'`.
+
+**Actions taken:**
+1. Written Beacon inbox envelope `dag-preflight-missions-v2-phase3-reregister-20260612T025716Z.json` — direction-ask to: (a) re-register the stranded dag-preflight APPROVAL_REQUEST; (b) note scope expansion for fix-depth1 PR. ✅
+2. `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0, Tier 1. ✅
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention --template dag-preflight-missions-v2-phase3-stranded-reregister` ✅
+4. No DMs sent — all findings [blue] (stranded preflight is pipeline state, not Larry-action-required; already on track via Beacon direction-ask).
+
+**Standing findings (updated):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. Also blocks alert-translations.json Forge task. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). Pending Larry. [carry]
+- [blue] APPROVAL_REQUEST `fix-alert-triage-watermark-durability-001` — REGISTERED. Forge preflight, pending Larry. [updated: registered]
+- [blue] APPROVAL_REQUEST `fix-depth1-pulse-approval-extraction-001` — REGISTERED. Forge preflight, pending Larry. [updated: registered]
+- [blue] APPROVAL_REQUEST `pulse-envelope-builder-001` — REGISTERED (manual via heal_unregistered_approval). Trust policy pending; expect auto-dispatch to Forge preflight. [new]
+- [blue] dag-preflight-missions-v2-phase3 second preflight — STRANDED (source='mirror-result' extraction gap). Beacon direction-ask written this iter. Once Beacon processes, AR should register and trust_policy dispatches routing-signal to Mirror. [updated]
+- [blue] sentinel-inbox-stall-respect-inflight-001 — unverifiable; say `go: sentinel-inbox-stall-respect-inflight-001` to Beacon if applicable. [carry]
+- [blue] G-rule Pulse-envelope-format — 3/3 DISPATCHED (pulse-envelope-builder-001 specced, in Forge preflight). [updated: fix in progress]
+- [blue] heal-stale-daemon-code-state.json MISSING — G-rule dispatched iter ~1416. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 5/34 shelf cards. 1/3 G-rule. [carry]
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464, 465, 467, 468, 466, 470, 471, 472, 473, 475, 476, 477) — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] Various G-rule carries: silence-missions-card-gc 001, heal-pipeline-stall heartbeat 3/3 deferred, auto-restart-failed 1/3, completion-DM 1/3, auto-retry source=auto-retry 1/3, Check-C-launcher-liveness APPROVAL_REQUEST pending, retry-exhausted-on-shipped-task 2/3, retry_exhausted:post-merge-install-drift 1/3, bughunt-gate-soak Phase 2 pending, health-check-notify-script-missing G-rule 3/3 dispatched, Check IX GITHUB_TOKEN missing.
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST worktree-cleanup-merged-pr-reap-001 routing gap — 1/3 G-rule. [carry]
+- [blue] G-rule `routing-denied:pulse→forge` — 1/3. [carry]
+
+**Watch items for iter ~1546:**
+- **dag-preflight-missions-v2-phase3 re-register**: Watch for Beacon to process `dag-preflight-missions-v2-phase3-reregister-20260612T025716Z.json` → AR registration → trust_policy auto-dispatches routing-signal → Mirror second preflight. Also scope check for fix-depth1 PR.
+- **pulse-envelope-builder-001 trust_policy**: Expect auto-dispatch to Forge preflight on next Beacon tick (technical fix, no scope/values call). Watch for Forge preflight envelope in Forge inbox.
+- **fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001**: Awaiting Larry to approve/reject on Approvals tab → Forge build phase dispatch.
+- **Sync health**: last_sync=2026-06-12T01:53:19Z (~64 min at iter end). Will cross 2h threshold at ~03:53Z if sync doesn't run. Watch Check B next iter.
+
+**PRIME DIRECTIVE:** 1 intervention, 0 systemic_fixes this iter. Running total: interventions=802, systemic_fixes=29, ratio=27.66.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0.
+
+---
+
+## Between-cycle note — 2026-06-12 ~02:52Z UTC (Beacon result: pulse-envelope-builder-001 specced)
+
+**Trigger:** Inter-agent notify from Beacon — task `f24b-envelope-schema-fix-direction-ask-20260612T024743Z` → status=SUCCESS.
+
+**Event:** Beacon successfully specced the `pulse-envelope-builder-001` fix for the F24b `body`-vs-`prompt` envelope field confusion. Key arch finding: `safe_write_inbox.py` already validates via `dispatch_validator` (guard exists at line 212); Pulse has been bypassing it by raw-writing JSON. The fix is a thin Pulse-facing `scripts/pulse_envelope_builder.py` builder that owns `prompt` field naming structurally (caller passes text, never names the key), routes through the existing `safe_write_inbox` F24 gate, plus a `cycle-prompt.md` § 17 enforcement edit.
+
+Beacon emitted an APPROVAL_REQUEST for `pulse-envelope-builder-001` targeting Forge for preflight.
+
+**Marker registration (manual — source=pulse gap):** Per memory `project_pulse_direction_ask_marker_gap.md`, markers in replies to Pulse-originated direction-asks are NOT auto-extracted by outbox_notifier until `fix-depth1-pulse-approval-extraction-001` merges. Pulse registered the APPROVAL_REQUEST manually via `heal_unregistered_approval.register_approval()`. chain_event emitted OK. Confirmed in `beacon-pending-approvals.json` pending: `pulse-envelope-builder-001` ✅.
+
+**Next state:** Trust policy processes on next tick — likely auto-dispatches Forge preflight (technical reliability fix, no scope/values call). If auto-dispatched, Forge preflight appears in Forge inbox; Larry sees Beacon spec DM on approval.
+
+**Standing watch update:**
+- [blue] APPROVAL_REQUEST `pulse-envelope-builder-001` — REGISTERED (manual). Trust policy pending. [new]
+
+---
+
+## Between-cycle note — 2026-06-12 02:47Z UTC (dead-letter: f24b dispatch)
+
+**Trigger:** Inbound dead-letter notification from outbox notifier re: `f24b-envelope-schema-fix-direction-ask-20260612T024400Z`.
+
+**Event:** Pulse dispatch to Beacon (G-rule F24b 3/3) was rejected by dispatch_validator and moved to `~/agents/inboxes/beacon/.invalid/`. Root cause: two schema violations in the iter ~1544 envelope:
+1. `source: "pulse-g-rule"` — not in `ALLOWED_SOURCES` (validator halted here)
+2. `intent: "direction-ask"` — not in `ALLOWED_INTENTS` (would have been next rejection)
+
+Valid envelope format requires `source: "pulse"` and no `intent` field (intent is optional; "direction-ask" is not an allowed value).
+
+**Action:** Re-dispatched corrected envelope `f24b-envelope-schema-fix-direction-ask-20260612T024743Z.json` to Beacon's inbox. Validated OK before write (`dispatch_validator.py` → OK). Prompt content unchanged; only schema fields corrected.
+
+**Gap note:** Per memory `project_pulse_direction_ask_marker_gap.md` — if Beacon's response to this direction-ask embeds an APPROVAL_REQUEST marker, it will NOT be auto-extracted by outbox_notifier (source=pulse is not in `_BEACON_AUTO_DISPATCH_SOURCES`). If a Forge build task dispatch requires an APPROVAL_REQUEST, Pulse will need to register it manually via `heal_unregistered_approval.register_approval(...)` when the Beacon result arrives.
+
+**G-rule note:** The dead-letter itself is a 4th invalid envelope in the F24b pattern (original 3 were `body`/`prompt` confusion; this one was invalid source/intent fields). The permanent fix proposal (pulse_envelope_builder.py) addresses the root cause. No counter increment — this occurrence was the re-dispatch attempt, not a new independent failure.
+
+---
+
 ## Iteration ~1544 — 2026-06-12 02:43Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→1)
 
 **Trigger:** Larry direct invocation (`/cycle`).
