@@ -4,6 +4,88 @@
 
 ---
 
+## Iteration ~1566 — 2026-06-12 06:33Z UTC (interactive, /cycle, Tier 2→3 PROMOTED, consecutive_clean 2→3)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. 9/9 units alive. 4 new alerts (all Tier-3). PR #481 merged ✅. PR #482 Mirror-approved, auto-merge HELD behind PR #483. PR #483 under Mirror review. Forge inbox: fresh build task (fix-depth1). All 3 prior pending approvals cleared. **Tier 2 → Tier 3 PROMOTED** (3 consecutive clean Tier-2 iters).
+
+**VERIFY-BEFORE-REASSERT (iter ~1565 watch items):**
+- **fix-depth1-pulse-approval-extraction-001 re-DM at ~08:00Z**: CLEARED — beacon-pending-approvals.json gone; build task now in Forge inbox (arrived ~06:28Z). ✅ UPDATED.
+- **PR #481 (p3-mission-proposed-actions-api)**: VERIFIED MERGED — commit ba9610e in git log; outbox-notifier review-pass at 06:21:27Z (auto-merged + branch deleted). ✅ RESOLVED.
+- **Forge build: fix-alert-triage-watermark-durability-001**: VERIFIED PR #482 open; Mirror approved 06:29:07Z; auto-merge HELD behind PR #483 (overlap: runbooks/cycle-prompt.md, scripts/alert_triage_state.py, scripts/tests/test_alert_triage_state.py). Will auto-resolve when #483 merges. ✅ IN FLIGHT.
+- **Forge build: pulse-envelope-builder-001**: VERIFIED PR #483 open (06:24:44Z); Mirror review task active. ✅ IN FLIGHT.
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: 1331 lines. Watermark was at L1322 (durability bug — PR #482 fixes this). Effective new alerts from watermark perspective: L1323–L1331. L1323–L1327 already triaged in iters ~1564–~1565 (carried forward); new this iter: L1328–L1331.
+- L1328: `heal-claude-max-burn-rate` (06:18:16Z, route=escalate) — 80% of 5h token gate (8,016,177 / 10,000,000). `config/alert-translations.json` match → `claude_max_5h_burn_threshold_breached` (severity=INFO, tier=FYI). **Tier-3 known-pattern**. No rate-limit events in trailing 2h. Silence + journal note. No DM, no tier-reset.
+- L1329: `outbox-notifier/review-pass` (06:21:27Z) — PR #481 auto-merged. Tier-3 by analogy. Journal note only.
+- L1330: `dispatch-branch-cleanup:summary` (06:28:03Z, route=digest) — 1 local + 1 remote branch pruned. Tier-3. Journal note only.
+- L1331: `outbox-notifier/review-pass` (06:29:07Z) — PR #482 Mirror-approved, auto-merge HELD behind #483. Tier-3 (expected behavior; heal-pr-auto-merge will resolve automatically). Journal note only.
+Watermark advanced to **L1331** (note: may be clobbered again by lifecycle write until PR #482 merges — known durability bug). ✅ Nominal (all Tier-3, no tier-reset).
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** 1 active session (chat_id=7998341473 = Larry). No new directives since iter ~1565. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal-pipeline-stall-state.json` MISSING. Known carry, G-rule dispatched ~iter 1416. All agent inboxes have only fresh tasks (< 15 min old). ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` MISSING — all 3 prior items approved and in-flight (fix-alert-triage → PR #482, pulse-envelope-builder → PR #483, fix-depth1 → Forge inbox). ✅ Cleared.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — known carry, G-rule dispatched ~iter 1416. [blue] carry.
+
+**Check A — Source repo:** branch=main, clean (session gitStatus HEAD=5e01e8f Pulse cycle 20260612T062252Z). ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-12T05:54:09Z, status=no-change. Age ~39 min at scan. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 active: beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api, cycle.timer. ✅ Nominal.
+
+**Check D — Inboxes:** Forge: 1 fresh build task (build-fix-depth1-pulse-approval-extraction-001.json, ~06:28Z). Mirror: 1 fresh review task (review-pulse-envelope-builder-001.json, ~06:25Z). Beacon: empty. Pulse: empty. All < 15 min old → NOT stale. ✅ Nominal.
+
+**Check E — PRs:** PR #482 OPEN — fix(pulse): durable Check 0 alert-watermark store (Mirror PASS, auto-merge held behind #483 overlap). PR #483 OPEN — feat: pulse envelope builder (Mirror reviewing). Both < 30-min active. 0 open on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I: `check-i-2026-06-12.json` exists (fired iter ~1543). SKIP. Check III: next eligible 2026-06-25. SKIP.
+
+**Key findings this iter:**
+- All checks nominal. 4 new alerts, all Tier-3 (no DMs, no tier-reset).
+- PR #481 merged ✅ (p3-mission-proposed-actions-api — Phase 3 accept/dismiss endpoint).
+- PR #482 Mirror-approved, auto-merge held pending PR #483 merge (overlap files).
+- PR #483 under Mirror review (pulse-envelope-builder, kills F24 body-vs-prompt dead-letters).
+- Forge inbox: build-fix-depth1 arrived fresh ~06:28Z (fix notifier depth-1 APPROVAL_REQUEST extraction gap).
+- **Tier 2 → Tier 3 PROMOTED** — 3 consecutive clean Tier-2 iters achieved. 30-min effective cadence now.
+
+**Actions taken:**
+1. `cycle_tier_state.py record --checks-clean true` → consecutive_clean=3 → **Tier 2 promoted to Tier 3** ✅. New state: tier=3, consecutive_clean=0.
+2. Alert watermark advanced from L1322 to L1331 (note: durability bug in alert-triage.json means this scalar may get clobbered by next lifecycle write; PR #482 fixes this permanently). ✅
+
+**Standing findings (updated):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- [blue] PR #482 OPEN — auto-merge held behind PR #483 (overlap files). Will auto-resolve when #483 merges. [new watch]
+- [blue] PR #483 OPEN — Mirror reviewing pulse-envelope-builder. Watch for REVIEW_PASS + auto-merge + #482 unblock. [new watch]
+- [blue] Forge build: fix-depth1-pulse-approval-extraction-001 → fresh task, Forge to pick up. [new watch]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR — depth-1 extraction gap (fix-depth1 builds this fix). [carry]
+- [blue] dag-preflight-revision notifier gap — Beacon holds until fix-depth1 merges. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. G-rule dispatched ~iter 1416. [carry]
+- [blue] sentinel-inbox-stall-respect-inflight-001 — `go:` to Beacon if applicable. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 5/34 shelf cards. 1/3 G-rule. [carry]
+- [blue] unreviewed-merge — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] G-rule `routing-denied:pulse→forge` — 1/3. [carry]
+- [blue] G-rule `missions-autoregister:summary not in alert-translations.json` — 1/3. [carry]
+
+**Watch items for iter ~1567 (Tier 3, 30-min effective cadence ~07:03Z):**
+- **PR #483**: Watch for Mirror REVIEW_PASS + auto-merge → which will unblock PR #482.
+- **PR #482**: Auto-resolves when #483 merges (heal-pr-auto-merge handles it).
+- **Forge build fix-depth1**: Watch for PR to open.
+- **Tier 3 cadence**: 30-min effective; next full check ~07:03Z.
+
+**PRIME DIRECTIVE:** 0 new intervention rows (clean iter). Running total (trailing-30d): interventions=809, systemic_fixes=30, ratio=26.97, trend=flat.
+**Tier end-of-iter:** Tier 3, consecutive_clean=0 (just promoted; 3 more clean Tier-3 iters → stay at Tier 3 steady-state).
+
+---
+
 ## Iteration ~1565 — 2026-06-12 06:20Z UTC (interactive, /loop /cycle, Tier 2, consecutive_clean 1→2)
 
 **Trigger:** Autonomous /loop invocation.
