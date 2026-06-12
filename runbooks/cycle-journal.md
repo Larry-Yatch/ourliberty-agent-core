@@ -90,6 +90,110 @@ All properly registered. ✅ Nominal.
 
 ---
 
+## Iteration ~1547 — 2026-06-12 03:16Z UTC (interactive, /loop /cycle, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/loop /cycle` invocation (self-paced mode).
+
+**Health:** ✅ Nominal. 4/4 bots alive. 0 open PRs. 1 new alert (Tier 3 known-pattern: Mirror DAG-preflight PASS for missions-v2-phase3 — already delivered by Beacon at 03:08Z). All mandatory checks clean. **Positive:** missions-v2-phase3 pipeline ACTIVE — Forge building `p3-capture-actions-api` (session started 03:10:53Z). Tier 1, consecutive_clean=0 (standing: Check 5 MISSING + Check B sync-error carry).
+
+**VERIFY-BEFORE-REASSERT (iter ~1546 watch items):**
+- **Mirror dag-preflight review**: ✅ RESOLVED — Mirror PASS at 03:06:38Z; missions-v2-phase3 transitioned `pending` → `active`; build-sequence-advancer dispatched `p3-capture-actions-api` to Forge at ~03:10Z. CLOSED.
+- **Beacon direction-ask (reregister)**: ✅ RESOLVED — Beacon processed `dag-preflight-missions-v2-phase3-reregister-20260612T025716Z` at 03:10:44Z ($0.2121). Between-cycle note written to journal. Task now REDUNDANT/CLOSED.
+- **pulse-envelope-builder-001 trust_policy**: Still in `~/agents/state/beacon-pending-approvals.json` (3 entries unchanged). Beacon's 03:10 session was about the reregister task, not trust_policy processing. [blue] carry.
+- **fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001**: Still pending in `beacon-pending-approvals.json`. Awaiting Larry. [blue] carry.
+- **Sync self-heal**: `agent-core-sync.json` still shows 02:53Z error (auto-commit push-failed). Within 2h threshold (~23 min elapsed). [blue] carry.
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: **1318 lines** (+1 from iter ~1546). New:
+- L1318 (03:06:38Z): `source=outbox-notifier`, route=escalate, subject=`mirror-dag-pass:missions-v2-phase3`. Content: Mirror DAG-preflight PASS for missions-v2-phase3; sequence → active; build-sequence-advancer dispatching first step. **Tier 3 (known-pattern: Mirror PASS → pipeline advance notification, already delivered by Beacon idx=1317 at 03:08:03Z).** Claimed. Resolved.
+`alert-triage.json` watermark still MISSING (standing; fix-alert-triage-watermark-durability-001 in preflight). ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** No new Larry messages since "Go" at 19:57:53 MDT Jun 11 (~7.5h ago). All directives fully resolved: "Can you launch the missions v2 dag" → dag-preflight → Mirror PASS → pipeline ACTIVE → Forge building p3-capture-actions-api. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` (03:11Z) → 0 new stalls, 1 suppressed (cooldown: missions-v2-phase3). Note: `p3-capture-actions-api.json` in Forge inbox at ~03:10Z (< 1h threshold, actively being processed). ✅ Nominal.
+
+**Check 4 — Pending directives:** `~/agents/state/beacon-pending-approvals.json`: 3 pending approvals (unchanged):
+- `fix-alert-triage-watermark-durability-001` — forge preflight, pending Larry
+- `fix-depth1-pulse-approval-extraction-001` — forge preflight, pending Larry
+- `pulse-envelope-builder-001` — forge preflight, trust_policy pending
+All properly registered on Larry's Approvals tab. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing known, G-rule dispatched iter ~1416. [blue] carry.
+
+**Check A — Source repo:** Branch=main, up to date with origin/main. Working tree dirty: `runbooks/cycle-journal.md` modified with between-cycle note (~03:10Z, expected pre-commit state; wrapper commits post-cycle). ✅ Nominal (not long-lived drift).
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-12T02:53:41Z (~23 min at check time), status=error. Within 2h threshold. Self-heal pending (sync timer will retry). [blue] informational.
+
+**Check C — Agent liveness:** 4/4 bots active (beacon, forge, mirror, pulse). Forge session active since 03:10:53Z (p3-capture-actions-api, first step of missions-v2-phase3). ✅ Nominal.
+
+**Check D — Inboxes:** Beacon: EMPTY. Forge: 1 task (`p3-capture-actions-api.json`, written ~03:10Z, < 1h, actively being processed). Mirror: EMPTY. Pulse: EMPTY. ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs (ourliberty-agent-core). ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** `audit_due_nudge.py` → no committed audit baseline; no-op. `distill_detector.py` → no un-distilled audits; no-op. `audit_cadence_signal.py` → no post-seed distill artifacts; no-op. ✅
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I already fired in iter ~1543 (02:31Z). SKIP. Check III (next eligible 2026-06-25) → skip.
+
+**Credential rotation:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). Outside 60-day window. ✅
+
+**Key finding this iter:**
+
+**missions-v2-phase3 pipeline now ACTIVE and Forge building first step:** Mirror's DAG-preflight PASS at 03:06:38Z resolved the stranded-preflight finding from iter ~1545. The build-sequence-advancer dispatched `p3-capture-actions-api` (Forge task_type=feature-development) at ~03:10Z. Forge started a session at 03:10:53Z and is actively working on it now. Larry was notified via Beacon alert idx=1317 at 03:08:03Z. Watch for Forge completion + PR open for `p3-capture-actions-api` within 2h.
+
+Also: Beacon's between-cycle note (03:10Z) clarified the `dag-preflight-revision` notifier gap: it is a **separate fix** from `fix-depth1-pulse-approval-extraction-001` (different routing shape — requires symmetric notifier branch gated on `inbound_intent='dag-preflight-revision'` that dispatches directly to Mirror without trust_policy). Beacon holds authoring until `fix-depth1-pulse-approval-extraction-001` merges. No urgency (missions-v2-phase3 unblocked via manual recovery path).
+
+**Actions taken:**
+1. `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0, Tier 1 (standing: Check 5 MISSING + Check B sync-error). ✅
+
+**Standing findings (updated):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. Also blocks alert-translations.json Forge task. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). Pending Larry. [carry]
+- [blue] APPROVAL_REQUEST `fix-alert-triage-watermark-durability-001` — Forge preflight, pending Larry. [carry]
+- [blue] APPROVAL_REQUEST `fix-depth1-pulse-approval-extraction-001` — Forge preflight, pending Larry. [carry]
+- [blue] APPROVAL_REQUEST `pulse-envelope-builder-001` — REGISTERED. Trust policy dispatch to Forge pending (Beacon's 03:10 session was reregister task, not trust_policy). [carry]
+- [blue] missions-v2-phase3 pipeline — ACTIVE. Forge building `p3-capture-actions-api` (first step). Watch for completion + PR. [updated: pipeline active]
+- [blue] dag-preflight-revision notifier gap — Beacon holds authoring until `fix-depth1-pulse-approval-extraction-001` merges. Separate PR from fix-depth1. [new from between-cycle note]
+- [blue] Sync push-fail 02:53Z — self-healing, informational. Watch Check B next iter. [carry]
+- [blue] sentinel-inbox-stall-respect-inflight-001 — say `go: sentinel-inbox-stall-respect-inflight-001` to Beacon if applicable. [carry]
+- [blue] heal-stale-daemon-code-state.json MISSING — G-rule dispatched iter ~1416. [carry]
+- [blue] G-rule Pulse-envelope-format — 3/3 DISPATCHED (pulse-envelope-builder-001 specced, Forge preflight). [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 5/34 shelf cards. 1/3 G-rule. [carry]
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464, 465, 467, 468, 466, 470, 471, 472, 473, 475, 476, 477) — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] Various G-rule carries: silence-missions-card-gc 001, heal-pipeline-stall heartbeat 3/3 deferred, auto-restart-failed 1/3, completion-DM 1/3, auto-retry source=auto-retry 1/3, Check-C-launcher-liveness APPROVAL_REQUEST pending, retry-exhausted-on-shipped-task 2/3, retry_exhausted:post-merge-install-drift 1/3, bughunt-gate-soak Phase 2 pending, health-check-notify-script-missing G-rule 3/3 dispatched, Check IX GITHUB_TOKEN missing.
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST worktree-cleanup-merged-pr-reap-001 routing gap — 1/3 G-rule. [carry]
+- [blue] G-rule `routing-denied:pulse→forge` — 1/3. [carry]
+
+**Watch items for iter ~1548:**
+- **p3-capture-actions-api Forge build**: Watch for Forge completion + PR open within 2h (from 03:10Z). If no PR by 05:10Z, escalate.
+- **pulse-envelope-builder-001 trust_policy**: Watch for Beacon trust_policy auto-dispatch to Forge inbox (expect on next Beacon tick).
+- **Sync self-heal**: Check B — confirm next sync push succeeds (expect status=success in agent-core-sync.json within 2h of 02:53Z error).
+- **fix-depth1 / fix-watermark**: Awaiting Larry approval on Approvals tab.
+
+**PRIME DIRECTIVE:** 0 interventions, 0 systemic_fixes this iter. Running total: interventions=802, systemic_fixes=29, ratio=27.66.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0.
+
+---
+
+## Between-cycle note — 2026-06-12 ~03:10Z UTC (Beacon result: dag-preflight root cause + sequencing decision)
+
+**Trigger:** Inter-agent result notify from Beacon — task `dag-preflight-missions-v2-phase3-reregister-20260612T025716Z` → status=SUCCESS.
+
+**Event summary:** Beacon confirms the manual recovery path it used: add_pending → approval_request chain_event → dispatch_approved → safe_write_inbox → resolve(approved). What iter ~1546 observed as "trust_policy auto-dispatch" was actually Beacon's forced dispatch via `resolve(approved)` — same outcome, routing path clarified.
+
+**Scope correction for iter ~1546:** Iter ~1546 noted that `fix-depth1-pulse-approval-extraction-001` should expand to cover `source='mirror-result'`. Beacon's analysis is more precise: this is a **separate fix**, not an expansion. The root cause is `_BEACON_REPLAN_INBOUND_INTENTS = {'review-escalate'}` — `dag-preflight-revision` is absent from that set, so the replan branch (which extracts+dispatches) is skipped, and `source='mirror-result'` is in neither dispatch-source set. The proper fix is a symmetric notifier branch gated on `inbound_intent='dag-preflight-revision'` that dispatches the `review-sequence-dag` marker directly to Mirror **without consulting trust_policy** (trust_policy returns `force_ask` for beacon→mirror code-review; routing it through the trust gate would wrongly interrupt the operator). This is NOT the same routing shape as `fix-depth1-pulse-approval-extraction-001`.
+
+**Sequencing decision — Hold:** Both this fix and `fix-depth1-pulse-approval-extraction-001` touch the same `dispatch_outbox` routing block (~lines 8569–8621 in `outbox_notifier.py`). Dispatching the dag-preflight-revision fix before fix-depth1 merges risks an overlapping-edit conflict in Forge's build. The missions-v2-phase3 pipeline is unblocked, so there is no urgency. **Correct sequence: `fix-depth1-pulse-approval-extraction-001` merges first → then Beacon authors+dispatches the symmetric `dag-preflight-revision` notifier branch fix as a separate PR.** Beacon should hold authoring until that PR merges.
+
+**Standing updates:**
+- [blue] dag-preflight-revision notifier gap — new standing item. Beacon holds authoring until `fix-depth1-pulse-approval-extraction-001` merges. [new]
+- [blue] fix-depth1-pulse-approval-extraction-001 scope — the `source='mirror-result'` expansion is a separate follow-on PR, not in-scope for the current preflight task. [clarified]
+
+---
+
 ## Iteration ~1545 — 2026-06-12 02:50Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry direct invocation (`/cycle`).
