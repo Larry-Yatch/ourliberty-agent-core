@@ -2290,6 +2290,40 @@
       "proposed_at": "2026-06-12T19:38:22.991425+00:00",
       "orphan_branch": null,
       "orphan_last_activity_ts": "2026-06-11T03:20:20.041456+00:00"
+    },
+    {
+      "id": "proposed-wire-pulse-check-iv-cadence-001",
+      "name": "Wire Pulse Check Iv Cadence 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `wire-pulse-check-iv-cadence-001`. Last activity 2026-06-12T20:02:29.607475+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "wire-pulse-check-iv-cadence-001"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T20:08:40.116350+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-12T20:02:29.607475+00:00"
+    },
+    {
+      "id": "proposed-pulse-check-iv-cadence-fix-g-rule-20260612T195740Z",
+      "name": "Pulse Check Iv Cadence Fix G Rule 20260612T195740Z",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pulse-check-iv-cadence-fix-g-rule-20260612T195740Z`. Last activity 2026-06-12T20:02:28.548573+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pulse-check-iv-cadence-fix-g-rule-20260612T195740Z"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T20:08:40.116350+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-12T20:02:28.548573+00:00"
     }
   ]
 }
