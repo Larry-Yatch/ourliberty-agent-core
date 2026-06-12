@@ -3845,6 +3845,12 @@ def _get_larry_action_supabase_client():
     key = os.environ.get('SUPABASE_SERVICE_ROLE_KEY')
     if not url or not key:
         return None
+    # supabase_factory and its test_isolation_guard dep both live in scripts/.
+    # Other handlers add scripts_dir lazily; this function must do the same
+    # so the import succeeds regardless of which handler runs first.
+    scripts_dir = Path(__file__).resolve().parent
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
     try:
         from supabase_factory import get_supabase_client  # type: ignore  # noqa: PLC0415
         return get_supabase_client(url, key)
