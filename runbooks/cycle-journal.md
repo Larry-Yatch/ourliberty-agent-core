@@ -4,6 +4,86 @@
 
 ---
 
+## Iteration ~1567 — 2026-06-12 07:08Z UTC (interactive, /cycle, Tier 3, consecutive_clean 0→1)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. 8 long-running services active (beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api). cycle.timer unit not found — known standing issue (G-rule 3/3 dispatched iter 848, `go: cycle-timer checkpoint` pending Larry). 4 new alerts (all Tier-3). **Three major fixes landed this cycle: PRs #482, #483, #484 all merged.** 0 open PRs. All inboxes empty. Tier 3, consecutive_clean 0→1.
+
+**VERIFY-BEFORE-REASSERT (iter ~1566 watch items):**
+- **PR #483 (pulse-envelope-builder)**: VERIFIED MERGED ✅ at 06:38:27Z (outbox-notifier review-pass, auto-merged + branch deleted). Kills F24 body-vs-prompt dead-letters. ✅ CLOSED.
+- **PR #482 (durable watermark store)**: VERIFIED MERGED ✅ at 06:38:31Z (blocker resolved after #483 merged, auto-merged + branch deleted). Fixes recurring watermark-clobber. ✅ CLOSED.
+- **Forge build fix-depth1**: VERIFIED PR #484 opened and MERGED ✅ at 06:46:23Z (fix(notifier): extract APPROVAL_REQUEST from source='pulse' direction-ask beacon results, auto-merged + branch deleted). Fixes direction-ask extraction gap. ✅ CLOSED.
+- **Tier 3 cadence**: Confirmed Tier 3 running. consecutive_clean=0 entering iter, advancing to 1. ✅ CARRY.
+
+**Check 0 — Alert triage:** Watermark: MISSING on entry (new `alert-triage-watermark.json` store first-run, post-PR #482 deploy at 06:54Z sync). Per catchup rule: claimed last 100 lines. Effective new alerts from prior watermark L1331: L1332–L1335 (4 lines).
+- L1332: `outbox-notifier/review-pass` (06:38:27Z) — PR #483 pulse-envelope-builder-001 auto-merged. Tier-3 by-design. Journal note only.
+- L1333: `outbox-notifier/review-pass` (06:38:31Z) — PR #482 fix-alert-triage-watermark-durability-001 auto-merged. Tier-3 by-design. Journal note only.
+- L1334: `outbox-notifier/review-pass` (06:46:23Z) — PR #484 fix-depth1-pulse-approval-extraction-001 auto-merged. Tier-3 by-design. Journal note only.
+- L1335: `auto-restarted:ourliberty-dashboard-api.service` (06:51:40Z, source=heal-stale-daemon-code, route=digest) — stale daemon healer restarted dashboard-api to pick up PR #481 code. Tier-3 by-design. Journal note only.
+Watermark initialized at **L1335** via new `set-watermark` CLI (first write to dedicated store — no more clobber risk). ✅ Nominal (all Tier-3, no tier-reset).
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** No new Larry directives since iter ~1566. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal-pipeline-stall-state.json` MISSING — known carry, G-rule dispatched ~iter 1416. All inboxes empty. 0 open PRs. ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` shows 2 items as `pending` — both already-merged PRs (#482 `fix-alert-triage-watermark-durability-001`, #484 `fix-depth1-pulse-approval-extraction-001`). Stale file state; `ourliberty-heal-stale-approvals.timer` last fired ~5 min ago and will clear. No new unresolved approvals. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — known carry, G-rule dispatched ~iter 1416. Healer IS running: fired at 06:51Z auto-restarting dashboard-api (L1335). [blue] carry.
+
+**Check A — Source repo:** last_sync=2026-06-12T06:54:11Z status=success HEAD=028636e ("fix(notifier): extract APPROVAL_REQUEST from source='pulse' direction-ask beacon results (#484)"). On main, clean. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-12T06:54:11Z, status=success. Age ~14 min at scan time. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 8/8 long-running services active (beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api). `ourliberty-agent-cycle.timer` unit not found — standing issue from G-rule 3/3 dispatched iter 848; cycle running via direct invocation. ✅ Core services nominal; [blue] cycle.timer standing carry.
+
+**Check D — Inboxes:** All 4 empty (Forge, Mirror, Beacon, Pulse). ✅ Nominal.
+
+**Check E — PRs:** 0 open on agent-core, 0 on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I: `check-i-2026-06-12.json` exists (fired iter ~1543). SKIP. Check III: next eligible 2026-06-25. SKIP.
+
+**Key findings this iter:**
+All checks nominal. Three major systemic fixes verified merged:
+- **PR #483** (feat: pulse envelope builder) — MERGED ✅. `build_envelope` now owns the `prompt` key; F24 body-vs-prompt dead-letters structurally impossible going forward.
+- **PR #482** (fix(pulse): durable Check 0 alert-watermark store) — MERGED ✅. `alert-triage-watermark.json` dedicated store live; watermark initialized at L1335 this iter. The recurring "watermark missing; claimed trailing 100 lines" pattern is now permanently closed.
+- **PR #484** (fix(notifier): source='pulse' direction-ask APPROVAL_REQUEST extraction) — MERGED ✅. The depth-1 extraction gap that stranded `sync-push-rebase-loop-001` and blocked dag-preflight-revision re-dispatches is now closed.
+
+**dag-preflight-revision notifier gap update:** Blocker (fix-depth1) has merged. Beacon can now process direction-ask ARs from source='pulse' correctly. The already-dropped `sync-push-rebase-loop-001` AR may still need manual recovery (`go: sync-push-rebase-loop-001` to Beacon if the root code fix is still desired).
+
+**Actions taken:**
+1. Alert watermark initialized at L1335 via `alert_triage_state.py set-watermark --line 1335` (first write to new dedicated store). ✅
+2. `cycle_tier_state.py record --checks-clean true` → consecutive_clean=1, Tier 3. ✅
+3. No auto-fix actions. No DMs (all Tier-3, no new escalations needed).
+
+**Standing findings (updated from iter ~1566):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR — PR #484 fixes the extraction gap going forward; the already-dropped AR may need manual recovery (`go: sync-push-rebase-loop-001` to Beacon). [updated]
+- [blue] dag-preflight-revision notifier gap — BLOCKER REMOVED (fix-depth1 merged). Beacon unblocked for dag-preflight-revision re-dispatches. [updated]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent, healer confirmed running (fired 06:51Z). G-rule dispatched ~iter 1416. [carry]
+- [blue] heal-pipeline-stall-state.json MISSING — G-rule dispatched ~iter 1416. [carry]
+- [blue] sentinel-inbox-stall-respect-inflight-001 — `go:` to Beacon if applicable. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 5/34 shelf cards. 1/3 G-rule. [carry]
+- [blue] unreviewed-merge — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] G-rule `routing-denied:pulse→forge` — 1/3. [carry]
+- [blue] G-rule `missions-autoregister:summary not in alert-translations.json` — 1/3. [carry]
+- [blue] cycle.timer unit not found — standing G-rule 3/3, `go: cycle-timer checkpoint` pending Larry. [carry]
+
+**Watch items for iter ~1568 (Tier 3, 30-min cadence ~07:38Z):**
+- **sync-push-rebase-loop-001 recovery**: If Larry wants the root fix, say `go: sync-push-rebase-loop-001` to Beacon now that the extraction gap is closed.
+- **Tier 3 cadence**: 2 more clean Tier-3 iters → steady-state Tier 3.
+
+**PRIME DIRECTIVE:** 0 new intervention rows (clean iter). Running total (trailing-30d): interventions=809, systemic_fixes=30, ratio=26.97, trend=flat.
+**Tier end-of-iter:** Tier 3, consecutive_clean=1.
+
+---
+
 ## Iteration ~1566 — 2026-06-12 06:33Z UTC (interactive, /cycle, Tier 2→3 PROMOTED, consecutive_clean 2→3)
 
 **Trigger:** Larry direct invocation (`/cycle`).
