@@ -4,6 +4,67 @@
 
 ---
 
+## Iteration ~1575 — 2026-06-12 11:27Z UTC (interactive, /cycle, Tier 3, consecutive_clean 8→9)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. 10 core services active. 0 new alerts. 0 open PRs. All inboxes empty. Tier 3, consecutive_clean 8→9.
+
+**VERIFY-BEFORE-REASSERT (iter ~1574 watch items):**
+- G-rule catalog-accuracy-drift (2/3): Last alert 10:20Z June 12 (7/34 drifted). No new occurrence since iter ~1574. Still 2/3. CARRY.
+- G-rule missions-autoregister:summary (2/3): Last alert 10:32Z June 12. No new occurrence since iter ~1574. Still 2/3. CARRY.
+
+**Check 0 — Alert triage:** Watermark L1337 (file=1110 lines, unchanged since iter ~1574). 0 new alerts since 11:00Z. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message "Go" at 00:17Z June 12. No new directives since iter ~1574. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** Healer ran → "no stalls detected." FORGE_NO_PR_SKIP for tasks #481–#484 (all merged). All 4 inboxes empty. 0 open PRs. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json present — 2 entries with null task_id/title/source (ghost entries from June 12 ~06:03–06:05Z approval-recovery churn; no actionable content; healer clears on next pass). ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry.
+
+**Check A — Source repo:** branch=main, clean (sync.json commit=999a953 "chore(missions): autoregister healer"). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-12T10:54:39Z, status=no-change. Age ~33 min at scan. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 10/10 active: beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api, cycle.service, cycle.timer. ✅ Nominal.
+
+**Check D — Inboxes:** All 4 (beacon, forge, mirror, pulse) empty. ✅ Nominal.
+
+**Check E — PRs:** 0 open on agent-core, 0 on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I: check-i-2026-06-12.json exists (fired iter ~1543). SKIP. Check III: next eligible 2026-06-25. SKIP.
+
+**Actions taken:**
+1. `cycle_tier_state.py record --checks-clean true` → consecutive_clean=9, Tier 3. ✅
+2. No watermark update (0 new alerts). No auto-fix actions. No DMs.
+
+**Standing findings (unchanged from iter ~1574):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR — manual recovery via `go: sync-push-rebase-loop-001` to Beacon if root fix still desired. [carry]
+- [blue] dag-preflight-revision notifier gap — fix-depth1 merged (PR #484). Separate re-dispatch may need `go:` to Beacon. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. G-rule dispatched ~iter 1416. [carry]
+- [blue] sentinel-inbox-stall-respect-inflight-001 — `go:` to Beacon if applicable. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 7/34 shelf cards (up from 5). G-rule **2/3**. [carry]
+- [blue] unreviewed-merge — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] G-rule `routing-denied:pulse→forge` — 1/3. [carry]
+- [blue] G-rule `missions-autoregister:summary not in alert-translations.json` — **2/3**. [carry]
+
+**Watch items for iter ~1576 (Tier 3, 30-min cadence ~12:00Z):**
+- G-rules approaching 3/3: catalog-accuracy-drift (2/3), missions-autoregister:summary (2/3). At 3/3 next occurrence → dispatch Beacon.
+
+**PRIME DIRECTIVE:** 0 new intervention rows (clean iter). Running total (trailing-30d): interventions=809, systemic_fixes=30, ratio=26.97, trend=flat.
+**Tier end-of-iter:** Tier 3, consecutive_clean=9.
+
+---
+
 ## Iteration ~1574 — 2026-06-12 11:00Z UTC (interactive, /cycle, Tier 3, consecutive_clean 7→8)
 
 **Trigger:** Larry direct invocation (`/cycle`).
