@@ -1918,7 +1918,11 @@ This doctrine is **load-bearing post-PR #157.** A deny block in `scripts/run_cyc
 
 ### 17. Dispatch task format (reference)
 
-When you write to `~/agents/inboxes/<agent>/<slug>.json`, the file MUST satisfy `dispatch_validator.validate_task` or the inbox watcher will move it to `.invalid/` with a `.reason` sidecar. The validator is stricter than HANDSHAKE-SCHEMA — it exists to kill the F24 empty-prompt bug class.
+**Construct every dispatch envelope via `scripts/pulse_envelope_builder.py` — do NOT hand-write the JSON file.** The builder owns the canonical field naming: you pass the prompt TEXT as an argument and never name the key, so the recurring `body`-vs-`prompt` confusion (the F24 empty-prompt dead-letter class) becomes structurally impossible. A malformed envelope (short prompt, bad source) fails fast with a clear stderr diagnostic and a non-zero exit BEFORE any file reaches the watcher.
+
+**Enforcement:** all cycle-fix / cycle-finding dispatch construction routes through `scripts/pulse_envelope_builder.py`, which owns the `prompt` field name and writes via `safe_write_inbox` → `dispatch_validator.validate_task` (the F24 fail-fast gate) + `routing_validator` topology check + atomic write + audit log. A raw hand-written `body`-keyed JSON file is the failure mode this rule exists to eliminate; `scripts/tests/test_pulse_envelope_builder.py` asserts the builder output always carries `prompt`, never `body`, and that a short prompt is rejected at construction with no inbox file written.
+
+The envelope the builder writes MUST satisfy `dispatch_validator.validate_task` (the builder validates it for you, pre-write) or the inbox watcher would move it to `.invalid/` with a `.reason` sidecar. The validator is stricter than HANDSHAKE-SCHEMA — it exists to kill the F24 empty-prompt bug class. The field reference below describes what the builder produces, so you understand the envelope shape.
 
 **Required fields:**
 
@@ -1937,21 +1941,22 @@ When you write to `~/agents/inboxes/<agent>/<slug>.json`, the file MUST satisfy 
 | `timeout` | Default 14400 (4h). Set lower (e.g. 600) for narrow questions. |
 | `model` | Omit unless overriding the agent's `inbox_model` from `config/agent-models.json`. |
 
-**Template you can copy:**
+**Canonical invocation (copy this):**
 
-```json
-{
-  "task_id": "cycle-fix-<slug>-<YYYYMMDDTHHMMSSZ>",
-  "source": "pulse",
-  "dedup_identity": "cycle-fix:<canonical-slug>",
-  "prompt": "Pulse observed <finding> in cycles <iter-list>. <Evidence: log excerpts, file paths, counts>. <Why this matters: which contract / behaviour is broken>. <Proposed fix shape, or the constraint that needs a real design call>. <Acceptance criteria: how we'll know the fix worked>. Read agents/pulse/memory/ for prior context if needed.",
-  "timeout": 3600
-}
+Pipe the prompt TEXT on stdin via a heredoc — this mirrors the `marker.py render ... <<'JSON'` pattern and avoids shell-escaping a long multi-line prompt. The builder reads the prompt from stdin; everything else is an argument.
+
+```bash
+python3 ~/agent-core/scripts/pulse_envelope_builder.py beacon \
+  --task-id "cycle-finding-<slug>-$(date -u +%Y%m%dT%H%M%SZ)" \
+  --dedup-identity "cycle-finding:<canonical-slug>" \
+  --timeout 3600 <<'PROMPT'
+Pulse observed <finding> in cycles <iter-list>. <Evidence: log excerpts, file paths, counts>. <Why this matters: which contract / behaviour is broken>. <Proposed fix shape, or the constraint that needs a real design call>. <Acceptance criteria: how we'll know the fix worked>. Read agents/pulse/memory/ for prior context if needed.
+PROMPT
 ```
 
-Drop the file as `~/agents/inboxes/<agent>/cycle-fix-<slug>.json` (or `cycle-finding-<slug>.json` if you're routing to Beacon for a design call rather than Forge for a code change). The watcher picks it up on the next 5s tick.
+The first positional argument is the **target inbox**. Routing topology is enforced by `safe_write_inbox`: a `pulse` source can dispatch to **`beacon`** (the design-call / `cycle-finding` route — `pulse → forge` is denied by the role-boundary table, so design calls go through Beacon). The builder writes the file as `~/agents/inboxes/<target>/<task_id>.json` and prints the written path on success; the watcher picks it up on the next 5s tick. `--source` defaults to `pulse`; override only with another `ALLOWED_SOURCES` value when a non-Pulse system source is correct for the route.
 
-If the task is rejected: read `~/agents/inboxes/<agent>/.invalid/<file>.reason`, fix the issue, and re-dispatch with a new `task_id` (don't reuse — dedup will block).
+If the builder exits non-zero, read its stderr diagnostic (it tells you exactly which check failed — short prompt, bad source, denied route) and fix the call. Because the envelope is validated BEFORE the write, a rejected envelope never lands in `.invalid/`. If a write-time rejection ever does occur, read `~/agents/inboxes/<target>/.invalid/<file>.reason`, fix the issue, and re-invoke with a new `task_id` (don't reuse — dedup will block).
 
 ---
 

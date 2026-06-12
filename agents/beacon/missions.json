@@ -147,7 +147,8 @@
         "seq-pulse-upgrade-001-step-gamma",
         "dag-preflight-pulse-upgrade-001",
         "sequence-complete-pulse-upgrade-001",
-        "fix-apply-skip-finalization"
+        "fix-apply-skip-finalization",
+        "pulse-envelope-builder-001"
       ],
       "repo": "ourliberty-agent-core",
       "created": "2026-05-26",
