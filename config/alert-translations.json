@@ -322,6 +322,14 @@
       "recommended_action": "One-off: no action needed, it self-recovered. If it recurs, inspect ~/agents/state/cycle-tier.json by hand for what is writing bad data."
     }
   },
+  "missions-autoregister": {
+    "summary": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "missions-autoregister periodically scans orphan threads and proposes auto-registration for the best candidate. This is routine housekeeping — the result is a committed thread proposal with route=digest. No operator action required.",
+      "recommended_action": "None. The autoregister healer handles this automatically. Review the proposed thread in ~/agent-core/agents/ if the proposal looks unexpected."
+    }
+  },
   "pulse-check-iv": {
     "check-iv-update": {
       "severity": "INFO",
