@@ -1,0 +1,14 @@
+[Unit]
+Description=~15-min tick for the orphan auto-registration healer (propose phase=proposed missions.json threads for non-terminal orphans)
+
+[Timer]
+# Phase 3 § 6: timer healer, low cadence (proposals are not time-critical and the
+# scan is idempotent). Boot offset staggers it off the GC healer (7min) and the
+# other git-touching healers so it doesn't contend for the missions.json lock.
+OnBootSec=12min
+OnUnitActiveSec=15min
+Unit=ourliberty-heal-orphan-autoregister.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

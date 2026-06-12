@@ -5,7 +5,7 @@
       "id": "cap-bidirectional-missions-board-agents-read-it-to-s-bebd",
       "title": "Bidirectional Missions board \u2014 agents read it to self-prioritize",
       "note": "Today the board is a read-only operator view; the fleet gets work from inbox + sequence DAG, not the board. Raised 2026-06-10; net-new capability (also relevant to the sibling project). Possible future phase: make the registry a prioritized backlog the fleet queries before pulling from its inbox.",
-      "state": "parked",
+      "state": "promoted",
       "origin": {
         "source": "desktop-chat",
         "session_id": null,
@@ -13,8 +13,9 @@
         "branch": "feat/telegram-approve-clears-dashboard-pending",
         "captured_at": "2026-06-10T06:01:59.654438+00:00"
       },
-      "last_touched": "2026-06-10T06:01:59.654438+00:00",
-      "promoted_to": null
+      "last_touched": "2026-06-12T03:57:17.151990+00:00",
+      "promoted_to": "scripts/heal_orphan_autoregister.py (Missions v2 Phase 3 § 6 orphan auto-registration healer) — the concrete realization of agents reading the board to self-prioritize",
+      "promoted_at": "2026-06-12T03:57:17.151990+00:00"
     },
     {
       "id": "cap-orphan-lane-show-desktop-chat-title-fallback-rep-dd23",

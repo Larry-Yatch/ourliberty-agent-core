@@ -1,0 +1,39 @@
+[Unit]
+Description=Missions v2 orphan auto-registration healer — propose phase=proposed missions.json entries for non-terminal orphans (Phase 3 § 6)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/heal_orphan_autoregister.py
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/agents/beacon/specs/missions-v2-phase3-writeback-autoregister.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+# Carries SUPABASE_* (chain_events read via chain_event_emit), GITHUB_TOKEN / gh
+# auth token (orphan PR-state read for terminal detection) + git credentials
+# (push the missions.json delta to main).
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/heal_orphan_autoregister.py
+# A tick fetches chain_events, optionally a batched GitHub PR-state read per repo,
+# then a push round-trip — generous headroom for the network legs.
+TimeoutStartSec=600
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-heal-orphan-autoregister
+
+# Hardening (matches ourliberty-heal-missions-card-gc.service). ReadWritePaths
+# covers agent-core (missions.json write + git commit/push), the agents tree (kill
+# switch, logs, alert queue), and credentials.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /home/larry/agent-core /home/larry/credentials /home/larry/.claude /home/larry/.claude.json /home/larry/.local /home/larry/.cache /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+Nice=10
