@@ -4,6 +4,93 @@
 
 ---
 
+## Iteration ~1550 — 2026-06-12 03:32Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 4/4 bots alive. 1 open PR (#478, under Mirror review — missions-v2-phase3 step 1). 0 new alerts. All mandatory checks clean. Sync push-fail still showing from 02:53Z (1h 38min elapsed, threshold 03:53Z — 21 min margin; still in window). Tier 1, consecutive_clean=0 (standing: Check 5 MISSING + Check B sync error watch).
+
+**VERIFY-BEFORE-REASSERT (iter ~1549 watch items):**
+- **PR #478 Mirror review**: ✅ Still active — Mirror inbox has `review-p3-capture-actions-api.json` (mtime 03:25Z, ~6 min old at check time 03:31Z). reviewDecision="" (no decision yet). Under 30-min auto-merge threshold. Expected normal. [blue] watch for Mirror PASS → build-sequence-advancer dispatches p3-mission-actions-api (step 2).
+- **Sync self-heal**: agent-core-sync.json still shows 02:53Z error. Current time 03:31Z; elapsed ~1h 38min from last successful sync ~01:53Z. Threshold 03:53Z → 22 min margin. Within window; wrapper pushes succeeding independently. If no self-heal by iter ~1551, trigger `sync_agent_core.sh` (always-allowed auto-fix). [blue] watch.
+- **pulse-envelope-builder-001 trust_policy**: Confirmed still in beacon-pending-approvals.json (3 pending, unchanged). Forge inbox EMPTY — trust_policy not yet dispatched to Forge. [blue] carry.
+- **fix-depth1 / fix-watermark**: Both confirmed in beacon-pending-approvals.json. Awaiting Larry. [blue] carry.
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: **1318 lines** (UNCHANGED from iter ~1549 — no new alerts). `alert-triage.json` watermark MISSING (standing; fix-alert-triage-watermark-durability-001 in preflight). ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry messages: "Go" at 19:57 MDT Jun 11 (01:57Z UTC), "Can you launch the missions v2 dag" at 19:54 MDT — all fully tracked by missions-v2-phase3 pipeline (now in PR #478 Mirror review). No new Larry messages since iter ~1549. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` (03:31Z) → `FORGE_NO_PR_SKIP task=test-jail-pr4-acceptance-proof-001 reason=pr_exists match=branch pr=#476` and `adopt-approval-visibility-hardening-spec reason=pr_exists match=branch pr=#477` (both expected suppressions); `no stalls detected`. ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json`: 3 pending approvals (unchanged):
+- `fix-alert-triage-watermark-durability-001` — Forge preflight, pending Larry
+- `fix-depth1-pulse-approval-extraction-001` — Forge preflight, pending Larry
+- `pulse-envelope-builder-001` — Forge preflight, trust_policy pending
+All on Larry's Approvals tab. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing known, G-rule dispatched iter ~1416. [blue] carry.
+
+**Check A — Source repo:** Session-start gitStatus: branch=main, clean, head=ab577ed (Pulse cycle 20260612T032938Z = iter ~1549 commit). ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-12T02:53:41Z, status=error (auto-commit push failed; rolled back). Elapsed from last successful sync (~01:53Z): ~1h 38min at check time. 2h threshold expires ~03:53Z (22 min margin). Wrapper's own pushes succeeding independently. Trigger `sync_agent_core.sh` next iter if no self-heal before 03:53Z. [blue] watch.
+
+**Check C — Agent liveness:** `systemctl is-active` → all 4 bot units active (beacon, forge, mirror, pulse). `ourliberty-inbox-watcher.service` active. `ourliberty-cycle.timer` active. ✅ Nominal.
+
+**Check D — Inboxes:** Beacon: EMPTY. Forge: EMPTY. Mirror: 1 task (`review-p3-capture-actions-api.json`, mtime 03:25Z, ~6 min old, actively processing). Pulse: EMPTY. ✅ Nominal.
+
+**Check E — PRs:** PR #478 OPEN (`forge/p3-capture-actions-api`, createdAt 03:25:25Z, age ~6 min), mergeable=UNKNOWN (GitHub resolving), reviewDecision="" (Mirror reviewing). Auto-merge not yet triggered — under 30-min threshold. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** `audit_due_nudge.py` → "no committed audit baseline; no-op." `distill_detector.py` → "no un-distilled audits; no-op." `audit_cadence_signal.py` → "no post-seed distill artifacts yet; no-op." ✅
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I already fired iter ~1543 (02:31Z). SKIP. Check III (next eligible 2026-06-25) → skip.
+
+**Credential rotation:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~71d). Outside 60-day window. ✅
+
+**Key finding this iter:**
+
+**missions-v2-phase3 step 1 in Mirror review — nominal pipeline progress.** PR #478 ("feat: capture write-back endpoint (promote/drop/snooze)") is under Mirror review. Build-sequence-advancer will dispatch step 2 (p3-mission-actions-api) to Forge once Mirror PASSes. No stalls, no anomalies, no new alerts. System running cleanly.
+
+**Sync threshold closing:** 22 min margin remaining at check time. Next iter (~1551) at or after 03:53Z must trigger `sync_agent_core.sh` if last_sync still shows 02:53Z error.
+
+**Actions taken:**
+1. `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0, Tier 1 (standing: Check 5 MISSING + Check B sync error). ✅
+2. No DMs sent — no [yellow]/[red] findings.
+3. No auto-fix actions triggered.
+
+**Standing findings (updated):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. Also blocks alert-translations.json Forge task. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). Pending Larry. [carry]
+- [blue] APPROVAL_REQUEST `fix-alert-triage-watermark-durability-001` — Forge preflight, pending Larry. [carry]
+- [blue] APPROVAL_REQUEST `fix-depth1-pulse-approval-extraction-001` — Forge preflight, pending Larry. [carry]
+- [blue] APPROVAL_REQUEST `pulse-envelope-builder-001` — Forge preflight, trust_policy pending. [carry]
+- [blue] missions-v2-phase3 pipeline — ACTIVE. PR #478 open (p3-capture-actions-api), under Mirror review. Watch for Mirror PASS → step 2 (p3-mission-actions-api). [carry]
+- [blue] dag-preflight-revision notifier gap — Beacon holds authoring until `fix-depth1-pulse-approval-extraction-001` merges. [carry]
+- [blue] Sync push-fail 02:53Z — threshold 03:53Z (22 min). Trigger sync_agent_core.sh next iter if no self-heal. [updated: closing window]
+- [blue] sentinel-inbox-stall-respect-inflight-001 — say `go: sentinel-inbox-stall-respect-inflight-001` to Beacon if applicable. [carry]
+- [blue] heal-stale-daemon-code-state.json MISSING — G-rule dispatched iter ~1416. [carry]
+- [blue] G-rule Pulse-envelope-format — 3/3 DISPATCHED (pulse-envelope-builder-001 specced, Forge preflight). [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 5/34 shelf cards. 1/3 G-rule. [carry]
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464, 465, 467, 468, 466, 470, 471, 472, 473, 475, 476, 477, 478) — actor-exemption pending `go: actor-exemption-config`. [carry + 478 added]
+- [blue] Various G-rule carries: silence-missions-card-gc 001, heal-pipeline-stall heartbeat 3/3 deferred, auto-restart-failed 1/3, completion-DM 1/3, auto-retry source=auto-retry 1/3, Check-C-launcher-liveness APPROVAL_REQUEST pending, retry-exhausted-on-shipped-task 2/3, retry_exhausted:post-merge-install-drift 1/3, bughunt-gate-soak Phase 2 pending, health-check-notify-script-missing G-rule 3/3 dispatched, Check IX GITHUB_TOKEN missing.
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST worktree-cleanup-merged-pr-reap-001 routing gap — 1/3 G-rule. [carry]
+- [blue] G-rule `routing-denied:pulse→forge` — 1/3. [carry]
+
+**Watch items for iter ~1551:**
+- **PR #478 Mirror review**: Watch for Mirror PASS → build-sequence-advancer dispatches p3-mission-actions-api (missions-v2-phase3 step 2) to Forge.
+- **Sync threshold**: Check B — if last_sync still shows 02:53Z error and current time > 03:53Z (2h from 01:53Z last successful), trigger `sync_agent_core.sh` (always-allowed auto-fix).
+- **pulse-envelope-builder-001**: Watch for trust_policy dispatch to Forge inbox.
+- **fix-depth1 / fix-watermark**: Awaiting Larry approval on Approvals tab.
+
+**PRIME DIRECTIVE:** 0 interventions, 0 systemic_fixes this iter. Running total: interventions=802, systemic_fixes=29, ratio=27.66.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0.
+
+---
+
 ## Iteration ~1549 — 2026-06-12 03:28Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry direct invocation (`/cycle`).
