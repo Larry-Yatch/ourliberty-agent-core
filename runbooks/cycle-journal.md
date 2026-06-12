@@ -4,6 +4,83 @@
 
 ---
 
+## Iteration ~1583 — 2026-06-12 13:57Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Dirty tree. missions-autoregister healer proposed 2 new missions but git commit failed at 13:50Z. Healer auto-retries in ~15 min. All services 10/10 active. 0 open PRs. All inboxes empty. Tier 1 (cycle.service already reset at 13:49Z), consecutive_clean=0.
+
+**VERIFY-BEFORE-REASSERT (iter ~1582 watch items):**
+- missions-autoregister-alert-translation-001 APPROVAL_REQUEST: Telegram log confirms delivered 12:35Z June 12. No Larry reply yet (last message "Go" at 00:17 MDT). Still pending. [carry]
+- G-rule catalog-accuracy-drift (2/3): 0 new alerts L1116–L1117 match this pattern. Still 2/3. [carry]
+- Alert watermark rotation-alignment: watermark reset from anomalous 1337 → 1115 (PR #482 effective). File=1117, watermark=1117 after this iter. Rotation-alignment anomaly resolved. ✅ [resolved]
+- Tier 2 consecutive_clean=2: automated cycle.service ran at 13:49Z, found signal, reset to Tier 1 before this iter started. Tier 3 de-escalation did NOT occur as expected. [updated]
+
+**Check 0 — Alert triage:** File=1117 lines. Watermark was 1115. 2 new alerts:
+- L1116: `outbox-notifier:approval_request` (approval_id=p3-dashboard-proposed-lane-002) at 13:47Z — Beacon delivered APPROVAL_REQUEST to Telegram at 07:51 MDT. Success signal. → Tier 3 informational, silent. ✅ Nominal.
+- L1117: `missions-autoregister:failure:commit-failed` at 13:50Z — route=escalate. → Tier 2 / ask-then-do. First occurrence, auto-retry path. Journaled + watch; no DM per actionable-only guidance (healer retries every 15 min). ⚠️ tier-reset.
+- Watermark advanced to 1117. ✅
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message "Go" at 00:17 MDT June 12. Two APPROVAL_REQUESTs delivered and pending (missions-autoregister-alert-translation-001 at 06:35 MDT; p3-dashboard-proposed-lane-002 at 07:51 MDT). No new directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall-state.json: stalled_pending_sequence:missions-v2-phase3 (snooze_until=02:36Z expired — same stale entry). VERIFY: 5/5 inboxes empty, 0 open PRs. Stale healer entry, stall self-resolved when Phase 3 shipped. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json MISSING. No orphaned directives. missions-autoregister-alert-translation-001 + p3-dashboard-proposed-lane-002 both in Telegram — in-flight, not stale. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry.
+
+**Check A — Source repo:** branch=main ✅. Working tree: DIRTY — M agents/beacon/missions.json (34-line insertion from missions-autoregister healer at 13:50Z; commit failed). → never-auto → escalate. ⚠️ tier-reset.
+- Root cause: missions-autoregister ran at 13:49Z (concurrent with cycle.service auto-commit at same timestamp). Likely transient git lock. No `.git/*.lock` files present now. Healer retries every 15 min; next retry ~14:04Z UTC.
+- File contains 2 new proposed missions: `proposed-p3-dashboard-proposed-lane-002` and `proposed-p3-dashboard-proposed-lane-redispatch-20260612T132800Z`. Both are valid orphan threads (p3-dashboard-proposed-lane-002 APPROVAL_REQUEST was delivered to Telegram 07:51 MDT).
+
+**Check B — Sync health:** last_sync=2026-06-12T12:55:01Z, status=no-change. Age ~62 min at scan. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 10/10 active (systemctl): beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api, cycle.service, cycle.timer. ✅ Nominal.
+
+**Check D — Inboxes:** All 5 (beacon, forge, mirror, pulse, build_sequence_advancer) empty. ✅ Nominal.
+
+**Check E — PRs:** 0 open on agent-core, 0 on ourliberty-dashboard. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** no-op (no committed audit baseline). ✅ Nominal.
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I: check-i-2026-06-12.json exists (fired iter ~1543). SKIP. Check III: next eligible 2026-06-25. SKIP.
+
+**Actions taken:**
+1. `alert_triage_state.py set-watermark --line 1117` → watermark advanced. ✅
+2. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 1583 --template missions-autoregister-commit-failed --detail dirty-tree-missions-json` → recorded. ✅
+3. `cycle_tier_state.py record --checks-clean false` → Tier 1, consecutive_clean=0, last_signal_at=2026-06-12T13:56Z. ✅
+4. No auto-fix actions. No DMs sent (per actionable-only guidance — commit failure has auto-retry path; no action for Larry until retry also fails).
+
+**Standing findings (updated):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- [yellow] missions-autoregister commit-failed — tree dirty (M agents/beacon/missions.json, 34-line insertion). Healer retries ~14:04Z UTC. If next retry also fails → DM Larry. [new]
+- [blue] missions-autoregister-alert-translation-001 APPROVAL_REQUEST — delivered Telegram 12:35Z. Larry: "approve / go / ok / ship it" to proceed. [carry]
+- [blue] p3-dashboard-proposed-lane-002 APPROVAL_REQUEST — delivered Telegram 13:47Z (07:51 MDT). Larry: "approve / go / ok / ship it" to re-dispatch the Proposed-thread affordance (Missions v2 Phase 3 §6). [new]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR — manual recovery via `go: sync-push-rebase-loop-001` to Beacon if root fix still desired. [carry]
+- [blue] dag-preflight-revision notifier gap — PR #484 closed source=pulse gap; DAG re-dispatch markers still fall through; separate `go:` to Beacon if desired. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. G-rule dispatched ~iter 1416. [carry]
+- [blue] sentinel-inbox-stall-respect-inflight-001 — `go:` to Beacon if applicable. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 7/34 shelf cards. G-rule **2/3**. [carry]
+- [blue] unreviewed-merge — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] G-rule `routing-denied:pulse→forge` — 1/3. [carry]
+
+**Watch items for iter ~1584:**
+- missions-autoregister retry: next run ~14:04Z UTC. If commit succeeds → tree clean → clear this finding. If fails again → DM Larry [yellow] + Check A remains.
+- p3-dashboard-proposed-lane-002: watch for Larry approval in Telegram.
+- missions-autoregister-alert-translation-001: watch for Larry approval.
+- G-rule catalog-accuracy-drift: still 2/3. One more occurrence → dispatch.
+
+**PRIME DIRECTIVE:** 1 intervention row this iter (missions-autoregister-commit-failed:dirty-tree-missions-json). Trailing-30d: interventions=812, systemic_fixes=30.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0.
+
+---
+
 ## Iteration ~1582 — 2026-06-12 13:23Z UTC (interactive, /cycle, Tier 2, consecutive_clean 1→2)
 
 **Trigger:** Larry direct invocation (`/cycle`).
