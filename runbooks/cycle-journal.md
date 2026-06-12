@@ -107255,3 +107255,77 @@ Forge rejected p3-dashboard-proposed-lane at preflight (04:41Z) because accept/d
 **PRIME DIRECTIVE:** 1 intervention (pulse_check_iv.py --force). 0 new systemic_fix rows. Trailing-30d: tracked via ledger.
 **Tier end-of-iter:** 1 (consecutive_clean=0 — Check 5 MISSING non-nominal per spec).
 
+
+
+---
+
+## Iteration ~1604 -- 2026-06-12 20:25Z UTC (interactive, /loop /cycle, Tier 3->1, consecutive_clean=0)
+
+**Trigger:** Larry direct invocation (`/loop /cycle`).
+
+**Health:** Green with standing carries. 9/9 services active. 0 open PRs. All inboxes empty. 1 new alert (L1136: approval_request wire-pulse-check-iv-cadence-001, already delivered to Larry by outbox-notifier). Tier 3 at start; reset to Tier 1.
+
+**VERIFY-BEFORE-REASSERT (prior iter ~1603 watch items):**
+- wire-pulse-check-iv-cadence-001: CONFIRMED IN PIPELINE -- approval_request delivered to Larry 14:05:38-0600 (20:05:38Z) per beacon_telegram_bot.log. Pending Larry 'Go'.
+- G-rule pulse-check-iv-no-heartbeat: FIX DISPATCH IN MOTION -- prior automated cycle (19:57:55Z) appended verification_pending row; Beacon spec wire-pulse-check-iv-cadence-001 created, outbox-notifier sent approval_request. Awaiting Larry approval.
+- beacon-pending-approvals.json: 3 entries (2 stale for merged PRs #482/#484; healer will GC; 1 active: wire-pulse-check-iv-cadence-001).
+- sync-push-rebase-fallback-001 / sentinel-inflight / sentinel-inbox-stall: inboxes empty; Forge briefs not yet received. [blue] carry.
+
+**Check 0 -- Alert triage:** Watermark L1135 -> 1 new alert: L1136 (outbox-notifier:approval_request:wire-pulse-check-iv-cadence-001, 20:02:30Z). Already delivered to Larry by outbox-notifier (bot log idx=1135 at 14:05:38-0600). Triaged Tier-4 (no registry template). No Pulse DM needed. Watermark advanced -> L1136. Tier-reset.
+
+**Check 1 -- Log noise:** No WARN/ERROR in last 60 min. Nominal.
+
+**Check 2 -- Telegram sweep:** Last Larry message 12:10 MDT 'Go' for alert-triage-intent-fallback-001. No orphan directives. Nominal.
+
+**Check 3 -- Pipeline stall:** heal-pipeline-stall-state.json MISSING. Healer dry-run -> FORGE_NO_PR_SKIP for completed tasks only; no active stalls. Nominal.
+
+**Check 4 -- Pending directives:** All Larry directives tracked. Nominal.
+
+**Check 5 -- Stale daemon code:** heal-stale-daemon-code-state.json MISSING. Standing [blue] carry (G-rule ~iter 1416). Non-nominal per spec. Tier-reset.
+
+**Check A -- Source repo:** branch=main, status=no-change, commit=159984a. Nominal.
+**Check B -- Sync health:** last_sync=2026-06-12T19:55:19Z (~30 min), no-change. Nominal.
+**Check C -- Agent liveness:** 9/9 active. All key bots running. Nominal.
+**Check D -- Inboxes:** All empty. Nominal.
+**Check E -- PRs:** 0 open. Nominal.
+
+**Conditional checks:** Friday -- Check I already ran this week. Check III: next 2026-06-25. SKIP.
+
+**G-rule tracking:**
+- pulse-check-iv-no-heartbeat: Fix in motion (wire-pulse-check-iv-cadence-001 pending Larry 'Go').
+- catalog-accuracy-drift: 2/3 unchanged. Watch.
+- All others carry from iter ~1603 unchanged.
+
+**Actions taken:**
+1. Alert L1136 claimed + triaged Tier-4. Watermark -> L1136. Intervention logged to cycle-prime-ledger.jsonl.
+2. Tier recorded non-clean -> Tier 3 reset to Tier 1, consecutive_clean=0.
+
+**Dispatches:** 0.
+
+**Standing findings:**
+- [yellow] Tier 2 weekly probe auth_401 -- rotate-claude-setup-tokens.md. Pending Larry.
+- [yellow] Check IX GITHUB_TOKEN missing -- Monday check.
+- [yellow] health-check-notify-script-missing -- G-rule 3/3 dispatched ~iter 1415; no Forge PR found.
+- [yellow] bughunt-gate-soak Phase 2 -- pending Larry.
+- [blue] wire-pulse-check-iv-cadence-001 -- approval_request in Larry's Telegram queue. Fix: weekly systemd timer for Pulse Check IV. Closes pulse-check-iv-no-heartbeat G-rule.
+- [blue] beacon-pending-approvals.json -- 2 stale entries healer will GC; 1 active (wire-pulse-check-iv-cadence-001).
+- [blue] sync-push-rebase-fallback-001 / sentinel-inflight-marker-fix / sentinel-inbox-stall G-rule 3/3 -- Beacon consumed; watch Forge briefs.
+- [blue] Check III threshold proposals -- approve threshold-update-2026-06-11. Pending Larry.
+- [blue] cycle-timer checkpoint -- pending `go: cycle-timer checkpoint`.
+- [blue] actor-exemption-config -- pending `go: actor-exemption-config`.
+- [blue] cycle-prompt-check-c-pgrep-liveness-001 -- APPROVAL_REQUEST pending Larry.
+- [blue] G-rule unreviewed-merge sprint batch -- dispatched ~iter 1378.
+- [blue] catalog-accuracy-drift -- 2/3.
+- [blue] F24-empty-prompt-envelope-rejected -- 1/3.
+- [blue] sync-blocked:uncommitted-changes -- 1/3.
+- [blue] dag-preflight-revision notifier gap -- carry.
+- [blue] Check 5 MISSING -- G-rule dispatched ~iter 1416.
+- [blue] ccd-s1-envelope-builder -- PAUSED (unverified carry from ~iter 1603).
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR -- carry.
+
+**Watch items for next iter (~1605):**
+- wire-pulse-check-iv-cadence-001: Larry 'Go' -> Forge build -> PR -> merge.
+- beacon-pending-approvals.json: healer GC of stale entries.
+
+**PRIME DIRECTIVE:** 1 intervention (L1136 claim). Script-authoritative: interventions=819, systemic_fixes=33, verification_pending=11, ratio=24.79, trend=flat.
+**Tier end-of-iter:** 3->1 (consecutive_clean=0 -- approval_request in flight + Check 5 MISSING non-nominal per spec).
