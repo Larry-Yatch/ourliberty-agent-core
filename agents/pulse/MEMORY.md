@@ -24,6 +24,12 @@
 
 ---
 
+## Status snapshot — updated 2026-06-12 19:17Z UTC (Iter ~1602, /cycle)
+
+**Iter ~1602 summary:** Alert watermark: L1133 (unchanged). Tier 2, consecutive_clean=0→1. PRIME DIRECTIVE (script-authoritative): interventions=818, systemic_fixes=33, verification_pending=10, ratio=24.79, trend=flat. **KEY STATE:** 9/9 services active. 0 open PRs. All inboxes empty. Sync: last_sync=18:55:16Z, no-change, commit=859721f. beacon-pending-approvals.json present (2 stale entries for merged PRs #482+#484; healer will GC; v1 schema confirmed). pulse-check-iv.heartbeat present (mtime=18:26Z). **STANDING:** Tier-2 weekly probe auth_401, Check III proposals `approve threshold-update-2026-06-11` (2 high-attention), Check 5 MISSING (G-rule dispatched ~iter 1416), sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED, catalog-accuracy-drift G-rule 2/3, G-rule pulse-check-iv-no-heartbeat 1/3 (heartbeat present; watching). **Tier:** Tier 2, consecutive_clean=1 (2 more clean Tier-2 iters → Tier 3).
+
+---
+
 ## Status snapshot — updated 2026-06-12 18:58Z UTC (Iter ~1601, /cycle)
 
 **Iter ~1601 summary:** Alert watermark: L1133. Tier 1→2 de-escalated (consecutive_clean 2→3→Tier 2 promotion). PRIME DIRECTIVE (script-authoritative): interventions=818, systemic_fixes=33, ratio=24.79, trend=flat. NOTE: iter ~1600 claimed systemic_fixes=43/ratio=19.02 — incorrect; script canonical value is 33/24.79. **KEY STATE:** 9/9 services active. 0 open PRs. All inboxes empty. Sync: last_sync=18:55:16Z, no-change. beacon-pending-approvals.json present (2 stale entries for merged PRs #482+#484; healer will GC). pulse-check-iv.heartbeat confirmed present. **STANDING:** Tier-2 weekly probe auth_401, Check III proposals `approve threshold-update-2026-06-11` (2 high-attention), Check 5 MISSING (G-rule dispatched ~iter 1416), sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED, catalog-accuracy-drift G-rule 2/3, G-rule pulse-check-iv-no-heartbeat 1/3 (heartbeat file present; watching). **Tier:** Tier 2, consecutive_clean=0 (3 more clean Tier-2 iters → Tier 3).
