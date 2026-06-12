@@ -2324,6 +2324,23 @@
       "proposed_at": "2026-06-12T20:08:40.116350+00:00",
       "orphan_branch": null,
       "orphan_last_activity_ts": "2026-06-12T20:02:28.548573+00:00"
+    },
+    {
+      "id": "proposed-build-done-today-projection-fix-20260604T054838Z",
+      "name": "Build Done Today Projection Fix 20260604T054838Z",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `build-done-today-projection-fix-20260604T054838Z`. Last activity 2026-06-04T06:07:38.991185+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "build-done-today-projection-fix-20260604T054838Z"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T23:40:09.810610+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-04T06:07:38.991185+00:00"
     }
   ]
 }
