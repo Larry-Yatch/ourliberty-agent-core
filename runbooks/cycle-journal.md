@@ -4,6 +4,87 @@
 
 ---
 
+## Iteration ~1565 — 2026-06-12 06:20Z UTC (interactive, /loop /cycle, Tier 2, consecutive_clean 1→2)
+
+**Trigger:** Autonomous /loop invocation.
+
+**Health:** ✅ Green. 9/9 units alive (+2 new: heal-orphan-autoregister.service inactive/oneshot + .timer active). 3 new alerts (all Tier-3). PR #481 opened (p3-mission-proposed-actions-api, Mirror reviewing). Forge has 2 fresh build tasks (6-7 min old, Larry-approved). Tier 2, consecutive_clean 1→2.
+
+**VERIFY-BEFORE-REASSERT (iter ~1564 watch items):**
+- **Pending approvals re-DM at ~08:00Z**: Current time 06:20Z — threshold not yet reached. VERIFY: beacon-pending-approvals.json now shows only `fix-depth1-pulse-approval-extraction-001` still pending. `fix-alert-triage-watermark-durability-001` and `pulse-envelope-builder-001` APPROVED and dispatched to Forge inbox (files present, 06:12-06:14Z UTC). ✅ UPDATED: 2 of 3 pending approvals cleared.
+- **p3-mission-proposed-actions-api AR unregistered**: VERIFIED CLEARED — Larry approved; Forge built PR #481 at 06:11:05Z; Mirror review task `review-p3-mission-proposed-actions-api.json` dispatched 06:11Z. ✅ IN FLIGHT.
+- **Tier 2 cadence**: Confirmed running. Sync 22 min old at scan. ✅ CARRY.
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: 1327 lines (+3 from watermark L1324). New alerts:
+- L1325: `install-healed:ourliberty-heal-orphan-autoregister.service` (06:00:03Z, source=heal-systemd-install-drift, route=digest) → Tier-3: healer working correctly. Journal-note only.
+- L1326: `install-healed:ourliberty-heal-orphan-autoregister.timer` (06:00:05Z, source=heal-systemd-install-drift, route=digest) → Tier-3: healer working correctly. Journal-note only.
+- L1327: `summary` (06:00:11Z, source=missions-autoregister, route=digest) → Tier-3 by analogy to missions-card-gc:summary (same route=digest structure, healer first-run). 102 orphan threads proposed, 131 scanned, 29 skipped terminal. `commit=committed`. G-rule 1/3: add `missions-autoregister:summary` to alert-translations.json as Tier-3/FYI at 3/3. Journal-note only, no DM. Watermark advances to **L1327**.
+- Tier-reset: NO (all Tier-3 per allowlist analogy). ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** 1 active session (chat_id=7998341473 = Larry). No new directives observed; session consistent with Larry's recent approvals (fix-alert-triage, pulse-envelope-builder, p3-mission proposed-actions-api all cleared 05:56–06:12Z). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal-pipeline-stall-state.json` MISSING. Known carry, G-rule dispatched ~iter 1416. Inboxes: Forge has 2 fresh build tasks (6-7 min old). ✅ Nominal.
+
+**Check 4 — Pending directives:** `fix-depth1-pulse-approval-extraction-001` remains in beacon-pending-approvals.json. Re-DM threshold ~08:00Z not yet reached. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — known carry, G-rule dispatched ~iter 1416. [blue] carry.
+
+**Check A — Source repo:** branch=main, clean (session gitStatus HEAD=21aba54 chore(missions): autoregister healer). ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-12T05:54:09Z, status=no-change. Age ~26 min at scan. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 active: beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api, cycle.timer. `ourliberty-heal-orphan-autoregister.service` = inactive (oneshot, fired 06:00Z, expected). `.timer` = active ✅. ✅ Nominal.
+
+**Check D — Inboxes:** Forge: 2 fresh build tasks (build-fix-alert-triage-watermark-durability-001.json 06:12Z, build-pulse-envelope-builder-001.json 06:14Z). Mirror: 1 fresh review task (review-p3-mission-proposed-actions-api.json 06:11Z). Beacon: empty. Pulse: empty. All tasks < 15 min old → NOT stale. ✅ Nominal.
+
+**Check E — PRs:** PR #481 OPEN MERGEABLE (feat(missions): add accept/dismiss to mission action endpoint — Phase 3 proposed-lane prerequisite) created 06:11:05Z. Mirror review task active. < 30-min threshold. ✅ Nominal. 0 open PRs on ourliberty-dashboard.
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I: `check-i-2026-06-12.json` exists (fired iter ~1543). SKIP. Check III: next eligible 2026-06-25. SKIP.
+
+**Key findings this iter:**
+- All checks nominal. 3 new Tier-3 alerts (install-healed ×2, missions-autoregister:summary ×1). No DMs sent.
+- **NEW: Larry approved 3 pending items** since iter ~1564: fix-alert-triage-watermark-durability-001 → Forge build active; pulse-envelope-builder-001 → Forge build active; p3-mission-proposed-actions-api → PR #481 opened, Mirror reviewing.
+- **NEW: `ourliberty-heal-orphan-autoregister` healer installed and fired** (commit 21aba54). Proposed 102 orphan threads on first run. Timer active for recurring runs.
+- **G-rule 1/3: `missions-autoregister:summary` not in alert-translations.json** — at 3/3: dispatch Beacon to add as Tier-3/FYI.
+
+**Actions taken:**
+1. `cycle_tier_state.py record --checks-clean true` → consecutive_clean=2, Tier 2. ✅
+2. Alert watermark advanced to L1327. ✅
+3. No auto-fix actions. No DMs (all Tier-3; re-DM threshold not reached).
+
+**Standing findings (updated from iter ~1564):**
+- [yellow] `fix-depth1-pulse-approval-extraction-001` — still pending Larry approval. Re-DM at ~08:00Z if still pending. [carry]
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- [blue] PR #481 OPEN MERGEABLE — Mirror reviewing `review-p3-mission-proposed-actions-api.json`. Watch for REVIEW_PASS + auto-merge. [new watch]
+- [blue] Forge build: fix-alert-triage-watermark-durability-001 → watch for PR. [new watch]
+- [blue] Forge build: pulse-envelope-builder-001 → watch for PR. [new watch]
+- [blue] missions-autoregister first run: 102 orphan threads proposed 06:00:11Z, commit=committed. Larry should review proposals. G-rule 1/3 (add to alert-translations). [new]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR — depth-1 extraction gap. [carry]
+- [blue] dag-preflight-revision notifier gap — Beacon holds until fix-depth1 merges. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. G-rule dispatched ~iter 1416. [carry]
+- [blue] sentinel-inbox-stall-respect-inflight-001 — `go:` to Beacon if applicable. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 5/34 shelf cards. 1/3 G-rule. [carry]
+- [blue] unreviewed-merge — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] G-rule `routing-denied:pulse→forge` — 1/3. [carry]
+- [blue] G-rule `missions-autoregister:summary not in alert-translations.json` — 1/3. [new]
+
+**Watch items for iter ~1566 (Tier 2, 15-min cadence ~06:35Z):**
+- **Pending approval re-DM**: `fix-depth1-pulse-approval-extraction-001` — fire re-DM at ~08:00Z if still pending.
+- **PR #481**: Watch for Mirror REVIEW_PASS + auto-merge.
+- **Forge builds**: Watch fix-alert-triage-watermark-durability-001 and pulse-envelope-builder-001 for PRs.
+- **Tier promotion**: 1 more clean Tier-2 iter → Tier 3.
+
+**PRIME DIRECTIVE:** 0 new intervention rows (clean iter). Running total (trailing-30d): interventions=809, systemic_fixes=30, ratio=26.97, trend=flat.
+**Tier end-of-iter:** Tier 2, consecutive_clean=2.
+
+---
+
 ## Iteration ~1564 — 2026-06-12 05:56Z UTC (interactive, /cycle, Tier 2, consecutive_clean 0→1)
 
 **Trigger:** Larry direct invocation (`/cycle`).
