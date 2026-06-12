@@ -567,6 +567,21 @@ class CaptureActionResponse(BaseModel):
     snoozed_until: Optional[str] = None
 
 
+class MissionActionRequest(BaseModel):
+    # Missions v2 Phase 3 § 5 — POST /api/system/missions/{id}/action body.
+    action: str = Field(..., min_length=1)  # defer | resume | reprioritize
+    # defer: optional human-readable reason recorded in deferred_reason.
+    reason: Optional[str] = None
+    # reprioritize: new optional priority int (additive schema; null clears it).
+    priority: Optional[int] = None
+
+
+class MissionActionResponse(BaseModel):
+    # All three mission write-backs are PR-backed → {pr_url, branch} (§ 5).
+    pr_url: Optional[str] = None
+    branch: Optional[str] = None
+
+
 # ---- /api/larry/* response + request models (E4.4e PR-B2) ----
 
 class LarryActionRequest(BaseModel):
@@ -4305,6 +4320,258 @@ def _handle_capture_action(
     )
 
 
+# Missions v2 Phase 3 — mission write-back (POST /api/system/missions/{id}/action)
+# (spec: agents/beacon/specs/missions-v2-phase3-writeback-autoregister.md § 5)
+#
+# defer / resume / reprioritize are ALL PR-backed (missions.json is the curated
+# registry — every change auditable). Each is a single-field edit via the shared
+# _open_registry_pr helper (the generalized _handle_new_mission mechanism), so the
+# LOCAL missions.json is never mutated — it updates via `git pull` on merge.
+#
+#   defer        — phase: deferred + deferred_reason. The derive's
+#                  aggregate_mission_phase already treats deferred as a mission-
+#                  level override (Phase 2 § 3.4), so NO new derive logic is
+#                  needed — the board reflects it on merge.
+#   resume       — clear the override (phase back to drafting; deferred_reason
+#                  null). The derive recomputes the real phase from the mission's
+#                  tasks once the override is gone.
+#   reprioritize — set the additive optional `priority` int (absent = default);
+#                  drives board row order (a thin sort, no new lane). null clears.
+
+
+def _find_mission(missions: list[Any], mission_id: str) -> dict[str, Any]:
+    """Return the mission dict with id == mission_id, or 404."""
+    for mission in missions:
+        if isinstance(mission, dict) and mission.get('id') == mission_id:
+            return mission
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail={'error': 'mission not found', 'mission_id': mission_id},
+    )
+
+
+def _handle_mission_defer(
+    *,
+    mission_id: str,
+    reason: Any,
+    missions_path: Path,
+) -> dict[str, Any]:
+    """`defer` — set a mission's `phase: deferred` + `deferred_reason` (§ 5).
+    PR-backed (missions.json only). 404 if no such mission; 409 if already
+    deferred (idempotency guard against a double-click reopening a second PR);
+    400 if reason is non-string. Returns {pr_url, branch}."""
+    if reason is not None and not isinstance(reason, str):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='reason must be a string',
+        )
+    token = _github_token()
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                'error': 'github token missing',
+                'detail': 'no GITHUB_TOKEN env nor gh auth token on dashboard-api host',
+            },
+        )
+    repo_full = _missions_repo_full()
+
+    with _NEW_MISSION_LOCK:
+        registry = _read_missions_registry(missions_path)
+        mission = _find_mission(registry['missions'], mission_id)
+        if mission.get('phase') == 'deferred':
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    'error': 'mission already deferred',
+                    'mission_id': mission_id,
+                    'hint': 'resume it before deferring again',
+                },
+            )
+
+        mission['phase'] = 'deferred'
+        mission['deferred_reason'] = reason if reason else None
+
+        branch = f'chore/defer-mission-{mission_id}'
+        title = f'chore(missions): defer mission {mission_id}'
+        pr_body = '\n'.join([
+            f'Defer mission `{mission_id}` (`phase: deferred`).',
+            *(['', f'**Reason:** {reason}'] if reason else []),
+            '',
+            'Single-field registry edit. The derive already treats `deferred` as '
+            'a mission-level override, so the board reflects it on merge with no '
+            'new derive logic (Missions v2 Phase 3 § 5).',
+        ])
+        pr_url = _open_registry_pr(
+            branch=branch,
+            title=title,
+            pr_body=pr_body,
+            files=[(_MISSIONS_REPO_REL, registry)],
+            token=token,
+            repo_full=repo_full,
+        )
+
+    return {'pr_url': pr_url, 'branch': branch}
+
+
+def _handle_mission_resume(
+    *,
+    mission_id: str,
+    missions_path: Path,
+) -> dict[str, Any]:
+    """`resume` — clear a mission's deferred override (§ 5). Resets `phase` to
+    `drafting` (the base hint — the derive recomputes the real phase from the
+    mission's tasks once the override is gone) and drops `deferred_reason`.
+    PR-backed (missions.json only). 404 if no such mission; 409 if not deferred
+    (nothing to resume). Returns {pr_url, branch}."""
+    token = _github_token()
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                'error': 'github token missing',
+                'detail': 'no GITHUB_TOKEN env nor gh auth token on dashboard-api host',
+            },
+        )
+    repo_full = _missions_repo_full()
+
+    with _NEW_MISSION_LOCK:
+        registry = _read_missions_registry(missions_path)
+        mission = _find_mission(registry['missions'], mission_id)
+        if mission.get('phase') != 'deferred':
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    'error': 'mission not deferred',
+                    'mission_id': mission_id,
+                    'phase': mission.get('phase'),
+                    'hint': 'only a deferred mission can be resumed',
+                },
+            )
+
+        mission['phase'] = 'drafting'
+        mission['deferred_reason'] = None
+
+        branch = f'chore/resume-mission-{mission_id}'
+        title = f'chore(missions): resume mission {mission_id}'
+        pr_body = '\n'.join([
+            f'Resume mission `{mission_id}` — clears the `deferred` override '
+            '(`phase: drafting`, `deferred_reason: null`).',
+            '',
+            'Single-field registry edit. The derive recomputes the real phase '
+            'from the mission\'s tasks once the override is gone (Missions v2 '
+            'Phase 3 § 5).',
+        ])
+        pr_url = _open_registry_pr(
+            branch=branch,
+            title=title,
+            pr_body=pr_body,
+            files=[(_MISSIONS_REPO_REL, registry)],
+            token=token,
+            repo_full=repo_full,
+        )
+
+    return {'pr_url': pr_url, 'branch': branch}
+
+
+def _handle_mission_reprioritize(
+    *,
+    mission_id: str,
+    priority: Any,
+    missions_path: Path,
+) -> dict[str, Any]:
+    """`reprioritize` — set a mission's additive optional `priority` int (§ 5).
+    Drives board row ordering (a thin sort; no new lane). `priority=null` clears
+    it (back to default). PR-backed (missions.json only). 404 if no such mission;
+    400 if priority is neither an int nor null. Returns {pr_url, branch}."""
+    # bool is an int subclass — reject it explicitly so `true`/`false` don't slip
+    # through as 1/0.
+    if priority is not None and (
+        isinstance(priority, bool) or not isinstance(priority, int)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='priority must be an integer or null',
+        )
+    token = _github_token()
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                'error': 'github token missing',
+                'detail': 'no GITHUB_TOKEN env nor gh auth token on dashboard-api host',
+            },
+        )
+    repo_full = _missions_repo_full()
+
+    with _NEW_MISSION_LOCK:
+        registry = _read_missions_registry(missions_path)
+        mission = _find_mission(registry['missions'], mission_id)
+
+        if priority is None:
+            mission.pop('priority', None)
+            priority_label = 'default'
+        else:
+            mission['priority'] = priority
+            priority_label = str(priority)
+
+        branch = f'chore/reprioritize-mission-{mission_id}'
+        title = (
+            f'chore(missions): reprioritize mission {mission_id} '
+            f'-> {priority_label}'
+        )
+        pr_body = '\n'.join([
+            f'Reprioritize mission `{mission_id}` (`priority: {priority_label}`).',
+            '',
+            'Single-field additive registry edit. `priority` drives board row '
+            'ordering (a thin sort; absent = default). null clears it back to '
+            'default (Missions v2 Phase 3 § 5).',
+        ])
+        pr_url = _open_registry_pr(
+            branch=branch,
+            title=title,
+            pr_body=pr_body,
+            files=[(_MISSIONS_REPO_REL, registry)],
+            token=token,
+            repo_full=repo_full,
+        )
+
+    return {'pr_url': pr_url, 'branch': branch}
+
+
+def _handle_mission_action(
+    *,
+    mission_id: str,
+    action: str,
+    args: dict[str, Any],
+    missions_path: Path,
+) -> dict[str, Any]:
+    """Dispatch POST /api/system/missions/{id}/action to the per-action handler.
+    defer / resume / reprioritize are all PR-backed → {pr_url, branch}. Unknown
+    action → 400."""
+    if action == 'defer':
+        return _handle_mission_defer(
+            mission_id=mission_id,
+            reason=args.get('reason'),
+            missions_path=missions_path,
+        )
+    if action == 'resume':
+        return _handle_mission_resume(
+            mission_id=mission_id,
+            missions_path=missions_path,
+        )
+    if action == 'reprioritize':
+        return _handle_mission_reprioritize(
+            mission_id=mission_id,
+            priority=args.get('priority'),
+            missions_path=missions_path,
+        )
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=f'invalid action={action!r}; expected defer|resume|reprioritize',
+    )
+
+
 # Test seam: tests monkeypatch this to inject a recording mock.
 def _get_larry_action_supabase_client():
     """Build a service-role supabase client for the larry-action endpoint.
@@ -5438,6 +5705,30 @@ def post_capture_action(
         action=body.action,
         args=body.model_dump(exclude={'action'}, exclude_none=True),
         captures_path=_captures_json_path(),
+        missions_path=_missions_json_path(),
+    )
+
+
+# POST /api/system/missions/{mission_id}/action — mission write-back (Missions
+# v2 Phase 3 § 5). defer/resume/reprioritize are ALL PR-backed (missions.json is
+# the curated registry — every change auditable) and reuse the new-mission
+# GitHub-REST mechanism via _open_registry_pr. Same auth as /api/larry/action:
+# X-Dashboard-Token + an allowlisted X-Actor.
+@app.post(
+    '/api/system/missions/{mission_id}/action',
+    response_model=MissionActionResponse,
+    response_model_exclude_none=True,
+    dependencies=[Depends(_require_token)],
+)
+def post_mission_action(
+    mission_id: str,
+    body: MissionActionRequest,
+    actor: str = Depends(_require_actor),
+) -> dict[str, Any]:
+    return _handle_mission_action(
+        mission_id=mission_id,
+        action=body.action,
+        args=body.model_dump(exclude={'action'}, exclude_none=True),
         missions_path=_missions_json_path(),
     )
 
