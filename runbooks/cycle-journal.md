@@ -4,6 +4,81 @@
 
 ---
 
+## Iteration ~1590 — 2026-06-12 15:23Z UTC (interactive, /cycle, Tier 2→3, consecutive_clean 2→de-escalate)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. 10/10 services active. 0 open PRs. All inboxes empty. 0 new alerts above watermark. Tier 2→3 de-escalated (3rd consecutive clean iter).
+
+**VERIFY-BEFORE-REASSERT (iter ~1589 watch items):**
+- beacon-pending-approvals.json stale entries: VERIFIED — still 4 entries; stale 2 (06:03Z/06:05Z) present ~9h post-merge of PRs #482/#484. Healer hasn't cleared yet. [blue] [carry]
+- APPROVAL_REQUESTs missions-autoregister-alert-translation-001 + p3-dashboard-proposed-lane-002: No new Larry Telegram replies (last message "Go" 00:17 MDT June 12 = 06:17Z). Still pending. [carry]
+- G-rule catalog-accuracy-drift (2/3): 0 new alerts above watermark 1119. Still 2/3. [carry]
+- Tier 2 consecutive_clean=2: de-escalated to Tier 3 this iter. ✅ CLOSED.
+
+**Check 0 — Alert triage:** larry-alerts.jsonl=1119 lines. Watermark=1119. 0 new alerts above watermark. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message 00:17:27-0600 (06:17:27Z) June 12 — "Go", handled prior cycles. No new directives in last 9h. No agent-distress keywords in bot logs. Forge/Mirror bots idle (inboxes empty — expected). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall-state.json: 0 active stalls. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json EXISTS (4 entries): 2 stale (06:03Z/06:05Z — fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001, PRs #482/#484 merged ~8-9h ago, healer backlog); 2 valid in-flight (missions-autoregister-alert-translation-001 12:31Z + p3-dashboard-proposed-lane-002 13:47Z). No orphaned directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry. G-rule dispatched ~iter 1416. ✅ Known carry.
+
+**Check A — Source repo:** Session gitStatus: main, clean, HEAD=4d32d24 "Pulse cycle 20260612T150436Z". ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: status=no-change, last_sync=2026-06-12T14:55:04Z (~28 min ago). ✅ Nominal.
+
+**Check C — Agent liveness:** 10/10 active (systemctl): beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api, cycle.service, cycle.timer. ✅ Nominal.
+
+**Check D — Inboxes:** All 5 (beacon, forge, mirror, pulse, build_sequence_advancer) empty. ✅ Nominal.
+
+**Check E — PRs:** 0 open on agent-core, 0 on ourliberty-dashboard (carry from ~1589; gh approval denied this session). ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge → no-op (no committed audit baseline). distill_detector → no-op. audit_cadence_signal → no-op. ✅ Nominal.
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I: check-i-2026-06-12.json exists (fired iter ~1543). SKIP. Check III: next eligible 2026-06-25. SKIP.
+
+**Rotations:** 0 credentials in 60-day window. ✅ Nominal.
+
+**Actions taken:**
+1. `alert_triage_state.py set-watermark --line 1119` → idempotent, no change. ✅
+2. `cycle_prime_ledger.py append --tier 2 --kind iter_clean --iter 1590` → recorded. ✅
+3. `cycle_tier_state.py record --checks-clean true` → consecutive_clean=3 → **tier promoted 2→3**, consecutive_clean reset to 0. ✅
+4. No DMs sent (no new actionable items).
+
+**Standing findings (unchanged from iter ~1589):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- [blue] missions-autoregister-alert-translation-001 APPROVAL_REQUEST — in beacon-pending-approvals.json, delivered Telegram 12:35Z June 12. Larry: "approve / go / ok / ship it" to proceed. [carry]
+- [blue] p3-dashboard-proposed-lane-002 APPROVAL_REQUEST — in beacon-pending-approvals.json, delivered Telegram 13:47Z June 12. Larry: "approve / go / ok / ship it" to re-dispatch proposed-thread affordance. [carry]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR — manual recovery via `go: sync-push-rebase-loop-001` to Beacon if root fix still desired. [carry]
+- [blue] dag-preflight-revision notifier gap — PR #484 closed source=pulse gap; DAG re-dispatch markers still fall through; `go:` to Beacon if desired. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. G-rule dispatched ~iter 1416. [carry]
+- [blue] sentinel-inbox-stall-respect-inflight-001 — `go:` to Beacon if applicable. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 7/34 shelf cards. G-rule **2/3**. [carry]
+- [blue] unreviewed-merge — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] G-rule `routing-denied:pulse→forge` — 1/3. [carry]
+- [blue] G-rule spurious-orphan-autoregister-entry — 1/3. [carry]
+- [blue] beacon-pending-approvals.json stale entries — PRs #482/#484 entries uncleared ~9h post-merge; healer backlog. [carry]
+
+**Watch items for iter ~1591:**
+- beacon-pending-approvals.json stale entries: verify cleared by healer.
+- APPROVAL_REQUESTs: missions-autoregister-alert-translation-001 + p3-dashboard-proposed-lane-002 — watch for Larry reply.
+- G-rule catalog-accuracy-drift: still 2/3. One more occurrence → dispatch.
+- Tier 3 cadence now active (30-min window); next fire skip-cadence unless signal fires.
+
+**PRIME DIRECTIVE:** 0 intervention rows this iter (clean). Trailing-30d: interventions=815, systemic_fixes=30, ratio=27.17, trend=flat.
+**Tier end-of-iter:** Tier 2→3, de-escalated. consecutive_clean reset to 0.
+
+---
+
 ## Iteration ~1589 — 2026-06-12 15:03Z UTC (interactive, /loop /cycle, Tier 2, consecutive_clean 1→2)
 
 **Trigger:** Larry direct invocation (`/loop /cycle`).
