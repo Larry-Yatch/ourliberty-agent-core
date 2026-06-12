@@ -4,6 +4,88 @@
 
 ---
 
+## Iteration ~1596 — 2026-06-12 16:53Z UTC (interactive, /cycle, Tier 2, consecutive_clean 1→2)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. 9/9 services active. PRs #485/#486 in active merge sequence (Mirror PASS on #485; Mirror reviewing #486). PR #53 auto-merged ✅. 0 new actionable alerts. Tier 2, consecutive_clean 1→2.
+
+**VERIFY-BEFORE-REASSERT (iter ~1595 watch items):**
+- PR #53 (ourliberty-dashboard, p3-dashboard-proposed-lane-002): **VERIFIED CLOSED ✅** — Mirror PASSED at ~16:48Z; auto-merged + branch deleted (L1125 notification confirmed).
+- PR #485 (agent-core): **VERIFIED PROGRESSING** — Mirror PASSED at ~16:48Z (L1124); auto-merge HELD behind PR #486 (alert-translations.json file overlap — expected sequence behavior).
+- PR #486 (agent-core): Mirror review task active since 16:40Z (~13 min at check time). Review in progress.
+- beacon-pending-approvals.json stale entries: STILL MISSING. No regeneration between ~1595 and ~1596. [carry]
+- G-rule catalog-accuracy-drift (2/3): 0 new catalog-accuracy-drift alerts above watermark. Still 2/3. [carry]
+- Tier 2 consecutive_clean=1→2: ✅ advancing.
+
+**Check 0 — Alert triage:** larry-alerts.jsonl=1125 lines. Watermark=1123→1125. 2 new alerts:
+- L1124: outbox-notifier, kind=notification, intent=review-pass, PR #485 Mirror PASS (auto-merge held). `alert_triage_state.py` Tier-4 (no translation match); **Tier-3 override on judgment** — review-pass notification is a normal designed chain event; AR missions-autoregister-alert-translation-001 (PR #486) will add the formal Tier-3 entry. Journal note only. No DM.
+- L1125: outbox-notifier, kind=notification, intent=review-pass, PR #53 Mirror PASS + auto-merged. Same Tier-3 override. Journal note only. No DM.
+- Watermark advanced to 1125. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message 10:31 MDT (16:31Z) "Status" — handled iter ~1595. No new directives. Beacon log last entry 10:48 MDT (16:48Z) — review-pass notification delivered. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall dry-run at 16:51Z: "no stalls detected". All FORGE_NO_PR_SKIP entries verified (pr_exists or preflight-non-proceed). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json MISSING. All 3 prior ARs approved by Larry ~16:27Z and dispatched. Outstanding [blue] ARs (ccd-s1-identity-resolution, alert-translation-no-mirror-dispatch-001, cycle-prompt-check-c-pgrep-liveness-001) should populate this file; absence is a healer-write gap. [blue] carry.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry. G-rule dispatched ~iter 1416. ✅ Known carry.
+
+**Check A — Source repo:** main, clean (session gitStatus 09ff4df "Pulse cycle 20260612T164421Z"). ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: status=no-change, last_sync=2026-06-12T15:55:06Z (~58 min ago at check time). ✅ Nominal (< 2h threshold).
+
+**Check C — Agent liveness:** 9/9 active running (ourliberty-*.service systemctl). ✅ Nominal.
+
+**Check D — Inboxes:** Mirror: 2 active review tasks (review-alert-translation-dispatch-branch-cleanup-summary-.json created 16:45Z, review-missions-autoregister-alert-translation-001.json created 16:40Z). All others empty. Mirror reviewing — expected chain activity. ✅ Nominal.
+
+**Check E — PRs:** 2 open on agent-core:
+- PR #485: Mirror PASSED; auto-merge HELD behind #486 (alert-translations.json overlap). Expected; not a stall.
+- PR #486: open, reviewDecision="" (Mirror reviewing; task 13 min old at check time).
+- ourliberty-dashboard: 0 open (PR #53 merged). ✅ Active chain, not stalled.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal → no-op. ✅ Nominal.
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I: check-i-2026-06-12.json exists (fired iter ~1543). SKIP. Check III: next eligible 2026-06-25. SKIP.
+
+**Rotations:** 0 credentials in 60-day window. ✅ Nominal.
+
+**Actions taken:**
+1. `alert_triage_state.py set-watermark --line 1125` → watermark L1123→L1125. ✅
+2. `cycle_prime_ledger.py append --tier 2 --kind iter_clean --iter 1596` → recorded. ✅
+3. `cycle_tier_state.py record --checks-clean true` → consecutive_clean=2, Tier 2. ✅
+4. No DMs sent (clean iter; all new alerts Tier-3 override; no new Larry-action items).
+
+**Standing findings (unchanged from iter ~1595 except as noted):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- **[CLOSED ✅] PR #53 (p3-dashboard-proposed-lane-002)** — Mirror PASS, auto-merged ~16:48Z.
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR — `go: sync-push-rebase-loop-001` to Beacon if desired. [carry]
+- [blue] dag-preflight-revision notifier gap — PR #484 closed source=pulse gap; DAG re-dispatch markers still fall through. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. G-rule dispatched ~iter 1416. [carry]
+- [blue] sentinel-inbox-stall-respect-inflight-001 — `go:` to Beacon if applicable. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 7/34 shelf cards. G-rule 2/3. [carry]
+- [blue] unreviewed-merge — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] G-rule `routing-denied:pulse→forge` — 1/3. [carry]
+- [blue] G-rule spurious-orphan-autoregister-entry — 1/3. [carry]
+- [blue] beacon-pending-approvals.json MISSING — absent again this iter (healer-write gap). [carry]
+
+**Watch items for iter ~1597:**
+- PR #486 (agent-core): Mirror reviewing → expect PASS → auto-merge → PR #485 unblocked → auto-merge.
+- beacon-pending-approvals.json: MISSING 2 iters post-regeneration. If MISSING in ~1597, approaching G-rule (3/3).
+- G-rule catalog-accuracy-drift: 2/3. One more occurrence → dispatch Beacon.
+- Tier 2 consecutive_clean=2; one more clean iter → de-escalate to Tier 3.
+
+**PRIME DIRECTIVE:** 0 intervention rows this iter (clean). Trailing-30d: tracked via ledger.
+**Tier end-of-iter:** Tier 2, consecutive_clean=2.
+
+---
+
 ## Iteration ~1595 — 2026-06-12 16:41Z UTC (interactive, /cycle, Tier 2, consecutive_clean 0→1)
 
 **Trigger:** Larry direct invocation (`/cycle`).
