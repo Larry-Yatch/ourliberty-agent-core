@@ -106709,3 +106709,113 @@ Forge rejected p3-dashboard-proposed-lane at preflight (04:41Z) because accept/d
 
 **Self-note (discipline):** The direction-ask was dispatched against a finding that had already been self-diagnosed and closed within the same cycle run. Verify-before-dispatch must apply not just to cycle findings but to G-rule dispatches: before sending a direction-ask to Beacon about a pattern, confirm the pattern is STILL ACTIVE in the current cycle's ground truth, not merely carried in standing findings from a prior iter.
 
+---
+
+## Iteration ~1575 — 2026-06-12 18:11Z UTC (interactive, Tier 1)
+
+**Health:** ✅ Nominal — Active pipeline: Forge opened PR #487 (alert-triage-intent-fallback-001, Mirror reviewing). All checks clean. Check IV ran this cycle (staleness alert addressed).
+
+**Tier at start:** 3 (consecutive_clean=1, last_signal_at=2026-06-12T16:01:04Z). Iter forced Tier 1 by Check IV staleness alert + active pipeline.
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Watermark in: 1130. File: 1131 lines. Delta: L1131 (one new entry).
+  - L1131 (18:01Z): heal-pulse-check-staleness → `pulse-check-stale:iv`, route=escalate. Alert was already delivered to Larry by outbox-notifier (idx=1130, 12:04 MDT). **Tier 4 (novel)** — no allowlist match, no action-template. Suggested action: "run pulse_check_iv.py." Executed this iter; see Check IV section below. G-rule 1/3: pulse-check-iv-not-wired-in-cycle-prompt.
+- New watermark: **L1131**. Written via `alert_triage_state.py set-watermark`.
+- Triage: 1 Tier-4 (actioned + G-rule noted), 0 Tier-3. ✅ Nominal (alert previously delivered; action taken).
+
+**Check 1 — Log noise:** 0 WARNs today (Jun 12) in outbox-notifier.log. Prior WARNs all from Jun 11 (test-jail-pr3/pr4, p3-mission-actions-api, p3-autoregister-healer marker errors — all resolved). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry directive: "Go" at 12:10 MDT (18:10Z) → approved alert-triage-intent-fallback-001. No other directives in trailing 4h. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → "no stalls detected." ✅ Nominal.
+
+**Check 4 — Pending directives / Inboxes (VERIFY-BEFORE-REASSERT):**
+- Forge: alert-triage-intent-fallback-001.json — Forge completed preflight + opened PR #487 at 18:13Z. ✅ Active pipeline (Mirror review dispatched).
+- Beacon/Mirror/Pulse: EMPTY. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT (standing known). All 9 services active. ✅ Nominal.
+
+**Check A — Source repo:** agent-core-sync.json: status=no-change, HEAD=f078cc5 (Pulse cycle 20260612T174129Z), last_sync=17:55Z. Clean tree, on main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=17:55Z (~16 min ago). Status=no-change. Within 2h. ✅ Nominal.
+- Note: sync-blocked:uncommitted-changes alert fired at 13:55Z (L~1124) — interactive iter ~1563 left uncommitted changes; automated cycle at 17:41Z committed + cleaned. Self-healed. 1/3 G-rule observation for "sync-blocked from interactive sessions."
+
+**Check C — Agent liveness (VERIFY-BEFORE-REASSERT):** 9/9 services active (beacon-bot, forge-bot, mirror-bot, pulse-bot, outbox-notifier, chain-event-shipper, inbox-watcher, cycle.timer, dashboard-api). Forge PID 2249642 completed build (PR #487 opened). ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- ourliberty-agent-core: PR #487 (alert-triage-intent-fallback-001, opened 18:13Z, ~2 min old). Active pipeline, Mirror review dispatched. ✅ Nominal.
+- ourliberty-dashboard: 0 open. ✅ Nominal.
+
+**Check H — Forge digest:**
+- Open: PR #487 (18:13Z, ~2 min old). ✅ Nominal.
+- Merged since iter ~1563: PR #485 (16:56Z, dispatch-branch-cleanup:summary alert-translation), PR #486 (16:56Z, missions-autoregister/summary alert-translation), ourliberty-dashboard PR #53 (16:48Z, Proposed-thread affordance Phase 3 §6). missions-v2-phase3 pipeline substantially complete.
+
+**§5.0 Bug-hunt gate:** All three scripts no-op (no committed baseline, no un-distilled audits, no post-seed artifacts). ✅
+
+**Check IV (actioning heal-pulse-check-staleness L1131):**
+- Ran `python3 ~/agent-core/scripts/pulse_check_iv.py` → `rule=none events=0 rate=0.00/week`. Script works correctly; no marker-drift proposals this cycle.
+- Root cause of staleness alert: pulse_check_iv.py is β-scope and not yet wired into the cycle-prompt's periodic checks. **G-rule 1/3: pulse-check-iv-not-in-cycle-prompt.** Watch: if the staleness healer fires again in a future cycle, escalate to G-rule 2/3 and prepare Beacon dispatch to wire it in.
+
+**Conditional checks:** Friday — Check I already fired in automated cycles (1 proposal: medic-operator-scaffold-001 σ-anomaly, dedup-skip per prior 2026-06-10 dispatch). Check VIII/IX/X: Monday-only, skip. Check III: next eligible 2026-06-25. ✅
+
+**Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due ~2026-08-22 (~72d). No 60d trigger. ✅
+
+**G-rule tracking:**
+- **pulse-check-iv-not-in-cycle-prompt**: **1/3** (new this iter). pulse_check_iv.py exists + works; cycle-prompt doesn't invoke it (β-scope). Watch: if heal-pulse-check-staleness re-fires, escalate to 2/3.
+- **catalog-accuracy-drift**: 2/3 (unchanged from iter ~1563). No new catalog-accuracy-drift alerts today. Watch.
+- **sync-blocked:uncommitted-changes**: **1/3** (new observation this iter). 13:55Z sync blocked by interactive session's uncommitted changes; self-healed by 17:41Z automated commit. Note: distinct sub-variant from sync-push-rebase-fallback-001 (which covers push failures). Watch.
+- All other G-rules carry unchanged from iter ~1563.
+
+**Verify-before-reassert on carried standings:**
+- PR #53 dashboard (p3-dashboard-proposed-lane-002): MERGED 16:48Z. ✅ CLOSED.
+- PR #485 (alert-translation-dispatch-branch-cleanup-summary-001): MERGED 16:56Z. ✅ CLOSED.
+- PR #486 (missions-autoregister-alert-translation-001): MERGED 16:56Z. ✅ CLOSED.
+- missions-autoregister commit-failed (L~1122, 13:50Z): self-healed; subsequent run at 14:05Z committed cleanly. ✅ CLOSED.
+- alert-triage-intent-fallback-001 APPROVAL_REQUEST: Larry "Go" at 12:10 MDT; Forge dispatched + PR #487 opened. ✅ Active pipeline.
+- sync-push-rebase-fallback-001 G-rule 3/3: Beacon consumed dispatch (in .archive). Watch Forge brief. [blue] carry.
+- sentinel-inflight-marker-fix G-rule: Beacon consumed dispatch (in .archive). Watch Forge brief. [blue] carry.
+- health-check-notify-script-missing G-rule 3/3: `gh pr list --search "health-check-notify"` → no results. [yellow] carry.
+- bughunt-gate-soak Phase 2: no new info (Friday). [yellow] carry.
+- Tier 2 weekly probe auth_401: not probe day. [yellow] carry.
+- Check IX GITHUB_TOKEN missing: Monday check. [yellow] carry.
+- Check III threshold proposals: `approve threshold-update-2026-06-11`. [blue] pending Larry.
+- cycle-timer checkpoint: pending `go: cycle-timer checkpoint`. [blue] carry.
+- actor-exemption-config: pending `go: actor-exemption-config`. [blue] carry.
+- cycle-prompt-check-c-pgrep-liveness-001: APPROVAL_REQUEST pending Larry. [blue] carry.
+- G-rule unreviewed-merge sprint batch: dispatched iter ~1378. [blue] carry.
+- sentinel-inbox-stall-ignores-inflight G-rule 3/3: Beacon consumed. [blue] watch Forge brief.
+- F24-empty-prompt-envelope-rejected: 1/3 G-rule. [blue] carry.
+
+**Actions taken:**
+1. Advanced alert-triage.json watermark → L1131. Logged intervention to cycle-prime-ledger.jsonl.
+2. Ran pulse_check_iv.py (addressing heal-pulse-check-staleness alert). Result: rule=none events=0. Logged intervention to cycle-prime-ledger.jsonl.
+
+**Dispatches:** 0.
+
+**Standing findings:**
+- [yellow] **bughunt-gate-soak Phase 2** — pending Larry.
+- [yellow] **Tier 2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api POST 500; Monday check.
+- [yellow] **health-check-notify-script-missing** — G-rule 3/3 dispatched iter ~1415; no Forge PR found. Stale.
+- [blue] **PR #487 alert-triage-intent-fallback-001** — Mirror reviewing. Watch: review-pass + auto-merge.
+- [blue] **sync-push-rebase-fallback-001** — Beacon consumed dispatch. Watch Forge brief.
+- [blue] **sentinel-inflight-marker-fix** — Beacon consumed dispatch. Watch Forge brief.
+- [blue] **sentinel-inbox-stall-ignores-inflight G-rule 3/3** — Beacon consumed. Watch Forge brief.
+- [blue] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry.
+- [blue] **cycle-timer checkpoint** — pending `go: cycle-timer checkpoint`.
+- [blue] **actor-exemption-config** — pending `go: actor-exemption-config`.
+- [blue] **cycle-prompt-check-c-pgrep-liveness-001** — APPROVAL_REQUEST pending Larry.
+- [blue] **G-rule unreviewed-merge sprint batch** — dispatched iter ~1378. Watch Beacon.
+- [blue] **catalog-accuracy-drift** — 2/3 G-rule.
+- [blue] **F24-empty-prompt-envelope-rejected** — 1/3 G-rule.
+- [blue] **pulse-check-iv-not-in-cycle-prompt** — 1/3 G-rule. Watch for heal-pulse-check-staleness re-fire.
+- [blue] **sync-blocked:uncommitted-changes** — 1/3 G-rule (new).
+
+**Watch items for next iter (~1576):**
+- PR #487: Mirror review → auto-merge. Watch for review-pass notification.
+- sync-push-rebase-fallback-001 + sentinel-inflight + sentinel-inbox-stall: Forge briefs after Beacon consumption.
+- pulse-check-iv-not-in-cycle-prompt: watch for heal-pulse-check-staleness re-fire.
+
+**PRIME DIRECTIVE:** 2 interventions this iter (watermark advance L1131; pulse_check_iv.py manual run). Script-authoritative: interventions=818, systemic_fixes=33, ratio=24.79, trend=flat.
+**Tier end-of-iter:** 1 (consecutive_clean=0 — active pipeline + Check IV staleness finding).
+
