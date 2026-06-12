@@ -4,6 +4,80 @@
 
 ---
 
+## Iteration ~1584 — 2026-06-12 14:03Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Dirty tree (carry). M agents/beacon/missions.json — missions-autoregister commit still pending retry. Retry window not yet reached at scan time (14:01Z; expected ~14:04Z). All other checks nominal. 10/10 services active. 0 open PRs. All inboxes empty. Tier 1, consecutive_clean=0.
+
+**VERIFY-BEFORE-REASSERT (iter ~1583 watch items):**
+- missions-autoregister commit-failed (dirty tree): VERIFIED — M agents/beacon/missions.json still present. agent-core-sync.json status=error (sync-blocked, last_sync=13:55Z). Retry expected ~14:04Z (not reached at scan time 14:01Z). [carry]
+- p3-dashboard-proposed-lane-002 APPROVAL_REQUEST: beacon-pending-approvals.json MISSING. No new Larry Telegram messages since "Go" at 00:17 MDT June 12. Still pending. [carry]
+- missions-autoregister-alert-translation-001 APPROVAL_REQUEST: No new Larry messages. Still pending. [carry]
+- Alert watermark rotation-alignment anomaly: watermark=1117, file grew to 1118 — watermark advanced to 1118 this iter. Alignment restored. ✅ [resolved]
+- G-rule catalog-accuracy-drift (2/3): 0 new catalog-accuracy-drift alerts in new lines (1118 only = sync-blocked). Still 2/3. [carry]
+
+**Check 0 — Alert triage:** File=1118 lines. Watermark was 1117. 1 new alert:
+- L1118: `sync.service:sync-blocked:uncommitted-changes` at 13:55Z — sync service refusing to pull due to dirty tree. Root cause = same Check A finding (M agents/beacon/missions.json). Downstream effect, already tracked. → Tier 3 journal-only, no DM. Watermark advanced to 1118. ✅ Nominal (downstream of known finding).
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message "Go" at 00:17 MDT June 12 (06:17Z). No new directives in last 4h. No agent-distress keywords in recent bot logs. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall-state.json: one non-2099 entry `stalled_pending_sequence:missions-v2-phase3` snooze_until=02:36Z (expired). VERIFY: 5/5 inboxes empty, 0 open PRs — stall self-resolved when Phase 3 shipped. Stale healer state entry. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json MISSING. No orphaned directives. Two APPROVAL_REQUESTs in Telegram (missions-autoregister-alert-translation-001 + p3-dashboard-proposed-lane-002) — in-flight, not stale. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry. Note: healer IS active (fired auto-restarts at 00:52 MDT + 01:23 MDT today per beacon_bot log); state file path mismatch vs expected. All 10 services currently active.
+
+**Check A — Source repo:** branch=main ✅. Working tree: DIRTY — M agents/beacon/missions.json (missions-autoregister commit-failed at 13:50Z, retry not yet reached). → never-auto. ⚠️ tier-reset. [carry from ~1583]
+
+**Check B — Sync health:** agent-core-sync.json status=error (sync-blocked:uncommitted-changes), last_sync=2026-06-12T13:55:02Z. Root cause = dirty tree (Check A). → never-auto (root cause is Check A). Monitoring.
+
+**Check C — Agent liveness:** 10/10 active (systemctl): beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api, cycle.service, cycle.timer. ✅ Nominal.
+
+**Check D — Inboxes:** All 5 (beacon, forge, mirror, pulse, build_sequence_advancer) empty. ✅ Nominal.
+
+**Check E — PRs:** 0 open on agent-core, 0 on ourliberty-dashboard. ✅ Nominal.
+
+**Rotations:** token-rotation-schedule.json: 0 credentials in 60-day window. ✅ Nominal.
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I: check-i-2026-06-12.json exists (fired iter ~1543). SKIP. Check III: next eligible 2026-06-25. SKIP.
+
+**Actions taken:**
+1. `alert_triage_state.py set-watermark --line 1118` → watermark advanced. ✅
+2. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 1584 --template missions-autoregister-commit-failed --detail dirty-tree-missions-json-carry` → recorded. ✅
+3. `cycle_tier_state.py record --checks-clean false` → Tier 1, consecutive_clean=0, last_signal_at=2026-06-12T14:03:12Z. ✅
+4. No DMs sent (per actionable-only guidance — retry not yet reached; DM Larry [yellow] if retry also fails).
+
+**Standing findings (updated):**
+- [yellow] missions-autoregister commit-failed — tree dirty (M agents/beacon/missions.json). Retry window ~14:04-14:05Z UTC. If retry fails → DM Larry. [carry]
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- [blue] missions-autoregister-alert-translation-001 APPROVAL_REQUEST — delivered Telegram 12:35Z June 12. Larry: "approve / go / ok / ship it" to proceed. [carry]
+- [blue] p3-dashboard-proposed-lane-002 APPROVAL_REQUEST — delivered Telegram 13:51Z June 12. Larry: "approve / go / ok / ship it" to re-dispatch proposed-thread affordance (Missions v2 Phase 3 §6). [carry]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR — manual recovery via `go: sync-push-rebase-loop-001` to Beacon if root fix still desired. [carry]
+- [blue] dag-preflight-revision notifier gap — PR #484 closed source=pulse gap; DAG re-dispatch markers still fall through; separate `go:` to Beacon if desired. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent at expected path (healer IS running). G-rule dispatched ~iter 1416. [carry]
+- [blue] sentinel-inbox-stall-respect-inflight-001 — `go:` to Beacon if applicable. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 7/34 shelf cards. G-rule **2/3**. [carry]
+- [blue] unreviewed-merge — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] G-rule `routing-denied:pulse→forge` — 1/3. [carry]
+
+**Watch items for iter ~1585:**
+- missions-autoregister retry: window ~14:04-14:05Z UTC. Verify tree clean in next iter. If dirty → DM Larry [yellow].
+- If tree clean → sync-blocked resolves automatically → consecutive_clean path resumes.
+- APPROVAL_REQUESTs: missions-autoregister-alert-translation-001 + p3-dashboard-proposed-lane-002 — watch for Larry reply.
+- G-rule catalog-accuracy-drift: still 2/3.
+
+**PRIME DIRECTIVE:** 1 intervention row this iter (missions-autoregister-commit-failed:dirty-tree-missions-json-carry). Trailing-30d: interventions=813, systemic_fixes=30.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0.
+
+---
+
 ## Iteration ~1583 — 2026-06-12 13:57Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0)
 
 **Trigger:** Larry direct invocation (`/cycle`).
