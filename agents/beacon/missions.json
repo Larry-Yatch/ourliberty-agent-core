@@ -2035,6 +2035,40 @@
       "proposed_at": "2026-06-12T12:03:15.967492+00:00",
       "orphan_branch": null,
       "orphan_last_activity_ts": "2026-06-12T12:01:36.371796+00:00"
+    },
+    {
+      "id": "proposed-missions-autoregister-alert-translation-001",
+      "name": "Missions Autoregister Alert Translation 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `missions-autoregister-alert-translation-001`. Last activity 2026-06-12T12:31:21.35907+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "missions-autoregister-alert-translation-001"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T12:33:19.733501+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-12T12:31:21.35907+00:00"
+    },
+    {
+      "id": "proposed-alert-translations-missions-autoregister-summary-001",
+      "name": "Alert Translations Missions Autoregister Summary 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `alert-translations-missions-autoregister-summary-001`. Last activity 2026-06-12T12:31:19.687391+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "alert-translations-missions-autoregister-summary-001"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T12:33:19.733501+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-12T12:31:19.687391+00:00"
     }
   ]
 }
