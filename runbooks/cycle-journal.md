@@ -4,6 +4,81 @@
 
 ---
 
+## Iteration ~1594 — 2026-06-12 16:21Z UTC (interactive, /cycle, Tier 1→2, consecutive_clean 2→de-escalate)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. 10/10 services active. 0 open PRs. All inboxes empty. 0 new alerts above watermark. Tier 1→2 de-escalated (3rd consecutive clean iter). beacon-pending-approvals.json watch item CLOSED — file regenerated.
+
+**VERIFY-BEFORE-REASSERT (iter ~1593 watch items):**
+- beacon-pending-approvals.json MISSING: **VERIFIED CLOSED ✅** — file present with 5 entries (2 stale: PRs #482/#484, 3 valid in-flight ARs). Healer regenerated between 16:15Z and 16:20Z.
+- APPROVAL_REQUESTs missions-autoregister-alert-translation-001 + p3-dashboard-proposed-lane-002 + alert-translation-dispatch-branch-cleanup-summary-001: No new Larry Telegram replies since 06:17Z "Go". Still pending. [carry]
+- G-rule catalog-accuracy-drift (2/3): 0 new alerts above watermark 1122. Still 2/3. [carry]
+- Tier 1 consecutive_clean=2: ✅ → 3 → de-escalated to Tier 2.
+
+**Check 0 — Alert triage:** larry-alerts.jsonl=1122 lines. Watermark=1122. 0 new alerts above watermark. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message 00:17 MDT June 12 (06:17Z) — "Go", handled prior cycles. No new directives in last ~10h. No agent-distress keywords in bot logs. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall dry-run: "no stalls detected" (16:17Z). All FORGE_NO_PR_SKIP entries verified (pr_exists or preflight-non-proceed). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json PRESENT (5 entries): 2 stale (fix-alert-triage-watermark-durability-001 06:03Z + fix-depth1-pulse-approval-extraction-001 06:05Z, PRs #482/#484 merged ~10h ago, healer will clear); 3 valid in-flight (missions-autoregister-alert-translation-001 12:31Z, p3-dashboard-proposed-lane-002 13:47Z, alert-translation-dispatch-branch-cleanup-summary-001 16:05Z). No orphaned directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry. G-rule dispatched ~iter 1416. ✅ Known carry.
+
+**Check A — Source repo:** main, clean (gitStatus dc500b4 "Pulse cycle 20260612T161605Z"). ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: status=no-change, last_sync=2026-06-12T15:55:06Z (~26 min ago). ✅ Nominal.
+
+**Check C — Agent liveness:** 10/10 active (systemctl). ✅ Nominal.
+
+**Check D — Inboxes:** All 5 (beacon, forge, mirror, pulse, build_sequence_advancer) empty. ✅ Nominal.
+
+**Check E — PRs:** 0 open on agent-core, 0 on ourliberty-dashboard. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge → no-op (no committed audit baseline). distill_detector → no-op. audit_cadence_signal → no-op. ✅ Nominal.
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I: check-i-2026-06-12.json exists (fired iter ~1543). SKIP. Check III: next eligible 2026-06-25. SKIP.
+
+**Rotations:** 0 credentials in 60-day window. ✅ Nominal.
+
+**Actions taken:**
+1. `cycle_prime_ledger.py append --tier 1 --kind iter_clean --iter 1594` → recorded. ✅
+2. `cycle_tier_state.py record --checks-clean true` → consecutive_clean=3 → **tier promoted 1→2**, consecutive_clean reset to 0. ✅
+3. No DMs sent (clean iter, no new Larry-action items).
+
+**Standing findings (unchanged from iter ~1593 except as noted):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- [blue] missions-autoregister-alert-translation-001 APPROVAL_REQUEST — delivered Telegram 06:35Z June 12. Larry: "approve / go / ok / ship it" to proceed. [carry]
+- [blue] p3-dashboard-proposed-lane-002 APPROVAL_REQUEST — delivered Telegram 07:51Z June 12. Larry: "approve / go / ok / ship it" to re-dispatch proposed-thread affordance. [carry]
+- [blue] alert-translation-dispatch-branch-cleanup-summary-001 APPROVAL_REQUEST — delivered Telegram 16:07Z June 12. Larry: "approve / go / ok / ship it" to add dispatch-branch-cleanup:summary to alert-translations.json. [carry]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR — `go: sync-push-rebase-loop-001` to Beacon if root fix still desired. [carry]
+- [blue] dag-preflight-revision notifier gap — PR #484 closed source=pulse gap; DAG re-dispatch markers still fall through; `go:` to Beacon if desired. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. G-rule dispatched ~iter 1416. [carry]
+- [blue] sentinel-inbox-stall-respect-inflight-001 — `go:` to Beacon if applicable. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 7/34 shelf cards. G-rule 2/3. [carry]
+- [blue] unreviewed-merge — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] G-rule `routing-denied:pulse→forge` — 1/3. [carry]
+- [blue] G-rule spurious-orphan-autoregister-entry — 1/3. [carry]
+- **[CLOSED ✅] beacon-pending-approvals.json MISSING** — file regenerated with 5 entries between iters ~1593 and ~1594.
+
+**Watch items for iter ~1595:**
+- APPROVAL_REQUESTs: missions-autoregister-alert-translation-001 + p3-dashboard-proposed-lane-002 + alert-translation-dispatch-branch-cleanup-summary-001 — watch for Larry reply.
+- G-rule catalog-accuracy-drift: still 2/3. One more occurrence → dispatch.
+- Tier 2 consecutive_clean=0; 3 clean iters → de-escalate to Tier 3.
+- beacon-pending-approvals.json stale entries (PRs #482/#484): healer should clear on next run.
+
+**PRIME DIRECTIVE:** 0 intervention rows this iter (clean). Trailing-30d: tracked via ledger.
+**Tier end-of-iter:** Tier 1→2 (de-escalated, consecutive_clean 2→3→0).
+
+---
+
 ## Iteration ~1593 — 2026-06-12 16:15Z UTC (interactive, /cycle, Tier 1, consecutive_clean 1→2)
 
 **Trigger:** Larry direct invocation (`/cycle`).
