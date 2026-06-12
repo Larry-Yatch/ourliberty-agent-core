@@ -102671,3 +102671,116 @@ New watermark: **2026-06-10T17:05:59Z / pulse:ccd-s1-identity-resolution-2026061
 **Tier end-of-iter:** 1 (consecutive_clean=0 — carry).
 
 ---
+
+## Iteration ~1545 — 2026-06-12 03:48Z UTC (interactive, Tier 1)
+
+**Note:** Automated cycles ~1533–~1544 ran after iter ~1532 (01:00Z). Key events in that window: PRs #477 (approval-visibility-hardening spec) and #478 (capture write-back endpoint) merged; missions-v2-phase3 DAG preflight passed; Beacon dispatched `p3-mission-actions-api` + `p3-autoregister-healer` to Forge (03:36Z); sentinel-inflight-marker-fix-beacon consumed by Beacon; watermark repair landed via iter ~1542 (02:21Z ledger) + iter ~1531 (23:16Z interactive). Tier at start: 1, consecutive_clean=0, last_signal_at=2026-06-12T03:32Z.
+
+**Health:** ⚠️ Attention — G-rule 3/3 for sync-push-rebase-fallback-001 (4 occurrences total, permanent fix dispatched). Otherwise chain actively progressing: Forge running p3-autoregister-healer (03:43Z), marker-error retry on p3-mission-actions-api (1/3), PR #479 open and MERGEABLE.
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Watermark MISSING on session start → catchup: file total L1318, claimed delta L1309–L1318 (10 lines).
+- L1309 (00:01Z): sentinel inbox-stall test-jail-pr4-acceptance-proof-001.json → **Tier 3** (post-merge stale; now in .archive ✅ CLOSED).
+- L1310 (00:06Z): medic medic-diagnosis (for L1309 root cause) → **Tier 3** known-pattern. ✅
+- L1311 (00:59Z): inbox-watcher routing-denied:pulse→forge → **Tier 3** (routing error fixed in iter ~1532 dead-letter). ✅
+- L1312 (01:36Z): outbox-notifier review-pass PR #477 → **Tier 3** routine delivery. ✅
+- L1313 (02:31Z): ledger weekly-2026-06-08 sidecar available → **Tier 3** routine. ✅
+- L1314 (02:31Z): pulse check-i-2026-06-08 (automated cycle) → **Tier 3** Pulse-authored. ✅
+- L1315 (02:40Z): beacon approval-recovered — Beacon DM'd Larry: `fix-alert-triage-watermark-durability-001` + `fix-depth1-pulse-approval-extraction-001` recovered to Approvals tab. → **Tier 3** (Beacon handled delivery). ✅
+- L1316 (02:53Z): sync-blocked:auto-commit-push-failed (self-heals, route=digest) → **Tier 3** known-pattern. BUT: this is G-rule 3/3 — see systemic fix dispatch below.
+- L1317 (03:06Z): outbox-notifier mirror-dag-pass:missions-v2-phase3 → **Tier 3** routine. ✅
+- L1318 (03:44Z): pulse check-i-2026-06-08 (this iter's Check I) → **Tier 3** Pulse-authored. ✅
+- New watermark: **L1318**. Written to alert-triage.json. Triage: 0 dispatches, 10 Tier-3 silences. ✅ Nominal.
+
+**Check 1 — Log noise:** journalctl not queried (requires bash approval). Outbox-notifier.log tail shows: 1 WARN `forge marker error p3-mission-actions-api` (retry 1/3, 03:43Z) — sub-threshold (1 occurrence), part of normal retry flow. Inbox-watcher.log nominal. ✅ Nominal (marker-error below 5/h threshold; not a systemic signal).
+
+**Check 2 — Telegram sweep:**
+- Last Larry directive: 19:57 MDT (01:57Z Jun 12) — "Go" approving dag-preflight-missions-v2-phase3 → Beacon dispatched, chain executing. ✅ Tracked.
+- No orphaned directives in 4h window. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → "no stalls detected." (FORGE_NO_PR_SKIP for test-jail-pr4 and adopt-approval-visibility-hardening — both PR-matched, correct.) Forge p3-autoregister-healer started 03:43:08Z — fresh (~5 min), not a stall. ✅ Nominal.
+
+**Check 4 — Pending directives / Inboxes (VERIFY-BEFORE-REASSERT):**
+- Forge: `marker-error-p3-mission-actions-api-1.json` (retry 1/3; active retry flow — inbox-watcher will re-dispatch to Forge shortly) + `p3-autoregister-healer.json` (0.1h, currently being processed). Both are active pipeline items, not stale. ✅ Nominal.
+- Beacon/Mirror/Pulse: EMPTY. ✅
+- All directives tracked. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT (healer completed; standing known). ✅ Nominal.
+
+**Check A — Source repo:** Session-start gitStatus: branch=main, clean (per git commit log HEAD=3521a6d "Pulse cycle 20260612T033416Z"). Sync no-change carried from prior automated cycles. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: status=error, message="Auto-commit push failed; rolled back", last_sync=2026-06-12T02:53Z (~55 min ago, within 2h threshold). Route=digest, message says "Self-heals on next sync tick; no action needed." Prior successful automated cycles confirm sync is functionally working (PRs merging, journal commits landing). The error is the known self-healing race condition. G-rule 3/3 crossed (see G-rule section). ✅ Nominal (self-healed) + G-rule 3/3 dispatched.
+
+**Check C — Agent liveness (VERIFY-BEFORE-REASSERT):** All 8 services active: beacon-bot, forge-bot, mirror-bot, pulse-bot (systemd), inbox-watcher, cycle.timer, outbox-notifier, chain-event-shipper, dashboard-api. Inbox-watcher log shows active processing at 03:43Z (p3-autoregister-healer started). ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- PR #479 "feat(missions): mission write-back endpoint (defer/resume/reprioritize)" — OPEN, MERGEABLE, reviewDecision="" (0 min old; just opened by Forge for p3-mission-actions-api). Active pipeline, not stale. Marker-error retry will unblock → Mirror review → auto-merge. ✅ Nominal.
+- ourliberty-dashboard: 0 open. ✅
+
+**Check H — Forge digest:**
+- Open Forge PRs: PR #479 (active pipeline, ~0 min old). ✅ Nominal.
+- Merged since iter ~1532: PR #477 (01:36Z, docs(spec): adopt approval-visibility-hardening spec), PR #478 (03:34Z, feat: capture write-back endpoint).
+
+**§5.0 Bug-hunt gate:** audit_due_nudge → no committed audit baseline, no-op. distill_detector → no un-distilled audits, no-op. audit_cadence_signal → no post-seed artifacts, no-op. ✅
+
+**Check I (Friday 2026-06-12):**
+- Fired. 1 proposal: "Review high-σ anomaly task `medic-operator-scaffold-001`" (24.4σ above baseline, effort=small). Auto-dispatch dedup-skip: prior dispatch `pulse-auto-655be51b08-20260610` sent 2026-06-10. ✅ No new action needed.
+- Artifact: `~/agents/blackboard/pulse-check-i/check-i-2026-06-12.json`. DM queued via larry_alerts.
+
+**Conditional checks:** Friday — Checks VIII, IX, X: skip (Monday-only). Check III: last ran 2026-06-11T14:06Z, next eligible 2026-06-25. ✅
+
+**Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due ~2026-08-22 (~72d). No 60d trigger. ✅
+
+**G-rule tracking:**
+- **sync-push-rebase-fallback-001**: **3/3 DISPATCHED** — Beacon inbox `cycle-finding-sync-push-rebase-fallback-20260612T034808Z.json`. Spec: sync service push step should retry-with-rebase (fetch + rebase + retry, max 2x) instead of rollback-and-wait-for-next-tick. 4 occurrences: L1233 (07:51Z Jun 11), L1291 (18:52Z Jun 11), L1306 (20:52Z Jun 11), L1317 (02:53Z Jun 12). Watch: Beacon consumption + Forge brief.
+- All other G-rules carry from iter ~1532 unchanged.
+
+**Verify-before-reassert on carried standings:**
+- PR #457 mirror-review FAILURE: MERGED 17:39Z Jun 11. ✅ CLOSED.
+- Forge PID 1669068: NOT ALIVE. ✅ CLOSED.
+- test-jail-pr4-acceptance-proof-001.json post-merge stale: found in Forge .archive. ✅ CLOSED.
+- sentinel-inflight-marker-fix-beacon: consumed by Beacon (found in Beacon .archive). ✅ Beacon will spec + dispatch Forge brief.
+- fix-build-background-poll-idiom-001: PR #473 MERGED Jun 11. ✅ CLOSED.
+- bughunt-gate-soak Phase 2: Friday, no new info. [yellow] carry.
+- Tier 2 weekly probe auth_401: Friday (not Thursday probe day for this week). [yellow] carry.
+- Check IX GITHUB_TOKEN missing: Not Monday. [yellow] carry.
+- health-check-notify-script-missing G-rule 3/3: No PR found via gh search. [yellow] carry — Beacon/Forge dispatch may be pending.
+- alert-triage-watermark-loss-on-write G-rule 3/3: `fix-alert-triage-watermark-durability-001` APPROVAL_REQUEST on Larry's tab (Beacon DM'd 02:40Z). [blue] carry pending Larry.
+- fix-depth1-pulse-approval-extraction-001: APPROVAL_REQUEST on Larry's tab (Beacon DM'd 02:40Z). [blue] carry pending Larry.
+- sync-push-rebase-fallback-001: G-rule 3/3 DISPATCHED this iter. [blue] watch Beacon consumption.
+
+**Actions taken:**
+1. Repaired alert-triage.json watermark → L1318. Logged intervention to cycle-prime-ledger.jsonl.
+2. Wrote `cycle-finding-sync-push-rebase-fallback-20260612T034808Z.json` to Beacon inbox (G-rule 3/3 dispatch). Logged systemic_fix to cycle-prime-ledger.jsonl.
+
+**Dispatches:** 1 (Beacon: sync-push-rebase-fallback G-rule spec).
+
+**Standing findings:**
+- [yellow] **bughunt-gate-soak Phase 2** — pending Larry.
+- [yellow] **Tier 2 weekly probe auth_401** — Action: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api POST 500.
+- [yellow] **health-check-notify-script-missing** — G-rule 3/3 dispatched iter ~1415; no Forge PR yet. Watch.
+- [blue] **sync-push-rebase-fallback-001** — G-rule 3/3 DISPATCHED this iter. Watch Beacon consumption + Forge brief.
+- [blue] **fix-alert-triage-watermark-durability-001** — APPROVAL_REQUEST on Larry's tab. Pending Larry.
+- [blue] **fix-depth1-pulse-approval-extraction-001** — APPROVAL_REQUEST on Larry's tab. Pending Larry.
+- [blue] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry.
+- [blue] **APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001** — pending Larry.
+- [blue] **G-rule cycle-timer checkpoint 3/3** — pending `go: cycle-timer checkpoint`.
+- [blue] **G-rule actor-exemption-config 3/3** — pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001** — pending Larry.
+- [blue] **catalog-accuracy-drift G-rule 1/3** — watch.
+- [blue] **sentinel-inbox-stall-ignores-inflight G-rule 3/3 dispatched** — Beacon consumed (in .archive). Watch Forge brief.
+- [blue] **PR #479** (p3-mission-actions-api marker-error retry 1/3) — active pipeline, expect PROCEED re-emit → Mirror review → auto-merge.
+- [blue] **p3-autoregister-healer** — Forge running (03:43Z). Watch for PR open.
+- [blue] **missions-v2-phase3** — DAG passed, pipeline executing. Watch for p3 completion.
+
+**Watch items for iter ~1546:**
+- Forge marker-error retry on p3-mission-actions-api: expect PROCEED marker → Mirror review of PR #479.
+- p3-autoregister-healer: expect PR open.
+- Beacon: sync-push-rebase-fallback G-rule envelope consumed + Forge brief dispatched.
+- health-check-notify-script-missing: check for Forge PR.
+
+**PRIME DIRECTIVE:** 2 new rows this iter (intervention: alert-triage-watermark-repair; systemic_fix: sync-push-rebase-fallback-001 G-rule dispatch). Script-authoritative ledger: interventions≈802, systemic_fixes≈27, ratio≈29.7, trend=declining (systemic fixes 2 in same iter as intervention).
+**Tier end-of-iter:** 1 (consecutive_clean=0 — G-rule dispatch + active pipeline monitoring).
+
+---
