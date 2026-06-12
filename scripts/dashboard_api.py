@@ -52,6 +52,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 logger = logging.getLogger(__name__)
 
+# supabase_factory and test_isolation_guard live in scripts/ alongside this
+# file. Add scripts/ to sys.path once at module load so every lazy import
+# in this file finds them regardless of which handler runs first.
+_scripts_dir = Path(__file__).resolve().parent
+if str(_scripts_dir) not in sys.path:
+    sys.path.insert(0, str(_scripts_dir))
+
 
 # ---- AGENTS_ROOT + derived paths (env-overridable for test isolation) ----
 
