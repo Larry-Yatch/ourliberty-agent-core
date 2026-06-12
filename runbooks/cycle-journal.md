@@ -4,6 +4,68 @@
 
 ---
 
+## Iteration ~1613 — 2026-06-12 23:18Z UTC (interactive, /cycle via /loop, Tier 3, consecutive_clean 2→3)
+
+**Trigger:** Larry direct invocation (`/cycle` via `/loop` dynamic mode).
+
+**Health:** ✅ Green. 9/9 services active. 0 open PRs. All inboxes empty. 1 new alert (Tier-3 silence). Tier 3, consecutive_clean 2→3.
+
+**VERIFY-BEFORE-REASSERT (iter ~1612 watch items):**
+- wire-pulse-check-iv-cadence-001 IN-FLIGHT (PR #488): **RESOLVED** — Mirror review-pass delivered at 22:46Z; PR #488 auto-merged + branch deleted. [closed]
+- G-rule pulse-check-iv-no-heartbeat 3/3: **CARRIED** — heartbeat still stale (18:26:04Z). PR #488 merged; heal_systemd_install_drift.py detects service+timer uninstalled; ENABLED env var not set; next drift-healer run Sat 2026-06-13 00:00 MDT (~06:00Z). [carry pending install]
+- G-rule timer-cycle-no-journal-entry 1/3: **CONFIRMED 1/3** — no new unjournaled fires observed. [carry at 1/3]
+- beacon-pending-approvals.json stale entries (#482+#484): **CONFIRMED STILL PRESENT** — healer will GC. [known carry]
+- PRIME DIRECTIVE ratio=24.82: **CONFIRMED** (script-authoritative). [confirmed]
+
+**Check 0 — Alert triage:** larry-alerts.jsonl=1139 lines. Watermark was 1138, 1 new alert. Line 1139: `outbox-notifier`, `kind=notification`, `intent=review-pass` — Mirror approved + auto-merged PR #488. Known-pattern (review-pass/auto-merge = nominal outcome) → Tier-3 silence. Watermark advanced to 1139. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot log last entry 17:05:19-0600 (23:05Z). Two events since iter ~1612: (1) notification idx=1138 delivered 16:47Z (review-pass for PR #488, delivery confirmation). (2) Larry sent "pin to tier 2" at 17:03:30-0600 (23:03Z); Beacon bot responded at 17:05Z explaining the rotation.disabled file mechanism. Current rotation.disabled = "tier1". The pin-to-tier2 directive was handled by Beacon bot (not Pulse's domain); file not yet updated to "tier2". [note: rotation configuration is Beacon's domain; no Pulse action required] ✅ Nominal (journaled).
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall dry-run: "no stalls detected". 15 FORGE_NO_PR_SKIP (all pr_exists or preflight-non-proceed). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 2 entries (fix-alert-triage-watermark-durability-001 06:03Z + fix-depth1-pulse-approval-extraction-001 06:05Z; both stale for already-merged PRs; healer will GC). wire-pulse-check-iv-cadence-001 consumed (PR #488 merged). ✅ Nominal (known carry).
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry. G-rule dispatched ~iter 1416. ✅ Known carry.
+
+**Check A — Source repo:** Session gitStatus: main, clean, latest 83ff858 "feat(systemd): weekly timer for Pulse Check IV so it stops going dark (#488)" — PR #488 merged commit. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: last_sync=2026-06-12T22:56:02Z (~22 min ago), status=no-change, commit=83ff858. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 active (beacon-bot, chain-event-shipper, cycle.service, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot). ✅ Nominal.
+
+**Check D — Inboxes:** All inboxes empty (forge, beacon, mirror, pulse). ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on agent-core (PR #488 merged). 0 open PRs on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I: check-i-2026-06-12.json exists (fired iter ~1543). SKIP. Check III: today=Friday (not Sunday); next eligible 2026-06-15. SKIP.
+
+**Rotations:** 0 credentials in 60-day window. ✅ Nominal.
+
+**Actions taken:**
+1. Alert watermark advanced 1138→1139 (review-pass Tier-3 silence). ✅
+2. `cycle_tier_state.py record --checks-clean true` → consecutive_clean 2→3, Tier 3. ✅
+3. `cycle_prime_ledger.py append --kind iter_clean` → iter_clean row logged. ✅
+
+**Standing findings (updated):**
+- [yellow] wire-pulse-check-iv-cadence-001 — **RESOLVED**: PR #488 auto-merged 22:46Z. pulse-check-iv timer not yet installed on droplet (heal_systemd_install_drift.py detects missing units; next drift-healer run Sat 06:00Z). Heartbeat will refresh after install. [closed; monitor install]
+- [yellow] Tier-2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- [blue] G-rule pulse-check-iv-no-heartbeat — 3/3; PR #488 merged (systemic fix landed); heartbeat stale pending drift-healer install (Sat 06:00Z). [carry → resolves after install]
+- [blue] G-rule timer-cycle-no-journal-entry — 1/3. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. G-rule dispatched ~iter 1416. [carry]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR. [carry]
+- [blue] dag-preflight-revision gap — PR #484 closed source=pulse gap; DAG re-dispatch markers still fall through. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED. [carry]
+- [blue] catalog-accuracy-drift — G-rule 2/3. [carry]
+- [blue] beacon-pending-approvals.json stale entries (#482+#484) — healer will GC. [carry]
+
+**PRIME DIRECTIVE:** 0 intervention rows this iter (clean). Trailing-30d (script-authoritative): interventions=819, systemic_fixes=33, verification_pending=11, ratio=24.82, trend=flat.
+**Tier end-of-iter:** Tier 3, consecutive_clean=3. (Any non-clean drops to Tier 1; Tier 3 is max de-escalation.)
+
+---
+
 ## Iteration ~1612 — 2026-06-12 22:44Z UTC (interactive, /cycle, Tier 3, consecutive_clean 1→2)
 
 **Trigger:** Larry direct invocation (`/cycle`).
