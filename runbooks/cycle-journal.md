@@ -4,6 +4,107 @@
 
 ---
 
+## Iteration ~1540 — 2026-06-12 01:14Z UTC (interactive, /cycle, Tier 3, consecutive_clean 0→1)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 4/4 bots alive. 0 open PRs. 0 new alerts. All mandatory checks clean. **Tier 3, consecutive_clean 0→1** (2 more clean iters needed to stay at Tier 3). Two standing watch items resolved this iter.
+
+**VERIFY-BEFORE-REASSERT (iter ~1539 watch items + inter-cycle notification):**
+- **Forge inbox test-jail-pr4-acceptance-proof-001**: VERIFIED ARCHIVED — file confirmed in `inboxes/forge/.archive/` (not in inbox). PID 1896766 ended. log_growth CLEARED (system-health 01:10Z: `status=ok, seconds_since_write=117`). children_mb=176.2 (down from 319.5 at iter ~1539). ✅ **CLOSED.**
+- **sentinel-inflight-marker-fix-001**: VERIFIED in `inboxes/forge/.invalid/` with `.reason` file — routing-denied:pulse→forge at 00:59Z as reported in inter-cycle notification. ✅ Confirmed invalid (correct disposition).
+- **APPROVAL_REQUEST sentinel-inbox-stall-respect-inflight-001**: Inter-cycle notification reports Beacon created this. `beacon-pending-approvals.json`: FILE_NOT_FOUND — unable to verify pending state via approvals file. [blue] carry without asserting pending.
+- **G-rule Pulse-envelope-format 2/3**: No new occurrence this iter. Beacon inbox EMPTY. Still 2/3. [blue] carry.
+- **Tier 3, consecutive_clean=0**: Clean this iter → 1. Need 2 more.
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: **1312 lines** (unchanged from L1312 watermark set in inter-cycle notification). 0 new alerts. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot log: last activity 19:03:30 MDT (01:03:30Z, ~10 min before this check) — routing-denied alert delivered. `beacon-pending-approvals.json`: FILE_NOT_FOUND. Larry's last messages 13:57–13:59 MDT (Jun 11) addressed by Beacon. No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `RETRY_EXHAUSTED_SKIP task=test-jail-pr4-acceptance-proof-001 reason=superseded_session` + `[INFO] no stalls detected` (01:11Z). ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json`: FILE_NOT_FOUND. No unresolved Larry directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing known, G-rule dispatched iter ~1416. [blue] carry.
+
+**Check A — Source repo:** main, dirty (MEMORY.md staged + cycle-journal.md working-tree modified — Pulse-owned pre-commit files, expected wrapper-commit state). ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-12T00:53:08Z (~21 min at check time), status=no-change. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** `system-health.json` (01:10:15Z): 4/4 bots alive (beacon, forge, mirror, pulse). log_growth: **OK** (117s — cleared, Forge test-jail session ended). children_mb=176.2. disk 6%, memory 14%. ✅ Nominal.
+
+**Check D — Inboxes:** Forge: 5 old tasks (tune-unregistered-approval-reconcile Jun4, watchdog-bot-liveness-policy May28, watchdog-doc-fix May12, wire-pulse-optimize May15, worktree-relocation-smoke May12) — all pre-existing backlog, pipeline healer nominal. Beacon/Mirror/Pulse: EMPTY. ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs (both ourliberty-agent-core + ourliberty-dashboard). ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal → no-op. ✅
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I (Monday only) → skip. Check III (next eligible 2026-06-25) → skip. Checks VIII/IX/X (Monday) → skip. ✅
+
+**Credential rotation:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~71d). Outside 60-day DM window. ✅
+
+**Actions taken:**
+1. `cycle_tier_state.py record --checks-clean true` → consecutive_clean 0→1. Tier 3 maintained. ✅
+2. No DMs sent — no new [yellow]/[red] findings.
+
+**Resolved this iter:**
+- **test-jail-pr4-acceptance-proof-001** — ARCHIVED ✅ (PID 1896766 ended, PR #476 merged)
+- **log_growth: warning** — CLEARED ✅ (117s at 01:10Z, system-health overall=healthy)
+
+**Standing findings (updated):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. Also blocks alert-translations.json Forge task. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). Pending Larry. [carry]
+- [blue] APPROVAL_REQUEST sentinel-inbox-stall-respect-inflight-001 — inter-cycle notification says created by Beacon; beacon-pending-approvals.json FILE_NOT_FOUND (unverifiable). Say `go: sentinel-inbox-stall-respect-inflight-001` to Beacon if still applicable. [carry/updated]
+- [blue] G-rule Pulse-envelope-format — **2/3**. At 3/3 → dispatch Beacon task. [carry]
+- [blue] G-rule `approval_request_not_extracted_from_depth1_beacon_result` — 1/3. [carry]
+- [blue] G-rule `alert-triage-watermark-loss-on-write` — 1/3. [carry]
+- [blue] heal-stale-daemon-code-state.json MISSING — G-rule dispatched iter ~1416. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 5/34 shelf cards. 1/3 G-rule. [carry]
+- [blue] cycle.timer G-rule 3/3 → Beacon consumed. [carry]
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464, 465, 467, 468, 466, 470, 471, 472, 473, 475, 476) — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] Various G-rule carries: silence-missions-card-gc 001, heal-pipeline-stall heartbeat 3/3 deferred, auto-restart-failed 1/3, completion-DM 1/3, auto-retry source=auto-retry 1/3, Check-C-launcher-liveness APPROVAL_REQUEST pending, alert-triage-durable-watermark-001 parked, retry-exhausted-on-shipped-task 2/3, retry_exhausted:post-merge-install-drift 1/3, F24b JSON malformation 2/3, bughunt-gate-soak Phase 2 pending, health-check-notify-script-missing G-rule 3/3 dispatched, Check IX GITHUB_TOKEN missing.
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST worktree-cleanup-merged-pr-reap-001 routing gap — 1/3 G-rule. [carry]
+- [blue] G-rule `routing-denied:pulse→forge` — 1/3. [carry]
+
+**Watch items for iter ~1541:**
+- **sentinel-inbox-stall-respect-inflight-001**: APPROVAL_REQUEST status unverifiable via approvals file. If Larry says `go: sentinel-inbox-stall-respect-inflight-001` → Beacon dispatches Forge build.
+- **G-rule Pulse-envelope-format 2/3**: Watching for 3rd occurrence → Beacon dispatch.
+- **Tier 3 cadence**: consecutive_clean=1. Need 2 more clean iters to maintain Tier 3 position.
+
+**PRIME DIRECTIVE:** 0 interventions, 0 systemic_fixes this iter. Running total: interventions=800, systemic_fixes=26, ratio=30.77, trend=flat.
+**Tier end-of-iter:** Tier 3, consecutive_clean=1.
+
+---
+
+## Result notification — 2026-06-12 ~01:10Z UTC (inter-cycle, from=beacon, task=sentinel-inflight-marker-fix-beacon-20260612T010014Z)
+
+**Status:** SUCCESS. Beacon refined the sentinel-inflight diagnosis and dispatched an APPROVAL_REQUEST.
+
+**Beacon's corrected diagnosis:** The fix target is `scripts/dispatch_sentinel.py:scan_inbox` (add a read of `state/in-flight/<key>.json` before classifying a task as an inbox-stall), NOT `inbox_watcher.py` (which would redundantly write markers already written by `agent_runner._register_in_flight`, risking double-write/double-unregister races). Pulse's original file-target recommendation was incorrect; Beacon made the technical call per escalation discipline.
+
+**APPROVAL_REQUEST created:** `sentinel-inbox-stall-respect-inflight-001` — pending Larry approval. Once approved, Beacon dispatches Forge build (phase=preflight). PR will make `scan_inbox` skip any inbox file whose in-flight marker exists AND whose PID is alive (`os.kill(pid, 0)` does not raise). Dead/missing marker falls through to stall classification as today.
+
+**Concurrent state changes confirmed this notification:**
+- **test-jail-pr4-acceptance-proof-001 COMPLETED ✅** — PID 1896766 gone, task archived to `inboxes/forge/.archive/`. Standing [blue] watch item CLOSED.
+- **sentinel-inflight-marker-fix-001 → .invalid ✅** — routing-denied:pulse→forge at 00:59:10Z. Pulse dispatched this directly to Forge (iter ~1537, before the routing rule was written to MEMORY). Dispatch-validator correctly rejected it. Beacon's direction-ask was the correct recovery.
+- **Forge inbox: EMPTY** — no active build tasks queued.
+
+**Alert triage (L1312):** `routing-denied:pulse→forge` (00:59:10Z, source=inbox-watcher) — Tier-3 FYI. Root: Pulse dispatched `sentinel-inflight-marker-fix-001.json` directly to Forge (routing rule Pulse→Beacon-only was not yet in MEMORY at that iter). Correctly rejected; Beacon has authored the proper spec. G-rule `routing-denied:pulse→forge` **1/3** (first occurrence). Alert watermark: L1312.
+
+**Actions taken:** None (no always-allowed fix applies to an inter-cycle notification).
+
+**Watch items update:**
+- **[yellow] APPROVAL_REQUEST sentinel-inbox-stall-respect-inflight-001**: Pending Larry. Say `go: sentinel-inbox-stall-respect-inflight-001` to Beacon to unblock Forge build. [NEW]
+- **Forge inbox**: EMPTY — test-jail + sentinel original both cleared. Log_growth warning will clear once inbox-watcher confirms idle.
+- **G-rule routing-denied:pulse→forge**: 1/3. At 3/3 investigate whether Pulse's dispatch surfaces need a validator guard at write time (not just pickup time).
+
+---
+
 ## Iteration ~1539 — 2026-06-12 00:37Z UTC (interactive, /cycle, Tier 2→3 promoted, consecutive_clean 2→3→promote)
 
 **Trigger:** Larry direct invocation (`/cycle`).
@@ -101578,5 +101679,22 @@ New watermark: **2026-06-10T17:05:59Z / pulse:ccd-s1-identity-resolution-2026061
 
 **PRIME DIRECTIVE:** 1 intervention this iter (watermark repair). Script-authoritative ratio: interventions=799, systemic_fixes=25, ratio=31.96, trend=flat.
 **Tier end-of-iter:** 1 (consecutive_clean=0 — stale Forge task carry).
+
+---
+
+## Iteration ~1532 (dead-letter notify) — 2026-06-12 01:00Z UTC (interactive, Tier 1)
+
+**Note:** Dead-letter notify from outbox-notifier: `sentinel-inflight-marker-fix-001.json` dispatch to Forge was rejected by dispatch_validator and never reached Forge.
+
+**Health:** ✅ Nominal — dead-letter journal + re-dispatch via correct route.
+
+**Dead-letter root cause:** dispatch_validator rejection: `routing: route pulse -> forge not allowed (allowed from pulse: ['beacon'])`. Pulse dispatched directly to Forge instead of routing through Beacon. This is a Pulse routing error — the correct path is always Pulse → Beacon → Forge. The envelope content (task_id, prompt, schema) was valid; only the target_agent was wrong.
+
+**Action taken:** Re-dispatched to Beacon inbox as `sentinel-inflight-marker-fix-beacon-20260612T010014Z.json` with the same fix spec: inbox_watcher.py must write `state/in-flight/<task_stem>.json` before spawning the Claude subprocess, and remove it on completion/error. This closes G-rule `sentinel-inbox-stall-ignores-inflight` (3/3 at iter ~1538). Beacon will spec + dispatch Forge build brief.
+
+**Learning / self-improvement:** Pulse must NEVER dispatch directly to Forge. Allowed Pulse routes: → Beacon only. Beacon routes → Forge. This routing constraint is enforced by dispatch_validator. Prior F24-empty-prompt bug led to a similar mis-dispatch pattern. Adding this routing rule to MEMORY.md.
+
+**PRIME DIRECTIVE:** +1 intervention (routing correction). Ratio carry: interventions≈800, systemic_fixes=25, ratio≈32.0, trend=flat.
+**Tier end-of-iter:** 1 (consecutive_clean=0 — carry).
 
 ---

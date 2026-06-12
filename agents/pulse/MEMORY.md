@@ -6,6 +6,12 @@
 
 ---
 
+## Dispatch routing rule (learned 2026-06-12 — routing rejection)
+
+**Rule:** Pulse may ONLY dispatch to **Beacon**. The dispatch_validator enforces `allowed from pulse: ['beacon']`. Pulse → Forge dispatches are REJECTED and dead-lettered to `.invalid/`. The correct path for code fixes is always: Pulse direction-ask → Beacon → Forge build brief. When writing a dispatch envelope, set `target_agent: beacon` (not `forge`), and phrase the prompt as a direction-ask to Beacon asking it to spec + dispatch Forge.
+
+---
+
 ## Dispatch envelope schema (learned 2026-06-11, two failures)
 
 **Rule:** Beacon inbox dispatch envelopes MUST use root field `task_id` (not `envelope_id`). Required fields: `task_id`, `source`, `dedup_identity`, `prompt`, `timeout`. `envelope_id` is silently ignored and fails the validator. Observed two failures: first at 20:23Z (source field empty → DISPATCH_BLOCKED), second at 20:36Z (used `envelope_id` instead of `task_id` → REJECTED). Third attempt (dead-letter recovery) with corrected schema succeeded. F24b G-rule is at 2/3 for JSON dispatch malformation — track for 3/3.
