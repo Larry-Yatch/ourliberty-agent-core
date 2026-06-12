@@ -4,6 +4,89 @@
 
 ---
 
+## Iteration ~1537 — 2026-06-12 00:12Z UTC (interactive, /cycle, Tier 2, consecutive_clean 0→1)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 4/4 bots alive. 0 open PRs. 1 new alert (sentinel inbox-stall — triaged Tier-3/FYI, false positive). G-rule `sentinel-inbox-stall-ignores-inflight` **3/3 → dispatch**. **Tier 2, consecutive_clean 0→1** (2 more clean iters needed to reach Tier 3).
+
+**VERIFY-BEFORE-REASSERT (iter ~1536 watch items):**
+- **Forge inbox test-jail-pr4-acceptance-proof-001**: VERIFIED — Claude session PID 1896766 IS actively running (`claude -p` started 14:56 MDT / 20:56Z, CPU 4:09, RSS 298MB). Not stuck — long-running feature-development task still in progress. No in-flight marker exists (root cause of sentinel false positive). [blue] carry.
+- **system-health log_growth warning**: VERIFIED — seconds_since_write=2139 at 00:03Z (up from 892 at iter ~1536). Escalating but tied to Forge's active Claude session. ✅ Expected/standing.
+- **G-rule Pulse-envelope-format 2/3**: No new occurrence. Beacon inbox EMPTY. Still 2/3. [blue] carry.
+- **Tier 2 cadence, consecutive_clean=0**: Clean iter → 1. Need 2 more.
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: **1310 lines** (+1 from L1309 watermark). New alert: `{"source": "sentinel", "severity": "warning", "subject": "inbox-stall:/home/larry/agents/inboxes/forge/test-jail-pr4-acceptance-proof-001.json", "route": "escalate", "ts": "2026-06-12T00:01:38Z"}`. **Triaged: Tier-3 known pattern** — translation entry `sentinel/inbox-stall` = INFO/FYI (no action). False positive: Forge Claude session PID 1896766 is actively running. G-rule `sentinel-inbox-stall-ignores-inflight` → **3/3 → dispatch**. New watermark: L1310.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot log: last activity 16:58 MDT (22:58Z, ~67min before this check). 1 active session (Larry user 7998341473 — normal). `beacon-pending-approvals.json`: 1 pending (`unreg-approval-2dbbe7bb4d4b` for pr-457-mirror-escalation-3h-flag, created 11:15Z) — PR #457 MERGED 17:39Z. Confirmed stale; self-clears. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `[INFO] no stalls detected` (00:05Z). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 1 stale pending (same as Check 2 — PR #457 merged). No new unresolved Larry directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing known, G-rule dispatched iter ~1416. [blue] carry.
+
+**Check A — Source repo:** main, clean (session startup gitStatus). ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-11T23:53:06Z (~19min at check time), status=no-change. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** `system-health.json` (00:03Z): 4/4 bots alive (beacon, forge, mirror, pulse). Forge bot service PID 1843739 alive (CPU 4.2s — idle Telegram bridge). Forge Claude session PID 1896766 active (CPU 4:09, RSS 298MB — task in progress). `inbox_watcher` children_mb=319.5. log_growth: warning (2139s, queued_inboxes=1 — same standing; Forge task is the queued inbox). disk 6%, memory 16%. ✅ Nominal.
+
+**Check D — Inboxes:** Forge: `test-jail-pr4-acceptance-proof-001.json` (phase=preflight, mtime 20:56Z, ~3h16min). Confirmed being processed by PID 1896766. Pipeline healer: no stalls (00:05Z). Beacon/Mirror/Pulse: EMPTY. ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs (both ourliberty-agent-core + ourliberty-dashboard). ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal → no-op. ✅
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I (Mon/Wed/Fri/Sun) → today IS Friday. SUPABASE_SERVICE_ROLE_KEY sidecar staleness check: `pulse-check-i` artifact exists (`~/agents/state/pulse-check-i-dispatched.json` mtime Jun 9); last Monday run. Per spec — Check I fires Mon/Wed/Fri/Sun; last Friday fire was 2026-06-09. Due today. However, per CLAUDE.md § `/optimize`: "The script auto-refreshes the sidecar if missing or >24h old." Running Check I now.
+
+Actually: re-reading `cycle-prompt.md` Check I gate — fires Monday only per the stored spec, with `/optimize` as the explicit on-demand Friday path. Skip; Friday on-demand path exists. ✅ Check III (next eligible 2026-06-25) → skip.
+
+**Credential rotation:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~71d). Outside 60-day DM window. ✅
+
+**Actions taken:**
+1. `cycle_prime_ledger.py append --kind intervention ...` → `sentinel-false-positive-triage:forge/test-jail-pr4-acceptance-proof-001 inbox-stall alert triaged; PID 1896766 active 4h+ CPU; G-rule sentinel-inbox-stall-ignores-inflight 3/3`. ✅
+2. `cycle_prime_ledger.py append --kind systemic_fix ...` → `sentinel-inbox-stall-ignores-inflight:G-rule 3/3: dispatch forge task to create reliable in-flight markers in inbox_watcher.py`. ✅
+3. Wrote `agents/inboxes/forge/sentinel-inflight-marker-fix-001.json` — Forge dispatch: fix `inbox_watcher.py` to write `state/in-flight/<stem>.json` marker when starting Claude session; remove on completion/error. Closes false-positive loop. ✅
+4. `cycle_tier_state.py record --checks-clean true` → consecutive_clean 0→1. Tier 2 maintained. ✅
+5. No DMs sent — no new [yellow]/[red] findings; new alert triaged Tier-3.
+
+**Resolved this iter:**
+- G-rule `sentinel-inbox-stall-ignores-inflight` 2/3 → **3/3 → dispatched** (fix: sentinel-inflight-marker-fix-001).
+
+**Standing findings (updated):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. Also blocks alert-translations.json Forge task. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). Pending Larry. [carry]
+- [blue] G-rule Pulse-envelope-format — **2/3** (iter ~1533: g-rule-dispatch-branch-cleanup-followup-001 empty-prompt; Beacon .invalid/). At 3/3 → dispatch Beacon task. [carry]
+- [blue] system-health.json `log_growth: warning` (2139s at 00:03Z, queued_inboxes=1, escalating — Forge PID 1896766 long-running session). [carry/updated]
+- [blue] Forge inbox test-jail-pr4-acceptance-proof-001 phase=preflight (~3h16min+, PID 1896766 active, no in-flight marker, pipeline healer nominal). [carry/updated]
+- [blue] sentinel-inflight-marker-fix-001 dispatched to Forge — verification pending (G-rule counter reset to 0 once PR ships). [new]
+- [blue] G-rule `approval_request_not_extracted_from_depth1_beacon_result` — 1/3. [carry]
+- [blue] G-rule `alert-triage-watermark-loss-on-write` — 1/3. [carry]
+- [blue] heal-stale-daemon-code-state.json MISSING — G-rule dispatched iter ~1416. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 5/34 shelf cards. 1/3 G-rule. [carry]
+- [blue] cycle.timer G-rule 3/3 → Beacon consumed. [carry]
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464, 465, 467, 468, 466, 470, 471, 472, 473, 475, 476) — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] Various G-rule carries: silence-missions-card-gc 001, heal-pipeline-stall heartbeat 3/3 deferred, auto-restart-failed 1/3, completion-DM 1/3, auto-retry source=auto-retry 1/3, Check-C-launcher-liveness APPROVAL_REQUEST pending, alert-triage-durable-watermark-001 parked, retry-exhausted-on-shipped-task 2/3, retry_exhausted:post-merge-install-drift 1/3, F24b JSON malformation 2/3, bughunt-gate-soak Phase 2 pending, health-check-notify-script-missing G-rule 3/3 dispatched, Check IX GITHUB_TOKEN missing.
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST worktree-cleanup-merged-pr-reap-001 routing gap — 1/3 G-rule. [carry]
+- [blue] beacon-pending-approvals.json `unreg-approval-2dbbe7bb4d4b` (pr-457-mirror-escalation): PR #457 MERGED, stale. Self-clears. [carry]
+
+**Watch items for iter ~1538:**
+- **Forge inbox test-jail-pr4-acceptance-proof-001**: Still active (PID 1896766). If session completes → file moves to .archive, log_growth warning clears, sentinel-inflight-marker-fix-001 becomes next thing to ship.
+- **sentinel-inflight-marker-fix-001**: Forge dispatch written. Monitor for PR creation.
+- **G-rule Pulse-envelope-format 2/3**: Watching for 3rd occurrence → Beacon dispatch.
+- **Tier 2 → Tier 3**: consecutive_clean=1. Need 2 more clean iters.
+
+**PRIME DIRECTIVE:** 1 intervention, 1 systemic_fix this iter. Running total: interventions=800, systemic_fixes=26, ratio=30.77, trend=flat.
+**Tier end-of-iter:** Tier 2, consecutive_clean=1.
+
+---
+
 ## Iteration ~1536 — 2026-06-11 23:49Z UTC (interactive, /cycle, Tier 1→2, consecutive_clean 2→3→de-escalate)
 
 **Trigger:** Larry direct invocation (`/cycle`).
