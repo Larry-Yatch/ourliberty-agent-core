@@ -4,6 +4,82 @@
 
 ---
 
+## Iteration ~1568 — 2026-06-12 07:47Z UTC (interactive, /cycle, Tier 3, consecutive_clean 1→2)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. 9 core services active (beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api, cycle.service). outbox-notifier restarted at 07:22Z by healer (PR #484 code now live). 1 new alert (L1336, Tier-3). 0 open PRs. All inboxes empty. **Two standing issues RETIRED: cycle.timer verified active; heal-pipeline-stall-state.json verified exists.** Tier 3, consecutive_clean 1→2.
+
+**VERIFY-BEFORE-REASSERT (iter ~1567 watch items):**
+- **cycle.timer unit not found**: VERIFIED CLOSED ✅ — `ourliberty-cycle.timer` is active (running since 2026-06-11 12:00 MDT = 18:00Z UTC, 13h). The G-rule 3/3 `go: cycle-timer checkpoint` standing issue is STALE/FALSE. Unit name is `ourliberty-cycle.timer` (not `ourliberty-agent-cycle.timer`). RETIRE.
+- **heal-pipeline-stall-state.json MISSING**: VERIFIED CLOSED ✅ — file exists with snoozed-stall contents. Most recent active entry: `stalled_pending_sequence:missions-v2-phase3` snooze expired at 02:36Z, but missions-v2-phase3 DAG-preflight PASSED at 03:06Z and sequence transitioned to active. No real stall. RETIRE.
+- **sync-push-rebase-loop-001 recovery / dag-preflight-revision gap**: Carrying; fix-depth1 merged, Beacon unblocked. No new activity this iter.
+- **Tier 3 cadence**: consecutive_clean=1 entering iter, advancing to 2. ✅ CARRY.
+
+**Check 0 — Alert triage:** Watermark was L1335. Total lines: 1336. 1 new alert.
+- L1336: `heal-stale-daemon-code` (07:22Z, route=digest) — auto-restarted `ourliberty-outbox-notifier.service` (script mtime 666.2 min newer than active-since; PR #484 code now live). Same by-design healer class as L1334/L1335. Already delivered as digest by bot (bot log: `alert idx=1335 route=digest; skipping DM`). Tier-3 by-design. Journal note only.
+Watermark advanced to **L1336**. ✅ Nominal (1 alert, Tier-3, no tier-reset).
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry directive at 00:17 MDT (06:17Z UTC) = "Go" (final approval for fix-depth1). All directives since 23:54 MDT (2026-06-11T05:54Z UTC) — `go: p3-mission-proposed-actions-api`, three "Go" approvals, "Status", "Recheck current status" — all tracked by PRs #481, #482, #483, #484 (all merged). No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall-state.json NOW EXISTS (was MISSING — see verify above). All 4 inboxes empty. 0 open PRs. missions-v2-phase3 stall snooze expired but sequence is active post-DAG-preflight. 5 forge archive tasks (tune-unregistered-approval-reconcile, watchdog-bot-liveness-policy-001, watchdog-doc-fix-001, wire-pulse-optimize-001, worktree-relocation-smoke-001) — normal in-progress sequence execution. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json MISSING (no pending approvals). All Larry directives tracked. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known carry, G-rule dispatched ~iter 1416. Healer confirmed firing at 07:22Z (outbox-notifier restart). Both restarted daemons now current (outbox-notifier active-since 07:22Z > script-mtime 06:54Z — no stale condition). [blue] carry.
+
+**Check A — Source repo:** session gitStatus branch=main, clean. Sync state=success, last_sync=06:54Z, HEAD=028636e (PR #484). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=06:54Z. Age ~53 min at scan time. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 9 core services active (services + cycle.service = this session). **ourliberty-cycle.timer VERIFIED ACTIVE** — running since 2026-06-11 18:00Z (13h). Total 58 units loaded per `systemctl list-units`. ✅ Nominal. Standing "[blue] cycle.timer unit not found" RETIRED.
+
+**Check D — Inboxes:** All 4 empty at time of check. Mirror inbox had 5 tasks (tune-unregistered-approval-reconcile, watchdog-bot-liveness-policy-001, watchdog-doc-fix-001, wire-pulse-optimize-001, worktree-relocation-smoke-001) briefly visible, picked up by inbox-watcher within seconds — normal active processing, not stale. Mirror archive shows reviews completed for 3 of 5; remaining 2 likely in-progress with Mirror session. ✅ Nominal.
+
+**Check E — PRs:** 0 open on agent-core, 0 on ourliberty-dashboard. Last 10 merges: #484–#475 (today/yesterday). ✅ Nominal.
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I: `check-i-2026-06-12.json` exists (fired iter ~1543). SKIP. Check III: next eligible 2026-06-25. SKIP.
+
+**Key findings this iter:**
+All checks nominal. Two standing issues retired:
+- **cycle.timer verified active** — G-rule 3/3 `go: cycle-timer checkpoint` was tracking a false positive (unit name `ourliberty-cycle.timer` is correct and active). Retired.
+- **heal-pipeline-stall-state.json verified exists** — prior MISSING carry is stale. File has valid snoozed-stall contents. Retired.
+- outbox-notifier restarted at 07:22Z by healer — PR #484 code (direction-ask extraction fix) now live in the notifier. Chain fully unblocked.
+- missions-v2-phase3 sequence in active execution (5 steps dispatched/in-progress).
+
+**Actions taken:**
+1. Alert watermark advanced to L1336 via `alert_triage_state.py set-watermark --line 1336`. ✅
+2. `cycle_tier_state.py record --checks-clean true` → consecutive_clean=2, Tier 3. ✅
+3. No auto-fix actions. No DMs (all Tier-3, no new escalations).
+
+**Standing findings (updated from iter ~1567):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR — needs manual recovery (`go: sync-push-rebase-loop-001` to Beacon if root fix still desired). [carry]
+- [blue] dag-preflight-revision notifier gap — fix-depth1 merged, Beacon unblocked. Separate dag-preflight-revision re-dispatch may still need `go:` to Beacon. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent, healer confirmed running (07:22Z). G-rule dispatched ~iter 1416. [carry]
+- [blue] sentinel-inbox-stall-respect-inflight-001 — `go:` to Beacon if applicable. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 5/34 shelf cards. 1/3 G-rule. [carry]
+- [blue] unreviewed-merge — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] G-rule `routing-denied:pulse→forge` — 1/3. [carry]
+- [blue] G-rule `missions-autoregister:summary not in alert-translations.json` — 1/3. [carry]
+- ~~[blue] cycle.timer unit not found~~ — **RETIRED** (verified active since 2026-06-11). G-rule 3/3 closed.
+- ~~[blue] heal-pipeline-stall-state.json MISSING~~ — **RETIRED** (file exists, healer operational).
+
+**Watch items for iter ~1569 (Tier 3, 30-min cadence ~08:17Z):**
+- missions-v2-phase3 remaining steps: `watchdog-doc-fix-001`, `worktree-relocation-smoke-001` — confirm PRs open and Mirror reviewing.
+- Tier 3 cadence: 1 more clean iter → consecutive_clean=3. (Already at Tier 3 max; no further de-escalation, but sustains 30-min cadence.)
+
+**PRIME DIRECTIVE:** 0 new intervention rows (clean iter). Running total (trailing-30d): interventions=809, systemic_fixes=30, ratio=26.97, trend=flat.
+**Tier end-of-iter:** Tier 3, consecutive_clean=2.
+
+---
+
 ## Iteration ~1567 — 2026-06-12 07:08Z UTC (interactive, /cycle, Tier 3, consecutive_clean 0→1)
 
 **Trigger:** Larry direct invocation (`/cycle`).
