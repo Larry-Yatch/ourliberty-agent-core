@@ -24,6 +24,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-12 11:00Z UTC (Iter ~1574, /cycle)
+
+**Iter ~1574 summary:** Alert watermark: L1337 (file=1110 lines; counter-reset known; 1 new alert: missions-autoregister:summary 10:32Z, digest). Tier 3, consecutive_clean=7→8. PRIME DIRECTIVE: interventions=809, systemic_fixes=40, ratio=20.23, trend=improving. **KEY STATE:** 10/10 services active. 0 open PRs. All inboxes empty. Sync: last_sync=10:54:39Z, no-change. beacon-pending-approvals.json present (1.5MB, stale entries for PRs #482-484 already merged; healer will clear). healer dry-run: no stalls. **G-RULE UPDATES:** catalog-accuracy-drift 1/3→2/3 (new alert 7/34 shelf cards at 10:20Z); missions-autoregister:summary 1/3→2/3 (new digest at 10:32Z, not in alert-translations.json). At 3/3 → dispatch Beacon. **STANDING:** Tier-2 weekly probe auth_401 (last fail 2026-06-08T19:02Z), Check III proposals pending `approve threshold-update-2026-06-11`, dag-preflight-revision gap (PR #484 fix merged), Check 5 MISSING (G-rule dispatched ~iter 1416). **Tier:** Tier 3, consecutive_clean=8.
+
 ## Status snapshot — updated 2026-06-12 08:54Z UTC (Iter ~1570, /cycle)
 
 **Iter ~1570 summary:** Alert watermark: L1337 (+1: dispatch-branch-cleanup:summary 08:28Z, Tier-3 digest). Tier 3, consecutive_clean=3→4. PRIME DIRECTIVE: interventions=809, systemic_fixes=30, ratio=26.97, trend=flat. **KEY STATE:** 9/9 services active. 0 open PRs. All inboxes empty. Sync: last_sync=07:54:19Z, status=no-change. `beacon-pending-approvals.json` — 2 stale entries (PRs #482/#484 already merged, healer will clear). `heal-pipeline-stall-state.json` — 0 entries. **missions-v2-phase3:** `worktree-relocation-smoke-001` CLOSED (smoke test REJECT by design). `watchdog-doc-fix-001` in forge `.archive/` at phase=preflight, result="PR opened: PR #1" — watch next iter to verify PR exists. **Tier:** Tier 3, consecutive_clean=4 (max tier, 30-min cadence).
