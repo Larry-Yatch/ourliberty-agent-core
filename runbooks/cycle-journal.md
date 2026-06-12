@@ -4,6 +4,94 @@
 
 ---
 
+## Iteration ~1560 — 2026-06-12 05:20Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Yellow. 9/9 units alive. 0 new alerts. 0 open PRs. All 4 inboxes empty. 3 pending approvals unchanged from iter ~1559. p3-mission-proposed-actions-api AR still unregistered. 4 Forge PRs merged overnight (478-480 + 477). Tier 1, consecutive_clean 0→0.
+
+**VERIFY-BEFORE-REASSERT (iter ~1559 watch items):**
+- **p3-mission-proposed-actions-api**: Forge inbox empty, beacon bot log shows no "go: p3-mission-proposed-actions-api" from Larry since iter ~1559. ✅ CARRY — unregistered AR still outstanding.
+- **beacon-pending-approvals.json path**: Confirmed `~/agents/state/beacon-pending-approvals.json` still 3 pending (fix-alert-triage-watermark-durability-001, fix-depth1-pulse-approval-extraction-001, pulse-envelope-builder-001, all 02:40–02:55Z). UNCHANGED. ✅ CARRY.
+- **adopt-approval-visibility-hardening-spec PR**: ✅ CONFIRMED MERGED — PR #477 merged 01:36Z. [CLOSED]
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: 1323 lines (UNCHANGED from iter ~1559 escalation at 05:09Z). 0 new alerts since last iter. ✅ Nominal.
+
+**Check 1 — Log noise:** `outbox-notifier.log` trailing 30 lines: INFO only. No WARN/ERROR patterns above threshold. Sync-push failures (02:57Z and 03:58Z local) logged as digest-skips in beacon bot log — self-healed at 04:54Z sync (status=no-change). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry directive: "Can you launch the missions v2 dag" (01:54Z June 12) → dag-preflight-missions-v2-phase3 dispatched to Mirror 01:57Z. All tracked. No new directives since iter ~1559. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal-pipeline-stall-state.json` present. `stalled_pending_sequence:missions-v2-phase3` entry (02:36Z) noted but 3 backend PRs (#478 03:34Z, #479 04:04Z, #480 04:13Z) have merged — sequence progressing on backend side. Frontend step (`p3-dashboard-proposed-lane`) blocked on `p3-mission-proposed-actions-api` unregistered AR — same root cause as iter ~1559 carry. 0 open PRs on agent-core + ourliberty-dashboard. ✅ Nominal (carry stall known and escalated).
+
+**Check 4 — Pending directives:** "Can you launch missions v2 dag" → PRs #478-480 merged + healer PR #480 shipped = tracked. All 24h directives have matching chain artifacts. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — carry, G-rule dispatched ~iter 1416. Healer confirmed functioning: auto-restarted dashboard-api at 03:50Z after PR #478 merged (mtime delta 476.4 min). [blue] carry.
+
+**Check A — Source repo:** branch=main, clean (session gitStatus HEAD=84f7943). ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-12T04:54:09Z, status=no-change. Age ~26 min from this iter (~05:20Z). Within 2h threshold. ✅ Nominal. (Sync-push failure at 03:53Z self-healed by 04:54Z — [blue] carry sync-push-rebase-loop-001.)
+
+**Check C — Agent liveness:** 9/9 active: beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api, cycle.timer. ✅ Nominal.
+
+**Check D — Inboxes:** All 4 empty. ✅ Nominal.
+
+**Check E — PRs:** 0 open on agent-core, 0 on ourliberty-dashboard. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge → no committed baseline; no-op. distill_detector → no un-distilled audits; no-op. audit_cadence_signal → no post-seed distills yet; no-op. ✅
+
+**Forge digest:** 4 PRs merged since iter ~1559:
+- PR #477: docs(spec): adopt approval-visibility-hardening spec — merged 01:36Z ✅ [CONFIRMED from iter ~1559 "likely"]
+- PR #478: feat: capture write-back endpoint (promote/drop/snooze) — merged 03:34Z ✅
+- PR #479: feat(missions): mission write-back endpoint (defer/resume/reprioritize) — merged 04:04Z ✅
+- PR #480: feat: orphan auto-registration healer (Missions v2 Phase 3 § 6) — merged 04:13Z ✅
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I: `check-i-2026-06-12.json` exists (fired iter ~1543 at 02:31Z). SKIP. Check III: next eligible 2026-06-25. SKIP.
+
+**Credential rotation:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~71d), DESKTOP_INGEST_TOKEN due 2027-06-09 (~362d). All others ≥2027. ✅ No DM warranted.
+
+**G-rule resolved — beacon-pending-approvals.json path:** 5 prior iters incorrectly checked `~/agents/blackboard/beacon-pending-approvals.json` (file does not exist). Correct path: `~/agents/state/beacon-pending-approvals.json`. Root cause: session habit from stale memory. Fix: added path note to MEMORY.md. No Beacon dispatch needed (cycle-prompt.md has no incorrect path reference — the error was pure session context). G-rule [CLOSED].
+
+**Key findings this iter:**
+1. [CLOSED] adopt-approval-visibility-hardening-spec → CONFIRMED MERGED PR #477 01:36Z.
+2. [carry yellow] 3 pending approvals — fix-alert-triage-watermark-durability-001, fix-depth1-pulse-approval-extraction-001, pulse-envelope-builder-001. DM sent iter ~1559. No re-DM (< 15 min since last DM).
+3. [carry yellow] p3-mission-proposed-actions-api unregistered AR — blocks missions-v2-phase3 frontend. Larry action: "go: p3-mission-proposed-actions-api" to Beacon.
+4. [blue] missions-v2-phase3 backend fully shipped (PRs #478-480). Frontend blocked on item 3.
+5. [blue] sync-push-rebase-loop-001 — 2 overnight failures, self-healed. G-rule ongoing.
+
+**Actions taken:**
+1. Added beacon-pending-approvals.json path note to `agents/pulse/MEMORY.md`. ✅
+2. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 1560 --template carry-pending-approvals-frontend-stall` → logged.
+3. `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0, Tier 1.
+4. No auto-fix actions. No new DMs (all items already escalated iter ~1559 < 15 min ago).
+
+**Standing findings (updated):**
+- [yellow] 3 pending approvals in beacon-pending-approvals.json — say `go: fix-alert-triage-watermark-durability-001`, `go: fix-depth1-pulse-approval-extraction-001`, `go: pulse-envelope-builder-001` to Beacon. DM sent iter ~1559 (05:09Z). [carry]
+- [yellow] p3-mission-proposed-actions-api AR unregistered — say `go: p3-mission-proposed-actions-api` to Beacon. DM sent iter ~1559. [carry]
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. Also blocks alert-translations.json Forge task. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). Pending Larry. [carry]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR — depth-1 extraction gap. [carry]
+- [blue] dag-preflight-revision notifier gap — Beacon holds until fix-depth1 merges. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent, healer running (03:50Z restart confirmed). G-rule dispatched ~iter 1416. [carry]
+- [blue] sentinel-inbox-stall-respect-inflight-001 — say `go: sentinel-inbox-stall-respect-inflight-001` to Beacon if applicable. [carry]
+- [blue] G-rule Pulse-envelope-format — 3/3 DISPATCHED (pulse-envelope-builder-001 specced, in pending approvals). [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 5/34 shelf cards. 1/3 G-rule. [carry]
+- [blue] unreviewed-merge — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST worktree-cleanup-merged-pr-reap-001 routing gap — 1/3 G-rule. [carry]
+- [blue] G-rule `routing-denied:pulse→forge` — 1/3. [carry]
+
+**Watch items for iter ~1561:**
+- **p3-mission-proposed-actions-api**: Check if Larry approved + Forge has a new inbox task.
+- **Pending approvals**: Check if Larry said "go:" to any of the 3 in beacon-pending-approvals.json.
+- **sync-push**: Monitor for further push failures (self-healing but recurring pattern).
+
+**PRIME DIRECTIVE:** 1 new intervention row this iter (carry-pending-approvals-frontend-stall). Running total (trailing-30d): interventions≈809+, systemic_fixes=30, ratio≈27.0, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0.
+
+---
+
 ## Iteration ~1559 — 2026-06-12 05:10Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry direct invocation (`/cycle`).

@@ -12,6 +12,12 @@
 
 ---
 
+## beacon-pending-approvals.json correct path (learned 2026-06-12 — 5 consecutive false positives)
+
+**Rule:** `beacon-pending-approvals.json` lives at `~/agents/state/beacon-pending-approvals.json`. NOT `~/agents/blackboard/`. Prior Pulse sessions checked the blackboard path for 5 consecutive iters, always seeing "MISSING." File is not referenced in cycle-prompt.md — the check is informal (Pulse reads it as part of Check 4 / pending-directives scan). Always use `~/agents/state/beacon-pending-approvals.json`.
+
+---
+
 ## Dispatch envelope schema (learned 2026-06-11, two failures)
 
 **Rule:** Beacon inbox dispatch envelopes MUST use root field `task_id` (not `envelope_id`). Required fields: `task_id`, `source`, `dedup_identity`, `prompt`, `timeout`. `envelope_id` is silently ignored and fails the validator. Observed two failures: first at 20:23Z (source field empty → DISPATCH_BLOCKED), second at 20:36Z (used `envelope_id` instead of `task_id` → REJECTED). Third attempt (dead-letter recovery) with corrected schema succeeded. F24b G-rule is at 2/3 for JSON dispatch malformation — track for 3/3.
