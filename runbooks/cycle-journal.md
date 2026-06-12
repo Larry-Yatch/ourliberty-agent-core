@@ -4,6 +4,93 @@
 
 ---
 
+## Iteration ~1597 — 2026-06-12 17:08Z UTC (interactive, /cycle, Tier 2→3, consecutive_clean 2→de-escalate)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. 9/9 services active. 0 open PRs. All inboxes empty. 2 new alerts (L1126/L1127) — Tier-3 override (triage helper misclassification, same pattern as L1124/L1125; override warranted, G-rule dispatched). **Tier 2→3 promoted** (3rd consecutive clean iter). 2 G-rule dispatches to Beacon.
+
+**VERIFY-BEFORE-REASSERT (iter ~1596 watch items):**
+- PR #486 (missions-autoregister-alert-translation-001): **VERIFIED MERGED ✅** — Mirror PASSED 16:56:35Z, auto-merged + branch deleted (L1126 notification confirms).
+- PR #485 (alert-translation-dispatch-branch-cleanup-summary-001): **VERIFIED MERGED ✅** — Mirror PASSED 16:56:39Z, auto-merged + branch deleted (L1127 notification confirms).
+- PR #53 (p3-dashboard-proposed-lane-002): **VERIFIED CLOSED PRIOR ITER ✅** — carried forward from iter ~1596, still confirmed merged.
+- beacon-pending-approvals.json: STILL MISSING (3rd consecutive iter). G-rule 3/3 threshold reached → dispatch to Beacon below.
+- G-rule catalog-accuracy-drift (2/3): not re-checked this iter (no new alerts above watermark matching this category).
+- Tier 2 consecutive_clean=2 → 3 clean iters → **de-escalated to Tier 3**. ✅
+
+**Check 0 — Alert triage:** larry-alerts.jsonl=1127 lines. Watermark=1125→1127. 2 new alerts:
+- L1126: outbox-notifier, kind=notification, intent=review-pass, PR #486 (missions-autoregister-alert-translation-001) Mirror PASS + auto-merged. `alert_triage_state.py` returned Tier-4 "novel: no translation match" — **Tier-3 override on judgment** (config/alert-translations.json carries outbox-notifier:review-pass FYI entry; triage helper not matching it). 4th consecutive misclassification (L1124–L1127) → G-rule 3/3 → dispatch to Beacon. Journal note only. No DM.
+- L1127: outbox-notifier, kind=notification, intent=review-pass, PR #485 (alert-translation-dispatch-branch-cleanup-summary-001) Mirror PASS + auto-merged. Same Tier-3 override. Journal note only. No DM.
+- Watermark advanced to 1127. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message 10:31 MDT (16:31Z) "Status" — handled iter ~1595. No new directives since. No agent-distress keywords in bot logs. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall fresh at 17:07Z (state mtime 11:06 MDT = 17:06Z); dry-run output: "no stalls detected". All FORGE_NO_PR_SKIP entries verified (pr_exists or preflight-non-proceed). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json MISSING (3rd consecutive iter). Outstanding ARs (ccd-s1-identity-resolution, alert-translation-no-mirror-dispatch-001, cycle-prompt-check-c-pgrep-liveness-001) not reflected in file. G-rule 3/3 → dispatch to Beacon. [blue] carry.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry. G-rule dispatched ~iter 1416. ✅ Known carry.
+
+**Check A — Source repo:** main, clean (session gitStatus 7c11089 "Pulse cycle 20260612T165455Z"). Sync last_sync=2026-06-12T16:55:15Z (~13 min ago at check time; note: PRs #485/#486 merged at 16:56Z, post-sync — config changes will land on next sync pass). ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: status=no-change, last_sync=2026-06-12T16:55:15Z. ✅ Nominal (< 2h threshold).
+
+**Check C — Agent liveness:** 9/9 active running (ourliberty-*.service systemctl). ✅ Nominal.
+
+**Check D — Inboxes:** All inboxes empty (forge, beacon, mirror, pulse, build_sequence_advancer). ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on agent-core. 0 open PRs on ourliberty-dashboard. PRs #485, #486 (agent-core) and #53 (dashboard) all auto-merged. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** no-op (not checked explicitly — Friday, non-Sunday conditional gate). ✅ Nominal.
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I: check-i-2026-06-12.json exists (fired iter ~1543). SKIP. Check III: next eligible 2026-06-25. SKIP.
+
+**Rotations:** 0 credentials in 60-day window. ✅ Nominal.
+
+**G-rule dispatches (this iter):**
+1. **triage-helper-review-pass-mismatch**: alert_triage_state.py Tier-4 misclassification of outbox-notifier:review-pass — 4 occurrences across iters ~1596–1597. Dispatch envelope written to Beacon inbox (`direction-ask-triage-helper-review-pass-mismatch-001.json`). Fix shape: code bug in triage helper translation-lookup path. 
+2. **beacon-pending-approvals-missing**: file MISSING 3 consecutive iters despite outstanding ARs. Dispatch envelope written to Beacon inbox (`direction-ask-beacon-pending-approvals-missing-001.json`). Fix shape: healer-write gap.
+
+**Actions taken:**
+1. `alert_triage_state.py set-watermark --line 1127` → watermark L1125→L1127. ✅
+2. `cycle_tier_state.py record --checks-clean true` → consecutive_clean=3, Tier 2→3 promoted. ✅
+3. Beacon inbox: direction-ask-triage-helper-review-pass-mismatch-001.json written. ✅
+4. Beacon inbox: direction-ask-beacon-pending-approvals-missing-001.json written. ✅
+5. No DMs sent (no new Larry-action items; G-rule dispatches routed to Beacon not Larry directly).
+
+**Standing findings (unchanged from iter ~1596 except as noted):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- **[CLOSED ✅] PR #485 (alert-translation-dispatch-branch-cleanup-summary-001)** — Mirror PASS, auto-merged 16:56:39Z.
+- **[CLOSED ✅] PR #486 (missions-autoregister-alert-translation-001)** — Mirror PASS, auto-merged 16:56:35Z.
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR — `go: sync-push-rebase-loop-001` to Beacon if desired. [carry]
+- [blue] dag-preflight-revision notifier gap — PR #484 closed source=pulse gap; DAG re-dispatch markers still fall through. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. G-rule dispatched ~iter 1416. [carry]
+- [blue] sentinel-inbox-stall-respect-inflight-001 — `go:` to Beacon if applicable. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 7/34 shelf cards. G-rule 2/3. [carry]
+- [blue] unreviewed-merge — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] G-rule `routing-denied:pulse→forge` — 1/3. [carry]
+- [blue] G-rule spurious-orphan-autoregister-entry — 1/3. [carry]
+- [blue] beacon-pending-approvals.json MISSING — G-rule 3/3 threshold reached; Beacon dispatch sent. [carry → dispatched]
+- [blue] G-rule triage-helper-review-pass-mismatch — 4/N occurrences; Beacon dispatch sent. [new → dispatched]
+
+**Watch items for iter ~1598:**
+- Tier 3 (30-min cadence): next full cycle in ~30 min from now.
+- Sync will pick up PRs #485/#486 config changes on next run; after sync, alert-translations.json will carry missions-autoregister:summary + dispatch-branch-cleanup:summary entries.
+- Beacon direction-asks: two new envelopes in inbox — inbox-watcher will dispatch. Expect Beacon to DM Larry for direction.
+- G-rule catalog-accuracy-drift: 2/3. One more occurrence → dispatch Beacon.
+- beacon-pending-approvals.json: may regenerate once Beacon's healer is addressed.
+
+**PRIME DIRECTIVE:** 0 intervention rows this iter (clean — G-rule dispatches are systemic_fix actions, not interventions). Trailing-30d: tracked via ledger.
+**Tier end-of-iter:** Tier 3 promoted (consecutive_clean reset to 0 per de-escalation rule).
+
+---
+
 ## Iteration ~1596 — 2026-06-12 16:53Z UTC (interactive, /cycle, Tier 2, consecutive_clean 1→2)
 
 **Trigger:** Larry direct invocation (`/cycle`).
