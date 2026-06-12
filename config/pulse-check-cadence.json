@@ -15,7 +15,7 @@
   "checks": {
     "i":    {"cadence_hours": 48,  "grace_hours": 24, "label": "Optimization digest",        "firing": "Mon/Wed/Fri/Sun (max 2-day gap)"},
     "iii":  {"cadence_hours": 336, "grace_hours": 48, "label": "Stuck-threshold review",      "firing": "Sunday, every 14 days"},
-    "iv":   {"cadence_hours": 168, "grace_hours": 36, "label": "Marker-drift analyzer",       "firing": "Weekly (Monday)"},
+    "iv":   {"cadence_hours": 168, "grace_hours": 36, "label": "Marker-drift analyzer",       "firing": "Weekly (systemd timer: ourliberty-pulse-check-iv)"},
     "v":    {"cadence_hours": 840, "grace_hours": 96, "label": "Action-template trust",       "firing": "Monthly (first Monday)"},
     "vi":   {"cadence_hours": 840, "grace_hours": 96, "label": "PRIME DIRECTIVE posture",     "firing": "Monthly (first Monday)"},
     "vii":  {"event_driven": true,                    "label": "Cost-ceiling thresholds",     "firing": "Event-driven (after each escalation DM logged)"},
