@@ -1915,6 +1915,74 @@
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
       "orphan_last_activity_ts": "2026-05-27T03:56:30.402155+00:00"
+    },
+    {
+      "id": "proposed-fix-alert-triage-watermark-durability-001",
+      "name": "Fix Alert Triage Watermark Durability 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `fix-alert-triage-watermark-durability-001`. Last activity 2026-06-12T06:14:12.004292+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "fix-alert-triage-watermark-durability-001"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:15:09.727315+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-12T06:14:12.004292+00:00"
+    },
+    {
+      "id": "proposed-pulse-envelope-builder-001",
+      "name": "Pulse Envelope Builder 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pulse-envelope-builder-001`. Last activity 2026-06-12T06:14:10.149883+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pulse-envelope-builder-001"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:15:09.727315+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-12T06:14:10.149883+00:00"
+    },
+    {
+      "id": "proposed-fix-depth1-pulse-approval-extraction-001",
+      "name": "Fix Depth1 Pulse Approval Extraction 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `fix-depth1-pulse-approval-extraction-001`. Last activity 2026-06-12T06:05:44.943495+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "fix-depth1-pulse-approval-extraction-001"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:15:09.727315+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-12T06:05:44.943495+00:00"
+    },
+    {
+      "id": "proposed-suppress-by-design-tier2-skipped-alerts",
+      "name": "Suppress By Design Tier2 Skipped Alerts",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `suppress-by-design-tier2-skipped-alerts`. Last activity 2026-06-02T19:01:36.923823+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "suppress-by-design-tier2-skipped-alerts"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:15:09.727315+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-02T19:01:36.923823+00:00"
     }
   ]
 }
