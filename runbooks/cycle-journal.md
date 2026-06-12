@@ -4,6 +4,102 @@
 
 ---
 
+## Iteration ~1598 — 2026-06-12 17:40Z UTC (interactive, /cycle, Tier 3, consecutive_clean 0→1)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. 9/9 services active. 0 open PRs. All inboxes empty. 3 new alerts (L1128–L1130) — all Tier-3 silence (2 known-pattern, 1 judgment override). Tier 3, consecutive_clean 0→1.
+
+**VERIFY-BEFORE-REASSERT (iter ~1597 watch items):**
+- G-rule triage-helper-review-pass-mismatch dispatch (-002): **VERIFIED PROCESSED ✅** — Beacon produced APPROVAL_REQUEST `alert-triage-intent-fallback-001`; outbox_notifier delivered to Larry at 17:15:33Z (L1128 confirmed).
+- G-rule beacon-pending-approvals-missing dispatch (-002): **PENDING** — direction-ask written to Beacon inbox; missions-autoregister proposed `proposed-direction-ask-beacon-pending-approvals-missing-002` as orphan thread (L1129), suggesting Beacon processed it. beacon-pending-approvals.json still MISSING (4th iter). [blue carry]
+- PRs #485/#486 config changes: **VERIFIED PRESENT IN LOCAL CONFIG ✅** — `config/alert-translations.json` carries both missions-autoregister:summary and dispatch-branch-cleanup:summary entries; triage helper confirming Tier-3 on new matching alerts.
+- Tier 3 consecutive_clean=0 (fresh promotion): advancing to 1 this iter.
+
+**Check 0 — Alert triage:** larry-alerts.jsonl=1130 lines. Watermark=1127→1130. 3 new alerts:
+- L1128: outbox-notifier, kind=approval_request, approval_id=alert-triage-intent-fallback-001, ts=17:15:33Z. triage helper: Tier-4 (novel: no registry/translation match). **Tier-3 override on judgment** — APPROVAL_REQUEST delivery already handled by outbox_notifier to Larry's Telegram; no additional DM from Pulse. Journal note only.
+- L1129: missions-autoregister, subject=summary, route=digest, ts=17:22:45Z. triage helper: **Tier-3** known-pattern match (missions-autoregister:summary now in alert-translations.json per PR #486). Silence. ✅
+- L1130: dispatch-branch-cleanup, subject=summary, route=digest, ts=17:29:14Z. triage helper: **Tier-3** known-pattern match (dispatch-branch-cleanup:summary in alert-translations.json per PR #485). Silence. ✅
+- Watermark advanced to 1130. ✅ Nominal (all Tier-3, no tier-reset).
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message 10:31 MDT (16:31Z) "Status" — handled iter ~1595. No new directives. No agent-distress keywords in bot logs. Beacon last log 10:48 MDT (16:48Z). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall dry-run at 17:36Z: "no stalls detected". All FORGE_NO_PR_SKIP entries verified (pr_exists or preflight-non-proceed for 9 tasks). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json MISSING (4th consecutive iter). G-rule direction-ask already dispatched iter ~1597 (-002). Beacon appears to have processed both direction-asks (produced APPROVAL_REQUEST for triage-helper fix; beacon-pending-approvals response pending). [blue] carry.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry. G-rule dispatched ~iter 1416. ✅ Known carry.
+
+**Check A — Source repo:** main, clean (session gitStatus: M runbooks/cycle-journal.md — expected, wrapper commits after exit). ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: status=no-change, last_sync=2026-06-12T16:55:15Z (~45 min ago at check time; within 2h threshold). ✅ Nominal. Note: PRs #485/#486 merged 16:56Z post-sync; config changes already present in local files (Forge writes direct to local repo before push).
+
+**Check C — Agent liveness:** 9/9 active running (beacon-bot, chain-event-shipper, cycle.service, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot) + all timers active. ✅ Nominal.
+
+**Check D — Inboxes:** All inboxes empty (forge, beacon, mirror, pulse). ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on agent-core. 0 open PRs on ourliberty-dashboard. ✅ Nominal.
+
+**Check H — Forge digest:** 0 open Forge PRs. Shipped this window: PR #485 (alert-translation dispatch-branch-cleanup:summary, merged 16:56:37Z), PR #486 (alert-translation missions-autoregister:summary, merged 16:56:32Z). ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal → no-op. ✅ Nominal.
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I: check-i-2026-06-12.json exists (fired iter ~1543). SKIP. Check III: next eligible 2026-06-25. SKIP.
+
+**Rotations:** 0 credentials in 60-day window. ✅ Nominal.
+
+**Actions taken:**
+1. `alert_triage_state.py set-watermark --line 1130` → watermark L1127→L1130. ✅
+2. `cycle_tier_state.py record --checks-clean true` → consecutive_clean=1, Tier 3. ✅
+3. No DMs sent (all alerts Tier-3 silence; APPROVAL_REQUEST for triage fix already delivered by outbox_notifier; no new Larry-action items requiring Pulse DM).
+
+**Standing findings (unchanged from iter ~1597 except as noted):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- **[NEW ⚡] APPROVAL_REQUEST alert-triage-intent-fallback-001** — Beacon plan ready; pending Larry approval via Telegram ("approve" / "go"). Fix: `alert_triage_state.py classify()` to fall back to `intent` when `subject=None`, so outbox-notifier:review-pass matches its alert-translations.json entry. [active AR]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR — `go: sync-push-rebase-loop-001` to Beacon if desired. [carry]
+- [blue] dag-preflight-revision notifier gap — PR #484 closed source=pulse gap; DAG re-dispatch markers still fall through. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. G-rule dispatched ~iter 1416. [carry]
+- [blue] sentinel-inbox-stall-respect-inflight-001 — `go:` to Beacon if applicable. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 7/34 shelf cards. G-rule 2/3. [carry]
+- [blue] unreviewed-merge — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] G-rule `routing-denied:pulse→forge` — 1/3. [carry]
+- [blue] G-rule spurious-orphan-autoregister-entry — 1/3. [carry]
+- [blue] beacon-pending-approvals.json MISSING (4th iter) — G-rule direction-asks dispatched iter ~1597 (-002 re-dispatches); Beacon processing. [carry]
+- [blue] G-rule triage-helper-review-pass-mismatch — resolved via Beacon dispatch; active AR alert-triage-intent-fallback-001 pending Larry approval. [carry → active AR]
+
+**Watch items for iter ~1599:**
+- APPROVAL_REQUEST alert-triage-intent-fallback-001: Larry approves → Forge builds classify() fix → PR → Mirror PASS → auto-merge. Will resolve recurring Tier-4 misclassification of outbox-notifier:review-pass alerts.
+- beacon-pending-approvals.json: Beacon processed both direction-asks (-002 envelopes); watch for file regeneration or follow-up AR from the pending-approvals-missing fix.
+- L1129 context: missions-autoregister committed 4 proposed orphan threads (proposed-direction-ask-beacon-pending-approvals-missing-002, proposed-alert-triage-intent-fallback-001, proposed-direction-ask-triage-helper-review-pass-mismatch-002, proposed-build-test-suite-green-001) — normal chain activity, no operator action.
+- Tier 3 cadence: next full cycle in ~30 min.
+
+**PRIME DIRECTIVE:** 0 intervention rows this iter (clean). All Tier-3 silences. Trailing-30d: tracked via ledger.
+**Tier end-of-iter:** Tier 3, consecutive_clean=1.
+
+---
+
+## Dead-letter recovery — 2026-06-12 17:13Z UTC (inter-agent notify, non-cycle)
+
+**Trigger:** Beacon dead-letter notification for `direction-ask-beacon-pending-approvals-missing-001` (dispatched iter ~1597, rejected by dispatch_validator).
+
+**Rejection root cause (verified):** F24 empty-prompt bug — same class as the `-triage-helper-review-pass-mismatch-001` dead-letter recovered earlier this session. Envelope hand-written with `body` field instead of `prompt`; `dispatch_validator.validate_task` sees `prompt` at 0 chars and rejects. Reason file: "validator: prompt too short (0 chars, min 100) — likely F24 empty-prompt bug". `pulse_envelope_builder.py` fix (PR #483, merged 2026-06-12T06:24Z) was available but the iter ~1597 cycle session pre-dated the merge and continued hand-writing.
+
+**Underlying finding re-verified:** beacon-pending-approvals.json **STILL MISSING** at 17:12Z (confirmed: `ls ~/agents/blackboard/beacon-pending-approvals.json` → MISSING). Finding remains live. ✅
+
+**Action taken:** Re-dispatched as `direction-ask-beacon-pending-approvals-missing-002` via `pulse_envelope_builder.py` (correct builder, no `body` field possible). Written to `~/agents/inboxes/beacon/direction-ask-beacon-pending-approvals-missing-002.json`. ✅
+
+**Iter ~1597 journal correction:** That entry recorded `direction-ask-beacon-pending-approvals-missing-001.json` as "written ✅" — the file was written but immediately rejected. The corrected envelope is `-002`. G-rule finding is accurate; only the dispatch mechanism was faulty. Both F24 dead-letters from iter ~1597 now recovered.
+
+**PRIME DIRECTIVE:** 1 systemic_fix row — dead-letter recovery re-dispatched via correct builder path.
+
+---
+
 ## Iteration ~1597 — 2026-06-12 17:08Z UTC (interactive, /cycle, Tier 2→3, consecutive_clean 2→de-escalate)
 
 **Trigger:** Larry direct invocation (`/cycle`).
@@ -88,6 +184,26 @@
 
 **PRIME DIRECTIVE:** 0 intervention rows this iter (clean — G-rule dispatches are systemic_fix actions, not interventions). Trailing-30d: tracked via ledger.
 **Tier end-of-iter:** Tier 3 promoted (consecutive_clean reset to 0 per de-escalation rule).
+
+---
+
+## Dead-letter recovery — 2026-06-12 17:10Z UTC (inter-agent notify, non-cycle)
+
+**Trigger:** Beacon dead-letter notification for `direction-ask-triage-helper-review-pass-mismatch-001` (dispatched iter ~1597, rejected by dispatch_validator).
+
+**Rejection root cause (verified):** F24 empty-prompt bug — iter ~1597 hand-wrote the envelope JSON with a `body` field instead of `prompt`. `dispatch_validator.validate_task` sees `prompt` missing (0 chars), rejects with "prompt too short", moves file to `beacon/.invalid/`. The PR #483 `pulse_envelope_builder.py` fix was already merged (2026-06-12T06:24Z) but Pulse's cycle session pre-dated that and continued hand-writing.
+
+**Underlying finding re-verified (do not re-assert without checking):**
+- `config/alert-translations.json:147` carries `outbox-notifier → review-pass` (severity=INFO, tier=FYI) ✅
+- L1124–L1127 alerts: `source='outbox-notifier'`, **`subject=None`**, `intent='review-pass'`
+- `scripts/alert_triage_state.py:_translation_match()` line 500–501: returns `None` immediately when `subject is None` → never reaches the config entry → tier-4 fallthrough
+- Fix: `classify()` line 538 should fall back to `intent` when `subject` is None. No fix merged to date (last commit to `alert_triage_state.py`: PR #482, watermark durability — unrelated). **Finding still live.** ✅
+
+**Action taken:** Re-dispatched as `direction-ask-triage-helper-review-pass-mismatch-002` via `pulse_envelope_builder.py` (correct builder, no `body` field possible). Written to `~/agents/inboxes/beacon/direction-ask-triage-helper-review-pass-mismatch-002.json`. ✅
+
+**Iter ~1597 journal correction:** That entry recorded `direction-ask-triage-helper-review-pass-mismatch-001.json` as "written ✅" — the file was written but immediately rejected. The corrected envelope is `-002`. The G-rule finding itself is accurate; only the dispatch mechanism was faulty.
+
+**PRIME DIRECTIVE:** 1 systemic_fix row — dead-letter recovery re-dispatched via correct builder path.
 
 ---
 
@@ -106570,3 +106686,26 @@ Forge rejected p3-dashboard-proposed-lane at preflight (04:41Z) because accept/d
 **Tier end-of-iter:** 1 (consecutive_clean=0 — routed dispatch + active pipeline watch).
 
 ---
+
+## Notification receipt — 2026-06-12 (inter-agent result | from=beacon | task=direction-ask-beacon-pending-approvals-missing-002)
+
+**Trigger:** Automatic result delivery from Beacon, not a /cycle invocation.
+
+**Summary:** Beacon investigated `direction-ask-beacon-pending-approvals-missing-002` and returned a **false-alarm verdict**.
+
+**Beacon's findings:**
+1. `beacon-pending-approvals.json` is healthy at `~/agents/state/beacon-pending-approvals.json` (1.6 MB, 3 genuine live pending entries: `fix-alert-triage-watermark-durability-001`, `fix-depth1-pulse-approval-extraction-001`, `alert-triage-intent-fallback-001`).
+2. Pulse's direction-ask was checking `~/agents/blackboard/beacon-pending-approvals.json` — a path that has never existed. The file is at `state/`, not `blackboard/`.
+3. The 3 ARs named in the original direction-ask (`ccd-s1-identity-resolution`, `alert-translation-no-mirror-dispatch-001`, `cycle-prompt-check-c-pgrep-liveness-001`) do not appear in the file.
+4. This G-rule was already diagnosed and closed (cycle-journal.md:2750, iter ~1560), and the correct path was added to MEMORY.md at that time. The direction-ask was therefore redundant.
+
+**Beacon's proposed fix:** Add an explicit path-guard for `beacon-pending-approvals.json` (correct: `~/agents/state/`) to `cycle-prompt.md` Check 4, so path drift cannot re-occur across sessions even when MEMORY.md is not consulted. Beacon has emitted a marker for Larry's approval.
+
+**Disposition:** No new Pulse action required.
+- Prescribed fix (verify healer / write-path fix) was void — nothing broken.
+- Beacon's marker handles the durable fix path (Larry approve → Forge config-only PR → Mirror merge).
+- MEMORY.md already carries the correct-path note; the cycle-prompt.md path-guard will be the more durable anchor once approved.
+- This G-rule is [CLOSED] (was already closed iter ~1560; the direction-ask was dispatch-churn on a resolved finding).
+
+**Self-note (discipline):** The direction-ask was dispatched against a finding that had already been self-diagnosed and closed within the same cycle run. Verify-before-dispatch must apply not just to cycle findings but to G-rule dispatches: before sending a direction-ask to Beacon about a pattern, confirm the pattern is STILL ACTIVE in the current cycle's ground truth, not merely carried in standing findings from a prior iter.
+
