@@ -4,6 +4,80 @@
 
 ---
 
+## Iteration ~1538 — 2026-06-12 00:22Z UTC (interactive, /cycle, Tier 2, consecutive_clean 1→2)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 4/4 bots alive. 0 open PRs. 1 new entry (medic notification — false positive verdict on prior sentinel alert, no new escalatable alert). All mandatory checks clean. **Tier 2, consecutive_clean 1→2** (1 more clean iter needed to reach Tier 3).
+
+**VERIFY-BEFORE-REASSERT (iter ~1537 watch items):**
+- **Forge inbox test-jail-pr4-acceptance-proof-001**: VERIFIED — PID 1896766 still running (CPU 4m21s, RSS 299MB). Task still in progress. Medic L1311 issued false-positive verdict (confirmed PR #476 merged, session cleanup pending). No in-flight marker. Pipeline healer: no stalls (00:21Z). [blue] carry.
+- **sentinel-inflight-marker-fix-001**: Written Jun 11 18:14 MDT (00:14Z), now sitting in Forge inbox awaiting pickup after test-jail session completes. [blue] carry.
+- **G-rule Pulse-envelope-format 2/3**: No new malformed envelope. Beacon inbox EMPTY. Still 2/3. [blue] carry.
+- **Tier 2, consecutive_clean=1**: Clean this iter → 2. Need 1 more.
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: **1311 lines** (+1 from L1310 watermark). L1311: medic notification (source=medic, kind=notification, intent=medic-diagnosis) — medic's response to sentinel inbox-stall L1310 (iter ~1537). Medic verdict: FALSE POSITIVE (Forge PID 1896766 active, PR #476 merged, post-task cleanup pending). Triage: informational, no new escalatable alert. New watermark: L1311. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot log: last activity 18:08:01 MDT (00:08Z, ~14 min before this check) — notification delivery. `beacon-pending-approvals.json`: FILE_NOT_FOUND. No pending approvals, no orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `[INFO] no stalls detected` (00:21Z). ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json`: FILE_NOT_FOUND. No unresolved Larry directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing known, G-rule dispatched iter ~1416. [blue] carry.
+
+**Check A — Source repo:** main, clean (session startup gitStatus). ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-11T23:53:06Z (~28 min at check time), status=no-change. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** `system-health.json` (00:18:35Z): 4/4 bots alive (beacon, forge, mirror, pulse). log_growth: warning (seconds_since_write=3058, queued_inboxes=1 — standing; Forge PID 1896766 long-running test-jail session). disk 6%, memory 16%. ✅ Nominal.
+
+**Check D — Inboxes:** Forge: `test-jail-pr4-acceptance-proof-001.json` (phase=preflight, mtime Jun 11 14:56, ~5h26min) + `sentinel-inflight-marker-fix-001.json` (mtime Jun 11 18:14, awaiting pickup). Pipeline healer: no stalls. Beacon/Mirror/Pulse: EMPTY. ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs (both ourliberty-agent-core + ourliberty-dashboard). ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal → no-op. ✅
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I (Monday only per spec) → skip. Check III (next eligible 2026-06-25) → skip. Checks VIII/IX/X (Monday) → skip. ✅
+
+**Credential rotation:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~71d). Outside 60-day DM window. ✅
+
+**Actions taken:**
+1. `cycle_tier_state.py record --checks-clean true` → consecutive_clean 1→2. Tier 2 maintained. ✅
+2. No DMs sent — no new [yellow]/[red] findings.
+
+**Standing findings (updated):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. Also blocks alert-translations.json Forge task. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). Pending Larry. [carry]
+- [blue] G-rule Pulse-envelope-format — **2/3**. At 3/3 → dispatch Beacon task. [carry]
+- [blue] system-health.json `log_growth: warning` (3058s at 00:18Z, queued_inboxes=1, Forge PID 1896766 long-running test-jail session, medic: false positive). [carry]
+- [blue] Forge inbox test-jail-pr4-acceptance-proof-001 phase=preflight (~5h26min+, PID 1896766 active, medic false-positive verdict, pipeline healer nominal). [carry]
+- [blue] sentinel-inflight-marker-fix-001 dispatched to Forge (iter ~1537) — in Forge inbox awaiting pickup. Verification pending. [carry]
+- [blue] G-rule `approval_request_not_extracted_from_depth1_beacon_result` — 1/3. [carry]
+- [blue] G-rule `alert-triage-watermark-loss-on-write` — 1/3. [carry]
+- [blue] heal-stale-daemon-code-state.json MISSING — G-rule dispatched iter ~1416. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 5/34 shelf cards. 1/3 G-rule. [carry]
+- [blue] cycle.timer G-rule 3/3 → Beacon consumed. [carry]
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464, 465, 467, 468, 466, 470, 471, 472, 473, 475, 476) — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] Various G-rule carries: silence-missions-card-gc 001, heal-pipeline-stall heartbeat 3/3 deferred, auto-restart-failed 1/3, completion-DM 1/3, auto-retry source=auto-retry 1/3, Check-C-launcher-liveness APPROVAL_REQUEST pending, alert-triage-durable-watermark-001 parked, retry-exhausted-on-shipped-task 2/3, retry_exhausted:post-merge-install-drift 1/3, F24b JSON malformation 2/3, bughunt-gate-soak Phase 2 pending, health-check-notify-script-missing G-rule 3/3 dispatched, Check IX GITHUB_TOKEN missing.
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST worktree-cleanup-merged-pr-reap-001 routing gap — 1/3 G-rule. [carry]
+
+**Watch items for iter ~1539:**
+- **Forge inbox test-jail-pr4-acceptance-proof-001**: Medic: false positive. If PID 1896766 completes → file archives, log_growth clears, sentinel-inflight-marker-fix-001 next in queue.
+- **sentinel-inflight-marker-fix-001**: Waiting in Forge inbox. Expect Forge to pick up after test-jail session.
+- **G-rule Pulse-envelope-format 2/3**: Watching for 3rd occurrence → Beacon dispatch.
+- **Tier 2 → Tier 3**: consecutive_clean=2. 1 more clean iter needed.
+
+**PRIME DIRECTIVE:** 0 interventions, 0 systemic_fixes this iter. Running total: interventions=800, systemic_fixes=26, ratio=30.77, trend=flat.
+**Tier end-of-iter:** Tier 2, consecutive_clean=2.
+
+---
+
 ## Iteration ~1537 — 2026-06-12 00:12Z UTC (interactive, /cycle, Tier 2, consecutive_clean 0→1)
 
 **Trigger:** Larry direct invocation (`/cycle`).
