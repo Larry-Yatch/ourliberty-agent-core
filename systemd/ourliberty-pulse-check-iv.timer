@@ -1,0 +1,14 @@
+[Unit]
+Description=Weekly run of Pulse Check IV -- marker-drift analyzer
+
+[Timer]
+# OnCalendar (absolute wall-clock) per the OnUnitActiveSec-dies lesson: keeps
+# firing even if a run is missed/slow. Weekly (Monday) mirrors the cadence-config
+# entry (cadence_hours=168). 04:25 local: off-peak, offset from check-xi (04:17).
+OnCalendar=Mon *-*-* 04:25:00
+Persistent=true
+RandomizedDelaySec=300
+Unit=ourliberty-pulse-check-iv.service
+
+[Install]
+WantedBy=timers.target
