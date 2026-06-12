@@ -100,7 +100,7 @@
       "id": "operator-ux-clarify-visibility",
       "name": "CLARIFY round visibility on Missions cards",
       "phase": "deferred",
-      "brief": "Surface the Forge↔Beacon CLARIFY round-trip Q&A on Missions-tab card side-panel. Today the operator only learns CLARIFY-exhausted post-mortem from logs. Read-only v1; later optional 'intervene' affordance.",
+      "brief": "Surface the Forge\u2194Beacon CLARIFY round-trip Q&A on Missions-tab card side-panel. Today the operator only learns CLARIFY-exhausted post-mortem from logs. Read-only v1; later optional 'intervene' affordance.",
       "spec_docs": [
         "agents/beacon/specs/operator-ux-clarify-visibility.md"
       ],
@@ -111,9 +111,9 @@
     },
     {
       "id": "clarify-round-visibility",
-      "name": "CLARIFY round visibility — full Q+A on Missions cards",
+      "name": "CLARIFY round visibility \u2014 full Q+A on Missions cards",
       "phase": "ready",
-      "brief": "Render the full Forge↔Beacon CLARIFY round-trip (questions AND answers) on Missions tab side-panel. Supersedes stub operator-ux-clarify-visibility (answer side gap surfaced 2026-05-29). 2-step sequence: agent-core chain_event_shipper extension + dashboard ClarifyRoundDrawer component.",
+      "brief": "Render the full Forge\u2194Beacon CLARIFY round-trip (questions AND answers) on Missions tab side-panel. Supersedes stub operator-ux-clarify-visibility (answer side gap surfaced 2026-05-29). 2-step sequence: agent-core chain_event_shipper extension + dashboard ClarifyRoundDrawer component.",
       "spec_docs": [
         "agents/beacon/specs/clarify-round-visibility.md"
       ],
@@ -181,6 +181,1740 @@
       "repo": "ourliberty-agent-core",
       "created": "2026-05-30",
       "deferred_reason": null
+    },
+    {
+      "id": "proposed-p3-mission-proposed-actions-api",
+      "name": "P3 Mission Proposed Actions API",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `p3-mission-proposed-actions-api`. Last activity 2026-06-12T05:56:59.154465+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "p3-mission-proposed-actions-api"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-12T05:56:59.154465+00:00"
+    },
+    {
+      "id": "proposed-summary",
+      "name": "Summary",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `summary`. Last activity 2026-06-12T05:27:44.184131+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "summary"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-12T05:27:44.184131+00:00"
+    },
+    {
+      "id": "proposed-20",
+      "name": "20",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `20`. Last activity 2026-06-12T05:10:29.595487+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "20"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-12T05:10:29.595487+00:00"
+    },
+    {
+      "id": "proposed-pending-approvals-3-plus-unregistered-ar-iter-1559",
+      "name": "Pending Approvals 3 Plus Unregistered Ar Iter 1559",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pending-approvals-3-plus-unregistered-ar-iter-1559`. Last activity 2026-06-12T05:09:20.161842+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pending-approvals-3-plus-unregistered-ar-iter-1559"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-12T05:09:20.161842+00:00"
+    },
+    {
+      "id": "proposed-p3-dashboard-proposed-lane",
+      "name": "P3 Dashboard Proposed Lane",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `p3-dashboard-proposed-lane`. Last activity 2026-06-12T04:47:19.071308+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "p3-dashboard-proposed-lane"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-12T04:47:19.071308+00:00"
+    },
+    {
+      "id": "proposed-seq-missions-v2-phase3-step-p3-dashboard-proposed-lane",
+      "name": "Seq Missions V2 Phase3 Step P3 Dashboard Proposed Lane",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `seq-missions-v2-phase3-step-p3-dashboard-proposed-lane`. Last activity 2026-06-12T04:35:40.787778+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "seq-missions-v2-phase3-step-p3-dashboard-proposed-lane"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-12T04:35:40.787778+00:00"
+    },
+    {
+      "id": "proposed-post-merge-install-drift-trigger-001",
+      "name": "Post Merge Install Drift Trigger 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `post-merge-install-drift-trigger-001`. Last activity 2026-06-11T04:40:11.123622+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "post-merge-install-drift-trigger-001"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-11T04:40:11.123622+00:00"
+    },
+    {
+      "id": "proposed-desktop-7807b99c",
+      "name": "ourliberty-agent-core/HEAD",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `desktop-7807b99c` (ourliberty-agent-core/HEAD). Last activity 2026-06-11T04:36:43.283717+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "desktop-7807b99c"
+      ],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": "HEAD",
+      "orphan_last_activity_ts": "2026-06-11T04:36:43.283717+00:00"
+    },
+    {
+      "id": "proposed-desktop-44d27007",
+      "name": "Read ~/dev/ourliberty-graph/PLAN.md \u00a70 (START HERE) and the linked memory. We're",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `desktop-44d27007` (ourliberty-agent-core/HEAD). Last activity 2026-06-11T04:36:19.76119+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "desktop-44d27007"
+      ],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": "HEAD",
+      "orphan_last_activity_ts": "2026-06-11T04:36:19.76119+00:00"
+    },
+    {
+      "id": "proposed-desktop-8b27d515",
+      "name": "this continues to be an issue, we have deployed 3-4 fixes for this same problem.",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `desktop-8b27d515` (ourliberty-agent-core/HEAD). Last activity 2026-06-11T04:27:28.815105+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "desktop-8b27d515"
+      ],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": "HEAD",
+      "orphan_last_activity_ts": "2026-06-11T04:27:28.815105+00:00"
+    },
+    {
+      "id": "proposed-seq-chain-context-durability-step-ccd-s1-envelope-builder",
+      "name": "Seq Chain Context Durability Step Ccd S1 Envelope Builder",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `seq-chain-context-durability-step-ccd-s1-envelope-builder`. Last activity 2026-06-11T04:27:01.392512+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "seq-chain-context-durability-step-ccd-s1-envelope-builder"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-11T04:27:01.392512+00:00"
+    },
+    {
+      "id": "proposed-ops-cleanup2-s1-dedup-ledger-20260611",
+      "name": "Ops Cleanup2 S1 Dedup Ledger 20260611",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `ops-cleanup2-s1-dedup-ledger-20260611`. Last activity 2026-06-11T04:26:31.363826+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "ops-cleanup2-s1-dedup-ledger-20260611"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-11T04:26:31.363826+00:00"
+    },
+    {
+      "id": "proposed-rotation-mode",
+      "name": "Rotation Mode",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `rotation-mode`. Last activity 2026-06-11T04:26:00.706836+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "rotation-mode"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-11T04:26:00.706836+00:00"
+    },
+    {
+      "id": "proposed-fix-headless-approval-dedup-spawn-failure-wedge-002",
+      "name": "Fix Headless Approval Dedup Spawn Failure Wedge 002",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `fix-headless-approval-dedup-spawn-failure-wedge-002`. Last activity 2026-06-11T04:20:46.446389+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "fix-headless-approval-dedup-spawn-failure-wedge-002"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-11T04:20:46.446389+00:00"
+    },
+    {
+      "id": "proposed-transcript-not-persisted:tier1",
+      "name": "Transcript Not Persisted Tier1",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `transcript-not-persisted:tier1`. Last activity 2026-06-11T03:24:33.369722+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "transcript-not-persisted:tier1"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-11T03:24:33.369722+00:00"
+    },
+    {
+      "id": "proposed-transcript-not-persisted:tier2",
+      "name": "Transcript Not Persisted Tier2",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `transcript-not-persisted:tier2`. Last activity 2026-06-11T03:23:02.748252+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "transcript-not-persisted:tier2"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-11T03:23:02.748252+00:00"
+    },
+    {
+      "id": "proposed-seq-park-the-nudge-step-pulse-park-and-silence",
+      "name": "Seq Park The Nudge Step Pulse Park And Silence",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `seq-park-the-nudge-step-pulse-park-and-silence`. Last activity 2026-06-11T02:45:40.566534+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "seq-park-the-nudge-step-pulse-park-and-silence"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-11T02:45:40.566534+00:00"
+    },
+    {
+      "id": "proposed-seq-park-the-nudge-step-capture-label-contract",
+      "name": "Seq Park The Nudge Step Capture Label Contract",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `seq-park-the-nudge-step-capture-label-contract`. Last activity 2026-06-11T01:57:49.850628+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "seq-park-the-nudge-step-capture-label-contract"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-11T01:57:49.850628+00:00"
+    },
+    {
+      "id": "proposed-dispatch-translations-entry-20260610",
+      "name": "Dispatch Translations Entry 20260610",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `dispatch-translations-entry-20260610`. Last activity 2026-06-11T01:56:54.784821+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "dispatch-translations-entry-20260610"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-11T01:56:54.784821+00:00"
+    },
+    {
+      "id": "proposed-ops-cleanup-ccds1-ledger-20260610",
+      "name": "Ops Cleanup Ccds1 Ledger 20260610",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `ops-cleanup-ccds1-ledger-20260610`. Last activity 2026-06-11T01:53:59.746735+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "ops-cleanup-ccds1-ledger-20260610"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-11T01:53:59.746735+00:00"
+    },
+    {
+      "id": "proposed-dag-preflight-park-the-nudge",
+      "name": "DAG Preflight Park The Nudge",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `dag-preflight-park-the-nudge`. Last activity 2026-06-11T01:53:56.465555+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "dag-preflight-park-the-nudge"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-11T01:53:56.465555+00:00"
+    },
+    {
+      "id": "proposed-rekick-reaper-fix-20260610",
+      "name": "Rekick Reaper Fix 20260610",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `rekick-reaper-fix-20260610`. Last activity 2026-06-11T01:49:09.685581+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "rekick-reaper-fix-20260610"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-11T01:49:09.685581+00:00"
+    },
+    {
+      "id": "proposed-medic-diagnosis",
+      "name": "Medic Diagnosis",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `medic-diagnosis`. Last activity 2026-06-11T01:28:07.425858+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "medic-diagnosis"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-11T01:28:07.425858+00:00"
+    },
+    {
+      "id": "proposed-transcript-not-persisted:post-pr438-unit-install-gap",
+      "name": "Transcript Not Persisted Post Pr438 Unit Install Gap",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `transcript-not-persisted:post-pr438-unit-install-gap`. Last activity 2026-06-11T00:18:02.601407+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "transcript-not-persisted:post-pr438-unit-install-gap"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-11T00:18:02.601407+00:00"
+    },
+    {
+      "id": "proposed-desktop-900b3ea4",
+      "name": "ourliberty-agent-core/work/larry-session",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `desktop-900b3ea4` (ourliberty-agent-core/work/larry-session). Last activity 2026-06-10T08:56:13.765592+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "desktop-900b3ea4"
+      ],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": "work/larry-session",
+      "orphan_last_activity_ts": "2026-06-10T08:56:13.765592+00:00"
+    },
+    {
+      "id": "proposed-p2-digest-generator",
+      "name": "P2 Digest Generator",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `p2-digest-generator`. Last activity 2026-06-10T08:44:27.287145+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "p2-digest-generator"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-10T08:44:27.287145+00:00"
+    },
+    {
+      "id": "proposed-p2-derive-endpoint",
+      "name": "P2 Derive Endpoint",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `p2-derive-endpoint`. Last activity 2026-06-10T08:44:20.602711+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "p2-derive-endpoint"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-10T08:44:20.602711+00:00"
+    },
+    {
+      "id": "proposed-dag-preflight-revision-autonomy-001",
+      "name": "DAG Preflight Revision Autonomy 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `dag-preflight-revision-autonomy-001`. Last activity 2026-06-10T08:30:36.833471+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "dag-preflight-revision-autonomy-001"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-10T08:30:36.833471+00:00"
+    },
+    {
+      "id": "proposed-seq-missions-v2-phase2-step-p2-digest-generator",
+      "name": "Seq Missions V2 Phase2 Step P2 Digest Generator",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `seq-missions-v2-phase2-step-p2-digest-generator`. Last activity 2026-06-10T08:25:48.8419+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "seq-missions-v2-phase2-step-p2-digest-generator"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-10T08:25:48.8419+00:00"
+    },
+    {
+      "id": "proposed-seq-missions-v2-phase2-step-p2-derive-endpoint",
+      "name": "Seq Missions V2 Phase2 Step P2 Derive Endpoint",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `seq-missions-v2-phase2-step-p2-derive-endpoint`. Last activity 2026-06-10T08:25:28.810753+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "seq-missions-v2-phase2-step-p2-derive-endpoint"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-10T08:25:28.810753+00:00"
+    },
+    {
+      "id": "proposed-dag-preflight-missions-v2-phase2",
+      "name": "DAG Preflight Missions V2 Phase2",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `dag-preflight-missions-v2-phase2`. Last activity 2026-06-10T08:24:38.26856+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "dag-preflight-missions-v2-phase2"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-10T08:24:38.26856+00:00"
+    },
+    {
+      "id": "proposed-unreg-approval-8ba8e3b472a8",
+      "name": "Unreg Approval 8ba8e3b472a8",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `unreg-approval-8ba8e3b472a8`. Last activity 2026-06-10T08:11:28.398198+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "unreg-approval-8ba8e3b472a8"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-10T08:11:28.398198+00:00"
+    },
+    {
+      "id": "proposed-desktop-05a159bb",
+      "name": "ourliberty-agent-core/work/larry-session",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `desktop-05a159bb` (ourliberty-agent-core/work/larry-session). Last activity 2026-06-10T08:03:15.128284+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "desktop-05a159bb"
+      ],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": "work/larry-session",
+      "orphan_last_activity_ts": "2026-06-10T08:03:15.128284+00:00"
+    },
+    {
+      "id": "proposed-unreg-approval-8c1842d7319d",
+      "name": "Unreg Approval 8c1842d7319d",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `unreg-approval-8c1842d7319d`. Last activity 2026-06-10T08:00:24.684163+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "unreg-approval-8c1842d7319d"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-10T08:00:24.684163+00:00"
+    },
+    {
+      "id": "proposed-wedged-worktree:wt-mirror-dag-preflight-missions-v2-phase1-captures",
+      "name": "Wedged Worktree Wt Mirror DAG Preflight Missions V2 Phase1 Captures",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `wedged-worktree:wt-mirror-dag-preflight-missions-v2-phase1-captures`. Last activity 2026-06-10T07:59:02.543309+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "wedged-worktree:wt-mirror-dag-preflight-missions-v2-phase1-captures"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-10T07:59:02.543309+00:00"
+    },
+    {
+      "id": "proposed-no-session-revision:pr412-forge-redispatch-needed",
+      "name": "No Session Revision Pr412 Forge Redispatch Needed",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `no-session-revision:pr412-forge-redispatch-needed`. Last activity 2026-06-10T07:58:57.65506+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "no-session-revision:pr412-forge-redispatch-needed"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-10T07:58:57.65506+00:00"
+    },
+    {
+      "id": "proposed-desktop-6377f618",
+      "name": "ourliberty-agent-core/work/larry-session",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `desktop-6377f618` (ourliberty-agent-core/work/larry-session). Last activity 2026-06-10T07:56:15.747786+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "desktop-6377f618"
+      ],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": "work/larry-session",
+      "orphan_last_activity_ts": "2026-06-10T07:56:15.747786+00:00"
+    },
+    {
+      "id": "proposed-pipeline-stall:pr412-approval-request-not-dispatched",
+      "name": "Pipeline Stall Pr412 Approval Request Not Dispatched",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pipeline-stall:pr412-approval-request-not-dispatched`. Last activity 2026-06-10T07:35:33.550731+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pipeline-stall:pr412-approval-request-not-dispatched"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-10T07:35:33.550731+00:00"
+    },
+    {
+      "id": "proposed-desktop-e2e0ab79",
+      "name": "ourliberty-agent-core/fix/install-drift-grace-clean",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `desktop-e2e0ab79` (ourliberty-agent-core/fix/install-drift-grace-clean). Last activity 2026-06-10T07:22:43.629092+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "desktop-e2e0ab79"
+      ],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": "fix/install-drift-grace-clean",
+      "orphan_last_activity_ts": "2026-06-10T07:22:43.629092+00:00"
+    },
+    {
+      "id": "proposed-desktop-744bcd2d",
+      "name": "ourliberty-agent-core/feat/telegram-approve-clears-dashboard-pending",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `desktop-744bcd2d` (ourliberty-agent-core/feat/telegram-approve-clears-dashboard-pending). Last activity 2026-06-10T07:22:22.644158+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "desktop-744bcd2d"
+      ],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": "feat/telegram-approve-clears-dashboard-pending",
+      "orphan_last_activity_ts": "2026-06-10T07:22:22.644158+00:00"
+    },
+    {
+      "id": "proposed-desktop-efa13afc",
+      "name": "ourliberty-graph/main",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `desktop-efa13afc` (ourliberty-graph/main). Last activity 2026-06-10T07:22:21.209347+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "desktop-efa13afc"
+      ],
+      "repo": "ourliberty-graph",
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": "main",
+      "orphan_last_activity_ts": "2026-06-10T07:22:21.209347+00:00"
+    },
+    {
+      "id": "proposed-desktop-547e0d56",
+      "name": "ourliberty-graph/main",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `desktop-547e0d56` (ourliberty-graph/main). Last activity 2026-06-10T07:22:03.367417+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "desktop-547e0d56"
+      ],
+      "repo": "ourliberty-graph",
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": "main",
+      "orphan_last_activity_ts": "2026-06-10T07:22:03.367417+00:00"
+    },
+    {
+      "id": "proposed-desktop-de0a1d89",
+      "name": "ourliberty-agent-core/feat/telegram-approve-clears-dashboard-pending",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `desktop-de0a1d89` (ourliberty-agent-core/feat/telegram-approve-clears-dashboard-pending). Last activity 2026-06-10T07:20:45.066517+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "desktop-de0a1d89"
+      ],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": "feat/telegram-approve-clears-dashboard-pending",
+      "orphan_last_activity_ts": "2026-06-10T07:20:45.066517+00:00"
+    },
+    {
+      "id": "proposed-desktop-07e97ba7",
+      "name": "ourliberty-graph/main",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `desktop-07e97ba7` (ourliberty-graph/main). Last activity 2026-06-10T07:18:53.52927+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "desktop-07e97ba7"
+      ],
+      "repo": "ourliberty-graph",
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": "main",
+      "orphan_last_activity_ts": "2026-06-10T07:18:53.52927+00:00"
+    },
+    {
+      "id": "proposed-desktop-71355b2a",
+      "name": "ourliberty-graph/main",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `desktop-71355b2a` (ourliberty-graph/main). Last activity 2026-06-10T07:14:33.005372+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "desktop-71355b2a"
+      ],
+      "repo": "ourliberty-graph",
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": "main",
+      "orphan_last_activity_ts": "2026-06-10T07:14:33.005372+00:00"
+    },
+    {
+      "id": "proposed-pipeline-stall:harden-test-prod-write-isolation-001",
+      "name": "Pipeline Stall Harden Test Prod Write Isolation 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pipeline-stall:harden-test-prod-write-isolation-001`. Last activity 2026-06-10T07:11:40.547204+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pipeline-stall:harden-test-prod-write-isolation-001"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-10T07:11:40.547204+00:00"
+    },
+    {
+      "id": "proposed-desktop-8b098187",
+      "name": "ourliberty-graph/main",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `desktop-8b098187` (ourliberty-graph/main). Last activity 2026-06-10T07:09:48.328573+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "desktop-8b098187"
+      ],
+      "repo": "ourliberty-graph",
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": "main",
+      "orphan_last_activity_ts": "2026-06-10T07:09:48.328573+00:00"
+    },
+    {
+      "id": "proposed-harden-test-prod-write-isolation-001",
+      "name": "Harden Test Prod Write Isolation 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `harden-test-prod-write-isolation-001`. Last activity 2026-06-10T07:02:02.870213+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "harden-test-prod-write-isolation-001"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-10T07:02:02.870213+00:00"
+    },
+    {
+      "id": "proposed-desktop-bc57cca6",
+      "name": "ourliberty-agent-core/fix/sync-autocommit-captures-json",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `desktop-bc57cca6` (ourliberty-agent-core/fix/sync-autocommit-captures-json). Last activity 2026-06-10T06:56:14.137921+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "desktop-bc57cca6"
+      ],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": "fix/sync-autocommit-captures-json",
+      "orphan_last_activity_ts": "2026-06-10T06:56:14.137921+00:00"
+    },
+    {
+      "id": "proposed-desktop-91597d89",
+      "name": "ourliberty-agent-core/feat/telegram-approve-clears-dashboard-pending",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `desktop-91597d89` (ourliberty-agent-core/feat/telegram-approve-clears-dashboard-pending). Last activity 2026-06-10T06:41:13.181096+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "desktop-91597d89"
+      ],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": "feat/telegram-approve-clears-dashboard-pending",
+      "orphan_last_activity_ts": "2026-06-10T06:41:13.181096+00:00"
+    },
+    {
+      "id": "proposed-desktop-267765cf",
+      "name": "ourliberty-graph/main",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `desktop-267765cf` (ourliberty-graph/main). Last activity 2026-06-10T06:32:30.080305+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "desktop-267765cf"
+      ],
+      "repo": "ourliberty-graph",
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": "main",
+      "orphan_last_activity_ts": "2026-06-10T06:32:30.080305+00:00"
+    },
+    {
+      "id": "proposed-desktop-7118a866",
+      "name": "ourliberty-agent-core/feat/telegram-approve-clears-dashboard-pending",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `desktop-7118a866` (ourliberty-agent-core/feat/telegram-approve-clears-dashboard-pending). Last activity 2026-06-10T06:30:22.350936+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "desktop-7118a866"
+      ],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": "feat/telegram-approve-clears-dashboard-pending",
+      "orphan_last_activity_ts": "2026-06-10T06:30:22.350936+00:00"
+    },
+    {
+      "id": "proposed-install-drift-timer:ourliberty-heal-missions-card-gc",
+      "name": "Install Drift Timer Ourliberty Heal Missions Card Gc",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `install-drift-timer:ourliberty-heal-missions-card-gc`. Last activity 2026-06-10T06:12:21.176169+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "install-drift-timer:ourliberty-heal-missions-card-gc"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-10T06:12:21.176169+00:00"
+    },
+    {
+      "id": "proposed-seq-missions-v2-phase1-captures-step-step-parked-lane",
+      "name": "Seq Missions V2 Phase1 Captures Step Step Parked Lane",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `seq-missions-v2-phase1-captures-step-step-parked-lane`. Last activity 2026-06-10T05:01:40.28874+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "seq-missions-v2-phase1-captures-step-step-parked-lane"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-10T05:01:40.28874+00:00"
+    },
+    {
+      "id": "proposed-seq-missions-v2-phase1-captures-step-step-gc-healer",
+      "name": "Seq Missions V2 Phase1 Captures Step Step Gc Healer",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `seq-missions-v2-phase1-captures-step-step-gc-healer`. Last activity 2026-06-10T05:01:05.240958+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "seq-missions-v2-phase1-captures-step-step-gc-healer"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-10T05:01:05.240958+00:00"
+    },
+    {
+      "id": "proposed-approval-request:parked:alert-triage-durable-watermark-001",
+      "name": "Approval Request Parked Alert Triage Durable Watermark 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `approval-request:parked:alert-triage-durable-watermark-001`. Last activity 2026-06-10T04:49:03.183118+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "approval-request:parked:alert-triage-durable-watermark-001"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-10T04:49:03.183118+00:00"
+    },
+    {
+      "id": "proposed-approval_request:routing-failure:preflight-reminder-enforcement-001",
+      "name": "Approval Request Routing Failure Preflight Reminder Enforcement 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `approval_request:routing-failure:preflight-reminder-enforcement-001`. Last activity 2026-06-10T04:08:21.401622+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "approval_request:routing-failure:preflight-reminder-enforcement-001"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-10T04:08:21.401622+00:00"
+    },
+    {
+      "id": "proposed-seq-missions-v2-phase1-captures-step-step-captures-core",
+      "name": "Seq Missions V2 Phase1 Captures Step Step Captures Core",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `seq-missions-v2-phase1-captures-step-step-captures-core`. Last activity 2026-06-10T04:01:34.649003+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "seq-missions-v2-phase1-captures-step-step-captures-core"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-10T04:01:34.649003+00:00"
+    },
+    {
+      "id": "proposed-dag-preflight-missions-v2-phase1-captures",
+      "name": "DAG Preflight Missions V2 Phase1 Captures",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `dag-preflight-missions-v2-phase1-captures`. Last activity 2026-06-10T03:59:50.156017+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "dag-preflight-missions-v2-phase1-captures"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-10T03:59:50.156017+00:00"
+    },
+    {
+      "id": "proposed-desktop-64c6ad47",
+      "name": "ourliberty-agent-core/feat/telegram-approve-clears-dashboard-pending",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `desktop-64c6ad47` (ourliberty-agent-core/feat/telegram-approve-clears-dashboard-pending). Last activity 2026-06-10T03:59:17.477635+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "desktop-64c6ad47"
+      ],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": "feat/telegram-approve-clears-dashboard-pending",
+      "orphan_last_activity_ts": "2026-06-10T03:59:17.477635+00:00"
+    },
+    {
+      "id": "proposed-check-i-2026-06-08",
+      "name": "Check I 2026 06 08",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `check-i-2026-06-08`. Last activity 2026-06-10T03:55:07.384409+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "check-i-2026-06-08"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-10T03:55:07.384409+00:00"
+    },
+    {
+      "id": "proposed-weekly-2026-06-08",
+      "name": "Weekly 2026 06 08",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `weekly-2026-06-08`. Last activity 2026-06-10T03:55:05.749599+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "weekly-2026-06-08"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-10T03:55:05.749599+00:00"
+    },
+    {
+      "id": "proposed-desktop-610cfc2f",
+      "name": "ourliberty-graph/main",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `desktop-610cfc2f` (ourliberty-graph/main). Last activity 2026-06-10T03:53:21.391139+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "desktop-610cfc2f"
+      ],
+      "repo": "ourliberty-graph",
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": "main",
+      "orphan_last_activity_ts": "2026-06-10T03:53:21.391139+00:00"
+    },
+    {
+      "id": "proposed-missions-v2-phase0-desktop-feed",
+      "name": "ourliberty-agent-core/feat/missions-phase0-desktop-feed",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `missions-v2-phase0-desktop-feed` (ourliberty-agent-core/feat/missions-phase0-desktop-feed). Last activity 2026-06-10T00:15:40.133053+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "missions-v2-phase0-desktop-feed"
+      ],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": "feat/missions-phase0-desktop-feed",
+      "orphan_last_activity_ts": "2026-06-10T00:15:40.133053+00:00"
+    },
+    {
+      "id": "proposed-fix-notifier-review-dispatch-reliability",
+      "name": "Fix Notifier Review Dispatch Reliability",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `fix-notifier-review-dispatch-reliability`. Last activity 2026-06-04T06:31:42.084249+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "fix-notifier-review-dispatch-reliability"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-04T06:31:42.084249+00:00"
+    },
+    {
+      "id": "proposed-forge-claude-md-canonical-pr-line-discipline",
+      "name": "Forge Claude Md Canonical PR Line Discipline",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `forge-claude-md-canonical-pr-line-discipline`. Last activity 2026-06-04T06:27:11.151478+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "forge-claude-md-canonical-pr-line-discipline"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-04T06:27:11.151478+00:00"
+    },
+    {
+      "id": "proposed-cycle-timer-daemon-reload-checkpoint",
+      "name": "Cycle Timer Daemon Reload Checkpoint",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `cycle-timer-daemon-reload-checkpoint`. Last activity 2026-06-04T06:18:49.709423+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "cycle-timer-daemon-reload-checkpoint"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-04T06:18:49.709423+00:00"
+    },
+    {
+      "id": "proposed-build-forge-queue-ui-move-20260604T042018Z",
+      "name": "Build Forge Queue UI Move 20260604T042018Z",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `build-forge-queue-ui-move-20260604T042018Z`. Last activity 2026-06-04T04:37:48.591897+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "build-forge-queue-ui-move-20260604T042018Z"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-04T04:37:48.591897+00:00"
+    },
+    {
+      "id": "proposed-pipeline-stall:clarify1-suppress-needed",
+      "name": "Pipeline Stall Clarify1 Suppress Needed",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pipeline-stall:clarify1-suppress-needed`. Last activity 2026-06-04T04:37:36.939126+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pipeline-stall:clarify1-suppress-needed"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-04T04:37:36.939126+00:00"
+    },
+    {
+      "id": "proposed-rebase-pr252-digest-generator-001",
+      "name": "Rebase Pr252 Digest Generator 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `rebase-pr252-digest-generator-001`. Last activity 2026-06-02T19:07:31.139062+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "rebase-pr252-digest-generator-001"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-02T19:07:31.139062+00:00"
+    },
+    {
+      "id": "proposed-step-digest-generator",
+      "name": "Step Digest Generator",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `step-digest-generator`. Last activity 2026-06-02T18:57:10.565428+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "step-digest-generator"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-02T18:57:10.565428+00:00"
+    },
+    {
+      "id": "proposed-step-alert-promotion",
+      "name": "Step Alert Promotion",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `step-alert-promotion`. Last activity 2026-06-02T18:54:24.555754+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "step-alert-promotion"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-02T18:54:24.555754+00:00"
+    },
+    {
+      "id": "proposed-real-19-clarify",
+      "name": "Real 19 Clarify",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `real-19-clarify`. Last activity 2026-06-02T18:32:42.117702+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "real-19-clarify"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-02T18:32:42.117702+00:00"
+    },
+    {
+      "id": "proposed-real-pf",
+      "name": "Real Pf",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `real-pf`. Last activity 2026-06-02T18:32:41.603187+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "real-pf"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-02T18:32:41.603187+00:00"
+    },
+    {
+      "id": "proposed-real-rej",
+      "name": "Real Rej",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `real-rej`. Last activity 2026-06-02T18:32:39.865982+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "real-rej"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-02T18:32:39.865982+00:00"
+    },
+    {
+      "id": "proposed-prod-clr",
+      "name": "Prod Clr",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `prod-clr`. Last activity 2026-06-02T18:32:39.440203+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "prod-clr"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-02T18:32:39.440203+00:00"
+    },
+    {
+      "id": "proposed-seq-approvals-queue-rework-step-step-digest-generator",
+      "name": "Seq Approvals Queue Rework Step Step Digest Generator",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `seq-approvals-queue-rework-step-step-digest-generator`. Last activity 2026-06-02T17:46:45.069917+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "seq-approvals-queue-rework-step-step-digest-generator"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-02T17:46:45.069917+00:00"
+    },
+    {
+      "id": "proposed-seq-approvals-queue-rework-step-step-alert-promotion",
+      "name": "Seq Approvals Queue Rework Step Step Alert Promotion",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `seq-approvals-queue-rework-step-step-alert-promotion`. Last activity 2026-06-02T17:46:00.051591+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "seq-approvals-queue-rework-step-step-alert-promotion"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-02T17:46:00.051591+00:00"
+    },
+    {
+      "id": "proposed-seq-approvals-queue-rework-step-step-autoclear",
+      "name": "Seq Approvals Queue Rework Step Step Autoclear",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `seq-approvals-queue-rework-step-step-autoclear`. Last activity 2026-06-02T17:45:29.992574+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "seq-approvals-queue-rework-step-step-autoclear"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-02T17:45:29.992574+00:00"
+    },
+    {
+      "id": "proposed-sequence-invalid:approvals-queue-rework:iter-583",
+      "name": "Sequence Invalid Approvals Queue Rework Iter 583",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `sequence-invalid:approvals-queue-rework:iter-583`. Last activity 2026-06-02T17:42:04.211603+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "sequence-invalid:approvals-queue-rework:iter-583"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-02T17:42:04.211603+00:00"
+    },
+    {
+      "id": "proposed-real-pf-ok",
+      "name": "Real Pf Ok",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `real-pf-ok`. Last activity 2026-06-02T17:37:51.346444+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "real-pf-ok"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-02T17:37:51.346444+00:00"
+    },
+    {
+      "id": "proposed-real-cascade",
+      "name": "Real Cascade",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `real-cascade`. Last activity 2026-06-02T17:37:48.715933+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "real-cascade"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-02T17:37:48.715933+00:00"
+    },
+    {
+      "id": "proposed-sequence-invalid:approvals-queue-rework",
+      "name": "Sequence Invalid Approvals Queue Rework",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `sequence-invalid:approvals-queue-rework`. Last activity 2026-06-02T17:35:02.549979+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "sequence-invalid:approvals-queue-rework"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-02T17:35:02.549979+00:00"
+    },
+    {
+      "id": "proposed-seq-rate-limit-resilience-001-step-step-a-rotation",
+      "name": "Seq Rate Limit Resilience 001 Step Step A Rotation",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `seq-rate-limit-resilience-001-step-step-a-rotation`. Last activity 2026-05-30T23:09:44.988287+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "seq-rate-limit-resilience-001-step-step-a-rotation"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-05-30T23:09:44.988287+00:00"
+    },
+    {
+      "id": "proposed-step-c-ledger",
+      "name": "Step C Ledger",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `step-c-ledger`. Last activity 2026-05-30T23:06:02.809587+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "step-c-ledger"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-05-30T23:06:02.809587+00:00"
+    },
+    {
+      "id": "proposed-auth-setup-token-wiring",
+      "name": "Auth Setup Token Wiring",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `auth-setup-token-wiring`. Last activity 2026-05-30T23:01:36.78547+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "auth-setup-token-wiring"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-05-30T23:01:36.78547+00:00"
+    },
+    {
+      "id": "proposed-sync-push-failure-g-rule-117",
+      "name": "Sync Push Failure G Rule 117",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `sync-push-failure-g-rule-117`. Last activity 2026-05-30T22:48:52.999503+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "sync-push-failure-g-rule-117"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-05-30T22:48:52.999503+00:00"
+    },
+    {
+      "id": "proposed-real-clr",
+      "name": "Real Clr",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `real-clr`. Last activity 2026-05-30T22:43:31.06305+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "real-clr"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-05-30T22:43:31.06305+00:00"
+    },
+    {
+      "id": "proposed-seq-rate-limit-resilience-001-step-step-c-ledger",
+      "name": "Seq Rate Limit Resilience 001 Step Step C Ledger",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `seq-rate-limit-resilience-001-step-step-c-ledger`. Last activity 2026-05-30T22:29:38.298143+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "seq-rate-limit-resilience-001-step-step-c-ledger"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-05-30T22:29:38.298143+00:00"
+    },
+    {
+      "id": "proposed-cycle-timer-oncalendar-fallback",
+      "name": "Cycle Timer Oncalendar Fallback",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `cycle-timer-oncalendar-fallback`. Last activity 2026-05-30T22:09:22.796143+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "cycle-timer-oncalendar-fallback"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-05-30T22:09:22.796143+00:00"
+    },
+    {
+      "id": "proposed-extend-fixture-gate-outbox-side",
+      "name": "Extend Fixture Gate Outbox Side",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `extend-fixture-gate-outbox-side`. Last activity 2026-05-29T20:21:55.62396+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "extend-fixture-gate-outbox-side"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-05-29T20:21:55.62396+00:00"
+    },
+    {
+      "id": "proposed-dag-preflight-clarify-round-visibility-rollout",
+      "name": "DAG Preflight Clarify Round Visibility Rollout",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `dag-preflight-clarify-round-visibility-rollout`. Last activity 2026-05-29T16:25:19.569597+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "dag-preflight-clarify-round-visibility-rollout"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-05-29T16:25:19.569597+00:00"
+    },
+    {
+      "id": "proposed-test-isolation-v3",
+      "name": "Test Isolation V3",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `test-isolation-v3`. Last activity 2026-05-28T03:05:19.846862+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "test-isolation-v3"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-05-28T03:05:19.846862+00:00"
+    },
+    {
+      "id": "proposed-test-isolation-v2",
+      "name": "Test Isolation V2",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `test-isolation-v2`. Last activity 2026-05-27T21:05:10.186391+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "test-isolation-v2"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-05-27T21:05:10.186391+00:00"
+    },
+    {
+      "id": "proposed-pr-s4-rectification-v1",
+      "name": "PR S4 Rectification V1",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-s4-rectification-v1`. Last activity 2026-05-27T17:58:45.684077+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-s4-rectification-v1"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-05-27T17:58:45.684077+00:00"
+    },
+    {
+      "id": "proposed-pulse-check-iii-tune-forge-stuck-threshold",
+      "name": "Pulse Check Iii Tune Forge Stuck Threshold",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pulse-check-iii-tune-forge-stuck-threshold`. Last activity 2026-05-27T17:56:31.088256+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pulse-check-iii-tune-forge-stuck-threshold"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-05-27T17:56:31.088256+00:00"
+    },
+    {
+      "id": "proposed-build-sequence-orchestrator-pr-s4-shortcuts-routing-and-mirror-dag-verify",
+      "name": "Build Sequence Orchestrator PR S4 Shortcuts Routing And Mirror DAG Verify",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `build-sequence-orchestrator-pr-s4-shortcuts-routing-and-mirror-dag-verify`. Last activity 2026-05-27T14:24:37.765981+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "build-sequence-orchestrator-pr-s4-shortcuts-routing-and-mirror-dag-verify"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-05-27T14:24:37.765981+00:00"
+    },
+    {
+      "id": "proposed-fix-pr-s2-test-isolation-leak-plus-ast-walk-regression-gate",
+      "name": "Fix PR S2 Test Isolation Leak Plus Ast Walk Regression Gate",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `fix-pr-s2-test-isolation-leak-plus-ast-walk-regression-gate`. Last activity 2026-05-27T06:07:13.698743+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "fix-pr-s2-test-isolation-leak-plus-ast-walk-regression-gate"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-05-27T06:07:13.698743+00:00"
+    },
+    {
+      "id": "proposed-build-sequence-orchestrator-pr-s3b-dashboard-ladder-ui",
+      "name": "Build Sequence Orchestrator PR S3b Dashboard Ladder UI",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `build-sequence-orchestrator-pr-s3b-dashboard-ladder-ui`. Last activity 2026-05-27T05:39:48.906463+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "build-sequence-orchestrator-pr-s3b-dashboard-ladder-ui"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-05-27T05:39:48.906463+00:00"
+    },
+    {
+      "id": "proposed-build-sequence-orchestrator-pr-s3a-droplet-api-endpoint",
+      "name": "Build Sequence Orchestrator PR S3a Droplet API Endpoint",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `build-sequence-orchestrator-pr-s3a-droplet-api-endpoint`. Last activity 2026-05-27T05:15:27.058021+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "build-sequence-orchestrator-pr-s3a-droplet-api-endpoint"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-05-27T05:15:27.058021+00:00"
+    },
+    {
+      "id": "proposed-build-sequence-orchestrator-pr-s2-advancer-validator-healer",
+      "name": "Build Sequence Orchestrator PR S2 Advancer Validator Healer",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `build-sequence-orchestrator-pr-s2-advancer-validator-healer`. Last activity 2026-05-27T04:09:44.514204+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "build-sequence-orchestrator-pr-s2-advancer-validator-healer"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-05-27T04:09:44.514204+00:00"
+    },
+    {
+      "id": "proposed-fix-heal-pipeline-stall-preflight-clean-exit-detection",
+      "name": "Fix Heal Pipeline Stall Preflight Clean Exit Detection",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `fix-heal-pipeline-stall-preflight-clean-exit-detection`. Last activity 2026-05-27T03:56:30.402155+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "fix-heal-pipeline-stall-preflight-clean-exit-detection"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T06:00:06.074119+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-05-27T03:56:30.402155+00:00"
     }
   ]
 }
