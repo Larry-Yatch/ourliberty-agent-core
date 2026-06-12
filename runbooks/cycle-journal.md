@@ -4,6 +4,83 @@
 
 ---
 
+## Iteration ~1541 — 2026-06-12 01:49Z UTC (interactive, /cycle, Tier 3, consecutive_clean 1→2)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 4/4 bots alive. 0 open PRs. 0 new escalatable alerts. All mandatory checks clean. PR #477 (adopt-approval-visibility-hardening-spec) auto-merged since last iter. **Tier 3, consecutive_clean 1→2** (1 more clean iter to maintain Tier 3 position).
+
+**VERIFY-BEFORE-REASSERT (iter ~1540 watch items):**
+- **sentinel-inbox-stall-respect-inflight-001**: `beacon-pending-approvals.json` FILE_NOT_FOUND — cannot verify pending state. [blue] carry/unverifiable.
+- **G-rule Pulse-envelope-format 2/3**: No new occurrence. Beacon inbox EMPTY. Still 2/3. [blue] carry.
+- **Tier 3, consecutive_clean=1**: Clean this iter → 2. Need 1 more.
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: **1313 lines** (+1 from L1312 narrative watermark). Watermark: MISSING from `alert-triage.json` (G-rule `alert-triage-watermark-loss-on-write` → **2/3**; per spec: claiming trailing 100 lines as catchup). L1313: `outbox-notifier notification intent=review-pass` — Mirror approved PR #477, auto-merged + branch deleted. Informational; Tier-3 known pattern, no action. 0 new escalatable alerts. New narrative watermark: L1313. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot log: last activity 19:39:45 MDT (01:39Z) — notification idx=1312 delivered (review-pass for PR #477). Larry's last message: 19:25 MDT Jun 11 — "Go" (approved adopt-approval-visibility-hardening-spec). Fully addressed: Beacon dispatched → Forge built → Mirror approved → PR #477 auto-merged. No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `[INFO] no stalls detected` (01:45:57Z). ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json`: FILE_NOT_FOUND. No unresolved Larry directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing known, G-rule dispatched iter ~1416. [blue] carry.
+
+**Check A — Source repo:** main, clean (session startup gitStatus; latest commit 803fb78 PR #477). ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-12T00:53:08Z (~56 min at check time), status=no-change. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** `system-health.json` (01:45:38Z): 4/4 bots alive (beacon, forge, mirror, pulse). log_growth: **OK** (525s — idle, empty inboxes; Forge test-jail session completed). children_mb=185.0. disk 6%, memory 15%. overall=healthy. ✅ Nominal.
+
+**Check D — Inboxes:** Forge: EMPTY (.archive + .invalid only). Beacon/Mirror/Pulse: EMPTY. Pipeline healer: no stalls (01:45Z). ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs (ourliberty-agent-core). ✅ Nominal.
+
+**Forge digest:** 0 open PRs. 1 recently merged since last iter: PR #477 `docs(spec): adopt approval-visibility-hardening spec (no decision-for-Larry goes silent)` — Mirror auto-merged. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal → no-op. ✅
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I (Monday only) → skip. Check III (next eligible 2026-06-25) → skip. Checks VIII/IX/X (Monday) → skip. ✅
+
+**Credential rotation:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~71d). Outside 60-day DM window. ✅
+
+**Actions taken:**
+1. `cycle_tier_state.py record --checks-clean true` → consecutive_clean 1→2. Tier 3 maintained. ✅
+2. No DMs sent — no new [yellow]/[red] findings.
+
+**G-rule update this iter:**
+- `alert-triage-watermark-loss-on-write`: **2/3** (was 1/3; watermark MISSING again from alert-triage.json state file).
+
+**Standing findings (updated):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. Also blocks alert-translations.json Forge task. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). Pending Larry. [carry]
+- [blue] APPROVAL_REQUEST sentinel-inbox-stall-respect-inflight-001 — beacon-pending-approvals.json FILE_NOT_FOUND (unverifiable). Say `go: sentinel-inbox-stall-respect-inflight-001` to Beacon if still applicable. [carry]
+- [blue] G-rule Pulse-envelope-format — **2/3**. At 3/3 → dispatch Beacon task. [carry]
+- [blue] G-rule `alert-triage-watermark-loss-on-write` — **2/3** (updated this iter). At 3/3 → dispatch Beacon/Forge fix for watermark persistence in `alert_triage_state.py`. [updated]
+- [blue] G-rule `approval_request_not_extracted_from_depth1_beacon_result` — 1/3. [carry]
+- [blue] heal-stale-daemon-code-state.json MISSING — G-rule dispatched iter ~1416. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 5/34 shelf cards. 1/3 G-rule. [carry]
+- [blue] cycle.timer G-rule 3/3 → Beacon consumed. [carry]
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464, 465, 467, 468, 466, 470, 471, 472, 473, 475, 476, 477) — actor-exemption pending `go: actor-exemption-config`. [updated: +477]
+- [blue] Various G-rule carries: silence-missions-card-gc 001, heal-pipeline-stall heartbeat 3/3 deferred, auto-restart-failed 1/3, completion-DM 1/3, auto-retry source=auto-retry 1/3, Check-C-launcher-liveness APPROVAL_REQUEST pending, alert-triage-durable-watermark-001 parked, retry-exhausted-on-shipped-task 2/3, retry_exhausted:post-merge-install-drift 1/3, F24b JSON malformation 2/3, bughunt-gate-soak Phase 2 pending, health-check-notify-script-missing G-rule 3/3 dispatched, Check IX GITHUB_TOKEN missing.
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST worktree-cleanup-merged-pr-reap-001 routing gap — 1/3 G-rule. [carry]
+- [blue] G-rule `routing-denied:pulse→forge` — 1/3. [carry]
+
+**Watch items for iter ~1542:**
+- **G-rule alert-triage-watermark-loss-on-write 2/3**: Next occurrence → dispatch Beacon/Forge task to fix watermark persistence in `alert_triage_state.py`.
+- **G-rule Pulse-envelope-format 2/3**: Next occurrence → dispatch Beacon task.
+- **sentinel-inbox-stall-respect-inflight-001**: APPROVAL_REQUEST status unverifiable. `go: sentinel-inbox-stall-respect-inflight-001` to Beacon if applicable.
+- **Tier 3 cadence**: consecutive_clean=2. 1 more clean iter stays at Tier 3.
+
+**PRIME DIRECTIVE:** 0 interventions, 0 systemic_fixes this iter. Running total: interventions=800, systemic_fixes=26, ratio=30.77, trend=flat.
+**Tier end-of-iter:** Tier 3, consecutive_clean=2.
+
+---
+
 ## Iteration ~1540 — 2026-06-12 01:14Z UTC (interactive, /cycle, Tier 3, consecutive_clean 0→1)
 
 **Trigger:** Larry direct invocation (`/cycle`).
