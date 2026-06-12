@@ -4,6 +4,79 @@
 
 ---
 
+## Iteration ~1561 — 2026-06-12 05:25Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→1)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. 9/9 units alive. 0 new alerts. 0 open PRs. All 4 inboxes empty. Standing items from iter ~1560 carry unchanged. Tier 1, consecutive_clean 0→1.
+
+**VERIFY-BEFORE-REASSERT (iter ~1560 watch items):**
+- **p3-mission-proposed-actions-api**: Forge inbox empty; no "go: p3-mission-proposed-actions-api" in Telegram log since iter ~1560 (last directive: "Go" at 01:57:53Z June 12 for missions-v2-dag launch). ✅ CARRY — unregistered AR still outstanding.
+- **Pending approvals**: beacon-pending-approvals.json still 3 pending (fix-alert-triage-watermark-durability-001 02:40Z, fix-depth1-pulse-approval-extraction-001 02:40Z, pulse-envelope-builder-001 02:55Z). No Larry "go:" in Telegram since DM at 05:09Z. ✅ CARRY.
+- **sync-push**: agent-core-sync.json last_sync=04:54:09Z status=no-change. No new push failures in larry-alerts.jsonl since iter ~1560. ✅ No new occurrence.
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: 1323 lines (UNCHANGED from iter ~1560). 0 new alerts. ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log + inbox-watcher.log: 0 WARN/ERROR lines. `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** No new Larry directives since iter ~1560. Last directive: "Go" at 01:57:53Z June 12 (missions-v2-dag launch, fully resolved per prior iters). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal-pipeline-stall-state.json` present, stalls=0. All 4 inboxes empty. 0 open PRs on agent-core + ourliberty-dashboard. ✅ Nominal.
+
+**Check 4 — Pending directives:** All Larry directives from last 24h tracked. No orphans. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — known carry, G-rule dispatched ~iter 1416. Healer confirmed running (last fire 03:50:24Z auto-restarted dashboard-api per iter ~1560). [blue] carry.
+
+**Check A — Source repo:** branch=main, clean (session gitStatus HEAD=96a0606). ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-12T04:54:09Z, status=no-change. Age ~31 min from this iter (~05:25Z). Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 active: beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api, cycle.timer. ✅ Nominal.
+
+**Check D — Inboxes:** All 4 empty (Forge, Mirror, Beacon, Pulse). ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on agent-core, 0 on ourliberty-dashboard. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge → no committed baseline; no-op. distill_detector → no un-distilled audits; no-op. audit_cadence_signal → no output (no-op). ✅
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I: `check-i-2026-06-12.json` exists (fired iter ~1543). SKIP. Check III: next eligible 2026-06-25. SKIP.
+
+**Credential rotation:** All >= 90d out per rotation schedule. ✅ No DM warranted.
+
+**Key findings this iter:** None new. All checks nominal.
+
+**Actions taken:**
+1. `cycle_tier_state.py record --checks-clean true` → consecutive_clean=1, Tier 1. ✅
+2. No auto-fix actions. No new DMs (all standing items already escalated iter ~1559 05:09Z, < 30 min gap).
+
+**Standing findings (unchanged from iter ~1560):**
+- [yellow] 3 pending approvals in beacon-pending-approvals.json — say `go: fix-alert-triage-watermark-durability-001`, `go: fix-depth1-pulse-approval-extraction-001`, `go: pulse-envelope-builder-001`. DM sent iter ~1559. [carry]
+- [yellow] p3-mission-proposed-actions-api AR unregistered — say `go: p3-mission-proposed-actions-api` to Beacon. DM sent iter ~1559. [carry]
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. Also blocks alert-translations.json Forge task. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). Pending Larry. [carry]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR — depth-1 extraction gap. [carry]
+- [blue] dag-preflight-revision notifier gap — Beacon holds until fix-depth1 merges. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent, healer running (03:50Z restart confirmed). G-rule dispatched ~iter 1416. [carry]
+- [blue] sentinel-inbox-stall-respect-inflight-001 — say `go: sentinel-inbox-stall-respect-inflight-001` to Beacon if applicable. [carry]
+- [blue] G-rule Pulse-envelope-format — 3/3 DISPATCHED (pulse-envelope-builder-001 specced, in pending approvals). [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 5/34 shelf cards. 1/3 G-rule. [carry]
+- [blue] unreviewed-merge — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST worktree-cleanup-merged-pr-reap-001 routing gap — 1/3 G-rule. [carry]
+- [blue] G-rule `routing-denied:pulse→forge` — 1/3. [carry]
+
+**Watch items for iter ~1562:**
+- **p3-mission-proposed-actions-api**: Check if Larry approved + Forge has a new inbox task.
+- **Pending approvals**: Check if Larry said "go:" to any of the 3 in beacon-pending-approvals.json.
+- **Tier de-escalation path**: If iter ~1562 also clean → consecutive_clean=2 (Tier 1); 1 more clean iter to Tier 2.
+
+**PRIME DIRECTIVE:** 0 new intervention rows this iter (clean — no findings, no spend of attention). Running total (trailing-30d): interventions≈809+, systemic_fixes=30, ratio≈27.0, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=1.
+
+---
+
 ## Iteration ~1560 — 2026-06-12 05:20Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry direct invocation (`/cycle`).
