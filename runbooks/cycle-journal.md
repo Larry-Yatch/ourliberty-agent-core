@@ -4,6 +4,75 @@
 
 ---
 
+## Iteration ~1614 — 2026-06-12 23:49Z UTC (interactive, /cycle via /loop, Tier 3→1, consecutive_clean reset)
+
+**Trigger:** Larry direct invocation (`/cycle` via `/loop` dynamic mode).
+
+**Health:** ⚠️ Signal. 9/9 services active. 0 open PRs. All inboxes empty. 3 new alerts (1 Tier-4 escalation: unreviewed-merge:489). Tier 3→1 reset (consecutive_clean reset to 0).
+
+**VERIFY-BEFORE-REASSERT (iter ~1613 watch items):**
+- wire-pulse-check-iv-cadence-001: **CONFIRMED RESOLVED** — PR #488 auto-merged 22:46Z (prior iter). [closed]
+- G-rule pulse-check-iv-no-heartbeat 3/3: **CONFIRMED STALE** — heartbeat ts=18:26:04Z unchanged. PR #488 merged; drift-healer install pending next Sat 06:00Z run. [carry]
+- G-rule timer-cycle-no-journal-entry 1/3: **CONFIRMED 1/3** — journalctl shows no unjournaled cycle.service fires since 23:18Z. [carry at 1/3]
+- beacon-pending-approvals.json stale entries (#482+#484): **CONFIRMED STILL PRESENT** — healer will GC. [known carry]
+- PRIME DIRECTIVE ratio=24.82: **CONFIRMED** (script-authoritative, now 24.85 after +1 intervention this iter). [updated]
+
+**Check 0 — Alert triage:** larry-alerts.jsonl=1142 lines. Watermark was 1139, 3 new alerts.
+- L1140 (dispatch-branch-cleanup/summary, 23:30Z): "pruned 5 local + 3 remote stale branch(es)" → Tier-3 known-pattern, resolved.
+- L1141 (heal-unreviewed-merge-detector, 23:30Z, severity=critical): "PR #489 merged without Mirror review (actor=Larry-Yatch). 9 files including agents/forge/CLAUDE.md + scripts/dashboard_api.py." → Tier-4 (novel, alert-translations.json flags as never-silence). [yellow] escalation DM sent. Tier-reset.
+- L1142 (missions-autoregister/summary, 23:40Z): "proposed 1 orphan thread(s) ['proposed-build-done-today-projection-fix-20260604T054838Z']" → Tier-3 known-pattern, resolved.
+- Watermark advanced 1139→1142. ⚠️ Tier-reset (Tier-4 non-clean).
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last bot activity 23:05Z (Beacon reply to Larry's "pin to tier 2"). No new Larry directives since then. Wire-pulse-check-iv-cadence-001 consumed (PR #488 merged). No orphaned directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall dry-run at 23:47Z: "no stalls detected". 15 FORGE_NO_PR_SKIP (all pr_exists or preflight-non-proceed). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 2 stale entries (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001; both stale for already-merged PRs; healer will GC). ✅ Nominal (known carry).
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry. G-rule dispatched ~iter 1416. ✅ Known carry.
+
+**Check A — Source repo:** gitStatus: main, clean, HEAD=a2dd023 "chore(missions): autoregister healer — propose orphan thread(s)". ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: last_sync=2026-06-12T22:56:02Z (~53 min ago), status=no-change, commit=83ff858. Within 2h threshold. Note: commits a2dd023 (missions) + 3669a93 (PR #489) landed after last sync; next sync will capture them. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 active (beacon-bot, chain-event-shipper, cycle.service, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot). ✅ Nominal.
+
+**Check D — Inboxes:** All inboxes empty (forge, beacon, mirror, pulse). ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on agent-core (PR #488 + #489 both merged). 0 open PRs on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I: check-i-2026-06-12.json exists (fired iter ~1543). SKIP. Check III: today=Friday (not Sunday); next eligible 2026-06-15. SKIP.
+
+**Rotations:** 0 credentials in 60-day window. ✅ Nominal.
+
+**Actions taken:**
+1. Alert watermark advanced 1139→1142. ✅
+2. L1140 (dispatch-branch-cleanup/summary) → Tier-3 silenced, resolved. ✅
+3. L1141 (heal-unreviewed-merge-detector) → Tier-4 triaged; `alert_triage_state.py triage-alert` recorded; [yellow] escalation DM sent via larry_alerts (source=pulse-cycle, route=escalate, subject=unreviewed-merge:489). ✅
+4. L1142 (missions-autoregister/summary) → Tier-3 silenced, resolved. ✅
+5. `cycle_tier_state.py record --checks-clean false` → Tier 3→1, consecutive_clean=0. ✅
+6. `cycle_prime_ledger.py append --kind intervention --template unreviewed-merge-detector` → interventions=820. ✅
+
+**Standing findings (updated):**
+- [yellow] unreviewed-merge:489 — **NEW**: PR #489 merged by Larry-Yatch at 23:26Z without Mirror review. 9 files: agents/forge/CLAUDE.md, scripts/dashboard_api.py, docs/, runbooks/leak-residue-reconciliation.md, test fixtures. Likely intentional bypass (urgent fix). [yellow] DM sent. Reply 'go: retroactive-review-489' if Mirror review wanted. [new]
+- [yellow] Tier-2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- [blue] G-rule pulse-check-iv-no-heartbeat — 3/3; PR #488 merged; heartbeat stale (18:26Z) pending drift-healer Sat 06:00Z install. [carry → resolves after install]
+- [blue] G-rule timer-cycle-no-journal-entry — 1/3. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. G-rule dispatched ~iter 1416. [carry]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR. [carry]
+- [blue] dag-preflight-revision gap — PR #484 closed source=pulse gap; DAG re-dispatch markers still fall through. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED. [carry]
+- [blue] catalog-accuracy-drift — G-rule 2/3. [carry]
+- [blue] beacon-pending-approvals.json stale entries (#482+#484) — healer will GC. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention row this iter (unreviewed-merge-detector escalation). Trailing-30d (script-authoritative): interventions=820, systemic_fixes=33, verification_pending=11, ratio=24.85, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0. (Tier-4 alert forced reset from Tier 3.)
+
+---
+
 ## Iteration ~1613 — 2026-06-12 23:18Z UTC (interactive, /cycle via /loop, Tier 3, consecutive_clean 2→3)
 
 **Trigger:** Larry direct invocation (`/cycle` via `/loop` dynamic mode).
