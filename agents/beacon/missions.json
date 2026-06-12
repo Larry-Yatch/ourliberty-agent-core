@@ -2273,6 +2273,23 @@
       "proposed_at": "2026-06-12T17:22:41.761986+00:00",
       "orphan_branch": null,
       "orphan_last_activity_ts": "2026-06-02T18:47:46.110406+00:00"
+    },
+    {
+      "id": "proposed-pulse-park-and-silence",
+      "name": "Pulse Park And Silence",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pulse-park-and-silence`. Last activity 2026-06-11T03:20:20.041456+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pulse-park-and-silence"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T19:38:22.991425+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-11T03:20:20.041456+00:00"
     }
   ]
 }
