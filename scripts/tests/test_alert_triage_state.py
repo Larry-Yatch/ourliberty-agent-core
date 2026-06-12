@@ -469,6 +469,103 @@ class TestTriageExecutionRecording(_ATSTestBase):
         self.assertEqual(execs[0]['outcome'], 'failure')
 
 
+class TestWatermark(_ATSTestBase):
+    """The dedicated Check 0 line watermark store must survive lifecycle writes.
+
+    The whole reason it lives in its own file: a scalar inside alert-triage.json
+    is filtered by read_state() and clobbered by _write_state. These tests prove
+    the separate store is immune to that."""
+
+    def _watermark_path(self) -> Path:
+        return self.tmp / ats.WATERMARK_REL
+
+    def test_missing_file_returns_none(self):
+        self.assertIsNone(ats.read_watermark())
+
+    def test_round_trip(self):
+        ats.write_watermark(4242)
+        self.assertEqual(ats.read_watermark(), 4242)
+
+    def test_overwrite_advances(self):
+        ats.write_watermark(10)
+        ats.write_watermark(99)
+        self.assertEqual(ats.read_watermark(), 99)
+
+    def test_survives_multiple_lifecycle_writes(self):
+        # THE load-bearing regression: a watermark written first must still be
+        # readable after several record_triage / mark_dispatched writes against
+        # the SEPARATE alert-triage.json. This is exactly what the old
+        # co-located-scalar design failed.
+        ats.write_watermark(1542)
+        ats.record_triage('alert-1', tier=2, decision='dispatch', rationale='a')
+        ats.record_triage('alert-2', tier=1, decision='auto', rationale='b')
+        ats.mark_dispatched('alert-1', 'ts', 'forge', 'tid')
+        ats.record_triage('alert-3', tier=4, decision='ask', rationale='c')
+        self.assertEqual(ats.read_watermark(), 1542)
+
+    def test_corrupt_file_returns_none(self):
+        path = self._watermark_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('{not json')
+        self.assertIsNone(ats.read_watermark())
+
+    def test_wrong_shape_returns_none(self):
+        path = self._watermark_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('[1, 2, 3]')
+        self.assertIsNone(ats.read_watermark())
+
+    def test_missing_key_returns_none(self):
+        path = self._watermark_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('{"something_else": 7}')
+        self.assertIsNone(ats.read_watermark())
+
+    def test_non_int_key_returns_none(self):
+        path = self._watermark_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('{"last_claimed_line": "nope"}')
+        self.assertIsNone(ats.read_watermark())
+
+    def test_bool_value_rejected(self):
+        # bool is an int subclass in Python; a boolean watermark is meaningless.
+        path = self._watermark_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('{"last_claimed_line": true}')
+        self.assertIsNone(ats.read_watermark())
+
+    def test_write_preserves_other_keys(self):
+        path = self._watermark_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('{"last_claimed_line": 1, "note": "keep me"}')
+        ats.write_watermark(2)
+        doc = json.loads(path.read_text())
+        self.assertEqual(doc['last_claimed_line'], 2)
+        self.assertEqual(doc['note'], 'keep me')
+
+    def test_write_rejects_non_int(self):
+        with self.assertRaises(ValueError):
+            ats.write_watermark('5')  # type: ignore[arg-type]
+
+    def test_cli_get_missing_prints_missing(self):
+        from io import StringIO
+        from contextlib import redirect_stdout
+        buf = StringIO()
+        with redirect_stdout(buf):
+            rc = ats.main(['get-watermark'])
+        self.assertEqual(rc, 0)
+        self.assertEqual(buf.getvalue().strip(), 'MISSING')
+
+    def test_cli_set_then_get(self):
+        from io import StringIO
+        from contextlib import redirect_stdout
+        self.assertEqual(ats.main(['set-watermark', '--line', '777']), 0)
+        buf = StringIO()
+        with redirect_stdout(buf):
+            ats.main(['get-watermark'])
+        self.assertEqual(buf.getvalue().strip(), '777')
+
+
 class TestLoaders(_ATSTestBase):
 
     def test_missing_registry_is_empty(self):
