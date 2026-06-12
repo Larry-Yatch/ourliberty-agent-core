@@ -107,24 +107,35 @@ def read_captures_registry(path: Path) -> Optional[dict[str, Any]]:
 # -------------------- selection (pure; aging-flag-only) --------------------
 
 
-def select_aging_parked(registry: dict[str, Any]) -> list[dict[str, Any]]:
+def select_aging_parked(
+    registry: dict[str, Any], now: datetime,
+) -> list[dict[str, Any]]:
     """The parked-&-aging set: captures with `state == "parked"` AND the GC
     healer's persisted `aging` flag set true. PURE and flag-only — no date math,
-    no business-day computation, no aging recompute (spec § 6 enforcement)."""
+    no business-day computation, no aging recompute (spec § 6 enforcement).
+
+    A capture snoozed past `now` is suppressed from the digest (Phase 3 § 4.3)
+    — it isn't surfaced as aging while the snooze holds."""
     out: list[dict[str, Any]] = []
     for cap in registry.get('captures', []):
         if not isinstance(cap, dict):
+            continue
+        if is_snoozed(cap, now):
             continue
         if cap.get('state') == 'parked' and cap.get('aging') is True:
             out.append(cap)
     return out
 
 
-def count_parked(registry: dict[str, Any]) -> int:
-    """Total parked captures (aging or not) — the denominator on the card."""
+def count_parked(registry: dict[str, Any], now: datetime) -> int:
+    """Total parked captures (aging or not) — the denominator on the card.
+    Snoozed captures are excluded so the count matches the suppressed card
+    (Phase 3 § 4.3)."""
     return sum(
         1 for cap in registry.get('captures', [])
-        if isinstance(cap, dict) and cap.get('state') == 'parked'
+        if isinstance(cap, dict)
+        and cap.get('state') == 'parked'
+        and not is_snoozed(cap, now)
     )
 
 
@@ -139,6 +150,15 @@ def _parse_iso_utc(value: Any) -> Optional[datetime]:
     except ValueError:
         return None
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+def is_snoozed(cap: dict[str, Any], now: datetime) -> bool:
+    """True iff the capture is snoozed past `now` (`snoozed_until` in the
+    future). Null / absent / unparseable / past → not snoozed (fail-open to
+    visible). Mirrors dashboard_api._is_snoozed so the digest and the derive
+    suppress the same set (Missions v2 Phase 3 § 4.3)."""
+    until = _parse_iso_utc(cap.get('snoozed_until'))
+    return until is not None and until > now
 
 
 def _origin_repo(cap: dict[str, Any]) -> Optional[str]:
@@ -172,13 +192,13 @@ def build_item(cap: dict[str, Any], now: datetime) -> dict[str, Any]:
 
 def build_digest(registry: dict[str, Any], now: datetime, trigger: str) -> dict[str, Any]:
     """Assemble the structured artifact: counts + the aging items (§ 6)."""
-    aging = select_aging_parked(registry)
+    aging = select_aging_parked(registry, now)
     items = [build_item(cap, now) for cap in aging]
     return {
         'schema_version': SCHEMA_VERSION,
         'generated_at': now.isoformat(),
         'trigger': trigger,
-        'parked_count': count_parked(registry),
+        'parked_count': count_parked(registry, now),
         'aging_count': len(aging),
         'items': items,
     }

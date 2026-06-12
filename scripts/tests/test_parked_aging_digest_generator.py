@@ -65,7 +65,7 @@ class SelectAgingParkedTest(unittest.TestCase):
             _cap('d', state='promoted', aging=True),  # out (not parked)
             _cap('e', state='parked', aging=True),    # in
         )
-        ids = [c['id'] for c in pad.select_aging_parked(reg)]
+        ids = [c['id'] for c in pad.select_aging_parked(reg, NOW)]
         self.assertEqual(ids, ['a', 'e'])
 
     def test_aging_must_be_boolean_true_not_truthy(self):
@@ -75,14 +75,32 @@ class SelectAgingParkedTest(unittest.TestCase):
             _cap('truthy', state='parked', aging='yes'),
             _cap('one', state='parked', aging=1),
         )
-        self.assertEqual(pad.select_aging_parked(reg), [])
+        self.assertEqual(pad.select_aging_parked(reg, NOW), [])
 
     def test_skips_non_dict_entries(self):
         reg = {'captures': ['junk', None, _cap('ok', aging=True)]}
-        self.assertEqual([c['id'] for c in pad.select_aging_parked(reg)], ['ok'])
+        self.assertEqual(
+            [c['id'] for c in pad.select_aging_parked(reg, NOW)], ['ok'])
 
     def test_empty_registry(self):
-        self.assertEqual(pad.select_aging_parked(_registry()), [])
+        self.assertEqual(pad.select_aging_parked(_registry(), NOW), [])
+
+    def test_snoozed_aging_capture_suppressed(self):
+        # A parked+aging capture snoozed into the future is hidden from the
+        # digest until the snooze elapses (Phase 3 § 4.3).
+        snoozed = _cap('snz', state='parked', aging=True)
+        snoozed['snoozed_until'] = '2026-06-20T00:00:00+00:00'  # after NOW
+        reg = _registry(_cap('a', state='parked', aging=True), snoozed)
+        self.assertEqual(
+            [c['id'] for c in pad.select_aging_parked(reg, NOW)], ['a'])
+
+    def test_past_snooze_does_not_suppress(self):
+        # A snooze that already elapsed no longer hides the capture.
+        woke = _cap('woke', state='parked', aging=True)
+        woke['snoozed_until'] = '2026-06-01T00:00:00+00:00'  # before NOW
+        reg = _registry(woke)
+        self.assertEqual(
+            [c['id'] for c in pad.select_aging_parked(reg, NOW)], ['woke'])
 
 
 class CountParkedTest(unittest.TestCase):
@@ -93,7 +111,17 @@ class CountParkedTest(unittest.TestCase):
             _cap('c', state='parked'),
             _cap('d', state='promoted'),
         )
-        self.assertEqual(pad.count_parked(reg), 3)
+        self.assertEqual(pad.count_parked(reg, NOW), 3)
+
+    def test_excludes_snoozed_from_count(self):
+        snoozed = _cap('snz', state='parked')
+        snoozed['snoozed_until'] = '2026-06-20T00:00:00+00:00'  # after NOW
+        reg = _registry(
+            _cap('a', state='parked'),
+            _cap('b', state='parked'),
+            snoozed,
+        )
+        self.assertEqual(pad.count_parked(reg, NOW), 2)
 
 
 class AgeDaysTest(unittest.TestCase):
@@ -202,7 +230,7 @@ class RealCapturesFixtureTest(unittest.TestCase):
         path = _REPO_SCRIPTS.parent / pad.CAPTURES_REL
         reg = pad.read_captures_registry(path)
         self.assertIsNotNone(reg)
-        aging = pad.select_aging_parked(reg)
+        aging = pad.select_aging_parked(reg, NOW)
         # Every selected item is parked AND flagged aging — no exceptions.
         for cap in aging:
             self.assertEqual(cap.get('state'), 'parked')

@@ -31,6 +31,7 @@ Run locally (after pip install):
 """
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
@@ -539,6 +540,31 @@ class NewMissionResponse(BaseModel):
     mission_id: str
     pr_url: str
     branch: str
+
+
+class CaptureActionRequest(BaseModel):
+    # Missions v2 Phase 3 § 4 — POST /api/missions/captures/{id}/action body.
+    action: str = Field(..., min_length=1)  # promote | drop | snooze
+    # promote overrides (all optional — defaults inferred from the capture):
+    name: Optional[str] = None
+    brief: Optional[str] = None
+    repo: Optional[str] = None
+    spec_docs: Optional[list[str]] = None
+    # drop:
+    reason: Optional[str] = None
+    # snooze (ISO-8601 datetime; null clears the snooze):
+    snoozed_until: Optional[str] = None
+
+
+class CaptureActionResponse(BaseModel):
+    # promote/drop are PR-backed → {pr_url, branch[, mission_id]}; snooze is a
+    # direct committer write → {applied, snoozed_until}. All optional so one
+    # model covers both shapes (§ 4 contract).
+    pr_url: Optional[str] = None
+    branch: Optional[str] = None
+    mission_id: Optional[str] = None
+    applied: Optional[bool] = None
+    snoozed_until: Optional[str] = None
 
 
 # ---- /api/larry/* response + request models (E4.4e PR-B2) ----
@@ -3119,13 +3145,20 @@ def _derive_orphan_readability(
     }
 
 
-def _parked_from_captures(captures: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _parked_from_captures(
+    captures: list[dict[str, Any]], now: datetime,
+) -> list[dict[str, Any]]:
     """Build the `parked[]` array (§ 3.3) from captures.json. Only state=='parked'
     captures; `aging` is the GC healer's persisted flag (Phase 1 — never
-    recomputed here). `area` is reserved (always None today — scene-graph T8)."""
+    recomputed here). `area` is reserved (always None today — scene-graph T8).
+
+    Phase 3 § 4.3: a capture snoozed past `now` (`snoozed_until` in the future)
+    is suppressed from the Parked lane / resurfacing until the snooze elapses."""
     out: list[dict[str, Any]] = []
     for cap in captures:
         if not isinstance(cap, dict) or cap.get('state') != 'parked':
+            continue
+        if _is_snoozed(cap, now):
             continue
         origin = cap.get('origin') if isinstance(cap.get('origin'), dict) else {}
         out.append({
@@ -3278,7 +3311,7 @@ def _build_derived_response(
         'schema_version': 1,
         'missions': missions,
         'orphans': orphans,
-        'parked': _parked_from_captures(captures),
+        'parked': _parked_from_captures(captures, now),
         'last_synced_at': last_synced_at,
         'as_of': _now_utc_iso(now),
     }
@@ -3649,6 +3682,14 @@ def _parse_iso_utc(value: Any) -> Optional[datetime]:
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
+def _is_snoozed(cap: dict[str, Any], now: datetime) -> bool:
+    """True iff the capture is snoozed past `now` (`snoozed_until` in the
+    future). A null / absent / unparseable / past `snoozed_until` → not snoozed.
+    Fail-open to VISIBLE: a bad value never hides a capture (§ 4.3)."""
+    until = _parse_iso_utc(cap.get('snoozed_until'))
+    return until is not None and until > now
+
+
 def _read_captures_registry(captures_path: Path) -> dict[str, Any]:
     """Load captures.json as a mutable registry dict ({schema_version,
     captures}). Missing file → a fresh empty registry. Malformed JSON →
@@ -3831,6 +3872,437 @@ def _handle_capture_ingest(
         registry['schema_version'] = CAPTURES_SCHEMA_VERSION
         _atomic_write_captures(captures_path, registry)
     return {'ok': True, 'capture_id': capture_id}
+
+
+# ---------------------------------------------------------------------------
+# Missions v2 Phase 3 — capture write-back (POST /api/missions/captures/{id}/action)
+# (spec: agents/beacon/specs/missions-v2-phase3-writeback-autoregister.md § 4)
+#
+# `promote` and `drop` are PR-backed: they reuse the _handle_new_mission
+# GitHub-REST mechanism (GET main ref → create branch → PUT contents → POST PR)
+# via the shared _open_registry_pr helper, so the LOCAL missions.json/captures.json
+# are never mutated — they update via `git pull` on merge (no drift in the shared
+# checkout). `promote` PUTs BOTH files onto one branch so the new mission entry
+# and the capture's promoted_to/state land atomically in ONE PR.
+#
+# `snooze` is the exception: a trivial, reversible date field that routes DIRECT
+# through the single captures.json committer primitives (_CAPTURE_INGEST_LOCK +
+# _atomic_write_captures — the SAME writer the ingest path uses, NOT a second
+# one), per the § 4.3 decision. It returns {applied: true} rather than a PR.
+
+_MISSIONS_REPO_REL = 'agents/beacon/missions.json'
+_CAPTURES_REPO_REL = 'agents/beacon/captures.json'
+
+
+def _open_registry_pr(
+    *,
+    branch: str,
+    title: str,
+    pr_body: str,
+    files: list[tuple[str, dict[str, Any]]],
+    token: str,
+    repo_full: str,
+) -> str:
+    """Open ONE PR editing one or more in-repo JSON files (the generalized
+    _handle_new_mission mechanism). `files` is a list of (repo-relative path,
+    new registry dict); each is PUT onto the same fresh branch, so they land
+    atomically in a single PR. Returns the PR html_url. Raises HTTPException on
+    any GitHub error (502), a duplicate branch (409), or an empty html_url.
+
+    The caller computes the mutated registries from a local read; this helper
+    never touches the local working copy — the merge `git pull` does."""
+    api_base = f'https://api.github.com/repos/{repo_full}'
+    api_headers = {
+        'Authorization': f'Bearer {token}',
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+    }
+
+    # 1. Resolve main's SHA.
+    ref_resp = _github_api_request(
+        'GET', f'{api_base}/git/refs/heads/main', headers=api_headers,
+    )
+    if ref_resp.status_code != 200:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={
+                'error': 'github get main ref failed',
+                'detail': f'status={ref_resp.status_code}',
+            },
+        )
+    main_sha = ref_resp.json().get('object', {}).get('sha')
+    if not isinstance(main_sha, str) or not main_sha:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={'error': 'github main ref missing sha', 'detail': ''},
+        )
+
+    # 2. Create the branch — atomic at GitHub. 422 → already exists → 409.
+    branch_resp = _github_api_request(
+        'POST', f'{api_base}/git/refs', headers=api_headers,
+        json_body={'ref': f'refs/heads/{branch}', 'sha': main_sha},
+    )
+    if branch_resp.status_code == 422:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                'error': 'branch_exists',
+                'branch': branch,
+                'hint': 'An action PR for this capture is already in flight.',
+            },
+        )
+    if branch_resp.status_code not in (200, 201):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={
+                'error': 'github create branch failed',
+                'detail': f'status={branch_resp.status_code}',
+            },
+        )
+
+    # 3+4. For each file: read its current blob sha on the branch (inherits
+    #      main's content), then PUT the replacement onto the branch.
+    for rel_path, registry in files:
+        contents_get = _github_api_request(
+            'GET', f'{api_base}/contents/{rel_path}?ref={branch}',
+            headers=api_headers,
+        )
+        file_sha: Optional[str] = None
+        if contents_get.status_code == 200:
+            sha_val = contents_get.json().get('sha')
+            if isinstance(sha_val, str):
+                file_sha = sha_val
+        elif contents_get.status_code != 404:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail={
+                    'error': 'github get contents failed',
+                    'path': rel_path,
+                    'detail': f'status={contents_get.status_code}',
+                },
+            )
+        new_text = json.dumps(registry, indent=2) + '\n'
+        put_body: dict[str, Any] = {
+            'message': title,
+            'content': base64.b64encode(
+                new_text.encode('utf-8'),
+            ).decode('ascii'),
+            'branch': branch,
+        }
+        if file_sha:
+            put_body['sha'] = file_sha
+        put_resp = _github_api_request(
+            'PUT', f'{api_base}/contents/{rel_path}',
+            headers=api_headers, json_body=put_body,
+        )
+        if put_resp.status_code not in (200, 201):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail={
+                    'error': 'github put contents failed',
+                    'path': rel_path,
+                    'detail': f'status={put_resp.status_code}',
+                },
+            )
+
+    # 5. Open the PR.
+    pr_resp = _github_api_request(
+        'POST', f'{api_base}/pulls', headers=api_headers,
+        json_body={'title': title, 'head': branch, 'base': 'main', 'body': pr_body},
+    )
+    if pr_resp.status_code not in (200, 201):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={
+                'error': 'github create pr failed',
+                'detail': f'status={pr_resp.status_code}',
+            },
+        )
+    pr_json = pr_resp.json()
+    pr_url = pr_json.get('html_url') if isinstance(pr_json, dict) else None
+    if not isinstance(pr_url, str) or not pr_url:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={'error': 'github create pr returned no html_url', 'detail': ''},
+        )
+    return pr_url
+
+
+def _find_capture(captures: list[Any], capture_id: str) -> dict[str, Any]:
+    """Return the capture dict with id == capture_id, or 404."""
+    for cap in captures:
+        if isinstance(cap, dict) and cap.get('id') == capture_id:
+            return cap
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail={'error': 'capture not found', 'capture_id': capture_id},
+    )
+
+
+def _require_parked(cap: dict[str, Any], capture_id: str) -> None:
+    """Guard: write-back actions only apply to a still-parked capture. A
+    promoted/dropped capture is state-terminal — re-acting is a 409 (also the
+    idempotency guard against a double-click re-opening a second PR)."""
+    state = cap.get('state')
+    if state != 'parked':
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                'error': 'capture not actionable',
+                'capture_id': capture_id,
+                'state': state,
+                'hint': 'only parked captures can be promoted/dropped/snoozed',
+            },
+        )
+
+
+def _handle_capture_snooze(
+    *,
+    capture_id: str,
+    snoozed_until: Any,
+    captures_path: Path,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """`snooze` — set or clear a capture's `snoozed_until` (§ 4.3). DIRECT write
+    via the single captures.json committer (NOT PR-backed): `snoozed_until=None`
+    clears the snooze; an ISO-8601 datetime defers resurfacing until it passes.
+    Returns {applied: True, snoozed_until}. 404 if no such capture; 409 if it
+    isn't parked; 400 on a malformed or non-future date."""
+    now = now or datetime.now(timezone.utc)
+    parsed: Optional[datetime] = None
+    if snoozed_until is not None:
+        parsed = _parse_iso_utc(snoozed_until)
+        if parsed is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail='snoozed_until must be an ISO-8601 datetime or null',
+            )
+        if parsed <= now:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail='snoozed_until must be in the future',
+            )
+
+    with _CAPTURE_INGEST_LOCK:
+        registry = _read_captures_registry(captures_path)
+        cap = _find_capture(registry['captures'], capture_id)
+        _require_parked(cap, capture_id)
+        cap['snoozed_until'] = parsed.isoformat() if parsed else None
+        registry['schema_version'] = CAPTURES_SCHEMA_VERSION
+        _atomic_write_captures(captures_path, registry)
+    return {'applied': True, 'snoozed_until': cap['snoozed_until']}
+
+
+def _handle_capture_promote(
+    *,
+    capture_id: str,
+    overrides: dict[str, Any],
+    captures_path: Path,
+    missions_path: Path,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """`promote` — capture → mission (§ 4.1). Opens ONE PR editing BOTH
+    missions.json (new `phase: drafting` entry) and captures.json (the capture's
+    `promoted_to` + `state: promoted`) so they land atomically. The local files
+    are NOT mutated. Optional overrides: name / brief / repo / spec_docs
+    (defaults inferred from the capture). Returns {pr_url, branch, mission_id}."""
+    now = now or datetime.now(timezone.utc)
+    token = _github_token()
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                'error': 'github token missing',
+                'detail': 'no GITHUB_TOKEN env nor gh auth token on dashboard-api host',
+            },
+        )
+    repo_full = _missions_repo_full()
+
+    with _NEW_MISSION_LOCK:
+        cap_registry = _read_captures_registry(captures_path)
+        cap = _find_capture(cap_registry['captures'], capture_id)
+        _require_parked(cap, capture_id)
+
+        cap_origin = cap.get('origin') if isinstance(cap.get('origin'), dict) else {}
+        name = (overrides.get('name') or cap.get('title') or '').strip()
+        mission_id = _kebab_case(name)
+        if not mission_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    'error': 'invalid mission name',
+                    'detail': 'name (override or capture title) kebab-cases to empty',
+                },
+            )
+
+        missions_registry = _read_missions_registry(missions_path)
+        for existing in missions_registry['missions']:
+            if isinstance(existing, dict) and existing.get('id') == mission_id:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        'error': 'mission_id collision',
+                        'id': mission_id,
+                        'existing_entry_brief': existing.get('brief', ''),
+                    },
+                )
+
+        brief = (
+            overrides.get('brief')
+            or cap.get('note')
+            or cap.get('title')
+            or ''
+        )
+        repo = overrides.get('repo') or cap_origin.get('repo') or ''
+        spec_docs = overrides.get('spec_docs') or []
+        new_entry: dict[str, Any] = {
+            'id': mission_id,
+            'name': name,
+            'phase': 'drafting',
+            'brief': brief,
+            'spec_docs': list(spec_docs),
+            'task_ids': [],
+            'repo': repo,
+            'created': now.date().isoformat(),
+            'deferred_reason': None,
+        }
+        updated_missions = {
+            'schema_version': missions_registry.get('schema_version', 1),
+            'missions': missions_registry['missions'] + [new_entry],
+        }
+
+        # Mutate the in-memory capture (never written to disk locally — only PUT
+        # to the branch): promoted_to + terminal state.
+        cap['promoted_to'] = mission_id
+        cap['state'] = 'promoted'
+        cap_registry['schema_version'] = CAPTURES_SCHEMA_VERSION
+
+        branch = f'feat/promote-capture-{capture_id}'
+        title = f'chore(missions): promote capture {capture_id} -> mission {mission_id}'
+        pr_body = '\n'.join([
+            f'Promote capture `{capture_id}` to mission `{mission_id}`.',
+            '',
+            f'**Brief:** {brief}',
+            '',
+            'Edits both `missions.json` (new `drafting` entry) and '
+            '`captures.json` (`promoted_to` + `state: promoted`) in one PR so '
+            'they land atomically. No dispatch — Larry dispatches the mission '
+            '(Missions v2 Phase 3 § 4.1).',
+        ])
+        pr_url = _open_registry_pr(
+            branch=branch,
+            title=title,
+            pr_body=pr_body,
+            files=[
+                (_MISSIONS_REPO_REL, updated_missions),
+                (_CAPTURES_REPO_REL, cap_registry),
+            ],
+            token=token,
+            repo_full=repo_full,
+        )
+
+    return {'pr_url': pr_url, 'branch': branch, 'mission_id': mission_id}
+
+
+def _handle_capture_drop(
+    *,
+    capture_id: str,
+    reason: Any,
+    captures_path: Path,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """`drop` — retire a capture (§ 4.2). PR-backed (auditable — never a silent
+    delete): sets `state: dropped` (+ optional `drop_reason`). The local file is
+    NOT mutated. Returns {pr_url, branch}."""
+    token = _github_token()
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                'error': 'github token missing',
+                'detail': 'no GITHUB_TOKEN env nor gh auth token on dashboard-api host',
+            },
+        )
+    repo_full = _missions_repo_full()
+    if reason is not None and not isinstance(reason, str):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='reason must be a string',
+        )
+
+    with _NEW_MISSION_LOCK:
+        cap_registry = _read_captures_registry(captures_path)
+        cap = _find_capture(cap_registry['captures'], capture_id)
+        _require_parked(cap, capture_id)
+
+        cap['state'] = 'dropped'
+        if reason:
+            cap['drop_reason'] = reason
+        cap_registry['schema_version'] = CAPTURES_SCHEMA_VERSION
+
+        branch = f'chore/drop-capture-{capture_id}'
+        title = f'chore(missions): drop capture {capture_id}'
+        pr_body = '\n'.join([
+            f'Drop capture `{capture_id}` (`state: dropped`).',
+            *(['', f'**Reason:** {reason}'] if reason else []),
+            '',
+            'Auditable retire — the GC healer moves dropped captures to the '
+            'collapsed lane (Missions v2 Phase 3 § 4.2).',
+        ])
+        pr_url = _open_registry_pr(
+            branch=branch,
+            title=title,
+            pr_body=pr_body,
+            files=[(_CAPTURES_REPO_REL, cap_registry)],
+            token=token,
+            repo_full=repo_full,
+        )
+
+    return {'pr_url': pr_url, 'branch': branch}
+
+
+def _handle_capture_action(
+    *,
+    capture_id: str,
+    action: str,
+    args: dict[str, Any],
+    captures_path: Path,
+    missions_path: Path,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Dispatch POST /api/missions/captures/{id}/action to the per-action
+    handler. `promote`/`drop` are PR-backed → {pr_url, branch}; `snooze` is a
+    direct committer write → {applied: True, snoozed_until}. Unknown action →
+    400."""
+    if action == 'promote':
+        return _handle_capture_promote(
+            capture_id=capture_id,
+            overrides={
+                k: args[k] for k in ('name', 'brief', 'repo', 'spec_docs')
+                if k in args and args[k] is not None
+            },
+            captures_path=captures_path,
+            missions_path=missions_path,
+            now=now,
+        )
+    if action == 'drop':
+        return _handle_capture_drop(
+            capture_id=capture_id,
+            reason=args.get('reason'),
+            captures_path=captures_path,
+            now=now,
+        )
+    if action == 'snooze':
+        return _handle_capture_snooze(
+            capture_id=capture_id,
+            snoozed_until=args.get('snoozed_until'),
+            captures_path=captures_path,
+            now=now,
+        )
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=f'invalid action={action!r}; expected promote|drop|snooze',
+    )
 
 
 # Test seam: tests monkeypatch this to inject a recording mock.
@@ -4943,6 +5415,31 @@ def get_missions_derived(
 )
 def post_system_missions_new(body: NewMissionRequest) -> dict[str, Any]:
     return _handle_new_mission(body=body, missions_path=_missions_json_path())
+
+
+# POST /api/missions/captures/{capture_id}/action — capture write-back (Missions
+# v2 Phase 3 § 4). promote/drop are PR-backed (reuse the new-mission GitHub-REST
+# mechanism; promote edits missions.json + captures.json in ONE PR); snooze
+# routes direct through the single captures.json committer. Same auth as
+# /api/larry/action: X-Dashboard-Token + an allowlisted X-Actor.
+@app.post(
+    '/api/missions/captures/{capture_id}/action',
+    response_model=CaptureActionResponse,
+    response_model_exclude_none=True,
+    dependencies=[Depends(_require_token)],
+)
+def post_capture_action(
+    capture_id: str,
+    body: CaptureActionRequest,
+    actor: str = Depends(_require_actor),
+) -> dict[str, Any]:
+    return _handle_capture_action(
+        capture_id=capture_id,
+        action=body.action,
+        args=body.model_dump(exclude={'action'}, exclude_none=True),
+        captures_path=_captures_json_path(),
+        missions_path=_missions_json_path(),
+    )
 
 
 # ---- /api/larry/* routes (E4.4e PR-B2) ----
