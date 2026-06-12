@@ -4,6 +4,26 @@
 
 ---
 
+## Result notification — 2026-06-12 03:53Z UTC (inter-agent notify, from=beacon, task=cycle-finding-sync-push-rebase-fallback-20260612T034808Z)
+
+**Trigger:** Beacon outbox result delivery for G-rule SYNC-PUSH-REBASE-FALLBACK-001 (Pulse dispatch from iter ~1550).
+
+**Result:** Beacon spec'd the fix. Key technical correction: the rebase fallback already exists in `scripts/_lib_push_with_rebase.sh::push_with_rebase` — it just does a single rebase+retry. The race is that a second concurrent push (Forge auto-merge, PR squash, GC healer) can land in the rebase→push window before the one retry completes. Beacon's correct architectural call: upgrade the shared lib to a **bounded rebase+retry loop** (PUSH_REBASE_MAX_RETRIES=2, PUSH_REBASE_BACKOFF_SEC=2) rather than patch sync_agent_core.sh directly. This covers all 3 callers (run_cycle.sh, run_ledger.sh, sync_agent_core.sh) in one change. Conflict-bail semantics preserved (rebase conflict → return 1 immediately, no retry-spin).
+
+**APPROVAL_REQUEST authored by Beacon:**
+- task_id: `sync-push-rebase-loop-001`
+- target_agent: forge, phase: preflight
+- pr_title: "fix: bounded rebase+retry loop in push_with_rebase to close sync-push race"
+- cost: $0.53 (session 42537133)
+
+**Notifier gap check:** `beacon-pending-approvals.json` not found at journal time. `heal-unregistered-approval` last ran 03:45Z (before Beacon completed at 03:50Z). Next healer run should register `sync-push-rebase-loop-001`. No manual recovery needed yet — watch for registration.
+
+**G-rule SYNC-PUSH-REBASE-FALLBACK-001:** 3/3 dispatched → spec'd → APPROVAL_REQUEST authored. Pipeline is running; Forge preflight pending Larry approval once marker registers.
+
+**Actions taken:** None (result notification only).
+
+---
+
 ## Iteration ~1550 — 2026-06-12 03:32Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry direct invocation (`/cycle`).
