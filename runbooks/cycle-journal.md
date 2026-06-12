@@ -4,6 +4,94 @@
 
 ---
 
+## Iteration ~1559 — 2026-06-12 05:10Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Yellow. 6/6 units alive. 0 new alerts. 0 open PRs. All inboxes empty. Two corrections to iter ~1558 watch items. 3 real pending approvals in beacon-pending-approvals.json (correct path: `~/agents/state/`, not `~/agents/blackboard/`). p3-mission-proposed-actions-api APPROVAL_REQUEST unregistered (extraction gap). Tier 1, consecutive_clean 0→0.
+
+**VERIFY-BEFORE-REASSERT (iter ~1558 watch items):**
+- **beacon-pending-approvals.json "MISSING 4th consecutive iter"**: ✅ CORRECTED — file exists at `~/agents/state/beacon-pending-approvals.json`. Prior 5 "MISSING" readings were path confusion — cycle check was looking in `~/agents/blackboard/` (which has no such file). 3 real pending approvals present. False finding de-escalated. G-rule candidate (5 consecutive false positives on same root cause).
+- **p3-dashboard-proposed-lane "RESOLVED, Forge resumed"**: ✅ CORRECTED — Forge REJECTED at 04:47Z, not resumed. Forge correctly determined that the accept/dismiss endpoint doesn't exist in agent-core; Beacon processed the rejection at 04:50Z and emitted a new APPROVAL_REQUEST for `p3-mission-proposed-actions-api` (the missing Phase 3 DAG prerequisite). The watch-item expectation of "new PR on ourliberty-dashboard" was based on a wrong understanding of the Forge resumed-but-then-rejected sequence.
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: 1322 lines (UNCHANGED from iter ~1558). 0 new alerts since last iter. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** No new Larry directives since iter ~1558. Last substantive interaction: yesterday's missions-v2-phase3 launch + adopt-approval-visibility-hardening-spec approval (all resolved). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal-pipeline-stall-state.json` MISSING. All 4 inboxes empty. Forge outbox archive confirms p3-dashboard-proposed-lane completed (reject, 04:47Z). No chain stalls detected. ✅ Nominal.
+
+**Check 4 — Pending directives:** All Larry directives from last 24h have matching chain artifacts. ✅ Nominal. (Note: beacon-pending-approvals.json check corrected — see VERIFY-BEFORE-REASSERT above.)
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — known, G-rule dispatched iter ~1416. Healer confirmed running (last fire 03:50:24Z per larry-alerts.jsonl). [blue] carry.
+
+**Check A — Source repo:** branch=main, clean (session gitStatus), HEAD=44a9347 (Pulse cycle 20260612T050209Z = iter ~1558 wrapper). ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-12T04:54:09Z, status=no-change. ✅ Nominal.
+
+**Check C — Agent liveness:** 6/6 active (ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-cycle.timer). Note: ourliberty-graph-refresh.service was in `activating/start` state — one-shot graph rebuild, not a failure. ✅ Nominal.
+
+**Check D — Inboxes:** All 4 empty (Forge, Mirror, Beacon, Pulse). Forge archive: `p3-dashboard-proposed-lane.1.json` (reject, 04:47Z) is most recent completed task. `adopt-approval-visibility-hardening-spec` completed Jun 11 19:25 local; review-pass DM delivered at 01:39Z — likely auto-merged. ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on agent-core or ourliberty-dashboard. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** `audit_due_nudge.py` → no committed audit baseline; no-op. `distill_detector.py` → no un-distilled audits; no-op. `audit_cadence_signal.py` → no post-seed distills yet; no-op. ✅
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I already fired iter ~1543 (02:31Z) this week. SKIP. Check III (next eligible 2026-06-25) → skip.
+
+**Credential rotation:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~71d). ✅ No DM warranted (within window, not overdue).
+
+**Key findings this iter:**
+
+**1. [CORRECTIVE] beacon-pending-approvals.json path confusion resolved**
+Prior 5 iters reported "MISSING" — file exists at `~/agents/state/beacon-pending-approvals.json`, NOT `~/agents/blackboard/`. 3 real pending approvals: `fix-alert-triage-watermark-durability-001`, `fix-depth1-pulse-approval-extraction-001`, `pulse-envelope-builder-001` (all created 02:40–02:55Z today). G-rule: 5 consecutive false positives on same root cause → dispatching Beacon to update cycle check path.
+
+**2. [yellow] 3 pending approvals awaiting Larry**
+`fix-alert-triage-watermark-durability-001`, `fix-depth1-pulse-approval-extraction-001`, `pulse-envelope-builder-001` are in `~/agents/state/beacon-pending-approvals.json`. Larry can say "go: <task_id>" to Beacon or use the Approvals tab. DM sent (larry-alerts.jsonl). Escalated: pulse-escalations.json #20.
+
+**3. [yellow] p3-mission-proposed-actions-api APPROVAL_REQUEST unregistered (extraction gap)**
+Beacon emitted this in the reject-notification session (04:50:30Z): add accept/dismiss actions to `POST /api/system/missions/{id}/action` — the missing Phase 3 DAG step that blocked `p3-dashboard-proposed-lane`. The outbox_notifier's depth-1 extraction gap means it did NOT land in `beacon-pending-approvals.json`. Manual recovery: Larry says "go: p3-mission-proposed-actions-api" to Beacon. Once the endpoint merges, Beacon will re-dispatch `p3-dashboard-proposed-lane`. DM sent. Escalated: pulse-escalations.json #20.
+
+**4. [blue] adopt-approval-visibility-hardening-spec shipped**
+Forge completed the spec at 01:25Z (dispatch →19:25 local), Mirror gave review-pass at 01:39Z. Likely auto-merged. [carry → CLOSED]
+
+**Actions taken:**
+1. `larry_alerts.append_alert(source='pulse', severity='warning', subject='pending-approvals-3-plus-unregistered-ar-iter-1559')` → DM appended. ✅
+2. `pulse-escalations.json` entry #20 written. ✅
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 1559 --template beacon-pending-approvals-path-confusion` → logged. ✅
+4. `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0, Tier 1 (last_signal_at 05:10:03Z). ✅
+5. No auto-fix actions triggered.
+
+**Standing findings (updated):**
+- [yellow] 3 pending approvals in beacon-pending-approvals.json — `go: fix-alert-triage-watermark-durability-001`, `go: fix-depth1-pulse-approval-extraction-001`, `go: pulse-envelope-builder-001`. DM sent. pulse-escalations.json #20. [NEW]
+- [yellow] p3-mission-proposed-actions-api AR unregistered (extraction gap) — say `go: p3-mission-proposed-actions-api` to Beacon. DM sent. pulse-escalations.json #20. [NEW]
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. Also blocks alert-translations.json Forge task. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). Pending Larry. [carry]
+- [blue] beacon-pending-approvals.json path confusion G-rule — 5/5 false positives on ~/agents/blackboard/ path; real file at ~/agents/state/. Systemic fix: update cycle check path. Candidate for Beacon dispatch. [NEW]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR — depth-1 extraction gap. [carry]
+- [blue] dag-preflight-revision notifier gap — Beacon holds until fix-depth1 merges. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent, healer running (confirmed 03:50:24Z). G-rule dispatched ~iter 1416. [carry]
+- [blue] sentinel-inbox-stall-respect-inflight-001 — say `go: sentinel-inbox-stall-respect-inflight-001` to Beacon if applicable. [carry]
+- [blue] G-rule Pulse-envelope-format — 3/3 DISPATCHED (pulse-envelope-builder-001 specced, in pending approvals). [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 5/34 shelf cards. 1/3 G-rule. [carry]
+- [blue] unreviewed-merge — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST worktree-cleanup-merged-pr-reap-001 routing gap — 1/3 G-rule. [carry]
+- [blue] G-rule `routing-denied:pulse→forge` — 1/3. [carry]
+
+**Watch items for iter ~1560:**
+- **p3-mission-proposed-actions-api**: Check if Larry approved + Forge has a new inbox task. Stall threshold: if not approved by ~09:10Z, consider re-escalating.
+- **beacon-pending-approvals.json path**: Correct cycle check from `~/agents/blackboard/` to `~/agents/state/` (future iters should use correct path).
+- **adopt-approval-visibility-hardening-spec PR**: Watch for merged PR on ourliberty-agent-core.
+
+**PRIME DIRECTIVE:** 1 new intervention row this iter (beacon-pending-approvals-path-confusion). Running total (trailing-30d): interventions≈808, systemic_fixes=30, ratio≈26.9, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0.
+
+---
+
 ## Iteration ~1558 — 2026-06-12 05:00Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry direct invocation (`/cycle`).
