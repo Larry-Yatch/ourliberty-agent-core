@@ -4,6 +4,71 @@
 
 ---
 
+## Iteration ~1570 — 2026-06-12 08:54Z UTC (interactive, /cycle, Tier 3, consecutive_clean 3→4)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. 9 core services active. 1 new alert (L1337, Tier-3 digest). 0 open PRs. All inboxes empty. Tier 3, consecutive_clean 3→4.
+
+**VERIFY-BEFORE-REASSERT (iter ~1569 watch items):**
+- **missions-v2-phase3 `watchdog-doc-fix-001`**: In forge `.archive/`, preflight result = "PR opened: PR #1" (preflight completed). Pipeline stall state: 0 entries. No stall. Status: task handled at preflight phase. [carry resolved — no new watch needed]
+- **missions-v2-phase3 `worktree-relocation-smoke-001`**: In forge `.archive/`, result = REJECT (smoke test only — by design). ✅ CLOSED.
+- **Tier 3 cadence**: consecutive_clean=3 entering iter, advanced to 4. Remains Tier 3 (max tier). ✅ CARRY.
+
+**Check 0 — Alert triage:** Watermark was L1336. Total lines: 1337. 1 new alert.
+- L1337: `dispatch-branch-cleanup:summary` (08:28:14Z, route=digest) — pruned 2 local + 2 remote stale branches. Beacon-bot processed: `alert idx=1336 route=digest; skipping DM`. Tier-3 by-design GC summary. Journal note only.
+Watermark advanced to **L1337**. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon-bot last log entry at 02:28:40 MDT (08:28Z) — dispatch-branch-cleanup:summary digest (L1337, by-design). No new Larry directives since iter ~1569. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall-state.json: 0 total entries. All inboxes empty. 0 open PRs. ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` shows 2 "pending" items — `fix-alert-triage-watermark-durability-001` (created 06:03Z) and `fix-depth1-pulse-approval-extraction-001` (created 06:05Z). VERIFIED STALE: both correspond to already-merged PRs (#482 merged 06:38Z, #484 merged 06:46Z). `ourliberty-heal-stale-approvals.timer` will clear. No new unresolved approvals. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — known carry. Both daemons current (outbox-notifier restarted 07:22Z post-PR #484, dashboard-api restarted 06:51Z post-PR #481). No stale condition. [blue] carry.
+
+**Check A — Source repo:** branch=main, clean (session gitStatus, HEAD=5201eaf "Pulse cycle 20260612T082006Z"). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-12T07:54:19Z, status=no-change. Age ~60 min at scan time. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 active: beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api, cycle.service. All timers active. `ourliberty-cycle.timer` VERIFIED ACTIVE (standing carry RETIRED iter ~1568). ✅ Nominal.
+
+**Check D — Inboxes:** All 4 (beacon, forge, mirror, pulse) empty. ✅ Nominal.
+
+**Check E — PRs:** 0 open on agent-core, 0 on ourliberty-dashboard. Last 10 merges: #484–#475. ✅ Nominal.
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I: `check-i-2026-06-12.json` exists (fired iter ~1543). SKIP. Check III: next eligible 2026-06-25. SKIP.
+
+**Actions taken:**
+1. Alert watermark advanced to L1337 via `alert_triage_state.py set-watermark --line 1337`. ✅
+2. `cycle_tier_state.py record --checks-clean true` → consecutive_clean=4, Tier 3. ✅
+3. No auto-fix actions. No DMs (all nominal, no new escalations).
+
+**Standing findings (unchanged from iter ~1569):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR — manual recovery via `go: sync-push-rebase-loop-001` to Beacon if root fix still desired. [carry]
+- [blue] dag-preflight-revision notifier gap — fix-depth1 merged, Beacon unblocked. Separate re-dispatch may need `go:` to Beacon. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. G-rule dispatched ~iter 1416. [carry]
+- [blue] sentinel-inbox-stall-respect-inflight-001 — `go:` to Beacon if applicable. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 5/34 shelf cards. 1/3 G-rule. [carry]
+- [blue] unreviewed-merge — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] G-rule `routing-denied:pulse→forge` — 1/3. [carry]
+- [blue] G-rule `missions-autoregister:summary not in alert-translations.json` — 1/3. [carry]
+
+**Watch items for iter ~1571 (Tier 3, 30-min cadence ~09:24Z):**
+- `watchdog-doc-fix-001` preflight result claimed "PR opened: PR #1" — verify PR exists or was a dry-run artifact. If PR absent from GitHub, dispatch may be needed.
+
+**PRIME DIRECTIVE:** 0 new intervention rows (clean iter). Running total (trailing-30d): interventions=809, systemic_fixes=30, ratio=26.97, trend=flat.
+**Tier end-of-iter:** Tier 3, consecutive_clean=4.
+
+---
+
 ## Iteration ~1569 — 2026-06-12 08:18Z UTC (interactive, /cycle, Tier 3, consecutive_clean 2→3)
 
 **Trigger:** Larry direct invocation (`/cycle`).

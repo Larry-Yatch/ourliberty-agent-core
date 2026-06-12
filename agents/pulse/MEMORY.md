@@ -24,6 +24,12 @@
 
 ---
 
+## Status snapshot — updated 2026-06-12 08:54Z UTC (Iter ~1570, /cycle)
+
+**Iter ~1570 summary:** Alert watermark: L1337 (+1: dispatch-branch-cleanup:summary 08:28Z, Tier-3 digest). Tier 3, consecutive_clean=3→4. PRIME DIRECTIVE: interventions=809, systemic_fixes=30, ratio=26.97, trend=flat. **KEY STATE:** 9/9 services active. 0 open PRs. All inboxes empty. Sync: last_sync=07:54:19Z, status=no-change. `beacon-pending-approvals.json` — 2 stale entries (PRs #482/#484 already merged, healer will clear). `heal-pipeline-stall-state.json` — 0 entries. **missions-v2-phase3:** `worktree-relocation-smoke-001` CLOSED (smoke test REJECT by design). `watchdog-doc-fix-001` in forge `.archive/` at phase=preflight, result="PR opened: PR #1" — watch next iter to verify PR exists. **Tier:** Tier 3, consecutive_clean=4 (max tier, 30-min cadence).
+
+---
+
 ## Status snapshot — updated 2026-06-12 07:08Z UTC (Iter ~1567, /cycle)
 
 **Iter ~1567 summary:** Alert watermark: L1335 (first write to new dedicated `alert-triage-watermark.json` store — PR #482 live, no more clobber). Tier 3, consecutive_clean=0→1. PRIME DIRECTIVE: interventions=809, systemic_fixes=30, ratio=26.97, trend=flat. **KEY MILESTONE:** PRs #482, #483, #484 all MERGED ✅ — three major systemic fixes landed. **PR #483** (feat: pulse envelope builder) — F24 body-vs-prompt dead-letters structurally closed. **PR #482** (fix: durable Check 0 watermark store) — recurring watermark-clobber pattern permanently fixed; watermark CLI live. **PR #484** (fix: depth-1 source='pulse' APPROVAL_REQUEST extraction) — direction-ask extraction gap closed; Beacon unblocked for dag-preflight-revision re-dispatches. **PATH NOTE (closed):** `alert_triage_state.py set-watermark` now exists (PR #482 merged + sync 06:54Z); watermark initialized L1335. All 8 long-running services active (cycle.timer unit not found — standing G-rule 3/3; cycle via direct invocation). 0 open PRs. All inboxes empty. Sync: last_sync=06:54:11Z success. **STANDING:** Tier-2 weekly probe auth_401 (pending Larry: rotate-claude-setup-tokens.md); Check III proposals pending `approve threshold-update-2026-06-11`; sync-push-rebase-loop-001 UNREGISTERED AR (may need manual recovery: `go: sync-push-rebase-loop-001` to Beacon now that extraction gap fixed); dag-preflight-revision Beacon unblocked. **Tier:** Tier 3, consecutive_clean=1; 2 more clean Tier-3 iters → steady-state.
