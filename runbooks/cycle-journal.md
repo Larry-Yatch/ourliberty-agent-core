@@ -105295,3 +105295,108 @@ New watermark: **2026-06-10T17:05:59Z / pulse:ccd-s1-identity-resolution-2026061
 **Tier end-of-iter:** 1 (consecutive_clean=0 — active pipeline watch).
 
 ---
+
+## Iteration ~1563 — 2026-06-12 13:24Z UTC (interactive, Tier 2)
+
+**Health:** ⚠️ Attention — p3-dashboard-proposed-lane re-dispatch 7h overdue; routed to Beacon. All other checks nominal.
+
+**Tier at start:** 2 (consecutive_clean=2, last_signal_at=2026-06-12T12:30Z).
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Watermark state: `last_claimed_line=1337` but file has 1115 lines. File rotation occurred after automated cycles processed old file through idx=1336 (08:28Z UTC). New file retains old content through ~line 1108; new entries appended from line 1109 onward.
+- Claimed lines 1109–1115 (7 new entries, automated cycles had stale watermark and missed these):
+  - L1109 (10:20Z): pulse-check catalog-accuracy-drift (7/34=21%>10% gate) → **Tier 3** route=digest, Beacon delivered digest-skip. G-rule 2/3 (was 1/3 iter ~1550). ✅
+  - L1110–L1113: missions-autoregister + dispatch-branch-cleanup entries → **Tier 3** routine. ✅
+  - L1114 (12:31Z): APPROVAL_REQUEST missions-autoregister-alert-translation-001 → **Tier 1** already delivered by Beacon to Larry's tab 12:35Z (idx=1113). ✅
+  - L1115 (13:28Z): dispatch-branch-cleanup → **Tier 3** routine. ✅
+- New watermark: **L1115**. Written via `alert_triage_state.py set-watermark`. Triage: 6 Tier-3 silences + 1 Tier-1 already-delivered. ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log: no WARN spam above 5/h threshold. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry directive: "Go" for fix-depth1-pulse-approval-extraction-001 at 00:17 MDT (06:17Z). No directives in trailing 4h window. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → "no stalls detected." p3-dashboard-proposed-lane shows FORGE_NO_PR_SKIP marker='CLARIFY_REQUEST' (archived 04:41Z) — healer correctly skips it; re-dispatch routed separately (see Actions). ✅ Nominal per healer.
+
+**Check 4 — Pending directives / Inboxes (VERIFY-BEFORE-REASSERT):** Forge inbox EMPTY. Beacon inbox: 1 item written this iter. Pulse inbox EMPTY. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT (healer completed; standing known). ✅ Nominal.
+
+**Check A — Source repo:** agent-core-sync.json: status=no-change, last_sync=12:55Z UTC. Git status blocked by session permissions; sync no-change confirms clean tree. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=12:55Z (~29 min), status=no-change. Within 2h. ✅ Nominal.
+
+**Check C — Agent liveness (VERIFY-BEFORE-REASSERT):** 9/9 active: beacon-bot, forge-bot, mirror-bot, pulse-bot, outbox-notifier, chain-event-shipper, inbox-watcher, cycle.timer, dashboard-api. ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):** ourliberty-agent-core: 0 open. ourliberty-dashboard: healer shows PR #52 (p3-dashboard-writeback-ui) as pr_exists skip — this PR was opened by Forge; not stale (active pipeline step). ✅ Nominal.
+
+**Check H — Forge digest:** 0 open Forge PRs. Forge idle. Recent sprint batch merged: PRs #481–#484 (accept/dismiss endpoint, watermark durability, pulse envelope builder, depth-1 extraction fix). ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** All three scripts no-op (no committed baseline, no un-distilled audits, no post-seed artifacts). ✅
+
+**Conditional checks:** Friday — Check I fired in automated cycles (1 proposal, already DMed). Check III next eligible 2026-06-25. Check VIII/IX/X: Monday-only, skip. ✅
+
+**Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due ~2026-08-22 (~72d). No 60d trigger. ✅
+
+**G-rule tracking:**
+- **catalog-accuracy-drift**: 7/34 (21%). **2/3** (was 1/3 iter ~1550). Watch for 3/3.
+- All other G-rules carry unchanged from iter ~1550.
+
+**Key finding — p3-dashboard-proposed-lane re-dispatch gap (VERIFY-BEFORE-REASSERT):**
+Forge rejected p3-dashboard-proposed-lane at preflight (04:41Z) because accept/dismiss endpoint didn't exist. Beacon (session da60dda0, 04:50Z) correctly diagnosed and dispatched p3-mission-proposed-actions-api as the interface-first prerequisite, committing to re-dispatch p3-dashboard-proposed-lane once it merged. PR #481 built + auto-merged by Mirror at 06:21Z (accept=proposed→drafting, dismiss=additive acknowledged:true). Re-verified now: Forge inbox empty, no Beacon re-dispatch in .archive or inbox. 7h gap confirmed. Matches known dag-preflight-revision re-dispatch marker gap (MEMORY.md). **Routed to Beacon inbox this iter** (`p3-dashboard-proposed-lane-redispatch-20260612T132800Z.json`).
+
+**Verify-before-reassert on carried standings:**
+- PR #481 (p3-mission-proposed-actions-api): MERGED 06:21Z. ✅ CLOSED.
+- PR #482 (fix-alert-triage-watermark-durability-001): MERGED 06:38Z. ✅ CLOSED.
+- PR #483 (pulse-envelope-builder-001): MERGED 06:38Z. ✅ CLOSED.
+- PR #484 (fix-depth1-pulse-approval-extraction-001): MERGED 06:46Z. ✅ CLOSED.
+- heal-claude-max-burn-rate 80% alert (06:18Z): Beacon delivered to Larry idx=1327 at 06:22Z. Sprint batch complete by 07:00Z; 5h window rolled. ✅ No longer active.
+- health-check-notify-script-missing G-rule 3/3: no Forge PR visible. [yellow] carry.
+- bughunt-gate-soak Phase 2: pending Larry. [yellow] carry.
+- Tier 2 weekly probe auth_401: not probe day. [yellow] carry.
+- Check IX GITHUB_TOKEN missing: Monday check. [yellow] carry.
+- missions-autoregister-alert-translation-001 APPROVAL_REQUEST: delivered 12:35Z. [blue] carry.
+- sync-push-rebase-fallback-001 G-rule 3/3: Beacon consumed dispatch. [blue] watch Forge brief.
+- sentinel-inflight-marker-fix G-rule: Beacon consumed dispatch. [blue] watch Forge brief.
+- Check III threshold proposals: `approve threshold-update-2026-06-11`. [blue] carry.
+- cycle-prompt-check-c-pgrep-liveness-001: APPROVAL_REQUEST pending Larry. [blue] carry.
+- cycle-timer checkpoint: pending `go: cycle-timer checkpoint`. [blue] carry.
+- actor-exemption-config: pending `go: actor-exemption-config`. [blue] carry.
+- sentinel-inbox-stall-ignores-inflight G-rule 3/3: Beacon consumed. [blue] watch Forge brief.
+- F24-empty-prompt-envelope-rejected G-rule: 1/3. [blue] carry.
+- catalog-accuracy-drift G-rule: **2/3** this iter. [blue] watch.
+- alert-triage watermark file rotation note: automated cycles advanced watermark against old file through idx=1336; rotation left watermark stale at 1337 vs new file's 1115 lines. Reset this iter. Investigate whether log rotation should trigger a watermark-reset guard.
+
+**Actions taken:**
+1. Reset alert-triage-watermark to L1115 (was stale at 1337 post-file-rotation). Logged intervention to cycle-prime-ledger.jsonl.
+2. Wrote `p3-dashboard-proposed-lane-redispatch-20260612T132800Z.json` to Beacon inbox via pulse_envelope_builder.py. Logged intervention to cycle-prime-ledger.jsonl.
+
+**Dispatches:** 1 (Beacon: re-kick p3-dashboard-proposed-lane, dedup=cycle-finding:p3-dashboard-proposed-lane-redispatch).
+
+**Standing findings:**
+- [yellow] **bughunt-gate-soak Phase 2** — pending Larry.
+- [yellow] **Tier 2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api POST 500; Monday check.
+- [yellow] **health-check-notify-script-missing** — G-rule 3/3 dispatched iter ~1415; no Forge PR yet.
+- [blue] **p3-dashboard-proposed-lane** — re-dispatch routed to Beacon this iter. Watch: APPROVAL_REQUEST + Forge build against PR #481 contract.
+- [blue] **missions-autoregister-alert-translation-001** — APPROVAL_REQUEST on Larry's tab (12:35Z).
+- [blue] **sync-push-rebase-fallback-001** — Beacon consumed. Watch Forge brief.
+- [blue] **sentinel-inflight-marker-fix** — Beacon consumed. Watch Forge brief.
+- [blue] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry.
+- [blue] **cycle-prompt-check-c-pgrep-liveness-001** — APPROVAL_REQUEST pending Larry.
+- [blue] **cycle-timer checkpoint** — pending `go: cycle-timer checkpoint`.
+- [blue] **actor-exemption-config** — pending `go: actor-exemption-config`.
+- [blue] **G-rule unreviewed-merge sprint batch** — dispatched iter ~1378. Watch Beacon.
+- [blue] **sentinel-inbox-stall-ignores-inflight G-rule 3/3** — Beacon consumed. Watch Forge brief.
+- [blue] **catalog-accuracy-drift** — 2/3 G-rule.
+- [blue] **F24-empty-prompt-envelope-rejected** — 1/3 G-rule.
+
+**Watch items for next iter (~1564):**
+- Beacon: consume p3-dashboard-proposed-lane-redispatch envelope → APPROVAL_REQUEST or direct dispatch to Forge.
+- health-check-notify-script-missing: check for Forge PR.
+- catalog-accuracy-drift: watch for 3rd occurrence (3/3 dispatch threshold).
+- sync-push-rebase-fallback-001 + sentinel-inflight: watch Forge briefs after Beacon consumption.
+
+**PRIME DIRECTIVE:** 2 interventions this iter (watermark reset + p3-dashboard-proposed-lane re-dispatch routing). Script-authoritative: interventions≈813, systemic_fixes=30, ratio≈27.1, trend=stable.
+**Tier end-of-iter:** 1 (consecutive_clean=0 — routed dispatch + active pipeline watch).
+
+---
