@@ -4,6 +4,104 @@
 
 ---
 
+## Iteration ~1552 — 2026-06-12 04:15Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 6/6 units alive. missions-v2-phase3 advancing — **PR #479 MERGED 04:04Z** (step 2), **PR #480 OPEN** under Mirror review (step 3), **Forge building step 4** (p3-dashboard-writeback-ui). 0 new alerts. All checks clean except standing Check 5 MISSING. Tier 1, consecutive_clean=0.
+
+**VERIFY-BEFORE-REASSERT (iter ~1551 watch items):**
+- **PR #479 Forge marker-error retry**: ✅ RESOLVED — MERGED at 04:04:22Z (`edd50f7`). feat(missions): mission write-back endpoint (defer/resume/reprioritize). ✅ CLOSED.
+- **p3-autoregister-healer preflight**: ✅ RESOLVED — Forge built and PR #480 opened (03:58:06Z). Mirror has `review-p3-autoregister-healer.json` (04:01Z). ✅ Advancing.
+- **sync-push-rebase-loop-001**: Still UNREGISTERED AR. Not in `beacon-pending-approvals.json` (still shows only 3 pending: fix-watermark, fix-depth1, pulse-envelope). [blue] carry.
+- **fix-depth1 / fix-watermark / pulse-envelope-builder-001**: 3 pending in beacon-pending-approvals.json (unchanged). Awaiting Larry.
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: **1321 lines** (UNCHANGED from iter ~1551). `alert-triage.json` watermark MISSING (standing; fix-alert-triage-watermark-durability-001 in preflight). ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry messages in beacon log at 21:58Z MDT (03:58Z UTC) — all idle noise/alerts. Last substantive directive: "Go" 19:57 MDT (01:57Z UTC). Fully tracked by missions-v2-phase3. No new directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` (04:11Z) → `FORGE_NO_PR_SKIP` for test-jail-pr4-acceptance-proof-001 (pr=#476) and adopt-approval-visibility-hardening-spec (pr=#477); `no stalls detected`. ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json`: 3 pending (unchanged from iter ~1551):
+- `fix-alert-triage-watermark-durability-001` — Forge preflight, pending Larry
+- `fix-depth1-pulse-approval-extraction-001` — Forge preflight, pending Larry
+- `pulse-envelope-builder-001` — Forge preflight, trust_policy pending
+All on Larry's Approvals tab. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing known, G-rule dispatched iter ~1416. [blue] carry.
+
+**Check A — Source repo:** gitStatus at session start: branch=main, clean, head=41f6ba7 (Pulse cycle 20260612T041032Z = iter ~1551 wrapper commit). ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-12T03:58:24Z, status=no-change (already up to date at d049936). ~16 min old at check time. Well within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 6/6 active (beacon, forge, mirror, pulse, inbox-watcher, cycle.timer). ✅ Nominal.
+
+**Check D — Inboxes:**
+- Forge: 1 task — `build-p3-dashboard-writeback-ui.json` (mtime 04:08Z, ~6 min, build phase, target_repo=ourliberty-dashboard)
+- Mirror: 1 task — `review-p3-autoregister-healer.json` (mtime 04:01Z, ~13 min, actively processing)
+- Beacon: EMPTY. Pulse: EMPTY.
+✅ Nominal (both within 2h threshold).
+
+**Check E — PRs:** PR #480 OPEN ("feat: orphan auto-registration healer (Missions v2 Phase 3 § 6)", forge/p3-autoregister-healer, createdAt 03:58:06Z), MERGEABLE, reviewDecision="" (Mirror reviewing). Age ~16 min, under 30-min threshold. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** `audit_due_nudge.py` → "no committed audit baseline; no-op." `distill_detector.py` → "no un-distilled audits; no-op." `audit_cadence_signal.py` → script not found (not present; prior journal "no-op" entries were conservative; likely removed post Phase-2 gate completion). ✅
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I fired iter ~1543 (02:31Z). SKIP. Check III (next eligible 2026-06-25) → skip.
+
+**Credential rotation:** No credentials within 60-day window (SUPABASE_SERVICE_ROLE_KEY due 2026-08-22, ~71d). ✅
+
+**Key findings this iter:**
+
+**1. missions-v2-phase3 pipeline: 2/4+ steps merged, 2 active.**
+- Step 1 (p3-capture-actions-api / PR #478): ✅ MERGED (iter ~1551, 7c1ce5e)
+- Step 2 (p3-mission-actions-api / PR #479): ✅ MERGED at 04:04:22Z (edd50f7)
+- Step 3 (p3-autoregister-healer / PR #480): OPEN 03:58:06Z, MERGEABLE, Mirror reviewing (`review-p3-autoregister-healer.json`, 04:01Z, ~13 min)
+- Step 4 (p3-dashboard-writeback-ui): Forge inbox build phase (04:08Z, target_repo=ourliberty-dashboard)
+Pipeline running without stalls; 2 steps merged in a single ~4h window.
+
+**2. dashboard-api restart expected for PR #479 deploy (watch).**
+PR #479 updated mission endpoints in agent-core (new write-back routes). `heal-stale-daemon-code` runs every 30 min (last ~03:50Z, next ~04:20Z). Expect auto-restart of `ourliberty-dashboard-api.service` within ~5 min of this writing. No alert yet (healer hasn't run since merge); not a concern until 04:35Z.
+
+**Actions taken:**
+1. `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0, Tier 1 (last_signal_at 04:14:54Z). ✅
+2. No auto-fix actions triggered (sync nominal, all checks within threshold).
+3. No DMs sent — no new [yellow]/[red] findings.
+
+**Standing findings (updated):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. Also blocks alert-translations.json Forge task. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). Pending Larry. [carry]
+- [blue] APPROVAL_REQUEST `fix-alert-triage-watermark-durability-001` — Forge preflight, pending Larry. [carry]
+- [blue] APPROVAL_REQUEST `fix-depth1-pulse-approval-extraction-001` — Forge preflight, pending Larry. [carry]
+- [blue] APPROVAL_REQUEST `pulse-envelope-builder-001` — Forge preflight, trust_policy pending. [carry]
+- [blue] missions-v2-phase3 — ACTIVE. Steps 1+2 MERGED. Step 3 (PR #480) under Mirror review. Step 4 (p3-dashboard-writeback-ui) Forge build phase, ourliberty-dashboard. [updated]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR — depth-1 extraction gap. Noted pulse-escalations.json iter ~1551. [carry]
+- [blue] dag-preflight-revision notifier gap — Beacon holds until fix-depth1 merges. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent, healer running. G-rule dispatched ~iter 1416. [carry]
+- [blue] sentinel-inbox-stall-respect-inflight-001 — say `go: sentinel-inbox-stall-respect-inflight-001` to Beacon if applicable. [carry]
+- [blue] G-rule Pulse-envelope-format — 3/3 DISPATCHED (pulse-envelope-builder-001 specced, Forge preflight). [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 5/34 shelf cards. 1/3 G-rule. [carry]
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464, 465, 467, 468, 466, 470, 471, 472, 473, 475, 476, 477, 478, 479) — actor-exemption pending `go: actor-exemption-config`. [carry + 479 added]
+- [blue] Various G-rule carries: silence-missions-card-gc 001, heal-pipeline-stall heartbeat 3/3 deferred, auto-restart-failed 1/3, completion-DM 1/3, auto-retry source=auto-retry 1/3, Check-C-launcher-liveness APPROVAL_REQUEST pending, retry-exhausted-on-shipped-task 2/3, retry_exhausted:post-merge-install-drift 1/3, bughunt-gate-soak Phase 2 pending, health-check-notify-script-missing G-rule 3/3 dispatched, Check IX GITHUB_TOKEN missing.
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST worktree-cleanup-merged-pr-reap-001 routing gap — 1/3 G-rule. [carry]
+- [blue] G-rule `routing-denied:pulse→forge` — 1/3. [carry]
+- [blue] L1319/L1320 Tier-4 alerts — Check IV candidates for alert-translations.json. [carry]
+
+**Watch items for iter ~1553:**
+- **PR #480 Mirror review**: Watch for Mirror PASS → step 3 merges. No action until 30-min stall threshold (~04:30Z).
+- **dashboard-api restart**: heal-stale-daemon-code expected ~04:20Z for PR #479 deploy. If no restart alert by ~04:35Z, dashboard-api is stale — escalate.
+- **Forge build-p3-dashboard-writeback-ui**: Watch for PR open against ourliberty-dashboard.
+- **fix-depth1 / fix-watermark / pulse-envelope-builder-001**: Awaiting Larry on Approvals tab.
+
+**PRIME DIRECTIVE:** 0 new interventions this iter. Running total: interventions=804, systemic_fixes=30, ratio=26.8.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0.
+
+---
+
 ## Iteration ~1551 — 2026-06-12 04:00Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry direct invocation (`/cycle`).
