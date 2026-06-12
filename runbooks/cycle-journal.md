@@ -4,6 +4,113 @@
 
 ---
 
+## Iteration ~1551 — 2026-06-12 04:00Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Mostly nominal. 4/4 bots alive. 1 open PR (#479, missions write-back endpoint, awaiting Forge marker-error retry). **Positive: PR #478 MERGED (03:34Z), missions-v2-phase3 steps 2+3 active in Forge queue.** Auto-fix executed: sync triggered + succeeded (d049936, 03:58Z). 2 new Tier-4 alerts triaged. Unregistered APPROVAL_REQUEST for `sync-push-rebase-loop-001` — depth-1 extraction gap 2nd occurrence. Tier 1, consecutive_clean=0.
+
+**VERIFY-BEFORE-REASSERT (iter ~1550 watch items):**
+- **PR #478 Mirror review**: ✅ RESOLVED — Mirror PASSED at 03:34Z (session b02a0ef2), AUTO_MERGED (squash → 7c1ce5e). dashboard-api auto-restarted by heal-stale-daemon-code at 03:50:24Z (script mtime 476.4min newer post-deploy). Confirmed via outbox-notifier log: `SEQUENCE_STEP_MERGED seq=missions-v2-phase3 step=p3-capture-actions-api`. ✅ FULLY CLOSED.
+- **Sync threshold**: ✅ RESOLVED — Triggered `sync_agent_core.sh` at 03:58Z (elapsed >2h from ~01:53Z last successful, 2 prior failures at 02:53Z + 03:53Z). **SUCCEEDED**: pushed d049936 (Pulse runtime auto-commit) via push_with_rebase on first attempt. Push-race cleared naturally after missions-v2-phase3 concurrent-merge burst subsided. ✅ CLOSED.
+- **pulse-envelope-builder-001 trust_policy**: Still `status=pending` in `~/agents/state/beacon-pending-approvals.json`. [blue] carry.
+- **fix-depth1 / fix-watermark**: Both still `status=pending` in state file. [blue] carry.
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: **1321 lines** (+2 since iter ~1550, watermark 1318→1320). Healer tick ran at 03:58Z (scanned 1321, nothing to promote).
+- **L1319** (03:44Z): source=pulse, subject=check-i-2026-06-08. Second Check I firing today (first: iter ~1543 at 02:31Z; second: automated wrapper cycle at 03:44Z lacking "already-fired" session context). Triaged Tier 4 (novel — no alert-translations match). Already delivered to Larry by Beacon (idx=1318, 03:48Z). No additional DM. Check IV candidate: add `check-i-on-same-day` to `config/alert-translations.json` as Tier-3 digest. [blue] journal note.
+- **L1320** (03:50Z): source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-dashboard-api.service. Auto-restart after PR #478 deploy (script mtime 476.4min newer). Triaged Tier 4 (novel — no translation match). Route=digest (Beacon already skipped DM). Check IV candidate: add `auto-restarted:*` as Tier-3 digest. [blue] journal note.
+✅ Nominal (both already handled by downstream routing before Check 0 claim).
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry messages: "Go" at 01:57Z UTC, "Can you launch the missions v2 dag" at 01:54Z UTC. Both fully tracked — missions-v2-phase3 advancing. No new directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` (03:52Z) → FORGE_NO_PR_SKIP for test-jail-pr4-acceptance-proof-001 (pr=#476) and adopt-approval-visibility-hardening-spec (pr=#477); `no stalls detected`. Forge has 2 active tasks: `marker-error-p3-mission-actions-api-1.json` (retry 1/3, 03:43Z) + `p3-autoregister-healer.json` (03:36Z). Both <2h from dispatch. ✅ Nominal.
+
+**Check 4 — Pending directives:** `~/agents/state/beacon-pending-approvals.json`: 3 pending (unchanged from iter ~1550):
+- `fix-alert-triage-watermark-durability-001` — feature-development, Forge preflight, pending Larry
+- `fix-depth1-pulse-approval-extraction-001` — feature-development, Forge preflight, pending Larry
+- `pulse-envelope-builder-001` — feature-development, Forge preflight, pending Larry
+All on Larry's Approvals tab. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING (ongoing). Healer IS active — heartbeat 03:50:56Z, auto-restarted dashboard-api at 03:50:24Z. G-rule dispatched iter ~1416. [blue] carry.
+
+**Check A — Source repo:** gitStatus at session start: branch=main, clean, head=c700161. Sync succeeded post-session-start (d049936 at 03:58Z). ✅ Nominal.
+
+**Check B — Sync health:** Stale >2h (last successful ~01:53Z; failures at 02:53Z + 03:53Z during concurrent missions-v2-phase3 merges). Triggered `sync_agent_core.sh` (always-allowed: stale >2h + clean + on main) at 03:58Z → **SUCCESS**: d049936 pushed via push_with_rebase first attempt. ✅ Auto-fix executed.
+
+**Check C — Agent liveness:** 4/4 bot units active (beacon, forge, mirror, pulse). inbox-watcher active. cycle.timer active. ✅ Nominal.
+
+**Check D — Inboxes:**
+- Forge: 2 tasks — `marker-error-p3-mission-actions-api-1.json` (retry 1/3, 03:43Z) + `p3-autoregister-healer.json` (03:36Z, preflight)
+- Beacon: EMPTY. Mirror: EMPTY. Pulse: EMPTY (sync-push-rebase-fallback notify archived by inbox-watcher ~03:50Z).
+✅ Nominal (both Forge tasks within 2h threshold).
+
+**Check E — PRs:** PR #479 OPEN ("feat(missions): mission write-back endpoint (defer/resume/reprioritize)", 03:42:54Z), reviewDecision="" (awaiting Forge preflight resolution before Mirror review dispatches). ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** No committed audit baseline. `audit_due_nudge.py` / `distill_detector.py` / `audit_cadence_signal.py` → no-op. ✅
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I fired iter ~1543 (02:31Z). SKIP. Check III (next eligible 2026-06-25) → skip.
+
+**Credential rotation:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~71d). Outside 60-day window. ✅
+
+**Key findings this iter:**
+
+**1. Missions-v2-phase3 advancing — PR #478 merged, steps 2+3 active.**
+PR #478 ("feat: capture write-back endpoint (promote/drop/snooze)") AUTO_MERGED at 03:34Z (7c1ce5e). dashboard-api restarted at 03:50:24Z (new write-back code live).
+Step 2 (p3-mission-actions-api): Forge built PR #479 ("feat(missions): mission write-back endpoint (defer/resume/reprioritize)", 03:42:54Z). Forge's output omitted preflight marker → marker-error retry 1/3 in Forge inbox (03:43Z). PR is open; once Forge emits PROCEED, Mirror review dispatches.
+Step 3 (p3-autoregister-healer): Beacon dispatched "Build the orphan auto-registration healer" to Forge at 03:36Z. In Forge inbox, preflight phase.
+
+**2. sync-push-rebase-loop-001 UNREGISTERED APPROVAL_REQUEST — depth-1 extraction gap, 2nd confirmed occurrence.**
+Beacon received Pulse's direction-ask about the sync push race and authored a well-formed APPROVAL_REQUEST for `sync-push-rebase-loop-001` (fix: bounded rebase+retry loop in `scripts/_lib_push_with_rebase.sh`, 2 retries, 2s backoff). The outbox_notifier routed Beacon's response as a plain depth=1 beacon-result to Pulse inbox (archived ~03:50Z). APPROVAL_REQUEST marker NOT extracted — same routing gap as the `fix-alert-triage-watermark-durability-001` stranding (1st occurrence, per MEMORY.md). Task `sync-push-rebase-loop-001` is NOT on Larry's Approvals tab.
+Per CLAUDE.md Discipline 2: NOT writing "pending approval" here — nothing is registered.
+Permanent structural fix: `fix-depth1-pulse-approval-extraction-001` (pending Larry on Approvals tab). Manual recovery until then: route headless direction-ask to Beacon via orchestrator source (deferred to next iter unless Larry wants to prioritize).
+**G-rule escalation**: 2nd stranded approval from the depth-1 gap in <12h. [blue] noted in pulse-escalations.json.
+
+**3. Sync auto-fix resolved — push-race was burst-related.**
+Sync failures at 02:53Z and 03:53Z were push-race losses during the missions-v2-phase3 concurrent-merge window. `sync_agent_core.sh` succeeded at 03:58Z once the burst subsided. The permanent fix (`sync-push-rebase-loop-001`) is still worth landing to handle next burst, but this cycle's sync issue is closed.
+
+**Actions taken:**
+1. `sync_agent_core.sh` triggered at 03:58Z → SUCCESS (d049936 pushed). Logged to `runbooks/cycle-actions.jsonl`. ✅
+2. `cycle_prime_ledger.py append --tier 1 --kind intervention --template trigger-stale-sync --detail sync_agent_core.sh-success-d049936` → appended (interventions=804, ratio=26.8). ✅
+3. Alert-triage: L1319 → Tier 4 (novel, already-delivered). L1320 → Tier 4 (novel, digest-skipped). Watermark: 1318 → 1320. ✅
+4. `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0, Tier 1 (last_signal_at 04:00:23Z). ✅
+5. No DMs sent — no new [yellow]/[red] findings.
+
+**Standing findings (updated):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. Also blocks alert-translations.json Forge task. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). Pending Larry. [carry]
+- [blue] APPROVAL_REQUEST `fix-alert-triage-watermark-durability-001` — Forge preflight, pending Larry. [carry]
+- [blue] APPROVAL_REQUEST `fix-depth1-pulse-approval-extraction-001` — Forge preflight, pending Larry. [carry]
+- [blue] APPROVAL_REQUEST `pulse-envelope-builder-001` — Forge preflight, trust_policy pending. [carry]
+- [blue] missions-v2-phase3 — ACTIVE. Step 1 MERGED (PR #478 ✅). Step 2 (p3-mission-actions-api) PR #479 open, marker-error retry 1/3. Step 3 (p3-autoregister-healer) Forge inbox, preflight. [updated]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR — depth-1 extraction gap 2nd occurrence. Noted pulse-escalations.json. [new]
+- [blue] L1319/L1320 Tier-4 alerts — Check IV candidates for alert-translations.json additions (duplicate-check-i-same-day + auto-restarted pattern). [new]
+- [blue] dag-preflight-revision notifier gap — Beacon holds authoring until `fix-depth1-pulse-approval-extraction-001` merges. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent, healer running. G-rule dispatched ~iter 1416. [carry]
+- [blue] sentinel-inbox-stall-respect-inflight-001 — say `go: sentinel-inbox-stall-respect-inflight-001` to Beacon if applicable. [carry]
+- [blue] G-rule Pulse-envelope-format — 3/3 DISPATCHED (pulse-envelope-builder-001 specced, Forge preflight). [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 5/34 shelf cards. 1/3 G-rule. [carry]
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464, 465, 467, 468, 466, 470, 471, 472, 473, 475, 476, 477, 478) — actor-exemption pending `go: actor-exemption-config`. [carry + 478 added]
+- [blue] Various G-rule carries: silence-missions-card-gc 001, heal-pipeline-stall heartbeat 3/3 deferred, auto-restart-failed 1/3, completion-DM 1/3, auto-retry source=auto-retry 1/3, Check-C-launcher-liveness APPROVAL_REQUEST pending, retry-exhausted-on-shipped-task 2/3, retry_exhausted:post-merge-install-drift 1/3, bughunt-gate-soak Phase 2 pending, health-check-notify-script-missing G-rule 3/3 dispatched, Check IX GITHUB_TOKEN missing.
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST worktree-cleanup-merged-pr-reap-001 routing gap — 1/3 G-rule. [carry]
+- [blue] G-rule `routing-denied:pulse→forge` — 1/3. [carry]
+
+**Watch items for iter ~1552:**
+- **PR #479 Forge marker-error retry**: Watch for Forge PROCEED → Mirror review dispatch → missions-v2-phase3 step 2 advances.
+- **p3-autoregister-healer preflight**: Watch for Forge to process (queued behind retry resolution).
+- **sync-push-rebase-loop-001**: If `fix-depth1-pulse-approval-extraction-001` doesn't land soon, escalate to [yellow] and route headless recovery.
+- **fix-depth1 / fix-watermark / pulse-envelope-builder-001**: Awaiting Larry on Approvals tab.
+
+**PRIME DIRECTIVE:** 1 new intervention this iter (trigger-stale-sync). Running total: interventions=804, systemic_fixes=30, ratio=26.8.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0.
+
+---
+
+
 ## Result notification — 2026-06-12 03:53Z UTC (inter-agent notify, from=beacon, task=cycle-finding-sync-push-rebase-fallback-20260612T034808Z)
 
 **Trigger:** Beacon outbox result delivery for G-rule SYNC-PUSH-REBASE-FALLBACK-001 (Pulse dispatch from iter ~1550).
