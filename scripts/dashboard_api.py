@@ -4539,6 +4539,134 @@ def _handle_mission_reprioritize(
     return {'pr_url': pr_url, 'branch': branch}
 
 
+def _handle_mission_accept(
+    *,
+    mission_id: str,
+    missions_path: Path,
+) -> dict[str, Any]:
+    """`accept` — claim an auto-proposed orphan thread into a real mission (§ 6).
+    Flips `phase: proposed -> drafting` (the orphan's task_id is already in the
+    entry's `task_ids` from when the healer proposed it; the flip graduates the
+    proposal into a drafting mission). PR-backed (missions.json only) — mirrors
+    `resume`'s shape. 404 if no such mission; 409 if not proposed (nothing to
+    accept). Returns {pr_url, branch}."""
+    token = _github_token()
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                'error': 'github token missing',
+                'detail': 'no GITHUB_TOKEN env nor gh auth token on dashboard-api host',
+            },
+        )
+    repo_full = _missions_repo_full()
+
+    with _NEW_MISSION_LOCK:
+        registry = _read_missions_registry(missions_path)
+        mission = _find_mission(registry['missions'], mission_id)
+        if mission.get('phase') != 'proposed':
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    'error': 'mission not proposed',
+                    'mission_id': mission_id,
+                    'phase': mission.get('phase'),
+                    'hint': 'only a proposed mission can be accepted',
+                },
+            )
+
+        mission['phase'] = 'drafting'
+
+        branch = f'chore/accept-mission-{mission_id}'
+        title = f'chore(missions): accept proposed mission {mission_id}'
+        pr_body = '\n'.join([
+            f'Accept proposed mission `{mission_id}` — claims the orphan into a '
+            'drafting mission (`phase: proposed -> drafting`).',
+            '',
+            'Single-field registry edit. The orphan\'s task_id is already in the '
+            'entry\'s `task_ids` (the healer registered it on propose); accepting '
+            'graduates the proposal into a real mission the derive ranks normally '
+            '(Missions v2 Phase 3 § 6).',
+        ])
+        pr_url = _open_registry_pr(
+            branch=branch,
+            title=title,
+            pr_body=pr_body,
+            files=[(_MISSIONS_REPO_REL, registry)],
+            token=token,
+            repo_full=repo_full,
+        )
+
+    return {'pr_url': pr_url, 'branch': branch}
+
+
+def _handle_mission_dismiss(
+    *,
+    mission_id: str,
+    missions_path: Path,
+) -> dict[str, Any]:
+    """`dismiss` — acknowledge an auto-proposed orphan thread so the board stops
+    surfacing it (§ 6). Sets the ADDITIVE `acknowledged: true` flag; `phase`
+    STAYS `proposed`. PR-backed (missions.json only). 404 if no such mission;
+    409 if not proposed (only a proposed thread is dismissable). Returns
+    {pr_url, branch}.
+
+    Re-proposal suppression is structural: the proposed entry persists, so its
+    task_id stays registered and the autoregister healer's detect_orphans never
+    re-surfaces it (heal_orphan_autoregister.registered_task_ids). `acknowledged`
+    is additive metadata the dashboard's Proposed affordance reads to hide the
+    dismissed thread — it is NOT consulted by the healer."""
+    token = _github_token()
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                'error': 'github token missing',
+                'detail': 'no GITHUB_TOKEN env nor gh auth token on dashboard-api host',
+            },
+        )
+    repo_full = _missions_repo_full()
+
+    with _NEW_MISSION_LOCK:
+        registry = _read_missions_registry(missions_path)
+        mission = _find_mission(registry['missions'], mission_id)
+        if mission.get('phase') != 'proposed':
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    'error': 'mission not proposed',
+                    'mission_id': mission_id,
+                    'phase': mission.get('phase'),
+                    'hint': 'only a proposed mission can be dismissed',
+                },
+            )
+
+        mission['acknowledged'] = True
+
+        branch = f'chore/dismiss-mission-{mission_id}'
+        title = f'chore(missions): dismiss proposed mission {mission_id}'
+        pr_body = '\n'.join([
+            f'Dismiss proposed mission `{mission_id}` — sets `acknowledged: true` '
+            '(`phase` stays `proposed`).',
+            '',
+            'Single-field additive registry edit. The proposed entry persists '
+            '(its task_id stays registered), so the autoregister healer already '
+            'never re-proposes it; `acknowledged` lets the board hide the '
+            'dismissed thread from the Proposed affordance (Missions v2 Phase 3 '
+            '§ 6).',
+        ])
+        pr_url = _open_registry_pr(
+            branch=branch,
+            title=title,
+            pr_body=pr_body,
+            files=[(_MISSIONS_REPO_REL, registry)],
+            token=token,
+            repo_full=repo_full,
+        )
+
+    return {'pr_url': pr_url, 'branch': branch}
+
+
 def _handle_mission_action(
     *,
     mission_id: str,
@@ -4547,8 +4675,8 @@ def _handle_mission_action(
     missions_path: Path,
 ) -> dict[str, Any]:
     """Dispatch POST /api/system/missions/{id}/action to the per-action handler.
-    defer / resume / reprioritize are all PR-backed → {pr_url, branch}. Unknown
-    action → 400."""
+    defer / resume / reprioritize / accept / dismiss are all PR-backed →
+    {pr_url, branch}. Unknown action → 400."""
     if action == 'defer':
         return _handle_mission_defer(
             mission_id=mission_id,
@@ -4566,9 +4694,22 @@ def _handle_mission_action(
             priority=args.get('priority'),
             missions_path=missions_path,
         )
+    if action == 'accept':
+        return _handle_mission_accept(
+            mission_id=mission_id,
+            missions_path=missions_path,
+        )
+    if action == 'dismiss':
+        return _handle_mission_dismiss(
+            mission_id=mission_id,
+            missions_path=missions_path,
+        )
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail=f'invalid action={action!r}; expected defer|resume|reprioritize',
+        detail=(
+            f'invalid action={action!r}; expected '
+            'defer|resume|reprioritize|accept|dismiss'
+        ),
     )
 
 
@@ -5710,10 +5851,12 @@ def post_capture_action(
 
 
 # POST /api/system/missions/{mission_id}/action — mission write-back (Missions
-# v2 Phase 3 § 5). defer/resume/reprioritize are ALL PR-backed (missions.json is
-# the curated registry — every change auditable) and reuse the new-mission
-# GitHub-REST mechanism via _open_registry_pr. Same auth as /api/larry/action:
-# X-Dashboard-Token + an allowlisted X-Actor.
+# v2 Phase 3 § 5 + § 6). defer/resume/reprioritize/accept/dismiss are ALL
+# PR-backed (missions.json is the curated registry — every change auditable) and
+# reuse the new-mission GitHub-REST mechanism via _open_registry_pr. accept/dismiss
+# act on auto-proposed orphan threads (§ 6): accept flips phase proposed->drafting,
+# dismiss sets the additive acknowledged flag (phase stays proposed). Same auth as
+# /api/larry/action: X-Dashboard-Token + an allowlisted X-Actor.
 @app.post(
     '/api/system/missions/{mission_id}/action',
     response_model=MissionActionResponse,

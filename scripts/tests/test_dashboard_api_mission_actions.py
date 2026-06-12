@@ -369,6 +369,113 @@ class ReprioritizeTest(_MissionActionsTestBase):
         self.assertEqual(self.missions_path.read_text(), before)
 
 
+# ==================== accept ====================
+
+
+class AcceptTest(_MissionActionsTestBase):
+    def test_opens_pr_flipping_proposed_to_drafting(self):
+        # The orphan's task_id is already on the proposed entry (the healer put
+        # it there); accept graduates the proposal into a drafting mission.
+        self._seed(_mission('proposed-orphan-x', phase='proposed',
+                            task_ids=['orphan-x']))
+        branch = 'chore/accept-mission-proposed-orphan-x'
+        _mission_edit_github_script(self.gh, branch=branch)
+        r = self.client.post(_endpoint('proposed-orphan-x'), headers=AUTH,
+                             json={'action': 'accept'})
+        self.assertEqual(r.status_code, 200, r.text)
+        body = r.json()
+        self.assertEqual(body['branch'], branch)
+        self.assertEqual(body['pr_url'],
+                         'https://github.com/test-owner/test-repo/pull/77')
+
+        # Exactly one branch + one PR — single-field auditable edit.
+        self.assertEqual(len(self.gh.calls), 5)
+
+        entry = self._put_entry('proposed-orphan-x')
+        self.assertEqual(entry['phase'], 'drafting')
+        # The claimed task_id stays on the entry (it was the claim anchor).
+        self.assertEqual(entry['task_ids'], ['orphan-x'])
+
+    def test_accept_non_proposed_returns_409_no_github(self):
+        self._seed(_mission('m-1', phase='drafting'))
+        r = self.client.post(_endpoint('m-1'), headers=AUTH, json={'action': 'accept'})
+        self.assertEqual(r.status_code, 409, r.text)
+        self.assertEqual(r.json()['detail']['error'], 'mission not proposed')
+        self.assertEqual(self.gh.calls, [])
+
+    def test_missing_mission_returns_404_no_github(self):
+        self._seed(_mission('proposed-orphan-x', phase='proposed'))
+        r = self.client.post(_endpoint('nope'), headers=AUTH, json={'action': 'accept'})
+        self.assertEqual(r.status_code, 404, r.text)
+        self.assertEqual(self.gh.calls, [])
+
+    def test_local_missions_not_mutated(self):
+        self._seed(_mission('proposed-orphan-x', phase='proposed',
+                            task_ids=['orphan-x']))
+        before = self.missions_path.read_text()
+        _mission_edit_github_script(
+            self.gh, branch='chore/accept-mission-proposed-orphan-x')
+        self.client.post(_endpoint('proposed-orphan-x'), headers=AUTH,
+                         json={'action': 'accept'})
+        self.assertEqual(self.missions_path.read_text(), before)
+
+    def test_token_missing_returns_500_no_github(self):
+        self._seed(_mission('proposed-orphan-x', phase='proposed'))
+        da._github_token = lambda: None  # type: ignore[assignment]
+        r = self.client.post(_endpoint('proposed-orphan-x'), headers=AUTH,
+                             json={'action': 'accept'})
+        self.assertEqual(r.status_code, 500, r.text)
+        self.assertEqual(r.json()['detail']['error'], 'github token missing')
+        self.assertEqual(self.gh.calls, [])
+
+
+# ==================== dismiss ====================
+
+
+class DismissTest(_MissionActionsTestBase):
+    def test_opens_pr_setting_acknowledged_phase_unchanged(self):
+        self._seed(_mission('proposed-orphan-x', phase='proposed',
+                            task_ids=['orphan-x']))
+        branch = 'chore/dismiss-mission-proposed-orphan-x'
+        _mission_edit_github_script(self.gh, branch=branch)
+        r = self.client.post(_endpoint('proposed-orphan-x'), headers=AUTH,
+                             json={'action': 'dismiss'})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(r.json()['branch'], branch)
+
+        self.assertEqual(len(self.gh.calls), 5)
+
+        entry = self._put_entry('proposed-orphan-x')
+        # Additive flag set; phase STAYS proposed; task_id still registered so the
+        # healer never re-proposes it.
+        self.assertIs(entry['acknowledged'], True)
+        self.assertEqual(entry['phase'], 'proposed')
+        self.assertEqual(entry['task_ids'], ['orphan-x'])
+
+    def test_dismiss_non_proposed_returns_409_no_github(self):
+        self._seed(_mission('m-1', phase='drafting'))
+        r = self.client.post(_endpoint('m-1'), headers=AUTH, json={'action': 'dismiss'})
+        self.assertEqual(r.status_code, 409, r.text)
+        self.assertEqual(r.json()['detail']['error'], 'mission not proposed')
+        self.assertEqual(self.gh.calls, [])
+
+    def test_missing_mission_returns_404_no_github(self):
+        self._seed(_mission('proposed-orphan-x', phase='proposed'))
+        r = self.client.post(_endpoint('nope'), headers=AUTH, json={'action': 'dismiss'})
+        self.assertEqual(r.status_code, 404, r.text)
+        self.assertEqual(self.gh.calls, [])
+
+    def test_local_missions_not_mutated(self):
+        self._seed(_mission('proposed-orphan-x', phase='proposed',
+                            task_ids=['orphan-x']))
+        before = self.missions_path.read_text()
+        _mission_edit_github_script(
+            self.gh, branch='chore/dismiss-mission-proposed-orphan-x')
+        self.client.post(_endpoint('proposed-orphan-x'), headers=AUTH,
+                         json={'action': 'dismiss'})
+        self.assertEqual(self.missions_path.read_text(), before)
+
+
 # ==================== dispatch ====================
 
 
