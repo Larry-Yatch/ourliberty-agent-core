@@ -24,6 +24,12 @@
 
 ---
 
+## Status snapshot — updated 2026-06-12 19:39Z UTC (Iter ~1603, /cycle)
+
+**Iter ~1603 summary:** Alert watermark: L1135 (2 new: dispatch-branch-cleanup:summary + missions-autoregister:summary, both digest). Tier 2, consecutive_clean=1→2. PRIME DIRECTIVE (script-authoritative): interventions=818, systemic_fixes=33, verification_pending=10, ratio=24.79, trend=flat. **KEY STATE:** 9/9 services active. 0 open PRs. All inboxes empty. Sync: last_sync=18:55:16Z, no-change, commit=105fb0c. beacon-pending-approvals.json present (2 stale entries for merged PRs #482+#484; healer will GC; v1 schema). pulse-check-iv.heartbeat present (mtime=18:26Z). **VERIFIED THIS ITER:** PR #485 (alert-translation-dispatch-branch-cleanup-summary-001) MERGED 16:56:37Z ✅; PR #487 (fix(alert-triage): intent fallback) MERGED 18:23:12Z ✅. **STANDING:** Tier-2 weekly probe auth_401 (pending Larry: rotate-claude-setup-tokens), Check III proposals `approve threshold-update-2026-06-11` (2 high-attention), Check 5 MISSING (G-rule dispatched ~iter 1416), sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED, catalog-accuracy-drift G-rule 2/3, G-rule pulse-check-iv-no-heartbeat 1/3. **Tier:** Tier 2, consecutive_clean=2 (1 more clean Tier-2 iter → Tier 3).
+
+---
+
 ## Status snapshot — updated 2026-06-12 19:17Z UTC (Iter ~1602, /cycle)
 
 **Iter ~1602 summary:** Alert watermark: L1133 (unchanged). Tier 2, consecutive_clean=0→1. PRIME DIRECTIVE (script-authoritative): interventions=818, systemic_fixes=33, verification_pending=10, ratio=24.79, trend=flat. **KEY STATE:** 9/9 services active. 0 open PRs. All inboxes empty. Sync: last_sync=18:55:16Z, no-change, commit=859721f. beacon-pending-approvals.json present (2 stale entries for merged PRs #482+#484; healer will GC; v1 schema confirmed). pulse-check-iv.heartbeat present (mtime=18:26Z). **STANDING:** Tier-2 weekly probe auth_401, Check III proposals `approve threshold-update-2026-06-11` (2 high-attention), Check 5 MISSING (G-rule dispatched ~iter 1416), sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED, catalog-accuracy-drift G-rule 2/3, G-rule pulse-check-iv-no-heartbeat 1/3 (heartbeat present; watching). **Tier:** Tier 2, consecutive_clean=1 (2 more clean Tier-2 iters → Tier 3).
