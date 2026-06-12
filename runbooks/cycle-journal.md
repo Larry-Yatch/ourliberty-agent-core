@@ -4,6 +4,132 @@
 
 ---
 
+## Iteration ~1543 — 2026-06-12 02:29Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→0, G-rule dispatch)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ G-rule dispatch. 4/4 bots alive. 0 open PRs. 0 new escalatable alerts. All mandatory checks clean. G-rule `approval_request_not_extracted_from_depth1_beacon_result` → **3/3** → Beacon envelope dispatched. Tier 1 maintained, consecutive_clean=0.
+
+**VERIFY-BEFORE-REASSERT (iter ~1542 watch items):**
+- **Beacon dag-preflight-missions-v2-phase3**: VERIFIED COMPLETED — archive file `~/agents/outboxes/mirror/.archive/dag-preflight-missions-v2-phase3.json` present, mtime 2026-06-11 20:00Z. Mirror returned REVISION (Check 3: parallel p3-capture-actions-api ‖ p3-mission-actions-api both write `scripts/dashboard_api.py`). Beacon processed autonomously: serialized B behind A, re-dispatched for re-review. **CLOSED** as watch item (follow-up in standing findings below).
+- **alert-triage-watermark-fix direction-ask**: VERIFIED — Beacon result in `~/agents/outboxes/beacon/.archive/alert-triage-watermark-fix-direction-ask-20260612T022000Z.json`. Beacon corrected the diagnosis and dispatched `fix-alert-triage-watermark-durability-001`. See findings below.
+- **G-rule Pulse-envelope-format 2/3**: Beacon inbox empty at check time (only the alert-triage direction-ask, now consumed by Beacon). No new malformed Pulse envelope observed. Still 2/3. [blue] carry.
+- **sentinel-inbox-stall-respect-inflight-001**: `beacon-pending-approvals.json` — 0 requests (verified via `~/agents/state/beacon-pending-approvals.json`). Unable to confirm APPROVAL_REQUEST status — consistent with standing unverifiable state. [blue] carry.
+- **Tier 1, consecutive_clean=0**: G-rule dispatch this iter → non-clean. consecutive_clean stays 0.
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: **1315 lines** at end-of-iter (+2 from L1313 watermark: L1314=ledger-sidecar-refresh, L1315=Check-I-DM — both from Check I's run, expected/scheduled). 0 new escalatable alerts. `alert-triage.json` last_claimed_line: MISSING (G-rule dispatch in-flight from iter ~1542; permanent fix APPROVAL_REQUEST unregistered — see findings). ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot log: last Larry message 19:57:54 MDT Jun 11 (01:57Z) — "Go" for dag-preflight → fully addressed (dag-preflight completed, Beacon handled REVISION autonomously). No new Larry messages since iter ~1542. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `[INFO] no stalls detected` (02:23Z). ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` (state dir): 0 requests. No unresolved Larry directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing known, G-rule dispatched iter ~1416. [blue] carry.
+
+**Check A — Source repo:** main, clean (gitStatus at session start: head=0abc527, last cycle commit). ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-12T01:53:19Z (~36 min at check time), status=no-change. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 4/4 bots alive (systemctl is-active: beacon, forge, mirror, pulse — all `active`). `system-health.json` not present in `~/agents/state/` this iter (script not found). No log-growth detail available; bot systemd status substituted. ✅ Nominal.
+
+**Check D — Inboxes:** Forge: EMPTY. Beacon: EMPTY (alert-triage direction-ask consumed by Beacon). Mirror: EMPTY (dag-preflight task archived). Pulse: 1 file (`notify-alert-triage-watermark-fix-direction-ask-20260612T022000Z.json` — depth=1 result notification from Beacon; claimed this iter). Pipeline healer: no stalls. ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs (ourliberty-agent-core). ✅ Nominal.
+
+**Forge digest:** 0 open Forge PRs. No new merges since iter ~1542. ✅
+
+**§5.0 Bug-hunt gate:** `audit_due_nudge.py` → `[audit-due] no committed audit baseline; no-op.` `distill_detector.py` → `[distill-detector] no un-distilled audits; no-op.` `audit_cadence_signal.py` → `[audit-cadence] no post-seed decision-grade distill artifacts yet; no-op.` ✅
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I **FIRED** (Mon/Wed/Fri/Sun gate; sentinel `ledger-ready-2026-06-08` present; EMERGENCY_HALT absent). `pulse_check_i.py` ran at 02:31Z: week-ending 2026-06-08, total cost $1,041.64 (-$569.73 / -35.4% WoW), 1 proposal (small effort): review high-σ anomaly `medic-operator-scaffold-001` ($6.72 vs $1.68 baseline, 24.4σ). Auto-dispatch deduped (prior dispatch 2026-06-10). DM queued to Larry. Journal block deduped (week-of-June-8 block already present). Checks VIII/IX/X (Monday) → skip. Check III (next eligible 2026-06-25) → skip. ✅
+
+**Credential rotation:** No credentials within 60-day DM window. ✅
+
+**Key findings this iter:**
+
+1. **dag-preflight-missions-v2-phase3 REVISION → Beacon autonomous amend** (02:00Z): Mirror found parallel file overlap (p3-capture-actions-api ‖ p3-mission-actions-api both add POST endpoints to `scripts/dashboard_api.py`). Beacon serialized B behind A (`depends_on` edge, atomic write). Re-dispatched for Mirror re-review as `dag-preflight-missions-v2-phase3`. APPROVAL_REQUEST embedded in Beacon outbox result `notify-dag-revision-missions-v2-phase3.json` (depth=N result) → NOT registered by outbox notifier. **Unregistered.**
+
+2. **alert-triage-watermark-fix: Beacon corrected the diagnosis** (02:25Z): Beacon found that `last_claimed_line` was never implemented in `alert_triage_state.py` at all — the script's flat `alert_id → row` dict silently drops any scalar top-level field on read. Root cause: schema/contract divergence, not a write-clobber. Architecture decision: separate `alert-triage-watermark.json` + `get-watermark`/`set-watermark` CLI subcommands in `alert_triage_state.py` + cycle-prompt § 3.0 redirect. Task `fix-alert-triage-watermark-durability-001` dispatched to Forge (preflight phase). APPROVAL_REQUEST embedded in Beacon depth=1 result `notify-alert-triage-watermark-fix-direction-ask-20260612T022000Z.json` → NOT registered. **Unregistered.**
+
+3. **G-rule `approval_request_not_extracted_from_depth1_beacon_result`: 1/3 → 3/3** — Two new occurrences this iter (both unregistered APPROVAL_REQUESTs above). Beacon envelope dispatched (see Actions).
+
+**Actions taken:**
+1. Written Beacon inbox envelope `approval-request-depth1-extraction-fix-direction-ask-20260612T022900Z.json` — G-rule 3/3 dispatch: (a) re-emit the 2 unregistered APPROVAL_REQUESTs (`fix-alert-triage-watermark-durability-001` + `dag-preflight-missions-v2-phase3` re-review) via proper approval gate; (b) fix `outbox_notifier.py` to extract APPROVAL_REQUEST from depth=1 Beacon results. ✅
+2. `cycle_prime_ledger.py append --tier 1 --kind systemic_fix --template approval-request-depth1-extraction-fix` ✅
+3. `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0, Tier 1. ✅
+4. Pulse inbox notification `notify-alert-triage-watermark-fix-direction-ask-20260612T022000Z.json` claimed (outbox notifier will archive on next scan). ✅
+5. No DMs sent — all findings are [blue] (G-rule dispatch is not [yellow]/[red]).
+
+**G-rule update this iter:**
+- `approval_request_not_extracted_from_depth1_beacon_result`: **3/3 → DISPATCHED**. ✅ Beacon envelope written.
+
+**Standing findings (updated):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. Also blocks alert-translations.json Forge task. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). Pending Larry. [carry]
+- [blue] APPROVAL_REQUEST `fix-alert-triage-watermark-durability-001` — UNREGISTERED (embedded in Beacon depth=1 result; G-rule fix dispatched this iter). Will re-register once Beacon processes the direction-ask. [NEW]
+- [blue] APPROVAL_REQUEST `dag-preflight-missions-v2-phase3` re-review — HANDLED: routing-signal in mirror/.archive, worktree completed. No re-registration needed. [CLOSED]
+- [blue] APPROVAL_REQUEST sentinel-inbox-stall-respect-inflight-001 — 0 requests in beacon-pending-approvals.json; unverifiable status. Say `go: sentinel-inbox-stall-respect-inflight-001` to Beacon if still applicable. [carry]
+- [blue] G-rule Pulse-envelope-format — **2/3**. At 3/3 → dispatch Beacon task. [carry]
+- [blue] G-rule `approval_request_not_extracted_from_depth1_beacon_result` — **3/3 DISPATCHED** (beacon envelope written this iter). [updated/closed]
+- [blue] heal-stale-daemon-code-state.json MISSING — G-rule dispatched iter ~1416. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 5/34 shelf cards. 1/3 G-rule. [carry]
+- [blue] cycle.timer G-rule 3/3 → Beacon consumed. [carry]
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464, 465, 467, 468, 466, 470, 471, 472, 473, 475, 476, 477) — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] Various G-rule carries: silence-missions-card-gc 001, heal-pipeline-stall heartbeat 3/3 deferred, auto-restart-failed 1/3, completion-DM 1/3, auto-retry source=auto-retry 1/3, Check-C-launcher-liveness APPROVAL_REQUEST pending, alert-triage-durable-watermark-001 parked (superseded by fix-alert-triage-watermark-durability-001), retry-exhausted-on-shipped-task 2/3, retry_exhausted:post-merge-install-drift 1/3, **F24b JSON malformation 3/3 → dispatch Forge fix next cycle**, bughunt-gate-soak Phase 2 pending, health-check-notify-script-missing G-rule 3/3 dispatched, Check IX GITHUB_TOKEN missing.
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST worktree-cleanup-merged-pr-reap-001 routing gap — 1/3 G-rule. [carry]
+- [blue] G-rule `routing-denied:pulse→forge` — 1/3. [carry]
+
+**Watch items for iter ~1544:**
+- **Beacon approval-request-depth1-extraction-fix direction-ask**: Watch for Beacon to re-emit the 2 unregistered APPROVAL_REQUESTs + dispatch the outbox_notifier.py fix. Beacon inbox has the envelope; should process on next cycle.
+- **`fix-alert-triage-watermark-durability-001`**: Re-registration pending Beacon processing the direction-ask. Once registered → trust policy routes to Forge preflight.
+- **`dag-preflight-missions-v2-phase3` re-review**: Re-registration pending. Once registered → Mirror re-reviews the amended DAG.
+- **G-rule Pulse-envelope-format 2/3**: Watching for 3rd occurrence → Beacon dispatch.
+- **sentinel-inbox-stall-respect-inflight-001**: Still unverifiable. Larry can `go: sentinel-inbox-stall-respect-inflight-001` to Beacon to unblock.
+
+**PRIME DIRECTIVE:** 0 interventions, 1 systemic_fix this iter. Running total: interventions=801, systemic_fixes=28, ratio=28.61, trend=improving.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0.
+
+---
+
+## Between-cycle note — 2026-06-12 02:30Z UTC (dead-letter recovery)
+
+**Type:** Inter-agent dead-letter notification (`intent=dead-letter | from=beacon | task=approval-request-depth1-extraction-fix-direction-ask-20260612T022900Z | status=FAILED`)
+
+**Root cause:** Envelope rejected by dispatch_validator — `prompt` field missing, used `body` instead (0 chars). This is the F24 empty-prompt / F24b JSON malformation pattern.
+
+**State verification before re-dispatch:**
+- `fix-alert-triage-watermark-durability-001`: No Forge build task found in any forge inbox (active, .archive, .hold). APPROVAL_REQUEST not registered — confirmed unresolved.
+- `dag-preflight-missions-v2-phase3` re-review: routing-signal IS in `~/agents/inboxes/mirror/.archive/` and worktree `wt-mirror-dag-preflight-missions-v2-phase3` is GONE. Mirror already reviewed the amended DAG. **This one is handled; excluded from re-dispatch.**
+
+**Action:** Re-dispatched corrected envelope `approval-request-depth1-extraction-fix-direction-ask-20260612T023000Z.json` to Beacon with `prompt` field (correct schema) + scope narrowed to: (a) re-register `fix-alert-triage-watermark-durability-001` if not in chain_events; (b) dispatch Forge to fix `scripts/outbox_notifier.py` to extract APPROVAL_REQUEST from depth=1 beacon results.
+
+**F24b G-rule update:** This failure is the 3rd occurrence of Pulse generating an envelope with `body` instead of `prompt`. **F24b → 3/3.** A Forge fix is warranted (envelope schema validator / helper for Pulse envelope generation). Will dispatch in next cycle.
+
+---
+
+## Between-cycle note — 2026-06-12 02:25Z UTC (result notification from Beacon)
+
+**Type:** Inter-agent result notification (`intent=result-notification | from=beacon | task=alert-triage-watermark-fix-direction-ask-20260612T022000Z | status=SUCCESS`)
+
+**Summary:** Beacon completed investigation of the G-rule `alert-triage-watermark-loss-on-write` direction-ask dispatched in iter ~1542. Root cause was **corrected** from Pulse's original report.
+
+**Root cause correction (Beacon's verified finding):**
+- Pulse reported: `alert_triage_state.py` write path drops `last_claimed_line` on every write (read-modify-write missing).
+- Actual: The field is **never implemented at all**. `alert-triage.json` is a flat `alert_id → lifecycle_row` dict; `read_state()` filters out all non-dict top-level values; so a scalar `last_claimed_line` written to that file (per the cycle-prompt § 3.0 contract) is silently discarded on next read + clobbered by the next full-file rewrite. The watermark and per-alert lifecycle rows share top-level namespace, and lifecycle writes always win. Iter ~1531's inline data-patch didn't stick for this exact reason.
+
+**Beacon's architecture decision (no Larry input needed — technical call):** Separate the watermark into its own store `~/agents/state/alert-triage-watermark.json` + `get-watermark`/`set-watermark` CLI subcommands in `alert_triage_state.py`, and redirect cycle-prompt § 3.0 to the new CLI. Scoped OUT: the broader `alerts`/`known_patterns`/`triage_decisions` schema divergence — separate, larger reconciliation.
+
+**APPROVAL_REQUEST emitted (Beacon-authored):** `fix-alert-triage-watermark-durability-001` — Forge preflight phase. PR title: `fix(pulse): durable Check 0 alert-watermark store (stop lifecycle-write clobber)`. Trust policy processing.
+
+**Watch update:** G-rule `alert-triage-watermark-loss-on-write` dispatch chain now progressing through Forge preflight. Watch for Forge PROCEED/CLARIFY_REQUEST/REJECT marker → build phase dispatch.
+
+---
+
 ## Iteration ~1542 — 2026-06-12 02:20Z UTC (interactive, /cycle, Tier 3→1 reset, consecutive_clean 2→0)
 
 **Trigger:** Larry direct invocation (`/cycle`).
