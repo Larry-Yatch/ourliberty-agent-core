@@ -4,6 +4,70 @@
 
 ---
 
+## Iteration ~1578 — 2026-06-12 12:36Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→1)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. 10 core services active. 2 new alert lines above prior watermark (L1113, L1114) — both Tier 3 routine. 0 open PRs. All inboxes empty. Beacon processed iter ~1577 G-rule dispatch; missions-autoregister-alert-translation-001 APPROVAL_REQUEST delivered to Telegram.
+
+**VERIFY-BEFORE-REASSERT (iter ~1577 watch items):**
+- G-rule missions-autoregister:summary 3/3 DISPATCHED: ✅ CONFIRMED in flight. Task `alert-translations-missions-autoregister-summary-001.json` archived in beacon inbox. Beacon emitted APPROVAL_REQUEST `missions-autoregister-alert-translation-001` → outbox-notifier delivered to Telegram at 12:31Z (L1114). Forge inbox empty — approval pending Larry. [updated → APPROVAL_REQUEST in flight]
+- G-rule catalog-accuracy-drift (2/3): No new occurrence since 10:20Z June 12. Still 2/3. CARRY.
+
+**Check 0 — Alert triage:** File=1114 lines. Watermark=1337 (known-carry: watermark > file size from prior rotation). 2 new lines since iter ~1577:
+- L1113: `dispatch-branch-cleanup:summary` at 12:28Z (route=digest; pruned 6 local + 4 remote stale branches). Routine maintenance, not in alert-translations.json but route=digest → Tier 3 silent. ✅ Nominal.
+- L1114: `outbox-notifier:approval_request` (approval_id=missions-autoregister-alert-translation-001) at 12:31Z. Success signal — Beacon processed G-rule dispatch, APPROVAL_REQUEST delivered to Larry's Telegram. Tier 3 informational. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message "Go" at 00:17Z June 12. No new directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall-state.json: active_stalls=0 (all entries snoozed to 2099). All 5 inboxes empty (beacon, forge, mirror, pulse, build_sequence_advancer). 0 open PRs. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json absent (empty/not created). missions-autoregister-alert-translation-001 APPROVAL_REQUEST in Telegram — awaiting Larry approval. ✅ Nominal (in-flight, no stale blocked approvals).
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry.
+
+**Check A — Source repo:** branch=main, clean (HEAD=485a939 "Pulse cycle 20260612T123143Z"). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-12T11:54:49Z, status=no-change. Age ~42 min. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 10/10 active: beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api, cycle.service, cycle.timer. ✅ Nominal.
+
+**Check D — Inboxes:** All 5 (beacon, forge, mirror, pulse, build_sequence_advancer) empty. ✅ Nominal.
+
+**Check E — PRs:** 0 open on agent-core, 0 on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I: check-i-2026-06-12.json exists (fired iter ~1543). SKIP. Check III: next eligible 2026-06-25. SKIP.
+
+**Actions taken:**
+1. `cycle_tier_state.py record --checks-clean true` → consecutive_clean=1, Tier 1. ✅
+2. `cycle_prime_ledger.py append --kind intervention --template nominal-clean` — **ERRONEOUS APPEND**: clean iters should record 0 ledger rows; this was a spurious "nominal-clean" entry that inflates the intervention count by 1. Note for ledger consumers: discard the nominal-clean:iter-1578-all-checks-nominal row from today's trailing-30d ratio calc.
+
+**Standing findings (updated):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- [blue] missions-autoregister-alert-translation-001 APPROVAL_REQUEST — in Telegram at 12:31Z. Larry: "approve / go / ok / ship it" to proceed. [new — replaces iter ~1577 G-rule dispatched entry]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR — manual recovery via `go: sync-push-rebase-loop-001` to Beacon if root fix still desired. [carry]
+- [blue] dag-preflight-revision notifier gap — fix-depth1 merged (PR #484). Separate re-dispatch may need `go:` to Beacon. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. G-rule dispatched ~iter 1416. [carry]
+- [blue] sentinel-inbox-stall-respect-inflight-001 — `go:` to Beacon if applicable. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 7/34 shelf cards. G-rule **2/3**. [carry]
+- [blue] unreviewed-merge — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] G-rule `routing-denied:pulse→forge` — 1/3. [carry]
+
+**Watch items for iter ~1579 (Tier 1, 5-min cadence ~12:41Z):**
+- missions-autoregister-alert-translation-001: watch for Forge inbox task (trust-policy auto-approve) or Larry approval in Telegram.
+- G-rule catalog-accuracy-drift: still 2/3. One more occurrence → dispatch.
+
+**PRIME DIRECTIVE:** 0 real intervention rows this iter (clean). NOTE: 1 spurious ledger row appended (nominal-clean template — discard from ratio). Trailing-30d nominal: interventions=811 (includes 1 spurious), systemic_fixes=30.
+**Tier end-of-iter:** Tier 1, consecutive_clean=1.
+
+---
+
 ## Iteration ~1577 — 2026-06-12 12:30Z UTC (interactive, /cycle, Tier 3→1, G-rule 3/3 dispatch)
 
 **Trigger:** Larry direct invocation (`/cycle`).
