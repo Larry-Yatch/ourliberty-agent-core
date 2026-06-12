@@ -4,6 +4,90 @@
 
 ---
 
+## Iteration ~1557 — 2026-06-12 04:54Z UTC (interactive, /cycle, Tier 1, consecutive_clean 1→0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Yellow. 6/6 units alive. 0 new alerts. 0 open PRs. All inboxes clear (Beacon consumed `notify-p3-dashboard-proposed-lane.json` within ~10 min of dispatch). `beacon-pending-approvals.json` MISSING for 3rd consecutive iter — [yellow] threshold crossed per iter ~1556 watch condition. Tier 1, consecutive_clean 1→0.
+
+**VERIFY-BEFORE-REASSERT (iter ~1556 watch items):**
+- **Beacon → p3-dashboard-proposed-lane** (stall threshold 06:41Z UTC): ✅ Beacon's inbox now empty at 04:51Z — task consumed within ~10 min of 04:41Z dispatch. Well within stall threshold. Beacon processing. Watch for Forge re-dispatch.
+- **beacon-pending-approvals.json**: MISSING — 3rd consecutive iter (was ~1555, ~1556, now ~1557). [yellow] threshold crossed. Escalated to pulse-escalations.json entry #19. No DM (Larry active ~3h ago, under 24h threshold).
+- **Tier de-escalation**: consecutive_clean was 1, reset to 0 this iter (non-clean: [yellow] finding).
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: **1322 lines** (UNCHANGED from iter ~1556). 0 new alerts since last iter. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** No new Larry directives since iter ~1556. Last substantive directive: "Go" at 01:57Z UTC (missions-v2-phase3 launch, fully resolved). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** 0 open PRs on agent-core or ourliberty-dashboard. All inboxes clear. No active Forge build tasks. No stalls detected. ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` FILE MISSING — 3rd consecutive iter. 3 prior pending items (fix-alert-triage-watermark-durability-001, fix-depth1-pulse-approval-extraction-001, pulse-envelope-builder-001) remain unverifiable. ⚠️ [yellow] — escalated per watch condition. Possible causes: Beacon cleared pending queue after missions-v2-phase3 completion, items auto-expired, or generation logic changed. No orphaned Larry directives found in last 24h log. ✅ on directive scan; ⚠️ on substrate availability.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing known, G-rule dispatched iter ~1416. Healer confirmed running (last fire 03:50:24Z). [blue] carry.
+
+**Check A — Source repo:** branch=main, clean, head=7598e06 (iter ~1556 wrapper commit). ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-12T03:58:24Z, status=no-change. Age ~53 min at check time. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 6/6 active (ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-cycle.timer). ✅ Nominal. (Note: prior iters used shorter unit name `beacon` etc. — verified correct unit names are `*-bot.service` variants this iter.)
+
+**Check D — Inboxes:** All empty (Forge, Mirror, Beacon, Pulse). Beacon consumed `notify-p3-dashboard-proposed-lane.json` (dispatched 04:41Z, gone by 04:51Z). ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on agent-core. 0 open PRs on ourliberty-dashboard. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** `audit_due_nudge.py` → `no committed audit baseline; no-op.` ✅
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I fired iter ~1543 (02:31Z). SKIP. Check III (next eligible 2026-06-25) → skip.
+
+**Credential rotation:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~71d). ✅
+
+**Key finding this iter:**
+
+**1. [yellow] beacon-pending-approvals.json MISSING — 3rd consecutive iter.**
+File was present in iter ~1554 with 3 pending entries (fix-alert-triage-watermark-durability-001, fix-depth1-pulse-approval-extraction-001, pulse-envelope-builder-001 — all "Forge preflight, pending Larry"). MISSING in iters ~1555, ~1556, ~1557. Per watch condition set in iter ~1556, elevating from [blue] to [yellow]. Most likely cause: Beacon cleared the pending queue dynamically after missions-v2-phase3 completed and all 4 steps merged. Items may have been resolved or auto-expired rather than dropped. No DM issued (Larry active ~3h ago, under 24h threshold). Escalation written to `pulse-escalations.json` entry #19. Larry: if any of the 3 preflight tasks are still needed, re-surface via Beacon.
+
+**2. [blue] Beacon picked up p3-dashboard-proposed-lane clarification (within 2h stall threshold).**
+`notify-p3-dashboard-proposed-lane.json` was in Beacon's inbox at iter ~1556 (04:41Z). Beacon's inbox is now empty at 04:51Z (10 min elapsed). Beacon is processing Forge's design question on accept/dismiss handlers + durable state model for missions dismiss. Stall threshold: 04:41Z + 2h = 06:41Z UTC. Watch for Forge re-dispatch.
+
+**Actions taken:**
+1. `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0, Tier 1 (last_signal_at 04:54:40Z). ✅
+2. `cycle_prime_ledger.py append` → intervention row `beacon-pending-approvals-absent:3x-consecutive-yellow-escalation-iter-1557`. ✅
+3. `pulse-escalations.json` entry #19 written ([yellow] beacon-pending-approvals.json 3rd absence). ✅
+4. No auto-fix actions triggered.
+5. No DMs sent — [yellow] finding within 24h threshold.
+
+**Standing findings (updated):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. Also blocks alert-translations.json Forge task. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). Pending Larry. [carry]
+- [yellow] beacon-pending-approvals.json MISSING 3rd consecutive iter — 3 prior items unverifiable; likely auto-cleared post-missions-v2-phase3. pulse-escalations.json #19. [ESCALATED from blue]
+- [blue] p3-dashboard-proposed-lane — Beacon consumed task (04:51Z), processing Forge design Q. Stall threshold 06:41Z UTC. [carry]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR — depth-1 extraction gap. [carry]
+- [blue] dag-preflight-revision notifier gap — Beacon holds until fix-depth1 merges. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent, healer running (confirmed 03:50:24Z). G-rule dispatched ~iter 1416. [carry]
+- [blue] sentinel-inbox-stall-respect-inflight-001 — say `go: sentinel-inbox-stall-respect-inflight-001` to Beacon if applicable. [carry]
+- [blue] G-rule Pulse-envelope-format — 3/3 DISPATCHED (pulse-envelope-builder-001 specced, Forge preflight). [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 5/34 shelf cards. 1/3 G-rule. [carry]
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464, 465, 467, 468, 466, 470, 471, 472, 473, 475, 476, 477, 478, 479, 480, 52-dashboard) — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] Various G-rule carries: silence-missions-card-gc 001, heal-pipeline-stall heartbeat 3/3 deferred, auto-restart-failed 1/3, completion-DM 1/3, auto-retry source=auto-retry 1/3, Check-C-launcher-liveness APPROVAL_REQUEST pending, retry-exhausted-on-shipped-task 2/3, retry_exhausted:post-merge-install-drift 1/3, bughunt-gate-soak Phase 2 pending, health-check-notify-script-missing G-rule 3/3 dispatched, Check IX GITHUB_TOKEN missing.
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST worktree-cleanup-merged-pr-reap-001 routing gap — 1/3 G-rule. [carry]
+- [blue] G-rule `routing-denied:pulse→forge` — 1/3. [carry]
+- [blue] L1319/L1320 Tier-4 alerts — Check IV candidates for alert-translations.json. [carry]
+
+**Watch items for iter ~1558:**
+- **Beacon → p3-dashboard-proposed-lane**: Watch for Beacon to answer Forge's design question and re-dispatch to Forge. Stall threshold: 04:41Z + 2h = ~06:41Z UTC.
+- **beacon-pending-approvals.json**: If still MISSING in iter ~1558, investigate whether Beacon's generation logic changed or the 3 items were properly resolved. If still needed, nudge Beacon.
+- **Tier de-escalation**: consecutive_clean reset to 0. Need 3 clean iters to reach Tier 2.
+
+**PRIME DIRECTIVE:** 1 new intervention this iter (beacon-pending-approvals.json [yellow] escalation). Running total (trailing-30d): interventions=806, systemic_fixes=30, ratio=26.9.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0.
+
+---
+
 ## Iteration ~1556 — 2026-06-12 04:47Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→1)
 
 **Trigger:** Larry direct invocation (`/cycle`).
