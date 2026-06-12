@@ -40,6 +40,14 @@ tagged ``cycle_prime_ledger`` intervention so per-pattern track record accrues
 for Check V (the B→C link), with an idempotency guard so a re-run on an
 already-handled alert never double-acts.
 
+Check 0's last-claimed ``larry-alerts.jsonl`` line watermark lives in its OWN
+file (``~/agents/state/alert-triage-watermark.json``), NOT a field inside
+alert-triage.json: ``read_state`` drops non-dict top-level keys and
+``_write_state`` rewrites the whole object, so a co-located scalar watermark is
+silently filtered then clobbered by the next lifecycle write. ``read_watermark``
+/ ``write_watermark`` + the ``get-watermark`` / ``set-watermark`` CLI own that
+separate store.
+
 Atomic writes via tmp + replace. Stdlib only.
 """
 from __future__ import annotations
@@ -59,6 +67,15 @@ from atomic_io import atomic_write_json
 
 STATE_REL = 'state/alert-triage.json'
 LOG_REL = 'logs/alert-triage-state.log'
+
+# Check 0's last-claimed larry-alerts.jsonl line watermark. Deliberately a
+# PHYSICALLY-SEPARATE file from STATE_REL: read_state() keeps only top-level keys
+# whose value is a dict (the alert_id-keyed lifecycle rows), and _write_state
+# rewrites the whole object — so a scalar watermark co-located inside
+# alert-triage.json is silently dropped on read and clobbered on the next
+# lifecycle write. Its own store means the lifecycle writes can never touch it.
+WATERMARK_REL = 'state/alert-triage-watermark.json'
+WATERMARK_KEY = 'last_claimed_line'
 
 # Phase C — the per-template execution track-record store. Distinct from the
 # per-alert lifecycle state above: keyed by action-template, it accrues one
@@ -93,6 +110,11 @@ AUTO_FIX_AGENT = 'pulse-auto-fix'
 def _state_path() -> Path:
     root = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', str(Path.home() / 'agents')))
     return root / STATE_REL
+
+
+def _watermark_path() -> Path:
+    root = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', str(Path.home() / 'agents')))
+    return root / WATERMARK_REL
 
 
 def _log_path() -> Path:
@@ -269,6 +291,58 @@ def mark_resolved(alert_id: str, resolved_ts: str,
     row['last_updated'] = _now_iso()
     _write_state(state)
     return True
+
+
+# -------------------- Check 0 line watermark (dedicated store) --------------------
+
+
+def read_watermark() -> Optional[int]:
+    """Return the last-claimed larry-alerts.jsonl line, or None.
+
+    None is the 'MISSING → claim trailing 100 lines as catchup' signal Check 0
+    already handles, so EVERY failure mode degrades to None rather than raising:
+    missing file, corrupt JSON, wrong top-level shape, or a missing/non-int
+    ``last_claimed_line`` key. A bool is rejected (``isinstance(True, int)`` is
+    True in Python, but a boolean watermark is meaningless)."""
+    path = _watermark_path()
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        _log(f'{path.name} unreadable; treating watermark as missing', 'WARN')
+        return None
+    if not isinstance(data, dict):
+        return None
+    line = data.get(WATERMARK_KEY)
+    if isinstance(line, bool) or not isinstance(line, int):
+        return None
+    return line
+
+
+def write_watermark(line: int) -> None:
+    """Persist ``line`` as the last-claimed watermark (read-modify-write).
+
+    Loads the existing object if present so any other top-level keys survive,
+    sets ``last_claimed_line``, then atomically replaces the file. Lives in its
+    own store (``WATERMARK_REL``) that the alert_id-keyed lifecycle writes never
+    touch, so it can't be clobbered by ``_write_state``."""
+    if isinstance(line, bool) or not isinstance(line, int):
+        raise ValueError(f'watermark line must be an int, got {line!r}')
+    path = _watermark_path()
+    doc: dict[str, Any] = {}
+    if path.exists():
+        try:
+            existing = json.loads(path.read_text())
+            if isinstance(existing, dict):
+                doc = existing
+        except (OSError, json.JSONDecodeError):
+            # A corrupt watermark file shouldn't block a fresh write — overwrite
+            # it with a clean object carrying the new line (read returns None on
+            # corrupt anyway, so nothing of value is lost).
+            _log(f'{path.name} corrupt on read-modify-write; overwriting', 'WARN')
+    doc[WATERMARK_KEY] = int(line)
+    atomic_write_json(path, doc, indent=2, sort_keys=True)
 
 
 # -------------------- per-template execution track record (Phase C) --------------------
@@ -640,6 +714,18 @@ def _cli_triage_alert(args) -> int:
     return 0
 
 
+def _cli_get_watermark(_args) -> int:
+    """Print the watermark int, or ``MISSING`` (catchup signal) when absent."""
+    wm = read_watermark()
+    print('MISSING' if wm is None else wm)
+    return 0
+
+
+def _cli_set_watermark(args) -> int:
+    write_watermark(args.line)
+    return 0
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(prog='alert_triage_state.py',
                                      description=__doc__)
@@ -667,6 +753,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     p_r.add_argument('--alert-id', required=True)
     p_r.add_argument('--resolved-ts', required=True)
     p_r.add_argument('--resolution', required=True)
+    sub.add_parser('get-watermark',
+                   help='Print the last-claimed line watermark (or MISSING).')
+    p_sw = sub.add_parser('set-watermark',
+                          help='Set the last-claimed line watermark.')
+    p_sw.add_argument('--line', required=True, type=int)
     args = parser.parse_args(argv)
     if args.cmd == 'read':
         return _cli_read(args)
@@ -680,6 +771,10 @@ def main(argv: Optional[list[str]] = None) -> int:
         return _cli_dispatch(args)
     if args.cmd == 'resolved':
         return _cli_resolve(args)
+    if args.cmd == 'get-watermark':
+        return _cli_get_watermark(args)
+    if args.cmd == 'set-watermark':
+        return _cli_set_watermark(args)
     return 2
 
 
