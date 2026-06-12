@@ -4,6 +4,63 @@
 
 ---
 
+## Iteration ~1604 — 2026-06-12 19:55Z UTC (interactive, /cycle, Tier 2→3 promoted, consecutive_clean 2→3→de-escalate)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. 9/9 services active. 0 open PRs. All inboxes empty. 0 new alerts (watermark 1135=1135). Tier 2 → 3 promoted (3rd consecutive clean iter).
+
+**VERIFY-BEFORE-REASSERT (iter ~1603 watch items):**
+- beacon-pending-approvals.json stale entries (PRs #482+#484): **RESOLVED** — file MISSING (healer GC'd as expected). ✅
+- G-rule pulse-check-iv-no-heartbeat 1/3: heartbeat mtime=2026-06-12T18:26:04Z. **CONFIRMED STALE** — unchanged across iter ~1601/~1602/~1603 and now ~1604. 4th consecutive iter with no heartbeat update. See below.
+- PRIME DIRECTIVE systemic_fixes=33/ratio=24.79: **CONFIRMED** — script-authoritative: interventions=818, systemic_fixes=33, ratio=24.79.
+
+**Check 0 — Alert triage:** larry-alerts.jsonl=1135 lines. Watermark=1135. 0 new alerts since last iter. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message "Go" at 12:10 MDT (18:10Z); same as iter ~1603. Bot last activity: idx=1134 digest-skip at 13:40 MDT (19:40Z). No new directives or agent-distress signals. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall dry-run at 19:51Z: "no stalls detected". All FORGE_NO_PR_SKIP entries verified (pr_exists or preflight-non-proceed). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json MISSING (GC'd). No pending entries. ✅ Nominal (resolved from prior carry).
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry. G-rule dispatched ~iter 1416. ✅ Known carry.
+
+**Check A — Source repo:** main, clean (session gitStatus clean at start; no writes yet). Sync.json: last_sync=2026-06-12T18:55:16Z, status=no-change, commit=859721f. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=18:55:16Z (~56 min ago at check time). Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 active running (beacon-bot, chain-event-shipper, cycle.service, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot). ✅ Nominal.
+
+**Check D — Inboxes:** All inboxes empty (forge, beacon, mirror, pulse). ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on agent-core. 0 open PRs on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I: check-i-2026-06-12.json exists (fired iter ~1543). SKIP. Check III: today=Friday (not Sunday); next eligible 2026-06-15. SKIP.
+
+**Rotations:** 0 credentials in 60-day window. ✅ Nominal.
+
+**G-rule pulse-check-iv-no-heartbeat — THRESHOLD CROSSED:**
+Heartbeat mtime=2026-06-12T18:26:04Z across all 4 consecutive iters ~1601/~1602/~1603/~1604. Prior iters carried this as "1/3" — that count was stale residue (verify-before-reassert discipline failure). Correct count: 4 consecutive occurrences → G-rule 3/3 threshold met. Context from heal-pulse-check-staleness.log: Check IV had no liveness signal since 2026-06-04T04:15:18Z (in "warming up" / first-cadence-window mode for 8 days), finally fired WARN alert at 18:01:55Z (idx=1130 delivered to Larry 18:04Z). Heartbeat written once at 18:26Z (likely triggered by that alert), then no further updates. Pattern: Check IV is not running on a regular cadence after initial trigger. This is a code/config shape → [yellow] escalate + route to Beacon for permanent fix dispatch.
+
+**Actions taken:**
+1. `cycle_tier_state.py record --checks-clean true` → consecutive_clean=3, Tier 2→3 promoted, consecutive_clean reset to 0. ✅
+2. Wrote Beacon direction-ask envelope `pulse-check-iv-cadence-fix-g-rule-20260612T195740Z` → `~/agents/inboxes/beacon/`. ✅
+3. `cycle_prime_ledger.py append --kind verification_pending --template g-rule-pulse-check-iv-cadence` → ledger row appended. ✅
+
+**Standing findings:**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry — unverified this iter]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry — unverified this iter]
+- [yellow] G-rule pulse-check-iv-no-heartbeat 4/3 CROSSED — heartbeat stale since 18:26Z; Check IV not running on cadence. Healer alert delivered (idx=1130). Routing to Beacon for permanent fix. [NEW escalation this iter]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR — `go: sync-push-rebase-loop-001` to Beacon if desired. [carry from ~1603]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. G-rule dispatched ~iter 1416. [re-verified this iter]
+
+**PRIME DIRECTIVE:** 0 intervention rows this iter (clean). Trailing-30d (script-authoritative): interventions=818, systemic_fixes=33, verification_pending=10, ratio=24.79, trend=flat.
+**Tier end-of-iter:** Tier 3, consecutive_clean=0. (3 more clean Tier-3 iters → no further de-escalation; Tier 3 is the floor.)
+
+---
+
 ## Iteration ~1603 — 2026-06-12 19:39Z UTC (interactive, /cycle, Tier 2, consecutive_clean 1→2)
 
 **Trigger:** Larry direct invocation (`/cycle`).
