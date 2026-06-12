@@ -4,6 +4,86 @@
 
 ---
 
+## Iteration ~1592 — 2026-06-12 16:08Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→1)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. 10/10 services active. 0 open PRs. All inboxes empty. 2 new alerts above watermark (both Tier-3 override by judgment). G-rule dispatch-branch-cleanup-alert-translation completed by Beacon — APPROVAL_REQUEST alert-translation-dispatch-branch-cleanup-summary-001 created and delivered to Larry 16:05Z. Tier 1, consecutive_clean 0→1.
+
+**VERIFY-BEFORE-REASSERT (iter ~1591 watch items):**
+- Beacon inbox pick up G-rule envelope: **VERIFIED COMPLETE** — inbox_watcher processed g-rule-dispatch-branch-cleanup-alert-translation-20260612T163000Z at 16:03-16:05Z. Beacon created APPROVAL_REQUEST alert-translation-dispatch-branch-cleanup-summary-001. ✅ CLOSED.
+- missions-autoregister-alert-translation-001 APPROVAL_REQUEST: No new Larry Telegram replies (last message "Go" 00:17Z June 12). Still pending. [carry]
+- p3-dashboard-proposed-lane-002 APPROVAL_REQUEST: No new Larry Telegram replies. Still pending. [carry]
+- G-rule catalog-accuracy-drift (2/3): not re-fired this cycle. Still 2/3. [carry]
+
+**Check 0 — Alert triage:** larry-alerts.jsonl=1122 lines. Watermark=1120→1122. 2 new alerts:
+- L1121: outbox-notifier `approval_request` kind, approval_id=alert-translation-dispatch-branch-cleanup-summary-001, ts=16:05:02Z. Telegram DM already delivered by outbox-notifier. `alert_triage_state.py` returned Tier-4 (no translation match); **Tier-3 override on judgment** — approval_request delivery already happened via designed channel; re-DM would be duplicate noise. Journal note only.
+- L1122: missions-autoregister `summary` (route=digest), ts=16:06:22Z. `alert_triage_state.py` returned Tier-4 (no translation match); **Tier-3 override on judgment** — route=digest correct; AR missions-autoregister-alert-translation-001 is the pending systemic fix. Journal note only.
+- Watermark advanced to 1122. No DMs sent. ✅ No tier-reset from Check 0.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message 00:17:27 MDT June 12 (06:17Z) — "Go", handled prior cycles. No new directives in last 4h. Beacon bot log last entry 09:32 MDT (15:32Z) — log silence for 66m, but inbox_watcher confirms Beacon processed G-rule task at 16:03-16:05Z. Log silence is Telegram-idle, not bot-down. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall dry-run: "no stalls detected" (16:03:50Z). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json MISSING. 3 in-flight APPROVAL_REQUESTs confirmed delivered via beacon_telegram_bot.log (missions-autoregister-alert-translation-001 06:35Z, p3-dashboard-proposed-lane-002 07:51Z, alert-translation-dispatch-branch-cleanup-summary-001 16:05Z). No orphaned directives. File will regenerate on next healer pass. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry. G-rule dispatched ~iter 1416. ✅ Known carry.
+
+**Check A — Source repo:** main, clean (session gitStatus: 1635fbb "Pulse cycle 20260612T160248Z"). ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: status=no-change, last_sync=2026-06-12T15:55:06Z (~13 min ago at check time). ✅ Nominal.
+
+**Check C — Agent liveness:** 10/10 active (systemctl). ✅ Nominal.
+
+**Check D — Inboxes:** All 5 (beacon, forge, mirror, pulse, build_sequence_advancer) empty. ✅ Nominal. (Note: Beacon + Pulse inboxes each had 1 task at session start — both processed by inbox_watcher before this cycle's check ran. Beacon G-rule task completed 16:05Z. Pulse dead-letter task completed 16:04Z by prior Pulse session.)
+
+**Check E — PRs:** 0 open on agent-core, 0 on ourliberty-dashboard. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal → no-op. ✅ Nominal.
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I: check-i-2026-06-12.json exists (fired iter ~1543). SKIP. Check III: next eligible 2026-06-25. SKIP.
+
+**Rotations:** 0 credentials in 60-day window (nearest: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 = 71d out). ✅ Nominal.
+
+**Actions taken:**
+1. `alert_triage_state.py set-watermark --line 1122` → watermark advanced 1120→1122. ✅
+2. `cycle_prime_ledger.py append --tier 1 --kind iter_clean --iter 1592` → recorded. ✅
+3. `cycle_tier_state.py record --checks-clean true` → consecutive_clean=1, Tier 1. ✅
+4. No DMs sent (all new alerts Tier-3 override; no new Larry-action items).
+
+**Standing findings (unchanged from iter ~1591 except as noted):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- [blue] missions-autoregister-alert-translation-001 APPROVAL_REQUEST — delivered Telegram 06:35Z June 12. Larry: "approve / go / ok / ship it" to proceed. [carry]
+- [blue] p3-dashboard-proposed-lane-002 APPROVAL_REQUEST — delivered Telegram 07:51Z June 12. Larry: "approve / go / ok / ship it" to re-dispatch proposed-thread affordance. [carry]
+- **[NEW] [blue] alert-translation-dispatch-branch-cleanup-summary-001 APPROVAL_REQUEST** — Beacon processed G-rule and created this. Delivered Telegram 16:05Z June 12. Larry: "approve / go / ok / ship it" to add dispatch-branch-cleanup:summary to alert-translations.json (Tier-3 silence).
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR — `go: sync-push-rebase-loop-001` to Beacon if root fix still desired. [carry]
+- [blue] dag-preflight-revision notifier gap — PR #484 closed source=pulse gap; DAG re-dispatch markers still fall through; `go:` to Beacon if desired. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. G-rule dispatched ~iter 1416. [carry]
+- [blue] sentinel-inbox-stall-respect-inflight-001 — `go:` to Beacon if applicable. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 7/34 shelf cards. G-rule 2/3. [carry]
+- [blue] unreviewed-merge — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] G-rule `routing-denied:pulse→forge` — 1/3. [carry]
+- [blue] G-rule spurious-orphan-autoregister-entry — 1/3. [carry]
+- [blue] beacon-pending-approvals.json MISSING — 3 in-flight ARs confirmed delivered but file not regenerated yet. Healer will recreate. [carry]
+
+**Watch items for iter ~1593:**
+- alert-translation-dispatch-branch-cleanup-summary-001 APPROVAL_REQUEST: watch for Larry "approve / ship it" reply.
+- beacon-pending-approvals.json: verify regenerated by healer with 3 in-flight ARs.
+- APPROVAL_REQUESTs missions-autoregister-alert-translation-001 + p3-dashboard-proposed-lane-002: still pending.
+- G-rule catalog-accuracy-drift: still 2/3. One more occurrence → dispatch.
+- Tier 1 consecutive_clean=1; two more clean iters → de-escalate to Tier 2.
+
+**PRIME DIRECTIVE:** 0 intervention rows this iter (clean). Trailing-30d: interventions=816, systemic_fixes=31, ratio=26.32, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=1.
+
+---
+
 ## Iteration ~1591 — 2026-06-12 16:00Z UTC (interactive, /cycle, Tier 3→1, G-rule dispatch)
 
 **Trigger:** Larry direct invocation (`/cycle`).
@@ -79,6 +159,22 @@
 
 **PRIME DIRECTIVE:** 1 intervention + 1 systemic_fix this iter (G-rule dispatch). Trailing-30d: interventions=816, systemic_fixes=31, ratio=26.32, trend=improving.
 **Tier end-of-iter:** Tier 3→1 (G-rule dispatch = non-clean iter). consecutive_clean reset to 0.
+
+---
+
+## Inter-agent notify — 2026-06-12 ~16:30Z UTC (dispatch-dead-letter, not a full cycle)
+
+**Trigger:** Beacon dead-letter notify: `g-rule-dispatch-branch-cleanup-alert-translation-20260612T160047Z.json` rejected by dispatch_validator.
+
+**Root cause:** `"timeout": "2h"` — string instead of integer seconds. Validator bound is [60, 14400] seconds; the string literal "2h" fails schema validation. No reason was recorded in the validator rejection because the rejection predates the envelope being processed — the validator rejects on field type before inspecting content.
+
+**Context:** This was a second attempt to land `dispatch-branch-cleanup:summary` in `config/alert-translations.json`. The first attempt (`g-rule-dispatch-branch-cleanup-summary-silence-001`, June 11 ~22:58Z) was processed by Beacon which emitted an APPROVAL_REQUEST — but that marker fell through: `beacon-pending-approvals.json` does not exist and no Forge archive for this task exists. The work was never completed.
+
+**Action taken:** Re-dispatched corrected envelope `g-rule-dispatch-branch-cleanup-alert-translation-20260612T163000Z.json` to Beacon inbox with `"timeout": 7200` (integer). All other fields unchanged. `dedup_identity` retained as `g-rule-dispatch-branch-cleanup-alert-translation` to prevent a duplicate if the June 11 chain resurfaces.
+
+**PRIME DIRECTIVE:** 1 intervention (dead-letter diagnosis + re-dispatch). No systemic_fix row this iter (the schema bug is in Pulse's own envelope-construction pattern — logging for pattern watch, not dispatching a fix yet).
+
+**Pattern note (1/3 for timeout-schema G-rule):** This is the first observed instance of a Pulse envelope rejected for string-typed timeout. Watch for recurrence before dispatching a Forge fix.
 
 ---
 
