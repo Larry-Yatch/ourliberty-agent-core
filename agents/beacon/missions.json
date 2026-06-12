@@ -2018,6 +2018,23 @@
       "proposed_at": "2026-06-12T10:32:00.690568+00:00",
       "orphan_branch": null,
       "orphan_last_activity_ts": "2026-06-12T10:20:37.131051+00:00"
+    },
+    {
+      "id": "proposed-ceo-digest-daily-2026-06-11",
+      "name": "Ceo Digest Daily 2026 06 11",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `ceo-digest-daily-2026-06-11`. Last activity 2026-06-12T12:01:36.371796+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "ceo-digest-daily-2026-06-11"
+      ],
+      "repo": null,
+      "created": "2026-06-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-12T12:03:15.967492+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-12T12:01:36.371796+00:00"
     }
   ]
 }
