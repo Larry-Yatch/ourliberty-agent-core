@@ -7131,7 +7131,31 @@ def _route_beacon_replan_approval(data: dict[str, Any]) -> bool:
     return True
 
 
-def _route_beacon_pulse_auto_dispatch_approval(data: dict[str, Any]) -> bool:
+def _primary_chat_id() -> Optional[int]:
+    """Resolve Larry's primary Telegram chat from TELEGRAM_ALLOWED_CHAT_IDS
+    (the bot's own allow-list), returning the lowest authorized id — the
+    default Larry chat for daemon-originated approvals that carry no
+    originating chat. Mirrors `pulse_check_v._primary_chat_id`. Returns None
+    if the env var is unset/empty; callers then fall through rather than
+    drop the approval into a broadcast.
+    """
+    raw = os.environ.get('TELEGRAM_ALLOWED_CHAT_IDS', '')
+    ids = []
+    for tok in raw.replace(',', ' ').split():
+        try:
+            ids.append(int(tok))
+        except ValueError:
+            continue
+    return min(ids) if ids else None
+
+
+def _route_beacon_pulse_auto_dispatch_approval(
+    data: dict[str, Any],
+    *,
+    policy_source: str = 'pulse-auto-dispatch',
+    chat_id_fallback: Optional[int] = None,
+    enforce_task_id_match: bool = True,
+) -> bool:
     """Handle Beacon's APPROVAL_REQUEST emitted in response to a
     Pulse-auto-dispatch inbox envelope (closed-loop step 4).
 
@@ -7152,6 +7176,22 @@ def _route_beacon_pulse_auto_dispatch_approval(data: dict[str, Any]) -> bool:
     Discipline gate: payload `task_id` must match envelope `task_id`. Beacon's
     Shape 8 guidance keys the marker's task_id to the upstream envelope so a
     drift here signals she's responding to the wrong dispatch.
+
+    Keyword parameters (all default to the pulse-auto-dispatch behavior, so
+    the original caller is unchanged; the source='pulse' direction-ask caller
+    overrides them — fix-depth1-pulse-approval-extraction-001, 2026-06-12):
+      - `policy_source`: the `source` stamped on the trust_policy task so the
+        policy file can carve out per-source rules. Pulse direction-asks pass
+        `'pulse'` to stay distinct from `'pulse-auto-dispatch'`.
+      - `chat_id_fallback`: when the envelope's `reply_chat_id` is not an int
+        (direction-ask envelopes carry `reply_chat_id: null`), this int is
+        used instead of dropping the approval. `None` preserves the original
+        "no valid chat → fall through" behavior.
+      - `enforce_task_id_match`: when False, skip the marker/envelope task_id
+        discipline gate. A direction-ask proposes a NEW task, so the marker's
+        task_id legitimately differs from the question envelope's task_id
+        (mirrors `_handle_beacon_headless_approval_request`, where the
+        marker's task_id is authoritative).
 
     Returns:
       True if the auto-dispatch path took over (caller archives the outbox
@@ -7191,7 +7231,7 @@ def _route_beacon_pulse_auto_dispatch_approval(data: dict[str, Any]) -> bool:
     if envelope_task_id.startswith('notify-'):
         envelope_task_id = envelope_task_id[len('notify-'):]
     marker_task_id = payload.get('task_id')
-    if marker_task_id != envelope_task_id:
+    if enforce_task_id_match and marker_task_id != envelope_task_id:
         log(
             f'beacon pulse-auto-dispatch APPROVAL_REQUEST task_id mismatch '
             f'(envelope={envelope_task_id}, marker={marker_task_id!r}); '
@@ -7201,22 +7241,31 @@ def _route_beacon_pulse_auto_dispatch_approval(data: dict[str, Any]) -> bool:
         return False
 
     reply_chat_id = data.get('reply_chat_id')
-    is_valid_chat = isinstance(reply_chat_id, int)
-    if not is_valid_chat:
-        log(
-            f'beacon pulse-auto-dispatch APPROVAL_REQUEST for task {task_id} '
-            f'has no valid reply_chat_id (got {reply_chat_id!r}); cannot '
-            f'route approval DM, falling through',
-            'WARN',
-        )
-        return False
+    if not isinstance(reply_chat_id, int):
+        if isinstance(chat_id_fallback, int):
+            log(
+                f'beacon pulse-auto-dispatch APPROVAL_REQUEST for task '
+                f'{task_id} has no valid reply_chat_id (got '
+                f'{reply_chat_id!r}); falling back to default Larry chat '
+                f'{chat_id_fallback}',
+            )
+            reply_chat_id = chat_id_fallback
+        else:
+            log(
+                f'beacon pulse-auto-dispatch APPROVAL_REQUEST for task '
+                f'{task_id} has no valid reply_chat_id (got '
+                f'{reply_chat_id!r}); cannot route approval DM, falling '
+                f'through',
+                'WARN',
+            )
+            return False
 
     # Trust policy — source='pulse-auto-dispatch' so the policy file can
     # carve out per-source rules independently of beacon-sourced dispatches.
     # Bypass approval.trust_decision (which hardcodes source='beacon') and
     # call trust_policy.evaluate directly with the Pulse source.
     policy_task = {
-        'source': 'pulse-auto-dispatch',
+        'source': policy_source,
         'target_agent': payload.get('target_agent', 'forge'),
         'task_type': payload.get('task_type'),
         'target_repo': payload.get('target_repo'),
@@ -8586,6 +8635,33 @@ def process_outbox(outbox_file: Path) -> str:
         if _route_beacon_pulse_auto_dispatch_approval(data):
             _archive_outbox(outbox_file)
             return 'notified-pulse-auto-dispatch'
+
+    # fix-depth1-pulse-approval-extraction-001 (2026-06-12) — Beacon outbox
+    # responding to a Pulse *direction-ask* (a depth=1 beacon-result with
+    # source='pulse', NOT 'pulse-auto-dispatch'). When Pulse asks Beacon a
+    # question and Beacon answers by proposing a task via an APPROVAL_REQUEST
+    # marker, that marker previously matched NEITHER the auto-dispatch set
+    # (above) NOR the trusted set (larry/orchestrator, below), so it fell
+    # through to a plain notify-back-to-Pulse and was silently dropped — the
+    # gap that stranded `fix-alert-triage-watermark-durability-001`. Route it
+    # through the SAME extraction + trust_policy + add_pending pipeline as
+    # pulse-auto-dispatch, with two direction-ask accommodations: (1) the
+    # marker proposes a NEW task so its task_id legitimately differs from the
+    # question envelope's (enforce_task_id_match=False, mirroring the headless
+    # path); (2) direction-ask envelopes carry reply_chat_id=null, so fall
+    # back to the default Larry chat rather than dropping the approval.
+    # Trust policy is still consulted (source='pulse'), so a force_ask still
+    # reaches Larry — no auto-approve. A markerless / malformed result returns
+    # False and falls through to default Pulse-notify routing unchanged.
+    if agent == 'beacon' and source == 'pulse':
+        if _route_beacon_pulse_auto_dispatch_approval(
+            data,
+            policy_source='pulse',
+            chat_id_fallback=_primary_chat_id(),
+            enforce_task_id_match=False,
+        ):
+            _archive_outbox(outbox_file)
+            return 'notified-pulse-direction-ask'
 
     # Task #17 (2026-05-19) — headless Beacon APPROVAL_REQUEST handler.
     # When Claude in a Larry-session drops a dispatch envelope into Beacon's

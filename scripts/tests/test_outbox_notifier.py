@@ -6531,6 +6531,256 @@ class BeaconPulseAutoDispatchTest(unittest.TestCase):
         self.assertEqual(result, 'headless-approval-dispatched')
 
 
+# -------------------- fix-depth1-pulse-approval-extraction-001 (2026-06-12) --------------------
+
+
+class BeaconPulseDirectionAskTest(unittest.TestCase):
+    """A depth=1 Beacon beacon-result with source='pulse' (a Pulse
+    direction-ask answer) carrying an APPROVAL_REQUEST marker must be
+    extracted + registered through the SAME pipeline as pulse-auto-dispatch:
+    trust_policy is consulted, add_pending creates the entry, an
+    approval_request chain_event fires, and a force_ask alert reaches Larry.
+
+    Direction-ask accommodations exercised here: reply_chat_id=null falls
+    back to the default Larry chat (TELEGRAM_ALLOWED_CHAT_IDS) instead of
+    dropping the approval, and the marker's task_id is authoritative (no
+    envelope/marker match gate). A markerless source='pulse' result must
+    still fall through to default Pulse-notify routing (no regression).
+
+    Setup/teardown mirrors BeaconPulseAutoDispatchTest, plus management of
+    the TELEGRAM_ALLOWED_CHAT_IDS env that resolves the chat fallback.
+    """
+
+    _DEFAULT_LARRY_CHAT = 7998341473
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',
+            'BLACKBOARD', 'LOG_FILE', 'DEAD_LETTER_STATE',
+            'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+        self._rv_root = rv.REPO_ROOT
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.invalidate_cache()
+        import larry_alerts as la
+        self._la_originals = {
+            'AGENTS_ROOT': la.AGENTS_ROOT,
+            'ALERTS_FILE': la.ALERTS_FILE,
+            'COOLDOWN_ROOT': la.COOLDOWN_ROOT,
+            'OFFSET_FILE': la.OFFSET_FILE,
+        }
+        la.AGENTS_ROOT = self._root
+        la.ALERTS_FILE = self._root / 'blackboard' / 'larry-alerts.jsonl'
+        la.COOLDOWN_ROOT = self._root / 'state' / 'alert-cooldown'
+        la.OFFSET_FILE = self._root / 'state' / 'beacon-alerts-offset.txt'
+        self._la = la
+        import beacon_approval_handler as ah
+        self._ah_original = ah.PENDING_APPROVALS_PATH
+        ah.PENDING_APPROVALS_PATH = self._root / 'state' / 'pending-approvals.json'
+        self._ah = ah
+        import trust_policy as tp
+        self._tp = tp
+        self._tp_original_runtime = tp.RUNTIME_POLICY_PATH
+        self._tp_original_repo = tp.REPO_POLICY_PATH
+        tp.RUNTIME_POLICY_PATH = self._root / 'trust-policy.json'
+        tp.REPO_POLICY_PATH = self._root / 'trust-policy-repo.json'
+        self._chat_env_backup = os.environ.get('TELEGRAM_ALLOWED_CHAT_IDS')
+        os.environ['TELEGRAM_ALLOWED_CHAT_IDS'] = str(self._DEFAULT_LARRY_CHAT)
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        for name, value in self._la_originals.items():
+            setattr(self._la, name, value)
+        self._ah.PENDING_APPROVALS_PATH = self._ah_original
+        self._tp.RUNTIME_POLICY_PATH = self._tp_original_runtime
+        self._tp.REPO_POLICY_PATH = self._tp_original_repo
+        rv.REPO_ROOT = self._rv_root
+        rv.invalidate_cache()
+        if self._chat_env_backup is None:
+            os.environ.pop('TELEGRAM_ALLOWED_CHAT_IDS', None)
+        else:
+            os.environ['TELEGRAM_ALLOWED_CHAT_IDS'] = self._chat_env_backup
+        self._tmp.cleanup()
+
+    def _set_policy(self, default_action='force_ask', rules=None):
+        policy = {
+            'version': 1,
+            'default_action': default_action,
+            'rules': rules or [],
+        }
+        self._tp.RUNTIME_POLICY_PATH.parent.mkdir(parents=True, exist_ok=True)
+        self._tp.RUNTIME_POLICY_PATH.write_text(json.dumps(policy))
+
+    def _write_outbox(self, agent, name, body):
+        outbox_dir = on.OUTBOXES_ROOT / agent
+        outbox_dir.mkdir(parents=True, exist_ok=True)
+        f = outbox_dir / name
+        f.write_text(json.dumps(body))
+        return f
+
+    def _read_alerts(self):
+        if not self._la.ALERTS_FILE.exists():
+            return []
+        lines = self._la.ALERTS_FILE.read_text().splitlines()
+        return [json.loads(line) for line in lines if line.strip()]
+
+    def _direction_ask_outbox(
+        self,
+        marker_text=None,
+        narrative_prefix='Answering the Pulse direction-ask below.',
+        reply_chat_id=None,
+        envelope_task_id='direction-ask-001',
+        marker_task_id='fix-alert-triage-watermark-durability-001',
+        **overrides,
+    ):
+        """Synthetic depth=1 Beacon beacon-result answering a Pulse
+        direction-ask. source='pulse'; the marker proposes a NEW task whose
+        task_id differs from the question envelope's; reply_chat_id is null
+        (the gap that stranded fix-alert-triage-watermark-durability-001)."""
+        if marker_text is None:
+            marker_text = _beacon_approval_request_marker(task_id=marker_task_id)
+        result = (
+            f'{narrative_prefix}\n\n{marker_text}'
+            if marker_text else narrative_prefix
+        )
+        body = _good_outbox(
+            agent='beacon',
+            source='pulse',
+            task_id=envelope_task_id,
+            result=result,
+            _notify_depth=1,
+        )
+        body['reply_chat_id'] = reply_chat_id
+        body.update(overrides)
+        return body
+
+    # ----- happy path: marker extracted + registered via fallback chat -----
+
+    def test_direction_ask_marker_extracted_and_registered(self):
+        emitted = []
+
+        def _spy_emit(**kwargs):
+            emitted.append(kwargs)
+
+        body = self._direction_ask_outbox()
+        f = self._write_outbox('beacon', 'beacon-da.json', body)
+        with mock.patch.object(on.chain_event_emit, 'emit_event', _spy_emit):
+            result = on.process_outbox(f)
+        # Took over routing (NOT a plain Pulse-notify).
+        self.assertEqual(result, 'notified-pulse-direction-ask')
+        # add_pending registered the marker's (authoritative) task_id with
+        # the fallback Larry chat.
+        state = self._ah.load_state()
+        pending = state.get('pending', [])
+        self.assertEqual(len(pending), 1)
+        entry = pending[0]
+        self.assertEqual(entry['id'], 'fix-alert-triage-watermark-durability-001')
+        self.assertEqual(entry['chat_id'], self._DEFAULT_LARRY_CHAT)
+        # approval_request chain_event fired.
+        self.assertTrue(
+            any(e.get('event_type') == 'approval_request' for e in emitted),
+            f'expected an approval_request chain_event, got {emitted!r}',
+        )
+        # force_ask alert reached Larry on the fallback chat.
+        alerts = self._read_alerts()
+        approval_records = [a for a in alerts if a.get('kind') == 'approval_request']
+        self.assertEqual(len(approval_records), 1)
+        self.assertEqual(approval_records[0]['chat_id'], self._DEFAULT_LARRY_CHAT)
+        self.assertEqual(
+            approval_records[0]['approval_id'],
+            'fix-alert-triage-watermark-durability-001',
+        )
+
+    # ----- regression: markerless source='pulse' result falls through -----
+
+    def test_no_marker_falls_through_to_default_notify(self):
+        body = self._direction_ask_outbox(marker_text='')
+        f = self._write_outbox('beacon', 'beacon-da-noop.json', body)
+        result = on.process_outbox(f)
+        self.assertNotEqual(result, 'notified-pulse-direction-ask')
+        state = self._ah.load_state()
+        self.assertEqual(len(state.get('pending', [])), 0)
+        alerts = self._read_alerts()
+        approval_records = [a for a in alerts if a.get('kind') == 'approval_request']
+        self.assertEqual(len(approval_records), 0)
+
+    # ----- regression: malformed marker falls through cleanly -----
+
+    def test_malformed_marker_falls_through(self):
+        bad_payload = json.dumps({'task_id': 'x'})  # missing required fields
+        bad_marker = (
+            f'=== APPROVAL_REQUEST ===\n{bad_payload}\n'
+            f'=== END_APPROVAL_REQUEST ==='
+        )
+        body = self._direction_ask_outbox(marker_text=bad_marker)
+        f = self._write_outbox('beacon', 'beacon-da-bad.json', body)
+        result = on.process_outbox(f)
+        self.assertNotEqual(result, 'notified-pulse-direction-ask')
+        state = self._ah.load_state()
+        self.assertEqual(len(state.get('pending', [])), 0)
+
+    # ----- trust_policy still consulted: reject path DMs Larry -----
+
+    def test_trust_policy_reject_queues_rejection_dm(self):
+        self._set_policy(default_action='reject')
+        body = self._direction_ask_outbox()
+        f = self._write_outbox('beacon', 'beacon-da-rej.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-pulse-direction-ask')
+        state = self._ah.load_state()
+        self.assertEqual(len(state.get('pending', [])), 0)
+        alerts = self._read_alerts()
+        notifs = [a for a in alerts if a.get('kind') == 'notification']
+        self.assertEqual(len(notifs), 1)
+        self.assertEqual(notifs[0]['intent'], 'reject')
+
+    # ----- fallback unavailable: no chat env → fall through, not drop-to-DM -----
+
+    def test_no_chat_fallback_available_falls_through(self):
+        os.environ.pop('TELEGRAM_ALLOWED_CHAT_IDS', None)
+        body = self._direction_ask_outbox()
+        f = self._write_outbox('beacon', 'beacon-da-nochat.json', body)
+        result = on.process_outbox(f)
+        self.assertNotEqual(result, 'notified-pulse-direction-ask')
+        state = self._ah.load_state()
+        self.assertEqual(len(state.get('pending', [])), 0)
+
+    # ----- explicit reply_chat_id is honored over the fallback -----
+
+    def test_explicit_reply_chat_id_used_when_present(self):
+        body = self._direction_ask_outbox(reply_chat_id=12345)
+        f = self._write_outbox('beacon', 'beacon-da-explicit.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-pulse-direction-ask')
+        state = self._ah.load_state()
+        pending = state.get('pending', [])
+        self.assertEqual(len(pending), 1)
+        self.assertEqual(pending[0]['chat_id'], 12345)
+
+
 # -------------------- D3.5 5c-followup-2 (audit C-1 + C-2 + Miss #3) --------------------
 
 
