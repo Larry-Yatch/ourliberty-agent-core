@@ -217,6 +217,10 @@ _FIXTURE_TRANSLATIONS = {
         'surfaced-subject': {'severity': 'WARNING', 'tier': 'SOON',
                              'never_silence': True},
     },
+    # outbox-notifier success alerts carry the pattern in `intent`, subject None.
+    'outbox-notifier': {
+        'review-pass': {'severity': 'INFO', 'tier': 'FYI'},
+    },
 }
 
 
@@ -242,6 +246,19 @@ class TestTranslationMatch(unittest.TestCase):
     def test_none_subject_no_match(self):
         self.assertFalse(ats._translation_match(
             _FIXTURE_TRANSLATIONS, 'heal-known', None))
+
+    def test_intent_fallback_when_subject_none(self):
+        # outbox-notifier carries the pattern in `intent`, not `subject`. With
+        # subject None the lookup falls back to intent and finds the entry.
+        entry = ats._translation_match(
+            _FIXTURE_TRANSLATIONS, 'outbox-notifier', None, 'review-pass')
+        self.assertIsInstance(entry, dict)
+        self.assertEqual(entry.get('tier'), 'FYI')
+
+    def test_both_subject_and_intent_none_no_match(self):
+        # Regression guard for the existing 3-arg behavior: no key → None.
+        self.assertIsNone(ats._translation_match(
+            _FIXTURE_TRANSLATIONS, 'outbox-notifier', None, None))
 
     def test_match_returns_entry_dict(self):
         # The matcher returns the entry so callers can read directives like
@@ -273,6 +290,16 @@ class TestClassify(unittest.TestCase):
         r = self._classify({'source': 'heal-known', 'subject': 'known-subject',
                             'template': 'reinstall-systemd-unit'})
         self.assertEqual(r['tier'], 3)
+
+    def test_tier3_intent_fallback_silences_to_digest(self):
+        # outbox-notifier success: subject is None, pattern carried in intent.
+        # The gate-1 translation match must succeed via the intent fallback and
+        # silence to digest instead of falling through to Tier 4.
+        r = self._classify({'source': 'outbox-notifier', 'subject': None,
+                            'intent': 'review-pass'})
+        self.assertEqual(r['tier'], 3)
+        self.assertEqual(r['route'], 'digest')
+        self.assertEqual(r['decision'], 'silence')
 
     def test_never_silence_match_escalates_not_silenced(self):
         # A known pattern flagged never_silence (e.g. a dark pulse check) must
