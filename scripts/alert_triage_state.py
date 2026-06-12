@@ -481,13 +481,21 @@ def load_translations(path: Optional[Path] = None) -> dict[str, Any]:
 
 
 def _translation_match(translations: dict[str, Any], source: str,
-                       subject: Optional[str]) -> Optional[dict[str, Any]]:
+                       subject: Optional[str],
+                       intent: Optional[str] = None
+                       ) -> Optional[dict[str, Any]]:
     """Return the matched translation entry, or ``None`` if no match.
 
     Mirrors the table's own lookup_rule: source must match a top-level key
     exactly; then exact subject, else strip trailing ``:``-segments one at a
     time and retry (longest-prefix, first match wins). ``_schema`` is metadata,
     never a source.
+
+    Some producers (e.g. outbox-notifier success alerts) carry the pattern in
+    ``intent`` and leave ``subject`` None. When ``subject is None`` we fall back
+    to ``intent`` as the lookup key, then apply the same longest-prefix match.
+    With both None there is no key and the function returns ``None`` — so the
+    existing 3-arg callers (``intent`` defaults to None) keep their behavior.
 
     Returns the entry dict so callers can inspect directives such as
     ``never_silence``. A matched entry is always a (truthy) dict; a miss is
@@ -497,9 +505,9 @@ def _translation_match(translations: dict[str, Any], source: str,
     by_subject = translations.get(source)
     if not isinstance(by_subject, dict):
         return None
-    if subject is None:
+    key = subject if subject is not None else intent
+    if key is None:
         return None
-    key = subject
     while key:
         if key in by_subject:
             entry = by_subject[key]
@@ -545,7 +553,10 @@ def classify(alert: dict[str, Any], *, registry: dict[str, dict[str, Any]],
     # *translated but still surfaced* (e.g. a dark pulse check). Such an entry
     # must not be muted to digest — it falls through to Tier 4 so it escalates
     # with its translation intact.
-    match = _translation_match(translations, source, subject)
+    # ``subject`` stays untouched below (route_fn / is_significant / rationale);
+    # the intent fallback is scoped to this translation lookup only.
+    match = _translation_match(translations, source, subject,
+                               alert.get('intent'))
     if match is not None and not match.get('never_silence'):
         return {
             'tier': 3,
