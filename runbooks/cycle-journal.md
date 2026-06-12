@@ -4,6 +4,71 @@
 
 ---
 
+## Iteration ~1615 — 2026-06-12 23:57Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→1)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. 9/9 services active. 0 open PRs. All inboxes empty. 1 new alert (L1143 = source=pulse-cycle self-report; treated as known-pattern, no re-DM). Tier 1, consecutive_clean 0→1.
+
+**VERIFY-BEFORE-REASSERT (iter ~1614 watch items):**
+- unreviewed-merge:489 [yellow] DM sent: **CONFIRMED OPEN** — no Larry reply visible in beacon bot log since 17:05Z "pin to tier 2" response. DM delivered; carrying as open. [carry]
+- Tier-2 weekly probe auth_401: **CONFIRMED CARRY** — no new chain artifact. [carry]
+- Check III threshold proposals `approve threshold-update-2026-06-11`: **CONFIRMED CARRY** — no Larry approval observed. [carry]
+- G-rule pulse-check-iv-no-heartbeat (3/3): **CONFIRMED CARRY** — heartbeat mtime=18:26:04Z unchanged; pulse-check-iv service+timer inactive (exit code 4). Drift-healer runs Sat 06:00Z. [carry → resolves after install]
+- G-rule timer-cycle-no-journal-entry (1/3): **CARRIED** — no new unjournaled fires observed. [carry at 1/3]
+- beacon-pending-approvals.json stale entries: **CONFIRMED** — 0 pending items (healer has GC'd). ✅ Resolved.
+- PRIME DIRECTIVE ratio=24.85: **CONFIRMED** (script-authoritative). [confirmed]
+
+**Check 0 — Alert triage:** larry-alerts.jsonl=1143 lines. Watermark was 1142, 1 new alert.
+- L1143 (source=pulse-cycle, 23:49Z, subject=unreviewed-merge:489): This is Pulse's own [yellow] escalation DM record from iter ~1614. Script classified Tier-4 (no registry template), but this is a source=pulse-cycle self-report of an already-sent DM — re-DMing Larry would duplicate iter ~1614's escalation. Treated as known-pattern (self-report): journal-note only, no second DM. Watermark advanced 1142→1143. ✅ Nominal (G-rule candidate: source=pulse-cycle alerts are Pulse DM delivery records — 1/3; at 3/3 dispatch Beacon to add allowlist entry to alert-translations.json).
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message "pin to tier 2" at 17:03:30-0600 (23:03Z); Beacon responded 17:05Z explaining rotation.disabled mechanism. rotation.disabled=tier1 (unchanged). No new Larry messages since. No orphan directives. ✅ Nominal. [note: rotation.disabled not yet updated to "tier2" — Beacon's domain, no Pulse action]
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall dry-run at 23:55Z: "no stalls detected". 9 FORGE_NO_PR_SKIPs (all pr_exists or preflight-non-proceed). State file mtime=23:50Z (~7 min ago). ✅ Nominal.
+
+**Check 4 — Pending directives:** All 24h directives tracked: "Go" at 16:35Z → PR #488 (merged); "pin to tier 2" at 17:03Z → Beacon responded (handled). No orphans. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry. G-rule dispatched ~iter 1416. ✅ Known carry.
+
+**Check A — Source repo:** gitStatus: main, clean, HEAD=e56b32f "Pulse cycle 20260612T235134Z". Repo ahead of origin by ~3 post-iter-1614 commits (normal wrapper-commit pattern; sync not yet fired). ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: last_sync=2026-06-12T22:56:02Z (~57 min ago), status=no-change, commit=83ff858. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 active (beacon-bot, chain-event-shipper, cycle.service, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot). ourliberty-pulse-check-iv.service + .timer inactive (expected; drift-healer install pending Sat 06:00Z). ✅ Nominal.
+
+**Check D — Inboxes:** All inboxes empty (forge=0, beacon=0, mirror=0, pulse=0). ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on agent-core. 0 open PRs on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I: check-i-2026-06-12.json exists (fired iter ~1543). SKIP. Check III: today=Friday (not Sunday); next eligible 2026-06-15. SKIP.
+
+**Rotations:** 0 credentials in 60-day window (per MEMORY rotation.disabled=tier1 check). ✅ Nominal.
+
+**Actions taken:**
+1. Alert watermark advanced 1142→1143 (L1143 pulse-cycle self-report, known-pattern, no re-DM). ✅
+2. `cycle_tier_state.py record --checks-clean true` → consecutive_clean 0→1, Tier 1. ✅
+3. `cycle_prime_ledger.py append --kind iter_clean` → iter_clean row logged. ✅
+
+**Standing findings (updated):**
+- [yellow] unreviewed-merge:489 — DM sent iter ~1614; no Larry reply yet. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] Tier-2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- [blue] G-rule pulse-check-iv-no-heartbeat — 3/3; PR #488 merged; drift-healer install pending Sat 06:00Z. [carry → resolves after install]
+- [blue] G-rule timer-cycle-no-journal-entry — 1/3. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. G-rule dispatched ~iter 1416. [carry]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR. [carry]
+- [blue] dag-preflight-revision gap — PR #484 closed source=pulse gap; DAG re-dispatch markers still fall through. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED. [carry]
+- [blue] catalog-accuracy-drift — G-rule 2/3. [carry]
+- [blue] G-rule source=pulse-cycle-self-report — 1/3. First observation: L1143 was pulse-cycle DM record from iter ~1614 appearing as new alert. At 3/3 dispatch Beacon to add allowlist entry to alert-translations.json. [new]
+
+**PRIME DIRECTIVE:** 0 intervention rows this iter (clean). Trailing-30d (script-authoritative): interventions=820, systemic_fixes=33, verification_pending=11, ratio=24.85, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=1. (Need 2 more consecutive clean iters to reach Tier 2.)
+
+---
+
 ## Iteration ~1614 — 2026-06-12 23:49Z UTC (interactive, /cycle via /loop, Tier 3→1, consecutive_clean reset)
 
 **Trigger:** Larry direct invocation (`/cycle` via `/loop` dynamic mode).

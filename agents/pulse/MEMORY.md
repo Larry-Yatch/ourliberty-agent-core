@@ -36,6 +36,12 @@
 
 ---
 
+## Status snapshot — updated 2026-06-12 23:57Z UTC (Iter ~1615, interactive /cycle, Tier 1 consecutive_clean 0→1)
+
+**Iter ~1615 summary:** Alert watermark: L1143 (1 new: source=pulse-cycle self-report of iter ~1614 unreviewed-merge:489 DM — treated as known-pattern, no re-DM). Tier 1, consecutive_clean 0→1 (clean). PRIME DIRECTIVE (script-authoritative): interventions=820, systemic_fixes=33, verification_pending=11, ratio=24.85, trend=flat. **KEY STATE:** 9/9 services active. 0 open PRs. All inboxes empty. Sync: last_sync=22:56:02Z (~57 min ago), within 2h. beacon-pending-approvals.json: 0 items (GC'd). **NEW G-RULE:** source=pulse-cycle-self-report 1/3 (source=pulse-cycle alerts are Pulse DM delivery records appearing as new alerts next iter; at 3/3 dispatch Beacon for allowlist entry in alert-translations.json). **CARRY:** unreviewed-merge:489 [yellow] DM sent iter ~1614, no Larry reply. G-rule pulse-check-iv-no-heartbeat (heartbeat stale 18:26Z; resolves Sat 06:00Z drift-healer install). G-rule timer-cycle-no-journal-entry 1/3. Tier-2 weekly probe auth_401, Check III proposals `approve threshold-update-2026-06-11` (2 high-attention), Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED, catalog-accuracy-drift G-rule 2/3. **Tier:** Tier 1, consecutive_clean=1.
+
+---
+
 ## Status snapshot — updated 2026-06-12 23:49Z UTC (Iter ~1614, interactive /cycle via /loop, Tier 3→1 reset)
 
 **Iter ~1614 summary:** Alert watermark: L1142 (3 new: dispatch-branch-cleanup Tier-3 silence, heal-unreviewed-merge-detector Tier-4 escalation [NEW], missions-autoregister Tier-3 silence). Tier 3→1 reset (Tier-4 alert). PRIME DIRECTIVE (script-authoritative): interventions=820, systemic_fixes=33, verification_pending=11, ratio=24.85, trend=flat. **KEY STATE:** 9/9 services active. 0 open PRs. All inboxes empty. Sync: last_sync=22:56:02Z, no-change, commit=83ff858 (HEAD=a2dd023, 2 commits after last sync). **NEW FINDING:** PR #489 (fix(dashboard-api): add scripts/ to sys.path) merged by Larry-Yatch at 23:26Z without Mirror review. 9 files including agents/forge/CLAUDE.md. heal-unreviewed-merge-detector fired 23:30Z. [yellow] DM sent to Larry. Reply 'go: retroactive-review-489' to trigger Mirror retroactive review. **CARRY:** G-rule pulse-check-iv-no-heartbeat (heartbeat stale 18:26Z; resolves after drift-healer Sat 06:00Z install). G-rule timer-cycle-no-journal-entry 1/3. beacon-pending-approvals.json 2 stale entries. Tier-2 weekly probe auth_401, Check III proposals `approve threshold-update-2026-06-11` (2 high-attention), Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED, catalog-accuracy-drift G-rule 2/3. **Tier:** Tier 1, consecutive_clean=0.
@@ -88,7 +94,9 @@
 
 | Item | Status | Action needed |
 |---|---|---|
-| unreviewed-merge:489 | NEW — [yellow] DM sent | Larry: reply 'go: retroactive-review-489' if Mirror review wanted |
+| unreviewed-merge:489 | [yellow] DM sent iter ~1614 | No Larry reply yet; reply 'go: retroactive-review-489' if Mirror review wanted |
+| source=pulse-cycle-self-report | G-rule 1/3 | At 3/3 dispatch Beacon: add source=pulse-cycle allowlist to alert-translations.json |
+| beacon-pending-approvals.json (#482+#484) | **RESOLVED** — 0 items, GC'd iter ~1615 | — |
 | wire-pulse-check-iv-cadence-001 | **RESOLVED** — PR #488 merged 22:46Z | drift-healer will install timer Sat 06:00Z |
 | Tier-2 weekly probe auth_401 | Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | Pending Larry | `approve threshold-update-2026-06-11` |
