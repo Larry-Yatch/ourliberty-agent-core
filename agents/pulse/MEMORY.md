@@ -24,6 +24,12 @@
 
 ---
 
+## Status snapshot — updated 2026-06-12 16:00Z UTC (Iter ~1591, /cycle)
+
+**Iter ~1591 summary:** Alert watermark: L1120 (1 new: dispatch-branch-cleanup:summary 15:28Z, Tier-3/digest). Tier 3→1 reset (G-rule dispatch). PRIME DIRECTIVE: interventions=816, systemic_fixes=31, ratio=26.32, trend=improving. **KEY STATE:** 10/10 services active. 0 open PRs. All inboxes empty (G-rule beacon envelope written this cycle). Sync: last_sync=15:55:06Z, no-change. beacon-pending-approvals.json: 4 entries (2 stale PRs #482/#484, 2 valid in-flight). **G-RULE DISPATCHED:** dispatch-branch-cleanup:summary 3/3 → Beacon direction-ask written (add to alert-translations.json as Tier-3/FYI). **STANDING:** Tier-2 weekly probe auth_401 (pending Larry: rotate-claude-setup-tokens.md), Check III proposals pending `approve threshold-update-2026-06-11`, missions-autoregister-alert-translation-001 APPROVAL_REQUEST pending Larry "go", p3-dashboard-proposed-lane-002 APPROVAL_REQUEST pending Larry "go", catalog-accuracy-drift G-rule 2/3, Check 5 MISSING (G-rule dispatched ~iter 1416). **Tier:** Tier 1, consecutive_clean=0 (reset by G-rule dispatch).
+
+---
+
 ## Status snapshot — updated 2026-06-12 11:00Z UTC (Iter ~1574, /cycle)
 
 **Iter ~1574 summary:** Alert watermark: L1337 (file=1110 lines; counter-reset known; 1 new alert: missions-autoregister:summary 10:32Z, digest). Tier 3, consecutive_clean=7→8. PRIME DIRECTIVE: interventions=809, systemic_fixes=40, ratio=20.23, trend=improving. **KEY STATE:** 10/10 services active. 0 open PRs. All inboxes empty. Sync: last_sync=10:54:39Z, no-change. beacon-pending-approvals.json present (1.5MB, stale entries for PRs #482-484 already merged; healer will clear). healer dry-run: no stalls. **G-RULE UPDATES:** catalog-accuracy-drift 1/3→2/3 (new alert 7/34 shelf cards at 10:20Z); missions-autoregister:summary 1/3→2/3 (new digest at 10:32Z, not in alert-translations.json). At 3/3 → dispatch Beacon. **STANDING:** Tier-2 weekly probe auth_401 (last fail 2026-06-08T19:02Z), Check III proposals pending `approve threshold-update-2026-06-11`, dag-preflight-revision gap (PR #484 fix merged), Check 5 MISSING (G-rule dispatched ~iter 1416). **Tier:** Tier 3, consecutive_clean=8.
