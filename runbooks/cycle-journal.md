@@ -106819,3 +106819,81 @@ Forge rejected p3-dashboard-proposed-lane at preflight (04:41Z) because accept/d
 **PRIME DIRECTIVE:** 2 interventions this iter (watermark advance L1131; pulse_check_iv.py manual run). Script-authoritative: interventions=818, systemic_fixes=33, ratio=24.79, trend=flat.
 **Tier end-of-iter:** 1 (consecutive_clean=0 — active pipeline + Check IV staleness finding).
 
+---
+
+## Iteration ~1576 — 2026-06-12 18:30Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green with one known-carry. 9/9 services active. 0 open PRs. All inboxes empty. 0 new alerts (watermark=1131, already claimed prior iter). PR #487 merged. beacon-pending-approvals.json PRESENT. Tier 1, consecutive_clean=0.
+
+**VERIFY-BEFORE-REASSERT (prior iter watch items):**
+- PR #487 alert-triage-intent-fallback-001: **VERIFIED MERGED ✅** — Mirror PASS + auto-merged 18:23:12Z. Fix: `alert_triage_state.classify()` now falls back to `intent` when `subject=None`; outbox-notifier:review-pass alerts now match Tier-3 translation correctly. Standing misclassification arc CLOSED.
+- sync-push-rebase-fallback-001 + sentinel-inflight-marker-fix + sentinel-inbox-stall: **PENDING Beacon processing** — all inboxes empty; Forge has not yet received briefs. Expected.
+- pulse-check-iv-not-in-cycle-prompt: healer did NOT re-fire this iter (no new alerts above L1131). G-rule stays 1/3.
+
+**Check 0 — Alert triage:** Watermark=1131. 0 new alerts. ✅ Nominal.
+- Note: L1131 (heal-pulse-check-staleness) was claimed prior iter. Ran `pulse_check_iv.py --force` → "Check IV complete: rule=none events=0 rate=0.00/week". Script operational. Root cause confirmed: script runs but writes no heartbeat artifact to `~/agents/blackboard/pulse-check-iv/` or `~/agents/state/`. Healer will re-fire at next 168h cadence unless fixed. G-rule pulse-check-iv-no-heartbeat: 1/3 (no new firing this iter).
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message: 'Go' at 12:10 MDT (18:10Z) — approval of alert-triage-intent-fallback-001; chain completed (PR #487 merged). No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall (18:23Z dry-run): no stalls detected. All FORGE_NO_PR_SKIP entries verified (pr_exists for #478–484, dashboard #52; preflight_non_proceed for p3-dashboard-proposed-lane). ✅ Nominal.
+
+**Check 4 — Pending directives:** All Larry directives in last 24h tracked. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry. G-rule dispatched ~iter 1416. Non-nominal per spec; recorded non-clean.
+
+**Check A — Source repo:** main, clean. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: status=no-change, last_sync=2026-06-12T17:55:15Z (within 2h). ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 active running. ✅ Nominal.
+
+**Check D — Inboxes:** All inboxes empty (forge, beacon, mirror, pulse). ✅ Nominal.
+
+**Check E / Check H:** 0 open PRs. Shipped: PR #487 (fix(alert-triage): intent fallback when subject=None, merged 18:23:12Z). ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge → no audit baseline; no-op. distill_detector → no un-distilled audits; no-op. audit_cadence_signal → no post-seed artifacts; no-op. ✅ Nominal.
+
+**Conditional checks (Friday 2026-06-12 UTC):** Check I: check-i-2026-06-12.json exists. SKIP. Check III: next eligible 2026-06-25. SKIP.
+
+**Rotations:** 0 credentials in 60-day window. ✅ Nominal.
+
+**Actions taken:**
+1. `alert_triage_state.py triage-alert` for L1131 → triaged-tier-4; judgment override (auto-remediated by --force run; no DM per actionable-only policy). ✅
+2. `pulse_check_iv.py --force` → rule=none, events=0. Root cause of healer alert confirmed: no heartbeat artifact write. ✅
+3. `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0, Tier 1. ✅
+
+**Dispatches:** 0.
+
+**Standing findings:**
+- [yellow] **bughunt-gate-soak Phase 2** — pending Larry.
+- [yellow] **Tier 2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api POST 500; Monday check.
+- [yellow] **health-check-notify-script-missing** — G-rule 3/3 dispatched iter ~1415; no Forge PR found. Stale.
+- [blue] **beacon-pending-approvals.json** — PRESENT, 3 entries; 2 stale (PRs #482, #484 already merged; healer will GC). [resolved from MISSING carry]
+- [blue] **sync-push-rebase-fallback-001** — Beacon consumed dispatch. Watch Forge brief.
+- [blue] **sentinel-inflight-marker-fix** — Beacon consumed dispatch. Watch Forge brief.
+- [blue] **sentinel-inbox-stall-ignores-inflight G-rule 3/3** — Beacon consumed. Watch Forge brief.
+- [blue] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry.
+- [blue] **cycle-timer checkpoint** — pending `go: cycle-timer checkpoint`.
+- [blue] **actor-exemption-config** — pending `go: actor-exemption-config`.
+- [blue] **cycle-prompt-check-c-pgrep-liveness-001** — APPROVAL_REQUEST pending Larry.
+- [blue] **G-rule unreviewed-merge sprint batch** — dispatched iter ~1378. Watch Beacon.
+- [blue] **catalog-accuracy-drift** — 2/3 G-rule.
+- [blue] **F24-empty-prompt-envelope-rejected** — 1/3 G-rule.
+- [blue] **pulse-check-iv-no-heartbeat** — 1/3 G-rule. Script runs but writes no heartbeat artifact → healer fires each 168h cadence. At 3/3: dispatch Beacon to fix.
+- [blue] **sync-blocked:uncommitted-changes** — 1/3 G-rule.
+- [blue] **dag-preflight-revision notifier gap** — PR #484 closed source=pulse gap; DAG re-dispatch markers still fall through. [carry]
+- [blue] **Check 5 MISSING** — heal-stale-daemon-code-state.json absent. G-rule dispatched ~iter 1416. [carry]
+
+**Watch items for next iter (~1577):**
+- sync-push-rebase-fallback-001 + sentinel-inflight + sentinel-inbox-stall: watch for Forge briefs in Forge inbox.
+- pulse-check-iv-no-heartbeat G-rule: 1/3 → next heal-pulse-check-staleness fire advances to 2/3; at 3/3 dispatch Beacon.
+- beacon-pending-approvals.json: watch healer GC stale entries (PRs #482, #484).
+
+**PRIME DIRECTIVE:** 1 intervention (pulse_check_iv.py --force). 0 new systemic_fix rows. Trailing-30d: tracked via ledger.
+**Tier end-of-iter:** 1 (consecutive_clean=0 — Check 5 MISSING non-nominal per spec).
+
