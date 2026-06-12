@@ -137,6 +137,14 @@
       "recommended_action": "Run `sudo systemctl restart chain-event-shipper.service` and check `journalctl -u chain-event-shipper.service -n 50` for the underlying error. If the shipper crashes immediately on restart, inspect ~/agents/logs/chain_event_shipper.log for the stack trace."
     }
   },
+  "dispatch-branch-cleanup": {
+    "summary": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "The hourly dispatch-branch GC backstop (ourliberty-cleanup-dispatch-branches.timer) ran and pruned stale Forge/Mirror dispatch branches — the routine housekeeping success path. It runs every hour and almost always has something small to prune, so it fires frequently by design. route=digest means it is already surfaced only in the daily CEO digest, never DM'd. By-design FYI, not a failure.",
+      "recommended_action": "None — by-design housekeeping confirmation. Per-run detail (how many local/remote branches pruned, any deferred by batch cap) is in the digest line and ~/agents/logs/cleanup_dispatch_branches.log. The sibling `gh-unavailable` subject is route=escalate and DOES still surface — only this routine `summary` is silenced."
+    }
+  },
   "outbox-notifier": {
     "auto-merge-queue-corrupt": {
       "severity": "URGENT",
