@@ -4,6 +4,75 @@
 
 ---
 
+## Iteration ~1646 — 2026-06-13 12:27Z UTC (interactive, /cycle via /loop, Tier 1, consecutive_clean 0→1)
+
+**Trigger:** Larry direct invocation via `/loop /cycle`.
+
+**Health:** ✅ Green. 9/9 services active. 0 open PRs. 0 new alerts. Beacon in-flight session (PID 2438147) handling catalog-drift-facts-sync-001 retry — still running at 12:27Z (~11 min). iter_clean.
+
+**VERIFY-BEFORE-REASSERT (iter ~1645 watch items):**
+- catalog-drift Beacon active: **CONFIRMED** — PID 2438147 still running. commit 52115d0 "config: add ourliberty-graph to forge+mirror allowed_repos" landed between iters ~1644/~1645, resolving the dispatch blocking condition. [watch Beacon output]
+- unreviewed-merge:489: **CONFIRMED OPEN** — last Telegram log entry 06:18:12 MDT; no Larry reply. [carry]
+- beacon-pending-approvals.json 3 entries: **RE-VERIFIED** — 2 stale + catalog-drift-facts-sync-001 active (Beacon in-flight). [carry]
+- G-rule sync-blocked:uncommitted-changes 1/3: **RE-VERIFIED** — agents/pulse/.claude/settings.json still uncommitted. Same single pre-existing occurrence. Not incrementing. [carry]
+- PRIME DIRECTIVE ratio=24.24 (script-authoritative). [confirmed]
+
+**Check 0 — Alert triage:** larry-alerts.jsonl=951 lines, watermark=951. **0 new alerts.** ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last entry 06:18:12 MDT (Beacon → Larry re: catalog-drift). No new Larry messages since. Beacon in-flight session still running. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall dry-run → "no stalls detected". 5 FORGE_NO_PR_SKIPs (PRs #485, #53, #486, #487, #488 all exist). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 3 entries — 2 stale (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001; G-rule DISPATCHED iter ~1623) + 1 active (catalog-drift-facts-sync-001 — Beacon in-flight). ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry. G-rule dispatched ~iter 1416. ✅ Known carry.
+
+**Check A — Source repo:** On main. M agents/pulse/.claude/settings.json (pre-existing uncommitted from iter ~1625). Not behind origin/main (HEAD=0be63d7). ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: last_sync=2026-06-13T11:57:08Z status=error ("Uncommitted changes"), blocked by known settings.json. G-rule sync-blocked:uncommitted-changes: same single pre-existing occurrence. ✅ Nominal (triaged).
+
+**Check C — Agent liveness:** 9/9 active (ourliberty-beacon-bot + ourliberty-forge-bot + ourliberty-mirror-bot + ourliberty-pulse-bot + ourliberty-chain-event-shipper + ourliberty-inbox-watcher + ourliberty-outbox-notifier + ourliberty-dashboard-api + ourliberty-cycle.service [current]). ourliberty-pulse-check-iv.timer active (waiting, next fire Mon 2026-06-15 04:26:45 MDT). **NOTE:** ourliberty-agent-core-health.service failed at 11:55:16Z — known cause (uncommitted settings.json triggers working-copy health check failure; same root as sync-blocked). ✅ Nominal (known cause).
+
+**Check D — Inboxes:** Beacon: `larry-approval-a9b77b7c2e4d07ac9c2c92c0bb11e7517362b4b7.json` (in-flight, Beacon processing catalog-drift retry). All other inboxes empty. ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on agent-core. 0 open PRs on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Saturday 2026-06-13 UTC):** Check I gates Sunday UTC; skip. Check III gates Sunday + 14d cadence; skip.
+
+**Rotations:** 0 credentials in 60-day window. ✅ Nominal.
+
+**Actions taken:**
+1. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` → logged at 12:27:05Z. ✅
+2. `cycle_tier_state.py record --checks-clean true` → consecutive_clean 0→1. ✅
+3. MEMORY.md updated. ✅
+
+**Standing findings (updated):**
+- [yellow] **catalog-drift → BEACON ACTIVE** — PID 2438147 in-flight (~11 min). commit 52115d0 resolved ourliberty-graph allowed_repos blocker. [watch Beacon for dispatch result]
+- [yellow] unreviewed-merge:489 — DM sent iter ~1614; no Larry reply. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] Tier-2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- [blue] G-rule heal-stale-approvals-not-gc-merged-prs — DISPATCHED (iter ~1623). 2 stale entries self-clear after GC-fix PR. [watch Forge]
+- [blue] RESOLVED: pulse-check-iv — timer active, next fire Mon 2026-06-15 04:26:45 MDT. [monitoring]
+- [blue] G-rule sync-blocked:uncommitted-changes — 1/3. [carry]
+- [blue] G-rule timer-cycle-no-journal-entry — 1/3. [carry]
+- [blue] G-rule source=pulse-cycle-self-report — 2/3. At 3/3 dispatch Beacon to add source=pulse-cycle to alert-translations.json allowlist. [carry]
+- [blue] G-rule heal-stale-daemon-code-auto-restart-needs-template — 1/3. [carry]
+- [blue] G-rule catalog-accuracy-drift — DISPATCHED (3/3, iter ~1637). Beacon in-flight handling. [watch]
+- [blue] G-rule approval_request-delivery-confirmation — 1/3. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. [carry]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR. [carry]
+- [blue] dag-preflight-revision gap — PR #484 closed source=pulse gap; DAG re-dispatch markers still fall through. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED. [carry]
+- [blue] G-rule droplet-uncommitted:main — 1/3 (same occurrence). [carry]
+- [blue] G-rule F24-empty-prompt-envelope-rejected — 1/3. [carry]
+
+**PRIME DIRECTIVE:** 0 interventions this iter (iter_clean). Trailing-30d (script-authoritative): interventions=824, systemic_fixes=34, verification_pending=11, ratio=24.24, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=1.
+
+---
+
 ## Iteration ~1645 — 2026-06-13 12:20Z UTC (interactive, /cycle, Tier 1, catalog-drift retry in-flight)
 
 **Trigger:** Larry direct invocation (`/cycle`).
