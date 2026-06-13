@@ -36,6 +36,12 @@
 
 ---
 
+## Status snapshot — updated 2026-06-13 12:20Z UTC (Iter ~1645, interactive /cycle, Tier 1, catalog-drift retry Beacon active)
+
+**Iter ~1645 summary:** Alert watermark: 950→951 (L951 source=pulse-cycle catalog-drift-dispatch-failed, Tier-4, DM NOT re-sent — already sent as L951 iter ~1644; Larry responded; Beacon handling). Tier 1, consecutive_clean=0 (Check 0 Tier-4 reset). PRIME DIRECTIVE (script-authoritative): interventions=824, systemic_fixes=34, verification_pending=11, ratio=24.24, trend=flat. **KEY STATE:** 9/9 services active. 0 open PRs. Sync: last_sync=11:57:08Z status=error; last successful sync=01:56:15Z (~10.3h). beacon-pending-approvals.json: 3 entries (2 stale + catalog-drift-facts-sync-001 ACTIVE — Beacon now handling retry in-flight, started 12:16:40Z, PID 2438147). **CHECK 2 NEW:** Larry sent "Beacon — retry catalog-drift-facts-sync-001" at 06:16:27 MDT (after 3rd failed 'go'); Beacon responded 06:18:12 MDT, dashboard approval created 06:16:35 MDT. **G-RULE UPDATE:** source=pulse-cycle-self-report 1/3 → **2/3**. **CARRY:** unreviewed-merge:489 [yellow] DM sent iter ~1614, no Larry reply. Tier-2 weekly probe auth_401, Check III proposals `approve threshold-update-2026-06-11`, G-rule approval_request-delivery-confirmation 1/3, G-rule sync-blocked:uncommitted-changes 1/3, G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 1/3, G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. G-rule catalog-accuracy-drift DISPATCHED (3/3) — Beacon handling retry in-flight. **Tier:** Tier 1, consecutive_clean=0.
+
+---
+
 ## Status snapshot — updated 2026-06-13 12:13Z UTC (Iter ~1644, interactive /cycle, Tier 3→1 reset, catalog-drift dispatch failure)
 
 **Iter ~1644 summary:** Alert watermark: 950→951 (L950 Tier-3 silence, L951 [yellow] catalog-drift-dispatch-failed DM sent). Tier 3→1 RESET (Check 2 signal: catalog-drift-facts-sync-001 dispatch failed). PRIME DIRECTIVE (script-authoritative): interventions=823, systemic_fixes=34, verification_pending=11, ratio=24.21, trend=flat. **KEY STATE:** 9/9 services active. 0 open PRs. All inboxes empty. Sync: last_sync=11:57:08Z status=error ("Uncommitted changes"); last successful sync=01:56:15Z (~10.3h). beacon-pending-approvals.json: **3 entries** (2 stale: fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001; 1 FAILED-DISPATCH: catalog-drift-facts-sync-001 — Larry approved 12:02Z MDT but Forge rejected, target_repo ourliberty-graph not in allowed_repos; DM L951 sent). **NEW CARRY:** catalog-drift-dispatch-failed [yellow] — Larry to decide: respec vs. repo elevation. **CARRY:** unreviewed-merge:489 [yellow] DM sent iter ~1614, no Larry reply. Tier-2 weekly probe auth_401, Check III proposals `approve threshold-update-2026-06-11`, G-rule approval_request-delivery-confirmation 1/3, G-rule sync-blocked:uncommitted-changes 1/3, G-rule timer-cycle-no-journal-entry 1/3, G-rule source=pulse-cycle-self-report 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 1/3, G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. G-rule catalog-accuracy-drift DISPATCHED (3/3) — dispatch FAILED; escalated L951. **Tier:** Tier 1, consecutive_clean=0.
@@ -199,7 +205,7 @@
 | Item | Status | Action needed |
 |---|---|---|
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | No Larry reply yet; reply 'go: retroactive-review-489' if Mirror review wanted |
-| source=pulse-cycle-self-report | G-rule 1/3 | At 3/3 dispatch Beacon: add source=pulse-cycle allowlist to alert-translations.json |
+| source=pulse-cycle-self-report | G-rule **2/3** [incremented iter ~1645] | At 3/3 dispatch Beacon: add source=pulse-cycle allowlist to alert-translations.json |
 | beacon-pending-approvals.json (#482+#484) | **G-rule DISPATCHED** (3/3) — 2 entries still present; iter ~1622 "RESOLVED" was false. Beacon direction-ask written iter ~1623. | Watch Beacon for spec |
 | wire-pulse-check-iv-cadence-001 | **RESOLVED** — PR #488 merged 22:46Z; drift-healer installed service+timer 06:00Z UTC June 13; timer active, next fire Mon 2026-06-15 04:26:45 MDT | heartbeat still stale (mtime=18:26Z June 12) until first timer run |
 | Tier-2 weekly probe auth_401 | Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
@@ -211,7 +217,7 @@
 | ccd-s1-envelope-builder | PAUSED | Carry; unverified |
 | sync-push-rebase-loop-001 | UNREGISTERED AR | Carry |
 | dag-preflight-revision gap | Active | PR #484 closed source=pulse gap; DAG markers still fall through |
-| catalog-accuracy-drift / catalog-drift-dispatch-failed | **DISPATCH FAILED** — Larry approved Go x2 at 12:02Z MDT but Forge rejected (target_repo ourliberty-graph not in allowed_repos). DM L951 sent. | Larry to decide: 'go: respec-catalog-drift' or clarify repo elevation |
+| catalog-accuracy-drift / catalog-drift-dispatch-failed | **BEACON ACTIVE** — Larry sent retry directive 06:16:27 MDT; Beacon in-flight (started 12:16:40Z, PID 2438147). Prior: Larry approved 3× via Telegram; all failed (ourliberty-graph not in allowed_repos). Beacon acknowledged "payload staged and ready." | Watch Beacon for re-scope or new PR |
 | droplet-uncommitted:main | G-rule 1/3 [NEW iter ~1637] | Watch; at 3/3 dispatch Beacon to add translation allowlist entry |
 | F24-empty-prompt-envelope-rejected | G-rule 1/3 | Watch |
 | heal-stale-daemon-code-auto-restart-needs-template | G-rule 1/3 | At 3/3 dispatch Beacon: add translation template to alert-translations.json |

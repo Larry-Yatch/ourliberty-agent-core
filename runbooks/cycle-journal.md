@@ -4,6 +4,79 @@
 
 ---
 
+## Iteration ~1645 — 2026-06-13 12:20Z UTC (interactive, /cycle, Tier 1, catalog-drift retry in-flight)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Signal. 9/9 services active. 0 open PRs. 1 new alert (L951, Tier-4). Check 0 tier-reset. **NEW:** Larry sent "Beacon — retry catalog-drift-facts-sync-001" at 06:16:27 MDT; Beacon acknowledged + started in-flight session (PID 2438147, started 12:16:40Z).
+
+**VERIFY-BEFORE-REASSERT (iter ~1644 watch items):**
+- catalog-drift-dispatch-failed [yellow]: **RE-VERIFIED NEW STATE** — Larry sent 3rd 'go' at 06:16:14 MDT (dispatch failed again), then sent explicit retry directive at 06:16:27 MDT. Beacon responded at 06:18:12 MDT ("payload staged and ready") and is now processing in-flight. State has changed: this is now actively being handled by Beacon, not orphaned. [upgrading to "Beacon active"]
+- unreviewed-merge:489 [yellow] DM: **CONFIRMED OPEN** — last bot log at 06:18:12 MDT; no Larry reply to retroactive-review-489 request. [carry]
+- beacon-pending-approvals.json: **RE-VERIFIED** — 3 entries: fix-alert-triage-watermark-durability-001 (stale), fix-depth1-pulse-approval-extraction-001 (stale), catalog-drift-facts-sync-001 (still active — Beacon processing retry in-flight). [carry/active]
+- G-rule sync-blocked:uncommitted-changes 1/3: **RE-VERIFIED** — agents/pulse/.claude/settings.json still uncommitted. Same pre-existing single occurrence. Not incrementing. [carry]
+- G-rule droplet-uncommitted:main 1/3: **RE-VERIFIED** — same file, same root cause. Not incrementing. [carry]
+- PRIME DIRECTIVE ratio=24.21: **Confirmed** (script-authoritative pre-iter). [confirmed]
+
+**Check 0 — Alert triage:** larry-alerts.jsonl=951 lines (was 950 at iter ~1644). **1 new alert (L951).**
+- L951 (source=pulse-cycle, 12:13:01Z, route=escalate, subject=catalog-drift-dispatch-failed): `triage-alert` → **Tier-4** (novel — no registry template, no translation match). Decision=ask. G-rule source=pulse-cycle-self-report: **1/3 → 2/3**. DM NOT re-sent — L951 DM was already delivered in iter ~1644 at 06:15:03 MDT; Larry responded (3× 'go' + retry directive); Beacon is actively handling. Sending a redundant DM would be noise. Tier-reset applies. Watermark advanced 950→951. ⚠️ Tier-reset.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** **ACTIVE RESOLUTION.** Larry sent 'go' at 06:16:14 MDT → dispatch failed (3rd attempt). Larry then sent "Beacon — retry catalog-drift-facts-sync-001\n\nThe catalog-drift-facts-sync-001 dispatch failed earlier with RoutingDenied" at 06:16:27 MDT. Beacon responded at 06:18:12 MDT: "Confirmed both ends: The payload is staged and ready — catalog-drift-facts-sync-001 is a pending approval (with ...)". Beacon in-flight session started at 12:16:40Z (PID 2438147). This directive is actively tracked — NOT orphaned. ✅ Nominal (being handled).
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall dry-run at 12:17Z: "no stalls detected". 5 FORGE_NO_PR_SKIPs (pr_exists: #485, #486, #487, #488 + dashboard #53). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 3 entries — 2 stale (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001; G-rule DISPATCHED iter ~1623) + 1 active (catalog-drift-facts-sync-001 — Beacon now handling retry in-flight). No new Pulse action needed; Beacon owns the active path. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry. G-rule dispatched ~iter 1416. ✅ Known carry.
+
+**Check A — Source repo:** On main. M agents/pulse/.claude/settings.json (pre-existing uncommitted from iter ~1625). HEAD = origin/main (1e54495). ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: last_sync=2026-06-13T11:57:08Z status=error ("uncommitted modifications"), commit=2195c59. Last successful sync ~01:56:15Z (~10.3h ago). Blocked by known uncommitted agents/pulse/.claude/settings.json. G-rule sync-blocked:uncommitted-changes: same single pre-existing occurrence, not incrementing. ✅ Nominal (triaged).
+
+**Check C — Agent liveness:** 9/9 active (ourliberty-beacon-bot.service + ourliberty-forge-bot.service + ourliberty-mirror-bot.service + ourliberty-pulse-bot.service + ourliberty-chain-event-shipper.service + ourliberty-inbox-watcher.service + ourliberty-outbox-notifier.service + ourliberty-dashboard-api.service + ourliberty-cycle.service [current run]). ourliberty-pulse-check-iv.timer active (waiting, next fire Mon 2026-06-15 04:26:45 MDT). ✅ Nominal.
+
+**Check D — Inboxes:** Beacon inbox: `larry-approval-a9b77b7c2e4d07ac9c2c92c0bb11e7517362b4b7.json` (created 06:16:35 MDT, source=dashboard, dedup_identity=larry-approval:a9b77b7c2e4d07ac9c2c92c0bb11e7517362b4b7). In-flight state present (started 12:16:40Z). Not a fixture pattern match. Beacon is actively processing. All other inboxes empty. ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on agent-core. 0 open PRs on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Saturday 2026-06-13 UTC):** Check I gates Sunday UTC; skip. Check III gates Sunday + 14d cadence; skip.
+
+**Rotations:** 0 credentials in 60-day window. ✅ Nominal.
+
+**Actions taken:**
+1. Alert triage L951: Tier-4 (source=pulse-cycle catalog-drift-dispatch-failed); watermark advanced 950→951. No redundant DM (L951 DM already sent + Larry responded + Beacon handling). ✅
+2. `cycle_prime_ledger.py append --tier 1 --kind intervention --template catalog-drift-dispatch-failed-echo` → logged at 12:20:25Z. ✅
+3. `cycle_tier_state.py record --checks-clean false` → Tier 1 remains, consecutive_clean=0 (last_signal_at updated). ✅
+4. MEMORY.md updated. ✅
+
+**Standing findings (updated):**
+- [yellow] **catalog-drift-dispatch-failed → BEACON ACTIVE** — Beacon in-flight handling retry of catalog-drift-facts-sync-001 (started 12:16:40Z). Larry sent 3 'go's + retry directive; Beacon acknowledged. Watch for Beacon to resolve or re-scope. [upgrading status]
+- [yellow] unreviewed-merge:489 — DM sent iter ~1614; no Larry reply. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] Tier-2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- [yellow] droplet-uncommitted:main — agents/pulse/.claude/settings.json uncommitted 10.5h+. G-rule 1/3. [carry]
+- [blue] G-rule heal-stale-approvals-not-gc-merged-prs — DISPATCHED (iter ~1623). 2 stale entries self-clear after GC-fix PR. [watch Forge]
+- [blue] RESOLVED: pulse-check-iv — timer active, next fire Mon 2026-06-15 04:26:45 MDT. [monitoring]
+- [blue] G-rule sync-blocked:uncommitted-changes — 1/3. [carry]
+- [blue] G-rule timer-cycle-no-journal-entry — 1/3. [carry]
+- [blue] G-rule source=pulse-cycle-self-report — **2/3** [incremented this iter]. At 3/3 dispatch Beacon to add source=pulse-cycle to alert-translations.json allowlist.
+- [blue] G-rule heal-stale-daemon-code-auto-restart-needs-template — 1/3. [carry]
+- [blue] G-rule catalog-accuracy-drift — DISPATCHED (3/3, iter ~1637). Beacon handling retry; watching for re-scope outcome. [watch Beacon]
+- [blue] G-rule approval_request-delivery-confirmation — 1/3. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. G-rule dispatched ~iter 1416. [carry]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR. [carry]
+- [blue] dag-preflight-revision gap — PR #484 closed source=pulse gap; DAG re-dispatch markers still fall through. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED. [carry]
+- [blue] G-rule droplet-uncommitted:main — 1/3 (same occurrence, not incrementing). [carry]
+- [blue] G-rule F24-empty-prompt-envelope-rejected — 1/3. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention row this iter (catalog-drift-dispatch-failed-echo, Tier-4 Check 0). Trailing-30d (script-authoritative): interventions=824, systemic_fixes=34, verification_pending=11, ratio=24.24, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0 (Check 0 Tier-4 finding reset).
+
+---
+
 ## Iteration ~1644 — 2026-06-13 12:13Z UTC (interactive, /cycle, Tier 3→1 reset, catalog-drift dispatch failure)
 
 **Trigger:** Larry direct invocation (`/cycle`).
