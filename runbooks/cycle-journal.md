@@ -4,6 +4,80 @@
 
 ---
 
+## Iteration ~1639 — 2026-06-13 10:38Z UTC (interactive, /cycle via /loop, Tier 1, consecutive_clean 1→2)
+
+**Trigger:** Larry `/loop /cycle` invocation.
+
+**Health:** ✅ Green. 9/9 services active. 0 open PRs. 1 new alert (L947, approval_request delivery confirmation, memory-known). Tier 1, consecutive_clean 1→2.
+
+**VERIFY-BEFORE-REASSERT (iter ~1638 watch items):**
+- unreviewed-merge:489 [yellow] DM: **CONFIRMED OPEN** — beacon_telegram_bot.log last entry 04:34:01 MDT (10:34Z UTC); no Larry reply to unreviewed-merge DMs (idx=1140+1142). [carry]
+- beacon-pending-approvals.json: **RE-VERIFIED** — now 3 entries: 2 stale (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001) + 1 NEW (catalog-drift-facts-sync-001, created 10:31Z, outbox delivered to Larry at 10:34Z MDT). [carry; new entry is fresh/expected]
+- G-rule sync-blocked:uncommitted-changes 1/3: **RE-VERIFIED** — agents/pulse/.claude/settings.json still uncommitted. Same pre-existing occurrence. Not incrementing. [carry]
+- G-rule droplet-uncommitted:main 1/3: **RE-VERIFIED** — same uncommitted file. Not incrementing. [carry]
+- G-rule catalog-accuracy-drift DISPATCHED: **CONFIRMED ACTIVE** — direction-ask processed by Beacon; catalog-drift-facts-sync-001 approval_request now PENDING LARRY in Telegram. Approval delivered to chat_id at 10:34Z. [watch for Larry 'approve']
+- PRIME DIRECTIVE ratio=24.18: **Confirmed** (script-authoritative). [confirmed]
+
+**Check 0 — Alert triage:** larry-alerts.jsonl=947 lines. Watermark was 946. **1 new alert (L947).**
+- L947 (outbox-notifier, 10:31:09Z, kind=approval_request, approval_id=catalog-drift-facts-sync-001): `triage-alert` → Tier-4 (no registry template). Memory rule: approval_request delivery confirmations are known-pattern (outbox already sent DM). Treating as Tier-3 functionally — no second DM, no tier-reset. Journal-note only. G-rule approval_request-delivery-confirmation **1/3** [NEW]. Watermark advanced 946→947. ✅
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot.log last entry at 04:34:01 MDT (10:34Z UTC) — approval_request delivery for catalog-drift-facts-sync-001. No new Larry messages since "pin to tier 2" at 17:03:30 MDT June 12. unreviewed-merge:489 DMs still unanswered. ✅ Nominal (carry items noted).
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall dry-run at 10:36Z: "no stalls detected". 5 FORGE_NO_PR_SKIPs (all pr_exists: #485, #486, #487, #488 + dashboard #53). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 3 entries — 2 stale (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001; G-rule DISPATCHED iter ~1623) + 1 fresh (catalog-drift-facts-sync-001, delivered 10:34Z; awaiting Larry 'approve'). No new Pulse action. ✅ Nominal (carry + new expected).
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry. G-rule dispatched ~iter 1416. ✅ Known carry.
+
+**Check A — Source repo:** On main. M agents/pulse/.claude/settings.json (pre-existing uncommitted from iter ~1625). Up to date with origin/main. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: last_sync=09:56:49Z status=error ("Uncommitted changes in working tree"), commit=a9f8cc2. Last successful sync ~01:56:15Z (~9h ago). Blocked by known uncommitted agents/pulse/.claude/settings.json. G-rule sync-blocked:uncommitted-changes: same pre-existing single occurrence, not incrementing. ✅ Nominal (triaged).
+
+**Check C — Agent liveness:** 9/9 active (beacon_telegram_bot.py + agent_telegram_bot.py ×3 [forge/mirror/pulse] + chain_event_shipper.py + inbox_watcher.py + outbox_notifier.py + dashboard_api [uvicorn] + cycle.service [current run]). ourliberty-pulse-check-iv.timer active (waiting). ✅ Nominal.
+
+**Check D — Inboxes:** Beacon inbox has catalog-accuracy-drift-gruel-dispatch-001.json (dispatched iter ~1637; Beacon processed → built catalog-drift-facts-sync-001 plan → approval delivered to Larry). Forge/mirror/pulse inboxes empty. ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on agent-core. 0 open PRs on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Saturday 2026-06-13 UTC):** Check I gates Sunday UTC; skip. Check III gates Sunday + 14d cadence; skip.
+
+**Rotations:** 0 credentials in 60-day window. ✅ Nominal.
+
+**Actions taken:**
+1. Alert triage L947: Tier-4 (memory-known delivery confirmation); triage-alert called; watermark advanced 946→947. No DM. ✅
+2. G-rule approval_request-delivery-confirmation 1/3 [NEW]: kind=approval_request from outbox-notifier should be Tier-3 silenced in alert-translations.json. At 3/3 dispatch Beacon.
+3. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` → logged at 10:38:33Z. ✅
+4. `cycle_tier_state.py record --checks-clean true` → consecutive_clean 1→2, Tier 1 unchanged. ✅
+5. MEMORY.md updated. ✅
+
+**Standing findings (updated from iter ~1638):**
+- [yellow] unreviewed-merge:489 — DM sent iter ~1614; no Larry reply. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] Tier-2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- [yellow] droplet-uncommitted:main — agents/pulse/.claude/settings.json uncommitted 9h+. G-rule 1/3. [carry]
+- [yellow] catalog-drift-facts-sync-001 PENDING LARRY — Beacon built plan; approval_request delivered to Telegram at 10:34Z June 13. Reply 'approve' to proceed with deterministic facts-sync for ourliberty-graph. [new/active]
+- [blue] G-rule heal-stale-approvals-not-gc-merged-prs — DISPATCHED (iter ~1623). 2 stale beacon-pending-approvals.json entries self-clear after GC-fix PR. [watch Forge]
+- [blue] RESOLVED: pulse-check-iv — timer active, next fire Mon 2026-06-15 04:26:45 MDT. [monitoring]
+- [blue] G-rule sync-blocked:uncommitted-changes — 1/3. [carry]
+- [blue] G-rule timer-cycle-no-journal-entry — 1/3. [carry]
+- [blue] G-rule source=pulse-cycle-self-report — 1/3. [carry]
+- [blue] G-rule heal-stale-daemon-code-auto-restart-needs-template — 1/3. [carry]
+- [blue] **G-rule catalog-accuracy-drift — DISPATCHED** (3/3, iter ~1637). direction-ask processed by Beacon; plan built; approval pending Larry. [watch for 'approve']
+- [blue] G-rule approval_request-delivery-confirmation — 1/3 [NEW]. kind=approval_request delivery confirmations from outbox-notifier appear as Tier-4 alerts; should be Tier-3 silenced. At 3/3 dispatch Beacon to add to alert-translations.json. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. G-rule dispatched ~iter 1416. [carry]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR. [carry]
+- [blue] dag-preflight-revision gap — PR #484 closed source=pulse gap; DAG re-dispatch markers still fall through. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED. [carry]
+- [blue] G-rule droplet-uncommitted:main — 1/3 (same occurrence, not incrementing). [carry]
+- [blue] G-rule F24-empty-prompt-envelope-rejected — 1/3. [carry]
+
+**PRIME DIRECTIVE:** 0 intervention rows this iter (clean). Trailing-30d (script-authoritative): interventions=822, systemic_fixes=34, verification_pending=11, ratio=24.18, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=2.
+
+---
+
 ## Iteration ~1638 — 2026-06-13 10:28Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→1)
 
 **Trigger:** Larry direct invocation (`/cycle`).
