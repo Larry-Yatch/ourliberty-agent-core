@@ -4,6 +4,84 @@
 
 ---
 
+## Iteration ~1624 — 2026-06-13 03:19Z UTC (interactive, /cycle via /loop, Tier 3, consecutive_clean 3→4)
+
+**Trigger:** Larry direct invocation (`/cycle` via `/loop`).
+
+**Health:** ✅ Green. 9/9 services active. 0 open PRs. All inboxes empty. 1 new alert (L1147, Tier-3 silence). Tier 3, consecutive_clean 3→4.
+
+**VERIFY-BEFORE-REASSERT (iter ~1623 watch items):**
+- unreviewed-merge:489 [yellow] DM: **CONFIRMED OPEN** — beacon_telegram_bot.log last entry idx=1146 at 20:59:54 MDT (sync.service digest); no Larry reply since "pin to tier 2" at 17:03:30 MDT June 12. [carry]
+- beacon-pending-approvals.json G-rule DISPATCHED (iter ~1623): **CONFIRMED** — 2 stale entries still present (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001). Inter-agent notify confirms Beacon root-cause confirmed + dispatched fix to Forge. Entries self-clear after PR merges. [carry — no new action needed]
+- pulse-check-iv.heartbeat: **CONFIRMED EXISTS but stale** — mtime=2026-06-12T18:26:04Z (~15.5h stale). Service inactive. drift-healer fires ~12:00Z UTC today. [carry]
+- G-rule timer-cycle-no-journal-entry 1/3: **CONFIRMED 1/3** — no new unjournaled fires. [carry]
+- G-rule source=pulse-cycle-self-report 1/3: **CONFIRMED 1/3** — no source=pulse-cycle alerts in window. [carry]
+- G-rule heal-stale-daemon-code-auto-restart-needs-template 1/3: **CONFIRMED 1/3** — no new occurrences. [carry]
+- PRIME DIRECTIVE ratio=24.85: **CONFIRMED** (script-authoritative). [confirmed]
+
+**Check 0 — Alert triage:** larry-alerts.jsonl=1147 lines. Watermark was 1146. 1 new alert.
+- L1147 (sync.service, 02:56:16Z, route=digest, subject=sync-blocked:auto-commit-push-failed): `alert_triage_state.py triage-alert` → Tier-3 silence (known-pattern). No DM. Watermark advanced 1146→1147. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot.log: No Larry messages since 17:03:30 MDT June 12 (23:03Z UTC). Last bot entry: idx=1146 at 20:59:54 MDT (sync.service digest, route=digest). unreviewed-merge:489 DMs (idx=1140+1142) still unanswered. ✅ Nominal (carry items noted).
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall dry-run at 03:16Z: "no stalls detected". 14 FORGE_NO_PR_SKIPs. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 2 stale entries (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001). G-rule heal-stale-approvals-not-gc-merged-prs already DISPATCHED in iter ~1623; Beacon confirmed root cause + dispatched fix to Forge. No new action needed. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry. G-rule dispatched ~iter 1416. ✅ Known carry.
+
+**Check A — Source repo:** On main; M cycle-journal.md (expected during cycle write). ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: last_sync=2026-06-13T02:56:16Z, status=error ("Auto-commit push failed; rolled back to b5cdf7f3"). Last successful sync: 01:56Z (~83 min ago), within 2h threshold. sync-blocked alert triaged Tier-3 (known-pattern, self-heals next tick). ✅ Nominal (triaged).
+
+**Check C — Agent liveness:** 9/9 active (beacon-bot, chain-event-shipper, cycle.service, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot). pulse-check-iv.service inactive (expected; drift-healer fires ~12:00Z UTC today). ✅ Nominal.
+
+**Check D — Inboxes:** All inboxes empty (forge=0, beacon=0, mirror=0, pulse=0). ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on agent-core. 0 open PRs on ourliberty-dashboard. Most recent merged: #489 at 23:26Z June 12. ✅ Nominal.
+
+**Conditional checks (Saturday 2026-06-13 UTC):** Check I: gates Sunday UTC; skip. Check III: gates Sunday + 14d cadence; skip.
+
+**Rotations:** 0 credentials in 60-day window. ✅ Nominal.
+
+**Actions taken:**
+1. Alert triage: L1147 classified Tier-3 via `alert_triage_state.py triage-alert`; watermark advanced 1146→1147. ✅
+2. `cycle_prime_ledger.py append --tier 3 --kind iter_clean` → logged at 03:19:46Z. ✅
+3. `cycle_tier_state.py record --checks-clean true` → consecutive_clean 3→4, Tier 3 unchanged. ✅
+4. MEMORY.md updated: status snapshot updated. ✅
+
+**Standing findings (updated):**
+- [yellow] unreviewed-merge:489 — DM sent iter ~1614; no Larry reply. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] Tier-2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- [blue] G-rule heal-stale-approvals-not-gc-merged-prs — **DISPATCHED** (iter ~1623). Beacon confirmed root cause + fix dispatched to Forge. 2 stale beacon-pending-approvals.json entries self-clear after PR merges. [watch Forge for PR]
+- [blue] pulse-check-iv — heartbeat stale (15.5h, mtime=18:26Z June 12); service not yet installed; drift-healer fires ~12:00Z UTC today. [carry]
+- [blue] G-rule timer-cycle-no-journal-entry — 1/3. [carry]
+- [blue] G-rule source=pulse-cycle-self-report — 1/3. [carry]
+- [blue] G-rule heal-stale-daemon-code-auto-restart-needs-template — 1/3. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. G-rule dispatched ~iter 1416. [carry]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR. [carry]
+- [blue] dag-preflight-revision gap — PR #484 closed source=pulse gap; DAG re-dispatch markers still fall through. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED. [carry]
+- [blue] catalog-accuracy-drift — G-rule 2/3. [carry]
+
+**PRIME DIRECTIVE:** 0 intervention rows this iter (clean). Trailing-30d (script-authoritative): interventions=820, systemic_fixes=33, verification_pending=11, ratio=24.85, trend=flat.
+**Tier end-of-iter:** Tier 3, consecutive_clean=4.
+
+---
+
+## Inter-agent notify — 2026-06-13 ~04:46Z UTC | from=beacon | task=heal-stale-approvals-not-gc-merged-prs-dispatch-001 | status=SUCCESS
+
+**Root cause confirmed (Beacon):** `heal_stale_approvals.py` reads `beacon-pending-approvals.json` as a signal to clear Supabase `chain_events` rows but **never writes the JSON back** — there is no GC on the `pending` array at all. `chain_events` side was already clean; the 2 stale entries (`fix-alert-triage-watermark-durability-001` + `fix-depth1-pulse-approval-extraction-001`) live only in the local JSON. The canonical `resolve()` path fires only on explicit Telegram approve/reject; auto/pulse-path completions are never reconciled.
+
+**Fix dispatched to Forge (preflight):** Add reconciliation step to `heal_stale_approvals.py::run_once` — moves `pending`→`history` (via existing `resolve()` writer) when a path-independent resolution signal is present: primary = `review_pass`/`auto_merge` chain_event for the task_id; fallback = merged PR on GitHub (`query_merged_pr` pattern). Signal-only, conservative-on-missing, idempotent, dry-run honored, unit-tested. The 2 stranded entries self-clear on next tick after merge.
+
+**Action required from Pulse:** None. Trust policy routes to Forge preflight; fix is in the chain. Carry item `[blue] G-rule heal-stale-approvals-not-gc-merged-prs — DISPATCHED` remains open until Forge PR merges and entries clear.
+
+---
+
 ## Iteration ~1623 — 2026-06-13 02:42Z UTC (interactive, /cycle, Tier 3, consecutive_clean 2→3)
 
 **Trigger:** Larry direct invocation (`/cycle`).
