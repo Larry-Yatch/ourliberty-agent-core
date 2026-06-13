@@ -4,6 +4,81 @@
 
 ---
 
+## Iteration ~1670 — 2026-06-13 18:37Z UTC (interactive, /cycle, Tier 2, consecutive_clean 0→1; catalog-drift root cause corrected)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. All checks nominal. 0 new alerts. Catalog-drift root cause corrected via inbox_watcher log. [yellow] DM sent to Larry.
+
+**VERIFY-BEFORE-REASSERT (iter ~1669 carries):**
+- catalog-drift-facts-sync-001 stuck: **CONFIRMED ACTIVE** in inboxes/forge/.invalid/ (file: requeue_count=2, .reason="requeue_count >= 3"). **ROOT CAUSE CORRECTED** — prior cycles (including ~1669) attributed failure to stale Beacon allowlist config. inbox_watcher log at 17:48Z shows actual error: `git worktree add failed: Read-only file system` on ourliberty-graph/.git/worktrees/ (3 rapid failures at 17:48:04, :09, :14Z hit requeue cap). Allowlist IS fixed per agent-models.json (ourliberty-graph in forge+mirror allowed_repos). ourliberty-graph/.git/ currently drwxrwxr-x larry; .git/worktrees/ dir does not exist. ⚠️ Carry with corrected root cause.
+- unreviewed-merge:489: **CARRY** — no new Larry reply.
+- ourliberty-cycle.timer auto-healed (L967): **CARRY** [blue] — cannot verify from interactive session.
+- PR #487: **VERIFIED MERGED** (2026-06-12T18:23:12Z — fix(alert-triage): fall back to intent when subject is None). No longer in FORGE_NO_PR_SKIP list. ✅ CLOSED.
+
+**Check 0 — Alert triage:** Watermark=967. Total lines=967. 0 new alerts. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → no output. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message: 11:48 MDT 'go' → dispatched catalog-drift to forge inbox → inbox_watcher Read-only FS failure. Last bot entry: 12:00:39 MDT (L966 route=digest). No new directives in last 4h. ✅ Nominal (catalog-drift root cause now understood; DM sent).
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → no stalls. 4 FORGE_NO_PR_SKIPs (#488/#490/#491/#492). #487 absent — verified MERGED 2026-06-12T18:23:12Z. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 5 entries unchanged from ~1669.
+- fix-alert-triage-watermark-durability-001 (2026-06-12T06:03Z) — stale carry.
+- fix-depth1-pulse-approval-extraction-001 (2026-06-12T06:05Z) — stale carry.
+- catalog-drift-facts-sync-001 (17:14Z Jun-13) — unprocessed carry.
+- catalog-drift-facts-sync-001 (17:17Z Jun-13) — unprocessed carry.
+- catalog-drift-facts-sync-001 (17:47Z Jun-13) — latest; dispatched → dead-lettered (read-only FS). ⚠️ Known carry.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING. Known [blue] carry. ✅
+
+**Check A — Source repo:** On main. Working tree CLEAN. HEAD=42439bc=origin/main. 0 ahead, 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-13T17:58:09Z, status=no-change (~39 min at check time). Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 5/5 persistent daemons —
+- beacon_telegram_bot: PID 2517973 (11:45 MDT). ✅
+- chain_event_shipper: PID 1849505 (Jun 11). ✅
+- outbox_notifier: PID 2116613 (Jun 12). ✅
+- dashboard_api: PID 2322792 (Jun 12). ✅
+- inbox_watcher: PID 2514958 (Jun 12, 11:16 MDT). ✅
+
+**Check D — Inboxes:** beacon/forge/mirror/pulse: all empty. ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on ourliberty-agent-core. 0 open PRs on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Saturday 2026-06-13 UTC):** Check I gates Mon/Wed/Fri/Sun — skip. Check III gates Sunday + 14d cadence — skip.
+
+**Actions taken:**
+1. DM sent to Larry: [yellow] catalog-drift root cause CORRECTED (Read-only FS, not allowlist); recovery: send 'go' again (2 unprocessed pending approvals remain at 17:14Z + 17:17Z Jun-13). ✅
+2. `cycle_prime_ledger.py append --tier 2 --kind iter_clean` → logged. ✅
+3. `cycle_tier_state.py record --checks-clean true` → Tier 2, consecutive_clean 0→1. ✅
+4. MEMORY.md updated. ✅
+
+**Dispatches:** None.
+
+**Standing findings:**
+- [yellow] **catalog-drift-facts-sync-001 stuck** — in inboxes/forge/.invalid/ (requeue_count=2 in file, reason=requeue_count≥3). ROOT CAUSE: git worktree add failed with Read-only file system on ourliberty-graph at 17:48Z. Allowlist IS fixed. ourliberty-graph/.git/ appears writable now. Recovery: send 'go' again — 2 unprocessed pending approvals remain (17:14Z + 17:17Z Jun-13). DM sent this iter. [carry, root cause updated]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614; no Larry reply. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **ourliberty-cycle.timer auto-healed** — L967 at 18:00:18Z Jun-13. Cannot verify NextElapseUSecRealtime from interactive session. [carry]
+- [blue] **beacon-pending-approvals stale entries** — fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001 (both Jun-12). G-rule dispatched ~1623. [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — 1/3. [carry]
+- [blue] **G-rule heal-stale-daemon-code-auto-restart-needs-template** — 1/3. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 1/3 (no recurrence). [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **Check 5 MISSING** — heal-stale-daemon-code-state.json absent. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — [carry]
+- [blue] **dag-preflight-revision gap** — [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+
+**PRIME DIRECTIVE:** 0 new interventions. 1 iter_clean appended. Script-authoritative: interventions=833, systemic_fixes=36, verification_pending=11, ratio=23.14, trend=flat.
+**Tier end-of-iter:** Tier 2, consecutive_clean 0→1.
+
+---
+
 ## Iteration ~1669 — 2026-06-13 18:14Z UTC (interactive, /cycle, Tier 1→2 de-escalation; all checks nominal)
 
 **Trigger:** Larry direct invocation (`/cycle`).
