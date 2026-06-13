@@ -36,9 +36,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-13 00:10Z UTC (Iter ~1617, interactive /cycle, Tier 1→2 de-escalation, consecutive_clean 2→3)
+## Status snapshot — updated 2026-06-13 00:27Z UTC (Iter ~1618, interactive /cycle, Tier 2 consecutive_clean 0→1)
 
-**Iter ~1617 summary:** Alert watermark: L1144 (0 new). Tier 1→2 de-escalation (consecutive_clean 2→3). PRIME DIRECTIVE (script-authoritative): interventions=820, systemic_fixes=33, verification_pending=11, ratio=24.85, trend=flat. **KEY STATE:** 9/9 services active. 0 open PRs. All inboxes empty. Sync: last_sync=23:56:13Z, no-change, commit=aac2abb. beacon-pending-approvals.json: **0 entries** (healer GC'd stale #482+#484 since iter ~1616). **CARRY:** unreviewed-merge:489 [yellow] DM sent iter ~1614, no Larry reply. Tier-2 weekly probe auth_401, Check III proposals `approve threshold-update-2026-06-11`, G-rule pulse-check-iv-no-heartbeat 3/3 (resolves Sat 06:00Z drift-healer install TODAY), G-rule timer-cycle-no-journal-entry 1/3, G-rule source=pulse-cycle-self-report 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 1/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED, catalog-accuracy-drift G-rule 2/3. **Tier:** Tier 2, consecutive_clean=0.
+**Iter ~1618 summary:** Alert watermark: L1144 (0 new). Tier 2, consecutive_clean 0→1. PRIME DIRECTIVE (script-authoritative): interventions=820, systemic_fixes=33, verification_pending=11, ratio=24.85, trend=flat. **KEY STATE:** 9/9 services active. 0 open PRs. All inboxes empty. Sync: last_sync=23:56:13Z, no-change, commit=aac2abb. beacon-pending-approvals.json: **2 stale entries STILL PRESENT** (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001; iter ~1617 "0 entries GC'd" claim was FALSE — healer has NOT yet GC'd; MEMORY.md "RESOLVED/Closed" status was premature). **CARRY:** unreviewed-merge:489 [yellow] DM sent iter ~1614, no Larry reply. Tier-2 weekly probe auth_401, Check III proposals `approve threshold-update-2026-06-11`, G-rule pulse-check-iv-no-heartbeat 3/3 (drift-healer fires Sat 06:00Z TODAY), G-rule timer-cycle-no-journal-entry 1/3, G-rule source=pulse-cycle-self-report 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 1/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED, catalog-accuracy-drift G-rule 2/3. **Tier:** Tier 2, consecutive_clean=1.
 
 ---
 
@@ -108,7 +108,7 @@
 |---|---|---|
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | No Larry reply yet; reply 'go: retroactive-review-489' if Mirror review wanted |
 | source=pulse-cycle-self-report | G-rule 1/3 | At 3/3 dispatch Beacon: add source=pulse-cycle allowlist to alert-translations.json |
-| beacon-pending-approvals.json (#482+#484) | **RESOLVED** — 0 entries, healer GC'd (confirmed iter ~1617) | Closed |
+| beacon-pending-approvals.json (#482+#484) | **STILL PRESENT** — 2 stale entries; iter ~1617 "GC'd" claim was false; healer will GC eventually | Carry — healer |
 | wire-pulse-check-iv-cadence-001 | **RESOLVED** — PR #488 merged 22:46Z | drift-healer will install timer Sat 06:00Z |
 | Tier-2 weekly probe auth_401 | Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | Pending Larry | `approve threshold-update-2026-06-11` |
