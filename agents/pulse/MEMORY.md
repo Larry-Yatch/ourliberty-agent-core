@@ -36,6 +36,12 @@
 
 ---
 
+## Status snapshot — updated 2026-06-13 22:28Z UTC (Iter ~1687, interactive /cycle, Tier 2, consecutive_clean 1→2)
+
+**Iter ~1687 summary:** Alert watermark: 973 (0 new). Tier 2, consecutive_clean 1→2. PRIME DIRECTIVE (script-authoritative): interventions=836, systemic_fixes=37, verification_pending=11, ratio=22.59, trend=flat. All checks nominal. 5/5 daemons same PIDs (beacon_telegram_bot:2517973, chain_event_shipper:1849505, outbox_notifier:2552416, dashboard_api:2322792, inbox_watcher:2530123). 0 open PRs. git: clean, HEAD=d522066=origin/main. Sync: last_sync=21:58:42Z (~30 min, nominal). forge/.invalid now empty (build-task-001.json fixture cleaned). **CARRY:** unreviewed-merge:489 [yellow], Tier-2 weekly probe auth_401, Check III `approve threshold-update-2026-06-11`, beacon-pending-approvals 2 stale Jun-12 + catalog-drift artifact (Jun-13), G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 2/3, G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. **Tier:** Tier 2, consecutive_clean=2. (1 more clean iter → de-escalate to Tier 3.)
+
+---
+
 ## Status snapshot — updated 2026-06-13 22:12Z UTC (Iter ~1686, interactive /cycle, Tier 2, consecutive_clean 0→1)
 
 **Iter ~1686 summary:** Alert watermark: 973 (0 new). Tier 2, consecutive_clean 0→1. PRIME DIRECTIVE (script-authoritative): interventions=836, systemic_fixes=37, verification_pending=11, ratio=22.59, trend=flat. All checks nominal. 5/5 daemons same PIDs (beacon_telegram_bot:2517973, chain_event_shipper:1849505, outbox_notifier:2552416, dashboard_api:2322792, inbox_watcher:2530123). 0 open PRs. git: clean, HEAD=f47e0e9=origin/main. Sync: last_sync=21:58:42Z (~14 min, nominal). **CARRY:** unreviewed-merge:489 [yellow], Tier-2 weekly probe auth_401, Check III `approve threshold-update-2026-06-11`, beacon-pending-approvals 2 stale Jun-12 + catalog-drift artifact (Jun-13), G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 2/3, G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. **Tier:** Tier 2, consecutive_clean=1. (2 more clean iters → de-escalate to Tier 3.)
