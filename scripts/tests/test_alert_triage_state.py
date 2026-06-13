@@ -217,9 +217,11 @@ _FIXTURE_TRANSLATIONS = {
         'surfaced-subject': {'severity': 'WARNING', 'tier': 'SOON',
                              'never_silence': True},
     },
-    # outbox-notifier success alerts carry the pattern in `intent`, subject None.
+    # outbox-notifier success alerts carry the pattern in `intent`, subject None;
+    # delivery-confirmation alerts carry it only in `kind` (subject + intent None).
     'outbox-notifier': {
         'review-pass': {'severity': 'INFO', 'tier': 'FYI'},
+        'approval_request': {'severity': 'INFO', 'tier': 'FYI'},
     },
     # source-level '*' catch-all: any subject under this source matches, but a
     # more-specific subject entry still wins (consulted before the '*' fallback).
@@ -270,6 +272,16 @@ class TestTranslationMatch(unittest.TestCase):
         # Regression guard for the existing 3-arg behavior: no key → None.
         self.assertIsNone(ats._translation_match(
             _FIXTURE_TRANSLATIONS, 'outbox-notifier', None, None))
+
+    def test_kind_fallback_when_subject_and_intent_none(self):
+        # approval_request delivery confirmations carry the pattern only in
+        # `kind`, with subject AND intent both None. The lookup falls back to
+        # kind (precedence subject -> intent -> kind) and finds the entry.
+        entry = ats._translation_match(
+            _FIXTURE_TRANSLATIONS, 'outbox-notifier', None, None,
+            'approval_request')
+        self.assertIsInstance(entry, dict)
+        self.assertEqual(entry.get('tier'), 'FYI')
 
     def test_match_returns_entry_dict(self):
         # The matcher returns the entry so callers can read directives like
@@ -344,6 +356,17 @@ class TestClassify(unittest.TestCase):
         # silence to digest instead of falling through to Tier 4.
         r = self._classify({'source': 'outbox-notifier', 'subject': None,
                             'intent': 'review-pass'})
+        self.assertEqual(r['tier'], 3)
+        self.assertEqual(r['route'], 'digest')
+        self.assertEqual(r['decision'], 'silence')
+
+    def test_tier3_kind_fallback_silences_to_digest(self):
+        # outbox-notifier approval_request delivery confirmation: subject AND
+        # intent are None, the pattern is carried only in `kind`. The gate-1
+        # translation match must succeed via the kind fallback and silence to
+        # digest instead of falling through to Tier 4.
+        r = self._classify({'source': 'outbox-notifier',
+                            'kind': 'approval_request'})
         self.assertEqual(r['tier'], 3)
         self.assertEqual(r['route'], 'digest')
         self.assertEqual(r['decision'], 'silence')

@@ -163,6 +163,12 @@
       "tier": "FYI",
       "plain_language_summary": "Mirror's DAG preflight verification PASSED for a multi-step build sequence (no cycles, all depends_on references resolve, parallel steps touch no overlapping files, all referenced spec sections exist). The sequence auto-transitions pending -> active and the advancer dispatches the first step. The raw subject carries the sequence id after a colon (mirror-dag-pass:<seq-id>); this bare key matches via the prefix-strip lookup rule. By-design FYI, not a failure.",
       "recommended_action": "None — by-design success confirmation that a sequence kicked off cleanly. The sequence file is at ~/agents/blackboard/build-sequences/<seq-id>.json; advancer activity is in ~/agents/logs/outbox-notifier.log."
+    },
+    "approval_request": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "Delivery confirmation: outbox-notifier successfully dispatched an APPROVAL_REQUEST Telegram DM to Larry. The approval is now awaiting Larry's response in beacon-pending-approvals.json. No action needed from Pulse — the DM was already delivered.",
+      "recommended_action": "None. The Telegram DM has already been delivered. Monitor ~/agents/state/beacon-pending-approvals.json for the pending item."
     }
   },
   "heal-wedged-review-sessions": {
