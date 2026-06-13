@@ -4,6 +4,82 @@
 
 ---
 
+## Iteration ~1649 — 2026-06-13 12:49Z UTC (interactive, /cycle, Tier 1, agent-models RESOLVED, G-rule 3/3 dispatch)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green (one Tier-4 echo alert; underlying finding resolved). 9/9 services active. 0 open PRs. 2 new alerts (L952 Tier-3 silence, L953 Tier-4 stale echo → G-rule 3/3 dispatch). **MAJOR RESOLUTION: commit e427631 "config: actually add ourliberty-graph to forge+mirror allowed_repos + repo_paths" landed at 06:44:34 MDT. agent-models-allowlist-not-on-main is CLOSED.**
+
+**VERIFY-BEFORE-REASSERT (iter ~1648 watch items):**
+- agent-models-allowlist-not-on-main: **RESOLVED** — commit e427631 (`Lawrence Yatch`, 06:44:34 MDT) updated `config/agent-models.json`. Verified: `agents.forge.allowed_repos = ['ourliberty-agent-core','ourliberty-dashboard','ourliberty-graph']`; `agents.mirror.allowed_repos` same. Also adds `repo_paths` entry (2nd latent blocker). Fix landed directly, not through Beacon→Forge path. [CLOSED]
+- catalog-drift-facts-sync-001 root cause: **RESOLVED** — root cause was missing agent-models.json entry. e427631 fixes it. fix-agent-models-ourliberty-graph-001 envelope in Beacon inbox (dispatched iter ~1648); Beacon should re-dispatch catalog-drift-facts-sync-001 when it picks up the envelope. [watch Beacon]
+- unreviewed-merge:489: **CONFIRMED OPEN** — no Larry reply. [carry]
+- beacon-pending-approvals.json 3 entries: **RE-VERIFIED** — 2 stale + catalog-drift-facts-sync-001 active (pending Beacon re-dispatch now that allowlist fix landed). [carry/active]
+- G-rule source=pulse-cycle-self-report 2/3: **CONFIRMED** — L953 is the 3rd occurrence. 2/3 → 3/3. Dispatch triggered this iter. [advanced]
+- PRIME DIRECTIVE: interventions=825 (pre-iter), ratio≈24.26, trend=flat. [confirmed]
+
+**Check 0 — Alert triage:** larry-alerts.jsonl=953 lines, watermark was 951. **2 new alerts.**
+- L952 (12:31:34Z, dispatch-branch-cleanup summary, route=digest): `triage-alert` → **Tier-3 silence** (known-pattern match). No DM. No tier-reset. ✅
+- L953 (12:42:09Z, pulse-cycle agent-models-allowlist-not-on-main, route=escalate): `triage-alert` → **Tier-4** (no registry template, no translation match; `source=pulse-cycle` is not yet in allowlist). G-rule source=pulse-cycle-self-report: 2/3 → **3/3**. Content is stale (e427631 resolved the finding before L953 even landed). No redundant DM to Larry — he committed the fix; escalation already actioned. Dispatched Beacon for systemic fix (see Actions). Tier-reset: YES. Watermark advanced 951→953. ⚠️ Tier-reset.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot log last entry 06:45:28 MDT (delivered L953 pulse-cycle alert). Larry committed e427631 at 06:44:34 MDT (before Beacon's delivery). Beacon confirmed allowlist gap at 06:39:54 MDT; Larry self-resolved with the commit. No new Larry directives since. fix-agent-models-ourliberty-graph-001 in Beacon inbox; Beacon will see root cause resolved and re-dispatch catalog-drift-facts-sync-001. ✅ Nominal (positive resolution).
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall dry-run → "no stalls detected". 5 FORGE_NO_PR_SKIPs (known: #485, #53, #486, #487, #488). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 3 entries — 2 stale (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001; G-rule DISPATCHED iter ~1623) + 1 active (catalog-drift-facts-sync-001 — re-dispatch should now succeed via fix-agent-models-ourliberty-graph-001 Beacon task). ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry. G-rule dispatched ~iter 1416. ✅ Known carry.
+
+**Check A — Source repo:** On main. M agents/pulse/.claude/settings.json (pre-existing uncommitted from iter ~1625). HEAD=e427631, up to date with origin/main (0 commits behind). ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: last_sync=2026-06-13T11:57:08Z status=error ("Uncommitted changes"), blocked by known settings.json. Same pre-existing single occurrence. ✅ Nominal (triaged).
+
+**Check C — Agent liveness:** 9/9 active (ourliberty-beacon-bot PID 1843738 + forge-bot + mirror-bot + pulse-bot + chain-event-shipper + inbox-watcher + outbox-notifier + dashboard-api + cycle.service [current]). ourliberty-pulse-check-iv.timer active (next fire Mon 2026-06-15 04:26:45 MDT). ✅ Nominal.
+
+**Check D — Inboxes:** Beacon: fix-agent-models-ourliberty-graph-001.json (obsolete intent — fix already in e427631; Beacon should read context, skip the config change, and re-dispatch catalog-drift-facts-sync-001) + source-pulse-cycle-alert-translation-001.json (dispatched this iter). All other inboxes empty. ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on agent-core. 0 open PRs on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Saturday 2026-06-13 UTC):** Check I gates Sunday UTC; skip. Check III gates Sunday + 14d cadence; skip.
+
+**Rotations:** 0 credentials in 60-day window. ✅ Nominal.
+
+**Actions taken:**
+1. Alert triage L952: Tier-3 silence (dispatch-branch-cleanup known pattern). ✅
+2. Alert triage L953: Tier-4 (source=pulse-cycle, novel). G-rule source=pulse-cycle-self-report 2/3→3/3. Watermark advanced 951→953. No redundant DM (finding stale, already resolved). ✅
+3. **Dispatched Beacon** `source-pulse-cycle-alert-translation-001` — direction-ask to add source=pulse-cycle pattern to alert-translations.json for Tier-3 silence. G-rule 3/3 trigger. ✅
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --template source-pulse-cycle-self-report-g-rule-dispatch` → logged at 12:49:13Z. ✅
+5. `cycle_tier_state.py record --checks-clean false` → Tier 1 remains, consecutive_clean=0 (last_signal_at 12:49:32Z). ✅
+6. MEMORY.md updated. ✅
+
+**Standing findings (updated):**
+- [yellow] **RESOLVED: agent-models-allowlist-not-on-main** — commit e427631 landed 06:44:34 MDT June 13. ourliberty-graph now in forge+mirror allowed_repos + repo_paths. [CLOSED]
+- [yellow] catalog-drift-facts-sync-001 — root cause resolved (e427631). fix-agent-models-ourliberty-graph-001 in Beacon inbox to re-dispatch. Watch Beacon for re-dispatch result. [active — Beacon inbox]
+- [yellow] unreviewed-merge:489 — DM sent iter ~1614; no Larry reply. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] Tier-2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention. [carry]
+- [blue] G-rule source=pulse-cycle-self-report — **3/3 → DISPATCHED** (source-pulse-cycle-alert-translation-001 to Beacon). [watch Beacon for PR]
+- [blue] G-rule heal-stale-approvals-not-gc-merged-prs — DISPATCHED (iter ~1623). 2 stale entries self-clear after GC-fix PR. [watch Forge]
+- [blue] RESOLVED: pulse-check-iv — timer active, next fire Mon 2026-06-15 04:26:45 MDT. [monitoring]
+- [blue] G-rule sync-blocked:uncommitted-changes — 1/3. [carry]
+- [blue] G-rule timer-cycle-no-journal-entry — 1/3. [carry]
+- [blue] G-rule heal-stale-daemon-code-auto-restart-needs-template — 1/3. [carry]
+- [blue] G-rule catalog-accuracy-drift — DISPATCHED (3/3, iter ~1637). Root cause (agent-models.json) now fixed. Watch for Forge PR on catalog facts-sync. [watch]
+- [blue] G-rule approval_request-delivery-confirmation — 1/3. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. [carry]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR. [carry]
+- [blue] dag-preflight-revision gap — PR #484 closed source=pulse gap; DAG re-dispatch markers still fall through. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED. [carry]
+- [blue] G-rule droplet-uncommitted:main — 1/3. [carry]
+- [blue] G-rule F24-empty-prompt-envelope-rejected — 1/3. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention row this iter (source-pulse-cycle-self-report-g-rule-dispatch). Trailing-30d (script-authoritative): interventions=826, systemic_fixes=34, verification_pending=11, ratio≈24.26, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0 (Tier-4 alert L953 reset).
+
+---
+
 ## Iteration ~1648 — 2026-06-13 12:42Z UTC (interactive, /cycle, Tier 1→reset, agent-models allowlist integrity finding)
 
 **Trigger:** Larry direct invocation (`/cycle`).
