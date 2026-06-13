@@ -4,6 +4,84 @@
 
 ---
 
+## Iteration ~1651 — 2026-06-13 13:05Z UTC (interactive, /cycle, Tier 1, Larry approved pulse-cycle-silence fix, Forge building)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Signal. 9/9 services active. 0 open PRs. 3 new alerts. POSITIVE: Larry approved pulse-cycle-self-echo-silence-001 "go" at 06:56:25 MDT → Forge picked up build-pulse-cycle-self-echo-silence-001.json (now empty — Forge active). L956 (source=pulse-cycle self-echo, Tier-4) → tier-reset.
+
+**VERIFY-BEFORE-REASSERT (iter ~1650 watch items):**
+- source-pulse-cycle-alert-translation-001 in Beacon inbox: **RESOLVED** — Beacon processed and dispatched to Forge as pulse-cycle-self-echo-silence-001; Larry approved "go" at 06:56:25 MDT; Forge inbox `build-pulse-cycle-self-echo-silence-001.json` picked up this iter (now empty = Forge active). [CLOSED → watch Forge PR]
+- unreg-approval-01d93b417026 in beacon-pending-approvals.json: **GONE** — was 4 entries in iter ~1650, now 3. Entry unreg-approval-01d93b417026 no longer present. Reason unclear (approved via dashboard or GC'd). catalog-drift-facts-sync-001 still pending (reminders=0). No Forge inbox file for catalog-drift. [verify needed — carry]
+- unreviewed-merge:489: **CONFIRMED OPEN** — no Larry reply. [carry]
+- G-rule sync-blocked:uncommitted-changes 1/3: **RE-VERIFIED** — new sync alert L955 at 12:57:19Z. New occurrence. Advancing to 2/3. [advanced]
+
+**Check 0 — Alert triage:** larry-alerts.jsonl=956 lines, watermark was 953. **3 new alerts.**
+- L954 (12:55:29Z, outbox-notifier, kind=approval_request, approval_id=pulse-cycle-self-echo-silence-001): DELIVERY CONFIRMATION — Beacon plan delivered; Larry said "go" at 06:56:25 MDT → approved. → **Tier-3 silence** (memory-known approval_request delivery confirmation pattern). No DM. G-rule approval_request-delivery-confirmation: 1/3 → **2/3**. Watermark 953→954. ✅
+- L955 (12:57:19Z, sync.service, subject=sync-blocked:uncommitted-changes): recurring sync-blocked alert (new sync service run). → **Tier-3 silence** (known-pattern). No DM. G-rule sync-blocked:uncommitted-changes: 1/3 → **2/3**. Watermark 954→955. ✅
+- L956 (12:57:48Z, source=pulse-cycle, subject=unreg-approval-catalog-drift-new-pending): self-echo of Pulse's iter ~1650 escalation DM. source=pulse-cycle, no template yet (fix in Forge inbox being built). → **Tier-4** (novel; no registry entry). No new DM (DM sent last iter; underlying unreg-approval entry is now GONE from pending — content may be stale). Tier-reset. Watermark 955→956. ⚠️ Tier-reset.
+
+**Check 1 — Log noise:** Beacon bot log: delivered approval_request idx=953 (pulse-cycle-self-echo-silence-001) at 06:55:34 MDT; "go" received 06:56:25 MDT; dispatched to Forge 06:56:26 MDT. Delivered L955+L956 at 07:00:59 MDT. No new Larry replies after "go". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** No new Larry directives after 06:56:25 MDT "go". Larry's "go" actioned pulse-cycle-self-echo-silence-001 approval. No orphaned directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall dry-run → "no stalls detected". 5 FORGE_NO_PR_SKIPs (known: #485, #53, #486, #487, #488). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **3 entries** (down from 4 in iter ~1650):
+- fix-alert-triage-watermark-durability-001: pending, 2 reminders, stale [carry]
+- fix-depth1-pulse-approval-extraction-001: pending, 2 reminders, stale [carry]
+- catalog-drift-facts-sync-001: pending, reminders=0 [active, unreg-approval entry gone — approval path unclear]
+- **GONE: unreg-approval-01d93b417026** — was present iter ~1650 (created 12:45:34Z by heal-unregistered-approval). No longer in pending array. Reason: approved via dashboard or GC'd. No Forge task for catalog-drift visible. catalog-drift-facts-sync-001 still in pending state → approval path may need re-registration. [blue carry — watch next iter]
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry. ✅ Known carry.
+
+**Check A — Source repo:** On main. M agents/pulse/.claude/settings.json (pre-existing, iter ~1625). HEAD=b8b7827=origin/main (0 commits behind, 0 ahead). ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: last_sync=2026-06-13T12:57:19Z status=error ("Uncommitted modifications"). Same root cause (settings.json). New sync occurrence → G-rule sync-blocked:uncommitted-changes advanced (see Check 0). ✅ Nominal (triaged).
+
+**Check C — Agent liveness:** 8 external processes (beacon_telegram_bot PID 1843738 + 3x agent_telegram_bot + chain_event_shipper PID 1849505 + inbox_watcher PID 1850128 + outbox_notifier PID 2116613 + dashboard_api PID 2322792) + cycle.service [current] = **9/9**. ourliberty-pulse-check-iv.timer: active. ✅ Nominal.
+
+**Check D — Inboxes:** Forge inbox: **EMPTY** (build-pulse-cycle-self-echo-silence-001.json was present at start of iter, now gone — Forge picked it up and is building). Beacon/Mirror/Pulse inboxes: empty. ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on ourliberty-agent-core. 0 open PRs on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Saturday 2026-06-13 UTC):** Check I gates Sunday UTC; skip. Check III gates Sunday + 14d cadence; skip.
+
+**Actions taken:**
+1. Alert triage L954: Tier-3 silence. G-rule approval_request-delivery-confirmation 1/3→2/3. Watermark 953→954. ✅
+2. Alert triage L955: Tier-3 silence. G-rule sync-blocked:uncommitted-changes 1/3→2/3. Watermark 954→955. ✅
+3. Alert triage L956: Tier-4 (no template; source=pulse-cycle). No DM (content stale: unreg-approval entry gone). Tier-reset. Watermark 955→956. ✅
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention` → logged 13:05:52Z. ✅
+5. `cycle_tier_state.py record --checks-clean false` → Tier 1, consecutive_clean=0, last_signal_at=13:05:54Z. ✅
+6. MEMORY.md updated. ✅
+
+**Standing findings (updated):**
+- [yellow] **WATCH: catalog-drift-facts-sync-001** — unreg-approval-01d93b417026 gone from pending; approval path unclear; catalog-drift still pending (0 reminders). Monitor next iter; if approval path broken, re-escalate. [carry]
+- [yellow] unreviewed-merge:489 — DM sent iter ~1614; no Larry reply. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] Tier-2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention. [carry]
+- [blue] **POSITIVE: pulse-cycle-self-echo-silence-001** — Larry approved "go" at 06:56:25 MDT; Forge now building (inbox picked up). Watch for PR from Forge. [active]
+- [blue] G-rule approval_request-delivery-confirmation — **2/3** (advanced this iter). At 3/3 dispatch Beacon. [carry]
+- [blue] G-rule sync-blocked:uncommitted-changes — **2/3** (advanced this iter). At 3/3 dispatch Beacon. [carry]
+- [blue] G-rule heal-stale-approvals-not-gc-merged-prs — DISPATCHED (iter ~1623). 2 stale entries self-clear after GC-fix PR merges. [watch Forge]
+- [blue] RESOLVED: pulse-check-iv — timer active, next fire Mon 2026-06-15. [monitoring]
+- [blue] G-rule timer-cycle-no-journal-entry — 1/3. [carry]
+- [blue] G-rule heal-stale-daemon-code-auto-restart-needs-template — 1/3. [carry]
+- [blue] G-rule catalog-accuracy-drift — DISPATCHED (3/3, iter ~1637). Pending Larry approval of catalog-drift-facts-sync-001 (path unclear after unreg-approval GC). [watch]
+- [blue] G-rule droplet-uncommitted:main — 1/3. [carry]
+- [blue] G-rule F24-empty-prompt-envelope-rejected — 1/3. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. [carry]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR. [carry]
+- [blue] dag-preflight-revision gap — PR #484 closed source=pulse gap; DAG markers still fall through. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED. [carry]
+- CLOSED: agent-models-allowlist-not-on-main (e427631). [closed]
+- CLOSED: source=pulse-cycle-self-report G-rule DISPATCHED → Larry approved → Forge building. [active/building]
+
+**PRIME DIRECTIVE:** 1 intervention row this iter (L956 Tier-4 tier-reset). Trailing-30d (pre-iter script): interventions=827, systemic_fixes=34, verification_pending=11, ratio≈24.32, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0 (L956 Tier-4 tier-reset).
+
+---
+
 ## Iteration ~1650 — 2026-06-13 13:00Z UTC (interactive, /cycle, Tier 1, unreg-approval-catalog-drift new finding)
 
 **Trigger:** Larry direct invocation (`/cycle`).

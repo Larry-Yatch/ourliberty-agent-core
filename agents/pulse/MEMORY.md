@@ -36,6 +36,12 @@
 
 ---
 
+## Status snapshot — updated 2026-06-13 13:05Z UTC (Iter ~1651, interactive /cycle, Tier 1, Forge building pulse-cycle-silence fix)
+
+**Iter ~1651 summary:** Alert watermark: 956 (3 new: L954 approval_request delivery Tier-3, L955 sync-blocked Tier-3, L956 source=pulse-cycle self-echo Tier-4 tier-reset). Tier 1, consecutive_clean=0. PRIME DIRECTIVE (pre-iter script): interventions=827, systemic_fixes=34, verification_pending=11, ratio≈24.32, trend=flat. **KEY POSITIVE:** Larry approved pulse-cycle-self-echo-silence-001 "go" at 06:56:25 MDT → Forge built (inbox picked up this iter). **KEY CHANGE:** beacon-pending-approvals.json now 3 entries (unreg-approval-01d93b417026 GONE — was 4 at iter ~1650; reason unclear; catalog-drift-facts-sync-001 still pending reminders=0; approval path may need re-registration). G-rule approval_request-delivery-confirmation 1/3→2/3. G-rule sync-blocked:uncommitted-changes 1/3→2/3. **CARRY:** unreviewed-merge:489 [yellow], Tier-2 weekly probe auth_401, Check III proposals `approve threshold-update-2026-06-11`, G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 1/3, G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, G-rule heal-stale-approvals-not-gc-merged-prs DISPATCHED, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. **Tier:** Tier 1, consecutive_clean=0.
+
+---
+
 ## Status snapshot — updated 2026-06-13 13:00Z UTC (Iter ~1650, interactive /cycle, Tier 1, unreg-approval-catalog-drift NEW)
 
 **Iter ~1650 summary:** Alert watermark: 953 (0 new). Tier 1, consecutive_clean=0 (Check 4 new finding). PRIME DIRECTIVE (script-authoritative): interventions=827, systemic_fixes=34, verification_pending=11, ratio≈24.324, trend=flat. **KEY FINDING:** beacon-pending-approvals.json now has 4 entries (was 3 at iter ~1649). NEW: unreg-approval-01d93b417026 — heal-unregistered-approval registered missed APPROVAL_REQUEST for catalog-drift-facts-sync-001 at 12:45:34Z. Larry needs to Approve on Approvals tab (deterministic facts-sync for ourliberty-graph, ourliberty-graph elevated to sandbox for this task). DM sent this iter. **AGENT-MODELS CLOSED:** commit e427631 confirmed. **CARRY:** unreviewed-merge:489 [yellow] no Larry reply. Tier-2 weekly probe auth_401, Check III proposals `approve threshold-update-2026-06-11`, G-rule source=pulse-cycle-self-report DISPATCHED (3/3 — source-pulse-cycle-alert-translation-001 in Beacon inbox), G-rule approval_request-delivery-confirmation 1/3, G-rule sync-blocked:uncommitted-changes 1/3, G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 1/3, G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. G-rule catalog-accuracy-drift DISPATCHED (3/3) — pending Larry unreg-approval. **Tier:** Tier 1, consecutive_clean=0.
@@ -223,7 +229,7 @@
 | Item | Status | Action needed |
 |---|---|---|
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | No Larry reply yet; reply 'go: retroactive-review-489' if Mirror review wanted |
-| source=pulse-cycle-self-report | G-rule **3/3 → DISPATCHED** (iter ~1649, source-pulse-cycle-alert-translation-001 to Beacon) | Watch Beacon for PR |
+| source=pulse-cycle-self-report | **BUILDING** — Larry approved "go" at 06:56:25 MDT; Forge building pulse-cycle-self-echo-silence-001; inbox picked up iter ~1651 | Watch Forge for PR |
 | beacon-pending-approvals.json (#482+#484) | **G-rule DISPATCHED** (3/3) — 2 entries still present; iter ~1622 "RESOLVED" was false. Beacon direction-ask written iter ~1623. | Watch Beacon for spec |
 | wire-pulse-check-iv-cadence-001 | **RESOLVED** — PR #488 merged 22:46Z; drift-healer installed service+timer 06:00Z UTC June 13; timer active, next fire Mon 2026-06-15 04:26:45 MDT | heartbeat still stale (mtime=18:26Z June 12) until first timer run |
 | Tier-2 weekly probe auth_401 | Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
@@ -236,7 +242,7 @@
 | sync-push-rebase-loop-001 | UNREGISTERED AR | Carry |
 | dag-preflight-revision gap | Active | PR #484 closed source=pulse gap; DAG markers still fall through |
 | agent-models-allowlist-not-on-main | **RESOLVED iter ~1649** — commit e427631 landed 06:44:34 MDT June 13. ourliberty-graph now in forge+mirror allowed_repos + repo_paths. | CLOSED |
-| catalog-accuracy-drift / catalog-drift-facts-sync-001 | Root cause RESOLVED (e427631). unreg-approval-01d93b417026 registered by heal-unregistered-approval at 12:45:34Z (missed APPROVAL_REQUEST recovered). DM sent iter ~1650. | Tap Approve on Approvals tab |
+| catalog-accuracy-drift / catalog-drift-facts-sync-001 | Root cause RESOLVED (e427631). unreg-approval-01d93b417026 GONE from pending-approvals iter ~1651 (approved via dashboard or GC'd; unclear). catalog-drift-facts-sync-001 still pending (0 reminders). No Forge task visible. | Monitor — approval path may need re-registration |
 | droplet-uncommitted:main | G-rule 1/3 [NEW iter ~1637] | Watch; at 3/3 dispatch Beacon to add translation allowlist entry |
 | F24-empty-prompt-envelope-rejected | G-rule 1/3 | Watch |
 | heal-stale-daemon-code-auto-restart-needs-template | G-rule 1/3 | At 3/3 dispatch Beacon: add translation template to alert-translations.json |
