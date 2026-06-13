@@ -4,6 +4,80 @@
 
 ---
 
+## Iteration ~1679 — 2026-06-13 21:19Z UTC (interactive, /cycle, Tier 2→1 reset, PR #493 ff)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Signal. Check A: main behind origin/main by 1 (PR #493 auto-merged at 21:12Z). Fast-forward applied. **KEY POSITIVE: notifier-autopr-allowlist-from-config-001 RESOLVED** — PR #493 merged; beacon-pending-approvals down to 3 entries.
+
+**VERIFY-BEFORE-REASSERT (iter ~1678 carries):**
+- notifier-autopr-allowlist-from-config-001: **RESOLVED** — PR #493 "fix(notifier): source auto-merge PR-URL allowlist from agent-models config" merged at 21:12:18Z SHA=0dd718d. Removed from beacon-pending-approvals. ✅ CLOSED.
+- catalog-drift-facts-sync-001: **STALE ARTIFACT** — PR #1 on ourliberty-graph merged in ~1674. beacon-pending-approvals entry (19:26:54Z) remains as stale artifact; no action needed. ✅ Known carry.
+- unreviewed-merge:489: **CARRY** — no Larry reply.
+- ourliberty-cycle.timer auto-healed (L967): **CARRY** [blue] — cannot verify from interactive session.
+
+**Check 0 — Alert triage:** Watermark=971. Total lines=972. 1 new alert: L972 (ts=21:12:18Z, source=outbox-notifier, kind=notification, intent=review-pass, task_id=notifier-autopr-allowlist-from-config-001). `alert_triage_state.py triage-alert` → **Tier-3 silence** (known-pattern match in alert-translations.json). Watermark advanced to 972. ✅ Nominal (no tier-reset per Tier-3 carve-out).
+
+**Check 1 — Log noise:** journalctl not accessible from interactive session. ✅
+
+**Check 2 — Telegram sweep:** beacon_telegram_sessions.json: 1 session (7998341473). No new Larry directives visible since last cycle. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → no stalls. 4 FORGE_NO_PR_SKIPs (#488/#490/#491/#492 — all known closed). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 3 entries (down from 4; notifier-autopr removed post-PR-#493).
+- fix-alert-triage-watermark-durability-001 (2026-06-12T06:03Z) — stale carry, status=pending.
+- fix-depth1-pulse-approval-extraction-001 (2026-06-12T06:05Z) — stale carry, status=pending.
+- catalog-drift-facts-sync-001 (2026-06-13T19:26:54Z) — STALE (PR #1 ourliberty-graph merged ~1674). Known artifact carry.
+✅ No actionable pending approvals.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING. Known [blue] carry. ✅
+
+**Check A — Source repo:** On main. Working tree clean. After `git fetch`, HEAD=0f9c47f was **behind origin/main by 1** (PR #493 merge). → **always-fix applied**: `git pull --ff-only` → Fast-forward 0f9c47f→0dd718d. HEAD now at origin/main. ⚠️ tier-reset.
+
+**Check B — Sync health:** last_sync=2026-06-13T20:58:40Z (~21 min at check time). status=no-change. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 5/5 persistent daemons active.
+- beacon_telegram_bot: PID 2517973 (elapsed ~3h 31m) ✅
+- chain_event_shipper: PID 1849505 (elapsed ~2d 1h 28m) ✅
+- outbox_notifier: PID 2530124 (elapsed ~1h 51m) ✅
+- dashboard_api: PID 2322792 (elapsed ~21h 19m) ✅
+- inbox_watcher: PID 2530123 (elapsed ~1h 51m) ✅
+
+**Check D — Inboxes:** beacon/forge/mirror/pulse: all empty. forge/.invalid/ holds known dead-letters (unchanged). ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open. ourliberty-graph: 0 open. ✅ Nominal.
+
+**Conditional checks (Saturday 2026-06-13 UTC):** Check I gates Mon/Wed/Fri/Sun — skip. Check III gates Sunday + 14d cadence — skip.
+
+**Actions taken:**
+1. `alert_triage_state.py triage-alert` L972 → Tier-3 silence (known-pattern). Watermark set to 972. ✅
+2. `git -C ~/agent-core pull --ff-only` → Fast-forward 0f9c47f→0dd718d (PR #493). Logged to cycle-actions.jsonl. ✅
+3. `cycle_prime_ledger.py append --tier 2 --kind intervention --template ff-main-when-behind` → logged at 21:18:57Z. ✅
+4. `cycle_tier_state.py record --checks-clean false` → Tier 2→1 reset. consecutive_clean=0. ✅
+5. MEMORY.md updated. ✅
+
+**Dispatches:** None.
+
+**Standing findings:**
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614; no Larry reply. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **ourliberty-cycle.timer auto-healed** — L967. Cannot verify from interactive. [carry]
+- [blue] **beacon-pending-approvals stale entries** — fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001 (both Jun-12) + catalog-drift (Jun-13, artifact). [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — 1/3. [carry]
+- [blue] **G-rule heal-stale-daemon-code-auto-restart-needs-template** — 1/3. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 1/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **Check 5 MISSING** — heal-stale-daemon-code-state.json absent. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — [carry]
+- [blue] **dag-preflight-revision gap** — [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+
+**PRIME DIRECTIVE:** 1 intervention (ff-main-when-behind: PR #493 pulled). Script-authoritative: interventions=835, systemic_fixes=37, verification_pending=11, ratio=22.57, trend=flat.
+**Tier end-of-iter:** Tier 2→1 reset (Check A signal). consecutive_clean=0.
+
+---
+
 ## Iteration ~1678 — 2026-06-13 20:57Z UTC (interactive, /cycle, Tier 2, consecutive_clean 0→1)
 
 **Trigger:** Larry direct invocation (`/cycle`).
