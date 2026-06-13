@@ -4,6 +4,75 @@
 
 ---
 
+## Iteration ~1675 — 2026-06-13 20:22Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→1)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. All checks nominal. 1 new alert (L970, Tier-3 silence — approval_request delivery confirmation). 0 new interventions. **KEY POSITIVE: notifier-autopr-allowlist-from-config-001 plan ready** — Beacon processed the outbox-url-shape direction-ask from ~1674; outbox_notifier DM'd Larry at 20:22Z with plan for approval.
+
+**VERIFY-BEFORE-REASSERT (iter ~1674 carries):**
+- outbox-notifier url-shape-invalid: **IN-PROGRESS** — direction-ask `outbox-notifier-url-shape-ourliberty-graph-001` dispatched in ~1674; Beacon processed (PID 2517973 active); outbox_notifier generated plan `notifier-autopr-allowlist-from-config-001` and DM'd Larry at 20:22:17Z. Awaiting Larry's 'approve'. ⚠️ Active carry.
+- catalog-drift-facts-sync-001: **RESOLVED** — PR #1 merged at ~1674 sha=e9b0c0b. ✅ CLOSED.
+- unreviewed-merge:489: **CARRY** — no new Larry reply.
+- ourliberty-cycle.timer auto-healed (L967): **CARRY** [blue].
+
+**Check 0 — Alert triage:** Watermark=969. Total lines=970. 1 new alert: L970 (ts=20:22:17Z, source=outbox-notifier, kind=approval_request, approval_id=notifier-autopr-allowlist-from-config-001). Triaged → **Tier 3** (known-pattern match in alert-translations.json — approval_request delivery confirmations are silenced per memory rule; outbox_notifier already DM'd Larry). Watermark advanced to 970. ✅ Nominal (Tier-3 silence — no tier-reset).
+
+**Check 1 — Log noise:** journalctl not accessible from interactive session. ✅
+
+**Check 2 — Telegram sweep:** beacon_telegram_sessions.json: 0 sessions. No new Larry directives visible since ~1674 (~5 min ago; last known: 13:27 MDT 'Go'). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → no stalls. 4 FORGE_NO_PR_SKIPs (#488/#490/#491/#492 — all known closed). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 4 entries.
+- fix-alert-triage-watermark-durability-001 (2026-06-12T06:03Z) — stale carry.
+- fix-depth1-pulse-approval-extraction-001 (2026-06-12T06:05Z) — stale carry.
+- catalog-drift-facts-sync-001 (2026-06-13T19:26:54Z) — RESOLVED carry (PR #1 merged ~1674; approval state stale in file).
+- **notifier-autopr-allowlist-from-config-001 (2026-06-13T20:22:16Z)** — NEW: Beacon processed outbox-url-shape direction-ask, built plan (source PR-URL allowlist from agent-models.json instead of hardcoded regex), DM'd Larry for approval. ✅ Active chain.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING. Known [blue] carry. ✅
+
+**Check A — Source repo:** On main. Working tree CLEAN. HEAD=37bbb9c=origin/main. 0 ahead, 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-13T19:58:19Z (~24 min at check time). Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** All 5 daemons confirmed active (Beacon processed direction-ask + outbox_notifier sent approval_request at 20:22Z — both alive). PIDs unchanged from ~1674: beacon_telegram_bot:2517973, chain_event_shipper:1849505, outbox_notifier:2530124, dashboard_api:2322792, inbox_watcher:2530123. ✅ Nominal.
+
+**Check D — Inboxes:** beacon/forge/mirror/pulse: all empty. forge/.invalid/ holds 2 pre-fix dead-letters (known carry). ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open PRs. ourliberty-graph: 0 open PRs (PR #1 merged ~1674). ✅ Nominal.
+
+**Conditional checks (Saturday 2026-06-13 UTC):** Check I gates Mon/Wed/Fri/Sun — skip. Check III gates Sunday + 14d cadence — skip.
+
+**Actions taken:**
+1. `alert_triage_state.py triage-alert` L970 → Tier-3 silence (notifier-autopr-allowlist-from-config-001 known-pattern; outbox_notifier already DM'd Larry). Watermark set to 970. ✅
+2. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` → logged. ✅
+3. `cycle_tier_state.py record --checks-clean true` → Tier 1, consecutive_clean 0→1. ✅
+4. MEMORY.md updated. ✅
+
+**Dispatches:** None. (notifier-autopr-allowlist-from-config-001 plan already dispatched by Beacon and DM'd to Larry — awaiting approval.)
+
+**Standing findings:**
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614; no Larry reply. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **notifier-autopr-allowlist-from-config-001** — Beacon's plan for outbox_notifier url-shape fix (source allowlist from agent-models.json). Larry DM'd at 20:22Z; awaiting 'approve'. [new, active]
+- [blue] **ourliberty-cycle.timer auto-healed** — L967. Cannot verify from interactive session. [carry]
+- [blue] **beacon-pending-approvals stale entries** — fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001 (both Jun-12). [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — 1/3. [carry]
+- [blue] **G-rule heal-stale-daemon-code-auto-restart-needs-template** — 1/3. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 1/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **Check 5 MISSING** — heal-stale-daemon-code-state.json absent. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — [carry]
+- [blue] **dag-preflight-revision gap** — [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+
+**PRIME DIRECTIVE:** 0 new interventions. 1 iter_clean appended. Script-authoritative: interventions=834, systemic_fixes=37, verification_pending=11, ratio=22.54, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean 0→1.
+
+---
+
 ## Iteration ~1674 — 2026-06-13 20:17Z UTC (interactive, /cycle, Tier 3→1 reset, outbox-url-shape-fix dispatched)
 
 **Trigger:** Larry direct invocation (`/cycle`).
