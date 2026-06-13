@@ -4,6 +4,72 @@
 
 ---
 
+## Iteration ~1626 — 2026-06-13 04:28Z UTC (interactive, /cycle, Tier 3, consecutive_clean 5→6)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. 9/9 services active. 0 open PRs. All inboxes empty. 0 new alerts. Tier 3, consecutive_clean 5→6.
+
+**VERIFY-BEFORE-REASSERT (iter ~1625 watch items):**
+- unreviewed-merge:489 [yellow] DM: **CONFIRMED OPEN** — beacon_telegram_bot.log last entry idx=1148 at 22:00:27 MDT (04:00Z UTC); no Larry reply since "pin to tier 2" at 17:03:30 MDT June 12. [carry]
+- beacon-pending-approvals.json G-rule DISPATCHED: **CONFIRMED** — 2 stale entries still present (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001). Beacon confirmed root cause + fix dispatched to Forge (inter-agent notify 04:46Z iter ~1624). Watch Forge for PR. [carry]
+- pulse-check-iv.heartbeat: **CONFIRMED EXISTS but stale** — mtime=2026-06-12T18:26:04Z (MDT), ~10h stale. Service inactive (expected). drift-healer fires ~12:00Z UTC today (~1.5h from now). [carry]
+- G-rule sync-blocked:uncommitted-changes 1/3: **RE-VERIFIED** — agents/pulse/.claude/settings.json still uncommitted (from iter ~1625 fewer-permission-prompts skill). Sync blocked. This is the same pre-existing change; not incrementing G-rule (same occurrence, not a new cycle occurrence). [carry]
+- All other carries (G-rule timer-cycle-no-journal-entry 1/3, G-rule source=pulse-cycle-self-report 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 1/3): **CONFIRMED** — no new occurrences. [carry]
+- PRIME DIRECTIVE ratio=24.85: **CONFIRMED** (script-authoritative). [confirmed]
+
+**Check 0 — Alert triage:** larry-alerts.jsonl=1149 lines. Watermark=1149. **0 new alerts.** ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot.log: last entry idx=1148 at 22:00:27 MDT (04:00Z UTC); delivered sync.service/sync-blocked:uncommitted-changes. No Larry messages since 17:03:30 MDT June 12. unreviewed-merge:489 DMs (idx=1140+1142) still unanswered. ✅ Nominal (carry items noted).
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall dry-run at 04:26Z: "no stalls detected". 9 FORGE_NO_PR_SKIPs (all pr_exists). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 2 stale entries (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001). G-rule heal-stale-approvals-not-gc-merged-prs already DISPATCHED (iter ~1623); Beacon confirmed root cause + fix dispatched to Forge. No new action. ✅ Nominal (carry).
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry. G-rule dispatched ~iter 1416. ✅ Known carry.
+
+**Check A — Source repo:** On main. M agents/pulse/.claude/settings.json (pre-existing uncommitted change from iter ~1625 fewer-permission-prompts skill). Fetch dry-run: no output (on-par with origin). ✅ Nominal (known uncommitted — wrapper auto-commits on next run_cycle.sh invocation).
+
+**Check B — Sync health:** agent-core-sync.json: last_sync=03:56:17Z status=error ("Uncommitted Changes in working tree"). Last successful sync=01:56:15Z (~2.5h ago, past 2h threshold). Blocked by known uncommitted agents/pulse/.claude/settings.json. Known-pattern; self-heals on next wrapper commit. G-rule sync-blocked:uncommitted-changes: same pre-existing occurrence from iter ~1625, not incrementing. ✅ Nominal (triaged).
+
+**Check C — Agent liveness:** 9/9 active (beacon-bot, chain-event-shipper, cycle.service, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot). ourliberty-pulse-check-iv.service inactive (expected; drift-healer fires ~12:00Z UTC today). ✅ Nominal.
+
+**Check D — Inboxes:** All inboxes empty (forge=0, beacon=0, mirror=0, pulse=0). ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on agent-core. 0 open PRs on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Saturday 2026-06-13 UTC):** Check I: gates Sunday UTC; skip. Check III: gates Sunday + 14d cadence; skip.
+
+**Rotations:** 0 credentials in 60-day window. ✅ Nominal.
+
+**Actions taken:**
+1. `cycle_prime_ledger.py append --tier 3 --kind iter_clean` → logged at 04:28:25Z. ✅
+2. `cycle_tier_state.py record --checks-clean true` → consecutive_clean 5→6, Tier 3 unchanged. ✅
+3. MEMORY.md updated: status snapshot updated. ✅
+
+**Standing findings (updated):**
+- [yellow] unreviewed-merge:489 — DM sent iter ~1614; no Larry reply. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] Tier-2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- [blue] G-rule heal-stale-approvals-not-gc-merged-prs — **DISPATCHED** (iter ~1623). Beacon confirmed root cause + fix dispatched to Forge. 2 stale beacon-pending-approvals.json entries self-clear after PR merges. [watch Forge for PR]
+- [blue] pulse-check-iv — heartbeat stale (~10h, mtime=18:26Z June 12); service inactive; drift-healer fires ~12:00Z UTC today. [carry]
+- [blue] G-rule sync-blocked:uncommitted-changes — 1/3 (same pre-existing occurrence; not incremented this cycle). [carry]
+- [blue] G-rule timer-cycle-no-journal-entry — 1/3. [carry]
+- [blue] G-rule source=pulse-cycle-self-report — 1/3. [carry]
+- [blue] G-rule heal-stale-daemon-code-auto-restart-needs-template — 1/3. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. G-rule dispatched ~iter 1416. [carry]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR. [carry]
+- [blue] dag-preflight-revision gap — PR #484 closed source=pulse gap; DAG re-dispatch markers still fall through. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED. [carry]
+- [blue] catalog-accuracy-drift — G-rule 2/3. [carry]
+
+**PRIME DIRECTIVE:** 0 intervention rows this iter (clean). Trailing-30d (script-authoritative): interventions=820, systemic_fixes=33, verification_pending=11, ratio=24.85, trend=flat.
+**Tier end-of-iter:** Tier 3, consecutive_clean=6.
+
+---
+
 ## Iteration ~1625 — 2026-06-13 03:57Z UTC (interactive, /cycle, Tier 3, consecutive_clean 4→5)
 
 **Trigger:** Larry direct invocation (`/cycle`).
