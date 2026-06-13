@@ -4,6 +4,80 @@
 
 ---
 
+## Iteration ~1657 — 2026-06-13 14:12Z UTC (interactive, /cycle, Tier 2, consecutive_clean 1→2)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. 5/5 persistent daemons active. 0 open PRs. 0 inboxes with pending tasks. 1 new alert (L958, Tier-3 silence). G-rule sync-blocked:uncommitted-changes CLOSED + root-cause fix dispatched to Beacon. Tier 2, consecutive_clean 1→2.
+
+**VERIFY-BEFORE-REASSERT (iter ~1656 carries):**
+- G-rule sync-blocked:uncommitted-changes (2/3): **RE-VERIFIED** — `alert-translations.json` already contains `sync-blocked:uncommitted-changes` as Tier-3 SOON. The G-rule's original target ("dispatch Beacon to add allowlist entry") was already satisfied. G-rule **CLOSED**. Root cause (settings.json not in PULSE_RUNTIME_PATHS) dispatched separately this iter.
+- beacon-pending-approvals.json 3 entries: **RE-VERIFIED** — 2 stale (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001), 1 active (catalog-drift-facts-sync-001; 0 reminders). Same carries.
+- PR #490 (pulse-cycle-self-echo-silence-001) MERGED: **CONFIRMED** — repo HEAD=628e085, last wrapper commit 20260613T135436Z.
+- catalog-drift-facts-sync-001: **CARRY** — 0 reminders. No Forge PR visible. Monitor.
+
+**Check 0 — Alert triage:** Watermark=957 → 1 new alert (L958: 2026-06-13T13:57:26Z, source=sync.service, subject=sync-blocked:uncommitted-changes). Delivered by outbox-notifier at 14:01:32Z UTC.
+- `alert_triage_state.py triage-alert` → **Tier 3** (known-pattern match in alert-translations.json → SOON tier, digest route). No DM. No tier-reset.
+- Watermark advanced 957→958. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message: "approved pulse-cycle-self-echo-silence-001" at 06:56:26 MDT (12:56:26Z UTC). PR #490 auto-merged 13:12Z. No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → no stalls detected. FORGE_NO_PR_SKIP for PRs #485, #53, #486, #487, #488 all verified. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 3 entries (2 stale + 1 active: catalog-drift-facts-sync-001). No action needed. ✅ Nominal (known carries).
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING. Known [blue] carry. ✅ Known carry.
+
+**Check A — Source repo:** On main. M agents/pulse/.claude/settings.json only (pre-existing). HEAD=628e085=origin/main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-13T13:57:25Z status=error (uncommitted settings.json). G-rule CLOSED; root-cause fix dispatched this iter. ✅ Nominal (triaged).
+
+**Check C — Agent liveness:** 5/5 persistent daemons active (beacon PID 1843738, chain-event PID 1849505, inbox-watcher PID 1850128, outbox-notifier PID 2116613, dashboard-api PID 2322792). forge/mirror/pulse bots idle (inboxes empty — expected). pulse-check-iv.timer active, next fire Mon 2026-06-15 04:26:45 MDT. ✅ Nominal.
+
+**Check D — Inboxes:** All inboxes empty (beacon dispatch envelope written this iter — picked up on next inbox-watcher tick). ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs. ✅ Nominal.
+
+**Conditional checks (Saturday 2026-06-13 UTC):** Check I gates Sunday — skip. Check III — skip. ✅
+
+**G-rule sync-blocked:uncommitted-changes — CLOSED (verify-before-reassert):** Alert-translations.json already contains this pattern as Tier-3 SOON. The G-rule was tracking "dispatch Beacon to add allowlist entry" but the entry was already present. G-rule CLOSED. **New dispatch:** `sync-blocked-pulse-runtime-paths-001` — root cause is `agents/pulse/.claude/settings.json` not in `PULSE_RUNTIME_PATHS` in `scripts/_lib_pulse_runtime.sh`. The auto-commit wrapper stages only the listed paths; settings.json stays dirty after every cycle. Fix: add it to the array. Dispatched to Beacon inbox this iter.
+
+**Actions taken:**
+1. L958 claimed, triaged Tier 3, watermark 957→958. Intervention logged to cycle-prime-ledger.jsonl. ✅
+2. Direction-ask `sync-blocked-pulse-runtime-paths-001.json` written to Beacon inbox. Systemic_fix logged to cycle-prime-ledger.jsonl. ✅
+3. `cycle_tier_state.py record --checks-clean true` → consecutive_clean 1→2. ✅
+4. MEMORY.md updated. ✅
+
+**Dispatches:** 1 — `sync-blocked-pulse-runtime-paths-001` → Beacon inbox.
+
+**Standing findings:**
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614; no Larry reply. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **sync-blocked-pulse-runtime-paths-001** — DISPATCHED this iter. Watch Beacon for spec + Forge PR. Fixes persistent dirty tree since iter ~1625.
+- [blue] **catalog-drift-facts-sync-001** — active in pending-approvals (0 reminders). Monitor. [carry]
+- [blue] **beacon-pending-approvals stale entries** — 2 entries self-clear after GC-fix PR. [carry]
+- [blue] **pulse-check-iv.timer** — active, next fire Mon 2026-06-15. [nominal]
+- [blue] **Check 5 MISSING** — G-rule dispatched ~iter 1416. [carry]
+- [blue] **G-rule approval_request-delivery-confirmation** — 2/3. [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — 1/3. [carry]
+- [blue] **G-rule heal-stale-daemon-code-auto-restart-needs-template** — 1/3. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 1/3 (same occurrence). [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — [carry]
+- [blue] **dag-preflight-revision gap** — DAG re-dispatch markers still fall through. [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+
+**Watch items for next iter (~1658):**
+- Beacon picks up `sync-blocked-pulse-runtime-paths-001` → spec → Forge PR. consecutive_clean=2: one more clean Tier-2 iter → de-escalate to Tier 3.
+
+**PRIME DIRECTIVE:** 1 intervention (L958 claim) + 1 systemic_fix (sync-blocked-pulse-runtime-paths-001). Script-authoritative: interventions=830, systemic_fixes=35, verification_pending=11, ratio=23.71, trend=flat.
+**Tier end-of-iter:** Tier 2, consecutive_clean=2.
+
+---
+
 ## Iteration ~1656 — 2026-06-13 13:52Z UTC (interactive, /cycle via /loop, Tier 2, consecutive_clean 0→1)
 
 **Trigger:** Larry `/cycle` via `/loop` autonomous pacing.
