@@ -4,6 +4,80 @@
 
 ---
 
+## Iteration ~1672 — 2026-06-13 19:09Z UTC (interactive, /cycle, Tier 2→3 de-escalation, consecutive_clean 2→3)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. All checks nominal. 0 new alerts. New verified finding: catalog-drift-facts-sync-001 second dead-letter at 19:00Z (same Read-only FS error as 17:48Z). Beacon handled dead-letter, explained two-gate issue to Larry ($0.57). No new Pulse action required.
+
+**VERIFY-BEFORE-REASSERT (iter ~1671 carries):**
+- catalog-drift-facts-sync-001 stuck: **CONFIRMED ACTIVE** — forge/.invalid/ now has BOTH catalog-drift-facts-sync-001.json (17:48Z) AND catalog-drift-facts-sync-001.1.json (19:00Z). Larry sent 2 'Go' at 13:00–13:00 MDT (19:00Z UTC); both dispatched to forge and both dead-lettered: `fatal: could not create leading directories of '.git/worktrees/wt-forge-catalog-drift-facts-sync-001': Read-only file system`. Beacon handled dead-letter notification at 19:00:55Z (done 19:03:40Z, $0.57). Bot DM: "two gates — allowed_repos AND systemd ReadWritePaths." Larry confirmed 'Yes' at 13:04 MDT. Fix: add ourliberty-graph path to inbox_watcher.service ReadWritePaths before next retry. ⚠️ Carry.
+- unreviewed-merge:489: **CARRY** — no new Larry reply.
+- ourliberty-cycle.timer auto-healed (L967): **CARRY** [blue] — cannot verify NextElapseUSecRealtime from interactive session.
+
+**Check 0 — Alert triage:** Watermark=968. Total lines=968. 0 new alerts. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Post-iter ~1671 new messages observed:
+- 13:00:32 MDT: Larry 'Go' → approved catalog-drift-facts-sync-001 → forge → dead-lettered (Read-only FS).
+- 13:00:37 MDT: Larry 'Go' → same → dead-lettered.
+- 13:01:20 MDT: Larry "Check on the catalog drift task. I had to approve it 3 times."
+- 13:03:10 MDT: Beacon DM (two-gate explanation) + dead-letter handler $0.57.
+- 13:04:14 MDT: Larry 'Yes'.
+- 13:04:55 MDT: Beacon saved memory note `project_graph_dispatch_two_gates.md`.
+Last Larry message: 13:04:14 MDT. No new directives. ✅ Nominal (chain handled by Beacon).
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → no stalls. 4 FORGE_NO_PR_SKIPs (#488/#490/#491/#492). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 3 entries.
+- fix-alert-triage-watermark-durability-001 (2026-06-12T06:03Z) — stale carry.
+- fix-depth1-pulse-approval-extraction-001 (2026-06-12T06:05Z) — stale carry.
+- catalog-drift-facts-sync-001 (17:47Z Jun-13) — dead-lettered; 2nd dead-letter now also in .invalid/. Recovery blocked on ReadWritePaths fix. ⚠️ Known carry.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING. Known [blue] carry. ✅
+
+**Check A — Source repo:** On main. Working tree CLEAN. HEAD=4a999c2=origin/main. 0 ahead, 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-13T18:58:15Z, status=no-change (~11 min at check time). Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 5/5 persistent daemons — same PIDs as ~1671 (beacon_telegram_bot:2517973, chain_event_shipper:1849505, outbox_notifier:2116613, dashboard_api:2322792, inbox_watcher:2514958). ✅ Nominal.
+
+**Check D — Inboxes:** beacon/forge/mirror/pulse: all empty. ✅ Nominal. (forge/.invalid/ has 2 catalog-drift dead-letters: catalog-drift-facts-sync-001.json + .1.json)
+
+**Check E — PRs:** 0 open PRs on ourliberty-agent-core. 0 open PRs on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Saturday 2026-06-13 UTC):** Check I gates Mon/Wed/Fri/Sun — skip. Check III gates Sunday + 14d cadence — skip.
+
+**Actions taken:**
+1. Alert triage: 0 new alerts. Watermark at 968. ✅
+2. `cycle_prime_ledger.py append --tier 2 --kind iter_clean` → logged. ✅
+3. `cycle_tier_state.py record --checks-clean true` → Tier 2, consecutive_clean 2→3 → **de-escalated to Tier 3** (consecutive_clean reset to 0). ✅
+4. MEMORY.md updated. ✅
+
+**Dispatches:** None. (Beacon already handled dead-letter explanation; no redundant dispatch.)
+
+**Standing findings:**
+- [yellow] **catalog-drift-facts-sync-001 stuck (2nd dead-letter)** — forge/.invalid/ has .json (17:48Z) + .1.json (19:00Z). Same Read-only FS error: `could not create leading directories of '.git/worktrees/...'` on ourliberty-graph. Beacon DM'd Larry 19:03Z "two gates: allowed_repos + ReadWritePaths." Larry confirmed 'Yes' 19:04Z. Next: add ourliberty-graph path to systemd ReadWritePaths, then retry dispatch. [carry]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614; no Larry reply. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **ourliberty-cycle.timer auto-healed** — L967 at 18:00:18Z Jun-13. Cannot verify NextElapseUSecRealtime from interactive session. [carry]
+- [blue] **beacon-pending-approvals stale entries** — fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001 (both Jun-12). G-rule dispatched ~1623. [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — 1/3. [carry]
+- [blue] **G-rule heal-stale-daemon-code-auto-restart-needs-template** — 1/3. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 1/3 (no recurrence). [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **Check 5 MISSING** — heal-stale-daemon-code-state.json absent. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — [carry]
+- [blue] **dag-preflight-revision gap** — [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+
+**PRIME DIRECTIVE:** 0 new interventions. 1 iter_clean appended. Script-authoritative: interventions=833, systemic_fixes=36, verification_pending=11, ratio=23.14, trend=flat.
+**Tier end-of-iter:** Tier 2→3 de-escalation. consecutive_clean 2→3 → de-escalated. Tier 3, consecutive_clean=0.
+
+---
+
 ## Iteration ~1671 — 2026-06-13 18:53Z UTC (interactive, /cycle, Tier 2, consecutive_clean 1→2)
 
 **Trigger:** Larry direct invocation (`/cycle`).
