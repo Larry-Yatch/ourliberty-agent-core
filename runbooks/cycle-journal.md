@@ -4,6 +4,79 @@
 
 ---
 
+## Iteration ~1667 — 2026-06-13 17:59Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→1; catalog-drift stuck in .invalid; Beacon dead-letter resolved)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. All checks nominal. Beacon dead-letter processing complete; inboxes clear. No new alerts.
+
+**VERIFY-BEFORE-REASSERT (iter ~1666 carries):**
+- catalog-drift dead-letter in-flight (Beacon PID 2518433): **CONFIRMED RESOLVED** — notify-dead-letter-catalog-drift-facts-sync-001.json GONE from Beacon inbox; both Beacon and Forge inboxes now empty. Beacon session complete. ✅ CLOSED.
+- catalog-drift-facts-sync-001 stuck: **CONFIRMED ACTIVE** — forge/.invalid/catalog-drift-facts-sync-001.json exists (requeue_count=2). No active task in Forge inbox. Beacon-pending-approvals: 5 entries unchanged (2 stale Jun-12 + 3× catalog-drift). Larry has not sent new directive since 11:48 MDT 'go'. ⚠️ Carry.
+- unreviewed-merge:489: **CARRY** — no new Larry reply.
+
+**Check 0 — Alert triage:** Watermark=966. Total lines=966. 0 new alerts. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot logs (last 30 min) show no new Larry messages since 11:48 MDT 'go' (iter ~1666 action). Dead-letter notify processed by Beacon; no orphaned directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → no stalls. 5 FORGE_NO_PR_SKIPs (all known: #487/#488/#490/#491/#492). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 5 entries — unchanged from iter ~1666.
+- fix-alert-triage-watermark-durability-001 (created 2026-06-12) — stale carry.
+- fix-depth1-pulse-approval-extraction-001 (created 2026-06-12) — stale carry.
+- catalog-drift-facts-sync-001 (17:14Z Jun-13) — duplicate, carry.
+- catalog-drift-facts-sync-001 (17:17Z Jun-13) — duplicate, carry.
+- catalog-drift-facts-sync-001 (17:47Z Jun-13) — latest, pending Larry 'go' to re-dispatch.
+No new entries. Escalation already sent ~1664; Larry aware. ⚠️ Known carry, no new DM.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING. Known [blue] carry. ✅
+
+**Check A — Source repo:** On main. Working tree CLEAN. HEAD=4699965=origin/main. 0 ahead, 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-13T16:58:09Z, status=no-change (~59 min at check time). Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 5/5 persistent daemons —
+- beacon_telegram_bot: PID 2517973 (restarted 11:45 MDT, same as ~1666). ✅
+- chain_event_shipper: PID 1849505 (Jun 11). ✅
+- outbox_notifier: PID 2116613 (Jun 12). ✅
+- dashboard_api: PID 2322792 (Jun 12). ✅
+- inbox_watcher: PID 2514958 (Jun 12, 11:16 MDT). ✅
+
+**Check D — Inboxes:** beacon/forge/mirror/pulse: all empty. Dead-letter notify fully consumed. ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on ourliberty-agent-core. 0 open PRs on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Saturday 2026-06-13 UTC):** Check I gates Mon/Wed/Fri/Sun — skip. Check III gates Sunday + 14d cadence — skip.
+
+**Actions taken:**
+1. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` → logged. ✅
+2. `cycle_tier_state.py record --checks-clean true` → Tier 1, consecutive_clean 0→1. ✅
+3. MEMORY.md updated. ✅
+
+**Dispatches:** None.
+
+**Standing findings:**
+- [yellow] **catalog-drift-facts-sync-001 stuck** — in forge/.invalid/ (requeue_count=2). 3 pending approval entries in beacon-pending-approvals; latest at 17:47Z Jun-13. Larry needs to send 'go' to the Approvals tab for catalog-drift-facts-sync-001 (17:47Z entry). Escalation already sent ~1664. [carry]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614; no Larry reply. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **beacon-pending-approvals stale entries** — fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001 (both Jun-12). G-rule dispatched ~1623. [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — 1/3. [carry]
+- [blue] **G-rule heal-stale-daemon-code-auto-restart-needs-template** — 1/3. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 1/3 (resolved; no recurrence this iter). [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **Check 5 MISSING** — heal-stale-daemon-code-state.json absent. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — [carry]
+- [blue] **dag-preflight-revision gap** — [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+
+**PRIME DIRECTIVE:** 0 new interventions. 1 iter_clean appended. Script-authoritative: interventions=833, systemic_fixes=36, verification_pending=11, ratio=23.14, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean 0→1.
+
+---
+
 ## Iteration ~1666 — 2026-06-13 17:54Z UTC (interactive, /cycle, Tier 1, beacon-bot RESOLVED; catalog-drift dead-lettered; Beacon in-flight)
 
 **Trigger:** Larry direct invocation (`/cycle`).
