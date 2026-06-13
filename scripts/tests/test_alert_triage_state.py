@@ -221,6 +221,17 @@ _FIXTURE_TRANSLATIONS = {
     'outbox-notifier': {
         'review-pass': {'severity': 'INFO', 'tier': 'FYI'},
     },
+    # source-level '*' catch-all: any subject under this source matches, but a
+    # more-specific subject entry still wins (consulted before the '*' fallback).
+    'pulse-cycle': {
+        'cycle-blocked': {'severity': 'WARNING', 'tier': 'SOON'},
+        '*': {'severity': 'INFO', 'tier': 'FYI'},
+    },
+    # '*' catch-all tagged never_silence: returned as a truthy dict so classify
+    # routes it to Tier-4-surface, not Tier-3-mute.
+    'wildcard-surfaced': {
+        '*': {'severity': 'WARNING', 'tier': 'SOON', 'never_silence': True},
+    },
 }
 
 
@@ -267,6 +278,42 @@ class TestTranslationMatch(unittest.TestCase):
             _FIXTURE_TRANSLATIONS, 'heal-known', 'surfaced-subject')
         self.assertIsInstance(entry, dict)
         self.assertTrue(entry.get('never_silence'))
+        self.assertIsNone(ats._translation_match(
+            _FIXTURE_TRANSLATIONS, 'heal-known', 'no-such-subject'))
+
+    def test_wildcard_matches_arbitrary_novel_subject(self):
+        # A source with a '*' entry catches ANY subject that misses exact +
+        # prefix-strip. This is the pulse-cycle self-echo case: Pulse emits
+        # ad-hoc per-escalation subjects, none of which are enumerated.
+        entry = ats._translation_match(
+            _FIXTURE_TRANSLATIONS, 'pulse-cycle',
+            'agent-models-allowlist-not-on-main')
+        self.assertIsInstance(entry, dict)
+        self.assertEqual(entry.get('tier'), 'FYI')
+
+    def test_specific_subject_wins_over_wildcard(self):
+        # cycle-blocked has its own entry; it must match before the '*' fallback
+        # (the fallback is consulted only AFTER the prefix-strip loop misses).
+        entry = ats._translation_match(
+            _FIXTURE_TRANSLATIONS, 'pulse-cycle', 'cycle-blocked')
+        self.assertIsInstance(entry, dict)
+        self.assertEqual(entry.get('tier'), 'SOON')
+        # And the dynamic-suffix form strips back to cycle-blocked, still not '*'.
+        entry = ats._translation_match(
+            _FIXTURE_TRANSLATIONS, 'pulse-cycle', 'cycle-blocked:dirty-tree-on-x')
+        self.assertEqual(entry.get('tier'), 'SOON')
+
+    def test_wildcard_never_silence_returned_truthy(self):
+        # A '*' entry tagged never_silence is returned as a truthy dict so
+        # classify Gate 1 routes it to Tier-4-surface rather than Tier-3-mute.
+        entry = ats._translation_match(
+            _FIXTURE_TRANSLATIONS, 'wildcard-surfaced', 'anything-here')
+        self.assertIsInstance(entry, dict)
+        self.assertTrue(entry.get('never_silence'))
+
+    def test_source_without_wildcard_still_misses(self):
+        # No '*' entry → a subject miss still returns None (no behavior change
+        # for sources that never opted into the catch-all).
         self.assertIsNone(ats._translation_match(
             _FIXTURE_TRANSLATIONS, 'heal-known', 'no-such-subject'))
 
@@ -319,6 +366,16 @@ class TestClassify(unittest.TestCase):
                             'subject': 'surfaced-subject:iv'})
         self.assertEqual(r['tier'], 4)
         self.assertEqual(r['route'], 'escalate')
+
+    def test_pulse_cycle_novel_subject_silences_via_wildcard(self):
+        # The self-echo case: a novel pulse-cycle subject (not enumerated) hits
+        # the source-level '*' catch-all and silences to digest, so Check 0 does
+        # NOT re-classify Pulse's own re-read emission as a fresh Tier-4 alert.
+        r = self._classify({'source': 'pulse-cycle',
+                            'subject': 'agent-models-allowlist-not-on-main'})
+        self.assertEqual(r['tier'], 3)
+        self.assertEqual(r['route'], 'digest')
+        self.assertEqual(r['decision'], 'silence')
 
     def test_tier2_probation_template_asks(self):
         r = self._classify({'source': 's', 'subject': 'sub',
