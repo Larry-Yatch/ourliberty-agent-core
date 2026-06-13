@@ -4,6 +4,94 @@
 
 ---
 
+## Iteration ~1650 — 2026-06-13 13:00Z UTC (interactive, /cycle, Tier 1, unreg-approval-catalog-drift new finding)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Signal. 9/9 services active. 0 open PRs. 0 new alerts. 1 NEW CHECK 4 FINDING: `unreg-approval-01d93b417026` — heal-unregistered-approval registered a recovered APPROVAL_REQUEST for `catalog-drift-facts-sync-001` at 12:45:34Z. Larry needs to Approve on Approvals tab (or Reject). DM sent this iter. Tier-reset.
+
+**VERIFY-BEFORE-REASSERT (iter ~1649 watch items):**
+- G-rule source=pulse-cycle-self-report DISPATCHED (3/3) → source-pulse-cycle-alert-translation-001.json in Beacon inbox. **CONFIRMED PENDING** — file still in beacon inbox, Beacon hasn't processed yet. [carry]
+- agent-models-allowlist-not-on-main → **CONFIRMED CLOSED** — commit e427631 confirmed; `agents.forge.allowed_repos` includes `ourliberty-graph`. [closed]
+- catalog-drift-facts-sync-001 → **RE-VERIFIED** — still pending in beacon-pending-approvals.json + new unreg-approval entry (see Check 4). [active/new]
+- unreviewed-merge:489 → **CONFIRMED OPEN** — no Larry reply. [carry]
+- beacon-pending-approvals.json 3 entries → **RE-VERIFIED: NOW 4 ENTRIES** (unreg-approval-01d93b417026 added at 12:45:34Z, between iters ~1649 and ~1650). [updated]
+- G-rule sync-blocked:uncommitted-changes 1/3 → **CONFIRMED** — settings.json + MEMORY.md + cycle-journal.md uncommitted; latter two committed by wrapper after this iter. Same single occurrence. [carry]
+
+**Check 0 — Alert triage:** larry-alerts.jsonl=953 lines, watermark=953. **0 new alerts.** ✅ Nominal.
+
+**Check 1 — Log noise:** journalctl --user inaccessible (no session bus). File-based: outbox-notifier.log last entry 06:50:23 MDT (nominal delivery); heal_pipeline_stall.py dry-run → "no stalls detected." ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot.log last entry 06:45:28 MDT (L952 delivered: agent-models-allowlist-not-on-main). No new Larry directives since 06:37:07 MDT ("Tell Beacon: the allowlist change is on main"). Larry committed e427631 at 06:44:34 MDT independently. No orphaned directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py dry-run → "no stalls detected". 5 FORGE_NO_PR_SKIPs (known: #485, #53, #486, #487, #488). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **4 entries** (up from 3 in iter ~1649):
+- fix-alert-triage-watermark-durability-001: pending, 2 reminders, stale [carry]
+- fix-depth1-pulse-approval-extraction-001: pending, 2 reminders, stale [carry]
+- catalog-drift-facts-sync-001: pending (original failed-dispatch entry) [carry]
+- **NEW: unreg-approval-01d93b417026** — created 2026-06-13T12:45:34Z by heal-unregistered-approval. Recovered missed APPROVAL_REQUEST from Beacon's 12:16–12:35Z session for catalog-drift-facts-sync-001 (deterministic facts-sync for ourliberty-graph; ourliberty-graph elevated to sandbox for this task). bare_approvable=false, reminders_sent=[]. Larry needs to tap Approve (or Reject) on Approvals tab. → ask-then-do + tier-reset. [yellow] DM sent this iter.
+
+**Note on inter-agent notify (~12:55Z):** Beacon's notify described "catalog-drift-facts-sync-001 re-dispatched to Forge with phase=preflight." Forge inbox was empty at this iter's Check D scan — consistent with the unreg-approval being the actual gate (the APPROVAL_REQUEST marker was missed by the notifier, recovered by heal-unregistered-approval). Forge will be dispatched once Larry approves.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry. G-rule dispatched ~iter 1416. ✅ Known carry.
+
+**Check A — Source repo:** On main. M agents/pulse/.claude/settings.json (pre-existing, iter ~1625) + M agents/pulse/MEMORY.md + M runbooks/cycle-journal.md (latter two committed by wrapper after this iter). HEAD=f4c945c, 0 commits behind origin/main. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: last_sync=2026-06-13T11:57:08Z status=error ("Uncommitted modifications"), same failure instance. Last successful sync 01:56:15Z (~11h ago). G-rule sync-blocked:uncommitted-changes 1/3 — not incrementing (same instance). ✅ Nominal (triaged).
+
+**Check C — Agent liveness:** beacon_telegram_bot.py (PID 1843738, Jun11) + 3x agent_telegram_bot.py (PIDs 1843739, 1843740, 1843744 — forge/mirror/pulse-bot, Jun11) + chain_event_shipper.py (PID 1849505) + inbox_watcher.py (PID 1850128) + outbox_notifier.py (PID 2116613) + dashboard_api (PID 2322792). ourliberty-pulse-check-iv.timer active (next fire Mon 2026-06-15 04:26:45 MDT). 9/9. ✅ Nominal.
+
+**Check D — Inboxes:** Beacon: source-pulse-cycle-alert-translation-001.json (dispatched iter ~1649, pending Beacon pick-up). All other inboxes (forge, mirror, pulse) empty. ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on ourliberty-agent-core. 0 open PRs on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Saturday 2026-06-13 UTC):** Check I gates Sunday UTC; skip. Check III gates Sunday + 14d cadence; skip.
+
+**Actions taken:**
+1. Alert triage: 0 new alerts. Watermark remains at 953. ✅
+2. **[yellow] DM sent** (subject=unreg-approval-catalog-drift-new-pending): heal-unregistered-approval registered missed APPROVAL_REQUEST for catalog-drift-facts-sync-001. Tap Approve on Approvals tab (unreg-approval-01d93b417026) to dispatch Forge to build deterministic facts-sync for ourliberty-graph. ✅
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention --template unreg-approval-catalog-drift-new-pending` → logged at 12:57:49Z. ✅
+4. `cycle_tier_state.py record --checks-clean false` → Tier 1, consecutive_clean=0, last_signal_at=12:57:53Z. ✅
+5. MEMORY.md updated. ✅
+
+**Standing findings (updated):**
+- [yellow] **NEW: unreg-approval-01d93b417026** — heal-unregistered-approval registered recovered APPROVAL_REQUEST for catalog-drift-facts-sync-001 at 12:45:34Z. Tap Approve on Approvals tab. DM sent this iter. [active]
+- [yellow] unreviewed-merge:489 — DM sent iter ~1614; no Larry reply. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] Tier-2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention. [carry]
+- [blue] G-rule source=pulse-cycle-self-report — DISPATCHED (3/3, iter ~1649). source-pulse-cycle-alert-translation-001 in Beacon inbox. [watch Beacon]
+- [blue] G-rule heal-stale-approvals-not-gc-merged-prs — DISPATCHED (iter ~1623). [watch Forge]
+- [blue] RESOLVED: pulse-check-iv — timer active, next fire Mon 2026-06-15. [monitoring]
+- [blue] G-rule sync-blocked:uncommitted-changes — 1/3. [carry]
+- [blue] G-rule timer-cycle-no-journal-entry — 1/3. [carry]
+- [blue] G-rule heal-stale-daemon-code-auto-restart-needs-template — 1/3. [carry]
+- [blue] G-rule catalog-accuracy-drift — DISPATCHED (3/3, iter ~1637). Pending Larry approval of unreg-approval. [watch]
+- [blue] G-rule approval_request-delivery-confirmation — 1/3. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. [carry]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR. [carry]
+- [blue] dag-preflight-revision gap — PR #484 closed source=pulse gap; DAG markers still fall through. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED. [carry]
+- [blue] G-rule droplet-uncommitted:main — 1/3. [carry]
+- [blue] G-rule F24-empty-prompt-envelope-rejected — 1/3. [carry]
+- CLOSED: agent-models-allowlist-not-on-main (e427631). [closed]
+
+**PRIME DIRECTIVE:** 1 intervention row this iter (unreg-approval-catalog-drift-new-pending). Trailing-30d (script-authoritative): interventions=827, systemic_fixes=34, verification_pending=11, ratio≈24.324, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0 (Check 4 new finding).
+
+---
+
+## Inter-agent notify — 2026-06-13 ~12:55Z UTC (from=beacon, task=fix-agent-models-ourliberty-graph-001, status=SUCCESS)
+
+**Summary:** Beacon completed `fix-agent-models-ourliberty-graph-001`. Verified: commit `e427631` on local main adds `ourliberty-graph` to forge+mirror `allowed_repos` **and** `repo_paths` (Beacon caught `inbox_watcher.py:599` repo_paths gate as second blocker — both in same commit). `catalog-drift-facts-sync-001` re-dispatched to Forge with `target_repo=ourliberty-graph`, `phase=preflight`. Origin push rides next Pulse cycle; `e427631` confirmed on local main, origin/main still at `7e4f5dd`.
+
+**State updates:**
+- `fix-agent-models-ourliberty-graph-001`: **CLOSED** — both blockers resolved in `e427631`.
+- `catalog-drift-facts-sync-001`: **RE-DISPATCHED** — Beacon handed to Forge; preflight in progress. beacon-pending-approvals.json entry should transition once Forge picks up.
+- No Pulse action required. Watch Forge for preflight result.
+
+---
+
 ## Iteration ~1649 — 2026-06-13 12:49Z UTC (interactive, /cycle, Tier 1, agent-models RESOLVED, G-rule 3/3 dispatch)
 
 **Trigger:** Larry direct invocation (`/cycle`).
