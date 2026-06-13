@@ -4,6 +4,82 @@
 
 ---
 
+## Iteration ~1668 — 2026-06-13 18:09Z UTC (interactive, /cycle, Tier 1, consecutive_clean 1→2; cycle.timer auto-healed; all checks nominal)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. All checks nominal. 1 new alert (L967) Tier-3 silenced. No new interventions.
+
+**VERIFY-BEFORE-REASSERT (iter ~1667 carries):**
+- catalog-drift-facts-sync-001 stuck: **CONFIRMED ACTIVE** — forge/.invalid/catalog-drift-facts-sync-001.json present (requeue_count=2). beacon-pending-approvals: 5 entries unchanged (2 stale Jun-12 + 3× catalog-drift including 17:47Z latest). Forge inbox empty; Beacon inbox empty; inboxes remain clear as per ~1667 resolution. ⚠️ Carry.
+- unreviewed-merge:489: **CARRY** — no new Larry reply.
+
+**Check 0 — Alert triage:** Watermark=966→967. 1 new alert:
+- L967: source=heal-systemd-install-drift, subject=stuck-timer-healed:ourliberty-cycle.timer, ts=18:00:18Z, route=digest. Triage → **Tier-3 silence** (known-pattern match in alert-translations.json). Resolved. Watermark advanced to 967. ✅ Nominal (no tier-reset; Tier-3 per §3.0 carve-out).
+- Timer context: ourliberty-cycle.timer was stuck (NextElapseUSecRealtime empty, NextElapseUSecMonotonic=infinity → timer not firing). Healer daemon-reloaded + restarted. Verify advisory: `systemctl show ourliberty-cycle.timer --property=NextElapseUSecRealtime` — cannot run from this interactive session (no D-Bus). [blue] carry.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message at 11:48 MDT ('go' → catalog-drift-facts-sync-001 approved → dispatched to forge inbox → dead-lettered to .invalid/). Last beacon bot entry at 12:00:39 MDT (L966 route=digest; heal-systemd-install-drift). No new Larry directives. No orphaned directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → no stalls. 5 FORGE_NO_PR_SKIPs (all known: #487/#488/#490/#491/#492). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 5 entries unchanged from ~1667.
+- fix-alert-triage-watermark-durability-001 (Jun-12, reminders=[6,24]) — stale carry.
+- fix-depth1-pulse-approval-extraction-001 (Jun-12, reminders=[6,24]) — stale carry.
+- catalog-drift-facts-sync-001 (17:14Z Jun-13) — duplicate, carry.
+- catalog-drift-facts-sync-001 (17:17Z Jun-13) — duplicate, carry.
+- catalog-drift-facts-sync-001 (17:47Z Jun-13) — latest; Larry's 11:48 'go' dispatched this but dead-lettered to forge/.invalid/. Beacon processed dead-letter notify (~1667). No new entries since. ⚠️ Active carry; no new DM (escalation already sent ~1664).
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING. Known [blue] carry. ✅
+
+**Check A — Source repo:** On main. Working tree CLEAN. HEAD=0f4c0f1=origin/main. 0 ahead, 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-13T17:58:09Z, status=no-change (~11 min at check time). ✅ Nominal.
+
+**Check C — Agent liveness:** 5/5 persistent daemons —
+- beacon_telegram_bot: PID 2517973 (11:45 MDT). ✅
+- chain_event_shipper: PID 1849505 (Jun11). ✅
+- outbox_notifier: PID 2116613 (Jun12). ✅
+- dashboard_api: PID 2322792 (Jun12). ✅
+- inbox_watcher: PID 2514958 (11:16 MDT). ✅
+
+**Check D — Inboxes:** beacon/forge/mirror/pulse: all empty. ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on ourliberty-agent-core. 0 open PRs on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Saturday 2026-06-13 UTC):** Check I gates Mon/Wed/Fri/Sun — skip. Check III gates Sunday + 14d cadence — skip.
+
+**Actions taken:**
+1. `alert_triage_state.py triage-alert` L967 (heal-systemd-install-drift/stuck-timer-healed) → Tier-3 silence, resolved. ✅
+2. `alert_triage_state.py set-watermark --line 967` → watermark advanced. ✅
+3. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` → logged. ✅
+4. `cycle_tier_state.py record --checks-clean true` → Tier 1, consecutive_clean 1→2. ✅
+5. MEMORY.md updated. ✅
+
+**Dispatches:** None.
+
+**Standing findings:**
+- [yellow] **catalog-drift-facts-sync-001 stuck** — in forge/.invalid/ (requeue_count=2); beacon-pending-approvals 5 entries (2 stale Jun-12 + 3× catalog-drift). Escalation sent ~1664. No new Larry action since 11:48 MDT 'go'. [carry]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614; no Larry reply. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **ourliberty-cycle.timer was stuck** — auto-healed by heal-systemd-install-drift (L967, 18:00:18Z). Verify: `systemctl show ourliberty-cycle.timer --property=NextElapseUSecRealtime`. Cannot verify from interactive session. [new this iter; Tier-3 silenced]
+- [blue] **beacon-pending-approvals stale entries** — fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001. G-rule dispatched ~1623. [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — 1/3. [carry]
+- [blue] **G-rule heal-stale-daemon-code-auto-restart-needs-template** — 1/3. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 1/3 (resolved; no recurrence). [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **Check 5 MISSING** — heal-stale-daemon-code-state.json absent. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — [carry]
+- [blue] **dag-preflight-revision gap** — [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+
+**PRIME DIRECTIVE:** 0 new interventions. 1 iter_clean appended. Script-authoritative: interventions=833, systemic_fixes=36, verification_pending=11, ratio=23.14, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean 1→2.
+
+---
+
 ## Iteration ~1667 — 2026-06-13 17:59Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→1; catalog-drift stuck in .invalid; Beacon dead-letter resolved)
 
 **Trigger:** Larry direct invocation (`/cycle`).
