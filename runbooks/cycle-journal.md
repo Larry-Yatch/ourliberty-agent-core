@@ -4,6 +4,76 @@
 
 ---
 
+## Iteration ~1686 — 2026-06-13 22:12Z UTC (interactive, /cycle, Tier 2, consecutive_clean 0→1)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. All checks nominal. 0 new alerts. 0 interventions. Tier 2, consecutive_clean 0→1.
+
+**VERIFY-BEFORE-REASSERT (iter ~1685 carries):**
+- unreviewed-merge:489: **CARRY** — no Larry reply.
+- catalog-drift-facts-sync-001: **STALE ARTIFACT** — 0 open PRs on ourliberty-graph (PR #1 merged ~1674). beacon-pending-approvals entry remains as known artifact. ✅ Known carry.
+- ourliberty-cycle.timer: ✅ CLOSED in ~1685 — not carrying forward.
+
+**Check 0 — Alert triage:** Watermark=973. Total lines=973. 0 new alerts. ✅ Nominal.
+
+**Check 1 — Log noise:** beacon_telegram_bot.log: last entry 15:37:22 MDT (21:37:22Z) — alert idx=972 digest-route skip (~35 min idle, nominal). outbox_notifier.log: last entry 15:33:41 MDT "outbox-notifier starting" (post-PR #493 restart, nominal). 0 WARNs since 13:41:32Z (catalog-drift pr-url-shape-invalid, fixed by PR #493). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message: 15:00:30 MDT "Go" (approved notifier-autopr-allowlist-from-config-001 → PR #493 merged). No new directives since. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → no stalls. 5 FORGE_NO_PR_SKIPs: #488/#490/#491/#492 (all known closed) + catalog-drift-facts-sync-001 (preflight_exit, .archive). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 3 entries (unchanged).
+- fix-alert-triage-watermark-durability-001 (Jun-12) — stale carry.
+- fix-depth1-pulse-approval-extraction-001 (Jun-12) — stale carry.
+- catalog-drift-facts-sync-001 (Jun-13 19:26:54Z) — stale artifact (PR #1 merged ~1674). Known carry.
+✅ No actionable pending approvals.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING. Known [blue] carry. ✅
+
+**Check A — Source repo:** On main. Working tree clean. HEAD=f47e0e9=origin/main. 0 ahead, 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-13T21:58:42Z (~14 min at check time). status=no-change. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 5/5 persistent daemons active (same PIDs as ~1685).
+- beacon_telegram_bot: PID 2517973 (elapsed ~4h 26m) ✅
+- chain_event_shipper: PID 1849505 (elapsed ~2d 2h 23m) ✅
+- outbox_notifier: PID 2552416 (elapsed ~37m) ✅
+- dashboard_api: PID 2322792 (elapsed ~22h 15m) ✅
+- inbox_watcher: PID 2530123 (elapsed ~2h 47m) ✅
+
+**Check D — Inboxes:** beacon/forge/mirror/pulse: all empty. forge/.invalid/ holds known dead-letters (unchanged). ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open. ourliberty-graph: 0 open. ✅ Nominal.
+
+**Conditional checks (Saturday 2026-06-13 UTC):** Check I gates Mon/Wed/Fri/Sun — skip. Check III gates Sunday + 14d cadence — skip.
+
+**Actions taken:**
+1. `cycle_prime_ledger.py append --tier 2 --kind iter_clean` → logged at 22:12:37Z. ✅
+2. `cycle_tier_state.py record --checks-clean true` → Tier 2, consecutive_clean 0→1. ✅
+3. MEMORY.md updated. ✅
+
+**Dispatches:** None.
+
+**Standing findings:**
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614; no Larry reply. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **beacon-pending-approvals stale entries** — fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001 (both Jun-12) + catalog-drift artifact (Jun-13). [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — 1/3. [carry]
+- [blue] **G-rule heal-stale-daemon-code-auto-restart-needs-template** — 2/3 (dispatch at 3/3). [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 1/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **Check 5 MISSING** — heal-stale-daemon-code-state.json absent. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — [carry]
+- [blue] **dag-preflight-revision gap** — [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+
+**PRIME DIRECTIVE:** 0 new interventions. 1 iter_clean appended (22:12:37Z). Script-authoritative: interventions=836, systemic_fixes=37, verification_pending=11, ratio=22.59, trend=flat.
+**Tier end-of-iter:** Tier 2, consecutive_clean=1. (2 more clean iters → de-escalate to Tier 3.)
+
+---
+
 ## Iteration ~1685 — 2026-06-13 21:57Z UTC (interactive, /cycle, Tier 1→2 de-escalation, consecutive_clean 2→3)
 
 **Trigger:** Larry direct invocation (`/cycle`).
