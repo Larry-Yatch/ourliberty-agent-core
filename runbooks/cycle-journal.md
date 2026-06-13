@@ -4,6 +4,76 @@
 
 ---
 
+## Iteration ~1671 — 2026-06-13 18:53Z UTC (interactive, /cycle, Tier 2, consecutive_clean 1→2)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. All checks nominal. 1 new alert (L968, Tier-3 silence). No new interventions.
+
+**VERIFY-BEFORE-REASSERT (iter ~1670 carries):**
+- catalog-drift-facts-sync-001 stuck: **CONFIRMED ACTIVE** in inboxes/forge/.invalid/ (requeue_count=2 in file). Root cause from ~1670 (Read-only FS on ourliberty-graph/.git/worktrees/) re-verified: ourliberty-graph/.git/ is drwxrwxr-x larry ✅; .git/worktrees/ does NOT exist (normal — git creates it on first worktree add). Transient Read-only FS at 17:48Z may have been filesystem momentarily in emergency-read-only mode. Recovery: Larry send 'go' to retry one of the 2 unprocessed pending approvals. DM delivered at 18:41Z. No new Larry response. ⚠️ Carry.
+- unreviewed-merge:489: **CARRY** — no new Larry reply.
+- ourliberty-cycle.timer auto-healed (L967): **CARRY** [blue] — cannot verify NextElapseUSecRealtime from interactive session.
+
+**Check 0 — Alert triage:** Watermark was 967. Total lines=968. 1 new alert: L968 (ts=18:36:47Z, source=pulse-cycle, subject=catalog-drift-root-cause-corrected, route=escalate). Triaged via `alert_triage_state.py` → **Tier 3** (known-pattern: pulse-cycle). DM already delivered at 18:41Z by outbox_notifier. Silence + journal note. Watermark advanced to 968. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message: 11:48 MDT 'go' → catalog-drift dead-lettered. DM re [yellow] root-cause correction delivered 12:41 MDT. No new Larry directives since. ✅ Nominal (recovery ball in Larry's court).
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → no stalls. 4 FORGE_NO_PR_SKIPs (#488/#490/#491/#492). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 5 entries unchanged from ~1670.
+- fix-alert-triage-watermark-durability-001 (2026-06-12T06:03Z) — stale carry.
+- fix-depth1-pulse-approval-extraction-001 (2026-06-12T06:05Z) — stale carry.
+- catalog-drift-facts-sync-001 (17:14Z Jun-13) — unprocessed carry.
+- catalog-drift-facts-sync-001 (17:17Z Jun-13) — unprocessed carry.
+- catalog-drift-facts-sync-001 (17:47Z Jun-13) — dead-lettered carry.
+⚠️ Known carry; DM sent ~1670; no Larry action yet.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING. Known [blue] carry. ✅
+
+**Check A — Source repo:** On main. Working tree CLEAN. HEAD=f9e87f7=origin/main. 0 ahead, 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-13T17:58:09Z, status=no-change (~55 min at check time). Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 5/5 persistent daemons — same PIDs as ~1670 confirmed (beacon_telegram_bot:2517973, chain_event_shipper:1849505, outbox_notifier:2116613, dashboard_api:2322792, inbox_watcher:2514958). ✅ Nominal.
+
+**Check D — Inboxes:** beacon/forge/mirror/pulse: all empty. ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on ourliberty-agent-core. 0 open PRs on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Saturday 2026-06-13 UTC):** Check I gates Mon/Wed/Fri/Sun — skip. Check III gates Sunday + 14d cadence — skip.
+
+**Actions taken:**
+1. `alert_triage_state.py triage-alert` L968 → Tier-3 silence (known-pattern: pulse-cycle). Watermark set to 968. ✅
+2. `cycle_prime_ledger.py append --tier 2 --kind iter_clean` → logged. ✅
+3. `cycle_tier_state.py record --checks-clean true` → Tier 2, consecutive_clean 1→2. ✅
+4. MEMORY.md updated. ✅
+
+**Dispatches:** None.
+
+**Standing findings:**
+- [yellow] **catalog-drift-facts-sync-001 stuck** — in inboxes/forge/.invalid/ (requeue_count=2). ROOT CAUSE: Read-only FS at 17:48Z (transient; ourliberty-graph/.git/ is now writable, .git/worktrees/ absent—normal). Recovery: send 'go' again (2 unprocessed pending approvals: 17:14Z + 17:17Z Jun-13). DM sent ~1670, delivered 18:41Z. [carry]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614; no Larry reply. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **ourliberty-cycle.timer auto-healed** — L967 at 18:00:18Z Jun-13. Cannot verify NextElapseUSecRealtime from interactive session. [carry]
+- [blue] **beacon-pending-approvals stale entries** — fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001 (both Jun-12). G-rule dispatched ~1623. [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — 1/3. [carry]
+- [blue] **G-rule heal-stale-daemon-code-auto-restart-needs-template** — 1/3. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 1/3 (no recurrence). [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **Check 5 MISSING** — heal-stale-daemon-code-state.json absent. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — [carry]
+- [blue] **dag-preflight-revision gap** — [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+
+**PRIME DIRECTIVE:** 0 new interventions. 1 iter_clean appended. Script-authoritative: interventions=833, systemic_fixes=36, verification_pending=11, ratio=23.14, trend=flat.
+**Tier end-of-iter:** Tier 2, consecutive_clean 1→2.
+
+---
+
 ## Iteration ~1670 — 2026-06-13 18:37Z UTC (interactive, /cycle, Tier 2, consecutive_clean 0→1; catalog-drift root cause corrected)
 
 **Trigger:** Larry direct invocation (`/cycle`).
