@@ -36,6 +36,18 @@
 
 ---
 
+## Status snapshot — updated 2026-06-13 20:35Z UTC (Iter ~1676, interactive /cycle, Tier 1, consecutive_clean 1→2)
+
+**Iter ~1676 summary:** Alert watermark: 970→970 (0 new). Tier 1, consecutive_clean 1→2. PRIME DIRECTIVE (script-authoritative): interventions=834, systemic_fixes=37, verification_pending=11, ratio=22.54, trend=flat. **KEY STATE: notifier-autopr-allowlist-from-config-001 still awaiting Larry** — DM sent at 20:22Z (~1675); no Larry response as of 20:35Z. 5/5 daemons same PIDs (beacon_telegram_bot:2517973, chain_event_shipper:1849505, outbox_notifier:2530124, dashboard_api:2322792, inbox_watcher:2530123). 0 open PRs. git: clean, HEAD=e58c1ca=origin/main. Sync: last_sync=19:58:19Z (~37 min, nominal). **NOTE: systemctl is-active (system-level, no --user) returned "inactive" for beacon-bot — confirmed false negative via ps PID check.** forge/.invalid now contains build-task-001.json (task_id=task-001 — fixture, already dead-lettered, no action). **CARRY:** unreviewed-merge:489 [yellow], Tier-2 weekly probe auth_401, Check III `approve threshold-update-2026-06-11`, notifier-autopr-allowlist-from-config-001 [blue] (awaiting Larry approve), ourliberty-cycle.timer auto-healed L967 [blue], beacon-pending-approvals 2 stale Jun-12 + catalog-drift stale + notifier-autopr active, G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 1/3, G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. **Tier:** Tier 1, consecutive_clean=2.
+
+---
+
+## systemctl --user false-negative (learned 2026-06-13 iter ~1676)
+
+**Rule:** `systemctl is-active <service>` without `--user` returns "inactive" for user-scoped services when run from an interactive non-D-Bus session (e.g., `systemctl --user` fails with "No medium found"). Always verify daemon liveness via `ps -p <PID>` or `ps -p <PID1>,<PID2>,...` with comma-separated list. The comma-separated form is required; space-separated PIDs after `-p` produce exit-code 1 with no output.
+
+---
+
 ## Status snapshot — updated 2026-06-13 20:22Z UTC (Iter ~1675, interactive /cycle, Tier 1, consecutive_clean 0→1)
 
 **Iter ~1675 summary:** Alert watermark: 969→970 (L970 approval_request notifier-autopr-allowlist-from-config-001 Tier-3 silence — outbox_notifier already DM'd Larry). Tier 1, consecutive_clean 0→1. PRIME DIRECTIVE (script-authoritative): interventions=834, systemic_fixes=37, verification_pending=11, ratio=22.54, trend=flat. **KEY POSITIVE: notifier-autopr-allowlist-from-config-001 plan active** — Beacon processed outbox-url-shape direction-ask from ~1674 (~5 min turnaround); plan: source PR-URL allowlist from agent-models.json instead of hardcoded regex; outbox_notifier DM'd Larry at 20:22Z. Awaiting Larry 'approve'. 5/5 daemons same PIDs. 0 open PRs. git: clean, HEAD=37bbb9c=origin/main. Sync: last_sync=19:58:19Z (~24 min, nominal). **CARRY:** unreviewed-merge:489 [yellow], Tier-2 weekly probe auth_401, Check III `approve threshold-update-2026-06-11`, notifier-autopr-allowlist-from-config-001 [blue] (awaiting Larry approve), ourliberty-cycle.timer auto-healed L967 [blue], beacon-pending-approvals 2 stale Jun-12 entries, G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 1/3, G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. **Tier:** Tier 1, consecutive_clean=1.
