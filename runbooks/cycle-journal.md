@@ -4,6 +4,80 @@
 
 ---
 
+## Iteration ~1644 — 2026-06-13 12:13Z UTC (interactive, /cycle, Tier 3→1 reset, catalog-drift dispatch failure)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Signal. 9/9 services active. 0 open PRs. 1 new alert (L950 Tier-3 silence). Check 2 finding: catalog-drift-facts-sync-001 dispatch FAILED after Larry approval. Tier 3→1 reset.
+
+**VERIFY-BEFORE-REASSERT (iter ~1643 watch items):**
+- unreviewed-merge:489 [yellow] DM: **CONFIRMED OPEN** — last Telegram log entry 06:02:56 MDT (12:02Z UTC); no Larry reply to unreviewed-merge DMs. [carry]
+- beacon-pending-approvals.json: **RE-VERIFIED** — 3 entries: fix-alert-triage-watermark-durability-001 (2026-06-12T06:03Z, stale), fix-depth1-pulse-approval-extraction-001 (2026-06-12T06:05Z, stale), catalog-drift-facts-sync-001 (2026-06-13T10:31Z, still active — dispatch failed despite Larry approval). [escalated]
+- G-rule sync-blocked:uncommitted-changes 1/3: **RE-VERIFIED** — agents/pulse/.claude/settings.json still uncommitted. Same pre-existing single occurrence. Not incrementing. [carry]
+- G-rule droplet-uncommitted:main 1/3: **RE-VERIFIED** — same file, same root cause. Not incrementing. [carry]
+- G-rule catalog-accuracy-drift DISPATCHED: **CONFIRMED + NEW FINDING** — catalog-drift-facts-sync-001 dispatch failed; see Check 2. [escalated]
+- PRIME DIRECTIVE ratio=24.18: **Confirmed** (script-authoritative pre-iter). [confirmed]
+
+**Check 0 — Alert triage:** larry-alerts.jsonl=950 lines (was 949 at iter ~1643). **1 new alert (L950).**
+- L950 (sync.service, 11:57:08Z, route=escalate, subject=sync-blocked:uncommitted-changes): `triage-alert` → **Tier-3 silence** (known-pattern match in alert-translations.json). No DM. No tier-reset. Watermark advanced 949→950. ✅
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** **NEW FINDING.** Telegram log at 06:02:35 MDT (12:02Z UTC): Larry sent 'Go' in response to catalog-drift-facts-sync-001 approval DM. Beacon bot attempted dispatch at 06:02:36 MDT → **FAILED**: `dispatch failed for catalog-drift-facts-sync-001: target_repo "ourliberty-graph" not in allowed_repos for forge (allowed: ['ourliberty-agent-core', 'ourliberty-dashboard'])`. Larry retried 'Go' at 06:02:55 MDT → **FAILED again** same error. catalog-drift-facts-sync-001 still shows pending in beacon-pending-approvals.json (dispatch failure did not clear it). Larry's directive is NOT tracked by a PR. → **ask-then-do + tier-reset**. [yellow] DM sent as L951. No prior Larry reply to unreviewed-merge:489 DMs confirmed.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall dry-run at 12:10Z: "no stalls detected". 5 FORGE_NO_PR_SKIPs (pr_exists: #485, #486, #487, #488 + dashboard #53). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 3 entries — 2 stale (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001; G-rule DISPATCHED iter ~1623) + 1 active (catalog-drift-facts-sync-001, dispatch failed — see Check 2). No new action beyond the Check 2 escalation. ✅ Nominal (Check 2 handles it).
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry. G-rule dispatched ~iter 1416. ✅ Known carry.
+
+**Check A — Source repo:** On main. M agents/pulse/.claude/settings.json (pre-existing uncommitted from iter ~1625). Up to date with origin/main. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: last_sync=11:57:08Z status=error ("uncommitted modifications"), commit=2195c59. Last successful sync ~01:56:15Z (~10.3h ago). Blocked by known uncommitted agents/pulse/.claude/settings.json. G-rule sync-blocked:uncommitted-changes: same pre-existing single occurrence, not incrementing. ✅ Nominal (triaged).
+
+**Check C — Agent liveness:** 9/9 active (ourliberty-beacon-bot.service + ourliberty-forge-bot.service + ourliberty-mirror-bot.service + ourliberty-pulse-bot.service + ourliberty-chain-event-shipper.service + ourliberty-inbox-watcher.service + ourliberty-outbox-notifier.service + ourliberty-dashboard-api.service + ourliberty-cycle.service [current run]). ourliberty-pulse-check-iv.timer active (waiting, next fire Mon 2026-06-15 04:26:45 MDT). ✅ Nominal.
+
+**Check D — Inboxes:** All inboxes empty (beacon, forge, mirror, pulse). ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on agent-core. 0 open PRs on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Saturday 2026-06-13 UTC):** Check I gates Sunday UTC; skip. Check III gates Sunday + 14d cadence; skip.
+
+**Rotations:** 0 credentials in 60-day window. ✅ Nominal.
+
+**Actions taken:**
+1. Alert triage L950: Tier-3 silence (sync-blocked known pattern); watermark advanced 949→950. ✅
+2. [yellow] DM sent (L951): catalog-drift-facts-sync-001 dispatch failed — target_repo "ourliberty-graph" not in Forge allowed_repos. Suggested action: reply 'go: respec-catalog-drift' or clarify repo elevation. ✅
+3. `cycle_prime_ledger.py append --tier 3 --kind intervention --template catalog-drift-dispatch-failed` → logged at 12:13:16Z. ✅
+4. `cycle_tier_state.py record --checks-clean false` → Tier 3→1 reset (consecutive_clean→0). ✅
+5. MEMORY.md updated. ✅
+
+**Standing findings (updated):**
+- [yellow] **NEW: catalog-drift-dispatch-failed** — catalog-drift-facts-sync-001 dispatch rejected by Forge (ourliberty-graph not in allowed_repos). Larry approved twice; both attempts failed. DM sent L951. Reply 'go: respec-catalog-drift'. [escalated]
+- [yellow] unreviewed-merge:489 — DM sent iter ~1614; no Larry reply. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] Tier-2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- [yellow] droplet-uncommitted:main — agents/pulse/.claude/settings.json uncommitted 10.3h+. G-rule 1/3. [carry]
+- [blue] G-rule heal-stale-approvals-not-gc-merged-prs — DISPATCHED (iter ~1623). 2 stale entries self-clear after GC-fix PR. [watch Forge]
+- [blue] RESOLVED: pulse-check-iv — timer active, next fire Mon 2026-06-15 04:26:45 MDT. [monitoring]
+- [blue] G-rule sync-blocked:uncommitted-changes — 1/3. [carry]
+- [blue] G-rule timer-cycle-no-journal-entry — 1/3. [carry]
+- [blue] G-rule source=pulse-cycle-self-report — 1/3. [carry]
+- [blue] G-rule heal-stale-daemon-code-auto-restart-needs-template — 1/3. [carry]
+- [blue] G-rule catalog-accuracy-drift — DISPATCHED (3/3, iter ~1637). Beacon plan built; dispatch failed, pending re-scope. [escalated → watch]
+- [blue] G-rule approval_request-delivery-confirmation — 1/3. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. G-rule dispatched ~iter 1416. [carry]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR. [carry]
+- [blue] dag-preflight-revision gap — PR #484 closed source=pulse gap; DAG re-dispatch markers still fall through. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED. [carry]
+- [blue] G-rule droplet-uncommitted:main — 1/3 (same occurrence, not incrementing). [carry]
+- [blue] G-rule F24-empty-prompt-envelope-rejected — 1/3. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention row this iter (catalog-drift-dispatch-failed). Trailing-30d (script-authoritative): interventions=823, systemic_fixes=34, verification_pending=11, ratio=24.21, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0 (reset from Tier 3 — Check 2 signal).
+
+---
+
 ## Iteration ~1643 — 2026-06-13 11:37Z UTC (interactive, /cycle, Tier 2→3, consecutive_clean 2→3→de-escalate)
 
 **Trigger:** Larry direct invocation (`/cycle`).
