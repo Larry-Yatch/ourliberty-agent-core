@@ -10750,14 +10750,27 @@ class NoSessionRevisionDmTest(unittest.TestCase):
 
 
 class PrUrlStructuralShapeCheckTest(unittest.TestCase):
-    """Layer 1 — pure regex shape check (no shell-out, no network).
+    """Layer 1 — shape + allowlist check (no shell-out, no network).
 
     Replaces the prior name-based allowlist + canonical-form rewrite
     table. The discipline-correct fix is to validate intrinsic
     properties of the pr_url (shape + existence), not surface forms of
     the task_id, so the gate doesn't grow a fresh allowlist row every
     time a new fixture family leaks into the outbox.
+
+    The repo allowlist is now sourced from `config/agent-models.json`
+    `allowed_repos` via `routing_validator.allowed_repos_for('forge')` —
+    the SAME source of truth that gates dispatch. These tests run against
+    the live repo config (which lists ourliberty-agent-core,
+    ourliberty-dashboard, ourliberty-graph for forge); the cache is
+    invalidated in setUp so a prior test's temp config can't leak in.
     """
+
+    def setUp(self):
+        rv.invalidate_models_cache()
+
+    def tearDown(self):
+        rv.invalidate_models_cache()
 
     def test_canonical_agent_core_url_accepted(self):
         repo, n, reason = on._pr_url_shape_check(
@@ -10773,6 +10786,19 @@ class PrUrlStructuralShapeCheckTest(unittest.TestCase):
         )
         self.assertEqual(repo, 'Larry-Yatch/ourliberty-dashboard')
         self.assertEqual(n, 42)
+        self.assertEqual(reason, 'ok')
+
+    def test_canonical_graph_url_accepted(self):
+        # Regression target for notifier-autopr-allowlist-from-config-001:
+        # ourliberty-graph onboarded into config allowed_repos but the old
+        # hardcoded alternation never gained it, so a clean Mirror
+        # REVIEW_PASS on a graph PR (PR #1, 2026-06-13) was skipped as
+        # pr-url-shape-invalid. Config-sourcing the allowlist accepts it.
+        repo, n, reason = on._pr_url_shape_check(
+            'https://github.com/Larry-Yatch/ourliberty-graph/pull/1'
+        )
+        self.assertEqual(repo, 'Larry-Yatch/ourliberty-graph')
+        self.assertEqual(n, 1)
         self.assertEqual(reason, 'ok')
 
     def test_wrong_owner_rejected(self):
@@ -10836,13 +10862,17 @@ class PrUrlStructuralShapeCheckTest(unittest.TestCase):
         self.assertEqual(reason, 'shape-mismatch')
 
     def test_unknown_repo_with_correct_owner_rejected(self):
-        # Owner is right; repo is not one of the two allowed.
+        # Owner + shape are valid, but the repo slug is not in the
+        # config-sourced allowlist (allowed_repos_for('forge')). This is
+        # now a distinct reason from shape-mismatch: the URL is well-formed
+        # and Larry-Yatch-owned, it just points at a repo the chain does
+        # not manage. Closed-set anti-spoofing boundary preserved.
         repo, n, reason = on._pr_url_shape_check(
             'https://github.com/Larry-Yatch/some-other-repo/pull/1'
         )
         self.assertIsNone(repo)
         self.assertIsNone(n)
-        self.assertEqual(reason, 'shape-mismatch')
+        self.assertEqual(reason, 'repo-not-allowlisted')
 
     def test_http_scheme_rejected(self):
         # https only — http is rejected (the gate is feeding gh pr merge

@@ -77,6 +77,7 @@ import fixture_patterns             # noqa: E402  # outbox-side fixture gate
 import forge_preflight_handler as fph  # noqa: E402
 import larry_alerts                # noqa: E402
 import mirror_review_handler as mrh  # noqa: E402
+import routing_validator            # noqa: E402  # allowed_repos source of truth
 import safe_write_inbox             # noqa: E402
 import sequence_shortcut_helpers as ssh  # noqa: E402  # V6: step-merged signal
 import trust_policy                 # noqa: E402
@@ -270,22 +271,38 @@ _GH_PR_URL_RE = re.compile(
     r'^https?://github\.com/([^/]+/[^/]+)/pull/(\d+)',
 )
 
-# Structural pr_url validator (2026-05-29 — structural-pr-url-validator).
+# Structural pr_url validator (2026-05-29 — structural-pr-url-validator;
+# repo allowlist sourced from config 2026-06-13 —
+# notifier-autopr-allowlist-from-config-001).
 # Replaces the prior name-based repo-coords allowlist + canonical-form
-# rewrite table. The AUTO_MERGE gate now validates two intrinsic
-# properties of the pr_url: (1) shape — does it match the canonical
-# `https://github.com/Larry-Yatch/<allowed-repo>/pull/<N>` form with N>=1,
-# and (2) existence — does the PR actually exist and have state=OPEN
-# (Layer 2, `gh pr view`). Anchored start-and-end so trailing junk
-# (anchors, query strings, doctored fragments) is rejected — at this
-# layer we want the exact form `gh pr merge` needs, nothing else.
-# Hardcodes the two operating-environment repos rather than reading
-# config: Larry-Yatch + the two repos are ground truth, not configurable
-# at runtime (env vars / extra config files would just be another moving
-# part that can drift).
+# rewrite table. The AUTO_MERGE gate validates two intrinsic properties
+# of the pr_url: (1) shape — does it match the canonical
+# `https://github.com/Larry-Yatch/<repo>/pull/<N>` form with N>=1, AND the
+# captured `<repo>` slug is on the agent's allowlist; and (2) existence —
+# does the PR actually exist and have state=OPEN (Layer 2, `gh pr view`).
+#
+# The regex captures a GENERIC repo slug rather than a hardcoded
+# alternation. The closed-set anti-spoofing boundary (still Larry-Yatch
+# only, still a FINITE allowlist, NO wildcard) is preserved by checking
+# the captured slug for membership in
+# `routing_validator.allowed_repos_for('forge')` inside
+# `_pr_url_shape_check` — i.e. the SAME `config/agent-models.json`
+# `allowed_repos` that already gates dispatch. That config is the SINGLE
+# SOURCE OF TRUTH for the repo allowlist: do NOT re-hardcode an
+# alternation here. The prior hardcoded
+# `(ourliberty-agent-core|ourliberty-dashboard)` drifted when
+# ourliberty-graph onboarded (config gained the repo, this regex did
+# not), so a clean Mirror REVIEW_PASS on a graph PR was skipped as
+# `pr-url-shape-invalid`. Config-sourcing removes that drift class.
+#
+# Anchored start-and-end so trailing junk (anchors, query strings,
+# doctored fragments) is rejected — at this layer we want the exact form
+# `gh pr merge` needs, nothing else. The slug class `[A-Za-z0-9._-]+`
+# cannot contain a slash, so the owner anchor (`Larry-Yatch/`) still binds
+# and `x/y`-style owner spoofs fail as shape-mismatch.
 _PR_URL_STRUCTURAL_RE = re.compile(
     r'^https://github\.com/Larry-Yatch/'
-    r'(ourliberty-agent-core|ourliberty-dashboard)/pull/([1-9]\d*)$'
+    r'([A-Za-z0-9._-]+)/pull/([1-9]\d*)$'
 )
 
 # Existence-check timeout. Tighter than _AUTO_MERGE_TIMEOUT_S (30s) because
@@ -4634,18 +4651,25 @@ def _dispatch_mirror_review_rerun(
 def _pr_url_shape_check(
     pr_url: Any,
 ) -> tuple[Optional[str], Optional[int], str]:
-    """Layer 1 of the AUTO_MERGE pr_url validator — pure regex shape check.
+    """Layer 1 of the AUTO_MERGE pr_url validator — shape + allowlist check.
 
-    Returns `(repo_coords, pr_number, reason)`. On valid shape:
-    `('Larry-Yatch/<repo>', <int>, 'ok')`. On invalid shape:
-    `(None, None, '<short diagnostic>')`.
+    Returns `(repo_coords, pr_number, reason)`. On a valid, allowlisted
+    URL: `('Larry-Yatch/<repo>', <int>, 'ok')`. On rejection:
+    `(None, None, '<short diagnostic>')`, where the diagnostic is one of:
+      - `empty-or-non-string` — pr_url is not a non-empty str.
+      - `shape-mismatch` — doesn't match the canonical
+        `https://github.com/Larry-Yatch/<slug>/pull/<N>` form (wrong
+        owner/scheme, `pull/0`, trailing junk after the PR number).
+      - `repo-not-allowlisted` — shape is valid but the repo slug is not
+        in `routing_validator.allowed_repos_for('forge')` (the
+        `config/agent-models.json` `allowed_repos` that gates dispatch).
 
     No shell-out; no network. The whole point of Layer 1 is to fail fast
-    on garbage URLs (`pull/0`, wrong-owner spoofs, fixture-generated
-    pointers to nonexistent repos) before any shell-out to `gh pr view`
-    or `gh pr merge`. Anchored start-and-end so trailing junk after the
-    PR number is rejected — at the AUTO_MERGE layer we want the exact
-    canonical form, nothing fuzzy.
+    before any shell-out to `gh pr view` or `gh pr merge`. The allowlist
+    is sourced from config (NOT a second hardcoded set) so it tracks the
+    same source of truth as the dispatch gate — forge is the PR-opener
+    and mirror's list is identical by construction, so checking forge's
+    list covers both AUTO_MERGE and MIRROR_REVIEW_STATUS callers.
     """
     if not isinstance(pr_url, str) or not pr_url:
         return None, None, 'empty-or-non-string'
@@ -4653,6 +4677,8 @@ def _pr_url_shape_check(
     if not m:
         return None, None, 'shape-mismatch'
     repo = m.group(1)
+    if repo not in routing_validator.allowed_repos_for('forge'):
+        return None, None, 'repo-not-allowlisted'
     return f'Larry-Yatch/{repo}', int(m.group(2)), 'ok'
 
 
