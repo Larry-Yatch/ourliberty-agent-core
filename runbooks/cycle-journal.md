@@ -4,6 +4,71 @@
 
 ---
 
+## Iteration ~1617 — 2026-06-13 00:10Z UTC (interactive, /cycle, Tier 1→2, consecutive_clean 2→3 → de-escalate)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. 9/9 services active. 0 open PRs. All inboxes empty. 0 new alerts (watermark=1144 unchanged). Tier 1→2 de-escalation (consecutive_clean 2→3).
+
+**VERIFY-BEFORE-REASSERT (iter ~1616 watch items):**
+- unreviewed-merge:489 [yellow] DM: **CONFIRMED OPEN** — no Larry reply in beacon-bot log since 23:49Z DM delivery. [carry]
+- beacon-pending-approvals.json stale entries (#482+#484): **RESOLVED** — 0 entries now (healer GC'd since iter ~1616). ✅ Closed.
+- G-rule pulse-check-iv-no-heartbeat 3/3: **CONFIRMED STALE** — heartbeat MISSING, pulse-check-iv.service+timer inactive. drift-healer fires Sat 06:00Z UTC (~6h from now). [carry → expected to resolve today]
+- G-rule timer-cycle-no-journal-entry 1/3: **CONFIRMED 1/3** — no new unjournaled fires. [carry at 1/3]
+- G-rule source=pulse-cycle-self-report 1/3: **CONFIRMED 1/3** — no new source=pulse-cycle alerts. [carry at 1/3]
+- G-rule heal-stale-daemon-code-auto-restart-needs-template 1/3: **CONFIRMED 1/3** — no new occurrences. [carry at 1/3]
+- PRIME DIRECTIVE ratio=24.85: **CONFIRMED** (script-authoritative). [confirmed]
+
+**Check 0 — Alert triage:** larry-alerts.jsonl=1144 lines. Watermark=1144. 0 new alerts. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** No new Larry messages since iter ~1616 check. Beacon-bot log shows no incoming messages in last 30 min. unreviewed-merge:489 DM still unanswered. ✅ Nominal (carry items noted).
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall dry-run at 00:09Z: "no stalls detected". 4 FORGE_NO_PR_SKIPs (all pr_exists matches). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 0 entries. Healer GC'd stale entries (#482+#484) since last iter. ✅ Resolved/Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry. G-rule dispatched ~iter 1416. ✅ Known carry.
+
+**Check A — Source repo:** Session-start gitStatus: main, clean. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: last_sync=2026-06-12T23:56:13Z (~14 min ago), status=no-change, commit=aac2abb. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 active (beacon-bot, chain-event-shipper, cycle.service, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot). pulse-check-iv.service+timer inactive (expected; drift-healer installs ~06:00Z). ✅ Nominal.
+
+**Check D — Inboxes:** All inboxes empty (forge=0, beacon=0, mirror=0, pulse=0). ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on agent-core. 0 open PRs on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Saturday 2026-06-13 UTC):** Check I: gates Sunday UTC; skip. Check III: gates Sunday + 14d cadence; skip.
+
+**Rotations:** 0 credentials in 60-day window. ✅ Nominal.
+
+**Actions taken:**
+1. `cycle_prime_ledger.py append --kind iter_clean` → iter_clean logged at 00:10:12Z. ✅
+2. `cycle_tier_state.py record --checks-clean true` → consecutive_clean 2→3 → Tier 1→2 de-escalation. ✅
+
+**Standing findings (updated):**
+- [yellow] unreviewed-merge:489 — DM sent iter ~1614; no Larry reply yet. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] Tier-2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- [blue] G-rule pulse-check-iv-no-heartbeat — 3/3; PR #488 merged; drift-healer fires Sat 06:00Z UTC. [carry → expected to resolve today]
+- [blue] G-rule timer-cycle-no-journal-entry — 1/3. [carry]
+- [blue] G-rule source=pulse-cycle-self-report — 1/3. [carry]
+- [blue] G-rule heal-stale-daemon-code-auto-restart-needs-template — 1/3. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. G-rule dispatched ~iter 1416. [carry]
+- [blue] beacon-pending-approvals.json stale entries (#482+#484) — **RESOLVED** (GC'd). ✅
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR. [carry]
+- [blue] dag-preflight-revision gap — PR #484 closed source=pulse gap; DAG re-dispatch markers still fall through. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED. [carry]
+- [blue] catalog-accuracy-drift — G-rule 2/3. [carry]
+
+**PRIME DIRECTIVE:** 0 intervention rows this iter (clean). Trailing-30d (script-authoritative): interventions=820, systemic_fixes=33, verification_pending=11, ratio=24.85, trend=flat.
+**Tier end-of-iter:** Tier 2, consecutive_clean=0. (Need 3 consecutive clean Tier-2 iters to reach Tier 3.)
+
+---
+
 ## Iteration ~1616 — 2026-06-13 00:05Z UTC (interactive, /cycle, Tier 1, consecutive_clean 1→2)
 
 **Trigger:** Larry direct invocation (`/cycle`).
