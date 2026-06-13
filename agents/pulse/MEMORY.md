@@ -36,6 +36,12 @@
 
 ---
 
+## Status snapshot — updated 2026-06-13 17:02Z UTC (Iter ~1663, interactive /cycle, Tier 3, consecutive_clean 4→5)
+
+**Iter ~1663 summary:** Alert watermark: 964 (0 new). Tier 3, consecutive_clean 4→5. PRIME DIRECTIVE (script-authoritative): interventions=831, systemic_fixes=36, verification_pending=11, ratio=23.08, trend=flat. **KEY STATE:** 5/5 persistent daemons active (same PIDs as ~1662). 0 open PRs. All inboxes empty. git: clean, HEAD=76a7dae=origin/main. Sync: last_sync=16:58:09Z status=no-change. beacon-pending-approvals.json: 3 entries (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001 stale + catalog-drift-facts-sync-001 active — 6h reminder delivered 16:33Z). **CARRY:** unreviewed-merge:489 [yellow], Tier-2 weekly probe auth_401, Check III `approve threshold-update-2026-06-11`, catalog-drift-facts-sync-001 pending Larry, G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 1/3, G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. **Tier:** Tier 3, consecutive_clean=5.
+
+---
+
 ## Status snapshot — updated 2026-06-13 16:32Z UTC (Iter ~1662, interactive /cycle, Tier 3, consecutive_clean 3→4)
 
 **Iter ~1662 summary:** Alert watermark: 964 (0 new). Tier 3, consecutive_clean 3→4. PRIME DIRECTIVE (script-authoritative): interventions=831, systemic_fixes=36, verification_pending=11, ratio=23.08, trend=flat. **KEY STATE:** 5/5 persistent daemons active (same PIDs as ~1661). 0 open PRs. All inboxes empty. git: clean, HEAD=1860364=origin/main. Sync: last_sync=15:57:44Z status=no-change (~35 min, within 2h). beacon-pending-approvals.json: 3 entries (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001 stale + catalog-drift-facts-sync-001 active 0 reminders). **CARRY:** unreviewed-merge:489 [yellow], Tier-2 weekly probe auth_401, Check III `approve threshold-update-2026-06-11`, catalog-drift-facts-sync-001 0 reminders, G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 1/3, G-rule droplet-uncommitted:main 1/3 (may self-close), G-rule F24-empty-prompt-envelope-rejected 1/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. **Tier:** Tier 3, consecutive_clean=4.
