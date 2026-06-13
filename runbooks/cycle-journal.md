@@ -4,6 +4,81 @@
 
 ---
 
+## Iteration ~1660 — 2026-06-13 15:30Z UTC (interactive, /cycle, Tier 3, consecutive_clean 1→2)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. 5/5 persistent daemons active. 0 open PRs. 2 new alerts — both Tier-3 silenced. PR #492 confirmed merged (PULSE_RUNTIME_PATHS fix live). Sync-blocked carry resolves on next run_cycle.sh.
+
+**VERIFY-BEFORE-REASSERT (iter ~1659 carries):**
+- pulse-settings-runtime-path-001 auto-merge imminent → **CONFIRMED RESOLVED**: PR #492 (`a5eeb79 fix: track pulse settings.json in PULSE_RUNTIME_PATHS to unblock sync`) is at HEAD~1 in git log. beacon-pending-approvals.json now shows 3 entries (was 4 — pulse-settings-runtime-path-001 GONE). ✅
+- PR #491 fix (outbox-notifier/approval_request Tier-3 silence) live → **CONFIRMED**: Both new alerts this iter auto-silenced without manual triage, confirming the translation is active. ✅
+- catalog-drift-facts-sync-001 → **CARRY** — still pending, 0 reminders. No Forge task visible. [carry]
+- unreviewed-merge:489 → **CARRY** — no Larry reply in beacon bot log since DM iter ~1614. [carry]
+
+**Check 0 — Alert triage:** Watermark=962. Total=964. 2 new (L963–L964):
+- L963: sync.service / sync-blocked:uncommitted-changes (14:57:35Z) → **Tier 3** (known-pattern in alert-translations.json). No DM. [digest]
+- L964: outbox-notifier / kind=notification / intent=review-pass / task=pulse-settings-runtime-path-001 (14:59:00Z) → **Tier 3** (known-pattern). No DM. [digest]
+- Watermark advanced 962→964. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message: "Go" at 08:37:30 MDT (14:37:30Z) approving both pulse-settings-runtime-path-001 and silence-approval-request-delivery-confirmations-001. No new directives since. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → no stalls. 6 FORGE_NO_PR_SKIPs (known: #485/#53/#486/#487/#488/#490). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 3 entries — fix-alert-triage-watermark-durability-001 (stale), fix-depth1-pulse-approval-extraction-001 (stale), catalog-drift-facts-sync-001 (active, 0 reminders). ✅ Nominal (known carries).
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING. Known [blue] carry. ✅ Known carry.
+
+**Check A — Source repo:** On main. M agents/pulse/.claude/settings.json (PR #492 fix live — next run_cycle.sh will auto-commit). 0 ahead, 0 behind origin/main. ✅ Nominal (resolving).
+
+**Check B — Sync health:** last_sync=14:57:35Z status=error (uncommitted settings.json). Root-cause fixed by PR #492 — settings.json now in PULSE_RUNTIME_PATHS. Next run_cycle.sh auto-commit will include it; subsequent sync should succeed. ✅ Nominal (resolving).
+
+**Check C — Agent liveness:** 5/5 persistent daemons active — beacon_telegram_bot (PID 1843738), chain_event_shipper (PID 1849505), inbox_watcher (PID 1850128), outbox_notifier (PID 2116613), dashboard_api (PID 2322792). pulse-check-iv.timer active, next fire Mon 2026-06-15 04:26:45 MDT. ✅ Nominal.
+
+**Check D — Inboxes:** forge/mirror/pulse/beacon: all empty. ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on ourliberty-agent-core. 0 open PRs on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Saturday 2026-06-13 UTC):** Check I gates Sunday — skip. Check III gates Sunday + 14d cadence — skip.
+
+**Actions taken:**
+1. L963–L964 triaged (both Tier 3 silence), watermark advanced 962→964. ✅
+2. `cycle_tier_state.py record --checks-clean true` → consecutive_clean 1→2. ✅
+3. iter_clean recorded to cycle-prime-ledger.jsonl. ✅
+4. MEMORY.md updated. ✅
+
+**Dispatches:** None.
+
+**Standing findings:**
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614; no Larry reply. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **PR #492 (pulse-settings-runtime-path-001)** — MERGED ✅. Dirty-tree resolves on next run_cycle.sh auto-commit. [closing]
+- [blue] **catalog-drift-facts-sync-001** — pending, 0 reminders. No Forge task visible. Monitor. [carry]
+- [blue] **beacon-pending-approvals stale entries** — fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001. G-rule DISPATCHED iter ~1623. [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — 1/3. [carry]
+- [blue] **G-rule heal-stale-daemon-code-auto-restart-needs-template** — 1/3. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 1/3 (may self-resolve once PR #492 prevents further dirty-tree alerts). [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **Check 5 MISSING** — heal-stale-daemon-code-state.json absent. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — [carry]
+- [blue] **dag-preflight-revision gap** — [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+- CLOSED: G-rule approval_request-delivery-confirmation — PR #491 MERGED. ✅
+- CLOSED: G-rule sync-blocked:uncommitted-changes — dispatched iter ~1657 + PR #492 root-cause fix live. ✅
+
+**Watch items for next iter (~1661):**
+- settings.json dirty-tree: verify committed by next run_cycle.sh auto-commit.
+- Sync: next hourly run (~15:57Z) should succeed for first time since iter ~1625.
+- Tier 3 cadence: consecutive_clean=2; one more clean → consecutive_clean=3.
+
+**PRIME DIRECTIVE:** 0 new interventions, 0 new systemic_fixes (all Tier-3 silences). iter_clean recorded. Script-authoritative: interventions=831, systemic_fixes=36, verification_pending=11, ratio=23.08, trend=flat.
+**Tier end-of-iter:** Tier 3, consecutive_clean=2.
+
+---
+
 ## Iteration ~1659 — 2026-06-13 15:01Z UTC (interactive, /cycle, Tier 3, consecutive_clean 0→1)
 
 **Trigger:** Larry direct invocation (`/cycle`).

@@ -4,7 +4,13 @@
       "Bash(bash:*)",
       "Bash(gh pr merge:*)",
       "Bash(git branch:*)",
-      "Bash(python3:*)"
+      "Bash(git -C *)",
+      "Bash(journalctl *)",
+      "Bash(python3:*)",
+      "Bash(systemctl is-active *)",
+      "Bash(systemctl list-units *)",
+      "Bash(systemctl show *)",
+      "Bash(tmux ls *)"
     ],
     "deny": [
       "Bash(git commit:*)",
