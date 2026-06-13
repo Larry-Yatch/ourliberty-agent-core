@@ -4,6 +4,75 @@
 
 ---
 
+## Iteration ~1674 — 2026-06-13 20:17Z UTC (interactive, /cycle, Tier 3→1 reset, outbox-url-shape-fix dispatched)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Signal. New finding: outbox_notifier skipped AUTO_MERGE for ourliberty-graph PR #1 (pr-url-shape-invalid shape-mismatch) after Mirror PASS at 19:41Z. Pulse merged PR #1 as recovery. Systemic fix dispatched to Beacon.
+
+**VERIFY-BEFORE-REASSERT (iter ~1673 carries):**
+- catalog-drift-facts-sync-001 resolving: **RESOLVED** — ourliberty-graph PR #1 built by Forge, Mirror PASSED (19:41:30Z per outbox archive), Pulse merged at 20:18Z sha=e9b0c0b. ✅ CLOSED.
+- outbox_notifier url-shape-invalid: **NEW** — confirmed in outbox-notifier.log at 13:41:32 MDT. Systemic fix dispatched this iter. ⚠️ OPEN.
+- unreviewed-merge:489: **CARRY** — no new Larry reply.
+- ourliberty-cycle.timer auto-healed (L967): **CARRY** [blue].
+
+**Check 0 — Alert triage:** Watermark=969. Total lines=969. 0 new alerts. ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log shows 2 WARNs at 13:41:32 MDT (MIRROR_REVIEW_STATUS + AUTO_MERGE skipped, pr-url-shape-invalid). Both for the same root cause (shape validator rejects ourliberty-graph repo). Rate: 2 events, single occurrence (not a recurring threshold breach). Systemic fix dispatched; log-level calibration TBD after fix lands. ✅ Nominal within threshold (single occurrence, not >5/h).
+
+**Check 2 — Telegram sweep:** No new Larry messages since 13:27:13 MDT ('Go'). Last directive fully tracked (~1673). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → no stalls. 4 FORGE_NO_PR_SKIPs (#488/#490/#491/#492 — all known closed). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 3 entries.
+- fix-alert-triage-watermark-durability-001 (2026-06-12T06:03Z) — stale carry.
+- fix-depth1-pulse-approval-extraction-001 (2026-06-12T06:05Z) — stale carry.
+- catalog-drift-facts-sync-001 (2026-06-13T19:26:54Z) — RESOLVING: PR #1 merged this iter. ✅ Actively resolving.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING. Known [blue] carry. ✅
+
+**Check A — Source repo:** On main. Working tree CLEAN. HEAD=cd78cf6=origin/main. 0 ahead, 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-13T19:58:19Z (~19 min at check time). Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 5/5 persistent daemons active (same PIDs as ~1673: beacon_telegram_bot:2517973, chain_event_shipper:1849505, outbox_notifier:2530124, dashboard_api:2322792, inbox_watcher:2530123). ✅ Nominal.
+
+**Check D — Inboxes:** beacon (outbox-notifier-url-shape-ourliberty-graph-001.json dispatched this iter, now in inbox). forge/mirror/pulse: empty. forge/.invalid/ holds 2 pre-fix dead-letters (known, carry). ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open PRs. ourliberty-graph PR #1: **MERGED** sha=e9b0c0b mergedAt=20:18:52Z. ✅ Nominal (recovery action taken).
+
+**Check §5.0 (bug-hunt gate):** audit_due_nudge: no committed baseline, no-op. distill_detector: no-op. audit_cadence_signal: no-op. ✅ Nominal.
+
+**Root cause — outbox_notifier url-shape-invalid:** At 13:41:32 MDT (19:41:32Z), outbox_notifier classified Mirror's REVIEW_PASS marker for catalog-drift-facts-sync-001, then attempted to post MIRROR_REVIEW_STATUS and AUTO_MERGE to ourliberty-graph/pull/1. Both failed with `pr-url-shape-invalid (shape-mismatch)`. The validator's accepted-repo list does not include ourliberty-graph (only ourliberty-agent-core and likely ourliberty-dashboard). This is a new-repo-onboarding gap: when ourliberty-graph was added to allowed_repos and systemd RWP, the notifier shape validator was not updated.
+
+**Actions taken:**
+1. `gh pr merge 1 --repo Larry-Yatch/ourliberty-graph --squash --delete-branch` → **MERGED** sha=e9b0c0b. Logged to cycle-actions.jsonl. ✅
+2. `cycle_prime_ledger.py append --tier 3 --kind intervention` — mirror-pass-no-auto-merge intervention recorded. ✅
+3. Beacon direction-ask dispatched: `outbox-notifier-url-shape-ourliberty-graph-001` — add ourliberty-graph to PR URL shape validator; evaluate Larry-Yatch/* wildcard vs per-repo to prevent recurrence on future repo onboards. ✅
+4. `cycle_prime_ledger.py append --tier 3 --kind systemic_fix` — outbox-notifier-url-shape-ourliberty-graph-001 fix recorded. ✅
+5. `cycle_tier_state.py record --checks-clean false` → Tier 3→1 reset. ✅
+
+**Standing findings:**
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614; no Larry reply. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **outbox-notifier-url-shape-ourliberty-graph-001** — Beacon inbox, direction-ask for shape validator fix. [new, carry]
+- [blue] **ourliberty-cycle.timer auto-healed** — L967. Cannot verify from interactive session. [carry]
+- [blue] **beacon-pending-approvals stale entries** — fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001 (both Jun-12). [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — 1/3. [carry]
+- [blue] **G-rule heal-stale-daemon-code-auto-restart-needs-template** — 1/3. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 1/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **Check 5 MISSING** — heal-stale-daemon-code-state.json absent. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — [carry]
+- [blue] **dag-preflight-revision gap** — [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+
+**PRIME DIRECTIVE:** 1 intervention (mirror-pass-no-auto-merge), 1 systemic_fix (outbox-notifier-url-shape-ourliberty-graph-001). Script-authoritative: interventions=834, systemic_fixes=37, verification_pending=11, ratio=22.54, trend=flat (improved from 23.14).
+**Tier end-of-iter:** Tier 3→1 reset (new signal: url-shape-invalid finding). consecutive_clean=0.
+
+---
+
 ## Iteration ~1673 — 2026-06-13 19:44Z UTC (interactive, /cycle, Tier 3, consecutive_clean 0→1)
 
 **Trigger:** Larry direct invocation (`/cycle`).
