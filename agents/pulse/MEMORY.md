@@ -36,9 +36,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-13 21:24Z UTC (Iter ~1680, interactive /cycle, Tier 1, consecutive_clean 0→1)
+## Status snapshot — updated 2026-06-13 21:32Z UTC (Iter ~1681, interactive /cycle, Tier 1, consecutive_clean 1→2)
 
-**Iter ~1680 summary:** Alert watermark: 972 (0 new). Tier 1, consecutive_clean 0→1. PRIME DIRECTIVE (script-authoritative): interventions=835, systemic_fixes=37, verification_pending=11, ratio=22.57, trend=flat. **KEY VERIFIED: notifier-autopr-allowlist-from-config-001 RESOLVED** — PR #493 confirmed merged (HEAD=0fd7642 on origin/main). 5/5 daemons same PIDs. 0 open PRs (both agent-core + ourliberty-graph). git: clean, HEAD=0fd7642=origin/main. Sync: last_sync=20:58:40Z (~26 min, nominal). **CARRY:** unreviewed-merge:489 [yellow], Tier-2 weekly probe auth_401, Check III `approve threshold-update-2026-06-11`, ourliberty-cycle.timer auto-healed L967 [blue], beacon-pending-approvals 2 stale Jun-12 + catalog-drift artifact (Jun-13), G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 1/3, G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. **Tier:** Tier 1, consecutive_clean=1.
+**Iter ~1681 summary:** Alert watermark: 972 (0 new). Tier 1, consecutive_clean 1→2. PRIME DIRECTIVE (script-authoritative): interventions=835, systemic_fixes=37, verification_pending=11, ratio=22.57, trend=flat. All checks nominal. 5/5 daemons same PIDs. 0 open PRs (agent-core + ourliberty-graph). git: clean, HEAD=d96e98c=origin/main. Sync: last_sync=20:58:40Z (~34 min, nominal). **CARRY:** unreviewed-merge:489 [yellow], Tier-2 weekly probe auth_401, Check III `approve threshold-update-2026-06-11`, ourliberty-cycle.timer auto-healed L967 [blue], beacon-pending-approvals 2 stale Jun-12 + catalog-drift artifact (Jun-13), G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 1/3, G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. **Tier:** Tier 1, consecutive_clean=2. (1 more clean iter → de-escalate to Tier 2.)
 
 ---
 
