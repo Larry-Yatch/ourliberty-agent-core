@@ -36,9 +36,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-13 09:54Z UTC (Iter ~1636, interactive /cycle, Tier 3, consecutive_clean 15→16)
+## Status snapshot — updated 2026-06-13 10:24Z UTC (Iter ~1637, interactive /cycle, Tier 3→1, consecutive_clean 16→0)
 
-**Iter ~1636 summary:** Alert watermark: reset 1159→943 (retention job compacted file at 03:43Z UTC). Tier 3, consecutive_clean 15→16. PRIME DIRECTIVE (script-authoritative): interventions=820, systemic_fixes=33, verification_pending=11, ratio=24.85, trend=flat. **KEY STATE:** 9/9 services active. 0 open PRs. All inboxes empty. Sync: last_sync=08:56:39Z status=error ("Uncommitted changes"); last successful sync=01:56:15Z (~8h); blocked by uncommitted agents/pulse/.claude/settings.json from iter ~1625. beacon-pending-approvals.json: **2 stale entries** (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001); CONFIRMED both PRs (#482+#484) merged June 12; entries await GC-fix PR from Forge (G-rule DISPATCHED iter ~1623). **WATERMARK NOTE:** fix-alert-triage-watermark-durability-001 (PR #482) IS MERGED — `alert-triage-watermark.json` exists and CLI works. Retention job compacted larry-alerts.jsonl 03:43Z UTC; watermark reset 1159→943 this cycle. **CARRY:** unreviewed-merge:489 [yellow] DM sent iter ~1614, no Larry reply. Tier-2 weekly probe auth_401, Check III proposals `approve threshold-update-2026-06-11`, G-rule sync-blocked:uncommitted-changes 1/3, G-rule timer-cycle-no-journal-entry 1/3, G-rule source=pulse-cycle-self-report 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 1/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED, catalog-accuracy-drift G-rule 2/3. **Tier:** Tier 3, consecutive_clean=16.
+**Iter ~1637 summary:** Alert watermark: 943→946 (3 new alerts: L944 Tier-3 silence, L945 droplet-uncommitted:main Tier-4 [outbox-notifier already DM'd at 10:18Z], L946 catalog-accuracy-drift Tier-4 G-rule 3/3 DISPATCHED). Tier 3→1 reset (Tier-4 findings). PRIME DIRECTIVE (script-authoritative): interventions=822, systemic_fixes=34, verification_pending=11, ratio=24.18, trend=flat. **KEY STATE:** 9/9 services active. 0 open PRs. Beacon inbox: catalog-accuracy-drift-grule-dispatch-001.json. Sync: last_sync=09:56:49Z status=error ("Uncommitted changes"); last successful sync=01:56:15Z (~8.5h); blocked by uncommitted agents/pulse/.claude/settings.json from iter ~1625. beacon-pending-approvals.json: **2 stale entries** (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001); G-rule DISPATCHED iter ~1623. **NEW:** G-rule droplet-uncommitted-main 1/3 [NEW]. **G-rule catalog-accuracy-drift DISPATCHED** (3/3) — direction-ask catalog-accuracy-drift-grule-dispatch-001 to Beacon. **CARRY:** unreviewed-merge:489 [yellow] DM sent iter ~1614, no Larry reply. Tier-2 weekly probe auth_401, Check III proposals `approve threshold-update-2026-06-11`, G-rule sync-blocked:uncommitted-changes 1/3, G-rule timer-cycle-no-journal-entry 1/3, G-rule source=pulse-cycle-self-report 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 1/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. **Tier:** Tier 1, consecutive_clean=0.
 
 ---
 
@@ -169,7 +169,8 @@
 | ccd-s1-envelope-builder | PAUSED | Carry; unverified |
 | sync-push-rebase-loop-001 | UNREGISTERED AR | Carry |
 | dag-preflight-revision gap | Active | PR #484 closed source=pulse gap; DAG markers still fall through |
-| catalog-accuracy-drift | G-rule 2/3 | Watch; at 3/3 dispatch Beacon |
+| catalog-accuracy-drift | **G-rule DISPATCHED** (3/3, iter ~1637) | Watch Beacon for spec; direction-ask: catalog-accuracy-drift-grule-dispatch-001 |
+| droplet-uncommitted:main | G-rule 1/3 [NEW iter ~1637] | Watch; at 3/3 dispatch Beacon to add translation allowlist entry |
 | F24-empty-prompt-envelope-rejected | G-rule 1/3 | Watch |
 | heal-stale-daemon-code-auto-restart-needs-template | G-rule 1/3 | At 3/3 dispatch Beacon: add translation template to alert-translations.json |
 | heal-stale-approvals-not-gc-merged-prs | **DISPATCHED** (3/3, iter ~1623) | Watch Forge for PR; entries self-clear after merge |
