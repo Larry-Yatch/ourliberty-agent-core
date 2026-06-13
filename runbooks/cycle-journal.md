@@ -110189,3 +110189,73 @@ Forge rejected p3-dashboard-proposed-lane at preflight (04:41Z) because accept/d
 
 **PRIME DIRECTIVE:** 1 intervention (L1136 claim). Script-authoritative: interventions=819, systemic_fixes=33, verification_pending=11, ratio=24.79, trend=flat.
 **Tier end-of-iter:** 3->1 (consecutive_clean=0 -- approval_request in flight + Check 5 MISSING non-nominal per spec).
+
+## Iteration ~1647 — 2026-06-13 12:31Z UTC (interactive, /cycle, Tier 1, consecutive_clean 1→2)
+
+**Trigger:** Larry direct invocation via `/cycle`.
+
+**Health:** ✅ Green. 9/9 services active. 0 open PRs. 0 new alerts. Beacon catalog-drift: OLD PID 2438147 confirmed dead; NEW PID 2440729 active (started 12:26Z UTC, ~3 min in-flight at cycle start). iter_clean.
+
+**VERIFY-BEFORE-REASSERT (iter ~1646 watch items):**
+- catalog-drift Beacon in-flight: **VERIFIED + PID CHANGE** — PID 2438147 (iter ~1646) is no longer running; new session PID 2440729 started 12:26Z UTC. Inbox approval `larry-approval-a9b77b7c2e4d07ac9c2c92c0bb11e7517362b4b7.json` still present (mtime=06:16 MDT). Beacon is continuing the catalog-drift-facts-sync-001 work in a new session. [watch]
+- unreviewed-merge:489: **CONFIRMED OPEN** — no new Larry reply. Last bot log 06:18:12 MDT. [carry]
+- beacon-pending-approvals.json 3 entries: **RE-VERIFIED** — 2 stale (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001) + 1 active (catalog-drift-facts-sync-001 — Beacon new session in-flight). [carry]
+- G-rule sync-blocked:uncommitted-changes 1/3: **RE-VERIFIED** — agents/pulse/.claude/settings.json still uncommitted. Same single pre-existing occurrence. Not incrementing. [carry]
+- PRIME DIRECTIVE ratio=24.235 (script-authoritative). [confirmed]
+
+**Check 0 — Alert triage:** larry-alerts.jsonl=951 lines, watermark=951 (`alert-triage-watermark.json` confirmed). **0 new alerts.** ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last inbound message at 06:16:27 MDT (Larry retry directive). Last bot response at 06:18:12 MDT (Beacon → Larry re: catalog-drift). No new messages. Beacon new session (PID 2440729) active — continuity of catalog-drift-facts-sync-001. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall dry-run → "no stalls detected". 5 FORGE_NO_PR_SKIPs (PRs #485, #53, #486, #487, #488 all exist). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 3 entries — 2 stale (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001; G-rule DISPATCHED iter ~1623) + 1 active (catalog-drift-facts-sync-001 — Beacon new session in-flight). No Pulse action needed. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry. G-rule dispatched ~iter 1416. ✅ Known carry.
+
+**Check A — Source repo:** On main. M agents/pulse/.claude/settings.json (pre-existing uncommitted from iter ~1625). HEAD=51b1506=origin/main (up to date; wrapper committed iter ~1646 journal). ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: last_sync=2026-06-13T11:57:08Z status=error ("Uncommitted changes in working tree"), blocked by known settings.json. G-rule sync-blocked:uncommitted-changes: same single pre-existing occurrence, not incrementing. ✅ Nominal (triaged).
+
+**Check C — Agent liveness:** 9/9 active (ourliberty-beacon-bot + ourliberty-forge-bot + ourliberty-mirror-bot + ourliberty-pulse-bot + ourliberty-chain-event-shipper + ourliberty-inbox-watcher + ourliberty-outbox-notifier + ourliberty-dashboard-api + ourliberty-cycle.service [current]). ourliberty-pulse-check-iv.timer active (waiting, next fire Mon 2026-06-15 04:26:45 MDT). ourliberty-agent-core-health.service failed (known: uncommitted settings.json). ✅ Nominal (known cause).
+
+**Check D — Inboxes:** Beacon inbox: `larry-approval-a9b77b7c2e4d07ac9c2c92c0bb11e7517362b4b7.json` (mtime=06:16 MDT, Beacon new session processing). Forge/mirror/pulse inboxes empty. ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on agent-core. 0 open PRs on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Saturday 2026-06-13 UTC):** Check I gates Sunday UTC; skip. Check III gates Sunday + 14d cadence; skip.
+
+**Rotations:** 0 credentials in 60-day window. ✅ Nominal.
+
+**Actions taken:**
+1. Alert triage: watermark=951 confirmed via `alert-triage-watermark.json`; 0 new alerts. ✅
+2. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` → logged at 12:31:31Z. ✅
+3. `cycle_tier_state.py record --checks-clean true` → consecutive_clean 1→2. ✅
+4. MEMORY.md updated. ✅
+
+**Standing findings (updated):**
+- [yellow] **catalog-drift → BEACON ACTIVE (new session)** — PID 2440729 in-flight (started 12:26Z UTC). Old PID 2438147 died after iter ~1646. Inbox approval still present. [watch Beacon for dispatch result]
+- [yellow] unreviewed-merge:489 — DM sent iter ~1614; no Larry reply. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] Tier-2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- [blue] G-rule heal-stale-approvals-not-gc-merged-prs — DISPATCHED (iter ~1623). 2 stale entries self-clear after GC-fix PR. [watch Forge]
+- [blue] RESOLVED: pulse-check-iv — timer active, next fire Mon 2026-06-15 04:26:45 MDT. [monitoring]
+- [blue] G-rule sync-blocked:uncommitted-changes — 1/3. [carry]
+- [blue] G-rule timer-cycle-no-journal-entry — 1/3. [carry]
+- [blue] G-rule source=pulse-cycle-self-report — 2/3. At 3/3 dispatch Beacon to add source=pulse-cycle to alert-translations.json allowlist. [carry]
+- [blue] G-rule heal-stale-daemon-code-auto-restart-needs-template — 1/3. [carry]
+- [blue] G-rule catalog-accuracy-drift — DISPATCHED (3/3, iter ~1637). Beacon new session handling. [watch]
+- [blue] G-rule approval_request-delivery-confirmation — 1/3. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. G-rule dispatched ~iter 1416. [carry]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR. [carry]
+- [blue] dag-preflight-revision gap — PR #484 closed source=pulse gap; DAG re-dispatch markers still fall through. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED. [carry]
+- [blue] G-rule droplet-uncommitted:main — 1/3 (same occurrence). [carry]
+- [blue] G-rule F24-empty-prompt-envelope-rejected — 1/3. [carry]
+
+**PRIME DIRECTIVE:** 0 interventions this iter (iter_clean). Trailing-30d (script-authoritative): interventions=824, systemic_fixes=34, verification_pending=11, ratio=24.235, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=2.
+
+---
