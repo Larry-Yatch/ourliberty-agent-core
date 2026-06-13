@@ -22,7 +22,7 @@
       "inbox_model": "claude-opus-4-8",
       "fallback_model": "claude-sonnet-4-6",
       "worktree_enabled": true,
-      "allowed_repos": ["ourliberty-agent-core", "ourliberty-dashboard"],
+      "allowed_repos": ["ourliberty-agent-core", "ourliberty-dashboard", "ourliberty-graph"],
       "note": "Sonnet for chat / routine implementation. Opus for hard tasks (architecture, debugging, security review). Forge can self-escalate to Opus mid-task by setting model in the inbox handshake. worktree_enabled: dispatches go into /tmp/wt-forge-<task_id>/ via worktree_manager; allowed_repos gates target_repo on inbox writes."
     },
     "mirror": {
@@ -32,7 +32,7 @@
       "inbox_model": "claude-opus-4-8",
       "fallback_model": "claude-sonnet-4-6",
       "worktree_enabled": true,
-      "allowed_repos": ["ourliberty-agent-core", "ourliberty-dashboard"],
+      "allowed_repos": ["ourliberty-agent-core", "ourliberty-dashboard", "ourliberty-graph"],
       "note": "Opus for actual reviews. Sonnet acceptable for chat / status queries. worktree_enabled: review dispatches go into a per-task worktree (~/agent-worktrees/wt-mirror-<task_id>/) so Mirror can gh pr checkout the branch and run tests against the PR. allowed_repos gates target_repo on inbox writes (same shape as Forge)."
     },
     "pulse": {
@@ -117,7 +117,8 @@
   },
   "repo_paths": {
     "ourliberty-agent-core": "/home/larry/agent-core",
-    "ourliberty-dashboard": "/home/larry/ourliberty-dashboard"
+    "ourliberty-dashboard": "/home/larry/ourliberty-dashboard",
+    "ourliberty-graph": "/home/larry/ourliberty-graph"
   },
   "_history": [
     {
@@ -198,6 +199,11 @@
       "date": "2026-06-11",
       "change": "fix-auto-merge-freshness-revalidation: add auto_merge_queue.revalidate_regression_on_release=true + release_regression_timeout_per_sha_s=600. When a HELD auto-merge is released (its overlapping blocker merged, so main moved under the pre-hold approval), outbox_notifier now re-validates against CURRENT main before firing — re-confirm mergeable, and (only when the base actually moved since approval) re-run the regression gate (test_regression_check.py). A regressing/conflicting/unverifiable PR is held, NOT merged, and Larry is DMed to re-review/rebase. Motivated by the 2026-06-11 PR #455 incident: passed Mirror review, held ~6h behind #454, auto-fired 11s after #454 merged on its ~6h-stale approval, landing a +13-test regression (HOME-swap bootstrap hid ~/.local user-site, broke import fastapi) that mergeable=CLEAN never catches. revalidate_regression_on_release is the gate (leave true; false is an emergency escape hatch — the cheap mergeable re-confirm still runs); release_regression_timeout_per_sha_s bounds the inline regression shell-out so a hung suite can't wedge the notifier poll loop (timeout fails closed = held). Read via _load_revalidate_regression_on_release_from_config / _load_release_regression_timeout_per_sha_s_from_config.",
       "author": "Claude (via Larry's session)"
+    },
+    {
+      "date": "2026-06-13",
+      "change": "Add ourliberty-graph to forge+mirror allowed_repos AND to repo_paths (-> /home/larry/ourliberty-graph). Commit 52115d0's message claimed this allowlist change but the merge carried only the dashboard-api refactor, so the config was never actually updated; this blocked catalog-drift-facts-sync-001 dispatch 4+ times (routing_validator.check_target_repo rejected the unlisted target_repo). repo_paths also needed the entry: inbox_watcher.py refuses a worktree dispatch when _load_repo_paths().get(target_repo) is None, so the allowlist fix alone would have failed at worktree creation (the 2nd latent blocker).",
+      "author": "Beacon (direction-ask)"
     }
   ]
 }
