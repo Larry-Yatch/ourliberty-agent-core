@@ -36,6 +36,12 @@
 
 ---
 
+## Status snapshot — updated 2026-06-13 13:12Z UTC (Iter ~1652, interactive /cycle, Tier 1, PR #490 OPEN Mirror reviewing)
+
+**Iter ~1652 summary:** Alert watermark: 953→956 (3 alerts re-triaged: L954/L955/L956 — same alerts journaled in iter ~1651 but watermark not advanced by that session). Tier 1, consecutive_clean=0 (L956 Tier-4 re-triage tier-reset). PRIME DIRECTIVE: interventions=829, systemic_fixes=34, verification_pending=11, ratio≈24.38, trend=flat. **KEY POSITIVE:** PR #490 "feat: source-level wildcard silence for pulse-cycle self-echoes in Check 0 triage" OPEN, MERGEABLE, created 13:03:59Z; Mirror reviewing (review-pulse-cycle-self-echo-silence-001.json in mirror inbox). **KEY STATE:** 9/9 services active. Beacon/Forge/Pulse inboxes empty. Mirror inbox: PR #490 review. beacon-pending-approvals.json: 3 entries (2 stale + catalog-drift-facts-sync-001 active 0 reminders; unreg-approval-01d93b417026 CONFIRMED GONE). Sync blocked (uncommitted settings.json). **WATERMARK NOTE:** iter ~1651 journaled watermark advance to 956 but script still showed 953; advanced to 956 this iter. G-rules approval_request-delivery-confirmation 2/3 + sync-blocked:uncommitted-changes 2/3 NOT re-advanced (same alerts). **CARRY:** unreviewed-merge:489 [yellow], Tier-2 weekly probe auth_401, Check III `approve threshold-update-2026-06-11`, catalog-drift-facts-sync-001 approval path unclear (unreg-approval gone; monitor), G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 1/3, G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. **Tier:** Tier 1, consecutive_clean=0.
+
+---
+
 ## Status snapshot — updated 2026-06-13 13:05Z UTC (Iter ~1651, interactive /cycle, Tier 1, Forge building pulse-cycle-silence fix)
 
 **Iter ~1651 summary:** Alert watermark: 956 (3 new: L954 approval_request delivery Tier-3, L955 sync-blocked Tier-3, L956 source=pulse-cycle self-echo Tier-4 tier-reset). Tier 1, consecutive_clean=0. PRIME DIRECTIVE (pre-iter script): interventions=827, systemic_fixes=34, verification_pending=11, ratio≈24.32, trend=flat. **KEY POSITIVE:** Larry approved pulse-cycle-self-echo-silence-001 "go" at 06:56:25 MDT → Forge built (inbox picked up this iter). **KEY CHANGE:** beacon-pending-approvals.json now 3 entries (unreg-approval-01d93b417026 GONE — was 4 at iter ~1650; reason unclear; catalog-drift-facts-sync-001 still pending reminders=0; approval path may need re-registration). G-rule approval_request-delivery-confirmation 1/3→2/3. G-rule sync-blocked:uncommitted-changes 1/3→2/3. **CARRY:** unreviewed-merge:489 [yellow], Tier-2 weekly probe auth_401, Check III proposals `approve threshold-update-2026-06-11`, G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 1/3, G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, G-rule heal-stale-approvals-not-gc-merged-prs DISPATCHED, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. **Tier:** Tier 1, consecutive_clean=0.
@@ -229,7 +235,7 @@
 | Item | Status | Action needed |
 |---|---|---|
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | No Larry reply yet; reply 'go: retroactive-review-489' if Mirror review wanted |
-| source=pulse-cycle-self-report | **BUILDING** — Larry approved "go" at 06:56:25 MDT; Forge building pulse-cycle-self-echo-silence-001; inbox picked up iter ~1651 | Watch Forge for PR |
+| source=pulse-cycle-self-report | **PR #490 OPEN** — "feat: source-level wildcard silence for pulse-cycle self-echoes in Check 0 triage"; MERGEABLE, created 13:03:59Z UTC; Mirror reviewing (review task in mirror inbox iter ~1652) | Watch Mirror for REVIEW_PASS + auto-merge |
 | beacon-pending-approvals.json (#482+#484) | **G-rule DISPATCHED** (3/3) — 2 entries still present; iter ~1622 "RESOLVED" was false. Beacon direction-ask written iter ~1623. | Watch Beacon for spec |
 | wire-pulse-check-iv-cadence-001 | **RESOLVED** — PR #488 merged 22:46Z; drift-healer installed service+timer 06:00Z UTC June 13; timer active, next fire Mon 2026-06-15 04:26:45 MDT | heartbeat still stale (mtime=18:26Z June 12) until first timer run |
 | Tier-2 weekly probe auth_401 | Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
@@ -247,7 +253,7 @@
 | F24-empty-prompt-envelope-rejected | G-rule 1/3 | Watch |
 | heal-stale-daemon-code-auto-restart-needs-template | G-rule 1/3 | At 3/3 dispatch Beacon: add translation template to alert-translations.json |
 | heal-stale-approvals-not-gc-merged-prs | **DISPATCHED** (3/3, iter ~1623) | Watch Forge for PR; entries self-clear after merge |
-| sync-blocked:uncommitted-changes | G-rule 1/3 | Watch |
+| sync-blocked:uncommitted-changes | G-rule 2/3 (iter ~1651/~1652 re-triage) | At 3/3 dispatch Beacon for allowlist entry |
 | bughunt-gate-soak Phase 2 | Pending Larry | Yellow carry |
 | health-check-notify-script-missing | G-rule 3/3 | No Forge PR found; stale |
 | Check IX GITHUB_TOKEN missing | Pending | Monday check |

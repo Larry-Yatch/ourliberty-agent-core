@@ -4,6 +4,86 @@
 
 ---
 
+## Iteration ~1652 — 2026-06-13 13:11Z UTC (interactive, /cycle, Tier 1, PR #490 open/Mirror reviewing, watermark re-sync)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Signal (L956 Tier-4 re-triage). 9/9 services active. 1 open PR (#490 in Mirror review). POSITIVE: PR #490 "feat: source-level wildcard silence for pulse-cycle self-echoes in Check 0 triage" OPEN and MERGEABLE — Forge built pulse-cycle-self-echo-silence-001; Mirror reviewing (task in mirror inbox since ~13:04Z).
+
+**VERIFY-BEFORE-REASSERT (iter ~1651 watch items):**
+- source-pulse-cycle-alert-translation-001 in Beacon inbox: **RESOLVED** — Beacon dispatched to Forge; PR #490 opened at 13:03:59Z, MERGEABLE; Mirror review task in mirror inbox. [ACTIVE → watch Mirror for REVIEW_PASS + auto-merge]
+- unreg-approval-01d93b417026: **CONFIRMED GONE** — beacon-pending-approvals.json has 3 entries (not 4). catalog-drift-facts-sync-001 still pending with 0 reminders. Approval path unclear (entry GC'd or approved silently). [carry]
+- unreviewed-merge:489: **CONFIRMED OPEN** — no Larry reply. [carry]
+- G-rule sync-blocked:uncommitted-changes 2/3: **CARRY** — L955 re-triaged (same alert; watermark not advanced from iter ~1651); G-rule NOT incremented again for same alert.
+- G-rule approval_request-delivery-confirmation 2/3: **CARRY** — L954 re-triaged (same alert; watermark not advanced); G-rule NOT incremented again.
+
+**Check 0 — Alert triage:** larry-alerts.jsonl=956 lines, watermark was 953 (non-advance from iter ~1651). **3 alerts re-triaged (L954, L955, L956 — same alerts journaled in iter ~1651 but watermark not advanced by that session).**
+- L954 (12:55:29Z, source=outbox-notifier, kind=approval_request, approval_id=pulse-cycle-self-echo-silence-001): same alert as iter ~1651. Delivery confirmation — Larry said "go" at 06:56:25 MDT; Forge built PR #490. → **Tier-4** (approval_request delivery confirm; no registry template yet — PR #490 is the fix). No DM. G-rule approval_request-delivery-confirmation stays 2/3 (same alert already counted). Watermark 953→954. ✅
+- L955 (12:57:19Z, source=sync.service, subject=sync-blocked:uncommitted-changes): same alert as iter ~1651. → **Tier-3 silence** (known-pattern match). No DM. G-rule sync-blocked:uncommitted-changes stays 2/3 (same alert already counted). Watermark 954→955. ✅
+- L956 (12:57:48Z, source=pulse-cycle, subject=unreg-approval-catalog-drift-new-pending): same alert as iter ~1651. Source=pulse-cycle, no registry template yet. Content stale (unreg-approval-01d93b417026 now gone from pending). → **Tier-4** (novel; PR #490 addresses root cause). No DM (stale content; underlying approval gone). **Tier-reset.** Watermark 955→956. ⚠️
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot log last entry 07:00:59 MDT (L955 delivered). Larry's last message: "go" at 06:56:25 MDT (approved pulse-cycle-self-echo-silence-001). No new Larry directives since. No orphaned directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall dry-run → "no stalls detected". 5 FORGE_NO_PR_SKIPs (known: #485, #53, #486, #487, #488). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **3 entries**:
+- fix-alert-triage-watermark-durability-001: pending, reminders=[6, 24], stale [carry]
+- fix-depth1-pulse-approval-extraction-001: pending, reminders=[6, 24], stale [carry]
+- catalog-drift-facts-sync-001: pending, reminders=[], active — unreg-approval-01d93b417026 CONFIRMED GONE; approval path may need re-registration. [carry]
+✅ Nominal (triaged).
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry. ✅ Known carry.
+
+**Check A — Source repo:** On main. M agents/pulse/.claude/settings.json (pre-existing uncommitted iter ~1625). HEAD=8b70585=origin/main (0 behind, 0 ahead). ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: last_sync=2026-06-13T12:57:19Z status=error ("Uncommitted modifications"), same root cause (settings.json). ✅ Nominal (triaged).
+
+**Check C — Agent liveness:** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, chain-event-shipper, inbox-watcher, outbox-notifier, dashboard-api, cycle.service = **9/9 active**. ourliberty-agent-core-health.service FAILED (known: uncommitted settings.json). ourliberty-sync.service FAILED (known: uncommitted settings.json). ourliberty-pulse-check-iv.timer active. ✅ Nominal.
+
+**Check D — Inboxes:** Mirror: `review-pulse-cycle-self-echo-silence-001.json` (Mirror reviewing PR #490). All other inboxes (beacon, forge, pulse) empty. ✅ Nominal.
+
+**Check E — PRs:** PR #490 "feat: source-level wildcard silence for pulse-cycle self-echoes in Check 0 triage" OPEN on ourliberty-agent-core, MERGEABLE, created 13:03:59Z (~7 min old). Mirror reviewing. Not stale (< 30 min). 0 open PRs on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Saturday 2026-06-13 UTC):** Check I gates Sunday UTC; skip. Check III gates Sunday + 14d cadence; skip.
+
+**Actions taken:**
+1. Alert triage L954: Tier-4 (approval_request delivery confirm; same alert as iter ~1651). No DM. Watermark 953→954. ✅
+2. Alert triage L955: Tier-3 silence (sync-blocked known-pattern; same alert). No DM. Watermark 954→955. ✅
+3. Alert triage L956: Tier-4 (source=pulse-cycle, stale content). No DM. Tier-reset. Watermark 955→956. ✅
+4. `alert_triage_state.py set-watermark --line 956` → watermark advanced to 956. ✅
+5. `cycle_prime_ledger.py append --tier 1 --kind intervention --template l956-pulse-cycle-tier4-retriage` → logged 13:12:11Z. ✅
+6. `cycle_tier_state.py record --checks-clean false` → Tier 1, consecutive_clean=0, last_signal_at=13:11:59Z. ✅
+7. MEMORY.md updated. ✅
+
+**Standing findings (updated):**
+- [blue] **POSITIVE: PR #490 OPEN** — Forge built pulse-cycle-self-echo-silence-001; Mirror reviewing. Watch for REVIEW_PASS + auto-merge. [active]
+- [yellow] catalog-drift-facts-sync-001 — approval path unclear (unreg-approval-01d93b417026 gone, catalog-drift pending 0 reminders, no Forge task). Monitor; if still unresolved next iter, re-escalate. [carry]
+- [yellow] unreviewed-merge:489 — DM sent iter ~1614; no Larry reply. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] Tier-2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention. [carry]
+- [blue] G-rule approval_request-delivery-confirmation — **2/3** (same iter ~1651 alert; not re-advanced). At 3/3 dispatch Beacon for allowlist entry. [carry]
+- [blue] G-rule sync-blocked:uncommitted-changes — **2/3** (same iter ~1651 alert; not re-advanced). At 3/3 dispatch Beacon. [carry]
+- [blue] G-rule heal-stale-approvals-not-gc-merged-prs — DISPATCHED (iter ~1623). 2 stale entries self-clear after GC-fix PR merges. [watch Forge]
+- [blue] RESOLVED: pulse-check-iv — timer active, next fire Mon 2026-06-15. [monitoring]
+- [blue] G-rule timer-cycle-no-journal-entry — 1/3. [carry]
+- [blue] G-rule heal-stale-daemon-code-auto-restart-needs-template — 1/3. [carry]
+- [blue] G-rule catalog-accuracy-drift — DISPATCHED (3/3, iter ~1637). PR #490 addresses root cause for self-echo noise. [watch Mirror]
+- [blue] G-rule droplet-uncommitted:main — 1/3. [carry]
+- [blue] G-rule F24-empty-prompt-envelope-rejected — 1/3. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. [carry]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR. [carry]
+- [blue] dag-preflight-revision gap — PR #484 closed source=pulse gap; DAG markers still fall through. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED. [carry]
+- CLOSED: agent-models-allowlist-not-on-main (e427631). [closed]
+- CLOSED: source=pulse-cycle-self-report G-rule → PR #490 OPEN. [active/building]
+
+**PRIME DIRECTIVE:** 1 intervention row this iter (l956-pulse-cycle-tier4-retriage). interventions=829, systemic_fixes=34, verification_pending=11, ratio≈24.38, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0 (L956 Tier-4 re-triage tier-reset).
+
+---
+
 ## Iteration ~1651 — 2026-06-13 13:05Z UTC (interactive, /cycle, Tier 1, Larry approved pulse-cycle-silence fix, Forge building)
 
 **Trigger:** Larry direct invocation (`/cycle`).
