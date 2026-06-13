@@ -36,9 +36,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-13 00:47Z UTC (Iter ~1619, interactive /cycle, Tier 2 consecutive_clean 1→2)
+## Status snapshot — updated 2026-06-13 01:04Z UTC (Iter ~1620, interactive /cycle, Tier 2→3 promoted, consecutive_clean 2→3)
 
-**Iter ~1619 summary:** Alert watermark: L1145 (1 new: dispatch-branch-cleanup:summary route=digest, Tier-3 silence). Tier 2, consecutive_clean 1→2. PRIME DIRECTIVE (script-authoritative): interventions=820, systemic_fixes=33, verification_pending=11, ratio=24.85, trend=flat. **KEY STATE:** 9/9 services active. 0 open PRs. All inboxes empty. Sync: last_sync=23:56:13Z, no-change, commit=aac2abb. beacon-pending-approvals.json: **0 entries (RESOLVED)**—healer GC'd fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001 since iter ~1618. pulse-check-iv.service+timer inactive; heartbeat MISSING (expected; drift-healer fires Sat 06:00Z UTC ~5h away). **CARRY:** unreviewed-merge:489 [yellow] DM sent iter ~1614, no Larry reply. Tier-2 weekly probe auth_401, Check III proposals `approve threshold-update-2026-06-11`, G-rule pulse-check-iv-no-heartbeat 3/3 (drift-healer fires Sat 06:00Z TODAY), G-rule timer-cycle-no-journal-entry 1/3, G-rule source=pulse-cycle-self-report 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 1/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED, catalog-accuracy-drift G-rule 2/3. **Tier:** Tier 2, consecutive_clean=2.
+**Iter ~1620 summary:** Alert watermark: L1145 (1 new: dispatch-branch-cleanup:summary route=digest, Tier-3 silence). Tier 2→3 PROMOTED (consecutive_clean 2→3). PRIME DIRECTIVE (script-authoritative): interventions=820, systemic_fixes=33, verification_pending=11, ratio=24.85, trend=flat. **KEY STATE:** 9/9 services active. 0 open PRs. All inboxes empty. Sync: last_sync=00:56:15Z, no-change, commit=eee4dda. beacon-pending-approvals.json: **2 stale entries STILL PRESENT** (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001; PRs #482+#484 merged 19h ago). heal-stale-approvals runs regularly but is NOT clearing these. **CORRECTION:** iter ~1619 "RESOLVED/0 entries" claim was false (same false claim as iter ~1617). **NEW G-RULE:** heal-stale-approvals-not-gc-merged-prs 1/3. pulse-check-iv.service+timer inactive; heartbeat MISSING (expected; drift-healer fires Sat 06:00Z UTC ~5h away). **CARRY:** unreviewed-merge:489 [yellow] DM sent iter ~1614, no Larry reply. Tier-2 weekly probe auth_401, Check III proposals `approve threshold-update-2026-06-11`, G-rule pulse-check-iv-no-heartbeat 3/3 (drift-healer fires Sat 06:00Z TODAY), G-rule timer-cycle-no-journal-entry 1/3, G-rule source=pulse-cycle-self-report 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 1/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED, catalog-accuracy-drift G-rule 2/3. **Tier:** Tier 3, consecutive_clean=0.
 
 ---
 
@@ -114,7 +114,7 @@
 |---|---|---|
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | No Larry reply yet; reply 'go: retroactive-review-489' if Mirror review wanted |
 | source=pulse-cycle-self-report | G-rule 1/3 | At 3/3 dispatch Beacon: add source=pulse-cycle allowlist to alert-translations.json |
-| beacon-pending-approvals.json (#482+#484) | **RESOLVED** — 0 entries (GC'd by healer after iter ~1618) ✅ | Closed |
+| beacon-pending-approvals.json (#482+#484) | **STILL PRESENT** — 2 stale entries for merged PRs. heal-stale-approvals running but not GC'ing. G-rule 1/3. | Watch; new G-rule heal-stale-approvals-not-gc-merged-prs |
 | wire-pulse-check-iv-cadence-001 | **RESOLVED** — PR #488 merged 22:46Z | drift-healer will install timer Sat 06:00Z |
 | Tier-2 weekly probe auth_401 | Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | Pending Larry | `approve threshold-update-2026-06-11` |
@@ -128,6 +128,7 @@
 | catalog-accuracy-drift | G-rule 2/3 | Watch; at 3/3 dispatch Beacon |
 | F24-empty-prompt-envelope-rejected | G-rule 1/3 | Watch |
 | heal-stale-daemon-code-auto-restart-needs-template | G-rule 1/3 | At 3/3 dispatch Beacon: add translation template to alert-translations.json |
+| heal-stale-approvals-not-gc-merged-prs | G-rule 1/3 | At 3/3 dispatch Beacon: heal-stale-approvals not GC'ing merged-PR entries in beacon-pending-approvals.json |
 | sync-blocked:uncommitted-changes | G-rule 1/3 | Watch |
 | bughunt-gate-soak Phase 2 | Pending Larry | Yellow carry |
 | health-check-notify-script-missing | G-rule 3/3 | No Forge PR found; stale |
