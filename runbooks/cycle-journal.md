@@ -4,6 +4,81 @@
 
 ---
 
+## Iteration ~1673 — 2026-06-13 19:44Z UTC (interactive, /cycle, Tier 3, consecutive_clean 0→1)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. All checks nominal. 1 new alert (L969, Tier-3 silence). No new interventions. **KEY POSITIVE: catalog-drift-facts-sync-001 chain now active** — RWP fix (b8fe3be) landed post-~1672, services restarted, Larry sent 'Go' at 13:27 MDT, Forge built ourliberty-graph PR #1, Mirror reviewing.
+
+**VERIFY-BEFORE-REASSERT (iter ~1672 carries):**
+- catalog-drift-facts-sync-001 stuck: **RESOLVED/IN-PROGRESS** — b8fe3be "systemd: add ourliberty-graph to RWP on inbox-watcher, outbox-notifier, cleanup-dispatch-branches" landed. inbox_watcher (→PID 2530123) and outbox_notifier (→PID 2530124) restarted. Larry sent 'Go' at 13:27 MDT after confirming "Should be all set now" at 13:26 MDT. Forge built ourliberty-graph PR #1: "feat(pipeline): deterministic on-droplet facts-sync for catalog dependents-drift" (OPEN). Mirror picked up review task; inbox cleared (Mirror processing). Dead-letters in forge/.invalid/ are from pre-fix failures — not new. ✅ ACTIVELY RESOLVING.
+- unreviewed-merge:489: **CARRY** — no new Larry reply.
+- ourliberty-cycle.timer auto-healed (L967): **CARRY** [blue] — cannot verify from interactive session.
+
+**Check 0 — Alert triage:** Watermark was 968. Total lines=969. 1 new alert: L969 (ts=19:32:21Z, source=dispatch-branch-cleanup, route=digest, subject=summary). Triaged → **Tier 3** (known-pattern match in alert-translations.json). Watermark advanced to 969. ✅ Nominal.
+
+**Check 1 — Log noise:** journalctl not accessible from interactive session (known limitation). ✅
+
+**Check 2 — Telegram sweep:** Post-~1672 Larry messages:
+- 13:07:32 MDT: "Are there any other changes that need to be made for this to work? Be thorough" → Beacon responded; Larry confirmed "Should be all set now" at 13:26 MDT. ✅ Tracked.
+- 13:27:13 MDT: "Go" → triggered catalog-drift retry → Forge built PR #1 → Mirror reviewing. ✅ Tracked.
+No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → no stalls. 4 FORGE_NO_PR_SKIPs (#488/#490/#491/#492 — all known, closed). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 3 entries.
+- fix-alert-triage-watermark-durability-001 (2026-06-12T06:03Z) — stale carry.
+- fix-depth1-pulse-approval-extraction-001 (2026-06-12T06:05Z) — stale carry.
+- catalog-drift-facts-sync-001 (2026-06-13T19:26:54Z) — NEW post-RWP-fix approval_request; PR #1 in-flight on ourliberty-graph. ✅ Actively resolving.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING. Known [blue] carry. ✅
+
+**Check A — Source repo:** On main. Working tree CLEAN. HEAD=b8fe3be=origin/main (new commit since ~1672: RWP fix). 0 ahead, 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-13T18:58:15Z (~45 min at check time). Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 5/5 persistent daemons active.
+- beacon_telegram_bot: PID 2517973 ✅
+- chain_event_shipper: PID 1849505 ✅
+- outbox_notifier: PID 2530124 (restarted post-RWP fix, was 2116613) ✅
+- dashboard_api: PID 2322792 ✅
+- inbox_watcher: PID 2530123 (restarted post-RWP fix, was 2514958) ✅
+
+**Check D — Inboxes:** beacon/forge/mirror/pulse: all empty. forge/.invalid/ holds 2 pre-fix dead-letters — known artifacts. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open PRs. ourliberty-graph: PR #1 OPEN (Mirror reviewing). ✅ Nominal.
+
+**Conditional checks (Saturday 2026-06-13 UTC):** Check I gates Mon/Wed/Fri/Sun — skip. Check III gates Sunday + 14d cadence — skip.
+
+**Actions taken:**
+1. `alert_triage_state.py triage-alert` L969 → Tier-3 silence (dispatch-branch-cleanup known-pattern). Watermark set to 969. ✅
+2. `cycle_prime_ledger.py append --tier 3 --kind iter_clean` → logged. ✅
+3. `cycle_tier_state.py record --checks-clean true` → Tier 3, consecutive_clean 0→1. ✅
+4. MEMORY.md updated. ✅
+
+**Dispatches:** None. (Chain progressing without Pulse intervention.)
+
+**Standing findings:**
+- [blue] **catalog-drift-facts-sync-001 resolving** — ourliberty-graph PR #1 OPEN, Mirror reviewing. New approval_request at 19:26:54Z. [carry until merge]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614; no Larry reply. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **ourliberty-cycle.timer auto-healed** — L967 at 18:00:18Z Jun-13. Cannot verify NextElapseUSecRealtime from interactive session. [carry]
+- [blue] **beacon-pending-approvals stale entries** — fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001 (both Jun-12). G-rule dispatched ~1623. [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — 1/3. [carry]
+- [blue] **G-rule heal-stale-daemon-code-auto-restart-needs-template** — 1/3. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 1/3 (no recurrence). [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **Check 5 MISSING** — heal-stale-daemon-code-state.json absent. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — [carry]
+- [blue] **dag-preflight-revision gap** — [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+
+**PRIME DIRECTIVE:** 0 new interventions. 1 iter_clean appended. Script-authoritative: interventions=833, systemic_fixes=36, verification_pending=11, ratio=23.14, trend=flat.
+**Tier end-of-iter:** Tier 3, consecutive_clean 0→1.
+
+---
+
 ## Iteration ~1672 — 2026-06-13 19:09Z UTC (interactive, /cycle, Tier 2→3 de-escalation, consecutive_clean 2→3)
 
 **Trigger:** Larry direct invocation (`/cycle`).
