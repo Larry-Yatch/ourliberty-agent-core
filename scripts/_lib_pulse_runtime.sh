@@ -8,8 +8,11 @@
 # docs/sync-resilience-and-alert-translation-brief.md).
 #
 # Two machine-owned runtime classes, handled DIFFERENTLY by sync:
-#   - PULSE_RUNTIME_PATHS    — files Pulse rewrites every cycle. Sync may
-#                              auto-commit + push these (iter-98 resilience).
+#   - PULSE_RUNTIME_PATHS    — Pulse-owned files sync may auto-commit + push
+#                              (iter-98 resilience). Most are rewritten every
+#                              cycle; the exception is the .claude/settings.json
+#                              session config, which changes only on permission
+#                              grants — see the inline note on that entry.
 #   - SYNC_EXTRA_RUNTIME_PATHS — captures.json, whose SOLE committer is
 #                              heal_missions_card_gc.py. Sync must NOT commit it;
 #                              it only TOLERATES the dirt and proceeds to the
@@ -34,6 +37,11 @@ PULSE_RUNTIME_PATHS=(
     "runbooks/cycle-actions.jsonl"
     "agents/pulse/MEMORY.md"
     "agents/pulse/memory/"
+    # Pulse's interactive Claude Code session config (allow/deny tool perms).
+    # Unlike the entries above it is NOT rewritten every cycle — it only changes
+    # when new permissions are granted. Tracked here so sync auto-commits the
+    # grant instead of refusing-and-paging on otherwise-clean machine-owned dirt.
+    "agents/pulse/.claude/settings.json"
 )
 
 # Machine-owned runtime files that have their OWN designated committer, so sync

@@ -107,6 +107,12 @@ class _SyncResilienceBase(unittest.TestCase):
         (pulse_dir / 'MEMORY.md').write_text('seed memory\n')
         (pulse_dir / 'memory').mkdir()
         (pulse_dir / 'memory' / '.gitkeep').write_text('')
+        # Pulse's interactive Claude Code session config — a PULSE_RUNTIME_PATHS
+        # member. Seed it tracked so sync's atomic `git add -- <allowlist paths>`
+        # finds it; an absent path would abort the whole add and stage nothing.
+        claude_dir = pulse_dir / '.claude'
+        claude_dir.mkdir()
+        (claude_dir / 'settings.json').write_text('{"permissions": {}}\n')
         # Beacon captures.json: machine-owned missions-capture state, normally
         # committed by heal_missions_card_gc.py. Seed it tracked so a later
         # modification registers as tracked-modified (the sync-only extra in
