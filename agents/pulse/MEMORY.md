@@ -36,6 +36,12 @@
 
 ---
 
+## Status snapshot — updated 2026-06-13 13:33Z UTC (Iter ~1655, interactive /cycle, Tier 1→2 de-escalate, consecutive_clean 2→3→Tier 2)
+
+**Iter ~1655 summary:** Alert watermark: 957 (0 new). Tier 1→2 DE-ESCALATION (3rd consecutive clean iter). PRIME DIRECTIVE (script-authoritative): interventions=829, systemic_fixes=34, verification_pending=11, ratio=24.38, trend=flat. **KEY STATE:** 8/8 visible processes active (systemctl --user unavailable in interactive session). 0 open PRs. All inboxes empty. Sync: last_sync=12:57:19Z status=error (same uncommitted settings.json). beacon-pending-approvals.json: 3 entries (all 0 reminders; same carries). **CARRY:** unreviewed-merge:489 [yellow], Tier-2 weekly probe auth_401, Check III `approve threshold-update-2026-06-11`, G-rule approval_request-delivery-confirmation 2/3, G-rule sync-blocked:uncommitted-changes 2/3, G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 1/3, G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED, catalog-drift-facts-sync-001 approval path unclear. **Tier:** Tier 2, consecutive_clean=0.
+
+---
+
 ## Status snapshot — updated 2026-06-13 13:24Z UTC (Iter ~1654, interactive /cycle, Tier 1, consecutive_clean 1→2, clean)
 
 **Iter ~1654 summary:** Alert watermark: 957 (0 new). Tier 1, consecutive_clean=2 (clean). PRIME DIRECTIVE (script-authoritative): interventions=829, systemic_fixes=34, verification_pending=11, ratio=24.38, trend=flat. **KEY STATE:** 9/9 services active. 0 open PRs. All inboxes empty. Sync: last_sync=12:57:19Z status=error (same uncommitted settings.json). beacon-pending-approvals.json: 3 entries (all 0 reminders; fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001 + catalog-drift-facts-sync-001). **CARRY:** unreviewed-merge:489 [yellow], Tier-2 weekly probe auth_401, Check III `approve threshold-update-2026-06-11`, G-rule approval_request-delivery-confirmation 2/3, G-rule sync-blocked:uncommitted-changes 2/3, G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 1/3, G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED, catalog-drift-facts-sync-001 approval path unclear. **Tier:** Tier 1, consecutive_clean=2.
