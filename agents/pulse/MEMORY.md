@@ -36,6 +36,12 @@
 
 ---
 
+## Status snapshot — updated 2026-06-13 21:39Z UTC (Iter ~1682, interactive /cycle, Tier 1, consecutive_clean 2→0)
+
+**Iter ~1682 summary:** Alert watermark: 972→973 (L973 heal-stale-daemon-code auto-restarted outbox_notifier after PR #493 deploy at 21:33:43Z; Tier-4 novel, route=digest, beacon skipped DM, no Pulse DM). Tier 1, consecutive_clean 2→0 (tier-reset). PRIME DIRECTIVE (script-authoritative): interventions=836, systemic_fixes=37, verification_pending=11, ratio=22.59, trend=flat. **KEY: outbox_notifier PID changed** — old PID 2530124 → new PID 2552416 (auto-restarted, PR #493 code now live). 5/5 daemons all running. 0 open PRs. git: clean, HEAD=5fea98c=origin/main. Sync: last_sync=20:58:40Z (~41 min, nominal). **CARRY:** unreviewed-merge:489 [yellow], Tier-2 weekly probe auth_401, Check III `approve threshold-update-2026-06-11`, ourliberty-cycle.timer auto-healed L967 [blue], beacon-pending-approvals 2 stale Jun-12 + catalog-drift artifact (Jun-13), G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template **2/3** (dispatch at 3/3), G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. **Tier:** Tier 1, consecutive_clean=0.
+
+---
+
 ## Status snapshot — updated 2026-06-13 21:32Z UTC (Iter ~1681, interactive /cycle, Tier 1, consecutive_clean 1→2)
 
 **Iter ~1681 summary:** Alert watermark: 972 (0 new). Tier 1, consecutive_clean 1→2. PRIME DIRECTIVE (script-authoritative): interventions=835, systemic_fixes=37, verification_pending=11, ratio=22.57, trend=flat. All checks nominal. 5/5 daemons same PIDs. 0 open PRs (agent-core + ourliberty-graph). git: clean, HEAD=d96e98c=origin/main. Sync: last_sync=20:58:40Z (~34 min, nominal). **CARRY:** unreviewed-merge:489 [yellow], Tier-2 weekly probe auth_401, Check III `approve threshold-update-2026-06-11`, ourliberty-cycle.timer auto-healed L967 [blue], beacon-pending-approvals 2 stale Jun-12 + catalog-drift artifact (Jun-13), G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 1/3, G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. **Tier:** Tier 1, consecutive_clean=2. (1 more clean iter → de-escalate to Tier 2.)
