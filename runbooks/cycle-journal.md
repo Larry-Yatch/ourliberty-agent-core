@@ -4,6 +4,80 @@
 
 ---
 
+## Iteration ~1625 — 2026-06-13 03:57Z UTC (interactive, /cycle, Tier 3, consecutive_clean 4→5)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. 9/9 services active. 0 open PRs. All inboxes empty. 2 new alerts (L1148 + L1149, both Tier-3 silence). Tier 3, consecutive_clean 4→5.
+
+**Preamble — permissions allowlist:** Before checks ran, `fewer-permission-prompts` skill scanned recent transcripts and updated `.claude/settings.json` to add `Bash(journalctl *)`, `Bash(systemctl is-active *)`, `Bash(systemctl list-units *)`, `Bash(systemctl show *)`, `Bash(git -C *)`, `Bash(tmux ls *)`. This should eliminate most cycle permission prompts going forward.
+
+**VERIFY-BEFORE-REASSERT (iter ~1624 watch items):**
+- unreviewed-merge:489 [yellow] DM: **CONFIRMED OPEN** — beacon_telegram_bot.log last entry idx=1147 at 21:35:13 MDT (03:35Z UTC); no Larry reply since "pin to tier 2" at 17:03Z MDT June 12. [carry]
+- beacon-pending-approvals.json G-rule DISPATCHED: **CONFIRMED** — 2 stale entries still present (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001). Beacon root-cause confirmed + fix dispatched to Forge (inter-agent notify 04:46Z). Watch Forge for PR. [carry]
+- pulse-check-iv.heartbeat: **CONFIRMED EXISTS but stale** — flat path `~/agents/blackboard/pulse-check-iv.heartbeat`, mtime=18:26Z June 12 (~9.5h stale from iter start). Service known to systemd, inactive. drift-healer fires ~12:00Z UTC today. [carry — NOTE: earlier in this cycle I briefly checked wrong subdirectory path; flat path is correct]
+- G-rule timer-cycle-no-journal-entry 1/3: **CONFIRMED 1/3** — no new unjournaled fires. [carry]
+- G-rule source=pulse-cycle-self-report 1/3: **CONFIRMED 1/3** — no source=pulse-cycle alerts in window. [carry]
+- G-rule heal-stale-daemon-code-auto-restart-needs-template 1/3: **CONFIRMED 1/3** — no new occurrences. [carry]
+- PRIME DIRECTIVE ratio=24.85: **CONFIRMED** (script-authoritative). [confirmed]
+
+**Check 0 — Alert triage:** larry-alerts.jsonl=1149 lines. Watermark was 1147. 2 new alerts.
+- L1148 (dispatch-branch-cleanup, 03:30Z, route=digest, subject=summary): Tier-3 silence (known-pattern). No DM. ✅
+- L1149 (sync.service, 03:56Z, route=escalate→digest, subject=sync-blocked:uncommitted-changes): Tier-3 silence (known-pattern match in alert-translations.json; this occurrence is mid-cycle normal — active cycle had uncommitted journal/MEMORY writes). No DM. G-rule sync-blocked:uncommitted-changes: NOT incrementing (mid-cycle normal, not an inter-cycle drift occurrence). ✅
+- Watermark advanced 1147→1149. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot.log: last entry idx=1147 at 03:35Z UTC (route=digest, dispatch-branch-cleanup). No Larry messages since 17:03:30 MDT June 12 (23:03Z UTC). unreviewed-merge:489 DMs (idx=1140+1142) still unanswered. ✅ Nominal (carry items noted).
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall dry-run at 03:55Z: "no stalls detected". 14 FORGE_NO_PR_SKIPs (all pr_exists or preflight markers). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 2 stale entries (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001). G-rule heal-stale-approvals-not-gc-merged-prs already DISPATCHED (iter ~1623); Beacon confirmed + fix dispatched to Forge. No new action needed. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry. G-rule dispatched ~iter 1416. ✅ Known carry.
+
+**Check A — Source repo:** HEAD=c1242ee (Pulse cycle 20260613T032136Z). Working tree has uncommitted cycle files (in-progress, expected). fetch dry-run: no output (on-par with origin). ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json at cycle start: last_sync=02:56:16Z status=error ("Auto-commit push failed"). During cycle, new sync at 03:56:17Z status=error ("Uncommitted modifications" — expected mid-cycle state). Last successful sync=01:56:15Z. At cycle start (~03:55Z): ~2h elapsed from last success (borderline 2h threshold); triaged Tier-3 known-pattern. Self-heals on next tick after cycle commits. ✅ Nominal (triaged).
+
+**Check C — Agent liveness:** 9/9 active (beacon-bot, chain-event-shipper, cycle.service, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot). ourliberty-pulse-check-iv.service known to systemd, inactive (expected; drift-healer fires ~12:00Z UTC today). ✅ Nominal.
+
+**Check D — Inboxes:** All inboxes empty (forge=0, beacon=0, mirror=0, pulse=0). ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on agent-core. 0 open PRs on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Saturday 2026-06-13 UTC):** Check I: gates Sunday UTC; skip. Check III: gates Sunday + 14d cadence; skip.
+
+**Rotations:** 0 credentials in 60-day window. ✅ Nominal.
+
+**Actions taken:**
+1. Alert triage: L1148 Tier-3 silence, L1149 Tier-3 silence; watermark advanced 1147→1149. ✅
+2. `cycle_prime_ledger.py append --tier 3 --kind iter_clean` → logged at 03:57:43Z. ✅
+3. `cycle_tier_state.py record --checks-clean true` → consecutive_clean 4→5, Tier 3 unchanged. ✅
+4. Added permissions allowlist entries to `.claude/settings.json` (journalctl, systemctl, git -C, tmux ls). ✅
+5. MEMORY.md updated: status snapshot updated. ✅
+
+**Standing findings (updated):**
+- [yellow] unreviewed-merge:489 — DM sent iter ~1614; no Larry reply. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] Tier-2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- [blue] G-rule heal-stale-approvals-not-gc-merged-prs — **DISPATCHED** (iter ~1623). Beacon confirmed root cause + fix dispatched to Forge. 2 stale beacon-pending-approvals.json entries self-clear after PR merges. [watch Forge for PR]
+- [blue] pulse-check-iv — heartbeat stale (~9.5h, mtime=18:26Z June 12, flat path `~/agents/blackboard/pulse-check-iv.heartbeat`); service inactive; drift-healer fires ~12:00Z UTC today. [carry]
+- [blue] G-rule timer-cycle-no-journal-entry — 1/3. [carry]
+- [blue] G-rule source=pulse-cycle-self-report — 1/3. [carry]
+- [blue] G-rule heal-stale-daemon-code-auto-restart-needs-template — 1/3. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. G-rule dispatched ~iter 1416. [carry]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR. [carry]
+- [blue] dag-preflight-revision gap — PR #484 closed source=pulse gap; DAG re-dispatch markers still fall through. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED. [carry]
+- [blue] catalog-accuracy-drift — G-rule 2/3. [carry]
+- [blue] G-rule sync-blocked:uncommitted-changes — 1/3 (mid-cycle occurrence not counted; prior count maintained). [carry]
+
+**PRIME DIRECTIVE:** 0 intervention rows this iter (clean). Trailing-30d (script-authoritative): interventions=820, systemic_fixes=33, verification_pending=11, ratio=24.85, trend=flat.
+**Tier end-of-iter:** Tier 3, consecutive_clean=5.
+
+---
+
 ## Iteration ~1624 — 2026-06-13 03:19Z UTC (interactive, /cycle via /loop, Tier 3, consecutive_clean 3→4)
 
 **Trigger:** Larry direct invocation (`/cycle` via `/loop`).

@@ -36,6 +36,12 @@
 
 ---
 
+## Status snapshot — updated 2026-06-13 03:57Z UTC (Iter ~1625, interactive /cycle, Tier 3, consecutive_clean 4→5)
+
+**Iter ~1625 summary:** Alert watermark: L1149 (2 new: dispatch-branch-cleanup Tier-3 silence + sync-blocked:uncommitted-changes Tier-3 silence; latter is mid-cycle normal, G-rule not incremented). Tier 3, consecutive_clean 4→5. PRIME DIRECTIVE (script-authoritative): interventions=820, systemic_fixes=33, verification_pending=11, ratio=24.85, trend=flat. **KEY STATE:** 9/9 services active. 0 open PRs. All inboxes empty. Sync: last_sync=03:56:17Z status=error ("Uncommitted modifications" — mid-cycle normal); last successful sync=01:56:15Z (~2h at cycle start, triaged known-pattern). beacon-pending-approvals.json: **2 stale entries STILL PRESENT** (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001); G-rule heal-stale-approvals-not-gc-merged-prs DISPATCHED (iter ~1623); Beacon confirmed root cause + fix dispatched to Forge; entries self-clear after PR merges. **pulse-check-iv:** heartbeat EXISTS but stale (mtime=18:26Z June 12, ~9.5h at cycle start, flat path `~/agents/blackboard/pulse-check-iv.heartbeat`); service inactive; drift-healer fires ~12:00Z UTC today. **PERMISSIONS:** Added journalctl/systemctl/git-C/tmux-ls to `.claude/settings.json` allowlist this cycle. **CARRY:** unreviewed-merge:489 [yellow] DM sent iter ~1614, no Larry reply. Tier-2 weekly probe auth_401, Check III proposals `approve threshold-update-2026-06-11`, G-rule timer-cycle-no-journal-entry 1/3, G-rule source=pulse-cycle-self-report 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 1/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED, catalog-accuracy-drift G-rule 2/3. **Tier:** Tier 3, consecutive_clean=5.
+
+---
+
 ## Status snapshot — updated 2026-06-13 03:19Z UTC (Iter ~1624, interactive /cycle via /loop, Tier 3, consecutive_clean 3→4)
 
 **Iter ~1624 summary:** Alert watermark: L1147 (1 new: sync-service push-fail, Tier-3 silence). Tier 3, consecutive_clean 3→4. PRIME DIRECTIVE (script-authoritative): interventions=820, systemic_fixes=33, verification_pending=11, ratio=24.85, trend=flat. **KEY STATE:** 9/9 services active. 0 open PRs. All inboxes empty. Sync: last_sync=02:56:16Z status=error ("Auto-commit push failed; rolled back"); last successful sync=01:56:15Z (~83min ago, within 2h). beacon-pending-approvals.json: **2 stale entries STILL PRESENT** (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001); G-rule heal-stale-approvals-not-gc-merged-prs DISPATCHED (iter ~1623); Beacon confirmed root cause + dispatched fix to Forge (inter-agent notify at top of journal); entries self-clear after PR merges. **pulse-check-iv:** heartbeat EXISTS but stale (mtime=18:26Z June 12, ~15.5h); service inactive; drift-healer fires ~12:00Z UTC today. **CARRY:** unreviewed-merge:489 [yellow] DM sent iter ~1614, no Larry reply. Tier-2 weekly probe auth_401, Check III proposals `approve threshold-update-2026-06-11`, G-rule timer-cycle-no-journal-entry 1/3, G-rule source=pulse-cycle-self-report 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 1/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED, catalog-accuracy-drift G-rule 2/3. **Tier:** Tier 3, consecutive_clean=4.
@@ -104,24 +110,6 @@
 
 ---
 
-## Status snapshot — updated 2026-06-12 21:18Z UTC (Iter ~1609, interactive /cycle via /loop)
-
-**Iter ~1609 summary:** Alert watermark: L1137 (0 new). Tier 2, consecutive_clean 1→2. PRIME DIRECTIVE (script-authoritative): interventions=819, systemic_fixes=33, verification_pending=11, ratio=24.82, trend=flat. **KEY STATE:** 9/9 services active. 0 open PRs. All inboxes empty. Sync: last_sync=20:55:35Z, no-change, commit=b5d304c. beacon-pending-approvals.json (3 entries: 2 stale PRs #482+#484 healer will GC; 1 active wire-pulse-check-iv-cadence-001 pending Larry 'Go'). **CARRY:** wire-pulse-check-iv-cadence-001 approval DM delivered 20:05:38Z; pending Larry 'Go'. Check IV heartbeat absent (stale since 18:26Z). G-rule timer-cycle-no-journal-entry 1/3. **STANDING:** Tier-2 weekly probe auth_401, Check III proposals `approve threshold-update-2026-06-11` (2 high-attention), Check 5 MISSING (G-rule dispatched ~iter 1416), sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED, catalog-accuracy-drift G-rule 2/3. **Tier:** Tier 2, consecutive_clean=2.
-
----
-
-## Status snapshot — updated 2026-06-12 19:39Z UTC (Iter ~1603, /cycle)
-
-**Iter ~1603 summary:** Alert watermark: L1135 (2 new: dispatch-branch-cleanup:summary + missions-autoregister:summary, both digest). Tier 2, consecutive_clean=1→2. PRIME DIRECTIVE (script-authoritative): interventions=818, systemic_fixes=33, verification_pending=10, ratio=24.79, trend=flat. **KEY STATE:** 9/9 services active. 0 open PRs. All inboxes empty. Sync: last_sync=18:55:16Z, no-change, commit=105fb0c. beacon-pending-approvals.json present (2 stale entries for merged PRs #482+#484; healer will GC; v1 schema). pulse-check-iv.heartbeat present (mtime=18:26Z). **VERIFIED:** PR #485 MERGED 16:56:37Z; PR #487 (fix(alert-triage): intent fallback) MERGED 18:23:12Z. **STANDING:** Tier-2 weekly probe auth_401, Check III proposals `approve threshold-update-2026-06-11`, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED, catalog-accuracy-drift 2/3, pulse-check-iv-no-heartbeat 1/3. **Tier:** Tier 2, consecutive_clean=2.
-
----
-
-## Status snapshot — updated 2026-06-12 18:30Z UTC (Iter ~1576, /cycle)
-
-**Iter ~1576 summary:** Alert watermark: L1131 (no new). Tier 1, consecutive_clean=0. PRIME DIRECTIVE: interventions=819, systemic_fixes=33, ratio=24.79, trend=flat. **KEY STATE:** 9/9 active. 0 open PRs. All inboxes empty. Sync no-change. **MAJOR EVENT:** PR #487 (fix(alert-triage): intent fallback when subject=None) merged 18:23:12Z — resolves recurring outbox-notifier:review-pass Tier-4 misclassification arc. **NEW G-RULE:** pulse-check-iv-no-heartbeat 1/3. **STANDING:** Tier-2 weekly probe auth_401, Check III proposals `approve threshold-update-2026-06-11`, Check 5 MISSING (G-rule dispatched ~iter 1416), dag-preflight-revision gap. **Tier:** Tier 1, consecutive_clean=0.
-
----
-
 ## Key standing items (reference)
 
 | Item | Status | Action needed |
@@ -142,7 +130,7 @@
 | catalog-accuracy-drift | G-rule 2/3 | Watch; at 3/3 dispatch Beacon |
 | F24-empty-prompt-envelope-rejected | G-rule 1/3 | Watch |
 | heal-stale-daemon-code-auto-restart-needs-template | G-rule 1/3 | At 3/3 dispatch Beacon: add translation template to alert-translations.json |
-| heal-stale-approvals-not-gc-merged-prs | G-rule 1/3 | At 3/3 dispatch Beacon: heal-stale-approvals not GC'ing merged-PR entries in beacon-pending-approvals.json |
+| heal-stale-approvals-not-gc-merged-prs | **DISPATCHED** (3/3, iter ~1623) | Watch Forge for PR; entries self-clear after merge |
 | sync-blocked:uncommitted-changes | G-rule 1/3 | Watch |
 | bughunt-gate-soak Phase 2 | Pending Larry | Yellow carry |
 | health-check-notify-script-missing | G-rule 3/3 | No Forge PR found; stale |
