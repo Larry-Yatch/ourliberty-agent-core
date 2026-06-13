@@ -4,6 +4,91 @@
 
 ---
 
+## Iteration ~1658 — 2026-06-13 14:29Z UTC (interactive, /cycle, Tier 2→3 de-escalation)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. 5/5 persistent daemons active. 0 open PRs. 1 new alert (L959, Tier-3 silence). G-rule approval_request-delivery-confirmation 3/3 → dispatched to Beacon. Tier 2→3 DE-ESCALATION (3rd consecutive clean Tier-2 iter).
+
+**VERIFY-BEFORE-REASSERT (iter ~1657 carries):**
+- sync-blocked-pulse-runtime-paths-001 dispatched → **CONFIRMED**: Beacon processed it, `pulse-settings-runtime-path-001` APPROVAL_REQUEST created, Telegram DM delivered to Larry at 08:16:40 MDT (beacon bot log: approval_request idx=958). Now in beacon-pending-approvals.json (4 items). ✅
+- PR #490 MERGED (pulse-cycle wildcard silence) → **CONFIRMED CLOSED** — no self-echo alerts this iter. ✅
+- catalog-drift-facts-sync-001 → **CARRY** — still pending, 0 reminders, no Forge task visible. [carry]
+- unreviewed-merge:489 → **CARRY** — no Larry reply since DM iter ~1614. [carry]
+
+**Check 0 — Alert triage:** Watermark=958 → 1 new alert (L959: 2026-06-13T14:13:59Z, source=outbox-notifier, kind=approval_request, approval_id=pulse-settings-runtime-path-001). Delivery confirmation: Beacon sent Telegram DM to Larry for the `pulse-settings-runtime-path-001` fix plan.
+- Triage: Tier 3 (known delivery confirmation pattern). No DM. No tier-reset.
+- G-rule approval_request-delivery-confirmation: 2/3 → **3/3** → dispatch triggered.
+- Watermark advanced 958→959. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last beacon bot log: approval_request idx=958 delivered (pulse-settings-runtime-path-001) at 08:16:40 MDT. No new Larry directives observed. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → no stalls detected. 5 FORGE_NO_PR_SKIPs (known: #485/#53/#486/#487/#488). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **4 items** (was 3+1 new this iter):
+- fix-alert-triage-watermark-durability-001: stale, 0 reminders [carry]
+- fix-depth1-pulse-approval-extraction-001: stale, 0 reminders [carry]
+- catalog-drift-facts-sync-001: pending, 0 reminders [carry]
+- **pulse-settings-runtime-path-001: pending, 0 reminders** [NEW — Beacon processed sync-blocked-pulse-runtime-paths-001 direction-ask] ✅ Nominal (known carries + new one just delivered).
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry. ✅ Known carry.
+
+**Check A — Source repo:** On main. M agents/pulse/.claude/settings.json (pre-existing, iter ~1625). HEAD=0fe2da4=origin/main (0 behind, 0 ahead). ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: last_sync=2026-06-13T13:57:25Z status=error (uncommitted modifications — same settings.json). Root-cause fix now in approval queue as pulse-settings-runtime-path-001. ✅ Nominal (triaged, fix pending Larry approval).
+
+**Check C — Agent liveness:** 5/5 persistent daemons active — beacon_telegram_bot (PID 1843738), chain_event_shipper (PID 1849505), inbox_watcher (PID 1850128), outbox_notifier (PID 2116613), dashboard_api (PID 2322792). forge/mirror/pulse agent_telegram_bots (PIDs 1843739/1843740/1843744) idle (inboxes empty — expected). pulse-check-iv.timer active, next fire Mon 2026-06-15 04:26:45 MDT. ✅ Nominal.
+
+**Check D — Inboxes:** beacon: approval-request-translation-001.json (written this iter, pending pick-up). forge/mirror/pulse: empty. ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on ourliberty-agent-core. 0 open PRs on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Saturday 2026-06-13 UTC):** Check I gates Sunday — skip. Check III gates Sunday + 14d cadence — skip.
+
+**G-rule approval_request-delivery-confirmation — DISPATCHED (3/3):** L947 iter ~1639, L954 iter ~1651, L959 this iter — outbox-notifier approval_request delivery confirmations appearing in larry-alerts.jsonl without a translation entry, requiring manual Tier-3 triage each time. Direction-ask `approval-request-translation-001.json` written to Beacon inbox: add `source=outbox-notifier, kind=approval_request` entry to `config/alert-translations.json` so these get FYI-tier auto-silenced. G-rule CLOSED.
+
+**Actions taken:**
+1. L959 claimed, triaged Tier 3, watermark 958→959. Intervention logged to cycle-prime-ledger.jsonl. ✅
+2. Direction-ask `approval-request-translation-001.json` written to Beacon inbox. Systemic_fix logged to cycle-prime-ledger.jsonl. ✅
+3. `cycle_tier_state.py record --checks-clean true` → consecutive_clean 2→3 → **Tier 2→3 DE-ESCALATION**. ✅
+4. MEMORY.md updated. ✅
+
+**Dispatches:** 1 — `approval-request-translation-001` → Beacon inbox.
+
+**Standing findings:**
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614; no Larry reply. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [yellow] **pulse-settings-runtime-path-001** — Awaiting Larry 'approve' or 'go' on Telegram. Fixes persistent dirty tree since iter ~1625. [action needed]
+- [blue] **catalog-drift-facts-sync-001** — pending, 0 reminders. No Forge task visible. Monitor. [carry]
+- [blue] **beacon-pending-approvals stale entries** — fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001 self-clear after GC-fix PR. [carry]
+- [blue] **approval-request-translation-001** — DISPATCHED this iter → Beacon. G-rule CLOSED. [watch Beacon]
+- [blue] **sync-blocked-pulse-runtime-paths-001** — DISPATCHED iter ~1657; Beacon processed; awaiting Larry approval (pulse-settings-runtime-path-001). [carry]
+- [blue] **G-rule heal-stale-approvals-not-gc-merged-prs** — DISPATCHED iter ~1623. [watch Forge]
+- [blue] **G-rule timer-cycle-no-journal-entry** — 1/3. [carry]
+- [blue] **G-rule heal-stale-daemon-code-auto-restart-needs-template** — 1/3. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 1/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **Check 5 MISSING** — heal-stale-daemon-code-state.json absent. G-rule dispatched ~iter 1416. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — [carry]
+- [blue] **dag-preflight-revision gap** — DAG re-dispatch markers still fall through. [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+- CLOSED: G-rule approval_request-delivery-confirmation — dispatched this iter. ✅
+- CLOSED: G-rule sync-blocked:uncommitted-changes — dispatched iter ~1657. ✅
+- CLOSED: source=pulse-cycle-self-report G-rule — PR #490 MERGED. ✅
+
+**Watch items for next iter (~1659):**
+- Beacon picks up `approval-request-translation-001` → spec → Forge PR.
+- Larry approves `pulse-settings-runtime-path-001` on Telegram → Forge builds fix → persistent dirty tree resolved.
+- Tier 3 cadence: reduced checks, only fire conditionals on schedule.
+
+**PRIME DIRECTIVE:** 1 intervention (L959 claim) + 1 systemic_fix (approval_request-delivery-confirmation G-rule dispatch). Script-authoritative: interventions=831, systemic_fixes=36, verification_pending=11, ratio=23.08, trend=flat.
+**Tier end-of-iter:** Tier 3, consecutive_clean=0.
+
+---
+
 ## Iteration ~1657 — 2026-06-13 14:12Z UTC (interactive, /cycle, Tier 2, consecutive_clean 1→2)
 
 **Trigger:** Larry direct invocation (`/cycle`).
