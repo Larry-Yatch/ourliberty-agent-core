@@ -2,7 +2,7 @@
   "_schema": {
     "version": 1,
     "purpose": "Plain-language translation layer for healer alerts. Render-time lookup keyed by (source, subject); on match, surface severity + summary + recommended_action above a collapsed technical-detail footer. See docs/runbooks/add-new-healer-alert.md.",
-    "lookup_rule": "Exact match on subject first; if miss, strip trailing ':'-segments from subject one at a time and retry. First match wins (longest-prefix). Source must match exactly.",
+    "lookup_rule": "Exact match on subject first; if miss, strip trailing ':'-segments from subject one at a time and retry. First match wins (longest-prefix). If exact + ':'-prefix-strip both miss, a source-level '*' catch-all entry (when present) matches any subject under that source. Source must match exactly.",
     "severity_vocab": [
       "URGENT",
       "WARNING",
@@ -406,6 +406,12 @@
       "tier": "SOON",
       "plain_language_summary": "A Pulse maintenance cycle was stopped by its branch-guard because ~/agent-core was not on a clean main checkout, so it refused to auto-commit the cycle journal onto the wrong branch. Read the subject to tell the two cases apart: 'dirty-tree-on-<branch>' is expected-by-design and self-resolves once the working tree returns to main (no action needed); 'auto-restore-failed-from-<branch>' means the automatic return-to-main failed and needs a manual fix.",
       "recommended_action": "If the subject is dirty-tree-on-*, no action is required -- the next cycle runs once ~/agent-core is back on a clean main. If it is auto-restore-failed-from-*, ssh ourliberty-vm, cd ~/agent-core, and manually restore a clean main checkout (origin may have diverged); cycles resume on the next tick."
+    },
+    "*": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "This is one of Pulse's own cycle-emitted escalations being re-read by Check 0 on the next cycle -- a self-echo. Every source=pulse-cycle record is, by construction, Pulse's own outbound emission (a [yellow]/[red] it appended to larry-alerts.jsonl), and the original already reached Larry at emit time via the beacon-bot alert sweep. On the next cycle Check 0 re-reads that record and would otherwise classify it as a fresh novel alert. This catch-all silences the re-read so it stays journal-only. More-specific pulse-cycle subjects (e.g. cycle-blocked) still match their own entry first. Genuinely-important findings (e.g. unreviewed merges) also surface independently via their own detector source, so silencing the echo here drops no real signal.",
+      "recommended_action": "No action required. This is by-design self-echo suppression: the original escalation already reached Larry at emit time, and this entry only mutes Pulse's re-read of its own outbound record on the following cycle."
     }
   },
   "push-soft-gate": {

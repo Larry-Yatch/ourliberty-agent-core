@@ -494,8 +494,17 @@ def _translation_match(translations: dict[str, Any], source: str,
     Some producers (e.g. outbox-notifier success alerts) carry the pattern in
     ``intent`` and leave ``subject`` None. When ``subject is None`` we fall back
     to ``intent`` as the lookup key, then apply the same longest-prefix match.
-    With both None there is no key and the function returns ``None`` — so the
-    existing 3-arg callers (``intent`` defaults to None) keep their behavior.
+
+    Final step: if exact + ':'-prefix-strip both miss, consult a source-level
+    ``'*'`` catch-all entry that matches ANY subject under that source. It is
+    consulted only AFTER the loop misses, so more-specific subject entries
+    (e.g. ``pulse-cycle/cycle-blocked``, reached via the prefix-strip loop)
+    still win. ``never_silence`` semantics are preserved identically: a ``'*'``
+    entry tagged ``never_silence`` is returned as a truthy dict and classify
+    Gate 1 routes it to surface, not mute. The ``'*'`` fallback applies to
+    whichever source's ``by_subject`` map was selected, independent of the
+    derived key — so a source with no ``'*'`` entry still returns ``None`` on a
+    miss, preserving the existing 3-arg callers' behavior.
 
     Returns the entry dict so callers can inspect directives such as
     ``never_silence``. A matched entry is always a (truthy) dict; a miss is
@@ -506,8 +515,6 @@ def _translation_match(translations: dict[str, Any], source: str,
     if not isinstance(by_subject, dict):
         return None
     key = subject if subject is not None else intent
-    if key is None:
-        return None
     while key:
         if key in by_subject:
             entry = by_subject[key]
@@ -515,6 +522,9 @@ def _translation_match(translations: dict[str, Any], source: str,
         if ':' not in key:
             break
         key = key.rsplit(':', 1)[0]
+    wildcard = by_subject.get('*')
+    if wildcard is not None:
+        return wildcard if isinstance(wildcard, dict) else {}
     return None
 
 
