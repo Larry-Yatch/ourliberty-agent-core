@@ -4,6 +4,86 @@
 
 ---
 
+## Iteration ~1648 — 2026-06-13 12:42Z UTC (interactive, /cycle, Tier 1→reset, agent-models allowlist integrity finding)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Signal. 9/9 services active. 0 open PRs. 1 new alert (L952 Tier-3 silence). Check 2 NEW FINDING: Beacon's 12:35Z session confirmed commit `52115d0` never changed `config/agent-models.json` — `ourliberty-graph` still absent from forge+mirror allowed_repos. Larry's 06:37 MDT directive incorrect premise. Alert L953 sent; direction-ask dispatched to Beacon.
+
+**VERIFY-BEFORE-REASSERT (iter ~1647 watch items):**
+- catalog-drift Beacon active PID 2440729: **COMPLETED** — session ran 12:16:40Z-12:35:00Z (2 attempts; first TIMEOUT 600s, second successful $1.8515). Session found `agent-models.json` NOT updated (see Check 2). larry-approval inbox envelope archived to beacon outbox archive at 06:35 MDT. No new Forge dispatch from session. [resolved: Beacon surfaced blocker, direction-ask dispatched this iter]
+- unreviewed-merge:489 [yellow] DM: **CONFIRMED OPEN** — no Larry reply. [carry]
+- beacon-pending-approvals.json 3 entries: **RE-VERIFIED** — 2 stale + catalog-drift-facts-sync-001 still active (unresolved). [carry]
+- G-rule sync-blocked:uncommitted-changes 1/3: **RE-VERIFIED** — agents/pulse/.claude/settings.json still uncommitted. Same occurrence. [carry]
+- PRIME DIRECTIVE ratio=24.24 (script-authoritative pre-iter). [confirmed]
+
+**Check 0 — Alert triage:** larry-alerts.jsonl=952 lines (was 951 at iter ~1647). **1 new alert (L952).**
+- L952 (dispatch-branch-cleanup, 12:31:34Z, route=digest, subject=summary): `triage-alert` → **Tier-3 silence** (known-pattern match; PR #485 added dispatch-branch-cleanup:summary to alert-translations.json). No DM. No tier-reset. Watermark advanced 951→952. ✅
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** **NEW FINDING — HIGH INTEGRITY.**
+- Beacon bot log: Beacon session (06:16:40-06:35:00 MDT) processed `larry-approval-a9b77b7c...` envelope. Session result (embedded in archived outbox file): *"The approved task can't dispatch as-is — I've parked it and alerted you. Merge commit `52115d0` — message 'config: add ourliberty-graph to forge+mirror allowed_repos' — never actually changed `agent-models.json`. `git log -S 'ourliberty-graph'` confirms it was never added; the merge's branch side is an unrelated dashboard-api refactor (commit `a1676a1`)."*
+- **Verified independently**: `config/agent-models.json` `agents.forge.allowed_repos = ['ourliberty-agent-core', 'ourliberty-dashboard']`. `agents.mirror.allowed_repos = ['ourliberty-agent-core', 'ourliberty-dashboard']`. `ourliberty-graph` is absent from both.
+- **Commit `52115d0` is a merge commit** (`Merge: 1e54495 a1676a1`). The merged branch `a1676a1` = "refactor(dashboard-api): move scripts/ sys.path setup to module level" (PR #489 content). Commit message was written to describe an intended config change that never happened.
+- **Larry's 06:37:07 MDT message**: "Tell Beacon: the allowlist change is on main — verify deployed config shows ourliberty-graph, then re-dispatch catalog-d". Premise incorrect — the allowlist change is NOT on main.
+- **Beacon session**: Did not DM Larry (outbox-notifier shows no delivery after 04:31:09 UTC today; Beacon archived the approval but did not write a new outbox dispatch). Larry's 06:37 message was proactive, not a response to Beacon's finding.
+- **Action**: [yellow] DM L953 sent to Larry. Direction-ask `fix-agent-models-ourliberty-graph-001` written to Beacon inbox. → ask-then-do + tier-reset.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall dry-run → "no stalls detected". 5 FORGE_NO_PR_SKIPs (#485, #53, #486, #487, #488). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 3 entries — 2 stale (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001; G-rule DISPATCHED iter ~1623) + 1 active (catalog-drift-facts-sync-001 — unresolved, root cause now known: missing agent-models.json config). Direction-ask dispatched this iter (fix-agent-models-ourliberty-graph-001) to fix the root cause. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — known [blue] carry. G-rule dispatched ~iter 1416. ✅ Known carry.
+
+**Check A — Source repo:** On main. M agents/pulse/.claude/settings.json (pre-existing uncommitted from iter ~1625). HEAD=71d54e3, up to date with origin/main. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: last_sync=2026-06-13T11:57:08Z status=error ("Uncommitted changes"), blocked by known settings.json. Same pre-existing single occurrence. ✅ Nominal (triaged).
+
+**Check C — Agent liveness:** 9/9 active (ourliberty-beacon-bot + ourliberty-forge-bot + ourliberty-mirror-bot + ourliberty-pulse-bot + ourliberty-chain-event-shipper + ourliberty-inbox-watcher + ourliberty-outbox-notifier + ourliberty-dashboard-api + ourliberty-cycle.service [current]). ourliberty-pulse-check-iv.timer active (waiting, next fire Mon 2026-06-15 04:26:45 MDT). ✅ Nominal.
+
+**Check D — Inboxes:** Beacon inbox: `fix-agent-models-ourliberty-graph-001.json` (written this iter). All other inboxes empty (forge, mirror, pulse). ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on agent-core. 0 open PRs on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Saturday 2026-06-13 UTC):** Check I gates Sunday UTC; skip. Check III gates Sunday + 14d cadence; skip.
+
+**Rotations:** 0 credentials in 60-day window. ✅ Nominal.
+
+**Actions taken:**
+1. Alert triage L952: Tier-3 silence (dispatch-branch-cleanup known pattern); watermark advanced 951→952. ✅
+2. **[yellow] DM L953 sent** (source=pulse-cycle, subject=agent-models-allowlist-not-on-main): commit 52115d0 never changed agent-models.json; ourliberty-graph absent; Larry's 06:37 premise incorrect. Suggested action: 'go: fix-agent-models-allowlist'. ✅
+3. Direction-ask `fix-agent-models-ourliberty-graph-001` written to Beacon inbox: add ourliberty-graph to forge+mirror allowed_repos in agent-models.json, then re-dispatch catalog-drift-facts-sync-001. ✅
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --template agent-models-allowlist-not-on-main` → logged at 12:42:29Z. ✅
+5. `cycle_tier_state.py record --checks-clean false` → Tier 1 remains, consecutive_clean=2→0 (last_signal_at updated 12:42:30Z). ✅
+6. MEMORY.md updated. ✅
+
+**Standing findings (updated):**
+- [yellow] **NEW: agent-models-allowlist-not-on-main** — commit 52115d0 message misleading; ourliberty-graph not in forge+mirror allowed_repos. DM L953 sent. Direction-ask to Beacon dispatched (fix-agent-models-ourliberty-graph-001). Reply 'go: fix-agent-models-allowlist' if Beacon needs explicit Larry signal to proceed. [active — Beacon inbox]
+- [yellow] catalog-drift-facts-sync-001 — root cause now confirmed: missing agent-models.json config. Fix-agent-models direction-ask dispatched. Watch Beacon for config PR + re-dispatch. [active — pending Beacon action]
+- [yellow] unreviewed-merge:489 — DM sent iter ~1614; no Larry reply. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] Tier-2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- [blue] G-rule heal-stale-approvals-not-gc-merged-prs — DISPATCHED (iter ~1623). 2 stale entries self-clear after GC-fix PR. [watch Forge]
+- [blue] RESOLVED: pulse-check-iv — timer active, next fire Mon 2026-06-15 04:26:45 MDT. [monitoring]
+- [blue] G-rule sync-blocked:uncommitted-changes — 1/3. [carry]
+- [blue] G-rule timer-cycle-no-journal-entry — 1/3. [carry]
+- [blue] G-rule source=pulse-cycle-self-report — 2/3. At 3/3 dispatch Beacon (next iter after this DM will be L953 source=pulse-cycle → 3/3).
+- [blue] G-rule heal-stale-daemon-code-auto-restart-needs-template — 1/3. [carry]
+- [blue] G-rule catalog-accuracy-drift — DISPATCHED (3/3, iter ~1637). Root cause now identified (missing agent-models.json entry). [watching Beacon]
+- [blue] G-rule approval_request-delivery-confirmation — 1/3. [carry]
+- [blue] Check 5 MISSING — heal-stale-daemon-code-state.json absent. G-rule dispatched ~iter 1416. [carry]
+- [blue] sync-push-rebase-loop-001 UNREGISTERED AR. [carry]
+- [blue] dag-preflight-revision gap — PR #484 closed source=pulse gap; DAG re-dispatch markers still fall through. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED. [carry]
+- [blue] G-rule droplet-uncommitted:main — 1/3 (same occurrence). [carry]
+- [blue] G-rule F24-empty-prompt-envelope-rejected — 1/3. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention row this iter (agent-models-allowlist-not-on-main, Check 2). Trailing-30d (script-authoritative): interventions=825, systemic_fixes=34, verification_pending=11, ratio≈24.26, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0 (Check 2 signal reset).
+
+---
+
 ## Iteration ~1646 — 2026-06-13 12:27Z UTC (interactive, /cycle via /loop, Tier 1, consecutive_clean 0→1)
 
 **Trigger:** Larry direct invocation via `/loop /cycle`.
