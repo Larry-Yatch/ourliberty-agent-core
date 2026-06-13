@@ -4,6 +4,86 @@
 
 ---
 
+## Iteration ~1664 — 2026-06-13 17:39Z UTC (interactive, /cycle, Tier 3→1 reset, beacon-bot stale config)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Signal. Check 2 orphaned directive + Check 4 duplicate pending entries. Tier 3 → Tier 1 reset.
+
+**VERIFY-BEFORE-REASSERT (iter ~1663 carries):**
+- dirty-tree RESOLVED: **CONFIRMED** — clean tree, HEAD=7bf4a19=origin/main. ✅
+- sync RESTORED: **CONFIRMED** — last_sync=2026-06-13T16:58:09Z status=no-change (~40 min at check time). ✅
+- catalog-drift-facts-sync-001: **ACTIVE FAILURE** — still in pending-approvals + 2 new duplicate entries added 17:14Z + 17:17Z from Larry's failed 'go' commands. See Check 2 below.
+- unreviewed-merge:489: **CARRY** — no new Larry reply.
+
+**Check 0 — Alert triage:** Watermark 964→965. 1 new alert:
+- L965 `source=dispatch-branch-cleanup, route=digest` ts=17:32Z — Tier-3 known-pattern silence (dispatch-branch cleanup pruned 4 local + 3 remote stale branches). Watermark advanced to 965. ✅ Nominal (no tier-reset).
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** ⚠️ **NEW FINDING — orphaned directives.** After iter ~1663 (17:02Z UTC), Larry sent 3 'go' commands at 17:11Z, 17:14Z, 17:18Z UTC. All 3 dispatches for `catalog-drift-facts-sync-001` failed: `"target_repo 'ourliberty-graph' not in allowed_repos for forge (allowed: ['ourliberty-agent-core', 'ourliberty-dashboard'])"`. Larry said "try again it is allowed now" at 17:13Z and "they were restarted try again" at 17:16Z. inbox_watcher was restarted (old PID 1850128 → new PID 2514958) but **Beacon bot (PID 1843738, launched Jun 11) was NOT restarted**. On-disk `config/agent-models.json` DOES contain `ourliberty-graph` (commit e427631), but the Beacon bot cached config at startup before e427631 landed. Root cause: stale in-memory config in long-running Beacon bot process. → `ask-then-do` + `tier-reset`. [yellow] DM sent via larry_alerts (subject=beacon-bot-stale-config).
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → no stalls. 5 FORGE_NO_PR_SKIPs (all known: #487/#488/#490/#491/#492). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **5 entries** (was 3 at iter ~1663).
+- fix-alert-triage-watermark-durability-001 (created 2026-06-12, reminders=[6, 24]) — stale carry.
+- fix-depth1-pulse-approval-extraction-001 (created 2026-06-12, reminders=[6, 24]) — stale carry.
+- catalog-drift-facts-sync-001 (created 2026-06-13T10:31Z, reminders=[6]) — active carry.
+- **catalog-drift-facts-sync-001 (created 2026-06-13T17:14Z, reminders=[]) — DUPLICATE NEW** (from Larry 'go' at 17:14Z).
+- **catalog-drift-facts-sync-001 (created 2026-06-13T17:17Z, reminders=[]) — DUPLICATE NEW** (from Larry 'go' at 17:18Z).
+Two duplicate entries are a new finding, tied to the Check 2 Beacon bot stale-config root cause. → `ask-then-do` (same escalation as Check 2). Once Beacon bot is restarted + dispatch succeeds, duplicates should resolve.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING. Known [blue] carry. ✅ Known carry.
+
+**Check A — Source repo:** On main. Working tree CLEAN. HEAD=7bf4a19=origin/main. 0 ahead, 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-13T16:58:09Z, status=no-change, commit=76a7dae (~40 min at check time). ✅ Nominal.
+
+**Check C — Agent liveness:** 5/5 daemons running — beacon_telegram_bot (PID 1843738), chain_event_shipper (PID 1849505), outbox_notifier (PID 2116613), dashboard_api (PID 2322792), inbox_watcher (PID **2514958** NEW — restarted 11:16 MDT per Larry "they were restarted"). All PIDs except inbox_watcher match iter ~1663. Liveness nominal; inbox_watcher restart noted. pulse-check-iv.timer active, next fire Mon 2026-06-15 04:26:45 MDT. ✅ Nominal (liveness).
+
+**Check D — Inboxes:** beacon/forge/mirror/pulse: all empty. ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on ourliberty-agent-core. 0 open PRs on ourliberty-dashboard. ✅ Nominal.
+
+**Conditional checks (Saturday 2026-06-13 UTC):** Check I gates Sunday — skip. Check III gates Sunday + 14d cadence — skip.
+
+**Actions taken:**
+1. `alert_triage_state.py triage-alert` L965 (dispatch-branch-cleanup) → Tier-3 silence, resolved. ✅
+2. `alert_triage_state.py set-watermark --line 965` → watermark advanced. ✅
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` → logged (catalog-drift-dispatch-stale-bot-config). ✅
+4. `larry_alerts.append_alert` → [warning] DM queued (subject=beacon-bot-stale-config). ✅
+5. `cycle_tier_state.py record --checks-clean false` → Tier 3→1 reset, consecutive_clean=0. ✅
+6. MEMORY.md updated. ✅
+
+**Dispatches:** None (ask-then-do pending Larry action).
+
+**Escalation to Larry:**
+💓 [yellow] Iter ~1664 — Beacon bot has stale in-memory config; catalog-drift dispatch still failing.
+Root cause: Beacon bot (PID 1843738, launched Jun 11) cached agent-models.json before commit e427631 added ourliberty-graph. inbox_watcher was restarted but Beacon bot was not.
+Fix: `systemctl --user restart ourliberty-beacon-telegram-bot.service` (or kill PID 1843738 and relaunch beacon_telegram_bot.py). Then retry 'go' for catalog-drift-facts-sync-001.
+Journal: runbooks/cycle-journal.md iter ~1664.
+
+**Standing findings:**
+- [yellow] **catalog-drift dispatch ACTIVE** — Beacon bot stale config. Restart Beacon bot (`systemctl --user restart ourliberty-beacon-telegram-bot.service`), then retry 'go'. [escalated this iter]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614; no Larry reply. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **catalog-drift-facts-sync-001 duplicate pending entries** — 2 duplicates (17:14Z, 17:17Z) in beacon-pending-approvals; resolve after Beacon bot restart + successful dispatch. [carry]
+- [blue] **beacon-pending-approvals stale entries** — fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001. G-rule DISPATCHED iter ~1623. [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — 1/3. [carry]
+- [blue] **G-rule heal-stale-daemon-code-auto-restart-needs-template** — 1/3. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 1/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **Check 5 MISSING** — heal-stale-daemon-code-state.json absent. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — [carry]
+- [blue] **dag-preflight-revision gap** — [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+
+**PRIME DIRECTIVE:** 1 new intervention (beacon-bot-stale-config). 0 new systemic_fixes. Script-authoritative: interventions=832, systemic_fixes=36, verification_pending=11, ratio=23.11, trend=flat.
+**Tier end-of-iter:** Tier 3→1 reset. consecutive_clean=0.
+
+---
+
 ## Iteration ~1663 — 2026-06-13 17:02Z UTC (interactive, /cycle, Tier 3, consecutive_clean 4→5)
 
 **Trigger:** Larry direct invocation (`/cycle`).
