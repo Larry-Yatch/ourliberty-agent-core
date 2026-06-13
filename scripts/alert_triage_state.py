@@ -482,7 +482,8 @@ def load_translations(path: Optional[Path] = None) -> dict[str, Any]:
 
 def _translation_match(translations: dict[str, Any], source: str,
                        subject: Optional[str],
-                       intent: Optional[str] = None
+                       intent: Optional[str] = None,
+                       kind: Optional[str] = None
                        ) -> Optional[dict[str, Any]]:
     """Return the matched translation entry, or ``None`` if no match.
 
@@ -494,6 +495,12 @@ def _translation_match(translations: dict[str, Any], source: str,
     Some producers (e.g. outbox-notifier success alerts) carry the pattern in
     ``intent`` and leave ``subject`` None. When ``subject is None`` we fall back
     to ``intent`` as the lookup key, then apply the same longest-prefix match.
+    Other producers (e.g. outbox-notifier ``approval_request`` delivery
+    confirmations) carry the pattern only in ``kind`` and leave BOTH ``subject``
+    and ``intent`` None. When both are None we fall back to ``kind`` as the
+    lookup key. Precedence is subject -> intent -> kind (most-specific first):
+    a present ``subject`` stays authoritative and never falls through to
+    ``intent`` or ``kind``.
 
     Final step: if exact + ':'-prefix-strip both miss, consult a source-level
     ``'*'`` catch-all entry that matches ANY subject under that source. It is
@@ -514,7 +521,8 @@ def _translation_match(translations: dict[str, Any], source: str,
     by_subject = translations.get(source)
     if not isinstance(by_subject, dict):
         return None
-    key = subject if subject is not None else intent
+    key = subject if subject is not None \
+        else (intent if intent is not None else kind)
     while key:
         if key in by_subject:
             entry = by_subject[key]
@@ -566,7 +574,7 @@ def classify(alert: dict[str, Any], *, registry: dict[str, dict[str, Any]],
     # ``subject`` stays untouched below (route_fn / is_significant / rationale);
     # the intent fallback is scoped to this translation lookup only.
     match = _translation_match(translations, source, subject,
-                               alert.get('intent'))
+                               alert.get('intent'), alert.get('kind'))
     if match is not None and not match.get('never_silence'):
         return {
             'tier': 3,
