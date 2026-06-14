@@ -91,6 +91,21 @@ _MAX_FETCH_PAGES = 20
 # that matter (the cursor only re-presents PRs near the boundary).
 MAX_ALERTED_LEDGER = 200
 
+# Metadata-only exemption (the unreviewed-merge alert's whole point is to catch
+# CODE that landed without Mirror review; benign dashboard promote-capture PRs
+# only ever rewrite these two beacon state files and never enter the
+# Forge->Mirror chain, so they have no AUTO_MERGE evidence and would alert
+# uselessly). A PR is exempt IFF its title starts with one of these prefixes AND
+# EVERY changed file is in the allowlist below — the file-scope guard is
+# non-negotiable: a title-only exemption would be a literal review-evasion
+# bypass (any code PR named `chore(missions): ...` would be ignored). An empty
+# or missing files list is NOT exempt (indeterminate => fail toward alerting).
+EXEMPT_TITLE_PREFIXES = ('chore(missions):',)
+EXEMPT_FILE_ALLOWLIST = frozenset({
+    'agents/beacon/missions.json',
+    'agents/beacon/captures.json',
+})
+
 ALERT_SOURCE = 'heal-unreviewed-merge-detector'
 # Subject prefix MUST stay in sync with the translation entry keyed under
 # `unreviewed-merge` in config/alert-translations.json (the longest-prefix
@@ -223,7 +238,7 @@ def _run_gh_pr_list(search: str) -> Optional[tuple[list[dict[str, Any]], int]]:
         '--base', BASE_BRANCH,
         '--search', search,
         '--limit', str(_MERGED_PR_FETCH_LIMIT),
-        '--json', 'number,mergedAt,url,author,title',
+        '--json', 'number,mergedAt,url,author,title,files',
     ]
     try:
         proc = subprocess.run(
@@ -351,12 +366,24 @@ def parse_merged_prs(raw_json: str) -> list[dict[str, Any]]:
             continue
         author = r.get('author') or {}
         login = author.get('login') if isinstance(author, dict) else None
+        # gh returns `files` as a list of objects, each carrying a `path`.
+        # Normalize to a flat list of path strings; default [] when absent or
+        # malformed so the exemption check fails toward alerting.
+        raw_files = r.get('files')
+        files: list[str] = []
+        if isinstance(raw_files, list):
+            for f in raw_files:
+                if isinstance(f, dict):
+                    p = f.get('path')
+                    if isinstance(p, str) and p:
+                        files.append(p)
         out.append({
             'number': number,
             'mergedAt': merged_at,
             'url': url,
             'author_login': login or 'unknown',
             'title': r.get('title') or '',
+            'files': files,
         })
     return out
 
@@ -421,6 +448,30 @@ def review_passed_pr_urls(notifier_log_text: str) -> set[str]:
     return passed
 
 
+# -------------------- metadata exemption (pure) --------------------
+
+def is_metadata_exempt(pr: dict[str, Any]) -> bool:
+    """True iff this merged PR is a benign metadata-only change that should be
+    skipped by the unreviewed-merge alert.
+
+    Exempt IFF BOTH hold:
+      (a) the PR title starts with one of EXEMPT_TITLE_PREFIXES, AND
+      (b) the PR's changed-file list is non-empty and EVERY file is in
+          EXEMPT_FILE_ALLOWLIST.
+
+    The file-scope guard (b) is what makes this safe: a title-prefix-only
+    exemption would let any code PR named `chore(missions): ...` evade the
+    security detector. An empty/missing files list is treated as NOT exempt —
+    an indeterminate file set fails toward alerting."""
+    title = pr.get('title') or ''
+    if not title.startswith(EXEMPT_TITLE_PREFIXES):
+        return False
+    files = pr.get('files')
+    if not isinstance(files, list) or not files:
+        return False
+    return all(f in EXEMPT_FILE_ALLOWLIST for f in files)
+
+
 # -------------------- core detection (pure) --------------------
 
 def run_once(
@@ -437,6 +488,15 @@ def run_once(
     alerts: list[dict[str, Any]] = []
     for pr in merged_prs:
         url = str(pr['url']).rstrip('/')
+        if is_metadata_exempt(pr):
+            # Benign metadata-only promote-capture PR (title-prefix + all files
+            # in the allowlist). It never enters the Mirror chain, so it has no
+            # AUTO_MERGE evidence by design — skip rather than alert uselessly.
+            prefix = next(p for p in EXEMPT_TITLE_PREFIXES
+                          if (pr.get('title') or '').startswith(p))
+            log(f'exempt metadata-only PR #{pr["number"]} ({prefix}); '
+                f'skipping unreviewed-merge check')
+            continue
         if url in passed_urls:
             continue  # Mirror passed it — fine.
         if url in alerted_prs:

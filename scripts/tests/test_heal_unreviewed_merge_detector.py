@@ -41,13 +41,14 @@ import heal_unreviewed_merge_detector as h  # noqa: E402
 
 
 def _pr(number: int, merged_at: str, login: str = 'Larry-Yatch',
-        title: str = 't') -> dict:
+        title: str = 't', files: list | None = None) -> dict:
     return {
         'number': number,
         'mergedAt': merged_at,
         'url': f'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/{number}',
         'author_login': login,
         'title': title,
+        'files': files if files is not None else [],
     }
 
 
@@ -204,6 +205,31 @@ class ParseMergedPrsTest(unittest.TestCase):
         self.assertEqual(h.parse_merged_prs('{ not json'), [])
         self.assertEqual(h.parse_merged_prs(''), [])
 
+    def test_files_extracted_as_path_strings(self):
+        raw = json.dumps([
+            {'number': 5, 'mergedAt': '2026-06-04T18:00:00Z',
+             'url': 'https://x/pull/5',
+             'files': [{'path': 'agents/beacon/missions.json'},
+                       {'path': 'agents/beacon/captures.json'}]},
+        ])
+        rows = h.parse_merged_prs(raw)
+        self.assertEqual(rows[0]['files'],
+                         ['agents/beacon/missions.json',
+                          'agents/beacon/captures.json'])
+
+    def test_files_default_empty_on_missing_or_malformed(self):
+        raw = json.dumps([
+            {'number': 5, 'mergedAt': '2026-06-04T18:00:00Z',
+             'url': 'https://x/pull/5'},  # no files key
+            {'number': 6, 'mergedAt': '2026-06-04T18:00:00Z',
+             'url': 'https://x/pull/6', 'files': 'not-a-list'},
+            {'number': 7, 'mergedAt': '2026-06-04T18:00:00Z',
+             'url': 'https://x/pull/7',
+             'files': [{'no_path': 'x'}, 'bare-string', {'path': ''}]},
+        ])
+        rows = h.parse_merged_prs(raw)
+        self.assertEqual([r['files'] for r in rows], [[], [], []])
+
 
 # -------------------- core detection (run_once) --------------------
 
@@ -233,6 +259,74 @@ class RunOnceTest(unittest.TestCase):
         bad = _pr(41, '2026-06-04T17:30:00Z')
         alerts = h.run_once([good, bad], passed_urls={good['url']}, alerted_prs={})
         self.assertEqual([a['number'] for a in alerts], [41])
+
+
+# -------------------- metadata exemption --------------------
+
+_MISSIONS = 'agents/beacon/missions.json'
+_CAPTURES = 'agents/beacon/captures.json'
+_CHORE = 'chore(missions): promote capture cap-xyz -> mission abc'
+
+
+class IsMetadataExemptTest(unittest.TestCase):
+    def test_chore_title_allowlisted_files_is_exempt(self):
+        pr = _pr(494, '2026-06-04T18:00:00Z', title=_CHORE,
+                 files=[_MISSIONS, _CAPTURES])
+        self.assertTrue(h.is_metadata_exempt(pr))
+
+    def test_chore_title_single_allowlisted_file_is_exempt(self):
+        pr = _pr(494, '2026-06-04T18:00:00Z', title=_CHORE, files=[_MISSIONS])
+        self.assertTrue(h.is_metadata_exempt(pr))
+
+    def test_chore_title_with_code_file_is_not_exempt(self):
+        # File guard holds: a chore(missions) title touching any non-allowlisted
+        # path STILL alerts (this is the review-evasion backstop).
+        pr = _pr(489, '2026-06-04T18:00:00Z', title=_CHORE,
+                 files=[_MISSIONS, 'scripts/dashboard_api.py'])
+        self.assertFalse(h.is_metadata_exempt(pr))
+
+    def test_non_chore_title_allowlisted_files_is_not_exempt(self):
+        # Title guard holds: exemption needs BOTH conditions.
+        pr = _pr(494, '2026-06-04T18:00:00Z',
+                 title='fix(beacon): retune mission', files=[_MISSIONS])
+        self.assertFalse(h.is_metadata_exempt(pr))
+
+    def test_chore_title_empty_files_is_not_exempt(self):
+        # Indeterminate file set => fail toward alerting.
+        pr = _pr(494, '2026-06-04T18:00:00Z', title=_CHORE, files=[])
+        self.assertFalse(h.is_metadata_exempt(pr))
+
+    def test_chore_title_missing_files_key_is_not_exempt(self):
+        pr = {'number': 494, 'url': 'https://x/pull/494', 'title': _CHORE}
+        self.assertFalse(h.is_metadata_exempt(pr))
+
+
+class RunOnceExemptionTest(_IsolatedAgentsRoot):
+    """run_once must skip metadata-only chore(missions) PRs (no alert) while the
+    title/file guards keep every other shape alerting. Under _IsolatedAgentsRoot
+    so the exempt-path INFO log writes to tmp, not the prod log."""
+
+    def test_metadata_only_chore_pr_not_alerted(self):
+        pr = _pr(494, '2026-06-04T18:00:00Z', title=_CHORE,
+                 files=[_MISSIONS, _CAPTURES])
+        self.assertEqual(h.run_once([pr], passed_urls=set(), alerted_prs={}), [])
+
+    def test_chore_pr_touching_code_still_alerts(self):
+        pr = _pr(489, '2026-06-04T18:00:00Z', title=_CHORE,
+                 files=[_MISSIONS, 'scripts/dashboard_api.py'])
+        alerts = h.run_once([pr], passed_urls=set(), alerted_prs={})
+        self.assertEqual([a['number'] for a in alerts], [489])
+
+    def test_non_chore_metadata_pr_still_alerts(self):
+        pr = _pr(494, '2026-06-04T18:00:00Z',
+                 title='fix(beacon): edit mission', files=[_MISSIONS])
+        alerts = h.run_once([pr], passed_urls=set(), alerted_prs={})
+        self.assertEqual([a['number'] for a in alerts], [494])
+
+    def test_chore_pr_empty_files_still_alerts(self):
+        pr = _pr(494, '2026-06-04T18:00:00Z', title=_CHORE, files=[])
+        alerts = h.run_once([pr], passed_urls=set(), alerted_prs={})
+        self.assertEqual([a['number'] for a in alerts], [494])
 
 
 # -------------------- cursor advance --------------------
