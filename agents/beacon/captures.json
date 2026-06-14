@@ -30,7 +30,21 @@
         "captured_at": "2026-06-10T06:35:23.978896+00:00"
       },
       "last_touched": "2026-06-10T06:35:23.978896+00:00",
-      "promoted_to": null
+      "promoted_to": null,
+      "briefing": {
+        "what": "A small fix so parked desktop chats show their real name instead of a meaningless code.",
+        "why": "Right now those entries are unreadable gibberish, which makes the list harder to scan and trust at a glance.",
+        "suggest": "Worth doing, but it needs a quick check that the chat's name is actually available before we build on it \u2014 so green-light it as a scoped, verify-first improvement rather than a rushed change."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-14T17:52:43.946307+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "cap-orphan-lane-show-state-collapse-terminal-orphans-aa37",
@@ -45,7 +59,21 @@
         "captured_at": "2026-06-10T06:35:24.295967+00:00"
       },
       "last_touched": "2026-06-10T06:35:24.295967+00:00",
-      "promoted_to": null
+      "promoted_to": null,
+      "briefing": {
+        "what": "A cleanup of the work-tracking list, which currently shows 97 items as if they all need attention even though most are already finished.",
+        "why": "It's hard to see what actually needs action right now, so real work can get lost in the noise and time gets wasted sorting through finished items.",
+        "suggest": "Worth doing soon to hide the completed clutter and surface only what's still open \u2014 but roll it out in stages and confirm nothing important gets hidden by mistake."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-14T17:52:43.946307+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "cap-projects-pm-layer-data-is-stale-separate-system-84ec",
@@ -60,7 +88,21 @@
         "captured_at": "2026-06-10T06:35:24.627125+00:00"
       },
       "last_touched": "2026-06-10T06:35:24.627125+00:00",
-      "promoted_to": null
+      "promoted_to": null,
+      "briefing": {
+        "what": "Our project-tracking list isn't being automatically kept up to date the way our mission list is, so it's slowly filling with stale entries.",
+        "why": "If the project list drifts out of date, the team and you end up making calls off information that's quietly wrong, which erodes trust in the system.",
+        "suggest": "Worth fixing, but let's scope it as its own small cleanup effort rather than bolting it onto the mission system \u2014 get a quick estimate first before committing."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-14T17:52:43.946307+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "cap-operator-action-queue-is-full-of-benign-auto-han-3c39",
@@ -90,7 +132,21 @@
         "captured_at": "2026-06-10T07:12:40.075206+00:00"
       },
       "last_touched": "2026-06-10T07:12:40.075206+00:00",
-      "promoted_to": null
+      "promoted_to": null,
+      "briefing": {
+        "what": "A new access key we set up recently was never logged in our official key directory, so the system keeps flagging it as missing.",
+        "why": "Until it's logged, the system raises a repeating high-priority warning that adds noise and makes it harder to spot a real problem when one comes up.",
+        "suggest": "Worth doing soon to silence the false alarm, but let's double-check we're updating the right record before we make the change so we don't disturb anything else."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-14T17:52:43.946307+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     },
     {
       "id": "cap-decide-full-codebase-audit-cadence-abac",
@@ -121,7 +177,21 @@
         "captured_at": "2026-06-10T18:05:35.843140+00:00"
       },
       "last_touched": "2026-06-10T18:05:35.843140+00:00",
-      "promoted_to": null
+      "promoted_to": null,
+      "briefing": {
+        "what": "A standing reminder to decide whether our regular code health checkups should run automatically on a set schedule or only when you ask for one.",
+        "why": "Catching problems early keeps the product stable and protects us from costly surprises down the road, but checking too often wastes effort on things that haven't changed.",
+        "suggest": "Hold off until you run the next full checkup, which will hand you real usage numbers to make this call confidently rather than guessing now."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-14T17:52:43.946307+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "cap-tier-alert-cycle-3-pr-close-out-plan-3819",
@@ -136,7 +206,21 @@
         "captured_at": "2026-06-10T20:02:36.962016+00:00"
       },
       "last_touched": "2026-06-10T20:02:36.962016+00:00",
-      "promoted_to": null
+      "promoted_to": null,
+      "briefing": {
+        "what": "Our automated alert system has been crying wolf \u2014 flagging fake emergencies \u2014 while a safety net we thought was protecting us turned out to be switched off.",
+        "why": "False alarms waste attention and erode trust in the system, and the disabled safety check means bad data has been slipping through unnoticed.",
+        "suggest": "Approve a careful, staged clean-up that fixes the false alarms first, then re-enables and proves the safety net actually works before we rely on it again."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-14T17:52:43.946307+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     },
     {
       "id": "cap-erofs-tier2-home-systemd-unit-fix-pr-5-b0ef",
@@ -151,7 +235,21 @@
         "captured_at": "2026-06-10T22:12:33.270614+00:00"
       },
       "last_touched": "2026-06-10T22:12:33.270614+00:00",
-      "promoted_to": null
+      "promoted_to": null,
+      "briefing": {
+        "what": "A behind-the-scenes plumbing problem is the reason work sessions have been silently failing and losing progress about half the time.",
+        "why": "It quietly breaks tasks and erases work without warning, so the team can't trust the system to finish what it starts until it's fixed.",
+        "suggest": "Approve the fix, but pause the automatic switching first and confirm the repair holds before turning everything back on."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-14T17:52:43.946307+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     },
     {
       "id": "cap-phantom-build-phase-after-marker-error-retry-pr-4d78",
@@ -166,7 +264,21 @@
         "captured_at": "2026-06-10T23:01:33.065559+00:00"
       },
       "last_touched": "2026-06-10T23:01:33.065559+00:00",
-      "promoted_to": null
+      "promoted_to": null,
+      "briefing": {
+        "what": "Our automated system occasionally restarts work on a job that's already finished, kicking off duplicate effort that someone then has to catch and shut down by hand.",
+        "why": "It wastes time cleaning up after the machine and risks redoing or undoing completed work if a duplicate slips through unnoticed.",
+        "suggest": "Worth fixing soon but not an emergency \u2014 have the team add a simple check so the system confirms a job is still open before reopening it, and keep an eye out for repeat cases in the meantime."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-14T17:52:43.946307+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "cap-direct-discover-test-leak-still-open-pr-7-514a",
@@ -182,7 +294,21 @@
         "captured_at": "2026-06-11T04:12:01.009961+00:00"
       },
       "last_touched": "2026-06-11T04:12:01.009961+00:00",
-      "promoted_to": null
+      "promoted_to": null,
+      "briefing": {
+        "what": "Direct-discover test leak still open (PR-7) \u2014 RESIDUAL after the 2026-06-10 tier-alert close-out (#435-#443 all merged): #436 sandboxed the regression GATE invocation, but any DIRECT 'python3 -m unittest discover -s scripts/tests' (Mirror reviews follow the docs' canonical command; agent sessions type it by hand) still bypasses scripts/tests/__init__ and leaks fixture writes to real blackboard files. Evidence post-fix: 3 mock quota events 2026-06-11T02:40:00Z (during Mirror's capture-label-contract review) + 2 FALSE 'transcript-not-persisted:tier1' CRITICAL alerts 03:23/03:24Z from #438's own test mocks (paths /tmp/tmp*-work/sid-new.jsonl, task unknown-task \u2014 IGNORE these two alerts, they cite mock session ids; larry-alerts is append-only so they will not retract). FIX SHAPE (PR-7): per-module bootstrap \u2014 a scripts/tests/_bootstrap.py doing the env-sandbox at import, imported at the top of EVERY test file (works under any loader), plus an AST gate test enforcing the import (same pattern as test_no_production_log_writes.py); then purge the 3 new ledger lines (quarantine pattern, ~/agents/.fixture-cleanup-20260610/). Memory: tier-alert-cycle-final-rootcause.md",
+        "why": "A captured idea (in ourliberty-agent-core) waiting on a decision.",
+        "suggest": "Have the team look at this carefully before any change \u2014 it could be hard to undo."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-14T17:52:43.946307+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     },
     {
       "id": "cap-investigate-retry-clarification-cost-sources-7995",
@@ -198,7 +324,21 @@
         "captured_at": "2026-06-11T06:19:53.430591+00:00"
       },
       "last_touched": "2026-06-11T06:19:53.430591+00:00",
-      "promoted_to": null
+      "promoted_to": null,
+      "briefing": {
+        "what": "About a fifth of our automation spending is going to redo-work \u2014 tasks that have to be repeated because the first attempt wasn't clear enough.",
+        "why": "It's quietly wasting roughly $3 a week, and that share is higher than what we'd consider healthy, so it's a sign our instructions to the system aren't tight enough.",
+        "suggest": "Worth a careful look \u2014 let's first confirm where the redo-work is really coming from before changing anything, so we fix the actual cause rather than guess."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-14T17:52:43.946307+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     },
     {
       "id": "cap-restart-shipper-notifier-on-droplet-to-activate-5b70",
@@ -214,7 +354,21 @@
         "captured_at": "2026-06-11T07:17:28.294112+00:00"
       },
       "last_touched": "2026-06-11T07:17:28.294112+00:00",
-      "promoted_to": null
+      "promoted_to": null,
+      "briefing": {
+        "what": "A finished upgrade to our event-tracking system is approved but hasn't been switched on yet, so it's still running the old version.",
+        "why": "Until we flip the switch, important activity is going unrecorded, which leaves a gap in the visibility we rely on.",
+        "suggest": "Turn it on during a quiet window and confirm the events start flowing before walking away \u2014 quick, but worth watching once to make sure it took."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-14T17:52:43.946307+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     },
     {
       "id": "cap-investigate-retry-clarification-cost-sources-d121",
@@ -230,7 +384,21 @@
         "captured_at": "2026-06-11T17:47:05.211097+00:00"
       },
       "last_touched": "2026-06-11T17:47:05.211097+00:00",
-      "promoted_to": null
+      "promoted_to": null,
+      "briefing": {
+        "what": "About a fifth of our weekly tool spend is going to redo-work \u2014 the system asking again or re-doing tasks instead of getting them right the first time.",
+        "why": "It's roughly $3 a week of waste today, and that share is creeping past the level where it's worth a look before it grows.",
+        "suggest": "Worth a focused look at what's triggering the repeats and fixing the most common cause \u2014 but scope it tightly first, since the dollar amount is still small."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-14T17:52:43.946307+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     },
     {
       "id": "cap-test-jail-pr-4-ready-for-go-after-pr-3-lands-447f",
@@ -246,7 +414,21 @@
         "captured_at": "2026-06-11T20:00:50.396933+00:00"
       },
       "last_touched": "2026-06-11T20:00:50.396933+00:00",
-      "promoted_to": null
+      "promoted_to": null,
+      "briefing": {
+        "what": "A final round of cleanup that makes our automated quality checks airtight, so a bad change can never slip through no matter how it's run.",
+        "why": "It closes the last gaps that could let a faulty change reach customers undetected, protecting product reliability and our reputation.",
+        "suggest": "Let the current safety upgrade settle and prove itself first, then give the go to finish this closing piece as a single clean step."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-14T17:52:43.946307+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     },
     {
       "id": "cap-make-team-two-way-chat-a-dashboard-wide-layer-no-adaf",
@@ -262,7 +444,21 @@
         "captured_at": "2026-06-14T04:06:50.430525+00:00"
       },
       "last_touched": "2026-06-14T04:06:50.430525+00:00",
-      "promoted_to": null
+      "promoted_to": null,
+      "briefing": {
+        "what": "A proposal to let your team talk back and forth with you right inside the dashboard everywhere \u2014 not just on the missions screen \u2014 so the dashboard becomes the main place you and the team work together, with text messaging reduced to a simple doorbell that pings you and links you to the right spot.",
+        "why": "It would give you one consistent, plain-English place to review, decide, and chat across everything your team does, instead of juggling separate tools and losing context.",
+        "suggest": "Worth pursuing, but hold it until the current smaller test proves out, then give it a proper design pass before committing."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-14T17:52:43.946307+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
