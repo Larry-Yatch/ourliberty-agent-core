@@ -4,6 +4,117 @@
 
 ---
 
+## Iteration ~1809 — 2026-06-14 18:09Z UTC (interactive, /cycle, Tier 1, signal: TSR step 3 PR #506 open + G-rule droplet-uncommitted 3/3 dispatched + PR #497 [yellow] carry)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. All checks 0–5 + A–E nominal. PR #497 [yellow] standing carry (85th iter). **TSR DAG:** step 3 (tsr-missions-sequence-inflight-digest): BUILD DONE ($8.04), PR #506 OPEN (MERGEABLE), Mirror review RUNNING (PID 2871217, started 18:02Z). **G-rule droplet-uncommitted:main → 3/3 → dispatched to Beacon.**
+
+**VERIFY-BEFORE-REASSERT (iter ~1808 carries):**
+- PR #497 REVIEW_ESCALATE: `gh pr list` → OPEN, UNKNOWN, reviewDecision="", statusCheckRollup=FAILURE. 85th consecutive iter. **CARRY** [yellow].
+- TSR step 3 (tsr-missions-sequence-inflight-digest): Forge PID 2852025 confirmed running (ps). At 18:02:39Z outbox-notifier dispatched mirror-review for PR #506 (cost=$8.04). Mirror PID 2871217 running (started 18:02Z, ~5 min elapsed). PR #506: OPEN, MERGEABLE, ci=none. **ADVANCED** ✅ [blue].
+- unreviewed-merge:499/494/489: beacon_telegram_bot.log — last Larry message 10:28:47 MDT (16:28:47Z). No new replies. **CARRY** [yellow].
+- heal-stale-daemon-code.heartbeat: `2026-06-14T17:38:17Z` (~29 min before 18:07Z check). FRESH (<60 min). **NOMINAL** ✅.
+- G-rule droplet-uncommitted:main 2/3: dirty working tree observed at ~18:05Z (`agents/beacon/captures.json` 16 uncommitted lines). GC healer re-committed at ~18:06Z (commit `776acb0c`) — self-healed. **3/3 — DISPATCHED** (gc-healer-captures-dirty-tree-fix-001 to Beacon).
+- FORGE_NO_PR_SKIP count: 10 (down from 12; tsr-build tasks archived after completion). ✅ Nominal.
+- GC healer: new commits since iter ~1808 — `ac34f75e chore(missions): GC healer — commit captures.json delta` (17:56:50Z) + `776acb0c chore(missions): GC healer — commit captures.json delta` (~18:06Z). HEAD=776acb0c=origin/main. ✅.
+- Stale bash orphans: PID 1834248 (~17d+, Ss, 0% CPU), PID 2605007 (~13h+, Ss, 0% CPU). **CARRY** [blue].
+
+**Check 0 — Alert triage:** Watermark=925, file=926 → **1 new alert (line 926)**.
+- Alert: ts=17:56:51Z source=missions-card-gc severity=warning message="retired 0 stale session card(s) []; aged 0 parked capture(s) []; kept 0 session(s); commit=committed" route=digest.
+- Helper result: Tier-4 (novel: no registry template and no translation match). Route=escalate.
+- Action: claimed as Tier-4 (alert-triage.json updated), journal-note only. Content is 0-action GC summary; G-rule missions-card-gc-warn-vs-info already tracking at 2/3 (permanent fix dispatch at 3/3). No DM per sparse-contact discipline (unambiguously informational digest). Watermark advanced → 926.
+- ⚠️ tier-reset (Tier-4 alert claimed this iter).
+
+**Check 1 — Log noise:** outbox-notifier.log last entry 12:02:40 MDT (18:02:40Z) — mirror-review dispatch for TSR step 3 PR #506. No new WARNs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message 10:28:47 MDT (16:28:47Z). No new directives or distress keywords in last 1.5h+. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → 0 stalls, 10 FORGE_NO_PR_SKIP (stable). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: pending=0 ✅. Mirror inbox: review-tsr-missions-sequence-inflight-digest.json (BEING PROCESSED). Beacon inbox: EMPTY (gc-healer-captures-dirty-tree-fix-001 just dispatched). ✅ Nominal within TSR DAG workflow.
+
+**Check 5 — Stale daemon:** heartbeat `2026-06-14T17:38:17Z` (~29 min before check). FRESH (<60 min). [note] dashboard_api PID changed (2744674→2868353, restarted ~17:58Z); currently running Ssl; cause unknown (healer state file missing). ✅ Nominal per heartbeat freshness.
+
+**Check A — Source repo:** HEAD=776acb0c=origin/main. Clean working tree (GC healer re-committed at ~18:06Z). On main. 0 ahead, 0 behind. ✅ Nominal.
+- **G-rule droplet-uncommitted:main 3/3**: dirty-tree window ~18:05Z (captures.json 16 uncommitted lines). Self-healed ~18:06Z (776acb0c). Pattern: heal_missions_card_gc commits captures.json every ~8-10 min; brief dirty-tree windows between commits. **DISPATCHED** → gc-healer-captures-dirty-tree-fix-001 to Beacon.
+
+**Check B — Sync health:** agent-core-sync.json: status=no-change, last_sync=2026-06-14T17:23:11Z (~46 min before check). Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:**
+- inbox_watcher: PID 2530123 ✅ (22:37+ elapsed, Ssl)
+- chain_event_shipper: PID 2744551 ✅ (07:24+ elapsed, SNs)
+- dashboard_api: PID 2868353 ✅ (restarted ~17:58Z, Ssl, running)
+- beacon_telegram_bot: PID 2744840 ✅ (07:24+ elapsed, Ss)
+- outbox_notifier: PID 2744914 ✅ (07:24+ elapsed, Ss)
+- forge: PID 2852025 ✅ (TSR step 3 build complete, resume=55ae6336-bc9)
+- mirror: PID 2871217 ✅ (~5 min elapsed; tsr-missions-sequence-inflight-digest review running, PR #506)
+- [blue] PID 1834248: stale bash orphan (~17d+). Ss, 0% CPU. [carry]
+- [blue] PID 2605007: stale bash orphan (~13h+). Ss, 0% CPU. [carry]
+
+**Check D — Inboxes:** Forge: build-tsr-missions-sequence-inflight-digest.json (build done, cleanup pending). Mirror: review-tsr-missions-sequence-inflight-digest.json (BEING PROCESSED). Beacon: gc-healer-captures-dirty-tree-fix-001.json (just dispatched). ✅
+
+**Check E — PRs:**
+ourliberty-agent-core:
+- **PR #506** OPEN (`feat: terminal-state reconciliation for missions/sequence/in-flight/digest`), MERGEABLE, reviewDecision="", ci=none. [blue] TSR DAG step 3 — Mirror review running (PID 2871217, started 18:02Z). Expect PASS + auto-merge next 1–2 iters.
+- **PR #497** OPEN (`fix(cleanup-branches): success-prune alert is info, not warning`), UNKNOWN, reviewDecision="", statusCheckRollup=FAILURE. [yellow] carry — 85th consecutive iter.
+ourliberty-dashboard: No open PRs. ✅
+
+**Conditional checks:** Today is Sunday 2026-06-14 UTC. Check I already ran this cycle day (iter ~1718). **SKIP**. Check III last artifact 2026-06-11 (3 days old, <14d). **SKIP**.
+
+**Actions taken:**
+1. Alert watermark: 925 → 926 (`alert_triage_state.py set-watermark --line 926`). ✅
+2. `cycle_prime_ledger.py append --tier 1 --kind intervention --template missions-card-gc-tier4 --detail "Alert 926 tier-4: missions-card-gc 0-retirement summary, G-rule warn-vs-info 2/3, journal-note only"` ✅
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention --template droplet-uncommitted-main-g3 --detail "G-rule 3/3: captures.json dirty-tree ~18:05Z (16 uncommitted lines), self-healed ~18:06Z (776acb0c); dispatching Beacon direction-ask"` ✅
+4. `cycle_prime_ledger.py append --tier 1 --kind systemic_fix --template gc-healer-dirty-tree-fix --detail "Beacon direction-ask dispatched: gc-healer-captures-dirty-tree-fix-001"` ✅
+5. Dispatch: gc-healer-captures-dirty-tree-fix-001 → /home/larry/agents/inboxes/beacon/. ✅
+6. `cycle_tier_state.py record --checks-clean false` → tier stays 1, consecutive_clean=0. ✅
+
+**Dispatches:** gc-healer-captures-dirty-tree-fix-001 → Beacon inbox (direction-ask: G-rule droplet-uncommitted:main 3/3; spec fix for GC healer dirty-tree windows in captures.json).
+
+**Patterns:**
+- G-rule droplet-uncommitted:main: **3/3 → DISPATCHED** (gc-healer-captures-dirty-tree-fix-001 to Beacon). Reset to 0/3.
+- G-rule missions-card-gc-warn-vs-info: **2/3** (new: alert 926 severity=warning, 0-action GC). Watch; dispatch at 3/3.
+- G-rule missions-autoregister-warn-vs-info: 2/3. Carry.
+- G-rule alert-translations-no-patterns-delivery-confirmation-tier4: 2/3. Carry.
+- G-rule F24-empty-prompt-envelope-rejected: 1/3. Carry.
+- G-rule timer-cycle-no-journal-entry: 0/3. Carry.
+- G-rule Forge-timeout-worktree-missing-retry-loop: 1/3. Carry.
+- G-rule heal-stale-daemon-script_path-cosmetic: 1/3. Carry.
+- G-rule Forge-preflight-marker-error-retry: 1/3. Carry.
+
+**Standing findings:**
+- [yellow] **PR #497 REVIEW_ESCALATE** — statusCheckRollup=FAILURE (85th consecutive iter). Close: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core`. [carry]
+- [yellow] **unreviewed-merge:499** — Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed'. [carry]
+- [yellow] **unreviewed-merge:494** — DM sent iter ~1694. Reply or silence. [carry]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614. Reply or silence. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **TSR DAG sequence** — PR #504 ✅. PR #505 MERGED ✅. Step 3 (tsr-missions-sequence-inflight-digest): PR #506 OPEN (MERGEABLE), Mirror review RUNNING (PID 2871217, 18:02Z). Next: Mirror PASS → auto-merge. [ADVANCING]
+- [blue] **gc-healer-captures-dirty-tree-fix-001** — dispatched to Beacon (G-rule 3/3). Pending Beacon spec → Forge build.
+- [blue] **Check I medic-operator-scaffold-001** — 24.4σ; `/dispatch 1` if re-run needed. [carry]
+- [blue] **catalog-accuracy-drift** — 8/34 ourliberty-graph shelf cards drifted (attention rate 24%). journal-note. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — DISPATCHED (reset 0/3). Watch for recurrence.
+- [blue] **G-rule missions-card-gc-warn-vs-info** — 2/3. Watch; dispatch at 3/3.
+- [blue] **G-rule missions-autoregister-warn-vs-info** — 2/3. [carry]
+- [blue] **G-rule alert-translations-no-patterns-delivery-confirmation-tier4** — 2/3. [carry]
+- [blue] **G-rule missions-card-gc-warn-vs-info** — 1/3 → 2/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — 0/3. [carry]
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. [carry]
+- [blue] **G-rule heal-stale-daemon-script_path-cosmetic** — 1/3. [carry]
+- [blue] **G-rule Forge-preflight-marker-error-retry** — 1/3. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — last occurrence 13:22:39Z Jun-14 (self-healed). [carry]
+- [blue] **dag-preflight-revision gap** — PR #484 closed source=pulse gap; DAG markers still fall through. [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+- [blue] **Stale bash orphans** — PID 1834248 (~17d+) + PID 2605007 (~13h+). Ss, 0% CPU. [carry]
+- [blue] **dashboard_api PID change** — restarted ~17:58Z (PID 2744674→2868353); cause unknown; running fine. [note]
+
+**PRIME DIRECTIVE:** 2 new interventions (Alert-926 Tier-4; G-rule droplet-uncommitted:main 3/3), 1 new systemic_fix (Beacon dispatch gc-healer-captures-dirty-tree-fix-001). interventions=917, systemic_fixes=43, ratio≈21.33 (improving).
+**Tier end-of-iter:** **Tier 1** (--checks-clean false; Check 0 Tier-4 alert + G-rule dispatch; consecutive_clean=0).
+
+---
+
 ## Iteration ~1808 — 2026-06-14 17:53Z UTC (interactive, /cycle, Tier 1, signal: TSR step 3 BUILD running + PR #497 [yellow] carry)
 
 **Trigger:** Larry direct invocation (`/cycle`).
