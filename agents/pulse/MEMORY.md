@@ -66,9 +66,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 13:07Z UTC (Iter ~1779, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 13:15Z UTC (Iter ~1780, Tier 1, consecutive_clean=0)
 
-**Iter ~1779 summary:** All checks nominal. PR #497 MERGEABLE=UNKNOWN (56th consecutive iter, carry), no action. Phase 4 meaning-layer sequence COMPLETE: PRs #498/#500/#501/#502/dashboard#54 all MERGED. Heartbeat at `blackboard/heal-stale-daemon-code.heartbeat` 12:37:19Z (fresh, ~30 min). All inboxes clear. HEAD=2b032a71=origin/main. Sync: 12:22:27Z (status=no-change). PRIME DIRECTIVE: interventions=911, systemic_fixes=41, ratio≈22.22, trend=flat. **Tier:** Tier 1. Pipeline stall: 0 stalls, 13 FORGE_NO_PR_SKIP (stable). Larry last message 'Status' at 12:02Z.
+**Iter ~1780 summary:** Check 2 finding: Larry asked 'Check the pending approval for validity' at 13:11Z. `fix-alert-triage-watermark-durability-001` in beacon-pending-approvals.json is STALE — PR #482 shipped the fix on 2026-06-12. Dedicated watermark store live at `~/agents/state/alert-triage-watermark.json` (last_claimed_line=918). Reported to Larry directly. All other checks nominal. PR #497 MERGEABLE=UNKNOWN (57th consecutive iter, carry). Heartbeat fresh (13:07:19Z). All inboxes clear. HEAD=cb2e2890=origin/main. Sync: 12:22:27Z (status=no-change). PRIME DIRECTIVE: interventions=912, systemic_fixes=41, ratio≈22.22, trend=flat. **Tier:** Tier 1.
 
 ---
 
@@ -96,4 +96,4 @@
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
 | Stale bash orphan loops | [blue] PIDs 1834248 (May 28, 16+ days) + 2605007 (Jun 13). Sleeping, 0% CPU. | Carry; cleanup when convenient |
-| fix-alert-triage-watermark-durability-001 | [blue] Pending in beacon-pending-approvals (Jun-12) | Carry |
+| fix-alert-triage-watermark-durability-001 | [blue] **STALE** — PR #482 shipped fix Jun-12; store live | Remove from beacon-pending-approvals.json |
