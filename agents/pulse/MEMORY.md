@@ -66,30 +66,29 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 14:09Z UTC (Iter ~1786, Tier 2, consecutive_clean=1)
+## Status snapshot — updated 2026-06-14 14:21Z UTC (Iter ~1787, Tier 2, consecutive_clean=2)
 
-**Iter ~1786 summary:** 0 new alerts (watermark=919 = file length). All 5 expected agents live. Inboxes clean (Beacon has fresh forge-result notify for adopt-terminal-state-reconciliation-spec, ~3 min old — in-flight, not stall). No stalls. No auto-fix actions. Iter clean. PR #497: MERGEABLE=MERGEABLE (async flip back), statusCheckRollup=FAILURE — not clean+green, 62nd carry iter. sync.json status=error carry from self-healed iter ~1782; not a live finding. adopt-terminal-state-reconciliation-spec: Forge completed, notify in Beacon inbox. PRIME DIRECTIVE: interventions≈914, systemic_fixes=41, ratio≈22.29, trend=flat. **Tier:** **Tier 2** (consecutive_clean 0→1; 2 more clean Tier-2 iters to de-escalate to Tier 3).
+**Iter ~1787 summary:** 0 new alerts (watermark=919 = file length). All 5 expected agents live. All inboxes EMPTY (adopt-terminal-state-reconciliation-spec resolved — Beacon processed between ~1786 and ~1787). No stalls. No auto-fix actions. Iter clean. PR #497: MERGEABLE=UNKNOWN (async oscillation), statusCheckRollup=FAILURE — not clean+green, 63rd carry iter. sync.json status=error carry from self-healed iter ~1782; not a live finding. PRIME DIRECTIVE: interventions≈914, systemic_fixes=41, ratio≈22.29, trend=flat. **Tier:** **Tier 2** (consecutive_clean 1→2; 1 more clean Tier-2 iter to de-escalate to Tier 3).
 
 ---
 
-## Key standing items (as of iter ~1786)
+## Key standing items (as of iter ~1787)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=MERGEABLE (async flip), statusCheckRollup=FAILURE, no reviewDecision (~62 iters: ~1724→~1786) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (async oscillation), statusCheckRollup=FAILURE, no reviewDecision (~63 iters: ~1724→~1787) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| adopt-terminal-state-reconciliation-spec | [blue] IN-FLIGHT — Forge completed at 14:05Z Jun-14; Beacon notify in inbox | Beacon to process; track resolution |
 | catalog-accuracy-drift | [blue] 8/34 ourliberty-graph shelf cards drifted (attention rate 24%, gate 10%) | route=digest; journal-note only |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
 | G-rule missions-autoregister-warn-vs-info | [blue] **2/3** | Watch; dispatch at 3/3 |
 | G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule alert-translations-no-patterns-delivery-confirmation-tier4 | [blue] **2/3** | Watch; dispatch at 3/3 |
 | G-rule missions-card-gc-warn-vs-info | [blue] 1/3 | Watch; dispatch at 3/3 |
-| G-rule droplet-uncommitted:main | [blue] **2/3** (last occurrence 13:22:39Z Jun-14, self-healed; no new occurrence iter ~1786) | Watch; dispatch at 3/3 |
+| G-rule droplet-uncommitted:main | [blue] **2/3** (last occurrence 13:22:39Z Jun-14, self-healed; no new occurrence iter ~1787) | Watch; dispatch at 3/3 |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] 1/3 | Watch |
 | G-rule timer-cycle-no-journal-entry | [blue] **0/3** (RESET; false positive confirmed by Beacon) | Forge PR pending: approve/reject timer-label-fix |
 | G-rule heal-stale-daemon-script_path-cosmetic | [blue] 1/3 | Watch; dispatch at 3/3 |
