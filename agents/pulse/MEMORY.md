@@ -60,23 +60,22 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 08:59Z UTC (Iter ~1746, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 09:03Z UTC (Iter ~1747, Tier 1, consecutive_clean=0)
 
-**Iter ~1746 summary:** Alert watermark: 1003/1003 (0 new). Mirror PID 2693575 RESOLVED (PR #500 review_revision → Forge revision-1 dispatched → Mirror re-review round=1 dispatched to PID 2696041). PR #497 OPEN (MERGEABLE=UNKNOWN, 23rd consecutive iter). No new WARNs/ERRORs. PRIME DIRECTIVE: interventions=878, systemic_fixes=41, ratio=21.39, trend=flat. HEAD=5891411b=origin/main. Sync: 08:22:16Z (status=error, self-heals). **Tier:** Tier 1.
+**Iter ~1747 summary:** Auto-fixed repo 1 behind origin/main (ff to 94f69e4e — PR #500 merge). PR #500 (`p4-meaning-layer-narrator`, meaning-layer Phase 4 step 1a) CONFIRMED MERGED ✅ 03:00:58Z UTC; missions-v2-phase4 SEQUENCE_STEP_MERGED. All inboxes empty. Alert watermark: 1003/1003 (0 new). PR #497 OPEN (MERGEABLE=UNKNOWN, 24th consecutive iter). No new WARNs/ERRORs. PRIME DIRECTIVE: interventions=879, systemic_fixes=41, ratio=21.44, trend=flat. HEAD=94f69e4e=origin/main. Sync: 08:22:16Z (status=error, self-heals). **Tier:** Tier 1.
 
 ---
 
-## Key standing items (as of iter ~1746)
+## Key standing items (as of iter ~1747)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (23 iters: ~1724→~1746) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (24 iters: ~1724→~1747) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry 05:02:56Z without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| PR #500 in Mirror rev1 review | [blue/watch] p4-meaning-layer-narrator; Mirror PID 2696041 reviewing round=1 | Watch: expect merge or review-request |
 | fix-alert-triage-watermark-durability-001 | [blue] 1 stale entry in beacon-pending-approvals (Jun-12) | Carry |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
 | G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3 | Watch; dispatch at 3/3 |
