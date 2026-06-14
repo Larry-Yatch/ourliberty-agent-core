@@ -4,6 +4,80 @@
 
 ---
 
+## Iteration ~1703 — 2026-06-14 03:13Z UTC (interactive, /cycle, Tier 1→2 de-escalation, consecutive_clean 2→3→0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. All checks nominal. 2 new alerts (both Tier-3/nominal). 0 interventions. Tier 1→2 de-escalation.
+
+**VERIFY-BEFORE-REASSERT (iter ~1702 carries):**
+- unreviewed-merge:494: Bot log last entry idx=978 (19:55:58 MDT Jun-13). No new Larry reply. **CARRY** [yellow].
+- unreviewed-merge:489: No new Larry reply. **CARRY** [yellow].
+- Check 5 (heal-stale-daemon-code-state.json): MISSING confirmed. **CARRY** [blue].
+- beacon-pending-approvals: 2 stale entries (Jun-12) confirmed. **CARRY** [blue].
+- timer-label-fix binary: Beacon holding Forge dispatch. No new Larry reply. **CARRY** [blue].
+
+**Check 0 — Alert triage:** Watermark=982 (iter ~1702 set-watermark did not persist — interactive session gap). File=984 lines. 2 new alerts:
+- Line 983: kind=notification, intent=review-pass — "Mirror approved PR #496, auto-merged + branch deleted" (02:57:16Z). Delivery confirmation. Tier 3 / nominal. ✅
+- Line 984: sync.service warning (02:59:39Z) — "push failed; rolled back; self-heals on next tick." Self-healed confirmed (HEAD=1c01ccf=origin/main). Tier 3 / nominal. ✅
+- New watermark: **984**. ✅ 0 actionable alerts.
+
+**Check 1 — Log noise:** 2 WARNs in last 24h (both at Jun-13 13:41:32 — pr-url-shape-invalid for catalog-drift-facts-sync-001). RESOLVED by PR #493 (merged 21:12Z Jun-13). Not actively firing. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message: "Go" at 20:45:30 MDT Jun-13 → approved unreviewed-merge-missions-exemption-001. Fully resolved (PR #496 merged). No new Larry directives since. No distress keywords in bot logs. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → no stalls. Same 5 FORGE_NO_PR_SKIPs (#490, #491, #492, catalog-drift-preflight-exit, #493). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 2 stale entries (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001, both Jun-12). No actionable. ✅ Nominal carry.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING. Known [blue] carry. ✅
+
+**Check A — Source repo:** On main. Working tree clean. HEAD=1c01ccf=origin/main. 0 ahead, 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** sync.json shows last_sync=02:59:39Z (~13 min at check time), status=error (stale from self-healed push-fail). HEAD=1c01ccf=origin/main confirms actual sync is current. ✅ Nominal. ([blue] sync-push-rebase-loop-001 UNREGISTERED AR carry.)
+
+**Check C — Agent liveness:** 5/5 PIDs alive (same PIDs as iter ~1702):
+- beacon_telegram_bot: PID 2517973 (elapsed ~09h26m) ✅
+- chain_event_shipper: PID 1849505 (elapsed ~2d 7h23m) ✅
+- outbox_notifier: PID 2552416 (elapsed ~5h37m) ✅
+- dashboard_api: PID 2322792 (elapsed ~1d 3h14m) ✅
+- inbox_watcher: PID 2530123 (elapsed ~7h47m) ✅
+
+**Check D — Inboxes:** All empty (beacon, forge/non-archive, mirror, pulse). ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open PRs. ourliberty-graph: 0 open PRs. ✅ Nominal.
+
+**Actions taken:**
+1. Alert watermark advanced 982→984 (2 Tier-3/nominal alerts claimed). ✅
+2. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` → 03:13:24Z. ✅
+3. `cycle_tier_state.py record --checks-clean true` → Tier 1 consecutive_clean 2→3 → **DE-ESCALATE to Tier 2**, consecutive_clean reset to 0, 03:13:25Z. ✅
+
+**Dispatches:** None.
+
+**Standing findings:**
+- [yellow] **unreviewed-merge:494** — DM sent iter ~1694 (01:54Z Jun-14). Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed'. [carry]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614; no Larry reply. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **timer-label-fix binary** — Beacon holding Forge dispatch. Larry binary: `approve timer-label-fix` or `reject timer-label-fix`. [carry]
+- [blue] **Check I medic-operator-scaffold-001** — 24.4σ ($6.72 vs $1.68); prior dispatch 2026-06-10. `/dispatch 1` if re-run needed. [carry]
+- [blue] **beacon-pending-approvals stale entries** — 2 entries (Jun-12). [carry]
+- [blue] **G-rule dispatch-branch-cleanup-warning** — 2/3. [carry]
+- [blue] **G-rule heal-stale-daemon-code-auto-restart-needs-template** — 2/3. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 1/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **G-rule alert-translations-no-patterns-delivery-confirmation-tier4** — 0/3. [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — RESET 0/3 (false positive). [carry]
+- [blue] **Check 5 MISSING** — heal-stale-daemon-code-state.json absent. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — [carry]
+- [blue] **dag-preflight-revision gap** — [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+
+**PRIME DIRECTIVE:** 0 new interventions. 1 iter_clean appended (03:13:24Z). Script-authoritative: interventions=839, systemic_fixes=39, verification_pending=11, ratio=21.51, trend=flat.
+**Tier end-of-iter:** Tier 2, consecutive_clean=0. (De-escalated from Tier 1 after 3 consecutive clean iters.)
+
+---
+
 ## Iteration ~1702 — 2026-06-14 03:07Z UTC (interactive, /cycle, Tier 1, consecutive_clean 1→2)
 
 **Trigger:** Larry direct invocation (`/cycle`).

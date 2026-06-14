@@ -48,9 +48,15 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 03:07Z UTC (Iter ~1702, Tier 1, consecutive_clean=2)
+## Alert watermark persistence gap (learned 2026-06-14 iter ~1703)
 
-**Iter ~1702 summary:** Alert watermark: 984 (+2 both Tier-3/nominal). PRIME DIRECTIVE: interventions=839, systemic_fixes=39, verification_pending=11, ratio=21.51, trend=flat. All 5 daemons alive (same PIDs). HEAD=e12520e=origin/main. Sync: last_sync=02:59:39Z (sync.service transient push error, self-healed; repo clean+synced). PR #496 MERGED at 02:57:16Z (Mirror REVIEW_PASS + auto-merge). Inboxes: all empty. timer-cycle-no-journal-entry-001 Beacon result archived: FALSE POSITIVE confirmed, Beacon holding Forge dispatch pending Larry binary. **Tier:** Tier 1, consecutive_clean=2.
+**Rule:** In interactive `/cycle` sessions, `alert_triage_state.py set-watermark` is called by Pulse's journal narrative but NOT always committed before session end. On next iter, get-watermark returns the pre-session value (e.g., 982 instead of expected 984). Check the watermark at start of each iter and advance it if the lines in question have already been triaged (Tier-3/nominal). Do NOT re-triage — just confirm against prior journal and advance. This is structural: interactive sessions may not persist watermark if Pulse exits before the explicit set-watermark step.
+
+---
+
+## Status snapshot — updated 2026-06-14 03:13Z UTC (Iter ~1703, Tier 2, consecutive_clean=0)
+
+**Iter ~1703 summary:** Alert watermark: 984 (advanced from 982; 2 Tier-3/nominal lines re-claimed). PRIME DIRECTIVE: interventions=839, systemic_fixes=39, verification_pending=11, ratio=21.51, trend=flat. All 5 daemons alive (same PIDs). HEAD=1c01ccf=origin/main. Sync: sync.json stale-error (02:59Z), self-healed; actual repo synced. Inboxes: all empty. 0 open PRs. **Tier:** DE-ESCALATED to Tier 2, consecutive_clean=0 (3 consecutive clean iters at Tier 1).
 
 ---
 
