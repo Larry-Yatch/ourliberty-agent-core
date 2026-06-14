@@ -48,6 +48,12 @@
 
 ---
 
+## Status snapshot — updated 2026-06-14 01:54Z UTC (Iter ~1694, interactive /cycle, Tier 3→1 reset, consecutive_clean 5→0)
+
+**Iter ~1694 summary:** Alert watermark: 978 (3 new: dispatch-branch-cleanup/digest, Forge catalog-drift rejection/closure, unreviewed-merge:494/[yellow]). Tier 3→1 RESET (signal: unreviewed-merge:494 + fast-forward). PRIME DIRECTIVE (script-authoritative): interventions=837, systemic_fixes=37, verification_pending=11, ratio=22.62, trend=flat. All daemons alive (same PIDs). Fast-forward: f662d2a → a2ff03e (PR #494 merge). Sync: last_sync=00:59:26Z (~55 min, nominal). **catalog-drift-facts-sync-001 RESOLVED**: Forge formally rejected (work done on main PR#1); beacon-pending now 2 entries (down from 3). **New [yellow]**: unreviewed-merge:494 (PR #494, Larry-authored missions promotion, merged without Mirror review; DM sent). G-rule unreviewed-merge: **2/3** (#489 + #494). **New PR #495 OPEN**: missions promotion, no Mirror review, created 01:45Z — not in 30m window yet. **G-rule dispatch-branch-cleanup-warning**: 1/3 (first observation). **CARRY:** unreviewed-merge:489 [yellow], Tier-2 weekly probe auth_401, Check III `approve threshold-update-2026-06-11`, beacon-pending 2 stale entries (Jun-12 x2), Check I proposal medic-operator-scaffold-001 [blue], G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 2/3, G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, G-rule alert-translations-no-patterns-delivery-confirmation-tier4 0/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. **Tier:** Tier 1, consecutive_clean=0.
+
+---
+
 ## Status snapshot — updated 2026-06-14 01:22Z UTC (Iter ~1693, interactive /cycle, Tier 3, consecutive_clean 4→5)
 
 **Iter ~1693 summary:** Alert watermark: 975 (0 new). Tier 3, consecutive_clean 4→5 (steady-state). PRIME DIRECTIVE (script-authoritative): interventions=836, systemic_fixes=37, verification_pending=11, ratio=22.59, trend=flat. All checks nominal. 5/5 daemons same PIDs (beacon_telegram_bot:2517973, chain_event_shipper:1849505, outbox_notifier:2552416, dashboard_api:2322792, inbox_watcher:2530123). 0 open PRs. git: clean, HEAD=633a526=origin/main. Sync: last_sync=00:59:26Z (~23 min, nominal). Pipeline skip list 5 items (stable). **Conditional:** Check I SKIP (check-i-2026-06-14.json exists from ~1691). Check III SKIP (3d artifact, < 14d). **CARRY:** unreviewed-merge:489 [yellow], Tier-2 weekly probe auth_401, Check III `approve threshold-update-2026-06-11`, beacon-pending-approvals 3 stale entries (2x Jun-12 + catalog-drift Jun-13), Check I proposal medic-operator-scaffold-001 [blue], G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 2/3, G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, G-rule alert-translations-no-patterns-delivery-confirmation-tier4 0/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. **Tier:** Tier 3, consecutive_clean=5. (Steady-state.)
@@ -78,15 +84,19 @@
 
 ---
 
-## Key standing items (as of iter ~1692)
+## Key standing items (as of iter ~1694)
 
 | Item | Status | Action needed |
 |---|---|---|
-| unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
+| unreviewed-merge:494 | [yellow] DM sent iter ~1694 | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
+| unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Superseded by :494; Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
+| PR #495 OPEN | [blue] missions promotion, no Mirror review | Mirror review needed; created 01:45Z |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
-| beacon-pending-approvals | [blue] 3 stale entries (2x Jun-12 + catalog-drift Jun-13) | Carry; no actionable pending |
+| beacon-pending-approvals | [blue] 2 stale entries (2x Jun-12) | Carry; no actionable pending |
+| G-rule unreviewed-merge | [blue] 2/3 (#489 + #494) | Dispatch at 3/3 |
+| G-rule dispatch-branch-cleanup-warning | [blue] 1/3 (first: iter ~1694) | Watch |
 | G-rule timer-cycle-no-journal-entry | [blue] 1/3 | Watch |
 | G-rule heal-stale-daemon-code-auto-restart-needs-template | [blue] 2/3 | Dispatch at 3/3 |
 | G-rule droplet-uncommitted:main | [blue] 1/3 | Watch |
@@ -96,9 +106,9 @@
 | sync-push-rebase-loop-001 | [blue] UNREGISTERED AR | Carry |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
+| catalog-drift-facts-sync-001 | RESOLVED — Forge rejected (work done on main PR#1) | CLOSED iter ~1694 |
 | source=pulse-cycle-self-report | RESOLVED — PR #490 merged Jun-13 | CLOSED |
 | approval_request-delivery-confirmation | RESOLVED — PR #491 merged Jun-13 | CLOSED |
 | notifier-autopr-allowlist-from-config-001 | RESOLVED — PR #493 merged 21:12Z Jun-13 | CLOSED |
-| catalog-drift-facts-sync-001 | RESOLVED — ourliberty-graph PR #1 merged ~1674 | CLOSED |
 | agent-models-allowlist-not-on-main | RESOLVED — commit e427631 | CLOSED |
 | wire-pulse-check-iv-cadence-001 | RESOLVED — PR #488 merged; timer active | CLOSED |
