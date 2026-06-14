@@ -54,28 +54,28 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 04:34Z UTC (Iter ~1710, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 04:43Z UTC (Iter ~1711, Tier 1, consecutive_clean=0)
 
-**Iter ~1710 summary:** Alert watermark: 988 (no change, 0 new alerts). PRIME DIRECTIVE: interventions=842, systemic_fixes=40, verification_pending=11, ratio=21.05, trend=flat. All 5 daemons alive (same PIDs). HEAD=d27ec1c=origin/main. Sync: 03:59:51Z no-change (healthy). missions-proposed Forge second run in-flight (PID 2602672). PR #497 Mirror REVIEW_ESCALATE — spec invalid, fix already in translations.json, close PR. **Tier:** Tier 1 (signal: PR #497 escalation).
+**Iter ~1711 summary:** Alert watermark: 989 (1 new alert — dispatch-branch-cleanup warning, nominal/translations.json handles). PRIME DIRECTIVE: interventions=843, systemic_fixes=40, verification_pending=11, ratio=21.075, trend=flat. All 5 daemons alive (same PIDs). HEAD=ea3a409=origin/main. Sync: 03:59:51Z (38 min ago, within threshold). Forge PID 2602672 in-flight (missions-proposed-lane-signal-hardening-001, PR #498 created 04:29:54Z). PR #497 REVIEW_ESCALATE carry — close without merge. **Tier:** Tier 1 (signal: PR #497 carry).
 
 ---
 
-## Key standing items (as of iter ~1710)
+## Key standing items (as of iter ~1711)
 
 | Item | Status | Action needed |
 |---|---|---|
+| PR #497 REVIEW_ESCALATE | [yellow] Carry since iter ~1710 — Mirror found spec invalid; Beacon: fix already in alert-translations.json | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| PR #497 REVIEW_ESCALATE | [yellow] NEW iter ~1710 — Mirror found spec invalid; Beacon: fix already in alert-translations.json | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
-| missions-proposed-lane-signal-hardening-001 | [blue] Forge second run in-flight (PID 2602672, 04:08Z) | Watch for PR |
+| missions-proposed-lane-signal-hardening-001 | [blue] Forge second run in-flight (PID 2602672, 04:08:19Z). PR #498 created 04:29:54Z. | Watch for Forge completion + outbox-notifier Mirror dispatch |
 | fix-alert-triage-watermark-durability-001 | [blue] 1 stale entry in beacon-pending-approvals (Jun-12) | Carry |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
-| G-rule dispatch-branch-cleanup-warning | RESOLVED — PR #497 Mirror ESCALATED; fix already in translations.json | No further dispatch |
+| G-rule dispatch-branch-cleanup-warning | RESOLVED — translations.json handles display; PR #497 close pending | No further dispatch |
 | G-rule heal-stale-daemon-code-auto-restart-needs-template | [blue] 2/3 | Dispatch at 3/3 |
 | G-rule alert-translations-no-patterns-delivery-confirmation-tier4 | [blue] 2/3 | Watch; dispatch at 3/3 |
-| G-rule missions-card-gc-warn-vs-info | [blue] 1/3 | Watch; dispatch at 3/3 — missions-card-gc severity=warning on GC runs should be severity=info |
+| G-rule missions-card-gc-warn-vs-info | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule droplet-uncommitted:main | [blue] 1/3 | Watch |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] 1/3 | Watch |
 | G-rule timer-cycle-no-journal-entry | RESET 0/3 — false positive | Recalibrate |
