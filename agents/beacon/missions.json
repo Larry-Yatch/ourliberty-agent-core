@@ -2672,7 +2672,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T23:40:09.810610+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-04T06:07:38.991185+00:00"
+      "orphan_last_activity_ts": "2026-06-04T06:07:38.991185+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T09:27:33.644222+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-unreviewed-merge:489",
