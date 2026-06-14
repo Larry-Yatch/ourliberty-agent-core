@@ -66,22 +66,23 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 16:28Z UTC (Iter ~1795, Tier 1, signal: PR #497 carry)
+## Status snapshot — updated 2026-06-14 16:35Z UTC (Iter ~1796, Tier 1, signal: PR #497 carry + DAG pass)
 
-**Iter ~1795 summary:** All checks 0–5 + A–E nominal. 0 new alerts (watermark stays at 922). Larry asked Beacon "What is the next step since the spec merged?" at 16:26Z — no Pulse directive. 0 new interventions. G-rule adopt-terminal-state-forge-stall RESOLVED (removed from tracking). PRIME DIRECTIVE: interventions=915, systemic_fixes=42, ratio≈21.79, trend=flat. **Tier: Tier 1** (PR #497 [yellow] carry in Check E; consecutive_clean=0).
+**Iter ~1796 summary:** All checks 0–5 + A–E nominal. 1 new alert (line 923): mirror-dag-pass:terminal-state-reconciliation — DAG preflight PASSED 16:30:46Z, sequence pending→active, Forge first build step dispatch imminent. Triage: Tier-4 expected-workflow; outbox-notifier handles route=escalate; no Pulse DM; watermark advanced 922→923. 0 new interventions. PRIME DIRECTIVE: interventions=915, systemic_fixes=42, ratio≈21.79, trend=flat. **Tier: Tier 1** (PR #497 [yellow] carry in Check E; consecutive_clean=0).
 
 ---
 
-## Key standing items (as of iter ~1795)
+## Key standing items (as of iter ~1796)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (71st iter: ~1724→~1795) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (72nd iter: ~1724→~1796) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
+| terminal-state-reconciliation build sequence | [blue] DAG PREFLIGHT PASSED 16:30:46Z Jun-14; sequence pending→active; Forge first step dispatch imminent | Watch next iter for Forge inbox task + PR |
 | catalog-accuracy-drift | [blue] 8/34 ourliberty-graph shelf cards drifted (attention rate 24%, gate 10%) | route=digest; journal-note only |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
 | G-rule missions-autoregister-warn-vs-info | [blue] **2/3** | Watch; dispatch at 3/3 |
