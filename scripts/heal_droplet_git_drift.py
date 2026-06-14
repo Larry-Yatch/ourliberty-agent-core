@@ -16,6 +16,10 @@ recovery hint:
   - UNCOMMITTED: any uncommitted change whose newest mtime is older than
             6 hours. The age signal is the *newest* mtime so a stale edit
             session sitting overnight trips while an active edit doesn't.
+            Healer-managed runtime paths (config/healer-managed-runtime-paths.json,
+            e.g. captures.json) are subtracted first — a tree whose only dirt is
+            those files is nominal-by-design and never pages; the 6h gate then
+            applies to the remaining non-managed dirt only.
 
 Observation-only by construction: no auto-pull / auto-push / auto-commit.
 Broken main on origin or mid-edit local state must NEVER be silently
@@ -52,6 +56,21 @@ HEARTBEAT_FILE = AGENTS_ROOT / 'blackboard' / 'heal-droplet-git-drift.heartbeat'
 STATE_FILE = AGENTS_ROOT / 'state' / 'heal-droplet-git-drift-cooldowns.json'
 
 REPO_ROOT = Path(os.environ.get('OURLIBERTY_REPO_ROOT', '/home/larry/agent-core'))
+
+# Canonical allowlist of working-tree files written by a healer/ingest on its
+# own cadence and committed by a SOLE healer-committer on a timer. A tree whose
+# ONLY dirt is these paths is nominal-by-design (Missions v2 § 4 batched
+# durability), not a discipline violation — so it must NOT page. Loaded from the
+# repo the code is versioned with (next to scripts/), not REPO_ROOT, so the list
+# travels with the script regardless of which working tree is being inspected.
+HEALER_MANAGED_RUNTIME_PATHS_FILE = (
+    _SCRIPTS_DIR.parent / 'config' / 'healer-managed-runtime-paths.json'
+)
+# Hardcoded fallback so a JSON read/parse failure never crashes the tick nor
+# silences a real stale-edit alert. Kept consistent with the canonical JSON and
+# with _lib_pulse_runtime.sh SYNC_EXTRA_RUNTIME_PATHS by the drift test in
+# scripts/tests/test_heal_droplet_git_drift.py.
+_HEALER_MANAGED_PATHS_FALLBACK = ('agents/beacon/captures.json',)
 
 GIT_TIMEOUT_S = 30
 
@@ -233,6 +252,23 @@ def uncommitted_files() -> list[str]:
     return paths
 
 
+def healer_managed_paths() -> tuple[str, ...]:
+    """Return the canonical healer-managed runtime paths.
+
+    Read from HEALER_MANAGED_RUNTIME_PATHS_FILE; fall back to the hardcoded
+    tuple if the file is missing/unreadable/malformed so a read failure never
+    breaks the drift check (it would otherwise either crash or, worse, suppress
+    a real alert)."""
+    try:
+        data = json.loads(HEALER_MANAGED_RUNTIME_PATHS_FILE.read_text())
+        paths = data.get('paths')
+        if isinstance(paths, list) and all(isinstance(p, str) for p in paths):
+            return tuple(paths)
+    except (FileNotFoundError, json.JSONDecodeError, OSError, AttributeError):
+        pass
+    return _HEALER_MANAGED_PATHS_FALLBACK
+
+
 def newest_mtime_of(paths: list[str], root: Path) -> Optional[float]:
     """Return the newest mtime among tracked-file paths, or None if none stat."""
     newest: Optional[float] = None
@@ -352,6 +388,15 @@ def evaluate_uncommitted(
     branch: str, state: dict, now: Optional[float] = None,
 ) -> bool:
     paths = uncommitted_files()
+    if not paths:
+        return False
+    # Subtract healer-managed runtime paths first: a tree whose ONLY dirt is
+    # those files is nominal-by-design and must not page at any mtime age. The
+    # 6h gate then applies to the REMAINING (non-managed) dirt only, so a real
+    # stale edit still pages and is named — while captures.json's batched-
+    # durability window stays silent.
+    managed = set(healer_managed_paths())
+    paths = [p for p in paths if p not in managed]
     if not paths:
         return False
     newest = newest_mtime_of(paths, REPO_ROOT)

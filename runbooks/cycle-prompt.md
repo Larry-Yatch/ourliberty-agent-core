@@ -395,8 +395,11 @@ These checks were the legacy Checks A-H before the upgrade. They remain load-bea
 |---|---|---|
 | On main, clean, behind origin | always-fix | `git -C ~/agent-core/ pull --ff-only` |
 | Not on main | never-auto | Working-copy discipline violated. Escalate. |
-| Dirty tree | never-auto | Long-lived uncommitted changes silently break sync. Escalate. |
+| Dirty tree — only healer-managed runtime paths | nominal | None. A tree whose ONLY dirt is the paths in `config/healer-managed-runtime-paths.json` (e.g. `agents/beacon/captures.json`, written by the missions ingest endpoint and committed by its SOLE committer `heal_missions_card_gc.py` on a timer) is nominal-by-design (Missions v2 § 4 batched durability), not a discipline violation. |
+| Dirty tree — any non-managed dirt | never-auto | Long-lived uncommitted changes silently break sync. Escalate (name the non-managed files; healer-managed paths are not the trigger). |
 | Diverged history | never-auto | Need human to decide rebase vs reset. Escalate. |
+
+**Enforcement:** the hard backstop is the allowlist subtraction in `scripts/heal_droplet_git_drift.py` (`evaluate_uncommitted` subtracts `config/healer-managed-runtime-paths.json` before the 6h-mtime gate, so a captures.json-only tree never fires `droplet-uncommitted` and any remaining non-managed dirt still pages). This Check A teach is the soft layer. Both consult the same canonical JSON; the JSON is drift-guarded against `_lib_pulse_runtime.sh` `SYNC_EXTRA_RUNTIME_PATHS` by `scripts/tests/test_heal_droplet_git_drift.py`.
 
 #### 4.2 Check B — Sync health
 
