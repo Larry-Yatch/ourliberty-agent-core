@@ -54,9 +54,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 06:52Z UTC (Iter ~1729, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 06:57Z UTC (Iter ~1730, Tier 1, consecutive_clean=0)
 
-**Iter ~1729 summary:** Alert watermark: 996/996 (0 new). All mandatory checks nominal. PR #497 OPEN (MERGEABLE=UNKNOWN, 6th consecutive iter). Forge PID 2602672 alive (~2h42m; forge.log silent since 04:08:19Z UTC; timeout ~08:08Z Jun-14 ~1h18m remaining). outbox-notifier quiescent (last 23:35:36 MDT Jun-13). PRIME DIRECTIVE: interventions=861, systemic_fixes=41, ratio=21.00, trend=flat. HEAD=10fa8f0=origin/main. Sync: 06:21:50Z (~29 min ago). **Tier:** Tier 1.
+**Iter ~1730 summary:** Alert watermark: 996/996 (0 new). All mandatory checks nominal. PR #497 OPEN (MERGEABLE=UNKNOWN, 7th consecutive iter). Forge PID 2602672 alive (~2h47m; forge.log silent since 04:08:19Z UTC; timeout ~08:08Z Jun-14 ~1h12m remaining). outbox-notifier quiescent (last 23:35:36 MDT Jun-13). PRIME DIRECTIVE: interventions=862, systemic_fixes=41, ratio=21.00, trend=flat. HEAD=039fbfa=origin/main. Sync: 06:21:50Z (~35 min ago). **Tier:** Tier 1.
 
 ---
 
