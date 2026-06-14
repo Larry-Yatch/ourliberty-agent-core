@@ -54,9 +54,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 03:13Z UTC (Iter ~1703, Tier 2, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 03:32Z UTC (Iter ~1704, Tier 2, consecutive_clean=1)
 
-**Iter ~1703 summary:** Alert watermark: 984 (advanced from 982; 2 Tier-3/nominal lines re-claimed). PRIME DIRECTIVE: interventions=839, systemic_fixes=39, verification_pending=11, ratio=21.51, trend=flat. All 5 daemons alive (same PIDs). HEAD=1c01ccf=origin/main. Sync: sync.json stale-error (02:59Z), self-healed; actual repo synced. Inboxes: all empty. 0 open PRs. **Tier:** DE-ESCALATED to Tier 2, consecutive_clean=0 (3 consecutive clean iters at Tier 1).
+**Iter ~1704 summary:** Alert watermark: 984 (no new alerts). PRIME DIRECTIVE: interventions=839, systemic_fixes=39, verification_pending=11, ratio=21.51, trend=flat. All 5 daemons alive (same PIDs). HEAD=a088258=origin/main. Sync: sync.json stale-error (02:59Z), self-healed; actual repo synced. Inboxes: all empty. 0 open PRs. **Tier:** Tier 2, consecutive_clean=1.
 
 ---
 
