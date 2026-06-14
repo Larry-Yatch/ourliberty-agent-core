@@ -247,6 +247,22 @@
       },
       "last_touched": "2026-06-11T20:00:50.396933+00:00",
       "promoted_to": null
+    },
+    {
+      "id": "cap-make-team-two-way-chat-a-dashboard-wide-layer-no-adaf",
+      "title": "Make team two-way chat a dashboard-wide layer (not just Missions)",
+      "note": "Larry's insight during the missions-board comprehension redo: the per-card pattern (plain-English briefing + 3-level risk signal + one-click hand-to-team + live chat thread) likely belongs across the WHOLE dashboard \u2014 Approvals, Operations, alerts \u2014 making the dashboard the primary human<->team interaction surface instead of Telegram. Telegram demoted to a doorbell that pings + deep-links into the card. Revisit as its own design pass after the Parked-lane proof.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ol-work",
+        "branch": "pr476-review",
+        "captured_at": "2026-06-14T04:06:50.430525+00:00"
+      },
+      "last_touched": "2026-06-14T04:06:50.430525+00:00",
+      "promoted_to": null
     }
   ]
 }
