@@ -54,13 +54,13 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 03:48Z UTC (Iter ~1705, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 03:54Z UTC (Iter ~1706, Tier 1, consecutive_clean=1)
 
-**Iter ~1705 summary:** Alert watermark: 985 (1 new alert, Tier-3). PRIME DIRECTIVE: interventions=840, systemic_fixes=40, verification_pending=11, ratio=21.0, trend=flat. All 5 daemons alive (same PIDs). HEAD=595ee08=origin/main. Sync: sync.json stale-error (02:59Z); actual repo synced via cycle wrapper. Inboxes: beacon has 1 new dispatch. 0 open PRs. G-rule dispatch-branch-cleanup-warning: DISPATCHED 3/3. **Tier:** Tier 1, consecutive_clean=0 (intervention).
+**Iter ~1706 summary:** Alert watermark: 986 (1 new alert, Tier-4/journal-note-only — approval_request delivery confirmation for cleanup-branch-warn-to-info-001). PRIME DIRECTIVE: interventions=840, systemic_fixes=40, verification_pending=11, ratio=21.0, trend=flat. All 5 daemons alive (same PIDs). HEAD=c26c495=origin/main. Sync: sync.json stale-error (02:59Z); actual repo synced. 0 open PRs. **Tier:** Tier 1, consecutive_clean=1 (clean iter).
 
 ---
 
-## Key standing items (as of iter ~1705)
+## Key standing items (as of iter ~1706)
 
 | Item | Status | Action needed |
 |---|---|---|
@@ -68,21 +68,22 @@
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| PR #496 MERGED | RESOLVED — merged 02:57:16Z Jun-14 (Mirror REVIEW_PASS + auto-merge) | CLOSED |
+| cleanup-branch-warn-to-info-001 | [blue] Forge plan ready, awaiting Larry approval (DM delivered 03:49Z Jun-14) | approve / reject |
 | timer-cycle-no-journal-entry-001 | FALSE POSITIVE — Beacon investigated, journals present, cosmetic label only; TASK CLOSED | Larry binary: `approve timer-label-fix` or `reject timer-label-fix` (Beacon holding; [blue] carry) |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
-| beacon-pending-approvals | [blue] 2 stale entries (2x Jun-12) | Carry; no actionable pending |
+| beacon-pending-approvals | [blue] 2 stale entries (2x Jun-12) + cleanup-branch-warn-to-info-001 (new) | Carry; cleanup entry awaiting approval |
 | G-rule dispatch-branch-cleanup-warning | [blue] DISPATCHED 3/3 (iter ~1705) | Beacon direction-ask sent: dispatch-branch-cleanup-loglevel-001 |
 | G-rule heal-stale-daemon-code-auto-restart-needs-template | [blue] 2/3 | Dispatch at 3/3 |
+| G-rule alert-translations-no-patterns-delivery-confirmation-tier4 | [blue] 1/3 (iter ~1706) | Watch; dispatch at 3/3 |
 | G-rule droplet-uncommitted:main | [blue] 1/3 | Watch |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] 1/3 | Watch |
-| G-rule alert-translations-no-patterns-delivery-confirmation-tier4 | [blue] 0/3 | Watch |
 | G-rule timer-cycle-no-journal-entry | RESET to 0/3 — false positive (cosmetic label; Beacon confirmed journals present) | Recalibrate: only count iters where journal entry is genuinely absent from the file |
 | Check 5 MISSING | [blue] heal-stale-daemon-code-state.json absent | G-rule dispatched ~iter 1416 |
 | sync-push-rebase-loop-001 | [blue] UNREGISTERED AR; new occurrence 02:59:39Z Jun-14 (self-healed) | Carry |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
-| unreviewed-merge:495 | RESOLVED — implicitly resolved by PR #496 exemption merge; DM delivered, no Larry reply needed | CLOSED iter ~1702 |
+| PR #496 MERGED | RESOLVED — merged 02:57:16Z Jun-14 (Mirror REVIEW_PASS + auto-merge) | CLOSED |
+| unreviewed-merge:495 | RESOLVED — implicitly resolved by PR #496 exemption merge | CLOSED iter ~1702 |
 | unreviewed-merge-missions-exemption-001 | RESOLVED — Larry approved 02:45Z Jun-14; Forge built PR #496; Mirror PASS + auto-merged 02:57Z Jun-14 | CLOSED iter ~1702 |
 | G-rule unreviewed-merge | RESOLVED — 3/3 dispatched iter ~1700; PR #496 systemic fix MERGED iter ~1702 | CLOSED |
 | catalog-drift-facts-sync-001 | RESOLVED — Forge rejected (work done on main PR#1) | CLOSED iter ~1694 |
