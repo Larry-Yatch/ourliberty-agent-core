@@ -66,9 +66,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 13:45Z UTC (Iter ~1784, Tier 1, consecutive_clean=2)
+## Status snapshot — updated 2026-06-14 13:49Z UTC (Iter ~1785, Tier 2, consecutive_clean=0)
 
-**Iter ~1784 summary:** 0 new alerts (watermark=919 = file length). All 5 expected agents live. Inboxes empty. No stalls. No auto-fix actions. Iter clean. PR #497: MERGEABLE=UNKNOWN (GitHub re-computed from MERGEABLE; not a formal Check E finding). sync.json status=error is carry from self-healed iter ~1782 event; not a new finding. PRIME DIRECTIVE: interventions=914, systemic_fixes=41, ratio≈22.29, trend=flat. **Tier:** Tier 1, consecutive_clean=2.
+**Iter ~1785 summary:** 0 new alerts (watermark=919 = file length). All 5 expected agents live. Inboxes empty. No stalls. No auto-fix actions. Iter clean. PR #497: MERGEABLE=MERGEABLE (async flip from UNKNOWN), mirror-review=FAILURE — not clean+green, not a formal Check E finding. sync.json status=error carry from self-healed iter ~1782 event; not a live finding. PRIME DIRECTIVE: interventions=914, systemic_fixes=41, ratio≈22.29, trend=flat. **Tier:** **Tier 2** (promoted from Tier 1 after 3 consecutive clean iters; consecutive_clean reset to 0).
 
 ---
 
@@ -76,7 +76,7 @@
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (flipped back from MERGEABLE), mirror-review=FAILURE, no reviewDecision (~60 iters: ~1724→~1784) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=MERGEABLE (async flip), mirror-review=FAILURE, no reviewDecision (~61 iters: ~1724→~1785) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
