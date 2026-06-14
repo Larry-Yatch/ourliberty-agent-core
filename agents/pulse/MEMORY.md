@@ -78,18 +78,18 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 22:47Z UTC (Iter ~1845, Tier 1, action)
+## Status snapshot — updated 2026-06-14 22:53Z UTC (Iter ~1846, Tier 1, carry)
 
-**Iter ~1845 summary:** PRs #509 + #510 crossed 30-min Check E threshold; Mirror review was never dispatched (non-standard branch names `docs/`, `work/` bypassed outbox-notifier AND heal-undispatched-pr-review). Escalated [yellow] DM to Larry (ask-then-do: merge-direct or trigger-Mirror). 0 new alerts (watermark=931). All mandatory checks otherwise clean. PR #497 121st carry. Orphans PID 1834248 (17.1d+) + PID 2605007 (18.4h+) carrying. §5.0 no-op. Rotations nominal. PRIME DIRECTIVE: iter_clean (ask-then-do sent, no auto-fix), ratio≈20.47. **Tier: Tier 1** (consecutive_clean=0).
+**Iter ~1846 summary:** All mandatory checks 0–5 nominal. PRs #509 + #510 carry (DM sent iter ~1845, no Larry reply yet; both now UNKNOWN, age ~32-34 min). Alert idx-932 = delivery confirmation of my own iter ~1845 escalation — Tier-4, journal-note only, no re-DM. PR #497 122nd carry. Watermark advanced to 932. PRIME DIRECTIVE: iter_clean (no auto-fix), ratio≈20.47. **Tier: Tier 1** (consecutive_clean=0).
 
 ---
 
-## Key standing items (as of iter ~1845)
+## Key standing items (as of iter ~1846)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (121st iter) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
-| PR #509 + #510 | [yellow] CLEAN >30 min; Mirror review NEVER dispatched (non-standard branch bypass); DM sent iter ~1845; await Larry direction | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (122nd iter) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #509 + #510 | [yellow] UNKNOWN >32 min; Mirror review NEVER dispatched (non-standard branch bypass); DM sent iter ~1845; await Larry direction | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
