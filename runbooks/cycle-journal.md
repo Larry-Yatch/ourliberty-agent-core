@@ -4,6 +4,101 @@
 
 ---
 
+## Iteration ~1718 — 2026-06-14 05:41Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Tier 1 — PR #497 REVIEW_ESCALATE carry + unreviewed-merge carries. **Key positive: missions-v2-phase4 build sequence now active; first step `p4-meaning-layer-narrator` dispatched to Forge inbox.**
+
+**VERIFY-BEFORE-REASSERT (iter ~1717 carries):**
+- dag-preflight-missions-v2-phase4 [yellow]: RESOLVED ✅ — Larry approved 23:32 MDT; Beacon dispatched to Mirror; Mirror returned DAG-preflight PASS at 23:34Z; sequence `missions-v2-phase4` transitioned `pending→active`; build_sequence_advancer dispatched `p4-meaning-layer-narrator.json` to Forge inbox at 23:35 MDT. beacon-pending-approvals confirms entry removed.
+- PR #497 REVIEW_ESCALATE: `gh pr list --state open` → OPEN, MERGEABLE=UNKNOWN, no reviewDecision. **CARRY** [yellow].
+- Forge PID 2602672: `ps -p 2602672` → ALIVE, elapsed 1h29m. forge.log last entry 22:08:19 MDT (Running, resume=45e53d6e). Within 14400s timeout (~08:08Z Jun-14). **CARRY** [blue/watch].
+- unreviewed-merge:499/494/489: Bot log shows no new Larry replies since last iter. **CARRY** [yellow].
+- heal-stale-daemon-restart-tier3-translation-001: Forge inbox confirms present (23:24 Jun-13). **CARRY** [blue, queued].
+- Check 5 (heal-stale-daemon-code-state.json): Confirmed MISSING. **CARRY** [blue].
+- fix-alert-triage-watermark-durability-001: beacon-pending-approvals = 1 entry (Jun-12). **CARRY** [blue].
+- sync-push-rebase-loop-001: sync.json last_sync=2026-06-14T05:21:45Z (16 min ago). **CARRY** [blue].
+
+**Check 0 — Alert triage:** Watermark=993, file=995 lines. 2 new alerts:
+- Line 994 (05:34:05Z): source=dispatch-branch-cleanup, severity=warning, route=digest — "pruned 1 local + 1 remote stale branch(es)." → **Tier 3** silence (known-pattern match in alert-translations.json). Journal-note only.
+- Line 995 (05:34:21Z): source=outbox-notifier, route=escalate — "Mirror DAG-preflight PASS for sequence `missions-v2-phase4`. Sequence transitioned `pending` → `active`." → **Tier 3** silence (known-pattern match). DM already delivered by bot at 23:34 MDT (idx=994). Journal-note only.
+Watermark advanced 993→995. ✅ No tier-reset (both Tier-3 silences per § 3.0 carve-out).
+
+**Check 1 — Log noise:** outbox_notifier.log not present (known). beacon_telegram_bot.log last entry 23:34:46 MDT (alert idx=994 delivered). No WARNs or ERRORs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Telegram activity: Larry 'Go' at 23:32 MDT → dag-preflight dispatched to Mirror → Mirror PASS → DM delivered 23:34 MDT. No new Larry messages. Phase 4 sequence now active; no unhandled directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → no stalls. 6 FORGE_NO_PR_SKIPs unchanged (#490, #491, #492, catalog-drift-preflight-exit, #493, #496). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 1 entry:
+- `fix-alert-triage-watermark-durability-001` (Jun-12 — stale [blue] carry).
+dag-preflight-missions-v2-phase4 entry REMOVED (approved + resolved). ✅
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING. Known [blue] carry. ✅
+
+**Check A — Source repo:** On main. Clean working tree. HEAD=0fb62b0=origin/main. 0 ahead, 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** sync.json last_sync=2026-06-14T05:21:45Z (~16 min ago), within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:**
+- beacon_telegram_bot: PID 2517973 (elapsed ~11h52m) ✅
+- chain_event_shipper: PID 1849505 (elapsed ~2d09h49m) ✅
+- outbox_notifier: PID 2552416 (elapsed ~08h04m) ✅
+- dashboard_api: PID 2627542 (elapsed ~32m) ✅
+- inbox_watcher: PID 2530123 (elapsed ~10h13m) ✅
+- Forge claude: PID 2602672 (elapsed ~01h29m, resume=45e53d6e, within 14400s timeout ~08:08Z Jun-14) ✅ Nominal.
+
+**Check D — Inboxes:** Forge: 3 tasks:
+- `build-missions-proposed-lane-signal-hardening-001.json` (active, PID 2602672 alive)
+- `heal-stale-daemon-restart-tier3-translation-001.json` (queued, dispatched 23:24 MDT Jun-13)
+- `p4-meaning-layer-narrator.json` (NEW — Phase 4 step-1, dispatched 23:35 MDT Jun-13 by build_sequence_advancer)
+Beacon: EMPTY. ✅ Nominal (3-task Forge queue expected; two queued behind active session).
+
+**Check E — PRs:** ourliberty-agent-core:
+- PR #497 OPEN (`fix(cleanup-branches): success-prune alert is info, not warning`), MERGEABLE=UNKNOWN, no autoMergeRequest, no reviewDecision. → ask-then-do [yellow] **carry**.
+ourliberty-graph: 0 open PRs. ✅
+
+**Conditional checks:** Today is Sunday 2026-06-14.
+- Check I: check-i-2026-06-14.json already exists (ran in an earlier iter today). **SKIP** (cadence gate: once per Sunday).
+- Check III: Last artifact check-iii-2026-06-11.json (3 days ago, <14d threshold). **SKIP**.
+
+**Actions taken:**
+1. Alert watermark advanced 993→995 (`alert_triage_state.py set-watermark --line 995`). ✅
+2. `cycle_prime_ledger.py append --tier 1 --kind intervention` (pr-497-review-escalate-carry) → 05:41:29Z. ✅
+3. `cycle_tier_state.py record --checks-clean false` → Tier 1, consecutive_clean=0. ✅
+
+**Dispatches:** None.
+
+**Standing findings:**
+- [yellow] **PR #497 REVIEW_ESCALATE** — Mirror found spec invalid; Beacon confirmed fix already in alert-translations.json. Close without merging (`gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core`). [carry]
+- [yellow] **unreviewed-merge:499** — Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed'. [carry]
+- [yellow] **unreviewed-merge:494** — DM sent iter ~1694. Reply 'go: retroactive-review-494' or 'silence'. [carry]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614. Reply or silence. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **p4-meaning-layer-narrator in Forge queue** — NEW. Phase 4 step-1 dispatched 23:35 MDT Jun-13. Queued behind active Forge session (PID 2602672, timeout ~08:08Z). [new/watch]
+- [blue] **Forge missions-proposed reconciliation in-flight** — PID 2602672 (~01h29m elapsed; timeout ~08:08Z Jun-14). forge.log last entry 22:08:19 MDT. [carry/watch]
+- [blue] **heal-stale-daemon-restart-tier3-translation-001** — Queued in Forge inbox. [carry]
+- [blue] **fix-alert-triage-watermark-durability-001** — 1 stale entry in beacon-pending-approvals (Jun-12). [carry]
+- [blue] **Check I medic-operator-scaffold-001** — 24.4σ; `/dispatch 1` if re-run needed. [carry]
+- [blue] **G-rule heal-stale-daemon-code-auto-restart-needs-template** — in approval phase (heal-stale-daemon-restart-tier3-translation-001 in Forge queue). [carry]
+- [blue] **G-rule alert-translations-no-patterns-delivery-confirmation-tier4** — 2/3. [carry]
+- [blue] **G-rule missions-card-gc-warn-vs-info** — 1/3. [carry]
+- [blue] **G-rule missions-autoregister-warn-vs-info** — 1/3. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 1/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — 0/3. [carry]
+- [blue] **Check 5 MISSING** — heal-stale-daemon-code-state.json absent. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — within threshold. [carry]
+- [blue] **dag-preflight-revision gap** — [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+
+**PRIME DIRECTIVE:** 1 intervention appended (05:41:29Z). Script-authoritative: interventions=850, systemic_fixes=41, ratio=20.73, trend=flat.
+**Tier end-of-iter:** **Tier 1** (signal: PR #497 + unreviewed-merge carries). consecutive_clean=0.
+
+---
+
 ## Iteration ~1717 — 2026-06-14 05:34Z UTC (interactive, /loop /cycle, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry direct invocation (`/loop /cycle`).

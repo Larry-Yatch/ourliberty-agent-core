@@ -54,24 +54,25 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 05:35Z UTC (Iter ~1717, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 05:41Z UTC (Iter ~1718, Tier 1, consecutive_clean=0)
 
-**Iter ~1717 summary:** Alert watermark: 993/993 (1 new — approval_request delivery conf, Tier-4 known, no DM). Phase 4 build sequence RESOLVED: Beacon authored 3-step sequence at 23:28 MDT; DAG validated (OK: missions-v2-phase4 valid). `dag-preflight-missions-v2-phase4` pending Larry approval (created 05:28:06Z UTC). heal-stale-daemon-restart-tier3-translation-001 RESOLVED: Larry approved 23:24 MDT, dispatched to Forge queue. Forge PID 2602672 alive (1h21:36, missions post-merge reconciliation + heal-stale-daemon queued). PRIME DIRECTIVE: interventions=849, systemic_fixes=41, ratio=20.71, trend=flat. HEAD=507fc69=origin/main. Sync: 05:21:45Z (~13 min ago). **Tier:** Tier 1.
+**Iter ~1718 summary:** Alert watermark: 995/995 (2 new — both Tier-3 silences: dispatch-branch-cleanup + mirror-dag-pass delivery conf). missions-v2-phase4 build sequence **ACTIVE**: Larry approved dag-preflight 23:32 MDT; Mirror PASS 23:34 MDT; `p4-meaning-layer-narrator.json` dispatched to Forge inbox 23:35 MDT. Forge PID 2602672 alive (1h29m, missions post-merge reconciliation; timeout ~08:08Z Jun-14). PRIME DIRECTIVE: interventions=850, systemic_fixes=41, ratio=20.73, trend=flat. HEAD=0fb62b0=origin/main. Sync: 05:21:45Z (16 min ago). **Tier:** Tier 1.
 
 ---
 
-## Key standing items (as of iter ~1717)
+## Key standing items (as of iter ~1718)
 
 | Item | Status | Action needed |
 |---|---|---|
-| dag-preflight-missions-v2-phase4 | [yellow] NEW — Phase 4 Mirror DAG-preflight pending Larry approval (05:28:06Z UTC) | Reply 'go' or 'approve' on Telegram to ungate Phase 4 build sequence |
 | PR #497 REVIEW_ESCALATE | [yellow] Carry — Mirror found spec invalid; fix already in alert-translations.json | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry 05:02:56Z without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| Forge missions-proposed reconciliation | [blue/watch] PID 2602672 (1h21:36 elapsed; timeout ~08:08Z Jun-14); heal-stale-daemon task queued behind it | Watch: forge.log "Completed" + inbox archived |
+| p4-meaning-layer-narrator (Phase 4 step-1) | [blue/watch] NEW — dispatched to Forge inbox 23:35 MDT Jun-13 | Watch: Forge PID 2602672 completes → picks up next task |
+| Forge missions-proposed reconciliation | [blue/watch] PID 2602672 (1h29m elapsed; timeout ~08:08Z Jun-14) | Watch: forge.log "Completed" + inbox archived |
+| heal-stale-daemon-restart-tier3-translation-001 | [blue] Queued in Forge inbox | Watch: Forge PR after p4-meaning-layer or interleaved |
 | fix-alert-triage-watermark-durability-001 | [blue] 1 stale entry in beacon-pending-approvals (Jun-12) | Carry |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
 | G-rule heal-stale-daemon-code-auto-restart-needs-template | [blue] heal-stale-daemon-restart-tier3-translation-001 in Forge queue. RESET 0/3. | Watch: Forge PR |
@@ -85,5 +86,5 @@
 | sync-push-rebase-loop-001 | [blue] UNREGISTERED AR; self-healed | Carry |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
-| Phase 4 build sequence | RESOLVED — Beacon authored 23:28 MDT, DAG valid; dag-preflight approval pending | CLOSED as yellow carry |
-| heal-stale-daemon-restart-tier3-translation-001 | RESOLVED — Larry approved 23:24 MDT; queued in Forge inbox | CLOSED as blue pending |
+| dag-preflight-missions-v2-phase4 | RESOLVED — Larry approved 23:32 MDT; Mirror PASS; sequence active | CLOSED |
+| Phase 4 build sequence | RESOLVED — active as of 23:34Z MDT Jun-13; step-1 in Forge queue | CLOSED |
