@@ -4,6 +4,86 @@
 
 ---
 
+## Iteration ~1705 — 2026-06-14 03:48Z UTC (interactive, /loop /cycle, Tier 2→1 (intervention), consecutive_clean 1→0)
+
+**Trigger:** Larry direct invocation (`/loop /cycle`).
+
+**Health:** ⚠️ G-rule action. 1 new alert (Tier-3/nominal). 1 G-rule dispatch (dispatch-branch-cleanup-warning 3/3). 0 emergency interventions.
+
+**VERIFY-BEFORE-REASSERT (iter ~1704 carries):**
+- unreviewed-merge:494: Bot log last message "Go" at 20:45:29Z Jun-13 (approved exemption-001). No new Larry reply about retroactive-review-494. **CARRY** [yellow].
+- unreviewed-merge:489: No new Larry reply. **CARRY** [yellow].
+- Check 5 (heal-stale-daemon-code-state.json): MISSING confirmed. **CARRY** [blue].
+- beacon-pending-approvals: 2 stale entries (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001, Jun-12). **CARRY** [blue].
+- timer-label-fix binary: No new Larry reply. **CARRY** [blue].
+
+**Check 0 — Alert triage:** Watermark=984. File=985 lines. 1 new alert:
+- Line 985: kind=warning, source=dispatch-branch-cleanup (03:33:42Z) — "dispatch-branch cleanup: pruned 2 local + 1 remote stale branch(es)". Successful cleanup event. Tier 3 / nominal. ✅ (This is also the 3/3 G-rule occurrence; see G-rule action below.)
+- New watermark: **985**. ✅
+
+**Check 1 — Log noise:** outbox-notifier.log: last 5 lines all INFO (20:57:16Z Jun-13 — PR #496 auto-merge/worktree-teardown/notify). No WARNs or ERRORs since PR #493 fix. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message: "Go" at 20:45:29Z Jun-13 → approved unreviewed-merge-missions-exemption-001. All resolved. No new Larry directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → no stalls. Same 5 FORGE_NO_PR_SKIPs (#490, #491, #492, catalog-drift-preflight-exit, #493). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 2 stale entries (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001, both Jun-12). No actionable. ✅ Nominal carry.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING. Known [blue] carry. ✅
+
+**Check A — Source repo:** On main. Working tree clean. HEAD=595ee08=origin/main. 0 ahead, 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** sync.json last_sync=02:59:39Z, status=error (stale push-fail from prior cycle). HEAD=595ee08=origin/main confirms actual repo is synced (cycle wrapper committed "Pulse cycle 20260614T033345Z"). ✅ Nominal. ([blue] sync-push-rebase-loop-001 UNREGISTERED AR carry.)
+
+**Check C — Agent liveness:** 5/5 PIDs alive (same PIDs as iter ~1704, verified via ps):
+- beacon_telegram_bot: PID 2517973 ✅
+- chain_event_shipper: PID 1849505 ✅
+- outbox_notifier: PID 2552416 ✅
+- dashboard_api: PID 2322792 ✅
+- inbox_watcher: PID 2530123 ✅
+
+**Check D — Inboxes:** All empty pre-dispatch (beacon, forge, mirror, pulse). ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open PRs. ourliberty-graph: 0 open PRs. ✅ Nominal.
+
+**Conditional checks:** Not Sunday. Check I: SKIP (already fired today iter ~1691). Check III: SKIP (<14d threshold).
+
+**G-rule action — dispatch-branch-cleanup-warning (3/3 → DISPATCHED):**
+Root finding: `cleanup_dispatch_branches.py:695` emits `severity='warning'` when branches are successfully pruned (`elif local_pruned or remote_pruned or capped` branch). Per WARN-vs-INFO calibration doctrine, successful enforcement events should be `severity='info'` — the cleanup worked as designed. Only the `gh_down` path (line 691) is a genuine warning. Pattern hit 3/3 threshold (prior 2 occurrences in iters ~1703-~1704 journal carries). Dispatched Beacon direction-ask `dispatch-branch-cleanup-loglevel-001` to spec + dispatch Forge for one-line fix: `cleanup_dispatch_branches.py:695` `severity='warning'` → `severity='info'`. **G-rule CLOSED.**
+
+**Actions taken:**
+1. Alert watermark advanced 984→985 (1 Tier-3/nominal alert claimed). ✅
+2. Beacon direction-ask written: `/home/larry/agents/inboxes/beacon/dispatch-branch-cleanup-loglevel-001.json`. ✅
+3. `cycle_prime_ledger.py append --tier 2 --kind intervention` → 03:48:46Z. ✅
+4. `cycle_prime_ledger.py append --tier 2 --kind systemic_fix` → 03:48:50Z. ✅
+5. `cycle_tier_state.py record --checks-clean false` → Tier 2→1 (intervention signal), consecutive_clean reset to 0. ✅
+
+**Dispatches:** Beacon: `dispatch-branch-cleanup-loglevel-001` (G-rule direction-ask, severity calibration fix).
+
+**Standing findings:**
+- [yellow] **unreviewed-merge:494** — DM sent iter ~1694 (01:54Z Jun-14). Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed'. [carry]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614; no Larry reply. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **timer-label-fix binary** — Beacon holding Forge dispatch. Larry binary: `approve timer-label-fix` or `reject timer-label-fix`. [carry]
+- [blue] **Check I medic-operator-scaffold-001** — 24.4σ ($6.72 vs $1.68); prior dispatch 2026-06-10. `/dispatch 1` if re-run needed. [carry]
+- [blue] **beacon-pending-approvals stale entries** — 2 entries (Jun-12). [carry]
+- [blue] **G-rule dispatch-branch-cleanup-warning** — DISPATCHED (3/3). Beacon direction-ask sent. [closed→dispatch pending]
+- [blue] **G-rule heal-stale-daemon-code-auto-restart-needs-template** — 2/3. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 1/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **G-rule alert-translations-no-patterns-delivery-confirmation-tier4** — 0/3. [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — RESET 0/3 (false positive). [carry]
+- [blue] **Check 5 MISSING** — heal-stale-daemon-code-state.json absent. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — [carry]
+- [blue] **dag-preflight-revision gap** — [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+
+**PRIME DIRECTIVE:** 1 intervention + 1 systemic_fix appended. Script-authoritative: interventions=840, systemic_fixes=40, verification_pending=11, ratio=21.0, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0. (Tier 2→1: intervention signal from G-rule dispatch.)
+
+---
+
 ## Iteration ~1704 — 2026-06-14 03:32Z UTC (interactive, /cycle, Tier 2, consecutive_clean 0→1)
 
 **Trigger:** Larry direct invocation (`/cycle`).
