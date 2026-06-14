@@ -66,9 +66,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 17:01Z UTC (Iter ~1800, Tier 1, signal: PR #497 carry + PR #504 new + Forge build phase running)
+## Status snapshot — updated 2026-06-14 17:08Z UTC (Iter ~1801, Tier 1, signal: PR #497 carry + PR #504 Mirror review RUNNING)
 
-**Iter ~1800 summary:** All checks 0–5 + A–E nominal. 0 new alerts (watermark=924, file=924). **New:** PR #504 opened by Forge (`feat(terminal-state): shared task_terminal_state probe + refactor 3 ad-hoc gh probes`) at 16:57:56Z; build phase running (resume=cfa36c7e, started 16:58:53Z). Preflight had MalformedForgeMarker (missing PROCEED block), recovered via retry 1/3. New G-rule: Forge-preflight-marker-error-retry 1/3. PR #497 mergeable reverted MERGEABLE→UNKNOWN (normal GitHub re-compute). 0 new Pulse interventions. PRIME DIRECTIVE: interventions=915, systemic_fixes=42, ratio≈21.79, trend=flat. **Tier: Tier 1** (PR #497 [yellow] carry + PR #504 new; consecutive_clean=0).
+**Iter ~1801 summary:** All checks 0–5 + A–E nominal. 0 new alerts (watermark=924, file=924). **ADVANCED:** Forge tsr-shared-probe build COMPLETE (17:00:28Z, success=True, 95s, $0.224); Mirror review dispatched (17:00:29Z) and RUNNING (17:00:34Z, PID 2831999). FORGE_NO_PR_SKIP decreased 11→9. PR #497 carry (77th consecutive iter). 0 new Pulse interventions. PRIME DIRECTIVE: interventions=915, systemic_fixes=42, ratio≈21.79, trend=flat. **Tier: Tier 1** (PR #497 [yellow] carry + PR #504 Mirror review in-progress; consecutive_clean=0).
 
 ---
 
@@ -82,7 +82,7 @@
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| terminal-state-reconciliation build sequence | [blue] PR #504 opened 16:57:56Z; Forge build phase RUNNING (resume=cfa36c7e, started 16:58:53Z) | Watch next 1–2 iters for Mirror review dispatch |
+| terminal-state-reconciliation build sequence | [blue] Forge DONE 17:00:28Z; Mirror review RUNNING (17:00:34Z, PID 2831999) | Watch next iter for Mirror REVIEW_PASS + PR #504 auto-merge |
 | catalog-accuracy-drift | [blue] 8/34 ourliberty-graph shelf cards drifted (attention rate 24%, gate 10%) | route=digest; journal-note only |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
 | G-rule missions-autoregister-warn-vs-info | [blue] **2/3** | Watch; dispatch at 3/3 |
