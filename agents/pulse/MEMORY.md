@@ -60,35 +60,33 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 08:46Z UTC (Iter ~1744, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 08:52Z UTC (Iter ~1745, Tier 1, consecutive_clean=0)
 
-**Iter ~1744 summary:** Alert watermark: 1002/1002 (0 new alerts). Forge PID 2685976 + Beacon PID 2686024 DEAD (RESOLVED — completed pipeline coordination; PR #500 open from meaning-layer build). Mirror PID 2685274 ALIVE (test_regression_check for wt-mirror-heal-stale-daemon-restart-tier3-translation-001). PR #497 OPEN (MERGEABLE=UNKNOWN, 21st consecutive iter). PR #500/#501 in Mirror review. No new WARNs/ERRORs since 08:39:12Z. PRIME DIRECTIVE: interventions=876, systemic_fixes=41, ratio=21.37, trend=flat. HEAD=db45af70=origin/main. Sync: 08:22:16Z (status=error, self-heals). **Tier:** Tier 1.
+**Iter ~1745 summary:** Alert watermark: 1003/1003 (1 new: review-pass delivery confirmation for PR #501, Tier-3 silence). PR #501 MERGED 08:46:19Z (heal-stale-daemon-code auto-restart Tier-3-silence translation — G-rule RESOLVED). Mirror PID 2693575 ALIVE reviewing PR #500 (p4-meaning-layer-narrator). PR #497 OPEN (MERGEABLE=UNKNOWN, 22nd consecutive iter). No new WARNs/ERRORs. PRIME DIRECTIVE: interventions=877, systemic_fixes=41, ratio=21.39, trend=flat. HEAD=9347124e=origin/main. Sync: 08:22:16Z (status=error, self-heals). **Tier:** Tier 1.
 
 ---
 
-## Key standing items (as of iter ~1744)
+## Key standing items (as of iter ~1745)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (21 iters: ~1724→~1744) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (22 iters: ~1724→~1745) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry 05:02:56Z without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| PR #501 in Mirror review | [blue/watch] heal-stale-daemon-restart-tier3-translation-001; Mirror PID 2685274 running test_regression_check | Watch: expect merge or review-request |
-| PR #500 in Mirror queue | [blue/watch] p4-meaning-layer-narrator (meaning-layer Phase 4 step 1a); queued after #501 | Watch: expect sequential handling |
+| PR #500 in Mirror review | [blue/watch] p4-meaning-layer-narrator (meaning-layer Phase 4 step 1a); Mirror PID 2693575 active | Watch: expect merge or review-request |
 | fix-alert-triage-watermark-durability-001 | [blue] 1 stale entry in beacon-pending-approvals (Jun-12) | Carry |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
-| G-rule heal-stale-daemon-code-auto-restart-needs-template | [blue/watch] PR #501 OPEN, Mirror review in progress | Watch: Forge PR |
-| G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3; Medic recommends: add pipeline-stall:retry-exhausted: to medic-reversible-targets.json silenceable_subjects | Watch; dispatch at 3/3 |
+| G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule alert-translations-no-patterns-delivery-confirmation-tier4 | [blue] 2/3 | Watch; dispatch at 3/3 |
 | G-rule missions-card-gc-warn-vs-info | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule missions-autoregister-warn-vs-info | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule droplet-uncommitted:main | [blue] 1/3 | Watch |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] 1/3 | Watch |
 | G-rule timer-cycle-no-journal-entry | [blue] 0/3 | Watch |
-| Check 5 MISSING | [blue] heal-stale-daemon-code-state.json absent; fix in PR #501 review | Carry |
-| sync-push-rebase-loop-001 | [blue] UNREGISTERED AR; idx=1002 confirmed (route=digest, self-heals) | Carry |
+| Check 5 MISSING | [blue] heal-stale-daemon-code-state.json absent; cooldowns.json present (Jun-13); G-rule RESOLVED by PR #501 | Carry — state file created by healer on next activation |
+| sync-push-rebase-loop-001 | [blue] UNREGISTERED AR; idx=1003 confirmed (route=digest, self-heals) | Carry |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
