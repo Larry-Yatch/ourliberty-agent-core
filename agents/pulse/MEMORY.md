@@ -78,9 +78,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 23:12Z UTC (Iter ~1849, Tier 1, carry)
+## Status snapshot — updated 2026-06-14 23:17Z UTC (Iter ~1850, Tier 1, carry)
 
-**Iter ~1849 summary:** All mandatory checks 0–5 nominal. PRs #509 + #510 carry (DM sent iter ~1845 at 22:48Z, no Larry reply as of 23:12Z; #509 UNKNOWN, #510 CLEAN/MERGEABLE). PR #497 125th carry. Watermark=932 (no new alerts). PRIME DIRECTIVE: iter_clean (no auto-fix), ratio≈20.47. **Tier: Tier 1** (consecutive_clean=0).
+**Iter ~1850 summary:** All mandatory checks 0–5 nominal. PR #509 upgraded UNKNOWN→CLEAN/MERGEABLE this iter; PR #510 CLEAN/MERGEABLE. Both awaiting Larry direction (DM sent 22:48Z, no reply ~29 min later). PR #497 126th carry. Watermark=932 (no new alerts). PRIME DIRECTIVE: iter_clean (no auto-fix), ratio≈20.47. **Tier: Tier 1** (consecutive_clean=0).
 
 ---
 
