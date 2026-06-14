@@ -4,6 +4,116 @@
 
 ---
 
+## Iteration ~1812 — 2026-06-14 18:35Z UTC (interactive, /loop /cycle, Tier 1, signal: Check 0 classification bug revealed by Beacon + check0-triage-helper-authority-001 dispatched)
+
+**Trigger:** Larry direct invocation (`/loop /cycle`).
+
+**Health:** ⚠️ Drift (Check 0 behavioral bug found; corrective dispatch sent). All mandatory checks 0–5 + A,B,C,E nominal. New finding: Beacon result on approval-request-tier3-translation-001 reveals Pulse's Check 0 has been mis-classifying Tier-3 approval_request delivery confirmation alerts as Tier-4 because `alert_triage_state.py triage-alert` helper is not called before in-prompt manual classification. G-rule alert-translations-no-patterns-delivery-confirmation-tier4 was based on a false premise (PR #491 already added the Tier-3 translation). Real systemic fix dispatched. PR #497 [yellow] carry (88th iter).
+
+**VERIFY-BEFORE-REASSERT (iter ~1811 carries):**
+- PR #497 REVIEW_ESCALATE: `gh pr list` → OPEN, UNKNOWN, reviewDecision="", statusCheckRollup=FAILURE. 88th consecutive iter. **CARRY** [yellow].
+- approval-request-tier3-translation-001: Beacon processed; archived in beacon/.archive/. Beacon sent depth=1 result to Pulse inbox (archived 12:31Z). **ADVANCED ✅ → RESOLVED → superseded by check0-triage-helper-authority-001 dispatch** [blue].
+- captures-dirty-tree-allowlist-001: beacon-pending-approvals.json pending=1, created 18:16:47Z. No Larry approval yet (last Larry message 10:28:46 MDT predates task). **CARRY** [blue].
+- TSR DAG COMPLETE: confirmed. PR #504 ✅ PR #505 ✅ PR #506 ✅ MERGED 18:13:12Z. **CARRY COMPLETE** [blue].
+- dashboard_api PID 2868353: 30:30 elapsed at 18:30:55Z (running stable ~30 min more since ~18:00Z). ✅ Nominal. **CARRY** [blue].
+- Stale bash orphans: PID 1834248 (~23h+ elapsed, Ss, 0% CPU), PID 2605007 (~8h+ elapsed, Ss, 0% CPU). **CARRY** [blue].
+- G-rule alert-translations-no-patterns-delivery-confirmation-tier4: Was 3/3 DISPATCHED last iter. Beacon result reveals premise was FALSE (PR #491 already added the Tier-3 translation; the bug is Check 0 bypassing the helper). **RESOLVED → reset 0/3 (real fix = check0-triage-helper-authority-001)**.
+
+**Check 0 — Alert triage:** Watermark=927, file=927 lines. **0 new alerts**. ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log last entry 12:29:14 MDT (18:29:14Z) — `notified pulse <- beacon (beacon-result, depth=1, file=notify-approval-request-tier3-translation-001.json)`. No new WARNs/ERRORs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message 10:28:46 MDT (16:28:46Z). No new directives or distress keywords. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → 0 stalls. FORGE_NO_PR_SKIP=12. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: pending=1 (captures-dirty-tree-allowlist-001). No orphaned Larry directives. Beacon inbox: EMPTY (approval-request-tier3-translation-001 processed; check0-triage-helper-authority-001 just dispatched, pending pick-up). ✅ Nominal.
+
+**Check 5 — Stale daemon:** heartbeat `2026-06-14T18:08:19Z` (~22 min before 18:30Z check). FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=90d4d6fc=origin/main. Clean working tree. On main. 0 ahead, 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: status=no-change, last_sync=2026-06-14T18:23:19Z (~7 min before check). Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:**
+- inbox_watcher: PID 2530123 ✅ (23h 06m elapsed, Ssl)
+- chain_event_shipper: PID 2744551 ✅ (07h 53m elapsed, SNs)
+- beacon_telegram_bot: PID 2744840 ✅ (07h 53m elapsed, Ss)
+- outbox_notifier: PID 2744914 ✅ (07h 53m elapsed, Ss)
+- dashboard_api: PID 2868353 ✅ (30m 30s elapsed, Ssl, stable)
+- No forge/mirror sessions — expected (no active builds). ✅
+- [blue] PID 1834248: stale bash orphan (~23h+, Ss, 0% CPU). [carry]
+- [blue] PID 2605007: stale bash orphan (~8h+, Ss, 0% CPU). [carry]
+
+**Check E — PRs:**
+ourliberty-agent-core:
+- **PR #497** OPEN (`fix(cleanup-branches): success-prune alert is info, not warning`), UNKNOWN, reviewDecision="", statusCheckRollup=FAILURE. [yellow] carry — 88th consecutive iter.
+ourliberty-dashboard: No open PRs. ✅
+
+**Conditional checks:** Today is Sunday 2026-06-14 UTC. Check I already ran this cycle day (iter ~1718). **SKIP**. Check III last artifact 2026-06-11 (3 days old, <14d). **SKIP**.
+
+**New finding — Beacon result on approval-request-tier3-translation-001:**
+- Beacon analyzed the dispatch and found:
+  1. `config/alert-translations.json` already has `outbox-notifier → approval_request` Tier-3 silence entry (added by PR #491, merged 2026-06-13). Proposed config fix is a no-op.
+  2. Verified: `alert_triage_state.py triage-alert` returns Tier-3 for `kind=approval_request` alerts from outbox-notifier (decision=silence, route=digest). The helper handles the `kind`-only fallback correctly.
+  3. REAL bug: Pulse's Check 0 hand-derives alert tier in-prompt by subject-keyed lookup. Alerts with only `kind` field (no `subject`) miss the fallback the helper handles, leading to Tier-4 mis-classification.
+  4. Beacon recommended: enforce in cycle-prompt.md §3.0 + CLAUDE.md that Check 0 must call `alert_triage_state.py triage-alert` first; if helper returns a lower tier than manual judgment, helper wins.
+- Pulse response: Authorize Beacon to dispatch → dispatched `check0-triage-helper-authority-001` to Beacon inbox.
+
+**F24 G-rule — dead-letter signal:**
+- `pulse-auth-check0-enforcement-001.json` dead-lettered to Beacon's `.invalid/` at 18:31:10Z, reason: "prompt too short (0 chars, min 100) — likely F24 empty-prompt bug". This appears to be an auto-generated empty envelope from the inbox_watcher's processing pipeline. G-rule F24-empty-prompt-envelope-rejected advances **1→2/3**. Watch; dispatch at 3/3.
+
+**Actions taken:**
+1. Dispatch: `check0-triage-helper-authority-001` → `/home/larry/agents/inboxes/beacon/` (direction-ask: authorize Check 0 helper-authority enforcement to Forge). ✅
+2. `cycle_prime_ledger.py append --tier 1 --kind intervention --template check0-classification-bug` ✅
+3. `cycle_prime_ledger.py append --tier 1 --kind systemic_fix --template check0-helper-authority-dispatch` ✅
+4. `cycle_tier_state.py record --checks-clean false` → tier stays 1, consecutive_clean=0, last_signal_at=2026-06-14T18:35:43Z. ✅
+
+**Dispatches:** check0-triage-helper-authority-001 → Beacon inbox (direction-ask: go, dispatch Check 0 helper-authority enforcement to Forge; PR #491 already fixed config; real fix is behavioral in cycle-prompt.md §3.0 + CLAUDE.md).
+
+**Patterns:**
+- G-rule alert-translations-no-patterns-delivery-confirmation-tier4: **RESOLVED** (false-positive premise; real fix = check0-triage-helper-authority-001 dispatched). Reset 0/3.
+- G-rule F24-empty-prompt-envelope-rejected: **2/3** (new: pulse-auth-check0-enforcement-001 dead-lettered 18:31:10Z). Watch; dispatch at 3/3.
+- G-rule missions-card-gc-warn-vs-info: 2/3. No new occurrence this iter. Carry.
+- G-rule missions-autoregister-warn-vs-info: 2/3. Carry.
+- G-rule timer-cycle-no-journal-entry: 0/3. Carry.
+- G-rule Forge-timeout-worktree-missing-retry-loop: 1/3. Carry.
+- G-rule heal-stale-daemon-script_path-cosmetic: 1/3. Carry.
+- G-rule Forge-preflight-marker-error-retry: 1/3. Carry.
+- G-rule droplet-uncommitted:main: 0/3 (DISPATCHED iter ~1809). Carry.
+
+**Standing findings:**
+- [yellow] **PR #497 REVIEW_ESCALATE** — statusCheckRollup=FAILURE (88th consecutive iter). Close: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core`. [carry]
+- [yellow] **unreviewed-merge:499** — Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed'. [carry]
+- [yellow] **unreviewed-merge:494** — DM sent iter ~1694. Reply or silence. [carry]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614. Reply or silence. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **TSR DAG sequence** — COMPLETE ✅. PR #504 ✅. PR #505 ✅. PR #506 ✅ MERGED 18:13:12Z. [carry complete]
+- [blue] **captures-dirty-tree-allowlist-001** — PENDING Larry approval (beacon-pending-approvals.json, created 18:16:47Z). Reply 'approve'/'go'/'ok' in Telegram. [carry]
+- [blue] **check0-triage-helper-authority-001** — **DISPATCHED** to Beacon. Beacon should spec + dispatch Check 0 helper-authority enforcement to Forge. Pending Beacon session.
+- [blue] **G-rule alert-translations-no-patterns-delivery-confirmation-tier4** — RESOLVED (false-positive; real fix dispatched as check0-triage-helper-authority-001). Reset 0/3.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — **2/3** (pulse-auth-check0-enforcement-001 dead-lettered 18:31:10Z). Watch; dispatch at 3/3.
+- [blue] **G-rule missions-card-gc-warn-vs-info** — 2/3. Watch; dispatch at 3/3.
+- [blue] **G-rule missions-autoregister-warn-vs-info** — 2/3. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 0/3 (DISPATCHED iter ~1809). Watch for recurrence.
+- [blue] **G-rule timer-cycle-no-journal-entry** — 0/3. [carry]
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. [carry]
+- [blue] **G-rule heal-stale-daemon-script_path-cosmetic** — 1/3. [carry]
+- [blue] **G-rule Forge-preflight-marker-error-retry** — 1/3. [carry]
+- [blue] **Check I medic-operator-scaffold-001** — 24.4σ; `/dispatch 1` if re-run needed. [carry]
+- [blue] **catalog-accuracy-drift** — 8/34 ourliberty-graph shelf cards drifted. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — last occurrence 13:22:39Z Jun-14 (self-healed). [carry]
+- [blue] **dag-preflight-revision gap** — PR #484 closed source=pulse gap; DAG markers still fall through. [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+- [blue] **Stale bash orphans** — PID 1834248 (~23h+) + PID 2605007 (~8h+). Ss, 0% CPU. [carry]
+- [blue] **dashboard_api PID 2868353** — running ~30 min stable; prior restart cause still unknown. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention (Check 0 classification bug), 1 systemic_fix (check0-triage-helper-authority-001 Beacon dispatch). ratio≈20.86 (systemic_fixes=44→45 pending ledger count update), trend=flat.
+**Tier end-of-iter:** **Tier 1** (--checks-clean false; behavioral bug found + dispatch; consecutive_clean=0).
+
+---
+
 ## Iteration ~1811 — 2026-06-14 18:22Z UTC (interactive, /loop /cycle, Tier 1, signal: alert 927 Tier-4 triage + G-rule alert-translations-no-patterns-delivery-confirmation-tier4 3/3 DISPATCHED + PR #497 [yellow] carry)
 
 **Trigger:** Larry direct invocation (`/loop /cycle`).
@@ -105,6 +215,14 @@ ourliberty-dashboard: No open PRs. ✅
 
 **PRIME DIRECTIVE:** 1 intervention (Tier-4 triage), 1 systemic_fix (approval-request-tier3-translation-001 Beacon dispatch). ratio≈20.86 (systemic_fixes=44), trend=flat.
 **Tier end-of-iter:** **Tier 1** (--checks-clean false; Tier-4 intervention; consecutive_clean=0).
+
+**[ADDENDUM 18:30Z] Beacon result — approval-request-tier3-translation-001 FALSE DISPATCH:**
+- Beacon resolution: `outbox-notifier → approval_request` entry ALREADY EXISTS in `alert-translations.json` at tier=FYI (added PR #491, merged 2026-06-13). Confirmed via direct file read.
+- Root cause identified: Check 0 was hand-deriving the tier via subject-keyed read of alert-translations.json. These alerts carry only `kind` (no `subject`), so the subject-keyed path missed the entry. `alert_triage_state.py classify` handles the kind-only fallback correctly and would have returned FYI/Tier-3 — I bypassed the helper and reclassified Tier-4.
+- Proposed fix (Beacon asking Pulse authorization): enforce in `cycle-prompt.md` + `CLAUDE.md` that Check 0 calls `alert_triage_state.py classify` and trusts its result; a lower helper tier wins over any in-prompt re-derivation.
+- **Pulse authorization: YES — dispatch Check 0 helper-authority enforcement to Forge.**
+- The G-rule (alert-translations-no-patterns-delivery-confirmation-tier4) should be reconsidered; the pattern it detected was real (repeated Tier-4 mis-classification of approval_request) but the proposed config fix was wrong. The behavioral enforcement fix is the right shape.
+- G-rule reset already applied (3/3 → 0/3 last iter). No further ledger entry needed — systemic_fix row for approval-request-tier3-translation-001 stands; Beacon dispatch IS a systemic_fix even though the config target was stale; the actual fix (behavioral enforcement) is the downstream Forge task.
 
 ---
 

@@ -66,17 +66,23 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 18:22Z UTC (Iter ~1811, Tier 1, signal: alert 927 Tier-4 + G-rule delivery-confirmation-tier4 3/3 DISPATCHED + PR #497 [yellow] carry)
+## Check 0 must call helper before manual classification (learned 2026-06-14 iter ~1812)
 
-**Iter ~1811 summary:** All checks 0–5 + A–E nominal. 1 new alert (line 927: captures-dirty-tree-allowlist-001 approval_request delivery confirmation, Tier-4). G-rule alert-translations-no-patterns-delivery-confirmation-tier4 hit 3/3 → dispatched approval-request-tier3-translation-001 to Beacon. captures-dirty-tree-allowlist-001 PENDING Larry approval. PR #497 carry (87th iter). PRIME DIRECTIVE: ratio≈20.86, systemic_fixes=44, trend=flat. **Tier: Tier 1** (consecutive_clean=0).
+**Rule:** Before manually classifying an alert as Tier-4, Pulse MUST call `python3 scripts/alert_triage_state.py triage-alert --alert-id "<id>" --alert '<json>' --iter <N>` and act on the returned tier. If the helper returns Tier-3 (silence/known-pattern match), that result is authoritative — do NOT override it with in-prompt manual classification. The helper handles `kind`-only alerts (no `subject` field) via fallback logic in `_translation_match` that Pulse's in-prompt subject-keyed lookup misses. PR #491 (merged 2026-06-13) already added `outbox-notifier → approval_request` Tier-3 silence to `config/alert-translations.json`; multiple Tier-4 mis-classifications before and after that PR were Pulse bypassing the helper.
 
 ---
 
-## Key standing items (as of iter ~1811)
+## Status snapshot — updated 2026-06-14 18:35Z UTC (Iter ~1812, Tier 1, signal: Check 0 classification bug + check0-triage-helper-authority-001 dispatched)
+
+**Iter ~1812 summary:** All checks 0–5 + A–E nominal. Beacon result on approval-request-tier3-translation-001 revealed Check 0 behavioral bug (helper not called → Tier-3 mis-classified as Tier-4). PR #491 already fixed config. check0-triage-helper-authority-001 dispatched to Beacon. G-rule alert-translations-no-patterns-delivery-confirmation-tier4 RESOLVED (false-positive premise). G-rule F24-empty-prompt-envelope-rejected 1→2/3. captures-dirty-tree-allowlist-001 PENDING Larry approval. PR #497 carry (88th iter). PRIME DIRECTIVE: ratio≈20.86, systemic_fixes=45, trend=flat. **Tier: Tier 1** (consecutive_clean=0).
+
+---
+
+## Key standing items (as of iter ~1812)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (87th iter: ~1724→~1811) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (88th iter: ~1724→~1812) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
@@ -84,19 +90,20 @@
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
 | TSR DAG sequence | [blue] **COMPLETE ✅** — PR #504 ✅, PR #505 ✅, PR #506 ✅ (18:13:12Z) | Done |
 | captures-dirty-tree-allowlist-001 | [blue] **PENDING LARRY APPROVAL** (beacon-pending-approvals.json, created 18:16:47Z Jun-14) | Reply 'approve'/'go'/'ok' in Telegram |
-| G-rule alert-translations-no-patterns-delivery-confirmation-tier4 | [blue] **DISPATCHED** (approval-request-tier3-translation-001 to Beacon; reset 0/3) | Pending Beacon spec → Forge build |
+| check0-triage-helper-authority-001 | [blue] **DISPATCHED** to Beacon (iter ~1812; authorize Check 0 helper-authority enforcement to Forge) | Pending Beacon session → Forge build |
+| G-rule alert-translations-no-patterns-delivery-confirmation-tier4 | [blue] **RESOLVED** (false-positive; PR #491 already fixed config; real fix = check0-triage-helper-authority-001) | Done |
 | catalog-accuracy-drift | [blue] 8/34 ourliberty-graph shelf cards drifted (attention rate 24%, gate 10%) | route=digest; journal-note only |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
 | G-rule missions-autoregister-warn-vs-info | [blue] **2/3** | Watch; dispatch at 3/3 |
 | G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3 | Watch; dispatch at 3/3 |
-| G-rule missions-card-gc-warn-vs-info | [blue] **2/3** (last: alert 926, severity=warning, 0-action) | Watch; dispatch at 3/3 |
-| G-rule droplet-uncommitted:main | [blue] **DISPATCHED** (gc-healer-captures-dirty-tree-fix-001; reset 0/3) | Watch for recurrence |
-| G-rule F24-empty-prompt-envelope-rejected | [blue] 1/3 | Watch |
+| G-rule missions-card-gc-warn-vs-info | [blue] **2/3** | Watch; dispatch at 3/3 |
+| G-rule droplet-uncommitted:main | [blue] 0/3 (DISPATCHED gc-healer-captures-dirty-tree-fix-001) | Watch for recurrence |
+| G-rule F24-empty-prompt-envelope-rejected | [blue] **2/3** (pulse-auth-check0-enforcement-001 dead-lettered 18:31:10Z) | Watch; dispatch at 3/3 |
 | G-rule timer-cycle-no-journal-entry | [blue] **0/3** | Watch |
 | G-rule heal-stale-daemon-script_path-cosmetic | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule Forge-preflight-marker-error-retry | [blue] **1/3** | Watch; dispatch at 3/3 |
 | sync-push-rebase-loop-001 | [blue] UNREGISTERED AR; last occurrence 13:22:39Z Jun-14 (self-healed) | Carry |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
-| dashboard_api PID 2868353 | [blue] running ~22 min stable as of iter ~1811; prior restart cause still unknown | Note; watch for recurrence |
-| Stale bash orphans | [blue] PIDs 1834248 (~17d+) + 2605007 (~14h+ Jun-14). 0% CPU. | Carry; cleanup when convenient |
+| dashboard_api PID 2868353 | [blue] running ~30 min stable as of iter ~1812; prior restart cause still unknown | Note; watch for recurrence |
+| Stale bash orphans | [blue] PIDs 1834248 (~23h+) + 2605007 (~8h+). 0% CPU. | Carry; cleanup when convenient |
