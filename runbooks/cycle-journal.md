@@ -4,6 +4,99 @@
 
 ---
 
+## Iteration ~1797 — 2026-06-14 16:40Z UTC (interactive, /cycle, Tier 1, signal: PR #497 [yellow] carry + tsr DAG step-1 dispatched)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal with forward-progress note. All checks 0–5 + A–E nominal. PR #497 [yellow] carry (73rd iter). Key new: terminal-state-reconciliation DAG step 1 (tsr-shared-probe.json) arrived in Forge inbox ~16:38Z — sequence advancing as expected from the 16:30:46Z DAG preflight pass.
+
+**VERIFY-BEFORE-REASSERT (iter ~1796 carries):**
+- PR #497 REVIEW_ESCALATE: `gh pr list` → OPEN, mergeable=UNKNOWN, reviewDecision="", statusCheckRollup=FAILURE. 73rd consecutive iter. **CARRY** [yellow].
+- unreviewed-merge:499/494/489: Telegram log — last Larry message 10:28:46 MDT "Go". No new replies. **CARRY** [yellow].
+- heal-stale-daemon-code.heartbeat: `2026-06-14T16:08:15Z` (~32 min before 16:40Z check). Within 60-min threshold. **CARRY confirmed** ✅.
+- Stale bash orphans: PID 1834248 (16d 21h 20m, Ss, 0% CPU) + PID 2605007 (12h 18m, Ss, 0% CPU). Both alive. **CARRY** [blue].
+- G-rule droplet-uncommitted:main 2/3: sync.json status=no-change. **CARRY at 2/3**.
+- terminal-state-reconciliation build sequence: **ADVANCED** — tsr-shared-probe.json arrived in Forge inbox ~16:38Z. Updated below. ✅
+
+**Check 0 — Alert triage:** Watermark=923, file=924 (1 new line).
+- Line 924: `source=dispatch-branch-cleanup, severity=warning, subject=summary, ts=2026-06-14T16:35:08Z` — "dispatch-branch cleanup: pruned 1 local + 1 remote stale branch(es)". `alert_triage_state.py triage-alert` → **Tier-3** known-pattern match (`dispatch-branch-cleanup/summary` in alert-translations.json). Silenced. No DM. No tier-reset (Tier-3 silence). Watermark advanced 923→924. ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log: 0 WARNs in last 30 lines. inbox-watcher.log: 0 WARNs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message: 10:28:46 MDT "Go" (adopt-terminal-002 approval, prior iter). No new directives or distress keywords since. No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → 0 stalls, 11 FORGE_NO_PR_SKIP (stable; +0 from iter ~1796). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: `pending=0` ✅. Beacon/Mirror/Pulse inboxes: EMPTY ✅. Forge inbox: `tsr-shared-probe.json` arrived (DAG step 1 — expected workflow; inbox_watcher processing). ✅ Nominal.
+
+**Check 5 — Stale daemon:** heartbeat `2026-06-14T16:08:15Z` (~32 min before 16:40Z check). Fresh (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=075711ac=origin/main. Clean working tree. On main. 0 ahead, 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: status=no-change, last_sync=2026-06-14T16:22:49Z (~18 min before 16:40Z check). Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:**
+- inbox_watcher: PID 2530123 ✅ (Ssl, ~21h 14m)
+- chain_event_shipper: PID 2744551 ✅ (SNs, ~6h 1m)
+- dashboard_api: PID 2744674 ✅ (Ssl, ~6h 1m, 0.2% CPU)
+- beacon_telegram_bot: PID 2744840 ✅ (Ss, ~6h 1m)
+- outbox_notifier: PID 2744914 ✅ (Ss, ~6h 1m, 0.1% CPU)
+- [blue] PID 1834248: stale bash orphan (16d 21h 20m). Ss, 0% CPU. [carry]
+- [blue] PID 2605007: stale bash orphan (12h 18m). Ss, 0% CPU. [carry]
+
+**Check D — Inboxes:** Forge: `tsr-shared-probe.json` (DAG step 1 for terminal-state-reconciliation; arrived ~16:38Z; inbox_watcher will dispatch Forge). All other inboxes EMPTY. ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core:
+- **PR #497** OPEN (`fix(cleanup-branches): success-prune alert is info, not warning`), mergeable=UNKNOWN, reviewDecision="", statusCheckRollup=FAILURE. [yellow] carry — 73rd consecutive iter.
+ourliberty-dashboard: No open PRs. ✅
+
+**Conditional checks:** Today is Sunday 2026-06-14 UTC. Check I already ran this cycle day (iter ~1718). **SKIP**. Check III last artifact 2026-06-11 (3 days old, <14d). **SKIP**.
+
+**Actions taken:**
+1. `alert_triage_state.py set-watermark --line 924` → watermark 923→924. ✅
+2. `cycle_tier_state.py record --checks-clean false` → tier stays 1, consecutive_clean=0, last_signal_at=2026-06-14T16:40:42Z. ✅
+
+**Dispatches:** None.
+
+**Patterns:**
+- G-rule droplet-uncommitted:main: 2/3 (no new occurrence). Carry.
+- G-rule missions-autoregister-warn-vs-info: 2/3. Carry.
+- G-rule alert-translations-no-patterns-delivery-confirmation-tier4: 2/3. Carry.
+- G-rule missions-card-gc-warn-vs-info: 1/3. Carry.
+- G-rule F24-empty-prompt-envelope-rejected: 1/3. Carry.
+- G-rule timer-cycle-no-journal-entry: 0/3. Carry.
+- G-rule Forge-timeout-worktree-missing-retry-loop: 1/3. Carry.
+- G-rule heal-stale-daemon-script_path-cosmetic: 1/3. Carry.
+
+**Standing findings:**
+- [yellow] **PR #497 REVIEW_ESCALATE** — statusCheckRollup=FAILURE (73rd consecutive iter). Close: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core`. [carry]
+- [yellow] **unreviewed-merge:499** — Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed'. [carry]
+- [yellow] **unreviewed-merge:494** — DM sent iter ~1694. Reply or silence. [carry]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614. Reply or silence. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **terminal-state-reconciliation build sequence** — DAG step 1 (tsr-shared-probe.json) arrived in Forge inbox ~16:38Z. Forge will build: extract shared task_terminal_state probe + refactor 3 callers. Watch next iter for Forge session start + PR. [UPDATED]
+- [blue] **Check I medic-operator-scaffold-001** — 24.4σ; `/dispatch 1` if re-run needed. [carry]
+- [blue] **catalog-accuracy-drift** — 8/34 ourliberty-graph shelf cards drifted (attention rate 24%). journal-note. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 2/3. Watch; dispatch at 3/3. [carry]
+- [blue] **G-rule missions-autoregister-warn-vs-info** — 2/3. [carry]
+- [blue] **G-rule alert-translations-no-patterns-delivery-confirmation-tier4** — 2/3. [carry]
+- [blue] **G-rule missions-card-gc-warn-vs-info** — 1/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — 0/3. [carry]
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. [carry]
+- [blue] **G-rule heal-stale-daemon-script_path-cosmetic** — 1/3. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — last occurrence 13:22:39Z Jun-14 (self-healed). [carry]
+- [blue] **dag-preflight-revision gap** — PR #484 closed source=pulse gap; DAG markers still fall through. [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+- [blue] **Stale bash orphan loops** — PID 1834248 (16d 21h+) + PID 2605007 (12h 18m). Ss, 0% CPU. [carry]
+
+**PRIME DIRECTIVE:** No new ledger rows (no new interventions; dispatch-branch-cleanup Tier-3/nominal; Forge task arrival expected workflow; PR #497 standing carry previously logged). interventions=915, systemic_fixes=42, ratio≈21.79, trend=flat.
+**Tier end-of-iter:** **Tier 1** (--checks-clean false; PR #497 [yellow] carry in Check E; consecutive_clean=0).
+
+---
+
 ## Iteration ~1796 — 2026-06-14 16:35Z UTC (interactive, /cycle, Tier 1, signal: PR #497 [yellow] carry + DAG pass terminal-state-reconciliation)
 
 **Trigger:** Larry direct invocation (`/cycle`).
