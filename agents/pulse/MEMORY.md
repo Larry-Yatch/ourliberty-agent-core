@@ -54,9 +54,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 05:51Z UTC (Iter ~1720, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 05:57Z UTC (Iter ~1721, Tier 1, consecutive_clean=0)
 
-**Iter ~1720 summary:** Alert watermark: 995/995 (0 new). All mandatory checks nominal. missions-v2-phase4 build sequence **ACTIVE**: p4-meaning-layer-narrator queued in Forge inbox (Phase 4 step-1). Forge PID 2602672 alive (1h43m, missions-proposed reconciliation; timeout ~08:08Z Jun-14). PRIME DIRECTIVE: interventions=852, systemic_fixes=41, ratio=20.78, trend=flat. HEAD=b77526c=origin/main. Sync: 05:21:45Z (30 min ago). **Tier:** Tier 1. inbox-watcher.log missing (PID alive; no escalation).
+**Iter ~1721 summary:** Alert watermark: 995/995 (0 new). All mandatory checks nominal. missions-v2-phase4 build sequence **ACTIVE**: p4-meaning-layer-narrator queued in Forge inbox (Phase 4 step-1). Forge PID 2602672 alive (~1h49m, session 45e53d6e missions-proposed reconciliation; timeout ~08:08Z Jun-14). PRIME DIRECTIVE: interventions=853, systemic_fixes=41, ratio=20.80, trend=flat. HEAD=3959e69a=origin/main. Sync: 05:21:45Z (36 min ago). **Tier:** Tier 1. inbox-watcher.log missing (PID alive; no escalation).
 
 ---
 
