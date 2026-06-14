@@ -3235,6 +3235,52 @@ def _derive_orphan_readability(
     }
 
 
+# Phase 4 § 4 — the meaning-layer field contract. Authored by the Narrator
+# (scripts/missions_narrator.py), never computed here. Absence is legal and
+# renders the neutral "briefing…" state: a missing/malformed field surfaces as
+# None, NEVER as a raw machine value. These mirror the validators so a
+# hand-edited or partial capture can't leak a half-formed briefing to the card.
+_VALID_RISKS = ('safe', 'medium', 'careful')
+_VALID_RECOMMENDED_ACTIONS = ('delegate', 'promote', 'drop', 'snooze')
+
+
+def _meaning_layer_fields(cap: dict[str, Any]) -> dict[str, Any]:
+    """Extract the Phase 4 meaning-layer fields from a capture, validating each
+    so absence/garbage degrades to the neutral None state (§ 4: "A card with no
+    briefing yet renders a neutral state — never raw machine fields")."""
+    briefing = cap.get('briefing')
+    if not (isinstance(briefing, dict)
+            and all(isinstance(briefing.get(k), str) and briefing.get(k)
+                    for k in ('what', 'why', 'suggest'))):
+        briefing = None
+    else:
+        briefing = {k: briefing[k] for k in ('what', 'why', 'suggest')}
+
+    risk = cap.get('risk')
+    if risk not in _VALID_RISKS:
+        risk = None
+
+    risk_note = cap.get('risk_note')
+    if not (isinstance(risk_note, str) and risk_note):
+        risk_note = None
+
+    recommended_action = cap.get('recommended_action')
+    if recommended_action not in _VALID_RECOMMENDED_ACTIONS:
+        recommended_action = None
+
+    provenance = cap.get('briefing_provenance')
+    if not (isinstance(provenance, dict) and provenance):
+        provenance = None
+
+    return {
+        'briefing': briefing,
+        'risk': risk,
+        'risk_note': risk_note,
+        'recommended_action': recommended_action,
+        'briefing_provenance': provenance,
+    }
+
+
 def _parked_from_captures(
     captures: list[dict[str, Any]], now: datetime,
 ) -> list[dict[str, Any]]:
@@ -3243,7 +3289,12 @@ def _parked_from_captures(
     recomputed here). `area` is reserved (always None today — scene-graph T8).
 
     Phase 3 § 4.3: a capture snoozed past `now` (`snoozed_until` in the future)
-    is suppressed from the Parked lane / resurfacing until the snooze elapses."""
+    is suppressed from the Parked lane / resurfacing until the snooze elapses.
+
+    Phase 4 § 4: the meaning-layer fields (briefing/risk/risk_note/
+    recommended_action/briefing_provenance) ride along, validated so an
+    un-briefed capture surfaces None (neutral state) rather than raw machine
+    fields."""
     out: list[dict[str, Any]] = []
     for cap in captures:
         if not isinstance(cap, dict) or cap.get('state') != 'parked':
@@ -3251,7 +3302,7 @@ def _parked_from_captures(
         if _is_snoozed(cap, now):
             continue
         origin = cap.get('origin') if isinstance(cap.get('origin'), dict) else {}
-        out.append({
+        entry = {
             'capture_id': cap.get('id'),
             'title': cap.get('title'),
             'label': cap.get('label'),
@@ -3259,7 +3310,9 @@ def _parked_from_captures(
             'area': origin.get('area'),
             'aging': cap.get('aging') is True,
             'last_touched': cap.get('last_touched'),
-        })
+        }
+        entry.update(_meaning_layer_fields(cap))
+        out.append(entry)
     return out
 
 
