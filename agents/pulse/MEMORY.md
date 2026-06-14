@@ -54,29 +54,30 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 07:53Z UTC (Iter ~1738, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 08:12Z UTC (Iter ~1739, Tier 1, consecutive_clean=0)
 
-**Iter ~1738 summary:** Alert watermark: 999/999 (0 new alerts). All mandatory checks nominal. PR #497 OPEN (MERGEABLE=UNKNOWN, 15th consecutive iter). Forge PID 2602672 alive (elapsed ~3h42m; forge.log last "Running" since 04:08:19Z UTC; timeout ~08:08Z Jun-14 ~17m remaining). PRIME DIRECTIVE: interventions=870, systemic_fixes=41, ratio=21.22, trend=flat. HEAD=11b88f4=origin/main. Sync: 07:22:14Z. **Tier:** Tier 1.
+**Iter ~1739 summary:** Alert watermark: 999/999 (0 new alerts). All mandatory checks nominal. PR #497 OPEN (MERGEABLE=UNKNOWN, 16th consecutive iter). Forge PID 2602672 TIMED OUT at 08:08:20Z — chain self-recovered; Forge PID 2667517 now running heal-stale-daemon-restart-tier3-translation-001 (started 08:10:58Z, timeout ~12:11Z Jun-14). PRIME DIRECTIVE: interventions=871, systemic_fixes=41, ratio=21.24, trend=flat. HEAD=e982e66=origin/main. Sync: 07:22:14Z. **Tier:** Tier 1.
 
 ---
 
-## Key standing items (as of iter ~1736)
+## Key standing items (as of iter ~1739)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (15 iters: ~1724→~1738); Mirror spec invalid; fix in heal-stale-daemon-restart-tier3-translation-001 | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (16 iters: ~1724→~1739); Mirror spec invalid; fix in heal-stale-daemon-restart-tier3-translation-001 | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry 05:02:56Z without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| PR #498 missions-proposed-lane-signal-hardening-001 | **RESOLVED** — MERGED 04:49:45Z Jun-14; build-missions inbox file awaiting Forge session exit + inbox_watcher archive | WATCH |
-| Forge PID 2602672 | [blue/watch] forge.log last "Running" since 04:08:19Z (~3h42m as of 07:53Z); timeout ~08:08Z Jun-14 (~15m remaining) | Watch: pickup of heal-stale-daemon or p4-meaning-layer on next session |
-| p4-meaning-layer-narrator (Phase 4 step-1) | [blue/watch] Queued in Forge inbox; dispatched 05:35:36Z UTC Jun-14 | Watch: Forge PID 2602672 completes → inbox_watcher starts next task |
-| heal-stale-daemon-restart-tier3-translation-001 | [blue] Queued in Forge inbox | Watch: Forge PR |
+| PR #498 missions-proposed-lane-signal-hardening-001 | **RESOLVED** — MERGED 04:49:45Z Jun-14; inbox file archived by inbox_watcher at 08:10:51Z Jun-14 | Done |
+| Forge PID 2667517 | [blue/watch] task=heal-stale-daemon-restart-tier3-translation-001; started 08:10:58Z UTC Jun-14; timeout ~12:11Z Jun-14 | Watch: PR from heal-stale-daemon task |
+| p4-meaning-layer-narrator (Phase 4 step-1) | [blue/watch] Queued in Forge inbox; dispatched 05:35:36Z UTC Jun-14 | Watch: after heal-stale-daemon Forge session completes |
+| heal-stale-daemon-restart-tier3-translation-001 | [blue/watch] IN PROGRESS — Forge PID 2667517 started 08:10:58Z | Watch: Forge PR |
 | fix-alert-triage-watermark-durability-001 | [blue] 1 stale entry in beacon-pending-approvals (Jun-12) | Carry |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
-| G-rule heal-stale-daemon-code-auto-restart-needs-template | [blue] heal-stale-daemon-restart-tier3-translation-001 in Forge queue | Watch: Forge PR |
+| G-rule heal-stale-daemon-code-auto-restart-needs-template | [blue] heal-stale-daemon-restart-tier3-translation-001 IN PROGRESS | Watch: Forge PR |
+| G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3 (iter ~1739) | Watch; dispatch at 3/3 |
 | G-rule alert-translations-no-patterns-delivery-confirmation-tier4 | [blue] 2/3 | Watch; dispatch at 3/3 |
 | G-rule missions-card-gc-warn-vs-info | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule missions-autoregister-warn-vs-info | [blue] 1/3 | Watch; dispatch at 3/3 |
