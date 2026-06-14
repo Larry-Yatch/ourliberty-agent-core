@@ -48,6 +48,12 @@
 
 ---
 
+## alert_triage_state.py set-watermark correct syntax (learned 2026-06-14 iter ~1845)
+
+**Rule:** `alert_triage_state.py set-watermark` requires `--line <N>` (named argument), NOT a positional argument. Usage: `python3 scripts/alert_triage_state.py set-watermark --line 931`. Positional form fails with "the following arguments are required: --line".
+
+---
+
 ## Alert watermark persistence gap (learned 2026-06-14 iter ~1703)
 
 **Rule:** In interactive `/cycle` sessions, `alert_triage_state.py set-watermark` is called by Pulse's journal narrative but NOT always committed before session end. On next iter, get-watermark returns the pre-session value (e.g., 982 instead of expected 984). Check the watermark at start of each iter and advance it if the lines in question have already been triaged (Tier-3/nominal). Do NOT re-triage — just confirm against prior journal and advance. This is structural: interactive sessions may not persist watermark if Pulse exits before the explicit set-watermark step.
@@ -72,25 +78,18 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 22:39Z UTC (Iter ~1844, Tier 1, nominal)
+## Status snapshot — updated 2026-06-14 22:47Z UTC (Iter ~1845, Tier 1, action)
 
-**Iter ~1844 summary:** Fully nominal. 0 new alerts (watermark=931=file). All mandatory checks clean. PRs #509 + #510 opened by Forge at 22:18Z/22:21Z via non-standard branch names (`docs/meaning-layer-roadmap`, `work/build-consult-restock`); outbox-notifier NOT dispatched Mirror for either (Forge outbox last modified 19:38Z, ~2.5h before PRs created). Both PRs are <30 min old so no Check E action yet — **watch next iter** at 30-min threshold. PR #497 carry (120th iter). Orphans PID 1834248 (17.1d+) + PID 2605007 (18.3h+) carrying. §5.0 no-op. Rotations nominal. PRIME DIRECTIVE: 0 interventions (iter_clean), ratio≈20.47. **Tier: Tier 1** (consecutive_clean=0).
-
----
-
-## Status snapshot — updated 2026-06-14 22:28Z UTC (Iter ~1843, Tier 1, nominal)
-
-**Iter ~1843 summary:** Fully nominal. 0 new alerts (watermark=931=file). All mandatory checks clean. PRs #509 (docs: meaning-layer roadmap) + #510 (feat: consult-before-build) newly opened by Forge (<30 min, pending Mirror review). PR #497 carry (119th iter). Orphans PID 1834248 (17.1d+) + PID 2605007 (18.1h+, PR #498 merged) carrying. §5.0 no-op. Rotations nominal. PRIME DIRECTIVE: 0 interventions (iter_clean), ratio≈20.47. **Tier: Tier 1** (consecutive_clean=0).
+**Iter ~1845 summary:** PRs #509 + #510 crossed 30-min Check E threshold; Mirror review was never dispatched (non-standard branch names `docs/`, `work/` bypassed outbox-notifier AND heal-undispatched-pr-review). Escalated [yellow] DM to Larry (ask-then-do: merge-direct or trigger-Mirror). 0 new alerts (watermark=931). All mandatory checks otherwise clean. PR #497 121st carry. Orphans PID 1834248 (17.1d+) + PID 2605007 (18.4h+) carrying. §5.0 no-op. Rotations nominal. PRIME DIRECTIVE: iter_clean (ask-then-do sent, no auto-fix), ratio≈20.47. **Tier: Tier 1** (consecutive_clean=0).
 
 ---
 
-## Key standing items (as of iter ~1844)
+## Key standing items (as of iter ~1845)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (120th iter) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
-| PR #509 | [blue] Open — docs: meaning-layer roadmap; outbox-notifier NOT dispatched Mirror (non-standard branch); approaching 30-min Check E threshold | Watch next iter; if >30 min + no Mirror review, manual action needed |
-| PR #510 | [blue] Open — feat: consult→restock build loop; outbox-notifier NOT dispatched Mirror (non-standard branch); approaching 30-min threshold | Watch next iter |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (121st iter) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #509 + #510 | [yellow] CLEAN >30 min; Mirror review NEVER dispatched (non-standard branch bypass); DM sent iter ~1845; await Larry direction | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
