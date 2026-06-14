@@ -60,23 +60,23 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 10:26Z UTC (Iter ~1758, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 10:39Z UTC (Iter ~1759, Tier 1, consecutive_clean=0)
 
-**Iter ~1758 summary:** PR #54 (p4-parked-card, ourliberty-dashboard) Mirror issued REVIEW_REVISION at 04:20Z MDT; revision-p4-parked-card-1.json dispatched to Forge (PID 2739307, active). PR #502 (p4-conversation-doorbell) MERGED at 04:11Z. 1 new Tier-4 alert (catalog-accuracy-drift, ourliberty-graph, route=digest). All core daemons healthy. PR #497 OPEN (MERGEABLE=UNKNOWN, 35th consecutive iter). HEAD=da755fd1=origin/main. Sync: 09:22:15Z (status=no-change, ~64 min ago). PRIME DIRECTIVE: interventions=890, systemic_fixes=41, ratio=21.71, trend=flat. **Tier:** Tier 1.
+**Iter ~1759 summary:** PR #54 (p4-parked-card, ourliberty-dashboard) MERGED at 10:31:11Z — Mirror rev1 REVIEW_PASS → auto-merge → SEQUENCE_STEP_MERGED missions-v2-phase4. p4-conversation-doorbell also MERGED (PR #502, 04:11Z). Two of three p4 steps complete; p4-meaning-layer-narrator in revision archive (status unclear). All inboxes clear. PR #497 OPEN (MERGEABLE=UNKNOWN, 36th consecutive iter). HEAD=327c8453=origin/main. Sync: 10:22:19Z (status=no-change). PRIME DIRECTIVE: interventions=891, systemic_fixes=41, ratio=21.73, trend=flat. **Tier:** Tier 1.
 
 ---
 
-## Key standing items (as of iter ~1758)
+## Key standing items (as of iter ~1759)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (35 iters: ~1724→~1758) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (36 iters: ~1724→~1759) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| PR #54 p4-parked-card revision | [watch] Mirror REVIEW_REVISION 04:20Z; Forge PID 2739307 working revision-1 | Watch for REVIEW_PASS + auto-merge |
+| p4-meaning-layer-narrator | [watch] revision archive present Jun 14 02:51; stall healer nominal | Investigate: parked or cancelled? |
 | catalog-accuracy-drift | [blue] 8/34 ourliberty-graph shelf cards drifted (attention rate 24%, gate 10%) | route=digest; Tier 4; journal-note only |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
 | G-rule missions-autoregister-warn-vs-info | [blue] **2/3** | Watch; dispatch at 3/3 |
@@ -86,8 +86,9 @@
 | G-rule droplet-uncommitted:main | [blue] 1/3 | Watch |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] 1/3 | Watch |
 | G-rule timer-cycle-no-journal-entry | [blue] 0/3 | Watch |
-| Check 5 MISSING | [blue] heal-stale-daemon-code.heartbeat present 04:06 MDT (spec drift: no state.json). | Carry |
-| sync-push-rebase-loop-001 | [blue] UNREGISTERED AR; self-healed (09:22Z sync clean) | Carry |
+| Check 5 MISSING | [blue] heal-stale-daemon-code.heartbeat absent; cooldowns.json present (spec drift). | Carry |
+| sync-push-rebase-loop-001 | [blue] UNREGISTERED AR; self-healed (10:22Z sync clean) | Carry |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
 | Stale bash orphan loops | [blue] PIDs 1834248 (May 28, 16+ days) + 2605007 (Jun 13). Sleeping, 0% CPU. | Carry; cleanup when convenient |
+| fix-alert-triage-watermark-durability-001 | [blue] Pending in beacon-pending-approvals (Jun-12) | Carry |
