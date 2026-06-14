@@ -212,6 +212,48 @@ class RunSweepTest(unittest.TestCase):
         n = mn.run(now=NOW, use_llm=False, policy=_POLICY_ASK, captures_file=missing)
         self.assertEqual(n, 0)
 
+    def test_concurrent_write_during_sweep_is_not_reverted(self):
+        # A writer (snooze/ingest endpoint, GC healer) that lands a change AFTER
+        # the narrator's initial read but BEFORE its write must NOT be reverted.
+        # The narrator re-reads fresh and applies only its field deltas, so the
+        # author sweep's stale snapshot never clobbers concurrent state.
+        path = self._write_registry([
+            _capture(id='briefme'),
+            _capture(id='snoozed',
+                     briefing={'what': 'a', 'why': 'b', 'suggest': 'c'},
+                     briefing_provenance={'by': 'beacon', 'from_state': 'parked'}),
+        ])
+        real_author = mn.author_meaning_layer
+
+        def author_then_concurrent_write(cap, *a, **k):
+            fields = real_author(cap, *a, **k)
+            # Simulate another process writing captures.json mid-sweep: snooze an
+            # existing capture and ingest a brand-new one.
+            reg = json.loads(path.read_text())
+            for c in reg['captures']:
+                if c['id'] == 'snoozed':
+                    c['snoozed_until'] = '2026-07-01T00:00:00+00:00'
+            reg['captures'].append(_capture(id='late-ingest', state='inbox'))
+            path.write_text(json.dumps(reg))
+            return fields
+
+        mn.author_meaning_layer = author_then_concurrent_write
+        try:
+            n = mn.run(now=NOW, use_llm=False, policy=_POLICY_ASK, captures_file=path)
+        finally:
+            mn.author_meaning_layer = real_author
+
+        self.assertEqual(n, 1)
+        reg = json.loads(path.read_text())
+        by_id = {c['id']: c for c in reg['captures']}
+        # the narrator's briefing landed on the capture it authored
+        self.assertEqual(by_id['briefme']['risk'], 'medium')
+        # the concurrent snooze was preserved, not reverted to the stale snapshot
+        self.assertEqual(by_id['snoozed']['snoozed_until'],
+                         '2026-07-01T00:00:00+00:00')
+        # the capture ingested mid-sweep was not dropped from disk
+        self.assertIn('late-ingest', by_id)
+
     def test_stale_risk_note_cleared_when_downgraded_to_safe(self):
         # a capture re-briefed from medium→safe must not keep a dangling note.
         path = self._write_registry([

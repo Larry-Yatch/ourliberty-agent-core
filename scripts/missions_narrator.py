@@ -411,28 +411,62 @@ def run(
         # Malformed — read_captures_registry already logged; never write onto it.
         return 0
 
-    briefed = 0
+    # Author phase (slow): each capture may invoke claude up to CLAUDE_TIMEOUT_SEC,
+    # so the whole sweep can hold the process for N*180s. We accumulate the
+    # meaning-layer fields into a delta map keyed by capture id WITHOUT writing
+    # this stale snapshot back. The fresh re-read below is what we actually mutate
+    # and persist, so concurrent writers (snooze/ingest endpoints, the GC healer)
+    # are never clobbered by a stale full-registry write.
+    deltas: dict[str, dict[str, Any]] = {}
     for cap in registry.get('captures', []):
         if not isinstance(cap, dict) or not needs_briefing(cap):
             continue
-        cid = cap.get('id') or ''
-        events = fetch_capture_events(cid, client=client) if cid else []
-        fields = author_meaning_layer(
+        cid = cap.get('id')
+        if not cid:
+            continue  # no stable key to re-match across the fresh read — skip.
+        events = fetch_capture_events(cid, client=client)
+        deltas[cid] = author_meaning_layer(
             cap, events, now=now, policy=policy, use_llm=use_llm)
+
+    if not deltas:
+        log('narrator: nothing to brief this sweep')
+        return 0
+
+    if dry_run:
+        log(f'narrator: dry-run — would brief {len(deltas)} capture(s)')
+        return len(deltas)
+
+    # Write phase: re-read the registry FRESH immediately before writing and
+    # apply only the meaning-layer deltas to captures still present and still
+    # needs_briefing() in the fresh copy. This collapses the lost-update window
+    # from the whole author sweep (N*180s) down to this read→write span, so any
+    # state another writer landed mid-sweep (a snooze's snoozed_until, a capture
+    # ingested late, a GC age) survives instead of being silently reverted.
+    fresh = read_captures_registry(path)
+    if fresh is None:
+        # File went malformed/unreadable mid-sweep — never write onto it.
+        log('narrator: captures.json unreadable at write time; skipping write')
+        return 0
+
+    briefed = 0
+    for cap in fresh.get('captures', []):
+        if not isinstance(cap, dict):
+            continue
+        fields = deltas.get(cap.get('id'))
+        if fields is None or not needs_briefing(cap):
+            continue
         # risk_note is optional (absent for safe) — clear any stale one so a
         # capture that drops from medium→safe doesn't keep a dangling note.
         cap.pop('risk_note', None)
         cap.update(fields)
         briefed += 1
 
-    if briefed and not dry_run:
-        atomic_write_captures(path, registry)
+    if briefed:
+        atomic_write_captures(path, fresh)
         log(f'narrator: briefed {briefed} capture(s) → {path} (no commit; '
             f'GC healer batches the commit)')
-    elif briefed:
-        log(f'narrator: dry-run — would brief {briefed} capture(s)')
     else:
-        log('narrator: nothing to brief this sweep')
+        log('narrator: deltas superseded by concurrent writes; nothing written')
     return briefed
 
 
