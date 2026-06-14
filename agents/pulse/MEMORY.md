@@ -48,11 +48,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 02:54Z UTC (Iter ~1701, Tier 1, consecutive_clean=1)
+## Status snapshot — updated 2026-06-14 03:07Z UTC (Iter ~1702, Tier 1, consecutive_clean=2)
 
-**Iter ~1701 summary:** Alert watermark: 982 (0 new). PRIME DIRECTIVE: interventions=839, systemic_fixes=39, verification_pending=11, ratio=21.51, trend=flat. All 5 daemons alive (same PIDs). HEAD=745f2d4=origin/main. Sync: last_sync=01:59:32Z (~55min). PR #496 OPEN (unreviewed-merge exemption, Forge-built, Mirror review in-flight). Beacon inbox: 2 items (notify-unreviewed-merge-missions-exemption-001 + timer-cycle-no-journal-entry-001). Mirror inbox: 1 item (PR #496 review). All in-flight <10min. Larry "Go" at 02:45Z approved unreviewed-merge-missions-exemption-001 → Forge built PR #496. **Tier:** Tier 1, consecutive_clean=1.
-
-**Post-~1700 (non-cycle from prior session ~02:55Z):** Beacon result-notify: timer-cycle-no-journal-entry-001 = FALSE POSITIVE. Journals are NOT missing. Cosmetic label bug only (systemd-fired sessions self-label `(interactive)`). G-rule counter RESET to 0. Beacon holding Forge dispatch pending Larry binary: `approve timer-label-fix` (run_cycle.sh passes automated signal → correct self-labeling) or `reject timer-label-fix` (no code change, counter stays reset). NOTE: timer-cycle-no-journal-entry-001.json still in Beacon's inbox at iter ~1701 check (may be un-archived; Beacon's investigation may have been from a separate channel).
+**Iter ~1702 summary:** Alert watermark: 984 (+2 both Tier-3/nominal). PRIME DIRECTIVE: interventions=839, systemic_fixes=39, verification_pending=11, ratio=21.51, trend=flat. All 5 daemons alive (same PIDs). HEAD=e12520e=origin/main. Sync: last_sync=02:59:39Z (sync.service transient push error, self-healed; repo clean+synced). PR #496 MERGED at 02:57:16Z (Mirror REVIEW_PASS + auto-merge). Inboxes: all empty. timer-cycle-no-journal-entry-001 Beacon result archived: FALSE POSITIVE confirmed, Beacon holding Forge dispatch pending Larry binary. **Tier:** Tier 1, consecutive_clean=2.
 
 ---
 
@@ -64,8 +62,8 @@
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| PR #496 OPEN | [blue] Forge built (02:49Z Jun-14); Mirror review in-flight | Watch for Mirror PASS + merge |
-| timer-cycle-no-journal-entry-001 | FALSE POSITIVE — Beacon investigated, journals present, cosmetic label only | Larry binary: `approve timer-label-fix` or `reject timer-label-fix` (Beacon holding); task still in Beacon inbox (un-archived) |
+| PR #496 MERGED | RESOLVED — merged 02:57:16Z Jun-14 (Mirror REVIEW_PASS + auto-merge) | CLOSED |
+| timer-cycle-no-journal-entry-001 | FALSE POSITIVE — Beacon investigated, journals present, cosmetic label only; TASK CLOSED | Larry binary: `approve timer-label-fix` or `reject timer-label-fix` (Beacon holding; [blue] carry) |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
 | beacon-pending-approvals | [blue] 2 stale entries (2x Jun-12) | Carry; no actionable pending |
 | G-rule dispatch-branch-cleanup-warning | [blue] 2/3 (iter ~1700) | Watch |
@@ -75,11 +73,12 @@
 | G-rule alert-translations-no-patterns-delivery-confirmation-tier4 | [blue] 0/3 | Watch |
 | G-rule timer-cycle-no-journal-entry | RESET to 0/3 — false positive (cosmetic label; Beacon confirmed journals present) | Recalibrate: only count iters where journal entry is genuinely absent from the file |
 | Check 5 MISSING | [blue] heal-stale-daemon-code-state.json absent | G-rule dispatched ~iter 1416 |
-| sync-push-rebase-loop-001 | [blue] UNREGISTERED AR | Carry |
+| sync-push-rebase-loop-001 | [blue] UNREGISTERED AR; new occurrence 02:59:39Z Jun-14 (self-healed) | Carry |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
-| unreviewed-merge-missions-exemption-001 | RESOLVED — Larry approved 02:45Z Jun-14; Forge built PR #496; Mirror reviewing | CLOSED iter ~1701 |
-| G-rule unreviewed-merge | RESOLVED — 3/3 dispatched iter ~1700; PR #496 is systemic fix (in Mirror review) | CLOSED |
+| unreviewed-merge:495 | RESOLVED — implicitly resolved by PR #496 exemption merge; DM delivered, no Larry reply needed | CLOSED iter ~1702 |
+| unreviewed-merge-missions-exemption-001 | RESOLVED — Larry approved 02:45Z Jun-14; Forge built PR #496; Mirror PASS + auto-merged 02:57Z Jun-14 | CLOSED iter ~1702 |
+| G-rule unreviewed-merge | RESOLVED — 3/3 dispatched iter ~1700; PR #496 systemic fix MERGED iter ~1702 | CLOSED |
 | catalog-drift-facts-sync-001 | RESOLVED — Forge rejected (work done on main PR#1) | CLOSED iter ~1694 |
 | source=pulse-cycle-self-report | RESOLVED — PR #490 merged Jun-13 | CLOSED |
 | approval_request-delivery-confirmation | RESOLVED — PR #491 merged Jun-13 | CLOSED |
