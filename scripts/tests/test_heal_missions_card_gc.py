@@ -352,6 +352,117 @@ class CaptureIoTest(unittest.TestCase):
         self.assertEqual(leftovers, [])
 
 
+# ---------------------------------------- §3.3 missions phase reconcile
+
+
+class ReadMissionsRegistryTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix='missions-io-test-')
+        self.path = Path(self.tmp) / 'missions.json'
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_missing_file_returns_empty_registry(self):
+        self.assertEqual(
+            h.read_missions_registry(self.path),
+            {'schema_version': 1, 'missions': []})
+
+    def test_malformed_file_returns_none(self):
+        self.path.write_text('{not json')
+        self.assertIsNone(h.read_missions_registry(self.path))
+
+    def test_wrong_shape_returns_none(self):
+        self.path.write_text(json.dumps({'missions': 'not-a-list'}))
+        self.assertIsNone(h.read_missions_registry(self.path))
+
+
+class ClassifyMissionTest(unittest.TestCase):
+    """Pure decision logic — the conservative guard at the unit level."""
+
+    def test_all_tasks_terminal_ships(self):
+        states = {'a': h.tts.MERGED, 'b': h.tts.CLOSED}
+        self.assertEqual(
+            h.classify_mission('in_flight', ['a', 'b'], states).action, 'ship')
+
+    def test_one_open_task_keeps(self):
+        states = {'a': h.tts.MERGED, 'b': h.tts.OPEN}
+        self.assertEqual(
+            h.classify_mission('in_flight', ['a', 'b'], states).action, 'keep')
+
+    def test_unknown_task_keeps(self):
+        states = {'a': h.tts.MERGED, 'b': h.tts.UNKNOWN}
+        self.assertEqual(
+            h.classify_mission('ready', ['a', 'b'], states).action, 'keep')
+
+    def test_missing_task_state_keeps(self):
+        # A task_id absent from the probe map counts as non-terminal.
+        self.assertEqual(
+            h.classify_mission('drafting', ['a', 'b'], {'a': h.tts.MERGED}).action,
+            'keep')
+
+    def test_non_reconcilable_phase_keeps(self):
+        states = {'a': h.tts.MERGED}
+        for phase in ('proposed', 'deferred', 'shipped'):
+            self.assertEqual(
+                h.classify_mission(phase, ['a'], states).action, 'keep',
+                f'phase={phase} must never be auto-shipped')
+
+    def test_empty_task_ids_keeps(self):
+        # Vacuous-truth guard: no tasks ⇒ not "all terminal".
+        self.assertEqual(h.classify_mission('ready', [], {}).action, 'keep')
+
+
+class ReconcileMissionPhasesTest(unittest.TestCase):
+    """terminal⇒ship AND live/indeterminate⇒keep (spec §6 conservative guard)."""
+
+    def _now(self):
+        return datetime(2026, 6, 14, 12, 0, 0, tzinfo=timezone.utc)
+
+    def _registry(self):
+        return {'schema_version': 1, 'missions': [
+            {'id': 'm-shipped', 'phase': 'in_flight', 'task_ids': ['t1', 't2']},
+            {'id': 'm-live', 'phase': 'ready', 'task_ids': ['t3', 't4']},
+            {'id': 'm-proposed', 'phase': 'proposed', 'task_ids': ['t5']},
+        ]}
+
+    def test_merged_mission_ships_others_kept(self):
+        reg = self._registry()
+        terminal = {'t1': h.tts.MERGED, 't2': h.tts.MERGED}
+        probe = lambda tid: terminal.get(tid, h.tts.OPEN)
+        res = h.reconcile_mission_phases(reg, self._now(), probe_fn=probe, dry_run=False)
+        by_id = {m['id']: m for m in reg['missions']}
+        # terminal ⇒ shipped, with audit provenance preserved.
+        self.assertEqual(by_id['m-shipped']['phase'], 'shipped')
+        self.assertEqual(by_id['m-shipped']['prior_phase'], 'in_flight')
+        self.assertEqual(by_id['m-shipped']['shipped_by'], 'heal_missions_card_gc')
+        self.assertIn('shipped_at', by_id['m-shipped'])
+        # live (t3 OPEN) ⇒ kept untouched.
+        self.assertEqual(by_id['m-live']['phase'], 'ready')
+        self.assertNotIn('prior_phase', by_id['m-live'])
+        # proposed lane never touched (owned by another PR).
+        self.assertEqual(by_id['m-proposed']['phase'], 'proposed')
+        self.assertEqual([s[0] for s in res.shipped], ['m-shipped'])
+
+    def test_unknown_probe_keeps_all(self):
+        reg = self._registry()
+        res = h.reconcile_mission_phases(
+            reg, self._now(), probe_fn=lambda tid: h.tts.UNKNOWN, dry_run=False)
+        self.assertEqual(res.shipped, [])
+        self.assertTrue(all(m['phase'] != 'shipped' for m in reg['missions']))
+
+    def test_dry_run_does_not_mutate(self):
+        reg = self._registry()
+        res = h.reconcile_mission_phases(
+            reg, self._now(), probe_fn=lambda tid: h.tts.MERGED, dry_run=True)
+        # Reported as would-ship, but the registry is untouched.
+        self.assertTrue(res.shipped)
+        by_id = {m['id']: m for m in reg['missions']}
+        self.assertEqual(by_id['m-shipped']['phase'], 'in_flight')
+        self.assertNotIn('shipped_at', by_id['m-shipped'])
+
+
 # ---------------------------------------- commit + push (real temp git repo)
 
 

@@ -1224,6 +1224,87 @@ class TestActiveReconciliation(_AdvancerHarness):
         )
 
 
+class TestReconciliationConservativeGuard(_AdvancerHarness):
+    """Spec §3.4 — the reconciliation pass must run (a) independent of the
+    default-OFF advancer flag and (c) for `paused` sequences, while keeping
+    the spec §6 conservative posture: a MERGED PR retires the in-flight
+    step; an absent/unmatched (OPEN / UNKNOWN) PR keeps it."""
+
+    _MERGED_PR = {
+        'number': 77,
+        'url': 'https://github.com/x/y/pull/77',
+        'title': 'rebase under derivative task_id',
+        'headRefName': 'forge/step-foo',
+        'mergedAt': '2026-05-30T01:00:00Z',
+    }
+
+    def _patch_gh_pr_list(self, prs_by_repo):
+        def _fake_list(repo, logger=None):
+            return prs_by_repo.get(repo)
+        self.bsa._gh_list_merged_prs = _fake_list
+
+    def _dispatched_step_seq(self, status='active'):
+        return _make_sequence(
+            status=status,
+            steps=[
+                _make_step(
+                    'step-foo', status='dispatched', pr_url=None,
+                    dispatched_at='2026-05-30T00:00:00+00:00',
+                ),
+            ],
+            current_steps=['step-foo'],
+        )
+
+    def test_flag_off_merged_step_reconciled(self):
+        # Flag OFF, but a dispatched step's PR has merged → it must still be
+        # retired (§3.4a). No heartbeat (gate closed) and no dispatch fire.
+        os.environ['OURLIBERTY_BUILD_SEQUENCE_ADVANCER_ENABLED'] = 'false'
+        self._write_sequence(self._dispatched_step_seq())
+        self._patch_gh_pr_list({'ourliberty-agent-core': [self._MERGED_PR]})
+        rc = self.bsa.tick()
+        self.assertEqual(rc, 0)
+        seq = self._read_sequence('seq-001')
+        step = next(s for s in seq['steps'] if s['step_id'] == 'step-foo')
+        self.assertEqual(step['status'], 'merged')
+        self.assertFalse(self.bsa.HEARTBEAT_FILE.exists())
+        self.assertEqual(self.dispatched_envelopes, [])
+
+    def test_flag_off_unmatched_step_kept(self):
+        # Flag OFF and no merged PR matches (OPEN / UNKNOWN analog) → the
+        # step stays dispatched. Conservative: never retire on absence.
+        os.environ['OURLIBERTY_BUILD_SEQUENCE_ADVANCER_ENABLED'] = 'false'
+        self._write_sequence(self._dispatched_step_seq())
+        self._patch_gh_pr_list({'ourliberty-agent-core': []})
+        rc = self.bsa.tick()
+        self.assertEqual(rc, 0)
+        seq = self._read_sequence('seq-001')
+        step = next(s for s in seq['steps'] if s['step_id'] == 'step-foo')
+        self.assertEqual(step['status'], 'dispatched')
+        self.assertFalse(self.bsa.HEARTBEAT_FILE.exists())
+
+    def test_paused_sequence_merged_step_reconciled(self):
+        # §3.4c: a `paused` sequence is never advanced, but its dispatched
+        # steps must still be reconciled when their PR has merged.
+        self._write_sequence(self._dispatched_step_seq(status='paused'))
+        self._patch_gates(chain_merged=False, gh_merged=False)
+        self._patch_gh_pr_list({'ourliberty-agent-core': [self._MERGED_PR]})
+        self.bsa.tick()
+        seq = self._read_sequence('seq-001')
+        step = next(s for s in seq['steps'] if s['step_id'] == 'step-foo')
+        self.assertEqual(step['status'], 'merged')
+        # Paused → forward-dispatch leg skipped entirely.
+        self.assertEqual(self.dispatched_envelopes, [])
+
+    def test_paused_sequence_unmatched_step_kept(self):
+        self._write_sequence(self._dispatched_step_seq(status='paused'))
+        self._patch_gates(chain_merged=False, gh_merged=False)
+        self._patch_gh_pr_list({'ourliberty-agent-core': []})
+        self.bsa.tick()
+        seq = self._read_sequence('seq-001')
+        step = next(s for s in seq['steps'] if s['step_id'] == 'step-foo')
+        self.assertEqual(step['status'], 'dispatched')
+
+
 class _RecordingLogger:
     """Minimal logger stand-in capturing warning() message strings."""
 

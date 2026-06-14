@@ -9,7 +9,14 @@ Phase D3, Gap 2. Runs every 10 minutes via systemd timer. Three scans per run:
   2. **In-flight stalls** — tasks recorded in `state/in-flight/<stem>.json`
      past their per-model threshold without completion (i.e., picked up by
      the watcher but stuck mid-claude). This is the D3-specific addition;
-     upstream did not have this scan.
+     upstream did not have this scan. Before age-alerting an over-threshold
+     entry, the scan reconciles against terminal ground truth (terminal-state-
+     reconciliation spec §3.5): a dead worker pid OR a terminal (MERGED/CLOSED)
+     PR for the task ⇒ the record is a phantom, so it is retired (record
+     removed) instead of nagging. A live pid with an OPEN/UNKNOWN probe is a
+     genuine stall and is surfaced as before (conservative: indeterminate ⇒
+     keep). This extends the pid reconciliation the watcher only does at boot
+     to every 10-minute sweep.
   3. **Stale leases** — `state/dispatch-leases/*.lease` files whose
      `timestamp_renewed` is older than STALE_LEASE_SECONDS (15m), indicating
      the heartbeat stopped without reclaim.
@@ -24,7 +31,9 @@ Alerts:
 This script does NOT kill stalled tasks. Cancel-marker
 (`blackboard/cancel-task-<stem>.json`) is the explicit human-in-loop kill
 switch (see `agent_runner.run_claude` lines 409–429). The sentinel surfaces
-the stall; the operator decides whether to cancel.
+the stall; the operator decides whether to cancel. (It DOES retire phantom
+in-flight *records* whose work is terminal or whose pid is dead — that is
+bookkeeping cleanup, not killing live work.)
 
 A future commit (D3-approval) will wire a Telegram DM to Larry via Beacon's
 bot when ALERTS_PAUSED is not set. For D3-prep, alerts land on disk only.
@@ -52,6 +61,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 import larry_alerts  # noqa: E402
+import task_terminal_state as tts  # noqa: E402 — shared terminal-state probe
 
 HOME = Path.home()
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', str(HOME / 'agents')))
@@ -209,8 +219,70 @@ def _started_epoch(data: dict[str, Any]) -> float:
     return 0.0
 
 
-def scan_in_flight(now: float) -> list[dict[str, Any]]:
-    """Stalls in `state/in-flight/` — tasks picked up but stuck past threshold."""
+def _pid_alive(pid: Any) -> bool:
+    """True if `pid` names a live process. Mirrors inbox_watcher.reap_orphans:
+    `os.kill(pid, 0)` succeeds (or raises PermissionError) for a live process;
+    ProcessLookupError / a bad value means dead-or-unknowable. A non-int or
+    falsy pid is treated as dead — we cannot prove liveness, and the caller's
+    second signal (terminal state) plus the conservative grace window keep this
+    from forfeiting live work."""
+    if not pid:
+        return False
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except PermissionError:
+        # Process exists but is owned by another uid — alive.
+        return True
+    except (ProcessLookupError, OSError, ValueError, TypeError):
+        return False
+
+
+def _reconcile_in_flight(reg_file: Path, task_stem: Any, reason: str) -> None:
+    """Retire a phantom in-flight registry entry: remove the file and log it.
+
+    The invariant (terminal-state-reconciliation spec §1): no in-flight
+    bookkeeping record may outlive its work's terminal state. When the worker
+    pid is dead OR the work's PR is terminal, the entry is a phantom — keeping
+    it makes the sentinel nag about a 'stuck' task that is not actually
+    running. We remove the record rather than alert. The sentinel does NOT
+    write a forfeit outbox (that heavier reconciliation is inbox_watcher's job
+    at boot); its mid-run reconcile is suppress-nag + drop-phantom so the
+    record stops outliving its terminal work between watcher restarts."""
+    try:
+        reg_file.unlink()
+    except OSError as e:
+        log(f'in-flight reconcile: failed to remove {reg_file.name} '
+            f'({task_stem}): {e}', 'WARN')
+        return
+    log(f'in-flight reconcile: retired phantom {reg_file.name} '
+        f'(task={task_stem}) — {reason}')
+
+
+def scan_in_flight(
+    now: float,
+    *,
+    pid_alive_fn=_pid_alive,
+    terminal_state_fn=None,
+) -> list[dict[str, Any]]:
+    """Stalls in `state/in-flight/` — tasks picked up but stuck past threshold.
+
+    Before age-alerting an over-threshold entry (spec §3.5), check the two
+    terminal-ground-truth signals the watcher only checks at boot:
+
+      * dead worker pid (`pid_alive_fn`), OR
+      * a terminal PR for the task (`terminal_state_fn` → MERGED/CLOSED)
+
+    Either ⇒ the entry is a phantom: reconcile it (remove the record) instead
+    of nagging. A live pid with a non-terminal (OPEN/UNKNOWN) probe is a
+    genuine stall and is surfaced as before — the conservative posture
+    (indeterminate ⇒ keep) holds, so live work is never forfeited. The
+    terminal probe is consulted only when the pid is alive, so a dead-pid
+    entry costs no `gh` call.
+
+    `pid_alive_fn` / `terminal_state_fn` are injectable seams for tests."""
+    if terminal_state_fn is None:
+        terminal_state_fn = tts.task_terminal_state
     if not IN_FLIGHT_DIR.exists():
         return []
     stalls = []
@@ -229,6 +301,20 @@ def scan_in_flight(now: float) -> list[dict[str, Any]]:
         threshold = _per_model_threshold(model)
         if age < threshold:
             continue
+        task_stem = data.get('task_stem')
+        pid = data.get('pid')
+        # Terminal-ground-truth check BEFORE age-alerting (spec §3.5).
+        if not pid_alive_fn(pid):
+            _reconcile_in_flight(reg_file, task_stem, f'dead pid={pid}')
+            continue
+        # pid alive — consult the terminal-state probe. Only a positively
+        # terminal verdict (MERGED/CLOSED) forfeits; OPEN/UNKNOWN keeps.
+        if isinstance(task_stem, str) and task_stem:
+            state = terminal_state_fn(task_stem)
+            if state in tts.TERMINAL_STATES:
+                _reconcile_in_flight(
+                    reg_file, task_stem, f'terminal PR ({state})')
+                continue
         stalls.append({
             'kind': 'in-flight-stall',
             'agent': agent_id,
@@ -238,8 +324,8 @@ def scan_in_flight(now: float) -> list[dict[str, Any]]:
             'age_hours': round(age / 3600, 2),
             'threshold_seconds': threshold,
             'model': model,
-            'task_stem': data.get('task_stem'),
-            'pid': data.get('pid'),
+            'task_stem': task_stem,
+            'pid': pid,
         })
     return stalls
 

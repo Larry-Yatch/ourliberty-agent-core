@@ -142,6 +142,56 @@ class ActivityBucketTest(unittest.TestCase):
         ]
         self.assertEqual(cdg.collect_attention(events), ['disk full', 'token expiring'])
 
+    def test_collect_attention_suppresses_merged_fix(self):
+        # §3.6: an item whose fix PR has MERGED is suppressed, not re-surfaced.
+        events = [
+            {'event_type': 'escalation', 'task_id': 'watermark-fix-001',
+             'payload': {'subject': 'check-0 watermark loss'}},
+            {'event_type': 'larry_alert',
+             'payload': {'subject': 'still-open thing', 'task_id': 'open-001'}},
+        ]
+        probe = lambda tid: cdg.tts.MERGED if tid == 'watermark-fix-001' else cdg.tts.OPEN
+        self.assertEqual(
+            cdg.collect_attention(events, probe_fn=probe), ['still-open thing'])
+
+    def test_collect_attention_keeps_open_and_unknown(self):
+        # OPEN / UNKNOWN probe ⇒ conservative keep (never hide an open problem).
+        events = [
+            {'event_type': 'escalation', 'task_id': 'a-001',
+             'payload': {'subject': 'open problem'}},
+            {'event_type': 'escalation', 'task_id': 'b-001',
+             'payload': {'subject': 'indeterminate problem'}},
+        ]
+        def probe(tid):
+            return {'a-001': cdg.tts.OPEN, 'b-001': cdg.tts.UNKNOWN}[tid]
+        self.assertEqual(
+            cdg.collect_attention(events, probe_fn=probe),
+            ['open problem', 'indeterminate problem'])
+
+    def test_collect_attention_closed_fix_not_suppressed(self):
+        # A CLOSED (abandoned, not merged) fix PR ⇒ problem likely still open;
+        # only MERGED suppresses.
+        events = [
+            {'event_type': 'escalation', 'task_id': 'c-001',
+             'payload': {'subject': 'abandoned-fix problem'}},
+        ]
+        self.assertEqual(
+            cdg.collect_attention(events, probe_fn=lambda tid: cdg.tts.CLOSED),
+            ['abandoned-fix problem'])
+
+    def test_collect_attention_no_task_id_not_probed(self):
+        # No derivable fix task_id ⇒ conservative: never probe, never suppress.
+        events = [
+            {'event_type': 'escalation', 'payload': {'subject': 'no-id problem'}},
+        ]
+        calls = []
+        def probe(tid):
+            calls.append(tid)
+            return cdg.tts.MERGED
+        self.assertEqual(
+            cdg.collect_attention(events, probe_fn=probe), ['no-id problem'])
+        self.assertEqual(calls, [], 'must not probe when no task_id is derivable')
+
     def test_sum_spend_window_filter(self):
         with tempfile.TemporaryDirectory() as d:
             costs = Path(d) / 'costs.jsonl'

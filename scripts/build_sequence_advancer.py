@@ -107,9 +107,12 @@ SUPABASE_TIMEOUT_SEC = 15
 GH_PR_LIST_TIMEOUT_SEC = 10
 
 # How many recently-merged PRs to scan per repo per tick for the
-# reconciliation pass. 20 covers ~a week of typical velocity; bump if
-# silent-misses go undetected past the lookback window.
-RECONCILE_PR_LOOKBACK = 20
+# reconciliation pass. Widened from the original 20 (spec §3.4b): the
+# reconcile pass now runs flag-independent of the default-OFF advancer, so a
+# silent-miss can sit unreconciled for far longer than a week before the pass
+# is the thing that retires it — the lookback must cover that tail. 50 matches
+# task_terminal_state.DEFAULT_PR_LOOKBACK so both probes see the same horizon.
+RECONCILE_PR_LOOKBACK = 50
 
 # GitHub owner for the sandbox repos. Sequence steps store a bare repo
 # name (e.g. 'ourliberty-agent-core'), but `gh --repo` requires the
@@ -1150,16 +1153,31 @@ def tick(now: Optional[datetime] = None) -> int:
     if kill_switch_active():
         logger.info('KILL_SWITCH active; exiting tick')
         return 0
-    if not activation_enabled():
-        logger.info(
-            f'{ACTIVATION_ENV}=false; exiting tick (set true in systemd '
-            f'override to activate after PR-S3 + PR-S4 ship)'
-        )
-        return 0
-    heartbeat()
     now = now or datetime.now(timezone.utc)
-    supabase_client = _connect_supabase()
-    if supabase_client is None:
+    # The terminal-state reconciliation pass runs EVERY tick, independent of
+    # the advancer activation flag (spec §3.4a). The flag gates only the
+    # forward-dispatch logic in _process_active_sequence — a stranded
+    # `dispatched` step whose PR has already merged must be retired even while
+    # auto-dispatch is OFF, otherwise the in-flight record outlives its work's
+    # terminal state (the invariant this whole spec locks). When the flag is
+    # off we skip the supabase connect (dispatch-only) and the dispatch leg,
+    # but still walk every sequence file for reconciliation.
+    advancer_on = activation_enabled()
+    if advancer_on:
+        # Heartbeat only when forward-dispatch is live. The heartbeat healer
+        # treats a fresh mtime as "daemon active"; writing it while the gate
+        # is closed would mask an inactive advancer. The reconciliation pass
+        # below still runs regardless, but it is a backstop, not the daemon's
+        # primary liveness signal.
+        heartbeat()
+    else:
+        logger.info(
+            f'{ACTIVATION_ENV}=false; forward-dispatch gated OFF (set true in '
+            f'systemd override to activate after PR-S3 + PR-S4 ship). The '
+            f'terminal-state reconciliation pass still runs this tick.'
+        )
+    supabase_client = _connect_supabase() if advancer_on else None
+    if advancer_on and supabase_client is None:
         logger.warning(
             'supabase client unavailable (creds missing or library not '
             'installed); gate check chain_events leg will return False for '
@@ -1170,6 +1188,9 @@ def tick(now: Optional[datetime] = None) -> int:
     seen_files = 0
     processed = 0
     reconciled_total = 0
+    # Shared per-tick gh cache across all sequences (multiple sequences may
+    # target the same repo); survives the whole loop, not just one sequence.
+    repo_cache: dict[str, Optional[list[dict[str, Any]]]] = {}
     for path in _iter_sequence_files():
         seen_files += 1
         seq, err = _read_sequence(path)
@@ -1180,28 +1201,34 @@ def tick(now: Optional[datetime] = None) -> int:
         if not validation.valid:
             _handle_invalid_sequence(path, seq, validation.errors, logger)
             continue
-        if seq.get('status') != 'active':
+        status = seq.get('status')
+        # Reconciliation pass — flag-INDEPENDENT (§3.4a) and run for both
+        # `active` and `paused` sequences (§3.4c). A paused sequence can still
+        # hold `dispatched` steps whose PR merged after the pause; without
+        # this scan those records would never retire. Runs BEFORE the
+        # forward-dispatch leg so apply_step_merged's disk write is visible
+        # when the dispatch loop computes `merged_ids` on the same tick.
+        if status in ('active', 'paused'):
+            try:
+                reconciled_here = _reconcile_dispatched_steps(
+                    seq, logger, repo_cache,
+                )
+                reconciled_total += reconciled_here
+                # apply_step_merged wrote to disk; re-read so the in-memory
+                # copy matches before we hand it to _process_active_sequence.
+                if reconciled_here > 0:
+                    refreshed, _ = _read_sequence(path)
+                    if refreshed is not None:
+                        seq = refreshed
+            except Exception as e:
+                logger.error(
+                    f'reconcile: unexpected error for {path.name}: '
+                    f'{type(e).__name__}: {e}'
+                )
+        # Forward-dispatch leg — flag-GATED and active-only. Paused sequences
+        # are reconciled above but never advanced here.
+        if not advancer_on or status != 'active':
             continue
-        # Active reconciliation pass: backstop the V6 notifier hook for
-        # silent-misses where the auto-merge fired under a derivative
-        # task_id (rebase / rescue / revision) that doesn't exact-match
-        # the step. Runs BEFORE _process_active_sequence so apply_step_merged's
-        # disk write is visible when the dispatch loop computes `merged_ids`
-        # for downstream-dep satisfaction on the same tick.
-        try:
-            reconciled_here = _reconcile_dispatched_steps(seq, logger)
-            reconciled_total += reconciled_here
-            # apply_step_merged wrote to disk; re-read so the in-memory
-            # copy matches before we hand it to _process_active_sequence.
-            if reconciled_here > 0:
-                refreshed, _ = _read_sequence(path)
-                if refreshed is not None:
-                    seq = refreshed
-        except Exception as e:
-            logger.error(
-                f'reconcile: unexpected error for {path.name}: '
-                f'{type(e).__name__}: {e}'
-            )
         try:
             _process_active_sequence(path, seq, supabase_client, now, logger)
             processed += 1

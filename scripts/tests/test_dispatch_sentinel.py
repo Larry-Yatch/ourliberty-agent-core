@@ -128,10 +128,13 @@ class SentinelScansTest(_IsolatedAgentsRoot):
         return f
 
     def _write_in_flight(self, name, started_age_seconds, agent='forge',
-                         model='sonnet-4.6', iso=True):
+                         model='sonnet-4.6', iso=True, pid=None):
         # PRODUCTION format: agent_runner writes started_at as an ISO-8601
         # STRING. The old fixture wrote an epoch float, which masked the bug
         # where scan_in_flight float()'d the ISO string and skipped every entry.
+        # pid defaults to THIS test process (alive) so the §3.5 pid-alive check
+        # treats the entry as a genuine running stall; tests that exercise the
+        # dead-pid reconcile path pass an explicit dead pid.
         from datetime import datetime, timedelta, timezone
         ds.IN_FLIGHT_DIR.mkdir(parents=True, exist_ok=True)
         f = ds.IN_FLIGHT_DIR / name
@@ -146,9 +149,13 @@ class SentinelScansTest(_IsolatedAgentsRoot):
                 'agent_id': agent,
                 'started_at': started,
                 'model': model,
-                'pid': 99999,
+                'pid': os.getpid() if pid is None else pid,
             }, fh)
         return f
+
+    # A terminal_state_fn that never reports terminal — keeps over-threshold
+    # entries as genuine stalls without consulting the real `gh` probe.
+    _KEEP = staticmethod(lambda task_stem: ds.tts.UNKNOWN)
 
     def _write_lease(self, name, renewed_age_seconds):
         ds.LEASES_DIR.mkdir(parents=True, exist_ok=True)
@@ -190,7 +197,7 @@ class SentinelScansTest(_IsolatedAgentsRoot):
         # float()-only parse (every entry skipped → no stall ever detected).
         self._write_in_flight('fresh.json', started_age_seconds=25 * 60, model='sonnet-4.6')
         self._write_in_flight('old.json', started_age_seconds=35 * 60, model='sonnet-4.6')
-        stalls = ds.scan_in_flight(time.time())
+        stalls = ds.scan_in_flight(time.time(), terminal_state_fn=self._KEEP)
         names = [s['file'] for s in stalls]
         self.assertIn('old.json', names)
         self.assertNotIn('fresh.json', names)
@@ -199,7 +206,7 @@ class SentinelScansTest(_IsolatedAgentsRoot):
         # Back-compat: a legacy epoch-float started_at still parses.
         self._write_in_flight('legacy.json', started_age_seconds=35 * 60,
                               model='sonnet-4.6', iso=False)
-        stalls = ds.scan_in_flight(time.time())
+        stalls = ds.scan_in_flight(time.time(), terminal_state_fn=self._KEEP)
         self.assertIn('legacy.json', [s['file'] for s in stalls])
 
     def test_started_epoch_parses_iso_and_float_and_garbage(self):
@@ -216,8 +223,65 @@ class SentinelScansTest(_IsolatedAgentsRoot):
     def test_in_flight_stall_opus_has_higher_threshold(self):
         # Opus threshold = 60m. 35m should NOT stall on opus.
         self._write_in_flight('opus.json', started_age_seconds=35 * 60, model='claude-opus-4-7')
-        stalls = ds.scan_in_flight(time.time())
+        stalls = ds.scan_in_flight(time.time(), terminal_state_fn=self._KEEP)
         self.assertEqual(stalls, [], 'opus 35m task should not stall (60m threshold)')
+
+    # ---- §3.5 terminal-state reconcile (conservative guard) ----
+
+    def test_in_flight_dead_pid_reconciled_not_nagged(self):
+        # Dead worker pid ⇒ phantom record retired, no stall surfaced.
+        f = self._write_in_flight('dead.json', started_age_seconds=35 * 60,
+                                   model='sonnet-4.6', pid=2_147_483_646)
+        stalls = ds.scan_in_flight(
+            time.time(),
+            pid_alive_fn=lambda pid: False,
+            terminal_state_fn=self._KEEP,
+        )
+        self.assertEqual(stalls, [], 'dead-pid entry should reconcile, not nag')
+        self.assertFalse(f.exists(), 'phantom record should be removed')
+
+    def test_in_flight_merged_pr_reconciled_not_nagged(self):
+        # Live pid but the work's PR is MERGED ⇒ terminal ⇒ retire.
+        f = self._write_in_flight('merged.json', started_age_seconds=35 * 60,
+                                   model='sonnet-4.6')
+        stalls = ds.scan_in_flight(
+            time.time(),
+            pid_alive_fn=lambda pid: True,
+            terminal_state_fn=lambda task_stem: ds.tts.MERGED,
+        )
+        self.assertEqual(stalls, [], 'merged-PR entry should reconcile, not nag')
+        self.assertFalse(f.exists(), 'phantom record should be removed')
+
+    def test_in_flight_open_pr_kept_and_nagged(self):
+        # Live pid + OPEN PR ⇒ genuine stall ⇒ keep + surface. Record stays.
+        f = self._write_in_flight('open.json', started_age_seconds=35 * 60,
+                                   model='sonnet-4.6')
+        stalls = ds.scan_in_flight(
+            time.time(),
+            pid_alive_fn=lambda pid: True,
+            terminal_state_fn=lambda task_stem: ds.tts.OPEN,
+        )
+        self.assertIn('open.json', [s['file'] for s in stalls])
+        self.assertTrue(f.exists(), 'live/open entry must NOT be reconciled')
+
+    def test_in_flight_unknown_probe_kept_and_nagged(self):
+        # Live pid + UNKNOWN (gh failure / no match) ⇒ conservative keep.
+        f = self._write_in_flight('unknown.json', started_age_seconds=35 * 60,
+                                   model='sonnet-4.6')
+        stalls = ds.scan_in_flight(
+            time.time(),
+            pid_alive_fn=lambda pid: True,
+            terminal_state_fn=lambda task_stem: ds.tts.UNKNOWN,
+        )
+        self.assertIn('unknown.json', [s['file'] for s in stalls])
+        self.assertTrue(f.exists(), 'UNKNOWN entry must NOT be reconciled')
+
+    def test_pid_alive_helper(self):
+        self.assertTrue(ds._pid_alive(os.getpid()))
+        self.assertFalse(ds._pid_alive(None))
+        self.assertFalse(ds._pid_alive(0))
+        self.assertFalse(ds._pid_alive('not-an-int'))
+        self.assertFalse(ds._pid_alive(2_147_483_646))
 
     def test_stale_lease_detected(self):
         self._write_lease('fresh.lease', renewed_age_seconds=300)
