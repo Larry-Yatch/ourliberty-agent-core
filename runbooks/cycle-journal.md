@@ -4,6 +4,101 @@
 
 ---
 
+## Iteration ~1800 — 2026-06-14 17:01Z UTC (interactive, /cycle, Tier 1, signal: PR #497 [yellow] carry + PR #504 new + Forge build phase running)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. All checks 0–5 + A–E nominal. PR #497 [yellow] carry (76th iter). **New:** PR #504 opened by Forge (`feat(terminal-state): shared task_terminal_state probe + refactor 3 ad-hoc gh probes`) at 16:57:56Z; build phase now active (started 16:58:53Z, resume=cfa36c7e, ~3 min elapsed at iter close). Preflight had one MalformedForgeMarker (missing PROCEED block) at 16:58:09Z; recovered via retry 1/3 at 16:58:49Z. New G-rule: Forge-preflight-marker-error-retry 1/3.
+
+**VERIFY-BEFORE-REASSERT (iter ~1799 carries):**
+- PR #497 REVIEW_ESCALATE: `gh pr list` → OPEN, mergeable=UNKNOWN (reverted from MERGEABLE; normal GitHub re-compute), reviewDecision="", statusCheckRollup=FAILURE. 76th consecutive iter. **CARRY** [yellow].
+- terminal-state-reconciliation build sequence: **ADVANCED** — PR #504 opened 16:57:56Z; preflight MalformedForgeMarker at 16:58:09Z, retry 1/3 dispatched → PROCEED classified 16:58:49Z → build-phase dispatched → Forge started resume=cfa36c7e at 16:58:53Z. **UPDATED** [blue].
+- unreviewed-merge:499/494/489: Telegram log — last Larry message 10:28:47 MDT "Go" (dag-preflight). No new replies. **CARRY** [yellow].
+- heal-stale-daemon-code.heartbeat: `2026-06-14T16:38:17Z` (~23 min before 17:01Z check). Within 60-min threshold. ✅ confirmed.
+- Stale bash orphans: PID 1834248 (ELAPSED=16-21:39:43, ~17d) + PID 2605007 (ELAPSED=12:37:49, ~12.6h). Both Ss, 0% CPU. **CARRY** [blue].
+- G-rule droplet-uncommitted:main 2/3: HEAD=ea6bbd6b=origin/main. No new dirty-tree. **CARRY at 2/3**.
+
+**Check 0 — Alert triage:** Watermark=924, file=924 (0 new lines). ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log: 1 WARN at 16:58:09Z — `MalformedForgeMarker: phase=preflight requires ONE marker block at end of response (PROCEED / CLARIFY_REQUEST / REJECT) — none found` for tsr-shared-probe. Self-healed: retry 1/3 dispatched; PROCEED classified at 16:58:49Z; build-phase now running. inbox_watcher.log: 0 WARNs. ✅ Nominal (recovered). New G-rule: Forge-preflight-marker-error-retry 1/3.
+
+**Check 2 — Telegram sweep:** Last Larry message: 10:28:47 MDT "Go" (dag-preflight-terminal-state-reconciliation). No new directives or distress keywords since. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → 0 stalls, 11 FORGE_NO_PR_SKIP (stable; +0 vs iter ~1799). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: pending=0 ✅. Forge inbox: `build-tsr-shared-probe.json` (build phase active since 16:58:53Z, resume=cfa36c7e). All other inboxes EMPTY. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heartbeat `2026-06-14T16:38:17Z` (~23 min before 17:01Z check). Fresh (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=ea6bbd6b=origin/main. Clean working tree. On main. 0 ahead, 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: status=no-change, last_sync=2026-06-14T16:22:49Z (~39 min before 17:01Z check). Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:**
+- inbox_watcher: PID 2530123 ✅ (Ssl, Jun13)
+- chain_event_shipper: PID 2744551 ✅ (SNs, 04:36)
+- dashboard_api: PID 2744674 ✅ (Ssl, 04:36, 0.2% CPU)
+- beacon_telegram_bot: PID 2744840 ✅ (Ss, 04:36)
+- outbox_notifier: PID 2744914 ✅ (Ss, 04:36)
+- forge: PID 2814771 ✅ (Ssl, 10:35 MDT; tsr-shared-probe build phase in progress since 16:58:53Z, resume=cfa36c7e)
+- [blue] PID 1834248: stale bash orphan (~17d). Ss, 0% CPU. [carry]
+- [blue] PID 2605007: stale bash orphan (~12.6h). Ss, 0% CPU. [carry]
+
+**Check D — Inboxes:** Forge: `build-tsr-shared-probe.json` (build phase active). All other inboxes EMPTY. ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core:
+- **PR #497** OPEN (`fix(cleanup-branches): success-prune alert is info, not warning`), mergeable=UNKNOWN (reverted from MERGEABLE — normal GitHub re-compute), reviewDecision="", statusCheckRollup=FAILURE (mirror-review ctx 04:05:31Z). [yellow] carry — 76th consecutive iter.
+- **PR #504** OPEN (`feat(terminal-state): shared task_terminal_state probe + refactor 3 ad-hoc gh probes`), mergeable=MERGEABLE, reviewDecision="", statusCheckRollup=[] (no checks yet). New — created 16:57:56Z by Forge tsr-shared-probe preflight. Build phase now running. Awaiting Mirror review dispatch (outbox_notifier will dispatch once Forge posts a build marker). [blue] [new].
+ourliberty-dashboard: No open PRs. ✅
+
+**Conditional checks:** Today is Sunday 2026-06-14 UTC. Check I already ran this cycle day (iter ~1718). **SKIP**. Check III last artifact 2026-06-11 (3 days old, <14d). **SKIP**.
+
+**Actions taken:**
+1. `cycle_tier_state.py record --checks-clean false` → tier stays 1, consecutive_clean=0, last_signal_at=2026-06-14T17:01:53Z. ✅
+
+**Dispatches:** None.
+
+**Patterns:**
+- G-rule droplet-uncommitted:main: 2/3. No new occurrence. Carry.
+- G-rule missions-autoregister-warn-vs-info: 2/3. Carry.
+- G-rule alert-translations-no-patterns-delivery-confirmation-tier4: 2/3. Carry.
+- G-rule missions-card-gc-warn-vs-info: 1/3. Carry.
+- G-rule F24-empty-prompt-envelope-rejected: 1/3. Carry.
+- G-rule timer-cycle-no-journal-entry: 0/3. Carry.
+- G-rule Forge-timeout-worktree-missing-retry-loop: 1/3. Carry.
+- G-rule heal-stale-daemon-script_path-cosmetic: 1/3. Carry.
+- **G-rule Forge-preflight-marker-error-retry: 1/3** ← NEW. MalformedForgeMarker in tsr-shared-probe preflight (missing PROCEED block); retry 1/3 recovered. Track to 3/3 then dispatch to Beacon for Forge preflight-discipline improvement.
+
+**Standing findings:**
+- [yellow] **PR #497 REVIEW_ESCALATE** — statusCheckRollup=FAILURE (76th consecutive iter). Close: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core`. [carry]
+- [yellow] **unreviewed-merge:499** — Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed'. [carry]
+- [yellow] **unreviewed-merge:494** — DM sent iter ~1694. Reply or silence. [carry]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614. Reply or silence. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **terminal-state-reconciliation build sequence** — PR #504 opened 16:57:56Z; build phase running (resume=cfa36c7e, started 16:58:53Z). Next: Forge posts build marker → outbox_notifier dispatches Mirror review → Mirror reviews → PR merges. Watch next 1–2 iters for Mirror review dispatch. [UPDATED]
+- [blue] **Check I medic-operator-scaffold-001** — 24.4σ; `/dispatch 1` if re-run needed. [carry]
+- [blue] **catalog-accuracy-drift** — 8/34 ourliberty-graph shelf cards drifted (attention rate 24%). journal-note. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 2/3. Watch; dispatch at 3/3. [carry]
+- [blue] **G-rule missions-autoregister-warn-vs-info** — 2/3. [carry]
+- [blue] **G-rule alert-translations-no-patterns-delivery-confirmation-tier4** — 2/3. [carry]
+- [blue] **G-rule missions-card-gc-warn-vs-info** — 1/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — 0/3. [carry]
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. [carry]
+- [blue] **G-rule heal-stale-daemon-script_path-cosmetic** — 1/3. [carry]
+- [blue] **G-rule Forge-preflight-marker-error-retry** — 1/3. [NEW] [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — last occurrence 13:22:39Z Jun-14 (self-healed). [carry]
+- [blue] **dag-preflight-revision gap** — PR #484 closed source=pulse gap; DAG markers still fall through. [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+- [blue] **Stale bash orphan loops** — PID 1834248 (~17d) + PID 2605007 (~12.6h). Ss, 0% CPU. [carry]
+
+**PRIME DIRECTIVE:** No new Pulse interventions (tsr-shared-probe marker error self-healed via system retry; PR #504 and Forge build phase are expected workflow). interventions=915, systemic_fixes=42, ratio≈21.79, trend=flat.
+**Tier end-of-iter:** **Tier 1** (--checks-clean false; PR #497 [yellow] carry + PR #504 new in Check E; consecutive_clean=0).
+
+---
+
 ## Iteration ~1799 — 2026-06-14 16:54Z UTC (interactive, /cycle, Tier 1, signal: PR #497 [yellow] carry + Forge tsr-shared-probe running ~18 min)
 
 **Trigger:** Larry direct invocation (`/cycle`).

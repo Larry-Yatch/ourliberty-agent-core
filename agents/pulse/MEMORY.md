@@ -66,13 +66,13 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 16:54Z UTC (Iter ~1799, Tier 1, signal: PR #497 carry + Forge tsr-shared-probe running ~18 min)
+## Status snapshot — updated 2026-06-14 17:01Z UTC (Iter ~1800, Tier 1, signal: PR #497 carry + PR #504 new + Forge build phase running)
 
-**Iter ~1799 summary:** All checks 0–5 + A–E nominal. 0 new alerts (watermark=924, file=924). Noteworthy: PR #497 `mergeable` flipped UNKNOWN→MERGEABLE this iter (no merge conflicts; CI still FAILURE). Forge tsr-shared-probe session RUNNING (~18 min elapsed at 16:53Z; no done entry yet in inbox_watcher.log). 0 new interventions. PRIME DIRECTIVE: interventions=915, systemic_fixes=42, ratio≈21.79, trend=flat. **Tier: Tier 1** (PR #497 [yellow] carry; consecutive_clean=0).
+**Iter ~1800 summary:** All checks 0–5 + A–E nominal. 0 new alerts (watermark=924, file=924). **New:** PR #504 opened by Forge (`feat(terminal-state): shared task_terminal_state probe + refactor 3 ad-hoc gh probes`) at 16:57:56Z; build phase running (resume=cfa36c7e, started 16:58:53Z). Preflight had MalformedForgeMarker (missing PROCEED block), recovered via retry 1/3. New G-rule: Forge-preflight-marker-error-retry 1/3. PR #497 mergeable reverted MERGEABLE→UNKNOWN (normal GitHub re-compute). 0 new Pulse interventions. PRIME DIRECTIVE: interventions=915, systemic_fixes=42, ratio≈21.79, trend=flat. **Tier: Tier 1** (PR #497 [yellow] carry + PR #504 new; consecutive_clean=0).
 
 ---
 
-## Key standing items (as of iter ~1799)
+## Key standing items (as of iter ~1800)
 
 | Item | Status | Action needed |
 |---|---|---|
@@ -82,7 +82,7 @@
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| terminal-state-reconciliation build sequence | [blue] Forge tsr-shared-probe RUNNING (started 16:35:36Z Jun-14; ~18 min at iter ~1799 check) | Watch next iter for Forge PR |
+| terminal-state-reconciliation build sequence | [blue] PR #504 opened 16:57:56Z; Forge build phase RUNNING (resume=cfa36c7e, started 16:58:53Z) | Watch next 1–2 iters for Mirror review dispatch |
 | catalog-accuracy-drift | [blue] 8/34 ourliberty-graph shelf cards drifted (attention rate 24%, gate 10%) | route=digest; journal-note only |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
 | G-rule missions-autoregister-warn-vs-info | [blue] **2/3** | Watch; dispatch at 3/3 |
@@ -93,6 +93,7 @@
 | G-rule F24-empty-prompt-envelope-rejected | [blue] 1/3 | Watch |
 | G-rule timer-cycle-no-journal-entry | [blue] **0/3** (RESET; false positive confirmed by Beacon) | Watch |
 | G-rule heal-stale-daemon-script_path-cosmetic | [blue] 1/3 | Watch; dispatch at 3/3 |
+| G-rule Forge-preflight-marker-error-retry | [blue] **1/3** (NEW iter ~1800: MalformedForgeMarker in tsr-shared-probe preflight, retry 1/3 recovered) | Watch; dispatch at 3/3 |
 | sync-push-rebase-loop-001 | [blue] UNREGISTERED AR; last occurrence 13:22:39Z Jun-14 (self-healed) | Carry |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
