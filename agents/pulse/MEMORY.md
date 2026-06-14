@@ -66,13 +66,13 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 15:22Z UTC (Iter ~1789, Tier 3, consecutive_clean=1)
+## Status snapshot — updated 2026-06-14 15:51Z UTC (Iter ~1790, Tier 1, signal: Forge stall)
 
-**Iter ~1789 summary:** 0 new alerts (watermark=919 = file length). All 5 expected daemons live. All inboxes EMPTY. 0 stalls. 0 auto-fix actions. Iter clean. PR #497: statusCheckRollup=FAILURE — not clean+green, 65th carry iter. sync.json status=no-change (14:22:47Z). Forge in-flight on adopt-terminal-state re-dispatch (PID 2797732, Larry "Go" at 09:18:55 MDT — second approval after Beacon added 6th hole). PRIME DIRECTIVE: interventions≈914, systemic_fixes=41, ratio≈22.29, trend=flat. **Tier:** **Tier 3** (consecutive_clean 0→1; 30-min cadence).
+**Iter ~1790 summary:** 1 new signal — Forge adopt-terminal-state-reconciliation-spec PID 2797732 exited with only [WIP] commit (3rd consecutive stall). Alert idx=920 sent. Beacon dispatched: pulse-investigate-forge-stall-adopt-terminal-001.json. All mandatory checks (0-5) nominal. PR #497: statusCheckRollup=FAILURE — 66th carry. sync.json status=no-change (15:22:49Z). PRIME DIRECTIVE: interventions≈915, systemic_fixes=41, ratio≈22.32, trend=flat. **Tier: Tier 1** (reset from Tier 3 on signal; 5-min cadence).
 
 ---
 
-## Key standing items (as of iter ~1789)
+## Key standing items (as of iter ~1790)
 
 | Item | Status | Action needed |
 |---|---|---|
@@ -82,9 +82,10 @@
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| adopt-terminal-state re-dispatch | [blue] Forge in-flight (PID 2797732). Branch on remote, no PR yet. | Watch for PR open or auth failure next cycle |
+| adopt-terminal-state re-dispatch | [yellow] 3rd stall. Alert idx=920. Beacon dispatched to diagnose (pulse-investigate-forge-stall-adopt-terminal-001). | Watch for Beacon DM or resolution |
 | catalog-accuracy-drift | [blue] 8/34 ourliberty-graph shelf cards drifted (attention rate 24%, gate 10%) | route=digest; journal-note only |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
+| G-rule adopt-terminal-state-forge-stall | [yellow] **3/3 DISPATCHED** | Beacon investigating |
 | G-rule missions-autoregister-warn-vs-info | [blue] **2/3** | Watch; dispatch at 3/3 |
 | G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule alert-translations-no-patterns-delivery-confirmation-tier4 | [blue] **2/3** | Watch; dispatch at 3/3 |
