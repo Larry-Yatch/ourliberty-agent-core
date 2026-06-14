@@ -67,6 +67,12 @@ PULSE_RUNTIME_PATHS=(
 # so its captures.json commits are already in local HEAD before origin advances —
 # an incoming ff-pull never carries a captures.json change (and git fast-forwards
 # cleanly past commits that don't touch a dirty file).
+#
+# DRIFT GUARD: this array is the source of truth for the SYNC path and MUST stay
+# consistent with the canonical config/healer-managed-runtime-paths.json (the
+# same allowlist consumed by heal_droplet_git_drift.py and Pulse cycle Check A).
+# Equality is enforced by scripts/tests/test_heal_droplet_git_drift.py — keep
+# this kept-untouched-on-purpose bash literal in lock-step with that JSON.
 SYNC_EXTRA_RUNTIME_PATHS=(
     "agents/beacon/captures.json"
 )

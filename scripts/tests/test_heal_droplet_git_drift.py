@@ -386,5 +386,80 @@ class UncommittedParserTests(_IsolatedAgentsRoot):
         self.assertEqual(paths, [])
 
 
+# -------------------- healer-managed runtime-path carve-out --------------------
+
+class HealerManagedDirtCarveOutTests(_IsolatedAgentsRoot):
+    """captures.json (and any config/healer-managed-runtime-paths.json entry) is
+    nominal-by-design dirt — it must never page, but non-managed dirt still must.
+    """
+
+    def _write_stale(self, rel: str, age_h: float, now: float) -> None:
+        p = Path(self._isolated_repo) / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text('# touched')
+        mtime = now - (age_h * 60 * 60)
+        os.utime(p, (mtime, mtime))
+
+    def test_captures_only_dirt_stale_does_not_trip(self):
+        # Only dirt is the healer-managed captures.json, stale at 9h → NO alert.
+        now = 1_700_000_000.0
+        managed = h.healer_managed_paths()
+        self.assertIn('agents/beacon/captures.json', managed)
+        self._write_stale('agents/beacon/captures.json', 9, now)
+        state = {'subjects': {}}
+        with mock.patch.object(h, 'uncommitted_files',
+                               return_value=['agents/beacon/captures.json']):
+            patcher, fake_la = self._stub_alerts()
+            with patcher:
+                tripped = h.evaluate_uncommitted('main', state, now=now)
+        self.assertFalse(tripped)
+        self.assertEqual(fake_la.append_alert.call_count, 0)
+
+    def test_captures_plus_non_managed_stale_trips_and_names_non_managed(self):
+        # captures.json (managed) + a stale non-managed file → alert STILL fires,
+        # named on the non-managed file only; captures.json is not the trigger.
+        now = 1_700_000_000.0
+        self._write_stale('agents/beacon/captures.json', 9, now)
+        self._write_stale('scripts/stale_edit.py', 7, now)
+        state = {'subjects': {}}
+        with mock.patch.object(
+            h, 'uncommitted_files',
+            return_value=['agents/beacon/captures.json', 'scripts/stale_edit.py'],
+        ):
+            patcher, fake_la = self._stub_alerts()
+            with patcher:
+                tripped = h.evaluate_uncommitted('main', state, now=now)
+        self.assertTrue(tripped)
+        self.assertEqual(fake_la.append_alert.call_count, 1)
+        kwargs = fake_la.append_alert.call_args.kwargs
+        self.assertEqual(kwargs['subject'], 'droplet-uncommitted:main')
+        # The alert body counts + names ONLY the non-managed dirt.
+        self.assertIn('scripts/stale_edit.py', kwargs['message'])
+        self.assertNotIn('captures.json', kwargs['message'])
+        self.assertIn('1 uncommitted file', kwargs['message'])
+
+    def test_canonical_json_matches_sync_extra_runtime_paths(self):
+        # Drift guard: config/healer-managed-runtime-paths.json must equal the
+        # bash SYNC_EXTRA_RUNTIME_PATHS array (sole source of truth for sync).
+        repo_root = _REPO_SCRIPTS.parent
+        config_file = repo_root / 'config' / 'healer-managed-runtime-paths.json'
+        import json as _json
+        json_paths = _json.loads(config_file.read_text())['paths']
+
+        lib = _REPO_SCRIPTS / '_lib_pulse_runtime.sh'
+        import subprocess as _sp
+        out = _sp.run(
+            ['bash', '-c',
+             f'source "{lib}"; printf "%s\\n" "${{SYNC_EXTRA_RUNTIME_PATHS[@]}}"'],
+            capture_output=True, text=True, timeout=30,
+        )
+        self.assertEqual(out.returncode, 0, out.stderr)
+        bash_paths = [ln for ln in out.stdout.splitlines() if ln]
+        self.assertEqual(sorted(json_paths), sorted(bash_paths))
+        # And the healer's hardcoded fallback must agree too.
+        self.assertEqual(sorted(json_paths),
+                         sorted(h._HEALER_MANAGED_PATHS_FALLBACK))
+
+
 if __name__ == '__main__':
     unittest.main()
