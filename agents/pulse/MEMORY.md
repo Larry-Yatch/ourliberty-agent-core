@@ -66,23 +66,23 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 17:13Z UTC (Iter ~1802, Tier 1, signal: PR #497 carry + TSR DAG advancing)
+## Status snapshot — updated 2026-06-14 17:23Z UTC (Iter ~1803, Tier 1, signal: PR #497 carry + TSR DAG step 2 BUILD running)
 
-**Iter ~1802 summary:** All checks 0–5 + A–E nominal. 0 new alerts (watermark=924, file=924). **ADVANCED:** PR #504 (tsr-shared-probe) MERGED at 17:08:47Z (Mirror review 485s, $0.908, auto-merge success). TSR DAG sequence advancing: tsr-approvals-alerttriage in BUILD PHASE (Forge PID 2840154, resume=3d184f08, started 17:12:48Z); tsr-missions-sequence-inflight-digest queued (headless-approval-request in Forge inbox). PR #497 carry (78th consecutive iter). 0 new Pulse interventions. PRIME DIRECTIVE: interventions=915, systemic_fixes=42, ratio≈21.79, trend=flat. **Tier: Tier 1** (PR #497 [yellow] carry + TSR DAG in-progress; consecutive_clean=0).
+**Iter ~1803 summary:** All checks 0–5 + A–E nominal. 0 new alerts (watermark=924, file=924). TSR DAG: tsr-shared-probe MERGED ✅; tsr-approvals-alerttriage BUILD PHASE running (Forge PID 2842309, resume=3d184f08, started 17:15:53Z); tsr-missions-sequence-inflight-digest BUILD PHASE QUEUED (build envelope 17:15:53Z). PR #497 carry (79th consecutive iter). 0 new Pulse interventions. PRIME DIRECTIVE: interventions=915, systemic_fixes=42, ratio≈21.79, trend=flat. **Tier: Tier 1** (PR #497 [yellow] carry + TSR DAG step 2 BUILD running; consecutive_clean=0).
 
 ---
 
-## Key standing items (as of iter ~1802)
+## Key standing items (as of iter ~1803)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (78th iter: ~1724→~1802) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (79th iter: ~1724→~1803) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| TSR DAG sequence | [blue] PR #504 MERGED ✅; tsr-approvals-alerttriage BUILD PHASE (PID 2840154, resume=3d184f08); tsr-missions-sequence-inflight-digest QUEUED | Watch next 1–2 iters for PR + auto-merge for each step |
+| TSR DAG sequence | [blue] PR #504 MERGED ✅; step 2 tsr-approvals-alerttriage BUILD PHASE (PID 2842309, resume=3d184f08, started 17:15:53Z); step 3 tsr-missions-sequence-inflight-digest BUILD PHASE QUEUED | Watch next 1–2 iters for PR + auto-merge for each step |
 | catalog-accuracy-drift | [blue] 8/34 ourliberty-graph shelf cards drifted (attention rate 24%, gate 10%) | route=digest; journal-note only |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
 | G-rule missions-autoregister-warn-vs-info | [blue] **2/3** | Watch; dispatch at 3/3 |
@@ -97,4 +97,4 @@
 | sync-push-rebase-loop-001 | [blue] UNREGISTERED AR; last occurrence 13:22:39Z Jun-14 (self-healed) | Carry |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
-| Stale bash orphan loops | [blue] PIDs 1834248 (~17d+) + 2605007 (~12.9h Jun-14). 0% CPU. | Carry; cleanup when convenient |
+| Stale bash orphan loops | [blue] PIDs 1834248 (~17d+) + 2605007 (~13h Jun-14). 0% CPU. | Carry; cleanup when convenient |
