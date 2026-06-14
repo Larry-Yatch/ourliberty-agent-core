@@ -66,17 +66,17 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 13:20Z UTC (Iter ~1781, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 13:26Z UTC (Iter ~1782, Tier 1, consecutive_clean=0)
 
-**Iter ~1781 summary:** All checks nominal. PR #497 MERGEABLE=UNKNOWN (58th consecutive iter, carry). beacon-pending-approvals.json now `pending: []` — fix-alert-triage-watermark-durability-001 cleared by bot 07:13:35 MDT (13:13Z). No new Telegram directives. Heartbeat fresh (13:07:19Z). All inboxes clear. HEAD=ae4d4532=origin/main. Sync: 12:22:27Z (status=no-change). PRIME DIRECTIVE: interventions=913, systemic_fixes=41, ratio≈22.27, trend=flat. **Tier:** Tier 1.
+**Iter ~1782 summary:** 1 new alert (919): sync-blocked:push-failed at 13:22:39Z (push conflict between sync.service and run_cycle.sh wrapper; self-healed, HEAD=origin/main=0b94e1d1). G-rule droplet-uncommitted:main advanced to 2/3. PR #497 MERGEABLE=UNKNOWN (59th consecutive iter, carry). All agents live, inboxes empty, no pipeline stalls. Watermark → 919. PRIME DIRECTIVE: interventions=914, systemic_fixes=41, ratio≈22.29, trend=flat. **Tier:** Tier 1.
 
 ---
 
-## Key standing items (as of iter ~1781)
+## Key standing items (as of iter ~1782)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN, mirror-review=FAILURE, no reviewDecision (58 iters: ~1724→~1781) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN, mirror-review=FAILURE, no reviewDecision (59 iters: ~1724→~1782) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
@@ -88,11 +88,11 @@
 | G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule alert-translations-no-patterns-delivery-confirmation-tier4 | [blue] 2/3 | Watch; dispatch at 3/3 |
 | G-rule missions-card-gc-warn-vs-info | [blue] 1/3 | Watch; dispatch at 3/3 |
-| G-rule droplet-uncommitted:main | [blue] 1/3 | Watch |
+| G-rule droplet-uncommitted:main | [blue] **2/3** (advanced iter ~1782; sync push conflict) | Watch; dispatch at 3/3 |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] 1/3 | Watch |
 | G-rule timer-cycle-no-journal-entry | [blue] 0/3 | Watch |
 | G-rule heal-stale-daemon-script_path-cosmetic | [blue] 1/3 — alerts 917/918 show wrong script_path (chain_event_shipper.py for beacon-bot/outbox-notifier) | Watch; dispatch at 3/3 |
-| sync-push-rebase-loop-001 | [blue] UNREGISTERED AR; self-healed (10:22Z sync clean) | Carry |
+| sync-push-rebase-loop-001 | [blue] UNREGISTERED AR; new occurrence 13:22:39Z Jun-14 (self-healed) | Carry |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
 | Stale bash orphan loops | [blue] PIDs 1834248 (May 28, 16+ days) + 2605007 (Jun 13). Ss, 0% CPU. | Carry; cleanup when convenient |
