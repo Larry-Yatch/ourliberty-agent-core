@@ -66,9 +66,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 11:47Z UTC (Iter ~1769, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 11:53Z UTC (Iter ~1770, Tier 1, consecutive_clean=0)
 
-**Iter ~1769 summary:** All checks nominal. PR #497 MERGEABLE=UNKNOWN (46th consecutive iter, carry), mirror-review=FAILURE, no action. Heartbeat at `blackboard/heal-stale-daemon-code.heartbeat` 11:37:05Z (fresh, ~10 min). All inboxes clear. HEAD=6c3ff670=origin/main. Sync: 11:22:21Z (status=no-change). PRIME DIRECTIVE: interventions=901, systemic_fixes=41, ratio≈21.95, trend=flat. **Tier:** Tier 1. Pipeline stall: 0 stalls, 13 FORGE_NO_PR_SKIP (stable).
+**Iter ~1770 summary:** All checks nominal. PR #497 MERGEABLE=UNKNOWN (47th consecutive iter, carry), no action. Heartbeat at `blackboard/heal-stale-daemon-code.heartbeat` 11:37:05Z (fresh, ~15 min). All inboxes clear. HEAD=4ee9680d=origin/main. Sync: 11:22:21Z (status=no-change). PRIME DIRECTIVE: interventions=902, systemic_fixes=41, ratio≈22.00, trend=flat. **Tier:** Tier 1. Pipeline stall: 0 stalls, 13 FORGE_NO_PR_SKIP (stable). [Note: beacon-pending-approvals.json schema is v1 `pending:[...]` array; corrected parse this iter.]
 
 ---
 
