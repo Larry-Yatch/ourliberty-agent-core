@@ -60,9 +60,9 @@
 
 ---
 
-## heal-stale-daemon-code heartbeat correct path (corrected iter ~1768)
+## heal-stale-daemon-code heartbeat correct path and format (corrected iter ~1768, format confirmed ~1829)
 
-**Rule:** The heal-stale-daemon-code heartbeat lives at `/home/larry/agents/blackboard/heal-stale-daemon-code.heartbeat` (NOT `state/`). This is `HEARTBEAT_FILE` in `scripts/heal_stale_daemon_code.py`. Previous Check 5 invocations used `state/` path and would have gotten "no file" — always use `blackboard/` path.
+**Rule:** The heal-stale-daemon-code heartbeat lives at `/home/larry/agents/blackboard/heal-stale-daemon-code.heartbeat` (NOT `state/`). This is `HEARTBEAT_FILE` in `scripts/heal_stale_daemon_code.py`. Previous Check 5 invocations used `state/` path and would have gotten "no file" — always use `blackboard/` path. The file contains a **plain-text ISO 8601 UTC timestamp** (e.g. `2026-06-14T20:39:19.896028+00:00`), NOT JSON — read with `cat`, not `json.load`. Parse timestamp directly to compute age.
 
 ---
 
@@ -72,9 +72,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 20:28Z UTC (Iter ~1828, Tier 1, nominal)
+## Status snapshot — updated 2026-06-14 20:43Z UTC (Iter ~1829, Tier 1, nominal)
 
-**Iter ~1828 summary:** Fully nominal. 0 new alerts. 0 new findings. All daemons alive. Git clean/current. PR #497 carry (104th iter). Orphans PID 1834248 (17d 01h+) + PID 2605007 (16h 07m+, PR #498 merged, will not self-exit) carrying. Watermark=931. §5.0 no-op. Rotations nominal. PRIME DIRECTIVE: 0 interventions (iter_clean), ratio≈20.47. **Tier: Tier 1** (consecutive_clean=0).
+**Iter ~1829 summary:** Fully nominal. 0 new alerts. 0 new findings. All daemons alive. Git clean/current. PR #497 carry (105th iter). Orphans PID 1834248 (17d 01h 23m+) + PID 2605007 (16h 22m+, PR #498 merged, will not self-exit) carrying. Watermark=931. §5.0 no-op. Rotations nominal. PRIME DIRECTIVE: 0 interventions (iter_clean), ratio≈20.47. **Tier: Tier 1** (consecutive_clean=0).
 
 ---
 
@@ -82,7 +82,7 @@
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (104th iter) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (105th iter) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
