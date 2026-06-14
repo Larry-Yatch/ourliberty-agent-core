@@ -54,7 +54,21 @@
       "repo": "ourliberty-agent-core",
       "area": null,
       "aging": true,
-      "last_touched": "2026-06-01T00:00:00+00:00"
+      "last_touched": "2026-06-01T00:00:00+00:00",
+      "briefing": {
+        "what": "Aging idea — a captured idea waiting on a decision.",
+        "why": "It's been parked a while and is worth a decision before it goes stale.",
+        "suggest": "Have the team run it down and propose a fix."
+      },
+      "risk": "medium",
+      "risk_note": "A change here has wider effects than it first appears — worth a quick check.",
+      "recommended_action": "drop",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-02T00:00:00+00:00",
+        "from_state": "parked"
+      }
     },
     {
       "capture_id": "cap-fresh-two",
@@ -63,7 +77,12 @@
       "repo": "ourliberty-dashboard",
       "area": null,
       "aging": false,
-      "last_touched": "2026-06-09T00:00:00+00:00"
+      "last_touched": "2026-06-09T00:00:00+00:00",
+      "briefing": null,
+      "risk": null,
+      "risk_note": null,
+      "recommended_action": null,
+      "briefing_provenance": null
     }
   ]
 }

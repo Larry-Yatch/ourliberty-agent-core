@@ -55,6 +55,7 @@ ALLOWLIST: dict[str, set[str]] = {
         'agent_runner.py',          # run_claude Popen + tier2 subprocess.run
         'ceo_digest_generator.py',  # generate_ceo_voice
         'dashboard_api.py',         # _cleanup_review_verify_uncertain
+        'missions_narrator.py',     # generate_briefing_voice (Phase 4 Narrator)
     },
     'telegram': {
         'agent_telegram_bot.py',    # telegram_send
