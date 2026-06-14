@@ -4,6 +4,104 @@
 
 ---
 
+## Iteration ~1806 — 2026-06-14 17:44Z UTC (interactive, /cycle, Tier 1, signal: TSR DAG steps 2+3 RUNNING + PR #497 [yellow] carry)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. All checks 0–5 + A–E nominal. PR #497 [yellow] standing carry (82nd iter). **TSR DAG continuing:** tsr-approvals-alerttriage: BUILD DONE ($4.66), PR #505 OPEN, Mirror review RUNNING (PID 2852155, test_regression_check.py running in wt-mirror-tsr-approvals-alerttriage, ~10 min elapsed). tsr-missions-sequence-inflight-digest: BUILD PHASE RUNNING (Forge PID 2852025, resume=55ae6336-bc9, ~10 min elapsed).
+
+**VERIFY-BEFORE-REASSERT (iter ~1805 carries):**
+- PR #497 REVIEW_ESCALATE: `gh pr view 497` → OPEN, UNKNOWN, reviewDecision="", statusCheckRollup=FAILURE (mirror-review ctx 04:05:31Z). 82nd consecutive iter. **CARRY** [yellow].
+- PR #505 TSR step 2: OPEN, UNKNOWN, reviewDecision="", statusCheckRollup=[]. Mirror review running (PID 2852155, test_regression_check.py subprocess PID 2853239 in worktree). **ADVANCING** [blue].
+- TSR step 3: Forge PID 2852025 alive (7:28+ elapsed at check). build-tsr-missions-sequence-inflight-digest.json present in Forge inbox. **RUNNING** [blue].
+- unreviewed-merge:499/494/489: beacon_telegram_bot.log — last Larry message 10:28:47 MDT "Go" (dag-preflight dispatch). No new replies. **CARRY** [yellow].
+- heal-stale-daemon-code.heartbeat: `2026-06-14T17:38:17Z` (~6 min before 17:44Z check). FRESH (<60 min). **NOMINAL** ✅ (was 38 min at iter ~1805; daemon refreshed within cycle window).
+- G-rule droplet-uncommitted:main 2/3: HEAD=00d12d31=origin/main, clean tree. No new dirty-tree. **CARRY at 2/3**.
+- FORGE_NO_PR_SKIP count: was 11 at iter ~1805, now 12 (new entry: `catalog-drift-facts-sync-001` reason=preflight_exit — scanner picked up archive entry). No stall detected. ✅ Nominal.
+- Stale bash orphans: PID 1834248 (~17d+, polling for build-check-viii-pr-2b-analyzer-001.json, Ss, 0% CPU), PID 2605007 (~13h+, bash snapshot in missions-proposed-lane-signal-hardening-001 worktree, Ss, 0% CPU). **CARRY** [blue].
+
+**Check 0 — Alert triage:** Watermark=925, file=925 (0 new lines). ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log: last entry 11:34:01 MDT (17:34:01Z) — `build-phase already dispatched … skipping duplicate write`. 0 new WARNs since 17:34Z. 1136 cumulative WARN/ERROR in log (log not rotated; sub-threshold for new distinct patterns this iter). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message 10:28:47 MDT (16:28:47Z) "Go" (dag-preflight-terminal-state-reconciliation). No new directives or distress keywords in last 5h+. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → 0 stalls, 12 FORGE_NO_PR_SKIP (stable). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: pending=0 ✅. Forge inbox: `build-tsr-missions-sequence-inflight-digest.json` (BEING PROCESSED). Mirror inbox: `review-tsr-approvals-alerttriage.json` (BEING PROCESSED). ✅ Nominal within TSR DAG workflow.
+
+**Check 5 — Stale daemon:** heartbeat `2026-06-14T17:38:17Z` (~6 min before 17:44Z check). FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=00d12d31=origin/main. Clean working tree. On main. 0 ahead, 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: status=no-change, last_sync=2026-06-14T17:23:11Z (~21 min before 17:44Z check). Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:**
+- inbox_watcher: PID 2530123 ✅ (Ssl, 22:17:20 elapsed)
+- chain_event_shipper: PID 2744551 ✅ (SNs, 07:04:51)
+- dashboard_api: PID 2744674 ✅ (Ssl, 07:04:48)
+- beacon_telegram_bot: PID 2744840 ✅ (Ss, 07:04:43)
+- outbox_notifier: PID 2744914 ✅ (Ss, 07:04:39)
+- forge: PID 2852025 ✅ (Rsl, ~10 min elapsed; tsr-missions-sequence-inflight-digest BUILD PHASE running, resume=55ae6336-bc9)
+- mirror: PID 2852155 ✅ (Ssl, ~10 min elapsed; tsr-approvals-alerttriage review running, test_regression_check.py in worktree)
+- [blue] PID 1834248: stale bash orphan (~17d+, polling build-check-viii-pr-2b). Ss, 0% CPU. [carry]
+- [blue] PID 2605007: stale bash orphan (~13h+, missions-proposed-lane-signal-hardening snapshot). Ss, 0% CPU. [carry]
+
+**Check D — Inboxes:** Forge: `build-tsr-missions-sequence-inflight-digest.json` (BEING PROCESSED). Mirror: `review-tsr-approvals-alerttriage.json` (BEING PROCESSED). Beacon: EMPTY. ✅ Nominal within TSR DAG workflow.
+
+**Check E — PRs:**
+ourliberty-agent-core:
+- **PR #505** OPEN (`feat: terminal-state reconciliation for pending approvals + alert-triage`), UNKNOWN, reviewDecision="", statusCheckRollup=[]. [blue] TSR DAG step 2 — Mirror review running (~10 min elapsed). Expect PASS + auto-merge next 1–2 iters.
+- **PR #497** OPEN (`fix(cleanup-branches): success-prune alert is info, not warning`), UNKNOWN, reviewDecision="", statusCheckRollup=FAILURE. [yellow] carry — 82nd consecutive iter.
+ourliberty-dashboard: No open PRs. ✅
+
+**Conditional checks:** Today is Sunday 2026-06-14 UTC. Check I already ran this cycle day (iter ~1718). **SKIP**. Check III last artifact 2026-06-11 (3 days old, <14d). **SKIP**.
+
+**Actions taken:**
+1. `cycle_tier_state.py record --checks-clean false` → tier stays 1, consecutive_clean=0, last_signal_at=2026-06-14T17:44:26Z. ✅
+
+**Dispatches:** None.
+
+**Patterns:**
+- G-rule droplet-uncommitted:main: 2/3. No new occurrence. Carry.
+- G-rule missions-autoregister-warn-vs-info: 2/3. Carry.
+- G-rule alert-translations-no-patterns-delivery-confirmation-tier4: 2/3. Carry.
+- G-rule missions-card-gc-warn-vs-info: 1/3. Carry.
+- G-rule F24-empty-prompt-envelope-rejected: 1/3. Carry.
+- G-rule timer-cycle-no-journal-entry: 0/3. Carry.
+- G-rule Forge-timeout-worktree-missing-retry-loop: 1/3. Carry.
+- G-rule heal-stale-daemon-script_path-cosmetic: 1/3. Carry.
+- G-rule Forge-preflight-marker-error-retry: 1/3. Carry.
+
+**Standing findings:**
+- [yellow] **PR #497 REVIEW_ESCALATE** — statusCheckRollup=FAILURE (82nd consecutive iter). Close: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core`. [carry]
+- [yellow] **unreviewed-merge:499** — Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed'. [carry]
+- [yellow] **unreviewed-merge:494** — DM sent iter ~1694. Reply or silence. [carry]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614. Reply or silence. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **TSR DAG sequence** — PR #504 ✅. Step 2 (tsr-approvals-alerttriage): BUILD DONE ($4.66), PR #505 OPEN, Mirror review RUNNING (PID 2852155, ~10 min). Step 3 (tsr-missions-sequence-inflight-digest): BUILD RUNNING (Forge PID 2852025, resume=55ae6336-bc9, ~10 min). Next: Mirror PASS on #505 → auto-merge; Forge posts build marker → step 3 mirror review. [ADVANCING]
+- [blue] **Check I medic-operator-scaffold-001** — 24.4σ; `/dispatch 1` if re-run needed. [carry]
+- [blue] **catalog-accuracy-drift** — 8/34 ourliberty-graph shelf cards drifted (attention rate 24%). journal-note. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 2/3. Watch; dispatch at 3/3. [carry]
+- [blue] **G-rule missions-autoregister-warn-vs-info** — 2/3. [carry]
+- [blue] **G-rule alert-translations-no-patterns-delivery-confirmation-tier4** — 2/3. [carry]
+- [blue] **G-rule missions-card-gc-warn-vs-info** — 1/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — 0/3. [carry]
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. [carry]
+- [blue] **G-rule heal-stale-daemon-script_path-cosmetic** — 1/3. [carry]
+- [blue] **G-rule Forge-preflight-marker-error-retry** — 1/3. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — last occurrence 13:22:39Z Jun-14 (self-healed). [carry]
+- [blue] **dag-preflight-revision gap** — PR #484 closed source=pulse gap; DAG markers still fall through. [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+- [blue] **Stale bash orphans** — PID 1834248 (~17d+, build-check-viii-pr-2b poll) + PID 2605007 (~13h+, missions lane hardening). Ss, 0% CPU. [carry]
+
+**PRIME DIRECTIVE:** No new Pulse interventions this iter. TSR DAG advancement is expected pipeline; watermark unchanged is nominal. interventions=915, systemic_fixes=42, ratio≈21.79, trend=flat.
+**Tier end-of-iter:** **Tier 1** (--checks-clean false; PR #497 [yellow] carry + TSR DAG steps 2+3 RUNNING; consecutive_clean=0).
+
+---
+
 ## Iteration ~1805 — 2026-06-14 17:46Z UTC (interactive, /cycle, Tier 1, signal: TSR DAG steps 2+3 BUILD running + PR #497 [yellow] carry)
 
 **Trigger:** Larry direct invocation (`/cycle`).
