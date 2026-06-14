@@ -52,6 +52,26 @@ def _pr(number: int, merged_at: str, login: str = 'Larry-Yatch',
     }
 
 
+# A valid 40-hex head SHA for marker fixtures, and the matching marker body.
+_HEAD = 'a1b2c3d4e5f6' + '0' * 28
+
+
+def _marker_body(head: str = _HEAD) -> str:
+    return (f'=== LOCAL_REVIEW_PASS sha={head} ===\n'
+            f'Reviewed locally via Claude Code desktop /code-review.')
+
+
+def _comment(login: str = 'Larry-Yatch', body: str | None = None) -> dict:
+    """A parsed comment row, as fetch_pr_review_artifacts emits."""
+    return {'author_login': login,
+            'body': body if body is not None else _marker_body()}
+
+
+def _artifacts(head: str = _HEAD, comments: list | None = None) -> dict:
+    """A fetch_pr_review_artifacts return shape: head SHA + parsed comments."""
+    return {'headRefOid': head, 'comments': comments if comments is not None else []}
+
+
 def _gh_corpus(prs: list) -> 'callable':
     """Build a `_run_gh_pr_list` side_effect that simulates gh's newest-first,
     limit-capped windowing over a fixed `prs` corpus. Honors `merged:>=L` and
@@ -329,6 +349,156 @@ class RunOnceExemptionTest(_IsolatedAgentsRoot):
         self.assertEqual([a['number'] for a in alerts], [494])
 
 
+# -------------------- local-review (desktop) marker evidence --------------------
+
+_TRUSTED = frozenset({'Larry-Yatch'})
+
+
+class HasLocalReviewPassTest(unittest.TestCase):
+    """All three gates must hold: trusted author, anchored marker line, and an
+    embedded SHA equal to the PR's head."""
+
+    def test_trusted_anchored_sha_bound_marker_is_evidence(self):
+        art = _artifacts(_HEAD, [_comment('Larry-Yatch', _marker_body(_HEAD))])
+        self.assertTrue(h.has_local_review_pass(art, _TRUSTED))
+
+    def test_marker_line_among_other_lines_is_evidence(self):
+        body = ('### Code review (high) — passed\n\n'
+                f'=== LOCAL_REVIEW_PASS sha={_HEAD} ===\nmerging now')
+        art = _artifacts(_HEAD, [_comment('Larry-Yatch', body)])
+        self.assertTrue(h.has_local_review_pass(art, _TRUSTED))
+
+    def test_short_sha_prefix_of_head_is_evidence(self):
+        short = _HEAD[:12]
+        body = f'=== LOCAL_REVIEW_PASS sha={short} ==='
+        art = _artifacts(_HEAD, [_comment('Larry-Yatch', body)])
+        self.assertTrue(h.has_local_review_pass(art, _TRUSTED))
+
+    def test_untrusted_author_is_not_evidence(self):
+        # Security boundary: a non-reviewer posting a perfect marker can't pass.
+        art = _artifacts(_HEAD, [_comment('forge-bot', _marker_body(_HEAD))])
+        self.assertFalse(h.has_local_review_pass(art, _TRUSTED))
+
+    def test_sha_mismatch_is_not_evidence(self):
+        # Stale/replayed marker: SHA names a DIFFERENT commit than was merged.
+        other = 'b' * 40
+        art = _artifacts(_HEAD, [_comment('Larry-Yatch', _marker_body(other))])
+        self.assertFalse(h.has_local_review_pass(art, _TRUSTED))
+
+    def test_unanchored_substring_is_not_evidence(self):
+        # A trusted reviewer merely quoting / mentioning the token in prose or a
+        # markdown blockquote must NOT suppress the alert.
+        inline = f'fyi the marker is `=== LOCAL_REVIEW_PASS sha={_HEAD} ===`'
+        quoted = f'> === LOCAL_REVIEW_PASS sha={_HEAD} ==='
+        for body in (inline, quoted):
+            art = _artifacts(_HEAD, [_comment('Larry-Yatch', body)])
+            self.assertFalse(h.has_local_review_pass(art, _TRUSTED), body)
+
+    def test_no_marker_comment_is_not_evidence(self):
+        art = _artifacts(_HEAD, [_comment('Larry-Yatch', 'lgtm, merging')])
+        self.assertFalse(h.has_local_review_pass(art, _TRUSTED))
+
+    def test_empty_reviewer_set_is_not_evidence(self):
+        art = _artifacts(_HEAD, [_comment('Larry-Yatch', _marker_body(_HEAD))])
+        self.assertFalse(h.has_local_review_pass(art, frozenset()))
+
+    def test_none_artifacts_is_not_evidence(self):
+        self.assertFalse(h.has_local_review_pass(None, _TRUSTED))
+
+    def test_missing_head_sha_is_not_evidence(self):
+        art = {'headRefOid': None,
+               'comments': [_comment('Larry-Yatch', _marker_body(_HEAD))]}
+        self.assertFalse(h.has_local_review_pass(art, _TRUSTED))
+
+    def test_non_list_comments_is_not_evidence(self):
+        self.assertFalse(h.has_local_review_pass(
+            {'headRefOid': _HEAD, 'comments': None}, _TRUSTED))
+
+
+class LoadLocalReviewReviewersTest(_IsolatedAgentsRoot):
+    """The loader honors an explicit empty list as 'disabled' and falls back to
+    the default ONLY on a missing/malformed file. Under _IsolatedAgentsRoot so
+    the WARN-on-fallback log writes to tmp."""
+
+    def test_real_repo_config_includes_larry(self):
+        # Guards the shipped config file: it must parse and list the desktop id.
+        self.assertIn('Larry-Yatch', h.load_local_review_reviewers())
+
+    def _write_cfg(self, payload) -> Path:
+        p = Path(self._tmp) / 'local-review-reviewers.json'
+        p.write_text(payload if isinstance(payload, str) else json.dumps(payload))
+        return p
+
+    def test_missing_file_falls_back_to_default(self):
+        with mock.patch.object(h, 'LOCAL_REVIEW_REVIEWERS_FILE',
+                               Path('/nonexistent/local-review-reviewers.json')):
+            self.assertEqual(h.load_local_review_reviewers(),
+                             h._DEFAULT_LOCAL_REVIEW_REVIEWERS)
+
+    def test_malformed_json_falls_back_to_default(self):
+        cfg = self._write_cfg('{ not json')
+        with mock.patch.object(h, 'LOCAL_REVIEW_REVIEWERS_FILE', cfg):
+            self.assertEqual(h.load_local_review_reviewers(),
+                             h._DEFAULT_LOCAL_REVIEW_REVIEWERS)
+
+    def test_missing_reviewers_key_falls_back_to_default(self):
+        cfg = self._write_cfg({'other': 1})
+        with mock.patch.object(h, 'LOCAL_REVIEW_REVIEWERS_FILE', cfg):
+            self.assertEqual(h.load_local_review_reviewers(),
+                             h._DEFAULT_LOCAL_REVIEW_REVIEWERS)
+
+    def test_explicit_empty_list_disables_exemption(self):
+        # An empty list is honored verbatim (NOT replaced by the default) — the
+        # on-disk way to close the hole.
+        cfg = self._write_cfg({'reviewers': []})
+        with mock.patch.object(h, 'LOCAL_REVIEW_REVIEWERS_FILE', cfg):
+            self.assertEqual(h.load_local_review_reviewers(), frozenset())
+
+    def test_custom_reviewers_are_read(self):
+        cfg = self._write_cfg({'reviewers': ['Larry-Yatch', 'someone-else']})
+        with mock.patch.object(h, 'LOCAL_REVIEW_REVIEWERS_FILE', cfg):
+            self.assertEqual(h.load_local_review_reviewers(),
+                             frozenset({'Larry-Yatch', 'someone-else'}))
+
+
+class FetchPrReviewArtifactsTest(_IsolatedAgentsRoot):
+    """The gh pr view seam parses headRefOid + comments and tolerates failures."""
+
+    def test_parses_head_and_comments(self):
+        out = json.dumps({
+            'headRefOid': _HEAD,
+            'comments': [
+                {'author': {'login': 'Larry-Yatch'}, 'body': 'hi'},
+                {'author': None, 'body': 'orphan'},   # login -> unknown
+                {'author': {'login': 'x'}},            # no body -> dropped
+                'not-a-dict',
+            ],
+        })
+        fake = mock.Mock(returncode=0, stdout=out, stderr='')
+        with mock.patch.object(h.subprocess, 'run', return_value=fake):
+            art = h.fetch_pr_review_artifacts(512)
+        self.assertEqual(art['headRefOid'], _HEAD)
+        self.assertEqual(art['comments'], [
+            {'author_login': 'Larry-Yatch', 'body': 'hi'},
+            {'author_login': 'unknown', 'body': 'orphan'},
+        ])
+
+    def test_nonzero_returncode_returns_none(self):
+        fake = mock.Mock(returncode=1, stdout='', stderr='boom')
+        with mock.patch.object(h.subprocess, 'run', return_value=fake):
+            self.assertIsNone(h.fetch_pr_review_artifacts(512))
+
+    def test_timeout_returns_none(self):
+        with mock.patch.object(h.subprocess, 'run',
+                               side_effect=h.subprocess.TimeoutExpired('gh', 30)):
+            self.assertIsNone(h.fetch_pr_review_artifacts(512))
+
+    def test_malformed_json_returns_none(self):
+        fake = mock.Mock(returncode=0, stdout='{ not json', stderr='')
+        with mock.patch.object(h.subprocess, 'run', return_value=fake):
+            self.assertIsNone(h.fetch_pr_review_artifacts(512))
+
+
 # -------------------- cursor advance --------------------
 
 class AdvanceCursorTest(unittest.TestCase):
@@ -412,6 +582,17 @@ class MainTest(_IsolatedAgentsRoot):
                               {h.ENV_ENABLED: 'true'})
         env.start()
         self.addCleanup(env.stop)
+        # Default: a known reviewer set + no marker found, so the per-candidate
+        # check never hits real gh. Tests that exercise the marker path override
+        # these two patches.
+        rev = mock.patch.object(h, 'load_local_review_reviewers',
+                                return_value=_TRUSTED)
+        rev.start()
+        self.addCleanup(rev.stop)
+        fetch = mock.patch.object(h, 'fetch_pr_review_artifacts',
+                                  return_value=None)
+        fetch.start()
+        self.addCleanup(fetch.stop)
 
     def _seed_cursor(self, iso: str) -> None:
         h.save_state({'cursor_iso': iso, 'alerted_prs': {}})
@@ -448,6 +629,84 @@ class MainTest(_IsolatedAgentsRoot):
             rc = h.main()
         self.assertEqual(rc, 0)
         self.assertEqual(self._fake.calls, [])
+
+    def test_local_review_marker_no_alert(self):
+        # Desktop /code-review merge: no AUTO_MERGE evidence, but a trusted,
+        # SHA-bound LOCAL_REVIEW_PASS marker => main() must NOT page.
+        self._seed_cursor('2026-06-04T00:00:00Z')
+        pr = _pr(512, '2026-06-04T18:00:00Z')
+        art = _artifacts(_HEAD, [_comment('Larry-Yatch', _marker_body(_HEAD))])
+        with mock.patch.object(h, 'fetch_merged_prs', return_value=[pr]), \
+                mock.patch.object(h, 'read_notifier_log', return_value=''), \
+                mock.patch.object(h, 'load_local_review_reviewers',
+                                  return_value=_TRUSTED), \
+                mock.patch.object(h, 'fetch_pr_review_artifacts',
+                                  return_value=art) as fetch:
+            rc = h.main()
+        self.assertEqual(rc, 0)
+        self.assertEqual(self._fake.calls, [])
+        fetch.assert_called_once_with(512)
+        # Cursor still advances past the verified-good merge.
+        self.assertEqual(h._parse_iso(h.load_state()['cursor_iso']),
+                         h._parse_iso('2026-06-04T18:00:00Z'))
+
+    def test_untrusted_marker_still_pages(self):
+        # A marker by a NON-reviewer must not punch through the gate.
+        self._seed_cursor('2026-06-04T00:00:00Z')
+        pr = _pr(512, '2026-06-04T18:00:00Z')
+        art = _artifacts(_HEAD, [_comment('forge-bot', _marker_body(_HEAD))])
+        with mock.patch.object(h, 'fetch_merged_prs', return_value=[pr]), \
+                mock.patch.object(h, 'read_notifier_log', return_value=''), \
+                mock.patch.object(h, 'load_local_review_reviewers',
+                                  return_value=_TRUSTED), \
+                mock.patch.object(h, 'fetch_pr_review_artifacts',
+                                  return_value=art):
+            rc = h.main()
+        self.assertEqual(rc, 0)
+        self.assertEqual(len(self._fake.calls), 1)
+        self.assertEqual(self._fake.calls[0]['subject'], 'unreviewed-merge:512')
+
+    def test_sha_mismatch_marker_still_pages(self):
+        # Stale marker naming a different commit than was merged => pages.
+        self._seed_cursor('2026-06-04T00:00:00Z')
+        pr = _pr(512, '2026-06-04T18:00:00Z')
+        art = _artifacts(_HEAD, [_comment('Larry-Yatch', _marker_body('c' * 40))])
+        with mock.patch.object(h, 'fetch_merged_prs', return_value=[pr]), \
+                mock.patch.object(h, 'read_notifier_log', return_value=''), \
+                mock.patch.object(h, 'load_local_review_reviewers',
+                                  return_value=_TRUSTED), \
+                mock.patch.object(h, 'fetch_pr_review_artifacts',
+                                  return_value=art):
+            rc = h.main()
+        self.assertEqual(len(self._fake.calls), 1)
+        self.assertEqual(self._fake.calls[0]['subject'], 'unreviewed-merge:512')
+
+    def test_mirror_passed_pr_skips_marker_fetch(self):
+        # Efficiency: a PR with AUTO_MERGE evidence is filtered by run_once, so
+        # the per-candidate marker fetch must NOT run for it.
+        self._seed_cursor('2026-06-04T00:00:00Z')
+        pr = _pr(42, '2026-06-04T18:00:00Z')
+        log = f'AUTO_MERGE task=t pr={pr["url"]} outcome=merged'
+        with mock.patch.object(h, 'fetch_merged_prs', return_value=[pr]), \
+                mock.patch.object(h, 'read_notifier_log', return_value=log), \
+                mock.patch.object(h, 'fetch_pr_review_artifacts') as fetch:
+            rc = h.main()
+        self.assertEqual(rc, 0)
+        self.assertEqual(self._fake.calls, [])
+        fetch.assert_not_called()
+
+    def test_disabled_exemption_skips_marker_fetch_and_pages(self):
+        # Empty reviewer set (exemption disabled) => no fetch, PR pages.
+        self._seed_cursor('2026-06-04T00:00:00Z')
+        pr = _pr(512, '2026-06-04T18:00:00Z')
+        with mock.patch.object(h, 'fetch_merged_prs', return_value=[pr]), \
+                mock.patch.object(h, 'read_notifier_log', return_value=''), \
+                mock.patch.object(h, 'load_local_review_reviewers',
+                                  return_value=frozenset()), \
+                mock.patch.object(h, 'fetch_pr_review_artifacts') as fetch:
+            rc = h.main()
+        self.assertEqual(len(self._fake.calls), 1)
+        fetch.assert_not_called()
 
     def test_cursor_advances_after_scan(self):
         self._seed_cursor('2026-06-04T00:00:00Z')

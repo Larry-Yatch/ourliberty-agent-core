@@ -1,0 +1,6 @@
+{
+  "_comment": "Trusted reviewers for the desktop /code-review merge path. A PR merged from desktop Claude Code after a local /code-review never enters Mirror's droplet review cycle, so it has no AUTO_MERGE evidence and would falsely page Larry as 'merged without Mirror review'. The desktop merge flow (scripts/merge_reviewed_pr.sh) posts a SHA-bound marker comment (=== LOCAL_REVIEW_PASS sha=<head> ===) just before merging; heal_unreviewed_merge_detector.py accepts it as review evidence ONLY when ALL of: the comment author is in 'reviewers' below, the marker is an exact anchored line (not a loose substring), and the embedded SHA equals the PR's merged headRefOid. This is a deliberate hole in the Mirror-review merge gate — keep it minimal (human desktop identities only); bots merge through Mirror and never need it. To DISABLE the exemption entirely, set 'reviewers' to [] (an explicit empty list is honored; only a missing/malformed file falls back to the built-in default).",
+  "reviewers": [
+    "Larry-Yatch"
+  ]
+}
