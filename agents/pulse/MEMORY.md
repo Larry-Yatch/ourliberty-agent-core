@@ -72,39 +72,38 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 18:52Z UTC (Iter ~1814, Tier 1, signal: PR #507 opened — captures-dirty-tree-allowlist-001 Mirror review pipeline active)
+## Status snapshot — updated 2026-06-14 18:57Z UTC (Iter ~1815, Tier 1, signal: PR #507 MERGED — captures-dirty-tree-allowlist-001 RESOLVED)
 
-**Iter ~1814 summary:** All checks 0–5 + A–E nominal. 0 new alerts (watermark 929=file). captures-dirty-tree-allowlist-001: PR #507 opened 18:42Z by Forge; Mirror review dispatched 18:42:31Z — pipeline active. check-0-helper-authority-enforcement-001 still pending Larry approval. G-rule health-notify-script-missing: 1/3 (no new occurrence). PR #497 carry (90th iter). PRIME DIRECTIVE: ratio≈20.44, systemic_fixes=45, iter_clean. **Tier: Tier 1** (consecutive_clean=0).
+**Iter ~1815 summary:** All checks 0–5 + A–E nominal. 1 alert Tier-3 silenced (watermark 929→930, review-pass for PR #507). captures-dirty-tree-allowlist-001 COMPLETE (PR #507 auto-merged 18:50:13Z, commit 8cf83835). G-rule droplet-uncommitted:main RESOLVED (fix live). check-0-helper-authority-enforcement-001 still pending Larry approval. G-rule health-notify-script-missing: 1/3. PR #497 carry (91st iter). PRIME DIRECTIVE: ratio≈20.44, systemic_fixes=45, iter_clean. **Tier: Tier 1** (consecutive_clean=0).
 
 ---
 
-## Key standing items (as of iter ~1813)
+## Key standing items (as of iter ~1815)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (90th iter: ~1724→~1814) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (91st iter: ~1724→~1815) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
 | TSR DAG sequence | [blue] **COMPLETE ✅** — PR #504 ✅, PR #505 ✅, PR #506 ✅ (18:13:12Z) | Done |
-| captures-dirty-tree-allowlist-001 → PR #507 | [blue] **MIRROR REVIEW IN PROGRESS** (PR #507 opened 18:42:09Z; Mirror review dispatch sent 18:42:31Z) | Watch for Mirror REVIEW_PASS + auto-merge |
+| captures-dirty-tree-allowlist-001 | [blue] **RESOLVED ✅** — PR #507 merged 18:50:13Z, commit 8cf83835; fix live | Done |
 | check-0-helper-authority-enforcement-001 | [blue] **PENDING LARRY APPROVAL** (beacon-pending-approvals.json, created 18:38:15Z Jun-14) | Reply 'approve'/'go'/'ok' in Telegram |
-| G-rule health-notify-script-missing | [blue] **NEW 1/3** — ourliberty-health notify path misconfigured; alerts drop to journalctl only; transient dirty-tree (cycle-journal.md during wrapper window) was immediate cause | Watch; dispatch at 3/3 |
-| G-rule alert-translations-no-patterns-delivery-confirmation-tier4 | [blue] **RESOLVED** (false-positive; real fix = check-0-helper-authority-enforcement-001) | Done |
+| G-rule health-notify-script-missing | [blue] **1/3** — ourliberty-health notify path misconfigured; alerts drop to journalctl only | Watch; dispatch at 3/3 |
 | catalog-accuracy-drift | [blue] 8/34 ourliberty-graph shelf cards drifted (attention rate 24%, gate 10%) | route=digest; journal-note only |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
 | G-rule missions-autoregister-warn-vs-info | [blue] **2/3** | Watch; dispatch at 3/3 |
 | G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule missions-card-gc-warn-vs-info | [blue] **2/3** | Watch; dispatch at 3/3 |
-| G-rule droplet-uncommitted:main | [blue] 0/3 (DISPATCHED; fix building: captures-dirty-tree-allowlist-001) | Watch for recurrence |
-| G-rule F24-empty-prompt-envelope-rejected | [blue] **2/3** (pulse-auth-check0-enforcement-001 dead-lettered 18:31:10Z) | Watch; dispatch at 3/3 |
+| G-rule droplet-uncommitted:main | [blue] **RESOLVED** (PR #507 merged 18:50Z) | Monitor for recurrence |
+| G-rule F24-empty-prompt-envelope-rejected | [blue] **2/3** | Watch; dispatch at 3/3 |
 | G-rule timer-cycle-no-journal-entry | [blue] **0/3** | Watch |
 | G-rule heal-stale-daemon-script_path-cosmetic | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule Forge-preflight-marker-error-retry | [blue] **1/3** | Watch; dispatch at 3/3 |
 | sync-push-rebase-loop-001 | [blue] UNREGISTERED AR; last occurrence 13:22:39Z Jun-14 (self-healed) | Carry |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
-| dashboard_api PID 2868353 | [blue] running 40m stable as of iter ~1813; prior restart cause still unknown | Note; watch for recurrence |
-| Stale bash orphans | [blue] PIDs 1834248 (16d 23h+) + 2605007 (14h 19m+). Ss, 0% CPU. | Carry; cleanup when convenient |
+| dashboard_api PID 2868353 | [blue] Ssl stable since 17:59Z; prior restart cause still unknown | Note; watch for recurrence |
+| Stale bash orphans | [blue] PIDs 1834248 (16d 23h+) + 2605007 (14h 35m+). Ss, 0% CPU. | Carry; cleanup when convenient |
