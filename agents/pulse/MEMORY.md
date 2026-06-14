@@ -60,17 +60,17 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 10:58Z UTC (Iter ~1762, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 11:07Z UTC (Iter ~1763, Tier 1, consecutive_clean=0)
 
-**Iter ~1762 summary:** All checks nominal. heal-stale-daemon-code.heartbeat CONFIRMED PRESENT at 10:36:39Z (prior "MISSING" claim was stale residue — heartbeat file exists at `/home/larry/agents/blackboard/heal-stale-daemon-code.heartbeat`). All inboxes clear. PR #497 OPEN (MERGEABLE=UNKNOWN, 39th consecutive iter). HEAD=355f3acb=origin/main. Sync: 10:22:19Z (status=no-change). PRIME DIRECTIVE: interventions=894, systemic_fixes=41, ratio=21.80, trend=flat. **Tier:** Tier 1.
+**Iter ~1763 summary:** All checks nominal. PR #497 MERGEABLE status changed UNKNOWN→MERGEABLE but has mirror-review=FAILURE (04:05:31Z) and no reviewDecision; not clean+green. Heartbeat at 10:36:39Z (fresh). All inboxes clear. HEAD=39e8635a=origin/main. Sync: 10:22:19Z (status=no-change). PRIME DIRECTIVE: interventions=895, systemic_fixes=41, ratio=21.80, trend=flat. **Tier:** Tier 1.
 
 ---
 
-## Key standing items (as of iter ~1762)
+## Key standing items (as of iter ~1763)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (39 iters: ~1724→~1762) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=MERGEABLE (resolved from UNKNOWN), mirror-review=FAILURE, no reviewDecision (40 iters: ~1724→~1763) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
