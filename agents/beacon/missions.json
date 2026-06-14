@@ -198,7 +198,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-12T05:56:59.154465+00:00"
+      "orphan_last_activity_ts": "2026-06-12T05:56:59.154465+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-summary",
@@ -215,7 +219,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-12T05:27:44.184131+00:00"
+      "orphan_last_activity_ts": "2026-06-12T05:27:44.184131+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-20",
@@ -232,7 +240,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-12T05:10:29.595487+00:00"
+      "orphan_last_activity_ts": "2026-06-12T05:10:29.595487+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-pending-approvals-3-plus-unregistered-ar-iter-1559",
@@ -283,7 +295,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-12T04:35:40.787778+00:00"
+      "orphan_last_activity_ts": "2026-06-12T04:35:40.787778+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-post-merge-install-drift-trigger-001",
@@ -317,7 +333,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": "HEAD",
-      "orphan_last_activity_ts": "2026-06-11T04:36:43.283717+00:00"
+      "orphan_last_activity_ts": "2026-06-11T04:36:43.283717+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-desktop-44d27007",
@@ -334,7 +354,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": "HEAD",
-      "orphan_last_activity_ts": "2026-06-11T04:36:19.76119+00:00"
+      "orphan_last_activity_ts": "2026-06-11T04:36:19.76119+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-desktop-8b27d515",
@@ -351,7 +375,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": "HEAD",
-      "orphan_last_activity_ts": "2026-06-11T04:27:28.815105+00:00"
+      "orphan_last_activity_ts": "2026-06-11T04:27:28.815105+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-seq-chain-context-durability-step-ccd-s1-envelope-builder",
@@ -368,7 +396,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-11T04:27:01.392512+00:00"
+      "orphan_last_activity_ts": "2026-06-11T04:27:01.392512+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-ops-cleanup2-s1-dedup-ledger-20260611",
@@ -436,7 +468,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-11T03:24:33.369722+00:00"
+      "orphan_last_activity_ts": "2026-06-11T03:24:33.369722+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-transcript-not-persisted:tier2",
@@ -453,7 +489,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-11T03:23:02.748252+00:00"
+      "orphan_last_activity_ts": "2026-06-11T03:23:02.748252+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-seq-park-the-nudge-step-pulse-park-and-silence",
@@ -470,7 +510,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-11T02:45:40.566534+00:00"
+      "orphan_last_activity_ts": "2026-06-11T02:45:40.566534+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-seq-park-the-nudge-step-capture-label-contract",
@@ -487,7 +531,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-11T01:57:49.850628+00:00"
+      "orphan_last_activity_ts": "2026-06-11T01:57:49.850628+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-dispatch-translations-entry-20260610",
@@ -504,7 +552,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-11T01:56:54.784821+00:00"
+      "orphan_last_activity_ts": "2026-06-11T01:56:54.784821+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-ops-cleanup-ccds1-ledger-20260610",
@@ -589,7 +641,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-11T00:18:02.601407+00:00"
+      "orphan_last_activity_ts": "2026-06-11T00:18:02.601407+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-desktop-900b3ea4",
@@ -606,7 +662,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": "work/larry-session",
-      "orphan_last_activity_ts": "2026-06-10T08:56:13.765592+00:00"
+      "orphan_last_activity_ts": "2026-06-10T08:56:13.765592+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-p2-digest-generator",
@@ -674,7 +734,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-10T08:25:48.8419+00:00"
+      "orphan_last_activity_ts": "2026-06-10T08:25:48.8419+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-seq-missions-v2-phase2-step-p2-derive-endpoint",
@@ -691,7 +755,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-10T08:25:28.810753+00:00"
+      "orphan_last_activity_ts": "2026-06-10T08:25:28.810753+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-dag-preflight-missions-v2-phase2",
@@ -725,7 +793,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-10T08:11:28.398198+00:00"
+      "orphan_last_activity_ts": "2026-06-10T08:11:28.398198+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-desktop-05a159bb",
@@ -742,7 +814,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": "work/larry-session",
-      "orphan_last_activity_ts": "2026-06-10T08:03:15.128284+00:00"
+      "orphan_last_activity_ts": "2026-06-10T08:03:15.128284+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-unreg-approval-8c1842d7319d",
@@ -759,7 +835,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-10T08:00:24.684163+00:00"
+      "orphan_last_activity_ts": "2026-06-10T08:00:24.684163+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-wedged-worktree:wt-mirror-dag-preflight-missions-v2-phase1-captures",
@@ -776,7 +856,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-10T07:59:02.543309+00:00"
+      "orphan_last_activity_ts": "2026-06-10T07:59:02.543309+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-no-session-revision:pr412-forge-redispatch-needed",
@@ -793,7 +877,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-10T07:58:57.65506+00:00"
+      "orphan_last_activity_ts": "2026-06-10T07:58:57.65506+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-desktop-6377f618",
@@ -810,7 +898,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": "work/larry-session",
-      "orphan_last_activity_ts": "2026-06-10T07:56:15.747786+00:00"
+      "orphan_last_activity_ts": "2026-06-10T07:56:15.747786+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-pipeline-stall:pr412-approval-request-not-dispatched",
@@ -827,7 +919,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-10T07:35:33.550731+00:00"
+      "orphan_last_activity_ts": "2026-06-10T07:35:33.550731+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-desktop-e2e0ab79",
@@ -844,7 +940,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": "fix/install-drift-grace-clean",
-      "orphan_last_activity_ts": "2026-06-10T07:22:43.629092+00:00"
+      "orphan_last_activity_ts": "2026-06-10T07:22:43.629092+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-desktop-744bcd2d",
@@ -861,7 +961,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": "feat/telegram-approve-clears-dashboard-pending",
-      "orphan_last_activity_ts": "2026-06-10T07:22:22.644158+00:00"
+      "orphan_last_activity_ts": "2026-06-10T07:22:22.644158+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-desktop-efa13afc",
@@ -878,7 +982,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": "main",
-      "orphan_last_activity_ts": "2026-06-10T07:22:21.209347+00:00"
+      "orphan_last_activity_ts": "2026-06-10T07:22:21.209347+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-desktop-547e0d56",
@@ -895,7 +1003,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": "main",
-      "orphan_last_activity_ts": "2026-06-10T07:22:03.367417+00:00"
+      "orphan_last_activity_ts": "2026-06-10T07:22:03.367417+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-desktop-de0a1d89",
@@ -912,7 +1024,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": "feat/telegram-approve-clears-dashboard-pending",
-      "orphan_last_activity_ts": "2026-06-10T07:20:45.066517+00:00"
+      "orphan_last_activity_ts": "2026-06-10T07:20:45.066517+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-desktop-07e97ba7",
@@ -929,7 +1045,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": "main",
-      "orphan_last_activity_ts": "2026-06-10T07:18:53.52927+00:00"
+      "orphan_last_activity_ts": "2026-06-10T07:18:53.52927+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-desktop-71355b2a",
@@ -946,7 +1066,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": "main",
-      "orphan_last_activity_ts": "2026-06-10T07:14:33.005372+00:00"
+      "orphan_last_activity_ts": "2026-06-10T07:14:33.005372+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-pipeline-stall:harden-test-prod-write-isolation-001",
@@ -963,7 +1087,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-10T07:11:40.547204+00:00"
+      "orphan_last_activity_ts": "2026-06-10T07:11:40.547204+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-desktop-8b098187",
@@ -980,7 +1108,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": "main",
-      "orphan_last_activity_ts": "2026-06-10T07:09:48.328573+00:00"
+      "orphan_last_activity_ts": "2026-06-10T07:09:48.328573+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-harden-test-prod-write-isolation-001",
@@ -1014,7 +1146,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": "fix/sync-autocommit-captures-json",
-      "orphan_last_activity_ts": "2026-06-10T06:56:14.137921+00:00"
+      "orphan_last_activity_ts": "2026-06-10T06:56:14.137921+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-desktop-91597d89",
@@ -1031,7 +1167,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": "feat/telegram-approve-clears-dashboard-pending",
-      "orphan_last_activity_ts": "2026-06-10T06:41:13.181096+00:00"
+      "orphan_last_activity_ts": "2026-06-10T06:41:13.181096+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-desktop-267765cf",
@@ -1048,7 +1188,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": "main",
-      "orphan_last_activity_ts": "2026-06-10T06:32:30.080305+00:00"
+      "orphan_last_activity_ts": "2026-06-10T06:32:30.080305+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-desktop-7118a866",
@@ -1065,7 +1209,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": "feat/telegram-approve-clears-dashboard-pending",
-      "orphan_last_activity_ts": "2026-06-10T06:30:22.350936+00:00"
+      "orphan_last_activity_ts": "2026-06-10T06:30:22.350936+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-install-drift-timer:ourliberty-heal-missions-card-gc",
@@ -1082,7 +1230,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-10T06:12:21.176169+00:00"
+      "orphan_last_activity_ts": "2026-06-10T06:12:21.176169+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-seq-missions-v2-phase1-captures-step-step-parked-lane",
@@ -1099,7 +1251,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-10T05:01:40.28874+00:00"
+      "orphan_last_activity_ts": "2026-06-10T05:01:40.28874+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-seq-missions-v2-phase1-captures-step-step-gc-healer",
@@ -1116,7 +1272,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-10T05:01:05.240958+00:00"
+      "orphan_last_activity_ts": "2026-06-10T05:01:05.240958+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-approval-request:parked:alert-triage-durable-watermark-001",
@@ -1133,7 +1293,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-10T04:49:03.183118+00:00"
+      "orphan_last_activity_ts": "2026-06-10T04:49:03.183118+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-approval_request:routing-failure:preflight-reminder-enforcement-001",
@@ -1150,7 +1314,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-10T04:08:21.401622+00:00"
+      "orphan_last_activity_ts": "2026-06-10T04:08:21.401622+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-seq-missions-v2-phase1-captures-step-step-captures-core",
@@ -1167,7 +1335,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-10T04:01:34.649003+00:00"
+      "orphan_last_activity_ts": "2026-06-10T04:01:34.649003+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-dag-preflight-missions-v2-phase1-captures",
@@ -1201,7 +1373,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": "feat/telegram-approve-clears-dashboard-pending",
-      "orphan_last_activity_ts": "2026-06-10T03:59:17.477635+00:00"
+      "orphan_last_activity_ts": "2026-06-10T03:59:17.477635+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-check-i-2026-06-08",
@@ -1218,7 +1394,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-10T03:55:07.384409+00:00"
+      "orphan_last_activity_ts": "2026-06-10T03:55:07.384409+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-weekly-2026-06-08",
@@ -1235,7 +1415,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-10T03:55:05.749599+00:00"
+      "orphan_last_activity_ts": "2026-06-10T03:55:05.749599+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-desktop-610cfc2f",
@@ -1252,7 +1436,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": "main",
-      "orphan_last_activity_ts": "2026-06-10T03:53:21.391139+00:00"
+      "orphan_last_activity_ts": "2026-06-10T03:53:21.391139+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-missions-v2-phase0-desktop-feed",
@@ -1354,7 +1542,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-04T04:37:36.939126+00:00"
+      "orphan_last_activity_ts": "2026-06-04T04:37:36.939126+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-rebase-pr252-digest-generator-001",
@@ -1388,7 +1580,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-02T18:57:10.565428+00:00"
+      "orphan_last_activity_ts": "2026-06-02T18:57:10.565428+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-step-alert-promotion",
@@ -1405,7 +1601,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-02T18:54:24.555754+00:00"
+      "orphan_last_activity_ts": "2026-06-02T18:54:24.555754+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-real-19-clarify",
@@ -1422,7 +1622,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-02T18:32:42.117702+00:00"
+      "orphan_last_activity_ts": "2026-06-02T18:32:42.117702+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-real-pf",
@@ -1439,7 +1643,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-02T18:32:41.603187+00:00"
+      "orphan_last_activity_ts": "2026-06-02T18:32:41.603187+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-real-rej",
@@ -1456,7 +1664,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-02T18:32:39.865982+00:00"
+      "orphan_last_activity_ts": "2026-06-02T18:32:39.865982+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-prod-clr",
@@ -1473,7 +1685,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-02T18:32:39.440203+00:00"
+      "orphan_last_activity_ts": "2026-06-02T18:32:39.440203+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-seq-approvals-queue-rework-step-step-digest-generator",
@@ -1490,7 +1706,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-02T17:46:45.069917+00:00"
+      "orphan_last_activity_ts": "2026-06-02T17:46:45.069917+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-seq-approvals-queue-rework-step-step-alert-promotion",
@@ -1507,7 +1727,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-02T17:46:00.051591+00:00"
+      "orphan_last_activity_ts": "2026-06-02T17:46:00.051591+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-seq-approvals-queue-rework-step-step-autoclear",
@@ -1524,7 +1748,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-02T17:45:29.992574+00:00"
+      "orphan_last_activity_ts": "2026-06-02T17:45:29.992574+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-sequence-invalid:approvals-queue-rework:iter-583",
@@ -1541,7 +1769,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-02T17:42:04.211603+00:00"
+      "orphan_last_activity_ts": "2026-06-02T17:42:04.211603+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-real-pf-ok",
@@ -1558,7 +1790,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-02T17:37:51.346444+00:00"
+      "orphan_last_activity_ts": "2026-06-02T17:37:51.346444+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-real-cascade",
@@ -1575,7 +1811,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-02T17:37:48.715933+00:00"
+      "orphan_last_activity_ts": "2026-06-02T17:37:48.715933+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-sequence-invalid:approvals-queue-rework",
@@ -1592,7 +1832,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-02T17:35:02.549979+00:00"
+      "orphan_last_activity_ts": "2026-06-02T17:35:02.549979+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-seq-rate-limit-resilience-001-step-step-a-rotation",
@@ -1609,7 +1853,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-05-30T23:09:44.988287+00:00"
+      "orphan_last_activity_ts": "2026-05-30T23:09:44.988287+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-step-c-ledger",
@@ -1626,7 +1874,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-05-30T23:06:02.809587+00:00"
+      "orphan_last_activity_ts": "2026-05-30T23:06:02.809587+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-auth-setup-token-wiring",
@@ -1660,7 +1912,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-05-30T22:48:52.999503+00:00"
+      "orphan_last_activity_ts": "2026-05-30T22:48:52.999503+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-real-clr",
@@ -1677,7 +1933,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-05-30T22:43:31.06305+00:00"
+      "orphan_last_activity_ts": "2026-05-30T22:43:31.06305+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-seq-rate-limit-resilience-001-step-step-c-ledger",
@@ -1694,7 +1954,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-05-30T22:29:38.298143+00:00"
+      "orphan_last_activity_ts": "2026-05-30T22:29:38.298143+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-cycle-timer-oncalendar-fallback",
@@ -1762,7 +2026,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-05-28T03:05:19.846862+00:00"
+      "orphan_last_activity_ts": "2026-05-28T03:05:19.846862+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-test-isolation-v2",
@@ -1779,7 +2047,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-05-27T21:05:10.186391+00:00"
+      "orphan_last_activity_ts": "2026-05-27T21:05:10.186391+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-pr-s4-rectification-v1",
@@ -1932,7 +2204,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:15:09.727315+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-12T06:14:12.004292+00:00"
+      "orphan_last_activity_ts": "2026-06-12T06:14:12.004292+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-pulse-envelope-builder-001",
@@ -1949,7 +2225,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:15:09.727315+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-12T06:14:10.149883+00:00"
+      "orphan_last_activity_ts": "2026-06-12T06:14:10.149883+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-fix-depth1-pulse-approval-extraction-001",
@@ -1966,7 +2246,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:15:09.727315+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-12T06:05:44.943495+00:00"
+      "orphan_last_activity_ts": "2026-06-12T06:05:44.943495+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-suppress-by-design-tier2-skipped-alerts",
@@ -2034,7 +2318,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T12:03:15.967492+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-12T12:01:36.371796+00:00"
+      "orphan_last_activity_ts": "2026-06-12T12:01:36.371796+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-missions-autoregister-alert-translation-001",
@@ -2051,7 +2339,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T12:33:19.733501+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-12T12:31:21.35907+00:00"
+      "orphan_last_activity_ts": "2026-06-12T12:31:21.35907+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-alert-translations-missions-autoregister-summary-001",
@@ -2068,7 +2360,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T12:33:19.733501+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-12T12:31:19.687391+00:00"
+      "orphan_last_activity_ts": "2026-06-12T12:31:19.687391+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-p3-dashboard-proposed-lane-002",
@@ -2085,7 +2381,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T13:49:59.775710+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-12T13:47:06.600981+00:00"
+      "orphan_last_activity_ts": "2026-06-12T13:47:06.600981+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-p3-dashboard-proposed-lane-redispatch-20260612T132800Z",
@@ -2119,7 +2419,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T14:05:07.414127+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-12T13:50:04.243389+00:00"
+      "orphan_last_activity_ts": "2026-06-12T13:50:04.243389+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-alert-translation-dispatch-branch-cleanup-summary-001",
@@ -2136,7 +2440,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T16:06:17.285407+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-12T16:05:02.375766+00:00"
+      "orphan_last_activity_ts": "2026-06-12T16:05:02.375766+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-g-rule-dispatch-branch-cleanup-alert-translation-20260612T163000Z",
@@ -2153,7 +2461,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T16:06:17.285407+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-12T16:05:01.307682+00:00"
+      "orphan_last_activity_ts": "2026-06-12T16:05:01.307682+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-step-autoclear",
@@ -2170,7 +2482,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T16:36:50.865326+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-02T18:55:28.908682+00:00"
+      "orphan_last_activity_ts": "2026-06-02T18:55:28.908682+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-alert-translation-dispatch-branch-cleanup-summary-",
@@ -2187,7 +2503,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T16:51:56.432332+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-12T16:45:31.26031+00:00"
+      "orphan_last_activity_ts": "2026-06-12T16:45:31.26031+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-log-dir-test-isolation-leak-001",
@@ -2238,7 +2558,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T17:22:41.761986+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-12T17:15:33.081262+00:00"
+      "orphan_last_activity_ts": "2026-06-12T17:15:33.081262+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-direction-ask-triage-helper-review-pass-mismatch-002",
@@ -2306,7 +2630,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T20:08:40.116350+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-12T20:02:29.607475+00:00"
+      "orphan_last_activity_ts": "2026-06-12T20:02:29.607475+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-pulse-check-iv-cadence-fix-g-rule-20260612T195740Z",
@@ -2323,7 +2651,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T20:08:40.116350+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-12T20:02:28.548573+00:00"
+      "orphan_last_activity_ts": "2026-06-12T20:02:28.548573+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-build-done-today-projection-fix-20260604T054838Z",
@@ -2357,7 +2689,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T23:55:09.916635+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-12T23:49:07.49699+00:00"
+      "orphan_last_activity_ts": "2026-06-12T23:49:07.49699+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-14T04:55:04.767573+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "operator-action-queue-is-full-of-benign-auto-handled-alerts-101-fix-at-the-source",
