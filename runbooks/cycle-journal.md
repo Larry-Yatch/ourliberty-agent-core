@@ -4,6 +4,118 @@
 
 ---
 
+## Iteration ~1813 — 2026-06-14 18:42Z UTC (interactive, /cycle, Tier 1, signal: health-notify-script-missing G-rule 1/3 + captures-dirty-tree-allowlist-001 BUILD IN PROGRESS)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Drift (new G-rule: health-notify-script-missing 1/3; captures-dirty-tree-allowlist-001 advancing to build phase). All mandatory checks 0–5 + A–E nominal. New finding: `ourliberty-health` service WARN at 18:32:46Z "notify script missing, alert dropped" for transient dirty tree (cycle-journal.md during wrapper commit window). Tree now clean. G-rule 1/3 candidate. PR #497 [yellow] carry (89th iter).
+
+**VERIFY-BEFORE-REASSERT (iter ~1812 carries):**
+- PR #497 REVIEW_ESCALATE: `gh pr list` → OPEN, UNKNOWN, reviewDecision="", statusCheckRollup=FAILURE. 89th consecutive iter. **CARRY** [yellow].
+- captures-dirty-tree-allowlist-001: Larry sent 'Go' at 12:36:02 MDT (18:36:02Z). Forge build-phase dispatched 18:37:15Z. Worktree `wt-forge-captures-dirty-tree-allowlist-001` exists; inbox has `build-captures-dirty-tree-allowlist-001.json`. **BUILD IN PROGRESS** ✅ [blue].
+- check0-triage-helper-authority-001: ADVANCED → Beacon processed, plan `check-0-helper-authority-enforcement-001` created (pending Larry approval since 18:38:15Z). beacon-pending-approvals.json: pending=1. **CARRY** [blue].
+- TSR DAG COMPLETE: PRs #504, #505, #506 merged 18:13:12Z. **CARRY COMPLETE** [blue].
+- dashboard_api PID 2868353: 40m 6s elapsed, Ssl, stable. ✅ **CARRY** [blue].
+- Stale bash orphans: PID 1834248 (16d 23h+, Ss, 0% CPU), PID 2605007 (14h 19m+, Ss, 0% CPU). **CARRY** [blue].
+- G-rule alert-translations-no-patterns-delivery-confirmation-tier4: RESOLVED (0/3). Real fix = check0-triage-helper-authority-001 → check-0-helper-authority-enforcement-001. **CARRY RESOLVED** [blue].
+
+**Check 0 — Alert triage:** Watermark=927→929. File=929 lines. **2 new alerts**.
+- Alert 928 (18:35:21Z, dispatch-branch-cleanup severity=warning): Helper → Tier-3 silenced (known pattern, translations.json). ✅
+- Alert 929 (18:38:16Z, outbox-notifier kind=approval_request approval_id=check-0-helper-authority-enforcement-001): Helper → Tier-3 silenced (known pattern, translations.json). ✅
+- Watermark advanced → 929. No tier-reset (both Tier-3). ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log latest entry 12:38:16 MDT (18:38:16Z) — approval_request for check0-triage-helper-authority-001 queued. No new WARNs/ERRORs in outbox-notifier.log.
+- **New finding:** `ourliberty-health[2884113]` WARN at 18:32:46Z: "notify script missing, alert dropped: 1 issue(s) need attention". Health service found `✗ clean_tree: 1 modified (M runbooks/cycle-journal.md)`. The dirty tree was TRANSIENT — cycle-journal.md was uncommitted during the wrapper commit window; tree is now clean (HEAD=13e2952d=origin/main, clean). "notify script missing" = health service notify path not configured → alerts drop silently to journalctl only. Single occurrence, well below 5/hour threshold.
+- Classification: sub-threshold, journal note. New G-rule candidate: health-notify-script-missing (1/3). [blue]
+- ⚠️ Tier-reset: yes (new signal logged). Iter non-clean.
+
+**Check 2 — Telegram sweep (4h window, since 14:42Z = 08:42 MDT):**
+- New message: 12:36:02 MDT 'Go' → approved captures-dirty-tree-allowlist-001. Dispatched to Forge inbox 18:37:15Z. Chain handled. ✅ Nominal.
+- No distress keywords in agent logs. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → 0 stalls. FORGE_NO_PR_SKIP=12. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: pending=1 (check-0-helper-authority-enforcement-001, created 18:38:15Z — predates Larry's last message 18:36:02Z; no approval yet). Beacon inbox: EMPTY. Forge inbox: build-captures-dirty-tree-allowlist-001.json (actively building). ✅ Nominal.
+
+**Check 5 — Stale daemon:** heartbeat `2026-06-14T18:38:29Z` (~4 min before check). FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=13e2952d=origin/main. Clean working tree. On main. 0 ahead, 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-14T18:23:19Z, age=18.8 min. status=no-change. Within 2h. ✅ Nominal.
+
+**Check C — Agent liveness:**
+- inbox_watcher: PID 2530123 ✅ (23h 15m elapsed, Ssl)
+- chain_event_shipper: PID 2744551 ✅ (08h 03m elapsed, SNs)
+- beacon_telegram_bot: PID 2744840 ✅ (08h 03m elapsed, Ss)
+- outbox_notifier: PID 2744914 ✅ (08h 03m elapsed, Ss)
+- dashboard_api: PID 2868353 ✅ (40m 06s elapsed, Ssl, stable)
+- No forge/mirror sessions — expected (Forge building captures-dirty-tree-allowlist-001 in worktree; no persistent bot session). ✅
+- [blue] PID 1834248: stale bash orphan (16d 23h+, Ss, 0% CPU). [carry]
+- [blue] PID 2605007: stale bash orphan (14h 19m+, Ss, 0% CPU). [carry]
+
+**Check E — PRs:**
+ourliberty-agent-core:
+- **PR #497** OPEN (`fix(cleanup-branches): success-prune alert is info, not warning`), UNKNOWN, reviewDecision="", statusCheckRollup=FAILURE (mirror-review). [yellow] carry — 89th consecutive iter.
+ourliberty-dashboard: No open PRs. ✅
+
+**§5.0 conditional checks:** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal → no-op. ✅ All nominal.
+
+**Conditional checks:** Today is Sunday 2026-06-14 UTC. Check I already ran this cycle day (iter ~1718). **SKIP**. Check III last artifact 2026-06-11 (3 days old, <14d). **SKIP**.
+
+**New findings:**
+1. **health-notify-script-missing** [blue] G-rule 1/3: `ourliberty-health` service notify path misconfigured → health alerts silently dropped to journalctl. The immediate issue (dirty tree for cycle-journal.md during wrapper window) was transient and self-resolved. But the structural gap (notify path missing) persists. Watch; dispatch at 3/3.
+
+**Actions taken:**
+1. Alert watermark: 927 → 929 (`alert_triage_state.py set-watermark --line 929`). ✅
+2. `cycle_prime_ledger.py append --tier 1 --kind intervention --template health-notify-script-missing` ✅
+3. `cycle_tier_state.py record --checks-clean false` → tier stays 1, consecutive_clean=0, last_signal_at=2026-06-14T18:45:03Z. ✅
+
+**Dispatches:** None this iter.
+
+**Patterns:**
+- G-rule health-notify-script-missing: **NEW, 1/3**. Watch; dispatch at 3/3.
+- G-rule F24-empty-prompt-envelope-rejected: **2/3**. No new occurrence. Carry.
+- G-rule missions-card-gc-warn-vs-info: **2/3**. No new occurrence. Carry.
+- G-rule missions-autoregister-warn-vs-info: **2/3**. Carry.
+- G-rule alert-translations-no-patterns-delivery-confirmation-tier4: **RESOLVED (0/3)**. Carry.
+- G-rule droplet-uncommitted:main: **0/3** (DISPATCHED gc-healer-captures-dirty-tree-fix-001; fix building). Carry.
+- G-rule timer-cycle-no-journal-entry: **0/3**. Carry.
+- G-rule Forge-timeout-worktree-missing-retry-loop: **1/3**. Carry.
+- G-rule heal-stale-daemon-script_path-cosmetic: **1/3**. Carry.
+- G-rule Forge-preflight-marker-error-retry: **1/3**. Carry.
+
+**Standing findings:**
+- [yellow] **PR #497 REVIEW_ESCALATE** — statusCheckRollup=FAILURE (89th consecutive iter). Close: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core`. [carry]
+- [yellow] **unreviewed-merge:499** — Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed'. [carry]
+- [yellow] **unreviewed-merge:494** — DM sent iter ~1694. Reply or silence. [carry]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614. Reply or silence. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **TSR DAG sequence** — COMPLETE ✅. PR #504 ✅. PR #505 ✅. PR #506 ✅ MERGED 18:13:12Z. [carry complete]
+- [blue] **captures-dirty-tree-allowlist-001** — **BUILD IN PROGRESS** (Larry 'Go' 18:36:02Z → Forge build-phase dispatched 18:37:15Z; worktree active). Watch for PR.
+- [blue] **check-0-helper-authority-enforcement-001** — Beacon plan pending Larry approval (beacon-pending-approvals.json, created 18:38:15Z). Reply 'approve'/'go'/'ok' in Telegram.
+- [blue] **G-rule health-notify-script-missing** — **NEW, 1/3** (ourliberty-health notify path broken; dirty-tree during cycle window was transient). Watch; dispatch at 3/3.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch; dispatch at 3/3.
+- [blue] **G-rule missions-card-gc-warn-vs-info** — 2/3. Watch; dispatch at 3/3.
+- [blue] **G-rule missions-autoregister-warn-vs-info** — 2/3. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 0/3 (DISPATCHED + builds in progress). Watch for recurrence.
+- [blue] **G-rule timer-cycle-no-journal-entry** — 0/3. [carry]
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. [carry]
+- [blue] **G-rule heal-stale-daemon-script_path-cosmetic** — 1/3. [carry]
+- [blue] **G-rule Forge-preflight-marker-error-retry** — 1/3. [carry]
+- [blue] **Check I medic-operator-scaffold-001** — 24.4σ; `/dispatch 1` if re-run needed. [carry]
+- [blue] **catalog-accuracy-drift** — 8/34 ourliberty-graph shelf cards drifted. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — last occurrence 13:22:39Z Jun-14 (self-healed). [carry]
+- [blue] **dag-preflight-revision gap** — PR #484 closed source=pulse gap; DAG markers still fall through. [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+- [blue] **Stale bash orphans** — PID 1834248 (16d 23h+) + PID 2605007 (14h 19m+). Ss, 0% CPU. [carry]
+- [blue] **dashboard_api PID 2868353** — running 40m stable; prior restart cause still unknown. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention (health-notify-script-missing observation), 0 systemic_fixes. ratio≈20.42 (systemic_fixes=45, verification_pending=11), trend=flat.
+**Tier end-of-iter:** **Tier 1** (--checks-clean false; new G-rule + PR #497 carry; consecutive_clean=0).
+
+---
+
 ## Iteration ~1812 — 2026-06-14 18:35Z UTC (interactive, /loop /cycle, Tier 1, signal: Check 0 classification bug revealed by Beacon + check0-triage-helper-authority-001 dispatched)
 
 **Trigger:** Larry direct invocation (`/loop /cycle`).
