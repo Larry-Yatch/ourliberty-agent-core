@@ -66,18 +66,17 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 16:08Z UTC (Iter ~1792, Tier 1, signal: adopt-terminal-002 pending approval)
+## Status snapshot — updated 2026-06-14 16:15Z UTC (Iter ~1793, Tier 1, signal: PR #497 carry)
 
-**Iter ~1792 summary:** Check 0 found alert line 921 — same adopt-terminal-state-reconciliation-spec-002 approval_request (watermark persistence gap; iter ~1791 had already triaged this). Confirmed from prior journal, advanced watermark 920→921. Beacon inbox now clear (pulse-investigate task archived; Beacon processed it and independently created 002 re-dispatch). All mandatory checks 1-5 + A-E nominal except PR #497 (68th carry). No new dispatches. PRIME DIRECTIVE: interventions≈915, systemic_fixes=41, ratio≈22.32, trend=flat. **Tier: Tier 1** (pending approval in flight; consecutive_clean=0).
+**Iter ~1793 summary:** All checks 0–5 + A–E nominal. Larry's "Go" at 10:07:42 MDT (16:07:42Z) triggered Forge to open PR #503 (adopt-terminal-state-reconciliation spec) at 16:09:44Z; Mirror passed at 16:12:49Z; PR merged 16:12:53Z. G-rule adopt-terminal-state-forge-stall FULLY RESOLVED. 0 pending approvals. PRIME DIRECTIVE: interventions=915, systemic_fixes=42 (+1 this iter), ratio≈21.79, trend=flat. **Tier: Tier 1** (PR #497 [yellow] carry in Check E; consecutive_clean=0).
 
 ---
 
-## Key standing items (as of iter ~1792)
+## Key standing items (as of iter ~1793)
 
 | Item | Status | Action needed |
 |---|---|---|
-| **adopt-terminal-state-reconciliation-spec-002** | [yellow] Pending Larry's "go" — DM sent 10:00 MDT Jun-14; Forge inbox empty until approved | Reply "go" / "approve" to Telegram DM |
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (68th iter: ~1724→~1792) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (69th iter: ~1724→~1793) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
@@ -85,16 +84,15 @@
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
 | catalog-accuracy-drift | [blue] 8/34 ourliberty-graph shelf cards drifted (attention rate 24%, gate 10%) | route=digest; journal-note only |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
-| G-rule adopt-terminal-state-forge-stall | [yellow] **3/3 DISPATCHED** (iter ~1790); Beacon created 002 re-dispatch; pending Larry's "go" | Reply to DM |
 | G-rule missions-autoregister-warn-vs-info | [blue] **2/3** | Watch; dispatch at 3/3 |
 | G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule alert-translations-no-patterns-delivery-confirmation-tier4 | [blue] **2/3** | Watch; dispatch at 3/3 |
 | G-rule missions-card-gc-warn-vs-info | [blue] 1/3 | Watch; dispatch at 3/3 |
-| G-rule droplet-uncommitted:main | [blue] **2/3** (last occurrence 13:22:39Z Jun-14, self-healed; no new occurrence through iter ~1792) | Watch; dispatch at 3/3 |
+| G-rule droplet-uncommitted:main | [blue] **2/3** (last occurrence 13:22:39Z Jun-14, self-healed) | Watch; dispatch at 3/3 |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] 1/3 | Watch |
-| G-rule timer-cycle-no-journal-entry | [blue] **0/3** (RESET; false positive confirmed by Beacon) | Forge PR pending: approve/reject timer-label-fix |
+| G-rule timer-cycle-no-journal-entry | [blue] **0/3** (RESET; false positive confirmed by Beacon) | Watch |
 | G-rule heal-stale-daemon-script_path-cosmetic | [blue] 1/3 | Watch; dispatch at 3/3 |
-| sync-push-rebase-loop-001 | [blue] UNREGISTERED AR; last occurrence 13:22:39Z Jun-14 (self-healed); sync now no-change | Carry |
+| sync-push-rebase-loop-001 | [blue] UNREGISTERED AR; last occurrence 13:22:39Z Jun-14 (self-healed) | Carry |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
 | Stale bash orphan loops | [blue] PIDs 1834248 (May 28) + 2605007 (Jun 13). 0% CPU. | Carry; cleanup when convenient |

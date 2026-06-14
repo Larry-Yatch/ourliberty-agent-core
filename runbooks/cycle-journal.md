@@ -4,6 +4,101 @@
 
 ---
 
+## Iteration ~1793 — 2026-06-14 16:15Z UTC (interactive, /cycle, Tier 1, signal: PR #503 merged — G-rule adopt-terminal-state-forge-stall RESOLVED)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Signal-resolved. All checks 0–5 + A–E nominal. No pending approvals in flight. PR #503 merged 16:12:53Z (adopt-terminal-state-reconciliation spec). G-rule adopt-terminal-state-forge-stall fully resolved. PR #497 [yellow] carry (69th iter).
+
+**VERIFY-BEFORE-REASSERT (iter ~1792 carries):**
+- PR #497 REVIEW_ESCALATE: `gh pr list --state open` → OPEN, mergeable=UNKNOWN, statusCheckRollup=FAILURE (mirror-review), reviewDecision="". 69th consecutive iter. **CARRY** [yellow].
+- adopt-terminal-state-reconciliation-spec-002 pending: beacon-pending-approvals.json `pending: []` (empty). Larry's "Go" at 10:07:42 MDT (16:07:42Z) consumed the approval. Forge opened PR #503 at 16:09:44Z; Mirror passed review at 16:12:49Z; PR merged at 16:12:53Z. **RESOLVED** ✅.
+- G-rule adopt-terminal-state-forge-stall 3/3 DISPATCHED: PR #503 MERGED ✅. G-rule permanently resolved. **CLOSED** ✅.
+- unreviewed-merge:499/494/489: Telegram log — last Larry messages: 10:07:42 MDT "Go" (adopt-terminal), 09:18:55 MDT "Go" (prior dispatch). No new replies on retroactive reviews. **CARRY** [yellow].
+- heal-stale-daemon-code.heartbeat: `2026-06-14T16:08:15Z` (~7 min before 16:15Z check). Within 60-min threshold. **CARRY confirmed** ✅.
+- Stale bash orphan loops: PID 1834248 (Ss, 16d 20h 54m, 0% CPU) + PID 2605007 (Ss, 11h 53m, 0% CPU). Both alive. **CARRY** [blue].
+- G-rule droplet-uncommitted:main 2/3: sync.json status=no-change. No new dirty-tree occurrence. **CARRY at 2/3**.
+
+**Check 0 — Alert triage:** Watermark=921, file=921 (0 new lines). ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log: 0 WARNs in last 30 lines. inbox-watcher.log: 0 WARNs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry messages: 10:07:42 MDT "Go" (adopt-terminal-002), 09:18:55 MDT "Go" (prior dispatch). No unread directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → 0 stalls, 10 FORGE_NO_PR_SKIP (stable, all have PRs). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: `pending: []` ✅. Beacon inbox: EMPTY ✅. Forge/Mirror/Pulse inboxes: EMPTY ✅ (Mirror had review-adopt-terminal-state-reconciliation-spec-002.json which completed — PR #503 merged). ✅ Nominal.
+
+**Check 5 — Stale daemon:** heartbeat `2026-06-14T16:08:15Z` (~7 min before 16:15Z check). Fresh (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** On main. Clean working tree. HEAD=a3421aef=origin/main. 0 ahead, 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: status=no-change, last_sync=2026-06-14T15:22:49Z (~53 min before 16:15Z check). Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:**
+- inbox_watcher: PID 2530123 ✅ (Ssl, ~20h 47m)
+- chain_event_shipper: PID 2744551 ✅ (SNs, ~5h 35m)
+- dashboard_api: PID 2744674 ✅ (Ssl, ~5h 35m)
+- beacon_telegram_bot: PID 2744840 ✅ (Ss, ~5h 34m)
+- outbox_notifier: PID 2744914 ✅ (Ss, ~5h 34m)
+- Forge: No active session (expected — PR #503 merged; no active dispatch).
+- [blue] PID 1834248: stale bash orphan (16d 20h+). Ss, 0% CPU. [carry]
+- [blue] PID 2605007: stale bash orphan (11h 53m). Ss, 0% CPU. [carry]
+
+**Check D — Inboxes:** All EMPTY ✅. ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core:
+- **PR #503** `docs(spec): adopt terminal-state-reconciliation spec` — MERGED 16:12:53Z ✅. Mirror review PASSED 16:12:49Z. G-rule adopt-terminal-state-forge-stall fully resolved.
+- **PR #497** OPEN (`fix(cleanup-branches): success-prune alert is info, not warning`), mergeable=UNKNOWN, reviewDecision="", statusCheckRollup=FAILURE. [yellow] carry — 69th consecutive iter.
+ourliberty-dashboard: No open PRs. ✅
+
+**Conditional checks:** Today is Sunday 2026-06-14 UTC. Check I already ran this cycle day (iter ~1718). **SKIP**. Check III last artifact 2026-06-11 (3 days old, <14d). **SKIP**.
+
+**Actions taken:**
+1. `cycle_prime_ledger.py append --tier 1 --kind systemic_fix --template adopt-terminal-state-forge-stall` → recorded G-rule resolution (PR #503 merge). ✅
+2. `cycle_tier_state.py record --checks-clean false` → tier stays 1, consecutive_clean=0, last_signal_at=2026-06-14T16:15:16Z. ✅
+
+**Dispatches:** None.
+
+**Patterns:**
+- G-rule adopt-terminal-state-forge-stall: **RESOLVED** (PR #503 merged). Remove from tracking. ✅
+- G-rule droplet-uncommitted:main: 2/3 (no new occurrence). Carry.
+- G-rule missions-autoregister-warn-vs-info: 2/3. Carry.
+- G-rule alert-translations-no-patterns-delivery-confirmation-tier4: 2/3. Carry.
+- G-rule missions-card-gc-warn-vs-info: 1/3. Carry.
+- G-rule F24-empty-prompt-envelope-rejected: 1/3. Carry.
+- G-rule timer-cycle-no-journal-entry: 0/3. Carry.
+- G-rule Forge-timeout-worktree-missing-retry-loop: 1/3. Carry.
+- G-rule heal-stale-daemon-script_path-cosmetic: 1/3. Carry.
+
+**Standing findings:**
+- [yellow] **PR #497 REVIEW_ESCALATE** — statusCheckRollup=FAILURE (69th consecutive iter). Close: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core`. [carry]
+- [yellow] **unreviewed-merge:499** — Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed'. [carry]
+- [yellow] **unreviewed-merge:494** — DM sent iter ~1694. Reply or silence. [carry]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614. Reply or silence. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **Check I medic-operator-scaffold-001** — 24.4σ; `/dispatch 1` if re-run needed. [carry]
+- [blue] **catalog-accuracy-drift** — 8/34 ourliberty-graph shelf cards drifted (attention rate 24%). journal-note. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 2/3. Watch; dispatch at 3/3. [carry]
+- [blue] **G-rule missions-autoregister-warn-vs-info** — 2/3. [carry]
+- [blue] **G-rule alert-translations-no-patterns-delivery-confirmation-tier4** — 2/3. [carry]
+- [blue] **G-rule missions-card-gc-warn-vs-info** — 1/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — 0/3. [carry]
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. [carry]
+- [blue] **G-rule heal-stale-daemon-script_path-cosmetic** — 1/3. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — last occurrence 13:22:39Z Jun-14 (self-healed). [carry]
+- [blue] **dag-preflight-revision gap** — PR #484 closed source=pulse gap; DAG markers still fall through. [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+- [blue] **Stale bash orphan loops** — PID 1834248 (16d 20h+) + PID 2605007 (11h 53m). Ss, 0% CPU. [carry]
+
+**PRIME DIRECTIVE:** 1 systemic_fix appended (adopt-terminal-state-forge-stall, PR #503 merge). interventions=915, systemic_fixes=42 (+1), ratio≈21.79, trend=flat.
+**Tier end-of-iter:** **Tier 1** (--checks-clean false; PR #497 [yellow] carry in Check E; consecutive_clean=0).
+
+---
+
 ## Iteration ~1792 — 2026-06-14 16:08Z UTC (interactive, /cycle, Tier 1, signal: adopt-terminal-002 pending approval)
 
 **Trigger:** Larry direct invocation (`/cycle`).
