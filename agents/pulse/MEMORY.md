@@ -72,13 +72,13 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 19:28Z UTC (Iter ~1820, Tier 1, nominal)
+## Status snapshot — updated 2026-06-14 19:43Z UTC (Iter ~1822, Tier 1, nominal)
 
-**Iter ~1820 summary:** All checks 0–5 + A–E nominal. 0 new alerts (watermark=930). No new findings. PR #497 carry (96th iter). §5.0 one-shots all no-op. Rotations nominal (closest: SUPABASE_SERVICE_ROLE_KEY ~69d). PRIME DIRECTIVE: ratio≈20.44, systemic_fixes=45, iter_clean. **Tier: Tier 1** (consecutive_clean=0).
+**Iter ~1822 summary:** All checks 0–5 + A–E nominal. 0 new alerts (watermark=930). PR #497 carry (98th iter). PR #508 new (check-0-helper-authority-enforcement-001 approved+built, Mirror review dispatched 19:38:49Z). beacon-pending-approvals pending=0 (was 1). §5.0 one-shots all no-op. Rotations nominal (closest: SUPABASE_SERVICE_ROLE_KEY ~69d). PRIME DIRECTIVE: ratio≈20.44, systemic_fixes=45, iter_clean. **Tier: Tier 1** (consecutive_clean=0).
 
 ---
 
-## Key standing items (as of iter ~1816)
+## Key standing items (as of iter ~1822)
 
 | Item | Status | Action needed |
 |---|---|---|
@@ -91,7 +91,7 @@
 | TSR DAG sequence | [blue] **COMPLETE ✅** — PR #504 ✅, PR #505 ✅, PR #506 ✅ (18:13:12Z) | Done |
 | captures-dirty-tree-allowlist-001 | [blue] **RESOLVED ✅** — PR #507 merged 18:50:13Z, commit 8cf83835; fix live | Done |
 | ourliberty-dashboard PR #54 | [blue] **RESOLVED ✅** — merged 10:31:11Z (p4-parked-card: meaning-layer Parked card) | Done |
-| check-0-helper-authority-enforcement-001 | [blue] **PENDING LARRY APPROVAL** (beacon-pending-approvals.json, created 18:38:15Z Jun-14) | Reply 'approve'/'go'/'ok' in Telegram |
+| check-0-helper-authority-enforcement-001 | [blue] **IN PIPELINE** — PR #508 open, Mirror review dispatched 19:38:49Z Jun-14 | Auto-merges after REVIEW_PASS |
 | G-rule health-notify-script-missing | [blue] **1/3** — ourliberty-health notify path misconfigured; alerts drop to journalctl only | Watch; dispatch at 3/3 |
 | catalog-accuracy-drift | [blue] 8/34 ourliberty-graph shelf cards drifted (attention rate 24%, gate 10%) | route=digest; journal-note only |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
