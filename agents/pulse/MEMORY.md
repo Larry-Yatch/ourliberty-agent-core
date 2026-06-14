@@ -72,13 +72,13 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 19:48Z UTC (Iter ~1823, Tier 1, action)
+## Status snapshot — updated 2026-06-14 19:53Z UTC (Iter ~1824, Tier 1, nominal)
 
-**Iter ~1823 summary:** PR #508 (check-0-helper-authority-enforcement-001) auto-merged mid-cycle at 19:46:35Z (Mirror REVIEW_PASS 19:46:32Z). Fast-forwarded main 3f1bd193→e86faf2f. Alert line 931 (review-pass notification) → Tier-3 silence. Watermark=931. PR #497 carry (99th iter). §5.0 no-op. Rotations nominal. PRIME DIRECTIVE: 1 intervention (ff-main-when-behind), ratio≈20.44. **Tier: Tier 1** (consecutive_clean=0).
+**Iter ~1824 summary:** Fully nominal. 0 new alerts. 0 new findings. All daemons alive. Git clean/current. PR #497 carry (100th iter). PR #498 verified MERGED (stale FORGE_NO_PR_SKIP reference resolved). PID 2605007 (15h31m) waiting on PR #498 worktree output — PR merged, orphan will not self-exit. Watermark=931. §5.0 no-op. Rotations nominal. PRIME DIRECTIVE: 0 interventions (iter_clean), ratio≈20.47. **Tier: Tier 1** (consecutive_clean=0).
 
 ---
 
-## Key standing items (as of iter ~1823)
+## Key standing items (as of iter ~1824)
 
 | Item | Status | Action needed |
 |---|---|---|
