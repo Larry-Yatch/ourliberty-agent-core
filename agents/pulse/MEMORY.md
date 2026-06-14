@@ -78,9 +78,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 22:53Z UTC (Iter ~1846, Tier 1, carry)
+## Status snapshot — updated 2026-06-14 23:02Z UTC (Iter ~1847, Tier 1, carry)
 
-**Iter ~1846 summary:** All mandatory checks 0–5 nominal. PRs #509 + #510 carry (DM sent iter ~1845, no Larry reply yet; both now UNKNOWN, age ~32-34 min). Alert idx-932 = delivery confirmation of my own iter ~1845 escalation — Tier-4, journal-note only, no re-DM. PR #497 122nd carry. Watermark advanced to 932. PRIME DIRECTIVE: iter_clean (no auto-fix), ratio≈20.47. **Tier: Tier 1** (consecutive_clean=0).
+**Iter ~1847 summary:** All mandatory checks 0–5 nominal. PRs #509 + #510 carry (DM sent iter ~1845, no Larry reply ~9.5h; #509 UNKNOWN, #510 CLEAN). PR #497 123rd carry. Watermark=932 (no new alerts). PRIME DIRECTIVE: iter_clean (no auto-fix), ratio≈20.47. **Tier: Tier 1** (consecutive_clean=0).
 
 ---
 
@@ -88,8 +88,8 @@
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (122nd iter) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
-| PR #509 + #510 | [yellow] UNKNOWN >32 min; Mirror review NEVER dispatched (non-standard branch bypass); DM sent iter ~1845; await Larry direction | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — mergeState=UNKNOWN, no reviewDecision (123rd iter) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #509 + #510 | [yellow] UNKNOWN/CLEAN; Mirror review NEVER dispatched (non-standard branch bypass); DM sent iter ~1845 (22:48Z, no reply ~9.5h); await Larry direction | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
