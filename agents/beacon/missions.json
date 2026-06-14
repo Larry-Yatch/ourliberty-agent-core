@@ -2369,6 +2369,19 @@
       "repo": "ourliberty-agent-core",
       "created": "2026-06-14",
       "deferred_reason": null
+    },
+    {
+      "id": "missions-proposed-lane-signal-hardening-001",
+      "name": "Missions Proposed-Lane Signal Hardening",
+      "phase": "in_flight",
+      "brief": "Make the auto-proposed missions lane a short, self-cleaning decision queue. Filter non-buildable orphan categories (chain-incident/alert artifacts, desktop captures, sequence-step proposals, translation/rule/dated-digest artifacts, stale test-fixtures) at proposal time via a shared is_proposable_initiative predicate; retire-with-audit any proposed entry whose orphan is terminal or no longer passes the filter (additive acknowledged flag, phase stays proposed, never hard-deleted); the retirement pass reconciles the existing 128-entry backlog on the first post-merge run and the run log reports the surviving proposed ids.",
+      "spec_docs": [],
+      "task_ids": [
+        "missions-proposed-lane-signal-hardening-001"
+      ],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-14",
+      "deferred_reason": null
     }
   ]
 }

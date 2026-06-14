@@ -253,6 +253,129 @@ class ScanAndProposeTest(unittest.TestCase):
         self.assertEqual(res2.proposed, [])
         self.assertEqual(len(reg['missions']), 1)
 
+    def test_non_buildable_orphan_not_proposed(self):
+        # Each is an orphan (detect_orphans surfaces it) but NOT a buildable
+        # initiative -> the is_proposable_initiative filter drops it at propose time.
+        for tid in ('desktop-05a159bb', 'pipeline-stall:clarify1-suppress',
+                    'real-clr', 'seq-x-step-y', 'weekly-2026-06-08'):
+            reg = self._empty_reg()
+            rows = [_ev(tid, self.now - timedelta(hours=2),
+                        event_type='session_start', pr_url=None)]
+            res = h.scan_and_propose(reg, rows, derive, self.now,
+                                     pr_state_resolver=lambda urls: {})
+            self.assertEqual(res.proposed, [], tid)
+            self.assertEqual(reg['missions'], [], tid)
+            self.assertEqual(res.skipped_non_proposable, 1, tid)
+
+
+# --------------------------------------------- retirement (self-clean the lane)
+
+
+class RetireStaleProposalsTest(unittest.TestCase):
+    def setUp(self):
+        self.now = datetime(2026, 6, 14, 12, 0, tzinfo=timezone.utc)
+
+    def _proposed(self, entry_id, task_id, **extra):
+        e = {'id': entry_id, 'phase': 'proposed', 'task_ids': [task_id],
+             'proposed_by': 'heal_orphan_autoregister'}
+        e.update(extra)
+        return e
+
+    def test_retires_entry_failing_filter(self):
+        # A proposed entry whose task_id is a noise category (would no longer pass
+        # the filter) is retired with audit; phase stays proposed, never deleted.
+        reg = {'schema_version': 1, 'missions': [
+            self._proposed('proposed-desktop-05a159bb', 'desktop-05a159bb'),
+        ]}
+        retired = h.retire_stale_proposals(reg, [], derive, self.now,
+                                           pr_state_resolver=lambda urls: {})
+        self.assertEqual([eid for eid, _ in retired], ['proposed-desktop-05a159bb'])
+        entry = reg['missions'][0]
+        self.assertTrue(entry['acknowledged'])
+        self.assertEqual(entry['phase'], 'proposed')           # not hard-deleted
+        self.assertEqual(entry['retired_by'], 'heal_orphan_autoregister')
+        self.assertEqual(entry['retired_reason'], 'filter-non-buildable')
+        self.assertEqual(entry['retired_at'], self.now.isoformat())
+
+    def test_retires_terminal_merged_orphan(self):
+        # A buildable proposal whose orphan PR has merged is terminal -> retire.
+        url = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/53'
+        reg = {'schema_version': 1, 'missions': [
+            self._proposed('proposed-p3-dashboard-proposed-lane',
+                           'p3-dashboard-proposed-lane'),
+        ]}
+        rows = [_ev('p3-dashboard-proposed-lane', self.now - timedelta(days=2),
+                    event_type='pr_opened', pr_url=url)]
+        retired = h.retire_stale_proposals(reg, rows, derive, self.now,
+                                           pr_state_resolver=lambda urls: {url: 'MERGED'})
+        self.assertEqual([r for _, r in retired], ['orphan-terminal'])
+        self.assertTrue(reg['missions'][0]['acknowledged'])
+
+    def test_preserves_live_buildable_proposal(self):
+        # Passes the filter, PR still OPEN -> NOT terminal -> KEEP (err toward not
+        # retiring an ambiguous still-live buildable).
+        url = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/77'
+        reg = {'schema_version': 1, 'missions': [
+            self._proposed('proposed-auth-setup-token-wiring', 'auth-setup-token-wiring'),
+        ]}
+        rows = [_ev('auth-setup-token-wiring', self.now - timedelta(hours=3),
+                    event_type='pr_opened', pr_url=url)]
+        retired = h.retire_stale_proposals(reg, rows, derive, self.now,
+                                           pr_state_resolver=lambda urls: {url: 'OPEN'})
+        self.assertEqual(retired, [])
+        self.assertNotIn('acknowledged', reg['missions'][0])
+
+    def test_preserves_buildable_with_no_events_indeterminate(self):
+        # Passes the filter, no events in window -> indeterminate -> KEEP.
+        reg = {'schema_version': 1, 'missions': [
+            self._proposed('proposed-catalog-accuracy-drift', 'catalog-accuracy-drift'),
+        ]}
+        retired = h.retire_stale_proposals(reg, [], derive, self.now,
+                                           pr_state_resolver=lambda urls: {})
+        self.assertEqual(retired, [])
+        self.assertNotIn('acknowledged', reg['missions'][0])
+
+    def test_preserves_buildable_with_indeterminate_pr_state(self):
+        # Passes filter, has a PR but its live state could NOT be resolved -> KEEP.
+        url = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/88'
+        reg = {'schema_version': 1, 'missions': [
+            self._proposed('proposed-auth-setup-token-wiring', 'auth-setup-token-wiring'),
+        ]}
+        rows = [_ev('auth-setup-token-wiring', self.now - timedelta(hours=3),
+                    event_type='pr_opened', pr_url=url)]
+        retired = h.retire_stale_proposals(reg, rows, derive, self.now,
+                                           pr_state_resolver=lambda urls: {})  # unresolved
+        self.assertEqual(retired, [])
+
+    def test_already_acknowledged_not_retouched_idempotent(self):
+        reg = {'schema_version': 1, 'missions': [
+            self._proposed('proposed-desktop-05a159bb', 'desktop-05a159bb',
+                           acknowledged=True, retired_at='2026-06-13T00:00:00+00:00'),
+        ]}
+        retired = h.retire_stale_proposals(reg, [], derive, self.now,
+                                           pr_state_resolver=lambda urls: {})
+        self.assertEqual(retired, [])
+        # The prior retire timestamp is untouched (no churn on re-run).
+        self.assertEqual(reg['missions'][0]['retired_at'], '2026-06-13T00:00:00+00:00')
+
+    def test_ignores_entries_not_proposed_by_healer(self):
+        reg = {'schema_version': 1, 'missions': [
+            {'id': 'm-manual', 'phase': 'proposed', 'task_ids': ['desktop-05a159bb']},
+            {'id': 'm-drafting', 'phase': 'drafting', 'task_ids': ['desktop-07e97ba7'],
+             'proposed_by': 'heal_orphan_autoregister'},
+        ]}
+        retired = h.retire_stale_proposals(reg, [], derive, self.now,
+                                           pr_state_resolver=lambda urls: {})
+        self.assertEqual(retired, [])
+
+    def test_surviving_proposed_ids_excludes_acknowledged(self):
+        reg = {'schema_version': 1, 'missions': [
+            self._proposed('proposed-live', 'auth-setup-token-wiring'),
+            self._proposed('proposed-dead', 'desktop-05a159bb', acknowledged=True),
+            {'id': 'm-drafting', 'phase': 'drafting', 'task_ids': ['x']},
+        ]}
+        self.assertEqual(h.surviving_proposed_ids(reg), ['proposed-live'])
+
 
 # --------------------------------------- commit + push (real temp git repo)
 

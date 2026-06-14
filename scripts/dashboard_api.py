@@ -2884,6 +2884,74 @@ def is_infrastructure_task(task_id: str, agent: Optional[str]) -> bool:
     return False
 
 
+# task_id shapes that ARE orphans (so the Orphans lane still surfaces them) but
+# are NOT buildable initiatives — they must never be auto-proposed onto the
+# curated `proposed` missions lane (the autoregister healer's decision queue).
+# This is a STRICTER gate than is_infrastructure_task: the Orphans lane is an
+# everything-in-flight view, while the proposed lane is a short, high-signal
+# accept/dismiss queue. Categories swept: chain-incident / alert artifacts
+# (carry a `:`), desktop capture hashes (captures lane), sequence-step proposals,
+# translation / generated-rule / dated-digest artifacts, and stale
+# test-fixture-shaped ids. Chosen NOT to collide with genuine buildable ids
+# (e.g. `p2-digest-generator`, `harden-test-prod-write-isolation-001`,
+# `log-dir-test-isolation-leak-001` all stay proposable).
+_NON_PROPOSABLE_TASK_ID_PREFIXES: tuple[str, ...] = (
+    'step-',                # bare sequence-step proposal
+    'real-', 'prod-',       # stale test-fixture-shaped ids
+    'test-isolation-',      # stale test-fixture-shaped ids (prefix only — a real
+                            # `*-test-isolation-*` initiative is unaffected)
+    'unreg-approval-',      # chain-incident artifact (hyphen variant; the `:`
+                            # variant is caught by the bare-colon rule)
+    'ceo-digest-',          # generated digest artifact
+    'weekly-', 'check-i-',  # dated temporal digest artifacts
+)
+
+# Substrings that mark translation / generated-rule artifacts regardless of
+# position. Deliberately narrow (no bare `digest`/`summary`) so buildable ids are
+# never swept.
+_NON_PROPOSABLE_TASK_ID_SUBSTRINGS: tuple[str, ...] = (
+    'alert-translation',
+    'dispatch-translations',
+    'g-rule',
+)
+
+_DESKTOP_CAPTURE_HASH_RE = re.compile(r'^desktop-[0-9a-f]{6,}$')
+_SEQUENCE_STEP_RE = re.compile(r'^seq-.*-step-')
+
+
+def is_proposable_initiative(task_id: str, agent: Optional[str] = None) -> bool:
+    """True iff ``task_id`` is a genuine buildable initiative worth surfacing on
+    the curated `proposed` missions lane.
+
+    The proposed lane is a SHORT decision queue, so the bar is higher than the
+    Orphans lane's: an orphan that is infrastructure, a chain-incident/alert
+    artifact, a desktop capture, a sequence-step proposal, a translation/rule/
+    dated-digest artifact, or a stale test-fixture id is an orphan but NOT a
+    buildable mission. Conservative by design — anything not matching a known
+    noise shape is treated as proposable (err toward keeping a live buildable)."""
+    if not isinstance(task_id, str) or not task_id.strip():
+        return False
+    if is_infrastructure_task(task_id, agent):
+        return False
+    if ':' in task_id:
+        # transcript-not-persisted:, approval-request:, pipeline-stall:,
+        # sequence-invalid:, failure:, unreviewed-merge:, wedged-worktree:,
+        # no-session-revision:, install-drift-timer: — all incident/alert noise.
+        return False
+    if '-' not in task_id:
+        # Degenerate single-token id (e.g. `summary`, `20`) — never an initiative.
+        return False
+    if _DESKTOP_CAPTURE_HASH_RE.match(task_id):
+        return False
+    if _SEQUENCE_STEP_RE.match(task_id):
+        return False
+    if task_id.startswith(_NON_PROPOSABLE_TASK_ID_PREFIXES):
+        return False
+    if any(s in task_id for s in _NON_PROPOSABLE_TASK_ID_SUBSTRINGS):
+        return False
+    return True
+
+
 def _ts_key(ts: Optional[str]) -> datetime:
     """Sort key: parsed ts, with unparseable/missing sorting oldest."""
     return _ts_to_dt(ts) or datetime.min.replace(tzinfo=timezone.utc)

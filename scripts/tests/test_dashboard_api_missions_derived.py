@@ -758,5 +758,85 @@ class GithubTokenTest(unittest.TestCase):
         self.assertEqual(len(calls), 2)
 
 
+class IsProposableInitiativeTest(unittest.TestCase):
+    """`is_proposable_initiative` — the stricter proposed-lane gate (signal
+    hardening). It must sweep every noise category that flooded the proposed
+    lane while keeping genuine buildable initiatives proposable, and it must NOT
+    collide with buildable ids that merely contain a noise substring."""
+
+    def test_genuine_buildable_initiatives_are_proposable(self) -> None:
+        for tid in (
+            'p2-derive-endpoint',
+            'p2-digest-generator',                       # 'digest' is NOT swept
+            'rebase-pr252-digest-generator-001',
+            'harden-test-prod-write-isolation-001',      # 'prod' mid-id, not prefix
+            'log-dir-test-isolation-leak-001',           # 'test-isolation' mid-id
+            'fix-pr-s2-test-isolation-leak-plus-ast-walk-regression-gate',
+            'wire-pulse-check-iv-cadence-001',           # 'check-i' mid-id, not prefix
+            'pulse-check-iii-tune-forge-stuck-threshold',
+            'missions-v2-phase0-desktop-feed',           # 'desktop' mid-id, not a hash
+            'auth-setup-token-wiring',
+        ):
+            self.assertTrue(da.is_proposable_initiative(tid), tid)
+
+    def test_chain_incident_and_alert_artifacts_swept(self) -> None:
+        for tid in (
+            'pipeline-stall:clarify1-suppress-needed',
+            'sequence-invalid:approvals-queue-rework',
+            'failure:commit-failed',
+            'unreviewed-merge:489',
+            'wedged-worktree:wt-mirror-x',
+            'no-session-revision:pr412-forge-redispatch-needed',
+            'transcript-not-persisted:tier1',
+            'approval-request:parked:alert-triage-durable-watermark-001',
+            'approval_request:routing-failure:preflight-reminder-enforcement-001',
+            'install-drift-timer:ourliberty-heal-missions-card-gc',
+            'unreg-approval-8ba8e3b472a8',               # hyphen variant
+        ):
+            self.assertFalse(da.is_proposable_initiative(tid), tid)
+
+    def test_desktop_capture_hashes_swept(self) -> None:
+        for tid in ('desktop-05a159bb', 'desktop-e2e0ab79', 'desktop-bc57cca6'):
+            self.assertFalse(da.is_proposable_initiative(tid), tid)
+
+    def test_sequence_step_proposals_swept(self) -> None:
+        for tid in (
+            'seq-approvals-queue-rework-step-step-autoclear',
+            'seq-missions-v2-phase2-step-p2-derive-endpoint',
+            'step-alert-promotion',
+            'step-digest-generator',
+        ):
+            self.assertFalse(da.is_proposable_initiative(tid), tid)
+
+    def test_translation_rule_digest_artifacts_swept(self) -> None:
+        for tid in (
+            'alert-translation-dispatch-branch-cleanup-summary-001',
+            'missions-autoregister-alert-translation-001',
+            'g-rule-dispatch-branch-cleanup-alert-translation-20260612T163000Z',
+            'sync-push-failure-g-rule-117',
+            'dispatch-translations-entry-20260610',
+            'ceo-digest-daily-2026-06-11',
+            'weekly-2026-06-08',
+            'check-i-2026-06-08',
+        ):
+            self.assertFalse(da.is_proposable_initiative(tid), tid)
+
+    def test_test_fixture_shaped_ids_swept(self) -> None:
+        for tid in (
+            'real-clr', 'real-pf-ok', 'real-cascade',
+            'prod-clr', 'test-isolation-v2', 'test-isolation-v3',
+        ):
+            self.assertFalse(da.is_proposable_initiative(tid), tid)
+
+    def test_degenerate_and_empty_ids_swept(self) -> None:
+        for tid in ('20', 'summary', '', '   '):
+            self.assertFalse(da.is_proposable_initiative(tid), tid)
+
+    def test_delegates_to_infrastructure_classification(self) -> None:
+        # An id/agent that is_infrastructure_task already rejects is never proposable.
+        self.assertFalse(da.is_proposable_initiative('notify-routing-xyz'))
+        self.assertFalse(da.is_proposable_initiative('anything', agent='deploy-notifier'))
+
+
 if __name__ == '__main__':
     unittest.main()

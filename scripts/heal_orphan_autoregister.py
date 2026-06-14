@@ -9,6 +9,24 @@ render an accept/dismiss affordance (the dashboard step). The parked
 `cap-bidirectional-missions-board` idea is retired here: auto-registration IS the
 concrete realization of "agents read the board to self-prioritize".
 
+The proposed lane is a SHORT, high-signal decision queue that stays short on its
+own. Two mechanisms keep it that way (both reusing the Phase-2 derive, no drift):
+
+  * FILTER (proposal time) — only GENUINE BUILDABLE initiatives become proposed.
+    is_proposable_initiative (shared with the dashboard derive) is a stricter gate
+    than is_infrastructure_task: it additionally sweeps chain-incident/alert
+    artifacts, desktop captures, sequence-step proposals, translation/rule/
+    dated-digest artifacts, and stale test-fixture ids. The Orphans lane still
+    surfaces those; only the curated proposed lane filters them.
+
+  * RETIREMENT (retire-with-audit) — an existing proposal is retired when its
+    orphan is TERMINAL (PR merged/closed) or it would no longer pass the FILTER.
+    Retirement sets the additive `acknowledged: true` flag (the same one the
+    dashboard dismiss uses) + provenance; `phase` stays `proposed` so the task_id
+    stays registered (never re-proposed, never hard-deleted). The pass runs every
+    tick, so the first post-merge run RECONCILES the existing backlog retroactively
+    and the run log reports the surviving proposed ids.
+
 Three properties the spec pins (§ 6), all enforced structurally:
 
   1. REUSE THE PHASE-2 DERIVE (no drift). Orphan classification — which task_ids
@@ -301,8 +319,11 @@ def build_proposed_entry(orphan: dict[str, Any], now: datetime) -> dict[str, Any
 @dataclass
 class ProposeResult:
     proposed: list[tuple[str, str]] = field(default_factory=list)  # (task_id, entry_id)
+    retired: list[tuple[str, str]] = field(default_factory=list)  # (entry_id, reason)
+    surviving_proposed: list[str] = field(default_factory=list)  # live proposed entry ids
     scanned_orphans: int = 0
     skipped_terminal_or_indeterminate: int = 0
+    skipped_non_proposable: int = 0
     events_unavailable: bool = False
     registry_unreadable: bool = False
     derive_unavailable: bool = False
@@ -324,8 +345,18 @@ def scan_and_propose(
     registered = registered_task_ids(registry)
     existing_ids = existing_entry_ids(registry)
 
-    orphans = derive.detect_orphans(rows, registered)
-    res.scanned_orphans = len(orphans)
+    detected = derive.detect_orphans(rows, registered)
+    res.scanned_orphans = len(detected)
+    # Higher signal bar than the Orphans lane: only genuine buildable initiatives
+    # become a `proposed` decision-queue entry. detect_orphans already drops
+    # is_infrastructure_task; is_proposable_initiative additionally sweeps
+    # chain-incident/alert artifacts, desktop captures, sequence-step proposals,
+    # translation/rule/dated-digest artifacts, and stale test-fixture ids.
+    orphans = [
+        o for o in detected
+        if derive.is_proposable_initiative(o.get('task_id', ''), o.get('agent'))
+    ]
+    res.skipped_non_proposable = len(detected) - len(orphans)
     if not orphans:
         return res
 
@@ -371,6 +402,140 @@ def scan_and_propose(
     return res
 
 
+# ---------- retirement: self-clean stale proposals (retire-with-audit) ----------
+
+
+def _events_by_task(rows: list[dict[str, Any]], derive: Any) -> dict[str, list[dict[str, Any]]]:
+    """Group chain_events by task_id, newest-first (the order the derive's
+    readability/terminal helpers expect)."""
+    by_task: dict[str, list[dict[str, Any]]] = {}
+    for ev in rows:
+        tid = ev.get('task_id')
+        if tid:
+            by_task.setdefault(tid, []).append(ev)
+    for evs in by_task.values():
+        evs.sort(key=lambda e: derive._ts_key(e.get('ts')), reverse=True)
+    return by_task
+
+
+def _retire_reason(
+    entry: dict[str, Any],
+    events_by_task: dict[str, list[dict[str, Any]]],
+    derive: Any,
+    now: datetime,
+    pr_state_by_url: dict[str, str],
+) -> Optional[str]:
+    """Why this proposed entry should retire, or None to KEEP it.
+
+    Two triggers, both fail-safe (an indeterminate signal → KEEP a live buildable):
+      * FILTER — every task_id the entry carries is non-proposable noise (would not
+        pass is_proposable_initiative today): a category that should never have been
+        proposed → retire 'filter-non-buildable'.
+      * TERMINAL — the orphan's PR is merged or explicitly closed → retire
+        'orphan-terminal'. A task_id with no events in the window, or a PR whose
+        live state we could not resolve, is indeterminate → not a retire signal.
+    """
+    tids = [t for t in (entry.get('task_ids') or []) if isinstance(t, str) and t]
+    if not tids:
+        return None
+    if all(not derive.is_proposable_initiative(t) for t in tids):
+        return 'filter-non-buildable'
+    for tid in tids:
+        evs = events_by_task.get(tid)
+        if not evs:
+            continue  # no signal in window → indeterminate → keep
+        summ = derive.summarize_task_events(evs)
+        pr_url = summ.get('pr_url')
+        pr_state = pr_state_by_url.get(pr_url) if pr_url else None
+        if pr_url and pr_state is None:
+            continue  # has a PR but its live state is indeterminate → keep
+        readability = derive._derive_orphan_readability(
+            {'task_id': tid, 'last_event_ts': summ.get('last_event_ts'), 'pr_url': pr_url},
+            evs, now, pr_state=pr_state,
+        )
+        if readability.get('terminal'):
+            return 'orphan-terminal'
+    return None
+
+
+def retire_stale_proposals(
+    registry: dict[str, Any],
+    rows: list[dict[str, Any]],
+    derive: Any,
+    now: datetime,
+    *,
+    pr_state_resolver: Optional[Callable[[list[str]], dict[str, str]]] = None,
+) -> list[tuple[str, str]]:
+    """Retire-with-audit any auto-proposed entry that should no longer be live.
+
+    Reuses the system's existing dismiss mechanism: set the ADDITIVE
+    `acknowledged: true` flag (which the dashboard's Proposed affordance already
+    reads to hide a thread) plus retirement provenance. `phase` STAYS 'proposed'
+    so the task_id stays registered — the entry is never re-proposed, never
+    hard-deleted, and a re-run is a no-op (already-acknowledged entries are
+    skipped). Only touches entries this healer proposed (`proposed_by`).
+
+    Mutates ``registry['missions']`` in place; returns [(entry_id, reason), ...]
+    for the entries newly retired this tick. Fail-safe: an indeterminate signal
+    never retires a still-live buildable proposal."""
+    candidates = [
+        e for e in registry.get('missions', [])
+        if isinstance(e, dict)
+        and e.get('phase') == PROPOSED_PHASE
+        and e.get('proposed_by') == PROPOSED_BY
+        and not e.get('acknowledged')
+    ]
+    if not candidates:
+        return []
+
+    events_by_task = _events_by_task(rows, derive)
+
+    # Resolve live PR states for the candidates' PRs (fail-safe — {} → every
+    # PR-bearing candidate is indeterminate, so only the FILTER trigger can retire).
+    if pr_state_resolver is None:
+        pr_state_resolver = derive._resolve_orphan_pr_states
+    cand_pr_urls: list[str] = []
+    for e in candidates:
+        for tid in (e.get('task_ids') or []):
+            if not isinstance(tid, str):
+                continue
+            pr_url = derive.summarize_task_events(events_by_task.get(tid, [])).get('pr_url')
+            if pr_url:
+                cand_pr_urls.append(pr_url)
+    pr_state_by_url: dict[str, str] = {}
+    if cand_pr_urls:
+        try:
+            pr_state_by_url = pr_state_resolver(cand_pr_urls) or {}
+        except Exception as e:  # noqa: BLE001 — fail-safe: indeterminate → keep
+            log(f'retire PR-state resolve raised: {type(e).__name__}: {e} — treating as indeterminate')
+            pr_state_by_url = {}
+
+    retired: list[tuple[str, str]] = []
+    for entry in candidates:
+        reason = _retire_reason(entry, events_by_task, derive, now, pr_state_by_url)
+        if reason is None:
+            continue
+        entry['acknowledged'] = True
+        entry['retired_by'] = PROPOSED_BY
+        entry['retired_at'] = now.isoformat()
+        entry['retired_reason'] = reason
+        retired.append((entry.get('id', ''), reason))
+    return retired
+
+
+def surviving_proposed_ids(registry: dict[str, Any]) -> list[str]:
+    """Entry ids still LIVE on the proposed lane (phase=proposed, not
+    acknowledged) — the short list Beacon relays to Larry after a tick."""
+    out: list[str] = []
+    for entry in registry.get('missions', []):
+        if (isinstance(entry, dict) and entry.get('phase') == PROPOSED_PHASE
+                and not entry.get('acknowledged')):
+            eid = entry.get('id')
+            if isinstance(eid, str) and eid:
+                out.append(eid)
+    return out
+
+
 # ---------- commit + push the missions.json delta to main (§ 6) ----------
 
 
@@ -413,7 +578,7 @@ def commit_and_push_missions(repo: Path, audit_msg: str) -> str:
     if _git(repo, 'add', MISSIONS_REL).returncode != 0:
         return 'commit-failed'
     commit = _git(repo, 'commit', '-m',
-                  'chore(missions): autoregister healer — propose orphan thread(s)',
+                  'chore(missions): autoregister healer — reconcile proposed lane',
                   '-m', audit_msg)
     if commit.returncode != 0:
         log(f'missions.json commit failed in {repo}: {(commit.stderr or commit.stdout).strip()[:200]}')
@@ -440,11 +605,16 @@ def _emit_summary(res: ProposeResult, commit_status: str, dry_run: bool) -> None
     """One audit line (log) + a low-noise digest alert when something was proposed;
     escalate on a hard failure. Exact counts + the full id list go to the log."""
     proposed_ids = [eid for _, eid in res.proposed]
+    retired_ids = [eid for eid, _ in res.retired]
     verb = 'would propose' if dry_run else 'proposed'
+    retire_verb = 'would retire' if dry_run else 'retired'
     summary = (
         f'missions-autoregister: {verb} {len(res.proposed)} orphan thread(s) '
-        f'{proposed_ids}; scanned {res.scanned_orphans} orphan(s); '
-        f'skipped {res.skipped_terminal_or_indeterminate} terminal/indeterminate; '
+        f'{proposed_ids}; {retire_verb} {len(res.retired)} stale proposal(s) '
+        f'{retired_ids}; surviving proposed={len(res.surviving_proposed)} '
+        f'{res.surviving_proposed}; scanned {res.scanned_orphans} orphan(s); '
+        f'skipped {res.skipped_non_proposable} non-proposable, '
+        f'{res.skipped_terminal_or_indeterminate} terminal/indeterminate; '
         f'commit={commit_status}'
     )
     if res.events_unavailable:
@@ -468,7 +638,7 @@ def _emit_summary(res: ProposeResult, commit_status: str, dry_run: bool) -> None
         larry_alerts.append_alert(
             source='missions-autoregister', severity='warning',
             message=summary, subject=f'failure:{commit_status}', route='escalate')
-    elif res.proposed and commit_status == 'committed':
+    elif (res.proposed or res.retired) and commit_status == 'committed':
         larry_alerts.append_alert(
             source='missions-autoregister', severity='warning',
             message=summary, subject='summary', route='digest')
@@ -551,8 +721,17 @@ def run_once(*, dry_run: bool,
         _emit_summary(ProposeResult(), 'nothing', dry_run)
         return 0
 
+    # Retirement pass: self-clean stale/terminal proposals (retire-with-audit).
+    # Isolated so a retirement fault never blocks a healthy propose pass.
+    try:
+        res.retired = retire_stale_proposals(registry, rows, derive, now,
+                                             pr_state_resolver=pr_state_resolver)
+    except Exception as e:  # noqa: BLE001 — fail-safe: report, never corrupt
+        log(f'retire-stale-proposals raised: {type(e).__name__}: {e} — retiring nothing')
+    res.surviving_proposed = surviving_proposed_ids(registry)
+
     commit_status = 'nothing'
-    if res.proposed and not dry_run:
+    if (res.proposed or res.retired) and not dry_run:
         try:
             atomic_write_missions(mpath, registry)
         except Exception as e:  # noqa: BLE001 — fail-safe
@@ -573,7 +752,8 @@ def run_once(*, dry_run: bool,
 
 def _commit_audit(res: ProposeResult) -> str:
     return (f'Auto-committed by {PROPOSED_BY}. '
-            f'proposed={len(res.proposed)} scanned={res.scanned_orphans}.')
+            f'proposed={len(res.proposed)} retired={len(res.retired)} '
+            f'scanned={res.scanned_orphans} surviving={len(res.surviving_proposed)}.')
 
 
 def main(argv: Optional[list[str]] = None) -> int:
