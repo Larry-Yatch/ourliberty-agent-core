@@ -459,6 +459,22 @@
         "from_state": "parked"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "cap-schedule-the-missions-narrator-no-timer-new-park-9943",
+      "title": "Schedule the Missions Narrator (no timer; new parked cards do not auto-brief)",
+      "note": "Phase 4 shipped missions_narrator.py but nothing schedules it; the first pass was run manually 2026-06-14. New or re-stated captures stay at the placeholder until a timer is added or it is wired into the GC healer timer. Small follow-up build.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ol-work",
+        "branch": "pr476-review",
+        "captured_at": "2026-06-14T18:01:31.728606+00:00"
+      },
+      "last_touched": "2026-06-14T18:01:31.728606+00:00",
+      "promoted_to": null
     }
   ]
 }
