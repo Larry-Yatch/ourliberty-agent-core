@@ -66,17 +66,17 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 13:15Z UTC (Iter ~1780, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 13:20Z UTC (Iter ~1781, Tier 1, consecutive_clean=0)
 
-**Iter ~1780 summary:** Check 2 finding: Larry asked 'Check the pending approval for validity' at 13:11Z. `fix-alert-triage-watermark-durability-001` in beacon-pending-approvals.json is STALE — PR #482 shipped the fix on 2026-06-12. Dedicated watermark store live at `~/agents/state/alert-triage-watermark.json` (last_claimed_line=918). Reported to Larry directly. All other checks nominal. PR #497 MERGEABLE=UNKNOWN (57th consecutive iter, carry). Heartbeat fresh (13:07:19Z). All inboxes clear. HEAD=cb2e2890=origin/main. Sync: 12:22:27Z (status=no-change). PRIME DIRECTIVE: interventions=912, systemic_fixes=41, ratio≈22.22, trend=flat. **Tier:** Tier 1.
+**Iter ~1781 summary:** All checks nominal. PR #497 MERGEABLE=UNKNOWN (58th consecutive iter, carry). beacon-pending-approvals.json now `pending: []` — fix-alert-triage-watermark-durability-001 cleared by bot 07:13:35 MDT (13:13Z). No new Telegram directives. Heartbeat fresh (13:07:19Z). All inboxes clear. HEAD=ae4d4532=origin/main. Sync: 12:22:27Z (status=no-change). PRIME DIRECTIVE: interventions=913, systemic_fixes=41, ratio≈22.27, trend=flat. **Tier:** Tier 1.
 
 ---
 
-## Key standing items (as of iter ~1776)
+## Key standing items (as of iter ~1781)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN, mirror-review=FAILURE, no reviewDecision (56 iters: ~1724→~1779) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN, mirror-review=FAILURE, no reviewDecision (58 iters: ~1724→~1781) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
@@ -95,5 +95,4 @@
 | sync-push-rebase-loop-001 | [blue] UNREGISTERED AR; self-healed (10:22Z sync clean) | Carry |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
-| Stale bash orphan loops | [blue] PIDs 1834248 (May 28, 16+ days) + 2605007 (Jun 13). Sleeping, 0% CPU. | Carry; cleanup when convenient |
-| fix-alert-triage-watermark-durability-001 | [blue] **STALE** — PR #482 shipped fix Jun-12; store live | Remove from beacon-pending-approvals.json |
+| Stale bash orphan loops | [blue] PIDs 1834248 (May 28, 16+ days) + 2605007 (Jun 13). Ss, 0% CPU. | Carry; cleanup when convenient |
