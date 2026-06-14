@@ -54,13 +54,13 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 04:01Z UTC (Iter ~1707, Tier 1, consecutive_clean=2)
+## Status snapshot — updated 2026-06-14 04:08Z UTC (Iter ~1708, Tier 2, consecutive_clean=0)
 
-**Iter ~1707 summary:** Alert watermark: 986 (0 new alerts). PRIME DIRECTIVE: interventions=840, systemic_fixes=40, verification_pending=11, ratio=21.0, trend=flat. All 5 daemons alive (same PIDs). HEAD=597d593=origin/main. Sync: sync.json stale-error (02:59Z); actual repo synced. 0 open PRs. Beacon in-flight processing missions-proposed-lane-signal-hardening-001 dashboard approval (PID 2597190, 5m elapsed). **Tier:** Tier 1, consecutive_clean=2 (clean iter). 1 clean iter away from Tier 2 de-escalation.
+**Iter ~1708 summary:** Alert watermark: 986 (0 new alerts). PRIME DIRECTIVE: interventions=840, systemic_fixes=40, verification_pending=11, ratio=21.0, trend=flat. All 5 daemons alive (same PIDs). HEAD=7d9de47=origin/main. Sync: 03:59:51Z no-change (healthy). Larry approved missions-proposed-lane-signal-hardening-001 + fix-depth1-pulse-approval-extraction-001 at 04:03Z (both now in Forge inbox). PR #497 (cleanup-branch-warn-to-info-001) in Mirror review. **Tier:** Tier 1→2 de-escalation (3 consecutive clean iters).
 
 ---
 
-## Key standing items (as of iter ~1707)
+## Key standing items (as of iter ~1708)
 
 | Item | Status | Action needed |
 |---|---|---|
@@ -68,29 +68,30 @@
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| missions-proposed-lane-signal-hardening-001 | [blue] Beacon plan DM sent 03:55:51Z Jun-14 | approve / reject |
-| cleanup-branch-warn-to-info-001 | [blue] Forge plan ready, awaiting Larry approval (DM delivered 03:49Z Jun-14) | approve / reject |
-| timer-cycle-no-journal-entry-001 | FALSE POSITIVE — Beacon investigated, journals present, cosmetic label only; TASK CLOSED | Larry binary: `approve timer-label-fix` or `reject timer-label-fix` (Beacon holding; [blue] carry) |
+| missions-proposed-lane-signal-hardening-001 | [blue] APPROVED 04:03Z Jun-14 → Forge in-flight | Carry; watch for PR |
+| fix-depth1-pulse-approval-extraction-001 | [blue] APPROVED 04:03Z Jun-14 → Forge in-flight | Carry; watch for PR |
+| cleanup-branch-warn-to-info-001 / PR #497 | [blue] Mirror review in-flight (04:03Z); auto-merge on PASS | Carry; watch for merge |
+| fix-alert-triage-watermark-durability-001 | [blue] 1 stale entry in beacon-pending-approvals (Jun-12) | Carry |
+| timer-cycle-no-journal-entry-001 | FALSE POSITIVE — TASK CLOSED | Larry binary: `approve timer-label-fix` or `reject timer-label-fix` (Beacon holding; [blue] carry) |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
-| beacon-pending-approvals | [blue] 4 entries (2x Jun-12 stale + cleanup-branch-warn-to-info-001 + missions-proposed-lane-signal-hardening-001) | Carry |
-| G-rule dispatch-branch-cleanup-warning | [blue] DISPATCHED 3/3 (iter ~1705) | Beacon direction-ask sent: dispatch-branch-cleanup-loglevel-001 |
+| G-rule dispatch-branch-cleanup-warning | [blue] DISPATCHED 3/3 (iter ~1705) → PR #497 in Mirror review | Carry |
 | G-rule heal-stale-daemon-code-auto-restart-needs-template | [blue] 2/3 | Dispatch at 3/3 |
 | G-rule alert-translations-no-patterns-delivery-confirmation-tier4 | [blue] 1/3 (iter ~1706) | Watch; dispatch at 3/3 |
 | G-rule droplet-uncommitted:main | [blue] 1/3 | Watch |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] 1/3 | Watch |
-| G-rule timer-cycle-no-journal-entry | RESET to 0/3 — false positive (cosmetic label; Beacon confirmed journals present) | Recalibrate: only count iters where journal entry is genuinely absent from the file |
+| G-rule timer-cycle-no-journal-entry | RESET 0/3 — false positive | Recalibrate: only count iters where journal entry is genuinely absent |
 | Check 5 MISSING | [blue] heal-stale-daemon-code-state.json absent | G-rule dispatched ~iter 1416 |
-| sync-push-rebase-loop-001 | [blue] UNREGISTERED AR; new occurrence 02:59:39Z Jun-14 (self-healed) | Carry |
+| sync-push-rebase-loop-001 | [blue] UNREGISTERED AR; self-healed (03:59Z sync clean) | Carry |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
-| PR #496 MERGED | RESOLVED — merged 02:57:16Z Jun-14 (Mirror REVIEW_PASS + auto-merge) | CLOSED |
-| unreviewed-merge:495 | RESOLVED — implicitly resolved by PR #496 exemption merge | CLOSED iter ~1702 |
-| unreviewed-merge-missions-exemption-001 | RESOLVED — Larry approved 02:45Z Jun-14; Forge built PR #496; Mirror PASS + auto-merged 02:57Z Jun-14 | CLOSED iter ~1702 |
-| G-rule unreviewed-merge | RESOLVED — 3/3 dispatched iter ~1700; PR #496 systemic fix MERGED iter ~1702 | CLOSED |
-| catalog-drift-facts-sync-001 | RESOLVED — Forge rejected (work done on main PR#1) | CLOSED iter ~1694 |
-| source=pulse-cycle-self-report | RESOLVED — PR #490 merged Jun-13 | CLOSED |
-| approval_request-delivery-confirmation | RESOLVED — PR #491 merged Jun-13 | CLOSED |
+| PR #496 MERGED | RESOLVED — merged 02:57:16Z Jun-14 | CLOSED |
+| unreviewed-merge:495 | RESOLVED | CLOSED iter ~1702 |
+| unreviewed-merge-missions-exemption-001 | RESOLVED — auto-merged 02:57Z Jun-14 | CLOSED iter ~1702 |
+| G-rule unreviewed-merge | RESOLVED — PR #496 MERGED | CLOSED |
+| catalog-drift-facts-sync-001 | RESOLVED | CLOSED iter ~1694 |
+| source=pulse-cycle-self-report | RESOLVED — PR #490 merged | CLOSED |
+| approval_request-delivery-confirmation | RESOLVED — PR #491 merged | CLOSED |
 | notifier-autopr-allowlist-from-config-001 | RESOLVED — PR #493 merged 21:12Z Jun-13 | CLOSED |
-| agent-models-allowlist-not-on-main | RESOLVED — commit e427631 | CLOSED |
-| wire-pulse-check-iv-cadence-001 | RESOLVED — PR #488 merged; timer active | CLOSED |
-| PR #495 MERGED | RESOLVED — merged iter ~1699 (no Mirror review → G-rule 3/3) | CLOSED |
+| agent-models-allowlist-not-on-main | RESOLVED | CLOSED |
+| wire-pulse-check-iv-cadence-001 | RESOLVED — PR #488 merged | CLOSED |
+| PR #495 MERGED | RESOLVED | CLOSED |
