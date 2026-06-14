@@ -4,6 +4,89 @@
 
 ---
 
+## Iteration ~1712 — 2026-06-14 04:49Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Check E carry — PR #497 REVIEW_ESCALATE still open. PR #498 Mirror review in-flight (nominal, within 30-min window).
+
+**VERIFY-BEFORE-REASSERT (iter ~1711 carries):**
+- missions-proposed-lane-signal-hardening-001: Forge PID 2602672 alive (elapsed ~40m). PR #498 created 04:29:54Z. Mirror review STARTED 04:40:46Z (8 min ago, within 30-min window). **CARRY** [blue] → updated status.
+- PR #497 REVIEW_ESCALATE: Still OPEN. No Larry response. **CARRY** [yellow].
+- unreviewed-merge:494: No new Larry reply. **CARRY** [yellow].
+- unreviewed-merge:489: No new Larry reply. **CARRY** [yellow].
+- Check 5 (heal-stale-daemon-code-state.json): MISSING confirmed. **CARRY** [blue].
+- fix-alert-triage-watermark-durability-001: 1 entry in beacon-pending-approvals (Jun-12), unchanged. **CARRY** [blue].
+- sync-push-rebase-loop-001: sync.json last_sync=03:59:51Z (55 min ago), within 2h. **CARRY** [blue].
+
+**Check 0 — Alert triage:** Watermark=989. File=989 lines. 0 new alerts. ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log last entry 04:40:43Z (mirror review dispatch for PR #498, INFO). No WARNs/ERRORs. inbox_watcher.log last entry 04:40:46Z (mirror start, normal). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry messages "Go" × 2 at 04:03Z Jun-14 (45 min ago). Both dispatched. No new messages. No distress keywords. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → no stalls. Same 5 FORGE_NO_PR_SKIPs (#490, #491, #492, catalog-drift-preflight-exit, #493). Mirror review for PR #498 started 04:40:46Z (8 min ago — within 30-min AUTO_MERGE window). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 1 entry (fix-alert-triage-watermark-durability-001, Jun-12 — stale [blue] carry). No orphan directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING. Known [blue] carry. ✅
+
+**Check A — Source repo:** On main. Clean working tree. HEAD=22b3081=origin/main. 0 ahead, 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** sync.json last_sync=2026-06-14T03:59:51Z (55 min ago), within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 5/5 known daemon PIDs alive:
+- beacon_telegram_bot: PID 2517973 (elapsed ~11h01m) ✅
+- chain_event_shipper: PID 1849505 (elapsed ~2d 8h58m) ✅
+- outbox_notifier: PID 2552416 (elapsed ~7h12m) ✅
+- dashboard_api: PID 2322792 (elapsed ~1d 4h49m) ✅
+- inbox_watcher: PID 2530123 (elapsed ~9h22m) ✅
+- Forge claude (PID 2602672, ~40m elapsed, missions-proposed-lane-signal-hardening-001 second run in-flight) ✅
+- Mirror claude: worktree created 04:40:45Z, started 04:40:46Z (review-missions-proposed-lane-signal-hardening-001) ✅
+
+**Check D — Inboxes:** Forge: build-missions-proposed-lane-signal-hardening-001.json active (04:08:19Z, ~40 min old — not stale at 14400s timeout). Mirror: review-missions-proposed-lane-signal-hardening-001.json active (04:40:46Z, 8 min old). Beacon/Pulse: empty. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core:
+- PR #497 OPEN (`fix(cleanup-branches): success-prune alert is info, not warning`), MERGEABLE=UNKNOWN, no auto-merge, no PR reviews. Mirror REVIEW_ESCALATE still in effect (state=failure check posted 04:05:29Z). → ask-then-do [yellow] **carry**.
+- PR #498 OPEN (`feat(missions): high-signal self-cleaning proposed lane`), MERGEABLE=UNKNOWN, no reviews yet. Mirror review started 04:40:46Z (8 min old — within 30-min threshold). ✅ Nominal.
+- ourliberty-graph: 0 open PRs. ✅
+
+**Conditional checks:** Not Sunday (local time: 2026-06-13 MDT). Check I: SKIP. Check III: SKIP.
+
+**Actions taken:**
+1. `cycle_prime_ledger.py append --tier 1 --kind intervention` (pr-carry-ask-then-do) → 04:48:53Z. ✅
+2. `cycle_tier_state.py record --checks-clean false` → Tier 1, consecutive_clean=0, last_signal_at=04:48:59Z. ✅
+
+**Dispatches:** None.
+
+**Watch:** PR #498 Mirror review started 04:40:46Z → 30-min AUTO_MERGE window closes ~05:10Z. Next iter should confirm Mirror PASS + auto-merge or flag if gap.
+
+**Standing findings:**
+- [yellow] **PR #497 REVIEW_ESCALATE** — Mirror found spec invalid; Beacon confirmed fix already in alert-translations.json. Close PR without merging (`gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core`). Escalated pulse-escalations.json entry #21. [carry]
+- [yellow] **unreviewed-merge:494** — DM sent iter ~1694 (01:54Z Jun-14). Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed'. [carry]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614; no Larry reply. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **missions-proposed-lane-signal-hardening-001** — Forge second run in-flight (PID 2602672, 04:08:19Z). PR #498 open, Mirror review started 04:40:46Z. Auto-merge window closes ~05:10Z. [carry]
+- [blue] **fix-alert-triage-watermark-durability-001** — 1 stale entry in beacon-pending-approvals (Jun-12). [carry]
+- [blue] **Check I medic-operator-scaffold-001** — 24.4σ; prior dispatch 2026-06-10. `/dispatch 1` if re-run needed. [carry]
+- [blue] **G-rule heal-stale-daemon-code-auto-restart-needs-template** — 2/3. [carry]
+- [blue] **G-rule alert-translations-no-patterns-delivery-confirmation-tier4** — 2/3. [carry]
+- [blue] **G-rule missions-card-gc-warn-vs-info** — 1/3. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 1/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — RESET 0/3. [carry]
+- [blue] **Check 5 MISSING** — heal-stale-daemon-code-state.json absent. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — self-healed; recurrent. [carry]
+- [blue] **dag-preflight-revision gap** — [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+- ~~**G-rule dispatch-branch-cleanup-warning**~~ — RESOLVED (translations.json handles display; PR #497 close pending). [carry/resolved]
+
+**PRIME DIRECTIVE:** 1 intervention appended (04:48:53Z). Script-authoritative: interventions=844, systemic_fixes=40, verification_pending=11, ratio=21.1, trend=flat.
+**Tier end-of-iter:** **Tier 1** (signal: PR #497 REVIEW_ESCALATE carry). consecutive_clean=0.
+
+---
+
 ## Iteration ~1711 — 2026-06-14 04:43Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry direct invocation (`/cycle`).
