@@ -57,6 +57,8 @@ from typing import Any, Optional
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from supabase_chunk import chunked_clear, ChunkedClearError  # noqa: E402
+import beacon_approval_handler as approval  # noqa: E402
+import task_terminal_state as tts  # noqa: E402 — shared terminal-state probe
 
 # Resolve the approval-state root identically to the other two modules in the
 # pending-approvals trio (beacon_approval_handler, heal_unregistered_approval):
@@ -72,6 +74,12 @@ PENDING_APPROVALS = AGENTS_ROOT / 'state' / 'beacon-pending-approvals.json'
 BACKUP_DIR = AGENTS_ROOT / 'blackboard' / 'backups'
 
 UPDATE_BATCH = 200
+
+# Terminal-state reconciliation (spec terminal-state-reconciliation.md § 3.1).
+# A pending approval is only probed against its work's terminal ground truth
+# once it has aged past this grace window — fresh approvals are awaiting Larry,
+# not phantoms. 2h matches the spec's suggested grace.
+TERMINAL_APPROVAL_GRACE_HOURS = 2.0
 
 # Columns fetched per pending decision row. event_id is required for the
 # update + backup; the rest give the backup row enough context to audit.
@@ -286,6 +294,131 @@ def clear_resolved_by_task_id(
     return cleared
 
 
+# -------------------- terminal-state reconciliation (spec § 3.1) --------------------
+
+def _entry_task_id(entry: dict[str, Any]) -> Optional[str]:
+    """The work's stable task_id for a pending entry: the dispatch_payload's
+    task_id (what the PR branch/title carry), falling back to the entry id (which
+    add_pending sets to payload['task_id'], so they normally agree)."""
+    payload = entry.get('dispatch_payload')
+    if isinstance(payload, dict):
+        tid = payload.get('task_id')
+        if isinstance(tid, str) and tid:
+            return tid
+    eid = entry.get('id')
+    return eid if isinstance(eid, str) and eid else None
+
+
+def _approval_age_hours(entry: dict[str, Any], now: datetime) -> Optional[float]:
+    """Hours since the entry was created, or None if created_at is missing or
+    unparseable (which the caller treats as KEEP — never retire on a bad ts)."""
+    created_raw = entry.get('created_at')
+    if not isinstance(created_raw, str) or not created_raw:
+        return None
+    try:
+        created = approval._parse_iso(created_raw)
+    except (ValueError, TypeError):
+        return None
+    return (now - created).total_seconds() / 3600.0
+
+
+def classify_terminal_approval(
+    entry: dict[str, Any],
+    now: datetime,
+    grace_hours: float,
+    probe: Any,
+) -> tuple[bool, str]:
+    """(retire?, reason) for one pending approval against its work's terminal
+    ground truth. Conservative posture (spec § 1): retire ONLY when the work is
+    positively terminal (MERGED/CLOSED) AND the entry has aged past the grace
+    window. EVERY other path — missing/unparseable created_at, within grace,
+    missing task_id, OPEN, or UNKNOWN/indeterminate — is KEEP. An indeterminate
+    probe can only ever leave a phantom for another cycle, never falsely retire
+    live work."""
+    age = _approval_age_hours(entry, now)
+    if age is None:
+        return False, 'no/unparseable created_at (keep)'
+    if age < grace_hours:
+        return False, f'within grace ({age:.1f}h < {grace_hours}h) (keep)'
+    task_id = _entry_task_id(entry)
+    if not task_id:
+        return False, 'no task_id to probe (keep)'
+    state = probe(task_id)
+    if state in tts.TERMINAL_STATES:
+        return True, f'work terminal ({state}) past {grace_hours}h grace'
+    return False, f'work {state} (not terminal) (keep)'
+
+
+def reconcile_terminal_approvals(
+    *,
+    beacon_state: Optional[dict[str, Any]] = None,
+    now: Optional[datetime] = None,
+    grace_hours: float = TERMINAL_APPROVAL_GRACE_HOURS,
+    probe: Any = None,
+    dry_run: bool = False,
+) -> dict[str, int]:
+    """Spec § 3.1: retire pending approvals whose work has reached a terminal
+    state. For each `pending[]` entry past the grace window, probe
+    `task_terminal_state(task_id)`; on MERGED/CLOSED resolve it `expired` (which
+    self-clears the dashboard row) — OPEN/UNKNOWN keep.
+
+    This is the missing ground-truth check on the one store
+    (beacon-pending-approvals.json `pending[]`) the rest of this healer is
+    forbidden to touch. It is ADDITIVE to the happy-path `resolve()` — it only
+    catches approvals whose linking event was missed.
+
+    `beacon_state` / `now` / `probe` are injectable for tests; in production they
+    come from `approval.load_state()`, the wall clock, and
+    `task_terminal_state`. Returns a counts dict."""
+    now = now or datetime.now(timezone.utc)
+    probe = probe or (lambda tid: tts.task_terminal_state(tid))
+    counts = {'pending': 0, 'retired': 0, 'kept': 0}
+
+    state = beacon_state if beacon_state is not None else approval.load_state()
+    pending = state.get('pending', []) if isinstance(state, dict) else []
+    counts['pending'] = len(pending)
+
+    to_retire: list[tuple[str, str]] = []
+    for entry in pending:
+        if not isinstance(entry, dict):
+            continue
+        retire, reason = classify_terminal_approval(entry, now, grace_hours, probe)
+        approval_id = entry.get('id')
+        if retire and isinstance(approval_id, str) and approval_id:
+            to_retire.append((approval_id, reason))
+        else:
+            counts['kept'] += 1
+
+    for approval_id, reason in to_retire:
+        if dry_run:
+            counts['retired'] += 1
+            log(f'DRY-RUN would retire pending approval {approval_id} ({reason})')
+            continue
+        try:
+            # state=None: resolve self-locks, self-saves, AND best-effort clears
+            # the dashboard's pending approval_request row (spec § 3.1 "clear the
+            # dashboard row"). Re-loads fresh state under the lock internally, so
+            # passing no state here keeps the slow gh probes above out of the lock.
+            resolved = approval.resolve(
+                approval_id, 'expired',
+                note=f'auto-retired by heal-stale-approvals (terminal-state): {reason}',
+            )
+        except Exception as e:  # noqa: BLE001
+            log(f'terminal-retire failed for {approval_id}: '
+                f'{type(e).__name__}: {e}', 'ERROR')
+            continue
+        if resolved is None:
+            # Already gone from pending (a concurrent resolve / prior tick). Not
+            # an error — the phantom is cleared either way.
+            log(f'terminal-retire: {approval_id} no longer pending ({reason})')
+        counts['retired'] += 1
+        log(f'terminal-retired pending approval {approval_id} ({reason})')
+
+    log('terminal-approval reconcile: ' + ('DRY-RUN ' if dry_run else '')
+        + ' '.join(f'{k}={v}' for k, v in counts.items()))
+    return counts
+
+
 # -------------------- orchestration --------------------
 
 def run_once(
@@ -363,18 +496,32 @@ def main() -> int:
         return 0
     heartbeat()
 
+    rc = 0
+
+    # § 3.1 terminal-state reconcile runs FIRST and independent of Supabase: it
+    # needs only gh + the local beacon-pending-approvals.json + a best-effort
+    # resolve (whose dashboard clear self-suppresses when Supabase is down). So a
+    # Supabase outage must not skip the phantom-approval cleanup.
+    try:
+        reconcile_terminal_approvals(dry_run=args.dry_run)
+    except Exception as e:  # noqa: BLE001
+        log(f'terminal-approval reconcile FAILED: {type(e).__name__}: {e}', 'ERROR')
+        rc = 1
+
+    # The original Supabase-backed auto-clear (resolved decision rows on the
+    # dashboard). Degrades to a clean skip when Supabase is unavailable.
     try:
         client = _connect_supabase()
     except Exception as e:  # noqa: BLE001
         log(f'cannot connect to Supabase: {e}', 'WARN')
-        return 0
+        return rc
 
     try:
         run_once(client, dry_run=args.dry_run)
     except Exception as e:  # noqa: BLE001
         log(f'FATAL: {type(e).__name__}: {e}', 'ERROR')
         return 1
-    return 0
+    return rc
 
 
 if __name__ == '__main__':
