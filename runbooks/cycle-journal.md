@@ -4,6 +4,106 @@
 
 ---
 
+## Iteration ~1791 — 2026-06-14 16:00Z UTC (interactive, /cycle, Tier 1, signal: adopt-terminal-002 pending approval)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Signal. Checks 1-5 + A/B/C/D nominal. Check 0: new alert at line 920 — `adopt-terminal-state-reconciliation-spec-002` approval_request from outbox-notifier (15:56:11Z UTC). Beacon independently created re-dispatch-002 diagnosing push-auth gap as root cause. Pending Larry's "go". PR #497 [yellow] carry (67th iter).
+
+**VERIFY-BEFORE-REASSERT (iter ~1790 carries):**
+- PR #497 REVIEW_ESCALATE: `gh pr list --state open` → OPEN, mergeable=UNKNOWN, statusCheckRollup=FAILURE (mirror-review), reviewDecision="". 67th consecutive iter. **CARRY** [yellow].
+- unreviewed-merge:499/494/489: Bot log last Larry exchange 09:18:55 MDT "Go" (adopt-terminal re-dispatch). No new replies on retroactive reviews. **CARRY** [yellow].
+- heal-stale-daemon-code.heartbeat: `2026-06-14T15:38:07Z` (~22 min before 16:00Z). Within 60-min threshold. **CARRY confirmed** ✅.
+- Stale bash orphan loops: PID 1834248 (Ss, 16d 20h 37m, 0% CPU) + PID 2605007 (Ss, 11h 35m, 0% CPU). Both alive. **CARRY** [blue].
+- G-rule droplet-uncommitted:main 2/3: sync.json status=no-change, HEAD=86cfc15f=origin/main. No new dirty-tree occurrence. **CARRY at 2/3**.
+- adopt-terminal-state-reconciliation-spec Forge stall (iter ~1790): **NEW STATE** — Beacon independently diagnosed root cause (push-auth gap) and created adopt-terminal-state-reconciliation-spec-002 re-dispatch at 15:56:11Z. DM sent to Larry. Pending approval per beacon-pending-approvals.json. Forge inbox EMPTY (dispatch held until Larry approves). Pulse investigate task (`pulse-investigate-forge-stall-adopt-terminal-001.json`) still in Beacon inbox (~9 min old, not yet processed). See Check 0 below.
+
+**Check 0 — Alert triage:** Watermark=919. File=920 (1 new alert).
+- Line 920: `{"source":"outbox-notifier","kind":"approval_request","approval_id":"adopt-terminal-state-reconciliation-spec-002","ts":"2026-06-14T15:56:11Z","body":"Re-dispatch (clean worktree) of doc-only terminal-state-reconciliation spec adoption. Prior attempt lost to build-worktree push-auth gap; auth healthy now. Create agents/beacon/specs/terminal-state-reconciliation.md verbatim and open doc-only PR."}`.
+- Triage: delivery confirmation — outbox-notifier DM already sent to Larry. Per triage rule (kind=approval_request from outbox-notifier): journal-note only, NO second DM. Not Tier-3 (no allowlist entry). Not auto-dispatch eligible (pending Larry's explicit reply). **Non-nominal: pending approval in flight.**
+- Watermark advanced 919→920. ✅
+- [yellow] Risk: Beacon inbox still holds `pulse-investigate-forge-stall-adopt-terminal-001.json` (Pulse's investigate dispatch from iter ~1790). If Beacon processes it after 002 is already approved, Beacon's dedup logic should prevent a 3rd dispatch. Watch for Beacon DM or duplicate envelope on next iter.
+
+**Check 1 — Log noise:** outbox_notifier.log: 0 new WARNs since iter ~1790. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message: 09:18:55 MDT "Go" (adopt-terminal-state-reconciliation-spec). No new messages. adopt-terminal-state-reconciliation-spec-002 DM sent by outbox-notifier at 09:56 MDT, awaiting Larry's reply. ✅ Nominal (no unread directives to Pulse).
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → 0 stalls, 10 FORGE_NO_PR_SKIP (stable). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 1 pending — `adopt-terminal-state-reconciliation-spec-002` (15:56:11Z, DM sent, awaiting Larry). Beacon inbox: `pulse-investigate-forge-stall-adopt-terminal-001.json` (~9 min old, < 1h stale threshold). Forge/Mirror/Pulse inboxes: EMPTY ✅. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heartbeat `2026-06-14T15:38:07Z` (~22 min before 16:00Z). Fresh (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** On main. Clean working tree. HEAD=86cfc15f=origin/main. 0 ahead, 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: status=no-change, last_sync=2026-06-14T15:22:49Z (~37 min ago). Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:**
+- inbox_watcher: PID 2530123 ✅ (Ssl, ~20h 31m)
+- chain_event_shipper: PID 2744551 ✅ (SNs, ~5h 18m)
+- dashboard_api: PID 2744674 ✅ (Ssl, ~5h 18m)
+- beacon_telegram_bot: PID 2744840 ✅ (Ss, ~5h 18m)
+- outbox_notifier: PID 2744914 ✅ (Ss, ~5h 18m)
+- Forge: No active session (expected — prior session PID 2797732 stalled; 002 re-dispatch awaiting Larry's "go").
+- [blue] PID 1834248: stale bash orphan loop (16d 20h+). Ss, 0% CPU. [carry]
+- [blue] PID 2605007: stale bash orphan loop (11h 35m). Ss, 0% CPU. [carry]
+
+**Check D — Inboxes:** Beacon: 1 task (`pulse-investigate-forge-stall-adopt-terminal-001.json`, ~9 min old, not stale). Forge/Mirror/Pulse: EMPTY ✅. ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core:
+- **PR #497** OPEN (`fix(cleanup-branches): success-prune alert is info, not warning`), mergeable=UNKNOWN, reviewDecision="", statusCheckRollup=FAILURE. [yellow] carry — 67th consecutive iter. Not clean+green.
+ourliberty-dashboard: No open PRs. ✅
+
+**Conditional checks:** Today is Sunday 2026-06-14 UTC. Check I already ran this cycle day (iter ~1718). **SKIP**. Check III last artifact 2026-06-11 (3 days old, <14d). **SKIP**.
+
+**Actions taken:**
+1. `alert_triage_state.py set-watermark --line 920` → watermark 919→920. ✅
+2. `cycle_tier_state.py record --checks-clean false` → tier stays 1, consecutive_clean stays 0, last_signal_at=2026-06-14T15:59:32Z. ✅
+
+**Dispatches:** None. (adopt-terminal-002 is already in Beacon's hands via outbox-notifier DM; Pulse investigate task in Beacon inbox will be processed by Beacon; no new dispatches needed.)
+
+**Patterns:**
+- G-rule droplet-uncommitted:main: 2/3 (no new occurrence). Carry.
+- G-rule missions-autoregister-warn-vs-info: 2/3. Carry.
+- G-rule alert-translations-no-patterns-delivery-confirmation-tier4: 2/3. Carry.
+- G-rule missions-card-gc-warn-vs-info: 1/3. Carry.
+- G-rule F24-empty-prompt-envelope-rejected: 1/3. Carry.
+- G-rule timer-cycle-no-journal-entry: 0/3. Carry.
+- G-rule Forge-timeout-worktree-missing-retry-loop: 1/3. Carry.
+- G-rule heal-stale-daemon-script_path-cosmetic: 1/3. Carry.
+- G-rule adopt-terminal-state-forge-stall: 3/3 DISPATCHED (iter ~1790). Carry.
+
+**Standing findings:**
+- [yellow] **adopt-terminal-state-reconciliation-spec-002 pending Larry** — DM sent 09:56 MDT; reply "go" / "approve" / "ok". [new/updated from iter ~1790 Forge stall]
+- [yellow] **PR #497 REVIEW_ESCALATE** — statusCheckRollup=FAILURE (67th consecutive iter). Close: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core`. [carry]
+- [yellow] **unreviewed-merge:499** — Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed'. [carry]
+- [yellow] **unreviewed-merge:494** — DM sent iter ~1694. Reply or silence. [carry]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614. Reply or silence. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **pulse-investigate-forge-stall-adopt-terminal-001 in Beacon inbox** — ~9 min old; Beacon will process; watch for dedup behavior if 002 already approved. [carry]
+- [blue] **Check I medic-operator-scaffold-001** — 24.4σ; `/dispatch 1` if re-run needed. [carry]
+- [blue] **catalog-accuracy-drift** — 8/34 ourliberty-graph shelf cards drifted (attention rate 24%). route=digest; journal-note. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 2/3. Watch; dispatch at 3/3. [carry]
+- [blue] **G-rule missions-autoregister-warn-vs-info** — 2/3. [carry]
+- [blue] **G-rule alert-translations-no-patterns-delivery-confirmation-tier4** — 2/3. [carry]
+- [blue] **G-rule missions-card-gc-warn-vs-info** — 1/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — 0/3. [carry]
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. [carry]
+- [blue] **G-rule heal-stale-daemon-script_path-cosmetic** — 1/3. [carry]
+- [blue] **G-rule adopt-terminal-state-forge-stall** — 3/3 DISPATCHED (iter ~1790). Beacon processing. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — last occurrence 13:22:39Z Jun-14 (self-healed). [carry]
+- [blue] **dag-preflight-revision gap** — PR #484 closed source=pulse gap; DAG markers still fall through. [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+- [blue] **Stale bash orphan loops** — PID 1834248 (16d 20h+) + PID 2605007 (11h 35m). Ss, 0% CPU. [carry]
+
+**PRIME DIRECTIVE:** No new ledger append (no intervention taken; delivery confirmation observed only). interventions≈915, systemic_fixes=41, ratio≈22.32, trend=flat.
+**Tier end-of-iter:** **Tier 1** (--checks-clean false; consecutive_clean=0; 5-min cadence; pending approval in flight).
+
+---
+
 ## Iteration ~1790 — 2026-06-14 15:51Z UTC (interactive, /cycle, Tier 3→1, signal: Forge stall)
 
 **Trigger:** Larry direct invocation (`/cycle`).
