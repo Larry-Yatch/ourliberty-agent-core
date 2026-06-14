@@ -48,30 +48,29 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 02:34Z UTC (Iter ~1699, interactive /loop /cycle, Tier 2→1 reset, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 02:47Z UTC (Iter ~1700, interactive /cycle, Tier 1, consecutive_clean=0)
 
-**Iter ~1699 summary:** Alert watermark: 979 (0 new). Tier 2→1 RESET (intervention: PR #495 auto-merge). PRIME DIRECTIVE: interventions=838, systemic_fixes=38, verification_pending=11, ratio=22.05, trend=flat. All 5 daemons alive (same PIDs). HEAD=466647c (PR #495 merge)=origin/main. Sync: last_sync=01:59:32Z (~35 min, nominal). **Action:** PR #495 (missions promotion, MERGEABLE, 43min, no auto-merge) → `gh pr merge 495 --auto --squash` → MERGED. G-rule unreviewed-merge **3/3** → dispatched Beacon `unreviewed-merge-missions-no-mirror-001.json` (timeout=14400). **G-rule timer-cycle-no-journal-entry: 2/3** (last interactive journal: iter ~1647 Jun-13 12:31Z; ~50 automated cycles wrote MEMORY only). **Note:** Prior /loop iterations already did PR merge + MEMORY update but did NOT write cycle-journal.md; THIS iter wrote the journal entry (iter ~1699 at line ~113982). **Tier:** Tier 1, consecutive_clean=0.
+**Iter ~1700 summary:** Alert watermark: 982 (3 new: unreviewed-merge:495 Tier-4/never_silence; dispatch-branch-cleanup Tier-3 silenced; approval_request delivery-confirmation). PRIME DIRECTIVE: interventions=839, systemic_fixes=39, verification_pending=11, ratio=21.51, trend=flat. All 5 daemons alive (same PIDs). HEAD=29740fa=origin/main. Sync: last_sync=01:59:32Z. 0 open PRs. 0 inbox items. **Action:** G-rule timer-cycle-no-journal-entry **3/3** → dispatched Beacon `timer-cycle-no-journal-entry-001.json`. **Check I** artifact exists (check-i-2026-06-14.json, automated run); 1 proposal: medic-operator-scaffold-001 (prior dispatch 2026-06-10, carry). **Check III** skipped (last run Jun-11, 3 days ago < 14-day cadence). **Tier:** Tier 1, consecutive_clean=0 (tier-reset: unreviewed-merge:495 Tier-4).
 
 ---
 
-## Key standing items (as of iter ~1699)
+## Key standing items (as of iter ~1700)
 
 | Item | Status | Action needed |
 |---|---|---|
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
-| unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Superseded by :494; Reply 'go: retroactive-review-489' if Mirror review wanted |
+| unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| PR #495 MERGED | RESOLVED — merged 02:28Z Jun-14 without Mirror review (→ G-rule 3/3 trigger) | CLOSED |
+| unreviewed-merge-missions-exemption-001 | [blue] approval_request in Larry's Telegram | Reply 'approve' to proceed with chore(missions) Mirror exemption |
+| timer-cycle-no-journal-entry-001 | [blue] Beacon dispatch sent (3/3, iter ~1700) | Watch Beacon spec + Forge PR |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
 | beacon-pending-approvals | [blue] 2 stale entries (2x Jun-12) | Carry; no actionable pending |
-| G-rule unreviewed-merge | [blue] 3/3 — direction-ask dispatched to Beacon (unreviewed-merge-missions-no-mirror-001) | Beacon to spec Mirror exemption for chore(missions): PRs |
-| G-rule dispatch-branch-cleanup-warning | [blue] 1/3 (first: iter ~1694) | Watch |
-| G-rule timer-cycle-no-journal-entry | [blue] 2/3 (advanced iter ~1699) | Dispatch at 3/3 to investigate run_cycle.sh journal-write path |
+| G-rule dispatch-branch-cleanup-warning | [blue] 2/3 (iter ~1700) | Watch |
 | G-rule heal-stale-daemon-code-auto-restart-needs-template | [blue] 2/3 | Dispatch at 3/3 |
 | G-rule droplet-uncommitted:main | [blue] 1/3 | Watch |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] 1/3 | Watch |
-| G-rule alert-translations-no-patterns-delivery-confirmation-tier4 | [blue] 0/3 | Watch; first iter ~1692 |
+| G-rule alert-translations-no-patterns-delivery-confirmation-tier4 | [blue] 0/3 | Watch |
 | Check 5 MISSING | [blue] heal-stale-daemon-code-state.json absent | G-rule dispatched ~iter 1416 |
 | sync-push-rebase-loop-001 | [blue] UNREGISTERED AR | Carry |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
@@ -82,3 +81,6 @@
 | notifier-autopr-allowlist-from-config-001 | RESOLVED — PR #493 merged 21:12Z Jun-13 | CLOSED |
 | agent-models-allowlist-not-on-main | RESOLVED — commit e427631 | CLOSED |
 | wire-pulse-check-iv-cadence-001 | RESOLVED — PR #488 merged; timer active | CLOSED |
+| PR #495 MERGED | RESOLVED — merged iter ~1699 (no Mirror review → G-rule 3/3) | CLOSED |
+| G-rule unreviewed-merge | RESOLVED → missions-exemption-001 approval_request in Larry's Telegram | CLOSED iter ~1699 |
+| G-rule timer-cycle-no-journal-entry | RESOLVED → timer-cycle-no-journal-entry-001 Beacon dispatch | CLOSED iter ~1700 |

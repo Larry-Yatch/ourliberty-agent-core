@@ -114063,3 +114063,88 @@ Forge rejected p3-dashboard-proposed-lane at preflight (04:41Z) because accept/d
 **Tier end-of-iter:** Tier 1, consecutive_clean=0 (intervention taken; Tier 2→1 reset).
 
 ---
+
+## Iteration ~1700 — 2026-06-14 02:47Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0)
+
+**Trigger:** Larry direct invocation via `/cycle`.
+
+**Health:** ✅ Green with 1 G-rule systemic_fix dispatch. 5/5 daemons alive. 3 new alerts triaged. No stalls, no PRs, no inbox items.
+
+**Continuity:** Last interactive journal entry iter ~1699 (2026-06-14 02:34Z). Automated cycle commit 29740fa (20260614T024146Z) between ~1699 and this iter — no journal entry written by that cycle (G-rule evidence).
+
+**VERIFY-BEFORE-REASSERT (carried findings from MEMORY ~1699):**
+- unreviewed-merge:494 [yellow]: **CONFIRMED OPEN** — no new Larry Telegram messages since 2026-06-13T19:33:44-0600. [carry]
+- unreviewed-merge:489 [yellow]: **CONFIRMED OPEN** — no reply. [carry]
+- PR #495: **CLOSED** — merged iter ~1699; now in FORGE_NO_PR_SKIP scan. [closed]
+- 5 daemons (PIDs 2517973, 1849505, 2552416, 2322792, 2530123): **VERIFIED SAME** — all 5 alive. ✅
+- Git HEAD: **VERIFIED** — 29740fa = origin/main, clean tree. ✅
+
+**Check 0 — Alert triage:** larry-alerts.jsonl=982 lines, watermark was 979 → **3 new alerts**.
+- Alert 980 `unreviewed-merge:495` (heal-unreviewed-merge-detector, route=escalate, severity=critical): `never_silence=true`. Expected per iter ~1699 (PR #495 merged without Mirror review; G-rule 3/3 dispatch unreviewed-merge-missions-exemption-001 already generated approval_request DM to Larry). Triage Tier-4; remediation DM already delivered to Larry's Telegram (confirmed by alert 982). No additional DM this iter. **Tier-reset.**
+- Alert 981 `dispatch-branch-cleanup` (route=digest): **Tier-3/FYI** per alert-translations.json. Routine branch GC (1 local + 1 remote stale branch pruned). Silence + journal note. G-rule dispatch-branch-cleanup-warning: 1→**2/3**.
+- Alert 982 `approval_request` (outbox-notifier, `unreviewed-merge-missions-exemption-001` delivery confirmation): Known delivery-confirmation pattern (PR #491 resolved). Journal note only, no DM.
+- Watermark: **979→982**. ✅
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** No new Larry inbound since 2026-06-13T19:33:44-0600 (`Go` for catalog-drift). No new agent-distress keywords. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected`. 5 FORGE_NO_PR_SKIPs (PRs #490, #491, #492, #493 + catalog-drift archived). All known. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 2 stale entries (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001; created Jun-12). No new actionable pending. `unreviewed-merge-missions-exemption-001` approval_request live in Larry's Telegram (awaiting `approve` reply). ✅ Nominal (known carries).
+
+**Check 5 — Stale daemon code:** heal-stale-daemon-code-state.json MISSING — known [blue] carry, G-rule dispatched ~iter 1416. ✅ Known carry.
+
+**Check A — Source repo:** On main, clean. HEAD=29740fa=origin/main. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: status=no-change, last_sync=2026-06-14T01:59:32Z (~48 min). ✅ Nominal.
+
+**Check C — Agent liveness:** 5/5 alive (same PIDs). ✅ Nominal.
+
+**Check D — Inboxes:** All inboxes empty (beacon, forge, mirror, pulse) except Pulse just dispatched `timer-cycle-no-journal-entry-001.json` to Beacon inbox. ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on agent-core; 0 on dashboard. ✅ Nominal.
+
+**Conditional checks (Sunday 2026-06-14 UTC):**
+- **Check I:** Artifact `check-i-2026-06-14.json` already exists (automated cycle ran earlier). 1 proposal: `medic-operator-scaffold-001` (24.4σ, small effort, prior dispatch 2026-06-10). No re-dispatch needed. [carry]
+- **Check III:** Last artifact `check-iii-2026-06-11.json` (3 days ago < 14-day cadence). Skip.
+
+**G-rule tracking:**
+- **timer-cycle-no-journal-entry: 3/3 → DISPATCHED** — wrote `~/agents/inboxes/beacon/timer-cycle-no-journal-entry-001.json`. Direction-ask: investigate why run_cycle.sh automated path produces commits but no cycle-journal.md entries. [systemic_fix]
+- **dispatch-branch-cleanup-warning: 1→2/3** (alert 981). Watch.
+- All other G-rules carry from ~1699 unchanged (see standing items below).
+
+**Actions taken:**
+1. Alert watermark advanced 979→982 via `alert_triage_state.py set-watermark --line 982`. ✅
+2. Dispatched Beacon `timer-cycle-no-journal-entry-001.json` (G-rule 3/3 systemic_fix). ✅
+3. PRIME DIRECTIVE: `append --tier 1 --kind intervention` (alert triage) + `--kind systemic_fix` (timer-cycle-no-journal-entry). ✅
+4. `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0. ✅
+
+**Standing findings (updated):**
+- [yellow] **unreviewed-merge:494** — DM sent iter ~1694; no Larry reply. Reply `go: retroactive-review-494` or `silence: missions-promotions-no-mirror-needed`. [carry]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614; no Larry reply. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). [carry]
+- [blue] **unreviewed-merge-missions-exemption-001** — approval_request in Larry's Telegram (awaiting approve). Beacon dispatch from ~1699 processed. [watch]
+- [blue] **timer-cycle-no-journal-entry-001** — Beacon dispatch sent 3/3. Watch for Beacon spec + Forge PR. [new]
+- [blue] **G-rule dispatch-branch-cleanup-warning** — 2/3. [updated]
+- [blue] **G-rule heal-stale-daemon-code-auto-restart-needs-template** — 2/3. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 1/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **G-rule alert-translations-no-patterns-delivery-confirmation-tier4** — 0/3. [carry]
+- [blue] **Check 5 MISSING** — heal-stale-daemon-code-state.json absent. G-rule dispatched ~iter 1416. [carry]
+- [blue] **sync-push-rebase-loop-001** — UNREGISTERED AR. [carry]
+- [blue] **dag-preflight-revision gap** — PR #484 closed source=pulse gap; DAG re-dispatch markers still fall through. [carry]
+- [blue] **ccd-s1-envelope-builder** — PAUSED. [carry]
+- [blue] **Check I medic-operator-scaffold-001** — 24.4σ; prior dispatch 2026-06-10. `/dispatch 1` if re-run needed. [carry]
+- [blue] **beacon-pending-approvals** — 2 stale entries (Jun-12). [carry]
+
+**Watch items for next iter (~1701):**
+- unreviewed-merge:495 alert claimed (watermark advanced); no re-triage needed.
+- Beacon consumption of timer-cycle-no-journal-entry-001.
+- Larry approval of unreviewed-merge-missions-exemption-001 in Telegram.
+
+**PRIME DIRECTIVE:** 2 rows this iter (intervention: alert-triage 3 alerts; systemic_fix: timer-cycle-no-journal-entry-001). Trailing-30d (script-authoritative): interventions=839, systemic_fixes=39, ratio=21.51, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0 (unreviewed-merge:495 Tier-4 finding; tier-reset).
+
+---
