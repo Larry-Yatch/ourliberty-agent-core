@@ -2358,6 +2358,17 @@
       "proposed_at": "2026-06-12T23:55:09.916635+00:00",
       "orphan_branch": null,
       "orphan_last_activity_ts": "2026-06-12T23:49:07.49699+00:00"
+    },
+    {
+      "id": "test-jail-pr-4-ready-for-go-after-pr-3-lands",
+      "name": "test-jail PR-4 ready for go (after PR-3 lands)",
+      "phase": "drafting",
+      "brief": "PR-3 (gate hardening) dispatched+building as test-jail-pr3-gate-hardening-001. PR-4 REMAINING awaits your go: (a) docs sweep \u2014 bare 'unittest discover' prescriptions to the blessed entrypoint, esp docs/test-suite-green-brief.md's source-.env.larry recipe; (b) H18 leak-residue reconciliation runbook; (c) end-to-end deliberate-leak validation (a leaking test must fail under ALL invocation shapes on droplet+Mac = the acceptance property). NEW ops: one-time 'sudo apt install bubblewrap' on the droplet to ARM the Layer-C hard wall (droplet has no bwrap + userns disabled, so the wall ships best-effort/auto-arming until then). Mac phantom purge already DONE. Recommend: let PR-3 land+soak, then ship PR-4 as one closing PR + install bubblewrap.",
+      "spec_docs": [],
+      "task_ids": [],
+      "repo": "ol-work",
+      "created": "2026-06-14",
+      "deferred_reason": null
     }
   ]
 }
