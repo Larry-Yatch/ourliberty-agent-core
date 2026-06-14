@@ -54,24 +54,24 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 07:02Z UTC (Iter ~1731, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 07:10Z UTC (Iter ~1732, Tier 1, consecutive_clean=0)
 
-**Iter ~1731 summary:** Alert watermark: 996/996 (0 new). All mandatory checks nominal. PR #497 OPEN (MERGEABLE=UNKNOWN, 8th consecutive iter). Forge PID 2602672 alive (~2h53m; forge.log silent since 04:08:19Z UTC; timeout ~08:08Z Jun-14 ~1h06m remaining). outbox-notifier quiescent (last 23:35:36 MDT Jun-13). PRIME DIRECTIVE: interventions=863, systemic_fixes=41, ratio=21.05, trend=flat. HEAD=56d76c4=origin/main. Sync: 06:21:50Z (~40 min ago). **Tier:** Tier 1.
+**Iter ~1732 summary:** Alert watermark: 997/997 (1 new Tier-3 silenced: inbox-stall-build-missions-proposed-lane-signal-hardening-001 sentinel). All mandatory checks nominal. PR #497 OPEN (MERGEABLE=UNKNOWN, 9th consecutive iter). Forge PID 2602672 alive (~3h02m; forge.log silent since 04:08:19Z UTC; timeout ~08:08Z Jun-14 ~57m remaining). outbox_notifier.log empty/rotated but PID alive (~09h38m). PRIME DIRECTIVE: interventions=864, systemic_fixes=41, ratio=21.07, trend=flat. HEAD=5178803=origin/main. Sync: 06:21:50Z (~49 min ago). **Tier:** Tier 1.
 
 ---
 
-## Key standing items (as of iter ~1728)
+## Key standing items (as of iter ~1732)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (8 iters: ~1724→~1731); Mirror spec invalid; fix in heal-stale-daemon-restart-tier3-translation-001 | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (9 iters: ~1724→~1732); Mirror spec invalid; fix in heal-stale-daemon-restart-tier3-translation-001 | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry 05:02:56Z without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| PR #498 missions-proposed-lane-signal-hardening-001 | **RESOLVED** — MERGED 04:49:45Z Jun-14; inbox task awaiting archive | CLOSED |
-| Forge PID 2602672 | [blue/watch] forge.log silent since 04:08:19Z (~2h35m as of 06:45Z); timeout ~08:08Z Jun-14 (~1h25m remaining) | Watch: pickup of heal-stale-daemon or p4-meaning-layer |
+| PR #498 missions-proposed-lane-signal-hardening-001 | **RESOLVED** — MERGED 04:49:45Z Jun-14; inbox task sentinel-alerted (Tier-3 silenced); awaiting Forge session complete + inbox_watcher archive | WATCH |
+| Forge PID 2602672 | [blue/watch] forge.log silent since 04:08:19Z (~3h02m as of 07:10Z); timeout ~08:08Z Jun-14 (~57m remaining) | Watch: pickup of heal-stale-daemon or p4-meaning-layer |
 | p4-meaning-layer-narrator (Phase 4 step-1) | [blue/watch] Queued in Forge inbox; dispatched 23:35:36 MDT Jun-13 | Watch: Forge PID 2602672 completes → picks up next task |
 | heal-stale-daemon-restart-tier3-translation-001 | [blue] Queued in Forge inbox | Watch: Forge PR |
 | fix-alert-triage-watermark-durability-001 | [blue] 1 stale entry in beacon-pending-approvals (Jun-12) | Carry |
