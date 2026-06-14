@@ -34,7 +34,11 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent.parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
+import task_terminal_state as tts  # noqa: E402
+
 NOW = datetime(2026, 6, 2, 12, 0, 0, tzinfo=timezone.utc)
+OLD_TS = '2026-06-01T00:00:00+00:00'        # 36h before NOW (past grace)
+FRESH_TS = '2026-06-02T11:30:00+00:00'      # 0.5h before NOW (within grace)
 
 
 # -------------------- fake Supabase client --------------------
@@ -361,6 +365,192 @@ class TestRunOnce(_Base):
         self.assertEqual(counts2['clear_approval'], 0)
         self.assertEqual(counts2['clear_clarify'], 0)
         self.assertEqual(counts2['cleared'], 0)
+
+
+# -------------------- terminal-state reconciliation (spec § 3.1) --------------------
+
+def _entry(approval_id, created_at, task_id=None):
+    """A pending-approval entry. task_id defaults to approval_id (add_pending
+    sets id := dispatch_payload['task_id'], so they normally agree)."""
+    payload = {} if task_id is None else {'task_id': task_id}
+    return {
+        'id': approval_id,
+        'created_at': created_at,
+        'chat_id': 1,
+        'plan_summary': 'fixture plan',
+        'target_agent': 'forge',
+        'dispatch_payload': payload,
+        'status': 'pending',
+        'reminders_sent': [],
+    }
+
+
+class TestClassifyTerminalApproval(_Base):
+    """The conservative guard (spec § 1, § 6): retire ONLY when the work is
+    positively terminal AND past grace; OPEN / UNKNOWN / within-grace / no-ts /
+    no-task-id all KEEP. An indeterminate probe can never falsely retire."""
+
+    GRACE = 2.0
+
+    def _probe(self, state):
+        return lambda _tid: state
+
+    def test_merged_past_grace_retires(self):
+        retire, reason = self.mod.classify_terminal_approval(
+            _entry('zz-fixture-merged', OLD_TS, task_id='zz-fixture-merged'),
+            NOW, self.GRACE, self._probe(tts.MERGED))
+        self.assertTrue(retire)
+        self.assertIn('terminal', reason)
+
+    def test_closed_past_grace_retires(self):
+        retire, _ = self.mod.classify_terminal_approval(
+            _entry('zz-fixture-closed', OLD_TS, task_id='zz-fixture-closed'),
+            NOW, self.GRACE, self._probe(tts.CLOSED))
+        self.assertTrue(retire)
+
+    def test_open_kept(self):
+        retire, reason = self.mod.classify_terminal_approval(
+            _entry('zz-fixture-open', OLD_TS, task_id='zz-fixture-open'),
+            NOW, self.GRACE, self._probe(tts.OPEN))
+        self.assertFalse(retire)
+        self.assertIn('not terminal', reason)
+
+    def test_unknown_kept(self):
+        retire, reason = self.mod.classify_terminal_approval(
+            _entry('zz-fixture-unknown', OLD_TS, task_id='zz-fixture-unknown'),
+            NOW, self.GRACE, self._probe(tts.UNKNOWN))
+        self.assertFalse(retire)
+        self.assertIn('not terminal', reason)
+
+    def test_within_grace_kept_even_if_terminal(self):
+        # A freshly-created approval whose work already merged is NOT retired —
+        # the grace window protects against racing a just-landed happy path.
+        retire, reason = self.mod.classify_terminal_approval(
+            _entry('zz-fixture-fresh', FRESH_TS, task_id='zz-fixture-fresh'),
+            NOW, self.GRACE, self._probe(tts.MERGED))
+        self.assertFalse(retire)
+        self.assertIn('within grace', reason)
+
+    def test_missing_created_at_kept(self):
+        retire, reason = self.mod.classify_terminal_approval(
+            _entry('zz-fixture-nots', '', task_id='zz-fixture-nots'),
+            NOW, self.GRACE, self._probe(tts.MERGED))
+        self.assertFalse(retire)
+        self.assertIn('created_at', reason)
+
+    def test_unparseable_created_at_kept(self):
+        retire, _ = self.mod.classify_terminal_approval(
+            _entry('zz-fixture-bad', 'not-a-date', task_id='zz-fixture-bad'),
+            NOW, self.GRACE, self._probe(tts.MERGED))
+        self.assertFalse(retire)
+
+    def test_no_task_id_kept(self):
+        # No dispatch_payload.task_id AND no usable id to probe -> keep.
+        entry = _entry('', OLD_TS, task_id=None)
+        retire, reason = self.mod.classify_terminal_approval(
+            entry, NOW, self.GRACE, self._probe(tts.MERGED))
+        self.assertFalse(retire)
+        self.assertIn('no task_id', reason)
+
+    def test_falls_back_to_entry_id_when_payload_has_no_task_id(self):
+        # dispatch_payload lacks task_id, but the entry id is a valid task_id.
+        seen = []
+        entry = _entry('zz-fixture-byid', OLD_TS, task_id=None)
+        retire, _ = self.mod.classify_terminal_approval(
+            entry, NOW, self.GRACE,
+            lambda tid: (seen.append(tid) or tts.MERGED))
+        self.assertTrue(retire)
+        self.assertEqual(seen, ['zz-fixture-byid'])
+
+
+class _TerminalBase(_Base):
+    """_Base + a sandbox-repointed beacon_approval_handler so resolve() reads and
+    writes the temp-dir beacon-pending-approvals.json instead of the real one."""
+
+    def setUp(self):
+        super().setUp()
+        import beacon_approval_handler as approval
+        # reload mutates the module IN PLACE, so heal_stale_approvals' bound
+        # `approval` reference picks up the repointed PENDING_APPROVALS_PATH.
+        self.approval = importlib.reload(approval)
+        self.pending_path = self.approval.PENDING_APPROVALS_PATH
+
+    def _write_state(self, pending):
+        self.pending_path.write_text(json.dumps(
+            {'version': 1, 'pending': pending, 'history': []}))
+
+    def _load(self):
+        return json.loads(self.pending_path.read_text())
+
+
+class TestReconcileTerminalApprovals(_TerminalBase):
+    def _probe(self, states):
+        return lambda tid: states.get(tid, tts.UNKNOWN)
+
+    def test_retires_terminal_keeps_open_and_within_grace(self):
+        self._write_state([
+            _entry('zz-fixture-merged', OLD_TS, task_id='zz-fixture-merged'),
+            _entry('zz-fixture-open', OLD_TS, task_id='zz-fixture-open'),
+            _entry('zz-fixture-fresh', FRESH_TS, task_id='zz-fixture-fresh'),
+        ])
+        probe = self._probe({
+            'zz-fixture-merged': tts.MERGED,
+            'zz-fixture-open': tts.OPEN,
+            'zz-fixture-fresh': tts.MERGED,  # terminal but within grace -> keep
+        })
+        counts = self.mod.reconcile_terminal_approvals(now=NOW, probe=probe)
+
+        self.assertEqual(counts['pending'], 3)
+        self.assertEqual(counts['retired'], 1)
+        self.assertEqual(counts['kept'], 2)
+
+        state = self._load()
+        pending_ids = {e['id'] for e in state['pending']}
+        self.assertEqual(pending_ids, {'zz-fixture-open', 'zz-fixture-fresh'})
+        history = {e['id']: e for e in state['history']}
+        self.assertIn('zz-fixture-merged', history)
+        self.assertEqual(history['zz-fixture-merged']['status'], 'expired')
+        self.assertIn('terminal-state',
+                      history['zz-fixture-merged'].get('resolution_note', ''))
+
+    def test_dry_run_writes_nothing(self):
+        self._write_state([
+            _entry('zz-fixture-merged', OLD_TS, task_id='zz-fixture-merged'),
+        ])
+        counts = self.mod.reconcile_terminal_approvals(
+            now=NOW, probe=self._probe({'zz-fixture-merged': tts.MERGED}),
+            dry_run=True)
+        self.assertEqual(counts['retired'], 1)  # classified
+        state = self._load()
+        self.assertEqual([e['id'] for e in state['pending']],
+                         ['zz-fixture-merged'])      # but not applied
+        self.assertEqual(state['history'], [])
+
+    def test_unknown_probe_never_retires(self):
+        # The five-rows-stuck case: every probe is UNKNOWN (e.g. tier-1
+        # canonical_intervention_id that matches no PR). NONE may be retired.
+        self._write_state([
+            _entry('zz-fixture-a', OLD_TS, task_id='zz-fixture-a'),
+            _entry('zz-fixture-b', OLD_TS, task_id='zz-fixture-b'),
+        ])
+        counts = self.mod.reconcile_terminal_approvals(
+            now=NOW, probe=lambda _tid: tts.UNKNOWN)
+        self.assertEqual(counts['retired'], 0)
+        self.assertEqual(counts['kept'], 2)
+        self.assertEqual(len(self._load()['pending']), 2)
+
+    def test_idempotent_second_run(self):
+        self._write_state([
+            _entry('zz-fixture-merged', OLD_TS, task_id='zz-fixture-merged'),
+            _entry('zz-fixture-open', OLD_TS, task_id='zz-fixture-open'),
+        ])
+        probe = self._probe({
+            'zz-fixture-merged': tts.MERGED, 'zz-fixture-open': tts.OPEN})
+        self.mod.reconcile_terminal_approvals(now=NOW, probe=probe)
+        counts2 = self.mod.reconcile_terminal_approvals(now=NOW, probe=probe)
+        self.assertEqual(counts2['pending'], 1)   # only the open one remains
+        self.assertEqual(counts2['retired'], 0)
+        self.assertEqual(counts2['kept'], 1)
 
 
 if __name__ == '__main__':
