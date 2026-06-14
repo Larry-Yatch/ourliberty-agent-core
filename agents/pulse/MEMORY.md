@@ -72,19 +72,25 @@
 
 ---
 
+## Status snapshot — updated 2026-06-14 22:39Z UTC (Iter ~1844, Tier 1, nominal)
+
+**Iter ~1844 summary:** Fully nominal. 0 new alerts (watermark=931=file). All mandatory checks clean. PRs #509 + #510 opened by Forge at 22:18Z/22:21Z via non-standard branch names (`docs/meaning-layer-roadmap`, `work/build-consult-restock`); outbox-notifier NOT dispatched Mirror for either (Forge outbox last modified 19:38Z, ~2.5h before PRs created). Both PRs are <30 min old so no Check E action yet — **watch next iter** at 30-min threshold. PR #497 carry (120th iter). Orphans PID 1834248 (17.1d+) + PID 2605007 (18.3h+) carrying. §5.0 no-op. Rotations nominal. PRIME DIRECTIVE: 0 interventions (iter_clean), ratio≈20.47. **Tier: Tier 1** (consecutive_clean=0).
+
+---
+
 ## Status snapshot — updated 2026-06-14 22:28Z UTC (Iter ~1843, Tier 1, nominal)
 
 **Iter ~1843 summary:** Fully nominal. 0 new alerts (watermark=931=file). All mandatory checks clean. PRs #509 (docs: meaning-layer roadmap) + #510 (feat: consult-before-build) newly opened by Forge (<30 min, pending Mirror review). PR #497 carry (119th iter). Orphans PID 1834248 (17.1d+) + PID 2605007 (18.1h+, PR #498 merged) carrying. §5.0 no-op. Rotations nominal. PRIME DIRECTIVE: 0 interventions (iter_clean), ratio≈20.47. **Tier: Tier 1** (consecutive_clean=0).
 
 ---
 
-## Key standing items (as of iter ~1828)
+## Key standing items (as of iter ~1844)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (119th iter) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
-| PR #509 | [blue] New — docs: meaning-layer roadmap; CLEAN, pending Mirror review | Monitor for auto-merge at 30 min mark |
-| PR #510 | [blue] New — feat: consult-before-build + catalog-on-build; CLEAN, pending Mirror review | Monitor for auto-merge at 30 min mark |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (120th iter) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #509 | [blue] Open — docs: meaning-layer roadmap; outbox-notifier NOT dispatched Mirror (non-standard branch); approaching 30-min Check E threshold | Watch next iter; if >30 min + no Mirror review, manual action needed |
+| PR #510 | [blue] Open — feat: consult→restock build loop; outbox-notifier NOT dispatched Mirror (non-standard branch); approaching 30-min threshold | Watch next iter |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
