@@ -715,6 +715,7 @@ class OutcomeLanguageTest(unittest.TestCase):
     _OUTCOME_SUBJECTS = [
         ('heal-systemd-install-drift', 'install-healed'),
         ('heal-systemd-install-drift', 'stuck-timer-healed'),
+        ('heal-stale-daemon-code', 'auto-restarted'),
     ]
 
     # Tokens that signal an operator imperative — none belongs in an
