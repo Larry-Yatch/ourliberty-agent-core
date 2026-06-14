@@ -4,6 +4,91 @@
 
 ---
 
+## Iteration ~1709 — 2026-06-14 04:21Z UTC (interactive, /cycle, Tier 2→1 tier-reset, consecutive_clean 0→0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Tier-4 alerts (journal-note-only). 2 new alerts triaged; no dispatches.
+
+**VERIFY-BEFORE-REASSERT (iter ~1708 carries):**
+- missions-proposed-lane-signal-hardening-001: In Forge inbox since 04:06Z (15 min at check time). Normal pickup lag. **CARRY** [blue].
+- fix-depth1-pulse-approval-extraction-001: Forge REJECTED at preflight (Alert 988) — already implemented in PR #484. outbox-notifier DM'd Larry. **CLOSED** → resolved.
+- cleanup-branch-warn-to-info-001 / PR #497: Still open (19 min at check time, under 30-min threshold). Mirror review in-flight. **CARRY** [blue].
+- unreviewed-merge:494: No new Larry reply. **CARRY** [yellow].
+- unreviewed-merge:489: No new Larry reply. **CARRY** [yellow].
+- Check 5 (heal-stale-daemon-code-state.json): MISSING confirmed. **CARRY** [blue].
+- fix-alert-triage-watermark-durability-001: 1 stale entry in beacon-pending-approvals (Jun-12), unchanged. **CARRY** [blue].
+- timer-label-fix binary: No new Larry reply. **CARRY** [blue].
+- sync-push-rebase-loop-001: sync.json last_sync=03:59:51Z status=no-change (healthy). **CARRY** [blue].
+
+**Check 0 — Alert triage:** Watermark=986. File=988 lines. 2 new alerts:
+- Line 987: source=missions-card-gc, severity=warning, route=digest, subject=summary. "retired 0 stale session cards; aged 0 parked captures; commit=committed." Commit 55cc5c0 confirms it added 16 lines to agents/beacon/captures.json (new captures delta, not an empty commit). missions-card-gc NOT in alert-translations. Tier-4/novel → journal-note-only (no DM; route=digest handles it). WARN-vs-INFO miscalibration: GC success/no-op with new-captures-commit should be severity=info. G-rule: **missions-card-gc-warn-vs-info 1/3**.
+- Line 988: source=outbox-notifier, kind=notification, intent=reject. "Forge REJECTED fix-depth1-pulse-approval-extraction-001 at preflight. Reason: Already implemented in PR #484 (commit 028636e, 2026-06-12)." outbox-notifier DM'd Larry (chat_id=7998341473). Per MEMORY.md: no second DM. Tier-4/journal-note-only. Standing item **fix-depth1 CLOSED**. G-rule alert-translations-no-patterns-delivery-confirmation-tier4: **2/3** (alert-988 is outbox-notifier reject-notification, same Tier-4 fallthrough pattern as alert-987-class).
+- New watermark: **988**. ✅
+
+**Check 1 — Log noise:** outbox-notifier.log: Only pre-existing 2 WARNs from Jun-13 13:41 (pr-url-shape-invalid, resolved by PR #493). No new WARNs. inbox-watcher.log: no WARNs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry messages: "Go" × 2 at 22:03:21/22:03:24 MDT Jun-13 (04:03Z Jun-14) — processed by Beacon in iter ~1708. No new messages since 04:03Z. No distress keywords. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → no stalls. Same 5 FORGE_NO_PR_SKIPs (#490, #491, #492, catalog-drift-preflight-exit, #493). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 1 entry (fix-alert-triage-watermark-durability-001, Jun-12 — stale [blue] carry). fix-depth1 and missions-proposed cleared from pending (approved + dispatched). No orphaned directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING. Known [blue] carry. ✅
+
+**Check A — Source repo:** On main. Clean working tree. HEAD=4fc8acd=origin/main. 0 ahead, 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** sync.json last_sync=2026-06-14T03:59:51Z, status=no-change. 21 min ago at check time. Within 2h threshold. sync-push-rebase-loop-001 UNREGISTERED AR [blue] carry. ✅ Nominal.
+
+**Check C — Agent liveness:** 5/5 PIDs alive (ps verified):
+- beacon_telegram_bot: PID 2517973 (elapsed ~10h36m) ✅
+- chain_event_shipper: PID 1849505 (elapsed ~2d8h33m) ✅
+- outbox_notifier: PID 2552416 (elapsed ~6h47m) ✅
+- dashboard_api: PID 2322792 (elapsed ~1d4h25m) ✅
+- inbox_watcher: PID 2530123 (elapsed ~8h57m) ✅
+Plus forge/mirror/pulse bots (PIDs 1843740/1843744/2514954 — stable, idle since Jun-13). ✅ Nominal.
+
+**Check D — Inboxes:** Forge: build-missions-proposed-lane-signal-hardening-001.json (04:06Z, 15 min old at check time — not stale). Beacon/Mirror/Pulse: empty. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: PR #497 OPEN (`fix(cleanup-branches): success-prune alert is info, not warning`), mergeable=UNKNOWN, head=forge/cleanup-branch-warn-to-info-001, created 04:02Z (19 min old — under 30-min threshold). Mirror review in progress. ourliberty-graph: 0 open PRs. ✅ Nominal.
+
+**Conditional checks:** Not Sunday. Check I: SKIP (fired today iter ~1691). Check III: SKIP (<14d threshold).
+
+**Actions taken:**
+1. Alert watermark advanced 986→988 (2 Tier-4/journal-note-only alerts claimed). ✅
+2. `cycle_prime_ledger.py append --tier 2 --kind intervention` (alert-tier4-novel-no-dispatch) → 04:25:40Z. ✅
+3. `cycle_tier_state.py record --checks-clean false` → **Tier 2 → Tier 1** (signal observed; last_signal_at=04:25:41Z). ✅
+
+**Dispatches:** None.
+
+**Standing findings:**
+- [yellow] **unreviewed-merge:494** — DM sent iter ~1694 (01:54Z Jun-14). Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed'. [carry]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614; no Larry reply. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **missions-proposed-lane-signal-hardening-001** — In Forge inbox (04:06Z Jun-14). Forge in-flight. [carry]
+- [blue] **cleanup-branch-warn-to-info-001 / PR #497** — Mirror review in-flight (04:02Z). Auto-merge on Mirror PASS. [carry]
+- [blue] **fix-alert-triage-watermark-durability-001** — 1 stale entry in beacon-pending-approvals (Jun-12). [carry]
+- [blue] **timer-label-fix binary** — Beacon holding Forge dispatch. Larry binary: `approve timer-label-fix` or `reject timer-label-fix`. [carry]
+- [blue] **Check I medic-operator-scaffold-001** — 24.4σ ($6.72 vs $1.68); prior dispatch 2026-06-10. `/dispatch 1` if re-run needed. [carry]
+- [blue] **G-rule dispatch-branch-cleanup-warning** — DISPATCHED (iter ~1705); PR #497 in Mirror review. [carry]
+- [blue] **G-rule heal-stale-daemon-code-auto-restart-needs-template** — 2/3. [carry]
+- [blue] **G-rule alert-translations-no-patterns-delivery-confirmation-tier4** — **2/3** (incremented — Alert 988 outbox-notifier reject-notification). [updated]
+- [blue] **G-rule missions-card-gc-warn-vs-info** — **1/3** (new). missions-card-gc emits severity=warning for GC runs with new-captures-commit; should be severity=info. [new]
+- [blue] **G-rule droplet-uncommitted:main** — 1/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — RESET 0/3 (false positive). [carry]
+- [blue] **Check 5 MISSING** — heal-stale-daemon-code-state.json absent. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — self-healed; recurrent. [carry]
+- [blue] **dag-preflight-revision gap** — [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+- ~~**fix-depth1-pulse-approval-extraction-001**~~ — **CLOSED**: Forge rejected at preflight (Alert 988). Already implemented in PR #484 (commit 028636e). No action required.
+
+**PRIME DIRECTIVE:** 1 intervention appended (04:25:40Z). Script-authoritative: interventions=841, systemic_fixes=40, verification_pending=11, ratio=21.0, trend=flat.
+**Tier end-of-iter:** **Tier 1** (reset from Tier 2; 2 Tier-4 novel alerts). consecutive_clean=0.
+
+---
+
 ## Iteration ~1708 — 2026-06-14 04:08Z UTC (interactive, /cycle, Tier 1→2 de-escalation, consecutive_clean 2→3→0)
 
 **Trigger:** Larry direct invocation (`/cycle`).

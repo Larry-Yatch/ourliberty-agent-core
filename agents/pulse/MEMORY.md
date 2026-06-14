@@ -54,13 +54,13 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 04:08Z UTC (Iter ~1708, Tier 2, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 04:25Z UTC (Iter ~1709, Tier 1, consecutive_clean=0)
 
-**Iter ~1708 summary:** Alert watermark: 986 (0 new alerts). PRIME DIRECTIVE: interventions=840, systemic_fixes=40, verification_pending=11, ratio=21.0, trend=flat. All 5 daemons alive (same PIDs). HEAD=7d9de47=origin/main. Sync: 03:59:51Z no-change (healthy). Larry approved missions-proposed-lane-signal-hardening-001 + fix-depth1-pulse-approval-extraction-001 at 04:03Z (both now in Forge inbox). PR #497 (cleanup-branch-warn-to-info-001) in Mirror review. **Tier:** Tier 1→2 de-escalation (3 consecutive clean iters).
+**Iter ~1709 summary:** Alert watermark: 988 (+2 Tier-4/journal-note-only). PRIME DIRECTIVE: interventions=841, systemic_fixes=40, verification_pending=11, ratio=21.0, trend=flat. All 5 daemons alive (same PIDs). HEAD=4fc8acd=origin/main. Sync: 03:59:51Z no-change (healthy). missions-proposed in Forge inbox (04:06Z). fix-depth1 REJECTED by Forge (already in PR #484) → CLOSED. PR #497 Mirror review in-flight. **Tier:** Tier 2→1 tier-reset (2 Tier-4 alerts).
 
 ---
 
-## Key standing items (as of iter ~1708)
+## Key standing items (as of iter ~1709)
 
 | Item | Status | Action needed |
 |---|---|---|
@@ -68,15 +68,16 @@
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| missions-proposed-lane-signal-hardening-001 | [blue] APPROVED 04:03Z Jun-14 → Forge in-flight | Carry; watch for PR |
-| fix-depth1-pulse-approval-extraction-001 | [blue] APPROVED 04:03Z Jun-14 → Forge in-flight | Carry; watch for PR |
-| cleanup-branch-warn-to-info-001 / PR #497 | [blue] Mirror review in-flight (04:03Z); auto-merge on PASS | Carry; watch for merge |
+| missions-proposed-lane-signal-hardening-001 | [blue] APPROVED 04:03Z Jun-14 → Forge in-flight (inbox 04:06Z) | Carry; watch for PR |
+| fix-depth1-pulse-approval-extraction-001 | CLOSED — Forge REJECTED (PR #484 already implements it) | No action. dag-preflight-revision gap is separate. |
+| cleanup-branch-warn-to-info-001 / PR #497 | [blue] Mirror review in-flight (04:02Z); auto-merge on PASS | Carry; watch for merge |
 | fix-alert-triage-watermark-durability-001 | [blue] 1 stale entry in beacon-pending-approvals (Jun-12) | Carry |
 | timer-cycle-no-journal-entry-001 | FALSE POSITIVE — TASK CLOSED | Larry binary: `approve timer-label-fix` or `reject timer-label-fix` (Beacon holding; [blue] carry) |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
 | G-rule dispatch-branch-cleanup-warning | [blue] DISPATCHED 3/3 (iter ~1705) → PR #497 in Mirror review | Carry |
 | G-rule heal-stale-daemon-code-auto-restart-needs-template | [blue] 2/3 | Dispatch at 3/3 |
-| G-rule alert-translations-no-patterns-delivery-confirmation-tier4 | [blue] 1/3 (iter ~1706) | Watch; dispatch at 3/3 |
+| G-rule alert-translations-no-patterns-delivery-confirmation-tier4 | [blue] 2/3 (iter ~1709) | Watch; dispatch at 3/3 |
+| G-rule missions-card-gc-warn-vs-info | [blue] 1/3 (iter ~1709) | Watch; dispatch at 3/3 — missions-card-gc severity=warning on GC runs should be severity=info |
 | G-rule droplet-uncommitted:main | [blue] 1/3 | Watch |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] 1/3 | Watch |
 | G-rule timer-cycle-no-journal-entry | RESET 0/3 — false positive | Recalibrate: only count iters where journal entry is genuinely absent |
