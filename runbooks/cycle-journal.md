@@ -4,6 +4,85 @@
 
 ---
 
+## Iteration ~1713 — 2026-06-14 04:54Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Check E carry — PR #497 REVIEW_ESCALATE still open. PR #498 MERGED ✅ (RESOLVED from [blue] carry).
+
+**VERIFY-BEFORE-REASSERT (iter ~1712 carries):**
+- missions-proposed-lane-signal-hardening-001 / PR #498: VERIFY → outbox-notifier.log: MIRROR_REVIEW_STATUS state=success posted 22:49:42Z Jun-13; AUTO_MERGE merged (--squash --delete-branch) 22:49:46Z Jun-13. git log confirms 9bdbf83 `feat(missions): high-signal self-cleaning proposed lane (#498)` in HEAD ancestry. **RESOLVED ✅** — removing from standing items.
+- PR #497 REVIEW_ESCALATE: gh pr view 497 → state=OPEN, MERGEABLE. Mirror failure check still posted. **CARRY** [yellow].
+- unreviewed-merge:494: No new Larry reply. **CARRY** [yellow].
+- unreviewed-merge:489: No new Larry reply. **CARRY** [yellow].
+- Check 5 (heal-stale-daemon-code-state.json): ls → No such file. **CARRY** [blue].
+- fix-alert-triage-watermark-durability-001: beacon-pending-approvals.json — 1 entry (Jun-12), unchanged. **CARRY** [blue].
+- sync-push-rebase-loop-001: sync.json last_sync=03:59:51Z (53 min ago, within 2h). **CARRY** [blue].
+
+**Check 0 — Alert triage:** Watermark=989. File=989 lines. 0 new alerts. ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log last entry 22:49:46Z Jun-13 (AUTO_MERGE for PR #498, INFO). No WARNs/ERRORs since. inbox-watcher.log: no WARNs/ERRORs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Larry sent at [2026-06-13T21:31:39-0600] (03:31:39Z Jun-14): *"is the missions v2 dag project done, it looks like it got stuck on the last step. make sure to be careful…"* Beacon replied at 21:33:47-0600 (03:33:47Z): *"Carefully checked — and the answer is: **it's done, not stuck.**"* Directive answered within 2 min; no open task tracking needed. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → no stalls. 6 FORGE_NO_PR_SKIPs (#490, #491, #492, catalog-drift-preflight-exit, #493, #496). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 1 entry (fix-alert-triage-watermark-durability-001, Jun-12 — stale [blue] carry). ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING. Known [blue] carry. ✅
+
+**Check A — Source repo:** On main. Clean working tree. HEAD=d188eae=origin/main. 0 ahead, 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** sync.json last_sync=2026-06-14T03:59:51Z (~53 min ago), within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 5/5 known daemon PIDs alive:
+- beacon_telegram_bot: PID 2517973 (elapsed ~11h07m) ✅
+- chain_event_shipper: PID 1849505 (elapsed ~2d 09h05m) ✅
+- outbox_notifier: PID 2552416 (elapsed ~07h19m) ✅
+- dashboard_api: PID 2322792 (elapsed ~1d 04h56m) ✅
+- inbox_watcher: PID 2530123 (elapsed ~09h28m) ✅
+- No Forge/Mirror in-flight (PR #498 merged; worktrees torn down at 22:49:46Z Jun-13). ✅
+
+**Check D — Inboxes:** Forge/Beacon/Mirror/Pulse: empty (missions-proposed-lane-signal-hardening-001 archived post-merge). ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core:
+- PR #497 OPEN (`fix(cleanup-branches): success-prune alert is info, not warning`), MERGEABLE, no auto-merge, no PR reviews. Mirror REVIEW_ESCALATE (failure posted Jun-13 22:05Z). → ask-then-do [yellow] **carry**.
+- PR #498 MERGED ✅ (22:49:46Z Jun-13, squash+branch-delete). **RESOLVED**.
+- ourliberty-graph: 0 open PRs. ✅
+
+**Conditional checks:** Not Sunday. Check I: SKIP. Check III: SKIP.
+
+**Actions taken:**
+1. `cycle_prime_ledger.py append --tier 1 --kind intervention` (pr-carry-ask-then-do, PR #497) → 04:54:46Z. ✅
+2. `cycle_tier_state.py record --checks-clean false` → Tier 1, consecutive_clean=0, last_signal_at=04:54:56Z. ✅
+
+**Dispatches:** None.
+
+**Standing findings:**
+- [yellow] **PR #497 REVIEW_ESCALATE** — Mirror found spec invalid; Beacon confirmed fix already in alert-translations.json. Close PR without merging (`gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core`). Escalated pulse-escalations.json entry #21. [carry]
+- [yellow] **unreviewed-merge:494** — DM sent iter ~1694 (01:54Z Jun-14). Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed'. [carry]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614; no Larry reply. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- ~~**missions-proposed-lane-signal-hardening-001**~~ — **RESOLVED**. PR #498 merged 22:49:46Z Jun-13. ✅
+- [blue] **fix-alert-triage-watermark-durability-001** — 1 stale entry in beacon-pending-approvals (Jun-12). [carry]
+- [blue] **Check I medic-operator-scaffold-001** — 24.4σ; prior dispatch 2026-06-10. `/dispatch 1` if re-run needed. [carry]
+- [blue] **G-rule heal-stale-daemon-code-auto-restart-needs-template** — 2/3. [carry]
+- [blue] **G-rule alert-translations-no-patterns-delivery-confirmation-tier4** — 2/3. [carry]
+- [blue] **G-rule missions-card-gc-warn-vs-info** — 1/3. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 1/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — RESET 0/3. [carry]
+- [blue] **Check 5 MISSING** — heal-stale-daemon-code-state.json absent. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — self-healed; recurrent. [carry]
+- [blue] **dag-preflight-revision gap** — [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+
+**PRIME DIRECTIVE:** 1 intervention appended (04:54:46Z). Script-authoritative: interventions=845, systemic_fixes=40, verification_pending=11, ratio=21.125, trend=flat.
+**Tier end-of-iter:** **Tier 1** (signal: PR #497 REVIEW_ESCALATE carry). consecutive_clean=0.
+
+---
+
 ## Iteration ~1712 — 2026-06-14 04:49Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry direct invocation (`/cycle`).

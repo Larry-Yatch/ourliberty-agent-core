@@ -54,9 +54,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 04:49Z UTC (Iter ~1712, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 04:54Z UTC (Iter ~1713, Tier 1, consecutive_clean=0)
 
-**Iter ~1712 summary:** Alert watermark: 989 (0 new alerts). PRIME DIRECTIVE: interventions=844, systemic_fixes=40, verification_pending=11, ratio=21.1, trend=flat. All 5 daemons alive (same PIDs). HEAD=22b3081=origin/main. Sync: 03:59:51Z (55 min ago, within threshold). Forge PID 2602672 in-flight (missions-proposed-lane-signal-hardening-001 second run, PR #498 open). Mirror started review-missions-proposed-lane-signal-hardening-001 at 04:40:46Z (auto-merge window closes ~05:10Z). PR #497 REVIEW_ESCALATE carry — close without merge. **Tier:** Tier 1 (signal: PR #497 carry).
+**Iter ~1713 summary:** Alert watermark: 989 (0 new alerts). PRIME DIRECTIVE: interventions=845, systemic_fixes=40, verification_pending=11, ratio=21.125, trend=flat. All 5 daemons alive (same PIDs). HEAD=d188eae=origin/main. Sync: 03:59:51Z (55 min ago, within threshold). PR #498 MERGED ✅ (22:49:46Z Jun-13, Mirror PASS + auto-merge). PR #497 REVIEW_ESCALATE carry — close without merge. **Tier:** Tier 1 (signal: PR #497 carry).
 
 ---
 
@@ -69,7 +69,7 @@
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| missions-proposed-lane-signal-hardening-001 | [blue] Forge second run in-flight (PID 2602672, 04:08:19Z). PR #498 open. Mirror review started 04:40:46Z (auto-merge window closes ~05:10Z). | Watch for Mirror PASS + auto-merge |
+| missions-proposed-lane-signal-hardening-001 | RESOLVED — PR #498 merged 22:49:46Z Jun-13 (Mirror PASS + auto-merge) | CLOSED ✅ |
 | fix-alert-triage-watermark-durability-001 | [blue] 1 stale entry in beacon-pending-approvals (Jun-12) | Carry |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
 | G-rule dispatch-branch-cleanup-warning | RESOLVED — translations.json handles display; PR #497 close pending | No further dispatch |
