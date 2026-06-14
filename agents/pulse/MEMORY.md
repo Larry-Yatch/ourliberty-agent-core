@@ -60,9 +60,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 09:21Z UTC (Iter ~1749, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 09:26Z UTC (Iter ~1750, Tier 1, consecutive_clean=0)
 
-**Iter ~1749 summary:** All checks nominal, no new alerts. Watermark: 1004/1004. Pipeline in-motion: `p4-parked-card` Forge preflight (PID 2705460) still running since 09:09:47Z (~12+ min elapsed, no completion yet); `build-p4-conversation-doorbell` queued in Forge inbox. PR #497 OPEN (MERGEABLE=UNKNOWN, 26th consecutive iter). HEAD=56d63cdd=origin/main. Sync: 08:22:16Z (status=error, self-heals). Healer state files renamed (actual: `heal-stale-daemon-code.heartbeat` at 09:06:16Z — spec drift, healer healthy). PRIME DIRECTIVE: interventions=881, systemic_fixes=41, ratio=21.49, trend=flat. **Tier:** Tier 1.
+**Iter ~1750 summary:** All checks nominal, no new alerts. Watermark: 1004/1004. Pipeline in-motion: `p4-parked-card` Forge preflight (PID 2705460) still running since 09:09:47Z (~16+ min elapsed, no completion yet); `build-p4-conversation-doorbell` queued in Forge inbox. PR #497 OPEN (MERGEABLE=UNKNOWN, 27th consecutive iter). HEAD=5bf90bcf=origin/main. Sync: 09:22:15Z (status=no-change, self-healed from prior error). Healer state files renamed (actual: `heal-stale-daemon-code.heartbeat` at 09:06:16Z — spec drift, healer healthy). PRIME DIRECTIVE: interventions=882, systemic_fixes=41, ratio=21.51, trend=flat. **Tier:** Tier 1.
 
 ---
 
@@ -70,7 +70,7 @@
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (26 iters: ~1724→~1749) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (27 iters: ~1724→~1750) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry 05:02:56Z without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
