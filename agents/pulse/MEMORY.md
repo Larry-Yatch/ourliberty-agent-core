@@ -54,37 +54,42 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 08:20Z UTC (Iter ~1740, Tier 1, consecutive_clean=0)
+## larry-alerts.jsonl correct path (learned 2026-06-14 iter ~1741)
 
-**Iter ~1740 summary:** Alert watermark: 1000/1000 (1 new alert: pipeline-stall retry-exhausted for missions-proposed-lane-signal-hardening-001 — false positive, PR #498 already merged, Medic handling). All mandatory checks nominal. PR #497 OPEN (MERGEABLE=UNKNOWN, 17th consecutive iter). Forge PID 2668230 in BUILD phase for heal-stale-daemon-restart-tier3-translation-001 (started 08:12:29Z, timeout ~12:12Z Jun-14). PRIME DIRECTIVE: interventions=872, systemic_fixes=41, ratio=21.27, trend=flat. HEAD=8937947=origin/main. Sync: 07:22:14Z. **Tier:** Tier 1.
+**Rule:** `larry-alerts.jsonl` lives at `/home/larry/agents/blackboard/larry-alerts.jsonl`. NOT `/home/larry/agents/logs/`. Confirmed by `ls /home/larry/agents/blackboard/larry-alerts*`.
 
 ---
 
-## Key standing items (as of iter ~1740)
+## Status snapshot — updated 2026-06-14 08:27Z UTC (Iter ~1741, Tier 1, consecutive_clean=0)
+
+**Iter ~1741 summary:** Alert watermark: 1002/1002 (2 new alerts: idx=1001 medic-diagnosis false-positive confirmation for PR #498; idx=1002 sync-blocked push-failed self-heal). Medic PIDs 2669572/2669573 RESOLVED (10m timeout expired). Forge PID 2668230 ALIVE in BUILD phase for heal-stale-daemon-restart-tier3-translation-001 (~13 min elapsed, timeout ~12:12Z Jun-14). PR #497 OPEN (MERGEABLE=UNKNOWN, 18th consecutive iter). PRIME DIRECTIVE: interventions=873, systemic_fixes=41, ratio=21.29, trend=flat. HEAD=8f51922=origin/main. Sync: 08:22:16Z (status=error, self-heals). **Tier:** Tier 1.
+
+---
+
+## Key standing items (as of iter ~1741)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (17 iters: ~1724→~1740); Mirror spec invalid; fix in heal-stale-daemon-restart-tier3-translation-001 | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (18 iters: ~1724→~1741); Mirror spec invalid; fix in heal-stale-daemon-restart-tier3-translation-001 | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry 05:02:56Z without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
 | Forge PID 2668230 | [blue/watch] task=build-heal-stale-daemon-restart-tier3-translation-001; started 08:12:29Z UTC Jun-14; timeout ~12:12Z Jun-14 | Watch: PR from heal-stale-daemon build task |
-| Medic PIDs 2669572/2669573 | [blue/watch] batch=medic-batch-20260614T081819Z.json; judgment → diagnose-only; 10m timeout | Watch: should complete ~08:28Z |
-| p4-meaning-layer-narrator (Phase 4 step-1) | [blue/watch] Queued in Forge inbox; dispatched 05:35:36Z UTC Jun-14 | Watch: after heal-stale-daemon build completes |
-| heal-stale-daemon-restart-tier3-translation-001 | [blue/watch] BUILD PHASE — Forge PID 2668230 started 08:12:29Z | Watch: Forge PR |
+| p4-meaning-layer-narrator (Phase 4 step-1) | [blue] Queued in Forge inbox | Watch: after heal-stale-daemon build completes |
+| heal-stale-daemon-restart-tier3-translation-001 | [blue/watch] BUILD PHASE — Forge PID 2668230 | Watch: Forge PR |
 | fix-alert-triage-watermark-durability-001 | [blue] 1 stale entry in beacon-pending-approvals (Jun-12) | Carry |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
 | G-rule heal-stale-daemon-code-auto-restart-needs-template | [blue] heal-stale-daemon BUILD IN PROGRESS | Watch: Forge PR |
-| G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3 (retry-exhausted alert is aftermath of same first occurrence) | Watch; dispatch at 3/3 |
+| G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3; Medic recommends: add pipeline-stall:retry-exhausted: to medic-reversible-targets.json silenceable_subjects | Watch; dispatch at 3/3 |
 | G-rule alert-translations-no-patterns-delivery-confirmation-tier4 | [blue] 2/3 | Watch; dispatch at 3/3 |
 | G-rule missions-card-gc-warn-vs-info | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule missions-autoregister-warn-vs-info | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule droplet-uncommitted:main | [blue] 1/3 | Watch |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] 1/3 | Watch |
 | G-rule timer-cycle-no-journal-entry | [blue] 0/3 | Watch |
-| Check 5 MISSING | [blue] heal-stale-daemon-code-state.json absent; heartbeat fresh 08:05Z | Carry; possible path bug in healer |
-| sync-push-rebase-loop-001 | [blue] UNREGISTERED AR; self-healed | Carry |
+| Check 5 MISSING | [blue] heal-stale-daemon-code-state.json absent | Carry; possible path bug in healer |
+| sync-push-rebase-loop-001 | [blue] UNREGISTERED AR; idx=1002 confirmed (route=digest, self-heals) | Carry |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
