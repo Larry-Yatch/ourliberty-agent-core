@@ -72,17 +72,17 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 20:24Z UTC (Iter ~1827, Tier 1, nominal)
+## Status snapshot — updated 2026-06-14 20:28Z UTC (Iter ~1828, Tier 1, nominal)
 
-**Iter ~1827 summary:** Fully nominal. 0 new alerts. 0 new findings. All daemons alive. Git clean/current. PR #497 carry (103rd iter). Orphans PID 1834248 (17d 01h+) + PID 2605007 (16h 01m+, PR #498 merged, will not self-exit) carrying. Watermark=931. §5.0 no-op. Rotations nominal. PRIME DIRECTIVE: 0 interventions (iter_clean), ratio≈20.47. **Tier: Tier 1** (consecutive_clean=0).
+**Iter ~1828 summary:** Fully nominal. 0 new alerts. 0 new findings. All daemons alive. Git clean/current. PR #497 carry (104th iter). Orphans PID 1834248 (17d 01h+) + PID 2605007 (16h 07m+, PR #498 merged, will not self-exit) carrying. Watermark=931. §5.0 no-op. Rotations nominal. PRIME DIRECTIVE: 0 interventions (iter_clean), ratio≈20.47. **Tier: Tier 1** (consecutive_clean=0).
 
 ---
 
-## Key standing items (as of iter ~1827)
+## Key standing items (as of iter ~1828)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (103rd iter) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (104th iter) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
