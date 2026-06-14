@@ -54,9 +54,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 04:54Z UTC (Iter ~1713, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 05:06Z UTC (Iter ~1714, Tier 1, consecutive_clean=0)
 
-**Iter ~1713 summary:** Alert watermark: 989 (0 new alerts). PRIME DIRECTIVE: interventions=845, systemic_fixes=40, verification_pending=11, ratio=21.125, trend=flat. All 5 daemons alive (same PIDs). HEAD=d188eae=origin/main. Sync: 03:59:51Z (55 min ago, within threshold). PR #498 MERGED ✅ (22:49:46Z Jun-13, Mirror PASS + auto-merge). PR #497 REVIEW_ESCALATE carry — close without merge. **Tier:** Tier 1 (signal: PR #497 carry).
+**Iter ~1714 summary:** Alert watermark: 990 (1 new: missions-autoregister warning, Tier-4/nominal — healer working as designed). PRIME DIRECTIVE: interventions=846, systemic_fixes=40, verification_pending=11, ratio=21.15, trend=flat. All 5 daemons alive (same PIDs). HEAD=8aa2c00=origin/main. Sync: 03:59:51Z (~64 min ago, within threshold). PR #498 MERGED ✅. PR #497 REVIEW_ESCALATE carry — close without merge. Forge PID 2602672 still running post-merge (missions-proposed reconciliation; da74431 autoregister commit at 04:55Z; within 14400s timeout). **Tier:** Tier 1 (signal: PR #497 carry).
 
 ---
 
@@ -69,13 +69,14 @@
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| missions-proposed-lane-signal-hardening-001 | RESOLVED — PR #498 merged 22:49:46Z Jun-13 (Mirror PASS + auto-merge) | CLOSED ✅ |
+| missions-proposed-lane-signal-hardening-001 | Forge post-merge reconciliation in-flight (PID 2602672, da74431 at 04:55Z) | Watch: expect forge.log "Completed" next cycle |
 | fix-alert-triage-watermark-durability-001 | [blue] 1 stale entry in beacon-pending-approvals (Jun-12) | Carry |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
 | G-rule dispatch-branch-cleanup-warning | RESOLVED — translations.json handles display; PR #497 close pending | No further dispatch |
 | G-rule heal-stale-daemon-code-auto-restart-needs-template | [blue] 2/3 | Dispatch at 3/3 |
 | G-rule alert-translations-no-patterns-delivery-confirmation-tier4 | [blue] 2/3 | Watch; dispatch at 3/3 |
 | G-rule missions-card-gc-warn-vs-info | [blue] 1/3 | Watch; dispatch at 3/3 |
+| G-rule missions-autoregister-warn-vs-info | [blue] 1/3 (new iter ~1714) | Watch; dispatch at 3/3 |
 | G-rule droplet-uncommitted:main | [blue] 1/3 | Watch |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] 1/3 | Watch |
 | G-rule timer-cycle-no-journal-entry | RESET 0/3 — false positive | Recalibrate |
