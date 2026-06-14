@@ -54,13 +54,13 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 05:57Z UTC (Iter ~1721, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 06:14Z UTC (Iter ~1723, Tier 1, consecutive_clean=0)
 
-**Iter ~1721 summary:** Alert watermark: 995/995 (0 new). All mandatory checks nominal. missions-v2-phase4 build sequence **ACTIVE**: p4-meaning-layer-narrator queued in Forge inbox (Phase 4 step-1). Forge PID 2602672 alive (~1h49m, session 45e53d6e missions-proposed reconciliation; timeout ~08:08Z Jun-14). PRIME DIRECTIVE: interventions=853, systemic_fixes=41, ratio=20.80, trend=flat. HEAD=3959e69a=origin/main. Sync: 05:21:45Z (36 min ago). **Tier:** Tier 1. inbox-watcher.log missing (PID alive; no escalation).
+**Iter ~1723 summary:** Alert watermark: 995/995 (0 new). All mandatory checks nominal. **NEW RESOLUTION: PR #498 (missions-proposed-lane-signal-hardening-001) MERGED** — Mirror SUCCESS 04:49:42Z Jun-14; Forge session 45e53d6e completed. Forge PID 2602672 alive (~2h04m; forge.log silent since 04:08:19Z; timeout ~08:08Z Jun-14). p4-meaning-layer-narrator + heal-stale-daemon queued in Forge inbox. PRIME DIRECTIVE: interventions=855, systemic_fixes=41, ratio=20.85, trend=flat. HEAD=acc35a3=origin/main. Sync: 05:21:45Z (52 min ago). **Tier:** Tier 1. inbox-watcher.log missing (PID alive; no escalation).
 
 ---
 
-## Key standing items (as of iter ~1718)
+## Key standing items (as of iter ~1723)
 
 | Item | Status | Action needed |
 |---|---|---|
@@ -70,12 +70,13 @@
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| p4-meaning-layer-narrator (Phase 4 step-1) | [blue/watch] NEW — dispatched to Forge inbox 23:35 MDT Jun-13 | Watch: Forge PID 2602672 completes → picks up next task |
-| Forge missions-proposed reconciliation | [blue/watch] PID 2602672 (1h29m elapsed; timeout ~08:08Z Jun-14) | Watch: forge.log "Completed" + inbox archived |
-| heal-stale-daemon-restart-tier3-translation-001 | [blue] Queued in Forge inbox | Watch: Forge PR after p4-meaning-layer or interleaved |
+| PR #498 missions-proposed-lane-signal-hardening-001 | **RESOLVED** — MERGED, Mirror SUCCESS 04:49:42Z Jun-14 | CLOSED |
+| Forge PID 2602672 post-PR | [blue/watch] forge.log silent since 04:08:19Z (~2h); timeout ~08:08Z Jun-14 | Watch: pickup of heal-stale-daemon or p4-meaning-layer |
+| p4-meaning-layer-narrator (Phase 4 step-1) | [blue/watch] Queued in Forge inbox | Watch: Forge PID 2602672 completes → picks up next task |
+| heal-stale-daemon-restart-tier3-translation-001 | [blue] Queued in Forge inbox | Watch: Forge PR |
 | fix-alert-triage-watermark-durability-001 | [blue] 1 stale entry in beacon-pending-approvals (Jun-12) | Carry |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
-| G-rule heal-stale-daemon-code-auto-restart-needs-template | [blue] heal-stale-daemon-restart-tier3-translation-001 in Forge queue. RESET 0/3. | Watch: Forge PR |
+| G-rule heal-stale-daemon-code-auto-restart-needs-template | [blue] heal-stale-daemon-restart-tier3-translation-001 in Forge queue. | Watch: Forge PR |
 | G-rule alert-translations-no-patterns-delivery-confirmation-tier4 | [blue] 2/3 | Watch; dispatch at 3/3 |
 | G-rule missions-card-gc-warn-vs-info | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule missions-autoregister-warn-vs-info | [blue] 1/3 | Watch; dispatch at 3/3 |
@@ -86,5 +87,3 @@
 | sync-push-rebase-loop-001 | [blue] UNREGISTERED AR; self-healed | Carry |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
-| dag-preflight-missions-v2-phase4 | RESOLVED — Larry approved 23:32 MDT; Mirror PASS; sequence active | CLOSED |
-| Phase 4 build sequence | RESOLVED — active as of 23:34Z MDT Jun-13; step-1 in Forge queue | CLOSED |
