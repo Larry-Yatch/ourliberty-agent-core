@@ -60,9 +60,15 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 11:34Z UTC (Iter ~1767, Tier 1, consecutive_clean=0)
+## heal-stale-daemon-code heartbeat correct path (corrected iter ~1768)
 
-**Iter ~1767 summary:** All checks nominal. PR #497 MERGEABLE=UNKNOWN (44th consecutive iter, carry), mirror-review=FAILURE, no action. Heartbeat at 11:07:04Z (fresh, ~27 min). All inboxes clear. HEAD=7cd37d7b=origin/main. Sync: 11:22:21Z (status=no-change). PRIME DIRECTIVE: interventions=899, systemic_fixes=41, ratio≈21.90, trend=flat. **Tier:** Tier 1. Pipeline stall: 0 stalls, 13 FORGE_NO_PR_SKIP (+1 since iter ~1766: p4-conversation-doorbell pr=#502 merged 10:11Z).
+**Rule:** The heal-stale-daemon-code heartbeat lives at `/home/larry/agents/blackboard/heal-stale-daemon-code.heartbeat` (NOT `state/`). This is `HEARTBEAT_FILE` in `scripts/heal_stale_daemon_code.py`. Previous Check 5 invocations used `state/` path and would have gotten "no file" — always use `blackboard/` path.
+
+---
+
+## Status snapshot — updated 2026-06-14 11:38Z UTC (Iter ~1768, Tier 1, consecutive_clean=0)
+
+**Iter ~1768 summary:** All checks nominal. PR #497 MERGEABLE=UNKNOWN (45th consecutive iter, carry), mirror-review=FAILURE, no action. Heartbeat at `blackboard/heal-stale-daemon-code.heartbeat` 11:37:05Z (fresh, ~1-3 min). All inboxes clear. HEAD=6b1d191a=origin/main. Sync: 11:22:21Z (status=no-change). PRIME DIRECTIVE: interventions=900, systemic_fixes=41, ratio≈21.95, trend=flat. **Tier:** Tier 1. Pipeline stall: 0 stalls, 13 FORGE_NO_PR_SKIP (stable).
 
 ---
 
@@ -70,7 +76,7 @@
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN, mirror-review=FAILURE, no reviewDecision (44 iters: ~1724→~1767) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN, mirror-review=FAILURE, no reviewDecision (45 iters: ~1724→~1768) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
