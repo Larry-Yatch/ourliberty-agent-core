@@ -72,17 +72,17 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 18:57Z UTC (Iter ~1815, Tier 1, signal: PR #507 MERGED — captures-dirty-tree-allowlist-001 RESOLVED)
+## Status snapshot — updated 2026-06-14 19:05Z UTC (Iter ~1816, Tier 1, nominal)
 
-**Iter ~1815 summary:** All checks 0–5 + A–E nominal. 1 alert Tier-3 silenced (watermark 929→930, review-pass for PR #507). captures-dirty-tree-allowlist-001 COMPLETE (PR #507 auto-merged 18:50:13Z, commit 8cf83835). G-rule droplet-uncommitted:main RESOLVED (fix live). check-0-helper-authority-enforcement-001 still pending Larry approval. G-rule health-notify-script-missing: 1/3. PR #497 carry (91st iter). PRIME DIRECTIVE: ratio≈20.44, systemic_fixes=45, iter_clean. **Tier: Tier 1** (consecutive_clean=0).
+**Iter ~1816 summary:** All checks 0–5 + A–E nominal. 0 new alerts (watermark=930). dashboard PR #54 (p4-parked-card) confirmed MERGED 10:31:11Z — resolved carry. No new findings. PR #497 carry (92nd iter). PRIME DIRECTIVE: ratio≈20.44, systemic_fixes=45, iter_clean. **Tier: Tier 1** (consecutive_clean=0).
 
 ---
 
-## Key standing items (as of iter ~1815)
+## Key standing items (as of iter ~1816)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (91st iter: ~1724→~1815) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (92nd iter: ~1724→~1816) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
@@ -90,6 +90,7 @@
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
 | TSR DAG sequence | [blue] **COMPLETE ✅** — PR #504 ✅, PR #505 ✅, PR #506 ✅ (18:13:12Z) | Done |
 | captures-dirty-tree-allowlist-001 | [blue] **RESOLVED ✅** — PR #507 merged 18:50:13Z, commit 8cf83835; fix live | Done |
+| ourliberty-dashboard PR #54 | [blue] **RESOLVED ✅** — merged 10:31:11Z (p4-parked-card: meaning-layer Parked card) | Done |
 | check-0-helper-authority-enforcement-001 | [blue] **PENDING LARRY APPROVAL** (beacon-pending-approvals.json, created 18:38:15Z Jun-14) | Reply 'approve'/'go'/'ok' in Telegram |
 | G-rule health-notify-script-missing | [blue] **1/3** — ourliberty-health notify path misconfigured; alerts drop to journalctl only | Watch; dispatch at 3/3 |
 | catalog-accuracy-drift | [blue] 8/34 ourliberty-graph shelf cards drifted (attention rate 24%, gate 10%) | route=digest; journal-note only |
@@ -106,4 +107,4 @@
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
 | dashboard_api PID 2868353 | [blue] Ssl stable since 17:59Z; prior restart cause still unknown | Note; watch for recurrence |
-| Stale bash orphans | [blue] PIDs 1834248 (16d 23h+) + 2605007 (14h 35m+). Ss, 0% CPU. | Carry; cleanup when convenient |
+| Stale bash orphans | [blue] PIDs 1834248 (16d 23h+) + 2605007 (14h 41m+). Ss, 0% CPU. | Carry; cleanup when convenient |
