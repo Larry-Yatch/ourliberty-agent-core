@@ -72,9 +72,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 19:53Z UTC (Iter ~1824, Tier 1, nominal)
+## Status snapshot — updated 2026-06-14 20:02Z UTC (Iter ~1825, Tier 1, nominal)
 
-**Iter ~1824 summary:** Fully nominal. 0 new alerts. 0 new findings. All daemons alive. Git clean/current. PR #497 carry (100th iter). PR #498 verified MERGED (stale FORGE_NO_PR_SKIP reference resolved). PID 2605007 (15h31m) waiting on PR #498 worktree output — PR merged, orphan will not self-exit. Watermark=931. §5.0 no-op. Rotations nominal. PRIME DIRECTIVE: 0 interventions (iter_clean), ratio≈20.47. **Tier: Tier 1** (consecutive_clean=0).
+**Iter ~1825 summary:** Fully nominal. 0 new alerts. 0 new findings. All daemons alive. Git clean/current. PR #497 carry (101st iter). Orphans PID 1834248 (17d+) + PID 2605007 (15h41m+, PR #498 merged, will not self-exit) carrying. Watermark=931. §5.0 no-op. Rotations nominal. PRIME DIRECTIVE: 0 interventions (iter_clean), ratio≈20.47. **Tier: Tier 1** (consecutive_clean=0).
 
 ---
 

@@ -4,6 +4,105 @@
 
 ---
 
+## Iteration ~1825 — 2026-06-14 20:02Z UTC (interactive, /loop→/cycle, Tier 1, nominal)
+
+**Trigger:** Larry `/loop` autonomous invocation.
+
+**Health:** ✅ Nominal. All checks 0–5 + A–E clean. PR #497 [yellow] 101st consecutive carry.
+
+**VERIFY-BEFORE-REASSERT (iter ~1824 carries):**
+- PR #497 REVIEW_ESCALATE: `gh pr list` → OPEN, UNKNOWN, reviewDecision="", statusCheckRollup=FAILURE (mirror-review). 101st consecutive iter. **CARRY** [yellow].
+- dashboard_api PID 2868353: elapsed=02:01:10, Ssl, stable. **CARRY** [blue].
+- Stale bash orphans: PID 1834248 (17d 00h 43m, Ss — still waiting on build-check-viii-pr-2b artifact), PID 2605007 (15h 41m, Ss — still waiting on PR #498 worktree, PR merged; will not self-exit). **CARRY** [blue].
+- G-rule health-notify-script-missing: outbox-notifier.log 0 WARNs/ERRORs. **CARRY 1/3** [blue].
+- G-rule droplet-uncommitted:main: Repo clean this iter. **CARRY monitoring** [blue].
+
+**Check 0 — Alert triage:** Watermark=931 (set end of iter ~1824). File=931 lines. **0 new alerts.** ✅ Nominal.
+
+**Check 1 — Log noise:** outbox_notifier.log last 50 lines: 0 WARNs/ERRORs. inbox_watcher.log: 0 WARNs/ERRORs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot.log: last message from Larry 13:36:21 MDT (19:36:21Z) "Go" → PR #508 handled iter ~1823. Last notification idx=930 delivered 13:51:35 MDT (review-pass PR #508). No new Larry messages. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → "no stalls detected". FORGE_NO_PR_SKIP=15 (expected pattern tasks). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: pending=0. All agent inboxes empty. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heartbeat=`2026-06-14T19:38:51Z`, age≈22 min. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=533d540c=origin/main (Pulse cycle 20260614T195533Z). Clean working tree. On main. 0 ahead, 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-14T19:23:37Z, status=no-change, age≈37 min. Within 2h. ✅ Nominal.
+
+**Check C — Agent liveness:**
+- inbox_watcher: PID 2530123 ✅ (1d 00h 36m, Ssl)
+- chain_event_shipper: PID 2744551 ✅ (09h 24m, SNs)
+- beacon_telegram_bot: PID 2744840 ✅ (09h 24m, Ss)
+- outbox_notifier: PID 2744914 ✅ (09h 24m, Ss)
+- dashboard_api: PID 2868353 ✅ (02h 01m, Ssl, stable)
+- No forge/mirror persistent sessions — expected. ✅
+- [blue] PID 1834248: stale bash orphan (17d 00h 43m+, Ss). [carry]
+- [blue] PID 2605007: stale bash orphan (15h 41m+, Ss). PR #498 merged; will not self-exit. [carry]
+
+**Check E — PRs:**
+ourliberty-agent-core:
+- **PR #497** OPEN (`fix(cleanup-branches): success-prune alert is info, not warning`), UNKNOWN, reviewDecision="", statusCheckRollup=FAILURE. [yellow] carry — **101st** consecutive iter.
+ourliberty-dashboard: No open PRs. ✅
+
+**§5.0 conditional checks:** Today is Sunday 2026-06-14 UTC. Check I already ran this cycle day (iter ~1718). **SKIP**. Check III last artifact 2026-06-11 (3 days old, <14d). **SKIP**.
+
+**Rotations:** No change from iter ~1824. Closest: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~69 days). No DM needed.
+
+**New findings:** None. All items are carries.
+
+**Actions taken:**
+1. `cycle_prime_ledger.py append --tier 1 --kind iter_clean --template no-new-findings-pr-497-carry` ✅
+2. `cycle_tier_state.py record --checks-clean false` → tier stays 1, consecutive_clean=0 (PR #497 standing item in Check E). ✅
+
+**Dispatches:** None.
+
+**Patterns:**
+- G-rule health-notify-script-missing: **1/3**. Carry.
+- G-rule F24-empty-prompt-envelope-rejected: **2/3**. Carry.
+- G-rule missions-card-gc-warn-vs-info: **2/3**. Carry.
+- G-rule missions-autoregister-warn-vs-info: **2/3**. Carry.
+- G-rule droplet-uncommitted:main: **RESOLVED** (PR #507 live). Monitoring for recurrence.
+- G-rule timer-cycle-no-journal-entry: **0/3**. Carry.
+- G-rule Forge-timeout-worktree-missing-retry-loop: **1/3**. Carry.
+- G-rule heal-stale-daemon-script_path-cosmetic: **1/3**. Carry.
+- G-rule Forge-preflight-marker-error-retry: **1/3**. Carry.
+
+**Standing findings:**
+- [yellow] **PR #497 REVIEW_ESCALATE** — statusCheckRollup=FAILURE (101st consecutive iter). Close: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core`. [carry]
+- [yellow] **unreviewed-merge:499** — Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed'. [carry]
+- [yellow] **unreviewed-merge:494** — DM sent iter ~1694. Reply or silence. [carry]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614. Reply or silence. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **TSR DAG sequence** — COMPLETE ✅. PR #504 ✅, #505 ✅, #506 ✅. [carry complete]
+- [blue] **captures-dirty-tree-allowlist-001** — RESOLVED ✅ PR #507 merged 18:50:13Z.
+- [blue] **check-0-helper-authority-enforcement-001** — RESOLVED ✅ PR #508 merged 19:46:35Z.
+- [blue] **G-rule health-notify-script-missing** — 1/3. Watch; dispatch at 3/3.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch; dispatch at 3/3.
+- [blue] **G-rule missions-card-gc-warn-vs-info** — 2/3. Watch; dispatch at 3/3.
+- [blue] **G-rule missions-autoregister-warn-vs-info** — 2/3. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — RESOLVED (PR #507 live). Monitoring for recurrence.
+- [blue] **G-rule timer-cycle-no-journal-entry** — 0/3. [carry]
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. [carry]
+- [blue] **G-rule heal-stale-daemon-script_path-cosmetic** — 1/3. [carry]
+- [blue] **G-rule Forge-preflight-marker-error-retry** — 1/3. [carry]
+- [blue] **Check I medic-operator-scaffold-001** — 24.4σ; `/dispatch 1` if re-run needed. [carry]
+- [blue] **catalog-accuracy-drift** — 8/34 ourliberty-graph shelf cards drifted. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — last occurrence 13:22:39Z Jun-14 (self-healed). [carry]
+- [blue] **dag-preflight-revision gap** — PR #484 closed source=pulse gap; DAG markers still fall through. [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+- [blue] **Stale bash orphans** — PID 1834248 (17d 00h 43m+) + PID 2605007 (15h 41m+, PR #498 merged; will not self-exit). Ss, 0% CPU. [carry]
+- [blue] **dashboard_api PID 2868353** — Ssl, stable; prior restart cause still unknown. [carry]
+
+**PRIME DIRECTIVE:** 0 interventions this iter (iter_clean). ratio≈20.47, trend=flat. Recorded iter_clean.
+**Tier end-of-iter:** **Tier 1** (--checks-clean false; PR #497 standing item; consecutive_clean=0).
+
+---
+
 ## Iteration ~1824 — 2026-06-14 19:53Z UTC (interactive, /cycle, Tier 1, nominal)
 
 **Trigger:** Larry direct invocation (`/cycle`).
