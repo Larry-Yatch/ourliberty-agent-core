@@ -574,6 +574,37 @@ class CaptureActionResponse(BaseModel):
     snoozed_until: Optional[str] = None
 
 
+class CaptureThreadMessage(BaseModel):
+    # Missions v2 Phase 4 § 8 — one card_message turn. Every field is optional so
+    # a malformed/legacy row degrades per-field rather than failing the read.
+    ts: Optional[str] = None
+    direction: Optional[str] = None  # larry_to_team | team_to_larry
+    text: Optional[str] = None
+    actor: Optional[str] = None
+    needs_reply: Optional[bool] = None
+
+
+class CaptureThreadResponse(BaseModel):
+    # GET /api/missions/captures/{id}/thread — oldest-first conversation (§ 8).
+    capture_id: str
+    messages: list[CaptureThreadMessage] = Field(default_factory=list)
+    last_synced_at: str
+
+
+class CaptureMessageRequest(BaseModel):
+    # POST /api/missions/captures/{id}/message body (§ 8).
+    text: str = Field(..., min_length=1)
+
+
+class CaptureMessageResponse(BaseModel):
+    # The card_message was emitted + a resume envelope dropped in Beacon's inbox.
+    posted: bool
+    event_id: str
+    direction: str
+    envelope_written: Optional[str] = None
+    doorbell_resolved: bool = False
+
+
 class MissionActionRequest(BaseModel):
     # Missions v2 Phase 3 § 5 — POST /api/system/missions/{id}/action body.
     action: str = Field(..., min_length=1)  # defer | resume | reprioritize
@@ -2969,6 +3000,12 @@ def detect_orphans(
         tid = ev.get('task_id')
         if not tid or tid in registered_task_ids:
             continue
+        # Phase 4 step 1b: card_message events are keyed by capture_id (a
+        # capture, not a mission task) so a thread is one query. They'd
+        # otherwise surface every captured card in the Orphans lane — they
+        # are conversation rows on a capture, never standalone chain work.
+        if (ev.get('event_type') or '') == 'card_message':
+            continue
         if is_infrastructure_task(tid, ev.get('agent')):
             continue
         existing = by_task.get(tid)
@@ -4446,6 +4483,199 @@ def _handle_capture_action(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail=f'invalid action={action!r}; expected promote|drop|snooze',
     )
+
+
+# Missions v2 Phase 4 step 1b — the capture-scoped conversation thread + doorbell
+# (spec: agents/beacon/specs/missions-v2-phase4-meaning-layer.md § 8 + § 9)
+#
+# The thread reuses the chain_events store keyed by the capture_id (a `card_message`
+# event per turn) rather than a bespoke thread table (§ 3 reuse map: "generalize
+# the CLARIFY rails"). GET reads the rows back oldest-first; POST emits one row for
+# Larry's message AND drops a resume/notify envelope into Beacon's inbox so she
+# answers on her next cycle (§ 8: "writes a resume/notify envelope into Beacon's
+# inbox; Beacon answers on its next cycle"). A Larry message also resolves any
+# pending blocked-on-you doorbell (§ 9) — his reply silences the ping immediately.
+
+# direction values on a card_message payload. larry_to_team is the operator
+# asking/answering on the card; team_to_larry is Beacon's reply (push-emitted by
+# Beacon's runtime, NOT this endpoint — listed here as the read-side contract).
+_CARD_MSG_LARRY = 'larry_to_team'
+_CARD_MSG_TEAM = 'team_to_larry'
+
+
+def _shape_thread_message(ev: dict[str, Any]) -> dict[str, Any]:
+    """Project a `card_message` chain_event into a thread entry (§ 8). Fields are
+    read defensively — a malformed row degrades to None per field rather than
+    500-ing the read."""
+    payload = _ev_payload(ev)
+    direction = payload.get('direction')
+    if direction not in (_CARD_MSG_LARRY, _CARD_MSG_TEAM):
+        direction = None
+    text = payload.get('text')
+    if not isinstance(text, str):
+        text = None
+    actor = payload.get('actor')
+    if not isinstance(actor, str):
+        actor = ev.get('agent') if isinstance(ev.get('agent'), str) else None
+    needs_reply = payload.get('needs_reply')
+    if not isinstance(needs_reply, bool):
+        needs_reply = None
+    return {
+        'ts': ev.get('ts'),
+        'direction': direction,
+        'text': text,
+        'actor': actor,
+        'needs_reply': needs_reply,
+    }
+
+
+def _handle_capture_thread(
+    *,
+    capture_id: str,
+    captures_path: Path,
+    supabase_client: Any,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """GET /api/missions/captures/{id}/thread (§ 8). Returns the card's
+    conversation, oldest-first. 404 if the capture doesn't exist. Degrades to an
+    empty thread when Supabase is unavailable (no creds / test env) — same
+    read-resilience contract as the derive."""
+    now = now or datetime.now(timezone.utc)
+    registry = _read_captures_registry(captures_path)
+    _find_capture(registry.get('captures') or [], capture_id)
+
+    by_task = _fetch_events_for_task_ids(supabase_client, [capture_id])
+    events = by_task.get(capture_id) or []  # newest-first from the fetch
+    messages = [
+        _shape_thread_message(ev)
+        for ev in events
+        if (ev.get('event_type') or '') == 'card_message'
+    ]
+    messages.reverse()  # oldest-first for natural thread render
+    return {
+        'capture_id': capture_id,
+        'messages': messages,
+        'last_synced_at': now.isoformat(),
+    }
+
+
+def _handle_capture_message(
+    *,
+    capture_id: str,
+    text: str,
+    actor: str,
+    captures_path: Path,
+    agents_root: Path,
+    supabase_client: Any,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """POST /api/missions/captures/{id}/message (§ 8) — Larry posts on a card.
+
+    Three effects, in order:
+      1. Emit one `card_message` chain_event (direction=larry_to_team) keyed by
+         the capture_id, so GET .../thread reads it back and the audit trail
+         records the operator turn.
+      2. Drop a resume/notify envelope into Beacon's inbox so she answers on her
+         next cycle (the team is the single voice — § 2 decision #5).
+      3. Resolve any pending blocked-on-you doorbell for this card (§ 9) — the
+         operator just replied, so the loud ping is stale.
+
+    404 if the capture doesn't exist; 503 if Supabase is unavailable (the
+    message must be durable, so we refuse rather than silently drop it)."""
+    text = (text or '').strip()
+    if not text:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='message text must be non-empty',
+        )
+    if supabase_client is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail='supabase unavailable',
+        )
+    now = now or datetime.now(timezone.utc)
+    ts_iso = now.isoformat()
+
+    registry = _read_captures_registry(captures_path)
+    cap = _find_capture(registry.get('captures') or [], capture_id)
+
+    compute_event_id, sanitize_payload = _import_chain_event_helpers()
+    event_id = compute_event_id(capture_id, 'card_message', ts_iso, extra=actor)
+    payload = {
+        'capture_id': capture_id,
+        'direction': _CARD_MSG_LARRY,
+        'text': text,
+        'actor': actor,
+        # Larry asked/answered → the team owes a reply on its next cycle.
+        'needs_reply': True,
+    }
+    row: dict[str, Any] = {
+        'event_id': event_id,
+        'ts': ts_iso,
+        'agent': actor,
+        'event_type': 'card_message',
+        'task_id': capture_id,
+        'actor': actor,
+        'payload': sanitize_payload(payload),
+    }
+    supabase_client.table('chain_events').upsert(
+        [row], on_conflict='event_id', ignore_duplicates=True,
+    ).execute()
+
+    # Resume/notify envelope → Beacon's inbox. Beacon answers on her next cycle
+    # (§ 8). Filename keyed on the event_id so concurrent messages never collide.
+    inbox = (agents_root / 'inboxes' / 'beacon').resolve()
+    filename = f'card-message-{event_id}.json'
+    envelope_candidate = (inbox / filename).resolve()
+    envelope_written: Optional[str] = None
+    if envelope_candidate.parent != inbox:
+        # Defense-in-depth: capture_id flows into the event_id (a hex digest),
+        # not the filename, so this should be unreachable — but never write
+        # outside Beacon's inbox.
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='invalid envelope filename',
+        )
+    envelope = {
+        'task_id': f'card-message-{capture_id}',
+        'source': 'dashboard',
+        'actor': actor,
+        'capture_id': capture_id,
+        'dedup_identity': f'card-message:{event_id}',
+        'timeout': 600,
+        'prompt': (
+            f'Larry posted a message on parked card `{capture_id}` '
+            f'("{cap.get("title") or capture_id}"). Read the card thread via '
+            f'GET /api/missions/captures/{capture_id}/thread, answer in your '
+            'single-voice as the team, and post your reply as a '
+            'team_to_larry card_message event for the same capture_id. '
+            f'Larry\'s message: {text}'
+        ),
+    }
+    _atomic_write_envelope(envelope_candidate, envelope)
+    envelope_written = str(envelope_candidate)
+
+    # § 9: a Larry reply clears the blocked-on-you doorbell for this card.
+    doorbell_resolved = False
+    try:
+        import missions_doorbell  # noqa: PLC0415 — lazy; sibling module
+        result = missions_doorbell.resolve_doorbell(
+            capture_id=capture_id, now=now,
+        )
+        doorbell_resolved = bool(result.get('resolved'))
+    except Exception:  # noqa: BLE001 — doorbell resolve is best-effort
+        logger.exception(
+            'doorbell resolve failed for capture %s (message still posted)',
+            capture_id,
+        )
+
+    return {
+        'posted': True,
+        'event_id': event_id,
+        'direction': _CARD_MSG_LARRY,
+        'envelope_written': envelope_written,
+        'doorbell_resolved': doorbell_resolved,
+    }
 
 
 # Missions v2 Phase 3 — mission write-back (POST /api/system/missions/{id}/action)
@@ -5975,6 +6205,47 @@ def post_capture_action(
         args=body.model_dump(exclude={'action'}, exclude_none=True),
         captures_path=_captures_json_path(),
         missions_path=_missions_json_path(),
+    )
+
+
+# GET /api/missions/captures/{capture_id}/thread — the card's async conversation
+# (Missions v2 Phase 4 § 8). Reads back the capture's card_message chain_events,
+# oldest-first. Read-only → X-Dashboard-Token suffices (no actor mutation).
+@app.get(
+    '/api/missions/captures/{capture_id}/thread',
+    response_model=CaptureThreadResponse,
+    dependencies=[Depends(_require_token)],
+)
+def get_capture_thread(capture_id: str) -> dict[str, Any]:
+    return _handle_capture_thread(
+        capture_id=capture_id,
+        captures_path=_captures_json_path(),
+        supabase_client=_get_larry_action_supabase_client(),
+    )
+
+
+# POST /api/missions/captures/{capture_id}/message — Larry posts on a card
+# (Missions v2 Phase 4 § 8). Emits a card_message event (direction larry_to_team),
+# drops a resume envelope in Beacon's inbox, and clears any blocked-on-you
+# doorbell. Same auth as the action route: X-Dashboard-Token + allowlisted X-Actor.
+@app.post(
+    '/api/missions/captures/{capture_id}/message',
+    response_model=CaptureMessageResponse,
+    response_model_exclude_none=True,
+    dependencies=[Depends(_require_token)],
+)
+def post_capture_message(
+    capture_id: str,
+    body: CaptureMessageRequest,
+    actor: str = Depends(_require_actor),
+) -> dict[str, Any]:
+    return _handle_capture_message(
+        capture_id=capture_id,
+        text=body.text,
+        actor=actor,
+        captures_path=_captures_json_path(),
+        agents_root=_agents_root(),
+        supabase_client=_get_larry_action_supabase_client(),
     )
 
 

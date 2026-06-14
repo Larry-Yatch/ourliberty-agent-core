@@ -156,6 +156,16 @@ KNOWN_EVENT_TYPES: frozenset[str] = frozenset({
     'desktop_session_start',
     'desktop_session_active',
     'desktop_session_done',
+    # Missions v2 Phase 4 step 1b (missions-v2-phase4-meaning-layer.md § 8):
+    # the capture-scoped conversation thread. The dashboard's
+    # POST /api/missions/captures/{id}/message push-emits one of these per
+    # operator message (direction='larry_to_team', agent=actor email), and
+    # Beacon push-emits the same type on her reply (direction='team_to_larry',
+    # agent='beacon'). task_id is the capture_id so a thread is one query.
+    # GET /api/missions/captures/{id}/thread reads these rows back. The
+    # shipper never produces these rows; listing the type here admits it to
+    # the weekly chain-event-type audit (heal_chain_event_type_audit.py).
+    'card_message',
 })
 
 # PII / credential redaction. Any payload field key matching one of these

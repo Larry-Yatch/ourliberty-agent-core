@@ -1,0 +1,311 @@
+#!/usr/bin/env python3
+"""Tests for the capture conversation thread (Missions v2 Phase 4 § 8):
+
+  - GET  /api/missions/captures/{id}/thread  — read the card_message thread
+  - POST /api/missions/captures/{id}/message — Larry posts on a card
+
+The thread reuses the chain_events store (no bespoke thread store): a POST emits
+one `card_message` event (direction larry_to_team), drops a resume envelope in
+Beacon's inbox, and clears any blocked-on-you doorbell; the GET reads the
+card_message rows back oldest-first. Supabase is stubbed; the doorbell resolve is
+mocked (it routes through larry_alerts/alert_triage_state which refuse_under_test).
+
+Also covers the detect_orphans card_message skip-guard (card_message rows are
+keyed by capture_id and must never surface in the Orphans lane).
+
+Run:
+    cd ~/agent-core && python3 -m unittest \\
+        scripts.tests.test_dashboard_api_captures_thread
+"""
+from __future__ import annotations
+
+try:  # engage the test sandbox before any production import reads env/paths
+    from . import _bootstrap  # noqa: F401
+except ImportError:  # discover loads this module top-level (no package parent)
+    import _bootstrap  # noqa: F401
+
+import json
+import os
+import sys
+import tempfile
+import unittest
+from unittest import mock
+from pathlib import Path
+from typing import Any, Optional
+
+_REPO_SCRIPTS = Path(__file__).resolve().parent.parent
+if str(_REPO_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_REPO_SCRIPTS))
+
+TOKEN = 'test-token-value'
+os.environ.setdefault('DASHBOARD_API_TOKEN', TOKEN)
+
+import dashboard_api as da  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+ACTOR = next(iter(da.LARRY_ACTION_ALLOWED_EMAILS))
+AUTH = {'X-Dashboard-Token': TOKEN, 'X-Actor': ACTOR}
+
+
+def _thread_url(cid: str) -> str:
+    return f'/api/missions/captures/{cid}/thread'
+
+
+def _message_url(cid: str) -> str:
+    return f'/api/missions/captures/{cid}/message'
+
+
+def _cap(cid='cap-1', *, title='Aging idea', risk=None):
+    cap = {'id': cid, 'title': title, 'state': 'parked',
+           'origin': {'repo': 'ourliberty-agent-core'}}
+    if risk is not None:
+        cap['risk'] = risk
+    return cap
+
+
+class _Resp:
+    def __init__(self, data: list[Any]):
+        self.data = data
+
+
+class _ThreadClient:
+    """Minimal supabase stub: thread fetch (select.in_.order) + message upsert.
+
+    `rows` is the chain_events table; select returns rows matching the in_ filter,
+    upsert appends (honoring on_conflict/ignore_duplicates on event_id)."""
+
+    def __init__(self, rows: Optional[list[dict[str, Any]]] = None):
+        self.rows = list(rows or [])
+        self.upserts: list[dict[str, Any]] = []
+        self._op: Optional[str] = None
+        self._in_vals: list[str] = []
+        self._upsert_rows: list[dict[str, Any]] = []
+        self._upsert_kwargs: dict[str, Any] = {}
+
+    def table(self, name: str):
+        self._op = None
+        self._in_vals = []
+        self._upsert_rows = []
+        self._upsert_kwargs = {}
+        return self
+
+    def select(self, cols: str = '*'):
+        self._op = 'select'
+        return self
+
+    def in_(self, col: str, vals: list[str]):
+        self._in_vals = list(vals)
+        return self
+
+    def order(self, col: str, desc: bool = False):
+        return self
+
+    def upsert(self, rows: list[dict[str, Any]], **kwargs):
+        self._op = 'upsert'
+        self._upsert_rows = rows
+        self._upsert_kwargs = kwargs
+        return self
+
+    def execute(self):
+        if self._op == 'select':
+            data = [r for r in self.rows if r.get('task_id') in self._in_vals]
+            return _Resp(data)
+        if self._op == 'upsert':
+            existing = {r.get('event_id') for r in self.rows}
+            for row in self._upsert_rows:
+                self.upserts.append(row)
+                if (self._upsert_kwargs.get('ignore_duplicates')
+                        and row.get('event_id') in existing):
+                    continue
+                self.rows.append(row)
+            return _Resp([])
+        return _Resp([])
+
+
+class _ThreadBase(unittest.TestCase):
+    def setUp(self):
+        os.environ['DASHBOARD_API_TOKEN'] = TOKEN
+        self.tmp = Path(tempfile.mkdtemp(prefix='dash-thread-'))
+        (self.tmp / 'inboxes' / 'beacon').mkdir(parents=True, exist_ok=True)
+        self.captures_path = self.tmp / 'agents' / 'beacon' / 'captures.json'
+
+        self._orig_captures = da._captures_json_path
+        self._orig_agents = da._agents_root
+        self._orig_client = da._get_larry_action_supabase_client
+        da._captures_json_path = lambda: self.captures_path  # type: ignore[assignment]
+        da._agents_root = lambda: self.tmp  # type: ignore[assignment]
+        self.client = _ThreadClient()
+        da._get_larry_action_supabase_client = lambda: self.client  # type: ignore[assignment]
+        self.c = TestClient(da.app)
+
+    def tearDown(self):
+        da._captures_json_path = self._orig_captures  # type: ignore[assignment]
+        da._agents_root = self._orig_agents  # type: ignore[assignment]
+        da._get_larry_action_supabase_client = self._orig_client  # type: ignore[assignment]
+
+    def _seed(self, *caps):
+        self.captures_path.parent.mkdir(parents=True, exist_ok=True)
+        self.captures_path.write_text(
+            json.dumps({'schema_version': 2, 'captures': list(caps)}) + '\n')
+
+    def _msg_row(self, cid, event_id, ts, *, direction='larry_to_team',
+                 text='hi', actor=ACTOR, needs_reply=True):
+        return {
+            'event_id': event_id, 'ts': ts, 'agent': actor,
+            'event_type': 'card_message', 'task_id': cid, 'actor': actor,
+            'payload': {'capture_id': cid, 'direction': direction,
+                        'text': text, 'actor': actor, 'needs_reply': needs_reply},
+        }
+
+    def _beacon_inbox(self) -> Path:
+        return self.tmp / 'inboxes' / 'beacon'
+
+
+# ==================== auth ====================
+
+class AuthTest(_ThreadBase):
+    def test_thread_missing_token_401(self):
+        r = self.c.get(_thread_url('cap-1'))
+        self.assertEqual(r.status_code, 401)
+
+    def test_message_missing_actor_401(self):
+        self._seed(_cap('cap-1'))
+        r = self.c.post(_message_url('cap-1'),
+                        headers={'X-Dashboard-Token': TOKEN},
+                        json={'text': 'hello'})
+        self.assertEqual(r.status_code, 401)
+
+
+# ==================== GET thread ====================
+
+class ThreadGetTest(_ThreadBase):
+    def test_missing_capture_404(self):
+        self._seed(_cap('cap-1'))
+        r = self.c.get(_thread_url('nope'), headers=AUTH)
+        self.assertEqual(r.status_code, 404)
+
+    def test_empty_thread_for_known_capture(self):
+        self._seed(_cap('cap-1'))
+        r = self.c.get(_thread_url('cap-1'), headers=AUTH)
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(body['capture_id'], 'cap-1')
+        self.assertEqual(body['messages'], [])
+        self.assertIn('last_synced_at', body)
+
+    def test_returns_card_messages_oldest_first(self):
+        self._seed(_cap('cap-1'))
+        # store newest-first (as supabase would, before the handler reverses)
+        self.client.rows = [
+            self._msg_row('cap-1', 'e2', '2026-06-14T02:00:00+00:00',
+                          direction='team_to_larry', text='second'),
+            self._msg_row('cap-1', 'e1', '2026-06-14T01:00:00+00:00',
+                          direction='larry_to_team', text='first'),
+        ]
+        r = self.c.get(_thread_url('cap-1'), headers=AUTH)
+        self.assertEqual(r.status_code, 200)
+        msgs = r.json()['messages']
+        self.assertEqual([m['text'] for m in msgs], ['first', 'second'])
+        self.assertEqual([m['direction'] for m in msgs],
+                         ['larry_to_team', 'team_to_larry'])
+
+    def test_filters_non_card_message_rows(self):
+        self._seed(_cap('cap-1'))
+        self.client.rows = [
+            self._msg_row('cap-1', 'e1', '2026-06-14T01:00:00+00:00'),
+            {'event_id': 'x', 'ts': '2026-06-14T01:30:00+00:00',
+             'event_type': 'task_done', 'task_id': 'cap-1', 'payload': {}},
+        ]
+        r = self.c.get(_thread_url('cap-1'), headers=AUTH)
+        msgs = r.json()['messages']
+        self.assertEqual(len(msgs), 1)
+        self.assertEqual(msgs[0]['text'], 'hi')
+
+
+# ==================== POST message ====================
+
+class MessagePostTest(_ThreadBase):
+    def test_empty_text_400(self):
+        self._seed(_cap('cap-1'))
+        r = self.c.post(_message_url('cap-1'), headers=AUTH, json={'text': '   '})
+        # pydantic min_length=1 lets '   ' through; the handler strips → 400.
+        self.assertEqual(r.status_code, 400)
+
+    def test_missing_text_422(self):
+        self._seed(_cap('cap-1'))
+        r = self.c.post(_message_url('cap-1'), headers=AUTH, json={})
+        self.assertEqual(r.status_code, 422)
+
+    def test_unknown_capture_404(self):
+        self._seed(_cap('cap-1'))
+        r = self.c.post(_message_url('nope'), headers=AUTH, json={'text': 'hi'})
+        self.assertEqual(r.status_code, 404)
+
+    def test_post_emits_event_envelope_and_resolves_doorbell(self):
+        self._seed(_cap('cap-1', title='My card'))
+        with mock.patch('missions_doorbell.resolve_doorbell',
+                        return_value={'resolved': True}) as resolve:
+            r = self.c.post(_message_url('cap-1'), headers=AUTH,
+                            json={'text': 'what about X?'})
+        self.assertEqual(r.status_code, 200, r.text)
+        body = r.json()
+        self.assertTrue(body['posted'])
+        self.assertEqual(body['direction'], 'larry_to_team')
+        self.assertTrue(body['doorbell_resolved'])
+        self.assertTrue(body['event_id'])
+
+        # the card_message event was upserted with the right shape
+        self.assertEqual(len(self.client.upserts), 1)
+        row = self.client.upserts[0]
+        self.assertEqual(row['event_type'], 'card_message')
+        self.assertEqual(row['task_id'], 'cap-1')
+        self.assertEqual(row['actor'], ACTOR)
+        self.assertEqual(row['payload']['direction'], 'larry_to_team')
+        self.assertEqual(row['payload']['text'], 'what about X?')
+        self.assertTrue(row['payload']['needs_reply'])
+
+        # a resume envelope landed in Beacon's inbox
+        envelopes = list(self._beacon_inbox().glob('card-message-*.json'))
+        self.assertEqual(len(envelopes), 1)
+        env = json.loads(envelopes[0].read_text())
+        self.assertEqual(env['source'], 'dashboard')
+        self.assertEqual(env['capture_id'], 'cap-1')
+        self.assertIn('what about X?', env['prompt'])
+        self.assertEqual(env['dedup_identity'], f"card-message:{row['event_id']}")
+
+        resolve.assert_called_once()
+
+    def test_supabase_unavailable_503(self):
+        self._seed(_cap('cap-1'))
+        da._get_larry_action_supabase_client = lambda: None  # type: ignore[assignment]
+        r = self.c.post(_message_url('cap-1'), headers=AUTH, json={'text': 'hi'})
+        self.assertEqual(r.status_code, 503)
+
+    def test_doorbell_resolve_failure_does_not_500(self):
+        self._seed(_cap('cap-1'))
+        with mock.patch('missions_doorbell.resolve_doorbell',
+                        side_effect=RuntimeError('boom')):
+            r = self.c.post(_message_url('cap-1'), headers=AUTH,
+                            json={'text': 'hi'})
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(r.json()['doorbell_resolved'])
+
+
+# ==================== detect_orphans card_message skip ====================
+
+class DetectOrphansCardMessageTest(unittest.TestCase):
+    def test_card_message_events_never_orphan(self):
+        events = [
+            {'task_id': 'cap-1', 'event_type': 'card_message', 'agent': ACTOR,
+             'ts': '2026-06-14T01:00:00+00:00'},
+            {'task_id': 'genuine-orphan-work', 'event_type': 'task_done',
+             'agent': 'forge', 'ts': '2026-06-14T01:00:00+00:00'},
+        ]
+        orphans = da.detect_orphans(events, registered_task_ids=set())
+        tids = {o['task_id'] for o in orphans}
+        self.assertNotIn('cap-1', tids)
+        self.assertIn('genuine-orphan-work', tids)
+
+
+if __name__ == '__main__':
+    unittest.main()
