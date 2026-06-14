@@ -51,6 +51,7 @@ if str(_SCRIPT_DIR) not in sys.path:
 
 import chain_event_emit as cee  # noqa: E402
 import larry_alerts  # noqa: E402
+import task_terminal_state as tts  # noqa: E402 — shared terminal-state probe
 from test_isolation_guard import refuse_under_test  # noqa: E402
 
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
@@ -274,8 +275,39 @@ def count_auto_cleared(events: list[dict]) -> int:
     return n
 
 
-def collect_attention(events: list[dict]) -> list[str]:
-    """Subjects of raised-attention conditions in the window (deduped)."""
+def _attention_fix_task_id(ev: dict, payload: dict) -> Optional[str]:
+    """Derive the candidate fix task_id for an attention event, or None.
+
+    The terminal-state probe needs a stable task id to look up the fix PR. An
+    attention event carries it as a top-level `task_id` or in its payload
+    (`task_id` / `fix_task_id`). When none is present we CANNOT derive a fix
+    id — the conservative posture (spec §3.6) is to leave the item unchanged
+    rather than guess, so this returns None and the caller does not probe."""
+    for cand in (ev.get('task_id'), payload.get('task_id'),
+                 payload.get('fix_task_id')):
+        if isinstance(cand, str) and cand.strip():
+            return cand.strip()
+    return None
+
+
+def collect_attention(events: list[dict], probe_fn=None) -> list[str]:
+    """Subjects of raised-attention conditions in the window (deduped).
+
+    Terminal-state suppression (spec §3.6): before surfacing an item as a
+    still-open "needs your call" problem, derive its candidate fix task_id and
+    probe the work's terminal ground truth. If the fix PR has MERGED, the
+    problem is already resolved — suppress the item rather than re-present a
+    fixed issue as open (the 2026-06-14 Check-0 watermark / PR #482 incident).
+
+    Conservative posture: ONLY a positively MERGED fix suppresses. No derivable
+    task_id, or any non-MERGED probe (OPEN/CLOSED/UNKNOWN — gh failure, no
+    match, abandoned fix), leaves the item in place. A genuinely-open problem
+    is never hidden.
+
+    `probe_fn` is an injectable seam for tests; defaults to the shared
+    `task_terminal_state` probe."""
+    if probe_fn is None:
+        probe_fn = tts.task_terminal_state
     seen: list[str] = []
     for ev in events:
         if ev.get('event_type') not in ATTENTION_EVENT_TYPES:
@@ -284,8 +316,14 @@ def collect_attention(events: list[dict]) -> list[str]:
         subject = (payload.get('subject') or payload.get('message')
                    or ev.get('task_id') or ev.get('event_type'))
         subject = str(subject).strip()
-        if subject and subject not in seen:
-            seen.append(subject)
+        if not subject or subject in seen:
+            continue
+        fix_task_id = _attention_fix_task_id(ev, payload)
+        if fix_task_id is not None and probe_fn(fix_task_id) == tts.MERGED:
+            log(f'attention item suppressed — fix shipped: subject={subject!r} '
+                f'task_id={fix_task_id!r}')
+            continue
+        seen.append(subject)
     return seen
 
 

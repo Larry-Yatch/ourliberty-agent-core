@@ -32,8 +32,17 @@ corrupts):
      like run_cycle.sh's self-commit path (push with a pull --rebase --autostash
      fallback on a non-fast-forward).
 
-  4. REPORT what it retired/aged on one audit line, never silently truncating
-     (full id lists go to the log; the digest alert carries exact counts).
+  4. RECONCILE SHIPPED MISSION PHASES (terminal-state spec § 3.3). A mission in
+     a reconcilable phase (drafting/in_flight/ready) whose every task_id is
+     terminal (MERGED/CLOSED per the shared task_terminal_state probe) is
+     flipped to `shipped` (audit-preserved: prior_phase + shipped_at/by recorded
+     in-file and logged), then the missions.json delta is committed like (3).
+     `proposed` (owned by missions-proposed-lane-signal-hardening-001) and
+     `deferred` are never touched; any OPEN/UNKNOWN task ⇒ KEEP (conservative).
+
+  5. REPORT what it retired/aged/shipped on one audit line, never silently
+     truncating (full id lists go to the log; the digest alert carries exact
+     counts).
 
 stdlib only (+ supabase-py via chain_event_emit, lazily and optionally).
 """
@@ -56,6 +65,8 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
+import task_terminal_state as tts  # noqa: E402 — shared terminal-state probe
+
 _MODELS_CONFIG_PATH = _SCRIPTS_DIR.parent / 'config' / 'agent-models.json'
 
 # The agent that owns desktop-session cards. The ingest endpoint pins this; we
@@ -77,6 +88,20 @@ _TRUNK_BRANCHES = frozenset({'main', 'master'})
 AGING_BUSINESS_DAYS = 5
 
 CAPTURES_REL = 'agents/beacon/captures.json'
+
+# The mission registry (phase model). Honors OURLIBERTY_MISSIONS_JSON for test
+# redirection, mirroring dashboard_api._missions_json_path.
+MISSIONS_REL = 'agents/beacon/missions.json'
+
+# Mission phases eligible for terminal-state reconciliation (spec § 3.3). A
+# mission in one of these whose every task_id is terminal flips to `shipped`.
+# Excluded on purpose: `proposed` (owned by the in-flight
+# missions-proposed-lane-signal-hardening-001 PR — never touch), `deferred` (a
+# deliberate human hold), and `shipped` (already terminal). Mirrors the three
+# phases named in spec § 5 success criteria ("flips out of
+# drafting/in_flight/ready").
+RECONCILABLE_MISSION_PHASES = frozenset({'drafting', 'in_flight', 'ready'})
+SHIPPED_PHASE = 'shipped'
 
 GIT_TIMEOUT_SEC = 60
 PUSH_TIMEOUT_SEC = 180
@@ -144,6 +169,16 @@ def captures_path(repo_paths: dict[str, Path]) -> Optional[Path]:
     configured."""
     core = repo_paths.get('ourliberty-agent-core')
     return (core / CAPTURES_REL) if core else None
+
+
+def missions_path(repo_paths: dict[str, Path]) -> Optional[Path]:
+    """Path to agent-core's missions.json, or None if agent-core isn't
+    configured. Honors OURLIBERTY_MISSIONS_JSON (test redirection)."""
+    override = os.environ.get('OURLIBERTY_MISSIONS_JSON')
+    if override:
+        return Path(override)
+    core = repo_paths.get('ourliberty-agent-core')
+    return (core / MISSIONS_REL) if core else None
 
 
 # ---------- time helpers ----------
@@ -508,7 +543,7 @@ def age_parked_captures(registry: dict[str, Any], now: datetime,
     return newly
 
 
-def atomic_write_captures(path: Path, registry: dict[str, Any]) -> None:
+def _atomic_write_json(path: Path, data: dict[str, Any]) -> None:
     """tmp-in-same-dir + os.replace. Mirrors dashboard_api._atomic_write_captures
     so a reader never sees a partial file."""
     import tempfile
@@ -516,7 +551,7 @@ def atomic_write_captures(path: Path, registry: dict[str, Any]) -> None:
     fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=path.name + '.', suffix='.tmp')
     try:
         with os.fdopen(fd, 'w') as fh:
-            fh.write(json.dumps(registry, indent=2) + '\n')
+            fh.write(json.dumps(data, indent=2) + '\n')
         os.replace(tmp_name, path)
     except BaseException:
         try:
@@ -526,12 +561,150 @@ def atomic_write_captures(path: Path, registry: dict[str, Any]) -> None:
         raise
 
 
+def atomic_write_captures(path: Path, registry: dict[str, Any]) -> None:
+    """Atomic write for captures.json (thin wrapper over _atomic_write_json)."""
+    _atomic_write_json(path, registry)
+
+
+# ---------- missions phase reconciliation (terminal-state spec § 3.3) -------
+
+
+def read_missions_registry(path: Path) -> Optional[dict[str, Any]]:
+    """Load missions.json as a registry dict. Missing file → fresh empty
+    registry. Malformed/wrong-shape → None (caller skips reconcile+commit; the
+    write path never appends onto a corrupt file). Mirrors
+    read_captures_registry's fail-safe contract."""
+    if not path.exists():
+        return {'schema_version': 1, 'missions': []}
+    try:
+        raw = path.read_text()
+        data = json.loads(raw) if raw.strip() else {'schema_version': 1, 'missions': []}
+    except (OSError, json.JSONDecodeError) as e:
+        log(f'missions.json malformed/unreadable ({path}): {e} — skipping reconcile this tick')
+        return None
+    if not isinstance(data, dict) or not isinstance(data.get('missions'), list):
+        log(f'missions.json shape invalid ({path}) — skipping reconcile this tick')
+        return None
+    data.setdefault('schema_version', 1)
+    return data
+
+
+@dataclass(frozen=True)
+class MissionDecision:
+    action: str   # 'ship' | 'keep'
+    reason: str
+
+
+def classify_mission(
+    phase: Any, task_ids: Any, terminal_states: dict[str, str],
+) -> MissionDecision:
+    """Decide whether a mission flips to `shipped`. Pure.
+
+    Ships ONLY when ALL of: the phase is reconcilable (drafting/in_flight/ready
+    — `proposed`/`deferred`/`shipped` are left alone), `task_ids` is a non-empty
+    list, and EVERY task_id resolves to a terminal state (MERGED/CLOSED) in
+    ``terminal_states``. A task_id missing from the map counts as non-terminal.
+    Any OPEN/UNKNOWN/missing task, an empty task list, or a non-reconcilable
+    phase ⇒ KEEP — the conservative posture (spec § 1): never falsely retire
+    live work."""
+    if phase not in RECONCILABLE_MISSION_PHASES:
+        return MissionDecision('keep', f'phase={phase} not reconcilable')
+    if not isinstance(task_ids, list) or not task_ids:
+        # Empty task list: "every entry is terminal" is vacuously true, so guard
+        # explicitly — a mission with no tasks can't be terminal-state shipped.
+        return MissionDecision('keep', 'no task_ids')
+    non_terminal = [
+        t for t in task_ids
+        if terminal_states.get(t) not in tts.TERMINAL_STATES
+    ]
+    if non_terminal:
+        return MissionDecision('keep', f'{len(non_terminal)} task(s) not terminal')
+    return MissionDecision('ship', 'all-tasks-terminal')
+
+
+@dataclass
+class MissionReconcileResult:
+    shipped: list[tuple[str, str]] = field(default_factory=list)  # (id, prior_phase)
+    kept: int = 0
+    probed: int = 0
+
+
+def reconcile_mission_phases(
+    registry: dict[str, Any],
+    now: datetime,
+    *,
+    probe_fn: Callable[[str], str],
+    dry_run: bool,
+) -> MissionReconcileResult:
+    """Flip every eligible mission whose work has shipped to `shipped`
+    (spec § 3.3). Effectful only on the in-memory registry dict (the caller
+    atomic-writes); fail-safe per-mission. `probe_fn(task_id) -> state` is the
+    terminal-state probe (production: tts.task_terminal_state).
+
+    Probing short-circuits on the first non-terminal task so a still-open
+    mission costs at most one gh round-trip past its first live task."""
+    res = MissionReconcileResult()
+    for mission in registry.get('missions', []):
+        if not isinstance(mission, dict):
+            continue
+        phase = mission.get('phase')
+        if phase not in RECONCILABLE_MISSION_PHASES:
+            continue
+        task_ids = mission.get('task_ids')
+        if not isinstance(task_ids, list) or not task_ids:
+            res.kept += 1
+            continue
+        states: dict[str, str] = {}
+        for tid in task_ids:
+            if not (isinstance(tid, str) and tid):
+                continue
+            states[tid] = probe_fn(tid)
+            res.probed += 1
+            if states[tid] not in tts.TERMINAL_STATES:
+                break  # one live/indeterminate task ⇒ KEEP; stop probing
+        decision = classify_mission(phase, task_ids, states)
+        if decision.action != 'ship':
+            res.kept += 1
+            continue
+        mid = mission.get('id') if isinstance(mission.get('id'), str) else '<unknown>'
+        if dry_run:
+            res.shipped.append((mid, f'{phase} (dry-run)'))
+            continue
+        # Audit-preserved flip: record the prior phase + provenance in-file
+        # (the dashboard reader tolerates extra keys) and in the log line below.
+        mission['phase'] = SHIPPED_PHASE
+        mission['shipped_at'] = now.isoformat()
+        mission['shipped_by'] = 'heal_missions_card_gc'
+        mission['prior_phase'] = phase
+        res.shipped.append((mid, str(phase)))
+        log(f'mission {mid}: {phase} -> shipped (all {len(task_ids)} task_id(s) '
+            f'terminal: {states})')
+    return res
+
+
 # ---------- commit + push the captures.json delta to main (§ 6.3) ----------
 
 
 def commit_and_push_captures(repo: Path, audit_msg: str) -> str:
-    """Commit + push any captures.json delta to origin/main, the batched-
-    durability half of § 4. Returns a status token:
+    """Commit + push any captures.json delta to origin/main (the batched-
+    durability half of § 4). Thin wrapper over _commit_and_push_path."""
+    return _commit_and_push_path(
+        repo, CAPTURES_REL,
+        'chore(missions): GC healer — commit captures.json delta', audit_msg)
+
+
+def commit_and_push_missions(repo: Path, audit_msg: str) -> str:
+    """Commit + push any missions.json delta to origin/main (the durability
+    half of the § 3.3 phase reconcile). Thin wrapper over _commit_and_push_path."""
+    return _commit_and_push_path(
+        repo, MISSIONS_REL,
+        'chore(missions): GC healer — reconcile terminal mission phases', audit_msg)
+
+
+def _commit_and_push_path(repo: Path, rel_path: str, commit_subject: str,
+                          audit_msg: str) -> str:
+    """Commit + push any delta to ``rel_path`` to origin/main. Returns a status
+    token:
       'nothing'       — no delta to commit
       'wrong-branch'  — repo not on main; refuse to commit (would land on a
                         feature branch) — caller escalates
@@ -546,25 +719,24 @@ def commit_and_push_captures(repo: Path, audit_msg: str) -> str:
     if branch != 'main':
         return 'wrong-branch'
 
-    clean = _git(repo, 'diff', '--quiet', '--', CAPTURES_REL)
-    clean_cached = _git(repo, 'diff', '--quiet', '--cached', '--', CAPTURES_REL)
+    clean = _git(repo, 'diff', '--quiet', '--', rel_path)
+    clean_cached = _git(repo, 'diff', '--quiet', '--cached', '--', rel_path)
     # rc 0 == no diff; rc 1 == differs. Both clean → nothing to do.
     if clean.returncode == 0 and clean_cached.returncode == 0:
         return 'nothing'
 
-    if _git(repo, 'add', CAPTURES_REL).returncode != 0:
+    if _git(repo, 'add', rel_path).returncode != 0:
         return 'commit-failed'
-    commit = _git(repo, 'commit', '-m', 'chore(missions): GC healer — commit captures.json delta',
-                  '-m', audit_msg)
+    commit = _git(repo, 'commit', '-m', commit_subject, '-m', audit_msg)
     if commit.returncode != 0:
         # "nothing to commit" shouldn't happen (we checked the delta), but treat
         # any non-zero as a failed commit so we don't claim success.
-        log(f'captures.json commit failed in {repo}: {(commit.stderr or commit.stdout).strip()[:200]}')
+        log(f'{rel_path} commit failed in {repo}: {(commit.stderr or commit.stdout).strip()[:200]}')
         return 'commit-failed'
 
     if _git(repo, 'push', '-q', 'origin', 'main', timeout=PUSH_TIMEOUT_SEC).returncode == 0:
         return 'committed'
-    log('captures.json push refused (likely non-FF); attempting pull --rebase --autostash')
+    log(f'{rel_path} push refused (likely non-FF); attempting pull --rebase --autostash')
     rebase = _git(repo, 'pull', '--rebase', '--autostash', '-q', 'origin', 'main',
                   timeout=PUSH_TIMEOUT_SEC)
     if rebase.returncode == 0:
@@ -584,7 +756,7 @@ def commit_and_push_captures(repo: Path, audit_msg: str) -> str:
     # accept the rare orphan over a retry loop: retrying would re-run `pull
     # --rebase --autostash`, briefly stashing a possibly-dirty live captures.json
     # off disk — a worse trade than the rare page.
-    log('captures.json rebase failed; aborting (commit retained locally)')
+    log(f'{rel_path} rebase failed; aborting (commit retained locally)')
     _git(repo, 'rebase', '--abort')
     return 'push-failed'
 
@@ -593,7 +765,9 @@ def commit_and_push_captures(repo: Path, audit_msg: str) -> str:
 
 
 def _emit_summary(retire: RetireResult, aged: list[str], commit_status: str,
-                  dry_run: bool) -> None:
+                  dry_run: bool,
+                  missions: Optional[MissionReconcileResult] = None,
+                  missions_commit_status: str = 'nothing') -> None:
     """One audit line (log) + a low-noise digest alert when something happened;
     escalate on a hard failure. Exact counts only — never a silently truncated
     list (full ids live in the log line above)."""
@@ -602,6 +776,11 @@ def _emit_summary(retire: RetireResult, aged: list[str], commit_status: str,
     summary = (f'missions-card-gc: {verb} {len(retire.retired)} stale session card(s) '
                f'{retired_ids}; aged {len(aged)} parked capture(s) {aged}; '
                f'kept {retire.kept} session(s); commit={commit_status}')
+    if missions is not None:
+        ship_verb = 'would ship' if dry_run else 'shipped'
+        shipped_ids = [mid for mid, _ in missions.shipped]
+        summary += (f'; {ship_verb} {len(missions.shipped)} mission(s) {shipped_ids}; '
+                    f'missions-commit={missions_commit_status}')
     if retire.emit_failures:
         summary += f'; {len(retire.emit_failures)} emit-failure(s) {retire.emit_failures}'
     if retire.skipped_no_client:
@@ -616,13 +795,20 @@ def _emit_summary(retire: RetireResult, aged: list[str], commit_status: str,
         log(f'larry_alerts unavailable: {e}')
         return
 
-    hard_failure = commit_status in ('wrong-branch', 'commit-failed', 'push-failed') \
+    failure_statuses = ('wrong-branch', 'commit-failed', 'push-failed')
+    hard_failure = (
+        commit_status in failure_statuses
+        or missions_commit_status in failure_statuses
         or bool(retire.emit_failures)
+    )
+    shipped_missions = bool(missions and missions.shipped)
     if hard_failure:
+        fail_token = commit_status if commit_status in failure_statuses else missions_commit_status
         larry_alerts.append_alert(
             source='missions-card-gc', severity='warning',
-            message=summary, subject=f'failure:{commit_status}', route='escalate')
-    elif retire.retired or aged or commit_status == 'committed':
+            message=summary, subject=f'failure:{fail_token}', route='escalate')
+    elif (retire.retired or aged or shipped_missions
+          or commit_status == 'committed' or missions_commit_status == 'committed'):
         larry_alerts.append_alert(
             source='missions-card-gc', severity='warning',
             message=summary, subject='summary', route='digest')
@@ -634,12 +820,16 @@ def _emit_summary(retire: RetireResult, aged: list[str], commit_status: str,
 def run_once(*, dry_run: bool,
              emit_fn: Optional[Callable[..., bool]] = None,
              events_fetcher: Optional[Callable[[], Optional[list[dict[str, Any]]]]] = None,
+             mission_probe_fn: Optional[Callable[[str], str]] = None,
              now: Optional[datetime] = None) -> int:
-    """One healer tick. The injectable seams (emit_fn / events_fetcher / now)
-    keep the effectful edges test-controllable; production resolves them from
-    chain_event_emit + the live Supabase client."""
+    """One healer tick. The injectable seams (emit_fn / events_fetcher /
+    mission_probe_fn / now) keep the effectful edges test-controllable;
+    production resolves them from chain_event_emit + the live Supabase client +
+    the shared terminal-state probe."""
     now = now or datetime.now(timezone.utc)
     repo_paths = load_repo_paths()
+    if mission_probe_fn is None:
+        mission_probe_fn = lambda tid: tts.task_terminal_state(tid)  # noqa: E731
 
     # --- phase 1: retire stale desktop-session cards ---
     if emit_fn is None or events_fetcher is None:
@@ -706,13 +896,47 @@ def run_once(*, dry_run: bool,
                         log(f'commit+push raised: {type(e).__name__}: {e}')
                         commit_status = 'push-failed'
 
-    _emit_summary(retire, aged, commit_status, dry_run)
+    # --- phase 4: reconcile shipped mission phases (terminal-state § 3.3) ---
+    missions = MissionReconcileResult()
+    missions_commit_status = 'nothing'
+    miss_path = missions_path(repo_paths)
+    if miss_path is None:
+        log('missions.json path unresolved (agent-core not in repo_paths) — skipping reconcile')
+    else:
+        registry = read_missions_registry(miss_path)
+        if registry is not None:
+            try:
+                missions = reconcile_mission_phases(
+                    registry, now, probe_fn=mission_probe_fn, dry_run=dry_run)
+                if missions.shipped and not dry_run:
+                    _atomic_write_json(miss_path, registry)
+            except Exception as e:  # noqa: BLE001 — fail-safe: report, never corrupt
+                log(f'mission-reconcile raised: {type(e).__name__}: {e}')
+                missions = MissionReconcileResult()
+            if missions.shipped and not dry_run:
+                core = repo_paths.get('ourliberty-agent-core')
+                if core:
+                    try:
+                        missions_commit_status = commit_and_push_missions(
+                            core, _missions_commit_audit(missions))
+                    except Exception as e:  # noqa: BLE001 — fail-safe
+                        log(f'missions commit+push raised: {type(e).__name__}: {e}')
+                        missions_commit_status = 'push-failed'
+
+    _emit_summary(retire, aged, commit_status, dry_run,
+                  missions=missions, missions_commit_status=missions_commit_status)
     return 0
 
 
 def _commit_audit(retire: RetireResult, aged: list[str]) -> str:
     return (f'Auto-committed by heal_missions_card_gc. '
             f'retired={len(retire.retired)} aged={len(aged)}.')
+
+
+def _missions_commit_audit(missions: MissionReconcileResult) -> str:
+    shipped = [f'{mid}({prior}->shipped)' for mid, prior in missions.shipped]
+    return (f'Auto-committed by heal_missions_card_gc. '
+            f'terminal-state reconcile shipped={len(missions.shipped)} {shipped}.')
 
 
 def main(argv: Optional[list[str]] = None) -> int:
