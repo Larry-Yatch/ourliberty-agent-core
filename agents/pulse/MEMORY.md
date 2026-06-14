@@ -60,17 +60,17 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 10:46Z UTC (Iter ~1760, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 10:53Z UTC (Iter ~1761, Tier 1, consecutive_clean=0)
 
-**Iter ~1760 summary:** Missions v2 Phase 4 COMPLETE — all 3 steps merged (p4-conversation-doorbell PR #502, p4-meaning-layer-narrator PR #500 ~09:01Z, p4-parked-card PR #54 ourliberty-dashboard 10:31Z). PR #501 (heal-stale-daemon Tier-3 silence) MERGED 08:46Z; confirmed working by 4 correct auto-triage events. 4 new heal-stale-daemon-code alerts (lines 915–918) all correctly Tier-3-silenced. All inboxes clear. PR #497 OPEN (MERGEABLE=UNKNOWN, 37th consecutive iter). HEAD=935edfff=origin/main. Sync: 10:22:19Z (status=no-change). PRIME DIRECTIVE: interventions=892, systemic_fixes=41, ratio=21.76, trend=flat. **Tier:** Tier 1.
+**Iter ~1761 summary:** All checks nominal. PR #498 missions-proposed-lane-signal-hardening-001 CONFIRMED MERGED at 04:49:45Z Jun-14 (Mirror REVIEW_PASS + AUTO_MERGE completed overnight). All inboxes clear. PR #497 OPEN (MERGEABLE=UNKNOWN, 38th consecutive iter). HEAD=c36eb8b5=origin/main. Sync: 10:22:19Z (status=no-change). PRIME DIRECTIVE: interventions=893, systemic_fixes=41, ratio=21.78, trend=flat. **Tier:** Tier 1.
 
 ---
 
-## Key standing items (as of iter ~1760)
+## Key standing items (as of iter ~1761)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (37 iters: ~1724→~1760) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (38 iters: ~1724→~1761) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
