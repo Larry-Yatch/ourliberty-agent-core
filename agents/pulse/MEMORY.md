@@ -66,9 +66,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 16:40Z UTC (Iter ~1797, Tier 1, signal: PR #497 carry + tsr DAG step-1 dispatched)
+## Status snapshot — updated 2026-06-14 16:45Z UTC (Iter ~1798, Tier 1, signal: PR #497 carry + Forge tsr-shared-probe running)
 
-**Iter ~1797 summary:** All checks 0–5 + A–E nominal. 1 new alert (line 924): dispatch-branch-cleanup/summary — Tier-3 known-pattern, silenced, watermark 923→924. Key forward progress: tsr-shared-probe.json (terminal-state-reconciliation DAG step 1) arrived in Forge inbox ~16:38Z; inbox_watcher will dispatch Forge session. 0 new interventions. PRIME DIRECTIVE: interventions=915, systemic_fixes=42, ratio≈21.79, trend=flat. **Tier: Tier 1** (PR #497 [yellow] carry in Check E; consecutive_clean=0).
+**Iter ~1798 summary:** All checks 0–5 + A–E nominal. 0 new alerts (watermark=924, file=924). Key forward progress: Forge tsr-shared-probe session RUNNING (started 16:35:36Z per inbox_watcher log; ~9 min elapsed; expect PR in next cycle). 0 new interventions. PRIME DIRECTIVE: interventions=915, systemic_fixes=42, ratio≈21.79, trend=flat. **Tier: Tier 1** (PR #497 [yellow] carry in Check E; consecutive_clean=0).
 
 ---
 
@@ -82,7 +82,7 @@
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| terminal-state-reconciliation build sequence | [blue] DAG step 1 (tsr-shared-probe.json) in Forge inbox ~16:38Z Jun-14; Forge session launch imminent | Watch next iter for Forge session start + PR |
+| terminal-state-reconciliation build sequence | [blue] Forge tsr-shared-probe session RUNNING (started 16:35:36Z Jun-14; ~9 min elapsed) | Watch next iter for PR |
 | catalog-accuracy-drift | [blue] 8/34 ourliberty-graph shelf cards drifted (attention rate 24%, gate 10%) | route=digest; journal-note only |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
 | G-rule missions-autoregister-warn-vs-info | [blue] **2/3** | Watch; dispatch at 3/3 |
