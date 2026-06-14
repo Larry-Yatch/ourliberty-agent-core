@@ -54,9 +54,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 06:57Z UTC (Iter ~1730, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 07:02Z UTC (Iter ~1731, Tier 1, consecutive_clean=0)
 
-**Iter ~1730 summary:** Alert watermark: 996/996 (0 new). All mandatory checks nominal. PR #497 OPEN (MERGEABLE=UNKNOWN, 7th consecutive iter). Forge PID 2602672 alive (~2h47m; forge.log silent since 04:08:19Z UTC; timeout ~08:08Z Jun-14 ~1h12m remaining). outbox-notifier quiescent (last 23:35:36 MDT Jun-13). PRIME DIRECTIVE: interventions=862, systemic_fixes=41, ratio=21.00, trend=flat. HEAD=039fbfa=origin/main. Sync: 06:21:50Z (~35 min ago). **Tier:** Tier 1.
+**Iter ~1731 summary:** Alert watermark: 996/996 (0 new). All mandatory checks nominal. PR #497 OPEN (MERGEABLE=UNKNOWN, 8th consecutive iter). Forge PID 2602672 alive (~2h53m; forge.log silent since 04:08:19Z UTC; timeout ~08:08Z Jun-14 ~1h06m remaining). outbox-notifier quiescent (last 23:35:36 MDT Jun-13). PRIME DIRECTIVE: interventions=863, systemic_fixes=41, ratio=21.05, trend=flat. HEAD=56d76c4=origin/main. Sync: 06:21:50Z (~40 min ago). **Tier:** Tier 1.
 
 ---
 
@@ -64,7 +64,7 @@
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (6 iters: ~1724→~1729); Mirror spec invalid; fix in heal-stale-daemon-restart-tier3-translation-001 | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (8 iters: ~1724→~1731); Mirror spec invalid; fix in heal-stale-daemon-restart-tier3-translation-001 | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry 05:02:56Z without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
