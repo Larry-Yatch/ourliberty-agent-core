@@ -72,9 +72,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 19:22Z UTC (Iter ~1819, Tier 1, nominal)
+## Status snapshot — updated 2026-06-14 19:28Z UTC (Iter ~1820, Tier 1, nominal)
 
-**Iter ~1819 summary:** All checks 0–5 + A–E nominal. 0 new alerts (watermark=930). No new findings. PR #497 carry (95th iter). §5.0 one-shots all no-op. Rotations nominal (closest: SUPABASE_SERVICE_ROLE_KEY 69d). PRIME DIRECTIVE: ratio≈20.44, systemic_fixes=45, iter_clean. **Tier: Tier 1** (consecutive_clean=0).
+**Iter ~1820 summary:** All checks 0–5 + A–E nominal. 0 new alerts (watermark=930). No new findings. PR #497 carry (96th iter). §5.0 one-shots all no-op. Rotations nominal (closest: SUPABASE_SERVICE_ROLE_KEY ~69d). PRIME DIRECTIVE: ratio≈20.44, systemic_fixes=45, iter_clean. **Tier: Tier 1** (consecutive_clean=0).
 
 ---
 
