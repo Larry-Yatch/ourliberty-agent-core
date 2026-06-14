@@ -54,13 +54,13 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 03:54Z UTC (Iter ~1706, Tier 1, consecutive_clean=1)
+## Status snapshot — updated 2026-06-14 04:01Z UTC (Iter ~1707, Tier 1, consecutive_clean=2)
 
-**Iter ~1706 summary:** Alert watermark: 986 (1 new alert, Tier-4/journal-note-only — approval_request delivery confirmation for cleanup-branch-warn-to-info-001). PRIME DIRECTIVE: interventions=840, systemic_fixes=40, verification_pending=11, ratio=21.0, trend=flat. All 5 daemons alive (same PIDs). HEAD=c26c495=origin/main. Sync: sync.json stale-error (02:59Z); actual repo synced. 0 open PRs. **Tier:** Tier 1, consecutive_clean=1 (clean iter).
+**Iter ~1707 summary:** Alert watermark: 986 (0 new alerts). PRIME DIRECTIVE: interventions=840, systemic_fixes=40, verification_pending=11, ratio=21.0, trend=flat. All 5 daemons alive (same PIDs). HEAD=597d593=origin/main. Sync: sync.json stale-error (02:59Z); actual repo synced. 0 open PRs. Beacon in-flight processing missions-proposed-lane-signal-hardening-001 dashboard approval (PID 2597190, 5m elapsed). **Tier:** Tier 1, consecutive_clean=2 (clean iter). 1 clean iter away from Tier 2 de-escalation.
 
 ---
 
-## Key standing items (as of iter ~1706)
+## Key standing items (as of iter ~1707)
 
 | Item | Status | Action needed |
 |---|---|---|
@@ -68,10 +68,11 @@
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
+| missions-proposed-lane-signal-hardening-001 | [blue] Beacon plan DM sent 03:55:51Z Jun-14 | approve / reject |
 | cleanup-branch-warn-to-info-001 | [blue] Forge plan ready, awaiting Larry approval (DM delivered 03:49Z Jun-14) | approve / reject |
 | timer-cycle-no-journal-entry-001 | FALSE POSITIVE — Beacon investigated, journals present, cosmetic label only; TASK CLOSED | Larry binary: `approve timer-label-fix` or `reject timer-label-fix` (Beacon holding; [blue] carry) |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
-| beacon-pending-approvals | [blue] 2 stale entries (2x Jun-12) + cleanup-branch-warn-to-info-001 (new) | Carry; cleanup entry awaiting approval |
+| beacon-pending-approvals | [blue] 4 entries (2x Jun-12 stale + cleanup-branch-warn-to-info-001 + missions-proposed-lane-signal-hardening-001) | Carry |
 | G-rule dispatch-branch-cleanup-warning | [blue] DISPATCHED 3/3 (iter ~1705) | Beacon direction-ask sent: dispatch-branch-cleanup-loglevel-001 |
 | G-rule heal-stale-daemon-code-auto-restart-needs-template | [blue] 2/3 | Dispatch at 3/3 |
 | G-rule alert-translations-no-patterns-delivery-confirmation-tier4 | [blue] 1/3 (iter ~1706) | Watch; dispatch at 3/3 |
