@@ -66,9 +66,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 16:15Z UTC (Iter ~1793, Tier 1, signal: PR #497 carry)
+## Status snapshot — updated 2026-06-14 16:20Z UTC (Iter ~1794, Tier 1, signal: PR #497 carry)
 
-**Iter ~1793 summary:** All checks 0–5 + A–E nominal. Larry's "Go" at 10:07:42 MDT (16:07:42Z) triggered Forge to open PR #503 (adopt-terminal-state-reconciliation spec) at 16:09:44Z; Mirror passed at 16:12:49Z; PR merged 16:12:53Z. G-rule adopt-terminal-state-forge-stall FULLY RESOLVED. 0 pending approvals. PRIME DIRECTIVE: interventions=915, systemic_fixes=42 (+1 this iter), ratio≈21.79, trend=flat. **Tier: Tier 1** (PR #497 [yellow] carry in Check E; consecutive_clean=0).
+**Iter ~1794 summary:** All checks 0–5 + A–E nominal. Alert line 922 (review-pass notification for PR #503) triaged as Tier-3 delivery confirmation; watermark advanced 921→922. 0 new interventions. G-rule adopt-terminal-state-forge-stall confirmed RESOLVED. PRIME DIRECTIVE: interventions=915, systemic_fixes=42, ratio≈21.79, trend=flat. **Tier: Tier 1** (PR #497 [yellow] carry in Check E; consecutive_clean=0).
 
 ---
 
@@ -76,7 +76,7 @@
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (69th iter: ~1724→~1793) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (70th iter: ~1724→~1794) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
