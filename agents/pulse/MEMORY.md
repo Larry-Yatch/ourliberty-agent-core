@@ -72,9 +72,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 21:32Z UTC (Iter ~1836, Tier 1, nominal)
+## Status snapshot — updated 2026-06-14 21:47Z UTC (Iter ~1838, Tier 1, nominal)
 
-**Iter ~1836 summary:** Fully nominal. 0 new alerts. 0 new findings. All daemons alive. Git clean/current. PR #497 carry (112th iter). Orphans PID 1834248 (17d 02h 13m+) + PID 2605007 (17h 11m+, PR #498 merged, will not self-exit) carrying. Watermark=931. §5.0 no-op. Rotations nominal. PRIME DIRECTIVE: 0 interventions (iter_clean), ratio≈20.47. **Tier: Tier 1** (consecutive_clean=0).
+**Iter ~1838 summary:** Fully nominal. 0 new alerts (watermark=931=file). 0 new findings. All daemons alive. Git clean/current. PR #497 carry (114th iter). Orphans PID 1834248 (17d 02h 28m+) + PID 2605007 (17h 26m+, PR #498 merged, will not self-exit) carrying. §5.0 no-op. Rotations nominal. PRIME DIRECTIVE: 0 interventions (iter_clean), ratio≈20.47. **Tier: Tier 1** (consecutive_clean=0). Triggered by `/loop /cycle`.
 
 ---
 
