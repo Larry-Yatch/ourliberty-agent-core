@@ -60,9 +60,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 09:16Z UTC (Iter ~1748, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 09:21Z UTC (Iter ~1749, Tier 1, consecutive_clean=0)
 
-**Iter ~1748 summary:** Dashboard-api auto-restarted by heal-stale-daemon-code at 09:06:20Z (PR #500 `dashboard_api.py` now live, PID 2704827). Alert idx=1004 triaged Tier-3/silence (PR #501 translation working). Watermark: 1004/1004. Pipeline in-motion: `p4-parked-card` preflight running (09:09:47Z, wt-forge-p4-parked-card, ourliberty-dashboard), `build-p4-conversation-doorbell` queued in Forge inbox. PR #497 OPEN (MERGEABLE=UNKNOWN, 25th consecutive iter). HEAD=0941c757=origin/main. Sync: 08:22:16Z (status=error, self-heals). PRIME DIRECTIVE: interventions=880, systemic_fixes=41, ratio=21.46, trend=flat. **Tier:** Tier 1.
+**Iter ~1749 summary:** All checks nominal, no new alerts. Watermark: 1004/1004. Pipeline in-motion: `p4-parked-card` Forge preflight (PID 2705460) still running since 09:09:47Z (~12+ min elapsed, no completion yet); `build-p4-conversation-doorbell` queued in Forge inbox. PR #497 OPEN (MERGEABLE=UNKNOWN, 26th consecutive iter). HEAD=56d63cdd=origin/main. Sync: 08:22:16Z (status=error, self-heals). Healer state files renamed (actual: `heal-stale-daemon-code.heartbeat` at 09:06:16Z — spec drift, healer healthy). PRIME DIRECTIVE: interventions=881, systemic_fixes=41, ratio=21.49, trend=flat. **Tier:** Tier 1.
 
 ---
 
@@ -70,7 +70,7 @@
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (25 iters: ~1724→~1748) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (26 iters: ~1724→~1749) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry 05:02:56Z without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
@@ -87,7 +87,7 @@
 | G-rule droplet-uncommitted:main | [blue] 1/3 | Watch |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] 1/3 | Watch |
 | G-rule timer-cycle-no-journal-entry | [blue] 0/3 | Watch |
-| Check 5 MISSING | [blue] heal-stale-daemon-code-state.json absent from ~/agents/blackboard/; healer healthy (runs every ~30m); likely spec drift (cooldowns.json is actual state file) | Carry |
+| Check 5 MISSING | [blue] heal-stale-daemon-code-state.json absent from ~/agents/blackboard/; healer healthy (actual state file is `heal-stale-daemon-code.heartbeat` flat timestamp — spec drift; heartbeat at 09:06:16Z iter ~1749) | Carry |
 | sync-push-rebase-loop-001 | [blue] UNREGISTERED AR; idx=1003, route=digest, self-heals | Carry |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
