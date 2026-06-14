@@ -20,7 +20,7 @@
 
 ## Dispatch envelope schema (learned 2026-06-11, two failures)
 
-**Rule:** Beacon inbox dispatch envelopes MUST use root field `task_id` (not `envelope_id`). Required fields: `task_id`, `source`, `dedup_identity`, `prompt`, `timeout`. `envelope_id` is silently ignored and fails the validator.
+**Rule:** Beacon inbox dispatch envelopes MUST use root field `task_id` (not `envelope_id`). Required fields: `task_id`, `source`, `dedup_identity`, `prompt`, `timeout`. `envelope_id` is silently ignored and fails the validator. `timeout` MUST be an integer (seconds), in range [60, 14400] — string durations like `"48h"` are rejected with `out of bounds` error. (learned 2026-06-14 from dead-letter on unreviewed-merge-missions-no-mirror-001)
 
 ---
 
@@ -48,61 +48,13 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 02:12Z UTC (Iter ~1697, interactive /cycle, Tier 1→2 de-escalation, consecutive_clean 2→3→0)
+## Status snapshot — updated 2026-06-14 02:34Z UTC (Iter ~1699, interactive /loop /cycle, Tier 2→1 reset, consecutive_clean=0)
 
-**Iter ~1697 summary:** Alert watermark: 979 (0 new). Tier 1→2 DE-ESCALATION (3rd consecutive clean iter). PRIME DIRECTIVE (script-authoritative): interventions=837, systemic_fixes=37, verification_pending=11, ratio=22.62, trend=flat. All 5 daemons alive (same PIDs). No fast-forward needed (HEAD=9bbcbf7=origin/main). Sync: last_sync=01:59:32Z (~13 min, nominal). PR #495 OPEN (missions promotion, ~27 min old, MERGEABLE=UNKNOWN, no Mirror review; approaching 30m window). Check I SKIP (artifact exists). Check III SKIP (3d artifact). **CARRY (unchanged):** unreviewed-merge:494 [yellow] (DM sent ~1694, no Larry reply), unreviewed-merge:489 [yellow], Tier-2 weekly probe auth_401, Check III `approve threshold-update-2026-06-11`, PR #495 [blue], Check I medic-operator-scaffold-001 [blue], beacon-pending 2 stale entries (Jun-12), G-rule unreviewed-merge 2/3 (dispatch at 3/3; watch PR #495), G-rule dispatch-branch-cleanup-warning 1/3, G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 2/3, G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, G-rule alert-translations-no-patterns-delivery-confirmation-tier4 0/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. **Tier:** Tier 2, consecutive_clean=0.
-
----
-
-## Status snapshot — updated 2026-06-14 02:08Z UTC (Iter ~1696, interactive /cycle, Tier 1, consecutive_clean 1→2)
-
-**Iter ~1696 summary:** Alert watermark: 979 (0 new). Tier 1, consecutive_clean 1→2 (steady progression). PRIME DIRECTIVE (script-authoritative): interventions=837, systemic_fixes=37, verification_pending=11, ratio=22.62, trend=flat. All 5 daemons alive (same PIDs). No fast-forward needed (HEAD=2ea63a1=origin/main). Sync: last_sync=01:59:32Z (~8 min, nominal). PR #495 OPEN (missions promotion, MERGEABLE, no Mirror review, ~23 min old at check; not clean+green, no auto-merge trigger). No new interventions. **CARRY (unchanged):** unreviewed-merge:494 [yellow] (DM sent ~1694, no Larry reply), unreviewed-merge:489 [yellow], Tier-2 weekly probe auth_401, Check III `approve threshold-update-2026-06-11`, PR #495 [blue], Check I medic-operator-scaffold-001 [blue], beacon-pending 2 stale entries (Jun-12), G-rule unreviewed-merge 2/3, G-rule dispatch-branch-cleanup-warning 1/3, G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 2/3, G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, G-rule alert-translations-no-patterns-delivery-confirmation-tier4 0/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. **Tier:** Tier 1, consecutive_clean=2.
+**Iter ~1699 summary:** Alert watermark: 979 (0 new). Tier 2→1 RESET (intervention: PR #495 auto-merge). PRIME DIRECTIVE: interventions=838, systemic_fixes=38, verification_pending=11, ratio=22.05, trend=flat. All 5 daemons alive (same PIDs). HEAD=466647c (PR #495 merge)=origin/main. Sync: last_sync=01:59:32Z (~35 min, nominal). **Action:** PR #495 (missions promotion, MERGEABLE, 43min, no auto-merge) → `gh pr merge 495 --auto --squash` → MERGED. G-rule unreviewed-merge **3/3** → dispatched Beacon `unreviewed-merge-missions-no-mirror-001.json` (timeout=14400). **G-rule timer-cycle-no-journal-entry: 2/3** (last interactive journal: iter ~1647 Jun-13 12:31Z; ~50 automated cycles wrote MEMORY only). **Note:** Prior /loop iterations already did PR merge + MEMORY update but did NOT write cycle-journal.md; THIS iter wrote the journal entry (iter ~1699 at line ~113982). **Tier:** Tier 1, consecutive_clean=0.
 
 ---
 
-## Status snapshot — updated 2026-06-14 02:00Z UTC (Iter ~1695, interactive /cycle, Tier 1, consecutive_clean 0→1)
-
-**Iter ~1695 summary:** Alert watermark: 979 (1 new: self-DM delivery-confirmation for unreviewed-merge:494, Tier-4 silenced per memory discipline). Tier 1, consecutive_clean 0→1 (first clean iter post-reset). PRIME DIRECTIVE (script-authoritative): interventions=837, systemic_fixes=37, verification_pending=11, ratio=22.62, trend=flat. All 5 daemons alive (same PIDs). No fast-forward needed (HEAD=cd27d76=origin/main). Sync: last_sync=00:59:26Z (~60 min, nominal). PR #495 OPEN (missions promotion, 14 min old, no Mirror review, watching 30m window). Check I SKIP (artifact exists). Check III SKIP (3d artifact). **CARRY (unchanged):** unreviewed-merge:494 [yellow] (DM sent ~1694, no Larry reply yet), unreviewed-merge:489 [yellow], Tier-2 weekly probe auth_401, Check III `approve threshold-update-2026-06-11`, PR #495 [blue], Check I medic-operator-scaffold-001 [blue], beacon-pending 2 stale entries (Jun-12), G-rule unreviewed-merge 2/3, G-rule dispatch-branch-cleanup-warning 1/3, G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 2/3, G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, G-rule alert-translations-no-patterns-delivery-confirmation-tier4 0/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. **Tier:** Tier 1, consecutive_clean=1.
-
----
-
-## Status snapshot — updated 2026-06-14 01:54Z UTC (Iter ~1694, interactive /cycle, Tier 3→1 reset, consecutive_clean 5→0)
-
-**Iter ~1694 summary:** Alert watermark: 978 (3 new: dispatch-branch-cleanup/digest, Forge catalog-drift rejection/closure, unreviewed-merge:494/[yellow]). Tier 3→1 RESET (signal: unreviewed-merge:494 + fast-forward). PRIME DIRECTIVE (script-authoritative): interventions=837, systemic_fixes=37, verification_pending=11, ratio=22.62, trend=flat. All daemons alive (same PIDs). Fast-forward: f662d2a → a2ff03e (PR #494 merge). Sync: last_sync=00:59:26Z (~55 min, nominal). **catalog-drift-facts-sync-001 RESOLVED**: Forge formally rejected (work done on main PR#1); beacon-pending now 2 entries (down from 3). **New [yellow]**: unreviewed-merge:494 (PR #494, Larry-authored missions promotion, merged without Mirror review; DM sent). G-rule unreviewed-merge: **2/3** (#489 + #494). **New PR #495 OPEN**: missions promotion, no Mirror review, created 01:45Z — not in 30m window yet. **G-rule dispatch-branch-cleanup-warning**: 1/3 (first observation). **CARRY:** unreviewed-merge:489 [yellow], Tier-2 weekly probe auth_401, Check III `approve threshold-update-2026-06-11`, beacon-pending 2 stale entries (Jun-12 x2), Check I proposal medic-operator-scaffold-001 [blue], G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 2/3, G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, G-rule alert-translations-no-patterns-delivery-confirmation-tier4 0/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. **Tier:** Tier 1, consecutive_clean=0.
-
----
-
-## Status snapshot — updated 2026-06-14 01:22Z UTC (Iter ~1693, interactive /cycle, Tier 3, consecutive_clean 4→5)
-
-**Iter ~1693 summary:** Alert watermark: 975 (0 new). Tier 3, consecutive_clean 4→5 (steady-state). PRIME DIRECTIVE (script-authoritative): interventions=836, systemic_fixes=37, verification_pending=11, ratio=22.59, trend=flat. All checks nominal. 5/5 daemons same PIDs (beacon_telegram_bot:2517973, chain_event_shipper:1849505, outbox_notifier:2552416, dashboard_api:2322792, inbox_watcher:2530123). 0 open PRs. git: clean, HEAD=633a526=origin/main. Sync: last_sync=00:59:26Z (~23 min, nominal). Pipeline skip list 5 items (stable). **Conditional:** Check I SKIP (check-i-2026-06-14.json exists from ~1691). Check III SKIP (3d artifact, < 14d). **CARRY:** unreviewed-merge:489 [yellow], Tier-2 weekly probe auth_401, Check III `approve threshold-update-2026-06-11`, beacon-pending-approvals 3 stale entries (2x Jun-12 + catalog-drift Jun-13), Check I proposal medic-operator-scaffold-001 [blue], G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 2/3, G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, G-rule alert-translations-no-patterns-delivery-confirmation-tier4 0/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. **Tier:** Tier 3, consecutive_clean=5. (Steady-state.)
-
----
-
-## Status snapshot — updated 2026-06-14 00:51Z UTC (Iter ~1692, interactive /cycle, Tier 3, consecutive_clean 3→4)
-
-**Iter ~1692 summary:** Alert watermark: 975 (2 new delivery-confirmation alerts from iter ~1691's Check I + ledger run; both Tier-4 per helper, silenced per memory discipline, no DM). Tier 3, consecutive_clean 3→4 (steady-state). PRIME DIRECTIVE (script-authoritative): interventions=836, systemic_fixes=37, verification_pending=11, ratio=22.59, trend=flat. All checks nominal. 5/5 daemons same PIDs (beacon_telegram_bot:2517973, chain_event_shipper:1849505, outbox_notifier:2552416, dashboard_api:2322792, inbox_watcher:2530123). 0 open PRs. git: clean, HEAD=b67ad72=origin/main. Sync: last_sync=23:59:19Z (~52 min, nominal). Pipeline skip list 5 items (stable). **Conditional:** Check I SKIP (check-i-2026-06-14.json exists from ~1691). Check III SKIP (3d artifact, < 14d). **New note:** alert-translations.json has 0 patterns → G-rule 0/3 alert-translations-no-patterns-delivery-confirmation-tier4. **CARRY:** unreviewed-merge:489 [yellow], Tier-2 weekly probe auth_401, Check III `approve threshold-update-2026-06-11`, beacon-pending-approvals 3 stale entries (2x Jun-12 + catalog-drift Jun-13), Check I proposal medic-operator-scaffold-001 [blue], G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 2/3, G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, G-rule alert-translations-no-patterns-delivery-confirmation-tier4 0/3 (new), Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. **Tier:** Tier 3, consecutive_clean=4. (Steady-state.)
-
----
-
-## Status snapshot — updated 2026-06-14 00:20Z UTC (Iter ~1691, interactive /cycle, Tier 3, consecutive_clean 2→3, Sunday Check I)
-
-**Iter ~1691 summary:** Alert watermark: 973 (0 new at check-time; Check I DM queued → expect 974 next iter). Tier 3, consecutive_clean 2→3 (steady-state). PRIME DIRECTIVE (script-authoritative): interventions=836, systemic_fixes=37, verification_pending=11, ratio=22.59, trend=flat. All checks nominal. 5/5 daemons same PIDs (beacon_telegram_bot:2517973, chain_event_shipper:1849505, outbox_notifier:2552416, dashboard_api:2322792, inbox_watcher:2530123). 0 open PRs. git: clean, HEAD=92bf506=origin/main. Sync: last_sync=23:59:19Z (~21 min, nominal). Pipeline skip list 5 items (stable). **Check I (Sunday):** mode=digest, 1 proposal — medic-operator-scaffold-001 24.4σ ($6.72 vs $1.68 baseline), effort=small, dedup-skip (prior dispatch 2026-06-10). **CARRY:** unreviewed-merge:489 [yellow], Tier-2 weekly probe auth_401, Check III `approve threshold-update-2026-06-11`, beacon-pending-approvals 3 stale entries (2x Jun-12 + catalog-drift Jun-13), Check I proposal medic-operator-scaffold-001 [blue], G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 2/3, G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. **Tier:** Tier 3, consecutive_clean=3. (Steady-state.)
-
----
-
-## Status snapshot — updated 2026-06-13 23:46Z UTC (Iter ~1690, interactive /cycle, Tier 3, consecutive_clean 1→2)
-
-**Iter ~1690 summary:** Alert watermark: 973 (0 new). Tier 3, consecutive_clean 1→2. PRIME DIRECTIVE (script-authoritative): interventions=836, systemic_fixes=37, verification_pending=11, ratio=22.59, trend=flat. All checks nominal. 5/5 daemons same PIDs (beacon_telegram_bot:2517973, chain_event_shipper:1849505, outbox_notifier:2552416, dashboard_api:2322792, inbox_watcher:2530123). 0 open PRs. git: clean, HEAD=dc8bb39=origin/main. Sync: last_sync=22:58:59Z (~48 min, nominal). Pipeline skip list 5 items (stable). **CARRY:** unreviewed-merge:489 [yellow], Tier-2 weekly probe auth_401, Check III `approve threshold-update-2026-06-11`, beacon-pending-approvals 3 stale entries (2x Jun-12 + catalog-drift Jun-13), G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 2/3, G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. **Tier:** Tier 3, consecutive_clean=2.
-
----
-
-## Status snapshot — updated 2026-06-13 22:42Z UTC (Iter ~1688, interactive /cycle, Tier 2→3 de-escalation, consecutive_clean 2→3)
-
-**Iter ~1688 summary:** Alert watermark: 973 (0 new). Tier 2→3 DE-ESCALATION (3rd consecutive clean Tier-2 iter). PRIME DIRECTIVE (script-authoritative): interventions=836, systemic_fixes=37, verification_pending=11, ratio=22.59, trend=flat. All checks nominal. 5/5 daemons same PIDs. 0 open PRs. git: clean, HEAD=41205ad=origin/main. Sync: last_sync=21:58:42Z (~44 min, nominal). forge/.invalid: empty. Pipeline skip list 4 items (PR #488 task cleaned). **Tier:** Tier 3, consecutive_clean=0.
-
----
-
-## Key standing items (as of iter ~1697)
+## Key standing items (as of iter ~1699)
 
 | Item | Status | Action needed |
 |---|---|---|
@@ -110,12 +62,12 @@
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Superseded by :494; Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| PR #495 OPEN | [blue] missions promotion, no Mirror review | Mirror review needed; created 01:45Z |
+| PR #495 MERGED | RESOLVED — merged 02:28Z Jun-14 without Mirror review (→ G-rule 3/3 trigger) | CLOSED |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
 | beacon-pending-approvals | [blue] 2 stale entries (2x Jun-12) | Carry; no actionable pending |
-| G-rule unreviewed-merge | [blue] 2/3 (#489 + #494) | Dispatch at 3/3 |
+| G-rule unreviewed-merge | [blue] 3/3 — direction-ask dispatched to Beacon (unreviewed-merge-missions-no-mirror-001) | Beacon to spec Mirror exemption for chore(missions): PRs |
 | G-rule dispatch-branch-cleanup-warning | [blue] 1/3 (first: iter ~1694) | Watch |
-| G-rule timer-cycle-no-journal-entry | [blue] 1/3 | Watch |
+| G-rule timer-cycle-no-journal-entry | [blue] 2/3 (advanced iter ~1699) | Dispatch at 3/3 to investigate run_cycle.sh journal-write path |
 | G-rule heal-stale-daemon-code-auto-restart-needs-template | [blue] 2/3 | Dispatch at 3/3 |
 | G-rule droplet-uncommitted:main | [blue] 1/3 | Watch |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] 1/3 | Watch |
