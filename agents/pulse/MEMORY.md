@@ -72,9 +72,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 19:05Z UTC (Iter ~1816, Tier 1, nominal)
+## Status snapshot — updated 2026-06-14 19:11Z UTC (Iter ~1817, Tier 1, nominal)
 
-**Iter ~1816 summary:** All checks 0–5 + A–E nominal. 0 new alerts (watermark=930). dashboard PR #54 (p4-parked-card) confirmed MERGED 10:31:11Z — resolved carry. No new findings. PR #497 carry (92nd iter). PRIME DIRECTIVE: ratio≈20.44, systemic_fixes=45, iter_clean. **Tier: Tier 1** (consecutive_clean=0).
+**Iter ~1817 summary:** All checks 0–5 + A–E nominal. 0 new alerts (watermark=930). No new findings. PR #497 carry (93rd iter). §5.0 one-shots all no-op. Rotations nominal (closest: SUPABASE_SERVICE_ROLE_KEY 69d). PRIME DIRECTIVE: ratio≈20.44, systemic_fixes=45, iter_clean. **Tier: Tier 1** (consecutive_clean=0).
 
 ---
 
@@ -82,7 +82,7 @@
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (92nd iter: ~1724→~1816) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (93rd iter: ~1724→~1817) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
