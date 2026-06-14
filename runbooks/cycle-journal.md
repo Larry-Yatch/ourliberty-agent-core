@@ -4,6 +4,89 @@
 
 ---
 
+## Iteration ~1701 — 2026-06-14 02:54Z UTC (interactive, /cycle via /loop, Tier 1, consecutive_clean 0→1)
+
+**Trigger:** Larry direct invocation (`/loop /cycle`).
+
+**Health:** ✅ Green. All checks nominal. 0 new alerts. 0 interventions. 1 clean iter.
+
+**New development:** Larry approved `unreviewed-merge-missions-exemption-001` ("Go" at 02:45:30Z Jun-14). Forge built PR #496 (feat(unreviewed-merge-detector): exempt metadata-only chore(missions) PRs, created 02:49:06Z). Mirror got review task dispatched at 02:49:21Z. Standing item unreviewed-merge-missions-exemption-001 **CLOSED**.
+
+**VERIFY-BEFORE-REASSERT (iter ~1700 carries):**
+- unreviewed-merge:495: Bot log delivery confirm at 02:31Z; Larry "Go" at 02:45Z was for exemption approval_request, not a retroactive-review reply. **CARRY** [yellow].
+- unreviewed-merge:494: No new Larry reply since DM at 01:54Z. **CARRY** [yellow].
+- unreviewed-merge:489: No new Larry reply. **CARRY** [yellow].
+- PR #496 OPEN: Confirmed (gh pr list), created 02:49:06Z, MERGEABLE, reviewDecision="", Mirror review in-flight. [blue].
+- timer-cycle-no-journal-entry-001 in Beacon inbox: confirmed present, <10 min old, in-flight. **CARRY** [blue].
+- beacon-pending-approvals: 2 stale entries confirmed (both Jun-12). **CARRY** [blue].
+- Check 5 (heal-stale-daemon-code-state.json): MISSING confirmed. **CARRY** [blue].
+
+**Check 0 — Alert triage:** Watermark=982. File=982 lines. 0 new alerts. ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log: last entry 02:49:21Z (INFO-level dispatch for unreviewed-merge-missions-exemption-001). No WARNs or ERRORs. inbox-watcher.log: not found / empty (known carry). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message: "Go" at 02:45:30Z Jun-14 → approved unreviewed-merge-missions-exemption-001. Resolved into Forge build (PR #496). No new Larry directives since. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → no stalls. Same 5 FORGE_NO_PR_SKIPs as prior iters (#490, #491, #492, catalog-drift-preflight-exit, #493). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 2 stale entries (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001, both Jun-12). No actionable pending approvals. ✅ Nominal carry.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING. Known [blue] carry. ✅
+
+**Check A — Source repo:** On main. Working tree clean. HEAD=745f2d4=origin/main. 0 ahead, 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-14T01:59:32Z (~55 min at check time). Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 5/5 persistent daemons active (same PIDs confirmed via ps -p).
+- beacon_telegram_bot: PID 2517973 (elapsed ~9h05m) ✅
+- chain_event_shipper: PID 1849505 (elapsed ~2d 7h02m) ✅
+- outbox_notifier: PID 2552416 (elapsed ~5h17m) ✅
+- dashboard_api: PID 2322792 (elapsed ~1d 2h54m) ✅
+- inbox_watcher: PID 2530123 (elapsed ~7h26m) ✅
+
+**Check D — Inboxes:** 3 in-flight items (all <10 min old, dispatched ~02:49Z):
+- beacon: notify-unreviewed-merge-missions-exemption-001.json (Forge ACK); timer-cycle-no-journal-entry-001.json (Pulse direction-ask). ✅ In-flight.
+- mirror: review-unreviewed-merge-missions-exemption-001.json (PR #496 review request). ✅ In-flight.
+- forge/.invalid: pre-existing items, no new. ✅
+
+**Check E — PRs:** ourliberty-agent-core: PR #496 OPEN (feat(unreviewed-merge-detector): exempt metadata-only chore(missions) PRs, created 02:49:06Z, MERGEABLE, reviewDecision=""), ~5 min old at check. Mirror review in-flight. Not past 30m window. ✅ No always-fix needed. ourliberty-graph: 0 open. ✅
+
+**Conditional checks:** check-i-2026-06-14.json already fired (iter ~1691). Check I: SKIP. Check III: artifact 3d old, <14d threshold. SKIP.
+
+**Actions taken:**
+1. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` → logged at 02:54:22Z. ✅
+2. `cycle_tier_state.py record --checks-clean true` → Tier 1, consecutive_clean 0→1, updated 02:54:22Z. ✅
+
+**Dispatches:** None.
+
+**Standing findings:**
+- [yellow] **unreviewed-merge:494** — DM sent iter ~1694 (01:54Z). Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed'. [carry]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614; no Larry reply. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **PR #496 OPEN** — unreviewed-merge exemption PR, Mirror review in-flight (~02:49Z). Watch for merge. [new-carry]
+- [blue] **timer-cycle-no-journal-entry-001** — in Beacon's inbox since 02:49Z, in-flight. Watch for Beacon spec + Forge PR. [carry]
+- [blue] **Check I medic-operator-scaffold-001** — 24.4σ ($6.72 vs $1.68); prior dispatch 2026-06-10. `/dispatch 1` if re-run needed. [carry]
+- [blue] **beacon-pending-approvals stale entries** — 2 entries (fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001, both Jun-12). [carry]
+- [blue] **G-rule dispatch-branch-cleanup-warning** — 2/3. [carry]
+- [blue] **G-rule heal-stale-daemon-code-auto-restart-needs-template** — 2/3. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 1/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **G-rule alert-translations-no-patterns-delivery-confirmation-tier4** — 0/3. [carry]
+- [blue] **Check 5 MISSING** — heal-stale-daemon-code-state.json absent. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — [carry]
+- [blue] **dag-preflight-revision gap** — [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+
+**Closed this iter:**
+- unreviewed-merge-missions-exemption-001 — RESOLVED: Larry approved, Forge built PR #496, Mirror reviewing.
+- G-rule unreviewed-merge — CLOSED (3/3 dispatched iter ~1700; PR #496 is the systemic fix in-review).
+
+**PRIME DIRECTIVE:** 0 new interventions. 1 iter_clean appended (02:54:22Z). Script-authoritative: interventions=839, systemic_fixes=39, verification_pending=11, ratio=21.51, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=1.
+
+---
+
 ## Non-cycle event — 2026-06-14 02:40Z UTC (dead-letter: unreviewed-merge-missions-no-mirror-001)
 
 **Trigger:** Inter-agent dead-letter notify from Beacon dispatcher.
@@ -114146,5 +114229,32 @@ Forge rejected p3-dashboard-proposed-lane at preflight (04:41Z) because accept/d
 
 **PRIME DIRECTIVE:** 2 rows this iter (intervention: alert-triage 3 alerts; systemic_fix: timer-cycle-no-journal-entry-001). Trailing-30d (script-authoritative): interventions=839, systemic_fixes=39, ratio=21.51, trend=flat.
 **Tier end-of-iter:** Tier 1, consecutive_clean=0 (unreviewed-merge:495 Tier-4 finding; tier-reset).
+
+---
+
+## Non-cycle event — 2026-06-14 02:55Z UTC (result-notify: timer-cycle-no-journal-entry-001 from Beacon)
+
+**Trigger:** Inter-agent result notification from Beacon (`task=timer-cycle-no-journal-entry-001`, `status=SUCCESS`).
+
+**Beacon's finding:** The G-rule 3/3 dispatch at iter ~1700 was based on a **false premise — journals are NOT missing.**
+
+Beacon verified against git + runtime before touching anything:
+- All 30 most-recent `Pulse cycle <TS>` commits write to `cycle-journal.md`.
+- Iterations ~1647 → ~1699 are all present, sequential, no gaps — including the 9-hour window (12:31Z→21:43Z) when no interactive session ran.
+- systemd `ourliberty-cycle.timer`/`.service` are active and the sole driver is `run_cycle.sh → claude --print --model sonnet … write the journal entry`.
+
+**Root cause (cosmetic only):** The headless sonnet session cannot tell it's systemd-fired. It self-labels every entry `(interactive, /loop /cycle)` — including systemd-fired entries like iter ~1699 (written at 20:41Z, labeled `(interactive, /loop /cycle)` with no loop running). Pulse's G-rule pattern-counter in `MEMORY.md` saw only `(interactive, ...)` labels and wrongly inferred automated cycles weren't journaling. The continuity note in iter ~1700 (`"Automated cycle commit 29740fa — no journal entry written"`) was incorrect.
+
+**G-rule verdict:** FALSE POSITIVE. Counter reset to 0. The fix `unreviewed-merge-missions-exemption-001` went through the correct channel; the `timer-cycle-no-journal-entry-001` dispatch was wasted Opus.
+
+**Beacon's binary for Larry (Beacon holding Forge dispatch):**
+- **Approve** → small Forge fix: `run_cycle.sh` passes an `"automated"` signal into the cycle prompt so systemd entries self-label `(automated)`, plus a one-line note in `cycle-prompt.md §13`. Kills the false G-rule at the source. Config/prompt-only, low risk.
+- **Reject** → no code change; Beacon records the G-rule as a confirmed false positive; Pulse resets counter and recalibrates the detection pattern.
+
+Reply `approve timer-label-fix` or `reject timer-label-fix` to Beacon when convenient. Beacon's standard alert sweep will DM Larry with this binary — no duplicate DM needed from Pulse.
+
+**Actions taken:**
+1. G-rule `timer-cycle-no-journal-entry` counter RESET to 0 (false positive confirmed by Beacon investigation).
+2. MEMORY.md standing items updated: `timer-cycle-no-journal-entry-001` closed; Beacon binary noted.
 
 ---
