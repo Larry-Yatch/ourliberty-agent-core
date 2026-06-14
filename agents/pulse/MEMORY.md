@@ -48,6 +48,12 @@
 
 ---
 
+## Status snapshot — updated 2026-06-14 02:12Z UTC (Iter ~1697, interactive /cycle, Tier 1→2 de-escalation, consecutive_clean 2→3→0)
+
+**Iter ~1697 summary:** Alert watermark: 979 (0 new). Tier 1→2 DE-ESCALATION (3rd consecutive clean iter). PRIME DIRECTIVE (script-authoritative): interventions=837, systemic_fixes=37, verification_pending=11, ratio=22.62, trend=flat. All 5 daemons alive (same PIDs). No fast-forward needed (HEAD=9bbcbf7=origin/main). Sync: last_sync=01:59:32Z (~13 min, nominal). PR #495 OPEN (missions promotion, ~27 min old, MERGEABLE=UNKNOWN, no Mirror review; approaching 30m window). Check I SKIP (artifact exists). Check III SKIP (3d artifact). **CARRY (unchanged):** unreviewed-merge:494 [yellow] (DM sent ~1694, no Larry reply), unreviewed-merge:489 [yellow], Tier-2 weekly probe auth_401, Check III `approve threshold-update-2026-06-11`, PR #495 [blue], Check I medic-operator-scaffold-001 [blue], beacon-pending 2 stale entries (Jun-12), G-rule unreviewed-merge 2/3 (dispatch at 3/3; watch PR #495), G-rule dispatch-branch-cleanup-warning 1/3, G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 2/3, G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, G-rule alert-translations-no-patterns-delivery-confirmation-tier4 0/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. **Tier:** Tier 2, consecutive_clean=0.
+
+---
+
 ## Status snapshot — updated 2026-06-14 02:08Z UTC (Iter ~1696, interactive /cycle, Tier 1, consecutive_clean 1→2)
 
 **Iter ~1696 summary:** Alert watermark: 979 (0 new). Tier 1, consecutive_clean 1→2 (steady progression). PRIME DIRECTIVE (script-authoritative): interventions=837, systemic_fixes=37, verification_pending=11, ratio=22.62, trend=flat. All 5 daemons alive (same PIDs). No fast-forward needed (HEAD=2ea63a1=origin/main). Sync: last_sync=01:59:32Z (~8 min, nominal). PR #495 OPEN (missions promotion, MERGEABLE, no Mirror review, ~23 min old at check; not clean+green, no auto-merge trigger). No new interventions. **CARRY (unchanged):** unreviewed-merge:494 [yellow] (DM sent ~1694, no Larry reply), unreviewed-merge:489 [yellow], Tier-2 weekly probe auth_401, Check III `approve threshold-update-2026-06-11`, PR #495 [blue], Check I medic-operator-scaffold-001 [blue], beacon-pending 2 stale entries (Jun-12), G-rule unreviewed-merge 2/3, G-rule dispatch-branch-cleanup-warning 1/3, G-rule timer-cycle-no-journal-entry 1/3, G-rule heal-stale-daemon-code-auto-restart-needs-template 2/3, G-rule droplet-uncommitted:main 1/3, G-rule F24-empty-prompt-envelope-rejected 1/3, G-rule alert-translations-no-patterns-delivery-confirmation-tier4 0/3, Check 5 MISSING, sync-push-rebase-loop-001 UNREGISTERED AR, dag-preflight-revision gap, ccd-s1-envelope-builder PAUSED. **Tier:** Tier 1, consecutive_clean=2.
@@ -96,7 +102,7 @@
 
 ---
 
-## Key standing items (as of iter ~1694)
+## Key standing items (as of iter ~1697)
 
 | Item | Status | Action needed |
 |---|---|---|
