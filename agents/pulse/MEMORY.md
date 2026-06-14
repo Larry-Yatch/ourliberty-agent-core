@@ -60,24 +60,23 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 10:05Z UTC (Iter ~1755, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 10:17Z UTC (Iter ~1757, Tier 1, consecutive_clean=0)
 
-**Iter ~1755 summary:** Pipeline advanced. build-p4-conversation-doorbell COMPLETED (PR #502 ourliberty-agent-core MERGEABLE, Mirror PID 2727703 reviewing). p4-parked-card preflight retry 1/3 SUCCEEDED + build COMPLETED (PR #54 ourliberty-dashboard MERGEABLE, Mirror review queued). Forge idle. All daemons healthy. PR #497 OPEN (MERGEABLE=UNKNOWN, 32nd consecutive iter). HEAD=d9dc0582=origin/main. Sync: 09:22:15Z (status=no-change). Healer healthy. PRIME DIRECTIVE: interventions=887, systemic_fixes=41, ratio=21.63, trend=flat. **Tier:** Tier 1.
+**Iter ~1757 summary:** PR #502 (p4-conversation-doorbell) MERGED at 04:11:18Z MDT (Mirror REVIEW_PASS → AUTO_MERGE). Mirror PID 2736406 reviewing PR #54 (p4-parked-card, ourliberty-dashboard, MERGEABLE/CLEAN). Forge idle. All daemons healthy. PR #497 OPEN (MERGEABLE=UNKNOWN, 34th consecutive iter). HEAD=0f13b500=origin/main. Sync: 09:22:15Z (status=no-change, ~55 min ago). PRIME DIRECTIVE: interventions=889, systemic_fixes=41, ratio=21.68, trend=flat. **Tier:** Tier 1.
 
 ---
 
-## Key standing items (as of iter ~1755)
+## Key standing items (as of iter ~1757)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (32 iters: ~1724→~1755) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (34 iters: ~1724→~1757) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| PR #502 Mirror review | [blue/watch] Mirror PID 2727703 reviewing p4-conversation-doorbell (ourliberty-agent-core) | Watch for REVIEW_PASS + auto-merge |
-| PR #54 Mirror review | [blue/watch] review-p4-parked-card.json queued in Mirror inbox (ourliberty-dashboard) | Watch for Mirror start + REVIEW_PASS + auto-merge |
+| PR #54 Mirror review | [blue/watch] Mirror PID 2736406 reviewing p4-parked-card (ourliberty-dashboard, MERGEABLE/CLEAN) | Watch for REVIEW_PASS + auto-merge |
 | fix-alert-triage-watermark-durability-001 | [blue] 1 stale entry in beacon-pending-approvals (Jun-12) | Carry |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
 | G-rule missions-autoregister-warn-vs-info | [blue] **2/3** | Watch; dispatch at 3/3 |
@@ -87,7 +86,7 @@
 | G-rule droplet-uncommitted:main | [blue] 1/3 | Watch |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] 1/3 | Watch |
 | G-rule timer-cycle-no-journal-entry | [blue] 0/3 | Watch |
-| Check 5 MISSING | [blue] heal-stale-daemon-code.heartbeat present (09:36Z tick); spec drift on state.json name | Carry |
+| Check 5 MISSING | [blue] heal-stale-daemon-code.heartbeat absent; cooldowns.json present (03:06 MDT). Spec drift. | Carry |
 | sync-push-rebase-loop-001 | [blue] UNREGISTERED AR; self-healed (09:22Z sync clean) | Carry |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
