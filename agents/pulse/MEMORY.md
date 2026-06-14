@@ -78,9 +78,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 23:08Z UTC (Iter ~1848, Tier 1, carry)
+## Status snapshot — updated 2026-06-14 23:12Z UTC (Iter ~1849, Tier 1, carry)
 
-**Iter ~1848 summary:** All mandatory checks 0–5 nominal. PRs #509 + #510 carry (DM sent iter ~1845 at 22:48Z, no Larry reply as of 23:06Z; #509 UNKNOWN, #510 CLEAN/MERGEABLE). PR #497 124th carry. Watermark=932 (no new alerts). PRIME DIRECTIVE: iter_clean (no auto-fix), ratio≈20.47. **Tier: Tier 1** (consecutive_clean=0).
+**Iter ~1849 summary:** All mandatory checks 0–5 nominal. PRs #509 + #510 carry (DM sent iter ~1845 at 22:48Z, no Larry reply as of 23:12Z; #509 UNKNOWN, #510 CLEAN/MERGEABLE). PR #497 125th carry. Watermark=932 (no new alerts). PRIME DIRECTIVE: iter_clean (no auto-fix), ratio≈20.47. **Tier: Tier 1** (consecutive_clean=0).
 
 ---
 
@@ -88,7 +88,7 @@
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — mergeState=UNKNOWN, no reviewDecision (124th iter) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — mergeState=UNKNOWN, no reviewDecision (125th iter) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | PR #509 + #510 | [yellow] UNKNOWN/CLEAN; Mirror review NEVER dispatched (non-standard branch bypass); DM sent iter ~1845 (22:48Z, no reply ~9.5h); await Larry direction | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
