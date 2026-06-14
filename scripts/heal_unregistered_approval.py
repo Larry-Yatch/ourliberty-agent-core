@@ -52,6 +52,7 @@ if str(_SCRIPT_DIR) not in sys.path:
 
 import beacon_approval_handler as approval  # noqa: E402
 import chain_event_emit  # noqa: E402
+import task_terminal_state as tts  # noqa: E402 — shared terminal-state probe kernel
 
 CONFIG_FILE = _SCRIPT_DIR.parent / 'config' / 'unregistered-approval-heuristics.json'
 
@@ -431,21 +432,14 @@ def ref_repo() -> str:
 
 def _gh_state(kind: str, number: int, repo: str, timeout: float) -> Optional[str]:
     """Return the `state` field from `gh <kind> view <number>` or None on any
-    failure (timeout, gh missing, non-PR/issue number, bad JSON)."""
-    import subprocess
-    try:
-        proc = subprocess.run(
-            ['gh', kind, 'view', str(number), '--repo', repo, '--json', 'state'],
-            capture_output=True, text=True, timeout=timeout,
-        )
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
-        return None
-    if proc.returncode != 0:
-        return None
-    try:
-        data = json.loads(proc.stdout)
-    except json.JSONDecodeError:
-        return None
+    failure (timeout, gh missing, non-PR/issue number, bad JSON).
+
+    Uses the shared kernel (task_terminal_state.gh_json) for the bounded `gh`
+    call + None-on-error handling; the return contract is unchanged."""
+    data = tts.gh_json(
+        ['gh', kind, 'view', str(number), '--repo', repo, '--json', 'state'],
+        timeout=timeout,
+    )
     state = data.get('state') if isinstance(data, dict) else None
     return state if isinstance(state, str) else None
 
