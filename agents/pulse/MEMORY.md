@@ -78,18 +78,18 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 23:37Z UTC (Iter ~1853, Tier 1, carry+new-alert)
+## Status snapshot — updated 2026-06-14 23:47Z UTC (Iter ~1854, Tier 1, clean)
 
-**Iter ~1853 summary:** 1 new Tier-4 alert (line 936): medic diagnosis for PR #510 unrouted Mirror review. Medic DM already sent at 23:31Z — no additional Pulse DM. PR #510 recovered CLEAN/MERGEABLE (iter ~1852 UNKNOWN was GitHub flap). PR #509 regressed to UNKNOWN/UNKNOWN (iter ~1852 CLEAN was GitHub flap). PR #497 129th carry. Watermark=936. PRIME DIRECTIVE: 1 intervention (Tier-4 alert), ratio≈20.51, trend=flat. **Tier: Tier 1** (consecutive_clean=0).
+**Iter ~1854 summary:** Clean iter. 1 new alert (line 937: dispatch-branch-cleanup digest) → Tier-3 silence (no tier-reset). All mandatory checks nominal. PR #497 status changed UNKNOWN/UNKNOWN → UNSTABLE/MERGEABLE (GitHub resolved flap; CI failing on stale PR; close recommendation unchanged). PRs #509+#510 unchanged (outstanding DMs from iter ~1845 + medic). Watermark=937. PRIME DIRECTIVE: 0 new interventions, ratio≈20.53, trend=flat. **Tier: Tier 1** (consecutive_clean=1).
 
 ---
 
-## Key standing items (as of iter ~1852)
+## Key standing items (as of iter ~1854)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — mergeState=UNKNOWN, no reviewDecision (129th iter) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
-| PR #509 + #510 | [yellow] #509 UNKNOWN/UNKNOWN (flap), #510 CLEAN/MERGEABLE (recovered); Mirror review NEVER dispatched; DM sent iter ~1845 (22:48Z); medic DMs 23:22Z (PR#509) + 23:31Z (PR#510) Jun-14; await Larry direction | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — mergeState=UNSTABLE/MERGEABLE (130th iter; CI failing on stale PR) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #509 + #510 | [yellow] #509 UNKNOWN/UNKNOWN (flap), #510 CLEAN/MERGEABLE; Mirror review NEVER dispatched; DM sent iter ~1845 (22:48Z); medic DMs 23:22Z (PR#509) + 23:31Z (PR#510) Jun-14; await Larry direction | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
