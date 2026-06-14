@@ -4,6 +4,103 @@
 
 ---
 
+## Iteration ~1753 — 2026-06-14 09:49Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal carries — all checks clean. Pipeline in-motion: `build-p4-conversation-doorbell` RUNNING (PID 2713362, started 09:30:33Z, ~19 min elapsed). `marker-error-p4-parked-card-1` retry 1/3 queued in Forge inbox. PR #497 carry (30th consecutive iter). Alert watermark corrected after retention script run.
+
+**VERIFY-BEFORE-REASSERT (iter ~1752 carries):**
+- PR #497 REVIEW_ESCALATE: `gh pr list` → OPEN, MERGEABLE=UNKNOWN (30th consecutive iter: ~1724→~1753). **CARRY** [yellow].
+- unreviewed-merge:499/494/489: Bot log last entry 03:31:53 MDT (idx=1004, missions-autoregister digest). No new Larry messages since "Go" 23:32:14 MDT Jun-13. **CARRY** [yellow].
+- heal-stale-daemon-code.heartbeat: MISSING (spec drift). heal-stale-daemon-code-cooldowns.json present; bot log shows healer fired at 09:06:20Z (auto-restarted ourliberty-dashboard-api.service, idx=1003). Healer alive. **CARRY** [blue].
+- fix-alert-triage-watermark-durability-001: beacon-pending-approvals.json 1 stale pending (Jun-12). **CARRY** [blue].
+- sync-push-rebase-loop-001: last_sync=2026-06-14T09:22:15Z, status=no-change. Self-healed. **CARRY** [blue].
+- build-p4-conversation-doorbell: RUNNING (PID 2713362, started 09:30:33Z, ~19 min elapsed). **CARRY** [blue/watch].
+- marker-error-p4-parked-card-1: Queued in Forge inbox (retry 1/3). PR #54 OPEN/MERGEABLE on ourliberty-dashboard. **CARRY** [blue/watch].
+
+**Check 0 — Alert triage:** Watermark was 1005; file now 912 lines (retention script ran at 03:45 MDT / 09:45Z, trimmed ~93 old entries). 0 new alerts above old watermark; 0 new alerts above new-file-end. Watermark advanced to 912 via `alert_triage_state.py set-watermark --line 912`. No missed alerts confirmed (last file entry is missions-autoregister at 09:27Z, triaged Tier-3 in iter ~1751 before retention ran). ✅ Nominal (watermark corrected).
+
+**Check 1 — Log noise:** outbox-notifier.log last entry 03:30:33 MDT: `[WARN] forge marker error in p4-parked-card.json` + `[INFO] marker-error notify written`. No new entries since iter ~1752. Single WARN, single occurrence, handled by retry mechanism. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot log last entry 03:31:53 MDT (idx=1004 missions-autoregister digest, no DM). No new Larry messages since "Go" 23:32:14 MDT Jun-13. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → 0 stalls, 9 FORGE_NO_PR_SKIP (all expected: PRs #490–498 + PREFLIGHT_EXIT for catalog-drift-facts-sync). ✅ Nominal.
+
+**Check 4 — Pending directives:** Beacon inbox: EMPTY ✅. beacon-pending-approvals.json: 1 pending entry (fix-alert-triage-watermark-durability-001, Jun-12). ✅ Nominal (carry).
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code.heartbeat MISSING (spec drift, same as prior 2 iters). heal-stale-daemon-code-cooldowns.json present with all services. Bot log confirms healer alive (fired 09:06Z). ✅ [blue carry].
+
+**Check A — Source repo:** On main. Clean working tree. HEAD=2cf5b920=origin/main. 0 ahead, 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-14T09:22:15Z (~27 min ago), status=no-change. ✅ Nominal.
+
+**Check C — Agent liveness:**
+- beacon_telegram_bot: PID 2517973 ✅
+- chain_event_shipper: PID 1849505 ✅
+- inbox_watcher: PID 2530123 ✅
+- outbox_notifier: PID 2552416 ✅
+- dashboard_api: PID 2704827 ✅
+- Forge claude: PID 2713362 RUNNING (build-p4-conversation-doorbell, started 09:30:33Z, ~19 min) ✅ [blue/watch]
+
+**Check D — Inboxes:** Forge: `build-p4-conversation-doorbell.json` (in-flight, PID 2713362), `marker-error-p4-parked-card-1.json` (queued, retry 1/3). ✅ Pipeline in-motion. Beacon: EMPTY ✅. Mirror: EMPTY ✅. Pulse: EMPTY ✅.
+
+**Check E — PRs:** ourliberty-agent-core:
+- **PR #497** OPEN (`fix(cleanup-branches): success-prune alert is info, not warning`), MERGEABLE=UNKNOWN (30th consecutive iter: ~1724→~1753), no autoMergeRequest, reviewDecision="" — [yellow] carry.
+
+ourliberty-dashboard:
+- **PR #54** OPEN (`feat: meaning-layer Parked card (Missions v2 Phase 4)`), MERGEABLE=MERGEABLE — pipeline in-motion; marker-error retry 1/3 pending in Forge inbox.
+
+**Conditional checks:** Today is Sunday 2026-06-14 UTC. Check I already ran this cycle day (iter ~1718). **SKIP**. Check III last artifact check-iii-2026-06-11.json (3 days ago, <14d threshold). **SKIP**.
+
+**Pipeline in-motion:**
+- `build-p4-conversation-doorbell`: RUNNING (PID 2713362, started 09:30:33Z, ~19 min elapsed). Build phase in-flight.
+- `p4-parked-card`: Preflight completed; PR #54 OPEN/MERGEABLE on ourliberty-dashboard. Marker-error retry 1/3 queued in Forge inbox.
+
+**Actions taken:**
+1. `alert_triage_state.py set-watermark --line 912` — corrected stale watermark (1005→912) after retention script trimmed file at 09:45Z. ✅
+2. `cycle_prime_ledger.py append --tier 1 --kind intervention --template watermark-retention-fix` → 09:48:58Z. ✅
+3. `cycle_tier_state.py record --checks-clean false` → 09:49:01Z. ✅
+
+**Dispatches:** None.
+
+**Patterns:**
+- G-rule missions-autoregister-warn-vs-info: **2/3** (no new occurrence this iter). Carry.
+- G-rule alert-translations-no-patterns-delivery-confirmation-tier4: 2/3. Carry.
+- G-rule missions-card-gc-warn-vs-info: 1/3. Carry.
+- G-rule droplet-uncommitted:main: 1/3. Carry.
+- G-rule F24-empty-prompt-envelope-rejected: 1/3. Carry.
+- G-rule timer-cycle-no-journal-entry: 0/3. Carry.
+- G-rule Forge-timeout-worktree-missing-retry-loop: 1/3. Carry.
+
+**Standing findings:**
+- [yellow] **PR #497 REVIEW_ESCALATE** — MERGEABLE=UNKNOWN (30th consecutive iter). (`gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` to close). [carry]
+- [yellow] **unreviewed-merge:499** — Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed'. [carry]
+- [yellow] **unreviewed-merge:494** — DM sent iter ~1694. Reply or silence. [carry]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614. Reply or silence. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue/watch] **build-p4-conversation-doorbell RUNNING** — PID 2713362, started 09:30:33Z, ~19 min elapsed. [watch]
+- [blue/watch] **marker-error-p4-parked-card-1 QUEUED** — retry 1/3 pending; PR #54 OPEN/MERGEABLE on ourliberty-dashboard. [watch]
+- [blue] **fix-alert-triage-watermark-durability-001** — 1 stale entry in beacon-pending-approvals (Jun-12). [carry]
+- [blue] **Check I medic-operator-scaffold-001** — 24.4σ; `/dispatch 1` if re-run needed. [carry]
+- [blue] **G-rule missions-autoregister-warn-vs-info** — **2/3**. [carry]
+- [blue] **G-rule alert-translations-no-patterns-delivery-confirmation-tier4** — 2/3. [carry]
+- [blue] **G-rule missions-card-gc-warn-vs-info** — 1/3. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 1/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — 0/3. [carry]
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. [carry]
+- [blue] **Check 5 MISSING** — heal-stale-daemon-code.heartbeat absent; healer healthy (cooldowns.json present, fired 09:06Z). Spec drift. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — self-healed (09:22Z sync clean). [carry]
+- [blue] **dag-preflight-revision gap** — PR #484 closed source=pulse gap; DAG markers still fall through. [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+
+**PRIME DIRECTIVE:** 1 intervention appended (09:48:58Z). interventions=885, systemic_fixes=41, ratio=21.59, trend=flat.
+**Tier end-of-iter:** **Tier 1** (signal: PR #497 open + unreviewed-merge carries + pipeline in-motion). consecutive_clean=0.
+
+---
+
 ## Iteration ~1752 — 2026-06-14 09:38Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry direct invocation (`/cycle`).
