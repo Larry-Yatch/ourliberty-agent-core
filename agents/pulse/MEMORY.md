@@ -54,34 +54,35 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 05:16Z UTC (Iter ~1715, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 05:26Z UTC (Iter ~1716, Tier 1, consecutive_clean=0)
 
-**Iter ~1715 summary:** Alert watermark: 992 (2 new: unreviewed-merge:499 [yellow] DM already sent by Beacon; dashboard_api auto-restart [Tier-4/nominal]). G-rule heal-stale-daemon-code-auto-restart-needs-template hit 3/3 → dispatched to Beacon (g-rule-heal-stale-daemon-warn-to-info-001). PRIME DIRECTIVE: interventions=847, systemic_fixes=41, verification_pending=11, ratio=20.66, trend=flat. Dashboard_api PID: 2322792→2627542 (restarted by healer). HEAD=ea9a055=origin/main. Sync: 04:59:59Z (~16 min ago). Larry directive active: Phase 4 build sequence request to Beacon at 05:05:59Z (Beacon replied, in-flight). PR #497 REVIEW_ESCALATE carry. PR #499 unreviewed merge (new). **Tier:** Tier 1.
+**Iter ~1716 summary:** Alert watermark: 992/992 (0 new). Beacon processed G-rule dispatch (g-rule-heal-stale-daemon-warn-to-info-001) at 23:16-23:21 MDT → created `heal-stale-daemon-restart-tier3-translation-001` pending approval (not yet auto-dispatched). Phase 4 build sequence UNEXECUTED: Beacon blocked on sync at 23:18 MDT; session handled G-rule only; spec IS on droplet. PRIME DIRECTIVE: interventions=848, systemic_fixes=41, ratio=20.68, trend=flat. Forge PID 2602672 alive (1h12m, timeout ~08:08Z). HEAD=2eab82c=origin/main. Sync: 04:59:59Z (~27 min ago). **Tier:** Tier 1.
 
 ---
 
-## Key standing items (as of iter ~1715)
+## Key standing items (as of iter ~1716)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry since iter ~1710 — Mirror found spec invalid; Beacon: fix already in alert-translations.json | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
-| unreviewed-merge:499 | [yellow] NEW — PR #499 spec(missions-v2) Phase 4 merged by Larry at 05:02:56Z without Mirror; DM sent by Beacon at 23:09 MDT | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
+| Phase 4 build sequence | [yellow] NEW — Larry directive 23:05 MDT. Beacon blocked on sync 23:18; session 23:16-23:21 handled G-rule only. Spec IS on droplet. | Beacon needs re-trigger; next Telegram message or inbox task will fire |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — Mirror found spec invalid; fix already in alert-translations.json | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| unreviewed-merge:499 | [yellow] PR #499 merged by Larry 05:02:56Z without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| Forge missions-proposed reconciliation | [blue/watch] PID 2602672 running (1h+ elapsed; timeout ~08:08Z Jun-14); inbox task active | Watch: next cycle expect forge.log "Completed" + inbox archived |
-| Phase 4 build sequence directive | [blue] Larry asked Beacon at 05:05Z to dispatch build sequence for missions-v2 Phase 4 spec | Beacon handling; watch for approval_request in next cycle |
+| heal-stale-daemon-restart-tier3-translation-001 | [blue] NEW pending approval (Beacon's G-rule response; not auto-dispatched) | Approve via Telegram to dispatch Forge |
+| Forge missions-proposed reconciliation | [blue/watch] PID 2602672 (1h12m elapsed; timeout ~08:08Z Jun-14) | Watch: forge.log "Completed" + inbox archived |
 | fix-alert-triage-watermark-durability-001 | [blue] 1 stale entry in beacon-pending-approvals (Jun-12) | Carry |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
-| G-rule heal-stale-daemon-code-auto-restart-needs-template | DISPATCHED to Beacon iter ~1715 (g-rule-heal-stale-daemon-warn-to-info-001). Reset 0/3. | Watch: Beacon spec → Forge PR |
+| G-rule heal-stale-daemon-code-auto-restart-needs-template | [blue] In approval phase (heal-stale-daemon-restart-tier3-translation-001). RESET 0/3. | Watch: Larry approval → Forge PR |
 | G-rule alert-translations-no-patterns-delivery-confirmation-tier4 | [blue] 2/3 | Watch; dispatch at 3/3 |
 | G-rule missions-card-gc-warn-vs-info | [blue] 1/3 | Watch; dispatch at 3/3 |
-| G-rule missions-autoregister-warn-vs-info | [blue] 1/3 (new iter ~1714) | Watch; dispatch at 3/3 |
+| G-rule missions-autoregister-warn-vs-info | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule droplet-uncommitted:main | [blue] 1/3 | Watch |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] 1/3 | Watch |
-| G-rule timer-cycle-no-journal-entry | RESET 0/3 | Watch |
-| Check 5 MISSING | [blue] heal-stale-daemon-code-state.json absent despite healer running at 05:05Z | Carry; possible path bug in healer |
+| G-rule timer-cycle-no-journal-entry | [blue] RESET 0/3 | Watch |
+| Check 5 MISSING | [blue] heal-stale-daemon-code-state.json absent | Carry; possible path bug in healer |
 | sync-push-rebase-loop-001 | [blue] UNREGISTERED AR; self-healed | Carry |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
