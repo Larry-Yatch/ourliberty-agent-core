@@ -4,6 +4,89 @@
 
 ---
 
+## Iteration ~1691 — 2026-06-14 00:20Z UTC (interactive, /cycle, Tier 3, consecutive_clean 2→3, Sunday Check I fired)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Green. All checks nominal. 0 new alerts. 0 interventions. Tier 3, consecutive_clean 2→3. Check I fired (Sunday gate).
+
+**VERIFY-BEFORE-REASSERT (iter ~1690 carries):**
+- unreviewed-merge:489: Last Larry bot message "Go" 21:00:30Z unchanged since ~1690. **CARRY**.
+- catalog-drift-facts-sync-001: 0 open PRs on ourliberty-graph confirmed (gh pr list = []). Beacon-pending entry unchanged. **CARRY** known stale artifact.
+- beacon-pending-approvals 3 entries: Confirmed 3 entries, same 3 as iter ~1690. **CARRY**.
+- Check 5 (heal-stale-daemon-code-state.json): MISSING confirmed. **CARRY**.
+
+**Check 0 — Alert triage:** Watermark=973. Total lines=973. 0 new alerts. ✅ Nominal. (Note: Check I DM queued will push watermark to 974 next iter.)
+
+**Check 1 — Log noise:** outbox_notifier.log: no WARNs or ERRORs (no output). inbox_watcher.log: no new issues. beacon_telegram_bot.log: last entry 15:37:22 MDT (21:37:22Z) — idx=972 route=digest, heal-stale-daemon-code. No new entries. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message: "Go" at 21:00:30Z (same as ~1690). No new directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → no stalls. 5 FORGE_NO_PR_SKIPs (same as ~1690): pulse-cycle-self-echo-silence-001/PR#490, silence-approval-request-delivery-confirmations-001/PR#491, pulse-settings-runtime-path-001/PR#492, catalog-drift-facts-sync-001 (preflight_exit/.archive), notifier-autopr-allowlist-from-config-001/PR#493. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 3 entries (same 3, unchanged).
+- fix-alert-triage-watermark-durability-001 (Jun-12 06:03Z) — stale carry.
+- fix-depth1-pulse-approval-extraction-001 (Jun-12 06:05Z) — stale carry.
+- catalog-drift-facts-sync-001 (Jun-13 19:26:54Z) — stale artifact (PR #1 on ourliberty-graph merged ~1674). Known carry.
+✅ No actionable pending approvals.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING. Known [blue] carry. ✅
+
+**Check A — Source repo:** On main. Working tree clean. HEAD=92bf506=origin/main. 0 ahead, 0 behind. ✅ Nominal. (HEAD advanced from dc8bb39: auto-commit wrapper wrote Pulse cycle 20260613T234844Z.)
+
+**Check B — Sync health:** last_sync=2026-06-13T23:59:19Z (~21 min at check time). status=no-change. Within 2h. ✅ Nominal.
+
+**Check C — Agent liveness:** 5/5 persistent daemons active (same PIDs as ~1690).
+- beacon_telegram_bot: PID 2517973 (started 11:45 MDT) ✅
+- chain_event_shipper: PID 1849505 (started Jun 11) ✅
+- outbox_notifier: PID 2552416 (started 15:33 MDT, post-PR#493) ✅
+- dashboard_api: PID 2322792 (started Jun 12) ✅
+- inbox_watcher: PID 2530123 (started 13:24 MDT) ✅
+
+**Check D — Inboxes:** beacon/forge/mirror/pulse: all empty. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open. ourliberty-graph: 0 open. ✅ Nominal.
+
+**Conditional checks (Sunday 2026-06-14 UTC):**
+**Check I — Optimization mode fired (Sunday gate):**
+- Sidecar refreshed: run_ledger.sh exit=0 (2.0s). ✅
+- mode=digest, 1 proposal.
+- Proposal #1: "Review high-σ anomaly task `medic-operator-scaffold-001`" — $6.72 task cost vs $1.68 baseline (24.4σ above). Effort=small. Rationale: Ledger flagged; read chain archive and propose fast-path/prompt-discipline/model-downgrade.
+- Auto-dispatch: DEDUP SKIP — prior dispatch `pulse-auto-655be51b08-20260610` sent 2026-06-10T03:55:05Z. Auto-dispatched=0.
+- DM queued via larry_alerts.append_alert. ✅
+- Audit JSON: ~/agents/blackboard/pulse-check-i/check-i-2026-06-14.json. ✅
+- Journal note: script reported "block for 2026-06-08 already present" (prior Sunday block exists).
+
+**Check III — Skip:** most-recent artifact = check-iii-2026-06-11.json (3 days ago, < 14d threshold). ✅ Skip.
+
+**Actions taken:**
+1. Check I run: `pulse_check_i.py` → mode=digest, 1 proposal, dedup-skip, DM queued. ✅
+2. `cycle_prime_ledger.py append --tier 3 --kind iter_clean` → logged at 00:20:39Z. ✅
+3. `cycle_tier_state.py record --checks-clean true` → Tier 3, consecutive_clean 2→3. ✅
+4. MEMORY.md updated. ✅
+
+**Dispatches:** None (Check I auto-dispatch deduped).
+
+**Standing findings:**
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614; no Larry reply. Reply 'go: retroactive-review-489' if Mirror review wanted. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **Check I proposal medic-operator-scaffold-001** — 24.4σ above baseline ($6.72 vs $1.68); prior dispatch 2026-06-10 (pulse-auto-655be51b08-20260610). Use `/dispatch 1` if that prior dispatch needs a re-run. [blue]
+- [blue] **beacon-pending-approvals stale entries** — fix-alert-triage-watermark-durability-001 + fix-depth1-pulse-approval-extraction-001 (both Jun-12) + catalog-drift artifact (Jun-13). [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — 1/3. [carry]
+- [blue] **G-rule heal-stale-daemon-code-auto-restart-needs-template** — 2/3 (dispatch at 3/3). [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 1/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **Check 5 MISSING** — heal-stale-daemon-code-state.json absent. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — [carry]
+- [blue] **dag-preflight-revision gap** — [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+
+**PRIME DIRECTIVE:** 0 new interventions. 1 iter_clean appended (00:20:39Z). Script-authoritative: interventions=836, systemic_fixes=37, verification_pending=11, ratio=22.59, trend=flat.
+**Tier end-of-iter:** Tier 3, consecutive_clean=3. Steady-state. (0 new signals since last_signal_at=2026-06-13T21:39Z.)
+
+---
+
 ## Iteration ~1690 — 2026-06-13 23:46Z UTC (interactive, /cycle, Tier 3, consecutive_clean 1→2)
 
 **Trigger:** Larry direct invocation (`/cycle`).
