@@ -4,6 +4,109 @@
 
 ---
 
+## Iteration ~1758 — 2026-06-14 10:26Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Pipeline in revision. PR #54 (`p4-parked-card`) Mirror issued REVIEW_REVISION at 04:20Z MDT; revision-1 dispatched to Forge (PID 2739307, active). 1 new Tier-4 alert (catalog-accuracy-drift, route=digest, journal-note). PR #497 carry (35th consecutive iter).
+
+**VERIFY-BEFORE-REASSERT (iter ~1757 carries):**
+- PR #497 REVIEW_ESCALATE: `gh pr list` → OPEN, MERGEABLE=UNKNOWN (35th consecutive iter: ~1724→~1758). **CARRY** [yellow].
+- unreviewed-merge:499/494/489: Bot log last entry 03:31:53 MDT (idx=1004). No new Larry messages since "Go" 23:32:14 MDT Jun-13. **CARRY** [yellow].
+- heal-stale-daemon-code.heartbeat: EXISTS at 04:06:33 MDT (~19 min ago, within 60-min threshold). Spec drift (no state.json, healer uses heartbeat file only). **CARRY** [blue — heartbeat present].
+- fix-alert-triage-watermark-durability-001: beacon-pending-approvals.json → pending=[] (no pending entries). **RESOLVED** ✅. Removed from carries.
+- sync-push-rebase-loop-001: last_sync=2026-06-14T09:22:15Z (~64 min ago), status=no-change. **CARRY** [blue].
+- Stale bash orphan loops PID 1834248 (May 28) + PID 2605007 (Jun 13): both alive, sleeping. **CARRY** [blue].
+- PR #54 Mirror review IN PROGRESS (PID 2736406): **RESOLVED** — Mirror completed; REVIEW_REVISION issued at 04:20:06Z MDT. revision-1 dispatched to Forge (PID 2739307). ✅ Updated below.
+
+**Check 0 — Alert triage:** Watermark=912, file=913 lines. 1 new alert (line 913):
+- `catalog-accuracy-drift` (source=pulse-check, ts=10:20:23Z, route=digest): 8/34 ourliberty-graph shelf cards no longer verify against live code (attention rate 24%, gate 10%). Drifted: active_tier, agent_runner, alert_triage_state, dashboard_api, human-approval-gate, inbox-dispatch, larry_alerts, outbox_notifier. No known-pattern match (alert-translations.json empty). Tier 4 (novel/ambiguous). route=digest; no DM. Journal note only. Watermark advanced to 913. [blue].
+
+**Check 1 — Log noise:** outbox-notifier.log: 2 WARNs in 24h window (forge marker errors for p4-meaning-layer-narrator at 02:35Z and p4-parked-card at 03:30Z — both historical, both resolved by retry success). Most recent entries at 04:20Z all INFO. Max signature rate <1/h. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot log last entry 03:31:53 MDT (idx=1004 missions-autoregister digest). No new Larry messages since "Go" 23:32:14 MDT Jun-13. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → 0 stalls, 10 FORGE_NO_PR_SKIP (all expected). ✅ Nominal.
+
+**Check 4 — Pending directives:** Larry's "Go" at 23:32:14 MDT Jun-13 approved dag-preflight-missions-v2-phase4 → tracked by current pipeline (PR #502 MERGED, PR #54 revision in progress). Beacon inbox: EMPTY ✅. fix-alert-triage-watermark-durability-001 RESOLVED (beacon-pending-approvals pending=[]). ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code.heartbeat present at 04:06:33 MDT (~19 min ago). Within 60-min threshold. Spec drift: no heal-stale-daemon-code-state.json (healer uses heartbeat only). ✅ [blue carry].
+
+**Check A — Source repo:** On main. Clean working tree. HEAD=da755fd1=origin/main. 0 ahead, 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-14T09:22:15Z (~64 min ago), status=no-change. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:**
+- beacon_telegram_bot: PID 2517973 ✅
+- chain_event_shipper: PID 1849505 ✅
+- inbox_watcher: PID 2530123 ✅
+- outbox_notifier: PID 2552416 ✅
+- dashboard_api: PID 2704827 ✅
+- Mirror claude: PID 2736406 COMPLETED (REVIEW_REVISION at 04:20Z, expected). ✅
+- Forge claude: PID 2739307 RUNNING (revision-1 for p4-parked-card, since 04:20Z, ~6 min elapsed). ✅
+- [blue] PID 1834248: stale bash poll loop from May 28 (16d 15h). Sleeping, 0% CPU.
+- [blue] PID 2605007: stale bash poll loop from Jun 13 (6h 1m). Sleeping, 0% CPU.
+
+**Check D — Inboxes:** Forge: revision-p4-parked-card-1.json (in revision, PID 2739307). ✅ Pipeline in-motion. Beacon: EMPTY ✅. Mirror: EMPTY ✅. Pulse: EMPTY ✅.
+
+**Check E — PRs:**
+ourliberty-agent-core:
+- **PR #497** OPEN (`fix(cleanup-branches): success-prune alert is info, not warning`), MERGEABLE=UNKNOWN (35th consecutive iter: ~1724→~1758). [yellow] carry.
+
+ourliberty-dashboard:
+- **PR #54** OPEN (`feat: meaning-layer Parked card (Missions v2 Phase 4)`), MERGEABLE=MERGEABLE, mergeStateStatus=UNSTABLE. Mirror REVIEW_REVISION issued at 04:20Z. revision-p4-parked-card-1.json dispatched to Forge. [watch].
+
+**Conditional checks:** Today is Sunday 2026-06-14 UTC. Check I already ran this cycle day (iter ~1718). **SKIP**. Check III last artifact 2026-06-11 (<14d threshold). **SKIP**.
+
+**Pipeline in-motion:**
+- `p4-conversation-doorbell`: **MERGED** (PR #502 ourliberty-agent-core, 04:11Z MDT). ✅ Complete.
+- `p4-meaning-layer-narrator`: Revision archived (outbox/.archive/p4-meaning-layer-narrator.3.json, phase=revision). Stall healer shows clean. Not in active stall window.
+- `p4-parked-card`: Mirror REVIEW_REVISION at 04:20:06Z MDT. revision-p4-parked-card-1.json in Forge inbox. Forge PID 2739307 working on revision.
+
+**Actions taken:**
+1. `alert_triage_state.py set-watermark --line 913` → 10:26:10Z. ✅ (catalog-accuracy-drift claimed, Tier 4, route=digest, journal-note-only)
+2. `cycle_prime_ledger.py append --tier 1 --kind intervention --template nominal-carry` → 10:26:17Z. ✅
+3. `cycle_tier_state.py record --checks-clean false` → 10:26:20Z. ✅
+
+**Dispatches:** None.
+
+**Patterns:**
+- G-rule missions-autoregister-warn-vs-info: 2/3 (no new occurrence). Carry.
+- G-rule alert-translations-no-patterns-delivery-confirmation-tier4: 2/3 (no new occurrence). Carry.
+- G-rule missions-card-gc-warn-vs-info: 1/3. Carry.
+- G-rule droplet-uncommitted:main: 1/3. Carry.
+- G-rule F24-empty-prompt-envelope-rejected: 1/3. Carry.
+- G-rule timer-cycle-no-journal-entry: 0/3. Carry.
+- G-rule Forge-timeout-worktree-missing-retry-loop: 1/3. Carry.
+
+**Standing findings:**
+- [yellow] **PR #497 REVIEW_ESCALATE** — MERGEABLE=UNKNOWN (35th consecutive iter). (`gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` to close). [carry]
+- [yellow] **unreviewed-merge:499** — Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed'. [carry]
+- [yellow] **unreviewed-merge:494** — DM sent iter ~1694. Reply or silence. [carry]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614. Reply or silence. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [watch] **PR #54 p4-parked-card revision** — Mirror REVIEW_REVISION at 04:20Z; Forge PID 2739307 working revision-1. [watch]
+- [blue] **catalog-accuracy-drift** — 8/34 ourliberty-graph shelf cards drifted (attention rate 24%). route=digest, Tier 4, journal-note. [new]
+- [blue] **Check I medic-operator-scaffold-001** — 24.4σ; `/dispatch 1` if re-run needed. [carry]
+- [blue] **G-rule missions-autoregister-warn-vs-info** — **2/3**. [carry]
+- [blue] **G-rule alert-translations-no-patterns-delivery-confirmation-tier4** — 2/3. [carry]
+- [blue] **G-rule missions-card-gc-warn-vs-info** — 1/3. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 1/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — 0/3. [carry]
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. [carry]
+- [blue] **Check 5 MISSING** — heal-stale-daemon-code.heartbeat present at 04:06 MDT (spec drift: no state.json). [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — self-healed (09:22Z sync clean). [carry]
+- [blue] **dag-preflight-revision gap** — PR #484 closed source=pulse gap; DAG markers still fall through. [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+- [blue] **Stale bash orphan loops** — PID 1834248 (May 28, 16+ days) and PID 2605007 (Jun 13, 6h 1m). Both sleeping, 0% CPU. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention appended (10:26:17Z). interventions=890, systemic_fixes=41, ratio=21.71, trend=flat.
+**Tier end-of-iter:** **Tier 1** (signal: PR #497 UNKNOWN + new Tier-4 alert + pipeline in-motion). consecutive_clean=0.
+
+---
+
 ## Iteration ~1757 — 2026-06-14 10:17Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry direct invocation (`/cycle`).
