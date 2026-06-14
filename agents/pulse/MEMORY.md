@@ -72,9 +72,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 18:45Z UTC (Iter ~1813, Tier 1, signal: health-notify-script-missing G-rule 1/3 + captures-dirty-tree-allowlist-001 BUILD IN PROGRESS)
+## Status snapshot — updated 2026-06-14 18:52Z UTC (Iter ~1814, Tier 1, signal: PR #507 opened — captures-dirty-tree-allowlist-001 Mirror review pipeline active)
 
-**Iter ~1813 summary:** All checks 0–5 + A–E nominal. 2 new alerts (Tier-3 silenced). Larry 'Go' at 18:36:02Z approved captures-dirty-tree-allowlist-001; Forge build-phase dispatched 18:37:15Z, worktree active. check-0-helper-authority-enforcement-001 pending Larry approval (Beacon plan created 18:38:15Z). New G-rule: ourliberty-health notify script missing (1/3, transient dirty tree during cycle window). PR #497 carry (89th iter). PRIME DIRECTIVE: ratio≈20.42, systemic_fixes=45, trend=flat. **Tier: Tier 1** (consecutive_clean=0).
+**Iter ~1814 summary:** All checks 0–5 + A–E nominal. 0 new alerts (watermark 929=file). captures-dirty-tree-allowlist-001: PR #507 opened 18:42Z by Forge; Mirror review dispatched 18:42:31Z — pipeline active. check-0-helper-authority-enforcement-001 still pending Larry approval. G-rule health-notify-script-missing: 1/3 (no new occurrence). PR #497 carry (90th iter). PRIME DIRECTIVE: ratio≈20.44, systemic_fixes=45, iter_clean. **Tier: Tier 1** (consecutive_clean=0).
 
 ---
 
@@ -82,14 +82,14 @@
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (89th iter: ~1724→~1813) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (90th iter: ~1724→~1814) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
 | TSR DAG sequence | [blue] **COMPLETE ✅** — PR #504 ✅, PR #505 ✅, PR #506 ✅ (18:13:12Z) | Done |
-| captures-dirty-tree-allowlist-001 | [blue] **BUILD IN PROGRESS** (Larry 'Go' 18:36:02Z; Forge build dispatched 18:37:15Z; worktree wt-forge-captures-dirty-tree-allowlist-001 active) | Watch for PR |
+| captures-dirty-tree-allowlist-001 → PR #507 | [blue] **MIRROR REVIEW IN PROGRESS** (PR #507 opened 18:42:09Z; Mirror review dispatch sent 18:42:31Z) | Watch for Mirror REVIEW_PASS + auto-merge |
 | check-0-helper-authority-enforcement-001 | [blue] **PENDING LARRY APPROVAL** (beacon-pending-approvals.json, created 18:38:15Z Jun-14) | Reply 'approve'/'go'/'ok' in Telegram |
 | G-rule health-notify-script-missing | [blue] **NEW 1/3** — ourliberty-health notify path misconfigured; alerts drop to journalctl only; transient dirty-tree (cycle-journal.md during wrapper window) was immediate cause | Watch; dispatch at 3/3 |
 | G-rule alert-translations-no-patterns-delivery-confirmation-tier4 | [blue] **RESOLVED** (false-positive; real fix = check-0-helper-authority-enforcement-001) | Done |
