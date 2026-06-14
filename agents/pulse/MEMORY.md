@@ -60,22 +60,24 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 09:03Z UTC (Iter ~1747, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 09:16Z UTC (Iter ~1748, Tier 1, consecutive_clean=0)
 
-**Iter ~1747 summary:** Auto-fixed repo 1 behind origin/main (ff to 94f69e4e — PR #500 merge). PR #500 (`p4-meaning-layer-narrator`, meaning-layer Phase 4 step 1a) CONFIRMED MERGED ✅ 03:00:58Z UTC; missions-v2-phase4 SEQUENCE_STEP_MERGED. All inboxes empty. Alert watermark: 1003/1003 (0 new). PR #497 OPEN (MERGEABLE=UNKNOWN, 24th consecutive iter). No new WARNs/ERRORs. PRIME DIRECTIVE: interventions=879, systemic_fixes=41, ratio=21.44, trend=flat. HEAD=94f69e4e=origin/main. Sync: 08:22:16Z (status=error, self-heals). **Tier:** Tier 1.
+**Iter ~1748 summary:** Dashboard-api auto-restarted by heal-stale-daemon-code at 09:06:20Z (PR #500 `dashboard_api.py` now live, PID 2704827). Alert idx=1004 triaged Tier-3/silence (PR #501 translation working). Watermark: 1004/1004. Pipeline in-motion: `p4-parked-card` preflight running (09:09:47Z, wt-forge-p4-parked-card, ourliberty-dashboard), `build-p4-conversation-doorbell` queued in Forge inbox. PR #497 OPEN (MERGEABLE=UNKNOWN, 25th consecutive iter). HEAD=0941c757=origin/main. Sync: 08:22:16Z (status=error, self-heals). PRIME DIRECTIVE: interventions=880, systemic_fixes=41, ratio=21.46, trend=flat. **Tier:** Tier 1.
 
 ---
 
-## Key standing items (as of iter ~1747)
+## Key standing items (as of iter ~1748)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (24 iters: ~1724→~1747) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (25 iters: ~1724→~1748) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry 05:02:56Z without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
+| p4-parked-card preflight | [blue/watch] Running (09:09:47Z, Forge, ourliberty-dashboard) | Watch for completion |
+| build-p4-conversation-doorbell | [blue/watch] Queued in Forge inbox | Starts after p4-parked-card |
 | fix-alert-triage-watermark-durability-001 | [blue] 1 stale entry in beacon-pending-approvals (Jun-12) | Carry |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
 | G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3 | Watch; dispatch at 3/3 |
@@ -85,7 +87,7 @@
 | G-rule droplet-uncommitted:main | [blue] 1/3 | Watch |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] 1/3 | Watch |
 | G-rule timer-cycle-no-journal-entry | [blue] 0/3 | Watch |
-| Check 5 MISSING | [blue] heal-stale-daemon-code-state.json absent; G-rule RESOLVED by PR #501 | Carry — state file created by healer on next activation |
-| sync-push-rebase-loop-001 | [blue] UNREGISTERED AR; idx=1003 confirmed (route=digest, self-heals) | Carry |
+| Check 5 MISSING | [blue] heal-stale-daemon-code-state.json absent from ~/agents/blackboard/; healer healthy (runs every ~30m); likely spec drift (cooldowns.json is actual state file) | Carry |
+| sync-push-rebase-loop-001 | [blue] UNREGISTERED AR; idx=1003, route=digest, self-heals | Carry |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |

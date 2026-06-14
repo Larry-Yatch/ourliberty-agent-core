@@ -4,6 +4,90 @@
 
 ---
 
+## Iteration ~1748 — 2026-06-14 09:16Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Tier 1 — dashboard-api auto-restarted by healer (PR #500 code now live). Pipeline in-motion: `p4-parked-card` preflight running, `build-p4-conversation-doorbell` queued. PR #497 OPEN (MERGEABLE=UNKNOWN, 25th consecutive iter). Unreviewed-merge 499/494/489 carries.
+
+**VERIFY-BEFORE-REASSERT (iter ~1747 carries):**
+- PR #497 REVIEW_ESCALATE: `gh pr list` → OPEN, MERGEABLE=UNKNOWN (25th consecutive iter: ~1724→~1748). **CARRY** [yellow].
+- unreviewed-merge:499/494/489: Bot log last entry 03:06:40 MDT (idx=1003 digest, heap-stale-daemon alert). No new Larry messages since "Go" 23:32:14 MDT Jun-13. **CARRY** [yellow].
+- heal-stale-daemon-code-state.json: Still MISSING from `~/agents/blackboard/`. Healer ran at 09:06:22Z (heartbeat + cooldowns present); state file remains absent — suspected spec drift (healer writes cooldowns.json, not state.json). **CARRY** [blue].
+- fix-alert-triage-watermark-durability-001: beacon-pending-approvals.json 1 stale pending (Jun-12). **CARRY** [blue].
+- sync-push-rebase-loop-001: last_sync=08:22:16Z, status=error (push-failed self-heal artifact). **CARRY** [blue].
+
+**Check 0 — Alert triage:** Watermark=1003, file=1004 lines. 1 new alert at idx=1004: `heal-stale-daemon-code` auto-restarted `ourliberty-dashboard-api.service` at 09:06:20Z (script mtime 09:01:39Z newer than pre-restart active-since by 236.4 min; PR #500 updated `dashboard_api.py`). Route=digest at emit time — PR #501 translation confirmed working (bot log: `alert idx=1003 route=digest; skipping DM`). **Tier 3/silence.** Watermark advanced to 1004. ✅
+
+**Check 1 — Log noise:** outbox-notifier.log last entry 03:09:45 MDT (build-phase dispatched forge ← beacon for p4-conversation-doorbell). No WARNs/ERRORs in tail. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot log last entry 03:06:40 MDT (idx=1003 digest route, no DM). No new Larry messages since "Go" at 23:32:14 MDT Jun-13 (approved dag-preflight-missions-v2-phase4). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → 0 new stalls, 9 FORGE_NO_PR_SKIP (all expected). `no stalls detected`. ✅ Nominal.
+
+**Check 4 — Pending directives:** Beacon inbox: EMPTY ✅. beacon-pending-approvals.json: 1 stale pending (fix-alert-triage-watermark-durability-001, Jun-12). ✅ Nominal (carry).
+
+**Check 5 — Stale daemon:** `~/agents/blackboard/heal-stale-daemon-code-state.json` MISSING. Healer confirmed healthy: ran at 09:06:22Z (heartbeat present, tick: auto-restarted=1 fresh=74), cooldowns.json present. State file may be named `cooldowns.json` (spec drift in cycle-prompt.md). dashboard-api now live on PR #500 code (PID 2704827). ✅ [blue carry]
+
+**Check A — Source repo:** On main. Clean working tree. HEAD=0941c757=origin/main. 0 behind, 0 ahead. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-14T08:22:16Z (~54 min ago, within 2h threshold), status=error (push-failed self-heal artifact, sync-push-rebase-loop-001 carry). Repo clean+synced. ✅ Nominal.
+
+**Check C — Agent liveness:**
+- beacon_telegram_bot: PID 2517973 ✅
+- chain_event_shipper: PID 1849505 ✅
+- outbox_notifier: PID 2552416 ✅
+- dashboard_api: PID **2704827** ✅ (restarted 09:06:20Z by healer; PR #500 `dashboard_api.py` now live)
+- inbox_watcher: PID 2530123 ✅
+- Forge claude: p4-parked-card preflight RUNNING (started 09:09:47Z, wt-forge-p4-parked-card, target=ourliberty-dashboard) ✅ [blue/watch]
+
+**Check D — Inboxes:** Forge: `build-p4-conversation-doorbell.json` (queued, build phase dispatched 09:09:45Z), `p4-parked-card.json` (in-flight, Forge running since 09:09:47Z). Pipeline tasks, normal state. ✅ Beacon: EMPTY ✅. Mirror: EMPTY ✅. Pulse: EMPTY ✅.
+
+**Check E — PRs:** ourliberty-agent-core:
+- **PR #497** OPEN (`fix(cleanup-branches): success-prune alert is info, not warning`), MERGEABLE=UNKNOWN (25th consecutive iter: ~1724→~1748), no autoMergeRequest, reviewDecision="" — [yellow] carry.
+- No other open PRs. ✅
+
+**Conditional checks:** Today is Sunday 2026-06-14 UTC. Check I already ran this cycle day (iter ~1718). **SKIP**. Check III last artifact check-iii-2026-06-11.json (3 days ago, <14d threshold). **SKIP**.
+
+**Pipeline in-motion:**
+- `p4-conversation-doorbell` preflight: COMPLETE ✅ (09:05:55→09:09:40Z, $0.99). Build phase (`build-p4-conversation-doorbell`) dispatched and queued in Forge inbox.
+- `p4-parked-card` preflight: RUNNING (09:09:47Z, Forge wt, ourliberty-dashboard repo).
+
+**Actions taken:**
+1. `alert_triage_state.py set-watermark --line 1004` — Tier-3/silence triage of idx=1004 (dashboard-api auto-restart). ✅
+2. `cycle_prime_ledger.py append --tier 1 --kind intervention` → 09:16:20Z. ✅
+3. `cycle_tier_state.py record --checks-clean false` → 09:16:20Z. ✅
+
+**Dispatches:** None.
+
+**Standing findings:**
+- [yellow] **PR #497 REVIEW_ESCALATE** — MERGEABLE=UNKNOWN (25th consecutive iter). (`gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` to close). [carry]
+- [yellow] **unreviewed-merge:499** — Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed'. [carry]
+- [yellow] **unreviewed-merge:494** — DM sent iter ~1694. Reply or silence. [carry]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614. Reply or silence. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue/watch] **p4-parked-card preflight RUNNING** — Forge wt started 09:09:47Z (ourliberty-dashboard). [watch]
+- [blue] **build-p4-conversation-doorbell QUEUED** — Forge inbox, will start after p4-parked-card. [watch]
+- [blue] **fix-alert-triage-watermark-durability-001** — 1 stale entry in beacon-pending-approvals (Jun-12). [carry]
+- [blue] **Check I medic-operator-scaffold-001** — 24.4σ; `/dispatch 1` if re-run needed. [carry]
+- [blue] **G-rule alert-translations-no-patterns-delivery-confirmation-tier4** — 2/3. [carry]
+- [blue] **G-rule missions-card-gc-warn-vs-info** — 1/3. [carry]
+- [blue] **G-rule missions-autoregister-warn-vs-info** — 1/3. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 1/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — 0/3. [carry]
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. [carry]
+- [blue] **Check 5 MISSING** — heal-stale-daemon-code-state.json absent from ~/agents/blackboard/; healer healthy (cooldowns.json + heartbeat + 09:06Z tick); suspected spec drift (file may be named cooldowns.json). [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — idx=1003, route=digest, self-heals. [carry]
+- [blue] **dag-preflight-revision gap** — [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+
+**PRIME DIRECTIVE:** 1 intervention appended (09:16:20Z). interventions=880, systemic_fixes=41, ratio=21.46, trend=flat.
+**Tier end-of-iter:** **Tier 1** (signal: PR #497 open + unreviewed-merge carries + pipeline in-motion). consecutive_clean=0.
+
+---
+
 ## Iteration ~1747 — 2026-06-14 09:03Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry direct invocation (`/cycle`).
