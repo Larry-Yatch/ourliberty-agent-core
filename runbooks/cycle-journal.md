@@ -4,6 +4,115 @@
 
 ---
 
+## Iteration ~1760 — 2026-06-14 10:46Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Missions v2 Phase 4 COMPLETE. PR #501 (heal-stale-daemon Tier-3 silence) MERGED 08:46Z — 4 subsequent auto-restart alerts correctly Tier-3-silenced (fix confirmed). PR #500 (p4-meaning-layer-narrator) MERGED ~09:01Z — all 3 Phase 4 steps done. PR #497 carry (37th consecutive iter).
+
+**VERIFY-BEFORE-REASSERT (iter ~1759 carries):**
+- PR #497 REVIEW_ESCALATE: `gh pr view 497` → OPEN, MERGEABLE=UNKNOWN (37th consecutive iter: ~1724→~1760). **CARRY** [yellow].
+- unreviewed-merge:499/494/489: Bot log last entry 23:32:14 MDT Jun-13 ('Go'). No new Larry messages. **CARRY** [yellow].
+- heal-stale-daemon-code.heartbeat: MISSING (only cooldowns.json present). Healer DID run at 10:36Z (4 auto-restart alerts emitted). Spec drift: no heartbeat file written. **CARRY** [blue].
+- sync-push-rebase-loop-001: last_sync=2026-06-14T10:22:19Z (~23 min ago), status=no-change. **CARRY** [blue].
+- Stale bash orphan loops PID 1834248 (May 28, 16d+) + PID 2605007 (Jun 13, 6h+): both alive (Ss). **CARRY** [blue].
+- PR #501 heal-stale-daemon-restart-tier3-translation-001: **RESOLVED** → MERGED 08:46:17Z. ✅
+- p4-meaning-layer-narrator (PR #500): **RESOLVED** → MERGED ~09:01Z (dashboard-api restart at 09:06Z cites commit 94f69e4e). ✅
+- catalog-accuracy-drift: 8/34 ourliberty-graph shelf cards drifted; route=digest; Tier 4. **CARRY** [blue].
+
+**Check 0 — Alert triage:** Watermark=914, file=918 lines. 4 new alerts (lines 915–918):
+- Line 915: `heal-stale-daemon-code` 10:36:43Z, route=digest — auto-restarted chain-event-shipper (mtime +3743.8 min; commit 91a4bb70). Tier 3 (PR #501 translation: auto-restarted:* → silence). ✅
+- Line 916: `heal-stale-daemon-code` 10:36:47Z, route=digest — auto-restarted dashboard-api (mtime +65.4 min; commit 91a4bb70). Tier 3. ✅
+- Line 917: `heal-stale-daemon-code` 10:36:52Z, route=digest — auto-restarted beacon-bot (mtime +986.6 min; commit 91a4bb70). Tier 3. [note: script_path field shows chain_event_shipper.py — cosmetic bug in healer message, restart was correct]. ✅
+- Line 918: `heal-stale-daemon-code` 10:36:56Z, route=digest — auto-restarted outbox-notifier (mtime +758.0 min; commit 91a4bb70). Tier 3. [same script_path cosmetic issue]. ✅
+All 4 correctly triaged as digest by bot (idx=914–917 in bot log at 04:36:49 and 04:41:52 MDT). PR #501 fix confirmed in production. Watermark advanced to 918. ✅
+
+**Check 1 — Log noise:** outbox-notifier.log: received signal 15, exited cleanly 04:36:53 MDT; restarted 04:36:54. 0 new WARNs/ERRORs post-restart. Historical WARNs (04:24:52, 04:25:07 — forge revision preamble) already resolved in iter ~1759. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message: 23:32:14 MDT Jun-13 ('Go'). No new messages. No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → 0 stalls, 10 FORGE_NO_PR_SKIP (all expected: existing PRs). ✅ Nominal.
+
+**Check 4 — Pending directives:** Beacon inbox: EMPTY ✅. beacon-pending-approvals.json: 1 pending (fix-alert-triage-watermark-durability-001, Jun-12). ✅ Nominal (carry).
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code.heartbeat MISSING (only cooldowns.json). Healer ran at 10:36Z (4 alerts emitted) but writes no heartbeat file. Spec drift. ✅ [blue carry].
+
+**Check A — Source repo:** On main. Clean working tree. HEAD=935edfffc5a6bc2873dc8b884a11e48dc544ab1d=origin/main. 0 ahead, 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-14T10:22:19Z (~23 min ago), status=no-change. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:**
+- beacon_telegram_bot: PID 2744840 (restarted 10:36:52Z by heal-stale-daemon-code) ✅
+- chain_event_shipper: PID 2744551 (restarted 10:36:43Z) ✅
+- inbox_watcher: PID 2530123 (uptime 15h+, not restarted) ✅
+- outbox_notifier: PID 2744914 (restarted 10:36:56Z) ✅
+- dashboard_api: PID 2744674 (restarted 10:36:47Z) ✅
+- [blue] PID 1834248: stale bash poll loop from May 28 (16d 15h+). Sleeping, 0% CPU.
+- [blue] PID 2605007: stale bash poll loop from Jun 13 (6h 24m). Sleeping, 0% CPU.
+
+**Check D — Inboxes:** Forge: EMPTY ✅. Beacon: EMPTY ✅. Mirror: EMPTY ✅. Pulse: EMPTY ✅.
+
+**Check E — PRs:**
+ourliberty-agent-core:
+- **PR #497** OPEN (`fix(cleanup-branches): success-prune alert is info, not warning`), MERGEABLE=UNKNOWN (37th consecutive iter: ~1724→~1760). [yellow] carry.
+- **PR #500** MERGED (`feat: meaning-layer fields + Narrator pass (Missions v2 Phase 4 step 1a)`) ✅ Resolved this iter.
+- **PR #501** MERGED (`fix(alerts): Tier-3-silence heal-stale-daemon-code auto-restart success`) 08:46:17Z ✅ Resolved this iter.
+ourliberty-dashboard: No open PRs. ✅
+
+**Conditional checks:** Today is Sunday 2026-06-14 UTC. Check I already ran this cycle day (iter ~1718). **SKIP**. Check III last artifact 2026-06-11 (<14d threshold). **SKIP**.
+
+**Missions v2 Phase 4 — COMPLETE:**
+- `p4-conversation-doorbell`: **MERGED** (PR #502 ourliberty-agent-core, 04:11Z MDT Jun-14) ✅
+- `p4-meaning-layer-narrator`: **MERGED** (PR #500 ourliberty-agent-core, ~09:01Z Jun-14) ✅ **NEW**
+- `p4-parked-card`: **MERGED** (PR #54 ourliberty-dashboard, 10:31Z Jun-14) ✅
+
+**Actions taken:**
+1. `alert_triage_state.py set-watermark --line 918` → 10:45Z. ✅ (4 Tier-3 heal-stale-daemon-code alerts claimed)
+2. `cycle_prime_ledger.py append --tier 1 --kind intervention --template nominal-carry` → 10:45:57Z. ✅
+3. `cycle_tier_state.py record --checks-clean false` → 10:45:57Z. ✅
+
+**Dispatches:** None.
+
+**Patterns:**
+- G-rule heal-stale-daemon-restart: **RESOLVED** → PR #501 merged 08:46Z; 4 correct Tier-3 triage events confirm fix. Counter cleared. ✅
+- G-rule missions-autoregister-warn-vs-info: 2/3 (no new occurrence). Carry.
+- G-rule alert-translations-no-patterns-delivery-confirmation-tier4: 2/3 (no new occurrence). Carry.
+- G-rule missions-card-gc-warn-vs-info: 1/3. Carry.
+- G-rule droplet-uncommitted:main: 1/3. Carry.
+- G-rule F24-empty-prompt-envelope-rejected: 1/3. Carry.
+- G-rule timer-cycle-no-journal-entry: 0/3. Carry.
+- G-rule Forge-timeout-worktree-missing-retry-loop: 1/3. Carry.
+- [new, blue] heal-stale-daemon-code script_path cosmetic bug: alerts for beacon-bot and outbox-notifier show chain_event_shipper.py as script_path. Cosmetic only (restarts correct). G-rule counter: 1/3.
+
+**Standing findings:**
+- [yellow] **PR #497 REVIEW_ESCALATE** — MERGEABLE=UNKNOWN (37th consecutive iter). (`gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` to close). [carry]
+- [yellow] **unreviewed-merge:499** — Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed'. [carry]
+- [yellow] **unreviewed-merge:494** — DM sent iter ~1694. Reply or silence. [carry]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614. Reply or silence. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **fix-alert-triage-watermark-durability-001** — 1 pending in beacon-pending-approvals (Jun-12). [carry]
+- [blue] **Check I medic-operator-scaffold-001** — 24.4σ; `/dispatch 1` if re-run needed. [carry]
+- [blue] **catalog-accuracy-drift** — 8/34 ourliberty-graph shelf cards drifted (attention rate 24%). route=digest, Tier 4, journal-note. [carry]
+- [blue] **G-rule missions-autoregister-warn-vs-info** — 2/3. [carry]
+- [blue] **G-rule alert-translations-no-patterns-delivery-confirmation-tier4** — 2/3. [carry]
+- [blue] **G-rule missions-card-gc-warn-vs-info** — 1/3. [carry]
+- [blue] **G-rule droplet-uncommitted:main** — 1/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 1/3. [carry]
+- [blue] **G-rule timer-cycle-no-journal-entry** — 0/3. [carry]
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. [carry]
+- [blue] **G-rule heal-stale-daemon-script_path-cosmetic** — 1/3. [new]
+- [blue] **Check 5 MISSING** — heal-stale-daemon-code.heartbeat absent; cooldowns.json present. Spec drift. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — self-healed (10:22Z sync clean). [carry]
+- [blue] **dag-preflight-revision gap** — PR #484 closed source=pulse gap; DAG markers still fall through. [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+- [blue] **Stale bash orphan loops** — PID 1834248 (May 28, 16d+) and PID 2605007 (Jun 13, 6h+). Sleeping, 0% CPU. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention appended (10:45:57Z). interventions=892, systemic_fixes=41, ratio=21.76, trend=flat.
+**Tier end-of-iter:** **Tier 1** (signal: PR #497 UNKNOWN, 37th consecutive iter). consecutive_clean=0.
+
+---
+
 ## Iteration ~1759 — 2026-06-14 10:39Z UTC (interactive, /cycle, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry direct invocation (`/cycle`).
