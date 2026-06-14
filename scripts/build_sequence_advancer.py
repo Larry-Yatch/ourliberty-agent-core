@@ -126,6 +126,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 import build_sequence_validator as bsv  # noqa: E402
+import task_terminal_state as tts  # noqa: E402 — shared terminal-state probe kernel
 from id_match import id_matches  # noqa: E402
 
 
@@ -368,20 +369,16 @@ def gh_pr_says_merged(pr_url: str) -> Optional[bool]:
     rather than counting as one-leg mismatch)."""
     if not pr_url:
         return None
-    try:
-        proc = subprocess.run(
-            ['gh', 'pr', 'view', pr_url, '--json', 'state'],
-            capture_output=True, text=True, timeout=GH_PR_VIEW_TIMEOUT_SEC,
-        )
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+    # Shared kernel (task_terminal_state.gh_json): bounded `gh`, None on any
+    # error. Behavior is unchanged from the prior inline implementation — a gh
+    # failure stays a soft None; only a positive MERGED state returns True.
+    data = tts.gh_json(
+        ['gh', 'pr', 'view', pr_url, '--json', 'state'],
+        timeout=GH_PR_VIEW_TIMEOUT_SEC,
+    )
+    if data is None:
         return None
-    if proc.returncode != 0:
-        return None
-    try:
-        data = json.loads(proc.stdout)
-    except json.JSONDecodeError:
-        return None
-    return data.get('state') == 'MERGED'
+    return isinstance(data, dict) and data.get('state') == 'MERGED'
 
 
 def _first_gate_mismatch_ts(

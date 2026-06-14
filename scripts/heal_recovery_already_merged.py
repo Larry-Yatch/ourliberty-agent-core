@@ -32,10 +32,15 @@ import json
 import os
 import re
 import shutil
-import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+_SCRIPT_DIR = Path(__file__).resolve().parent
+if str(_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPT_DIR))
+
+import task_terminal_state as tts  # noqa: E402 — shared terminal-state probe kernel
 
 # Path isolation: honor OURLIBERTY_AGENTS_ROOT (the repo-wide convention — see
 # agent_runner / dashboard_api / the other healers) so tests can point this at a
@@ -94,25 +99,24 @@ def query_merged_pr(sub_task_tag: str) -> dict | None:
     order and returns the first hit; a query error on one repo doesn't abort
     the others."""
     for repo in verify_repos():
-        try:
-            r = subprocess.run(
-                ["gh", "pr", "list",
-                 "--repo", repo,
-                 "--state", "merged",
-                 "--search", f"[{sub_task_tag}] in:title",
-                 "--json", "number,title,mergedAt",
-                 "--limit", "5"],
-                capture_output=True, text=True, timeout=15,
-            )
-            if r.returncode != 0:
-                continue
-            prs = json.loads(r.stdout)
-            for pr in prs:
-                if f"[{sub_task_tag}]" in pr.get("title", ""):
-                    pr["repo"] = repo
-                    return pr
-        except (subprocess.TimeoutExpired, json.JSONDecodeError, OSError):
+        # Shared kernel (task_terminal_state.gh_json): bounded `gh`, None on any
+        # error (timeout / gh missing / non-zero exit / bad JSON), so a per-repo
+        # failure falls through to the next repo exactly as before.
+        prs = tts.gh_json(
+            ["gh", "pr", "list",
+             "--repo", repo,
+             "--state", "merged",
+             "--search", f"[{sub_task_tag}] in:title",
+             "--json", "number,title,mergedAt",
+             "--limit", "5"],
+            timeout=15,
+        )
+        if not isinstance(prs, list):
             continue
+        for pr in prs:
+            if isinstance(pr, dict) and f"[{sub_task_tag}]" in pr.get("title", ""):
+                pr["repo"] = repo
+                return pr
     return None
 
 

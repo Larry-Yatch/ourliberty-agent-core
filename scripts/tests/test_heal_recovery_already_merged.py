@@ -30,6 +30,11 @@ _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_REPO_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_REPO_SCRIPTS))
 
+# The `gh` subprocess now lives in the shared kernel (task_terminal_state.gh_json),
+# which query_merged_pr delegates to — so patch the kernel's subprocess, not the
+# healer module's (it no longer imports subprocess).
+import task_terminal_state as tts  # noqa: E402
+
 _ENV_KEYS = ('OURLIBERTY_AGENTS_ROOT', 'OURLIBERTY_VERIFY_REPO')
 
 
@@ -90,7 +95,7 @@ class QueryMergedPrTest(_ReloadBase):
     def test_finds_in_first_repo(self) -> None:
         self.h.REPOS = ['a/one', 'b/two']
         hit = [{'number': 7, 'title': '[PR-1f] x', 'mergedAt': '2026-06-01T00:00:00Z'}]
-        with mock.patch.object(self.h.subprocess, 'run',
+        with mock.patch.object(tts.subprocess, 'run',
                                return_value=_CompletedProc(0, json.dumps(hit))) as run:
             pr = self.h.query_merged_pr('PR-1f')
         self.assertIsNotNone(pr)
@@ -103,23 +108,23 @@ class QueryMergedPrTest(_ReloadBase):
         miss = _CompletedProc(0, json.dumps([]))
         hit = _CompletedProc(0, json.dumps(
             [{'number': 9, 'title': '[PR-2a] y', 'mergedAt': '2026-06-02T00:00:00Z'}]))
-        with mock.patch.object(self.h.subprocess, 'run', side_effect=[miss, hit]):
+        with mock.patch.object(tts.subprocess, 'run', side_effect=[miss, hit]):
             pr = self.h.query_merged_pr('PR-2a')
         self.assertEqual(pr['repo'], 'b/two')
 
     def test_per_repo_error_does_not_abort_search(self) -> None:
         self.h.REPOS = ['a/one', 'b/two']
-        boom = self.h.subprocess.TimeoutExpired(cmd='gh', timeout=15)
+        boom = tts.subprocess.TimeoutExpired(cmd='gh', timeout=15)
         hit = _CompletedProc(0, json.dumps(
             [{'number': 11, 'title': '[PR-3c] z', 'mergedAt': '2026-06-03T00:00:00Z'}]))
-        with mock.patch.object(self.h.subprocess, 'run', side_effect=[boom, hit]):
+        with mock.patch.object(tts.subprocess, 'run', side_effect=[boom, hit]):
             pr = self.h.query_merged_pr('PR-3c')
         self.assertEqual(pr['number'], 11)
         self.assertEqual(pr['repo'], 'b/two')
 
     def test_no_match_returns_none(self) -> None:
         self.h.REPOS = ['a/one', 'b/two']
-        with mock.patch.object(self.h.subprocess, 'run',
+        with mock.patch.object(tts.subprocess, 'run',
                                return_value=_CompletedProc(0, json.dumps([]))) as run:
             self.assertIsNone(self.h.query_merged_pr('PR-none'))
         self.assertEqual(run.call_count, 2)  # both repos searched on a miss
