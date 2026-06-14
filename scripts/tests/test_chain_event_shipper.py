@@ -847,6 +847,10 @@ class TestKnownEventTypesContract(unittest.TestCase):
         # Phase 0 (missions-v2-phase0-desktop-session-feed.md), push-emitted by
         # desktop Claude Code sessions via the droplet ingest endpoint
         # (POST /api/ingest/desktop-session → chain_event_emit.emit_event).
+        # The card_message type was added by Missions v2 Phase 4 step 1b
+        # (missions-v2-phase4-meaning-layer.md § 8) — the capture-scoped
+        # conversation thread, push-emitted by the dashboard
+        # POST /api/missions/captures/{id}/message route and Beacon's reply.
         spec_listed = {
             'session_start', 'session_done', 'marker_emit', 'auto_merge',
             'marker_error', 'cost_budget', 'review_request',
@@ -860,6 +864,7 @@ class TestKnownEventTypesContract(unittest.TestCase):
             'needs_attention',
             'desktop_session_start', 'desktop_session_active',
             'desktop_session_done',
+            'card_message',
         }
         self.assertEqual(ces.KNOWN_EVENT_TYPES, frozenset(spec_listed))
 
