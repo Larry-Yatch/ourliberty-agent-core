@@ -54,29 +54,29 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 06:14Z UTC (Iter ~1723, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 06:21Z UTC (Iter ~1724, Tier 1, consecutive_clean=0)
 
-**Iter ~1723 summary:** Alert watermark: 995/995 (0 new). All mandatory checks nominal. **NEW RESOLUTION: PR #498 (missions-proposed-lane-signal-hardening-001) MERGED** — Mirror SUCCESS 04:49:42Z Jun-14; Forge session 45e53d6e completed. Forge PID 2602672 alive (~2h04m; forge.log silent since 04:08:19Z; timeout ~08:08Z Jun-14). p4-meaning-layer-narrator + heal-stale-daemon queued in Forge inbox. PRIME DIRECTIVE: interventions=855, systemic_fixes=41, ratio=20.85, trend=flat. HEAD=acc35a3=origin/main. Sync: 05:21:45Z (52 min ago). **Tier:** Tier 1. inbox-watcher.log missing (PID alive; no escalation).
+**Iter ~1724 summary:** Alert watermark: 995/995 (0 new). All mandatory checks nominal. PR #498 MERGED (RESOLVED). **NEW: PR #497 now MERGEABLE** (CI passing, was UNKNOWN) — still no Mirror review, still needs close decision. Forge PID 2602672 alive (~2h09m; forge.log silent since 04:08:19Z; timeout ~08:08Z Jun-14). Watchdog WARNs: "Watcher log stale" 12/hour; systemic fix in flight (heal-stale-daemon-restart-tier3-translation-001 queued). PRIME DIRECTIVE: interventions=856, systemic_fixes=41, ratio=20.85, trend=flat. HEAD=8243101=origin/main. Sync: 05:21:45Z (59 min ago). **Tier:** Tier 1.
 
 ---
 
-## Key standing items (as of iter ~1723)
+## Key standing items (as of iter ~1724)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — Mirror found spec invalid; fix already in alert-translations.json | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — **Now MERGEABLE** (CI green); Mirror spec invalid; fix in alert-translations.json | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry 05:02:56Z without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| PR #498 missions-proposed-lane-signal-hardening-001 | **RESOLVED** — MERGED, Mirror SUCCESS 04:49:42Z Jun-14 | CLOSED |
-| Forge PID 2602672 post-PR | [blue/watch] forge.log silent since 04:08:19Z (~2h); timeout ~08:08Z Jun-14 | Watch: pickup of heal-stale-daemon or p4-meaning-layer |
+| PR #498 missions-proposed-lane-signal-hardening-001 | **RESOLVED** — MERGED 04:49:45Z Jun-14 | CLOSED |
+| Forge PID 2602672 post-PR | [blue/watch] forge.log silent since 04:08:19Z (~2h09m); timeout ~08:08Z Jun-14 (~1h47m remaining) | Watch: pickup of heal-stale-daemon or p4-meaning-layer |
 | p4-meaning-layer-narrator (Phase 4 step-1) | [blue/watch] Queued in Forge inbox | Watch: Forge PID 2602672 completes → picks up next task |
 | heal-stale-daemon-restart-tier3-translation-001 | [blue] Queued in Forge inbox | Watch: Forge PR |
 | fix-alert-triage-watermark-durability-001 | [blue] 1 stale entry in beacon-pending-approvals (Jun-12) | Carry |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
-| G-rule heal-stale-daemon-code-auto-restart-needs-template | [blue] heal-stale-daemon-restart-tier3-translation-001 in Forge queue. | Watch: Forge PR |
+| G-rule heal-stale-daemon-code-auto-restart-needs-template | [blue] heal-stale-daemon-restart-tier3-translation-001 in Forge queue | Watch: Forge PR |
 | G-rule alert-translations-no-patterns-delivery-confirmation-tier4 | [blue] 2/3 | Watch; dispatch at 3/3 |
 | G-rule missions-card-gc-warn-vs-info | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule missions-autoregister-warn-vs-info | [blue] 1/3 | Watch; dispatch at 3/3 |
