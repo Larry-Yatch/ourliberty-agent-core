@@ -66,30 +66,30 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 18:09Z UTC (Iter ~1809, Tier 1, signal: TSR step 3 PR #506 Mirror review + G-rule droplet-uncommitted dispatched)
+## Status snapshot — updated 2026-06-14 18:17Z UTC (Iter ~1810, Tier 1, signal: TSR DAG COMPLETE ✅ + PR #497 [yellow] carry)
 
-**Iter ~1809 summary:** All checks 0–5 + A–E nominal. 1 new alert (watermark=926): missions-card-gc 0-retirement digest, Tier-4 per helper, journal-note only. G-rule droplet-uncommitted:main hit 3/3 (captures.json dirty-tree ~18:05Z, self-healed ~18:06Z) → **dispatched gc-healer-captures-dirty-tree-fix-001 to Beacon**. TSR DAG step 3: PR #506 OPEN (MERGEABLE), Mirror review RUNNING (PID 2871217). PR #497 carry (85th iter). PRIME DIRECTIVE: interventions=917, systemic_fixes=43, ratio≈21.33 (improving). **Tier: Tier 1** (G-rule dispatch + Tier-4 alert; consecutive_clean=0).
+**Iter ~1810 summary:** All checks 0–5 + A–E nominal. 0 new alerts (watermark=926=file). **TSR DAG `terminal-state-reconciliation` FULLY COMPLETE**: PR #506 MERGED 18:13:12Z (Mirror PASS, auto-squash). All 3 steps: #504 ✅, #505 ✅, #506 ✅. gc-healer-captures-dirty-tree-fix-001 dispatched last iter, pending Beacon pick-up. PR #497 carry (86th iter). PRIME DIRECTIVE: interventions=917, systemic_fixes=43, ratio≈21.33, trend=flat. **Tier: Tier 1** (PR #497 [yellow]; consecutive_clean=0).
 
 ---
 
-## Key standing items (as of iter ~1809)
+## Key standing items (as of iter ~1810)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (85th iter: ~1724→~1809) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — statusCheckRollup=FAILURE, no reviewDecision (86th iter: ~1724→~1810) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| TSR DAG sequence | [blue] PR #504 ✅; PR #505 MERGED ✅; step 3 (tsr-missions-sequence-inflight-digest): PR #506 OPEN (MERGEABLE), Mirror review RUNNING (PID 2871217, 18:02Z) | Watch next 1–2 iters for Mirror PASS + auto-merge |
+| TSR DAG sequence | [blue] **COMPLETE ✅** — PR #504 ✅, PR #505 ✅ (17:43:06Z), PR #506 ✅ (18:13:12Z) | Done |
 | gc-healer-captures-dirty-tree-fix-001 | [blue] DISPATCHED to Beacon (G-rule 3/3: captures.json dirty-tree ~8-10 min windows) | Pending Beacon spec → Forge build |
 | catalog-accuracy-drift | [blue] 8/34 ourliberty-graph shelf cards drifted (attention rate 24%, gate 10%) | route=digest; journal-note only |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
 | G-rule missions-autoregister-warn-vs-info | [blue] **2/3** | Watch; dispatch at 3/3 |
 | G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule alert-translations-no-patterns-delivery-confirmation-tier4 | [blue] **2/3** | Watch; dispatch at 3/3 |
-| G-rule missions-card-gc-warn-vs-info | [blue] **2/3** (new: alert 926, severity=warning, 0-action) | Watch; dispatch at 3/3 |
+| G-rule missions-card-gc-warn-vs-info | [blue] **2/3** (last: alert 926, severity=warning, 0-action) | Watch; dispatch at 3/3 |
 | G-rule droplet-uncommitted:main | [blue] **DISPATCHED** (gc-healer-captures-dirty-tree-fix-001; reset 0/3) | Watch for recurrence |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] 1/3 | Watch |
 | G-rule timer-cycle-no-journal-entry | [blue] **0/3** (RESET; false positive confirmed by Beacon) | Watch |
@@ -98,5 +98,5 @@
 | sync-push-rebase-loop-001 | [blue] UNREGISTERED AR; last occurrence 13:22:39Z Jun-14 (self-healed) | Carry |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
-| dashboard_api PID change | [blue] Restarted ~17:58Z (2744674→2868353); running fine; cause unknown | Note; watch for recurrence |
-| Stale bash orphans | [blue] PIDs 1834248 (~17d+) + 2605007 (~13h+ Jun-14). 0% CPU. | Carry; cleanup when convenient |
+| dashboard_api PID change | [blue] PID 2868353 running stable (~29 min as of iter ~1810); cause of prior restart still unknown | Note; watch for recurrence |
+| Stale bash orphans | [blue] PIDs 1834248 (~17d+) + 2605007 (~14h+ Jun-14). 0% CPU. | Carry; cleanup when convenient |
