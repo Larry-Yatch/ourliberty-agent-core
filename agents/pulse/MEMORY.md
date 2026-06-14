@@ -66,9 +66,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 13:36Z UTC (Iter ~1783, Tier 1, consecutive_clean=1)
+## Status snapshot — updated 2026-06-14 13:45Z UTC (Iter ~1784, Tier 1, consecutive_clean=2)
 
-**Iter ~1783 summary:** 0 new alerts (watermark=919 = file length). All 7 agents live. Inboxes empty. No stalls. No auto-fix actions. PR #497 updated: MERGEABLE=MERGEABLE (was UNKNOWN; mirror-review=FAILURE still). beacon-pending-approvals stale entries CLEARED. G-rule heal-stale-daemon-code-auto-restart-needs-template RESOLVED (PR #501 merged 08:46Z). PRIME DIRECTIVE: interventions=914, systemic_fixes=41, ratio≈22.29, trend=flat. **Tier:** Tier 1, consecutive_clean=1.
+**Iter ~1784 summary:** 0 new alerts (watermark=919 = file length). All 5 expected agents live. Inboxes empty. No stalls. No auto-fix actions. Iter clean. PR #497: MERGEABLE=UNKNOWN (GitHub re-computed from MERGEABLE; not a formal Check E finding). sync.json status=error is carry from self-healed iter ~1782 event; not a new finding. PRIME DIRECTIVE: interventions=914, systemic_fixes=41, ratio≈22.29, trend=flat. **Tier:** Tier 1, consecutive_clean=2.
 
 ---
 
@@ -76,7 +76,7 @@
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=MERGEABLE (changed from UNKNOWN), mirror-review=FAILURE, no reviewDecision (~60 iters: ~1724→~1783) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (flipped back from MERGEABLE), mirror-review=FAILURE, no reviewDecision (~60 iters: ~1724→~1784) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
@@ -89,7 +89,7 @@
 | G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule alert-translations-no-patterns-delivery-confirmation-tier4 | [blue] **2/3** | Watch; dispatch at 3/3 |
 | G-rule missions-card-gc-warn-vs-info | [blue] 1/3 | Watch; dispatch at 3/3 |
-| G-rule droplet-uncommitted:main | [blue] **2/3** (last occurrence 13:22:39Z Jun-14, self-healed) | Watch; dispatch at 3/3 |
+| G-rule droplet-uncommitted:main | [blue] **2/3** (last occurrence 13:22:39Z Jun-14, self-healed; no new occurrence iter ~1784) | Watch; dispatch at 3/3 |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] 1/3 | Watch |
 | G-rule timer-cycle-no-journal-entry | [blue] **0/3** (RESET; false positive confirmed by Beacon) | Forge PR pending: approve/reject timer-label-fix |
 | G-rule heal-stale-daemon-script_path-cosmetic | [blue] 1/3 | Watch; dispatch at 3/3 |
