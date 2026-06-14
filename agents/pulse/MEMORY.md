@@ -60,24 +60,24 @@
 
 ---
 
-## Status snapshot — updated 2026-06-14 09:49Z UTC (Iter ~1753, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-14 10:05Z UTC (Iter ~1755, Tier 1, consecutive_clean=0)
 
-**Iter ~1753 summary:** All checks nominal. Check 0: retention script trimmed larry-alerts.jsonl (1005→912 lines at 09:45Z); watermark fixed to 912, 0 missed alerts. Pipeline in-motion: `build-p4-conversation-doorbell` RUNNING (PID 2713362, started 09:30:33Z, ~19 min); `marker-error-p4-parked-card-1` retry 1/3 queued in Forge inbox; PR #54 OPEN/MERGEABLE on ourliberty-dashboard. PR #497 OPEN (MERGEABLE=UNKNOWN, 30th consecutive iter). HEAD=2cf5b920=origin/main. Sync: 09:22:15Z (status=no-change). Healer healthy (cooldowns.json present, fired 09:06Z). PRIME DIRECTIVE: interventions=885, systemic_fixes=41, ratio=21.59, trend=flat. **Tier:** Tier 1.
+**Iter ~1755 summary:** Pipeline advanced. build-p4-conversation-doorbell COMPLETED (PR #502 ourliberty-agent-core MERGEABLE, Mirror PID 2727703 reviewing). p4-parked-card preflight retry 1/3 SUCCEEDED + build COMPLETED (PR #54 ourliberty-dashboard MERGEABLE, Mirror review queued). Forge idle. All daemons healthy. PR #497 OPEN (MERGEABLE=UNKNOWN, 32nd consecutive iter). HEAD=d9dc0582=origin/main. Sync: 09:22:15Z (status=no-change). Healer healthy. PRIME DIRECTIVE: interventions=887, systemic_fixes=41, ratio=21.63, trend=flat. **Tier:** Tier 1.
 
 ---
 
-## Key standing items (as of iter ~1751)
+## Key standing items (as of iter ~1755)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (30 iters: ~1724→~1753) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE=UNKNOWN (32 iters: ~1724→~1755) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| build-p4-conversation-doorbell | [blue/watch] RUNNING (PID 2713362, build phase) | Watch for completion |
-| marker-error-p4-parked-card-1 | [blue/watch] Retry 1/3 queued in Forge inbox; PR #54 OPEN/MERGEABLE on ourliberty-dashboard | Watch for retry + PROCEED marker |
+| PR #502 Mirror review | [blue/watch] Mirror PID 2727703 reviewing p4-conversation-doorbell (ourliberty-agent-core) | Watch for REVIEW_PASS + auto-merge |
+| PR #54 Mirror review | [blue/watch] review-p4-parked-card.json queued in Mirror inbox (ourliberty-dashboard) | Watch for Mirror start + REVIEW_PASS + auto-merge |
 | fix-alert-triage-watermark-durability-001 | [blue] 1 stale entry in beacon-pending-approvals (Jun-12) | Carry |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
 | G-rule missions-autoregister-warn-vs-info | [blue] **2/3** | Watch; dispatch at 3/3 |
@@ -87,7 +87,8 @@
 | G-rule droplet-uncommitted:main | [blue] 1/3 | Watch |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] 1/3 | Watch |
 | G-rule timer-cycle-no-journal-entry | [blue] 0/3 | Watch |
-| Check 5 MISSING | [blue] heal-stale-daemon-code-state.json absent from ~/agents/blackboard/; healer healthy (actual state file is `heal-stale-daemon-code.heartbeat` flat timestamp — spec drift; heartbeat 09:06:16Z) | Carry |
+| Check 5 MISSING | [blue] heal-stale-daemon-code.heartbeat present (09:36Z tick); spec drift on state.json name | Carry |
 | sync-push-rebase-loop-001 | [blue] UNREGISTERED AR; self-healed (09:22Z sync clean) | Carry |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
+| Stale bash orphan loops | [blue] PIDs 1834248 (May 28, 16+ days) + 2605007 (Jun 13). Sleeping, 0% CPU. | Carry; cleanup when convenient |
