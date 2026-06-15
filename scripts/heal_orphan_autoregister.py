@@ -638,10 +638,6 @@ def _emit_summary(res: ProposeResult, commit_status: str, dry_run: bool) -> None
         larry_alerts.append_alert(
             source='missions-autoregister', severity='warning',
             message=summary, subject=f'failure:{commit_status}', route='escalate')
-    elif (res.proposed or res.retired) and commit_status == 'committed':
-        larry_alerts.append_alert(
-            source='missions-autoregister', severity='warning',
-            message=summary, subject='summary', route='digest')
 
 
 # ---------- main ----------
