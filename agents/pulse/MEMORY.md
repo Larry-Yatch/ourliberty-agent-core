@@ -120,9 +120,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 11:29Z UTC (Iter ~1932, Tier 1)
+## Status snapshot — updated 2026-06-15 11:38Z UTC (Iter ~1933, Tier 1)
 
-**Iter ~1932 summary:** ✅ Nominal. Tier 1, consecutive_clean=1. All checks clean. No new alerts. Pipeline stall cooldowns still active (PRs #509/#510/#512/#513). alert-translation-unrouted-pr-001 now confirmed in beacon-pending-approvals.json (pending=2 total). ratio≈20.49 (963/47). All 5 PIDs healthy. Watermark=989 (file=978 lines); gap persists. Sync last=11:24Z (FRESH). 5 open PRs: #497 (MERGEABLE; REVIEW_ESCALATE ~31.6h, expires Jun-17T04:05Z), #509/#510/#512/#513 (stall/cooldowns).
+**Iter ~1933 summary:** ✅ Nominal. Tier 1, consecutive_clean=2. All checks clean. No new alerts. Pipeline stall cooldowns still active (PRs #509/#510/#512/#513). beacon-pending-approvals.json: pending=2 (unreg-approval-482eb78951ee + alert-translation-unrouted-pr-001). ratio≈20.49 (963/47). All 5 PIDs healthy. Watermark=989 (file=978 lines); gap persists. Sync last=11:24Z (FRESH). 5 open PRs: #497 (MERGEABLE re-verified; REVIEW_ESCALATE ~31.5h, expires Jun-17T04:05Z), #509/#510/#512/#513 (stall/cooldowns).
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl. When cooldown expires, the alert fires in dry-run mode. Be aware: calling --dry-run in a cycle will write real alerts if the cooldown has passed. Always check wc -l of the file before and after.
 
