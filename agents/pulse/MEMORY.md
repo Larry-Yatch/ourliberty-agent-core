@@ -78,9 +78,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 02:12Z UTC (Iter ~1868, Tier 1, new finding)
+## Status snapshot — updated 2026-06-15 02:17Z UTC (Iter ~1869, Tier 1, nominal)
 
-**Iter ~1868 summary:** New finding: PR #511 (`feat/local-review-pass-marker`) merged by Larry at 23:58Z Jun-14 without Mirror routing — 4th unreviewed-merge in standing items. All 5 mandatory checks nominal. 0 new alerts (watermark=947). Beacon spec done for stall-detector-exclude-external-pr-001; Forge build pending dashboard approval (Forge inbox empty, no PR). consecutive_clean=0 (reset). ratio≈20.24.
+**Iter ~1869 summary:** All mandatory+additive checks nominal. 0 new alerts (watermark=947). Carries only. Forge inbox empty; stall-detector Forge build still pending dashboard approval. consecutive_clean=1 (incrementing toward Tier-2 de-escalation at 3). ratio≈20.26.
 
 ---
 
@@ -88,7 +88,7 @@
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — mergeState=UNKNOWN/UNKNOWN (144th iter; GitHub API flap) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — mergeState=UNKNOWN/UNKNOWN (145th iter; GitHub API flap) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | PR #509 + #510 | [yellow] Both UNKNOWN; pending approval `unreg-approval-482eb78951ee` registered (dashboard); DM sent iter ~1864 | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
 | G-rule stall-detector Forge build | [yellow] Beacon spec done 01:51Z Jun-15 (stall-detector-exclude-external-pr-001). Forge build pending dashboard approval. Forge inbox empty; no PR yet. | Check dashboard Approvals tab; approve Forge build |
 | unreviewed-merge:511 | [yellow] PR #511 (`feat/local-review-pass-marker`) merged by Larry at 23:58Z Jun-14 without Mirror routing | Reply 'go: retroactive-review-511' or 'silence: local-review-marker-counts' |
