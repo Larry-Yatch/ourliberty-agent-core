@@ -102,9 +102,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 07:28Z UTC (Iter ~1902, Tier 1)
+## Status snapshot — updated 2026-06-15 07:35Z UTC (Iter ~1903, Tier 2)
 
-**Iter ~1902 summary:** ✅ Nominal. **Tier 1, consecutive_clean=2**. Check 0: 1 new alert (watermark=973), Tier-3 silence (sync-blocked self-healing). All daemons alive. All checks clean. G-rule Forge-preflight-marker-error-retry stays at **2/3** (no new occurrence). ratio≈20.57 (946/46). One more clean iter → de-escalate to Tier 2.
+**Iter ~1903 summary:** ✅ Nominal. **Tier 2, consecutive_clean=0** (de-escalated from Tier 1). Check 0: 0 new alerts (watermark=973). All daemons alive. All checks clean. G-rule Forge-preflight-marker-error-retry stays at **2/3** (no new occurrence). ratio≈20.57 (946/46). Next de-escalation to Tier 3 requires 3 consecutive clean Tier-2 iters.
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl for this script. When cooldown expires, the alert fires even in dry-run mode. Be aware: calling --dry-run in a cycle will generate real alerts if the cooldown has passed.
 
