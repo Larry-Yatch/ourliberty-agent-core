@@ -126,7 +126,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 17:48Z UTC (Iter ~1969, Tier 2, consecutive_clean=1)
+## Status snapshot — updated 2026-06-15 18:02Z UTC (Iter ~1970, Tier 2, consecutive_clean=2)
+
+**Iter ~1970 summary:** ✅ Nominal. 2 new alerts, both Tier-3 silenced (L1033-L1034, medic-diagnosis). Watermark: 1032→1034. pending=0. Tier 2, consecutive_clean=2. Daemons all alive. No G-rule advances. 3 open PRs: #497 (age≈38h, deadline Jun-17T04:05Z ~34h), #512, #513.
 
 **Iter ~1969 summary:** ✅ Nominal. 4 new alerts, all Tier-3 silenced (L1029-1032). Watermark: 1028→1032. pending=0. Tier 2, consecutive_clean=1. Daemons all alive. **G-rule medic-diagnosis-tier4: COMPLETE ✅** (PR #515 merged). **G-rule healer-unrouted-pr-tier3-translation: COMPLETE ✅** (PR #516 merged, L1031+L1032 verified Tier-3). 3 open PRs: #497 (age≈39.3h, deadline Jun-17T04:05Z ~30.3h), #512, #513.
 
