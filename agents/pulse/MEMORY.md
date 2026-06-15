@@ -126,11 +126,11 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 15:52Z UTC (Iter ~1957, Tier 1, signal)
+## Status snapshot — updated 2026-06-15 16:04Z UTC (Iter ~1959, Tier 1, clean, consecutive_clean=2)
 
-**Iter ~1957 summary:** ⚠️ Signal. Check 0: 1 new alert (L1014) — `missions-autoregister summary/warning` (Tier-3 silenced). G-rule missions-autoregister-warn-vs-info 2/3 → 3/3 → **DISPATCHED** `g-rule-missions-autoregister-warn-vs-info-001` to Beacon inbox (direction-ask for code-level severity demotion from warning to info). All mandatory checks nominal. Tier 1, consecutive_clean=0. Watermark: 1013 → 1014. ratio≈20.68.
+**Iter ~1959 summary:** ✅ Nominal. Check 0: 1 new alert (L1015) — `approval_request` for `autoregister-warn-demote-001` from outbox-notifier (Tier-3 silenced, known-pattern). Check 4: pending=4 (+1 new: autoregister-warn-demote-001 plan ready for Larry approve/reject). Beacon completed g-rule-missions-autoregister-warn-vs-info-001 in 290s ($0.98). All checks nominal. Tier 1, consecutive_clean=2. Watermark: 1014 → 1015. ratio≈20.70.
 
-**Iter ~1956 summary (prior):** ✅ Nominal. Check 0: 1 new alert (L1013) — `approval_request` for `medic-diagnosis-tier3-silence-001` from outbox-notifier (Tier-3 silenced, known-pattern). Check 4: pending=3 (+1 new: medic-diagnosis-tier3-silence-001 APPROVAL_REQUEST delivered to Larry at 09:42 MDT). All other checks nominal. Tier 1, consecutive_clean=1. Watermark: 1012 → 1013. ratio≈20.68.
+**Iter ~1958 summary (prior):** ✅ Nominal. All checks clean. 0 new alerts. Tier 1, consecutive_clean=1. Watermark=1014. ratio≈20.70.
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl. When cooldown expires, the alert fires in dry-run mode. Be aware: calling --dry-run in a cycle will write real alerts if the cooldown has passed. Always check wc -l of the file before and after.
 
@@ -140,30 +140,30 @@
 
 ---
 
-## Key standing items (as of iter ~1956)
+## Key standing items (as of iter ~1959)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] UNKNOWN mergeable; reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ~36.3h; 72h expires ~Jun-17T04:05Z. | Carry; escalate if still open at Jun-17T04:05Z |
-| PR #509 | [yellow] Cooldown active (last alert 15:25:31Z Jun-15). | Merge/close or dispatch Mirror review |
-| PRs #510 + #512 + #513 | [yellow] Cooldowns active; last alerts fired 15:35:59Z Jun-15 (iter ~1955). | Larry to route to Mirror or merge/close; OR reply "approve" for alert-translation-unrouted-pr-001 to silence |
-| medic-diagnosis-tier3-silence-001 | [yellow] **NEW** APPROVAL_REQUEST in beacon-pending-approvals.json; bot delivered idx=1012 at 09:42 MDT Jun-15. Beacon plan for Tier-3 silence of medic-diagnosis alerts. | Reply "approve" in Telegram to trigger Forge config-only PR |
-| alert-translation-unrouted-pr-001 | [yellow] APPROVAL_REQUEST in beacon-pending-approvals.json (pending since 11:29Z iter ~1932). Tier-3 translation for pipeline-stall:unrouted-pr alerts. | Reply "approve" to trigger Forge config-only PR |
+| PR #497 REVIEW_ESCALATE | [yellow] UNKNOWN mergeable; reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ~36h; 72h expires ~Jun-17T04:05Z. | Carry; escalate if still open at Jun-17T04:05Z |
+| PR #509 | [yellow] Cooldown active. | Merge/close or dispatch Mirror review |
+| PRs #510 + #512 + #513 | [yellow] Cooldowns active. | Larry to route to Mirror or merge/close; OR reply "approve" for alert-translation-unrouted-pr-001 to silence |
+| autoregister-warn-demote-001 | [yellow] **NEW** APPROVAL_REQUEST in beacon-pending-approvals.json. Beacon plan ready (built iter ~1957 dispatch, $0.98). Option A=approve (suppress digest row in heal_orphan_autoregister.py; 1-file). Option B=reject (add INFO tier to larry_alerts.py; multi-file). | Reply "approve" or "reject: use Option B" in Telegram |
+| medic-diagnosis-tier3-silence-001 | [yellow] APPROVAL_REQUEST in beacon-pending-approvals.json. | Reply "approve" to trigger Forge config-only PR |
+| alert-translation-unrouted-pr-001 | [yellow] APPROVAL_REQUEST in beacon-pending-approvals.json. | Reply "approve" to trigger Forge config-only PR |
 | G-rule stall-detector Forge build | [yellow] Beacon spec complete. Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
-| Check VIII rule=lower | [yellow] FN=3027, TP=5, FP=2 — threshold too high. DM queued iter ~1899. | `approve check-viii-update-2026-06-15` when shortcut lands |
-| unreviewed-merge:511 | [yellow] PR #511 merged by Larry at 23:58Z Jun-14 without Mirror routing | Reply 'go: retroactive-review-511' or 'silence: local-review-marker-counts' |
-| unreviewed-merge:499/494/489 | [yellow] PRs merged by Larry without Mirror | Reply appropriate shortcut or silence |
+| Check VIII rule=lower | [yellow] FN=3027, TP=5, FP=2 — threshold too high. | `approve check-viii-update-2026-06-15` when shortcut lands |
+| unreviewed-merge:511/499/494/489 | [yellow] PRs merged by Larry without Mirror | Reply appropriate shortcut or silence |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| Telegram 409 burst | [yellow] G-rule **2/3**. All self-inflicted by calling get-messages. Bot recovered all times. | Watch; dispatch at 3/3 |
+| Telegram 409 burst | [yellow] G-rule **2/3**. All self-inflicted by calling get-messages. | Watch; dispatch at 3/3 |
 | Check I 2026-06-15 | [blue] 1 proposal dispatched iter ~1899, Beacon processed | Beacon spec in progress |
-| Check IX missions | [blue] PR #512 (catch-me-up-gap) + PR #513 (alert-ignored) open, no review yet | Larry review on kanban |
-| G-rule medic-diagnosis-tier4 | [blue] **DISPATCHED** iter ~1955; medic-diagnosis-tier3-silence-001 APPROVAL_REQUEST in beacon-pending-approvals.json | Watch for Larry approval → Forge PR |
-| G-rule catalog-accuracy-drift-tier4 | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 for Tier-3 translation |
+| Check IX missions | [blue] PR #512 (catch-me-up-gap) + PR #513 (alert-ignored) open | Larry review on kanban |
+| G-rule medic-diagnosis-tier4 | [blue] **DISPATCHED** iter ~1955; medic-diagnosis-tier3-silence-001 pending | Watch for Larry approval → Forge PR |
+| G-rule missions-autoregister-warn-vs-info | [blue] **DISPATCHED** iter ~1957; plan autoregister-warn-demote-001 ready | Awaiting Larry approve/reject |
+| G-rule catalog-accuracy-drift-tier4 | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule ledger/check-i Tier-4 | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule health-notify-script-missing | [blue] **1/3** | Watch; dispatch at 3/3 |
 | catalog-accuracy-drift | [blue] 9/34 ourliberty-graph shelf cards drifted | route=digest; journal-note only |
-| G-rule missions-autoregister-warn-vs-info | [blue] **DISPATCHED** iter ~1957 | Watch for Beacon spec + Forge PR |
 | G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule missions-card-gc-warn-vs-info | [blue] **2/3** | Watch; dispatch at 3/3 |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] **2/3** | Watch; dispatch at 3/3 |
