@@ -126,11 +126,13 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 16:39Z UTC (Iter ~1962, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-15 16:49Z UTC (Iter ~1963, Tier 1, consecutive_clean=0)
 
-**Iter ~1962 summary:** ⚠️ 1 new alert. L1017 medic-diagnosis Tier-4 (chat_id DM delivered by medic directly; no Pulse action). Watermark: 1016→1017. pending=4 unchanged. Tier 1 unchanged, consecutive_clean=0. ratio=20.72, trend=improving. Daemons: beacon:2744840, chain-event-shipper:2744551, outbox-notifier:2744914, dashboard-api:2868353, inbox-watcher:2530123.
+**Iter ~1963 summary:** ⚠️ 7 new alerts (L1018-L1024). L1018-1020: pipeline-stall PRs #510/512/513 Tier-4, bot delivered. L1021: missions-autoregister Tier-3 silenced. L1022-1024: medic-diagnosis Tier-4, chat_id delivered. Watermark: 1017→1024. Check 2: Larry "Go" at 10:41MDT → dispatch FAILED for autoregister-warn-demote-001 (self-dispatch denied beacon→beacon). G-rule telegram-approval-self-dispatch-denied **1/3 NEW**. Tier 1, consecutive_clean=0. Daemons: beacon:2744840, chain-event-shipper:2744551, outbox-notifier:2744914, dashboard-api:2868353, inbox-watcher:2530123.
 
-**Iter ~1961 summary (prior):** ⚠️ 1 new alert. Check 0: PR #509 unrouted-pr (heal-pipeline-stall, Tier-4, bot escalate delivered). Watermark: 1015→1016. pending=4 unchanged. **Tier 2→1 reset** (Tier-4 alert). ratio=20.70.
+**Iter ~1962 summary (prior):** ⚠️ 1 new alert. L1017 medic-diagnosis Tier-4 (chat_id DM delivered by medic directly; no Pulse action). Watermark: 1016→1017. pending=4 unchanged. Tier 1 unchanged, consecutive_clean=0. ratio=20.72.
+
+**Iter ~1961 summary (prior-2):** ⚠️ 1 new alert. Check 0: PR #509 unrouted-pr (heal-pipeline-stall, Tier-4, bot escalate delivered). Watermark: 1015→1016. **Tier 2→1 reset** (Tier-4 alert).
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl. When cooldown expires, the alert fires in dry-run mode. Be aware: calling --dry-run in a cycle will write real alerts if the cooldown has passed. Always check wc -l of the file before and after.
 
@@ -140,15 +142,21 @@
 
 ---
 
-## Key standing items (as of iter ~1961)
+## telegram-approval-self-dispatch-denied G-rule (observed iter ~1963)
+
+**Rule:** When Larry replies "Go" (or similar approval shortcut) in Telegram for a Beacon-authored APPROVAL_REQUEST plan, the bot attempts to dispatch the plan back to Beacon (its own source), resulting in "self-dispatch denied (beacon → beacon)". The approval is NOT processed. The plan stays pending in beacon-pending-approvals.json. Recovery: Larry must re-approve explicitly via Telegram or dashboard. **G-rule count: 1/3** — dispatch to Beacon at 3/3 for a routing fix in the bot's approval handler.
+
+---
+
+## Key standing items (as of iter ~1963)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] UNKNOWN mergeable; reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ~36.5h; 72h expires ~Jun-17T04:02Z (~35h remaining). | Carry; escalate if still open at Jun-17T04:02Z |
-| PR #509 | [yellow] Cooldown expired; alert fired iter ~1961 (Tier-4, bot escalate delivered). | Reply `approve` for alert-translation-unrouted-pr-001 to silence future occurrences |
-| unreg-approval-482eb78951ee | [yellow] APPROVAL_REQUEST in beacon-pending-approvals.json (created 01:45Z). | Investigate + resolve |
-| PRs #510 + #512 + #513 | [yellow] Cooldowns active. | Larry to route to Mirror or merge/close; OR reply "approve" for alert-translation-unrouted-pr-001 to silence |
-| autoregister-warn-demote-001 | [yellow] **NEW** APPROVAL_REQUEST in beacon-pending-approvals.json. Beacon plan ready (built iter ~1957 dispatch, $0.98). Option A=approve (suppress digest row in heal_orphan_autoregister.py; 1-file). Option B=reject (add INFO tier to larry_alerts.py; multi-file). | Reply "approve" or "reject: use Option B" in Telegram |
+| PR #497 REVIEW_ESCALATE | [yellow] UNKNOWN mergeable; reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ~36.7h; 72h expires ~Jun-17T04:05Z (~35.3h remaining). | Carry; escalate if still open at Jun-17T04:05Z |
+| "Go" dispatch failure | [yellow] **NEW iter ~1963.** Larry's "Go" at 10:41MDT → dispatch failed autoregister-warn-demote-001 (self-dispatch denied beacon→beacon). Approval NOT processed. | Reply "approve" again in Telegram or use dashboard approve path |
+| PRs #509/#510/#512/#513 | [yellow] Cooldowns expired for 510/512/513; new alerts L1018-1020 filed. | Reply `approve` for alert-translation-unrouted-pr-001 to silence |
+| unreg-approval-482eb78951ee | [yellow] APPROVAL_REQUEST in beacon-pending-approvals.json. | Investigate + resolve |
+| autoregister-warn-demote-001 | [yellow] APPROVAL_REQUEST in beacon-pending-approvals.json. Larry's "Go" failed. Option A=approve (suppress digest row; 1-file). Option B=reject (add INFO tier; multi-file). | Reply "approve" or "reject: use Option B" in Telegram |
 | medic-diagnosis-tier3-silence-001 | [yellow] APPROVAL_REQUEST in beacon-pending-approvals.json. | Reply "approve" to trigger Forge config-only PR |
 | alert-translation-unrouted-pr-001 | [yellow] APPROVAL_REQUEST in beacon-pending-approvals.json. | Reply "approve" to trigger Forge config-only PR |
 | G-rule stall-detector Forge build | [yellow] Beacon spec complete. Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
@@ -161,6 +169,7 @@
 | Check IX missions | [blue] PR #512 (catch-me-up-gap) + PR #513 (alert-ignored) open | Larry review on kanban |
 | G-rule medic-diagnosis-tier4 | [blue] **DISPATCHED** iter ~1955; medic-diagnosis-tier3-silence-001 pending | Watch for Larry approval → Forge PR |
 | G-rule missions-autoregister-warn-vs-info | [blue] **DISPATCHED** iter ~1957; plan autoregister-warn-demote-001 ready | Awaiting Larry approve/reject |
+| G-rule telegram-approval-self-dispatch-denied | [blue] **1/3 NEW** — bot routes Beacon-authored plan approvals back to Beacon | Watch; dispatch to Beacon at 3/3 for bot routing fix |
 | G-rule catalog-accuracy-drift-tier4 | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule ledger/check-i Tier-4 | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule health-notify-script-missing | [blue] **1/3** | Watch; dispatch at 3/3 |

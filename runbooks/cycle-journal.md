@@ -4,6 +4,102 @@
 
 ---
 
+## Iteration ~1963 — 2026-06-15 16:49Z UTC (interactive, /loop /cycle, Tier 1, 7 new alerts 6×Tier-4)
+
+**Trigger:** Larry direct invocation (`/loop /cycle`).
+
+**Health:** ⚠️ Signal. 7 new alerts (L1018-L1024): 6×Tier-4 (3 pipeline-stall + 3 medic-diagnosis), 1×Tier-3. Check 2: Larry's "Go" directive at 10:41 MDT → dispatch failed for autoregister-warn-demote-001 (self-dispatch denied beacon→beacon). Tier 1, consecutive_clean=0.
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): Confirmed open (gh pr list). UNKNOWN mergeable, reviewDecision=''. Mirror REVIEW_ESCALATE 04:05:31Z Jun-14. Age ≈ 36.7h. 72h expires ~Jun-17T04:05Z (~35.3h remaining). **CARRY** [yellow].
+- PRs #509/#510/#512/#513: Confirmed open (gh pr list). PRs #510/#512/#513 cooldowns EXPIRED this iter — heal_pipeline_stall fired 3 new alerts (L1018-1020). PR #509 still on cooldown. **CARRY** [yellow].
+- beacon-pending-approvals.json: pending=4 (unchanged: unreg-approval-482eb78951ee, alert-translation-unrouted-pr-001, medic-diagnosis-tier3-silence-001, autoregister-warn-demote-001). **CARRY** [yellow].
+
+**Check 0 — Alert triage:** Watermark=1017 (entering); file grew to 1024 during cycle. **7 new alerts (L1018-L1024):**
+- L1018: `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#513` (ts=16:43:10Z) → **Tier-4**. Bot already delivered (route=escalate). No DM from Pulse. G-rule alert-translation-unrouted-pr-001 pending.
+- L1019: `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#512` (ts=16:43:10Z) → **Tier-4**. Same pattern. No DM.
+- L1020: `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#510` (ts=16:43:10Z) → **Tier-4**. Same pattern. No DM.
+- L1021: `source=missions-autoregister, subject=summary` (ts=16:44:44Z) → **Tier-3 (silenced)**. Known pattern in alert-translations.json. No DM.
+- L1022-L1024: `source=medic, intent=medic-diagnosis` (ts=16:46:17/23/30Z) → **Tier-4**. Medic delivered via chat_id=7998341473 directly. No second DM from Pulse.
+Watermark: 1017 → 1024. 6×Tier-4 → tier-reset.
+
+**Check 1 — Log noise:** outbox-notifier: last WARN 01:10:53Z Jun-15 (pulse-auto-dispatch task-id mismatch, G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3 unchanged). inbox_watcher: no WARNs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:**
+- 409 burst: last occurrence 07:44:56-0600 MDT (OLD), G-rule telegram-409-burst 2/3 unchanged.
+- Larry "Why do we have 80 messages over the night?" (10:33:36-0600 MDT) — bot replied, resolved. Nominal.
+- Larry context about pipeline-stall PR#510 (10:39:02-0600 MDT) — medic diagnosed at 10:41:12 MDT.
+- **[yellow] NEW: Larry sent "Go" at 10:41:13-0600 MDT → dispatch FAILED: "dispatch failed for autoregister-warn-demote-001: self-dispatch denied (beacon -> beacon)".** Bot attempted to route Larry's approval back to Beacon (the plan's source), which is rejected. autoregister-warn-demote-001 still pending. **G-rule telegram-approval-self-dispatch-denied: 1/3** (routing bug: Telegram approval shortcut for Beacon-authored plans attempts beacon→beacon dispatch). Ask-then-do: Larry needs to re-authorize (reply "approve" again, or use dashboard approve path).
+PID 2744840 alive (Ss). ⚠️ Tier-reset.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run fired 3 real alerts (L1018-1020). Per MEMORY: --dry-run does NOT suppress writes when cooldowns expire. PR #509 still on cooldown (suppressed). PRs #510/#512/#513 cooldowns expired → 3 new alerts written. No new Pulse action beyond triage.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: pending=4 (unchanged): unreg-approval-482eb78951ee, alert-translation-unrouted-pr-001, medic-diagnosis-tier3-silence-001, autoregister-warn-demote-001. Note: Larry's "Go" failed (see Check 2). [yellow] carry.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T16:15:55.291631+00:00`, age≈33 min at check time. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=76af3dad = origin/main. Clean tree. Branch=main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-15T16:25:16Z, age≈24 min. FRESH (<2h). ✅ Nominal.
+
+**Check C — Agent liveness:**
+- inbox_watcher: PID 2530123 ✅ (Ssl)
+- chain_event_shipper: PID 2744551 ✅ (SNs)
+- beacon_telegram_bot: PID 2744840 ✅ (Ss)
+- outbox_notifier: PID 2744914 ✅ (Ss)
+- dashboard_api: PID 2868353 ✅ (Ssl)
+- No forge/mirror persistent sessions — expected. ✅
+
+**Check E — PRs:**
+ourliberty-agent-core (5 open, unchanged):
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): UNKNOWN mergeable, reviewDecision=''. Mirror REVIEW_ESCALATE 04:05:31Z Jun-14. Age ≈ 36.7h. 72h expires ~Jun-17T04:05Z (~35.3h remaining). [yellow] carry.
+- **PR #509** (`docs/meaning-layer-roadmap`), cooldown active. [yellow] carry.
+- **PR #510** (`work/build-consult-restock`), cooldown expired, new alert L1020 filed. [yellow] carry.
+- **PR #512** (`feat/new-mission-pulse-check-ix-catch-me-up-gap-2026-06-15`), cooldown expired, new alert L1019 filed. [yellow] carry.
+- **PR #513** (`feat/new-mission-pulse-check-ix-alert-ignored-2026-06-15`), cooldown expired, new alert L1018 filed. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Conditional checks:** Check I sentinel `check-i-2026-06-15.json` EXISTS (fired iter ~1899). Skip. Check III: not Sunday. Skip. ✅
+
+**Actions taken:**
+1. Triage L1018-L1024 via `alert_triage_state.py` batch (7 alerts: 6×Tier-4, 1×Tier-3 silenced) ✅
+2. `alert_triage_state.py set-watermark --line 1024` ✅ (1017 → 1024)
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` ✅ (ts=16:48:54Z)
+4. `cycle_tier_state.py record --checks-clean false` → **Tier 1, consecutive_clean=0** ✅
+
+**Dispatches:** None. (All Tier-4 alerts already delivered by bot/medic; no new G-rule at 3/3.)
+
+**G-rule updates this iter:**
+- `telegram-approval-self-dispatch-denied`: **NEW, 1/3** — Larry "Go" → dispatch failed for autoregister-warn-demote-001 ("self-dispatch denied beacon→beacon"). Routing bug: bot tries to dispatch Beacon-authored plan back to Beacon. Dispatch to Beacon at 3/3 for permanent fix.
+- All other counters unchanged from iter ~1962.
+
+**Standing findings (updated from iter ~1962):**
+- [yellow] **"Go" dispatch failure (NEW)** — Larry's "Go" at 10:41:13-0600 MDT attempted to approve autoregister-warn-demote-001, dispatch failed ("self-dispatch denied beacon→beacon"). Approval still pending. Recovery: reply "approve" again in Telegram (or use dashboard approve path: dispatch_approved + safe_write_inbox + resolve()).
+- [yellow] **PR #497 REVIEW_ESCALATE** — Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ≈ 36.7h; 72h expires ~Jun-17T04:05Z (~35.3h remaining). [carry]
+- [yellow] **PRs #509/510/512/513 pipeline-stall** — cooldowns expired for 510/512/513; new alerts filed (L1018-1020). Awaiting `approve alert-translation-unrouted-pr-001`.
+- [yellow] **autoregister-warn-demote-001** — pending in beacon-pending-approvals.json. Larry's "Go" didn't process. Reply "approve" (Option A) or "reject: use Option B".
+- [yellow] **alert-translation-unrouted-pr-001** — pending. Reply "approve" to trigger Forge config-only PR.
+- [yellow] **medic-diagnosis-tier3-silence-001** — pending. Reply "approve" to trigger Forge config-only PR.
+- [yellow] **unreg-approval-482eb78951ee** — pending (direction-ask: merge-509-510-direct vs mirror-review-509-510). [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **unreviewed-merge:511/499/494/489** — [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. [watch → dispatch at 3/3]
+- [blue] **G-rule missions-autoregister-warn-vs-info** — **DISPATCHED** iter ~1957; plan autoregister-warn-demote-001 in pending. Awaiting Larry approve/reject.
+- [blue] **G-rule medic-diagnosis-tier4** — **DISPATCHED** iter ~1955; medic-diagnosis-tier3-silence-001 in pending. Awaiting Larry approval → Forge PR.
+- [blue] **catalog-accuracy-drift** — G-rule 1/3. [carry]
+- [blue] **Check I 2026-06-15** — sentinel exists. 1 proposal dispatched. [carry]
+- [blue] **Check IX missions** — PRs #512 + #513 open. [carry]
+- [blue] G-rule counters: Forge-preflight-marker-error-retry 2/3, missions-card-gc-warn-vs-info 2/3, F24-empty-prompt-envelope-rejected 2/3, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, heal-stale-daemon-script_path-cosmetic 1/3, Forge-preflight-CLARIFY_REQUEST 1/3, telegram-409-burst **2/3**, **telegram-approval-self-dispatch-denied 1/3 NEW**, missions-autoregister-warn-vs-info DISPATCHED, medic-diagnosis-tier4 DISPATCHED.
+- [blue] **Stale bash orphans** — PIDs 1834248 (17d+, Ss) + 2605007 (1d+, Ss). Low CPU. [carry]
+
+**PRIME DIRECTIVE:** intervention (6×Tier-4 alerts + Check 2 dispatch failure noted). ratio pending ledger compute.
+**Tier end-of-iter:** **Tier 1, consecutive_clean=0**.
+
+---
+
 ## Iteration ~1960 — 2026-06-15 16:09Z UTC (interactive, /cycle, Tier 1→2 de-escalation, consecutive_clean=3)
 
 **Trigger:** Larry direct invocation (`/cycle`).
