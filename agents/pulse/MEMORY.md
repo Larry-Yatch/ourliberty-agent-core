@@ -102,11 +102,13 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 07:53Z UTC (Iter ~1904, Tier 1)
+## Status snapshot — updated 2026-06-15 08:00Z UTC (Iter ~1905, Tier 1)
 
-**Iter ~1904 summary:** ⚠️ Signal. **Tier 1, consecutive_clean=0** (tier-reset from Tier 2). Check 0: 1 new alert (line 974, PR #509 pipeline-stall, Tier-4, bot already DM'd Larry via route=escalate, watermark=974). All daemons alive. No other findings. ratio≈20.59 (947/46). Awaiting Larry triage response for PR #509 alert.
+**Iter ~1905 summary:** ⚠️ Signal. **Tier 1, consecutive_clean=0**. Check 0: 1 new alert (line 975, medic-diagnosis intent for PR #509, Tier-4, medic already DM'd Larry at chat_id=7998341473 at 07:55Z). All daemons alive. No other findings. ratio≈20.59 (948/46). Awaiting Larry's response to PR #509 medic-diagnosis DM.
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl for this script. When cooldown expires, the alert fires even in dry-run mode. Be aware: calling --dry-run in a cycle will generate real alerts if the cooldown has passed.
+
+**medic-diagnosis alerts (learned iter ~1905):** The medic module sends `kind=notification, intent=medic-diagnosis` alerts with a chat_id when it performs detailed PR diagnoses. These carry a chat_id meaning the DM was already delivered directly. Triage helper classifies as Tier-4 (no registry template). No second DM from Pulse warranted.
 
 ---
 
