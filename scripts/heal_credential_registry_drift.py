@@ -498,6 +498,26 @@ def _path_from_location(location: str) -> Path:
     return Path(p)
 
 
+def _ignored_keys_for(
+    known_locations: dict[str, Any], location: str,
+) -> set[str]:
+    """Return the allowlist of non-credential keys (feature flags / tunables)
+    the drift scan must skip for `location`, per the registry's
+    `known_storage_locations[location].ignored_keys` array.
+
+    Defensive: returns an empty set when the location is unknown, has no
+    `ignored_keys`, or the value isn't a list of strings (a malformed config
+    is caught by validate_token_rotation_schedule.py — here we just never
+    silently drop a real key)."""
+    meta = known_locations.get(location)
+    if not isinstance(meta, dict):
+        return set()
+    raw = meta.get('ignored_keys')
+    if not isinstance(raw, list):
+        return set()
+    return {k for k in raw if isinstance(k, str) and k}
+
+
 def _claude_cli_tier_for_location(location: str) -> Optional[str]:
     """Map a claude_cli storage location to its rotation tier, or None if the
     path is not one active_tier owns.
@@ -616,6 +636,14 @@ def detect_drift(
                 log(f'scanner for {location} raised {type(e).__name__}: {e}; '
                     f'skipping', 'WARN')
                 continue
+
+        # Drop allowlisted non-credential keys (feature flags / tunables)
+        # configured for this location. An ignored key is treated as absent
+        # for drift purposes: neither reported as MISSING_REGISTRY_ENTRY nor
+        # counted as a registered credential expected to be present.
+        ignored = _ignored_keys_for(known_locations, location)
+        if ignored:
+            live = live - ignored
 
         # Special case: gh_cli, claude_cli, workspace_mcp scanners return
         # generic credential names ('GITHUB_GH_OAUTH_TOKEN', etc.) — only

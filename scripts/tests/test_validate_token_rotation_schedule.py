@@ -246,6 +246,58 @@ class StorageLocationTest(unittest.TestCase):
         self.assertTrue(ok, msg=reasons)
 
 
+class IgnoredKeysTest(unittest.TestCase):
+    _ENV_LOC = 'env_file:/home/larry/credentials/.env.larry'
+
+    def test_valid_ignored_keys_passes(self):
+        reg = _good_registry()
+        reg['known_storage_locations'][self._ENV_LOC]['ignored_keys'] = [
+            'OURLIBERTY_NEWMISSION_INGEST_ENABLED',
+        ]
+        ok, reasons = v.validate_registry(reg)
+        self.assertTrue(ok, msg=reasons)
+
+    def test_empty_ignored_keys_passes(self):
+        reg = _good_registry()
+        reg['known_storage_locations'][self._ENV_LOC]['ignored_keys'] = []
+        ok, reasons = v.validate_registry(reg)
+        self.assertTrue(ok, msg=reasons)
+
+    def test_ignored_keys_not_a_list_fails(self):
+        reg = _good_registry()
+        reg['known_storage_locations'][self._ENV_LOC]['ignored_keys'] = (
+            'OURLIBERTY_NEWMISSION_INGEST_ENABLED'
+        )
+        ok, reasons = v.validate_registry(reg)
+        self.assertFalse(ok)
+        self.assertTrue(any('ignored_keys' in r for r in reasons))
+
+    def test_ignored_keys_non_string_element_fails(self):
+        reg = _good_registry()
+        reg['known_storage_locations'][self._ENV_LOC]['ignored_keys'] = [
+            'OK_KEY', 123,
+        ]
+        ok, reasons = v.validate_registry(reg)
+        self.assertFalse(ok)
+        self.assertTrue(any('ignored_keys' in r for r in reasons))
+
+    def test_ignored_keys_empty_string_element_fails(self):
+        reg = _good_registry()
+        reg['known_storage_locations'][self._ENV_LOC]['ignored_keys'] = ['']
+        ok, reasons = v.validate_registry(reg)
+        self.assertFalse(ok)
+        self.assertTrue(any('ignored_keys' in r for r in reasons))
+
+    def test_ignored_keys_on_non_env_file_location_fails(self):
+        reg = _good_registry()
+        reg['known_storage_locations'][
+            'gh_cli:/home/larry/.config/gh/hosts.yml'
+        ]['ignored_keys'] = ['SOME_KEY']
+        ok, reasons = v.validate_registry(reg)
+        self.assertFalse(ok)
+        self.assertTrue(any('ignored_keys' in r for r in reasons))
+
+
 class CalendarUrlTest(unittest.TestCase):
     def test_null_calendar_url_passes(self):
         entry = _good_entry(calendar_event_url=None)
