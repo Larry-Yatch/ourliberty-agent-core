@@ -120,11 +120,11 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 14:31Z UTC (Iter ~1948, Tier 1, non-clean)
+## Status snapshot — updated 2026-06-15 14:35Z UTC (Iter ~1949, Tier 1, non-clean)
 
-**Iter ~1948 summary:** ⚠️ Non-clean. Check 0: 4 new Tier-4 alerts (lines 997–1000): medic-diagnosis for PR#509 (chat_id DM already sent) + pipeline-stall:unrouted-pr alerts for PRs #510/#512/#513 (cooldowns expired in dry-run). All journal-note only; G-rule 3/3 DISPATCHED. Check 3: 3 new fires (#510/#512/#513 cooldowns expired), 1 suppressed (#509). Watermark 996→1000. Tier 1, consecutive_clean=0. ratio≈20.62 (improving).
+**Iter ~1949 summary:** ⚠️ Non-clean. Check 0: 3 new Tier-4 alerts (lines 1001–1003): medic-diagnosis for PRs #513/#512/#510 (chat_id DMs already sent by bot). Journal-note only. G-rule medic-diagnosis-tier4 now 2/3. Check 3: 4 suppressed (cooldowns active). Watermark 1000→1003. Tier 1, consecutive_clean=0. ratio≈20.62 (improving).
 
-**Iter ~1947 summary (prior):** ⚠️ Non-clean. Check 0: 1 new Tier-4 alert (larry-alerts-996, source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#509). Tier 2→1 reset. ratio≈20.57.
+**Iter ~1948 summary (prior):** ⚠️ Non-clean. Check 0: 4 new Tier-4 alerts (lines 997–1000): medic-diagnosis for PR#509 (chat_id DM already sent) + pipeline-stall:unrouted-pr alerts for PRs #510/#512/#513 (cooldowns expired in dry-run). All journal-note only. Check 3: 3 new fires (#510/#512/#513 cooldowns expired), 1 suppressed (#509). Watermark 996→1000.
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl. When cooldown expires, the alert fires in dry-run mode. Be aware: calling --dry-run in a cycle will write real alerts if the cooldown has passed. Always check wc -l of the file before and after.
 
@@ -152,6 +152,7 @@
 | Telegram 409 burst | [yellow] G-rule **2/3**. Three distinct occurrences: (1) 12:22Z UTC Jun-15; (2) 12:47Z UTC Jun-15 self-inflicted; (3) 13:41Z UTC Jun-15 self-inflicted (iter ~1943). Bot recovered all times; no messages lost. All self-inflicted by calling get-messages. | Watch; dispatch at 3/3 |
 | Check I 2026-06-15 | [blue] 1 proposal dispatched iter ~1899, Beacon processed | Beacon spec in progress |
 | Check IX missions | [blue] PR #512 (catch-me-up-gap) + PR #513 (alert-ignored) open, no review yet | Larry review on kanban |
+| G-rule medic-diagnosis-tier4 | [blue] **2/3** (iter ~1948 + iter ~1949; source=medic, intent=medic-diagnosis → Tier-4, DMs sent via chat_id) | Watch; dispatch to Beacon at 3/3 for Tier-3 translation in alert-translations.json |
 | G-rule catalog-accuracy-drift-tier4 | [blue] **1/3** (new iter ~1926) | Watch; dispatch to Beacon at 3/3 for Tier-3 translation |
 | G-rule heal-pipeline-stall:unrouted-pr Tier-4 repeat | [yellow] **APPROVAL_REQUEST** `alert-translation-unrouted-pr-001` confirmed in beacon-pending-approvals.json (11:29Z iter ~1932); bot DM delivered | Reply "approve" to trigger Forge build (config-only PR adding Tier-3 translation) |
 | G-rule ledger/check-i Tier-4 | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 |
