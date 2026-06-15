@@ -126,7 +126,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 17:14Z UTC (Iter ~1966, Tier 1, consecutive_clean=1)
+## Status snapshot — updated 2026-06-15 17:23Z UTC (Iter ~1967, Tier 1, consecutive_clean=2)
+
+**Iter ~1967 summary:** ✅ Nominal. L1028 Tier-3 silenced (review-pass PR #515). PR #515 Mirror PASS received — auto-merge HELD behind PR #516 (config/alert-translations.json overlap; system retries automatically when #516 merges). 0 new directives. Watermark: 1027→1028. pending=0. Tier 1, consecutive_clean=2. Daemons all alive. No new G-rule advances. PR #497 REVIEW_ESCALATE age=37.3h (deadline Jun-17T04:05Z).
 
 **Iter ~1966 summary:** ✅ Nominal. All checks clean. 0 new alerts. No new directives. Watermark: 1027 (unchanged). pending=0. Tier 1, consecutive_clean=1. Daemons all alive. No new G-rule advances. PR #516 (alert-translation-unrouted-pr-001) in Mirror review; PR #515 (medic-diagnosis) in Mirror review; PR #497 REVIEW_ESCALATE age=37.1h (deadline Jun-17T04:05Z).
 
@@ -156,8 +158,8 @@
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #516 new | [yellow] `forge/alert-translation-unrouted-pr-001` — config PR for unrouted-pr Tier-3 translation. UNKNOWN mergeable, reviewDecision=''. Awaiting Mirror review. | Watch; should auto-merge on Mirror PASS |
-| PR #515 | [yellow] `forge/medic-diagnosis-tier3-silence-001` — config PR for Tier-3 silence. UNKNOWN mergeable, reviewDecision=''. Awaiting Mirror review. | Watch; should auto-merge on Mirror PASS |
+| PR #516 | [yellow] `forge/alert-translation-unrouted-pr-001` — config PR for unrouted-pr Tier-3 translation. Awaiting Mirror review (0.3h old iter ~1967). | Watch; should auto-merge on Mirror PASS → unblocks #515 auto-merge |
+| PR #515 | [blue] `forge/medic-diagnosis-tier3-silence-001` — **Mirror PASS received** (L1028, iter ~1967). MERGEABLE. Auto-merge HELD behind #516 (overlap: config/alert-translations.json). Will retry when #516 merges. | Watch for merge outcome; may need Forge rebase if conflict |
 | PR #497 REVIEW_ESCALATE | [yellow] UNKNOWN mergeable; reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ~38h; 72h expires ~Jun-17T04:05Z (~34h remaining). | Escalate if still open at Jun-17T04:05Z |
 | PRs #512/#513 pipeline-stall | [yellow] Cooldowns suppressed iters ~1964-1965. | Carry |
 | unreviewed-merge:511/499/494/489/510/509 | [yellow] PRs merged by Larry without Mirror; bot-delivered; Larry's judgment call. | Reply appropriate shortcut or silence |
