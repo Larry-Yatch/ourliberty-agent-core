@@ -102,9 +102,15 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 08:27Z UTC (Iter ~1909, Tier 1)
+## auto-dispatch-APPROVAL_REQUEST-task-id-mismatch (observed iter ~1910)
 
-**Iter ~1909 summary:** ✅ Nominal. No new signals. **Tier 1, consecutive_clean=0**. All checks clean except Check 4 (pending=1, same carry). Sync error carry from 07:24Z **RESOLVED** (new sync 08:24Z status=no-change). 0 new interventions. ratio≈20.74 (954/46).
+**Rule:** When Pulse sends a Check I auto-dispatch envelope, outbox-notifier WARNs `beacon pulse-auto-dispatch APPROVAL_REQUEST task_id mismatch (envelope=pulse-auto-XXXX, marker='<proposal-task-id>'); falling through to default routing`. Dispatch STILL SUCCEEDS via fallback. 6 total occurrences since May 28 (firing at Check I dispatch cadence). Prior iters missed it because Check 1 used `tail -20` (too small). G-rule: **auto-dispatch-APPROVAL_REQUEST-task-id-mismatch-warn-vs-info 1/3**. Dispatch to Beacon at 3/3 for warn-vs-info fix.
+
+---
+
+## Status snapshot — updated 2026-06-15 08:35Z UTC (Iter ~1910, Tier 1)
+
+**Iter ~1910 summary:** ✅ Nominal. No new signals. **Tier 1, consecutive_clean=0**. All checks clean except Check 4 (pending=1, same carry). New G-rule: auto-dispatch-APPROVAL_REQUEST-task-id-mismatch-warn-vs-info 1/3. 0 new interventions. ratio≈20.74 (954/46).
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl for this script. When cooldown expires, the alert fires even in dry-run mode. Be aware: calling --dry-run in a cycle will generate real alerts if the cooldown has passed.
 
@@ -141,7 +147,8 @@
 | G-rule timer-cycle-no-journal-entry | [blue] **0/3** | Watch |
 | G-rule heal-stale-daemon-script_path-cosmetic | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule Forge-preflight-marker-error-retry | [blue] **2/3** | Watch; dispatch at 3/3 |
+| G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch | [blue] **1/3** (new iter ~1910) | Watch; dispatch to Beacon at 3/3 (warn-vs-info) |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
 | dashboard_api PID 2868353 | [blue] Ssl stable | Note; watch for recurrence |
-| Stale bash orphans | [blue] PIDs 1834248 (17d 11h+) + 2605007 (1d 2h+). Ss, low CPU. | Carry |
+| Stale bash orphans | [blue] PIDs 1834248 (17d 13h+) + 2605007 (1d 4h+). Ss, low CPU. | Carry |
