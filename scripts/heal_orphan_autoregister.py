@@ -92,6 +92,20 @@ PROPOSED_BY = 'heal_orphan_autoregister'
 
 GIT_TIMEOUT_SEC = 60
 PUSH_TIMEOUT_SEC = 180
+GH_TIMEOUT_SEC = 30
+
+# Dashboard "+New mission" PRs (branch `feat/new-mission-<id>`, one missions.json
+# append each) are opened via the GitHub API outside the Forge pipeline, so they
+# never get an auto-dispatched Mirror review — they sit open, page
+# heal-pipeline-stall every cycle, and go stale/CONFLICTING against the high-churn
+# missions.json. We reconcile them HERE, inside the missions writer: ingest the
+# single named mission into missions.json (append-only) and close the PR. No
+# stale-branch merge (so no conflicts), no `feat(missions):` unreviewed-merge page
+# (the mission lands via this healer's own commit, the PR is closed not merged).
+# Bounded per tick and fully fail-safe — a fault here never blocks propose/retire.
+NEWMISSION_BRANCH_PREFIX = 'feat/new-mission-'
+NEWMISSION_MAX_PER_TICK = 20
+ENV_NEWMISSION_INGEST = 'OURLIBERTY_NEWMISSION_INGEST_ENABLED'
 
 
 # ---------- env-resolved paths (read at call time so tests can override) ----------
@@ -321,6 +335,8 @@ class ProposeResult:
     proposed: list[tuple[str, str]] = field(default_factory=list)  # (task_id, entry_id)
     retired: list[tuple[str, str]] = field(default_factory=list)  # (entry_id, reason)
     surviving_proposed: list[str] = field(default_factory=list)  # live proposed entry ids
+    ingested: list[tuple[int, str]] = field(default_factory=list)  # (pr_number, mission_id)
+    closeable_prs: list[tuple[int, str]] = field(default_factory=list)  # new-mission PRs to close
     scanned_orphans: int = 0
     skipped_terminal_or_indeterminate: int = 0
     skipped_non_proposable: int = 0
@@ -601,17 +617,198 @@ def commit_and_push_missions(repo: Path, audit_msg: str) -> str:
 # ---------- alerting ----------
 
 
+# ---------- new-mission PR ingestion (clears the dashboard +New mission stall) ----------
+
+
+def _missions_repo_full() -> str:
+    """owner/repo the dashboard opens +New mission PRs against. Env-overridable to
+    match dashboard_api._missions_repo_full."""
+    return os.environ.get(
+        'OURLIBERTY_MISSIONS_REPO', 'Larry-Yatch/ourliberty-agent-core')
+
+
+def newmission_ingest_enabled() -> bool:
+    """True ONLY when OURLIBERTY_NEWMISSION_INGEST_ENABLED == 'true'. Defaults OFF
+    (observe/dry-run) so a mutating action — committing to main and closing PR
+    branches — gets a soak before it goes live, matching heal_pr_auto_merge's
+    default-off posture. When off, run_once logs what it WOULD reconcile and
+    mutates nothing. The global healers.disabled kills the whole healer."""
+    return os.environ.get(ENV_NEWMISSION_INGEST, '').strip().lower() == 'true'
+
+
+def _gh(*args: str, timeout: int = GH_TIMEOUT_SEC) -> subprocess.CompletedProcess:
+    """Tolerant `gh` wrapper (mirrors `_git`): never raises — returns a
+    CompletedProcess with returncode 255 on timeout/OSError so callers degrade.
+    Hardens PATH like the sibling gh wrappers (heal_pr_auto_merge.gh_json): the
+    systemd unit runs with a minimal PATH and `gh` lives in /usr/local/bin or
+    /snap/bin, so without this every call would 255 and silently no-op."""
+    env = {**os.environ, 'PATH': '/usr/bin:/usr/local/bin:/snap/bin'}
+    try:
+        return subprocess.run(['gh', *args], capture_output=True, text=True,
+                              timeout=timeout, env=env)
+    except (subprocess.TimeoutExpired, OSError) as e:
+        return subprocess.CompletedProcess(args, returncode=255, stdout='', stderr=str(e))
+
+
+def list_open_new_mission_prs(repo_full: str) -> list[dict[str, Any]]:
+    """Open PRs whose branch starts with NEWMISSION_BRANCH_PREFIX, as
+    [{'number': int, 'branch': str}]. [] on any gh failure (logged upstream)."""
+    proc = _gh('pr', 'list', '--repo', repo_full, '--state', 'open',
+               '--limit', '100', '--json', 'number,headRefName')
+    if proc.returncode != 0:
+        log(f'list new-mission PRs failed: {(proc.stderr or "").strip()[:200]}')
+        return []
+    try:
+        rows = json.loads(proc.stdout or '[]')
+    except (json.JSONDecodeError, TypeError):
+        return []
+    out: list[dict[str, Any]] = []
+    if isinstance(rows, list):
+        for r in rows:
+            if not isinstance(r, dict):
+                continue
+            branch, num = r.get('headRefName'), r.get('number')
+            if (isinstance(branch, str) and branch.startswith(NEWMISSION_BRANCH_PREFIX)
+                    and isinstance(num, int)):
+                out.append({'number': num, 'branch': branch})
+    return out
+
+
+def fetch_branch_mission_entry(repo_full: str, branch: str,
+                               mission_id: str) -> Optional[dict[str, Any]]:
+    """Fetch the branch's missions.json (GitHub contents API) and return the single
+    entry whose id == mission_id, or None (gh failure / not found / malformed).
+
+    Only the ONE named entry is read — never the whole stale file — so the branch
+    being behind main doesn't matter, and a PR can't smuggle edits to OTHER
+    missions: we append exactly the mission its branch name claims."""
+    proc = _gh('api', f'repos/{repo_full}/contents/{MISSIONS_REL}?ref={branch}',
+               '--jq', '.content')
+    if proc.returncode != 0:
+        return None
+    content = proc.stdout.replace('\n', '').strip()
+    if not content:
+        # The contents API returns empty `content` for a file over its inline-size
+        # limit (~1MB). Log distinctly (not a transient retry) so an oversized
+        # missions.json doesn't become a silent never-reconciled PR.
+        log(f'new-mission branch {branch}: empty contents-API body for '
+            f'{MISSIONS_REL} (file too large for the inline API?) — leaving open')
+        return None
+    try:
+        import base64  # noqa: PLC0415
+        data = json.loads(base64.b64decode(content))
+    except Exception:  # noqa: BLE001 — any decode/parse failure => skip, retry next tick
+        return None
+    missions = data.get('missions') if isinstance(data, dict) else None
+    if not isinstance(missions, list):
+        return None
+    for m in missions:
+        if isinstance(m, dict) and m.get('id') == mission_id:
+            return m
+    return None
+
+
+def _valid_mission_entry(entry: Any, mission_id: str) -> bool:
+    """A minimally well-formed mission entry whose id matches the branch claim.
+    task_ids (if present) must be a list — a non-list would corrupt the
+    registered_task_ids idempotency set the propose path relies on."""
+    return (isinstance(entry, dict)
+            and entry.get('id') == mission_id
+            and isinstance(entry.get('name'), str)
+            and isinstance(entry.get('phase'), str)
+            and isinstance(entry.get('task_ids', []), list))
+
+
+def ingest_new_mission_prs(
+    registry: dict[str, Any], repo_full: str,
+) -> tuple[list[tuple[int, str]], list[tuple[int, str]]]:
+    """Append the mission named by each open `feat/new-mission-*` PR into the
+    in-memory registry (append-only, dedup by id, bounded), and report which PRs
+    are now fully reconciled and safe to close.
+
+    Returns (ingested, closeable): `ingested` = (pr, id) actually appended this
+    tick; `closeable` = (pr, id) whose mission is present on main (just-appended OR
+    already there) and so can be closed once the registry is committed. A PR whose
+    branch content can't be fetched, or whose named entry is missing/malformed, is
+    left open (not closeable) for a human."""
+    ingested: list[tuple[int, str]] = []
+    closeable: list[tuple[int, str]] = []
+    prs = list_open_new_mission_prs(repo_full)
+    if not prs:
+        return ingested, closeable
+    existing = existing_entry_ids(registry)
+    missions = registry.setdefault('missions', [])
+    for pr in prs[:NEWMISSION_MAX_PER_TICK]:
+        num, branch = pr['number'], pr['branch']
+        mission_id = branch[len(NEWMISSION_BRANCH_PREFIX):]
+        if not mission_id:
+            continue
+        if mission_id in existing:
+            closeable.append((num, mission_id))  # already on main → redundant PR
+            continue
+        entry = fetch_branch_mission_entry(repo_full, branch, mission_id)
+        if entry is None:
+            continue  # gh failure / not found → retry next tick
+        if not _valid_mission_entry(entry, mission_id):
+            log(f'new-mission PR #{num}: branch entry for `{mission_id}` '
+                f'missing/malformed — leaving open for review')
+            continue
+        missions.append(entry)
+        existing.add(mission_id)
+        ingested.append((num, mission_id))
+        closeable.append((num, mission_id))
+    return ingested, closeable
+
+
+def _missions_ids_on_main(repo: Path) -> set[str]:
+    """Mission ids present in missions.json at origin/main — the PUSHED truth, not
+    the local working tree. A successful push updates this local remote-tracking
+    ref, so after this tick's commit it reflects just-ingested missions. Empty set
+    on any git/parse failure => close nothing (fail toward leaving PRs open)."""
+    proc = _git(repo, 'show', f'origin/main:{MISSIONS_REL}')
+    if proc.returncode != 0:
+        return set()
+    try:
+        data = json.loads(proc.stdout)
+    except (json.JSONDecodeError, TypeError):
+        return set()
+    out: set[str] = set()
+    if isinstance(data, dict) and isinstance(data.get('missions'), list):
+        for m in data['missions']:
+            if isinstance(m, dict) and isinstance(m.get('id'), str) and m['id']:
+                out.add(m['id'])
+    return out
+
+
+def close_new_mission_pr(repo_full: str, number: int, mission_id: str) -> bool:
+    """Close a reconciled +New mission PR (and delete its branch) with an audit
+    comment. Best-effort: logs + returns False on failure (retry next tick)."""
+    comment = (
+        f'Reconciled mission `{mission_id}` into {MISSIONS_REL} on main via '
+        f'heal_orphan_autoregister (the missions single-committer path), so this '
+        f'+New mission PR is no longer needed — closing to clear the '
+        f'pipeline-stall. The mission is registered on main.')
+    proc = _gh('pr', 'close', str(number), '--repo', repo_full,
+               '--delete-branch', '--comment', comment)
+    if proc.returncode != 0:
+        log(f'close new-mission PR #{number} failed: {(proc.stderr or "").strip()[:200]}')
+        return False
+    return True
+
+
 def _emit_summary(res: ProposeResult, commit_status: str, dry_run: bool) -> None:
     """One audit line (log) + a low-noise digest alert when something was proposed;
     escalate on a hard failure. Exact counts + the full id list go to the log."""
     proposed_ids = [eid for _, eid in res.proposed]
     retired_ids = [eid for eid, _ in res.retired]
+    ingested_ids = [mid for _, mid in res.ingested]
     verb = 'would propose' if dry_run else 'proposed'
     retire_verb = 'would retire' if dry_run else 'retired'
     summary = (
         f'missions-autoregister: {verb} {len(res.proposed)} orphan thread(s) '
         f'{proposed_ids}; {retire_verb} {len(res.retired)} stale proposal(s) '
-        f'{retired_ids}; surviving proposed={len(res.surviving_proposed)} '
+        f'{retired_ids}; ingested {len(res.ingested)} new-mission PR(s) '
+        f'{ingested_ids}; surviving proposed={len(res.surviving_proposed)} '
         f'{res.surviving_proposed}; scanned {res.scanned_orphans} orphan(s); '
         f'skipped {res.skipped_non_proposable} non-proposable, '
         f'{res.skipped_terminal_or_indeterminate} terminal/indeterminate; '
@@ -726,8 +923,30 @@ def run_once(*, dry_run: bool,
         log(f'retire-stale-proposals raised: {type(e).__name__}: {e} — retiring nothing')
     res.surviving_proposed = surviving_proposed_ids(registry)
 
+    # New-mission PR ingestion: append each open feat/new-mission-* PR's named
+    # mission into the registry so it lands via this healer's single-committer
+    # commit (not a stale-branch merge). Isolated + fail-safe like the passes above
+    # — a fault here proposes/retires normally and ingests nothing. Default-off
+    # (soak): when disabled, observe + log what WOULD be reconciled, mutate nothing.
+    if not dry_run and newmission_ingest_enabled():
+        try:
+            res.ingested, res.closeable_prs = ingest_new_mission_prs(
+                registry, _missions_repo_full())
+        except Exception as e:  # noqa: BLE001 — fail-safe: report, never corrupt
+            log(f'new-mission ingest raised: {type(e).__name__}: {e} — ingesting nothing')
+    elif not dry_run:
+        try:
+            pending = list_open_new_mission_prs(_missions_repo_full())
+            if pending:
+                log(f'new-mission ingest DISABLED: {len(pending)} open '
+                    f'feat/new-mission-* PR(s) '
+                    f'{[p["number"] for p in pending]} would be reconciled — set '
+                    f'{ENV_NEWMISSION_INGEST}=true to act')
+        except Exception as e:  # noqa: BLE001 — observe is best-effort
+            log(f'new-mission observe raised: {type(e).__name__}: {e}')
+
     commit_status = 'nothing'
-    if (res.proposed or res.retired) and not dry_run:
+    if (res.proposed or res.retired or res.ingested) and not dry_run:
         try:
             atomic_write_missions(mpath, registry)
         except Exception as e:  # noqa: BLE001 — fail-safe
@@ -742,6 +961,24 @@ def run_once(*, dry_run: bool,
                 log(f'commit+push raised: {type(e).__name__}: {e}')
                 commit_status = 'push-failed'
 
+    # Close reconciled +New mission PRs whose mission is CONFIRMED present on
+    # origin/main (the pushed truth — read from the remote-tracking ref, not the
+    # local working tree). This is robust to every state: a just-ingested mission
+    # is on main only after this tick's push landed it; a redundant dup is already
+    # there; a not-yet-pushed mission (push failed) is absent so we leave its PR
+    # open and retry. We never close a PR whose mission isn't durably on main.
+    core = repo_paths.get('ourliberty-agent-core')
+    if res.closeable_prs and not dry_run and core:
+        on_main = _missions_ids_on_main(core)
+        repo_full = _missions_repo_full()
+        for num, mid in res.closeable_prs:
+            if mid not in on_main:
+                continue  # not on main yet — retry next tick
+            try:
+                close_new_mission_pr(repo_full, num, mid)
+            except Exception as e:  # noqa: BLE001 — fail-safe
+                log(f'close new-mission PR #{num} raised: {type(e).__name__}: {e}')
+
     _emit_summary(res, commit_status, dry_run)
     return 0
 
@@ -749,6 +986,7 @@ def run_once(*, dry_run: bool,
 def _commit_audit(res: ProposeResult) -> str:
     return (f'Auto-committed by {PROPOSED_BY}. '
             f'proposed={len(res.proposed)} retired={len(res.retired)} '
+            f'ingested-new-mission-prs={len(res.ingested)} '
             f'scanned={res.scanned_orphans} surviving={len(res.surviving_proposed)}.')
 
 

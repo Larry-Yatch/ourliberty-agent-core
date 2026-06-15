@@ -478,5 +478,229 @@ class RunOnceTest(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+# ----------------------------------------------------- new-mission PR ingestion
+
+
+def _mentry(mid='m1', name='M1', phase='drafting'):
+    return {'id': mid, 'name': name, 'phase': phase, 'task_ids': [],
+            'repo': 'ourliberty-agent-core', 'created': '2026-06-15',
+            'deferred_reason': None}
+
+
+class NewMissionEnableTest(unittest.TestCase):
+    def test_default_disabled_soak(self):
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop(h.ENV_NEWMISSION_INGEST, None)
+            self.assertFalse(h.newmission_ingest_enabled())
+
+    def test_explicit_true_enables(self):
+        with mock.patch.dict(os.environ, {h.ENV_NEWMISSION_INGEST: 'true'}):
+            self.assertTrue(h.newmission_ingest_enabled())
+
+    def test_false_and_other_values_disabled(self):
+        for v in ('false', 'yes', '1', ''):
+            with mock.patch.dict(os.environ, {h.ENV_NEWMISSION_INGEST: v}):
+                self.assertFalse(h.newmission_ingest_enabled(), v)
+
+
+class ListOpenNewMissionPrsTest(unittest.TestCase):
+    def _proc(self, rows):
+        return subprocess.CompletedProcess([], 0, stdout=json.dumps(rows), stderr='')
+
+    def test_filters_to_prefix(self):
+        rows = [
+            {'number': 1, 'headRefName': 'feat/new-mission-alpha'},
+            {'number': 2, 'headRefName': 'forge/some-task'},          # excluded
+            {'number': 3, 'headRefName': 'feat/new-mission-beta'},
+            {'number': 4, 'headRefName': None},                        # excluded
+        ]
+        with mock.patch.object(h, '_gh', return_value=self._proc(rows)):
+            out = h.list_open_new_mission_prs('r/r')
+        self.assertEqual(out, [
+            {'number': 1, 'branch': 'feat/new-mission-alpha'},
+            {'number': 3, 'branch': 'feat/new-mission-beta'},
+        ])
+
+    def test_gh_failure_returns_empty(self):
+        bad = subprocess.CompletedProcess([], 1, stdout='', stderr='boom')
+        with mock.patch.object(h, '_gh', return_value=bad):
+            self.assertEqual(h.list_open_new_mission_prs('r/r'), [])
+
+
+class FetchBranchMissionEntryTest(unittest.TestCase):
+    def _content_proc(self, registry):
+        import base64
+        b64 = base64.b64encode(json.dumps(registry).encode()).decode()
+        # GitHub returns base64 with embedded newlines; simulate that.
+        chunked = '\n'.join(b64[i:i + 60] for i in range(0, len(b64), 60))
+        return subprocess.CompletedProcess([], 0, stdout=chunked + '\n', stderr='')
+
+    def test_returns_named_entry(self):
+        reg = {'missions': [_mentry('alpha'), _mentry('beta')]}
+        with mock.patch.object(h, '_gh', return_value=self._content_proc(reg)):
+            entry = h.fetch_branch_mission_entry('r/r', 'feat/new-mission-beta', 'beta')
+        self.assertEqual(entry['id'], 'beta')
+
+    def test_missing_id_returns_none(self):
+        reg = {'missions': [_mentry('alpha')]}
+        with mock.patch.object(h, '_gh', return_value=self._content_proc(reg)):
+            self.assertIsNone(
+                h.fetch_branch_mission_entry('r/r', 'feat/new-mission-zzz', 'zzz'))
+
+    def test_gh_failure_returns_none(self):
+        bad = subprocess.CompletedProcess([], 1, stdout='', stderr='404')
+        with mock.patch.object(h, '_gh', return_value=bad):
+            self.assertIsNone(
+                h.fetch_branch_mission_entry('r/r', 'feat/new-mission-x', 'x'))
+
+
+class IngestNewMissionPrsTest(unittest.TestCase):
+    def _patch(self, prs, fetch):
+        return (
+            mock.patch.object(h, 'list_open_new_mission_prs', return_value=prs),
+            mock.patch.object(h, 'fetch_branch_mission_entry', side_effect=fetch),
+        )
+
+    def test_appends_new_mission_and_marks_closeable(self):
+        reg = {'schema_version': 1, 'missions': []}
+        prs = [{'number': 512, 'branch': 'feat/new-mission-foo'}]
+        p1, p2 = self._patch(prs, lambda r, b, mid: _mentry('foo'))
+        with p1, p2:
+            ingested, closeable = h.ingest_new_mission_prs(reg, 'r/r')
+        self.assertEqual([m['id'] for m in reg['missions']], ['foo'])
+        self.assertEqual(ingested, [(512, 'foo')])
+        self.assertEqual(closeable, [(512, 'foo')])
+
+    def test_duplicate_id_not_appended_but_closeable(self):
+        reg = {'schema_version': 1, 'missions': [_mentry('foo')]}
+        prs = [{'number': 512, 'branch': 'feat/new-mission-foo'}]
+        # fetch must not even be needed for a dup; assert it's not called.
+        fetch = mock.Mock(side_effect=AssertionError('should not fetch a dup'))
+        with mock.patch.object(h, 'list_open_new_mission_prs', return_value=prs), \
+                mock.patch.object(h, 'fetch_branch_mission_entry', fetch):
+            ingested, closeable = h.ingest_new_mission_prs(reg, 'r/r')
+        self.assertEqual(len(reg['missions']), 1)         # unchanged
+        self.assertEqual(ingested, [])
+        self.assertEqual(closeable, [(512, 'foo')])       # close the redundant PR
+
+    def test_fetch_failure_leaves_pr_open(self):
+        reg = {'schema_version': 1, 'missions': []}
+        prs = [{'number': 9, 'branch': 'feat/new-mission-bar'}]
+        p1, p2 = self._patch(prs, lambda r, b, mid: None)
+        with p1, p2:
+            ingested, closeable = h.ingest_new_mission_prs(reg, 'r/r')
+        self.assertEqual(reg['missions'], [])
+        self.assertEqual(ingested, [])
+        self.assertEqual(closeable, [])                   # NOT closeable — retry
+
+    def test_malformed_entry_leaves_pr_open(self):
+        reg = {'schema_version': 1, 'missions': []}
+        prs = [{'number': 9, 'branch': 'feat/new-mission-bar'}]
+        # id mismatch (smuggled different id) — must be rejected by the guard.
+        p1, p2 = self._patch(prs, lambda r, b, mid: _mentry('OTHER'))
+        with p1, p2:
+            ingested, closeable = h.ingest_new_mission_prs(reg, 'r/r')
+        self.assertEqual(reg['missions'], [])
+        self.assertEqual(closeable, [])
+
+    def test_bounded_per_tick(self):
+        reg = {'schema_version': 1, 'missions': []}
+        prs = [{'number': i, 'branch': f'feat/new-mission-m{i}'} for i in range(5)]
+        with mock.patch.object(h, 'NEWMISSION_MAX_PER_TICK', 2), \
+                mock.patch.object(h, 'list_open_new_mission_prs', return_value=prs), \
+                mock.patch.object(h, 'fetch_branch_mission_entry',
+                                  side_effect=lambda r, b, mid: _mentry(mid)):
+            ingested, _ = h.ingest_new_mission_prs(reg, 'r/r')
+        self.assertEqual(len(ingested), 2)
+
+
+class RunOnceIngestTest(unittest.TestCase):
+    """run_once ingests + closes only when ENABLED and only for missions confirmed
+    on origin/main; defaults to observe-only; tolerates gh failure."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix='run-once-ingest-')
+        self.core = Path(self.tmp) / 'agent-core'
+        (self.core / 'agents' / 'beacon').mkdir(parents=True)
+        (self.core / h.MISSIONS_REL).write_text(
+            json.dumps({'schema_version': 1, 'missions': []}) + '\n')
+        self.now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _run(self):
+        return h.run_once(dry_run=False, events_fetcher=lambda: [],
+                          derive=derive, pr_state_resolver=lambda urls: {},
+                          now=self.now)
+
+    def _registry(self):
+        return json.loads((self.core / h.MISSIONS_REL).read_text())
+
+    def test_ingests_and_closes_when_enabled_and_on_main(self):
+        prs = [{'number': 512, 'branch': 'feat/new-mission-foo'}]
+        closed = []
+        with mock.patch.dict(os.environ, {h.ENV_NEWMISSION_INGEST: 'true'}), \
+                mock.patch.object(h, 'load_repo_paths',
+                                  return_value={'ourliberty-agent-core': self.core}), \
+                mock.patch.object(h, 'list_open_new_mission_prs', return_value=prs), \
+                mock.patch.object(h, 'fetch_branch_mission_entry',
+                                  side_effect=lambda r, b, mid: _mentry('foo')), \
+                mock.patch.object(h, 'commit_and_push_missions', return_value='committed'), \
+                mock.patch.object(h, '_missions_ids_on_main', return_value={'foo'}), \
+                mock.patch.object(h, 'close_new_mission_pr',
+                                  side_effect=lambda r, n, m: closed.append((n, m)) or True):
+            rc = self._run()
+        self.assertEqual(rc, 0)
+        self.assertEqual([m['id'] for m in self._registry()['missions']], ['foo'])
+        self.assertEqual(closed, [(512, 'foo')])
+
+    def test_does_not_close_when_not_on_main(self):
+        # Ingested + committed locally, but the mission is NOT yet on origin/main
+        # (e.g. push lagged) -> PR stays open, retry next tick.
+        prs = [{'number': 512, 'branch': 'feat/new-mission-foo'}]
+        closed = []
+        with mock.patch.dict(os.environ, {h.ENV_NEWMISSION_INGEST: 'true'}), \
+                mock.patch.object(h, 'load_repo_paths',
+                                  return_value={'ourliberty-agent-core': self.core}), \
+                mock.patch.object(h, 'list_open_new_mission_prs', return_value=prs), \
+                mock.patch.object(h, 'fetch_branch_mission_entry',
+                                  side_effect=lambda r, b, mid: _mentry('foo')), \
+                mock.patch.object(h, 'commit_and_push_missions', return_value='committed'), \
+                mock.patch.object(h, '_missions_ids_on_main', return_value=set()), \
+                mock.patch.object(h, 'close_new_mission_pr',
+                                  side_effect=lambda r, n, m: closed.append((n, m)) or True):
+            self._run()
+        self.assertEqual([m['id'] for m in self._registry()['missions']], ['foo'])
+        self.assertEqual(closed, [])
+
+    def test_default_disabled_observes_only(self):
+        # No env => soak/observe: list to log, but never fetch/append/close.
+        prs = [{'number': 512, 'branch': 'feat/new-mission-foo'}]
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop(h.ENV_NEWMISSION_INGEST, None)
+            with mock.patch.object(h, 'load_repo_paths',
+                                   return_value={'ourliberty-agent-core': self.core}), \
+                    mock.patch.object(h, 'list_open_new_mission_prs', return_value=prs), \
+                    mock.patch.object(h, 'fetch_branch_mission_entry',
+                                      side_effect=AssertionError('disabled: no fetch')), \
+                    mock.patch.object(h, 'close_new_mission_pr',
+                                      side_effect=AssertionError('disabled: no close')):
+                rc = self._run()
+        self.assertEqual(rc, 0)
+        self.assertEqual(self._registry()['missions'], [])
+
+    def test_gh_failure_tolerated_no_crash(self):
+        with mock.patch.dict(os.environ, {h.ENV_NEWMISSION_INGEST: 'true'}), \
+                mock.patch.object(h, 'load_repo_paths',
+                                  return_value={'ourliberty-agent-core': self.core}), \
+                mock.patch.object(h, 'list_open_new_mission_prs',
+                                  side_effect=RuntimeError('gh exploded')):
+            rc = self._run()
+        self.assertEqual(rc, 0)
+        self.assertEqual(self._registry()['missions'], [])
+
+
 if __name__ == '__main__':
     unittest.main()
