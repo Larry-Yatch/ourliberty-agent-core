@@ -126,7 +126,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 20:37Z UTC (Iter ~1984, Tier 1, consecutive_clean=2, all checks nominal)
+## Status snapshot — updated 2026-06-15 20:48Z UTC (Iter ~1985, Tier 1→2 DE-ESCALATION, consecutive_clean=3→0, all checks nominal)
+
+**Iter ~1985 summary:** ✅ Nominal. 0 new alerts. All checks clean. Repo at 491e5de4=origin/main. Watermark: 1046 (unchanged). pending=0. 2 open PRs: #522 (CONFLICTING, Forge rebase needed), #497 (72h deadline Jun-17T04:02Z ~31.2h, MERGEABLE/UNSTABLE). PRIME ratio=20.04. **Tier 1 → Tier 2 DE-ESCALATION** (3 consecutive clean iters).
 
 **Iter ~1984 summary:** ✅ Nominal. 0 new alerts. All checks clean. Repo at 881bafce=origin/main. Watermark: 1046 (unchanged). pending=0. 2 open PRs: #522 (CONFLICTING, Forge rebase needed), #497 (72h deadline Jun-17T04:02Z ~31.4h). PRIME ratio=20.04. Tier 1, consecutive_clean=2.
 
