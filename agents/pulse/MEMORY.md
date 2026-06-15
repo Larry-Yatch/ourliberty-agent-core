@@ -120,9 +120,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 10:42Z UTC (Iter ~1928, Tier 1)
+## Status snapshot — updated 2026-06-15 10:54Z UTC (Iter ~1929, Tier 2)
 
-**Iter ~1928 summary:** ✅ Nominal. **Tier 1, consecutive_clean=2**. No new alerts (file=969 lines, unchanged). 0 interventions. ratio≈20.89 (961/46), trend=improving. All agent PIDs healthy. Watermark=989 (file=969 lines); watermark gap persists. Sync fresh (last_sync=10:24Z). No new Larry directives. 5 open PRs: #497 (MERGEABLE via gh pr view — list shows UNKNOWN, known cache artifact; REVIEW_ESCALATE ~31h, expires Jun-17T04:05Z), #509/#510/#512/#513 (stall/cooldowns). Consecutive_clean=2; promote to Tier 2 at next clean iter.
+**Iter ~1929 summary:** ✅ Nominal. **Tier 2, consecutive_clean=0** (de-escalated from Tier 1 after 3 consecutive clean iters). No new alerts (file=969 lines, unchanged). 0 interventions. ratio≈20.89 (961/46), trend=improving. All agent PIDs healthy. Watermark=989 (file=969 lines); watermark gap persists. Sync fresh (last_sync=10:24Z). No new Larry directives. 5 open PRs: #497 (MERGEABLE via gh pr view — list shows UNKNOWN, known cache artifact; REVIEW_ESCALATE ~32h, expires Jun-17T04:05Z), #509/#510/#512/#513 (stall/cooldowns). PRs #503–#508 confirmed MERGED Jun-14 (terminal-state-reconciliation suite).
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl. When cooldown expires, the alert fires in dry-run mode. Be aware: calling --dry-run in a cycle will write real alerts if the cooldown has passed. Always check wc -l of the file before and after.
 
