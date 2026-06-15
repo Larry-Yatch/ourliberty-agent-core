@@ -443,36 +443,6 @@
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     },
     {
-      "id": "cap-test-jail-pr-4-ready-for-go-after-pr-3-lands-447f",
-      "title": "test-jail PR-4 ready for go (after PR-3 lands)",
-      "note": "PR-3 (gate hardening) dispatched+building as test-jail-pr3-gate-hardening-001. PR-4 REMAINING awaits your go: (a) docs sweep \u2014 bare 'unittest discover' prescriptions to the blessed entrypoint, esp docs/test-suite-green-brief.md's source-.env.larry recipe; (b) H18 leak-residue reconciliation runbook; (c) end-to-end deliberate-leak validation (a leaking test must fail under ALL invocation shapes on droplet+Mac = the acceptance property). NEW ops: one-time 'sudo apt install bubblewrap' on the droplet to ARM the Layer-C hard wall (droplet has no bwrap + userns disabled, so the wall ships best-effort/auto-arming until then). Mac phantom purge already DONE. Recommend: let PR-3 land+soak, then ship PR-4 as one closing PR + install bubblewrap.",
-      "state": "parked",
-      "label": null,
-      "origin": {
-        "source": "desktop-chat",
-        "session_id": null,
-        "repo": "ol-work",
-        "branch": "fix/install-drift-activate",
-        "captured_at": "2026-06-11T20:00:50.396933+00:00"
-      },
-      "last_touched": "2026-06-11T20:00:50.396933+00:00",
-      "promoted_to": null,
-      "briefing": {
-        "what": "A final round of cleanup that makes our automated quality checks airtight, so a bad change can never slip through no matter how it's run.",
-        "why": "It closes the last gaps that could let a faulty change reach customers undetected, protecting product reliability and our reputation.",
-        "suggest": "Let the current safety upgrade settle and prove itself first, then give the go to finish this closing piece as a single clean step."
-      },
-      "risk": "careful",
-      "recommended_action": "delegate",
-      "briefing_provenance": {
-        "by": "beacon",
-        "model": "claude-opus-4-8",
-        "at": "2026-06-14T17:52:43.946307+00:00",
-        "from_state": "parked"
-      },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
-    },
-    {
       "id": "cap-make-team-two-way-chat-a-dashboard-wide-layer-no-adaf",
       "title": "Make team two-way chat a dashboard-wide layer (not just Missions)",
       "note": "Larry's insight during the missions-board comprehension redo: the per-card pattern (plain-English briefing + 3-level risk signal + one-click hand-to-team + live chat thread) likely belongs across the WHOLE dashboard \u2014 Approvals, Operations, alerts \u2014 making the dashboard the primary human<->team interaction surface instead of Telegram. Telegram demoted to a doorbell that pings + deep-links into the card. Revisit as its own design pass after the Parked-lane proof.",
@@ -533,40 +503,39 @@
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
-      "id": "cap-test-card-button-verification-safe-to-drop-d416",
-      "title": "TEST CARD - button verification (safe to drop)",
-      "note": "Throwaway card created by Claude to test the Parked-lane buttons end-to-end. Safe to delete.",
+      "id": "cap-test-jail-pr-4-ready-for-go-after-pr-3-lands-447f",
+      "title": "test-jail PR-4 ready for go (after PR-3 lands)",
+      "note": "PR-3 (gate hardening) dispatched+building as test-jail-pr3-gate-hardening-001. PR-4 REMAINING awaits your go: (a) docs sweep \u2014 bare 'unittest discover' prescriptions to the blessed entrypoint, esp docs/test-suite-green-brief.md's source-.env.larry recipe; (b) H18 leak-residue reconciliation runbook; (c) end-to-end deliberate-leak validation (a leaking test must fail under ALL invocation shapes on droplet+Mac = the acceptance property). NEW ops: one-time 'sudo apt install bubblewrap' on the droplet to ARM the Layer-C hard wall (droplet has no bwrap + userns disabled, so the wall ships best-effort/auto-arming until then). Mac phantom purge already DONE. Recommend: let PR-3 land+soak, then ship PR-4 as one closing PR + install bubblewrap.",
       "state": "parked",
       "label": null,
       "origin": {
         "source": "desktop-chat",
         "session_id": null,
         "repo": "ol-work",
-        "branch": "pr476-review",
-        "captured_at": "2026-06-15T23:22:10.667250+00:00"
+        "branch": "fix/install-drift-activate",
+        "captured_at": "2026-06-11T20:00:50.396933+00:00"
       },
-      "last_touched": "2026-06-15T23:22:10.667250+00:00",
+      "last_touched": "2026-06-11T20:00:50.396933+00:00",
       "promoted_to": null,
-      "snoozed_until": "2026-06-22T00:00:00+00:00",
       "briefing": {
-        "what": "This is a throwaway test item created only to check that the parked-items buttons work.",
-        "why": "It carries no business value \u2014 it exists purely to confirm the system's controls behave as expected.",
-        "suggest": "Go ahead and clear it out, but glance to confirm nothing real is attached before it's gone."
+        "what": "A final round of cleanup that makes our automated quality checks airtight, so a bad change can never slip through no matter how it's run.",
+        "why": "It closes the last gaps that could let a faulty change reach customers undetected, protecting product reliability and our reputation.",
+        "suggest": "Let the current safety upgrade settle and prove itself first, then give the go to finish this closing piece as a single clean step."
       },
       "risk": "careful",
       "recommended_action": "delegate",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-06-15T23:29:03.702835+00:00",
+        "at": "2026-06-14T17:52:43.946307+00:00",
         "from_state": "parked"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     },
     {
-      "id": "cap-test-promote-button-safe-to-drop-55e0",
-      "title": "TEST - promote button (safe to drop)",
-      "note": "Throwaway card to test Promote end-to-end. Delete after.",
+      "id": "cap-fix-delegate-to-team-button-is-broken-404-37ea",
+      "title": "Fix: Delegate-to-team button is broken (404)",
+      "note": "The primary one-click Delegate on Parked cards POSTs to /api/missions/captures/{id}/delegate and returns 404 \u2014 dashboard UI + proxy route shipped (dash #54) but the droplet backend endpoint in dashboard_api.py was never implemented. Found in button test 2026-06-15. Minor also: the card chat labels MY message as Forge asks (reused CLARIFY component) \u2014 should read You.",
       "state": "parked",
       "label": null,
       "origin": {
@@ -574,84 +543,24 @@
         "session_id": null,
         "repo": "ol-work",
         "branch": "pr476-review",
-        "captured_at": "2026-06-15T23:23:58.384693+00:00"
+        "captured_at": "2026-06-15T23:32:59.329619+00:00"
       },
-      "last_touched": "2026-06-15T23:23:58.384693+00:00",
+      "last_touched": "2026-06-15T23:32:59.329619+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "This is a placeholder test card with no real business purpose, created only to check that the Promote button works.",
-        "why": "It doesn't matter to the business on its own \u2014 it's leftover scaffolding from a quick check, and keeping it around just adds clutter.",
-        "suggest": "Go ahead and drop it, but take a quick second to confirm nothing real got attached to it first."
+        "what": "The one-click 'Delegate' button on parked idea cards looks like it works but does nothing \u2014 clicking it just fails silently behind the scenes.",
+        "why": "It's the main way you hand parked ideas off to the team, so right now every delegation attempt dies and those ideas sit stuck instead of moving forward.",
+        "suggest": "Worth fixing soon since it blocks a core action, but it's a contained repair \u2014 schedule it into the next round of work rather than scrambling on it today."
       },
-      "risk": "careful",
+      "risk": "medium",
       "recommended_action": "delegate",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-06-15T23:29:03.702835+00:00",
+        "at": "2026-06-15T23:39:04.838378+00:00",
         "from_state": "parked"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
-    },
-    {
-      "id": "cap-test-drop-button-safe-to-drop-1613",
-      "title": "TEST - drop button (safe to drop)",
-      "note": "Throwaway card to test Drop end-to-end. Delete after.",
-      "state": "parked",
-      "label": null,
-      "origin": {
-        "source": "desktop-chat",
-        "session_id": null,
-        "repo": "ol-work",
-        "branch": "pr476-review",
-        "captured_at": "2026-06-15T23:23:58.818531+00:00"
-      },
-      "last_touched": "2026-06-15T23:23:58.818531+00:00",
-      "promoted_to": null,
-      "briefing": {
-        "what": "A placeholder test note someone created just to try out the system, not a real business idea.",
-        "why": "It carries no business value \u2014 it was only used to check that the system works and was meant to be cleaned up afterward.",
-        "suggest": "Go ahead and drop it, but take a quick second to confirm nothing real got attached to it before it goes."
-      },
-      "risk": "careful",
-      "recommended_action": "delegate",
-      "briefing_provenance": {
-        "by": "beacon",
-        "model": "claude-opus-4-8",
-        "at": "2026-06-15T23:29:03.702835+00:00",
-        "from_state": "parked"
-      },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
-    },
-    {
-      "id": "cap-test-delegate-button-safe-to-drop-3c53",
-      "title": "TEST - delegate button (safe to drop)",
-      "note": "Throwaway card to test Delegate end-to-end. Delete after.",
-      "state": "parked",
-      "label": null,
-      "origin": {
-        "source": "desktop-chat",
-        "session_id": null,
-        "repo": "ol-work",
-        "branch": "pr476-review",
-        "captured_at": "2026-06-15T23:23:59.251861+00:00"
-      },
-      "last_touched": "2026-06-15T23:23:59.251861+00:00",
-      "promoted_to": null,
-      "briefing": {
-        "what": "This is a throwaway test card created just to check that the Delegate button works, not real work.",
-        "why": "It has no business value on its own \u2014 it only exists to confirm a feature behaves correctly before you rely on it.",
-        "suggest": "Let's clear it off the board, but only once we've confirmed the Delegate test actually finished, so we don't toss it mid-check."
-      },
-      "risk": "careful",
-      "recommended_action": "delegate",
-      "briefing_provenance": {
-        "by": "beacon",
-        "model": "claude-opus-4-8",
-        "at": "2026-06-15T23:29:03.702835+00:00",
-        "from_state": "parked"
-      },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
