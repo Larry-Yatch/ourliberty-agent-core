@@ -90,9 +90,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 06:22Z UTC (Iter ~1895, Tier 1)
+## Status snapshot — updated 2026-06-15 06:27Z UTC (Iter ~1896, Tier 2)
 
-**Iter ~1895 summary:** ✅ Clean. Tier 1, consecutive_clean=2. 0 new alerts (watermark=965 unchanged). All daemons alive (PIDs 2530123/2744551/2744840/2744914/2868353). PRs #497/#509/#510 carry [yellow]. Forge/Beacon inboxes empty. ratio≈20.48 (942 interventions / 46 systemic_fixes). Check I/III skipped (Monday, most recent Check I artifact from Sunday Jun-14). 1 more clean iter → de-escalate to Tier 2.
+**Iter ~1896 summary:** ✅ Clean. **Tier promoted 1 → 2** (3rd consecutive clean iter). 0 new alerts (watermark=965 unchanged). All daemons alive (PIDs 2530123/2744551/2744840/2744914/2868353). PRs #497/#509/#510 carry [yellow]. Forge/Beacon inboxes empty. ratio≈20.48 (942 interventions / 46 systemic_fixes). Check I/III skipped (Monday). 3 more clean iters → Tier 3.
 
 ---
 
