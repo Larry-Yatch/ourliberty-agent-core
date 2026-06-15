@@ -474,7 +474,21 @@
         "captured_at": "2026-06-14T18:01:31.728606+00:00"
       },
       "last_touched": "2026-06-14T18:01:31.728606+00:00",
-      "promoted_to": null
+      "promoted_to": null,
+      "briefing": {
+        "what": "We built a tool that writes plain-English summaries of your parked ideas, but right now it only runs when someone kicks it off by hand.",
+        "why": "Until it runs on its own, every new idea you park sits blank with no summary, so you can't review them at a glance the way this was meant to work.",
+        "suggest": "Worth finishing with a small follow-up so summaries appear automatically, but let's confirm it runs cleanly on its own before relying on it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-15T20:16:15.974732+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
