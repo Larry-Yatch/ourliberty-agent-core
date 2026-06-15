@@ -4,6 +4,83 @@
 
 ---
 
+## Iteration ~1980 — 2026-06-15 20:06Z UTC (interactive, /cycle, Tier 2→1 RESET, PR #520+#524 merged, PR #522 CONFLICTING)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Signal. Check A: repo behind 1 commit (PR #520 merge), fast-forward executed. Check 0: L1043 Tier-4 (merge_conflict_manual_rebase, PR #522 CONFLICTING after PR #520 merged). Two G-rule completions: Forge-preflight-marker-error-retry ✅, PR #520 merged ✅. **Tier 2 → Tier 1 RESET** (Tier-4 finding).
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #520 (`forge/p41-schedule-harden`): Confirmed **MERGED** 2026-06-15T20:03:42Z (`cd9c44ca`). Was in Mirror re-review round 1 last iter — passed and merged. ✅ **RESOLVED.**
+- PR #524 (`forge/forge-preflight-marker-selfcheck-001`): Confirmed **MERGED** (in origin log as `97300fc1`, L1042 alert confirmed auto-merge + branch deleted). **G-rule Forge-preflight-marker-error-retry: COMPLETE ✅.**
+- PR #522 (`forge/missions-card-gc-warn-demote-001`): Confirmed **CONFLICTING** — Mirror PASS was valid, but PR #520 merged to main concurrently and overlaps `scripts/heal_missions_card_gc.py`. outbox-notifier attempted auto-merge, BLOCKED (`not mergeable: the merge commit cannot be cleanly created`). DM delivered to Larry via chat_id. Forge needs to rebase on origin/main and re-push. **G-rule missions-card-gc-warn-vs-info: NOT yet COMPLETE — carry.** [yellow]
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): Confirmed OPEN. mergeable=UNKNOWN. Mirror REVIEW_ESCALATE Jun-14T04:05Z. Age≈41h. 72h deadline Jun-17T04:02Z → **~31h remaining.** [yellow] carry.
+- All 5 daemons: PIDs 2530123 (Ssl), 2744551 (SNs), 2744840 (Ss), 2744914 (Ss), 2868353 (Ssl) — all alive. ✅
+- Repo HEAD: post-pull = cd9c44ca = origin/main. Clean tree, on main. ✅
+- 409 burst: no new occurrences. Last: 07:44:56 MDT Jun-15 (13:44:56Z). G-rule 2/3 unchanged. **CARRY** [yellow].
+
+**Check 0 — Alert triage:** Watermark=1041 (entering); file=1043 lines. **2 new alerts** (L1042-L1043):
+- L1042: `source=outbox-notifier, kind=notification, intent=review-pass` (Mirror approved PR #524 `forge-preflight-marker-selfcheck-001`; auto-merged + branch deleted) → helper: **Tier-3** silenced ✅. G-rule Forge-preflight-marker-error-retry: **COMPLETE ✅.** Journal-note only.
+- L1043: `source=outbox-notifier, kind=notification, intent=merge_conflict_manual_rebase` (Mirror approved PR #522, but auto-merge BLOCKED: merge conflict with main after PR #520 merged) → helper: **Tier-4** novel (no registry template). outbox-notifier already DM'd Larry via chat_id with rebase instructions. No second DM from Pulse. **Tier-reset to Tier 1.** G-rule `merge_conflict_manual_rebase-tier4: 1/3.`
+- Watermark advanced: 1041→1043.
+
+**Check 1 — Log noise:** outbox-notifier.log: last entry 20:07:37Z — 0 WARNs/ERRORs in recent tail-50 (only INFO: FORGE_NO_PR_SKIP ×5, recover auto-merge fail, alerted). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** PID 2744840 alive (Ss). Last Larry message: "Why do we have 80 messages over the night?" at 10:33:36 MDT. No 409 errors in recent log. G-rule telegram-409-burst 2/3 unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → 0 stalls, 6 skipped (preflight_exit or pr_exists). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0**. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T19:46:43.207773+00:00`, age≈19 min at check time. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** Repo was behind origin/main by 1 commit (PR #520 merge `cd9c44ca`). `git pull --ff-only` executed (or sync script beat it — HEAD already at cd9c44ca on verification). HEAD=cd9c44ca=origin/main. Clean tree, on main. ✅ **Auto-fixed.**
+
+**Check B — Sync health:** last_sync=2026-06-15T19:45:59Z, age≈20 min at check time. FRESH (<2h). ✅ Nominal.
+
+**Check C — Agent liveness:** All 5 PIDs alive (2530123 Ssl, 2744551 SNs, 2744840 Ss, 2744914 Ss, 2868353 Ssl). ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (2 open):
+- **PR #522** (`forge/missions-card-gc-warn-demote-001`): CONFLICTING. Mirror PASS. Auto-merge blocked (conflict with `scripts/heal_missions_card_gc.py` from PR #520). Forge needs to rebase on main. [yellow] carry.
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): OPEN. mergeable=UNKNOWN. Mirror REVIEW_ESCALATE Jun-14T04:05Z. Age≈41h, ~31h until 72h deadline Jun-17T04:02Z. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Conditional checks (Monday 2026-06-15):** Check I sentinel (check-i-2026-06-15.json) exists → skip. Check VIII/IX/X: sentinels exist → skip.
+
+**Actions taken:**
+1. Alert triage: L1042 Tier-3 (review-pass, silenced), L1043 Tier-4 (merge-conflict, no second DM).
+2. `alert_triage_state.py set-watermark --line 1043` → 1041→1043 ✅
+3. `git -C ~/agent-core pull --ff-only` → HEAD cd9c44ca=origin/main (or sync script ran first) ✅
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --template merge-conflict-pr-522` ✅
+5. `cycle_tier_state.py record --checks-clean false` → **Tier 2 → Tier 1 RESET** ✅
+
+**Dispatches:** None. (PR #522 conflict already DM'd to Larry via outbox-notifier chat_id; Forge rebase is next step pending Larry direction.)
+
+**G-rule updates this iter:**
+- **G-rule Forge-preflight-marker-error-retry: COMPLETE ✅** (PR #524 merged `97300fc1`). Remove from standing items.
+- **G-rule missions-card-gc-warn-vs-info: NOT COMPLETE** — PR #522 CONFLICTING. Forge rebase needed. Carry.
+- **G-rule merge_conflict_manual_rebase-tier4: 1/3** — novel Tier-4 alert; outbox-notifier already DMs directly via chat_id (same pattern as medic-diagnosis). Dispatch to Beacon at 3/3 for Tier-3 translation.
+- All other G-rule counters unchanged from iter ~1979.
+
+**Standing findings (updated):**
+- [yellow] **PR #522 CONFLICTING** — Mirror PASS, blocked by merge conflict with PR #520. Forge rebase needed. G-rule missions-card-gc-warn-vs-info blocked until merged. Larry has rebase instructions via DM.
+- [yellow] **PR #497 REVIEW_ESCALATE** — Mirror REVIEW_ESCALATE Jun-14T04:05Z; age≈41h; ~31h until 72h deadline Jun-17T04:02Z. Escalate if still open at deadline.
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. FN=3027, TP=5. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. Last: 07:44:56 MDT Jun-15. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST 1/3, telegram-409-burst **2/3**, telegram-approval-self-dispatch-denied **1/3**, **merge_conflict_manual_rebase-tier4 1/3**.
+- [blue] **Stale bash orphans** — PIDs 1834248 (17d+) + 2605007 (1d+). Low CPU. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention (merge-conflict-pr-522). ratio=20.0. Trend: improving.
+**Tier end-of-iter:** **Tier 1** (reset from Tier 2; Tier-4 finding L1043).
+
+---
+
 ## Iteration ~1979 — 2026-06-15 19:55Z UTC (interactive, /cycle, Tier 1→2 DE-ESCALATE, consecutive_clean=3, all nominal, PR #524 new, PR #520 revision-1, pending cleared)
 
 **Trigger:** Larry direct invocation (`/cycle`).
