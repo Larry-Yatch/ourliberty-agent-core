@@ -531,6 +531,71 @@
         "from_state": "parked"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "cap-test-card-button-verification-safe-to-drop-d416",
+      "title": "TEST CARD - button verification (safe to drop)",
+      "note": "Throwaway card created by Claude to test the Parked-lane buttons end-to-end. Safe to delete.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ol-work",
+        "branch": "pr476-review",
+        "captured_at": "2026-06-15T23:22:10.667250+00:00"
+      },
+      "last_touched": "2026-06-15T23:22:10.667250+00:00",
+      "promoted_to": null,
+      "snoozed_until": "2026-06-22T00:00:00+00:00"
+    },
+    {
+      "id": "cap-test-promote-button-safe-to-drop-55e0",
+      "title": "TEST - promote button (safe to drop)",
+      "note": "Throwaway card to test Promote end-to-end. Delete after.",
+      "state": "promoted",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ol-work",
+        "branch": "pr476-review",
+        "captured_at": "2026-06-15T23:23:58.384693+00:00"
+      },
+      "last_touched": "2026-06-15T23:23:58.384693+00:00",
+      "promoted_to": "test-promote-button-safe-to-drop"
+    },
+    {
+      "id": "cap-test-drop-button-safe-to-drop-1613",
+      "title": "TEST - drop button (safe to drop)",
+      "note": "Throwaway card to test Drop end-to-end. Delete after.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ol-work",
+        "branch": "pr476-review",
+        "captured_at": "2026-06-15T23:23:58.818531+00:00"
+      },
+      "last_touched": "2026-06-15T23:23:58.818531+00:00",
+      "promoted_to": null
+    },
+    {
+      "id": "cap-test-delegate-button-safe-to-drop-3c53",
+      "title": "TEST - delegate button (safe to drop)",
+      "note": "Throwaway card to test Delegate end-to-end. Delete after.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ol-work",
+        "branch": "pr476-review",
+        "captured_at": "2026-06-15T23:23:59.251861+00:00"
+      },
+      "last_touched": "2026-06-15T23:23:59.251861+00:00",
+      "promoted_to": null
     }
   ]
 }
