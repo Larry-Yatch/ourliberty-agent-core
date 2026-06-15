@@ -120,11 +120,11 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 13:53Z UTC (Iter ~1944, Tier 1, clean)
+## Status snapshot — updated 2026-06-15 13:58Z UTC (Iter ~1945, Tier 1, clean)
 
-**Iter ~1944 summary:** ✅ Clean. All checks nominal. No new alerts (watermark=995=file). All 5 PIDs healthy. Sync FRESH. Bot stable (no new 409). Pipeline stalls cooldowns all active — 0 new fires. ratio≈20.57 (improving). consecutive_clean=1.
+**Iter ~1945 summary:** ✅ Clean. All checks nominal. No new alerts (watermark=995=file). All 5 PIDs healthy. Sync FRESH (last 13:24:50Z). Bot stable (no new 409; last log entry 13:44:56Z — idle silence normal). Pipeline stalls cooldowns all active — 0 new fires. ratio≈20.57 (improving). consecutive_clean=2.
 
-**Iter ~1943 summary (prior):** ⚠️ Non-clean. Self-inflicted 409 burst in Check 2 (called get-messages; Bash auto-backgrounded it). Bot recovered. 1 new alert (dispatch-branch-cleanup, Tier-3 silence). Watermark advanced to 995. ratio≈20.55 (improving). All 5 PIDs healthy. Sync FRESH. G-rule telegram-409-burst → **2/3**. All pipeline stall cooldowns active — 0 new stall fires.
+**Iter ~1944 summary (prior):** ✅ Clean. All checks nominal. No new alerts (watermark=995=file). All 5 PIDs healthy. Sync FRESH. Bot stable (no new 409). Pipeline stalls cooldowns all active — 0 new fires. ratio≈20.57 (improving). consecutive_clean=1.
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl. When cooldown expires, the alert fires in dry-run mode. Be aware: calling --dry-run in a cycle will write real alerts if the cooldown has passed. Always check wc -l of the file before and after.
 
