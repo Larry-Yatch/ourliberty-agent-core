@@ -4,6 +4,84 @@
 
 ---
 
+## Iteration ~1939 — 2026-06-15 12:51Z UTC (interactive, /cycle, Tier 1→2, clean)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. All mandatory checks clean. One self-inflicted incident noted: `beacon_telegram_bot.py get-messages` call caused a ~2-min 409 burst (12:46:52–12:48:56Z UTC); bot PID 2744840 recovered after competing process exited. No messages lost. Tier promoted 1→2 (3rd consecutive clean iter).
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): `gh pr view 497` → MERGEABLE, reviewDecision="", state=OPEN. Mirror REVIEW_ESCALATE 04:05:31Z Jun-14. Age ≈ 36.8h. Under 72h (~Jun-17T04:05Z). **CARRY** [yellow].
+- PRs #509/#510/#512/#513: heal_pipeline_stall --dry-run → 0 new alerts, 4 suppressed (cooldowns still active). **CARRY** [yellow].
+- unreg-approval-482eb78951ee + alert-translation-unrouted-pr-001: beacon-pending-approvals.json confirmed pending=2. **CARRY** [yellow].
+
+**Check 0 — Alert triage:** Watermark=986; file=986 lines. No new alerts. ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier: last WARN 2026-06-15 01:10:53 (auto-dispatch task-id mismatch, G-rule 1/3 — unchanged). inbox-watcher: no WARN/ERROR. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** [yellow] **Self-inflicted 409 burst (12:46:52–12:48:56Z UTC, ~2 min):** Pulse called `beacon_telegram_bot.py get-messages` during this iter, violating MEMORY.md rule. Bot (PID 2744840) fought for the getUpdates poll and recovered after competing process exited. No messages lost; last delivery still idx=985 at 12:24:40Z UTC. G-rule telegram-409-burst: 0/3 → **1/3** (second distinct cycle-occurrence; first was pre-existing burst at 12:22Z UTC from unknown source). No new Larry directives. Self-resolving context → `nominal` with journal note.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → 0 new alerts fired, 4 suppressed (PRs #509/#510/#512/#513 cooldowns still active). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: pending=2 (unreg-approval-482eb78951ee plan=merge-509-510-direct; alert-translation-unrouted-pr-001 plan=Tier-3 translation config PR for unrouted-pr pattern). No change. [yellow] carry.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T12:45:15Z`, age≈6 min. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** On main, HEAD=bbdd0078 == origin/main. Clean. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-15T12:24:29Z (~27 min). FRESH (<2h). ✅ Nominal.
+
+**Check C — Agent liveness:**
+- inbox_watcher: PID 2530123 ✅ (Ssl)
+- chain_event_shipper: PID 2744551 ✅ (SNs)
+- beacon_telegram_bot: PID 2744840 ✅ (Ss) — recovered after self-inflicted 409 burst
+- outbox_notifier: PID 2744914 ✅ (Ss)
+- dashboard_api: PID 2868353 ✅ (Ssl)
+- No forge/mirror persistent sessions — expected. ✅
+
+**Check E — PRs:**
+ourliberty-agent-core (5 open):
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`), MERGEABLE (re-verified). Mirror REVIEW_ESCALATE 04:05:31Z Jun-14. Age ≈ 36.8h. Under 72h (~Jun-17T04:05Z). [yellow] carry.
+- **PR #509** (`docs/meaning-layer-roadmap`), cooldown active. [yellow] carry.
+- **PR #510** (`work/build-consult-restock`), cooldown active. [yellow] carry.
+- **PR #512** (`feat/new-mission-pulse-check-ix-catch-me-up-gap-2026-06-15`), cooldown active. [yellow] carry.
+- **PR #513** (`feat/new-mission-pulse-check-ix-alert-ignored-2026-06-15`), cooldown active. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Conditional checks:** Check I: sentinel `check-i-2026-06-15.json` exists (fired iter ~1899). Skip. Check III: Today is Monday (not Sunday). Skip. ✅
+
+**Actions taken:**
+1. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` ✅
+2. `cycle_tier_state.py record --checks-clean true` → **Tier 1→2 promoted** (3 consecutive clean iters; consecutive_clean reset to 0) ✅
+
+**Dispatches:** None.
+
+**Patterns:**
+- G-rule telegram-409-burst: **1/3** (new occurrence this iter from self-inflicted get-messages call; prior count was 0/3 from iter ~1937's pre-existing burst). Watch; dispatch to Beacon at 3/3.
+- All other G-rule counters unchanged.
+
+**Standing findings (unchanged from iter ~1938 except where noted):**
+- [yellow] **PR #497 REVIEW_ESCALATE** — MERGEABLE (re-verified 12:51Z); reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ≈ 36.8h; 72h expires ~Jun-17T04:05Z. [carry]
+- [yellow] **PRs #509/510/512/513 pipeline-stall** — cooldowns active, 0 new alerts. [carry; awaiting Larry]
+- [yellow] **alert-translation-unrouted-pr-001** — confirmed in beacon-pending-approvals.json. Reply "approve" to trigger Forge config-only PR for G-rule heal-pipeline-stall Tier-3 translation.
+- [yellow] **unreg-approval-482eb78951ee** — pending in beacon-pending-approvals.json (plan=merge-509-510-direct). [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **unreviewed-merge:511/499/494/489** — [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **1/3** (↑ from 0/3; new occurrence this iter from self-inflicted get-messages call). Bot recovered; no messages lost. [watch]
+- [blue] **catalog-accuracy-drift** — G-rule 1/3. route=digest. [carry]
+- [blue] **Check I 2026-06-15** — 1 proposal dispatched to Beacon iter ~1899. [carry]
+- [blue] **Check IX missions** — PRs #512 + #513 open. [carry]
+- [blue] G-rule counters: Forge-preflight-marker-error-retry 2/3, missions-autoregister-warn-vs-info 2/3, missions-card-gc-warn-vs-info 2/3, F24-empty-prompt-envelope-rejected 2/3, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, heal-stale-daemon-script_path-cosmetic 1/3, Forge-preflight-CLARIFY_REQUEST 1/3, telegram-409-burst **1/3** (↑).
+- [blue] **Stale bash orphans** — PIDs 1834248 (17d+, Ss) + 2605007 (1d+, Ss). Low CPU. [carry]
+
+**PRIME DIRECTIVE:** iter_clean. ratio≈20.51 (unchanged), trend=improving.
+**Tier end-of-iter:** **Tier 2** (promoted from Tier 1; consecutive_clean reset to 0).
+
+---
+
 ## Iteration ~1938 — 2026-06-15 12:40Z UTC (interactive, /cycle, Tier 1, clean)
 
 **Trigger:** Larry direct invocation (`/cycle`).
