@@ -126,11 +126,11 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 16:09Z UTC (Iter ~1960, Tier 2, clean, consecutive_clean=0)
+## Status snapshot — updated 2026-06-15 16:32Z UTC (Iter ~1961, Tier 1, consecutive_clean=0)
 
-**Iter ~1960 summary:** ✅ Nominal. All checks clean. 0 new alerts. pending=4 unchanged. **Tier 1 → Tier 2 de-escalation** (consecutive_clean 2→3). Watermark: 1015 (unchanged). ratio≈20.70.
+**Iter ~1961 summary:** ⚠️ 1 new alert. Check 0: PR #509 unrouted-pr (heal-pipeline-stall, Tier-4, bot escalate delivered). Watermark: 1015→1016. pending=4 unchanged. **Tier 2→1 reset** (Tier-4 alert). ratio=20.70. Daemons: beacon:2744840, chain-event-shipper:2744551, outbox-notifier:2744914, dashboard-api:2868353, inbox-watcher:2530123.
 
-**Iter ~1959 summary (prior):** ✅ Nominal. Check 0: 1 new alert (L1015) — `approval_request` for `autoregister-warn-demote-001` from outbox-notifier (Tier-3 silenced). Check 4: pending=4 (+1 new: autoregister-warn-demote-001 plan ready). Tier 1, consecutive_clean=2. Watermark: 1014 → 1015. ratio≈20.70.
+**Iter ~1960 summary (prior):** ✅ Nominal. All checks clean. 0 new alerts. pending=4 unchanged. **Tier 1 → Tier 2 de-escalation** (consecutive_clean 2→3). Watermark: 1015 (unchanged). ratio≈20.70.
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl. When cooldown expires, the alert fires in dry-run mode. Be aware: calling --dry-run in a cycle will write real alerts if the cooldown has passed. Always check wc -l of the file before and after.
 
@@ -140,12 +140,13 @@
 
 ---
 
-## Key standing items (as of iter ~1959)
+## Key standing items (as of iter ~1961)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] UNKNOWN mergeable; reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ~36h; 72h expires ~Jun-17T04:05Z. | Carry; escalate if still open at Jun-17T04:05Z |
-| PR #509 | [yellow] Cooldown active. | Merge/close or dispatch Mirror review |
+| PR #497 REVIEW_ESCALATE | [yellow] UNKNOWN mergeable; reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ~36.5h; 72h expires ~Jun-17T04:02Z (~35h remaining). | Carry; escalate if still open at Jun-17T04:02Z |
+| PR #509 | [yellow] Cooldown expired; alert fired iter ~1961 (Tier-4, bot escalate delivered). | Reply `approve` for alert-translation-unrouted-pr-001 to silence future occurrences |
+| unreg-approval-482eb78951ee | [yellow] APPROVAL_REQUEST in beacon-pending-approvals.json (created 01:45Z). | Investigate + resolve |
 | PRs #510 + #512 + #513 | [yellow] Cooldowns active. | Larry to route to Mirror or merge/close; OR reply "approve" for alert-translation-unrouted-pr-001 to silence |
 | autoregister-warn-demote-001 | [yellow] **NEW** APPROVAL_REQUEST in beacon-pending-approvals.json. Beacon plan ready (built iter ~1957 dispatch, $0.98). Option A=approve (suppress digest row in heal_orphan_autoregister.py; 1-file). Option B=reject (add INFO tier to larry_alerts.py; multi-file). | Reply "approve" or "reject: use Option B" in Telegram |
 | medic-diagnosis-tier3-silence-001 | [yellow] APPROVAL_REQUEST in beacon-pending-approvals.json. | Reply "approve" to trigger Forge config-only PR |

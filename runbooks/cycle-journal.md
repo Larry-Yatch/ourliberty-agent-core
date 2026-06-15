@@ -138875,3 +138875,94 @@ Reply `approve timer-label-fix` or `reject timer-label-fix` to Beacon when conve
 - Mode: digest — 1 proposal(s):
   1. [small] Review high-σ anomaly task `cycle-202606111240000000` — $2.80 task vs $0.81 baseline (21.5σ above)
      Rationale: Ledger flagged this task at 21.5σ above baseline. Read the chain archive and propose either: a fast-path for the shape, a prompt-discipline fix, or a model downgrade if the depth wasn't warranted.
+
+---
+
+## Iteration ~1961 — 2026-06-15 16:32Z UTC (interactive, /cycle, Tier 2→1, consecutive_clean=0)
+
+**Trigger:** Larry direct invocation via `/cycle`.
+
+**Health:** ⚠️ 1 new alert (PR #509 unrouted-pr, Tier-4). All daemons alive. All other checks nominal.
+
+**Continuity:** Last interactive journal entry iter ~1783 (2026-06-14 13:36Z). MEMORY.md snapshot at iter ~1960 (16:09Z). Automated cycles committed at 16:06Z (69af4319) and 16:12Z (9396e589) since iter ~1960. Tier on entry: Tier 2, consecutive_clean=0, last_signal_at=15:52:27Z.
+
+**VERIFY-BEFORE-REASSERT (carried findings from MEMORY ~1960):**
+- pending=4 (beacon-pending-approvals.json) → **VERIFIED UNCHANGED**: same 4 entries (unreg-approval-482eb78951ee, alert-translation-unrouted-pr-001, medic-diagnosis-tier3-silence-001, autoregister-warn-demote-001). [carry]
+- 5 daemons alive → **VERIFIED**: beacon_telegram_bot:2744840, chain_event_shipper:2744551, outbox_notifier:2744914, dashboard_api:2868353, inbox_watcher:2530123. PIDs differ from iter ~1783 (daemons restarted; heal-stale-daemon-code nominal). ✅
+- Git HEAD=origin/main → **VERIFIED**: 9396e589=origin/main, branch=main, clean tree. ✅
+- ratio≈20.70 → **VERIFIED**: interventions=973, systemic_fixes=47, ratio=20.70 (script-authoritative). ✅
+
+**Check 0 — Alert triage:** larry-alerts.jsonl=1016 lines (was 1015 at session start; +1 from heal-pipeline-stall dry-run firing PR #509 alert), watermark=1015 → **1 new alert**.
+- Line 1016: `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#509, route=escalate` — PR #509 (`docs/meaning-layer-roadmap`) opened 1087 min with no Mirror review dispatch. Triage via helper → **Tier-4** (novel: no registry template, no translation match). Bot already delivered via route=escalate to Larry's Telegram. No duplicate DM from Pulse.
+  - G-rule heal-pipeline-stall:unrouted-pr already 3/3 DISPATCHED (iter ~1930). alert-translation-unrouted-pr-001 APPROVAL_REQUEST pending Larry in beacon-pending-approvals (created 11:19Z). Resolves when Larry approves + Forge PR lands.
+- Watermark advanced: 1015→1016. ✅
+- **tier-reset** (Tier-4 alert).
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Tail-50 of beacon_telegram_bot.log shows no recent Larry inbound. Last items were digest-route alerts (09:42 and 09:47 MDT). No new directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` — 5 FORGE_NO_PR_SKIPs (PRs #504-508 pr_exists; cleanup-branch-success-alert-info-translation-001 preflight CLARIFY_REQUEST archived); 3 cooldown-suppressed (PRs #510, #512, #513); 1 alert fired for PR #509 (handled Check 0). ✅ Nominal (all known).
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: pending=4, unchanged from MEMORY ~1960:
+1. unreg-approval-482eb78951ee (01:45Z). [yellow carry]
+2. alert-translation-unrouted-pr-001 (11:19Z) — blocks PR #509 unrouted-pr Tier-3 silence. [yellow]
+3. medic-diagnosis-tier3-silence-001 (15:41Z). [yellow]
+4. autoregister-warn-demote-001 (15:57Z). [yellow]
+No new additions. ✅ Nominal (known carry).
+
+**Check 5 — Stale daemon code:** Heartbeat at 2026-06-15T16:15:55Z (~16 min old at check time). Fresh. ✅ Nominal.
+
+**Check A — Source repo:** branch=main, clean. HEAD=9396e589=origin/main. ✅ Nominal.
+
+**Check B — Sync health:** status=no-change, last_sync=2026-06-15T16:25:16Z (~7 min). ✅ Nominal.
+
+**Check C — Agent liveness:** 5/5 daemons alive. beacon_telegram_bot:2744840, chain_event_shipper:2744551, outbox_notifier:2744914, dashboard_api:2868353, inbox_watcher:2530123. (PIDs updated from iter ~1783 snapshot; daemons restarted between iters per heal-stale-daemon-code.) ✅ Nominal.
+
+**Check D — Inboxes:** beacon, forge, mirror, pulse — all empty. ✅ Nominal.
+
+**Check E — PRs:**
+- PR #497 (fix/cleanup-branch-warn-to-info-001): mg=UNKNOWN, rd="", Mirror REVIEW_ESCALATE ~36.5h ago, 72h deadline ~Jun-17T04:02Z (~35h remaining). [yellow carry]
+- PR #509 (docs/meaning-layer-roadmap): unrouted, cooldown expired → alert fired this iter (handled Check 0). [yellow]
+- PR #510 (feat: consult→restock loop): mg=UNKNOWN, cooldown active. [yellow carry]
+- PR #512 (feat/missions: catch-me-up-gap): mg=UNKNOWN, cooldown active. [yellow carry]
+- PR #513 (feat/missions: alert-ignored): mg=UNKNOWN, cooldown active. [yellow carry]
+No clean+green PRs awaiting auto-merge. ✅ Nominal.
+
+**Conditional Check I (Monday 2026-06-15):** Artifact check-i-2026-06-15.json already exists (automated cycle ran earlier). 1 proposal: [small] Review high-σ anomaly `cycle-202606111240000000` ($2.80 vs $0.81 baseline, 21.5σ). Per MEMORY iter ~1899, proposal dispatched; Beacon processing. No re-dispatch needed. [blue carry]
+
+**Actions taken:**
+1. Alert watermark advanced 1015→1016 via `alert_triage_state.py set-watermark --line 1016`. ✅
+2. PRIME DIRECTIVE: `cycle_prime_ledger.py append --tier 2 --kind intervention` — alert-triage-tier4 (PR#509 unrouted-pr line=1016). ✅
+3. `cycle_tier_state.py record --checks-clean false` → Tier 2→1 reset, consecutive_clean=0, last_signal_at=16:31:07Z. ✅
+
+**Standing findings:**
+- [yellow] **PR #497**: Mirror REVIEW_ESCALATE ~36.5h; 72h deadline ~Jun-17T04:02Z. [carry]
+- [yellow] **PR #509**: unrouted; `approve` alert-translation-unrouted-pr-001 to silence future occurrences. [carry]
+- [yellow] **PRs #510 + #512 + #513**: cooldowns active. Larry to route to Mirror or merge/close. [carry]
+- [yellow] **unreg-approval-482eb78951ee**: pending in beacon-pending-approvals. [carry]
+- [yellow] **autoregister-warn-demote-001**: APPROVAL_REQUEST pending. Reply `approve` or `reject: use Option B`. [carry]
+- [yellow] **medic-diagnosis-tier3-silence-001**: APPROVAL_REQUEST pending. Reply `approve`. [carry]
+- [yellow] **alert-translation-unrouted-pr-001**: APPROVAL_REQUEST pending. Reply `approve`. [carry]
+- [yellow] **Check III threshold proposals**: `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401**: docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **G-rule stall-detector Forge build**: Beacon spec complete. Approve via dashboard. [carry]
+- [yellow] **Check VIII rule=lower**: FN=3027, TP=5, FP=2. `approve check-viii-update-2026-06-15` when shortcut lands. [carry]
+- [yellow] **unreviewed-merge:511/499/494/489**: PRs merged without Mirror. Reply shortcut or silence. [carry]
+- [blue] **Check I 2026-06-15**: 1 proposal dispatched iter ~1899. Beacon processing. [carry]
+- [blue] **Check IX missions**: PR #512 + #513 open. [carry]
+- [blue] **dag-preflight-revision gap**: PR #484 closed source=pulse gap; DAG markers still fall through. [carry]
+- [blue] **G-rule medic-diagnosis-tier4**: DISPATCHED iter ~1955. Awaiting Larry approve → Forge PR. [carry]
+- [blue] **G-rule catalog-accuracy-drift-tier4**: 1/3. [carry]
+- [blue] **G-rule ledger/check-i Tier-4**: 1/3. [carry]
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch**: 1/3. [carry]
+- [blue] **G-rule telegram-409-burst**: 2/3. [carry]
+- [blue] **G-rule health-notify-script-missing**: 1/3. [carry]
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST**: 1/3. [carry]
+- [blue] **G-rule missions-card-gc-warn-vs-info**: 2/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected**: 2/3. [carry]
+- [blue] **G-rule Forge-preflight-marker-error-retry**: 2/3. [carry]
+- [blue] **Stale bash orphan loops**: PIDs 1834248 + 2605007. 0% CPU. [carry]
+
+**PRIME DIRECTIVE:** 1 row this iter (intervention: alert-triage-tier4, PR#509 unrouted-pr line=1016). Trailing-30d (script-authoritative): interventions=973, systemic_fixes=47, ratio=20.70, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0 (Tier-4 alert; Tier 2→1 reset).
