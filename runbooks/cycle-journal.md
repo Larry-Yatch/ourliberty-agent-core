@@ -4,6 +4,96 @@
 
 ---
 
+## Iteration ~1965 — 2026-06-15 17:09Z UTC (interactive, /cycle, Tier 1, 2 new Tier-4 alerts, PR #516 new)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Signal. Check 0: 2 new Tier-4 alerts (L1026-1027, unreviewed-merge:509+510, bot-delivered). Check E: PR #516 new (alert-translation-unrouted-pr-001). All other checks nominal. Tier 1, consecutive_clean=0.
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): Confirmed still open (gh pr list). UNKNOWN mergeable, reviewDecision=''. Mirror REVIEW_ESCALATE 04:05:31Z Jun-14. Age ≈ 38h. 72h expires ~Jun-17T04:05Z (~34h remaining). **CARRY** [yellow].
+- PRs #512/#513: Confirmed open. heal_pipeline_stall.py --dry-run → 0 new alerts, 2 suppressed (cooldowns active). **CARRY** [yellow].
+- beacon-pending-approvals.json: **pending=0** (confirmed, same as iter ~1964). ✅
+- Daemons: All 5 PIDs alive (verified ps). **CARRY** ✅.
+- 409 burst: last occurrence still 07:44:56 MDT (same as iter ~1964). No new burst. G-rule 2/3 unchanged. **CARRY** [yellow].
+
+**Check 0 — Alert triage:** Watermark=1025 (entering); file=1027 lines. **2 new alerts (L1026-1027):**
+- L1026: `source=heal-unreviewed-merge-detector, subject=unreviewed-merge:510, severity=critical` (ts=17:00:17Z) → **Tier-4** per helper (never-silence pattern). Bot delivered at 11:03:27 MDT (idx=1025, route=escalate). No second DM from Pulse.
+- L1027: `source=heal-unreviewed-merge-detector, subject=unreviewed-merge:509, severity=critical` (ts=17:00:17Z) → **Tier-4** per helper (never-silence pattern). Bot delivered at 11:03:28 MDT (idx=1026, route=escalate). No second DM from Pulse.
+- Context: PRs #509+#510 were merged by Larry-Yatch (no REVIEW_PASS evidence in routing-events.jsonl). Same pattern as unreviewed-merge:511/499/494/489 in standing items. Adds #509+#510 to the list.
+Watermark: 1025 → 1027. ⚠️ Tier-reset.
+
+**Check 1 — Log noise:** outbox-notifier: no new WARNs in last 80 lines. inbox_watcher: no WARNs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Most recent Larry message: 10:45:21-0600 MDT "Route to mirror on both" (processed in iter ~1964). No new messages this iter. Bot activity: delivered L1026-1027 at 11:03:27-28 MDT. 409 burst: last occurrence 07:44:56 MDT (unchanged). G-rule telegram-409-burst 2/3 unchanged. PID 2744840 alive (Ss). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → 0 new alerts, 2 suppressed (cooldowns: PR#512, PR#513). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0**. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T16:45:55.679728+00:00`, age≈19.7 min at check time. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=5ffb4142 = origin/main. Clean tree, on main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-15T16:25:16Z, age≈41 min. status=no-change. FRESH (<2h). ✅ Nominal.
+
+**Check C — Agent liveness:**
+- inbox_watcher: PID 2530123 ✅ (Ssl)
+- chain_event_shipper: PID 2744551 ✅ (SNs)
+- beacon_telegram_bot: PID 2744840 ✅ (Ss)
+- outbox_notifier: PID 2744914 ✅ (Ss)
+- dashboard_api: PID 2868353 ✅ (Ssl)
+✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (5 open, unchanged count, new PR #516):
+- **PR #516** (`forge/alert-translation-unrouted-pr-001`): **NEW**. Created 17:03:37Z. UNKNOWN mergeable, reviewDecision=''. Forge's impl of unrouted-pr alert-translation plan (previously pending in beacon-pending-approvals.json). Awaiting Mirror review. [yellow] new.
+- **PR #515** (`forge/medic-diagnosis-tier3-silence-001`): UNKNOWN mergeable, reviewDecision=''. Created 16:48:56Z. Awaiting Mirror review. [yellow] carry.
+- **PR #513** (`feat/new-mission-pulse-check-ix-alert-ignored-2026-06-15`): UNKNOWN mergeable, reviewDecision=''. Pipeline-stall, cooldown active. [yellow] carry.
+- **PR #512** (`feat/new-mission-pulse-check-ix-catch-me-up-gap-2026-06-15`): UNKNOWN mergeable, reviewDecision=''. Pipeline-stall, cooldown active. [yellow] carry.
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): UNKNOWN mergeable, reviewDecision=''. Mirror REVIEW_ESCALATE 04:05:31Z Jun-14. Age ≈ 38h. 72h expires ~Jun-17T04:05Z. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Conditional checks:** Check I: sentinel `check-i-2026-06-15.json` EXISTS, same-day re-fire blocked. Skip. Check III: not Sunday. Skip. ✅
+
+**Actions taken:**
+1. Triage L1026 via `alert_triage_state.py triage-alert` → Tier-4 (never-silence) ✅
+2. Triage L1027 via `alert_triage_state.py triage-alert` → Tier-4 (never-silence) ✅
+3. `alert_triage_state.py set-watermark --line 1027` ✅ (1025 → 1027)
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention` ✅
+5. `cycle_tier_state.py record --checks-clean false` → Tier 1, consecutive_clean=0 ✅
+
+**Dispatches:** None. (All Tier-4 alerts already delivered by bot; no G-rule at 3/3.)
+
+**G-rule updates this iter:**
+- All counters unchanged from iter ~1964.
+- unreviewed-merge pattern: #509 + #510 added to standing list (now: 511/499/494/489/510/509). Not a G-rule candidate — these are intentional Larry-direct merges, not a system malfunction. Journal-note only.
+
+**Standing findings (updated from iter ~1964):**
+- [yellow] **PR #516 new — alert-translation-unrouted-pr-001** — Forge config PR implementing unrouted-pr Tier-3 translation. Awaiting Mirror review. Watch next iter for Mirror outcome.
+- [yellow] **PR #515 — medic-diagnosis-tier3-silence-001** — Forge config PR, awaiting Mirror review. Normal pipeline. [carry]
+- [yellow] **PR #497 REVIEW_ESCALATE** — Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ≈ 38h; 72h expires ~Jun-17T04:05Z (~34h remaining). Escalate if still open at deadline. [carry]
+- [yellow] **PRs #512/#513 pipeline-stall** — cooldowns active. [carry]
+- [yellow] **unreviewed-merge:511/499/494/489/510/509** — bot-delivered, Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] **G-rule missions-autoregister-warn-vs-info** — **COMPLETE ✅** PR #514 merged.
+- [blue] **G-rule medic-diagnosis-tier4** — DISPATCHED iter ~1955; PR #515 built, Mirror review pending. [carry]
+- [blue] **catalog-accuracy-drift** — G-rule 1/3. route=digest. [carry]
+- [blue] **Check I 2026-06-15** — sentinel exists. [carry]
+- [blue] **Check IX missions** — PRs #512 + #513 open. [carry]
+- [blue] G-rule counters: Forge-preflight-marker-error-retry 2/3, missions-card-gc-warn-vs-info 2/3, F24-empty-prompt-envelope-rejected 2/3, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST 1/3, telegram-409-burst **2/3**, telegram-approval-self-dispatch-denied **1/3**, missions-autoregister-warn-vs-info **COMPLETE**, medic-diagnosis-tier4 DISPATCHED (PR #515 in review).
+- [blue] **Stale bash orphans** — PIDs 1834248 + 2605007. Low CPU. [carry]
+
+**PRIME DIRECTIVE:** intervention (L1026-1027 Tier-4 triage). ratio=20.77 (improving).
+**Tier end-of-iter:** **Tier 1, consecutive_clean=0**.
+
+---
+
 ## Iteration ~1964 — 2026-06-15 17:00Z UTC (interactive, /loop /cycle, Tier 1, Check A always-fix, PRs #509+#510+#514 merged)
 
 **Trigger:** Larry direct invocation (`/loop /cycle`).

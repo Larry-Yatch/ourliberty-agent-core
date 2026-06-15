@@ -126,11 +126,13 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 17:00Z UTC (Iter ~1964, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-15 17:09Z UTC (Iter ~1965, Tier 1, consecutive_clean=0)
 
-**Iter ~1964 summary:** ⚠️ Check A always-fix: repo behind origin/main → fast-forward to 9e0182ea (PRs #514 #509 #510 merged). L1025: review-pass for PR #514 Tier-3 silenced. Watermark: 1024→1025. pending=0 (all 4 cleared). PRs #509+#510 auto-merged after Larry's "Route to mirror" directive. PR #515 new (medic-diagnosis-tier3-silence-001, awaiting Mirror review). Tier 1, consecutive_clean=0. Daemons: beacon:2744840, chain-event-shipper:2744551, outbox-notifier:2744914, dashboard-api:2868353, inbox-watcher:2530123.
+**Iter ~1965 summary:** ⚠️ Check 0: L1026-1027 new (unreviewed-merge:510+509, Tier-4, bot-delivered, no Pulse DM). Check E: PR #516 new (alert-translation-unrouted-pr-001, awaiting Mirror). All other checks nominal. Watermark: 1025→1027. pending=0. Tier 1, consecutive_clean=0. Daemons: beacon:2744840, chain-event-shipper:2744551, outbox-notifier:2744914, dashboard-api:2868353, inbox-watcher:2530123. PRIME ratio=20.77 (improving).
 
-**Iter ~1963 summary (prior):** ⚠️ 7 new alerts (L1018-L1024). L1018-1020: pipeline-stall PRs #510/512/513 Tier-4, bot delivered. L1021: missions-autoregister Tier-3 silenced. L1022-1024: medic-diagnosis Tier-4, chat_id delivered. Watermark: 1017→1024. Check 2: Larry "Go" at 10:41MDT → dispatch FAILED for autoregister-warn-demote-001 (self-dispatch denied beacon→beacon). G-rule telegram-approval-self-dispatch-denied **1/3 NEW**. Tier 1, consecutive_clean=0.
+**Iter ~1964 summary (prior):** ⚠️ Check A always-fix: repo behind origin/main → fast-forward to 9e0182ea (PRs #514 #509 #510 merged). L1025: review-pass for PR #514 Tier-3 silenced. Watermark: 1024→1025. pending=0 (all 4 cleared). PRs #509+#510 auto-merged after Larry's "Route to mirror" directive. PR #515 new (medic-diagnosis-tier3-silence-001, awaiting Mirror review). Tier 1, consecutive_clean=0.
+
+**Iter ~1963 summary (prior-2):** ⚠️ 7 new alerts (L1018-L1024). L1018-1020: pipeline-stall PRs #510/512/513 Tier-4, bot delivered. L1021: missions-autoregister Tier-3 silenced. L1022-1024: medic-diagnosis Tier-4, chat_id delivered. Watermark: 1017→1024. Check 2: Larry "Go" at 10:41MDT → dispatch FAILED for autoregister-warn-demote-001 (self-dispatch denied beacon→beacon). G-rule telegram-approval-self-dispatch-denied **1/3 NEW**. Tier 1, consecutive_clean=0.
 
 **Iter ~1960 summary (prior-2):** ✅ Nominal. All checks clean. 0 new alerts. Tier 1 → Tier 2 de-escalation (consecutive_clean 2→3).
 
@@ -148,16 +150,17 @@
 
 ---
 
-## Key standing items (as of iter ~1964)
+## Key standing items (as of iter ~1965)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] UNKNOWN mergeable; reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ~37.5h; 72h expires ~Jun-17T04:05Z (~34.5h remaining). | Carry; escalate if still open at Jun-17T04:05Z |
-| PR #515 new | [yellow] `forge/medic-diagnosis-tier3-silence-001` — config PR for Tier-3 silence. UNKNOWN mergeable, reviewDecision=''. Awaiting Mirror review. | Watch; should auto-merge on Mirror PASS |
-| PRs #512/#513 pipeline-stall | [yellow] Cooldowns suppressed iter ~1964. alert-translation-unrouted-pr-001 cleared from pending (path unclear). | Carry |
+| PR #516 new | [yellow] `forge/alert-translation-unrouted-pr-001` — config PR for unrouted-pr Tier-3 translation. UNKNOWN mergeable, reviewDecision=''. Awaiting Mirror review. | Watch; should auto-merge on Mirror PASS |
+| PR #515 | [yellow] `forge/medic-diagnosis-tier3-silence-001` — config PR for Tier-3 silence. UNKNOWN mergeable, reviewDecision=''. Awaiting Mirror review. | Watch; should auto-merge on Mirror PASS |
+| PR #497 REVIEW_ESCALATE | [yellow] UNKNOWN mergeable; reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ~38h; 72h expires ~Jun-17T04:05Z (~34h remaining). | Escalate if still open at Jun-17T04:05Z |
+| PRs #512/#513 pipeline-stall | [yellow] Cooldowns suppressed iters ~1964-1965. | Carry |
+| unreviewed-merge:511/499/494/489/510/509 | [yellow] PRs merged by Larry without Mirror; bot-delivered; Larry's judgment call. | Reply appropriate shortcut or silence |
 | G-rule stall-detector Forge build | [yellow] Beacon spec complete. Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
 | Check VIII rule=lower | [yellow] FN=3027, TP=5, FP=2 — threshold too high. | `approve check-viii-update-2026-06-15` when shortcut lands |
-| unreviewed-merge:511/499/494/489 | [yellow] PRs merged by Larry without Mirror | Reply appropriate shortcut or silence |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
 | Telegram 409 burst | [yellow] G-rule **2/3**. All self-inflicted by calling get-messages. | Watch; dispatch at 3/3 |
