@@ -102,9 +102,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 08:15Z UTC (Iter ~1907, Tier 1)
+## Status snapshot — updated 2026-06-15 08:19Z UTC (Iter ~1908, Tier 1)
 
-**Iter ~1907 summary:** ⚠️ Signal. **Tier 1, consecutive_clean=0**. Check 0: 3 new medic-diagnosis alerts (lines 979–981) for PRs #513, #512, #510 (medic already DM'd Larry). All Tier-4. No other findings. ratio≈20.67 (954/46).
+**Iter ~1908 summary:** ✅ Nominal (no new signals). **Tier 1, consecutive_clean=0**. All checks clean except Check 4 (pending=1, same carry). 0 new interventions. ratio≈20.74 (954/46).
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl for this script. When cooldown expires, the alert fires even in dry-run mode. Be aware: calling --dry-run in a cycle will generate real alerts if the cooldown has passed.
 
