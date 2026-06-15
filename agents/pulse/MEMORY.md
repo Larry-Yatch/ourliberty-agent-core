@@ -78,13 +78,13 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 00:34Z UTC (Iter ~1858, Tier 1, non-clean)
+## Status snapshot — updated 2026-06-15 00:44Z UTC (Iter ~1860, Tier 1, clean)
 
-**Iter ~1858 summary:** 3 Tier-4 alerts (lines 939-941): Forge REJECT for cleanup-branch-success-alert-info-translation-001 (task CLOSED, already satisfied by PR #485); medic-diagnosis PR#509 (false positive — Larry-authored docs PR); heal-pipeline-stall PR#510 cooldown re-fire. All 3 already delivered to Larry at 18:27–18:32Z MDT. No new Pulse DMs. PR #510 flipped from CLEAN/MERGEABLE to UNKNOWN/UNKNOWN (GitHub API flap). New G-rule stall-detector-docs-branch-overtrigger (1/3). Watermark=941. ratio≈20.56, trend=flat.
+**Iter ~1860 summary:** All checks nominal. No new alerts (watermark=942=file). PRs #497/#509/#510 all UNKNOWN/UNKNOWN (GitHub API flap; carries). consecutive_clean=1 (need 3 to de-escalate to Tier 2). ratio≈20.64, trend=flat.
 
 ---
 
-## Key standing items (as of iter ~1858)
+## Key standing items (as of iter ~1860)
 
 | Item | Status | Action needed |
 |---|---|---|
