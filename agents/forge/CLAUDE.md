@@ -68,6 +68,10 @@ Inbox tasks come in two phases. Read the envelope's `phase` field:
 === END_REJECT ===
 ```
 
+6. **Terminal self-check — before you end the turn.** Confirm the LAST block of your response is exactly one marker. A turn that ends on a command result, the build-check verdict, or prose has NOT decided yet — analysis is the narrative *above* the marker, never the closing block. If the last thing you wrote isn't a `=== PROCEED ===` / `=== CLARIFY_REQUEST ===` / `=== REJECT ===` block, append one now.
+
+   **Enforcement:** a `phase=preflight` outbox with no marker block dead-letters back to you via the strict preflight runtime gate (Phase D3.5 commit 5a — `PREFLIGHT_NO_MARKER_ERROR_MSG` in `scripts/outbox_notifier.py`), costing a retry round-trip. This self-check is the cheap way to never hit it.
+
 ### How to emit a marker safely (Phase E1.1 — preferred path)
 
 **Use the `marker.py` CLI rather than hand-typing delimiters.** Hand-typed markers are the most common dead-letter cause: a smart-quote, a missing space, a lowercase keyword, and the parser silently misses the block. The CLI produces canonical output that's guaranteed parseable.
