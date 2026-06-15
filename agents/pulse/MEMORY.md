@@ -126,11 +126,11 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 15:39Z UTC (Iter ~1955, Tier 1, signal)
+## Status snapshot — updated 2026-06-15 15:45Z UTC (Iter ~1956, Tier 1, clean)
 
-**Iter ~1955 summary:** ⚠️ Signal. Check 0: 8 new alerts (L1005-1012). L1005: medic-diagnosis attempt-16 PR#509 (Tier-4, bot-delivered). L1006-1008: pipeline-stall PRs #513/#512/#510 (Tier-4, bot-delivered). L1009: dispatch-branch-cleanup/summary (Tier-3 silenced). L1010-1012: medic-diagnosis PRs #510/#512/#513 (Tier-4, delivery pending). G-rule medic-diagnosis-tier4 3/3 DISPATCHED. Watermark: 1004 → 1012. Tier 1. ratio≈20.66.
+**Iter ~1956 summary:** ✅ Nominal. Check 0: 1 new alert (L1013) — `approval_request` for `medic-diagnosis-tier3-silence-001` from outbox-notifier (Tier-3 silenced, known-pattern). Check 4: pending=3 (+1 new: medic-diagnosis-tier3-silence-001 APPROVAL_REQUEST delivered to Larry at 09:42 MDT). All other checks nominal. Tier 1, consecutive_clean=1. Watermark: 1012 → 1013. ratio≈20.68.
 
-**Iter ~1954 summary (prior):** ⚠️ Signal. Check 0: 1 new alert (line 1004) — `pipeline-stall:unrouted-pr:PR#509` cooldown-expiry at 15:25:31Z. Tier-4 (helper); bot delivered idx=1003 at 15:26:57Z; G-rule already DISPATCHED iter~1930; fix pending `alert-translation-unrouted-pr-001`. Tier-reset: Tier 2 → Tier 1. ratio≈20.66 (improving). Watermark: 1004.
+**Iter ~1955 summary (prior):** ⚠️ Signal. Check 0: 8 new alerts (L1005-1012). L1005: medic-diagnosis attempt-16 PR#509 (Tier-4, bot-delivered). L1006-1008: pipeline-stall PRs #513/#512/#510 (Tier-4, bot-delivered). L1009: dispatch-branch-cleanup/summary (Tier-3 silenced). L1010-1012: medic-diagnosis PRs #510/#512/#513 (Tier-4, delivery pending). G-rule medic-diagnosis-tier4 3/3 DISPATCHED. Watermark: 1004 → 1012. Tier 1. ratio≈20.66.
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl. When cooldown expires, the alert fires in dry-run mode. Be aware: calling --dry-run in a cycle will write real alerts if the cooldown has passed. Always check wc -l of the file before and after.
 
@@ -140,43 +140,36 @@
 
 ---
 
-## Key standing items (as of iter ~1936)
+## Key standing items (as of iter ~1956)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] MERGEABLE; reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ~32.3h; 72h expires ~Jun-17T04:05Z. | Carry; escalate if still open at Jun-17T04:05Z |
-| PR #509 | [yellow] Alert fired 13:13Z Jun-15 (attempt 14); bot delivered 13:15Z. Cooldown restarted; next expiry ~Jun-16. | Merge/close or dispatch Mirror review |
-| PRs #510 + #512 + #513 | [yellow] Cooldowns expired again; new alerts fired 15:35:59Z Jun-15 (iter ~1955). | Larry to route to Mirror or merge/close; OR reply "approve" for alert-translation-unrouted-pr-001 to silence |
+| PR #497 REVIEW_ESCALATE | [yellow] UNKNOWN mergeable; reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ~36.3h; 72h expires ~Jun-17T04:05Z. | Carry; escalate if still open at Jun-17T04:05Z |
+| PR #509 | [yellow] Cooldown active (last alert 15:25:31Z Jun-15). | Merge/close or dispatch Mirror review |
+| PRs #510 + #512 + #513 | [yellow] Cooldowns active; last alerts fired 15:35:59Z Jun-15 (iter ~1955). | Larry to route to Mirror or merge/close; OR reply "approve" for alert-translation-unrouted-pr-001 to silence |
+| medic-diagnosis-tier3-silence-001 | [yellow] **NEW** APPROVAL_REQUEST in beacon-pending-approvals.json; bot delivered idx=1012 at 09:42 MDT Jun-15. Beacon plan for Tier-3 silence of medic-diagnosis alerts. | Reply "approve" in Telegram to trigger Forge config-only PR |
+| alert-translation-unrouted-pr-001 | [yellow] APPROVAL_REQUEST in beacon-pending-approvals.json (pending since 11:29Z iter ~1932). Tier-3 translation for pipeline-stall:unrouted-pr alerts. | Reply "approve" to trigger Forge config-only PR |
 | G-rule stall-detector Forge build | [yellow] Beacon spec complete. Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
 | Check VIII rule=lower | [yellow] FN=3027, TP=5, FP=2 — threshold too high. DM queued iter ~1899. | `approve check-viii-update-2026-06-15` when shortcut lands |
 | unreviewed-merge:511 | [yellow] PR #511 merged by Larry at 23:58Z Jun-14 without Mirror routing | Reply 'go: retroactive-review-511' or 'silence: local-review-marker-counts' |
-| unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
-| unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' |
-| unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if wanted |
+| unreviewed-merge:499/494/489 | [yellow] PRs merged by Larry without Mirror | Reply appropriate shortcut or silence |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| Telegram 409 burst | [yellow] G-rule **2/3**. Three distinct occurrences: (1) 12:22Z UTC Jun-15; (2) 12:47Z UTC Jun-15 self-inflicted; (3) 13:41Z UTC Jun-15 self-inflicted (iter ~1943). Bot recovered all times; no messages lost. All self-inflicted by calling get-messages. | Watch; dispatch at 3/3 |
+| Telegram 409 burst | [yellow] G-rule **2/3**. All self-inflicted by calling get-messages. Bot recovered all times. | Watch; dispatch at 3/3 |
 | Check I 2026-06-15 | [blue] 1 proposal dispatched iter ~1899, Beacon processed | Beacon spec in progress |
 | Check IX missions | [blue] PR #512 (catch-me-up-gap) + PR #513 (alert-ignored) open, no review yet | Larry review on kanban |
-| G-rule medic-diagnosis-tier4 | [blue] **DISPATCHED** iter ~1955: `g-rule-medic-diagnosis-tier3-translation-001` to Beacon inbox | Watch for Beacon spec + Forge config-only PR |
-| G-rule catalog-accuracy-drift-tier4 | [blue] **1/3** (new iter ~1926) | Watch; dispatch to Beacon at 3/3 for Tier-3 translation |
-| G-rule heal-pipeline-stall:unrouted-pr Tier-4 repeat | [yellow] **APPROVAL_REQUEST** `alert-translation-unrouted-pr-001` confirmed in beacon-pending-approvals.json (11:29Z iter ~1932); bot DM delivered | Reply "approve" to trigger Forge build (config-only PR adding Tier-3 translation) |
+| G-rule medic-diagnosis-tier4 | [blue] **DISPATCHED** iter ~1955; medic-diagnosis-tier3-silence-001 APPROVAL_REQUEST in beacon-pending-approvals.json | Watch for Larry approval → Forge PR |
+| G-rule catalog-accuracy-drift-tier4 | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 for Tier-3 translation |
 | G-rule ledger/check-i Tier-4 | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule health-notify-script-missing | [blue] **1/3** | Watch; dispatch at 3/3 |
-| catalog-accuracy-drift | [blue] 9/34 ourliberty-graph shelf cards drifted (↑ from 8/34) | route=digest; journal-note only |
-| Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
+| catalog-accuracy-drift | [blue] 9/34 ourliberty-graph shelf cards drifted | route=digest; journal-note only |
 | G-rule missions-autoregister-warn-vs-info | [blue] **2/3** | Watch; dispatch at 3/3 |
 | G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule missions-card-gc-warn-vs-info | [blue] **2/3** | Watch; dispatch at 3/3 |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] **2/3** | Watch; dispatch at 3/3 |
-| G-rule stuck-cycle-timer | [blue] **0/3** (healed Jun-15 06:00Z, counter reset) | Watch; dispatch at 3/3 |
-| G-rule timer-cycle-no-journal-entry | [blue] **0/3** | Watch |
-| G-rule heal-stale-daemon-script_path-cosmetic | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule Forge-preflight-marker-error-retry | [blue] **2/3** | Watch; dispatch at 3/3 |
-| G-rule Forge-preflight-CLARIFY_REQUEST | [blue] **1/3** (first seen iter ~1935: cleanup-branch-success-alert-info-translation-001 archived with CLARIFY_REQUEST marker) | Watch; dispatch at 3/3 |
+| G-rule Forge-preflight-CLARIFY_REQUEST | [blue] **1/3** | Watch; dispatch at 3/3 |
 | G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 (warn-vs-info) |
-| G-rule telegram-409-burst | [yellow] **2/3** (iter ~1937 + iter ~1939 + iter ~1943, all self-inflicted by get-messages call) | Watch; dispatch at 3/3 |
+| G-rule telegram-409-burst | [yellow] **2/3** | Watch; dispatch at 3/3 |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
-| ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
-| dashboard_api PID 2868353 | [blue] Ssl stable | Note; watch for recurrence |
 | Stale bash orphans | [blue] PIDs 1834248 (17d+) + 2605007 (1d+). Ss, low CPU. | Carry |
