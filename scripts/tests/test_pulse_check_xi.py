@@ -69,6 +69,18 @@ def _write_fixture(report):
     return path
 
 
+def _coverage_report(coverage=0.22, lb_gaps=('lib/types.ts', 'lib/api.ts')):
+    """A synthetic coverage_meter --json report (the advisory secondary reading)."""
+    gaps = [{'file': f, 'dependents': 5, 'subsystem': 'dashboard / lib'} for f in lb_gaps]
+    return {
+        'universe': 228, 'covered': 51, 'coverage': coverage,
+        'load_bearing_total': 192, 'load_bearing_covered': 50,
+        'load_bearing_coverage': 0.26,
+        'gaps': gaps, 'load_bearing_gaps': gaps,
+        'by_subsystem': {}, 'unresolved_cards': [],
+    }
+
+
 class TestBuildArtifact(unittest.TestCase):
 
     def test_distills_and_filters_drifted(self):
@@ -161,6 +173,51 @@ class TestMain(unittest.TestCase):
         # No --fixture, meter binary absent -> MeterUnavailable -> rc 1.
         rc = pxi.main([])
         self.assertEqual(rc, 1)
+
+
+class TestCoverageReading(unittest.TestCase):
+    """The advisory coverage reading folded into the check (catalog-on-build backlog)."""
+
+    def test_build_artifact_folds_coverage(self):
+        art = pxi.build_artifact(_report(over_gate=False), _coverage_report())
+        self.assertIn('coverage', art)
+        self.assertEqual(art['coverage']['coverage'], 0.22)
+        self.assertEqual(art['coverage']['restock_backlog'], 2)
+        self.assertEqual(art['coverage']['restock_top'][:2], ['lib/types.ts', 'lib/api.ts'])
+
+    def test_build_artifact_without_coverage_omits_key(self):
+        art = pxi.build_artifact(_report(over_gate=False))
+        self.assertNotIn('coverage', art)
+
+    def test_missing_coverage_meter_returns_none_not_raises(self):
+        # GRAPH_DIR has no pipeline/coverage_meter.py -> advisory skip, returns None
+        # (NOT MeterUnavailable — coverage must never break the accuracy gate).
+        self.assertIsNone(pxi.run_coverage_meter())
+
+    def test_main_folds_coverage_fixture_into_artifact(self):
+        fx = _write_fixture(_report(over_gate=False))
+        cfx = _write_fixture(_coverage_report())
+        before = set(pxi.ARTIFACT_DIR.glob('check-xi-*.json')) \
+            if pxi.ARTIFACT_DIR.exists() else set()
+        with mock.patch('larry_alerts.append_alert') as alert:
+            rc = pxi.main(['--fixture', fx, '--coverage-fixture', cfx])
+        self.assertEqual(rc, 0)
+        alert.assert_not_called()
+        new = set(pxi.ARTIFACT_DIR.glob('check-xi-*.json')) - before
+        self.assertEqual(len(new), 1)
+        latest = json.loads(new.pop().read_text(encoding='utf-8'))
+        self.assertIn('coverage', latest)
+        self.assertEqual(latest['coverage']['restock_backlog'], 2)
+
+    def test_over_gate_alert_includes_coverage_clause(self):
+        fx = _write_fixture(_report(over_gate=True, drifted_ids=['pm-queries']))
+        cfx = _write_fixture(_coverage_report())
+        with mock.patch('larry_alerts.append_alert', return_value=True) as alert:
+            rc = pxi.main(['--fixture', fx, '--coverage-fixture', cfx])
+        self.assertEqual(rc, 0)
+        msg = alert.call_args.kwargs['message']
+        self.assertIn('Catalog coverage', msg)
+        self.assertIn('restock backlog', msg)
 
 
 if __name__ == '__main__':

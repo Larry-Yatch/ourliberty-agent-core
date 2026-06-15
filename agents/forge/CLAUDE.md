@@ -41,7 +41,14 @@ Inbox tasks come in two phases. Read the envelope's `phase` field:
 1. **Read the spec end-to-end.** Every field on the envelope — `prompt`, `target_repo`, `task_type`, `pr_title`, `success_criteria` if present.
 2. **Read referenced files.** If the spec mentions `docs/operating-manual.md L730-L740`, open it. Verify the line range exists and the surrounding context matches the spec's assumption.
 3. **Probe the environment.** If the spec says "the watchdog timer is enabled," check it (`systemctl is-enabled ourliberty-watchdog.timer`). Don't trust the spec's assertion about state — verify it.
-4. **Decide.** End your response with EXACTLY one marker:
+4. **Consult the shelf + graph (reuse before reinvention).** For any non-trivial build — a net-new capability, a multi-file change, or anything touching a seam — run the build-check before deciding *how* to build:
+
+   ```bash
+   python3 /home/larry/ourliberty-graph/pipeline/build_check.py "<the capability the spec asks for>" [files-you-expect-to-touch]
+   ```
+
+   It returns a SHELF verdict (does this already exist as a catalogued component you should extend instead of rebuild?) plus the GRAPH blast radius of the files you'll touch. If the verdict is `STRONG`, your plan should reuse/extend the named component rather than reimplement it — say so in `preflight_summary`. **Skip this for trivial edits** (a single-file localized fix, a config/doc/typo edit, a test-mock fix) — the check should earn its tokens. **Fail-safe:** if the ourliberty-graph checkout is absent or the command errors, note "build-check skipped" and proceed — never block on it. Advisory: it informs the plan, it does not gate PROCEED. See `ourliberty-graph/docs/build-loop.md`.
+5. **Decide.** End your response with EXACTLY one marker:
 
 ```
 === PROCEED ===
@@ -149,6 +156,7 @@ After PROCEED, the outbox notifier writes a build-phase task to your inbox with 
 
    **Enforcement:** the wedged-session reaper (#457) kills any session a heartbeat-poll wedges and the dispatch retries — so a violation fails loudly (lost session + retry) rather than silently passing, which is the structural backstop that makes the foreground rule self-correcting. The sanctioned fallback `scripts/wait_for_pid.sh` is the only blessed background-wait primitive and is covered by `scripts/tests/test_wait_for_pid.py` (success exit 0 + timeout exit 124 paths). Mirror's review checklist additionally flags any reintroduced background-and-poll idiom in build-phase diffs.
 3. **Self-review the diff** before committing. `git diff` end-to-end. Look for: dead code, debug prints, hardcoded values that should be config, security issues, test scaffolding you forgot to remove.
+3b. **Restock check (catalog-on-build).** If this build added a *new reusable component* — a net-new module or capability another builder could reuse — it needs a shelf card so the next builder finds it instead of reinventing it. You do NOT characterize it inline; just **name the new component(s) under a `## Restock` heading in the PR body** (path + one-line capability). The catalog loop (the coverage sweep / Mirror) picks it up from there. Skip for trivial builds and for changes that only touch *existing* components. See `ourliberty-graph/docs/build-loop.md`.
 4. **Commit.** Conventional-commit style. `git add <specific files>` (no `git add .`), then `git commit -m "<type>(<scope>): <short why>"`. Examples: `fix(watcher): close lease on early-return path` or `docs: clarify D3 build-phase flow`. Body explains the *why* if not obvious; the diff shows the *what*.
 5. **Push.** `git push -u origin <branch>`. The branch is already on origin from the preflight checkpoint; `-u` re-establishes the tracking link in case worktree state is fresh.
 6. **Open the PR.** `gh pr create --title "<envelope.pr_title or auto>" --body "<see template>"`. PR body template:

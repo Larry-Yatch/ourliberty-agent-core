@@ -12,6 +12,16 @@ catalog drift is *watched*, not noticed by luck — and so the meter's reading i
 the watched signal that decides when SCIP is worth buying (ourliberty-graph
 PLAN.md §5-#1, §10).
 
+It also takes a SECOND, advisory reading: the catalog COVERAGE meter
+(ourliberty-graph: pipeline/coverage_meter.py) — what fraction of the catalogable
+source surface carries a card at all, plus the uncatalogued load-bearing backlog
+(the restock list for the catalog-on-build loop, PLAN.md §6-#2). Coverage is
+SECONDARY to the accuracy gate: a coverage failure is logged and skipped, never
+escalated, so this check's pass/fail signal stays the accuracy meter alone. The
+number is folded into the artifact (trend) and into the drift alert when one
+fires — deliberately NO standalone daily backlog alert (that would be toil; the
+per-PR Mirror restock note is the real-time signal).
+
 Unlike checks I–X (agent-invoked inside the Pulse /cycle), this one is
 deterministic and LLM-free, so it runs on its own daily systemd timer
 (ourliberty-pulse-check-xi.timer). It still rides the shared liveness skeleton:
@@ -51,6 +61,7 @@ from typing import Optional
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
 GRAPH_DIR = Path(os.environ.get('OURLIBERTY_GRAPH_DIR', '/home/larry/ourliberty-graph'))
 METER = GRAPH_DIR / 'pipeline' / 'accuracy_meter.py'
+COVERAGE_METER = GRAPH_DIR / 'pipeline' / 'coverage_meter.py'
 
 ARTIFACT_DIR = AGENTS_ROOT / 'blackboard' / 'pulse-check-xi'
 LOG_FILE = AGENTS_ROOT / 'logs' / 'pulse-check-xi.log'
@@ -138,15 +149,41 @@ def run_meter() -> dict:
     return report
 
 
-def build_artifact(report: dict) -> dict:
-    """Distil the meter report into the dated check artifact."""
+def run_coverage_meter() -> Optional[dict]:
+    """Best-effort catalog COVERAGE reading (uncatalogued components = the restock backlog).
+
+    SECONDARY to the accuracy gate: coverage is advisory, so any failure here is logged and
+    returns None — it never raises MeterUnavailable and never changes this check's pass/fail.
+    The accuracy meter alone is the gate; this just makes the restock backlog a watched number.
+    """
+    if not COVERAGE_METER.exists():
+        log(f'coverage meter not found at {COVERAGE_METER}; skipping (advisory)', 'INFO')
+        return None
+    try:
+        proc = subprocess.run(
+            [sys.executable, str(COVERAGE_METER), '--json'],
+            cwd=str(GRAPH_DIR), capture_output=True, text=True,
+            timeout=METER_TIMEOUT_S,
+        )
+        cov = json.loads(proc.stdout)
+    except (OSError, subprocess.SubprocessError, json.JSONDecodeError, ValueError) as e:
+        log(f'coverage meter unavailable (advisory, skipping): {e}', 'WARNING')
+        return None
+    if not isinstance(cov, dict) or not isinstance(cov.get('coverage'), (int, float)):
+        log('coverage meter report missing fields (advisory, skipping)', 'WARNING')
+        return None
+    return cov
+
+
+def build_artifact(report: dict, coverage: Optional[dict] = None) -> dict:
+    """Distil the meter report (+ optional coverage reading) into the dated check artifact."""
     ts = datetime.now(timezone.utc).isoformat()
     drifted = [
         {'id': c.get('id') or c.get('card'), 'verdict': c.get('verdict'),
          'detail': c.get('detail', '')}
         for c in report.get('cards', []) if c.get('verdict') != 'VERIFIED'
     ]
-    return {
+    artifact = {
         'ts': ts,
         'check': 'xi',
         'cards_total': report.get('cards_total'),
@@ -158,6 +195,17 @@ def build_artifact(report: dict) -> dict:
         'tool_health': report.get('tool_health'),
         'drifted': drifted,
     }
+    if coverage:
+        lb_gaps = coverage.get('load_bearing_gaps', [])
+        artifact['coverage'] = {
+            'coverage': coverage.get('coverage'),
+            'load_bearing_coverage': coverage.get('load_bearing_coverage'),
+            'universe': coverage.get('universe'),
+            'covered': coverage.get('covered'),
+            'restock_backlog': len(lb_gaps),
+            'restock_top': [g.get('file') for g in lb_gaps[:10]],
+        }
+    return artifact
 
 
 def write_artifact(artifact: dict) -> Path:
@@ -172,6 +220,12 @@ def escalate_drift(artifact: dict) -> None:
     import larry_alerts as la  # local import: keep liveness skeleton independent
 
     drifted_ids = [d['id'] for d in artifact['drifted']]
+    cov = artifact.get('coverage')
+    cov_clause = (
+        f' (Catalog coverage: {cov["coverage"]:.0%} of the source surface carries a card; '
+        f'{cov["restock_backlog"]} load-bearing components uncatalogued — the restock backlog.)'
+        if cov else ''
+    )
     la.append_alert(
         source='pulse-check',
         severity='warning',
@@ -181,7 +235,7 @@ def escalate_drift(artifact: dict) -> None:
             f'live code (attention rate {artifact["attention_rate"]:.0%}, gate '
             f'{artifact["gate"]:.0%}). Drifted: {", ".join(drifted_ids) or "—"}. '
             'A drifted card can mislead reuse — its facts (dependents/seams) '
-            'have moved.'
+            'have moved.' + cov_clause
         ),
         subject='catalog-accuracy-drift',
         suggested_action=(
@@ -198,6 +252,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument('--fixture',
                         help='Read a meter --json report from this file '
                              'instead of running the meter (hermetic tests).')
+    parser.add_argument('--coverage-fixture',
+                        help='Read a coverage_meter --json report from this file '
+                             'instead of running the coverage meter (hermetic tests).')
     parser.add_argument('--dry-run', action='store_true',
                         help='Compute + print; do not write the artifact or '
                              'send any alert.')
@@ -206,6 +263,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     if args.fixture:
         with open(args.fixture, encoding='utf-8') as fh:
             report = json.load(fh)
+        coverage = None
+        if args.coverage_fixture:
+            with open(args.coverage_fixture, encoding='utf-8') as fh:
+                coverage = json.load(fh)
     else:
         try:
             report = run_meter()
@@ -215,23 +276,27 @@ def main(argv: Optional[list[str]] = None) -> int:
             # the missing heartbeat as a backstop.
             log(f'meter unavailable: {e}', 'ERROR')
             return 1
+        coverage = run_coverage_meter()  # advisory secondary — never raises, never gates
 
-    artifact = build_artifact(report)
+    artifact = build_artifact(report, coverage)
 
     if args.dry_run:
         print(json.dumps(artifact, indent=2))
         return 0
 
     path = write_artifact(artifact)
+    cov = artifact.get('coverage')
+    cov_note = (f'; coverage {cov["coverage"]:.0%} '
+                f'({cov["restock_backlog"]} load-bearing uncatalogued)') if cov else ''
     if artifact['over_gate']:
         escalate_drift(artifact)
         log(f'Check XI: DRIFT — {artifact["needs_attention"]}/'
             f'{artifact["cards_total"]} cards need attention '
-            f'(rate {artifact["attention_rate"]:.0%}); digest alert queued; '
+            f'(rate {artifact["attention_rate"]:.0%}){cov_note}; digest alert queued; '
             f'artifact {path}')
     else:
         log(f'Check XI: clean — {artifact["verified"]}/{artifact["cards_total"]} '
-            f'verified (rate {artifact["attention_rate"]:.0%}); artifact {path}')
+            f'verified (rate {artifact["attention_rate"]:.0%}){cov_note}; artifact {path}')
     return 0
 
 

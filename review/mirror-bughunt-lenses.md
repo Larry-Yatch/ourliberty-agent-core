@@ -84,7 +84,7 @@ Off-by-one, wrong early-return / drop path, inverted condition, mishandled tri-s
 The modified directories' CLAUDE.md guidance — but only rules that actually apply to
 review (not authoring-time hints). Lowest priority; do not invent rules.
 
-### Lens I — reuse / reinvention  *(ADVISORY — never blocks; Mission-A connect-on-build)*
+### Lens I — reuse / reinvention + catalog-on-build  *(ADVISORY — never blocks; Mission-A connect-on-build)*
 Unlike A–H (escaped-bug lenses), this one is a forward-looking *reuse* nudge: does this diff build a
 **new capability that already exists on the component shelf**, reimplementing a catalogued part
 instead of reusing it? **Scope: only diffs that ADD a part** — a new module/file, a new substantial
@@ -101,6 +101,12 @@ part and trivial helpers. For such an addition:
    diff does not import/reference/extend that part, surface a reuse note: name the shelf part, its
    `location` and `reuse_mode`, and what to reuse/extend instead of reinventing. A near-variant
    (same job, different implementation) is also worth a note — it seeds the portfolio layer.
+4. If NO candidate matches (the librarian's top score is low / the capability is genuinely new),
+   surface a **restock note** instead: name the new component and its file(s) and flag it to be
+   catalogued after merge, so the next builder finds it rather than reinventing it. This is the
+   *catalog-on-build* half of the loop — reuse what exists (steps 1–3), catalogue what's new (this
+   step). Same advisory weight: narrative-only, never blocks. (A Forge PR that already carries a
+   `## Restock` heading has self-declared this — just confirm it names the right new part.)
 
 **Fail-safe — this lens can never block or fail the review.** If the librarian or the
 ourliberty-graph checkout is absent or errors, write one line ("reuse-check skipped: librarian
@@ -144,10 +150,10 @@ confident reinvention is worth a narrative note.
 - Sub-blocking findings → noted in the review narrative above the marker (where
   Beacon reads them), not gated on. (Do not open a separate PR comment — Mirror's
   flow is marker-based.)
-- **Lens I (reuse/reinvention) never blocks** — its notes always go in the
-  narrative above the marker, regardless of confidence, and never enter
-  `findings[]`. It is an advisory connect-on-build nudge, not a correctness gate;
-  a reuse note must not, on its own, turn a `REVIEW_PASS` into a revision.
+- **Lens I (reuse/reinvention + restock) never blocks** — its notes (both reuse and
+  catalog-on-build restock) always go in the narrative above the marker, regardless of
+  confidence, and never enter `findings[]`. It is an advisory connect-on-build nudge, not a
+  correctness gate; a reuse or restock note must not, on its own, turn a `REVIEW_PASS` into a revision.
 - This runs **in addition to** the `test_regression_check.py` gate and the spec/AC
   checklist. Order: spec/AC → bug-hunt → test-regression gate. All three must pass
   for `REVIEW_PASS`.
