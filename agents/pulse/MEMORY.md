@@ -90,9 +90,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 06:14Z UTC (Iter ~1894, Tier 1)
+## Status snapshot — updated 2026-06-15 06:22Z UTC (Iter ~1895, Tier 1)
 
-**Iter ~1894 summary:** ✅ Clean. Tier 1, consecutive_clean=1. 0 new alerts (watermark=965 unchanged). All daemons alive (PIDs 2530123/2744551/2744840/2744914/2868353). PRs #497/#509/#510 carry [yellow]. Forge/Beacon inboxes empty. ratio≈20.48. Day-of-week correction: prior iters labeled Jun-15 "Sunday" — it is Monday. Check I/III correctly skipped (Monday, artifact check-i-2026-06-14.json from Sunday Jun-14).
+**Iter ~1895 summary:** ✅ Clean. Tier 1, consecutive_clean=2. 0 new alerts (watermark=965 unchanged). All daemons alive (PIDs 2530123/2744551/2744840/2744914/2868353). PRs #497/#509/#510 carry [yellow]. Forge/Beacon inboxes empty. ratio≈20.48 (942 interventions / 46 systemic_fixes). Check I/III skipped (Monday, most recent Check I artifact from Sunday Jun-14). 1 more clean iter → de-escalate to Tier 2.
 
 ---
 
