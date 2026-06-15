@@ -84,19 +84,25 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 03:15Z UTC (Iter ~1877, Tier 1)
+## beacon-pending-approvals.json correct structure (corrected iter ~1878)
 
-**Iter ~1877 summary:** Clean iter. 0 interventions. Telegram 409 conflict (from iter ~1876) CONFIRMED resolved — bot PID 2744840 alive and healthy, no new 409s since 03:04:35Z. PR #497 back to MERGEABLE (UNSTABLE was temporary). consecutive_clean=1. watermark=951. ratio≈20.35, trend=worsening (flipped after iter ~1876 intervention).
+**Rule:** `beacon-pending-approvals.json` structure is `{"version": 1, "pending": [...], "history": [...]}` — NOT a dict keyed by approval ID. Check for pending items via `d["pending"]` list. Prior parsing (looking for `.items()` with a `status` field) was wrong and returned 0 pending incorrectly. Correct check: `len(d.get("pending", []))`.
 
 ---
 
-## Key standing items (as of iter ~1877)
+## Status snapshot — updated 2026-06-15 03:21Z UTC (Iter ~1878, Tier 1)
+
+**Iter ~1878 summary:** Clean iter. 0 interventions. consecutive_clean=2 (one more clean iter → natural Tier 2 de-escalation). ratio≈20.35, trend=flat (stabilized after iter ~1876 intervention + two clean iters). Watermark=951. All daemons alive. PRs #497/#509/#510 carry.
+
+---
+
+## Key standing items (as of iter ~1878)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE (gh pr view; 153rd iter) | Close if still stuck: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
-| PR #509 + #510 | [yellow] Both UNKNOWN; pending approval `unreg-approval-482eb78951ee` registered (dashboard); cooldown suppressing new stall alerts | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
-| G-rule stall-detector Forge build | [yellow] Beacon spec done 01:51Z Jun-15 (stall-detector-exclude-external-pr-001). Forge build pending dashboard approval. Forge inbox empty; no PR yet. | Approve Forge build via dashboard |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE (gh pr view; 154th iter) | Close if still stuck: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #509 + #510 | [yellow] Both MERGEABLE (gh pr view); pending approval `unreg-approval-482eb78951ee` (dashboard; chat_id=None); cooldown suppressing new stall alerts | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
+| G-rule stall-detector Forge build | [yellow] Beacon spec done (stall-detector-exclude-external-pr-001). Forge build pending dashboard approval. Forge inbox empty; no PR yet. | Approve Forge build via dashboard |
 | unreviewed-merge:511 | [yellow] PR #511 (`feat/local-review-pass-marker`) merged by Larry at 23:58Z Jun-14 without Mirror routing | Reply 'go: retroactive-review-511' or 'silence: local-review-marker-counts' |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
@@ -118,4 +124,4 @@
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
 | dashboard_api PID 2868353 | [blue] Ssl stable; prior restart cause still unknown | Note; watch for recurrence |
-| Stale bash orphans | [blue] PIDs 1834248 + 2605007. Ss, low CPU. | Carry; cleanup when convenient |
+| Stale bash orphans | [blue] PIDs 1834248 (17d 8h) + 2605007 (23h+). Ss, low CPU. | Carry; cleanup when convenient |
