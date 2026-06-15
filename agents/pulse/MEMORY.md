@@ -108,9 +108,9 @@
 
 ---
 
-## heal-pipeline-stall:unrouted-pr Tier-4 repeat pattern (observed iter ~1922)
+## heal-pipeline-stall:unrouted-pr Tier-4 repeat pattern (observed iter ~1922, DISPATCHED iter ~1930)
 
-**Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#N` alerts consistently classify as Tier-4 (no registry template, no translation match) in the triage helper. The healer cycles through cooldowns and fires repeatedly for the same PR. Bot fallback delivery already DMs Larry; a second DM from Pulse is noise. Do NOT send repeat DM if the bot already delivered the prior iteration of the same alert. **G-rule count: 2/3** — dispatch to Beacon at 3/3 to add alert-translations.json template.
+**Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#N` alerts consistently classify as Tier-4 (no registry template, no translation match) in the triage helper. The healer cycles through cooldowns and fires repeatedly for the same PR. Bot fallback delivery already DMs Larry; a second DM from Pulse is noise. Do NOT send repeat DM if the bot already delivered the prior iteration of the same alert. **G-rule count: 3/3 → DISPATCHED** iter ~1930: `g-rule-healer-unrouted-pr-tier3-translation-001` sent to Beacon inbox — direction-ask to add Tier-3 translation for `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:*` in `config/alert-translations.json`. Watch for Beacon spec + Forge config-only PR.
 
 ---
 
@@ -120,9 +120,15 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 10:54Z UTC (Iter ~1929, Tier 2)
+## Status snapshot — updated 2026-06-15 11:14Z UTC (Iter ~1930, Tier 1)
 
-**Iter ~1929 summary:** ✅ Nominal. **Tier 2, consecutive_clean=0** (de-escalated from Tier 1 after 3 consecutive clean iters). No new alerts (file=969 lines, unchanged). 0 interventions. ratio≈20.89 (961/46), trend=improving. All agent PIDs healthy. Watermark=989 (file=969 lines); watermark gap persists. Sync fresh (last_sync=10:24Z). No new Larry directives. 5 open PRs: #497 (MERGEABLE via gh pr view — list shows UNKNOWN, known cache artifact; REVIEW_ESCALATE ~32h, expires Jun-17T04:05Z), #509/#510/#512/#513 (stall/cooldowns). PRs #503–#508 confirmed MERGED Jun-14 (terminal-state-reconciliation suite).
+**Iter ~1930 summary:** ⚠️ Signal. **Tier 2→1** (signal: PR#509 pipeline-stall cooldown expired at 11:06Z; 2 new alerts triaged Tier-4). 1 intervention + 1 systemic_fix. ratio≈20.89 pre-iter (961/46). All agent PIDs healthy. Watermark=989 (file=971 lines); watermark gap persists (manually triaged new lines). Sync last=10:24Z (~50min, FRESH). Bot last delivery idx=969 (PR#509 pipeline-stall, 11:08Z). **G-rule heal-pipeline-stall:unrouted-pr dispatched (3/3)** → `g-rule-healer-unrouted-pr-tier3-translation-001` in Beacon inbox. 5 open PRs: #497 (MERGEABLE re-verified 11:14Z; REVIEW_ESCALATE ~33h, expires Jun-17T04:05Z), #509/#510/#512/#513 (stall/cooldowns).
+
+**heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl. When cooldown expires, the alert fires in dry-run mode. Be aware: calling --dry-run in a cycle will write real alerts if the cooldown has passed. Always check wc -l of the file before and after.
+
+**medic-diagnosis alerts (learned iter ~1905):** The medic module sends `kind=notification, intent=medic-diagnosis` alerts with a chat_id when it performs detailed PR diagnoses. These carry a chat_id meaning the DM was already delivered directly. Triage helper classifies as Tier-4 (no registry template). No second DM from Pulse warranted.
+
+**Watermark gap (ongoing):** watermark=989, file grows toward 989 slowly. Lines added below the watermark are missed by the normal get-watermark path. Workaround: check `wc -l` vs watermark each iter; if file length < watermark AND file length has increased since prior iter, manually read the new tail lines and triage. Do NOT set watermark backward.
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl. When cooldown expires, the alert fires in dry-run mode. Be aware: calling --dry-run in a cycle will write real alerts if the cooldown has passed. Always check wc -l of the file before and after.
 
@@ -150,7 +156,7 @@
 | Check I 2026-06-15 | [blue] 1 proposal dispatched iter ~1899, Beacon processed | Beacon spec in progress |
 | Check IX missions | [blue] PR #512 (catch-me-up-gap) + PR #513 (alert-ignored) open, no review yet | Larry review on kanban |
 | G-rule catalog-accuracy-drift-tier4 | [blue] **1/3** (new iter ~1926) | Watch; dispatch to Beacon at 3/3 for Tier-3 translation |
-| G-rule heal-pipeline-stall:unrouted-pr Tier-4 repeat | [blue] **2/3** | Watch; dispatch to Beacon at 3/3 |
+| G-rule heal-pipeline-stall:unrouted-pr Tier-4 repeat | [blue] **DISPATCHED** iter ~1930 | Watch for Beacon spec + Forge PR |
 | G-rule ledger/check-i Tier-4 | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule health-notify-script-missing | [blue] **1/3** | Watch; dispatch at 3/3 |
 | catalog-accuracy-drift | [blue] 9/34 ourliberty-graph shelf cards drifted (↑ from 8/34) | route=digest; journal-note only |
