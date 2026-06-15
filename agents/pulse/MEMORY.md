@@ -90,9 +90,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 03:50Z UTC (Iter ~1881, Tier 1)
+## Status snapshot — updated 2026-06-15 04:14Z UTC (Iter ~1884, Tier 2)
 
-**Iter ~1881 summary:** Signal iter. **Tier 1** (tier-reset; consecutive_clean=0). 1 intervention. ratio≈20.39, trend=flat. Watermark=956. All daemons alive. Check 0: 1 new alert (line 956: medic-diagnosis PR#510 attempt 5, Tier 4). Medic already DM'd Larry at 03:43Z UTC — no Pulse duplicate. PRs #497/#509/#510 carry. heal_pipeline_stall --dry-run: 0 new alerts (both PRs on cooldown).
+**Iter ~1884 summary:** Clean iter. **Tier 2** (de-escalated from Tier 1; 3 consecutive clean iters ~1882/~1883/~1884). 0 interventions. ratio≈20.39, trend=flat. Watermark=956. All daemons alive. 0 new alerts. PRs #497/#509/#510 carry (all unchanged). heal_pipeline_stall: 0 new alerts (both PRs on cooldown).
 
 ---
 
