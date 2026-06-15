@@ -108,9 +108,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 08:46Z UTC (Iter ~1912, Tier 1)
+## Status snapshot — updated 2026-06-15 09:08Z UTC (Iter ~1915, Tier 1)
 
-**Iter ~1912 summary:** ✅ Nominal. No new signals. **Tier 1, consecutive_clean=0**. All checks clean except Check 4 (pending=1, same carry). 0 new interventions. ratio≈20.74 (954/46). All agent PIDs healthy; bot log quiet since 02:11:57 MDT Jun-15 (idx=980).
+**Iter ~1915 summary:** ⚠️ Check 0 Tier-4. **Tier 1, consecutive_clean=0**. PRs #510/#512/#513 pipeline-stall cooldowns expired; 3 new alerts fired (outbox-notifier delivered DMs idx=983/984/985 at 09:07Z). Check 4 pending=1 (carry). 1 intervention appended. ratio≈20.78 (955/46). All agent PIDs healthy. Watermark advanced 983→986.
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl for this script. When cooldown expires, the alert fires even in dry-run mode. Be aware: calling --dry-run in a cycle will generate real alerts if the cooldown has passed.
 
@@ -124,7 +124,7 @@
 |---|---|---|
 | PR #497 REVIEW_ESCALATE | [yellow] MERGEABLE; reviewDecision=""; Mirror REVIEW_ESCALATE confirmed 04:05:31Z Jun-14 (~27h actual). 72h expires ~Jun-17T04:05Z. | Carry; escalate if still open at Jun-17T04:05Z |
 | PR #509 | [yellow] UNKNOWN/no-review; medic DM'd Larry 07:55Z Jun-15 (attempt 9); merge/close to stop or dispatch Mirror review | Awaiting Larry |
-| PRs #510 + #512 + #513 | [yellow] Pipeline-stall alerts fired iter ~1906 (cooldowns expired; bot DM'd Larry route=escalate) | Larry to route to Mirror or merge/close |
+| PRs #510 + #512 + #513 | [yellow] Pipeline-stall alerts re-fired iter ~1915 (cooldowns expired again; DMs idx=983/984/985 09:07Z Jun-15) | Larry to route to Mirror or merge/close |
 | G-rule stall-detector Forge build | [yellow] Beacon spec complete. Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
 | Check VIII rule=lower | [yellow] FN=3027, TP=5, FP=2 — threshold too high. DM queued iter ~1899. | `approve check-viii-update-2026-06-15` when shortcut lands |
 | unreviewed-merge:511 | [yellow] PR #511 merged by Larry at 23:58Z Jun-14 without Mirror routing | Reply 'go: retroactive-review-511' or 'silence: local-review-marker-counts' |

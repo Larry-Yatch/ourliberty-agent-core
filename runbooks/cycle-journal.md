@@ -4,6 +4,109 @@
 
 ---
 
+## Iteration ~1915 — 2026-06-15 09:08Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Check 0 Tier-4 (PRs #510, #512, #513 pipeline-stall:unrouted-pr cooldowns expired; 3 new alerts fired); Check 4 pending=1 (carry). All other checks nominal.
+
+**VERIFY-BEFORE-REASSERT (iter ~1914 carries):**
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): `gh pr view 497` → OPEN, **MERGEABLE**, reviewDecision="". Mirror REVIEW_ESCALATE 04:05:31Z Jun-14. Age ~29.1h. Under 72h threshold (~Jun-17T04:05Z). **CARRY** [yellow].
+- PR #509 (`docs/meaning-layer-roadmap`): OPEN, UNKNOWN/no-review. Cooldown active (renewed at 08:57Z iter ~1914 alert). **CARRY** [yellow].
+- PRs #510, #512, #513: OPEN, UNKNOWN/no-review. Cooldowns EXPIRED this iter; 3 new alerts fired (see Check 0). **CARRY** [yellow].
+- G-rule stall-detector Forge build: Both inboxes empty. **CARRY** [yellow].
+- dashboard_api PID 2868353: Running (Ssl, 15h 7m). **CARRY** [blue].
+- Stale bash orphans PIDs 1834248 + 2605007: Not re-verified this iter; carry from ~1914. **CARRY** [blue].
+
+**Check 0 — Alert triage:** Watermark=983→986 (3 new alerts, lines 984-986):
+- Line 984: `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#513, route=escalate` — Helper returned **Tier 4** (novel, no template). outbox-notifier delivered DM (idx=983 at 09:07:27Z). No second Pulse DM. `tier-reset`.
+- Line 985: `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#512, route=escalate` — Helper returned **Tier 4** (novel, no template). outbox-notifier delivered DM (idx=984 at 09:07:28Z). No second Pulse DM. `tier-reset`.
+- Line 986: `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#510, route=escalate` — Helper returned **Tier 4** (novel, no template). outbox-notifier delivered DM (idx=985 at 09:07:28Z). No second Pulse DM. `tier-reset`.
+- Ledger: 1 intervention appended (`check-0-tier4-pipeline-stall-unrouted-pr`). Watermark advanced to 986.
+
+**Check 1 — Log noise:** outbox-notifier.log tail-100: Same 2 sub-threshold WARNs as iter ~1914:
+- `forge marker error in tsr-shared-probe.json: MalformedForgeMarker` (Jun-14 10:58Z). G-rule Forge-preflight-marker-error-retry 2/3, no new occurrence.
+- `beacon pulse-auto-dispatch APPROVAL_REQUEST task_id mismatch` (Jun-15 01:10Z). G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch-warn-vs-info 1/3, no new occurrence.
+✅ Nominal (both sub-threshold, same carry).
+
+**Check 2 — Telegram sweep:** Bot log last entries: 3 pipeline-stall DMs delivered by outbox-notifier at 09:07Z (idx=983/984/985). No Larry directives in last 4h. Bot running (PID 2744840, Ss, 22h 30m). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → 3 new alerts fired (PRs #513, #512, #510 cooldowns expired), 1 suppressed (PR #509 cooldown active). Alert delivery by outbox-notifier confirmed in bot log. ✅ Handled via Check 0.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: pending=1 (`unreg-approval-482eb78951ee`, PR#509+#510 merge decision). No change. [yellow] carry.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T08:43:50Z`, age≈23.6 min. FRESH (< 60 min). ✅ Nominal.
+
+**Check A — Source repo:** On main, clean. HEAD=c7498702 == origin/main (0 behind, 0 ahead). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-15T08:24:17Z (~44 min), status=no-change. < 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:**
+- inbox_watcher: PID 2530123 ✅ (Ssl, 1d 13h 42m)
+- chain_event_shipper: PID 2744551 ✅ (SNs, 22h 30m)
+- beacon_telegram_bot: PID 2744840 ✅ (Ss, 22h 30m)
+- outbox_notifier: PID 2744914 ✅ (Ss, 22h 30m)
+- dashboard_api: PID 2868353 ✅ (Ssl, 15h 7m)
+- No forge/mirror persistent sessions — expected. ✅
+
+**Check E — PRs:**
+ourliberty-agent-core (5 open):
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`), MERGEABLE (re-verified via `gh pr view 497`), reviewDecision="". Mirror REVIEW_ESCALATE 04:05:31Z Jun-14. Age ~29.1h. Under 72h (~Jun-17T04:05Z). [yellow] carry.
+- **PR #509** (`docs/meaning-layer-roadmap`), UNKNOWN/no-review. Cooldown active. [yellow] carry.
+- **PR #510** (`work/build-consult-restock`), UNKNOWN/no-review. 3 new alerts fired this iter. [yellow] carry.
+- **PR #512** (`feat/new-mission-pulse-check-ix-catch-me-up-gap-2026-06-15`), UNKNOWN/no-review. New alert fired. [yellow] carry.
+- **PR #513** (`feat/new-mission-pulse-check-ix-alert-ignored-2026-06-15`), UNKNOWN/no-review. New alert fired. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Check H — Forge/Beacon activity:** Both inboxes empty. ✅ Nominal.
+
+**Conditional checks:** Check I sentinel exists (check-i-2026-06-15.json) — already fired iter ~1899. Today Mon 2026-06-15 — Check III requires Sunday; skip. ✅
+
+**Actions taken:**
+1. Triage helper invoked for 3 new alerts → all Tier-4 (novel, no template). outbox-notifier already delivered DMs.
+2. Watermark advanced 983 → 986 via `alert_triage_state.py set-watermark --line 986`.
+3. Ledger intervention appended: `check-0-tier4-pipeline-stall-unrouted-pr` (PRs #510, #512, #513).
+4. `cycle_tier_state.py record --checks-clean false` → **Tier 1, consecutive_clean=0** ✅
+
+**Dispatches:** None.
+
+**Patterns:**
+- G-rule Forge-preflight-marker-error-retry: 0 new. **2/3**. Carry.
+- G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch-warn-vs-info: 0 new. **1/3**. Carry.
+- G-rule ledger/check-i Tier-4: 0 new. **1/3**. Carry.
+- G-rule missions-autoregister-warn-vs-info: 0 new. **2/3**. Carry.
+- G-rule missions-card-gc-warn-vs-info: 0 new. **2/3**. Carry.
+- G-rule F24-empty-prompt-envelope-rejected: 0 new. **2/3**. Carry.
+- G-rule health-notify-script-missing: 0 new. **1/3**. Carry.
+- G-rule timer-cycle-no-journal-entry: 0 new. **0/3**. Carry.
+- G-rule stuck-cycle-timer: 0 new. **0/3**. Carry.
+- G-rule Forge-timeout-worktree-missing-retry-loop: 0 new. **1/3**. Carry.
+- G-rule heal-stale-daemon-script_path-cosmetic: 0 new. **1/3**. Carry.
+
+**Standing findings:**
+- [yellow] **PR #497 REVIEW_ESCALATE** — MERGEABLE (re-verified 09:08Z); reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ~29.1h; 72h expires ~Jun-17T04:05Z. [carry]
+- [yellow] **PRs #509/510/512/513 pipeline-stall** — DMs delivered. Options: `dispatch mirror review pr=<N>` OR merge/close. [carry; awaiting Larry]
+- [yellow] **unreg-approval-482eb78951ee** — pending=1 (PR#509+#510 merge decision). [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **unreviewed-merge:511/499/494/489** — [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [blue] **Check I 2026-06-15** — 1 proposal dispatched to Beacon iter ~1899. [carry]
+- [blue] **Check IX missions** — PRs #512 + #513 open. [carry]
+- [blue] G-rule counters: Forge-preflight-marker-error-retry 2/3, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, missions-autoregister-warn-vs-info 2/3, missions-card-gc-warn-vs-info 2/3, F24-empty-prompt-envelope-rejected 2/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, heal-stale-daemon-script_path-cosmetic 1/3.
+- [blue] **Check I medic-operator-scaffold-001** — 24.4σ; prior dispatch 2026-06-10. [carry]
+- [blue] **catalog-accuracy-drift** — 8/34 ourliberty-graph shelf cards. [carry]
+- [blue] **dag-preflight-revision gap** — PR #484 closed source=pulse gap; DAG markers still fall through. [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+- [blue] **Stale bash orphans** — PIDs 1834248 + 2605007. Ss, low CPU. [carry]
+- [blue] **dashboard_api PID 2868353** — Ssl, stable. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention this iter (Check 0 Tier-4 pipeline-stall PRs #510/#512/#513). ratio≈20.78 (955/46), trend=improving.
+**Tier end-of-iter:** **Tier 1, consecutive_clean=0** (Check 0 Tier-4 + Check 4 pending directive).
+
+---
+
 ## Iteration ~1914 — 2026-06-15 09:01Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0)
 
 **Trigger:** Larry direct invocation (`/cycle`).
