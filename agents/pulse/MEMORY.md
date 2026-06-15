@@ -90,9 +90,11 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 06:27Z UTC (Iter ~1896, Tier 2)
+## Status snapshot — updated 2026-06-15 06:49Z UTC (Iter ~1897, Tier 1)
 
-**Iter ~1896 summary:** ✅ Clean. **Tier promoted 1 → 2** (3rd consecutive clean iter). 0 new alerts (watermark=965 unchanged). All daemons alive (PIDs 2530123/2744551/2744840/2744914/2868353). PRs #497/#509/#510 carry [yellow]. Forge/Beacon inboxes empty. ratio≈20.48 (942 interventions / 46 systemic_fixes). Check I/III skipped (Monday). 3 more clean iters → Tier 3.
+**Iter ~1897 summary:** ⚠️ Signal. **Tier reset 2 → 1** (Check 0 Tier-4 alert: heal-pipeline-stall PR #509 cooldown expired → line 966 in larry-alerts.jsonl, route=escalate). PR #497 now shows MERGEABLE (GitHub computed). Watermark=966. All daemons alive (PIDs 2530123/2744551/2744840/2744914/2868353). PRs #497/#509/#510 carry [yellow]. ratio≈20.48 (943 interventions / 46 systemic_fixes). Escalation written to pulse-escalations.json (#24).
+
+**heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl for this script. When cooldown expires, the alert fires even in dry-run mode. Be aware: calling --dry-run in a cycle will generate real alerts if the cooldown has passed.
 
 ---
 
