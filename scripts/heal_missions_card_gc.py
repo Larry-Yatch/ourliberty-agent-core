@@ -859,17 +859,11 @@ def _emit_summary(retire: RetireResult, aged: list[str], commit_status: str,
         or missions_commit_status in failure_statuses
         or bool(retire.emit_failures)
     )
-    shipped_missions = bool(missions and missions.shipped)
     if hard_failure:
         fail_token = commit_status if commit_status in failure_statuses else missions_commit_status
         larry_alerts.append_alert(
             source='missions-card-gc', severity='warning',
             message=summary, subject=f'failure:{fail_token}', route='escalate')
-    elif (retire.retired or aged or briefed or shipped_missions
-          or commit_status == 'committed' or missions_commit_status == 'committed'):
-        larry_alerts.append_alert(
-            source='missions-card-gc', severity='warning',
-            message=summary, subject='summary', route='digest')
 
 
 # ---------- main ----------
