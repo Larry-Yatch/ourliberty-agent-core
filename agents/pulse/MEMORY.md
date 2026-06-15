@@ -90,9 +90,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 04:27Z UTC (Iter ~1885, Tier 2)
+## Status snapshot — updated 2026-06-15 04:49Z UTC (Iter ~1886, Tier 1)
 
-**Iter ~1885 summary:** Clean iter. **Tier 2** (consecutive_clean=1). 0 interventions. ratio≈20.39, trend=flat. Watermark=956. All daemons alive. 0 new alerts. PRs #497/#509/#510 carry (all unchanged). Sync error (prior 3 iters) self-healed — status=no-change as of 04:24Z.
+**Iter ~1886 summary:** Tier-4 alert. **Tier 1** (reset from Tier 2; consecutive_clean=0). 1 intervention. ratio≈20.41, trend=improving. Watermark=958. All daemons alive. 2 new alerts (heal-pipeline-stall + medic notification, both PR#509 unrouted attempt 6; medic DM delivered at 04:39+04:45Z UTC). PR#510 cooldown expired — next heal_pipeline_stall run will fire alert for it. PRs #497/#509/#510 carry.
 
 ---
 
