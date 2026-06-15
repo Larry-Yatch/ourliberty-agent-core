@@ -4,6 +4,112 @@
 
 ---
 
+## Iteration ~1865 — 2026-06-15 01:48Z UTC (interactive, /cycle, Tier 1, signal + G-rule dispatch)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Signal (continuation). Check 0: 3 new Tier-4 alerts (lines 945-947) — all continuation of known PR#509/PR#510 unrouted-Mirror finding already DM'd in iter ~1864. No new DM sent. G-rule stall-detector-docs-branch-overtrigger hit 3/3 → dispatched direction-ask to Beacon.
+
+**VERIFY-BEFORE-REASSERT (iter ~1864 carries):**
+- PR #497: OPEN, mergeStateStatus=**UNKNOWN**, mergeable=**UNKNOWN** (GitHub API flap). **141st** consecutive iter. **CARRY** [yellow].
+- PR #509 (`docs/meaning-layer-roadmap`): OPEN, mergeStateStatus=**UNKNOWN**, mergeable=**UNKNOWN** — flap back (was CLEAN/MERGEABLE at iter ~1864). **CARRY** [yellow].
+- PR #510 (`feat: wire the consult→restock build loop`): OPEN, mergeStateStatus=**UNKNOWN**, mergeable=**UNKNOWN**. **CARRY** [yellow].
+- dashboard_api PID 2868353: `ps` alive (7h 44m, Ssl), stable. **CARRY** [blue].
+- Stale bash orphans: PID 1834248 (17d 6h 26m, Ss), PID 2605007 (21h 24m, Ss). Both alive. **CARRY** [blue].
+
+**Check 0 — Alert triage:** Watermark=944. File=947 lines. **3 new alerts (lines 945-947):**
+- Line 945 (01:37:07Z): `heal-pipeline-stall` — PR #510 opened 195 min, no routing-events entry. Subject=`pipeline-stall:unrouted-pr:PR#510`. Helper → **Tier 4** (novel). Already DM'd to Larry via Telegram (Telegram log idx=944, delivered 19:37:55 MDT). No new DM.
+- Line 946 (01:40:09Z): `source=pulse` — [yellow] escalation from iter ~1864 about PR#509+#510. Subject=`pulse-tier4:unrouted-pr:PR#509-510`. Helper → **Tier 4** (novel). This is Pulse's own DM from prior iter (delivery confirmation; already in Telegram idx=945). Journal-note only.
+- Line 947 (01:40:57Z): `medic` notification — attempt 3 of 3 for PR#510 unrouted. Helper → **Tier 4** (novel). Already delivered to Telegram idx=946. Journal-note only.
+- Watermark advanced to 947. No new DM needed (Larry has full picture from iter ~1864 DMs).
+
+**Check 1 — Log noise:** outbox-notifier.log: last activity 18:25:28Z Jun-14 (~7h ago, Forge reject notification for cleanup-branch-success-alert-info-translation-001). No new WARNs/ERRORs. inbox_watcher.log: last activity 00:26Z Jun-15 (beacon cleanup notify done, no errors). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message 18:21 MDT Jun-14 ('go' → approved cleanup-branch dispatch). No new messages or directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → 0 new alerts, 0 recovered, 2 suppressed (cooldown: PRs #509+#510). All 15 FORGE_NO_PR_SKIP entries expected. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: pending=[]. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heartbeat=`2026-06-15T01:40:57.690073+00:00`, age≈7 min. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** On main. Clean working tree. HEAD=561a23af == origin/main. 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-15T01:24:01Z, status=no-change, age≈24 min. Within 2h. ✅ Nominal.
+
+**Check C — Agent liveness:**
+- inbox_watcher: PID 2530123 ✅ (1d 6h 19m, Ssl)
+- chain_event_shipper: PID 2744551 ✅ (15h 7m, SNs)
+- beacon_telegram_bot: PID 2744840 ✅ (15h 7m, Ss)
+- outbox_notifier: PID 2744914 ✅ (15h 7m, Ss)
+- dashboard_api: PID 2868353 ✅ (7h 44m, Ssl, stable)
+- No forge/mirror persistent sessions — expected. ✅
+- [blue] PID 1834248: stale bash orphan (17d 6h 26m, Ss). [carry]
+- [blue] PID 2605007: stale bash orphan (21h 24m, Ss). [carry]
+
+**Check E — PRs:**
+ourliberty-agent-core:
+- **PR #497** OPEN (`fix(cleanup-branches): success-prune alert is info, not warning`), mergeStateStatus=**UNKNOWN**, mergeable=**UNKNOWN** (GitHub API flap). [yellow] carry — **141st** consecutive iter.
+- **PR #509** OPEN (`docs: meaning-layer + team-chat roadmap`), mergeStateStatus=**UNKNOWN**, mergeable=**UNKNOWN** — flap back from CLEAN at iter ~1864. [yellow] carry.
+- **PR #510** OPEN (`feat: wire the consult→restock build loop`), mergeStateStatus=**UNKNOWN**, mergeable=**UNKNOWN**. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**§5.0 conditional checks:** Sunday Jun-15 UTC. Check I already ran this cycle day (iter ~1718). **SKIP**. Check III last artifact 2026-06-11 (4 days old, <14d). **SKIP**.
+
+**Actions taken:**
+1. `alert_triage_state.py triage-alert` — line 945 (heal-pipeline-stall PR#510) → Tier 4 ✅
+2. `alert_triage_state.py triage-alert` — line 946 (pulse own escalation) → Tier 4 ✅
+3. `alert_triage_state.py triage-alert` — line 947 (medic PR#510 attempt 3) → Tier 4 ✅
+4. `alert_triage_state.py set-watermark --line 947` ✅
+5. Wrote dispatch envelope to Beacon inbox: `stall-detector-exclude-external-pr-001.json` ✅
+6. `cycle_prime_ledger.py append --tier 1 --kind intervention` (Tier-4 triage) ✅
+7. `cycle_prime_ledger.py append --tier 1 --kind systemic_fix` (G-rule dispatch) ✅
+8. `cycle_tier_state.py record --checks-clean false` → Tier 1 (signal, consecutive_clean=0) ✅
+
+**Dispatches:** Beacon — `stall-detector-exclude-external-pr-001` (direction-ask: spec + Forge fix to exclude externally-authored PRs from unrouted-pr stall alerts).
+
+**Patterns:**
+- G-rule stall-detector-docs-branch-overtrigger: Line 945 (PR#510 01:37:07Z) = 3rd distinct fire. **3/3 → DISPATCHED** to Beacon: propose exclude externally-authored PRs from unrouted-pr stall alert.
+- G-rule missions-autoregister-warn-vs-info: 0 new WARNs. **2/3**. Carry.
+- G-rule missions-card-gc-warn-vs-info: 0 new WARNs. **2/3**. Carry.
+- G-rule F24-empty-prompt-envelope-rejected: 0 new WARNs. **2/3**. Carry.
+- G-rule health-notify-script-missing: no new fire. **1/3**. Carry.
+- G-rule timer-cycle-no-journal-entry: **0/3**. Carry.
+- G-rule Forge-timeout-worktree-missing-retry-loop: **1/3**. Carry.
+- G-rule heal-stale-daemon-script_path-cosmetic: **1/3**. Carry.
+- G-rule Forge-preflight-marker-error-retry: same WARNs >24h old, no new fire. **1/3**. Carry.
+
+**Standing findings:**
+- [yellow] **PR #497 REVIEW_ESCALATE** — mergeState=UNKNOWN/UNKNOWN (141st iter; GitHub API flap). Close: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core`. [carry]
+- [yellow] **PRs #509 + #510 — unrouted to Mirror** — both UNKNOWN (GitHub flap); medic attempt 3 on both; [yellow] DM sent iter ~1864. Await Larry: `go:merge-509-510-direct` or `go:mirror-review-509-510`.
+- [yellow] **unreviewed-merge:499** — Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed'. [carry]
+- [yellow] **unreviewed-merge:494** — DM sent iter ~1694. [carry]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **cleanup-branch-success-alert-info-translation-001** — CLOSED (REJECTED by Forge, satisfied by PR #485). 5 residual baseline-red sources tracked under G-rules.
+- [blue] **G-rule stall-detector-docs-branch-overtrigger** — **DISPATCHED** to Beacon (stall-detector-exclude-external-pr-001). Awaiting Beacon spec + Forge build.
+- [blue] **G-rule health-notify-script-missing** — 1/3. Watch; dispatch at 3/3.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch; dispatch at 3/3.
+- [blue] **G-rule missions-card-gc-warn-vs-info** — 2/3. Watch; dispatch at 3/3.
+- [blue] **G-rule missions-autoregister-warn-vs-info** — 2/3. Watch; dispatch at 3/3.
+- [blue] **G-rule timer-cycle-no-journal-entry** — 0/3. Carry.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Carry.
+- [blue] **G-rule heal-stale-daemon-script_path-cosmetic** — 1/3. Carry.
+- [blue] **G-rule Forge-preflight-marker-error-retry** — 1/3. Carry.
+- [blue] **Check I medic-operator-scaffold-001** — 24.4σ; `/dispatch 1` if re-run needed. [carry]
+- [blue] **catalog-accuracy-drift** — 8/34 ourliberty-graph shelf cards. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — last occurrence 13:22:39Z Jun-14 (self-healed). [carry]
+- [blue] **dag-preflight-revision gap** — PR #484 closed source=pulse gap; DAG markers still fall through. [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+- [blue] **Stale bash orphans** — PID 1834248 (17d 6h 26m) + PID 2605007 (21h 24m). Ss, 0% CPU. [carry]
+- [blue] **dashboard_api PID 2868353** — Ssl, stable. [carry]
+
+**PRIME DIRECTIVE:** 2 actions this iter (1 intervention Tier-4 triage + 1 systemic_fix G-rule dispatch). ratio≈20.24, trend=flat.
+**Tier end-of-iter:** **Tier 1** (Tier-4 signal in Check 0; consecutive_clean=0).
+
+---
+
 ## Iteration ~1864 — 2026-06-15 01:40Z UTC (interactive, /cycle, Tier 2→1, signal)
 
 **Trigger:** Larry direct invocation (`/cycle`).
