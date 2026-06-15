@@ -244,6 +244,11 @@ _NO_FORGE_SESSION_RE = re.compile(
 ROUTING_EVENTS_LOG = AGENTS_ROOT / 'logs' / 'routing-events.jsonl'
 ROUTING_EVENTS_LOOKBACK_HOURS = 24 * 7  # PRs aren't routed faster than this
 PR_UNROUTED_MIN_AGE_MIN = 60            # don't race with in-flight auto-dispatch
+# Dashboard "+New mission" PRs (branch prefix below) are reconciled into
+# missions.json by heal_orphan_autoregister (it ingests the named mission and
+# closes the PR), NOT by a Mirror review — so an open one is not "unrouted" and
+# must not page here.
+NEWMISSION_BRANCH_PREFIX = 'feat/new-mission-'
 
 # Check 8 (claude-quota-tier2-fallback-wrapper, 2026-05-26). Scan per-agent
 # logs for TIER2_FALLBACK_UNAVAILABLE / TIER2_FALLBACK_FAILED /
@@ -1646,6 +1651,10 @@ def check_unrouted_open_prs(open_prs: list[dict],
     for pr in open_prs:
         branch = pr.get('headRefName', '')
         if not branch:
+            continue
+        if branch.startswith(NEWMISSION_BRANCH_PREFIX):
+            # Dashboard "+New mission" PR — reconciled into missions.json + closed
+            # by heal_orphan_autoregister, not Mirror-reviewed. Not "unrouted".
             continue
         created = _parse_ts(pr.get('createdAt', ''))
         if not created:

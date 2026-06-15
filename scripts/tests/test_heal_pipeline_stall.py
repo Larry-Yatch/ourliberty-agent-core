@@ -1509,6 +1509,16 @@ class TestCheckUnroutedOpenPrs(_TempAgentsRootMixin, unittest.TestCase):
         self.assertIn('PR #500', alerts[0]['message'])
         self.assertIn('routing-events.jsonl', alerts[0]['message'])
 
+    def test_silent_for_new_mission_pr(self):
+        # Dashboard "+New mission" PRs are reconciled into missions.json + closed
+        # by heal_orphan_autoregister, not Mirror-reviewed — so they must NOT page
+        # here even with no routing event and well past the min age.
+        prs = [self._make_pr(
+            513, 'feat/new-mission-pulse-check-ix-alert-ignored-2026-06-15',
+            age_min=600)]
+        alerts = self.hps.check_unrouted_open_prs(prs, [], {})
+        self.assertEqual(alerts, [])
+
     def test_silent_when_routing_event_matches_task_id(self):
         prs = [self._make_pr(501, 'forge/routed-task-001', age_min=180)]
         events = [{
