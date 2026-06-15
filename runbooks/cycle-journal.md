@@ -138966,3 +138966,92 @@ No clean+green PRs awaiting auto-merge. ✅ Nominal.
 
 **PRIME DIRECTIVE:** 1 row this iter (intervention: alert-triage-tier4, PR#509 unrouted-pr line=1016). Trailing-30d (script-authoritative): interventions=973, systemic_fixes=47, ratio=20.70, trend=flat.
 **Tier end-of-iter:** Tier 1, consecutive_clean=0 (Tier-4 alert; Tier 2→1 reset).
+
+---
+
+## Iteration ~1962 — 2026-06-15 16:39Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Signal (L1017 medic-diagnosis Tier-4; DM delivered by medic via chat_id — no Pulse action required).
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): Confirmed still open via `gh pr list`. UNKNOWN mergeable, reviewDecision=''. Age ≈ 36.6h. 72h expires ~Jun-17T04:02Z (~35.4h remaining). **CARRY** [yellow].
+- PRs #509/#510/#512/#513: heal_pipeline_stall.py --dry-run → 0 new alerts, 4 suppressed (cooldowns active). **CARRY** [yellow].
+- beacon-pending-approvals.json: pending=4 (unreg-approval-482eb78951ee + alert-translation-unrouted-pr-001 + medic-diagnosis-tier3-silence-001 + autoregister-warn-demote-001). No change. **CARRY** [yellow].
+
+**Check 0 — Alert triage:** Watermark=1016 (entering); file=1017 lines. **1 new alert (L1017):**
+- L1017: `source=medic, kind=notification, intent=medic-diagnosis` (ts=16:28:36Z) — Medic PR#509 diagnosis, attempt 17, chat_id=7998341473. → **Tier-4** per helper (novel; no registry template; `medic-diagnosis-tier3-silence-001` still pending Larry approval). DM already delivered directly by medic via chat_id. No second DM from Pulse. G-rule medic-diagnosis-tier4 already DISPATCHED iter ~1955.
+Watermark: 1016 → 1017. Tier-4 signal → tier reset (consecutive_clean stays 0).
+
+**Check 1 — Log noise:** outbox-notifier: 0 WARNs in tail-30 (last WARN still 01:10:53Z Jun-15, G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3 unchanged). inbox-watcher: no WARNs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot log: 409 burst OLD (07:44 MDT Jun-15), G-rule telegram-409-burst 2/3 unchanged. No new 409s. Larry message at 10:33:36 MDT: "Why do we have 80 messages over the night?" — **already answered by bot at 10:37:31 MDT** ("no overnight flood, nothing's wrong"). Handled prior to this iter. No unhandled Larry directives. PID 2744840 alive (Ss). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → 0 new alerts fired, 4 suppressed (PRs #509/#510/#512/#513 cooldowns active). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: pending=4 (unchanged):
+- unreg-approval-482eb78951ee (carry)
+- alert-translation-unrouted-pr-001 (carry)
+- medic-diagnosis-tier3-silence-001 (carry — will silence L1017-class alerts once Larry approves)
+- autoregister-warn-demote-001 (carry)
+[yellow] carry, no change.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T16:15:55.291631+00:00`, age≈23 min. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=9a3e9e0a = origin/main. Clean tree. On main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-15T16:25:16Z (≈14 min ago). FRESH (<2h). ✅ Nominal.
+
+**Check C — Agent liveness:**
+- inbox_watcher: PID 2530123 ✅ (Ssl)
+- chain_event_shipper: PID 2744551 ✅ (SNs)
+- beacon_telegram_bot: PID 2744840 ✅ (Ss)
+- outbox_notifier: PID 2744914 ✅ (Ss)
+- dashboard_api: PID 2868353 ✅ (Ssl)
+- No forge/mirror persistent sessions — expected. ✅
+
+**Check E — PRs:**
+ourliberty-agent-core (5 open, unchanged):
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): UNKNOWN mergeable, reviewDecision=''. Mirror REVIEW_ESCALATE 04:02:56Z Jun-14. Age ≈ 36.6h. 72h expires ~Jun-17T04:02Z (~35.4h remaining). [yellow] carry.
+- **PR #509** (`docs/meaning-layer-roadmap`), cooldown active. [yellow] carry.
+- **PR #510** (`work/build-consult-restock`), cooldown active. [yellow] carry.
+- **PR #512** (`feat/new-mission-pulse-check-ix-catch-me-up-gap-2026-06-15`), cooldown active. [yellow] carry.
+- **PR #513** (`feat/new-mission-pulse-check-ix-alert-ignored-2026-06-15`), cooldown active. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Conditional checks:** Check I sentinel `check-i-2026-06-15.json` EXISTS (fired iter ~1899). Today Mon (UTC weekday=0) — gate fires Mon/Wed/Fri/Sun but sentinel blocks same-day re-fire. Skip. Check III: not Sunday. Skip. ✅
+
+**Actions taken:**
+1. `alert_triage_state.py triage-alert` L1017 → Tier-4 ✅
+2. `alert_triage_state.py set-watermark --line 1017` ✅ (1016 → 1017)
+3. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` ✅ (ts=16:38:32Z)
+4. `cycle_tier_state.py record --checks-clean false` → Tier 1, consecutive_clean=0 (unchanged) ✅
+
+**Dispatches:** None.
+
+**G-rule updates this iter:** No changes. All counters unchanged from iter ~1961.
+
+**Standing findings (carried from iter ~1961):**
+- [yellow] **PR #497 REVIEW_ESCALATE** — Mirror REVIEW_ESCALATE 04:02:56Z Jun-14; age ≈ 36.6h; 72h expires ~Jun-17T04:02Z (~35.4h remaining). [carry]
+- [yellow] **PRs #509/510/512/513 pipeline-stall** — cooldowns active; 0 new alerts this iter. Awaiting `approve alert-translation-unrouted-pr-001`.
+- [yellow] **autoregister-warn-demote-001** — Beacon plan ready. Option A (approve: suppress digest row in heal_orphan_autoregister.py, 1-file) vs Option B (reject: add INFO tier to larry_alerts.py, multi-file). Reply "approve" or "reject: use Option B".
+- [yellow] **alert-translation-unrouted-pr-001** — pending. Reply "approve" to trigger Forge config-only PR.
+- [yellow] **medic-diagnosis-tier3-silence-001** — pending. Reply "approve" to trigger Forge config-only PR (will silence L1017-class medic alerts at Pulse triage).
+- [yellow] **unreg-approval-482eb78951ee** — pending (merge-509-510-direct vs mirror-review-509-510). [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **unreviewed-merge:511/499/494/489** — [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3** (no new occurrence this iter). [watch → dispatch at 3/3]
+- [blue] **G-rule missions-autoregister-warn-vs-info** — DISPATCHED iter ~1957; autoregister-warn-demote-001 plan ready. Awaiting Larry approve/reject.
+- [blue] **G-rule medic-diagnosis-tier4** — DISPATCHED iter ~1955; medic-diagnosis-tier3-silence-001 pending Larry approval → Forge PR.
+- [blue] **catalog-accuracy-drift** — G-rule 1/3. route=digest. [carry]
+- [blue] **Check I 2026-06-15** — sentinel exists (fired iter ~1899). 1 proposal dispatched to Beacon. [carry]
+- [blue] **Check IX missions** — PRs #512 + #513 open. [carry]
+- [blue] G-rule counters: Forge-preflight-marker-error-retry 2/3, missions-card-gc-warn-vs-info 2/3, F24-empty-prompt-envelope-rejected 2/3, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST 1/3, telegram-409-burst **2/3**, missions-autoregister-warn-vs-info **DISPATCHED**, medic-diagnosis-tier4 **DISPATCHED**.
+- [blue] **Stale bash orphans** — PIDs 1834248 (17d+, Ss) + 2605007 (1d+, Ss). Low CPU. [carry]
+
+**PRIME DIRECTIVE:** iter_clean. Trailing-30d (script-authoritative): interventions=973, systemic_fixes=47, ratio=20.72, trend=improving.
+**Tier end-of-iter:** **Tier 1, consecutive_clean=0** (Tier-4 signal; no consecutive clean increment).
