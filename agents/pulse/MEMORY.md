@@ -126,7 +126,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 20:24Z UTC (Iter ~1982, Tier 1, consecutive_clean=0, PR #525 MERGED ✅, PR #522 CONFLICTING)
+## Status snapshot — updated 2026-06-15 20:29Z UTC (Iter ~1983, Tier 1, consecutive_clean=1, all checks nominal)
+
+**Iter ~1983 summary:** ✅ Nominal. 0 new alerts. All checks clean. Repo at 262048c7=origin/main. Watermark: 1046 (unchanged). pending=0. 2 open PRs: #522 (CONFLICTING, Forge rebase needed), #497 (72h deadline Jun-17T04:02Z ~31.6h). PRIME ratio=20.04. Tier 1, consecutive_clean=1.
 
 **Iter ~1982 summary:** ⚠️ Signal. L1046 Tier-4 (missions-card-gc/summary — novel, no registry template; bot handled route=digest, DM skipped; no Pulse DM). G-rule missions-card-gc-warn-vs-info already 3/3 dispatched, PR #522 still blocking. Check A: repo behind 1 commit (PR #525 merge `1bebe776`); fast-forward executed. PR #525 (`forge/p41-rebrief-on-change`) MERGED ✅ 20:21:50Z — SEQUENCE_STEP_MERGED missions-v2-phase4.1. Watermark: 1045→1046. 2 open PRs: #522 (CONFLICTING, needs Forge rebase), #497 (72h deadline Jun-17T04:05Z ~31.7h). PRIME ratio=20.04. Tier 1, consecutive_clean=0.
 
