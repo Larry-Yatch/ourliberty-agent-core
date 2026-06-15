@@ -143,13 +143,47 @@ class NeedsBriefingTest(unittest.TestCase):
     def test_unbriefed_parked_needs_briefing(self):
         self.assertTrue(mn.needs_briefing(_capture()))
 
-    def test_non_parked_never_needs_briefing(self):
-        self.assertFalse(mn.needs_briefing(_capture(state='promoted')))
+    def test_promote_restamps_stale_briefing(self):
+        # A capture briefed while parked, then promoted: its provenance still
+        # reads from_state='parked' but state is now 'promoted' ⇒ re-author so
+        # the meaning layer matches the new state (§ 4). This is the behavior the
+        # parked-only gate used to suppress.
+        cap = _capture(
+            state='promoted',
+            briefing={'what': 'x', 'why': 'y', 'suggest': 'z'},
+            briefing_provenance={'by': 'beacon', 'from_state': 'parked'})
+        self.assertTrue(mn.needs_briefing(cap))
+
+    def test_drop_restamps_stale_briefing(self):
+        cap = _capture(
+            state='dropped',
+            briefing={'what': 'x', 'why': 'y', 'suggest': 'z'},
+            briefing_provenance={'by': 'beacon', 'from_state': 'parked'})
+        self.assertTrue(mn.needs_briefing(cap))
 
     def test_briefed_for_current_state_is_idempotent(self):
         cap = _capture(
             briefing={'what': 'x', 'why': 'y', 'suggest': 'z'},
             briefing_provenance={'by': 'beacon', 'from_state': 'parked'})
+        self.assertFalse(mn.needs_briefing(cap))
+
+    def test_promoted_and_briefed_for_current_state_is_idempotent(self):
+        # Once re-authored after a promote, provenance reads from_state=
+        # 'promoted'; a re-sweep is a no-op (idempotent on unchanged cards).
+        cap = _capture(
+            state='promoted',
+            briefing={'what': 'x', 'why': 'y', 'suggest': 'z'},
+            briefing_provenance={'by': 'beacon', 'from_state': 'promoted'})
+        self.assertFalse(mn.needs_briefing(cap))
+
+    def test_snooze_keeps_state_parked_so_no_rebrief(self):
+        # Snooze only sets snoozed_until; state stays 'parked', so a card already
+        # briefed for 'parked' is NOT re-authored by a snooze (its meaning is
+        # unchanged — only resurfacing is deferred).
+        cap = _capture(
+            briefing={'what': 'x', 'why': 'y', 'suggest': 'z'},
+            briefing_provenance={'by': 'beacon', 'from_state': 'parked'},
+            snoozed_until='2026-07-01T00:00:00+00:00')
         self.assertFalse(mn.needs_briefing(cap))
 
     def test_state_change_invalidates_briefing(self):
@@ -172,12 +206,15 @@ class RunSweepTest(unittest.TestCase):
         path.write_text(json.dumps({'schema_version': 1, 'captures': captures}))
         return path
 
-    def test_briefs_only_unbriefed_parked_and_writes_disk(self):
+    def test_briefs_stale_and_writes_disk(self):
         path = self._write_registry([
             _capture(id='needs-it'),
             _capture(id='already', briefing={'what': 'a', 'why': 'b', 'suggest': 'c'},
                      briefing_provenance={'by': 'beacon', 'from_state': 'parked'}),
-            _capture(id='not-parked', state='promoted'),
+            # promoted AND already briefed for its current state ⇒ a valid skip.
+            _capture(id='promoted-current', state='promoted',
+                     briefing={'what': 'p', 'why': 'q', 'suggest': 'r'},
+                     briefing_provenance={'by': 'beacon', 'from_state': 'promoted'}),
         ])
         n = mn.run(now=NOW, use_llm=False, policy=_POLICY_ASK, captures_file=path)
         self.assertEqual(n, 1)
@@ -187,10 +224,27 @@ class RunSweepTest(unittest.TestCase):
         self.assertEqual(set(by_id['needs-it']['briefing']),
                          {'what', 'why', 'suggest'})
         self.assertEqual(by_id['needs-it']['risk'], 'medium')
-        # the already-briefed and non-parked captures are untouched
+        # captures already briefed for their CURRENT state are untouched
         self.assertEqual(by_id['already']['briefing'],
                          {'what': 'a', 'why': 'b', 'suggest': 'c'})
-        self.assertNotIn('briefing', by_id['not-parked'])
+        self.assertEqual(by_id['promoted-current']['briefing'],
+                         {'what': 'p', 'why': 'q', 'suggest': 'r'})
+
+    def test_rebriefs_capture_after_state_change(self):
+        # A capture briefed while parked, then promoted by an endpoint, is stale
+        # (state != from_state); the sweep re-authors it and restamps from_state.
+        path = self._write_registry([
+            _capture(id='promoted-stale', state='promoted',
+                     briefing={'what': 'old', 'why': 'old', 'suggest': 'old'},
+                     briefing_provenance={'by': 'beacon', 'from_state': 'parked'}),
+        ])
+        n = mn.run(now=NOW, use_llm=False, policy=_POLICY_ASK, captures_file=path)
+        self.assertEqual(n, 1)
+        cap = json.loads(path.read_text())['captures'][0]
+        self.assertEqual(cap['briefing_provenance']['from_state'], 'promoted')
+        # a second sweep is a no-op now that provenance matches the state.
+        n2 = mn.run(now=NOW, use_llm=False, policy=_POLICY_ASK, captures_file=path)
+        self.assertEqual(n2, 0)
 
     def test_dry_run_does_not_write(self):
         path = self._write_registry([_capture(id='x')])
@@ -328,7 +382,10 @@ class AuthorCapturesInRegistryTest(unittest.TestCase):
             _capture(id='a'),
             _capture(id='b', briefing={'what': 'x', 'why': 'y', 'suggest': 'z'},
                      briefing_provenance={'by': 'beacon', 'from_state': 'parked'}),
-            _capture(id='c', state='promoted'),
+            # promoted AND already briefed for its current state ⇒ a valid skip.
+            _capture(id='c', state='promoted',
+                     briefing={'what': 'p', 'why': 'q', 'suggest': 'r'},
+                     briefing_provenance={'by': 'beacon', 'from_state': 'promoted'}),
         )
         briefed, deferred = mn.author_captures_in_registry(
             reg, now=NOW, use_llm=False, policy=_POLICY_ASK)
@@ -336,10 +393,11 @@ class AuthorCapturesInRegistryTest(unittest.TestCase):
         by_id = {c['id']: c for c in reg['captures']}
         self.assertEqual(by_id['a']['risk'], 'medium')
         self.assertEqual(set(by_id['a']['briefing']), {'what', 'why', 'suggest'})
-        # already-briefed + non-parked untouched
+        # captures already briefed for their current state are untouched
         self.assertEqual(by_id['b']['briefing'],
                          {'what': 'x', 'why': 'y', 'suggest': 'z'})
-        self.assertNotIn('briefing', by_id['c'])
+        self.assertEqual(by_id['c']['briefing'],
+                         {'what': 'p', 'why': 'q', 'suggest': 'r'})
 
     def test_respects_max_per_tick_and_defers_rest(self):
         reg = self._reg(*[_capture(id=f'c{i}') for i in range(5)])

@@ -416,13 +416,18 @@ def author_meaning_layer(
 
 
 def needs_briefing(capture: dict[str, Any]) -> bool:
-    """True if a parked capture needs (re)briefing — missing briefing, or its
-    provenance was stamped from a different state than the capture's current one
-    (§ 4: fields regenerate when state/context changes). Idempotent: a capture
-    already briefed for its current state returns False, so the periodic sweep
-    and the event-driven path converge."""
-    if capture.get('state') != 'parked':
-        return False
+    """True if a capture needs (re)briefing — missing briefing, or its provenance
+    was stamped from a different state than the capture's current one (§ 4: fields
+    regenerate when state/context changes). The state comparison is what makes a
+    promote/drop re-author: those endpoints change the capture's state, so the
+    next folded sweep sees state != briefing_provenance.from_state and rewrites the
+    meaning layer to match the new state. Idempotent: a capture already briefed for
+    its current state returns False, so the periodic sweep and the event-driven
+    path converge and an unchanged card is never re-authored.
+
+    (Snooze keeps state == 'parked' — it only defers resurfacing via
+    `snoozed_until` — so it is intentionally NOT a re-brief trigger here: the
+    card's meaning is unchanged by a snooze.)"""
     if not isinstance(capture.get('briefing'), dict):
         return True
     provenance = capture.get('briefing_provenance')
