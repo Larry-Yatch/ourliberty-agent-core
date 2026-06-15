@@ -108,9 +108,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 09:27Z UTC (Iter ~1918, Tier 1)
+## Status snapshot — updated 2026-06-15 09:43Z UTC (Iter ~1920, Tier 1)
 
-**Iter ~1918 summary:** ✅ Nominal. **Tier 1, consecutive_clean=0**. All checks clean except Check 4 carry (pending=1). 0 new interventions. ratio≈20.80 (957/46). All agent PIDs healthy. Watermark=989 (no change). Sync fresh (last_sync=09:24:17Z). Bot log last entry idx=988 at 03:12:32Z (no new directives from Larry). 5 open PRs: #497 (REVIEW_ESCALATE carry, 29.4h, under 72h), #509/#510/#512/#513 (cooldowns active).
+**Iter ~1920 summary:** ✅ Nominal. **Tier 1, consecutive_clean=0**. All checks clean except Check 4 carry (pending=1). 0 new interventions. ratio≈20.80 (957/46). All agent PIDs healthy. Watermark=989 (no change). Sync fresh (last_sync=09:24:17Z). Bot log last entry idx=988 at 03:12:32Z (no new directives from Larry). 5 open PRs: #497 (REVIEW_ESCALATE carry, 29.6h, under 72h — expires Jun-17T04:05Z), #509/#510/#512/#513 (cooldowns active).
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl for this script. When cooldown expires, the alert fires even in dry-run mode. Be aware: calling --dry-run in a cycle will generate real alerts if the cooldown has passed.
 
