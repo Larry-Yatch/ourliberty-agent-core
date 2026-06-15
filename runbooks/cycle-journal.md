@@ -4,6 +4,91 @@
 
 ---
 
+## Iteration ~1969 — 2026-06-15 17:48Z UTC (interactive, /cycle, Tier 2, all nominal, G-rules medic+unrouted-pr COMPLETE, consecutive_clean=1)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. All 6 mandatory checks + additive checks clean. 4 new alerts, all Tier-3 silenced (no tier-reset per § 3.0 carve-out). No new Larry directives. **Two G-rules closed this iter.** Tier 2, consecutive_clean=1.
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): Confirmed open (gh pr list). UNKNOWN mergeable, reviewDecision=''. Mirror REVIEW_ESCALATE Jun-14T04:05Z. Age≈39.3h. 72h deadline Jun-17T04:05Z → **~30.3h remaining**. **CARRY** [yellow].
+- PRs #512/#513: Confirmed open. heal_pipeline_stall.py --dry-run → 2 new alerts fired (PR#513, PR#512 cooldowns expired). Both triaged Tier-3 silenced (PR #516 translation working). ✅
+- beacon-pending-approvals.json: **pending=0** (unchanged). ✅
+- All 5 daemons: PIDs 2530123 (Ssl), 2744551 (SNs), 2744840 (Ss), 2744914 (Ss), 2868353 (Ssl) — all alive. ✅
+- PR #515: **MERGED** at 17:27:41Z (outbox-notifier review-pass L1030). G-rule `medic-diagnosis-tier4` → **COMPLETE ✅**
+- PR #516: **MERGED** at 17:27:36Z (outbox-notifier review-pass L1029). G-rule `g-rule-healer-unrouted-pr-tier3-translation-001` → **COMPLETE ✅**
+- Repo HEAD: `5d10b36d` = origin/main (includes both merges). Clean tree. ✅
+- 409 burst: last occurrence still 07:44:56 MDT Jun-15 (13:44:56Z, unchanged). G-rule 2/3 unchanged. **CARRY** [yellow].
+
+**Check 0 — Alert triage:** Watermark=1028 (entering); file=1032 lines (4 new). **4 new alerts (L1029-L1032):**
+- L1029: `source=outbox-notifier, intent=review-pass` (PR #516 auto-merged, ts=17:27:36Z) → **Tier-3 (silenced)** per helper. No DM.
+- L1030: `source=outbox-notifier, intent=review-pass` (PR #515 auto-merged, ts=17:27:41Z) → **Tier-3 (silenced)** per helper. No DM.
+- L1031: `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#513` (ts=17:46:06Z, fired by --dry-run cooldown expiry) → **Tier-3 (silenced)** per helper (PR #516 translation active). First live verification of G-rule fix. ✅
+- L1032: `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#512` (ts=17:46:06Z) → **Tier-3 (silenced)** per helper. ✅
+Watermark: 1028 → 1032. ✅ No tier-reset (all Tier-3 silence per § 3.0 carve-out).
+
+**Check 1 — Log noise:** outbox-notifier: 1 WARN in log (01:10:53Z Jun-15 auto-dispatch task_id mismatch — G-rule 1/3, unchanged from prior iters). inbox-watcher: no WARNs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message: 10:45:21 MDT "Route to mirror on both" (processed iter ~1964, no change). No new messages since. 409 burst: last 07:44:56 MDT (unchanged). G-rule telegram-409-burst 2/3 unchanged. PID 2744840 alive (Ss). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → 2 new alerts fired (PR#513, PR#512 cooldowns expired) — both triaged Tier-3 by alert triage helper. heal-stale-daemon-code heartbeat=2026-06-15T17:46:02Z, age≈2.8 min. FRESH. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0**. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T17:46:02.181806+00:00`, age≈2.8 min at check time. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=5d10b36d = origin/main (includes PRs #515+#516 merges). Clean tree, on main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-15T17:25:16Z, age≈23 min. status=no-change. FRESH (<2h). ✅ Nominal.
+
+**Check C — Agent liveness:** All 5 PIDs alive (2530123 Ssl, 2744551 SNs, 2744840 Ss, 2744914 Ss, 2868353 Ssl). ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (3 open — down from 5; PRs #515+#516 merged):
+- **PR #513** (`feat/new-mission-pulse-check-ix-alert-ignored-2026-06-15`): UNKNOWN mergeable, reviewDecision=''. Healer fired cooldown-expired alert (L1031) — Tier-3 silenced (unrouted, no Mirror dispatch). [yellow] carry.
+- **PR #512** (`feat/new-mission-pulse-check-ix-catch-me-up-gap-2026-06-15`): UNKNOWN mergeable, reviewDecision=''. Healer fired cooldown-expired alert (L1032) — Tier-3 silenced. [yellow] carry.
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): UNKNOWN mergeable, reviewDecision=''. Mirror REVIEW_ESCALATE Jun-14T04:05Z. Age≈39.3h, ~30.3h until 72h deadline Jun-17T04:05Z. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Conditional checks (Monday 2026-06-15):** Check I: sentinel `check-i-2026-06-15.json` EXISTS, same-day re-fire blocked. Skip. Check VIII: sentinel EXISTS. Skip. Check IX: sentinel EXISTS. Skip. Check X: sentinel EXISTS. Skip.
+
+**Actions taken:**
+1. `alert_triage_state.py triage-alert` L1029-L1032 → all Tier-3 silenced ✅
+2. `alert_triage_state.py set-watermark --line 1032` ✅ (1028 → 1032)
+3. `cycle_prime_ledger.py append --tier 2 --kind iter_clean` ✅
+4. `cycle_tier_state.py record --checks-clean true` → Tier 2, consecutive_clean=1 ✅
+
+**Dispatches:** None.
+
+**G-rule updates this iter:**
+- `g-rule-healer-unrouted-pr-tier3-translation-001`: **COMPLETE ✅** (PR #516 merged 17:27:36Z; L1031+L1032 first live verification Tier-3 silenced — fix confirmed end-to-end)
+- `g-rule-medic-diagnosis-tier4`: **COMPLETE ✅** (PR #515 merged 17:27:41Z — config-only, medic medic-diagnosis now Tier-3/digest route)
+- All other G-rule counters unchanged.
+
+**Standing findings (updated from iter ~1968):**
+- [yellow] **PR #497 REVIEW_ESCALATE** — Mirror REVIEW_ESCALATE Jun-14T04:05Z; age≈39.3h; ~30.3h until 72h deadline Jun-17T04:05Z. Escalate if still open at deadline.
+- [yellow] **PRs #512/#513 pipeline-stall** — healer cooldowns expired; alerts now Tier-3 silenced (PR #516 fix). PRs remain unrouted to Mirror; Larry routing decision needed. [carry]
+- [yellow] **unreviewed-merge:511/499/494/489/510/509** — bot-delivered, Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. FN=3027, TP=5. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. Last: 07:44:56 MDT Jun-15. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] **G-rule medic-diagnosis-tier4** — **COMPLETE ✅** PR #515 merged.
+- [blue] **G-rule healer-unrouted-pr-tier3-translation** — **COMPLETE ✅** PR #516 merged, verified.
+- [blue] **G-rule missions-autoregister-warn-vs-info** — **COMPLETE ✅** PR #514 merged.
+- [blue] **catalog-accuracy-drift** — G-rule 1/3. route=digest. [carry]
+- [blue] **Check I 2026-06-15** — sentinel exists. [carry]
+- [blue] **Check IX missions** — PRs #512 + #513 open, unrouted. [carry]
+- [blue] G-rule counters: Forge-preflight-marker-error-retry 2/3, missions-card-gc-warn-vs-info 2/3, F24-empty-prompt-envelope-rejected 2/3, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST 1/3, telegram-409-burst **2/3**, telegram-approval-self-dispatch-denied **1/3**.
+- [blue] **Stale bash orphans** — PIDs 1834248 (17d+) + 2605007 (1d+). Low CPU. [carry]
+
+**PRIME DIRECTIVE:** iter_clean (no intervention). Ledger appended (Tier 2). ratio improving.
+**Tier end-of-iter:** **Tier 2, consecutive_clean=1** (need 2 more clean iters to de-escalate to Tier 3).
+
+---
+
 ## Iteration ~1968 — 2026-06-15 17:28Z UTC (interactive, /cycle, Tier 1→2 de-escalation, all nominal, consecutive_clean=3)
 
 **Trigger:** Larry direct invocation (`/cycle`).

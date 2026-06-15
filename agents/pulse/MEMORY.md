@@ -96,9 +96,9 @@
 
 ---
 
-## medic-diagnosis-tier4 G-rule DISPATCHED (iter ~1955)
+## medic-diagnosis-tier4 G-rule COMPLETE ✅ (iter ~1955 dispatch, iter ~1969 verified)
 
-**Rule:** `source=medic, intent=medic-diagnosis` alerts classify Tier-4 consistently (no registry template). Medic DMs directly via `chat_id` — no second DM from Pulse warranted. **G-rule 3/3 → DISPATCHED** iter ~1955: `g-rule-medic-diagnosis-tier3-translation-001` sent to Beacon inbox — direction-ask to add Tier-3 silence in `config/alert-translations.json`. Watch for Beacon spec + Forge config-only PR.
+**Rule:** `source=medic, intent=medic-diagnosis` alerts now classify Tier-3 (silenced, route=digest) per translation in `config/alert-translations.json`. PR #515 (`forge/medic-diagnosis-tier3-silence-001`) merged 2026-06-15T17:27:41Z. **G-rule COMPLETE.** No DM from Pulse warranted — medic already DMs directly via chat_id.
 
 ---
 
@@ -114,9 +114,9 @@
 
 ---
 
-## heal-pipeline-stall:unrouted-pr Tier-4 repeat pattern (observed iter ~1922, DISPATCHED iter ~1930)
+## heal-pipeline-stall:unrouted-pr Tier-4 → COMPLETE ✅ (iter ~1930 dispatch, iter ~1969 verified)
 
-**Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#N` alerts consistently classify as Tier-4 (no registry template, no translation match) in the triage helper. The healer cycles through cooldowns and fires repeatedly for the same PR. Bot fallback delivery already DMs Larry; a second DM from Pulse is noise. Do NOT send repeat DM if the bot already delivered the prior iteration of the same alert. **G-rule count: 3/3 → DISPATCHED** iter ~1930: `g-rule-healer-unrouted-pr-tier3-translation-001` sent to Beacon inbox — direction-ask to add Tier-3 translation for `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:*` in `config/alert-translations.json`. Watch for Beacon spec + Forge config-only PR.
+**Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#N` alerts now classify Tier-3 (silenced per longest-prefix match) via translation in `config/alert-translations.json`. PR #516 (`forge/alert-translation-unrouted-pr-001`) merged 2026-06-15T17:27:36Z. First live verification: L1031+L1032 (PRs #513/#512) triaged Tier-3 by helper in iter ~1969. **G-rule COMPLETE.** Bot still DMs Larry for unrouted PRs — Pulse no longer double-DMs.
 
 ---
 
@@ -126,21 +126,17 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 17:28Z UTC (Iter ~1968, Tier 2, consecutive_clean=0)
+## Status snapshot — updated 2026-06-15 17:48Z UTC (Iter ~1969, Tier 2, consecutive_clean=1)
+
+**Iter ~1969 summary:** ✅ Nominal. 4 new alerts, all Tier-3 silenced (L1029-1032). Watermark: 1028→1032. pending=0. Tier 2, consecutive_clean=1. Daemons all alive. **G-rule medic-diagnosis-tier4: COMPLETE ✅** (PR #515 merged). **G-rule healer-unrouted-pr-tier3-translation: COMPLETE ✅** (PR #516 merged, L1031+L1032 verified Tier-3). 3 open PRs: #497 (age≈39.3h, deadline Jun-17T04:05Z ~30.3h), #512, #513.
 
 **Iter ~1968 summary:** ✅ Nominal. 0 new alerts. 0 directives. Watermark: 1028 (unchanged). pending=0. **Tier 1 → Tier 2 PROMOTED** (consecutive_clean=3). Daemons all alive. No new G-rule advances. PR #516 awaiting Mirror review. PR #515 Mirror PASS, auto-merge held behind #516. PR #497 REVIEW_ESCALATE age≈39h (deadline Jun-17T04:05Z, ~34.6h remaining).
 
-**Iter ~1967 summary:** ✅ Nominal. L1028 Tier-3 silenced (review-pass PR #515). PR #515 Mirror PASS received — auto-merge HELD behind PR #516 (config/alert-translations.json overlap; system retries automatically when #516 merges). 0 new directives. Watermark: 1027→1028. pending=0. Tier 1, consecutive_clean=2. Daemons all alive. No new G-rule advances. PR #497 REVIEW_ESCALATE age=37.3h (deadline Jun-17T04:05Z).
+**Iter ~1967 summary:** ✅ Nominal. L1028 Tier-3 silenced (review-pass PR #515). PR #515 Mirror PASS received — auto-merge HELD behind PR #516. 0 new directives. Watermark: 1027→1028. pending=0. Tier 1, consecutive_clean=2.
 
-**Iter ~1966 summary:** ✅ Nominal. All checks clean. 0 new alerts. No new directives. Watermark: 1027 (unchanged). pending=0. Tier 1, consecutive_clean=1. Daemons all alive. No new G-rule advances. PR #516 (alert-translation-unrouted-pr-001) in Mirror review; PR #515 (medic-diagnosis) in Mirror review; PR #497 REVIEW_ESCALATE age=37.1h (deadline Jun-17T04:05Z).
+**Iter ~1966 summary:** ✅ Nominal. 0 new alerts. Watermark: 1027 (unchanged). pending=0. Tier 1, consecutive_clean=1. PR #516 (unrouted-pr Tier-3 translation) + PR #515 (medic-diagnosis Tier-3 silence) in Mirror review. PR #497 REVIEW_ESCALATE age=37.1h.
 
-**Iter ~1965 summary:** ⚠️ Check 0: L1026-1027 new (unreviewed-merge:510+509, Tier-4, bot-delivered, no Pulse DM). Check E: PR #516 new (alert-translation-unrouted-pr-001, awaiting Mirror). All other checks nominal. Watermark: 1025→1027. pending=0. Tier 1, consecutive_clean=0. Daemons: beacon:2744840, chain-event-shipper:2744551, outbox-notifier:2744914, dashboard-api:2868353, inbox-watcher:2530123. PRIME ratio=20.77 (improving).
-
-**Iter ~1964 summary (prior):** ⚠️ Check A always-fix: repo behind origin/main → fast-forward to 9e0182ea (PRs #514 #509 #510 merged). L1025: review-pass for PR #514 Tier-3 silenced. Watermark: 1024→1025. pending=0 (all 4 cleared). PRs #509+#510 auto-merged after Larry's "Route to mirror" directive. PR #515 new (medic-diagnosis-tier3-silence-001, awaiting Mirror review). Tier 1, consecutive_clean=0.
-
-**Iter ~1963 summary (prior-2):** ⚠️ 7 new alerts (L1018-L1024). L1018-1020: pipeline-stall PRs #510/512/513 Tier-4, bot delivered. L1021: missions-autoregister Tier-3 silenced. L1022-1024: medic-diagnosis Tier-4, chat_id delivered. Watermark: 1017→1024. Check 2: Larry "Go" at 10:41MDT → dispatch FAILED for autoregister-warn-demote-001 (self-dispatch denied beacon→beacon). G-rule telegram-approval-self-dispatch-denied **1/3 NEW**. Tier 1, consecutive_clean=0.
-
-**Iter ~1960 summary (prior-2):** ✅ Nominal. All checks clean. 0 new alerts. Tier 1 → Tier 2 de-escalation (consecutive_clean 2→3).
+**Iter ~1965 summary:** ⚠️ Check 0: L1026-1027 (unreviewed-merge:510+509, Tier-4, bot-delivered). Check E: PR #516 new. Watermark: 1025→1027. Tier 1, consecutive_clean=0. Daemons: beacon:2744840, chain-event-shipper:2744551, outbox-notifier:2744914, dashboard-api:2868353, inbox-watcher:2530123. PRIME ratio=20.77.
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl. When cooldown expires, the alert fires in dry-run mode. Be aware: calling --dry-run in a cycle will write real alerts if the cooldown has passed. Always check wc -l of the file before and after.
 
@@ -156,14 +152,12 @@
 
 ---
 
-## Key standing items (as of iter ~1965)
+## Key standing items (as of iter ~1969)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #516 | [yellow] `forge/alert-translation-unrouted-pr-001` — config PR for unrouted-pr Tier-3 translation. Awaiting Mirror review (~24 min old iter ~1968). | Watch; should auto-merge on Mirror PASS → unblocks #515 auto-merge |
-| PR #515 | [blue] `forge/medic-diagnosis-tier3-silence-001` — **Mirror PASS received** (L1028, iter ~1967). Auto-merge HELD behind #516 (overlap: config/alert-translations.json). Will retry when #516 merges. | Watch for merge outcome; may need Forge rebase if conflict |
-| PR #497 REVIEW_ESCALATE | [yellow] UNKNOWN mergeable; reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ~38h; 72h expires ~Jun-17T04:05Z (~34h remaining). | Escalate if still open at Jun-17T04:05Z |
-| PRs #512/#513 pipeline-stall | [yellow] Cooldowns suppressed iters ~1964-1965. | Carry |
+| PR #497 REVIEW_ESCALATE | [yellow] UNKNOWN mergeable; reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age≈39.3h; 72h expires Jun-17T04:05Z (~30.3h remaining). | Escalate if still open at Jun-17T04:05Z |
+| PRs #512/#513 pipeline-stall | [yellow] Cooldowns expired; healer fired alerts (L1031-1032) → Tier-3 silenced (PR #516 fix working). PRs still unrouted to Mirror. | Larry routing decision needed |
 | unreviewed-merge:511/499/494/489/510/509 | [yellow] PRs merged by Larry without Mirror; bot-delivered; Larry's judgment call. | Reply appropriate shortcut or silence |
 | G-rule stall-detector Forge build | [yellow] Beacon spec complete. Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
 | Check VIII rule=lower | [yellow] FN=3027, TP=5, FP=2 — threshold too high. | `approve check-viii-update-2026-06-15` when shortcut lands |
@@ -171,10 +165,11 @@
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
 | Telegram 409 burst | [yellow] G-rule **2/3**. All self-inflicted by calling get-messages. | Watch; dispatch at 3/3 |
 | G-rule telegram-approval-self-dispatch-denied | [yellow] **1/3** — Larry "Go" → dispatch failed (self-dispatch denied beacon→beacon). | Watch; dispatch to Beacon at 3/3 for bot routing fix |
-| G-rule missions-autoregister-warn-vs-info | [blue] **COMPLETE ✅** iter ~1964. PR #514 merged 16:54:35Z Jun-15. | Done. |
+| G-rule missions-autoregister-warn-vs-info | [blue] **COMPLETE ✅** PR #514 merged Jun-15. | Done. |
+| G-rule medic-diagnosis-tier4 | [blue] **COMPLETE ✅** PR #515 merged Jun-15T17:27:41Z. | Done. |
+| G-rule healer-unrouted-pr-tier3-translation | [blue] **COMPLETE ✅** PR #516 merged Jun-15T17:27:36Z. Verified L1031+L1032 → Tier-3. | Done. |
 | Check I 2026-06-15 | [blue] 1 proposal dispatched iter ~1899, Beacon processed | Beacon spec in progress |
 | Check IX missions | [blue] PR #512 (catch-me-up-gap) + PR #513 (alert-ignored) open | Larry review on kanban |
-| G-rule medic-diagnosis-tier4 | [blue] **DISPATCHED** iter ~1955; PR #515 built, Mirror review in progress. | Watch for Mirror PASS → auto-merge |
 | G-rule catalog-accuracy-drift-tier4 | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule ledger/check-i Tier-4 | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule health-notify-script-missing | [blue] **1/3** | Watch; dispatch at 3/3 |
