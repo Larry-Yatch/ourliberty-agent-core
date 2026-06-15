@@ -126,11 +126,11 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 15:45Z UTC (Iter ~1956, Tier 1, clean)
+## Status snapshot — updated 2026-06-15 15:52Z UTC (Iter ~1957, Tier 1, signal)
 
-**Iter ~1956 summary:** ✅ Nominal. Check 0: 1 new alert (L1013) — `approval_request` for `medic-diagnosis-tier3-silence-001` from outbox-notifier (Tier-3 silenced, known-pattern). Check 4: pending=3 (+1 new: medic-diagnosis-tier3-silence-001 APPROVAL_REQUEST delivered to Larry at 09:42 MDT). All other checks nominal. Tier 1, consecutive_clean=1. Watermark: 1012 → 1013. ratio≈20.68.
+**Iter ~1957 summary:** ⚠️ Signal. Check 0: 1 new alert (L1014) — `missions-autoregister summary/warning` (Tier-3 silenced). G-rule missions-autoregister-warn-vs-info 2/3 → 3/3 → **DISPATCHED** `g-rule-missions-autoregister-warn-vs-info-001` to Beacon inbox (direction-ask for code-level severity demotion from warning to info). All mandatory checks nominal. Tier 1, consecutive_clean=0. Watermark: 1013 → 1014. ratio≈20.68.
 
-**Iter ~1955 summary (prior):** ⚠️ Signal. Check 0: 8 new alerts (L1005-1012). L1005: medic-diagnosis attempt-16 PR#509 (Tier-4, bot-delivered). L1006-1008: pipeline-stall PRs #513/#512/#510 (Tier-4, bot-delivered). L1009: dispatch-branch-cleanup/summary (Tier-3 silenced). L1010-1012: medic-diagnosis PRs #510/#512/#513 (Tier-4, delivery pending). G-rule medic-diagnosis-tier4 3/3 DISPATCHED. Watermark: 1004 → 1012. Tier 1. ratio≈20.66.
+**Iter ~1956 summary (prior):** ✅ Nominal. Check 0: 1 new alert (L1013) — `approval_request` for `medic-diagnosis-tier3-silence-001` from outbox-notifier (Tier-3 silenced, known-pattern). Check 4: pending=3 (+1 new: medic-diagnosis-tier3-silence-001 APPROVAL_REQUEST delivered to Larry at 09:42 MDT). All other checks nominal. Tier 1, consecutive_clean=1. Watermark: 1012 → 1013. ratio≈20.68.
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl. When cooldown expires, the alert fires in dry-run mode. Be aware: calling --dry-run in a cycle will write real alerts if the cooldown has passed. Always check wc -l of the file before and after.
 
@@ -163,7 +163,7 @@
 | G-rule ledger/check-i Tier-4 | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule health-notify-script-missing | [blue] **1/3** | Watch; dispatch at 3/3 |
 | catalog-accuracy-drift | [blue] 9/34 ourliberty-graph shelf cards drifted | route=digest; journal-note only |
-| G-rule missions-autoregister-warn-vs-info | [blue] **2/3** | Watch; dispatch at 3/3 |
+| G-rule missions-autoregister-warn-vs-info | [blue] **DISPATCHED** iter ~1957 | Watch for Beacon spec + Forge PR |
 | G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule missions-card-gc-warn-vs-info | [blue] **2/3** | Watch; dispatch at 3/3 |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] **2/3** | Watch; dispatch at 3/3 |
