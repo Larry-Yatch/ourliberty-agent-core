@@ -90,9 +90,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 06:49Z UTC (Iter ~1897, Tier 1)
+## Status snapshot — updated 2026-06-15 06:57Z UTC (Iter ~1898, Tier 1)
 
-**Iter ~1897 summary:** ⚠️ Signal. **Tier reset 2 → 1** (Check 0 Tier-4 alert: heal-pipeline-stall PR #509 cooldown expired → line 966 in larry-alerts.jsonl, route=escalate). PR #497 now shows MERGEABLE (GitHub computed). Watermark=966. All daemons alive (PIDs 2530123/2744551/2744840/2744914/2868353). PRs #497/#509/#510 carry [yellow]. ratio≈20.48 (943 interventions / 46 systemic_fixes). Escalation written to pulse-escalations.json (#24).
+**Iter ~1898 summary:** ⚠️ Signal. **Tier 1 (unchanged)**. Check 0: 1 new Tier-4 alert (line 967 — medic notification, source=medic, kind=notification, intent=medic-diagnosis, PR#509 attempt 8). Bot already delivered (idx=966, 06:51:09 UTC). No additional Pulse DM. Watermark=967. All daemons alive (PIDs 2530123/2744551/2744840/2744914/2868353). PRs #497/#509/#510 carry [yellow]. ratio≈20.5 (944 interventions / 46 systemic_fixes). Pattern note: medic notifications now flowing into larry-alerts.jsonl as Tier-4 — propose translation rule after PRs #509+#510 resolve.
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl for this script. When cooldown expires, the alert fires even in dry-run mode. Be aware: calling --dry-run in a cycle will generate real alerts if the cooldown has passed.
 
@@ -102,8 +102,8 @@
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — UNKNOWN (transient in gh pr list; Mirror REVIEW_ESCALATE at 04:05Z Jun-14; ~25h old) | Close if still stuck: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
-| PR #509 + #510 | [yellow] UNKNOWN/no-review; medic DM'd Larry at 04:50Z UTC Jun-15 (attempt 6); pending approval `unreg-approval-482eb78951ee` (dashboard; chat_id=None) | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — **MERGEABLE** (confirmed iter ~1897/~1898); reviewDecision=""; Mirror REVIEW_ESCALATE at 04:05Z Jun-14 (~35h old). Under 72h. | Carry; at 72h escalate or close |
+| PR #509 + #510 | [yellow] UNKNOWN/no-review; medic DM'd Larry attempt 8 (Jun-15 06:49Z); pending approval `unreg-approval-482eb78951ee` (dashboard; chat_id=None) | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
 | G-rule stall-detector Forge build | [yellow] Beacon spec CONFIRMED COMPLETE (branch-prefix gate; notification archived 01:51Z Jun-15). Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
 | G-rule stuck-cycle-timer | [blue] **1/3** (started iter ~1893). `ourliberty-cycle.timer` had NextElapseUSecRealtime empty + NextElapseUSecMonotonic=infinity; heal-systemd-install-drift auto-healed at 06:00Z Jun-15. | Watch; dispatch at 3/3 |
 | unreviewed-merge:511 | [yellow] PR #511 (`feat/local-review-pass-marker`) merged by Larry at 23:58Z Jun-14 without Mirror routing | Reply 'go: retroactive-review-511' or 'silence: local-review-marker-counts' |
