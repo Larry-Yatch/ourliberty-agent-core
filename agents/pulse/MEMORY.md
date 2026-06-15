@@ -120,9 +120,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 13:30Z UTC (Iter ~1941, Tier 1, non-clean)
+## Status snapshot — updated 2026-06-15 13:35Z UTC (Iter ~1942, Tier 1, non-clean)
 
-**Iter ~1941 summary:** ⚠️ Non-clean. Pipeline stall cooldowns expired for PRs #510/#512/#513; 3 new alerts fired 13:25Z (from dry-run) + 2 pre-existing (PR#509 stall + medic, bot delivered 13:15Z/13:20Z). 5 total Tier-4 alerts. Tier reset 2→1. Watermark advanced to 991. ratio≈20.51 (unchanged). All 5 PIDs healthy. Sync FRESH. G-rule alert-translation-unrouted-pr-001 still pending approval. G-rule telegram-409-burst **1/3** (no new occurrence iter ~1941).
+**Iter ~1942 summary:** ⚠️ Non-clean. 3 medic-diagnosis alerts (PRs #510/#512/#513, Tier-4, bot-delivered, no Pulse action). Pipeline stall cooldowns all active — 0 new stall fires. Watermark advanced to 994. ratio≈20.53 (improving). All 5 PIDs healthy. Sync FRESH. G-rule alert-translation-unrouted-pr-001 still pending approval. G-rule telegram-409-burst **1/3** (no new occurrence).
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl. When cooldown expires, the alert fires in dry-run mode. Be aware: calling --dry-run in a cycle will write real alerts if the cooldown has passed. Always check wc -l of the file before and after.
 
