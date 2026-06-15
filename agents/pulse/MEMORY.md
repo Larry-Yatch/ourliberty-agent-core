@@ -120,11 +120,11 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 14:07Z UTC (Iter ~1946, Tier 1→2 de-escalation, clean)
+## Status snapshot — updated 2026-06-15 14:24Z UTC (Iter ~1947, Tier 2→1 reset)
 
-**Iter ~1946 summary:** ✅ Clean. All checks nominal. No new alerts (watermark=995=file). All 5 PIDs healthy. Sync FRESH (last 13:24:50Z). Bot stable (no new 409; last log entry 13:44:56Z — idle silence normal). Pipeline stalls cooldowns all active — 0 new fires. ratio≈20.57 (improving). **consecutive_clean=3 → Tier 1→2 de-escalation fired. Now Tier 2, consecutive_clean=0.**
+**Iter ~1947 summary:** ⚠️ Non-clean. Check 0: 1 new Tier-4 alert (larry-alerts-996, source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#509). G-rule already dispatched 3/3 iter ~1930; APPROVAL_REQUEST `alert-translation-unrouted-pr-001` pending. Bot delivered prior DM. Journal-note only; no second DM. Watermark 995→996. Tier 2→1 reset. All other checks nominal. ratio≈20.57 (improving).
 
-**Iter ~1945 summary (prior):** ✅ Clean. All checks nominal. No new alerts (watermark=995=file). All 5 PIDs healthy. Sync FRESH. Bot stable (no new 409). Pipeline stalls cooldowns all active — 0 new fires. ratio≈20.57 (improving). consecutive_clean=2.
+**Iter ~1946 summary (prior):** ✅ Clean. All checks nominal. No new alerts (watermark=995=file). All 5 PIDs healthy. Sync FRESH. Bot stable. Pipeline stalls cooldowns all active. ratio≈20.57. **Tier 1→2 de-escalation fired. Was Tier 2, consecutive_clean=0.**
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl. When cooldown expires, the alert fires in dry-run mode. Be aware: calling --dry-run in a cycle will write real alerts if the cooldown has passed. Always check wc -l of the file before and after.
 
