@@ -126,7 +126,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 18:22Z UTC (Iter ~1971, Tier 3, consecutive_clean=0)
+## Status snapshot — updated 2026-06-15 19:01Z UTC (Iter ~1972, Tier 1, consecutive_clean=0)
+
+**Iter ~1972 summary:** ⚠️ Tier-reset 3→1. 2 new alerts. L1035 missions-card-gc/summary → Tier-4; G-rule 3/3 → dispatched Beacon `pulse-missions-card-gc-warn-vs-info-001`. L1036 unreviewed-merge:518 → Tier-4, bot-delivered, Larry judgment, carry. PRs #512+#513 now CLOSED. 1 open PR: #497 (age≈38.9h, deadline Jun-17T04:02Z ~33h). Watermark: 1034→1036. PRIME ratio≈20.79.
 
 **Iter ~1971 summary:** ✅ Nominal. 0 new alerts. Watermark: 1034 (unchanged). pending=0. **Tier 2 → Tier 3 PROMOTED** (consecutive_clean=3). Daemons all alive. No G-rule advances. 3 open PRs: #497 (age≈38.3h, deadline Jun-17T04:05Z ~33.7h), #512 CONFLICTING, #513 CONFLICTING.
 
@@ -135,10 +137,6 @@
 **Iter ~1969 summary:** ✅ Nominal. 4 new alerts, all Tier-3 silenced (L1029-1032). Watermark: 1028→1032. pending=0. Tier 2, consecutive_clean=1. Daemons all alive. **G-rule medic-diagnosis-tier4: COMPLETE ✅** (PR #515 merged). **G-rule healer-unrouted-pr-tier3-translation: COMPLETE ✅** (PR #516 merged, L1031+L1032 verified Tier-3). 3 open PRs: #497 (age≈39.3h, deadline Jun-17T04:05Z ~30.3h), #512, #513.
 
 **Iter ~1968 summary:** ✅ Nominal. 0 new alerts. 0 directives. Watermark: 1028 (unchanged). pending=0. **Tier 1 → Tier 2 PROMOTED** (consecutive_clean=3). Daemons all alive. No new G-rule advances. PR #516 awaiting Mirror review. PR #515 Mirror PASS, auto-merge held behind #516. PR #497 REVIEW_ESCALATE age≈39h (deadline Jun-17T04:05Z, ~34.6h remaining).
-
-**Iter ~1967 summary:** ✅ Nominal. L1028 Tier-3 silenced (review-pass PR #515). PR #515 Mirror PASS received — auto-merge HELD behind PR #516. 0 new directives. Watermark: 1027→1028. pending=0. Tier 1, consecutive_clean=2.
-
-**Iter ~1966 summary:** ✅ Nominal. 0 new alerts. Watermark: 1027 (unchanged). pending=0. Tier 1, consecutive_clean=1. PR #516 (unrouted-pr Tier-3 translation) + PR #515 (medic-diagnosis Tier-3 silence) in Mirror review. PR #497 REVIEW_ESCALATE age=37.1h.
 
 **Iter ~1965 summary:** ⚠️ Check 0: L1026-1027 (unreviewed-merge:510+509, Tier-4, bot-delivered). Check E: PR #516 new. Watermark: 1025→1027. Tier 1, consecutive_clean=0. Daemons: beacon:2744840, chain-event-shipper:2744551, outbox-notifier:2744914, dashboard-api:2868353, inbox-watcher:2530123. PRIME ratio=20.77.
 
@@ -156,30 +154,29 @@
 
 ---
 
-## Key standing items (as of iter ~1969)
+## Key standing items (as of iter ~1972)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] UNKNOWN mergeable; reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age≈39.3h; 72h expires Jun-17T04:05Z (~30.3h remaining). | Escalate if still open at Jun-17T04:05Z |
-| PRs #512/#513 pipeline-stall | [yellow] Now CONFLICTING (conflicts from #515/#516 merges). Healer cooldowns active. PRs unrouted to Mirror; rebase required before routing. | Larry routing decision + Forge rebase needed |
-| unreviewed-merge:511/499/494/489/510/509 | [yellow] PRs merged by Larry without Mirror; bot-delivered; Larry's judgment call. | Reply appropriate shortcut or silence |
+| PR #497 REVIEW_ESCALATE | [yellow] UNKNOWN mergeable; reviewDecision=""; Mirror REVIEW_ESCALATE Jun-14T04:05Z; age≈38.9h; 72h expires Jun-17T04:02Z (~33.1h remaining). | Escalate if still open at Jun-17T04:02Z |
+| unreviewed-merge:511/499/494/489/510/509/518 | [yellow] PRs merged by Larry without Mirror; bot-delivered; Larry's judgment call. (#518 added iter ~1972; #517 merged same cycle, no separate alert) | Reply appropriate shortcut or silence |
 | G-rule stall-detector Forge build | [yellow] Beacon spec complete. Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
 | Check VIII rule=lower | [yellow] FN=3027, TP=5, FP=2 — threshold too high. | `approve check-viii-update-2026-06-15` when shortcut lands |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
 | Telegram 409 burst | [yellow] G-rule **2/3**. All self-inflicted by calling get-messages. | Watch; dispatch at 3/3 |
 | G-rule telegram-approval-self-dispatch-denied | [yellow] **1/3** — Larry "Go" → dispatch failed (self-dispatch denied beacon→beacon). | Watch; dispatch to Beacon at 3/3 for bot routing fix |
+| G-rule missions-card-gc-warn-vs-info | [blue] **3/3 DISPATCHED** → Beacon `pulse-missions-card-gc-warn-vs-info-001`. Awaiting Forge PR. | Watch for Forge PR |
 | G-rule missions-autoregister-warn-vs-info | [blue] **COMPLETE ✅** PR #514 merged Jun-15. | Done. |
 | G-rule medic-diagnosis-tier4 | [blue] **COMPLETE ✅** PR #515 merged Jun-15T17:27:41Z. | Done. |
 | G-rule healer-unrouted-pr-tier3-translation | [blue] **COMPLETE ✅** PR #516 merged Jun-15T17:27:36Z. Verified L1031+L1032 → Tier-3. | Done. |
 | Check I 2026-06-15 | [blue] 1 proposal dispatched iter ~1899, Beacon processed | Beacon spec in progress |
-| Check IX missions | [blue] PR #512 (catch-me-up-gap) + PR #513 (alert-ignored) open | Larry review on kanban |
+| Check IX missions | [blue] PR #512 + #513 **CLOSED** iter ~1972. | Resolved. |
 | G-rule catalog-accuracy-drift-tier4 | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule ledger/check-i Tier-4 | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule health-notify-script-missing | [blue] **1/3** | Watch; dispatch at 3/3 |
 | catalog-accuracy-drift | [blue] 9/34 ourliberty-graph shelf cards drifted | route=digest; journal-note only |
 | G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3 | Watch; dispatch at 3/3 |
-| G-rule missions-card-gc-warn-vs-info | [blue] **2/3** | Watch; dispatch at 3/3 |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] **2/3** | Watch; dispatch at 3/3 |
 | G-rule Forge-preflight-marker-error-retry | [blue] **2/3** | Watch; dispatch at 3/3 |
 | G-rule Forge-preflight-CLARIFY_REQUEST | [blue] **1/3** | Watch; dispatch at 3/3 |
