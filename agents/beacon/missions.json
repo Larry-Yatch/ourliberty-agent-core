@@ -2776,6 +2776,74 @@
       "proposed_at": "2026-06-15T15:58:37.926399+00:00",
       "orphan_branch": null,
       "orphan_last_activity_ts": "2026-06-15T15:57:12.482915+00:00"
+    },
+    {
+      "id": "proposed-larry-approval-8aa50bfa8aec52113f9405772937021ca0fa7689",
+      "name": "Larry Approval 8aa50bfa8aec52113f9405772937021ca0fa7689",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `larry-approval-8aa50bfa8aec52113f9405772937021ca0fa7689`. Last activity 2026-06-15T16:44:20.849583+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "larry-approval-8aa50bfa8aec52113f9405772937021ca0fa7689"
+      ],
+      "repo": null,
+      "created": "2026-06-15",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-15T16:44:39.758328+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-15T16:44:20.849583+00:00"
+    },
+    {
+      "id": "proposed-larry-approval-45a1464c4cea2a71e1291bd5b6e96830c5175f12",
+      "name": "Larry Approval 45a1464c4cea2a71e1291bd5b6e96830c5175f12",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `larry-approval-45a1464c4cea2a71e1291bd5b6e96830c5175f12`. Last activity 2026-06-15T16:44:15.839488+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "larry-approval-45a1464c4cea2a71e1291bd5b6e96830c5175f12"
+      ],
+      "repo": null,
+      "created": "2026-06-15",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-15T16:44:39.758328+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-15T16:44:15.839488+00:00"
+    },
+    {
+      "id": "proposed-autoregister-warn-demote-optA-001",
+      "name": "Autoregister Warn Demote OptA 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `autoregister-warn-demote-optA-001`. Last activity 2026-06-15T16:43:55.414146+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "autoregister-warn-demote-optA-001"
+      ],
+      "repo": null,
+      "created": "2026-06-15",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-15T16:44:39.758328+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-15T16:43:55.414146+00:00"
+    },
+    {
+      "id": "proposed-deploy-notifier-ready-logonly",
+      "name": "Deploy Notifier Ready Logonly",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `deploy-notifier-ready-logonly`. Last activity 2026-06-04T05:53:59.062152+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "deploy-notifier-ready-logonly"
+      ],
+      "repo": null,
+      "created": "2026-06-15",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-15T16:44:39.758328+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-04T05:53:59.062152+00:00"
     }
   ]
 }
