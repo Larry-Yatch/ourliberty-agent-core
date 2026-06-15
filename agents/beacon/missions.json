@@ -2725,6 +2725,19 @@
       "shipped_at": "2026-06-14T18:17:18.456167+00:00",
       "shipped_by": "heal_missions_card_gc",
       "prior_phase": "in_flight"
+    },
+    {
+      "id": "pulse-check-ix-catch-me-up-gap-2026-06-15",
+      "name": "Pulse Check IX catch-me-up-gap 2026-06-15",
+      "phase": "drafting",
+      "brief": "Operator status-probe rate above threshold | Evidence: 12 status-probe events over trailing 7d | Suggested fix shape: Add a Telegram catch-me-up shortcut that summarizes in-flight PRs, paused sequences, and pending approvals without manual prompting.",
+      "spec_docs": [
+        "agents/beacon/specs/pulse-check-ix-operator-friction.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-15",
+      "deferred_reason": null
     }
   ]
 }
