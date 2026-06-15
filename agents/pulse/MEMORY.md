@@ -78,24 +78,25 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 00:26Z UTC (Iter ~1857, Tier 1, non-clean)
+## Status snapshot — updated 2026-06-15 00:34Z UTC (Iter ~1858, Tier 1, non-clean)
 
-**Iter ~1857 summary:** 1 Tier-4 alert (pipeline-stall:unrouted-pr:PR#509, line 938, heal-pipeline-stall). Triage helper returned Tier-4 (novel). No new DM sent — Larry notified 3× already. Tier reset 2 → 1. New in-flight: cleanup-branch-success-alert-info-translation-001 CLARIFY_REQUEST → Beacon auto-responded (round=1) → Forge resume-r1 in inbox. Watermark=938. ratio≈20.56, trend=flat.
+**Iter ~1858 summary:** 3 Tier-4 alerts (lines 939-941): Forge REJECT for cleanup-branch-success-alert-info-translation-001 (task CLOSED, already satisfied by PR #485); medic-diagnosis PR#509 (false positive — Larry-authored docs PR); heal-pipeline-stall PR#510 cooldown re-fire. All 3 already delivered to Larry at 18:27–18:32Z MDT. No new Pulse DMs. PR #510 flipped from CLEAN/MERGEABLE to UNKNOWN/UNKNOWN (GitHub API flap). New G-rule stall-detector-docs-branch-overtrigger (1/3). Watermark=941. ratio≈20.56, trend=flat.
 
 ---
 
-## Key standing items (as of iter ~1857)
+## Key standing items (as of iter ~1858)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — mergeState=UNKNOWN/UNKNOWN (133rd iter; GitHub API flap) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
-| PR #509 + #510 | [yellow] #509 UNKNOWN/UNKNOWN (flap), #510 CLEAN/MERGEABLE; Mirror review NEVER dispatched; DM sent iter ~1845 (22:48Z); medic DMs 23:22Z (PR#509) + 23:31Z (PR#510) Jun-14; new heal-pipeline-stall alert line 938 this iter | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — mergeState=UNKNOWN/UNKNOWN (134th iter; GitHub API flap) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #509 + #510 | [yellow] Both UNKNOWN/UNKNOWN (flap); #509 medic-confirmed as docs-only Larry-authored (expected stall behavior); #510 needs Mirror review. DMs through 18:32Z MDT Jun-14. | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| cleanup-branch-success-alert-info-translation-001 | [blue] CLARIFY_REQUEST round=1 in-flight (Forge resume-r1 in inbox as of 00:24Z Jun-15) | Watch for PR or next CLARIFY_REQUEST round |
+| cleanup-branch-success-alert-info-translation-001 | [blue] **CLOSED** — Forge REJECTED (already satisfied by PR #485). 5 residual baseline-red sources tracked under G-rules below. | No action; G-rules handle at 3/3 |
+| NEW G-rule stall-detector-docs-branch-overtrigger | [blue] **1/3** — medic confirmed stall detector fires on docs/* Larry-authored PRs (not real stalls) | Dispatch to Beacon at 3/3: exclude docs/* or author=Larry-Yatch from unrouted-pr alerts |
 | G-rule health-notify-script-missing | [blue] **1/3** | Watch; dispatch at 3/3 |
 | catalog-accuracy-drift | [blue] 8/34 ourliberty-graph shelf cards drifted (attention rate 24%, gate 10%) | route=digest; journal-note only |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
@@ -110,4 +111,4 @@
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
 | dashboard_api PID 2868353 | [blue] Ssl stable; prior restart cause still unknown | Note; watch for recurrence |
-| Stale bash orphans | [blue] PIDs 1834248 (17d 5h+) + 2605007 (20h+). Ss, 0% CPU. | Carry; cleanup when convenient |
+| Stale bash orphans | [blue] PIDs 1834248 (17d 5h 21m+) + 2605007 (20h 12m+). Ss, 0% CPU. | Carry; cleanup when convenient |
