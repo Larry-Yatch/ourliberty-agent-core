@@ -108,9 +108,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 08:35Z UTC (Iter ~1910, Tier 1)
+## Status snapshot — updated 2026-06-15 08:41Z UTC (Iter ~1911, Tier 1)
 
-**Iter ~1910 summary:** ✅ Nominal. No new signals. **Tier 1, consecutive_clean=0**. All checks clean except Check 4 (pending=1, same carry). New G-rule: auto-dispatch-APPROVAL_REQUEST-task-id-mismatch-warn-vs-info 1/3. 0 new interventions. ratio≈20.74 (954/46).
+**Iter ~1911 summary:** ✅ Nominal. No new signals. **Tier 1, consecutive_clean=0**. All checks clean except Check 4 (pending=1, same carry). 0 new interventions. ratio≈20.74 (954/46). Note: HTTP 409 cluster in beacon_telegram_bot.log at 03:03Z Jun-15 (self-resolved; historical; known pattern).
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl for this script. When cooldown expires, the alert fires even in dry-run mode. Be aware: calling --dry-run in a cycle will generate real alerts if the cooldown has passed.
 
