@@ -126,7 +126,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 17:09Z UTC (Iter ~1965, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-15 17:14Z UTC (Iter ~1966, Tier 1, consecutive_clean=1)
+
+**Iter ~1966 summary:** ✅ Nominal. All checks clean. 0 new alerts. No new directives. Watermark: 1027 (unchanged). pending=0. Tier 1, consecutive_clean=1. Daemons all alive. No new G-rule advances. PR #516 (alert-translation-unrouted-pr-001) in Mirror review; PR #515 (medic-diagnosis) in Mirror review; PR #497 REVIEW_ESCALATE age=37.1h (deadline Jun-17T04:05Z).
 
 **Iter ~1965 summary:** ⚠️ Check 0: L1026-1027 new (unreviewed-merge:510+509, Tier-4, bot-delivered, no Pulse DM). Check E: PR #516 new (alert-translation-unrouted-pr-001, awaiting Mirror). All other checks nominal. Watermark: 1025→1027. pending=0. Tier 1, consecutive_clean=0. Daemons: beacon:2744840, chain-event-shipper:2744551, outbox-notifier:2744914, dashboard-api:2868353, inbox-watcher:2530123. PRIME ratio=20.77 (improving).
 
