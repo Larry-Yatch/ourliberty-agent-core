@@ -888,40 +888,49 @@ def run_once(*, dry_run: bool,
         _emit_summary(ProposeResult(registry_unreadable=True), 'nothing', dry_run)
         return 0
 
+    # Propose/retire both need the derive module AND chain_events. If either is
+    # unavailable, SKIP those passes (recording why) but fall through to the
+    # new-mission ingestion below — ingestion is independent of chain_events, so a
+    # chain_events outage must not strand open +New mission PRs. (Each pass is
+    # isolated so a fault in one never blocks the others or corrupts the registry.)
+    res = ProposeResult()  # default; reassigned only on a successful propose pass
     if derive is None:
         derive = load_derive()
-        if derive is None:
-            _emit_summary(ProposeResult(derive_unavailable=True), 'nothing', dry_run)
-            return 0
-
-    if events_fetcher is None:
-        events_fetcher = _default_events_fetcher
-    try:
-        rows = events_fetcher()
-    except Exception as e:  # noqa: BLE001 — fail-safe
-        log(f'event fetch raised: {type(e).__name__}: {e}')
-        rows = None
-    if rows is None:
-        log('chain_events unavailable — proposing nothing this tick')
-        _emit_summary(ProposeResult(events_unavailable=True), 'nothing', dry_run)
-        return 0
-
-    try:
-        res = scan_and_propose(registry, rows, derive, now,
-                               pr_state_resolver=pr_state_resolver)
-    except Exception as e:  # noqa: BLE001 — fail-safe: report, never corrupt
-        log(f'scan-and-propose raised: {type(e).__name__}: {e} — proposing nothing')
-        _emit_summary(ProposeResult(), 'nothing', dry_run)
-        return 0
-
-    # Retirement pass: self-clean stale/terminal proposals (retire-with-audit).
-    # Isolated so a retirement fault never blocks a healthy propose pass.
-    try:
-        res.retired = retire_stale_proposals(registry, rows, derive, now,
-                                             pr_state_resolver=pr_state_resolver)
-    except Exception as e:  # noqa: BLE001 — fail-safe: report, never corrupt
-        log(f'retire-stale-proposals raised: {type(e).__name__}: {e} — retiring nothing')
-    res.surviving_proposed = surviving_proposed_ids(registry)
+    if derive is None:
+        res.derive_unavailable = True
+        log('derive unavailable — proposing/retiring nothing this tick')
+    else:
+        if events_fetcher is None:
+            events_fetcher = _default_events_fetcher
+        try:
+            rows = events_fetcher()
+        except Exception as e:  # noqa: BLE001 — fail-safe
+            log(f'event fetch raised: {type(e).__name__}: {e}')
+            rows = None
+        if rows is None:
+            res.events_unavailable = True
+            log('chain_events unavailable — proposing/retiring nothing this tick')
+        else:
+            try:
+                res = scan_and_propose(registry, rows, derive, now,
+                                       pr_state_resolver=pr_state_resolver)
+            except Exception as e:  # noqa: BLE001 — fail-safe: report, never corrupt
+                log(f'scan-and-propose raised: {type(e).__name__}: {e} — proposing nothing')
+                # scan_and_propose appends to registry in place, so a mid-loop raise
+                # can leave partial proposals in memory. Re-read the clean on-disk copy
+                # (disk was never written) so a same-tick ingest doesn't commit
+                # half-applied propose work — preserving the old early-return's "scan
+                # failure persists nothing" guarantee.
+                registry = read_missions_registry(mpath) or registry
+            else:
+                # Retire only after a successful propose (as before); isolated so a
+                # retirement fault never blocks a healthy propose pass.
+                try:
+                    res.retired = retire_stale_proposals(registry, rows, derive, now,
+                                                         pr_state_resolver=pr_state_resolver)
+                except Exception as e:  # noqa: BLE001 — fail-safe: report, never corrupt
+                    log(f'retire-stale-proposals raised: {type(e).__name__}: {e} — retiring nothing')
+                res.surviving_proposed = surviving_proposed_ids(registry)
 
     # New-mission PR ingestion: append each open feat/new-mission-* PR's named
     # mission into the registry so it lands via this healer's single-committer

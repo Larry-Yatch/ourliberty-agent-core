@@ -443,11 +443,13 @@ class RunOnceTest(unittest.TestCase):
             (core / h.MISSIONS_REL).write_text(
                 json.dumps({'schema_version': 1, 'missions': []}) + '\n')
             with mock.patch.object(h, 'load_repo_paths',
-                                   return_value={'ourliberty-agent-core': core}):
+                                   return_value={'ourliberty-agent-core': core}), \
+                    mock.patch.object(h, 'list_open_new_mission_prs', return_value=[]):
                 rc = h.run_once(dry_run=False, events_fetcher=lambda: None,
                                 derive=derive, now=now)
             self.assertEqual(rc, 0)
-            # registry untouched (no events -> nothing proposed)
+            # registry untouched (no events -> nothing proposed; ingest still runs
+            # but there are no new-mission PRs)
             reg = json.loads((core / h.MISSIONS_REL).read_text())
             self.assertEqual(reg['missions'], [])
         finally:
@@ -700,6 +702,58 @@ class RunOnceIngestTest(unittest.TestCase):
             rc = self._run()
         self.assertEqual(rc, 0)
         self.assertEqual(self._registry()['missions'], [])
+
+    def test_ingests_even_when_chain_events_unavailable(self):
+        # THE point of the ordering tidy-up: a chain_events outage skips
+        # propose/retire but must NOT strand new-mission PRs — ingestion still
+        # runs, lands the mission, and closes the PR.
+        prs = [{'number': 512, 'branch': 'feat/new-mission-foo'}]
+        closed = []
+        with mock.patch.dict(os.environ, {h.ENV_NEWMISSION_INGEST: 'true'}), \
+                mock.patch.object(h, 'load_repo_paths',
+                                  return_value={'ourliberty-agent-core': self.core}), \
+                mock.patch.object(h, 'list_open_new_mission_prs', return_value=prs), \
+                mock.patch.object(h, 'fetch_branch_mission_entry',
+                                  side_effect=lambda r, b, mid: _mentry('foo')), \
+                mock.patch.object(h, 'commit_and_push_missions', return_value='committed'), \
+                mock.patch.object(h, '_missions_ids_on_main', return_value={'foo'}), \
+                mock.patch.object(h, 'close_new_mission_pr',
+                                  side_effect=lambda r, n, m: closed.append((n, m)) or True):
+            # chain_events unavailable (events_fetcher returns None)
+            rc = h.run_once(dry_run=False, events_fetcher=lambda: None,
+                            derive=derive, pr_state_resolver=lambda urls: {},
+                            now=self.now)
+        self.assertEqual(rc, 0)
+        self.assertEqual([m['id'] for m in self._registry()['missions']], ['foo'])
+        self.assertEqual(closed, [(512, 'foo')])
+
+    def test_scan_partial_mutation_not_committed_with_ingest(self):
+        # If scan_and_propose leaves a partial in-memory mutation then raises, a
+        # same-tick ingest must NOT commit the half-applied propose work — only the
+        # cleanly-ingested mission lands (the on-disk re-read discards the partial).
+        def _scan_then_raise(registry, *a, **k):
+            registry['missions'].append({'id': 'PARTIAL-junk', 'name': 'x',
+                                         'phase': 'proposed'})
+            raise RuntimeError('scan blew up mid-loop')
+        prs = [{'number': 512, 'branch': 'feat/new-mission-foo'}]
+        with mock.patch.dict(os.environ, {h.ENV_NEWMISSION_INGEST: 'true'}), \
+                mock.patch.object(h, 'load_repo_paths',
+                                  return_value={'ourliberty-agent-core': self.core}), \
+                mock.patch.object(h, 'scan_and_propose', side_effect=_scan_then_raise), \
+                mock.patch.object(h, 'list_open_new_mission_prs', return_value=prs), \
+                mock.patch.object(h, 'fetch_branch_mission_entry',
+                                  side_effect=lambda r, b, mid: _mentry('foo')), \
+                mock.patch.object(h, 'commit_and_push_missions', return_value='committed'), \
+                mock.patch.object(h, '_missions_ids_on_main', return_value={'foo'}), \
+                mock.patch.object(h, 'close_new_mission_pr',
+                                  side_effect=lambda r, n, m: True):
+            rc = h.run_once(dry_run=False, events_fetcher=lambda: [{'x': 1}],
+                            derive=derive, pr_state_resolver=lambda urls: {},
+                            now=self.now)
+        self.assertEqual(rc, 0)
+        ids = [m['id'] for m in self._registry()['missions']]
+        self.assertEqual(ids, ['foo'])           # ONLY the ingested entry
+        self.assertNotIn('PARTIAL-junk', ids)    # partial scan work discarded
 
 
 if __name__ == '__main__':
