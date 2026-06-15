@@ -126,7 +126,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 19:24Z UTC (Iter ~1975, Tier 1, consecutive_clean=1)
+## Status snapshot — updated 2026-06-15 19:32Z UTC (Iter ~1976, Tier 1, consecutive_clean=0)
+
+**Iter ~1976 summary:** ⚠️ Check 1: Forge-preflight-marker-error-retry WARN (p41-schedule-harden preflight, 13:23:24 MDT, auto-recovered 13:25:40). G-rule **2/3 → 3/3 → DISPATCHED** (Beacon: pulse-forge-preflight-marker-error-retry-001). 3 new PRs: #520 (p41-schedule-harden, Mirror review), #521 (ingest-selftest, self-managed), #522 (missions-card-gc-warn-demote-001, Mirror review). 0 new alerts. Watermark: 1038 unchanged. 4 open PRs: #497 (MERGEABLE, 72h deadline Jun-17T04:02Z ~32.5h), #520, #521, #522. PRIME ratio≈19.98. Tier 1, consecutive_clean=0.
 
 **Iter ~1975 summary:** ✅ Nominal. 0 new alerts. 0 stalls. 0 pending directives. All daemons alive. Forge building p41-schedule-harden (~19 min elapsed, no PR yet). missions-card-gc-warn-demote-001 in Forge inbox, queued behind p41-schedule-harden. Watermark: 1038 unchanged. 1 open PR: #497 (MERGEABLE, age≈39.3h, deadline Jun-17T04:02Z ~32.7h). PRIME ratio≈20.40. Tier 1, consecutive_clean=1.
 
@@ -160,11 +162,11 @@
 
 ---
 
-## Key standing items (as of iter ~1975)
+## Key standing items (as of iter ~1976)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] **MERGEABLE**; reviewDecision=""; Mirror REVIEW_ESCALATE Jun-14T04:05Z; age≈39.3h; 72h expires Jun-17T04:02Z (~32.7h remaining). | Escalate if still open at Jun-17T04:02Z |
+| PR #497 REVIEW_ESCALATE | [yellow] **MERGEABLE**; reviewDecision=""; Mirror REVIEW_ESCALATE Jun-14T04:02Z; age≈39.5h; 72h expires Jun-17T04:02Z (~32.5h remaining). | Escalate if still open at Jun-17T04:02Z |
 | unreviewed-merge:511/499/494/489/510/509/518/519 | [yellow] PRs merged by Larry without Mirror; bot-delivered for others; #519 alert TBD. Larry's judgment call. | Reply appropriate shortcut or silence |
 | G-rule stall-detector Forge build | [yellow] Beacon spec complete. Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
 | Check VIII rule=lower | [yellow] FN=3027, TP=5, FP=2 — threshold too high. | `approve check-viii-update-2026-06-15` when shortcut lands |
@@ -172,9 +174,10 @@
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
 | Telegram 409 burst | [yellow] G-rule **2/3**. All self-inflicted by calling get-messages. | Watch; dispatch at 3/3 |
 | G-rule telegram-approval-self-dispatch-denied | [yellow] **1/3** — Larry "Go" → dispatch failed (self-dispatch denied beacon→beacon). | Watch; dispatch to Beacon at 3/3 for bot routing fix |
-| p41-schedule-harden build | [blue] Forge actively building (started 19:05:44Z Jun-15). Watch for PR. | Watch next iter |
-| missions-card-gc-warn-demote-001 | [blue] APPROVED by Larry 19:10Z Jun-15; Forge build in inbox. Queued behind p41-schedule-harden. | Watch for Forge PR → COMPLETE |
-| G-rule missions-card-gc-warn-vs-info | [blue] **3/3 DISPATCHED** → Forge build `missions-card-gc-warn-demote-001` in inbox. | Watch for PR → G-rule COMPLETE |
+| PR #520 (p41-schedule-harden) | [blue] PR opened 19:23:12Z Jun-15. In Mirror review. | Watch for REVIEW_PASS + auto-merge |
+| PR #521 (ingest-selftest) | [blue] Self-test PR for PR #519 auto-reconcile fix. heal_orphan_autoregister to auto-close. | Watch next iter |
+| PR #522 (missions-card-gc-warn-demote-001) | [blue] PR opened 19:26:45Z Jun-15. MERGEABLE. In Mirror review. | Watch for REVIEW_PASS → G-rule missions-card-gc-warn-vs-info COMPLETE |
+| G-rule missions-card-gc-warn-vs-info | [blue] **3/3 DISPATCHED** → PR #522 in Mirror review. | Watch for PR merge → G-rule COMPLETE |
 | G-rule missions-autoregister-warn-vs-info | [blue] **COMPLETE ✅** PR #514 merged Jun-15. | Done. |
 | G-rule medic-diagnosis-tier4 | [blue] **COMPLETE ✅** PR #515 merged Jun-15T17:27:41Z. | Done. |
 | G-rule healer-unrouted-pr-tier3-translation | [blue] **COMPLETE ✅** PR #516 merged Jun-15T17:27:36Z. | Done. |
@@ -185,7 +188,7 @@
 | catalog-accuracy-drift | [blue] 9/34 ourliberty-graph shelf cards drifted | route=digest; journal-note only |
 | G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] **2/3** | Watch; dispatch at 3/3 |
-| G-rule Forge-preflight-marker-error-retry | [blue] **2/3** | Watch; dispatch at 3/3 |
+| G-rule Forge-preflight-marker-error-retry | [blue] **3/3 DISPATCHED** → Beacon pulse-forge-preflight-marker-error-retry-001 | Watch for Forge PR |
 | G-rule Forge-preflight-CLARIFY_REQUEST | [blue] **1/3** | Watch; dispatch at 3/3 |
 | G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 (warn-vs-info) |
 | G-rule telegram-409-burst | [yellow] **2/3** | Watch; dispatch at 3/3 |

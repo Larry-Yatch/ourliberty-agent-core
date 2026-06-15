@@ -4,6 +4,90 @@
 
 ---
 
+## Iteration ~1976 — 2026-06-15 19:32Z UTC (interactive, /cycle, Tier 1, Check 1 WARN, G-rule Forge-preflight-marker-error-retry 3/3 DISPATCH, 3 new PRs)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Check 1: Forge-preflight-marker-error-retry WARN (p41-schedule-harden preflight, auto-recovered). G-rule 2/3 → 3/3 → DISPATCHED to Beacon. All other checks nominal. 3 new PRs (#520, #521, #522) appeared since iter ~1975.
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): Confirmed open. **mergeable=MERGEABLE** (unchanged). reviewDecision=''. statusCheckRollup: `mirror-review=FAILURE` (Mirror REVIEW_ESCALATE 2026-06-14T04:02:56Z). Age≈39.5h. 72h deadline Jun-17T04:02Z → **~32.5h remaining**. **CARRY** [yellow].
+- p41-schedule-harden: **PR #520 OPENED** at 19:23:12Z. In Mirror review (inbox: review-p41-schedule-harden.json). Build completed successfully. ✅ **CHANGED** [blue].
+- missions-card-gc-warn-demote-001: **PR #522 OPENED** at 19:26:45Z. MERGEABLE. In Mirror review (inbox: review-missions-card-gc-warn-demote-001.json). Build completed successfully. **CHANGED** [blue].
+- All 5 daemons: PIDs 2530123 (Ssl), 2744551 (SNs), 2744840 (Ss), 2744914 (Ss), 2868353 (Ssl) — all alive. ✅
+- Repo HEAD: 545bd4fb (Pulse cycle 20260615T192610Z) = origin/main. Clean tree, on main. ✅
+- 409 burst: last occurrence 07:44:56 MDT Jun-15 (13:44:56Z). G-rule 2/3 unchanged. **CARRY** [yellow].
+- unreviewed-merge:519: No new alert in larry-alerts.jsonl (file=1038, unchanged). No alert generated yet. **CARRY** [blue].
+- Forge-preflight-marker-error-retry: WARN at 13:23:24 MDT in outbox-notifier.log for p41-schedule-harden preflight — missed by iter ~1975 Check 1 (iter ~1975 reported 0 WARNs, but WARN appeared in that same minute window). Catching now. G-rule **2/3 → 3/3 → DISPATCHED**. **CHANGED**.
+
+**Check 0 — Alert triage:** Watermark=1038 (entering); file=1038 lines. **0 new alerts.** ✅ Nominal. Watermark unchanged.
+
+**Check 1 — Log noise:** outbox-notifier.log tail-100 shows 1 WARN: `[2026-06-15 13:23:24] [WARN] forge marker error in p41-schedule-harden.json: MalformedForgeMarker: phase=preflight requires ONE marker block — none found; retry 1/3`. Auto-recovered: `[13:25:40] classified forge proceed marker → build dispatched`. inbox-watcher: 0 WARNs/ERRORs. **G-rule Forge-preflight-marker-error-retry 2/3 → 3/3 → DISPATCHED** to Beacon (pulse-forge-preflight-marker-error-retry-001). Tier-reset. ⚠️
+
+**Check 2 — Telegram sweep:** PID 2744840 alive (Ss). Last Larry message: 13:02:44 MDT "go" (prev iter). No new messages since. No 409 errors in recent log. G-rule telegram-409-burst 2/3 unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → 0 stalls detected, 6 skipped (pr_exists or preflight_exit). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0**. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T19:16:19.698610+00:00`, age≈16 min at check time. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=545bd4fb = origin/main. Clean tree, on main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-15T18:45:54Z, status=success, age≈47 min. FRESH (<2h). Note: sync anchored to 076ea3e9; new HEAD 545bd4fb (Pulse cycles ~1975+~1976) will be picked up on next sync run. ✅ Nominal.
+
+**Check C — Agent liveness:** All 5 PIDs alive (2530123 Ssl, 2744551 SNs, 2744840 Ss, 2744914 Ss, 2868353 Ssl). ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (4 open — 3 new since iter ~1975):
+- **PR #520** (`forge/p41-schedule-harden`): NEW. Created 19:23:12Z. UNKNOWN mergeable, reviewDecision=''. "feat(missions): fold Narrator sweep into GC healer tick + harden LLM-JSON parse". Mirror review dispatched (inbox: review-p41-schedule-harden.json). Age≈9 min. [blue] watch.
+- **PR #521** (`feat/new-mission-ingest-selftest-2026-06-15`): NEW. Created 19:24:01Z. UNKNOWN mergeable, reviewDecision=''. "test(missions): ingest self-test (auto-reconciled)". Author: Larry-Yatch. Body: "heal_orphan_autoregister should append mission ingest-selftest-2026-06-15 to main and close this PR. Safe to drop." Self-managed; heal_orphan_autoregister will process. [blue] watch.
+- **PR #522** (`forge/missions-card-gc-warn-demote-001`): NEW. Created 19:26:45Z. **MERGEABLE**, reviewDecision=''. "fix(missions-card-gc): stop emitting routine success summary as a Pulse-claimed digest alert". Mirror review dispatched (inbox: review-missions-card-gc-warn-demote-001.json). [blue] watch → G-rule missions-card-gc-warn-vs-info COMPLETE once merged.
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): MERGEABLE, reviewDecision=''. Mirror REVIEW_ESCALATE Jun-14T04:02Z (status=FAILURE). Age≈39.5h, ~32.5h until 72h deadline Jun-17T04:02Z. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Conditional checks (Monday 2026-06-15):** § 5.0 audit_due_nudge, distill_detector, audit_cadence_signal — all returned no-op (no FIRED). ✅. Check I sentinel exists → skip. Check VIII/IX/X sentinels exist → skip.
+
+**Credential rotation check:** Config parsed (token-rotation-schedule.json found). Python tz-naive date parse error encountered for all entries (dates missing timezone suffix). Unable to compute delta reliably. No OVERDUE credentials visible. Minor: my inline check script needs tz-aware handling. Not a credential emergency. Note for next iter.
+
+**Actions taken:**
+1. Written `~/agents/inboxes/beacon/pulse-forge-preflight-marker-error-retry-001.json` (G-rule 3/3 dispatch) ✅
+2. `cycle_prime_ledger.py append --tier 1 --kind systemic_fix --template forge-preflight-marker-error-retry` ✅ (ratio→19.98)
+3. `cycle_tier_state.py record --checks-clean false` → **Tier 1, consecutive_clean=0** (G-rule dispatch = non-clean iter) ✅
+
+**Dispatches:**
+- `pulse-forge-preflight-marker-error-retry-001` → Beacon inbox. Direction-ask: spec + dispatch Forge build to harden preflight marker discipline (MalformedForgeMarker pattern, 3rd occurrence, auto-recovered each time but costs ~2 min per incident).
+
+**G-rule updates this iter:**
+- **Forge-preflight-marker-error-retry: 2/3 → 3/3 → DISPATCHED** (Beacon inbox: pulse-forge-preflight-marker-error-retry-001)
+- All other counters unchanged.
+
+**Standing findings (updated from iter ~1975):**
+- [yellow] **PR #497 REVIEW_ESCALATE** — Mirror REVIEW_ESCALATE Jun-14T04:02Z; MERGEABLE; age≈39.5h; ~32.5h until 72h deadline Jun-17T04:02Z. Escalate if still open at deadline.
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519** — bot-delivered for prior. #519 alert TBD. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. FN=3027, TP=5. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. Last: 07:44:56 MDT Jun-15. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] **PR #520 (p41-schedule-harden)** — in Mirror review. Watch for REVIEW_PASS + auto-merge.
+- [blue] **PR #521 (ingest-selftest)** — self-managed (heal_orphan_autoregister). Watch for auto-close.
+- [blue] **PR #522 (missions-card-gc-warn-demote-001)** — in Mirror review. COMPLETE when merged (→ G-rule missions-card-gc-warn-vs-info ✅).
+- [blue] **G-rule Forge-preflight-marker-error-retry** — **3/3 DISPATCHED** → Beacon inbox (pulse-forge-preflight-marker-error-retry-001). [watch for Forge PR]
+- [blue] **G-rule missions-card-gc-warn-vs-info** — **3/3 DISPATCHED** → PR #522 in Mirror review → COMPLETE on merge.
+- [blue] **G-rule medic-diagnosis-tier4** — **COMPLETE ✅** PR #515 merged.
+- [blue] **G-rule healer-unrouted-pr-tier3-translation** — **COMPLETE ✅** PR #516 merged.
+- [blue] **G-rule missions-autoregister-warn-vs-info** — **COMPLETE ✅** PR #514 merged.
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected 2/3, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST 1/3, telegram-409-burst **2/3**, telegram-approval-self-dispatch-denied **1/3**.
+- [blue] **catalog-accuracy-drift** — G-rule 1/3. route=digest. [carry]
+- [blue] **Stale bash orphans** — PIDs 1834248 (17d+) + 2605007 (1d+). Low CPU. [carry]
+
+**PRIME DIRECTIVE:** 1 systemic_fix (G-rule dispatch: forge-preflight-marker-error-retry). ratio≈19.98. Trend: improving.
+**Tier end-of-iter:** **Tier 1** (G-rule dispatch = non-clean; consecutive_clean=0).
+
+---
+
 ## Iteration ~1975 — 2026-06-15 19:24Z UTC (interactive, /cycle, Tier 1, consecutive_clean=1, all nominal)
 
 **Trigger:** Larry direct invocation (`/cycle`).
