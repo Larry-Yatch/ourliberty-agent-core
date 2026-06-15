@@ -90,19 +90,20 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 05:58Z UTC (Iter ~1892, Tier 1)
+## Status snapshot — updated 2026-06-15 06:09Z UTC (Iter ~1893, Tier 1)
 
-**Iter ~1892 summary:** ⚠️ Non-clean. Tier-reset 2→1. 2 Tier-4 alerts (lines 961-962): PR #509 pipeline stall (heal attempt 7) + medic-diagnosis; medic already DM'd Larry (chat_id=7998341473). PR #510 cooldown expiring in dry-run — expect new healer alert soon. 1 intervention recorded. ratio≈20.46. Watermark=962. All daemons alive. PRs #497/#509/#510 carry [yellow]. Forge/Beacon inboxes empty. G-rule stall-detector Forge build pending Larry's dashboard approval (Beacon spec confirmed complete).
+**Iter ~1893 summary:** ⚠️ Non-clean. Tier stays 1. 3 new alerts (lines 963-965): PR#510 pipeline-stall Tier-4 (bot DM delivered), medic-diagnosis Tier-4 (bot DM delivered), stuck-cycle-timer Tier-3 silence (ourliberty-cycle.timer had NextElapseUSecMonotonic=infinity; heal-systemd-install-drift auto-fixed at 06:00Z). 1 intervention recorded. ratio≈20.46. Watermark=965. All daemons alive. PRs #497/#509/#510 carry [yellow]. Forge/Beacon inboxes empty. G-rule stuck-cycle-timer: 1/3 (new). G-rule stall-detector Forge build pending Larry's dashboard approval.
 
 ---
 
-## Key standing items (as of iter ~1880)
+## Key standing items (as of iter ~1893)
 
 | Item | Status | Action needed |
 |---|---|---|
 | PR #497 REVIEW_ESCALATE | [yellow] Carry — UNKNOWN (transient in gh pr list; Mirror REVIEW_ESCALATE at 04:05Z Jun-14; ~25h old) | Close if still stuck: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | PR #509 + #510 | [yellow] UNKNOWN/no-review; medic DM'd Larry at 04:50Z UTC Jun-15 (attempt 6); pending approval `unreg-approval-482eb78951ee` (dashboard; chat_id=None) | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
 | G-rule stall-detector Forge build | [yellow] Beacon spec CONFIRMED COMPLETE (branch-prefix gate; notification archived 01:51Z Jun-15). Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
+| G-rule stuck-cycle-timer | [blue] **1/3** (started iter ~1893). `ourliberty-cycle.timer` had NextElapseUSecRealtime empty + NextElapseUSecMonotonic=infinity; heal-systemd-install-drift auto-healed at 06:00Z Jun-15. | Watch; dispatch at 3/3 |
 | unreviewed-merge:511 | [yellow] PR #511 (`feat/local-review-pass-marker`) merged by Larry at 23:58Z Jun-14 without Mirror routing | Reply 'go: retroactive-review-511' or 'silence: local-review-marker-counts' |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
