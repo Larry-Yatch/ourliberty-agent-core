@@ -120,7 +120,7 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 14:53Z UTC (Iter ~1952, Tier 1→2 de-escalation, clean)
+## Status snapshot — updated 2026-06-15 15:07Z UTC (Iter ~1953, Tier 2 consecutive_clean=1, clean)
 
 **Iter ~1952 summary:** ✅ Clean. Check 0: 0 new alerts (watermark=1003=file). All checks nominal. 4 pipeline stall cooldowns active. All daemons alive. Repo clean, sync fresh. **Tier 1 → Tier 2 de-escalation** (3 consecutive clean iters at Tier 1). consecutive_clean reset to 0. ratio≈20.64 (improving). Also: inbox-watcher log path corrected to `inbox_watcher.log` (underscore).
 
