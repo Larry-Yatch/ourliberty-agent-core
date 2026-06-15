@@ -126,7 +126,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 20:18Z UTC (Iter ~1981, Tier 1, consecutive_clean=0, PR #525 NEW Mirror reviewing, PR #522 CONFLICTING)
+## Status snapshot — updated 2026-06-15 20:24Z UTC (Iter ~1982, Tier 1, consecutive_clean=0, PR #525 MERGED ✅, PR #522 CONFLICTING)
+
+**Iter ~1982 summary:** ⚠️ Signal. L1046 Tier-4 (missions-card-gc/summary — novel, no registry template; bot handled route=digest, DM skipped; no Pulse DM). G-rule missions-card-gc-warn-vs-info already 3/3 dispatched, PR #522 still blocking. Check A: repo behind 1 commit (PR #525 merge `1bebe776`); fast-forward executed. PR #525 (`forge/p41-rebrief-on-change`) MERGED ✅ 20:21:50Z — SEQUENCE_STEP_MERGED missions-v2-phase4.1. Watermark: 1045→1046. 2 open PRs: #522 (CONFLICTING, needs Forge rebase), #497 (72h deadline Jun-17T04:05Z ~31.7h). PRIME ratio=20.04. Tier 1, consecutive_clean=0.
 
 **Iter ~1981 summary:** ⚠️ Signal. L1044 Tier-4 (heal-pipeline-stall:mirror-pass-unmerged:PR#522 — novel, no registry template; medic DM'd Larry at chat_id; no Pulse DM). L1045 Tier-3 silenced (medic-diagnosis). PR #525 NEW (`forge/p41-rebrief-on-change`, feat(missions): re-brief narrator cards on mission state change) — Mirror review dispatched 20:13Z. Watermark: 1043→1045. 3 open PRs: #525 (Mirror reviewing), #522 (CONFLICTING, needs Forge rebase), #497 (72h deadline Jun-17T04:02Z ~32h). PRIME ratio=20.0. **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4: 1/3 (new)**. Tier 1, consecutive_clean=0.
 
@@ -176,11 +178,11 @@
 
 ---
 
-## Key standing items (as of iter ~1981)
+## Key standing items (as of iter ~1982)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #525 Mirror review in progress | [blue] feat(missions): re-brief narrator cards on mission state change. Mirror review dispatched 20:13Z Jun-15. | Watch for REVIEW_PASS + auto-merge. |
+| PR #525 MERGED ✅ | feat(missions): re-brief narrator cards on mission state change. Merged 2026-06-15T20:21:50Z (`1bebe776`). missions-v2-phase4.1 sequence advancing. | DONE. Watch for next sequence step. |
 | PR #522 CONFLICTING | [yellow] Mirror PASS; auto-merge BLOCKED by conflict with PR #520 (scripts/heal_missions_card_gc.py). G-rule missions-card-gc-warn-vs-info blocked. | Forge rebase PR #522 on origin/main. Larry has DM with rebase commands. |
 | PR #497 REVIEW_ESCALATE | [yellow] mergeable=UNKNOWN; Mirror REVIEW_ESCALATE Jun-14T04:05Z; age≈41h; 72h expires Jun-17T04:02Z (~31h remaining). | Escalate if still open at Jun-17T04:02Z |
 | unreviewed-merge:511/499/494/489/510/509/518/519 | [yellow] PRs merged by Larry without Mirror; bot-delivered for others. Larry's judgment call. | Reply appropriate shortcut or silence |

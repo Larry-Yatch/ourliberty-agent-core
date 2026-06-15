@@ -4,6 +4,82 @@
 
 ---
 
+## Iteration ~1982 — 2026-06-15 20:24Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0, PR #525 MERGED ✅, L1046 Tier-4 no-DM)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Signal. Check A: repo behind 1 commit (PR #525 merge `1bebe776`); fast-forward executed. Check 0: L1046 Tier-4 (missions-card-gc/summary — novel, no registry template; bot already handled as route=digest, DM skipped; G-rule already dispatched 3/3). No second DM from Pulse. **Tier 1, consecutive_clean=0** (Tier-4 finding).
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #525 (`forge/p41-rebrief-on-change`): Confirmed **MERGED** 2026-06-15T20:21:50Z (`1bebe776`). Mirror PASS at 20:21:45Z, auto-merged. SEQUENCE_STEP_MERGED seq=missions-v2-phase4.1 step=p41-rebrief-on-change. ✅ **RESOLVED.**
+- PR #522 (`forge/missions-card-gc-warn-demote-001`): Confirmed **CONFLICTING** (mergeable=CONFLICTING, mergeStateStatus=DIRTY). Mirror PASS still valid. Forge rebase on origin/main needed. G-rule missions-card-gc-warn-vs-info **NOT COMPLETE.** [yellow] carry.
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): Confirmed OPEN. mirror-review=FAILURE (REVIEW_ESCALATE 2026-06-14T04:05:31Z). mergeable=UNKNOWN. Age≈40.3h. 72h deadline Jun-17T04:05Z → **~31.7h remaining.** [yellow] carry.
+- All 5 daemons: PIDs 2530123 (Ssl), 2744551 (SNs), 2744840 (Ss), 2744914 (Ss), 2868353 (Ssl) — all alive. ✅
+- Repo HEAD: post-pull = 1bebe776 = origin/main. Clean tree, on main. ✅
+- 409 burst: no new occurrences in recent bot log. G-rule 2/3 unchanged. **CARRY** [yellow].
+
+**Check 0 — Alert triage:** Watermark=1045 (entering); file=1046 lines. **1 new alert** (L1046):
+- L1046: `source=missions-card-gc, severity=warning, subject=summary, route=digest, ts=2026-06-15T20:16:37Z` ("briefed 1 capture(s), committed") → helper: **Tier-4** (novel, no registry template). Bot already handled at 14:16:40 MDT: `alert idx=1045 route=digest; skipping DM`. No second DM from Pulse. G-rule missions-card-gc-warn-vs-info: already 3/3 dispatched, PR #522 pending. **Continuing occurrence while fix blocked on Forge rebase.** Journal-note only.
+- Watermark advanced: 1045→1046.
+
+**Check 1 — Log noise:** outbox-notifier.log: last entry 14:21:50 MDT (AUTO_MERGE PR #525, SEQUENCE_STEP_MERGED missions-v2-phase4.1 p41-rebrief-on-change). Only WARN in window: AUTO_MERGE_HELD_STALE_CONFLICT at 14:03:45 MDT (PR #522, already known from iter ~1981). No new WARNs/ERRORs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** PID 2744840 alive (Ss). Last Larry message: "Go" at 13:59:52 MDT — approved p41-rebrief-on-change dispatch (built → Mirror PASS → merged 14:21:50 MDT). No 409 errors in recent log. G-rule telegram-409-burst 2/3 unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → 0 new alerts, 1 suppressed (cooldown: mirror_pass_unmerged:missions-card-gc-warn-demote-001). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0**. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T20:16:49.161614+00:00`, age≈8 min. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** Repo was behind origin/main by 1 commit (PR #525 merge `1bebe776`). `git pull --ff-only` executed. HEAD=1bebe776=origin/main. Clean tree, on main. ✅ **Auto-fixed.**
+
+**Check B — Sync health:** last_sync=2026-06-15T19:45:59Z, status=no-change, age≈39 min. FRESH (<2h). ✅ Nominal.
+
+**Check C — Agent liveness:** All 5 PIDs alive (2530123 Ssl, 2744551 SNs, 2744840 Ss, 2744914 Ss, 2868353 Ssl). ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (2 open):
+- **PR #525** (`forge/p41-rebrief-on-change`): **MERGED** ✅ 2026-06-15T20:21:50Z. feat(missions): re-brief narrator cards on mission state change. SEQUENCE_STEP_MERGED for missions-v2-phase4.1. RESOLVED — remove from standings.
+- **PR #522** (`forge/missions-card-gc-warn-demote-001`): CONFLICTING (mergeable=CONFLICTING, mergeStateStatus=DIRTY). Mirror PASS (19:34:59Z). Auto-merge blocked — Forge rebase on origin/main needed. [yellow] carry.
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): OPEN. mergeable=UNKNOWN. Mirror REVIEW_ESCALATE Jun-14T04:05Z. Age≈40.3h, ~31.7h until 72h deadline Jun-17T04:05Z. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Conditional checks (Monday 2026-06-15):** Check I sentinel (check-i-2026-06-15.json) exists → skip. Check VIII/IX/X: sentinels exist from iter ~1981 → skip.
+
+**Actions taken:**
+1. Alert triage: L1046 Tier-4 (missions-card-gc/summary, no DM — bot handled as digest).
+2. `git -C ~/agent-core pull --ff-only` → HEAD 1bebe776=origin/main ✅
+3. `alert_triage_state.py set-watermark --line 1046` → 1045→1046 ✅
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --template missions-card-gc-summary-continuing-pr522-blocked` ✅
+5. `cycle_tier_state.py record --checks-clean false` → **Tier 1, consecutive_clean=0** ✅
+
+**Dispatches:** None.
+
+**G-rule updates this iter:**
+- All G-rule counters unchanged from iter ~1981. No new occurrences.
+- G-rule missions-card-gc-warn-vs-info: 3/3 DISPATCHED → PR #522 CONFLICTING. Continuing occurrence at L1046 while fix is blocked on Forge rebase. PENDING COMPLETION.
+- G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4: 1/3 unchanged. Cooldown suppressed repeat this iter (correct behavior). CARRY.
+
+**Standing findings (updated):**
+- [yellow] **PR #522 CONFLICTING** — Mirror PASS, blocked by merge conflict. Forge rebase on origin/main needed. Larry has rebase instructions via DM (outbox-notifier 20:03Z + medic 20:11Z Jun-15).
+- [yellow] **PR #497 REVIEW_ESCALATE** — Mirror REVIEW_ESCALATE Jun-14T04:05Z; age≈40.3h; ~31.7h until 72h deadline Jun-17T04:05Z.
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. FN=3027, TP=5. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST 1/3, telegram-409-burst **2/3**, telegram-approval-self-dispatch-denied **1/3**, merge_conflict_manual_rebase-tier4 1/3, heal-pipeline-stall-mirror-pass-unmerged-tier4 1/3. All unchanged.
+- [blue] **Stale bash orphans** — PIDs 1834248 (17d+) + 2605007 (1d+). Low CPU. [carry]
+- [blue] **missions-v2-phase4.1 sequence** — p41-schedule-harden ✅ + p41-rebrief-on-change ✅ (MERGED this iter). Remaining steps TBD; pipeline managing.
+
+**PRIME DIRECTIVE:** 1 intervention (missions-card-gc-summary-continuing-pr522-blocked). ratio=20.04. Trend: improving.
+**Tier end-of-iter:** **Tier 1** (Tier-4 finding L1046; consecutive_clean=0).
+
+---
+
 ## Iteration ~1981 — 2026-06-15 20:18Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0, PR #525 NEW, L1044 Tier-4 no-DM, L1045 Tier-3)
 
 **Trigger:** Larry direct invocation (`/cycle`).
