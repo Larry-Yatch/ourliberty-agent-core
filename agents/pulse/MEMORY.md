@@ -120,9 +120,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 12:36Z UTC (Iter ~1937, Tier 1, clean)
+## Status snapshot — updated 2026-06-15 12:40Z UTC (Iter ~1938, Tier 1, clean)
 
-**Iter ~1937 summary:** ✅ Nominal. All checks clean. Watermark=986 = file length (no new alerts). Tier 1, consecutive_clean=1 (2 more clean iters → Tier 2). ratio≈20.51 (unchanged). All 5 PIDs healthy. Sync last=12:24Z (FRESH). 5 open PRs: #497 (MERGEABLE re-verified; REVIEW_ESCALATE ~32.5h, expires Jun-17T04:05Z), #509/#510/#512/#513 (stall/cooldowns). beacon-pending-approvals.json: pending=2 (unreg-approval-482eb78951ee + alert-translation-unrouted-pr-001). **New [yellow]**: transient Telegram 409 burst at 12:23Z UTC, self-resolved; G-rule telegram-409-burst 0/3; three old agent_telegram_bot.py PIDs (1843740/1843744/2514954) noted.
+**Iter ~1938 summary:** ✅ Nominal. All checks clean. Watermark=986 = file length (no new alerts). Tier 1, consecutive_clean=2 (1 more clean iter → Tier 2). ratio≈20.51 (unchanged). All 5 PIDs healthy. Sync last=12:24Z (FRESH). 5 open PRs: #497 (MERGEABLE re-verified; REVIEW_ESCALATE ~34.6h, expires Jun-17T04:05Z), #509/#510/#512/#513 (stall/cooldowns). beacon-pending-approvals.json: pending=2 (unreg-approval-482eb78951ee + alert-translation-unrouted-pr-001). Telegram 409 burst (12:22Z UTC Jun-15) same event as noted iter ~1937; no new occurrence; G-rule 0/3.
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl. When cooldown expires, the alert fires in dry-run mode. Be aware: calling --dry-run in a cycle will write real alerts if the cooldown has passed. Always check wc -l of the file before and after.
 
