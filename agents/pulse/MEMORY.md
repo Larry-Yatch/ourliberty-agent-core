@@ -126,7 +126,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 18:02Z UTC (Iter ~1970, Tier 2, consecutive_clean=2)
+## Status snapshot — updated 2026-06-15 18:22Z UTC (Iter ~1971, Tier 3, consecutive_clean=0)
+
+**Iter ~1971 summary:** ✅ Nominal. 0 new alerts. Watermark: 1034 (unchanged). pending=0. **Tier 2 → Tier 3 PROMOTED** (consecutive_clean=3). Daemons all alive. No G-rule advances. 3 open PRs: #497 (age≈38.3h, deadline Jun-17T04:05Z ~33.7h), #512 CONFLICTING, #513 CONFLICTING.
 
 **Iter ~1970 summary:** ✅ Nominal. 2 new alerts, both Tier-3 silenced (L1033-L1034, medic-diagnosis). Watermark: 1032→1034. pending=0. Tier 2, consecutive_clean=2. Daemons all alive. No G-rule advances. 3 open PRs: #497 (age≈38h, deadline Jun-17T04:05Z ~34h), #512, #513.
 
@@ -159,7 +161,7 @@
 | Item | Status | Action needed |
 |---|---|---|
 | PR #497 REVIEW_ESCALATE | [yellow] UNKNOWN mergeable; reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age≈39.3h; 72h expires Jun-17T04:05Z (~30.3h remaining). | Escalate if still open at Jun-17T04:05Z |
-| PRs #512/#513 pipeline-stall | [yellow] Cooldowns expired; healer fired alerts (L1031-1032) → Tier-3 silenced (PR #516 fix working). PRs still unrouted to Mirror. | Larry routing decision needed |
+| PRs #512/#513 pipeline-stall | [yellow] Now CONFLICTING (conflicts from #515/#516 merges). Healer cooldowns active. PRs unrouted to Mirror; rebase required before routing. | Larry routing decision + Forge rebase needed |
 | unreviewed-merge:511/499/494/489/510/509 | [yellow] PRs merged by Larry without Mirror; bot-delivered; Larry's judgment call. | Reply appropriate shortcut or silence |
 | G-rule stall-detector Forge build | [yellow] Beacon spec complete. Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
 | Check VIII rule=lower | [yellow] FN=3027, TP=5, FP=2 — threshold too high. | `approve check-viii-update-2026-06-15` when shortcut lands |
