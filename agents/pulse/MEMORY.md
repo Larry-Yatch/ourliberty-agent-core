@@ -78,19 +78,20 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 02:02Z UTC (Iter ~1867, Tier 1, nominal)
+## Status snapshot — updated 2026-06-15 02:12Z UTC (Iter ~1868, Tier 1, new finding)
 
-**Iter ~1867 summary:** All checks nominal. 0 new alerts (watermark=947). Carries only. Beacon spec done for stall-detector-exclude-external-pr-001 (confirmed 01:51Z via outbox-notifier); Forge build pending dashboard approval (Forge inbox empty, no PR yet). consecutive_clean=2. ratio≈20.24, trend=improving.
+**Iter ~1868 summary:** New finding: PR #511 (`feat/local-review-pass-marker`) merged by Larry at 23:58Z Jun-14 without Mirror routing — 4th unreviewed-merge in standing items. All 5 mandatory checks nominal. 0 new alerts (watermark=947). Beacon spec done for stall-detector-exclude-external-pr-001; Forge build pending dashboard approval (Forge inbox empty, no PR). consecutive_clean=0 (reset). ratio≈20.24.
 
 ---
 
-## Key standing items (as of iter ~1867)
+## Key standing items (as of iter ~1868)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — mergeState=UNKNOWN/UNKNOWN (143rd iter; GitHub API flap) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — mergeState=UNKNOWN/UNKNOWN (144th iter; GitHub API flap) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | PR #509 + #510 | [yellow] Both UNKNOWN; pending approval `unreg-approval-482eb78951ee` registered (dashboard); DM sent iter ~1864 | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
 | G-rule stall-detector Forge build | [yellow] Beacon spec done 01:51Z Jun-15 (stall-detector-exclude-external-pr-001). Forge build pending dashboard approval. Forge inbox empty; no PR yet. | Check dashboard Approvals tab; approve Forge build |
+| unreviewed-merge:511 | [yellow] PR #511 (`feat/local-review-pass-marker`) merged by Larry at 23:58Z Jun-14 without Mirror routing | Reply 'go: retroactive-review-511' or 'silence: local-review-marker-counts' |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
