@@ -4,6 +4,102 @@
 
 ---
 
+## Iteration ~1925 — 2026-06-15 10:21Z UTC (interactive, /cycle, Tier 1, consecutive_clean=1)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. No new alerts, no new pipeline stall fires, all agents alive, sync fresh.
+
+**VERIFY-BEFORE-REASSERT (iter ~1924 carries):**
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): `gh pr view 497` → OPEN, **MERGEABLE**, reviewDecision="". Mirror REVIEW_ESCALATE 04:05:31Z Jun-14. Age ≈ 30.3h. Under 72h (~Jun-17T04:05Z). **CARRY** [yellow].
+- PRs #509/#510/#512/#513: All OPEN, UNKNOWN. Cooldowns active (confirmed via --dry-run: all 4 suppressed this iter). **CARRY** [yellow].
+- unreg-approval-482eb78951ee: beacon-pending-approvals.json confirmed pending=1. **CARRY** [yellow].
+- dashboard_api PID 2868353: Ssl, 16h 20m. **CARRY** [blue].
+- Stale bash orphans PIDs 1834248 + 2605007: Not re-verified this iter; carry from ~1924 [blue].
+- sync-blocked (07:26Z): recovered (last_sync=09:24:17Z). Not a live finding. ✅
+
+**Check 0 — Alert triage:** Watermark=989. larry-alerts.jsonl=967 lines (unchanged from iter ~1924; no new alerts since last iter). Watermark gap persists (989 > 967 lines) — workaround in place (manual wc -l comparison). ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log tail-30: 0 WARNs, 0 ERRORs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot log tail: last delivery idx=966 (medic-diagnosis) at 04:18:10-0600 (10:18Z Jun-15). No new Larry directives since 'go' at 18:21:09-0600 Jun-14. Bot PID 2744840 alive (Ss, 23h 43m). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → 0 new alerts fired, 0 recovered, 4 suppressed (cooldowns: PRs #513, #512, #510, #509 all active). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: pending=1 (`unreg-approval-482eb78951ee`, PR#509+#510 merge decision). No change. [yellow] carry.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T10:14:02Z`, age≈7 min. FRESH (< 60 min). ✅ Nominal.
+
+**Check A — Source repo:** On main, clean (no uncommitted changes). HEAD=ab5fdbcb == origin/main (0 behind, 0 ahead). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-15T09:24:17Z (~57 min ago), status=no-change. FRESH (<<2h threshold). ✅ Nominal.
+
+**Check C — Agent liveness:**
+- inbox_watcher: PID 2530123 ✅ (Ssl, 1d 14h 55m)
+- chain_event_shipper: PID 2744551 ✅ (SNs, 23h 43m)
+- beacon_telegram_bot: PID 2744840 ✅ (Ss, 23h 43m)
+- outbox_notifier: PID 2744914 ✅ (Ss, 23h 43m)
+- dashboard_api: PID 2868353 ✅ (Ssl, 16h 20m)
+- No forge/mirror persistent sessions — expected. ✅
+
+**Check E — PRs:**
+ourliberty-agent-core (5 open):
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`), **MERGEABLE** (re-verified `gh pr view 497`), reviewDecision="". Mirror REVIEW_ESCALATE 04:05:31Z Jun-14. Age ≈ 30.3h. Under 72h. [yellow] carry.
+- **PR #509** (`docs/meaning-layer-roadmap`), UNKNOWN. Cooldown active. [yellow] carry.
+- **PR #510** (`work/build-consult-restock`), UNKNOWN. Cooldown active. [yellow] carry.
+- **PR #512** (`feat/new-mission-pulse-check-ix-catch-me-up-gap-2026-06-15`), UNKNOWN. Cooldown active. [yellow] carry.
+- **PR #513** (`feat/new-mission-pulse-check-ix-alert-ignored-2026-06-15`), UNKNOWN. Cooldown active. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Check H — Forge/Beacon/Pulse inbox:** All three inboxes empty. ✅ Nominal.
+
+**Conditional checks:** Today is Monday (2026-06-15 UTC). Check I: sentinel check-i-2026-06-15.json exists (fired iter ~1899) — skip re-run. Check III: most recent artifact 2026-06-11; today is Monday (not Sunday) — skip. ✅
+
+**Actions taken:**
+1. `cycle_tier_state.py record --checks-clean true` → **Tier 1, consecutive_clean=1** ✅
+2. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` — iter-1925-all-checks-nominal-no-new-findings ✅
+
+**Dispatches:** None.
+
+**Patterns:**
+- G-rule heal-pipeline-stall:unrouted-pr Tier-4 repeat: 0 new. **2/3**. Carry.
+- G-rule Forge-preflight-marker-error-retry: 0 new. **2/3**. Carry.
+- G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch-warn-vs-info: 0 new. **1/3**. Carry.
+- G-rule ledger/check-i Tier-4: 0 new. **1/3**. Carry.
+- G-rule missions-autoregister-warn-vs-info: 0 new. **2/3**. Carry.
+- G-rule missions-card-gc-warn-vs-info: 0 new. **2/3**. Carry.
+- G-rule F24-empty-prompt-envelope-rejected: 0 new. **2/3**. Carry.
+- G-rule health-notify-script-missing: 0 new. **1/3**. Carry.
+- G-rule timer-cycle-no-journal-entry: 0 new. **0/3**. Carry.
+- G-rule stuck-cycle-timer: 0 new. **0/3**. Carry.
+- G-rule Forge-timeout-worktree-missing-retry-loop: 0 new. **1/3**. Carry.
+- G-rule heal-stale-daemon-script_path-cosmetic: 0 new. **1/3**. Carry.
+
+**Standing findings:**
+- [yellow] **PR #497 REVIEW_ESCALATE** — MERGEABLE (re-verified 10:21Z); reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ≈ 30.3h; 72h expires ~Jun-17T04:05Z. [carry]
+- [yellow] **PRs #509/510/512/513 pipeline-stall** — all cooldowns active, no new DMs this iter. Options: `dispatch mirror review pr=<N>` OR merge/close. [carry; awaiting Larry]
+- [yellow] **unreg-approval-482eb78951ee** — pending=1 (PR#509+#510 merge decision). [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **unreviewed-merge:511/499/494/489** — [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [blue] **Check I 2026-06-15** — 1 proposal dispatched to Beacon iter ~1899. [carry]
+- [blue] **Check IX missions** — PRs #512 + #513 open. [carry]
+- [blue] G-rule counters: heal-pipeline-stall:unrouted-pr Tier-4 repeat 2/3, Forge-preflight-marker-error-retry 2/3, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, missions-autoregister-warn-vs-info 2/3, missions-card-gc-warn-vs-info 2/3, F24-empty-prompt-envelope-rejected 2/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, heal-stale-daemon-script_path-cosmetic 1/3.
+- [blue] **Check I medic-operator-scaffold-001** — 24.4σ; prior dispatch 2026-06-10. [carry]
+- [blue] **catalog-accuracy-drift** — 8/34 ourliberty-graph shelf cards. [carry]
+- [blue] **dag-preflight-revision gap** — PR #484 closed source=pulse gap; DAG markers still fall through. [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+- [blue] **Stale bash orphans** — PIDs 1834248 (17d+, Ss) + 2605007 (1d+, Ss). Low CPU. Not re-verified this iter. [carry]
+- [blue] **dashboard_api PID 2868353** — Ssl, stable. [carry]
+- [blue] **Watermark gap** — watermark=989 above file length (967 lines); manual wc -l comparison each iter as workaround. Carry.
+
+**PRIME DIRECTIVE:** 0 interventions this iter (iter_clean). ratio≈20.87 (959/46), trend=stable.
+**Tier end-of-iter:** **Tier 1, consecutive_clean=1** (first clean iter since pipeline stall fires in ~1922).
+
+---
+
 ## Iteration ~1924 — 2026-06-15 10:16Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0)
 
 **Trigger:** Larry direct invocation (`/cycle`).
