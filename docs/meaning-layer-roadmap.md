@@ -88,6 +88,8 @@ The board must never drift behind the work — the failure we hit twice on 2026-
   - **Completion:** *safe*-risk cards **auto-close on verified merge** (belt-and-suspenders gate, like the advancer/GC) with a "shipped in PR #X" note; *risky* cards get a **team-authored plain-language closeout** posted to the card — what we did · the outcome · anything to know — for Larry to **review before it closes** (the Narrator extends to closeout, not just the opening briefing).
   - **Failure / blocked rings back** to the card (loud doorbell), not just the good news.
 - **No stale board (freshness layer — both layers in scope):** engineer out the lag class we kept hitting — **push-emit** work-state to the board instead of waiting on polls / the hourly sync; remove the "needs an API restart / batched commit / hourly pull before it shows" gaps so the board reflects reality promptly.
+- **Cost visibility:** each card shows what its delegated work will / did cost — an estimate up front (Larry gates spend) and the actual on closeout.
+- **In-flight overrules a late pause:** if Larry snoozes / drops / pauses a card whose work is already in flight, the team's mid-work **continues to completion** — a late pause never yanks running work; the action applies once the work reaches a safe stop, and the card reports back.
 
 ### Phase 4.2 — Spread to the other lanes + **generalize for reuse**  ·  (Larry's pick for after 4.1)
 Put the meaning layer on the **Orphans lane** (the ~97-item pile) and the **active missions**, so the *whole* board reads plainly — and **this is where the capability becomes a shelf component**:
@@ -133,6 +135,8 @@ From the design conversation (2026-06-13/14):
 - **Prove on Parked first** — done + validated.
 - **Build as a reusable, shelf-able capability** — robust and generic, not a missions-only feature.
 - **Two-way / closed-loop sync** — the board never drifts behind the team's work. *Safe* cards auto-close on verified merge; *risky* cards get a plain-language team closeout for Larry to review before closing; failures ring back. Scope = **both** the card↔work loop and raw infra freshness.
+- **Cost on the card** — every card surfaces the cost of its delegated work (estimate up front, actual on closeout); Larry gates spend.
+- **In-flight work overrules a late pause** — a pause/snooze/drop never interrupts work already in flight; it applies only after the work safely completes.
 
 ---
 
