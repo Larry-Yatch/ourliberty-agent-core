@@ -2759,6 +2759,23 @@
       "proposed_at": "2026-06-15T15:43:23.147186+00:00",
       "orphan_branch": null,
       "orphan_last_activity_ts": "2026-06-15T15:41:35.214899+00:00"
+    },
+    {
+      "id": "proposed-autoregister-warn-demote-001",
+      "name": "Autoregister Warn Demote 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `autoregister-warn-demote-001`. Last activity 2026-06-15T15:57:12.482915+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "autoregister-warn-demote-001"
+      ],
+      "repo": null,
+      "created": "2026-06-15",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-15T15:58:37.926399+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-15T15:57:12.482915+00:00"
     }
   ]
 }
