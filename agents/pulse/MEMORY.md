@@ -126,7 +126,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 19:01Z UTC (Iter ~1972, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-15 19:10Z UTC (Iter ~1973, Tier 1, consecutive_clean=0)
+
+**Iter ~1973 summary:** ✅ Near-nominal. 2 new alerts (L1037-L1038, both Tier-3 silenced). Check 4: pending=1 (missions-card-gc-warn-demote-001, bot-DM already delivered 13:05 MDT, awaiting Larry "go"). No G-rule advances. No dispatches. Watermark: 1036→1038. 1 open PR: #497 (age≈39.1h, deadline Jun-17T04:02Z ~32.9h). PRIME ratio≈20.38. Tier 1, consecutive_clean=0.
 
 **Iter ~1972 summary:** ⚠️ Tier-reset 3→1. 2 new alerts. L1035 missions-card-gc/summary → Tier-4; G-rule 3/3 → dispatched Beacon `pulse-missions-card-gc-warn-vs-info-001`. L1036 unreviewed-merge:518 → Tier-4, bot-delivered, Larry judgment, carry. PRs #512+#513 now CLOSED. 1 open PR: #497 (age≈38.9h, deadline Jun-17T04:02Z ~33h). Watermark: 1034→1036. PRIME ratio≈20.79.
 
@@ -154,19 +156,21 @@
 
 ---
 
-## Key standing items (as of iter ~1972)
+## Key standing items (as of iter ~1973)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] UNKNOWN mergeable; reviewDecision=""; Mirror REVIEW_ESCALATE Jun-14T04:05Z; age≈38.9h; 72h expires Jun-17T04:02Z (~33.1h remaining). | Escalate if still open at Jun-17T04:02Z |
-| unreviewed-merge:511/499/494/489/510/509/518 | [yellow] PRs merged by Larry without Mirror; bot-delivered; Larry's judgment call. (#518 added iter ~1972; #517 merged same cycle, no separate alert) | Reply appropriate shortcut or silence |
+| PR #497 REVIEW_ESCALATE | [yellow] UNKNOWN mergeable; reviewDecision=""; Mirror REVIEW_ESCALATE Jun-14T04:05Z; age≈39.1h; 72h expires Jun-17T04:02Z (~32.9h remaining). | Escalate if still open at Jun-17T04:02Z |
+| missions-card-gc-warn-demote-001 pending | [yellow] Beacon plan authored; bot DM delivered 13:05 MDT Jun-15. Awaiting Larry "go". | Reply "go" in Telegram |
+| unreviewed-merge:511/499/494/489/510/509/518 | [yellow] PRs merged by Larry without Mirror; bot-delivered; Larry's judgment call. | Reply appropriate shortcut or silence |
 | G-rule stall-detector Forge build | [yellow] Beacon spec complete. Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
 | Check VIII rule=lower | [yellow] FN=3027, TP=5, FP=2 — threshold too high. | `approve check-viii-update-2026-06-15` when shortcut lands |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
 | Telegram 409 burst | [yellow] G-rule **2/3**. All self-inflicted by calling get-messages. | Watch; dispatch at 3/3 |
 | G-rule telegram-approval-self-dispatch-denied | [yellow] **1/3** — Larry "Go" → dispatch failed (self-dispatch denied beacon→beacon). | Watch; dispatch to Beacon at 3/3 for bot routing fix |
-| G-rule missions-card-gc-warn-vs-info | [blue] **3/3 DISPATCHED** → Beacon `pulse-missions-card-gc-warn-vs-info-001`. Awaiting Forge PR. | Watch for Forge PR |
+| p41-schedule-harden build | [blue] Forge inbox task dispatched 13:05Z. No PR yet. | Watch next iter |
+| G-rule missions-card-gc-warn-vs-info | [blue] **3/3 DISPATCHED** → Beacon plan `missions-card-gc-warn-demote-001`. Pending Larry approval. | Reply "go" (same as yellow above) |
 | G-rule missions-autoregister-warn-vs-info | [blue] **COMPLETE ✅** PR #514 merged Jun-15. | Done. |
 | G-rule medic-diagnosis-tier4 | [blue] **COMPLETE ✅** PR #515 merged Jun-15T17:27:41Z. | Done. |
 | G-rule healer-unrouted-pr-tier3-translation | [blue] **COMPLETE ✅** PR #516 merged Jun-15T17:27:36Z. Verified L1031+L1032 → Tier-3. | Done. |
