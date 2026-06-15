@@ -4,6 +4,97 @@
 
 ---
 
+## Iteration ~1955 — 2026-06-15 15:39Z UTC (interactive, /cycle, Tier 1 signal, medic-diagnosis G-rule 3/3 dispatched)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Signal. 8 new alerts (L1005-1012). G-rule medic-diagnosis-tier4 3/3 → DISPATCHED. Pipeline-stall cooldowns expired again for PRs #510/#512/#513. All daemons alive.
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): UNKNOWN mergeable, reviewDecision=''. Mirror REVIEW_ESCALATE 04:05:31Z Jun-14. Age ≈ 35.6h. 72h expires ~Jun-17T04:05Z (≈36.4h remaining). **CARRY** [yellow].
+- PRs #509/#510/#512/#513: heal_pipeline_stall --dry-run at 15:35:59Z → 3 new alerts fired (PRs #513/#512/#510 cooldowns expired), PR#509 suppressed. **CONFIRMED ACTIVE** [yellow].
+- beacon-pending-approvals.json: pending=2 (unreg-approval-482eb78951ee + alert-translation-unrouted-pr-001). No change. **CARRY** [yellow].
+
+**Check 0 — Alert triage:** Watermark=1004 (entering); file=1012 lines. **8 new alerts (L1005-1012):**
+- L1005: `source=medic, intent=medic-diagnosis` (attempt 16, PR#509, 15:29:35Z) → Tier-4 (ask). Bot delivered idx=1004 at 09:32 MDT. No second DM.
+- L1006: `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#513` (15:35:59Z) → Tier-4. Bot delivered idx=1005 at 09:37 MDT.
+- L1007: `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#512` (15:35:59Z) → Tier-4. Bot delivered idx=1006 at 09:37 MDT.
+- L1008: `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#510` (15:35:59Z) → Tier-4. Bot delivered idx=1007 at 09:37 MDT.
+- L1009: `source=dispatch-branch-cleanup, intent=summary` (15:37:07Z) → **Tier-3 (silenced)**. No DM.
+- L1010-1012: `source=medic, intent=medic-diagnosis` (PRs #510/#512/#513, 15:37:15-17Z) → Tier-4 (ask). Bot delivery pending.
+- **G-rule medic-diagnosis-tier4: 2/3 → 3/3 → DISPATCHED** `g-rule-medic-diagnosis-tier3-translation-001` to Beacon inbox (Tier-3 translation for medic-diagnosis; medic DMs via chat_id directly, Pulse second-DM is noise).
+- G-rule pipeline-stall Tier-4: DISPATCHED iter ~1930; fix pending approval (alert-translation-unrouted-pr-001).
+Watermark: 1004 → 1012. ⚠️ Non-clean → tier-reset.
+
+**Check 1 — Log noise:** outbox-notifier: last WARN at 01:10:53Z (task-id mismatch, G-rule 1/3 unchanged). No new WARNs. inbox_watcher: no WARNs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot log: 409 burst OLD (07:43-07:44 MDT), G-rule 2/3 unchanged, no new 409 since. Last delivery idx=1007 at 09:37:04 MDT (pipeline-stall PR#510). PID 2744840 alive (Ss). No new Larry directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run at 15:35:59Z: 3 new alerts fired (PRs #513/#512/#510 cooldowns expired → written as L1006-1008), 1 suppressed (#509). ⚠️ (already known pattern; G-rule fix pending).
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: pending=2 (unreg-approval-482eb78951ee + alert-translation-unrouted-pr-001). No change. [yellow] carry.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T15:15:34.124180+00:00`, age≈24 min. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=362b5982 = origin/main. Clean tree. On main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-15T15:25:15Z (~14 min ago). FRESH (<2h). ✅ Nominal.
+
+**Check C — Agent liveness:**
+- inbox_watcher: PID 2530123 ✅ (Ssl)
+- chain_event_shipper: PID 2744551 ✅ (SNs)
+- beacon_telegram_bot: PID 2744840 ✅ (Ss)
+- outbox_notifier: PID 2744914 ✅ (Ss)
+- dashboard_api: PID 2868353 ✅ (Ssl)
+- No forge/mirror persistent sessions — expected. ✅
+
+**Check E — PRs:**
+ourliberty-agent-core (5 open, unchanged):
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): UNKNOWN mergeable, reviewDecision=''. Mirror REVIEW_ESCALATE 04:05:31Z Jun-14. Age ≈ 35.6h. 72h expires ~Jun-17T04:05Z. [yellow] carry.
+- **PR #509** (`docs/meaning-layer-roadmap`), cooldown active. [yellow] carry.
+- **PR #510** (`work/build-consult-restock`), cooldown reset (new stall alert fired 15:35:59Z). [yellow] carry.
+- **PR #512** (`feat/new-mission-pulse-check-ix-catch-me-up-gap-2026-06-15`), cooldown reset. [yellow] carry.
+- **PR #513** (`feat/new-mission-pulse-check-ix-alert-ignored-2026-06-15`), cooldown reset. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Conditional checks:** Check I sentinel `check-i-2026-06-15.json` EXISTS (fired iter ~1899). Skip. Check III: Monday (not Sunday). Skip. ✅
+
+**Actions taken:**
+1. Triage 8 alerts via `alert_triage_state.py triage-alert` (L1005-1012): 7 Tier-4, 1 Tier-3 ✅
+2. Dispatch `g-rule-medic-diagnosis-tier3-translation-001` → Beacon inbox ✅ (G-rule 3/3)
+3. `alert_triage_state.py set-watermark --line 1012` ✅ (1004 → 1012)
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention` ✅ (ts=15:39:26Z)
+5. `cycle_tier_state.py record --checks-clean false` → **Tier 1, consecutive_clean=0** ✅
+
+**Dispatches:** `g-rule-medic-diagnosis-tier3-translation-001` to Beacon inbox — direction-ask to add Tier-3 translation for `source=medic, intent=medic-diagnosis` in `config/alert-translations.json`.
+
+**G-rule updates this iter:**
+- medic-diagnosis-tier4: **3/3 → DISPATCHED** `g-rule-medic-diagnosis-tier3-translation-001`
+- All other counters unchanged from iter ~1954.
+
+**Standing findings (updated from iter ~1954):**
+- [yellow] **PR #497 REVIEW_ESCALATE** — Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ≈ 35.6h; 72h expires ~Jun-17T04:05Z (~36.4h remaining). [carry]
+- [yellow] **PRs #509/510/512/513 pipeline-stall** — cooldowns expired again this iter for #510/#512/#513; new stall alerts fired (L1006-1008). Awaiting `approve alert-translation-unrouted-pr-001`.
+- [yellow] **alert-translation-unrouted-pr-001** — pending in beacon-pending-approvals.json. Reply "approve" to trigger Forge config-only PR.
+- [yellow] **unreg-approval-482eb78951ee** — pending (direction-ask: merge-509-510-direct vs mirror-review-509-510). [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **unreviewed-merge:511/499/494/489** — [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3** (no new occurrence this iter). [watch → dispatch at 3/3]
+- [blue] **G-rule medic-diagnosis-tier4** — **DISPATCHED** iter ~1955 (`g-rule-medic-diagnosis-tier3-translation-001`). Watch for Beacon spec + Forge config-only PR.
+- [blue] **catalog-accuracy-drift** — G-rule 1/3. route=digest. [carry]
+- [blue] **Check I 2026-06-15** — 1 proposal dispatched to Beacon iter ~1899. [carry]
+- [blue] **Check IX missions** — PRs #512 + #513 open. [carry]
+- [blue] G-rule counters: Forge-preflight-marker-error-retry 2/3, missions-autoregister-warn-vs-info 2/3, missions-card-gc-warn-vs-info 2/3, F24-empty-prompt-envelope-rejected 2/3, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, heal-stale-daemon-script_path-cosmetic 1/3, Forge-preflight-CLARIFY_REQUEST 1/3, telegram-409-burst **2/3**, medic-diagnosis-tier4 **DISPATCHED**.
+- [blue] **Stale bash orphans** — PIDs 1834248 (17d+, Ss) + 2605007 (1d+, Ss). Low CPU. [carry]
+
+**PRIME DIRECTIVE:** intervention (pipeline-stall-and-medic-diagnosis-repeat). ratio≈20.66. systemic_fix dispatched: g-rule-medic-diagnosis-tier3-translation-001.
+**Tier end-of-iter:** **Tier 1, consecutive_clean=0** (tier-reset from signal — 8 new alerts).
+
+---
+
 ## Iteration ~1954 — 2026-06-15 15:28Z UTC (interactive, /cycle, Tier 2→1 signal, pipeline-stall:PR#509)
 
 **Trigger:** Larry direct invocation (`/cycle`).
