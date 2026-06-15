@@ -2844,6 +2844,32 @@
       "proposed_at": "2026-06-15T16:44:39.758328+00:00",
       "orphan_branch": null,
       "orphan_last_activity_ts": "2026-06-04T05:53:59.062152+00:00"
+    },
+    {
+      "id": "pulse-check-ix-catch-me-up-gap-2026-06-15",
+      "name": "Pulse Check IX catch-me-up-gap 2026-06-15",
+      "phase": "drafting",
+      "brief": "Operator status-probe rate above threshold | Evidence: 12 status-probe events over trailing 7d | Suggested fix shape: Add a Telegram catch-me-up shortcut that summarizes in-flight PRs, paused sequences, and pending approvals without manual prompting.",
+      "spec_docs": [
+        "agents/beacon/specs/pulse-check-ix-operator-friction.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-15",
+      "deferred_reason": null
+    },
+    {
+      "id": "pulse-check-ix-alert-ignored-2026-06-15",
+      "name": "Pulse Check IX alert-ignored 2026-06-15",
+      "phase": "drafting",
+      "brief": "Alert subject `summary` ignored repeatedly | Evidence: 69 fires of `summary` over trailing 7d (23 repeating subject(s) total) | Suggested fix shape: Tighten the alert (raise its threshold, reduce its cadence, or convert to a periodic digest) — or land the operator shortcut that would resolve it without manual intervention.",
+      "spec_docs": [
+        "agents/beacon/specs/pulse-check-ix-operator-friction.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-15",
+      "deferred_reason": null
     }
   ]
 }
