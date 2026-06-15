@@ -120,9 +120,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 12:51Z UTC (Iter ~1939, Tier 2, clean)
+## Status snapshot — updated 2026-06-15 13:08Z UTC (Iter ~1940, Tier 2, clean)
 
-**Iter ~1939 summary:** ✅ Nominal. All checks clean. Tier promoted **1→2** (3 consecutive clean iters). Watermark=986 = file length (no new alerts). ratio≈20.51 (unchanged). All 5 PIDs healthy. Sync last=12:24Z (FRESH). 5 open PRs: #497 (MERGEABLE re-verified; REVIEW_ESCALATE ~36.8h, expires Jun-17T04:05Z), #509/#510/#512/#513 (stall/cooldowns). beacon-pending-approvals.json: pending=2 (unreg-approval-482eb78951ee + alert-translation-unrouted-pr-001). **Self-inflicted 409 burst** (12:46:52–12:48:56Z UTC): Pulse called `beacon_telegram_bot.py get-messages` in violation of MEMORY.md rule; bot recovered, no messages lost; G-rule telegram-409-burst **1/3** (↑ from 0/3).
+**Iter ~1940 summary:** ✅ Nominal. All checks clean. Tier 2, consecutive_clean=1 (2 more clean iters → Tier 3). Watermark=986 = file length (no new alerts). ratio≈20.51 (unchanged). All 5 PIDs healthy. Sync last=12:24Z (FRESH). 5 open PRs: #497 (MERGEABLE re-verified; REVIEW_ESCALATE ~33h, expires Jun-17T04:05Z), #509/#510/#512/#513 (stall/cooldowns). beacon-pending-approvals.json: pending=2 (unreg-approval-482eb78951ee + alert-translation-unrouted-pr-001). G-rule telegram-409-burst **1/3** (self-inflicted from iter ~1939; no new occurrence this iter).
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl. When cooldown expires, the alert fires in dry-run mode. Be aware: calling --dry-run in a cycle will write real alerts if the cooldown has passed. Always check wc -l of the file before and after.
 
