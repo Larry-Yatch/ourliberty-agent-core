@@ -2862,7 +2862,7 @@
       "id": "pulse-check-ix-alert-ignored-2026-06-15",
       "name": "Pulse Check IX alert-ignored 2026-06-15",
       "phase": "drafting",
-      "brief": "Alert subject `summary` ignored repeatedly | Evidence: 69 fires of `summary` over trailing 7d (23 repeating subject(s) total) | Suggested fix shape: Tighten the alert (raise its threshold, reduce its cadence, or convert to a periodic digest) — or land the operator shortcut that would resolve it without manual intervention.",
+      "brief": "Alert subject `summary` ignored repeatedly | Evidence: 69 fires of `summary` over trailing 7d (23 repeating subject(s) total) | Suggested fix shape: Tighten the alert (raise its threshold, reduce its cadence, or convert to a periodic digest) \u2014 or land the operator shortcut that would resolve it without manual intervention.",
       "spec_docs": [
         "agents/beacon/specs/pulse-check-ix-operator-friction.md"
       ],

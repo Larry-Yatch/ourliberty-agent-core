@@ -143,13 +143,47 @@ class NeedsBriefingTest(unittest.TestCase):
     def test_unbriefed_parked_needs_briefing(self):
         self.assertTrue(mn.needs_briefing(_capture()))
 
-    def test_non_parked_never_needs_briefing(self):
-        self.assertFalse(mn.needs_briefing(_capture(state='promoted')))
+    def test_promote_restamps_stale_briefing(self):
+        # A capture briefed while parked, then promoted: its provenance still
+        # reads from_state='parked' but state is now 'promoted' ⇒ re-author so
+        # the meaning layer matches the new state (§ 4). This is the behavior the
+        # parked-only gate used to suppress.
+        cap = _capture(
+            state='promoted',
+            briefing={'what': 'x', 'why': 'y', 'suggest': 'z'},
+            briefing_provenance={'by': 'beacon', 'from_state': 'parked'})
+        self.assertTrue(mn.needs_briefing(cap))
+
+    def test_drop_restamps_stale_briefing(self):
+        cap = _capture(
+            state='dropped',
+            briefing={'what': 'x', 'why': 'y', 'suggest': 'z'},
+            briefing_provenance={'by': 'beacon', 'from_state': 'parked'})
+        self.assertTrue(mn.needs_briefing(cap))
 
     def test_briefed_for_current_state_is_idempotent(self):
         cap = _capture(
             briefing={'what': 'x', 'why': 'y', 'suggest': 'z'},
             briefing_provenance={'by': 'beacon', 'from_state': 'parked'})
+        self.assertFalse(mn.needs_briefing(cap))
+
+    def test_promoted_and_briefed_for_current_state_is_idempotent(self):
+        # Once re-authored after a promote, provenance reads from_state=
+        # 'promoted'; a re-sweep is a no-op (idempotent on unchanged cards).
+        cap = _capture(
+            state='promoted',
+            briefing={'what': 'x', 'why': 'y', 'suggest': 'z'},
+            briefing_provenance={'by': 'beacon', 'from_state': 'promoted'})
+        self.assertFalse(mn.needs_briefing(cap))
+
+    def test_snooze_keeps_state_parked_so_no_rebrief(self):
+        # Snooze only sets snoozed_until; state stays 'parked', so a card already
+        # briefed for 'parked' is NOT re-authored by a snooze (its meaning is
+        # unchanged — only resurfacing is deferred).
+        cap = _capture(
+            briefing={'what': 'x', 'why': 'y', 'suggest': 'z'},
+            briefing_provenance={'by': 'beacon', 'from_state': 'parked'},
+            snoozed_until='2026-07-01T00:00:00+00:00')
         self.assertFalse(mn.needs_briefing(cap))
 
     def test_state_change_invalidates_briefing(self):
@@ -172,12 +206,15 @@ class RunSweepTest(unittest.TestCase):
         path.write_text(json.dumps({'schema_version': 1, 'captures': captures}))
         return path
 
-    def test_briefs_only_unbriefed_parked_and_writes_disk(self):
+    def test_briefs_stale_and_writes_disk(self):
         path = self._write_registry([
             _capture(id='needs-it'),
             _capture(id='already', briefing={'what': 'a', 'why': 'b', 'suggest': 'c'},
                      briefing_provenance={'by': 'beacon', 'from_state': 'parked'}),
-            _capture(id='not-parked', state='promoted'),
+            # promoted AND already briefed for its current state ⇒ a valid skip.
+            _capture(id='promoted-current', state='promoted',
+                     briefing={'what': 'p', 'why': 'q', 'suggest': 'r'},
+                     briefing_provenance={'by': 'beacon', 'from_state': 'promoted'}),
         ])
         n = mn.run(now=NOW, use_llm=False, policy=_POLICY_ASK, captures_file=path)
         self.assertEqual(n, 1)
@@ -187,10 +224,27 @@ class RunSweepTest(unittest.TestCase):
         self.assertEqual(set(by_id['needs-it']['briefing']),
                          {'what', 'why', 'suggest'})
         self.assertEqual(by_id['needs-it']['risk'], 'medium')
-        # the already-briefed and non-parked captures are untouched
+        # captures already briefed for their CURRENT state are untouched
         self.assertEqual(by_id['already']['briefing'],
                          {'what': 'a', 'why': 'b', 'suggest': 'c'})
-        self.assertNotIn('briefing', by_id['not-parked'])
+        self.assertEqual(by_id['promoted-current']['briefing'],
+                         {'what': 'p', 'why': 'q', 'suggest': 'r'})
+
+    def test_rebriefs_capture_after_state_change(self):
+        # A capture briefed while parked, then promoted by an endpoint, is stale
+        # (state != from_state); the sweep re-authors it and restamps from_state.
+        path = self._write_registry([
+            _capture(id='promoted-stale', state='promoted',
+                     briefing={'what': 'old', 'why': 'old', 'suggest': 'old'},
+                     briefing_provenance={'by': 'beacon', 'from_state': 'parked'}),
+        ])
+        n = mn.run(now=NOW, use_llm=False, policy=_POLICY_ASK, captures_file=path)
+        self.assertEqual(n, 1)
+        cap = json.loads(path.read_text())['captures'][0]
+        self.assertEqual(cap['briefing_provenance']['from_state'], 'promoted')
+        # a second sweep is a no-op now that provenance matches the state.
+        n2 = mn.run(now=NOW, use_llm=False, policy=_POLICY_ASK, captures_file=path)
+        self.assertEqual(n2, 0)
 
     def test_dry_run_does_not_write(self):
         path = self._write_registry([_capture(id='x')])
@@ -261,6 +315,138 @@ class RunSweepTest(unittest.TestCase):
         ])
         mn.run(now=NOW, use_llm=False, policy=_POLICY_SAFE, captures_file=path)
         reg = json.loads(path.read_text())
+        cap = reg['captures'][0]
+        self.assertEqual(cap['risk'], 'safe')
+        self.assertNotIn('risk_note', cap)
+
+
+class ParseBriefingJsonTest(unittest.TestCase):
+    """Contract C (spec § 5): tolerate fenced / prose-wrapped / trailing-comma
+    model replies; only fall through (None) when no JSON object is extractable."""
+
+    _GOOD = {'what': 'w', 'why': 'y', 'suggest': 's'}
+
+    def test_raw_json_object(self):
+        self.assertEqual(mn.parse_briefing_json(json.dumps(self._GOOD)), self._GOOD)
+
+    def test_fenced_json_block(self):
+        text = '```json\n' + json.dumps(self._GOOD) + '\n```'
+        self.assertEqual(mn.parse_briefing_json(text), self._GOOD)
+
+    def test_bare_fence_no_lang(self):
+        text = '```\n' + json.dumps(self._GOOD) + '\n```'
+        self.assertEqual(mn.parse_briefing_json(text), self._GOOD)
+
+    def test_prose_wrapped_object(self):
+        text = ('Sure! Here is the briefing you asked for:\n'
+                + json.dumps(self._GOOD)
+                + '\nLet me know if you want changes.')
+        self.assertEqual(mn.parse_briefing_json(text), self._GOOD)
+
+    def test_trailing_comma_repaired(self):
+        text = '{"what": "w", "why": "y", "suggest": "s",}'
+        self.assertEqual(mn.parse_briefing_json(text), self._GOOD)
+
+    def test_fenced_with_trailing_comma_and_prose(self):
+        text = ('Here you go:\n```json\n'
+                '{\n  "what": "w",\n  "why": "y",\n  "suggest": "s",\n}\n```\n'
+                'Hope that helps.')
+        self.assertEqual(mn.parse_briefing_json(text), self._GOOD)
+
+    def test_braces_inside_string_values_not_miscounted(self):
+        good = {'what': 'use {curly} braces', 'why': 'y', 'suggest': 's'}
+        text = 'Prefix prose ' + json.dumps(good) + ' suffix'
+        self.assertEqual(mn.parse_briefing_json(text), good)
+
+    def test_truly_unparseable_returns_none(self):
+        self.assertIsNone(mn.parse_briefing_json('no json here at all'))
+        self.assertIsNone(mn.parse_briefing_json(''))
+        self.assertIsNone(mn.parse_briefing_json('   '))
+
+    def test_non_object_json_returns_none(self):
+        # A bare array / scalar is valid JSON but not a briefing dict.
+        self.assertIsNone(mn.parse_briefing_json('[1, 2, 3]'))
+        self.assertIsNone(mn.parse_briefing_json('"just a string"'))
+
+
+class AuthorCapturesInRegistryTest(unittest.TestCase):
+    """Contract A (spec § 3): the folded sweep authors needs_briefing captures
+    in place, bounded per tick, fail-safe per capture, never writing/committing
+    (it only mutates the dict — the GC healer owns the single write)."""
+
+    def _reg(self, *caps):
+        return {'schema_version': 1, 'captures': list(caps)}
+
+    def test_briefs_pending_in_place_and_counts(self):
+        reg = self._reg(
+            _capture(id='a'),
+            _capture(id='b', briefing={'what': 'x', 'why': 'y', 'suggest': 'z'},
+                     briefing_provenance={'by': 'beacon', 'from_state': 'parked'}),
+            # promoted AND already briefed for its current state ⇒ a valid skip.
+            _capture(id='c', state='promoted',
+                     briefing={'what': 'p', 'why': 'q', 'suggest': 'r'},
+                     briefing_provenance={'by': 'beacon', 'from_state': 'promoted'}),
+        )
+        briefed, deferred = mn.author_captures_in_registry(
+            reg, now=NOW, use_llm=False, policy=_POLICY_ASK)
+        self.assertEqual((briefed, deferred), (1, 0))
+        by_id = {c['id']: c for c in reg['captures']}
+        self.assertEqual(by_id['a']['risk'], 'medium')
+        self.assertEqual(set(by_id['a']['briefing']), {'what', 'why', 'suggest'})
+        # captures already briefed for their current state are untouched
+        self.assertEqual(by_id['b']['briefing'],
+                         {'what': 'x', 'why': 'y', 'suggest': 'z'})
+        self.assertEqual(by_id['c']['briefing'],
+                         {'what': 'p', 'why': 'q', 'suggest': 'r'})
+
+    def test_respects_max_per_tick_and_defers_rest(self):
+        reg = self._reg(*[_capture(id=f'c{i}') for i in range(5)])
+        briefed, deferred = mn.author_captures_in_registry(
+            reg, now=NOW, use_llm=False, policy=_POLICY_ASK, max_per_tick=2)
+        self.assertEqual((briefed, deferred), (2, 3))
+        briefed_now = [c for c in reg['captures'] if isinstance(c.get('briefing'), dict)]
+        self.assertEqual(len(briefed_now), 2)
+
+    def test_per_capture_error_skipped_not_fatal(self):
+        reg = self._reg(_capture(id='a'), _capture(id='boom'), _capture(id='c'))
+        real_author = mn.author_meaning_layer
+
+        def flaky(cap, *a, **k):
+            if cap.get('id') == 'boom':
+                raise RuntimeError('author exploded')
+            return real_author(cap, *a, **k)
+
+        mn.author_meaning_layer = flaky
+        try:
+            briefed, deferred = mn.author_captures_in_registry(
+                reg, now=NOW, use_llm=False, policy=_POLICY_ASK)
+        finally:
+            mn.author_meaning_layer = real_author
+        # two briefed, the exploding one skipped (still pending → deferred).
+        self.assertEqual(briefed, 2)
+        self.assertEqual(deferred, 1)
+        by_id = {c['id']: c for c in reg['captures']}
+        self.assertEqual(by_id['a']['risk'], 'medium')
+        self.assertNotIn('briefing', by_id['boom'])
+        self.assertEqual(by_id['c']['risk'], 'medium')
+
+    def test_idempotent_second_sweep_is_noop(self):
+        reg = self._reg(_capture(id='a'))
+        mn.author_captures_in_registry(reg, now=NOW, use_llm=False, policy=_POLICY_ASK)
+        briefed, deferred = mn.author_captures_in_registry(
+            reg, now=NOW, use_llm=False, policy=_POLICY_ASK)
+        self.assertEqual((briefed, deferred), (0, 0))
+
+    def test_empty_or_malformed_registry_is_failsafe(self):
+        self.assertEqual(mn.author_captures_in_registry({}, now=NOW, use_llm=False), (0, 0))
+        self.assertEqual(
+            mn.author_captures_in_registry({'captures': 'nope'}, now=NOW, use_llm=False),
+            (0, 0))
+
+    def test_stale_risk_note_cleared_on_rebrief_to_safe(self):
+        reg = self._reg(_capture(id='a', risk='medium', risk_note='old note'))
+        mn.author_captures_in_registry(
+            reg, now=NOW, use_llm=False, policy=_POLICY_SAFE)
         cap = reg['captures'][0]
         self.assertEqual(cap['risk'], 'safe')
         self.assertNotIn('risk_note', cap)

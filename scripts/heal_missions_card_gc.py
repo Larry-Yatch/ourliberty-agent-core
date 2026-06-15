@@ -26,6 +26,15 @@ corrupts):
      (contextual-resurfacing seed; full digest is Phase 2). Captures are NEVER
      deleted and no other field is mutated; setting the flag is idempotent.
 
+  2b. AUTHOR THE MEANING LAYER (Phase 4.1 spec § 3). After aging and before the
+     commit, run the Narrator's author sweep over the in-memory registry —
+     missions_narrator.author_captures_in_registry briefs every capture whose
+     needs_briefing() is true, bounded by NARRATOR_MAX_PER_TICK so an LLM-slow
+     tick can't run unboundedly (the remainder briefs next tick; idempotent).
+     The healer is the SOLE captures.json committer: the narrator only mutates
+     the dict, and the single write+commit below batches its briefing delta.
+     Per-capture author errors are skipped, never fatal.
+
   3. COMMIT + PUSH the captures.json delta to main (the batched-durability half
      of § 4). The ingest endpoint writes captures.json atomically on disk but
      opens no PR; this healer version-controls any delta on its timer, exactly
@@ -566,6 +575,52 @@ def atomic_write_captures(path: Path, registry: dict[str, Any]) -> None:
     _atomic_write_json(path, registry)
 
 
+def _merge_capture_deltas(fresh: dict[str, Any],
+                          before_by_id: dict[str, dict[str, Any]],
+                          worked: dict[str, Any]) -> int:
+    """Apply only the per-capture field changes THIS tick made (``worked`` vs the
+    read-time snapshot ``before_by_id``) onto a freshly re-read ``fresh`` registry,
+    matching by capture id. Returns the count of captures whose delta was applied.
+
+    Why field-level, not whole-registry replace: the Narrator sweep can span
+    minutes of LLM round-trips, during which the dashboard (a separate process)
+    may ingest new captures or change a capture's state. Replacing the whole file
+    with the stale in-memory copy would silently lose those writes (§ 2 lost-update
+    class). By touching ONLY the keys we changed — never ``state``/``snooze_until``/
+    ``last_touched``, never a capture we didn't author, and never a capture missing
+    from the fresh file — concurrent dashboard writes survive. A capture the
+    dashboard moved out of ``parked`` mid-briefing keeps its new state and merely
+    carries a now-stale briefing that ``needs_briefing`` regenerates next tick."""
+    fresh_by_id = {
+        c['id']: c for c in fresh.get('captures', [])
+        if isinstance(c, dict) and c.get('id')
+    }
+    applied = 0
+    for cap in worked.get('captures', []):
+        if not isinstance(cap, dict):
+            continue
+        cid = cap.get('id')
+        if not cid:
+            continue
+        before = before_by_id.get(cid)
+        if before is None:
+            continue  # not present at read time — we never authored onto it
+        set_fields = {k: v for k, v in cap.items()
+                      if k not in before or before[k] != v}
+        removed = [k for k in before if k not in cap]
+        if not set_fields and not removed:
+            continue  # untouched this tick — leave the fresh copy alone
+        target = fresh_by_id.get(cid)
+        if target is None:
+            continue  # gone from the fresh file — drop our stale delta, don't re-add
+        for k, v in set_fields.items():
+            target[k] = v
+        for k in removed:
+            target.pop(k, None)
+        applied += 1
+    return applied
+
+
 # ---------- missions phase reconciliation (terminal-state spec § 3.3) -------
 
 
@@ -767,14 +822,17 @@ def _commit_and_push_path(repo: Path, rel_path: str, commit_subject: str,
 def _emit_summary(retire: RetireResult, aged: list[str], commit_status: str,
                   dry_run: bool,
                   missions: Optional[MissionReconcileResult] = None,
-                  missions_commit_status: str = 'nothing') -> None:
+                  missions_commit_status: str = 'nothing',
+                  briefed: int = 0, deferred: int = 0) -> None:
     """One audit line (log) + a low-noise digest alert when something happened;
     escalate on a hard failure. Exact counts only — never a silently truncated
     list (full ids live in the log line above)."""
     retired_ids = [tid for tid, _ in retire.retired]
     verb = 'would retire' if dry_run else 'retired'
+    brief_verb = 'would brief' if dry_run else 'briefed'
     summary = (f'missions-card-gc: {verb} {len(retire.retired)} stale session card(s) '
                f'{retired_ids}; aged {len(aged)} parked capture(s) {aged}; '
+               f'{brief_verb} {briefed} capture(s), deferred {deferred}; '
                f'kept {retire.kept} session(s); commit={commit_status}')
     if missions is not None:
         ship_verb = 'would ship' if dry_run else 'shipped'
@@ -815,11 +873,12 @@ def run_once(*, dry_run: bool,
              emit_fn: Optional[Callable[..., bool]] = None,
              events_fetcher: Optional[Callable[[], Optional[list[dict[str, Any]]]]] = None,
              mission_probe_fn: Optional[Callable[[str], str]] = None,
+             author_fn: Optional[Callable[..., tuple[int, int]]] = None,
              now: Optional[datetime] = None) -> int:
     """One healer tick. The injectable seams (emit_fn / events_fetcher /
-    mission_probe_fn / now) keep the effectful edges test-controllable;
+    mission_probe_fn / author_fn / now) keep the effectful edges test-controllable;
     production resolves them from chain_event_emit + the live Supabase client +
-    the shared terminal-state probe."""
+    the shared terminal-state probe + the Narrator sweep."""
     now = now or datetime.now(timezone.utc)
     repo_paths = load_repo_paths()
     if mission_probe_fn is None:
@@ -865,8 +924,15 @@ def run_once(*, dry_run: bool,
             log(f'session-retirement raised: {type(e).__name__}: {e}')
             retire = RetireResult(skipped_no_client=False)
 
-    # --- phase 2 + 3: age parked captures, then commit the delta ---
+    # --- phase 2 + 3: age parked captures, author the meaning layer, then
+    # commit the delta. The Narrator sweep (spec § 3) runs AFTER aging and
+    # BEFORE the single write+commit so the GC healer stays the SOLE
+    # captures.json committer (single-committer invariant): the narrator only
+    # mutates the in-memory registry, and the one atomic write + git commit
+    # below batches both the aging and the briefing deltas. ---
     aged: list[str] = []
+    briefed = 0
+    deferred = 0
     commit_status = 'nothing'
     cap_path = captures_path(repo_paths)
     if cap_path is None:
@@ -874,18 +940,59 @@ def run_once(*, dry_run: bool,
     else:
         registry = read_captures_registry(cap_path)
         if registry is not None:
+            # Snapshot the read-time state (shallow per capture is enough — aging
+            # and the sweep replace top-level keys, never mutate nested objects in
+            # place) so the pre-write merge can apply ONLY the fields this tick
+            # changed onto a fresh re-read (§ 2 lost-update guard).
+            before_by_id = {
+                c['id']: dict(c)
+                for c in registry.get('captures', [])
+                if isinstance(c, dict) and c.get('id')
+            }
             try:
                 aged = age_parked_captures(registry, now)
-                if aged and not dry_run:
-                    atomic_write_captures(cap_path, registry)
             except Exception as e:  # noqa: BLE001 — fail-safe
                 log(f'capture-aging raised: {type(e).__name__}: {e}')
                 aged = []
+            if author_fn is None:
+                from missions_narrator import author_captures_in_registry  # noqa: PLC0415
+                author_fn = author_captures_in_registry
+            try:
+                # use_llm only in LIVE mode; a dry-run uses the deterministic raw
+                # briefing (no claude spawn, no cost) and writes nothing.
+                briefed, deferred = author_fn(registry, now=now, use_llm=not dry_run)
+            except Exception as e:  # noqa: BLE001 — fail-safe: never abort the tick
+                log(f'narrator sweep raised: {type(e).__name__}: {e}')
+                briefed, deferred = 0, 0
+            if (aged or briefed) and not dry_run:
+                # The Narrator sweep can hold the registry for minutes (one claude
+                # spawn per pending capture, up to NARRATOR_MAX_PER_TICK ×
+                # CLAUDE_TIMEOUT_SEC). Writing the stale in-memory copy would clobber
+                # any capture the dashboard (a SEPARATE process) ingested or
+                # state-changed during that window — the #409→#413 lost-update class
+                # spec § 2 exists to prevent. Re-read the file FRESH and apply only
+                # this tick's per-capture field deltas by id, so the read→write
+                # window is sub-millisecond instead of the length of the LLM
+                # round-trips. Single git-committer invariant is unchanged: this is
+                # still the sole atomic write + the sole commit below.
+                try:
+                    fresh = read_captures_registry(cap_path)
+                    if fresh is None:
+                        log('captures.json re-read malformed before write — '
+                            'skipping write this tick (avoids clobbering with stale)')
+                    else:
+                        merged = _merge_capture_deltas(fresh, before_by_id, registry)
+                        atomic_write_captures(cap_path, fresh)
+                        log(f'captures.json write: merged {merged} capture delta(s) '
+                            'onto a fresh re-read (lost-update guard)')
+                except Exception as e:  # noqa: BLE001 — fail-safe
+                    log(f'captures.json write raised: {type(e).__name__}: {e}')
             if not dry_run:
                 core = repo_paths.get('ourliberty-agent-core')
                 if core:
                     try:
-                        commit_status = commit_and_push_captures(core, _commit_audit(retire, aged))
+                        commit_status = commit_and_push_captures(
+                            core, _commit_audit(retire, aged, briefed))
                     except Exception as e:  # noqa: BLE001 — fail-safe
                         log(f'commit+push raised: {type(e).__name__}: {e}')
                         commit_status = 'push-failed'
@@ -918,13 +1025,14 @@ def run_once(*, dry_run: bool,
                         missions_commit_status = 'push-failed'
 
     _emit_summary(retire, aged, commit_status, dry_run,
-                  missions=missions, missions_commit_status=missions_commit_status)
+                  missions=missions, missions_commit_status=missions_commit_status,
+                  briefed=briefed, deferred=deferred)
     return 0
 
 
-def _commit_audit(retire: RetireResult, aged: list[str]) -> str:
+def _commit_audit(retire: RetireResult, aged: list[str], briefed: int = 0) -> str:
     return (f'Auto-committed by heal_missions_card_gc. '
-            f'retired={len(retire.retired)} aged={len(aged)}.')
+            f'retired={len(retire.retired)} aged={len(aged)} briefed={briefed}.')
 
 
 def _missions_commit_audit(missions: MissionReconcileResult) -> str:

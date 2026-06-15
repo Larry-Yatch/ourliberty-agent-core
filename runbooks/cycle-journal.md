@@ -4,6 +4,827 @@
 
 ---
 
+## Iteration ~1985 — 2026-06-15 20:48Z UTC (interactive, /cycle, Tier 1→2 DE-ESCALATION, consecutive_clean=3, all checks nominal)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 0 new alerts. All daemons alive. Repo clean at origin/main. 2 open PRs, both known carries. No new findings, no new actions. **Tier 1 → Tier 2 DE-ESCALATION** (3 consecutive clean iters).
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #522 (`forge/missions-card-gc-warn-demote-001`): GitHub confirms **CONFLICTING/DIRTY** (mergeable=CONFLICTING, mergeStateStatus=DIRTY). Mirror PASS still valid. Forge rebase on origin/main needed. [yellow] carry.
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): GitHub shows mergeable=MERGEABLE, mergeStateStatus=UNSTABLE (Mirror REVIEW_ESCALATE Jun-14T04:05Z renders as failing CI status). Age≈40.8h, 72h deadline Jun-17T04:02Z → **~31.2h remaining.** [yellow] carry.
+- All 5 daemons: PIDs 2530123 (Ssl), 2744551 (SNs), 2744840 (Ss), 2744914 (Ss), 2868353 (Ssl) — all alive. ✅
+- Repo HEAD: 491e5de4=origin/main. Clean tree, on main. ✅
+- 409 burst: no new occurrences. G-rule 2/3 unchanged. [yellow] carry.
+
+**Check 0 — Alert triage:** Watermark=1046 (entering); file=1046 lines. **0 new alerts.** ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log: last entry 14:21:50 MDT (AUTO_MERGE PR #525). Only WARN in window: AUTO_MERGE_HELD_STALE_CONFLICT 14:03:45 MDT (PR #522, known carry). No new WARNs/ERRORs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** PID 2744840 alive (Ss). Last Larry message: "Go" at 13:59:52 MDT (already handled — PR #525 built, reviewed, merged iter ~1982). No new directives. No 409 errors. G-rule telegram-409-burst 2/3 unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → 0 new alerts, 1 suppressed (cooldown: mirror_pass_unmerged:missions-card-gc-warn-demote-001). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0**. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T20:16:49.161614+00:00`, age≈32 min. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=491e5de4=origin/main. Clean tree, on main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-15T20:46:13Z, age≈1.1 min. FRESH (<2h). ✅ Nominal.
+
+**Check C — Agent liveness:** All 5 PIDs alive (2530123 Ssl, 2744551 SNs, 2744840 Ss, 2744914 Ss, 2868353 Ssl). ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (2 open):
+- **PR #522** (`forge/missions-card-gc-warn-demote-001`): CONFLICTING/DIRTY. Mirror PASS. Forge rebase on origin/main needed. [yellow] carry.
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): MERGEABLE/UNSTABLE. Mirror REVIEW_ESCALATE Jun-14T04:05Z. Age≈40.8h, ~31.2h until 72h deadline Jun-17T04:02Z. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Conditional checks (Monday 2026-06-15):** Check I sentinel (check-i-2026-06-15.json) exists → skip. Check VIII/IX/X: sentinels exist → skip.
+
+**§5.0 bug-hunt gate:** audit_due_nudge=no-op, distill_detector=no-op, audit_cadence_signal=no-op. Nothing to journal.
+
+**Actions taken:**
+1. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` ✅
+2. `cycle_tier_state.py record --checks-clean true` → **Tier 1 → Tier 2 DE-ESCALATION** (consecutive_clean=3) ✅
+
+**Dispatches:** None.
+
+**G-rule updates this iter:** No new occurrences. All counters unchanged from iter ~1984.
+
+**Standing findings (unchanged from iter ~1984):**
+- [yellow] **PR #522 CONFLICTING** — Mirror PASS, blocked by merge conflict. Forge rebase on origin/main needed. Larry has rebase instructions via DM (outbox-notifier 20:03Z + medic 20:11Z Jun-15).
+- [yellow] **PR #497 REVIEW_ESCALATE** — Mirror REVIEW_ESCALATE Jun-14T04:05Z; age≈40.8h; ~31.2h until 72h deadline Jun-17T04:02Z.
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. FN=3027, TP=5. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST 1/3, telegram-409-burst **2/3**, telegram-approval-self-dispatch-denied **1/3**, merge_conflict_manual_rebase-tier4 1/3, heal-pipeline-stall-mirror-pass-unmerged-tier4 1/3. All unchanged.
+- [blue] **Stale bash orphans** — PIDs 1834248 (17d+) + 2605007 (1d+). Low CPU. [carry]
+- [blue] **missions-v2-phase4.1 sequence** — p41-schedule-harden ✅ + p41-rebrief-on-change ✅ (merged iter ~1982). Remaining steps TBD; pipeline managing.
+
+**PRIME DIRECTIVE:** iter_clean. ratio=20.04. Trend: improving.
+**Tier end-of-iter:** **Tier 2, consecutive_clean=0** (de-escalated from Tier 1; 3 consecutive clean iters earned de-escalation).
+
+---
+
+## Iteration ~1984 — 2026-06-15 20:37Z UTC (interactive, /loop /cycle, Tier 1, consecutive_clean=2, all checks nominal)
+
+**Trigger:** Larry direct invocation (`/loop /cycle`).
+
+**Health:** ✅ Nominal. 0 new alerts. All daemons alive. Repo clean at origin/main. 2 open PRs, both known carries. No findings, no actions.
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #522 (`forge/missions-card-gc-warn-demote-001`): GitHub shows UNKNOWN/UNKNOWN (recomputing). outbox-notifier.log confirms AUTO_MERGE_HELD_STALE_CONFLICT 14:03:45 MDT still stands. Still CONFLICTING. Forge rebase on origin/main needed. [yellow] carry.
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): GitHub UNKNOWN/UNKNOWN. Mirror REVIEW_ESCALATE Jun-14T04:05Z unchanged. Age≈40.5h. 72h deadline Jun-17T04:02Z → **~31.4h remaining.** [yellow] carry.
+- All 5 daemons: PIDs 2530123 (Ssl), 2744551 (SNs), 2744840 (Ss), 2744914 (Ss), 2868353 (Ssl) — all alive. ✅
+- Repo HEAD: 881bafce=origin/main. Clean tree, on main. ✅
+- 409 burst: no new occurrences. G-rule 2/3 unchanged. [yellow] carry.
+
+**Check 0 — Alert triage:** Watermark=1046 (entering); file=1046 lines. **0 new alerts.** ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log: last entry 14:21:50 MDT (AUTO_MERGE PR #525). Only WARN in window: AUTO_MERGE_HELD_STALE_CONFLICT 14:03:45 MDT (PR #522, known carry). No new WARNs/ERRORs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** PID 2744840 alive (Ss). Last bot activity: 14:16:40 MDT (alert idx=1045, route=digest skip). No 409 errors. G-rule telegram-409-burst 2/3 unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → 0 new alerts, 1 suppressed (cooldown: mirror_pass_unmerged:missions-card-gc-warn-demote-001). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0**. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T20:16:49.161614+00:00`, age≈20 min. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=881bafce=origin/main. Clean tree, on main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-15T19:45:59Z, age≈51 min. FRESH (<2h). ✅ Nominal.
+
+**Check C — Agent liveness:** All 5 PIDs alive (2530123 Ssl, 2744551 SNs, 2744840 Ss, 2744914 Ss, 2868353 Ssl). ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (2 open):
+- **PR #522** (`forge/missions-card-gc-warn-demote-001`): CONFLICTING (GitHub UNKNOWN/recomputing; prior confirmed CONFLICTING). Mirror PASS. Forge rebase needed. [yellow] carry.
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): OPEN. mergeable=UNKNOWN. Mirror REVIEW_ESCALATE Jun-14T04:05Z. Age≈40.5h, ~31.4h until 72h deadline Jun-17T04:02Z. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Conditional checks (Monday 2026-06-15):** Check I sentinel (check-i-2026-06-15.json) exists → skip. Check VIII/IX/X: sentinels exist → skip.
+
+**Actions taken:**
+1. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` ✅
+2. `cycle_tier_state.py record --checks-clean true` → **Tier 1, consecutive_clean=2** ✅
+
+**Dispatches:** None.
+
+**G-rule updates this iter:** No new occurrences. All counters unchanged from iter ~1983.
+
+**Standing findings (unchanged from iter ~1983):**
+- [yellow] **PR #522 CONFLICTING** — Mirror PASS, blocked by merge conflict. Forge rebase on origin/main needed. Larry has rebase instructions via DM (outbox-notifier 20:03Z + medic 20:11Z Jun-15).
+- [yellow] **PR #497 REVIEW_ESCALATE** — Mirror REVIEW_ESCALATE Jun-14T04:05Z; age≈40.5h; ~31.4h until 72h deadline Jun-17T04:02Z.
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. FN=3027, TP=5. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST 1/3, telegram-409-burst **2/3**, telegram-approval-self-dispatch-denied **1/3**, merge_conflict_manual_rebase-tier4 1/3, heal-pipeline-stall-mirror-pass-unmerged-tier4 1/3. All unchanged.
+- [blue] **Stale bash orphans** — PIDs 1834248 (17d+) + 2605007 (1d+). Low CPU. [carry]
+- [blue] **missions-v2-phase4.1 sequence** — p41-schedule-harden ✅ + p41-rebrief-on-change ✅ (merged iter ~1982). Remaining steps TBD; pipeline managing.
+
+**PRIME DIRECTIVE:** iter_clean. ratio=20.04. Trend: improving.
+**Tier end-of-iter:** **Tier 1, consecutive_clean=2** (1 more clean iter needed to de-escalate to Tier 2).
+
+---
+
+## Iteration ~1983 — 2026-06-15 20:29Z UTC (interactive, /cycle, Tier 1, consecutive_clean=1, all checks nominal)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 0 new alerts. All daemons alive. Repo clean at origin/main. 2 open PRs, both known carries. No new findings.
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #522 (`forge/missions-card-gc-warn-demote-001`): GitHub shows mergeable=UNKNOWN/mergeStateStatus=UNKNOWN (recomputing). Prior state was CONFLICTING (AUTO_MERGE_HELD_STALE_CONFLICT 14:03:45 MDT); medic diagnosis 20:11Z confirmed conflict. Still CONFLICTING. Forge rebase on origin/main needed. [yellow] carry.
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): mergeable=UNKNOWN, mergeStateStatus=UNKNOWN. Mirror REVIEW_ESCALATE Jun-14T04:05Z. Age≈40.4h. 72h deadline Jun-17T04:02Z → **~31.6h remaining.** [yellow] carry.
+- All 5 daemons: PIDs 2530123 (Ssl), 2744551 (SNs), 2744840 (Ss), 2744914 (Ss), 2868353 (Ssl) — all alive. ✅
+- Repo HEAD: 262048c7 = origin/main. Clean tree, on main. (New commit is Pulse auto-commit from iter ~1982 wrapper + GC healer commit 1eb16365 that landed between the fast-forward and wrapper commit.) ✅
+- 409 burst: no new occurrences. G-rule 2/3 unchanged. **CARRY** [yellow].
+
+**Check 0 — Alert triage:** Watermark=1046 (entering); file=1046 lines. **0 new alerts.** ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log: last entry 14:21:50 MDT (AUTO_MERGE PR #525). Only WARN in tail-30: AUTO_MERGE_HELD_STALE_CONFLICT at 14:03:45 MDT (PR #522, known carry). No new WARNs/ERRORs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** PID 2744840 alive (Ss). Last Larry message: "Go" at 13:59:52 MDT. No 409 errors. No new directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → 0 new alerts, 1 suppressed (cooldown: mirror_pass_unmerged:missions-card-gc-warn-demote-001). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0**. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T20:16:49.161614+00:00`, age≈11 min. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=262048c7=origin/main. Clean tree, on main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-15T19:45:59Z, age≈42 min. FRESH (<2h). ✅ Nominal.
+
+**Check C — Agent liveness:** All 5 PIDs alive (2530123 Ssl, 2744551 SNs, 2744840 Ss, 2744914 Ss, 2868353 Ssl). ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (2 open):
+- **PR #522** (`forge/missions-card-gc-warn-demote-001`): CONFLICTING (GitHub UNKNOWN/recomputing; prior known state = CONFLICTING from AUTO_MERGE_HELD). Mirror PASS. Forge rebase on origin/main needed. [yellow] carry.
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): OPEN. mergeable=UNKNOWN. Mirror REVIEW_ESCALATE Jun-14T04:05Z. Age≈40.4h, ~31.6h until 72h deadline Jun-17T04:02Z. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Conditional checks (Monday 2026-06-15):** Check I sentinel (check-i-2026-06-15.json) exists → skip. Check VIII/IX/X: sentinels exist → skip.
+
+**Actions taken:**
+1. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` ✅
+2. `cycle_tier_state.py record --checks-clean true` → **Tier 1, consecutive_clean=1** ✅
+
+**Dispatches:** None.
+
+**G-rule updates this iter:** No new occurrences. All counters unchanged from iter ~1982.
+
+**Standing findings (unchanged from iter ~1982):**
+- [yellow] **PR #522 CONFLICTING** — Mirror PASS, blocked by merge conflict. Forge rebase on origin/main needed. Larry has rebase instructions via DM (outbox-notifier 20:03Z + medic 20:11Z Jun-15).
+- [yellow] **PR #497 REVIEW_ESCALATE** — Mirror REVIEW_ESCALATE Jun-14T04:05Z; age≈40.4h; ~31.6h until 72h deadline Jun-17T04:02Z.
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. FN=3027, TP=5. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST 1/3, telegram-409-burst **2/3**, telegram-approval-self-dispatch-denied **1/3**, merge_conflict_manual_rebase-tier4 1/3, heal-pipeline-stall-mirror-pass-unmerged-tier4 1/3. All unchanged.
+- [blue] **Stale bash orphans** — PIDs 1834248 (17d+) + 2605007 (1d+). Low CPU. [carry]
+- [blue] **missions-v2-phase4.1 sequence** — p41-schedule-harden ✅ + p41-rebrief-on-change ✅ (merged iter ~1982). Remaining steps TBD; pipeline managing.
+
+**PRIME DIRECTIVE:** iter_clean. ratio=20.04. Trend: improving.
+**Tier end-of-iter:** **Tier 1, consecutive_clean=1** (clean iter; 2 more needed to de-escalate to Tier 2).
+
+---
+
+## Iteration ~1982 — 2026-06-15 20:24Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0, PR #525 MERGED ✅, L1046 Tier-4 no-DM)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Signal. Check A: repo behind 1 commit (PR #525 merge `1bebe776`); fast-forward executed. Check 0: L1046 Tier-4 (missions-card-gc/summary — novel, no registry template; bot already handled as route=digest, DM skipped; G-rule already dispatched 3/3). No second DM from Pulse. **Tier 1, consecutive_clean=0** (Tier-4 finding).
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #525 (`forge/p41-rebrief-on-change`): Confirmed **MERGED** 2026-06-15T20:21:50Z (`1bebe776`). Mirror PASS at 20:21:45Z, auto-merged. SEQUENCE_STEP_MERGED seq=missions-v2-phase4.1 step=p41-rebrief-on-change. ✅ **RESOLVED.**
+- PR #522 (`forge/missions-card-gc-warn-demote-001`): Confirmed **CONFLICTING** (mergeable=CONFLICTING, mergeStateStatus=DIRTY). Mirror PASS still valid. Forge rebase on origin/main needed. G-rule missions-card-gc-warn-vs-info **NOT COMPLETE.** [yellow] carry.
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): Confirmed OPEN. mirror-review=FAILURE (REVIEW_ESCALATE 2026-06-14T04:05:31Z). mergeable=UNKNOWN. Age≈40.3h. 72h deadline Jun-17T04:05Z → **~31.7h remaining.** [yellow] carry.
+- All 5 daemons: PIDs 2530123 (Ssl), 2744551 (SNs), 2744840 (Ss), 2744914 (Ss), 2868353 (Ssl) — all alive. ✅
+- Repo HEAD: post-pull = 1bebe776 = origin/main. Clean tree, on main. ✅
+- 409 burst: no new occurrences in recent bot log. G-rule 2/3 unchanged. **CARRY** [yellow].
+
+**Check 0 — Alert triage:** Watermark=1045 (entering); file=1046 lines. **1 new alert** (L1046):
+- L1046: `source=missions-card-gc, severity=warning, subject=summary, route=digest, ts=2026-06-15T20:16:37Z` ("briefed 1 capture(s), committed") → helper: **Tier-4** (novel, no registry template). Bot already handled at 14:16:40 MDT: `alert idx=1045 route=digest; skipping DM`. No second DM from Pulse. G-rule missions-card-gc-warn-vs-info: already 3/3 dispatched, PR #522 pending. **Continuing occurrence while fix blocked on Forge rebase.** Journal-note only.
+- Watermark advanced: 1045→1046.
+
+**Check 1 — Log noise:** outbox-notifier.log: last entry 14:21:50 MDT (AUTO_MERGE PR #525, SEQUENCE_STEP_MERGED missions-v2-phase4.1 p41-rebrief-on-change). Only WARN in window: AUTO_MERGE_HELD_STALE_CONFLICT at 14:03:45 MDT (PR #522, already known from iter ~1981). No new WARNs/ERRORs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** PID 2744840 alive (Ss). Last Larry message: "Go" at 13:59:52 MDT — approved p41-rebrief-on-change dispatch (built → Mirror PASS → merged 14:21:50 MDT). No 409 errors in recent log. G-rule telegram-409-burst 2/3 unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → 0 new alerts, 1 suppressed (cooldown: mirror_pass_unmerged:missions-card-gc-warn-demote-001). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0**. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T20:16:49.161614+00:00`, age≈8 min. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** Repo was behind origin/main by 1 commit (PR #525 merge `1bebe776`). `git pull --ff-only` executed. HEAD=1bebe776=origin/main. Clean tree, on main. ✅ **Auto-fixed.**
+
+**Check B — Sync health:** last_sync=2026-06-15T19:45:59Z, status=no-change, age≈39 min. FRESH (<2h). ✅ Nominal.
+
+**Check C — Agent liveness:** All 5 PIDs alive (2530123 Ssl, 2744551 SNs, 2744840 Ss, 2744914 Ss, 2868353 Ssl). ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (2 open):
+- **PR #525** (`forge/p41-rebrief-on-change`): **MERGED** ✅ 2026-06-15T20:21:50Z. feat(missions): re-brief narrator cards on mission state change. SEQUENCE_STEP_MERGED for missions-v2-phase4.1. RESOLVED — remove from standings.
+- **PR #522** (`forge/missions-card-gc-warn-demote-001`): CONFLICTING (mergeable=CONFLICTING, mergeStateStatus=DIRTY). Mirror PASS (19:34:59Z). Auto-merge blocked — Forge rebase on origin/main needed. [yellow] carry.
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): OPEN. mergeable=UNKNOWN. Mirror REVIEW_ESCALATE Jun-14T04:05Z. Age≈40.3h, ~31.7h until 72h deadline Jun-17T04:05Z. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Conditional checks (Monday 2026-06-15):** Check I sentinel (check-i-2026-06-15.json) exists → skip. Check VIII/IX/X: sentinels exist from iter ~1981 → skip.
+
+**Actions taken:**
+1. Alert triage: L1046 Tier-4 (missions-card-gc/summary, no DM — bot handled as digest).
+2. `git -C ~/agent-core pull --ff-only` → HEAD 1bebe776=origin/main ✅
+3. `alert_triage_state.py set-watermark --line 1046` → 1045→1046 ✅
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --template missions-card-gc-summary-continuing-pr522-blocked` ✅
+5. `cycle_tier_state.py record --checks-clean false` → **Tier 1, consecutive_clean=0** ✅
+
+**Dispatches:** None.
+
+**G-rule updates this iter:**
+- All G-rule counters unchanged from iter ~1981. No new occurrences.
+- G-rule missions-card-gc-warn-vs-info: 3/3 DISPATCHED → PR #522 CONFLICTING. Continuing occurrence at L1046 while fix is blocked on Forge rebase. PENDING COMPLETION.
+- G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4: 1/3 unchanged. Cooldown suppressed repeat this iter (correct behavior). CARRY.
+
+**Standing findings (updated):**
+- [yellow] **PR #522 CONFLICTING** — Mirror PASS, blocked by merge conflict. Forge rebase on origin/main needed. Larry has rebase instructions via DM (outbox-notifier 20:03Z + medic 20:11Z Jun-15).
+- [yellow] **PR #497 REVIEW_ESCALATE** — Mirror REVIEW_ESCALATE Jun-14T04:05Z; age≈40.3h; ~31.7h until 72h deadline Jun-17T04:05Z.
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. FN=3027, TP=5. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST 1/3, telegram-409-burst **2/3**, telegram-approval-self-dispatch-denied **1/3**, merge_conflict_manual_rebase-tier4 1/3, heal-pipeline-stall-mirror-pass-unmerged-tier4 1/3. All unchanged.
+- [blue] **Stale bash orphans** — PIDs 1834248 (17d+) + 2605007 (1d+). Low CPU. [carry]
+- [blue] **missions-v2-phase4.1 sequence** — p41-schedule-harden ✅ + p41-rebrief-on-change ✅ (MERGED this iter). Remaining steps TBD; pipeline managing.
+
+**PRIME DIRECTIVE:** 1 intervention (missions-card-gc-summary-continuing-pr522-blocked). ratio=20.04. Trend: improving.
+**Tier end-of-iter:** **Tier 1** (Tier-4 finding L1046; consecutive_clean=0).
+
+---
+
+## Iteration ~1981 — 2026-06-15 20:18Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0, PR #525 NEW, L1044 Tier-4 no-DM, L1045 Tier-3)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Signal. Check 0: L1044 Tier-4 (heal-pipeline-stall:mirror-pass-unmerged:PR#522 — novel, helper confirms no registry template). L1045 Tier-3 silenced (medic-diagnosis). No second DM from Pulse — medic already delivered diagnosis directly to chat_id. PR #525 new (p41-rebrief-on-change, Mirror review dispatched at 20:13Z). **Tier 1, consecutive_clean=0** (Tier-4 finding).
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #522 (`forge/missions-card-gc-warn-demote-001`): Confirmed **CONFLICTING** — mergeable=UNKNOWN (GitHub lag), mergeStateStatus=UNKNOWN. Mirror PASS at 19:34:59Z still valid. AUTO_MERGE_HELD_STALE_CONFLICT (14:03:45 MDT, 20:03Z). Forge rebase needed. DM delivered to Larry via chat_id (outbox-notifier 20:03Z) + medic diagnosis (20:11Z). G-rule missions-card-gc-warn-vs-info: **NOT COMPLETE.** [yellow] carry.
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): Confirmed OPEN. mergeable=UNKNOWN. Mirror REVIEW_ESCALATE Jun-14T04:05Z. Age≈43h. 72h deadline Jun-17T04:02Z → **~32h remaining.** [yellow] carry.
+- All 5 daemons: PIDs 2530123 (Ssl), 2744551 (SNs), 2744840 (Ss), 2744914 (Ss), 2868353 (Ssl) — all alive. ✅
+- Repo HEAD: 6df0b2bb = origin/main. Clean tree, on main. ✅
+- 409 burst: no new occurrences in recent log. G-rule 2/3 unchanged. **CARRY** [yellow].
+
+**Check 0 — Alert triage:** Watermark=1043 (entering); file=1045 lines. **2 new alerts** (L1044-L1045):
+- L1044: `source=heal-pipeline-stall, severity=warning, subject=pipeline-stall:mirror-pass-unmerged:PR#522, route=escalate` — Mirror PASSED PR #522 32 min prior, PR still open, AUTO_MERGE never fired. → helper: **Tier-4** (novel, no registry template). Medic already DM'd Larry at chat_id 7998341473 (L1045, 20:11Z) with full rebase path. **No second DM from Pulse.** Journal-note + tier-reset. **G-rule `heal-pipeline-stall-mirror-pass-unmerged-tier4`: 1/3.**
+- L1045: `source=medic, kind=notification, intent=medic-diagnosis` (diagnosis of L1044 root cause: PR #522 conflict from PR #520 merge, AUTO_MERGE_HELD_STALE_CONFLICT, rebase path provided) → helper: **Tier-3** silenced ✅ (known-pattern match, PR #515). Journal-note only.
+- Watermark advanced: 1043→1045.
+
+**Check 1 — Log noise:** outbox-notifier.log: last entry 14:13:03 MDT (20:13Z), all INFO (p41-rebrief-on-change build-phase + mirror-review dispatch). Single WARN in window: AUTO_MERGE_HELD_STALE_CONFLICT at 14:03:45 MDT (already known, PR #522 conflict). No new WARNs/ERRORs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** PID 2744840 alive (Ss). Last Larry message: "Go" at 13:59:52 MDT — approved p41-rebrief-on-change build dispatch (Forge dispatched 14:05:46 MDT). No 409 errors in recent log. G-rule telegram-409-burst 2/3 unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → 0 new alerts, 1 suppressed (cooldown: mirror_pass_unmerged:missions-card-gc-warn-demote-001). Healer fresh, cooldown correct — same underlying stall already escalated. ✅ Nominal (root cause known carry).
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0**. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T19:46:43.207773+00:00`, age≈31 min at check time. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=6df0b2bb = origin/main. Clean tree, on main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-15T19:45:59Z, status=no-change, age≈32 min. FRESH (<2h). ✅ Nominal.
+
+**Check C — Agent liveness:** All 5 PIDs alive (2530123 Ssl, 2744551 SNs, 2744840 Ss, 2744914 Ss, 2868353 Ssl). ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (3 open):
+- **PR #525** (`forge/p41-rebrief-on-change`): **NEW** at 20:12:56Z. `feat(missions): re-brief narrator cards on mission state change`. Mirror review dispatched at 20:13:02Z (review-p41-rebrief-on-change.json in Mirror inbox). Pipeline flowing. [blue] watch.
+- **PR #522** (`forge/missions-card-gc-warn-demote-001`): CONFLICTING. Mirror PASS. Auto-merge blocked (conflict with scripts/heal_missions_card_gc.py from PR #520). Forge rebase needed. [yellow] carry.
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): OPEN. mergeable=UNKNOWN. Mirror REVIEW_ESCALATE Jun-14T04:05Z. Age≈43h, ~32h until 72h deadline Jun-17T04:02Z. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Conditional checks (Monday 2026-06-15):** Check I sentinel (check-i-2026-06-15.json) exists → skip. Check VIII/IX/X: sentinels exist → skip.
+
+**Actions taken:**
+1. Alert triage: L1044 Tier-4 (heal-pipeline-stall:mirror-pass-unmerged:PR#522, no DM — medic delivered), L1045 Tier-3 silenced.
+2. `alert_triage_state.py set-watermark --line 1045` → 1043→1045 ✅
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention --template heal-pipeline-stall-mirror-pass-unmerged-tier4` ✅
+4. `cycle_tier_state.py record --checks-clean false` → **Tier 1, consecutive_clean=0** (Tier-4 finding) ✅
+
+**Dispatches:** None.
+
+**G-rule updates this iter:**
+- **G-rule `heal-pipeline-stall-mirror-pass-unmerged-tier4`: NEW — 1/3** (L1044: heal-pipeline-stall fires Tier-4 novel for mirror-pass-unmerged stalls on CONFLICTING PRs; medic already DMs directly; Pulse should not double-DM; dispatch to Beacon at 3/3 for alert-translations.json Tier-3 template).
+- All other G-rule counters unchanged.
+
+**Standing findings (updated):**
+- [yellow] **PR #522 CONFLICTING** — Mirror PASS, blocked by merge conflict. Forge rebase needed. Larry has rebase instructions via DM (outbox-notifier 20:03Z + medic 20:11Z).
+- [yellow] **PR #497 REVIEW_ESCALATE** — Mirror REVIEW_ESCALATE Jun-14T04:05Z; age≈43h; ~32h until 72h deadline Jun-17T04:02Z.
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. FN=3027, TP=5. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. Last: 07:44:56 MDT Jun-15. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] **PR #525 (p41-rebrief-on-change)** — NEW. Mirror review dispatched 20:13Z. Watch for REVIEW_PASS + auto-merge. [blue]
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST 1/3, telegram-409-burst **2/3**, telegram-approval-self-dispatch-denied **1/3**, merge_conflict_manual_rebase-tier4 1/3, **heal-pipeline-stall-mirror-pass-unmerged-tier4 1/3 (new)**.
+- [blue] **Stale bash orphans** — PIDs 1834248 (17d+) + 2605007 (1d+). Low CPU. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention (heal-pipeline-stall-mirror-pass-unmerged-tier4). ratio=20.0. Trend: stable.
+**Tier end-of-iter:** **Tier 1** (Tier-4 finding L1044; consecutive_clean reset to 0).
+
+---
+
+## Iteration ~1980 — 2026-06-15 20:06Z UTC (interactive, /cycle, Tier 2→1 RESET, PR #520+#524 merged, PR #522 CONFLICTING)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Signal. Check A: repo behind 1 commit (PR #520 merge), fast-forward executed. Check 0: L1043 Tier-4 (merge_conflict_manual_rebase, PR #522 CONFLICTING after PR #520 merged). Two G-rule completions: Forge-preflight-marker-error-retry ✅, PR #520 merged ✅. **Tier 2 → Tier 1 RESET** (Tier-4 finding).
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #520 (`forge/p41-schedule-harden`): Confirmed **MERGED** 2026-06-15T20:03:42Z (`cd9c44ca`). Was in Mirror re-review round 1 last iter — passed and merged. ✅ **RESOLVED.**
+- PR #524 (`forge/forge-preflight-marker-selfcheck-001`): Confirmed **MERGED** (in origin log as `97300fc1`, L1042 alert confirmed auto-merge + branch deleted). **G-rule Forge-preflight-marker-error-retry: COMPLETE ✅.**
+- PR #522 (`forge/missions-card-gc-warn-demote-001`): Confirmed **CONFLICTING** — Mirror PASS was valid, but PR #520 merged to main concurrently and overlaps `scripts/heal_missions_card_gc.py`. outbox-notifier attempted auto-merge, BLOCKED (`not mergeable: the merge commit cannot be cleanly created`). DM delivered to Larry via chat_id. Forge needs to rebase on origin/main and re-push. **G-rule missions-card-gc-warn-vs-info: NOT yet COMPLETE — carry.** [yellow]
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): Confirmed OPEN. mergeable=UNKNOWN. Mirror REVIEW_ESCALATE Jun-14T04:05Z. Age≈41h. 72h deadline Jun-17T04:02Z → **~31h remaining.** [yellow] carry.
+- All 5 daemons: PIDs 2530123 (Ssl), 2744551 (SNs), 2744840 (Ss), 2744914 (Ss), 2868353 (Ssl) — all alive. ✅
+- Repo HEAD: post-pull = cd9c44ca = origin/main. Clean tree, on main. ✅
+- 409 burst: no new occurrences. Last: 07:44:56 MDT Jun-15 (13:44:56Z). G-rule 2/3 unchanged. **CARRY** [yellow].
+
+**Check 0 — Alert triage:** Watermark=1041 (entering); file=1043 lines. **2 new alerts** (L1042-L1043):
+- L1042: `source=outbox-notifier, kind=notification, intent=review-pass` (Mirror approved PR #524 `forge-preflight-marker-selfcheck-001`; auto-merged + branch deleted) → helper: **Tier-3** silenced ✅. G-rule Forge-preflight-marker-error-retry: **COMPLETE ✅.** Journal-note only.
+- L1043: `source=outbox-notifier, kind=notification, intent=merge_conflict_manual_rebase` (Mirror approved PR #522, but auto-merge BLOCKED: merge conflict with main after PR #520 merged) → helper: **Tier-4** novel (no registry template). outbox-notifier already DM'd Larry via chat_id with rebase instructions. No second DM from Pulse. **Tier-reset to Tier 1.** G-rule `merge_conflict_manual_rebase-tier4: 1/3.`
+- Watermark advanced: 1041→1043.
+
+**Check 1 — Log noise:** outbox-notifier.log: last entry 20:07:37Z — 0 WARNs/ERRORs in recent tail-50 (only INFO: FORGE_NO_PR_SKIP ×5, recover auto-merge fail, alerted). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** PID 2744840 alive (Ss). Last Larry message: "Why do we have 80 messages over the night?" at 10:33:36 MDT. No 409 errors in recent log. G-rule telegram-409-burst 2/3 unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → 0 stalls, 6 skipped (preflight_exit or pr_exists). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0**. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T19:46:43.207773+00:00`, age≈19 min at check time. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** Repo was behind origin/main by 1 commit (PR #520 merge `cd9c44ca`). `git pull --ff-only` executed (or sync script beat it — HEAD already at cd9c44ca on verification). HEAD=cd9c44ca=origin/main. Clean tree, on main. ✅ **Auto-fixed.**
+
+**Check B — Sync health:** last_sync=2026-06-15T19:45:59Z, age≈20 min at check time. FRESH (<2h). ✅ Nominal.
+
+**Check C — Agent liveness:** All 5 PIDs alive (2530123 Ssl, 2744551 SNs, 2744840 Ss, 2744914 Ss, 2868353 Ssl). ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (2 open):
+- **PR #522** (`forge/missions-card-gc-warn-demote-001`): CONFLICTING. Mirror PASS. Auto-merge blocked (conflict with `scripts/heal_missions_card_gc.py` from PR #520). Forge needs to rebase on main. [yellow] carry.
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): OPEN. mergeable=UNKNOWN. Mirror REVIEW_ESCALATE Jun-14T04:05Z. Age≈41h, ~31h until 72h deadline Jun-17T04:02Z. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Conditional checks (Monday 2026-06-15):** Check I sentinel (check-i-2026-06-15.json) exists → skip. Check VIII/IX/X: sentinels exist → skip.
+
+**Actions taken:**
+1. Alert triage: L1042 Tier-3 (review-pass, silenced), L1043 Tier-4 (merge-conflict, no second DM).
+2. `alert_triage_state.py set-watermark --line 1043` → 1041→1043 ✅
+3. `git -C ~/agent-core pull --ff-only` → HEAD cd9c44ca=origin/main (or sync script ran first) ✅
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --template merge-conflict-pr-522` ✅
+5. `cycle_tier_state.py record --checks-clean false` → **Tier 2 → Tier 1 RESET** ✅
+
+**Dispatches:** None. (PR #522 conflict already DM'd to Larry via outbox-notifier chat_id; Forge rebase is next step pending Larry direction.)
+
+**G-rule updates this iter:**
+- **G-rule Forge-preflight-marker-error-retry: COMPLETE ✅** (PR #524 merged `97300fc1`). Remove from standing items.
+- **G-rule missions-card-gc-warn-vs-info: NOT COMPLETE** — PR #522 CONFLICTING. Forge rebase needed. Carry.
+- **G-rule merge_conflict_manual_rebase-tier4: 1/3** — novel Tier-4 alert; outbox-notifier already DMs directly via chat_id (same pattern as medic-diagnosis). Dispatch to Beacon at 3/3 for Tier-3 translation.
+- All other G-rule counters unchanged from iter ~1979.
+
+**Standing findings (updated):**
+- [yellow] **PR #522 CONFLICTING** — Mirror PASS, blocked by merge conflict with PR #520. Forge rebase needed. G-rule missions-card-gc-warn-vs-info blocked until merged. Larry has rebase instructions via DM.
+- [yellow] **PR #497 REVIEW_ESCALATE** — Mirror REVIEW_ESCALATE Jun-14T04:05Z; age≈41h; ~31h until 72h deadline Jun-17T04:02Z. Escalate if still open at deadline.
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. FN=3027, TP=5. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. Last: 07:44:56 MDT Jun-15. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST 1/3, telegram-409-burst **2/3**, telegram-approval-self-dispatch-denied **1/3**, **merge_conflict_manual_rebase-tier4 1/3**.
+- [blue] **Stale bash orphans** — PIDs 1834248 (17d+) + 2605007 (1d+). Low CPU. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention (merge-conflict-pr-522). ratio=20.0. Trend: improving.
+**Tier end-of-iter:** **Tier 1** (reset from Tier 2; Tier-4 finding L1043).
+
+---
+
+## Iteration ~1979 — 2026-06-15 19:55Z UTC (interactive, /cycle, Tier 1→2 DE-ESCALATE, consecutive_clean=3, all nominal, PR #524 new, PR #520 revision-1, pending cleared)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. All mandatory checks (0–5) clean. No new alerts. pending=0 (forge-preflight-marker-selfcheck-001 APPROVED by Larry, PR #524 built + Mirror reviewing). PR #520 in active revision-1 cycle (Mirror REVISION → Forge revised → Mirror re-reviewing). PR #524 new (Mirror reviewing). **Tier 1 → Tier 2 DE-ESCALATE** (consecutive_clean reached 3).
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): Confirmed OPEN. mergeable=UNKNOWN. Mirror REVIEW_ESCALATE Jun-14T04:05Z. Age≈40h. 72h deadline Jun-17T04:02Z → **~32h remaining**. **CARRY** [yellow].
+- PR #520 (`forge/p41-schedule-harden`): Mirror posted FAILURE (REVIEW_REVISION) at 19:47Z — data-loss bug (read-modify-write window on captures.json widens during LIVE narrator sweep, clobberable by dashboard-API's in-process lock). Pipeline handled it: revision-1 dispatched to Forge at 19:47Z, Forge revised, Mirror re-review dispatched at 19:52Z (review-p41-schedule-harden-rev1.json in Mirror inbox). Current GitHub status: statusCheckRollup=[] (reset after push). **ACTIVE REVISION — pipeline flowing** [blue].
+- PR #522 (`forge/missions-card-gc-warn-demote-001`): OPEN. Mirror PASS at 19:34:59Z. Auto-merge HELD behind PR #520 (overlap: scripts/heal_missions_card_gc.py). No change. **CARRY** [blue].
+- PR #524 (`forge/forge-preflight-marker-selfcheck-001`): **NEW** — created 19:47Z. Forge built docs-only PR for preflight marker self-check. Mirror reviewing (review-forge-preflight-marker-selfcheck-001.json in inbox, dispatched 19:47Z). MERGEABLE, statusCheckRollup=[]. [blue] NEW, watch.
+- forge-preflight-marker-selfcheck-001: **pending=0** — Larry approved (between iter ~1978 19:45Z and PR creation 19:47Z). Forge built PR #524. **RESOLVED** ✅.
+- All 5 daemons: PIDs 2530123 (Ssl), 2744551 (SNs), 2744840 (Ss), 2744914 (Ss), 2868353 (Ssl) — all alive. ✅
+- Repo HEAD: 76f08422 = origin/main. Clean tree, on main. ✅
+- 409 burst: no new occurrences. Last: 07:44:56 MDT Jun-15 (13:44:56Z). G-rule 2/3 unchanged. **CARRY** [yellow].
+
+**Check 0 — Alert triage:** Watermark=1041 (entering); file=1041 lines. **0 new alerts**. Nominal. Watermark unchanged.
+
+**Check 1 — Log noise:** outbox-notifier.log last entries 13:52:30 MDT (19:52:30Z), all INFO (revision dispatch, re-review dispatch). No WARNs/ERRORs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** PID 2744840 alive (Ss). Last Larry message: "go" at 13:02:44 MDT (≈19:02Z). forge-preflight-marker-selfcheck-001 approved by Larry (evidenced by PR #524 created 19:47Z). No new 409 errors. G-rule telegram-409-burst 2/3 unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → 0 stalls, 6 skipped (pr_exists or preflight_exit). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0** (forge-preflight-marker-selfcheck-001 approved by Larry → Forge PR #524 built). ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T19:46:43.207773+00:00`, age≈9 min. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=76f08422 = origin/main. Clean tree, on main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-15T19:45:59Z, status=no-change, age≈9 min. FRESH (<2h). ✅ Nominal.
+
+**Check C — Agent liveness:** All 5 PIDs alive (2530123 Ssl, 2744551 SNs, 2744840 Ss, 2744914 Ss, 2868353 Ssl). ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (4 open):
+- **PR #524** (`forge/forge-preflight-marker-selfcheck-001`): NEW. MERGEABLE. Mirror reviewing (dispatched 19:47Z). [blue] watch.
+- **PR #520** (`forge/p41-schedule-harden`): OPEN. statusCheckRollup=[] (Mirror re-reviewing round 1, revision pushed ~19:52Z). [blue] active revision, pipeline managing.
+- **PR #522** (`forge/missions-card-gc-warn-demote-001`): OPEN. Mirror PASS (19:34:59Z). Auto-merge HELD behind PR #520. [blue] carry.
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): Mirror REVIEW_ESCALATE Jun-14T04:05Z. Age≈40h, ~32h until 72h deadline Jun-17T04:02Z. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Conditional checks (Monday 2026-06-15):** Check I sentinel (check-i-2026-06-15.json) exists → skip. Check VIII/IX/X: carried from iter ~1978 (sentinels exist) → skip.
+
+**Actions taken:**
+1. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` ✅ (ratio≈19.98)
+2. `cycle_tier_state.py record --checks-clean true` → **Tier 1 → Tier 2 DE-ESCALATED** (consecutive_clean=3) ✅
+
+**Dispatches:** None.
+
+**G-rule updates this iter:**
+- All counters unchanged. No new WARN/pattern occurrences.
+- G-rule missions-card-gc-warn-vs-info: 3/3 DISPATCHED → PR #522 Mirror PASS, held behind #520 (revision in progress). PENDING COMPLETION.
+- G-rule Forge-preflight-marker-error-retry: 3/3 DISPATCHED → PR #524 in Mirror review. PENDING COMPLETION.
+- G-rule F24-empty-prompt-envelope-rejected: 2/3, unchanged.
+
+**Standing findings (updated from iter ~1978):**
+- [yellow] **PR #497 REVIEW_ESCALATE** — Mirror REVIEW_ESCALATE Jun-14T04:05Z; age≈40h; ~32h until 72h deadline Jun-17T04:02Z.
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. FN=3027, TP=5. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. Last: 07:44:56 MDT Jun-15. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] **PR #524 (forge-preflight-marker-selfcheck-001)** — NEW. Mirror reviewing round 0. G-rule COMPLETE on PASS+merge. [blue]
+- [blue] **PR #520 (p41-schedule-harden)** — Mirror REVISION: data-loss (captures.json RMW window during LIVE sweep). Forge revised → Mirror re-reviewing round 1. Watch for PASS + auto-merge unblocking #522.
+- [blue] **PR #522 (missions-card-gc-warn-demote-001)** — Mirror PASS. HELD behind PR #520. G-rule missions-card-gc-warn-vs-info COMPLETE once #520 merges.
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST 1/3, telegram-409-burst **2/3**, telegram-approval-self-dispatch-denied **1/3**.
+- [blue] **Stale bash orphans** — PIDs 1834248 (17d+) + 2605007 (1d+). Low CPU. [carry]
+
+**PRIME DIRECTIVE:** iter_clean. ratio≈19.98. Trend: improving.
+**Tier end-of-iter:** **Tier 2** (de-escalated from Tier 1; consecutive_clean reset to 0; 3 consecutive clean iters reached threshold).
+
+---
+
+## Iteration ~1978 — 2026-06-15 19:45Z UTC (interactive, /cycle, Tier 1, consecutive_clean=2, all nominal, dispatch-branch-cleanup Tier-3 silenced)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. All checks clean. 1 new alert (dispatch-branch-cleanup/summary), Tier-3 silenced. 0 stalls. pending=1 (forge-preflight-marker-selfcheck-001 — unchanged from iter ~1977, awaiting Larry response). PR #520 Mirror review in progress (~18 min). PR #522 Mirror PASS, held behind #520.
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): Confirmed OPEN. mergeable=UNKNOWN (GitHub recomputing). reviewDecision=''. mirror-review=FAILURE (REVIEW_ESCALATE 2026-06-14T04:05:31Z). Age≈39.7h. 72h deadline Jun-17T04:02Z → **~32.3h remaining**. **CARRY** [yellow].
+- PR #520 (`forge/p41-schedule-harden`): OPEN. mergeable=UNKNOWN. statusCheckRollup=[] (Mirror review in progress, dispatched 19:27:56Z, ~18 min elapsed — within normal range). **CARRY** [blue].
+- PR #522 (`forge/missions-card-gc-warn-demote-001`): OPEN. mergeable=UNKNOWN (GitHub recomputing). Mirror PASS confirmed (statusCheckRollup: mirror-review=SUCCESS at 19:34:59Z). Auto-merge HELD behind PR #520 (overlap: scripts/heal_missions_card_gc.py). **CARRY** [blue].
+- forge-preflight-marker-selfcheck-001: still pending=1 in beacon-pending-approvals.json (created 19:35:28Z). No change. **CARRY** [blue].
+- All 5 daemons: PIDs 2530123 (Ssl), 2744551 (SNs), 2744840 (Ss), 2744914 (Ss), 2868353 (Ssl) — all alive. ✅
+- Repo HEAD: a89bd083 = origin/main. Clean tree, on main. ✅
+- 409 burst: no new occurrences. Last: 07:44:56 MDT Jun-15 (13:44:56Z). G-rule 2/3 unchanged. **CARRY** [yellow].
+
+**Check 0 — Alert triage:** Watermark=1040 (entering); file=1041 lines. **1 new alert** (L1041):
+- L1041: `source=dispatch-branch-cleanup, severity=warning, subject=summary, route=digest` (pruned 1 local + 1 remote stale branch(es)) → helper: **Tier-3** silenced ✅ (known-pattern match). Journal-note only.
+- Watermark advanced: 1040→1041. No tier-reset (Tier-3).
+
+**Check 1 — Log noise:** outbox-notifier.log last entry 13:35:28Z — no new WARNs/ERRORs. inbox-watcher.log absent (file not found, unchanged from prior iters). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** PID 2744840 alive (Ss). Last Larry message: "go" at 13:02:44 MDT (≈19:02Z). forge-preflight-marker-selfcheck-001 approval_request DM delivered 13:35:39 MDT, awaiting response. No 409 errors in recent log. G-rule telegram-409-burst 2/3 unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → 0 stalls, 6 skipped (pr_exists or preflight_exit). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=1** (forge-preflight-marker-selfcheck-001, unchanged from iter ~1977). Awaiting Larry's "approve/go". Journal-note only — no Pulse action. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T19:16:19.698610+00:00`, age≈29 min. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=a89bd083 = origin/main. Clean tree, on main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-15T18:45:54Z, status=success, age≈59 min. FRESH (<2h). ✅ Nominal.
+
+**Check C — Agent liveness:** All 5 PIDs alive (2530123 Ssl, 2744551 SNs, 2744840 Ss, 2744914 Ss, 2868353 Ssl). ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (3 open):
+- **PR #520** (`forge/p41-schedule-harden`): OPEN. mergeable=UNKNOWN. Mirror review in progress (statusCheckRollup=[], ~18 min). [blue] watch.
+- **PR #522** (`forge/missions-card-gc-warn-demote-001`): OPEN. mergeable=UNKNOWN. Mirror PASS (19:34:59Z). Auto-merge HELD behind PR #520. [blue] watch.
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): mergeable=UNKNOWN. Mirror REVIEW_ESCALATE Jun-14T04:05Z. Age≈39.7h, ~32.3h until 72h deadline. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Conditional checks (Monday 2026-06-15):** Check I sentinel exists → skip. Check VIII/IX/X sentinels exist → skip.
+
+**Actions taken:**
+1. `alert_triage_state.py set-watermark --line 1041` → 1040→1041 ✅
+2. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` ✅ (ratio≈19.98)
+3. `cycle_tier_state.py record --checks-clean true` → **Tier 1, consecutive_clean=2** ✅
+
+**Dispatches:** None.
+
+**G-rule updates this iter:**
+- All counters unchanged. No new WARN/pattern occurrences.
+- G-rule missions-card-gc-warn-vs-info: 3/3 DISPATCHED → PR #522 Mirror PASS, auto-merge held behind #520. PENDING COMPLETION.
+- G-rule Forge-preflight-marker-error-retry: 3/3 DISPATCHED → forge-preflight-marker-selfcheck-001 pending Larry approval.
+
+**Standing findings (unchanged from iter ~1977):**
+- [yellow] **PR #497 REVIEW_ESCALATE** — Mirror REVIEW_ESCALATE Jun-14T04:05Z; age≈39.7h; ~32.3h until 72h deadline Jun-17T04:02Z.
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. Last: 07:44:56 MDT Jun-15. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] **forge-preflight-marker-selfcheck-001** — Pending Larry approval (Beacon DM'd 13:35:39 MDT).
+- [blue] **PR #520 (p41-schedule-harden)** — Mirror review in progress. Watch for REVIEW_PASS + auto-merge.
+- [blue] **PR #522 (missions-card-gc-warn-demote-001)** — Mirror PASS. Held behind #520. G-rule COMPLETE on merge.
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected 2/3, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST 1/3, telegram-409-burst **2/3**, telegram-approval-self-dispatch-denied **1/3**.
+- [blue] **Stale bash orphans** — PIDs 1834248 (17d+) + 2605007 (1d+). Low CPU. [carry]
+
+**PRIME DIRECTIVE:** iter_clean. ratio≈19.98. Trend: improving.
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=2; need 1 more clean iter for de-escalation to Tier 2).
+
+---
+
+## Iteration ~1977 — 2026-06-15 19:40Z UTC (interactive, /cycle, Tier 1, consecutive_clean=1, all nominal, PR #521 closed, PR #522 Mirror PASS held behind #520, forge-preflight-marker-selfcheck-001 pending approval)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. All checks clean. 2 new alerts, both Tier-3 silenced. 0 stalls. pending=1 (forge-preflight-marker-selfcheck-001 — Beacon DM'd Larry, awaiting response). PR #521 closed ✅. PR #522 Mirror PASS, auto-merge held behind #520.
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): Confirmed OPEN. mergeable=UNKNOWN (gh API lag). reviewDecision=''. mirror-review=FAILURE (REVIEW_ESCALATE 2026-06-14T04:05:31Z). Age≈39.6h. 72h deadline Jun-17T04:02Z → **~32.4h remaining**. **CARRY** [yellow].
+- PR #520 (`forge/p41-schedule-harden`): OPEN. mergeable=MERGEABLE. reviewDecision=''. statusCheckRollup=[] (Mirror review in progress, no result yet). **CARRY** [blue].
+- PR #521 (`feat/new-mission-ingest-selftest-2026-06-15`): **CLOSED** 2026-06-15T19:30:13Z by heal_orphan_autoregister. ✅ **RESOLVED** as expected. Remove from standing items.
+- PR #522 (`forge/missions-card-gc-warn-demote-001`): OPEN. mergeable=MERGEABLE. mirror-review=SUCCESS (PASS) at 19:34:59Z. Auto-merge **HELD** behind PR #520 (overlap: scripts/heal_missions_card_gc.py). G-rule missions-card-gc-warn-vs-info COMPLETE once #520 merges and unblocks. **CHANGED** [blue].
+- G-rule Forge-preflight-marker-error-retry: 3/3 DISPATCHED → Beacon spec authored → `forge-preflight-marker-selfcheck-001` awaiting Larry approval (DM delivered 13:35:39 MDT). **PROGRESSING** [blue].
+- All 5 daemons: PIDs 2530123 (Ssl), 2744551 (SNs), 2744840 (Ss), 2744914 (Ss), 2868353 (Ssl) — all alive. ✅
+- Repo HEAD: 2c5e1cd3 = origin/main. Clean tree, on main. ✅
+- 409 burst: last occurrence 07:44:56 MDT Jun-15 (13:44:56Z). G-rule 2/3 unchanged. **CARRY** [yellow].
+
+**Check 0 — Alert triage:** Watermark=1038 (entering); file=1040 lines. **2 new alerts** (L1039-L1040):
+- L1039: `source=outbox-notifier, kind=notification, intent=review-pass` (Mirror approved PR #522, auto-merge held behind #520, chat_id DM delivered) → helper: **Tier-3** silenced ✅ (known-pattern match). Journal-note only.
+- L1040: `source=outbox-notifier, kind=approval_request, approval_id=forge-preflight-marker-selfcheck-001` (Beacon-authored plan DM'd to Larry 13:35:39 MDT) → helper: **Tier-3** silenced ✅ (known-pattern match, delivery confirmation). Journal-note only.
+- Watermark advanced: 1038→1040. No tier-reset (both Tier-3).
+
+**Check 1 — Log noise:** outbox-notifier.log tail-100: 0 new WARNs/ERRORs (only pre-existing 13:23:24 marker error already G-rule dispatched in iter ~1976). inbox-watcher.log: 0 WARNs/ERRORs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** PID 2744840 alive (Ss). Last Larry message: "go" 13:02:44 MDT (missions-v2-phase4.1 approval). forge-preflight-marker-selfcheck-001 approval_request DM delivered 13:35:39 MDT — awaiting Larry response. No 409 errors in recent log. G-rule telegram-409-burst 2/3 unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → 0 stalls, 6 skipped (pr_exists or preflight_exit). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=1** (forge-preflight-marker-selfcheck-001, created 19:35:28Z, Beacon-DM delivered). Awaiting Larry's "approve/go". Journal-note only — no Pulse action (Beacon owns this gate). ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T19:16:19.698610+00:00`, age≈23 min at check time. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=2c5e1cd3 = origin/main. Clean tree, on main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-15T18:45:54Z, status=success, age≈54 min. FRESH (<2h). Note: sync behind by ~5 commits (autoregister reconcile, #523, iter ~1976 cycle) — will self-refresh on next sync run. ✅ Nominal.
+
+**Check C — Agent liveness:** All 5 PIDs alive (2530123 Ssl, 2744551 SNs, 2744840 Ss, 2744914 Ss, 2868353 Ssl). ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (3 open):
+- **PR #520** (`forge/p41-schedule-harden`): OPEN. MERGEABLE. Mirror review in progress (statusCheckRollup=[]). [blue] watch.
+- **PR #522** (`forge/missions-card-gc-warn-demote-001`): OPEN. MERGEABLE. Mirror PASS at 19:34:59Z. Auto-merge HELD behind PR #520 (overlap: scripts/heal_missions_card_gc.py). G-rule missions-card-gc-warn-vs-info COMPLETE once unblocked. [blue] watch.
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): MERGEABLE, reviewDecision=''. Mirror REVIEW_ESCALATE Jun-14T04:05Z. Age≈39.6h, ~32.4h until 72h deadline Jun-17T04:02Z. [yellow] carry.
+- **PR #521**: CLOSED ✅ (heal_orphan_autoregister). Removed from tracking.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Conditional checks (Monday 2026-06-15):** Check I sentinel exists → skip. Check VIII/IX/X sentinels exist → skip.
+
+**Actions taken:**
+1. `alert_triage_state.py set-watermark --line 1040` → 1038→1040 ✅
+2. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` ✅ (ratio≈19.98)
+3. `cycle_tier_state.py record --checks-clean true` → **Tier 1, consecutive_clean=1** ✅
+
+**Dispatches:** None.
+
+**G-rule updates this iter:**
+- All counters unchanged. No new WARN/pattern occurrences this iter.
+- G-rule missions-card-gc-warn-vs-info: 3/3 DISPATCHED → PR #522 Mirror PASS, blocked on PR #520 merge. PENDING COMPLETION.
+- G-rule Forge-preflight-marker-error-retry: 3/3 DISPATCHED → Beacon spec forge-preflight-marker-selfcheck-001 awaiting Larry approval.
+
+**Standing findings (updated from iter ~1976):**
+- [yellow] **PR #497 REVIEW_ESCALATE** — Mirror REVIEW_ESCALATE Jun-14T04:05Z; MERGEABLE; age≈39.6h; ~32.4h until 72h deadline Jun-17T04:02Z. Escalate if still open at deadline.
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519** — bot-delivered for prior. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. FN=3027, TP=5. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. Last: 07:44:56 MDT Jun-15. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] **forge-preflight-marker-selfcheck-001** — Pending Larry approval (Beacon DM'd 13:35:39 MDT). Approve to send Forge the doc-only build.
+- [blue] **PR #520 (p41-schedule-harden)** — In Mirror review. watch for REVIEW_PASS + auto-merge.
+- [blue] **PR #522 (missions-card-gc-warn-demote-001)** — Mirror PASS. Auto-merge held behind #520. G-rule COMPLETE on merge.
+- [blue] **G-rule Forge-preflight-marker-error-retry** — **3/3 DISPATCHED** → forge-preflight-marker-selfcheck-001 pending approval. [watch for Forge PR after Larry approves]
+- [blue] **G-rule missions-card-gc-warn-vs-info** — **3/3 DISPATCHED** → PR #522 Mirror PASS, auto-merge held behind #520. [COMPLETE on merge]
+- [blue] **G-rule medic-diagnosis-tier4** — **COMPLETE ✅** PR #515 merged.
+- [blue] **G-rule healer-unrouted-pr-tier3-translation** — **COMPLETE ✅** PR #516 merged.
+- [blue] **G-rule missions-autoregister-warn-vs-info** — **COMPLETE ✅** PR #514 merged.
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected 2/3, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST 1/3, telegram-409-burst **2/3**, telegram-approval-self-dispatch-denied **1/3**.
+- [blue] **catalog-accuracy-drift** — G-rule 1/3. route=digest. [carry]
+- [blue] **Stale bash orphans** — PIDs 1834248 (17d+) + 2605007 (1d+). Low CPU. [carry]
+
+**PRIME DIRECTIVE:** iter_clean. ratio≈19.98. Trend: improving.
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=1; need 2 more clean iters for de-escalation to Tier 2).
+
+---
+
+## Iteration ~1976 — 2026-06-15 19:32Z UTC (interactive, /cycle, Tier 1, Check 1 WARN, G-rule Forge-preflight-marker-error-retry 3/3 DISPATCH, 3 new PRs)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Check 1: Forge-preflight-marker-error-retry WARN (p41-schedule-harden preflight, auto-recovered). G-rule 2/3 → 3/3 → DISPATCHED to Beacon. All other checks nominal. 3 new PRs (#520, #521, #522) appeared since iter ~1975.
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): Confirmed open. **mergeable=MERGEABLE** (unchanged). reviewDecision=''. statusCheckRollup: `mirror-review=FAILURE` (Mirror REVIEW_ESCALATE 2026-06-14T04:02:56Z). Age≈39.5h. 72h deadline Jun-17T04:02Z → **~32.5h remaining**. **CARRY** [yellow].
+- p41-schedule-harden: **PR #520 OPENED** at 19:23:12Z. In Mirror review (inbox: review-p41-schedule-harden.json). Build completed successfully. ✅ **CHANGED** [blue].
+- missions-card-gc-warn-demote-001: **PR #522 OPENED** at 19:26:45Z. MERGEABLE. In Mirror review (inbox: review-missions-card-gc-warn-demote-001.json). Build completed successfully. **CHANGED** [blue].
+- All 5 daemons: PIDs 2530123 (Ssl), 2744551 (SNs), 2744840 (Ss), 2744914 (Ss), 2868353 (Ssl) — all alive. ✅
+- Repo HEAD: 545bd4fb (Pulse cycle 20260615T192610Z) = origin/main. Clean tree, on main. ✅
+- 409 burst: last occurrence 07:44:56 MDT Jun-15 (13:44:56Z). G-rule 2/3 unchanged. **CARRY** [yellow].
+- unreviewed-merge:519: No new alert in larry-alerts.jsonl (file=1038, unchanged). No alert generated yet. **CARRY** [blue].
+- Forge-preflight-marker-error-retry: WARN at 13:23:24 MDT in outbox-notifier.log for p41-schedule-harden preflight — missed by iter ~1975 Check 1 (iter ~1975 reported 0 WARNs, but WARN appeared in that same minute window). Catching now. G-rule **2/3 → 3/3 → DISPATCHED**. **CHANGED**.
+
+**Check 0 — Alert triage:** Watermark=1038 (entering); file=1038 lines. **0 new alerts.** ✅ Nominal. Watermark unchanged.
+
+**Check 1 — Log noise:** outbox-notifier.log tail-100 shows 1 WARN: `[2026-06-15 13:23:24] [WARN] forge marker error in p41-schedule-harden.json: MalformedForgeMarker: phase=preflight requires ONE marker block — none found; retry 1/3`. Auto-recovered: `[13:25:40] classified forge proceed marker → build dispatched`. inbox-watcher: 0 WARNs/ERRORs. **G-rule Forge-preflight-marker-error-retry 2/3 → 3/3 → DISPATCHED** to Beacon (pulse-forge-preflight-marker-error-retry-001). Tier-reset. ⚠️
+
+**Check 2 — Telegram sweep:** PID 2744840 alive (Ss). Last Larry message: 13:02:44 MDT "go" (prev iter). No new messages since. No 409 errors in recent log. G-rule telegram-409-burst 2/3 unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → 0 stalls detected, 6 skipped (pr_exists or preflight_exit). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0**. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T19:16:19.698610+00:00`, age≈16 min at check time. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=545bd4fb = origin/main. Clean tree, on main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-15T18:45:54Z, status=success, age≈47 min. FRESH (<2h). Note: sync anchored to 076ea3e9; new HEAD 545bd4fb (Pulse cycles ~1975+~1976) will be picked up on next sync run. ✅ Nominal.
+
+**Check C — Agent liveness:** All 5 PIDs alive (2530123 Ssl, 2744551 SNs, 2744840 Ss, 2744914 Ss, 2868353 Ssl). ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (4 open — 3 new since iter ~1975):
+- **PR #520** (`forge/p41-schedule-harden`): NEW. Created 19:23:12Z. UNKNOWN mergeable, reviewDecision=''. "feat(missions): fold Narrator sweep into GC healer tick + harden LLM-JSON parse". Mirror review dispatched (inbox: review-p41-schedule-harden.json). Age≈9 min. [blue] watch.
+- **PR #521** (`feat/new-mission-ingest-selftest-2026-06-15`): NEW. Created 19:24:01Z. UNKNOWN mergeable, reviewDecision=''. "test(missions): ingest self-test (auto-reconciled)". Author: Larry-Yatch. Body: "heal_orphan_autoregister should append mission ingest-selftest-2026-06-15 to main and close this PR. Safe to drop." Self-managed; heal_orphan_autoregister will process. [blue] watch.
+- **PR #522** (`forge/missions-card-gc-warn-demote-001`): NEW. Created 19:26:45Z. **MERGEABLE**, reviewDecision=''. "fix(missions-card-gc): stop emitting routine success summary as a Pulse-claimed digest alert". Mirror review dispatched (inbox: review-missions-card-gc-warn-demote-001.json). [blue] watch → G-rule missions-card-gc-warn-vs-info COMPLETE once merged.
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): MERGEABLE, reviewDecision=''. Mirror REVIEW_ESCALATE Jun-14T04:02Z (status=FAILURE). Age≈39.5h, ~32.5h until 72h deadline Jun-17T04:02Z. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Conditional checks (Monday 2026-06-15):** § 5.0 audit_due_nudge, distill_detector, audit_cadence_signal — all returned no-op (no FIRED). ✅. Check I sentinel exists → skip. Check VIII/IX/X sentinels exist → skip.
+
+**Credential rotation check:** Config parsed (token-rotation-schedule.json found). Python tz-naive date parse error encountered for all entries (dates missing timezone suffix). Unable to compute delta reliably. No OVERDUE credentials visible. Minor: my inline check script needs tz-aware handling. Not a credential emergency. Note for next iter.
+
+**Actions taken:**
+1. Written `~/agents/inboxes/beacon/pulse-forge-preflight-marker-error-retry-001.json` (G-rule 3/3 dispatch) ✅
+2. `cycle_prime_ledger.py append --tier 1 --kind systemic_fix --template forge-preflight-marker-error-retry` ✅ (ratio→19.98)
+3. `cycle_tier_state.py record --checks-clean false` → **Tier 1, consecutive_clean=0** (G-rule dispatch = non-clean iter) ✅
+
+**Dispatches:**
+- `pulse-forge-preflight-marker-error-retry-001` → Beacon inbox. Direction-ask: spec + dispatch Forge build to harden preflight marker discipline (MalformedForgeMarker pattern, 3rd occurrence, auto-recovered each time but costs ~2 min per incident).
+
+**G-rule updates this iter:**
+- **Forge-preflight-marker-error-retry: 2/3 → 3/3 → DISPATCHED** (Beacon inbox: pulse-forge-preflight-marker-error-retry-001)
+- All other counters unchanged.
+
+**Standing findings (updated from iter ~1975):**
+- [yellow] **PR #497 REVIEW_ESCALATE** — Mirror REVIEW_ESCALATE Jun-14T04:02Z; MERGEABLE; age≈39.5h; ~32.5h until 72h deadline Jun-17T04:02Z. Escalate if still open at deadline.
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519** — bot-delivered for prior. #519 alert TBD. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. FN=3027, TP=5. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. Last: 07:44:56 MDT Jun-15. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] **PR #520 (p41-schedule-harden)** — in Mirror review. Watch for REVIEW_PASS + auto-merge.
+- [blue] **PR #521 (ingest-selftest)** — self-managed (heal_orphan_autoregister). Watch for auto-close.
+- [blue] **PR #522 (missions-card-gc-warn-demote-001)** — in Mirror review. COMPLETE when merged (→ G-rule missions-card-gc-warn-vs-info ✅).
+- [blue] **G-rule Forge-preflight-marker-error-retry** — **3/3 DISPATCHED** → Beacon inbox (pulse-forge-preflight-marker-error-retry-001). [watch for Forge PR]
+- [blue] **G-rule missions-card-gc-warn-vs-info** — **3/3 DISPATCHED** → PR #522 in Mirror review → COMPLETE on merge.
+- [blue] **G-rule medic-diagnosis-tier4** — **COMPLETE ✅** PR #515 merged.
+- [blue] **G-rule healer-unrouted-pr-tier3-translation** — **COMPLETE ✅** PR #516 merged.
+- [blue] **G-rule missions-autoregister-warn-vs-info** — **COMPLETE ✅** PR #514 merged.
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected 2/3, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST 1/3, telegram-409-burst **2/3**, telegram-approval-self-dispatch-denied **1/3**.
+- [blue] **catalog-accuracy-drift** — G-rule 1/3. route=digest. [carry]
+- [blue] **Stale bash orphans** — PIDs 1834248 (17d+) + 2605007 (1d+). Low CPU. [carry]
+
+**PRIME DIRECTIVE:** 1 systemic_fix (G-rule dispatch: forge-preflight-marker-error-retry). ratio≈19.98. Trend: improving.
+**Tier end-of-iter:** **Tier 1** (G-rule dispatch = non-clean; consecutive_clean=0).
+
+---
+
+## Iteration ~1975 — 2026-06-15 19:24Z UTC (interactive, /cycle, Tier 1, consecutive_clean=1, all nominal)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. All mandatory checks + additive checks clean. 0 new alerts. 0 stalls. 0 pending directives. Forge building p41-schedule-harden (16 min elapsed, 4h timeout). No G-rule advances.
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): Confirmed open. **mergeable=MERGEABLE** (unchanged from iter ~1974). reviewDecision=''. Mirror REVIEW_ESCALATE Jun-14T04:05Z. Age≈39.3h. 72h deadline Jun-17T04:02Z → **~32.7h remaining**. **CARRY** [yellow].
+- p41-schedule-harden: Forge started at 19:05:44Z, inbox file present, no PR yet at 19:24Z (~19 min elapsed). Normal (4h timeout). **CARRY** [blue].
+- missions-card-gc-warn-demote-001: In Forge inbox, queued behind p41-schedule-harden. Not yet started. **CARRY** [blue].
+- All 5 daemons: PIDs 2530123 (Ssl), 2744551 (SNs), 2744840 (Ss), 2744914 (Ss), 2868353 (Ssl) — all alive. ✅
+- Repo HEAD: 6821d6a9 (Pulse cycle 20260615T192010Z) = origin/main. Clean tree, on main. ✅
+- 409 burst: last occurrence still 07:44:56 MDT Jun-15 (13:44:56Z). G-rule 2/3 unchanged. **CARRY** [yellow].
+- unreviewed-merge:519: No alert in larry-alerts.jsonl yet (file=1038 unchanged). Heal-unreviewed-merge-detector expected to fire on next sweep. **TBD** [blue].
+
+**Check 0 — Alert triage:** Watermark=1038 (entering); file=1038 lines. **0 new alerts.** ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier: last entry 13:05:42 MDT (p41-schedule-harden headless-approval-request dispatched). All INFO. 0 WARNs/ERRORs since. inbox-watcher: 0 WARNs/ERRORs. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3 unchanged. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** PID 2744840 alive (Ss). No 409 errors in recent log. G-rule telegram-409-burst 2/3 unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → 0 stalls detected, 6 skipped (pr_exists or preflight_exit). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0**. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T19:16:19.698610+00:00`, age≈8 min at check time. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=6821d6a9 = origin/main. Clean tree, on main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-15T18:45:54Z, status=success, age≈39 min. FRESH (<2h). ✅ Nominal. (Sync behind by 2 commits: 357f23f6 PR #519 + 6821d6a9 Pulse cycle; will self-refresh on next sync run.)
+
+**Check C — Agent liveness:** All 5 PIDs alive (2530123 Ssl, 2744551 SNs, 2744840 Ss, 2744914 Ss, 2868353 Ssl). ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (1 open, unchanged):
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): MERGEABLE, reviewDecision=''. Mirror REVIEW_ESCALATE Jun-14T04:05Z. Age≈39.3h, ~32.7h until 72h deadline Jun-17T04:02Z. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Conditional checks (Monday 2026-06-15):** Check I sentinel exists → skip. Check VIII, IX, X sentinels exist → skip.
+
+**Actions taken:**
+1. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` ✅
+2. `cycle_tier_state.py record --checks-clean true` → Tier 1, consecutive_clean=1 ✅
+
+**Dispatches:** None.
+
+**G-rule updates this iter:**
+- All counters unchanged. No new WARN/pattern occurrences this iter.
+
+**Standing findings (updated from iter ~1974):**
+- [yellow] **PR #497 REVIEW_ESCALATE** — Mirror REVIEW_ESCALATE Jun-14T04:05Z; MERGEABLE; age≈39.3h; ~32.7h until 72h deadline Jun-17T04:02Z. Escalate if still open at deadline.
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519** — #519 TBD (no alert yet). Bot-delivered for prior items. Larry's judgment.
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. FN=3027, TP=5. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. Last: 07:44:56 MDT Jun-15. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] **p41-schedule-harden** — Forge actively building (started 19:05:44Z, ~19 min elapsed). Watch for PR.
+- [blue] **missions-card-gc-warn-demote-001** — In Forge inbox; queued behind p41-schedule-harden. Watch for start.
+- [blue] **G-rule missions-card-gc-warn-vs-info** — **3/3 DISPATCHED** → Forge build `missions-card-gc-warn-demote-001` in inbox. [watch for PR → COMPLETE]
+- [blue] **G-rule medic-diagnosis-tier4** — **COMPLETE ✅** PR #515 merged.
+- [blue] **G-rule healer-unrouted-pr-tier3-translation** — **COMPLETE ✅** PR #516 merged.
+- [blue] **G-rule missions-autoregister-warn-vs-info** — **COMPLETE ✅** PR #514 merged.
+- [blue] G-rule counters: Forge-preflight-marker-error-retry 2/3, F24-empty-prompt-envelope-rejected 2/3, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST 1/3, telegram-409-burst **2/3**, telegram-approval-self-dispatch-denied **1/3**.
+- [blue] **catalog-accuracy-drift** — G-rule 1/3. route=digest. [carry]
+- [blue] **Stale bash orphans** — PIDs 1834248 (17d+) + 2605007 (1d+). Low CPU. [carry]
+
+**PRIME DIRECTIVE:** iter_clean. ratio≈20.40. Trend: improving.
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=1; need 2 more clean iters for de-escalation to Tier 2).
+
+---
+
 ## Iteration ~1974 — 2026-06-15 19:17Z UTC (interactive, /cycle, Tier 1, Check A always-fix, missions-card-gc-warn-demote-001 APPROVED, PR #519 merged)
 
 **Trigger:** Larry direct invocation (`/cycle`).

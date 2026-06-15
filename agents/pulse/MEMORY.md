@@ -126,7 +126,27 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 19:17Z UTC (Iter ~1974, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-15 20:48Z UTC (Iter ~1985, Tier 1→2 DE-ESCALATION, consecutive_clean=3→0, all checks nominal)
+
+**Iter ~1985 summary:** ✅ Nominal. 0 new alerts. All checks clean. Repo at 491e5de4=origin/main. Watermark: 1046 (unchanged). pending=0. 2 open PRs: #522 (CONFLICTING, Forge rebase needed), #497 (72h deadline Jun-17T04:02Z ~31.2h, MERGEABLE/UNSTABLE). PRIME ratio=20.04. **Tier 1 → Tier 2 DE-ESCALATION** (3 consecutive clean iters).
+
+**Iter ~1984 summary:** ✅ Nominal. 0 new alerts. All checks clean. Repo at 881bafce=origin/main. Watermark: 1046 (unchanged). pending=0. 2 open PRs: #522 (CONFLICTING, Forge rebase needed), #497 (72h deadline Jun-17T04:02Z ~31.4h). PRIME ratio=20.04. Tier 1, consecutive_clean=2.
+
+**Iter ~1983 summary:** ✅ Nominal. 0 new alerts. All checks clean. Repo at 262048c7=origin/main. Watermark: 1046 (unchanged). pending=0. 2 open PRs: #522 (CONFLICTING, Forge rebase needed), #497 (72h deadline Jun-17T04:02Z ~31.6h). PRIME ratio=20.04. Tier 1, consecutive_clean=1.
+
+**Iter ~1982 summary:** ⚠️ Signal. L1046 Tier-4 (missions-card-gc/summary — novel, no registry template; bot handled route=digest, DM skipped; no Pulse DM). G-rule missions-card-gc-warn-vs-info already 3/3 dispatched, PR #522 still blocking. Check A: repo behind 1 commit (PR #525 merge `1bebe776`); fast-forward executed. PR #525 (`forge/p41-rebrief-on-change`) MERGED ✅ 20:21:50Z — SEQUENCE_STEP_MERGED missions-v2-phase4.1. Watermark: 1045→1046. 2 open PRs: #522 (CONFLICTING, needs Forge rebase), #497 (72h deadline Jun-17T04:05Z ~31.7h). PRIME ratio=20.04. Tier 1, consecutive_clean=0.
+
+**Iter ~1981 summary:** ⚠️ Signal. L1044 Tier-4 (heal-pipeline-stall:mirror-pass-unmerged:PR#522 — novel, no registry template; medic DM'd Larry at chat_id; no Pulse DM). L1045 Tier-3 silenced (medic-diagnosis). PR #525 NEW (`forge/p41-rebrief-on-change`, feat(missions): re-brief narrator cards on mission state change) — Mirror review dispatched 20:13Z. Watermark: 1043→1045. 3 open PRs: #525 (Mirror reviewing), #522 (CONFLICTING, needs Forge rebase), #497 (72h deadline Jun-17T04:02Z ~32h). PRIME ratio=20.0. **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4: 1/3 (new)**. Tier 1, consecutive_clean=0.
+
+**Iter ~1980 summary:** ⚠️ Tier-reset. Check A: repo behind 1 commit (PR #520 merge `cd9c44ca`); fast-forward executed. Check 0: L1042 Tier-3 silenced (review-pass PR #524 auto-merged → G-rule Forge-preflight-marker-error-retry COMPLETE ✅). L1043 Tier-4 novel (merge_conflict_manual_rebase PR #522; outbox-notifier DM'd Larry via chat_id; no second DM). PR #520 MERGED ✅ 20:03:42Z. PR #524 MERGED ✅. PR #522 CONFLICTING (needs Forge rebase). Watermark: 1041→1043. 2 open PRs: #522 (CONFLICTING), #497 (72h deadline Jun-17T04:02Z ~31h). PRIME ratio=20.0. **Tier 2 → Tier 1 RESET**. G-rule merge_conflict_manual_rebase-tier4: **1/3**.
+
+**Iter ~1979 summary:** ✅ Nominal. 0 new alerts. pending=0 (Larry approved forge-preflight-marker-selfcheck-001 → PR #524 built). PR #520 Mirror REVISION (data-loss: captures.json RMW window) → Forge revised → Mirror re-reviewing round 1. PR #524 NEW (Mirror reviewing). PR #522 Mirror PASS, held behind #520. Watermark: 1041 unchanged. 4 open PRs: #497 (72h deadline Jun-17T04:02Z ~32h), #520 (revision-1 Mirror review), #522 (held behind #520), #524 (new, Mirror review). PRIME ratio≈19.98. **Tier 1 → Tier 2 DE-ESCALATED**.
+
+**Iter ~1977 summary:** ✅ Nominal. 2 new alerts, both Tier-3 silenced (L1039 review-pass PR #522, L1040 approval_request forge-preflight-marker-selfcheck-001). PR #521 CLOSED by heal_orphan_autoregister ✅. PR #522 Mirror PASS (19:35Z), auto-merge held behind PR #520 (file overlap). pending=1: forge-preflight-marker-selfcheck-001 (Beacon-DM'd Larry 13:35 MDT, awaiting "go"). G-rule Forge-preflight-marker-error-retry: DISPATCHED → Beacon spec → pending approval. Watermark: 1038→1040. 3 open PRs: #497 (MERGEABLE, 72h deadline Jun-17T04:02Z ~32.4h), #520 (Mirror review in progress), #522 (Mirror PASS, held). PRIME ratio≈19.98. Tier 1, consecutive_clean=1.
+
+**Iter ~1976 summary:** ⚠️ Check 1: Forge-preflight-marker-error-retry WARN (p41-schedule-harden preflight, 13:23:24 MDT, auto-recovered 13:25:40). G-rule **2/3 → 3/3 → DISPATCHED** (Beacon: pulse-forge-preflight-marker-error-retry-001). 3 new PRs: #520 (p41-schedule-harden, Mirror review), #521 (ingest-selftest, self-managed), #522 (missions-card-gc-warn-demote-001, Mirror review). 0 new alerts. Watermark: 1038 unchanged. 4 open PRs: #497 (MERGEABLE, 72h deadline Jun-17T04:02Z ~32.5h), #520, #521, #522. PRIME ratio≈19.98. Tier 1, consecutive_clean=0.
+
+**Iter ~1975 summary:** ✅ Nominal. 0 new alerts. 0 stalls. 0 pending directives. All daemons alive. Forge building p41-schedule-harden (~19 min elapsed, no PR yet). missions-card-gc-warn-demote-001 in Forge inbox, queued behind p41-schedule-harden. Watermark: 1038 unchanged. 1 open PR: #497 (MERGEABLE, age≈39.3h, deadline Jun-17T04:02Z ~32.7h). PRIME ratio≈20.40. Tier 1, consecutive_clean=1.
 
 **Iter ~1974 summary:** ⚠️ Check A: behind origin/main by 1 commit (PR #519 fix-missions-auto-reconcile merged 19:13:44Z). Fast-forward executed. Check 4: pending=0 (missions-card-gc-warn-demote-001 APPROVED, Forge build dispatched). p41-schedule-harden: Forge actively building (~11 min). PR #519 merged (unreviewed-merge, alert TBD). Watermark: 1038 unchanged. 1 open PR: #497 (now MERGEABLE, age≈39.2h, deadline Jun-17T04:02Z ~32.8h). PRIME ratio≈20.375. Tier-reset. Tier 1, consecutive_clean=0.
 
@@ -158,24 +178,33 @@
 
 ---
 
-## Key standing items (as of iter ~1974)
+## heal-pipeline-stall-mirror-pass-unmerged-tier4 G-rule (observed iter ~1981)
+
+**Rule:** When `heal-pipeline-stall` fires `pipeline-stall:mirror-pass-unmerged:PR#N` into larry-alerts.jsonl, the triage helper returns Tier-4 (novel, no registry template). The medic module almost always diagnoses the same event and DMs Larry directly via chat_id. Do NOT send a second Pulse DM — journal-note only. G-rule count: **1/3** — dispatch to Beacon at 3/3 for Tier-3 translation in `config/alert-translations.json`.
+
+---
+
+## Key standing items (as of iter ~1982)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] **MERGEABLE** (changed from UNKNOWN); reviewDecision=""; Mirror REVIEW_ESCALATE Jun-14T04:05Z; age≈39.2h; 72h expires Jun-17T04:02Z (~32.8h remaining). | Escalate if still open at Jun-17T04:02Z |
-| unreviewed-merge:511/499/494/489/510/509/518/519 | [yellow] PRs merged by Larry without Mirror; bot-delivered for others; #519 alert TBD. Larry's judgment call. | Reply appropriate shortcut or silence |
+| PR #525 MERGED ✅ | feat(missions): re-brief narrator cards on mission state change. Merged 2026-06-15T20:21:50Z (`1bebe776`). missions-v2-phase4.1 sequence advancing. | DONE. Watch for next sequence step. |
+| PR #522 CONFLICTING | [yellow] Mirror PASS; auto-merge BLOCKED by conflict with PR #520 (scripts/heal_missions_card_gc.py). G-rule missions-card-gc-warn-vs-info blocked. | Forge rebase PR #522 on origin/main. Larry has DM with rebase commands. |
+| PR #497 REVIEW_ESCALATE | [yellow] mergeable=UNKNOWN; Mirror REVIEW_ESCALATE Jun-14T04:05Z; age≈41h; 72h expires Jun-17T04:02Z (~31h remaining). | Escalate if still open at Jun-17T04:02Z |
+| unreviewed-merge:511/499/494/489/510/509/518/519 | [yellow] PRs merged by Larry without Mirror; bot-delivered for others. Larry's judgment call. | Reply appropriate shortcut or silence |
 | G-rule stall-detector Forge build | [yellow] Beacon spec complete. Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
 | Check VIII rule=lower | [yellow] FN=3027, TP=5, FP=2 — threshold too high. | `approve check-viii-update-2026-06-15` when shortcut lands |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
 | Telegram 409 burst | [yellow] G-rule **2/3**. All self-inflicted by calling get-messages. | Watch; dispatch at 3/3 |
 | G-rule telegram-approval-self-dispatch-denied | [yellow] **1/3** — Larry "Go" → dispatch failed (self-dispatch denied beacon→beacon). | Watch; dispatch to Beacon at 3/3 for bot routing fix |
-| p41-schedule-harden build | [blue] Forge actively building (started 19:05:44Z Jun-15). Watch for PR. | Watch next iter |
-| missions-card-gc-warn-demote-001 | [blue] APPROVED by Larry 19:10Z Jun-15; Forge build in inbox. Queued behind p41-schedule-harden. | Watch for Forge PR → COMPLETE |
-| G-rule missions-card-gc-warn-vs-info | [blue] **3/3 DISPATCHED** → Forge build `missions-card-gc-warn-demote-001` in inbox. | Watch for PR → G-rule COMPLETE |
+| G-rule missions-card-gc-warn-vs-info | [blue] **3/3 DISPATCHED** → PR #522 CONFLICTING (needs Forge rebase after PR #520 merge). | Forge rebase PR #522 → re-push → auto-merge → COMPLETE |
+| G-rule Forge-preflight-marker-error-retry | [blue] **COMPLETE ✅** PR #524 merged `97300fc1` Jun-15. | Done. |
 | G-rule missions-autoregister-warn-vs-info | [blue] **COMPLETE ✅** PR #514 merged Jun-15. | Done. |
 | G-rule medic-diagnosis-tier4 | [blue] **COMPLETE ✅** PR #515 merged Jun-15T17:27:41Z. | Done. |
 | G-rule healer-unrouted-pr-tier3-translation | [blue] **COMPLETE ✅** PR #516 merged Jun-15T17:27:36Z. | Done. |
+| G-rule merge_conflict_manual_rebase-tier4 | [blue] **1/3** — outbox-notifier DMs Larry directly via chat_id; Pulse should NOT double-DM. | Watch; dispatch to Beacon at 3/3 for Tier-3 translation |
+| G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4 | [blue] **1/3** — heal-pipeline-stall fires Tier-4; medic DMs directly; Pulse no-DM. | Watch; dispatch to Beacon at 3/3 for Tier-3 translation |
 | Check I 2026-06-15 | [blue] 1 proposal dispatched iter ~1899, Beacon processed | Beacon spec in progress |
 | G-rule catalog-accuracy-drift-tier4 | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule ledger/check-i Tier-4 | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 |
@@ -183,7 +212,6 @@
 | catalog-accuracy-drift | [blue] 9/34 ourliberty-graph shelf cards drifted | route=digest; journal-note only |
 | G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] **2/3** | Watch; dispatch at 3/3 |
-| G-rule Forge-preflight-marker-error-retry | [blue] **2/3** | Watch; dispatch at 3/3 |
 | G-rule Forge-preflight-CLARIFY_REQUEST | [blue] **1/3** | Watch; dispatch at 3/3 |
 | G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 (warn-vs-info) |
 | G-rule telegram-409-burst | [yellow] **2/3** | Watch; dispatch at 3/3 |

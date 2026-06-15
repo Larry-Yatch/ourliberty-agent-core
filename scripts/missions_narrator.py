@@ -80,6 +80,12 @@ NARRATOR_MODEL = 'claude-opus-4-8'
 NARRATOR_BY = 'beacon'
 CLAUDE_TIMEOUT_SEC = 180
 
+# Per-tick authoring bound (spec § 3). The folded sweep (run by the GC healer's
+# timer) authors at most this many captures per tick so an LLM-slow tick can't
+# run unboundedly; the remainder briefs on the next tick (needs_briefing is
+# idempotent, so deferral is safe).
+NARRATOR_MAX_PER_TICK = 8
+
 VALID_RISKS = ('safe', 'medium', 'careful')
 
 # Keywords in a capture's title/note that mark the proposed work as
@@ -251,6 +257,78 @@ def build_briefing_prompt(
     )
 
 
+def _strip_code_fences(text: str) -> str:
+    """Return the inner content of the first markdown code fence (```json … ```
+    or bare ``` … ```) if one is present, else the text stripped. The model
+    sometimes wraps its JSON in a fence; the strict parse choked on the
+    backticks (spec § 5)."""
+    fence = re.search(r'```(?:json)?\s*(.*?)```', text, re.DOTALL | re.IGNORECASE)
+    if fence:
+        return fence.group(1).strip()
+    return text.strip()
+
+
+def _first_balanced_object(text: str) -> Optional[str]:
+    """Return the first balanced ``{…}`` substring, tracking string literals and
+    backslash escapes so braces inside strings don't miscount. None if there is
+    no balanced object — this is what lets a JSON object wrapped in leading/
+    trailing prose still be extracted."""
+    start = text.find('{')
+    if start < 0:
+        return None
+    depth = 0
+    in_str = False
+    escaped = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_str:
+            if escaped:
+                escaped = False
+            elif ch == '\\':
+                escaped = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == '{':
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0:
+                return text[start:i + 1]
+    return None
+
+
+def _strip_trailing_commas(text: str) -> str:
+    """Drop a trailing comma before a closing ``}``/``]`` — a common model JSON
+    slip that strict json.loads rejects."""
+    return re.sub(r',(\s*[}\]])', r'\1', text)
+
+
+def parse_briefing_json(text: str) -> Optional[dict[str, Any]]:
+    """Tolerant parse of a model briefing reply (spec § 5). Accepts raw JSON,
+    fenced JSON, a JSON object wrapped in prose, and a trailing-comma slip.
+    Returns the parsed dict, or None when no JSON object is extractable — only
+    then does the caller fall through to the deterministic raw briefing."""
+    if not text or not text.strip():
+        return None
+    stripped = _strip_code_fences(text)
+    candidates = [stripped]
+    obj = _first_balanced_object(stripped)
+    if obj is not None:
+        candidates.append(obj)
+        candidates.append(_strip_trailing_commas(obj))
+    for cand in candidates:
+        try:
+            parsed = json.loads(cand)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+    return None
+
+
 def generate_briefing_voice(prompt: str) -> Optional[dict[str, str]]:
     """Invoke the claude CLI to author the briefing. Returns the parsed
     {what,why,suggest} dict, or None on any failure (timeout, non-zero exit,
@@ -278,12 +356,9 @@ def generate_briefing_voice(prompt: str) -> Optional[dict[str, str]]:
     text = (envelope.get('result') or '').strip() if isinstance(envelope, dict) else ''
     if not text:
         return None
-    try:
-        briefing = json.loads(text)
-    except json.JSONDecodeError:
-        log('narrator: claude result was not a JSON briefing; using raw briefing')
-        return None
+    briefing = parse_briefing_json(text)
     if not isinstance(briefing, dict):
+        log('narrator: claude result had no extractable JSON briefing; using raw briefing')
         return None
     out = {}
     for k in ('what', 'why', 'suggest'):
@@ -341,19 +416,81 @@ def author_meaning_layer(
 
 
 def needs_briefing(capture: dict[str, Any]) -> bool:
-    """True if a parked capture needs (re)briefing — missing briefing, or its
-    provenance was stamped from a different state than the capture's current one
-    (§ 4: fields regenerate when state/context changes). Idempotent: a capture
-    already briefed for its current state returns False, so the periodic sweep
-    and the event-driven path converge."""
-    if capture.get('state') != 'parked':
-        return False
+    """True if a capture needs (re)briefing — missing briefing, or its provenance
+    was stamped from a different state than the capture's current one (§ 4: fields
+    regenerate when state/context changes). The state comparison is what makes a
+    promote/drop re-author: those endpoints change the capture's state, so the
+    next folded sweep sees state != briefing_provenance.from_state and rewrites the
+    meaning layer to match the new state. Idempotent: a capture already briefed for
+    its current state returns False, so the periodic sweep and the event-driven
+    path converge and an unchanged card is never re-authored.
+
+    (Snooze keeps state == 'parked' — it only defers resurfacing via
+    `snoozed_until` — so it is intentionally NOT a re-brief trigger here: the
+    card's meaning is unchanged by a snooze.)"""
     if not isinstance(capture.get('briefing'), dict):
         return True
     provenance = capture.get('briefing_provenance')
     if not isinstance(provenance, dict):
         return True
     return provenance.get('from_state') != capture.get('state')
+
+
+def author_captures_in_registry(
+    registry: dict[str, Any],
+    *,
+    now: Optional[datetime] = None,
+    client: Optional[Any] = None,
+    use_llm: bool = True,
+    policy: Optional[dict[str, Any]] = None,
+    max_per_tick: int = NARRATOR_MAX_PER_TICK,
+) -> tuple[int, int]:
+    """Author the meaning layer onto captures in ``registry`` that need briefing,
+    bounded by ``max_per_tick`` (spec § 3). Mutates the registry IN PLACE — the
+    caller (the GC healer) owns the single atomic write + git commit, so this
+    never becomes a second writer of captures.json (single-committer invariant).
+
+    Returns ``(briefed, deferred)``: how many captures were authored this tick
+    and how many still need briefing afterward (the remainder briefs next tick;
+    needs_briefing is idempotent). Fail-safe per capture: an author error on one
+    capture is logged and skipped — never aborts the sweep, never corrupts the
+    registry (the deterministic fallback already guarantees a usable briefing).
+
+    The per-tick bound counts AUTHORING ATTEMPTS, not successes, so a tick can't
+    spend more than ``max_per_tick`` LLM round-trips even if some error out."""
+    now = now or datetime.now(timezone.utc)
+    captures = registry.get('captures')
+    if not isinstance(captures, list):
+        return (0, 0)
+    pending = [c for c in captures if isinstance(c, dict) and needs_briefing(c)]
+
+    attempted = 0
+    briefed = 0
+    for cap in pending:
+        if attempted >= max_per_tick:
+            break
+        cid = cap.get('id')
+        if not cid:
+            continue  # no stable id — can't author a meaningful card; skip.
+        attempted += 1
+        try:
+            events = fetch_capture_events(cid, client=client)
+            fields = author_meaning_layer(
+                cap, events, now=now, policy=policy, use_llm=use_llm)
+        except Exception as e:  # noqa: BLE001 — per-capture fail-safe
+            log(f'narrator: author failed for capture {cid}: '
+                f'{type(e).__name__}: {e} — skipped (retries next tick)')
+            continue
+        # risk_note is optional (absent for safe) — clear any stale one so a
+        # capture dropping medium→safe doesn't keep a dangling note.
+        cap.pop('risk_note', None)
+        cap.update(fields)
+        briefed += 1
+
+    deferred = max(0, len(pending) - briefed)
+    log(f'narrator sweep: briefed {briefed} capture(s); deferred {deferred} '
+        f'(max {max_per_tick}/tick)')
+    return (briefed, deferred)
 
 
 def fetch_capture_events(
