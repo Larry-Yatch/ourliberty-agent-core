@@ -126,11 +126,11 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 16:04Z UTC (Iter ~1959, Tier 1, clean, consecutive_clean=2)
+## Status snapshot — updated 2026-06-15 16:09Z UTC (Iter ~1960, Tier 2, clean, consecutive_clean=0)
 
-**Iter ~1959 summary:** ✅ Nominal. Check 0: 1 new alert (L1015) — `approval_request` for `autoregister-warn-demote-001` from outbox-notifier (Tier-3 silenced, known-pattern). Check 4: pending=4 (+1 new: autoregister-warn-demote-001 plan ready for Larry approve/reject). Beacon completed g-rule-missions-autoregister-warn-vs-info-001 in 290s ($0.98). All checks nominal. Tier 1, consecutive_clean=2. Watermark: 1014 → 1015. ratio≈20.70.
+**Iter ~1960 summary:** ✅ Nominal. All checks clean. 0 new alerts. pending=4 unchanged. **Tier 1 → Tier 2 de-escalation** (consecutive_clean 2→3). Watermark: 1015 (unchanged). ratio≈20.70.
 
-**Iter ~1958 summary (prior):** ✅ Nominal. All checks clean. 0 new alerts. Tier 1, consecutive_clean=1. Watermark=1014. ratio≈20.70.
+**Iter ~1959 summary (prior):** ✅ Nominal. Check 0: 1 new alert (L1015) — `approval_request` for `autoregister-warn-demote-001` from outbox-notifier (Tier-3 silenced). Check 4: pending=4 (+1 new: autoregister-warn-demote-001 plan ready). Tier 1, consecutive_clean=2. Watermark: 1014 → 1015. ratio≈20.70.
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl. When cooldown expires, the alert fires in dry-run mode. Be aware: calling --dry-run in a cycle will write real alerts if the cooldown has passed. Always check wc -l of the file before and after.
 
