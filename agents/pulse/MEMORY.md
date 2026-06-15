@@ -78,25 +78,25 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 01:55Z UTC (Iter ~1866, Tier 1, nominal)
+## Status snapshot — updated 2026-06-15 02:02Z UTC (Iter ~1867, Tier 1, nominal)
 
-**Iter ~1866 summary:** All checks nominal. Check 4: 1 pending directive (`unreg-approval-482eb78951ee`) — heal-unregistered-approval formalized PR#509-510 direction-ask into dashboard (chat_id=null); Larry already DM'd iter ~1864. No new DM. G-rule stall-detector dispatch confirmed picked up by Beacon: BEACON SPEC DONE → FORGE BUILD PENDING (branch-prefix allowlist approach). consecutive_clean=1. ratio≈20.24, trend=flat.
+**Iter ~1867 summary:** All checks nominal. 0 new alerts (watermark=947). Carries only. Beacon spec done for stall-detector-exclude-external-pr-001 (confirmed 01:51Z via outbox-notifier); Forge build pending dashboard approval (Forge inbox empty, no PR yet). consecutive_clean=2. ratio≈20.24, trend=improving.
 
 ---
 
-## Key standing items (as of iter ~1866)
+## Key standing items (as of iter ~1867)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — mergeState=UNKNOWN/UNKNOWN (142nd iter; GitHub API flap) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — mergeState=UNKNOWN/UNKNOWN (143rd iter; GitHub API flap) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | PR #509 + #510 | [yellow] Both UNKNOWN; pending approval `unreg-approval-482eb78951ee` registered (dashboard); DM sent iter ~1864 | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
+| G-rule stall-detector Forge build | [yellow] Beacon spec done 01:51Z Jun-15 (stall-detector-exclude-external-pr-001). Forge build pending dashboard approval. Forge inbox empty; no PR yet. | Check dashboard Approvals tab; approve Forge build |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
 | cleanup-branch-success-alert-info-translation-001 | [blue] **CLOSED** — Forge REJECTED (already satisfied by PR #485). 5 residual baseline-red sources tracked under G-rules below. | No action; G-rules handle at 3/3 |
-| G-rule stall-detector-docs-branch-overtrigger | [blue] **BEACON SPEC DONE → FORGE BUILD PENDING** (stall-detector-exclude-external-pr-001). Branch-prefix allowlist (`forge/`, `larry/`), not author-based. Larry approval needed. | Approve Beacon's spec; Forge builds config-backed branch-prefix gate in Check 7 |
 | G-rule health-notify-script-missing | [blue] **1/3** | Watch; dispatch at 3/3 |
 | catalog-accuracy-drift | [blue] 8/34 ourliberty-graph shelf cards drifted (attention rate 24%, gate 10%) | route=digest; journal-note only |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
