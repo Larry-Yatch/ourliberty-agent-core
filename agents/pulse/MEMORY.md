@@ -84,9 +84,9 @@
 
 ---
 
-## beacon_telegram_bot.py get-messages MUST NOT run in background (learned iter ~1876)
+## beacon_telegram_bot.py get-messages MUST NEVER BE CALLED (learned iter ~1876, escalated iter ~1943)
 
-**Rule:** Never call `beacon_telegram_bot.py get-messages` (or any Telegram long-poll command) with `run_in_background=true`. It spawns a competing getUpdates loop that causes HTTP 409 conflicts with the production bot, disrupting message receipt. For Telegram sweeps (Check 2), use a one-shot method that doesn't open a competing poll — or read from the bot's in-memory message cache / log directly. Calling get-messages in foreground mode from an interactive cycle also risks the same conflict; prefer log-based or state-file-based Telegram checks.
+**Rule:** NEVER call `beacon_telegram_bot.py get-messages` in ANY form — not with `run_in_background=true`, not in foreground, not with `| head -N` truncation. The Bash tool may auto-background blocking commands regardless of the run_in_background parameter, causing the same 409 conflict. The competing getUpdates loop causes HTTP 409 conflicts with the production bot, disrupting message receipt. For Telegram sweeps (Check 2), use ONLY: `tail -N /home/larry/agents/logs/beacon_telegram_bot.log` (note: NOT beacon-telegram-bot.log) + `ps -p <PID> -o stat` for the bot health check. This is the only safe Telegram check pattern. G-rule telegram-409-burst at **2/3** as of iter ~1943 — all three incidents were self-inflicted by calling get-messages.
 
 ---
 
@@ -120,9 +120,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 13:35Z UTC (Iter ~1942, Tier 1, non-clean)
+## Status snapshot — updated 2026-06-15 13:47Z UTC (Iter ~1943, Tier 1, non-clean)
 
-**Iter ~1942 summary:** ⚠️ Non-clean. 3 medic-diagnosis alerts (PRs #510/#512/#513, Tier-4, bot-delivered, no Pulse action). Pipeline stall cooldowns all active — 0 new stall fires. Watermark advanced to 994. ratio≈20.53 (improving). All 5 PIDs healthy. Sync FRESH. G-rule alert-translation-unrouted-pr-001 still pending approval. G-rule telegram-409-burst **1/3** (no new occurrence).
+**Iter ~1943 summary:** ⚠️ Non-clean. Self-inflicted 409 burst in Check 2 (called get-messages; Bash auto-backgrounded it). Bot recovered. 1 new alert (dispatch-branch-cleanup, Tier-3 silence). Watermark advanced to 995. ratio≈20.55 (improving). All 5 PIDs healthy. Sync FRESH. G-rule telegram-409-burst → **2/3**. All pipeline stall cooldowns active — 0 new stall fires.
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl. When cooldown expires, the alert fires in dry-run mode. Be aware: calling --dry-run in a cycle will write real alerts if the cooldown has passed. Always check wc -l of the file before and after.
 
@@ -147,7 +147,7 @@
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| Telegram 409 burst | [yellow] G-rule **1/3**. Two distinct occurrences: (1) 12:22Z UTC Jun-15 pre-existing source unknown; (2) 12:47Z UTC Jun-15 self-inflicted (Pulse called get-messages). Bot recovered both times; no messages lost. | Watch; dispatch at 3/3 |
+| Telegram 409 burst | [yellow] G-rule **2/3**. Three distinct occurrences: (1) 12:22Z UTC Jun-15; (2) 12:47Z UTC Jun-15 self-inflicted; (3) 13:41Z UTC Jun-15 self-inflicted (iter ~1943). Bot recovered all times; no messages lost. All self-inflicted by calling get-messages. | Watch; dispatch at 3/3 |
 | Check I 2026-06-15 | [blue] 1 proposal dispatched iter ~1899, Beacon processed | Beacon spec in progress |
 | Check IX missions | [blue] PR #512 (catch-me-up-gap) + PR #513 (alert-ignored) open, no review yet | Larry review on kanban |
 | G-rule catalog-accuracy-drift-tier4 | [blue] **1/3** (new iter ~1926) | Watch; dispatch to Beacon at 3/3 for Tier-3 translation |
@@ -166,7 +166,7 @@
 | G-rule Forge-preflight-marker-error-retry | [blue] **2/3** | Watch; dispatch at 3/3 |
 | G-rule Forge-preflight-CLARIFY_REQUEST | [blue] **1/3** (first seen iter ~1935: cleanup-branch-success-alert-info-translation-001 archived with CLARIFY_REQUEST marker) | Watch; dispatch at 3/3 |
 | G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 (warn-vs-info) |
-| G-rule telegram-409-burst | [yellow] **1/3** (iter ~1937 + iter ~1939 self-inflicted) | Watch; dispatch at 3/3 |
+| G-rule telegram-409-burst | [yellow] **2/3** (iter ~1937 + iter ~1939 + iter ~1943, all self-inflicted by get-messages call) | Watch; dispatch at 3/3 |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
 | dashboard_api PID 2868353 | [blue] Ssl stable | Note; watch for recurrence |

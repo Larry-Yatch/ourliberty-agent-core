@@ -4,6 +4,87 @@
 
 ---
 
+## Iteration ~1943 — 2026-06-15 13:47Z UTC (interactive, /cycle, Tier 1, non-clean)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Non-clean. Self-inflicted 409 Telegram burst in Check 2 (Pulse called `beacon_telegram_bot.py get-messages`; Bash tool auto-backgrounded the blocking call, creating a competing getUpdates loop). Competing process exited (exit 0 ~13:45Z). Production bot PID 2744840 recovered. G-rule telegram-409-burst → **2/3**. All other checks nominal.
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): `gh pr view 497` → OPEN, MERGEABLE, reviewDecision="". Mirror REVIEW_ESCALATE 04:05:31Z Jun-14. Age ≈ 33.7h. 72h expires ~Jun-17T04:05Z. **CARRY** [yellow].
+- PRs #509/#510/#512/#513: heal_pipeline_stall --dry-run → 0 new alerts, 4 suppressed (cooldowns active). **CARRY** [yellow].
+- beacon-pending-approvals.json: pending=2 (unreg-approval-482eb78951ee + alert-translation-unrouted-pr-001). **CARRY** [yellow].
+
+**Check 0 — Alert triage:** Watermark=994; file=995 lines (1 new). Line 995 (13:37:03Z): `source=dispatch-branch-cleanup, route=digest, subject=summary` — "pruned 2 local + 1 remote stale branch(es)". Triage helper: Tier-3 silence (known-pattern match in alert-translations.json). ✅ Nominal. Watermark advanced to 995.
+
+**Check 1 — Log noise:** outbox-notifier: last WARN 2026-06-15 01:10:53Z (unchanged — auto-dispatch task-id mismatch, G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3). inbox-watcher: no WARN/ERROR. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** ⚠️ Self-inflicted 409 burst. Called `beacon_telegram_bot.py get-messages --limit 5` in Check 2 sweep; Bash tool auto-backgrounded the blocking call (task bj6dr9p6g), creating a competing getUpdates loop (production bot offset=169966603 vs interloper offset=0). Burst started 07:41:46-0600 MDT (13:41:46Z UTC), last 409 entry at 07:44:56 MDT (13:44:56Z). Background task completed (exit 0). PID 2744840 alive (Ss). No new 409 entries after 13:44:56Z → bot recovered. No new Larry directives in log. G-rule telegram-409-burst: **2/3** (third distinct incident; prior 2 incidents in iters ~1937/1939 were counted as 1/3). [yellow] non-clean signal.
+- **ROOT CAUSE:** Memory rule says "never call get-messages with run_in_background=true" — but in this case run_in_background was not explicitly set; the Bash tool auto-backgrounded the blocking call. Strengthened rule in MEMORY.md: NEVER call get-messages in ANY form.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → 0 new alerts fired, 4 suppressed (PRs #509/#510/#512/#513 cooldowns still active). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: pending=2 (unreg-approval-482eb78951ee plan=merge-509-510-direct; alert-translation-unrouted-pr-001 plan=Tier-3 translation config PR). No change. [yellow] carry.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T13:15:16Z`, age≈32 min. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** On main, HEAD=299dc4d2 == origin/main. Clean. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-15T13:24:50Z (~22 min). FRESH (<2h). ✅ Nominal.
+
+**Check C — Agent liveness:**
+- inbox_watcher: PID 2530123 ✅ (Ssl)
+- chain_event_shipper: PID 2744551 ✅ (SNs)
+- beacon_telegram_bot: PID 2744840 ✅ (Ss) — recovered from self-inflicted 409 burst
+- outbox_notifier: PID 2744914 ✅ (Ss)
+- dashboard_api: PID 2868353 ✅ (Ssl)
+- No forge/mirror persistent sessions — expected. ✅
+
+**Check E — PRs:**
+ourliberty-agent-core (5 open):
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`), MERGEABLE (re-verified). Mirror REVIEW_ESCALATE 04:05:31Z Jun-14. Age ≈ 33.7h. Under 72h (~Jun-17T04:05Z). [yellow] carry.
+- **PR #509** (`docs/meaning-layer-roadmap`), cooldown active. [yellow] carry.
+- **PR #510** (`work/build-consult-restock`), cooldown active. [yellow] carry.
+- **PR #512** (`feat/new-mission-pulse-check-ix-catch-me-up-gap-2026-06-15`), cooldown active. [yellow] carry.
+- **PR #513** (`feat/new-mission-pulse-check-ix-alert-ignored-2026-06-15`), cooldown active. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Conditional checks:** Check I: sentinel `check-i-2026-06-15.json` exists (already fired iter ~1899). Skip. Check III: Monday (not Sunday). Skip. ✅
+
+**Actions taken:**
+1. `alert_triage_state.py set-watermark --line 995` ✅ (line 995 Tier-3 silence)
+2. `cycle_prime_ledger.py append --tier 1 --kind intervention` (self-inflicted-409-telegram-check2) ✅
+3. `cycle_tier_state.py record --checks-clean false` → **Tier 1, consecutive_clean=0** ✅
+4. MEMORY.md updated: G-rule telegram-409-burst → 2/3; strengthened get-messages prohibition ✅
+
+**Dispatches:** None. G-rule telegram-409-burst at 2/3; dispatch to Beacon at 3/3 for permanent fix (remove get-messages from Check 2; use bot log inspection only).
+
+**Patterns:**
+- telegram-409-burst is now at **2/3**. All three incidents were self-inflicted by Pulse calling get-messages in Check 2. Pattern is crystal clear: the method is wrong, not the timing. Dispatch at 3/3 should propose removing get-messages entirely from Check 2 and using only bot-log / state-file inspection for the Telegram sweep.
+- All other G-rule counters unchanged.
+
+**Standing findings (unchanged from iter ~1942 except where noted):**
+- [yellow] **PR #497 REVIEW_ESCALATE** — MERGEABLE (re-verified); reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ≈ 33.7h; 72h expires ~Jun-17T04:05Z. [carry]
+- [yellow] **PRs #509/510/512/513 pipeline-stall** — all cooldowns active; 0 new alerts this iter. [yellow] carry; awaiting `approve alert-translation-unrouted-pr-001`
+- [yellow] **alert-translation-unrouted-pr-001** — pending in beacon-pending-approvals.json. Reply "approve" to trigger Forge config-only PR.
+- [yellow] **unreg-approval-482eb78951ee** — pending (plan=merge-509-510-direct). [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **unreviewed-merge:511/499/494/489** — [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3** (third incident, all self-inflicted; this one 13:41-13:45Z). Bot recovered. [watch → dispatch at 3/3]
+- [blue] **catalog-accuracy-drift** — G-rule 1/3. route=digest. [carry]
+- [blue] **Check I 2026-06-15** — 1 proposal dispatched to Beacon iter ~1899. [carry]
+- [blue] **Check IX missions** — PRs #512 + #513 open. [carry]
+- [blue] G-rule counters: Forge-preflight-marker-error-retry 2/3, missions-autoregister-warn-vs-info 2/3, missions-card-gc-warn-vs-info 2/3, F24-empty-prompt-envelope-rejected 2/3, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, heal-stale-daemon-script_path-cosmetic 1/3, Forge-preflight-CLARIFY_REQUEST 1/3, **telegram-409-burst 2/3**.
+- [blue] **Stale bash orphans** — PIDs 1834248 (17d+, Ss) + 2605007 (1d+, Ss). Low CPU. [carry]
+
+**PRIME DIRECTIVE:** intervention (self-inflicted-409-telegram-check2). ratio≈20.55 (trend=improving).
+**Tier end-of-iter:** **Tier 1, consecutive_clean=0** (signal: self-inflicted Telegram 409 burst).
+
+---
+
 ## Iteration ~1942 — 2026-06-15 13:35Z UTC (interactive, /cycle, Tier 1, non-clean)
 
 **Trigger:** Larry direct invocation (`/cycle`).
