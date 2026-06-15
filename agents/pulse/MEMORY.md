@@ -120,11 +120,11 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 14:39Z UTC (Iter ~1950, Tier 1, clean)
+## Status snapshot — updated 2026-06-15 14:53Z UTC (Iter ~1952, Tier 1→2 de-escalation, clean)
 
-**Iter ~1950 summary:** ✅ Clean. Check 0: 0 new alerts (watermark=1003=file length). All other checks nominal. Pipeline stall 4 suppressed (cooldowns active). All daemons alive. Repo clean, sync fresh. Tier 1, consecutive_clean=1. ratio≈20.64 (improving).
+**Iter ~1952 summary:** ✅ Clean. Check 0: 0 new alerts (watermark=1003=file). All checks nominal. 4 pipeline stall cooldowns active. All daemons alive. Repo clean, sync fresh. **Tier 1 → Tier 2 de-escalation** (3 consecutive clean iters at Tier 1). consecutive_clean reset to 0. ratio≈20.64 (improving). Also: inbox-watcher log path corrected to `inbox_watcher.log` (underscore).
 
-**Iter ~1949 summary (prior):** ⚠️ Non-clean. Check 0: 3 new Tier-4 alerts (lines 1001–1003): medic-diagnosis for PRs #513/#512/#510 (chat_id DMs already sent by bot). Journal-note only. G-rule medic-diagnosis-tier4 now 2/3. Check 3: 4 suppressed (cooldowns active). Watermark 1000→1003. Tier 1, consecutive_clean=0. ratio≈20.62 (improving).
+**Iter ~1951 summary (prior):** ✅ Clean. Check 0: 0 new alerts (watermark=1003=file length). All other checks nominal. Pipeline stall 4 suppressed (cooldowns active). All daemons alive. Repo clean, sync fresh. Tier 1, consecutive_clean=2. ratio≈20.64 (improving).
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl. When cooldown expires, the alert fires in dry-run mode. Be aware: calling --dry-run in a cycle will write real alerts if the cooldown has passed. Always check wc -l of the file before and after.
 
