@@ -126,7 +126,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 21:42Z UTC (Iter ~1988, Tier 2→3 DE-ESCALATION, all checks nominal)
+## Status snapshot — updated 2026-06-15 22:12Z UTC (Iter ~1989, Tier 3, consecutive_clean=1, all checks nominal)
+
+**Iter ~1989 summary:** ✅ Nominal. 0 new alerts. All checks clean. Repo at 5e59afd8=origin/main. Watermark: 1047 (unchanged). pending=0. 1 open PR: #497 (UNKNOWN/UNKNOWN, 72h deadline Jun-17T04:02:56Z ~29.8h). PRIME ratio=20.04. Tier 3, consecutive_clean=1.
 
 **Iter ~1988 summary:** ✅ Nominal. 1 new alert (L1047 Tier-3 silenced, dispatch-branch-cleanup/summary). All checks clean. Repo at cbb7c162=origin/main. Watermark: 1046→1047. pending=0. 1 open PR: #497 (UNKNOWN/UNKNOWN, 72h deadline Jun-17T04:02Z ~30.4h). PRIME ratio=20.04. **Tier 2 → Tier 3 DE-ESCALATION** (consecutive_clean=3→promoted).
 
