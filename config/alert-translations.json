@@ -82,6 +82,12 @@
       "plain_language_summary": "A preflight/clarify task pointer was consumed but its archived outbox shows no PR (exit_code != 0 / error / auth_401), so the healer INFERRED a PR-create failure and routed it to this distinct lower-urgency subject (own cooldown) rather than the URGENT forge-no-pr build-gap alarm. In practice this is almost always a FALSE ALARM on a source=larry task: the source=larry outbox path does not populate `pr_url` after the PR is actually created, so a clarify pointer whose sibling build already shipped looks like a loss. The translation layer cannot tell a false alarm from a genuine source=forge infra crash because it keys only on (healer-source, subject), so this is conservatively classified FYI with a verify-first action.",
       "recommended_action": "Verify before acting: check whether the sibling build PR for this task family already merged (gh pr list --search <task-family>, or the Missions tab). If it shipped, this is the known source=larry pr_url-unset artifact -- no action. ONLY if there is genuinely no sibling PR AND the archived outbox (~/agents/outboxes/forge/.archive/<task>.json) shows a real infra/auth crash before PR-create is a re-dispatch warranted. Root-cause fix is healer-side (populate pr_url on the source=larry outbox path, or extend _preflight_family_shipped correlation); this translation is a stopgap. Runbook: runbooks/heal-pipeline-stall.md."
     },
+    "pipeline-stall:unrouted-pr": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "An open PR has no Mirror review-request logged — an externally-authored PR skipped the notifier's auto-dispatch, so Mirror won't review it until you route it manually.",
+      "recommended_action": "Route it from Beacon chat: `dispatch mirror review pr=<url>` (the raw alert below carries the exact PR URL and a routing-events tail to verify it fired)."
+    },
     "stalled-pending-sequence": {
       "severity": "WARNING",
       "tier": "SOON",

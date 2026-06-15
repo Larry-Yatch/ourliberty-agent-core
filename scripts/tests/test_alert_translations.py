@@ -74,8 +74,6 @@ _OUT_OF_V1_SCOPE_SUBJECTS = {
     ('heal-pipeline-stall', 'pipeline-stall:no-mirror-dispatch'),
     # heal_pipeline_stall.py:521-522 — mirror-pass-unmerged.
     ('heal-pipeline-stall', 'pipeline-stall:mirror-pass-unmerged'),
-    # heal_pipeline_stall.py:791-792 — unrouted-pr.
-    ('heal-pipeline-stall', 'pipeline-stall:unrouted-pr'),
     # heal_credential_registry_drift.py — MISSING_CREDENTIAL (different
     # drift-shape from MISSING_REGISTRY_ENTRY; not in V1).
     ('heal-credential-registry-drift', 'credential-drift:MISSING_CREDENTIAL'),
