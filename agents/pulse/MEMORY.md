@@ -90,9 +90,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 04:14Z UTC (Iter ~1884, Tier 2)
+## Status snapshot — updated 2026-06-15 04:27Z UTC (Iter ~1885, Tier 2)
 
-**Iter ~1884 summary:** Clean iter. **Tier 2** (de-escalated from Tier 1; 3 consecutive clean iters ~1882/~1883/~1884). 0 interventions. ratio≈20.39, trend=flat. Watermark=956. All daemons alive. 0 new alerts. PRs #497/#509/#510 carry (all unchanged). heal_pipeline_stall: 0 new alerts (both PRs on cooldown).
+**Iter ~1885 summary:** Clean iter. **Tier 2** (consecutive_clean=1). 0 interventions. ratio≈20.39, trend=flat. Watermark=956. All daemons alive. 0 new alerts. PRs #497/#509/#510 carry (all unchanged). Sync error (prior 3 iters) self-healed — status=no-change as of 04:24Z.
 
 ---
 
