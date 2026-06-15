@@ -90,18 +90,18 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 03:27Z UTC (Iter ~1879, Tier 2)
+## Status snapshot — updated 2026-06-15 03:44Z UTC (Iter ~1880, Tier 1)
 
-**Iter ~1879 summary:** Clean iter. 0 interventions. **Tier 1 → Tier 2 de-escalation** (3 consecutive clean iters; consecutive_clean reset to 0). ratio≈20.35, trend=flat. Watermark=952. All daemons alive. sync-push-failed at 03:24Z (Tier 3 silenced, self-heals). PRs #497/#509/#510 carry.
+**Iter ~1880 summary:** Signal iter. **Tier 2 → Tier 1** (tier-reset). 1 intervention. ratio≈20.37, trend=flat. Watermark=955. All daemons alive. Check 0: 3 new alerts (lines 953-955), all Tier 4 — pipeline-stall:unrouted-pr:PR#509 (medic DM'd Larry at 03:39Z UTC) + PR#510 alert. PRs #497/#509/#510 carry. heal_pipeline_stall --dry-run emits real alerts (line 955 fired by dry-run invocation — noted behavior).
 
 ---
 
-## Key standing items (as of iter ~1878)
+## Key standing items (as of iter ~1880)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE (gh pr view; 154th iter) | Close if still stuck: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
-| PR #509 + #510 | [yellow] Both MERGEABLE (gh pr view); pending approval `unreg-approval-482eb78951ee` (dashboard; chat_id=None); cooldown suppressing new stall alerts | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — UNKNOWN (transient in gh pr list; Mirror REVIEW_ESCALATE at 04:05Z Jun-14; 156th iter) | Close if still stuck: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #509 + #510 | [yellow] UNKNOWN/no-review; medic DM'd Larry at 03:39Z UTC Jun-15 (5th attempt PR#509); pending approval `unreg-approval-482eb78951ee` (dashboard; chat_id=None) | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
 | G-rule stall-detector Forge build | [yellow] Beacon spec done (stall-detector-exclude-external-pr-001). Forge build pending dashboard approval. Forge inbox empty; no PR yet. | Approve Forge build via dashboard |
 | unreviewed-merge:511 | [yellow] PR #511 (`feat/local-review-pass-marker`) merged by Larry at 23:58Z Jun-14 without Mirror routing | Reply 'go: retroactive-review-511' or 'silence: local-review-marker-counts' |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
