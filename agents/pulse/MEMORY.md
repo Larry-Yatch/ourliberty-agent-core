@@ -126,7 +126,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 19:17Z UTC (Iter ~1974, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-15 19:24Z UTC (Iter ~1975, Tier 1, consecutive_clean=1)
+
+**Iter ~1975 summary:** ✅ Nominal. 0 new alerts. 0 stalls. 0 pending directives. All daemons alive. Forge building p41-schedule-harden (~19 min elapsed, no PR yet). missions-card-gc-warn-demote-001 in Forge inbox, queued behind p41-schedule-harden. Watermark: 1038 unchanged. 1 open PR: #497 (MERGEABLE, age≈39.3h, deadline Jun-17T04:02Z ~32.7h). PRIME ratio≈20.40. Tier 1, consecutive_clean=1.
 
 **Iter ~1974 summary:** ⚠️ Check A: behind origin/main by 1 commit (PR #519 fix-missions-auto-reconcile merged 19:13:44Z). Fast-forward executed. Check 4: pending=0 (missions-card-gc-warn-demote-001 APPROVED, Forge build dispatched). p41-schedule-harden: Forge actively building (~11 min). PR #519 merged (unreviewed-merge, alert TBD). Watermark: 1038 unchanged. 1 open PR: #497 (now MERGEABLE, age≈39.2h, deadline Jun-17T04:02Z ~32.8h). PRIME ratio≈20.375. Tier-reset. Tier 1, consecutive_clean=0.
 
@@ -158,11 +160,11 @@
 
 ---
 
-## Key standing items (as of iter ~1974)
+## Key standing items (as of iter ~1975)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] **MERGEABLE** (changed from UNKNOWN); reviewDecision=""; Mirror REVIEW_ESCALATE Jun-14T04:05Z; age≈39.2h; 72h expires Jun-17T04:02Z (~32.8h remaining). | Escalate if still open at Jun-17T04:02Z |
+| PR #497 REVIEW_ESCALATE | [yellow] **MERGEABLE**; reviewDecision=""; Mirror REVIEW_ESCALATE Jun-14T04:05Z; age≈39.3h; 72h expires Jun-17T04:02Z (~32.7h remaining). | Escalate if still open at Jun-17T04:02Z |
 | unreviewed-merge:511/499/494/489/510/509/518/519 | [yellow] PRs merged by Larry without Mirror; bot-delivered for others; #519 alert TBD. Larry's judgment call. | Reply appropriate shortcut or silence |
 | G-rule stall-detector Forge build | [yellow] Beacon spec complete. Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
 | Check VIII rule=lower | [yellow] FN=3027, TP=5, FP=2 — threshold too high. | `approve check-viii-update-2026-06-15` when shortcut lands |
