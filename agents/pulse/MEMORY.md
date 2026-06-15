@@ -78,9 +78,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 00:44Z UTC (Iter ~1860, Tier 1, clean)
+## Status snapshot — updated 2026-06-15 00:53Z UTC (Iter ~1861, Tier 1, clean)
 
-**Iter ~1860 summary:** All checks nominal. No new alerts (watermark=942=file). PRs #497/#509/#510 all UNKNOWN/UNKNOWN (GitHub API flap; carries). consecutive_clean=1 (need 3 to de-escalate to Tier 2). ratio≈20.64, trend=flat.
+**Iter ~1861 summary:** All checks nominal. No new alerts (watermark=942=file). PR #497 still UNKNOWN/UNKNOWN (flap). PRs #509+#510 GitHub flap RESOLVED — both now CLEAN/MERGEABLE; still no Mirror review, stall-detector cooldown active, awaiting Larry. consecutive_clean=2 (need 1 more to de-escalate to Tier 2). ratio≈20.64, trend=flat.
 
 ---
 
@@ -89,7 +89,7 @@
 | Item | Status | Action needed |
 |---|---|---|
 | PR #497 REVIEW_ESCALATE | [yellow] Carry — mergeState=UNKNOWN/UNKNOWN (134th iter; GitHub API flap) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
-| PR #509 + #510 | [yellow] Both UNKNOWN/UNKNOWN (flap); #509 medic-confirmed as docs-only Larry-authored (expected stall behavior); #510 needs Mirror review. DMs through 18:32Z MDT Jun-14. | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
+| PR #509 + #510 | [yellow] Both now CLEAN/MERGEABLE (GitHub flap resolved iter ~1861); no Mirror review; stall-detector cooldown active. DMs through 18:32Z MDT Jun-14. | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
