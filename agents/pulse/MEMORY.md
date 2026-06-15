@@ -90,9 +90,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 05:04Z UTC (Iter ~1888, Tier 1)
+## Status snapshot — updated 2026-06-15 05:09Z UTC (Iter ~1889, Tier 1)
 
-**Iter ~1888 summary:** ✅ Nominal. **Tier 1** (consecutive_clean=1). 0 interventions (iter_clean). ratio≈20.43, trend=improving. Watermark=960. All daemons alive. 0 new alerts. PRs #497/#509/#510 carry. New material: Beacon stall-detector-exclude-external-pr-001 spec confirmed complete (notification archived); branch-prefix gate fix design done; Forge build pending Larry's dashboard approval. PR #508 confirmed MERGED.
+**Iter ~1889 summary:** ✅ Nominal. **Tier 1** (consecutive_clean=2; 1 more clean iter → Tier 2). 0 interventions (iter_clean). ratio≈20.43, trend=improving. Watermark=960. All daemons alive. 0 new alerts. PRs #497/#509/#510 carry. Forge/Beacon inboxes empty. G-rule stall-detector Forge build pending Larry's dashboard approval (Beacon spec confirmed complete).
 
 ---
 
