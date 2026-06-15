@@ -78,19 +78,25 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 02:55Z UTC (Iter ~1875, Tier 1)
+## beacon_telegram_bot.py get-messages MUST NOT run in background (learned iter ~1876)
 
-**Iter ~1875 summary:** 0 new alerts. All checks nominal. Clean iter. consecutive_clean=2 (need 1 more for Tier 2 de-escalation). watermark=951. ratio≈20.33.
+**Rule:** Never call `beacon_telegram_bot.py get-messages` (or any Telegram long-poll command) with `run_in_background=true`. It spawns a competing getUpdates loop that causes HTTP 409 conflicts with the production bot, disrupting message receipt. For Telegram sweeps (Check 2), use a one-shot method that doesn't open a competing poll — or read from the bot's in-memory message cache / log directly. Calling get-messages in foreground mode from an interactive cycle also risks the same conflict; prefer log-based or state-file-based Telegram checks.
 
 ---
 
-## Key standing items (as of iter ~1874)
+## Status snapshot — updated 2026-06-15 03:07Z UTC (Iter ~1876, Tier 1)
+
+**Iter ~1876 summary:** 1 intervention — self-inflicted Telegram 409 conflict (background get-messages subprocess vs. production bot; ~3min; resolved). PR #497 status changed from MERGEABLE to UNSTABLE (152nd iter; may be CI expiry on stale PR). All other checks nominal. consecutive_clean=0 (reset). watermark=951. ratio≈20.35.
+
+---
+
+## Key standing items (as of iter ~1876)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — mergeState=UNKNOWN/UNKNOWN (150th iter; GitHub API flap) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — UNSTABLE/MERGEABLE (gh pr view; 152nd iter; new UNSTABLE status this iter) | Verify next iter; close if still stuck: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | PR #509 + #510 | [yellow] Both UNKNOWN; pending approval `unreg-approval-482eb78951ee` registered (dashboard); cooldown suppressing new stall alerts | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
-| G-rule stall-detector Forge build | [yellow] Beacon spec done 01:51Z Jun-15 (stall-detector-exclude-external-pr-001). Forge build pending dashboard approval. Forge inbox empty; no PR yet. | Check dashboard Approvals tab; approve Forge build |
+| G-rule stall-detector Forge build | [yellow] Beacon spec done 01:51Z Jun-15 (stall-detector-exclude-external-pr-001). Forge build pending dashboard approval. Forge inbox empty; no PR yet. | Approve Forge build via dashboard |
 | unreviewed-merge:511 | [yellow] PR #511 (`feat/local-review-pass-marker`) merged by Larry at 23:58Z Jun-14 without Mirror routing | Reply 'go: retroactive-review-511' or 'silence: local-review-marker-counts' |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |

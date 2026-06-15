@@ -4,6 +4,113 @@
 
 ---
 
+## Iteration ~1876 — 2026-06-15 03:07Z UTC (interactive, /cycle via /loop, Tier 1)
+
+**Trigger:** Larry direct invocation (`/cycle` via /loop dynamic mode).
+
+**Health:** ⚠️ Self-fix. One remediation action (self-inflicted Telegram 409 conflict, resolved within iter).
+
+**VERIFY-BEFORE-REASSERT (iter ~1875 carries):**
+- PR #497: `gh pr view` → **UNSTABLE**/MERGEABLE, reviewDecision="" — STATUS CHANGE from MERGEABLE (iter ~1875). Mirror issued review-escalate at 04:05:31Z Jun-14. 152nd iter. [yellow] carry — UNSTABLE may be CI checks expiring on stale PR; verify next iter before escalating.
+- PR #509 (`docs/meaning-layer-roadmap`): OPEN, UNKNOWN/UNKNOWN (verified via `gh pr list`). **CARRY** [yellow].
+- PR #510 (`feat: wire the consult→restock build loop`): OPEN, UNKNOWN/UNKNOWN (verified). **CARRY** [yellow].
+- G-rule stall-detector Forge build: Forge inbox empty (verified). Dashboard approval pending. **CARRY** [yellow].
+- dashboard_api PID 2868353: `ps` alive (9h+, Ssl), stable. **CARRY** [blue].
+- Stale bash orphans: PID 1834248 (17d 7h+, Ss), PID 2605007 (22h 42m, Ss). Both alive. **CARRY** [blue].
+
+**Check 0 — Alert triage:** Watermark=951. File=951 lines. **0 new alerts.** ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log: 0 WARNs/ERRORs in last 80 lines. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** ⚠️ IMPAIRED by self-inflicted 409 conflict (see Actions). Check 2 called `beacon_telegram_bot.py get-messages --limit 10` as a background task, spawning a competing getUpdates loop. Conflict ran ~03:02–03:05Z (~3 min). Last confirmed Larry message: `go` at 18:21 MDT Jun-14 / 00:21Z Jun-15 (iter ~1875). No new directives visible before conflict started; production bot recovering post-kill.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → 0 new alerts, 0 recovered, 2 suppressed (cooldown: PRs #509+#510). All FORGE_NO_PR_SKIP entries expected. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 1 pending — `unreg-approval-482eb78951ee` (PR#509+#510 merge decision; chat_id=null). [yellow] carry.
+
+**Check 5 — Stale daemon:** heartbeat=`2026-06-15T02:41:19.679787+00:00`, age≈26 min at cycle time. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** On main. Clean working tree. HEAD=df25298b == origin/main. 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-15T02:24:03Z, status=no-change, age≈43 min at cycle time. Within 2h. ✅ Nominal.
+
+**Check C — Agent liveness:**
+- inbox_watcher: PID 2530123 ✅ (1d 7h+, Ssl)
+- chain_event_shipper: PID 2744551 ✅ (16h+, SNs)
+- beacon_telegram_bot: PID 2744840 ✅ (16h+, Ss) — recovering from self-inflicted 409 conflict
+- outbox_notifier: PID 2744914 ✅ (16h+, Ss)
+- dashboard_api: PID 2868353 ✅ (9h+, Ssl, stable)
+- No forge/mirror persistent sessions — expected. ✅
+- [blue] PID 1834248: stale bash orphan (17d 7h+, Ss). [carry]
+- [blue] PID 2605007: stale bash orphan (22h 42m+, Ss). [carry]
+
+**Check E — PRs:**
+ourliberty-agent-core (3 open):
+- **PR #497** (`fix(cleanup-branches): success-prune alert is info, not warning`), UNSTABLE/MERGEABLE (gh pr view), reviewDecision="" — Mirror REVIEW_ESCALATE at 04:05Z Jun-14. STATUS CHANGE: UNSTABLE (was MERGEABLE iter ~1875). 152nd iter. [yellow] carry.
+- **PR #509** (`docs: meaning-layer + team-chat roadmap`), UNKNOWN/UNKNOWN. Larry-authored; unrouted. [yellow] carry.
+- **PR #510** (`feat: wire the consult→restock build loop`), UNKNOWN/UNKNOWN. Larry-authored; unrouted. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Check H — Forge activity:** Forge inbox empty. Mirror inbox empty. 1 open Forge PR: #497 (~49h). Under 72h threshold. ✅ Nominal.
+
+**§5.0 conditional checks (Sunday Jun-15 UTC):**
+- audit_due_nudge.py, distill_detector.py, audit_cadence_signal.py: no-op (no seed artifacts). ✅
+- Check I: already ran this cycle day (iter ~1718). **SKIP**.
+- Check III: last artifact 2026-06-11 (4 days old, <14d). **SKIP**.
+
+**§4.6 Rotations:** 0 overdue (all credentials due 2027). ✅
+
+**Actions taken:**
+1. **Self-fix: Telegram 409 conflict** — Check 2 ran `beacon_telegram_bot.py get-messages --limit 10` with `run_in_background=true`. This spawned a competing getUpdates loop (PID 3005604, task ID bbe254ctz) that conflicted with production bot PID 2744840. Conflict ran ~03:02Z–03:04:35Z (~3 min). Remediated via TaskStop bbe254ctz. PID 3005604 confirmed dead. Last 409 logged at 03:04:35Z. Bot recovering. ✅
+   **Root cause:** `beacon_telegram_bot.py get-messages` is a long-polling command — must never be run with `run_in_background=true`.
+2. `cycle_prime_ledger.py append --tier 1 --kind intervention --template telegram-409-conflict-self-inflicted` ✅ (ratio≈20.35)
+3. `cycle_tier_state.py record --checks-clean false` → Tier 1, consecutive_clean=0 ✅ (reset from 2)
+
+**Dispatches:** None.
+
+**Patterns:**
+- G-rule stall-detector Forge build: Beacon spec done; Forge build pending dashboard approval. **CARRY** (not incrementing).
+- G-rule missions-autoregister-warn-vs-info: 0 new WARNs. **2/3**. Carry.
+- G-rule missions-card-gc-warn-vs-info: 0 new WARNs. **2/3**. Carry.
+- G-rule F24-empty-prompt-envelope-rejected: 0 new WARNs. **2/3**. Carry.
+- G-rule health-notify-script-missing: no new fire. **1/3**. Carry.
+- G-rule timer-cycle-no-journal-entry: **0/3**. Carry.
+- G-rule Forge-timeout-worktree-missing-retry-loop: **1/3**. Carry.
+- G-rule heal-stale-daemon-script_path-cosmetic: **1/3**. Carry.
+- G-rule Forge-preflight-marker-error-retry: **1/3**. Carry.
+
+**Standing findings:**
+- [yellow] **PR #497 REVIEW_ESCALATE + UNSTABLE** — UNSTABLE/MERGEABLE (gh pr view); Mirror review-escalate 04:05Z Jun-14; 152nd iter. UNSTABLE is new this iter; verify next iter. [carry]
+- [yellow] **PRs #509 + #510 — unrouted to Mirror** — both UNKNOWN; pending approval `unreg-approval-482eb78951ee` (dashboard). Await Larry: `go:merge-509-510-direct` or `go:mirror-review-509-510`. [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec done (stall-detector-exclude-external-pr-001); Forge build pending dashboard approval. [carry]
+- [yellow] **unreviewed-merge:511** — PR #511 merged by Larry at 23:58Z Jun-14 without Mirror routing. Reply `go: retroactive-review-511` or `silence: local-review-marker-counts`. [carry]
+- [yellow] **unreviewed-merge:499** — Reply `go: retroactive-review-499` or `silence: missions-spec-no-mirror-needed`. [carry]
+- [yellow] **unreviewed-merge:494** — DM sent iter ~1694. [carry]
+- [yellow] **unreviewed-merge:489** — DM sent iter ~1614. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **cleanup-branch-success-alert-info-translation-001** — CLOSED (REJECTED by Forge, satisfied by PR #485). 5 residual baseline-red sources tracked under G-rules.
+- [blue] **G-rule missions-autoregister-warn-vs-info** — 2/3. Watch; dispatch at 3/3.
+- [blue] **G-rule missions-card-gc-warn-vs-info** — 2/3. Watch; dispatch at 3/3.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch; dispatch at 3/3.
+- [blue] **G-rule health-notify-script-missing** — 1/3. Watch; dispatch at 3/3.
+- [blue] **G-rule timer-cycle-no-journal-entry** — 0/3. Carry.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Carry.
+- [blue] **G-rule heal-stale-daemon-script_path-cosmetic** — 1/3. Carry.
+- [blue] **G-rule Forge-preflight-marker-error-retry** — 1/3. Carry.
+- [blue] **Check I medic-operator-scaffold-001** — 24.4σ; `/dispatch 1` if re-run needed. [carry]
+- [blue] **catalog-accuracy-drift** — 8/34 ourliberty-graph shelf cards. [carry]
+- [blue] **sync-push-rebase-loop-001 UNREGISTERED AR** — last occurrence 13:22:39Z Jun-14 (self-healed). [carry]
+- [blue] **dag-preflight-revision gap** — PR #484 closed source=pulse gap; DAG markers still fall through. [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+- [blue] **Stale bash orphans** — PID 1834248 (17d 7h+, Ss) + PID 2605007 (22h 42m+, Ss). Low CPU. [carry]
+- [blue] **dashboard_api PID 2868353** — Ssl, stable. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention (self-inflicted Telegram 409, self-remediated). ratio≈20.35, trend=improving.
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; reset from 2 due to intervention).
+
+---
+
 ## Iteration ~1875 — 2026-06-15 02:55Z UTC (interactive, /cycle, Tier 1)
 
 **Trigger:** Larry direct invocation (`/cycle` via /loop).
