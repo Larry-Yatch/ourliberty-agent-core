@@ -78,9 +78,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 02:17Z UTC (Iter ~1869, Tier 1, nominal)
+## Status snapshot — updated 2026-06-15 02:23Z UTC (Iter ~1870, Tier 1, nominal)
 
-**Iter ~1869 summary:** All mandatory+additive checks nominal. 0 new alerts (watermark=947). Carries only. Forge inbox empty; stall-detector Forge build still pending dashboard approval. consecutive_clean=1 (incrementing toward Tier-2 de-escalation at 3). ratio≈20.26.
+**Iter ~1870 summary:** All mandatory+additive checks nominal. 0 new alerts (watermark=947). Carries only. Forge inbox empty; stall-detector Forge build still pending dashboard approval. consecutive_clean=2 (1 more clean iter needed for Tier-2 de-escalation). ratio≈20.26.
 
 ---
 
