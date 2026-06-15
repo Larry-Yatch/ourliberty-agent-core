@@ -114,9 +114,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 10:01Z UTC (Iter ~1922, Tier 1)
+## Status snapshot — updated 2026-06-15 10:08Z UTC (Iter ~1923, Tier 1)
 
-**Iter ~1922 summary:** ⚠️ Drift. **Tier 1, consecutive_clean=0**. Check 0: new alert line 960 (pipeline-stall:unrouted-pr:PR#509 cooldown re-fire, triage helper Tier-4, bot delivered idx=959 at 09:57:56Z, not DM-ing). Check 3: 1 new alert (PR#509 cooldown), 3 suppressed. All other checks nominal. 1 intervention (ledger). ratio≈20.81 (958/46). All agent PIDs healthy. Watermark=989 (file=960 lines); watermark gap persists — manually check tail each iter. Sync fresh (last_sync=09:24:17Z). No new Larry directives since 'go' at 18:21-0600 Jun-14. 5 open PRs: #497 (REVIEW_ESCALATE ~30.8h, expires Jun-17T04:05Z), #509/#510/#512/#513 (stall/cooldowns).
+**Iter ~1923 summary:** ⚠️ Drift. **Tier 1, consecutive_clean=0**. Check 0: new alert line 961 (medic-diagnosis, intent=medic-diagnosis, source=medic, PR#509 attempt 11, triage helper Tier-4, bot delivered idx=960 at 10:02:59Z, not DM-ing). Check 3: 0 new (4 suppressed). All other checks nominal. 1 intervention (ledger). ratio≈20.85 (959/46). All agent PIDs healthy. Watermark=989 (file=961 lines); watermark gap persists — manually check tail each iter. Sync fresh (last_sync=09:24:17Z). No new Larry directives since 'go' at 18:21-0600 Jun-14. 5 open PRs: #497 (REVIEW_ESCALATE ~30.1h, expires Jun-17T04:03Z), #509/#510/#512/#513 (stall/cooldowns).
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl. When cooldown expires, the alert fires in dry-run mode. Be aware: calling --dry-run in a cycle will write real alerts if the cooldown has passed. Always check wc -l of the file before and after.
 
