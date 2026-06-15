@@ -108,9 +108,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 09:08Z UTC (Iter ~1915, Tier 1)
+## Status snapshot — updated 2026-06-15 09:13Z UTC (Iter ~1916, Tier 1)
 
-**Iter ~1915 summary:** ⚠️ Check 0 Tier-4. **Tier 1, consecutive_clean=0**. PRs #510/#512/#513 pipeline-stall cooldowns expired; 3 new alerts fired (outbox-notifier delivered DMs idx=983/984/985 at 09:07Z). Check 4 pending=1 (carry). 1 intervention appended. ratio≈20.78 (955/46). All agent PIDs healthy. Watermark advanced 983→986.
+**Iter ~1916 summary:** ⚠️ Check 0 Tier-4. **Tier 1, consecutive_clean=0**. 3 medic-diagnosis follow-up DMs for PRs #510/#512/#513 (medic processed pipeline-stall alerts from iter ~1915 cooldown expiry; DMs already delivered idx=986/987/988 at 03:12Z MDT). Check 4 pending=1 (carry). 1 intervention appended. ratio≈20.78 (956/46). All agent PIDs healthy. Watermark advanced 986→989. outbox-notifier log WARNs from prior iters scrolled past 300-line window — no new WARNs this iter.
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl for this script. When cooldown expires, the alert fires even in dry-run mode. Be aware: calling --dry-run in a cycle will generate real alerts if the cooldown has passed.
 
@@ -118,13 +118,13 @@
 
 ---
 
-## Key standing items (as of iter ~1901)
+## Key standing items (as of iter ~1916)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] MERGEABLE; reviewDecision=""; Mirror REVIEW_ESCALATE confirmed 04:05:31Z Jun-14 (~27h actual). 72h expires ~Jun-17T04:05Z. | Carry; escalate if still open at Jun-17T04:05Z |
-| PR #509 | [yellow] UNKNOWN/no-review; medic DM'd Larry 07:55Z Jun-15 (attempt 9); merge/close to stop or dispatch Mirror review | Awaiting Larry |
-| PRs #510 + #512 + #513 | [yellow] Pipeline-stall alerts re-fired iter ~1915 (cooldowns expired again; DMs idx=983/984/985 09:07Z Jun-15) | Larry to route to Mirror or merge/close |
+| PR #497 REVIEW_ESCALATE | [yellow] MERGEABLE (re-verified 09:13Z); reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ~30.2h; 72h expires ~Jun-17T04:05Z. | Carry; escalate if still open at Jun-17T04:05Z |
+| PR #509 | [yellow] UNKNOWN/no-review; medic DM attempt 10 at 08:58Z Jun-15; cooldown active | Awaiting Larry; merge/close or dispatch Mirror review |
+| PRs #510 + #512 + #513 | [yellow] Medic follow-up DMs idx=986/987/988 delivered 03:12Z MDT Jun-15; cooldowns active iter ~1916 | Larry to route to Mirror or merge/close |
 | G-rule stall-detector Forge build | [yellow] Beacon spec complete. Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
 | Check VIII rule=lower | [yellow] FN=3027, TP=5, FP=2 — threshold too high. DM queued iter ~1899. | `approve check-viii-update-2026-06-15` when shortcut lands |
 | unreviewed-merge:511 | [yellow] PR #511 merged by Larry at 23:58Z Jun-14 without Mirror routing | Reply 'go: retroactive-review-511' or 'silence: local-review-marker-counts' |
