@@ -573,6 +573,259 @@ class RunOnceTest(unittest.TestCase):
             import shutil
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_narrator_sweep_briefs_and_writes_before_commit(self):
+        # Contract A: the folded sweep runs in LIVE mode (use_llm=True), mutates
+        # the in-memory registry, and the healer's SINGLE write lands the
+        # briefing on disk — proving the healer is the sole captures.json writer.
+        now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+        tmp = tempfile.mkdtemp(prefix='run-once-narrate-')
+        try:
+            core = Path(tmp) / 'agent-core'
+            (core / 'agents' / 'beacon').mkdir(parents=True)
+            (core / h.CAPTURES_REL).write_text(json.dumps({
+                'schema_version': 1,
+                'captures': [{'id': 'cap-a', 'state': 'parked',
+                              'last_touched': now.isoformat()}],
+            }) + '\n')
+
+            calls = {}
+
+            def fake_author(registry, *, now=None, use_llm=True, **_):
+                calls['use_llm'] = use_llm
+                n = 0
+                for c in registry.get('captures', []):
+                    if c.get('state') == 'parked' and 'briefing' not in c:
+                        c['briefing'] = {'what': 'w', 'why': 'y', 'suggest': 's'}
+                        c['risk'] = 'safe'
+                        n += 1
+                return (n, 0)
+
+            import larry_alerts
+            with mock.patch.object(h, 'load_repo_paths',
+                                   return_value={'ourliberty-agent-core': core}), \
+                    mock.patch.object(larry_alerts, 'append_alert'):
+                rc = h.run_once(
+                    dry_run=False,
+                    emit_fn=lambda **_: True,
+                    events_fetcher=lambda: [],
+                    author_fn=fake_author,
+                    now=now,
+                )
+            self.assertEqual(rc, 0)
+            self.assertTrue(calls['use_llm'])  # LIVE mode → author with the LLM
+            reg = json.loads((core / h.CAPTURES_REL).read_text())
+            self.assertEqual(reg['captures'][0]['briefing'],
+                             {'what': 'w', 'why': 'y', 'suggest': 's'})
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_concurrent_ingest_during_sweep_survives_write(self):
+        # § 2 lost-update guard: a capture the dashboard ingests DURING the slow
+        # Narrator sweep must survive the healer's write. The healer re-reads
+        # captures.json fresh just before writing and applies only its own
+        # per-capture deltas, so the concurrently-ingested capture is preserved.
+        now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+        tmp = tempfile.mkdtemp(prefix='run-once-lost-update-ingest-')
+        try:
+            core = Path(tmp) / 'agent-core'
+            (core / 'agents' / 'beacon').mkdir(parents=True)
+            cap_file = core / h.CAPTURES_REL
+            cap_file.write_text(json.dumps({
+                'schema_version': 1,
+                'captures': [{'id': 'cap-a', 'state': 'parked',
+                              'last_touched': now.isoformat()}],
+            }) + '\n')
+
+            def fake_author(registry, *, now=None, use_llm=True, **_):
+                # Simulate a SEPARATE process (dashboard API) ingesting a new
+                # capture onto disk mid-sweep, then brief cap-a in memory.
+                disk = json.loads(cap_file.read_text())
+                disk['captures'].append({'id': 'cap-b', 'state': 'parked',
+                                         'last_touched': now.isoformat()})
+                cap_file.write_text(json.dumps(disk) + '\n')
+                n = 0
+                for c in registry.get('captures', []):
+                    if c.get('id') == 'cap-a':
+                        c['briefing'] = {'what': 'w', 'why': 'y', 'suggest': 's'}
+                        n += 1
+                return (n, 0)
+
+            import larry_alerts
+            with mock.patch.object(h, 'load_repo_paths',
+                                   return_value={'ourliberty-agent-core': core}), \
+                    mock.patch.object(larry_alerts, 'append_alert'):
+                rc = h.run_once(
+                    dry_run=False,
+                    emit_fn=lambda **_: True,
+                    events_fetcher=lambda: [],
+                    author_fn=fake_author,
+                    now=now,
+                )
+            self.assertEqual(rc, 0)
+            reg = json.loads(cap_file.read_text())
+            by_id = {c['id']: c for c in reg['captures']}
+            # the concurrently-ingested capture survived the healer's write
+            self.assertEqual(set(by_id), {'cap-a', 'cap-b'})
+            # our briefing delta still landed on cap-a
+            self.assertEqual(by_id['cap-a']['briefing'],
+                             {'what': 'w', 'why': 'y', 'suggest': 's'})
+            # the untouched concurrent capture was not mutated by the healer
+            self.assertNotIn('briefing', by_id['cap-b'])
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_concurrent_state_change_on_briefed_capture_survives(self):
+        # § 2 lost-update guard, second failure mode: if the dashboard snoozes a
+        # capture WHILE it is being briefed, the field-level merge applies only the
+        # briefing fields — the dashboard's state change is NOT clobbered.
+        now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+        tmp = tempfile.mkdtemp(prefix='run-once-lost-update-state-')
+        try:
+            core = Path(tmp) / 'agent-core'
+            (core / 'agents' / 'beacon').mkdir(parents=True)
+            cap_file = core / h.CAPTURES_REL
+            cap_file.write_text(json.dumps({
+                'schema_version': 1,
+                'captures': [{'id': 'cap-a', 'state': 'parked',
+                              'last_touched': now.isoformat()}],
+            }) + '\n')
+
+            def fake_author(registry, *, now=None, use_llm=True, **_):
+                # dashboard flips cap-a parked→snoozed on disk mid-sweep
+                disk = json.loads(cap_file.read_text())
+                disk['captures'][0]['state'] = 'snoozed'
+                disk['captures'][0]['snooze_until'] = '2026-07-01T00:00:00+00:00'
+                cap_file.write_text(json.dumps(disk) + '\n')
+                for c in registry.get('captures', []):
+                    if c.get('id') == 'cap-a':
+                        c['briefing'] = {'what': 'w', 'why': 'y', 'suggest': 's'}
+                return (1, 0)
+
+            import larry_alerts
+            with mock.patch.object(h, 'load_repo_paths',
+                                   return_value={'ourliberty-agent-core': core}), \
+                    mock.patch.object(larry_alerts, 'append_alert'):
+                rc = h.run_once(
+                    dry_run=False,
+                    emit_fn=lambda **_: True,
+                    events_fetcher=lambda: [],
+                    author_fn=fake_author,
+                    now=now,
+                )
+            self.assertEqual(rc, 0)
+            cap = json.loads(cap_file.read_text())['captures'][0]
+            # the dashboard's concurrent state change survived (not clobbered)
+            self.assertEqual(cap['state'], 'snoozed')
+            self.assertEqual(cap['snooze_until'], '2026-07-01T00:00:00+00:00')
+            # and our briefing field was still merged on
+            self.assertEqual(cap['briefing'],
+                             {'what': 'w', 'why': 'y', 'suggest': 's'})
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_dry_run_narrator_uses_no_llm_and_writes_nothing(self):
+        now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+        tmp = tempfile.mkdtemp(prefix='run-once-narrate-dry-')
+        try:
+            core = Path(tmp) / 'agent-core'
+            (core / 'agents' / 'beacon').mkdir(parents=True)
+            (core / h.CAPTURES_REL).write_text(json.dumps({
+                'schema_version': 1,
+                'captures': [{'id': 'cap-a', 'state': 'parked',
+                              'last_touched': now.isoformat()}],
+            }) + '\n')
+            before = (core / h.CAPTURES_REL).read_text()
+
+            calls = {}
+
+            def fake_author(registry, *, now=None, use_llm=True, **_):
+                calls['use_llm'] = use_llm
+                # mutate to prove the dry-run discards the in-memory change
+                for c in registry.get('captures', []):
+                    c['briefing'] = {'what': 'w', 'why': 'y', 'suggest': 's'}
+                return (1, 0)
+
+            with mock.patch.object(h, 'load_repo_paths',
+                                   return_value={'ourliberty-agent-core': core}):
+                rc = h.run_once(
+                    dry_run=True,
+                    emit_fn=lambda **_: True,
+                    events_fetcher=lambda: [],
+                    author_fn=fake_author,
+                    now=now,
+                )
+            self.assertEqual(rc, 0)
+            self.assertFalse(calls['use_llm'])  # dry-run → deterministic raw, no spawn
+            self.assertEqual((core / h.CAPTURES_REL).read_text(), before)
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_default_author_fn_resolves_to_narrator_sweep(self):
+        # When no author_fn seam is injected, run_once lazily binds the real
+        # missions_narrator.author_captures_in_registry (no circular import).
+        import missions_narrator as mn_mod
+        now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+        tmp = tempfile.mkdtemp(prefix='run-once-default-author-')
+        try:
+            core = Path(tmp) / 'agent-core'
+            (core / 'agents' / 'beacon').mkdir(parents=True)
+            (core / h.CAPTURES_REL).write_text(json.dumps({
+                'schema_version': 1, 'captures': [],
+            }) + '\n')
+            import larry_alerts
+            with mock.patch.object(h, 'load_repo_paths',
+                                   return_value={'ourliberty-agent-core': core}), \
+                    mock.patch.object(larry_alerts, 'append_alert'), \
+                    mock.patch.object(mn_mod, 'author_captures_in_registry',
+                                      return_value=(0, 0)) as spy:
+                rc = h.run_once(
+                    dry_run=False,
+                    emit_fn=lambda **_: True,
+                    events_fetcher=lambda: [],
+                    now=now,
+                )
+            self.assertEqual(rc, 0)
+            spy.assert_called_once()
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_narrator_sweep_error_does_not_abort_tick(self):
+        # A sweep that raises is fail-safe: logged, briefed=0, tick still rc=0.
+        now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+        tmp = tempfile.mkdtemp(prefix='run-once-narrate-err-')
+        try:
+            core = Path(tmp) / 'agent-core'
+            (core / 'agents' / 'beacon').mkdir(parents=True)
+            (core / h.CAPTURES_REL).write_text(json.dumps({
+                'schema_version': 1,
+                'captures': [{'id': 'cap-a', 'state': 'parked',
+                              'last_touched': now.isoformat()}],
+            }) + '\n')
+
+            def boom(registry, **_):
+                raise RuntimeError('sweep exploded')
+
+            import larry_alerts
+            with mock.patch.object(h, 'load_repo_paths',
+                                   return_value={'ourliberty-agent-core': core}), \
+                    mock.patch.object(larry_alerts, 'append_alert'):
+                rc = h.run_once(
+                    dry_run=False,
+                    emit_fn=lambda **_: True,
+                    events_fetcher=lambda: [],
+                    author_fn=boom,
+                    now=now,
+                )
+            self.assertEqual(rc, 0)
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
 
 if __name__ == '__main__':
     unittest.main()

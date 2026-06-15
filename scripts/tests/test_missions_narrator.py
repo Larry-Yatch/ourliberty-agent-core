@@ -266,5 +266,133 @@ class RunSweepTest(unittest.TestCase):
         self.assertNotIn('risk_note', cap)
 
 
+class ParseBriefingJsonTest(unittest.TestCase):
+    """Contract C (spec § 5): tolerate fenced / prose-wrapped / trailing-comma
+    model replies; only fall through (None) when no JSON object is extractable."""
+
+    _GOOD = {'what': 'w', 'why': 'y', 'suggest': 's'}
+
+    def test_raw_json_object(self):
+        self.assertEqual(mn.parse_briefing_json(json.dumps(self._GOOD)), self._GOOD)
+
+    def test_fenced_json_block(self):
+        text = '```json\n' + json.dumps(self._GOOD) + '\n```'
+        self.assertEqual(mn.parse_briefing_json(text), self._GOOD)
+
+    def test_bare_fence_no_lang(self):
+        text = '```\n' + json.dumps(self._GOOD) + '\n```'
+        self.assertEqual(mn.parse_briefing_json(text), self._GOOD)
+
+    def test_prose_wrapped_object(self):
+        text = ('Sure! Here is the briefing you asked for:\n'
+                + json.dumps(self._GOOD)
+                + '\nLet me know if you want changes.')
+        self.assertEqual(mn.parse_briefing_json(text), self._GOOD)
+
+    def test_trailing_comma_repaired(self):
+        text = '{"what": "w", "why": "y", "suggest": "s",}'
+        self.assertEqual(mn.parse_briefing_json(text), self._GOOD)
+
+    def test_fenced_with_trailing_comma_and_prose(self):
+        text = ('Here you go:\n```json\n'
+                '{\n  "what": "w",\n  "why": "y",\n  "suggest": "s",\n}\n```\n'
+                'Hope that helps.')
+        self.assertEqual(mn.parse_briefing_json(text), self._GOOD)
+
+    def test_braces_inside_string_values_not_miscounted(self):
+        good = {'what': 'use {curly} braces', 'why': 'y', 'suggest': 's'}
+        text = 'Prefix prose ' + json.dumps(good) + ' suffix'
+        self.assertEqual(mn.parse_briefing_json(text), good)
+
+    def test_truly_unparseable_returns_none(self):
+        self.assertIsNone(mn.parse_briefing_json('no json here at all'))
+        self.assertIsNone(mn.parse_briefing_json(''))
+        self.assertIsNone(mn.parse_briefing_json('   '))
+
+    def test_non_object_json_returns_none(self):
+        # A bare array / scalar is valid JSON but not a briefing dict.
+        self.assertIsNone(mn.parse_briefing_json('[1, 2, 3]'))
+        self.assertIsNone(mn.parse_briefing_json('"just a string"'))
+
+
+class AuthorCapturesInRegistryTest(unittest.TestCase):
+    """Contract A (spec § 3): the folded sweep authors needs_briefing captures
+    in place, bounded per tick, fail-safe per capture, never writing/committing
+    (it only mutates the dict — the GC healer owns the single write)."""
+
+    def _reg(self, *caps):
+        return {'schema_version': 1, 'captures': list(caps)}
+
+    def test_briefs_pending_in_place_and_counts(self):
+        reg = self._reg(
+            _capture(id='a'),
+            _capture(id='b', briefing={'what': 'x', 'why': 'y', 'suggest': 'z'},
+                     briefing_provenance={'by': 'beacon', 'from_state': 'parked'}),
+            _capture(id='c', state='promoted'),
+        )
+        briefed, deferred = mn.author_captures_in_registry(
+            reg, now=NOW, use_llm=False, policy=_POLICY_ASK)
+        self.assertEqual((briefed, deferred), (1, 0))
+        by_id = {c['id']: c for c in reg['captures']}
+        self.assertEqual(by_id['a']['risk'], 'medium')
+        self.assertEqual(set(by_id['a']['briefing']), {'what', 'why', 'suggest'})
+        # already-briefed + non-parked untouched
+        self.assertEqual(by_id['b']['briefing'],
+                         {'what': 'x', 'why': 'y', 'suggest': 'z'})
+        self.assertNotIn('briefing', by_id['c'])
+
+    def test_respects_max_per_tick_and_defers_rest(self):
+        reg = self._reg(*[_capture(id=f'c{i}') for i in range(5)])
+        briefed, deferred = mn.author_captures_in_registry(
+            reg, now=NOW, use_llm=False, policy=_POLICY_ASK, max_per_tick=2)
+        self.assertEqual((briefed, deferred), (2, 3))
+        briefed_now = [c for c in reg['captures'] if isinstance(c.get('briefing'), dict)]
+        self.assertEqual(len(briefed_now), 2)
+
+    def test_per_capture_error_skipped_not_fatal(self):
+        reg = self._reg(_capture(id='a'), _capture(id='boom'), _capture(id='c'))
+        real_author = mn.author_meaning_layer
+
+        def flaky(cap, *a, **k):
+            if cap.get('id') == 'boom':
+                raise RuntimeError('author exploded')
+            return real_author(cap, *a, **k)
+
+        mn.author_meaning_layer = flaky
+        try:
+            briefed, deferred = mn.author_captures_in_registry(
+                reg, now=NOW, use_llm=False, policy=_POLICY_ASK)
+        finally:
+            mn.author_meaning_layer = real_author
+        # two briefed, the exploding one skipped (still pending → deferred).
+        self.assertEqual(briefed, 2)
+        self.assertEqual(deferred, 1)
+        by_id = {c['id']: c for c in reg['captures']}
+        self.assertEqual(by_id['a']['risk'], 'medium')
+        self.assertNotIn('briefing', by_id['boom'])
+        self.assertEqual(by_id['c']['risk'], 'medium')
+
+    def test_idempotent_second_sweep_is_noop(self):
+        reg = self._reg(_capture(id='a'))
+        mn.author_captures_in_registry(reg, now=NOW, use_llm=False, policy=_POLICY_ASK)
+        briefed, deferred = mn.author_captures_in_registry(
+            reg, now=NOW, use_llm=False, policy=_POLICY_ASK)
+        self.assertEqual((briefed, deferred), (0, 0))
+
+    def test_empty_or_malformed_registry_is_failsafe(self):
+        self.assertEqual(mn.author_captures_in_registry({}, now=NOW, use_llm=False), (0, 0))
+        self.assertEqual(
+            mn.author_captures_in_registry({'captures': 'nope'}, now=NOW, use_llm=False),
+            (0, 0))
+
+    def test_stale_risk_note_cleared_on_rebrief_to_safe(self):
+        reg = self._reg(_capture(id='a', risk='medium', risk_note='old note'))
+        mn.author_captures_in_registry(
+            reg, now=NOW, use_llm=False, policy=_POLICY_SAFE)
+        cap = reg['captures'][0]
+        self.assertEqual(cap['risk'], 'safe')
+        self.assertNotIn('risk_note', cap)
+
+
 if __name__ == '__main__':
     unittest.main()
