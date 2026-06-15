@@ -102,9 +102,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 08:19Z UTC (Iter ~1908, Tier 1)
+## Status snapshot — updated 2026-06-15 08:27Z UTC (Iter ~1909, Tier 1)
 
-**Iter ~1908 summary:** ✅ Nominal (no new signals). **Tier 1, consecutive_clean=0**. All checks clean except Check 4 (pending=1, same carry). 0 new interventions. ratio≈20.74 (954/46).
+**Iter ~1909 summary:** ✅ Nominal. No new signals. **Tier 1, consecutive_clean=0**. All checks clean except Check 4 (pending=1, same carry). Sync error carry from 07:24Z **RESOLVED** (new sync 08:24Z status=no-change). 0 new interventions. ratio≈20.74 (954/46).
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl for this script. When cooldown expires, the alert fires even in dry-run mode. Be aware: calling --dry-run in a cycle will generate real alerts if the cooldown has passed.
 
