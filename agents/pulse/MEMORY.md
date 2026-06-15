@@ -120,11 +120,11 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 14:24Z UTC (Iter ~1947, Tier 2→1 reset)
+## Status snapshot — updated 2026-06-15 14:31Z UTC (Iter ~1948, Tier 1, non-clean)
 
-**Iter ~1947 summary:** ⚠️ Non-clean. Check 0: 1 new Tier-4 alert (larry-alerts-996, source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#509). G-rule already dispatched 3/3 iter ~1930; APPROVAL_REQUEST `alert-translation-unrouted-pr-001` pending. Bot delivered prior DM. Journal-note only; no second DM. Watermark 995→996. Tier 2→1 reset. All other checks nominal. ratio≈20.57 (improving).
+**Iter ~1948 summary:** ⚠️ Non-clean. Check 0: 4 new Tier-4 alerts (lines 997–1000): medic-diagnosis for PR#509 (chat_id DM already sent) + pipeline-stall:unrouted-pr alerts for PRs #510/#512/#513 (cooldowns expired in dry-run). All journal-note only; G-rule 3/3 DISPATCHED. Check 3: 3 new fires (#510/#512/#513 cooldowns expired), 1 suppressed (#509). Watermark 996→1000. Tier 1, consecutive_clean=0. ratio≈20.62 (improving).
 
-**Iter ~1946 summary (prior):** ✅ Clean. All checks nominal. No new alerts (watermark=995=file). All 5 PIDs healthy. Sync FRESH. Bot stable. Pipeline stalls cooldowns all active. ratio≈20.57. **Tier 1→2 de-escalation fired. Was Tier 2, consecutive_clean=0.**
+**Iter ~1947 summary (prior):** ⚠️ Non-clean. Check 0: 1 new Tier-4 alert (larry-alerts-996, source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#509). Tier 2→1 reset. ratio≈20.57.
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl. When cooldown expires, the alert fires in dry-run mode. Be aware: calling --dry-run in a cycle will write real alerts if the cooldown has passed. Always check wc -l of the file before and after.
 
@@ -140,7 +140,7 @@
 |---|---|---|
 | PR #497 REVIEW_ESCALATE | [yellow] MERGEABLE; reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ~32.3h; 72h expires ~Jun-17T04:05Z. | Carry; escalate if still open at Jun-17T04:05Z |
 | PR #509 | [yellow] Alert fired 13:13Z Jun-15 (attempt 14); bot delivered 13:15Z. Cooldown restarted; next expiry ~Jun-16. | Merge/close or dispatch Mirror review |
-| PRs #510 + #512 + #513 | [yellow] Cooldowns expired again; new alerts fired 13:25Z Jun-15 (iter ~1941). | Larry to route to Mirror or merge/close; OR reply "approve" for alert-translation-unrouted-pr-001 to silence |
+| PRs #510 + #512 + #513 | [yellow] Cooldowns expired again; new alerts fired 14:28Z Jun-15 (iter ~1948). | Larry to route to Mirror or merge/close; OR reply "approve" for alert-translation-unrouted-pr-001 to silence |
 | G-rule stall-detector Forge build | [yellow] Beacon spec complete. Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
 | Check VIII rule=lower | [yellow] FN=3027, TP=5, FP=2 — threshold too high. DM queued iter ~1899. | `approve check-viii-update-2026-06-15` when shortcut lands |
 | unreviewed-merge:511 | [yellow] PR #511 merged by Larry at 23:58Z Jun-14 without Mirror routing | Reply 'go: retroactive-review-511' or 'silence: local-review-marker-counts' |
