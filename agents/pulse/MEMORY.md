@@ -108,23 +108,31 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 09:53Z UTC (Iter ~1921, Tier 1)
+## heal-pipeline-stall:unrouted-pr Tier-4 repeat pattern (observed iter ~1922)
 
-**Iter ~1921 summary:** ✅ Nominal. **Tier 1, consecutive_clean=0**. All checks clean except Check 4 carry (pending=1). 0 new interventions. ratio≈20.80 (957/46). All agent PIDs healthy. Watermark=989; larry-alerts.jsonl=959 lines (30 below watermark — prior iters inferred count from watermark; no functional issue; do not set watermark backward). Sync fresh (last_sync=09:24:17Z). Bot log last entry idx=988 at 09:12:32Z (no new directives from Larry). 5 open PRs: #497 (REVIEW_ESCALATE carry, 30.0h, under 72h — expires Jun-17T04:05Z), #509/#510/#512/#513 (cooldowns active).
-
-**heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl for this script. When cooldown expires, the alert fires even in dry-run mode. Be aware: calling --dry-run in a cycle will generate real alerts if the cooldown has passed.
-
-**medic-diagnosis alerts (learned iter ~1905):** The medic module sends `kind=notification, intent=medic-diagnosis` alerts with a chat_id when it performs detailed PR diagnoses. These carry a chat_id meaning the DM was already delivered directly. Triage helper classifies as Tier-4 (no registry template). No second DM from Pulse warranted.
+**Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#N` alerts consistently classify as Tier-4 (no registry template, no translation match) in the triage helper. The healer cycles through cooldowns and fires repeatedly for the same PR. Bot fallback delivery already DMs Larry; a second DM from Pulse is noise. Do NOT send repeat DM if the bot already delivered the prior iteration of the same alert. **G-rule count: 1/3** — dispatch to Beacon at 3/3 to add alert-translations.json template.
 
 ---
 
-## Key standing items (as of iter ~1916)
+## Status snapshot — updated 2026-06-15 10:01Z UTC (Iter ~1922, Tier 1)
+
+**Iter ~1922 summary:** ⚠️ Drift. **Tier 1, consecutive_clean=0**. Check 0: new alert line 960 (pipeline-stall:unrouted-pr:PR#509 cooldown re-fire, triage helper Tier-4, bot delivered idx=959 at 09:57:56Z, not DM-ing). Check 3: 1 new alert (PR#509 cooldown), 3 suppressed. All other checks nominal. 1 intervention (ledger). ratio≈20.81 (958/46). All agent PIDs healthy. Watermark=989 (file=960 lines); watermark gap persists — manually check tail each iter. Sync fresh (last_sync=09:24:17Z). No new Larry directives since 'go' at 18:21-0600 Jun-14. 5 open PRs: #497 (REVIEW_ESCALATE ~30.8h, expires Jun-17T04:05Z), #509/#510/#512/#513 (stall/cooldowns).
+
+**heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl. When cooldown expires, the alert fires in dry-run mode. Be aware: calling --dry-run in a cycle will write real alerts if the cooldown has passed. Always check wc -l of the file before and after.
+
+**medic-diagnosis alerts (learned iter ~1905):** The medic module sends `kind=notification, intent=medic-diagnosis` alerts with a chat_id when it performs detailed PR diagnoses. These carry a chat_id meaning the DM was already delivered directly. Triage helper classifies as Tier-4 (no registry template). No second DM from Pulse warranted.
+
+**Watermark gap (ongoing):** watermark=989, file grows toward 989 slowly. Lines added below the watermark are missed by the normal get-watermark path. Workaround: check `wc -l` vs watermark each iter; if file length < watermark AND file length has increased since prior iter, manually read the new tail lines and triage. Do NOT set watermark backward.
+
+---
+
+## Key standing items (as of iter ~1922)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] MERGEABLE (re-verified 09:13Z); reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ~30.2h; 72h expires ~Jun-17T04:05Z. | Carry; escalate if still open at Jun-17T04:05Z |
-| PR #509 | [yellow] UNKNOWN/no-review; medic DM attempt 10 at 08:58Z Jun-15; cooldown active | Awaiting Larry; merge/close or dispatch Mirror review |
-| PRs #510 + #512 + #513 | [yellow] Medic follow-up DMs idx=986/987/988 delivered 03:12Z MDT Jun-15; cooldowns active iter ~1916 | Larry to route to Mirror or merge/close |
+| PR #497 REVIEW_ESCALATE | [yellow] MERGEABLE; reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ~30.8h; 72h expires ~Jun-17T04:05Z. | Carry; escalate if still open at Jun-17T04:05Z |
+| PR #509 | [yellow] UNKNOWN/no-review; pipeline stall cooldown re-fired iter ~1922 (bot DM at 09:57:56Z); awaiting Larry | Merge/close or dispatch Mirror review |
+| PRs #510 + #512 + #513 | [yellow] UNKNOWN/no-review; cooldowns active | Larry to route to Mirror or merge/close |
 | G-rule stall-detector Forge build | [yellow] Beacon spec complete. Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
 | Check VIII rule=lower | [yellow] FN=3027, TP=5, FP=2 — threshold too high. DM queued iter ~1899. | `approve check-viii-update-2026-06-15` when shortcut lands |
 | unreviewed-merge:511 | [yellow] PR #511 merged by Larry at 23:58Z Jun-14 without Mirror routing | Reply 'go: retroactive-review-511' or 'silence: local-review-marker-counts' |
@@ -135,6 +143,7 @@
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
 | Check I 2026-06-15 | [blue] 1 proposal dispatched iter ~1899, Beacon processed | Beacon spec in progress |
 | Check IX missions | [blue] PR #512 (catch-me-up-gap) + PR #513 (alert-ignored) open, no review yet | Larry review on kanban |
+| G-rule heal-pipeline-stall:unrouted-pr Tier-4 repeat | [blue] **1/3** (new iter ~1922) | Watch; dispatch to Beacon at 3/3 |
 | G-rule ledger/check-i Tier-4 | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule health-notify-script-missing | [blue] **1/3** | Watch; dispatch at 3/3 |
 | catalog-accuracy-drift | [blue] 8/34 ourliberty-graph shelf cards drifted | route=digest; journal-note only |
@@ -147,8 +156,8 @@
 | G-rule timer-cycle-no-journal-entry | [blue] **0/3** | Watch |
 | G-rule heal-stale-daemon-script_path-cosmetic | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule Forge-preflight-marker-error-retry | [blue] **2/3** | Watch; dispatch at 3/3 |
-| G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch | [blue] **1/3** (new iter ~1910) | Watch; dispatch to Beacon at 3/3 (warn-vs-info) |
+| G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 (warn-vs-info) |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
 | dashboard_api PID 2868353 | [blue] Ssl stable | Note; watch for recurrence |
-| Stale bash orphans | [blue] PIDs 1834248 (17d 13h+) + 2605007 (1d 4h+). Ss, low CPU. | Carry |
+| Stale bash orphans | [blue] PIDs 1834248 (17d+) + 2605007 (1d+). Ss, low CPU. | Carry |
