@@ -126,7 +126,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 21:23Z UTC (Iter ~1987, Tier 2, consecutive_clean=2, all checks nominal)
+## Status snapshot — updated 2026-06-15 21:42Z UTC (Iter ~1988, Tier 2→3 DE-ESCALATION, all checks nominal)
+
+**Iter ~1988 summary:** ✅ Nominal. 1 new alert (L1047 Tier-3 silenced, dispatch-branch-cleanup/summary). All checks clean. Repo at cbb7c162=origin/main. Watermark: 1046→1047. pending=0. 1 open PR: #497 (UNKNOWN/UNKNOWN, 72h deadline Jun-17T04:02Z ~30.4h). PRIME ratio=20.04. **Tier 2 → Tier 3 DE-ESCALATION** (consecutive_clean=3→promoted).
 
 **Iter ~1987 summary:** ✅ Nominal. 0 new alerts. All checks clean. Repo at 12475384=origin/main. Watermark: 1046 (unchanged). pending=0. **PR #522 MERGED ✅** (G-rule missions-card-gc-warn-vs-info COMPLETE ✅). 1 open PR: #497 (MERGEABLE/UNSTABLE, 72h deadline Jun-17T04:02Z ~30.7h). PRIME ratio=20.04. Tier 2, consecutive_clean=2.
 
