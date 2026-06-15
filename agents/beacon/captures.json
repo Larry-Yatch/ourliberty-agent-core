@@ -531,6 +531,127 @@
         "from_state": "parked"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "cap-test-card-button-verification-safe-to-drop-d416",
+      "title": "TEST CARD - button verification (safe to drop)",
+      "note": "Throwaway card created by Claude to test the Parked-lane buttons end-to-end. Safe to delete.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ol-work",
+        "branch": "pr476-review",
+        "captured_at": "2026-06-15T23:22:10.667250+00:00"
+      },
+      "last_touched": "2026-06-15T23:22:10.667250+00:00",
+      "promoted_to": null,
+      "snoozed_until": "2026-06-22T00:00:00+00:00",
+      "briefing": {
+        "what": "This is a throwaway test item created only to check that the parked-items buttons work.",
+        "why": "It carries no business value \u2014 it exists purely to confirm the system's controls behave as expected.",
+        "suggest": "Go ahead and clear it out, but glance to confirm nothing real is attached before it's gone."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-15T23:29:03.702835+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-test-promote-button-safe-to-drop-55e0",
+      "title": "TEST - promote button (safe to drop)",
+      "note": "Throwaway card to test Promote end-to-end. Delete after.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ol-work",
+        "branch": "pr476-review",
+        "captured_at": "2026-06-15T23:23:58.384693+00:00"
+      },
+      "last_touched": "2026-06-15T23:23:58.384693+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "This is a placeholder test card with no real business purpose, created only to check that the Promote button works.",
+        "why": "It doesn't matter to the business on its own \u2014 it's leftover scaffolding from a quick check, and keeping it around just adds clutter.",
+        "suggest": "Go ahead and drop it, but take a quick second to confirm nothing real got attached to it first."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-15T23:29:03.702835+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-test-drop-button-safe-to-drop-1613",
+      "title": "TEST - drop button (safe to drop)",
+      "note": "Throwaway card to test Drop end-to-end. Delete after.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ol-work",
+        "branch": "pr476-review",
+        "captured_at": "2026-06-15T23:23:58.818531+00:00"
+      },
+      "last_touched": "2026-06-15T23:23:58.818531+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A placeholder test note someone created just to try out the system, not a real business idea.",
+        "why": "It carries no business value \u2014 it was only used to check that the system works and was meant to be cleaned up afterward.",
+        "suggest": "Go ahead and drop it, but take a quick second to confirm nothing real got attached to it before it goes."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-15T23:29:03.702835+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-test-delegate-button-safe-to-drop-3c53",
+      "title": "TEST - delegate button (safe to drop)",
+      "note": "Throwaway card to test Delegate end-to-end. Delete after.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ol-work",
+        "branch": "pr476-review",
+        "captured_at": "2026-06-15T23:23:59.251861+00:00"
+      },
+      "last_touched": "2026-06-15T23:23:59.251861+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "This is a throwaway test card created just to check that the Delegate button works, not real work.",
+        "why": "It has no business value on its own \u2014 it only exists to confirm a feature behaves correctly before you rely on it.",
+        "suggest": "Let's clear it off the board, but only once we've confirmed the Delegate test actually finished, so we don't toss it mid-check."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-15T23:29:03.702835+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
