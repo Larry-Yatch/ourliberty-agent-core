@@ -15,7 +15,21 @@
       },
       "last_touched": "2026-06-12T03:57:17.151990+00:00",
       "promoted_to": "scripts/heal_orphan_autoregister.py (Missions v2 Phase 3 \u00a7 6 orphan auto-registration healer) \u2014 the concrete realization of agents reading the board to self-prioritize",
-      "promoted_at": "2026-06-12T03:57:17.151990+00:00"
+      "promoted_at": "2026-06-12T03:57:17.151990+00:00",
+      "briefing": {
+        "what": "A way to turn your team's status board from a screen you just watch into one that actually tells the team what to work on next.",
+        "why": "Right now your people pick up work from a separate queue, so the board you look at doesn't steer the work \u2014 making it do both could keep everyone focused on your top priorities, and it would help the sister project too.",
+        "suggest": "Worth keeping on the list and scoping properly before committing, but I'd hold off greenlighting it until we've finished the work already in motion."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-15T20:26:19.776627+00:00",
+        "from_state": "promoted"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "cap-orphan-lane-show-desktop-chat-title-fallback-rep-dd23",
@@ -117,7 +131,21 @@
         "captured_at": "2026-06-10T07:05:19.863345+00:00"
       },
       "last_touched": "2026-06-10T07:05:19.863345+00:00",
-      "promoted_to": "operator-action-queue-is-full-of-benign-auto-handled-alerts-101-fix-at-the-source"
+      "promoted_to": "operator-action-queue-is-full-of-benign-auto-handled-alerts-101-fix-at-the-source",
+      "briefing": {
+        "what": "Your action queue is showing about 100 alerts, but almost all of them are things that already got fixed automatically or aren't really decisions you need to make.",
+        "why": "When the queue is full of noise, the few items that genuinely need your judgment get buried \u2014 which defeats the whole point of only bringing you the things that truly need you.",
+        "suggest": "Worth fixing so the queue only shows real decisions, but go in carefully and confirm we're only silencing the truly harmless alerts before turning it on."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-15T20:26:19.776627+00:00",
+        "from_state": "promoted"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     },
     {
       "id": "cap-register-desktop-ingest-token-in-the-credential-edbb",
@@ -162,7 +190,21 @@
       },
       "last_touched": "2026-06-10T18:32:39.789945+00:00",
       "promoted_to": null,
-      "dropped_at": "2026-06-10T18:32:39.789945+00:00"
+      "dropped_at": "2026-06-10T18:32:39.789945+00:00",
+      "briefing": {
+        "what": "A plan to run regular, automatic reviews of our whole product to catch problems before customers do.",
+        "why": "Each review is still uncovering new kinds of issues, so doing them on a set schedule keeps our quality and safety improving instead of slipping.",
+        "suggest": "Worth setting up a recurring review rhythm, but start with a modest cadence and confirm it's paying off before committing to more."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-15T20:26:19.776627+00:00",
+        "from_state": "dropped"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "cap-bug-hunt-phase-2-run-the-next-full-codebase-audi-5a20",
