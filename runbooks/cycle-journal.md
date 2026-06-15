@@ -4,6 +4,106 @@
 
 ---
 
+## Iteration ~1926 — 2026-06-15 10:29Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Drift (Check 0 Tier-4 catalog-accuracy-drift; all other checks nominal).
+
+**VERIFY-BEFORE-REASSERT (iter ~1925 carries):**
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): `gh pr view 497` → MERGEABLE, reviewDecision="", mirror-review state=FAILURE (REVIEW_ESCALATE 04:05:31Z Jun-14). Age ≈ 30.5h. Under 72h (~Jun-17T04:05Z). **CARRY** [yellow].
+- PRs #509/#510/#512/#513: All OPEN, UNKNOWN. `heal_pipeline_stall.py --dry-run` → 0 new alerts, 4 suppressed (cooldowns active). **CARRY** [yellow].
+- unreg-approval-482eb78951ee: beacon-pending-approvals.json confirmed pending=1. **CARRY** [yellow].
+- dashboard_api PID 2868353: Running (Ssl). **CARRY** [blue].
+- Stale bash orphans PIDs 1834248 + 2605007: Not re-verified this iter. **CARRY** [blue].
+
+**Check 0 — Alert triage:** Watermark=989. larry-alerts.jsonl=969 lines (was 967 at ~1925 → grew +2). New alerts at lines 968–969 triaged:
+- Line 968 (`ts=10:21:07Z`, `source=pulse-check`, `subject=catalog-accuracy-drift`, `route=digest`): triage helper → **Tier-4** (novel, no registry template, no translation match). Bot already delivered as idx=967 route=digest at 10:23:13Z (skipping DM per bot log). NOT DMing Larry — bot handled as digest. Catalog-accuracy-drift now **9/34** (was 8/34). ⚠️ [tier-reset]. G-rule catalog-accuracy-drift-tier4: **1/3** (new this iter).
+- Line 969 (`ts=10:25:44Z`, `source=missions-autoregister`, `subject=summary`, `route=digest`): triage helper → **Tier-3** (known-pattern match). 1 new orphan proposal: `proposed-heal-phantom-dispatch-claim`. ✅ No tier-reset.
+- Watermark gap persists (989 > 969 lines); workaround: compare wc -l each iter. Not advancing watermark (already above file length).
+
+**Check 1 — Log noise:** outbox-notifier.log tail-40: 0 new WARNs. Only WARN in range is `01:10:53Z Jun-15` auto-dispatch APPROVAL_REQUEST task-id mismatch — existing G-rule 1/3 carry. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot log last delivery: idx=967 (catalog-accuracy-drift, route=digest skip) at 04:23:13-0600 MDT (10:23Z). No new Larry directives since 'go' at 18:21:09-0600 Jun-14. Bot PID 2744840 alive (Ss, Jun14). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → 0 new alerts fired, 0 recovered, 4 suppressed (cooldowns: PRs #513, #512, #510, #509). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: pending=1 (`unreg-approval-482eb78951ee`, PR#509+#510 merge decision). No change. [yellow] carry.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T10:14:02Z`, age≈15 min. FRESH (< 60 min). ✅ Nominal.
+
+**Check A — Source repo:** On main, clean. HEAD=449640ff == origin/main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-15T10:24:19Z (~5 min ago), status=no-change. FRESH. ✅ Nominal.
+
+**Check C — Agent liveness:**
+- inbox_watcher: PID 2530123 ✅ (Ssl, Jun13)
+- chain_event_shipper: PID 2744551 ✅ (SNs, Jun14)
+- beacon_telegram_bot: PID 2744840 ✅ (Ss, Jun14)
+- outbox_notifier: PID 2744914 ✅ (Ss, Jun14)
+- dashboard_api: PID 2868353 ✅ (Ssl, Jun14)
+- No forge/mirror persistent sessions — expected. ✅
+
+**Check E — PRs:**
+ourliberty-agent-core (5 open):
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`), **MERGEABLE** (re-verified `gh pr view 497`), reviewDecision="". Mirror REVIEW_ESCALATE 04:05:31Z Jun-14. Age ≈ 30.5h. Under 72h. [yellow] carry.
+- **PR #509** (`docs/meaning-layer-roadmap`), UNKNOWN. Cooldown active. [yellow] carry.
+- **PR #510** (`work/build-consult-restock`), UNKNOWN. Cooldown active. [yellow] carry.
+- **PR #512** (`feat/new-mission-pulse-check-ix-catch-me-up-gap-2026-06-15`), UNKNOWN. Cooldown active. [yellow] carry.
+- **PR #513** (`feat/new-mission-pulse-check-ix-alert-ignored-2026-06-15`), UNKNOWN. Cooldown active. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Check H — Forge/Beacon/Pulse inbox:** All three inboxes empty. ✅ Nominal.
+
+**Conditional checks:** Today is Monday. Check I: sentinel check-i-2026-06-15.json exists (fired iter ~1899) — skip re-run. Check III: most recent artifact 2026-06-11; today is Monday (not Sunday) — skip. ✅
+
+**Actions taken:**
+1. `cycle_tier_state.py record --checks-clean false` → **Tier 1, consecutive_clean=0** ✅
+2. `cycle_prime_ledger.py append --tier 1 --kind intervention` — check0-catalog-accuracy-drift-tier4 ✅
+
+**Dispatches:** None.
+
+**Patterns:**
+- G-rule **catalog-accuracy-drift-tier4**: **1/3** (new this iter — 9/34 drift, Tier-4 novel, bot delivers as digest). Dispatch to Beacon at 3/3 for alert-translations.json template.
+- G-rule heal-pipeline-stall:unrouted-pr Tier-4 repeat: 0 new. **2/3**. Carry.
+- G-rule Forge-preflight-marker-error-retry: 0 new. **2/3**. Carry.
+- G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch-warn-vs-info: 0 new. **1/3**. Carry.
+- G-rule ledger/check-i Tier-4: 0 new. **1/3**. Carry.
+- G-rule missions-autoregister-warn-vs-info: 0 new. **2/3**. Carry.
+- G-rule missions-card-gc-warn-vs-info: 0 new. **2/3**. Carry.
+- G-rule F24-empty-prompt-envelope-rejected: 0 new. **2/3**. Carry.
+- G-rule health-notify-script-missing: 0 new. **1/3**. Carry.
+- G-rule timer-cycle-no-journal-entry: 0 new. **0/3**. Carry.
+- G-rule stuck-cycle-timer: 0 new. **0/3**. Carry.
+- G-rule Forge-timeout-worktree-missing-retry-loop: 0 new. **1/3**. Carry.
+- G-rule heal-stale-daemon-script_path-cosmetic: 0 new. **1/3**. Carry.
+
+**Standing findings:**
+- [yellow] **PR #497 REVIEW_ESCALATE** — MERGEABLE (re-verified 10:29Z); reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ≈ 30.5h; 72h expires ~Jun-17T04:05Z. [carry]
+- [yellow] **PRs #509/510/512/513 pipeline-stall** — all cooldowns active. Options: `dispatch mirror review pr=<N>` OR merge/close. [carry; awaiting Larry]
+- [yellow] **unreg-approval-482eb78951ee** — pending=1 (PR#509+#510 merge decision). [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **unreviewed-merge:511/499/494/489** — [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [blue] **catalog-accuracy-drift** — 9/34 ourliberty-graph shelf cards drifted (↑ from 8/34). Drifted: active_tier, agent_runner, alert_triage_state, dashboard_api, human-approval-gate, id_match, inbox-dispatch, larry_alerts, outbox_notifier. route=digest; journal-note only. G-rule **1/3**. [carry]
+- [blue] **Check I 2026-06-15** — 1 proposal dispatched to Beacon iter ~1899. [carry]
+- [blue] **Check IX missions** — PRs #512 + #513 open. [carry]
+- [blue] **proposed-heal-phantom-dispatch-claim** — missions-autoregister proposed new orphan thread this iter. route=digest; no action needed. [carry]
+- [blue] G-rule counters: catalog-accuracy-drift-tier4 **1/3** (new), heal-pipeline-stall:unrouted-pr Tier-4 repeat 2/3, Forge-preflight-marker-error-retry 2/3, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, missions-autoregister-warn-vs-info 2/3, missions-card-gc-warn-vs-info 2/3, F24-empty-prompt-envelope-rejected 2/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, heal-stale-daemon-script_path-cosmetic 1/3.
+- [blue] **Check I medic-operator-scaffold-001** — 24.4σ; prior dispatch 2026-06-10. [carry]
+- [blue] **dag-preflight-revision gap** — PR #484 closed source=pulse gap; DAG markers still fall through. [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+- [blue] **Stale bash orphans** — PIDs 1834248 (17d+, Ss) + 2605007 (1d+, Ss). Low CPU. Not re-verified. [carry]
+- [blue] **dashboard_api PID 2868353** — Ssl, stable. [carry]
+- [blue] **Watermark gap** — watermark=989 above file length (969 lines); manual wc -l comparison each iter. Carry.
+
+**PRIME DIRECTIVE:** 1 intervention this iter (Check 0 Tier-4 catalog-accuracy-drift). ratio≈20.87 (960/46), trend=improving.
+**Tier end-of-iter:** **Tier 1, consecutive_clean=0** (Check 0 Tier-4 tier-reset).
+
+---
+
 ## Iteration ~1925 — 2026-06-15 10:21Z UTC (interactive, /cycle, Tier 1, consecutive_clean=1)
 
 **Trigger:** Larry direct invocation (`/cycle`).

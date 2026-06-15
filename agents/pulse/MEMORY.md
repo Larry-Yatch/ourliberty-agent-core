@@ -110,13 +110,19 @@
 
 ## heal-pipeline-stall:unrouted-pr Tier-4 repeat pattern (observed iter ~1922)
 
-**Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#N` alerts consistently classify as Tier-4 (no registry template, no translation match) in the triage helper. The healer cycles through cooldowns and fires repeatedly for the same PR. Bot fallback delivery already DMs Larry; a second DM from Pulse is noise. Do NOT send repeat DM if the bot already delivered the prior iteration of the same alert. **G-rule count: 1/3** — dispatch to Beacon at 3/3 to add alert-translations.json template.
+**Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#N` alerts consistently classify as Tier-4 (no registry template, no translation match) in the triage helper. The healer cycles through cooldowns and fires repeatedly for the same PR. Bot fallback delivery already DMs Larry; a second DM from Pulse is noise. Do NOT send repeat DM if the bot already delivered the prior iteration of the same alert. **G-rule count: 2/3** — dispatch to Beacon at 3/3 to add alert-translations.json template.
 
 ---
 
-## Status snapshot — updated 2026-06-15 10:21Z UTC (Iter ~1925, Tier 1)
+## catalog-accuracy-drift Tier-4 pattern (observed iter ~1926)
 
-**Iter ~1925 summary:** ✅ Nominal. **Tier 1, consecutive_clean=1**. 0 new alerts, 0 new pipeline stall fires (4 suppressed — cooldowns active). 0 interventions (iter_clean). ratio≈20.87 (959/46). All agent PIDs healthy. Watermark=989 (file=967 lines); watermark gap persists. Sync fresh (last_sync=09:24:17Z). No new Larry directives. 5 open PRs: #497 (MERGEABLE, REVIEW_ESCALATE ~30.3h, expires Jun-17T04:05Z), #509/#510/#512/#513 (stall/cooldowns).
+**Rule:** `source=pulse-check, subject=catalog-accuracy-drift` alerts classify as Tier-4 (novel, no registry template) in triage helper. Alert carries `route=digest` — bot delivers as digest, no DM. Do NOT send second DM from Pulse. Journal-note only. Current count: 9/34 ourliberty-graph shelf cards drifted. **G-rule count: 1/3** — dispatch to Beacon at 3/3 for alert-translations.json Tier-3 template.
+
+---
+
+## Status snapshot — updated 2026-06-15 10:29Z UTC (Iter ~1926, Tier 1)
+
+**Iter ~1926 summary:** ⚠️ Drift. **Tier 1, consecutive_clean=0**. 2 new alerts (line 968: catalog-accuracy-drift Tier-4 9/34, bot delivered as digest; line 969: missions-autoregister Tier-3 suppressed). 1 intervention. ratio≈20.87 (960/46). All agent PIDs healthy. Watermark=989 (file=969 lines); watermark gap persists. Sync fresh (last_sync=10:24:19Z). No new Larry directives. 5 open PRs: #497 (MERGEABLE, REVIEW_ESCALATE ~30.5h, expires Jun-17T04:05Z), #509/#510/#512/#513 (stall/cooldowns). New G-rule: catalog-accuracy-drift-tier4 1/3.
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl. When cooldown expires, the alert fires in dry-run mode. Be aware: calling --dry-run in a cycle will write real alerts if the cooldown has passed. Always check wc -l of the file before and after.
 
@@ -126,12 +132,12 @@
 
 ---
 
-## Key standing items (as of iter ~1925)
+## Key standing items (as of iter ~1926)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] MERGEABLE; reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ~30.8h; 72h expires ~Jun-17T04:05Z. | Carry; escalate if still open at Jun-17T04:05Z |
-| PR #509 | [yellow] UNKNOWN/no-review; pipeline stall cooldown re-fired iter ~1922 (bot DM at 09:57:56Z); awaiting Larry | Merge/close or dispatch Mirror review |
+| PR #497 REVIEW_ESCALATE | [yellow] MERGEABLE; reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ~30.5h; 72h expires ~Jun-17T04:05Z. | Carry; escalate if still open at Jun-17T04:05Z |
+| PR #509 | [yellow] UNKNOWN/no-review; pipeline stall cooldowns active; awaiting Larry | Merge/close or dispatch Mirror review |
 | PRs #510 + #512 + #513 | [yellow] UNKNOWN/no-review; cooldowns active | Larry to route to Mirror or merge/close |
 | G-rule stall-detector Forge build | [yellow] Beacon spec complete. Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
 | Check VIII rule=lower | [yellow] FN=3027, TP=5, FP=2 — threshold too high. DM queued iter ~1899. | `approve check-viii-update-2026-06-15` when shortcut lands |
@@ -143,10 +149,11 @@
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
 | Check I 2026-06-15 | [blue] 1 proposal dispatched iter ~1899, Beacon processed | Beacon spec in progress |
 | Check IX missions | [blue] PR #512 (catch-me-up-gap) + PR #513 (alert-ignored) open, no review yet | Larry review on kanban |
-| G-rule heal-pipeline-stall:unrouted-pr Tier-4 repeat | [blue] **2/3** (↑ iter ~1924) | Watch; dispatch to Beacon at 3/3 |
+| G-rule catalog-accuracy-drift-tier4 | [blue] **1/3** (new iter ~1926) | Watch; dispatch to Beacon at 3/3 for Tier-3 translation |
+| G-rule heal-pipeline-stall:unrouted-pr Tier-4 repeat | [blue] **2/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule ledger/check-i Tier-4 | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule health-notify-script-missing | [blue] **1/3** | Watch; dispatch at 3/3 |
-| catalog-accuracy-drift | [blue] 8/34 ourliberty-graph shelf cards drifted | route=digest; journal-note only |
+| catalog-accuracy-drift | [blue] 9/34 ourliberty-graph shelf cards drifted (↑ from 8/34) | route=digest; journal-note only |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
 | G-rule missions-autoregister-warn-vs-info | [blue] **2/3** | Watch; dispatch at 3/3 |
 | G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3 | Watch; dispatch at 3/3 |
