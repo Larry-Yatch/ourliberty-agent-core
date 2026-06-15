@@ -96,30 +96,37 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 07:04Z UTC (Iter ~1899, Tier 1)
+## Ledger/Check-I Tier-4 pattern (observed 2026-06-15 iter ~1900)
 
-**Iter ~1899 summary:** ⚠️ Signal. **Tier 1**. Check 0: 1 new Tier-4 alert (line 968 — PR #510 pipeline-stall:unrouted-pr, cooldown expired). Watermark=968. Monday conditionals all fired: Check I (1 proposal dispatched to Beacon, `cycle-202606111240000000` at 21.5σ), Check VIII (rule=lower, FN=3027), Check IX (2 missions: catch-me-up-gap PR#512, alert-ignored PR#513), Check X (none). All daemons alive (same PIDs). PRs #497/#509/#510 carry [yellow]. ratio≈20.54 (946 interventions / 46 systemic_fixes). Bug discovered: prior iters ~1895–1898 incorrectly skipped Check I on Monday with "not Sunday"; Monday IS a firing day per spec (weekday ∈ {0,2,4,6}).
+**Rule:** `source=ledger` weekly reports (subject=weekly-YYYY-MM-DD) and `source=pulse` Check I digests (subject=check-i-YYYY-MM-DD) consistently classify as Tier-4 (novel, no template) in the triage helper. These are routine Monday outputs already delivered by the bot via route=escalate. G-rule candidate: add Tier-3 translations for both. **Count: 1/3** — dispatch to Beacon at 3/3.
+
+---
+
+## Status snapshot — updated 2026-06-15 07:14Z UTC (Iter ~1900, Tier 1)
+
+**Iter ~1900 summary:** ⚠️ Signal. **Tier 1**. Check 0: 4 new alerts (lines 969–972) — 3 Tier-4 (ledger-weekly, check-i, medic PR#510 attempt 8 — all delivery confirmations, bot already delivered), 1 Tier-3 (check-viii, known-pattern silence). Watermark=972. All daemons alive. PRs #497/#509/#510 carry [yellow]; new #512/#513 from Check IX. ratio≈20.54 (947/46). **Age correction:** PR #497 Mirror REVIEW_ESCALATE confirmed in routing-events.jsonl at 04:05:31Z Jun-14; actual age ~27h (prior iters ~1898–1899 misstated as ~35h/~43h). Expires 72h at ~Jun-17T04:05Z.
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl for this script. When cooldown expires, the alert fires even in dry-run mode. Be aware: calling --dry-run in a cycle will generate real alerts if the cooldown has passed.
 
 ---
 
-## Key standing items (as of iter ~1899)
+## Key standing items (as of iter ~1900)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] MERGEABLE; reviewDecision=""; Mirror REVIEW_ESCALATE at 04:05Z Jun-14 (~43h). Under 72h. | Carry; at 72h escalate or close |
-| PR #509 + #510 | [yellow] UNKNOWN/no-review; PR#510 new pipeline-stall alert (line 968, bot delivering); pending approval `unreg-approval-482eb78951ee` (dashboard; chat_id=None) | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
+| PR #497 REVIEW_ESCALATE | [yellow] MERGEABLE; reviewDecision=""; Mirror REVIEW_ESCALATE confirmed 04:05:31Z Jun-14 (~27h actual). 72h expires ~Jun-17T04:05Z. | Carry; escalate if still open at Jun-17T04:05Z |
+| PR #509 + #510 | [yellow] UNKNOWN/no-review; cooldown suppressed this iter; pending approval `unreg-approval-482eb78951ee` (chat_id=None) | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
 | G-rule stall-detector Forge build | [yellow] Beacon spec complete. Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
-| Check VIII rule=lower | [yellow] FN=3027, TP=5, FP=2 — threshold too high. DM queued. | `approve check-viii-update-2026-06-15` when shortcut lands |
+| Check VIII rule=lower | [yellow] FN=3027, TP=5, FP=2 — threshold too high. DM queued iter ~1899. | `approve check-viii-update-2026-06-15` when shortcut lands |
 | unreviewed-merge:511 | [yellow] PR #511 merged by Larry at 23:58Z Jun-14 without Mirror routing | Reply 'go: retroactive-review-511' or 'silence: local-review-marker-counts' |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
-| Check I 2026-06-15 | [blue] 1 proposal dispatched: `cycle-202606111240000000` (21.5σ, $2.80 vs $0.81 baseline) | Beacon spec incoming |
-| Check IX missions | [blue] 2 new missions: catch-me-up-gap (PR#512), alert-ignored (PR#513) | Larry review on kanban |
+| Check I 2026-06-15 | [blue] 1 proposal dispatched iter ~1899, Beacon processed | Beacon spec in progress |
+| Check IX missions | [blue] PR #512 (catch-me-up-gap) + PR #513 (alert-ignored) open, no review yet | Larry review on kanban |
+| G-rule ledger/check-i Tier-4 | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule health-notify-script-missing | [blue] **1/3** | Watch; dispatch at 3/3 |
 | catalog-accuracy-drift | [blue] 8/34 ourliberty-graph shelf cards drifted | route=digest; journal-note only |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
@@ -127,7 +134,7 @@
 | G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule missions-card-gc-warn-vs-info | [blue] **2/3** | Watch; dispatch at 3/3 |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] **2/3** | Watch; dispatch at 3/3 |
-| G-rule stuck-cycle-timer | [blue] **1/3** — heal-systemd auto-healed at 06:00Z Jun-15 | Watch; dispatch at 3/3 |
+| G-rule stuck-cycle-timer | [blue] **0/3** (healed Jun-15 06:00Z, counter reset) | Watch; dispatch at 3/3 |
 | G-rule timer-cycle-no-journal-entry | [blue] **0/3** | Watch |
 | G-rule heal-stale-daemon-script_path-cosmetic | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule Forge-preflight-marker-error-retry | [blue] **1/3** | Watch; dispatch at 3/3 |
