@@ -108,9 +108,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 09:13Z UTC (Iter ~1916, Tier 1)
+## Status snapshot — updated 2026-06-15 09:27Z UTC (Iter ~1918, Tier 1)
 
-**Iter ~1916 summary:** ⚠️ Check 0 Tier-4. **Tier 1, consecutive_clean=0**. 3 medic-diagnosis follow-up DMs for PRs #510/#512/#513 (medic processed pipeline-stall alerts from iter ~1915 cooldown expiry; DMs already delivered idx=986/987/988 at 03:12Z MDT). Check 4 pending=1 (carry). 1 intervention appended. ratio≈20.78 (956/46). All agent PIDs healthy. Watermark advanced 986→989. outbox-notifier log WARNs from prior iters scrolled past 300-line window — no new WARNs this iter.
+**Iter ~1918 summary:** ✅ Nominal. **Tier 1, consecutive_clean=0**. All checks clean except Check 4 carry (pending=1). 0 new interventions. ratio≈20.80 (957/46). All agent PIDs healthy. Watermark=989 (no change). Sync fresh (last_sync=09:24:17Z). Bot log last entry idx=988 at 03:12:32Z (no new directives from Larry). 5 open PRs: #497 (REVIEW_ESCALATE carry, 29.4h, under 72h), #509/#510/#512/#513 (cooldowns active).
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl for this script. When cooldown expires, the alert fires even in dry-run mode. Be aware: calling --dry-run in a cycle will generate real alerts if the cooldown has passed.
 
