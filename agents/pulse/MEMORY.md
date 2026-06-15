@@ -114,9 +114,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 10:08Z UTC (Iter ~1923, Tier 1)
+## Status snapshot — updated 2026-06-15 10:16Z UTC (Iter ~1924, Tier 1)
 
-**Iter ~1923 summary:** ⚠️ Drift. **Tier 1, consecutive_clean=0**. Check 0: new alert line 961 (medic-diagnosis, intent=medic-diagnosis, source=medic, PR#509 attempt 11, triage helper Tier-4, bot delivered idx=960 at 10:02:59Z, not DM-ing). Check 3: 0 new (4 suppressed). All other checks nominal. 1 intervention (ledger). ratio≈20.85 (959/46). All agent PIDs healthy. Watermark=989 (file=961 lines); watermark gap persists — manually check tail each iter. Sync fresh (last_sync=09:24:17Z). No new Larry directives since 'go' at 18:21-0600 Jun-14. 5 open PRs: #497 (REVIEW_ESCALATE ~30.1h, expires Jun-17T04:03Z), #509/#510/#512/#513 (stall/cooldowns).
+**Iter ~1924 summary:** ⚠️ Drift. **Tier 1, consecutive_clean=0**. Check 0/3: 3 new heal-pipeline-stall alerts (PRs #510/#512/#513 cooldowns expired) + 3 medic-diagnosis; all Tier-4 via triage helper; bot delivers; file 961→967 lines. G-rule heal-pipeline-stall:unrouted-pr Tier-4 repeat → **2/3**. 1 intervention (ledger). ratio≈20.85 (959/46). All agent PIDs healthy. Watermark=989 (file=967 lines); watermark gap persists. Sync fresh (last_sync=09:24:17Z). No new Larry directives. 5 open PRs: #497 (REVIEW_ESCALATE ~31h, expires Jun-17T04:05Z), #509/#510/#512/#513 (stall/cooldowns).
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl. When cooldown expires, the alert fires in dry-run mode. Be aware: calling --dry-run in a cycle will write real alerts if the cooldown has passed. Always check wc -l of the file before and after.
 
@@ -143,7 +143,7 @@
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
 | Check I 2026-06-15 | [blue] 1 proposal dispatched iter ~1899, Beacon processed | Beacon spec in progress |
 | Check IX missions | [blue] PR #512 (catch-me-up-gap) + PR #513 (alert-ignored) open, no review yet | Larry review on kanban |
-| G-rule heal-pipeline-stall:unrouted-pr Tier-4 repeat | [blue] **1/3** (new iter ~1922) | Watch; dispatch to Beacon at 3/3 |
+| G-rule heal-pipeline-stall:unrouted-pr Tier-4 repeat | [blue] **2/3** (↑ iter ~1924) | Watch; dispatch to Beacon at 3/3 |
 | G-rule ledger/check-i Tier-4 | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule health-notify-script-missing | [blue] **1/3** | Watch; dispatch at 3/3 |
 | catalog-accuracy-drift | [blue] 8/34 ourliberty-graph shelf cards drifted | route=digest; journal-note only |
