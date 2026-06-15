@@ -79,6 +79,16 @@ Make today's win *standing* instead of a one-time manual kick.
 - Watch install-drift (a brand-new timer must actually be installed + enabled on the droplet).
 - Captured as `cap-schedule-the-missions-narrator…` on the Parked lane.
 
+### Phase S — Two-way sync: close the loop  ·  **HIGH PRIORITY** (pairs with 4.1; interleaves with 4.2 / 4b)
+The board must never drift behind the work — the failure we hit twice on 2026-06-14 (team merged #500/#502/#54; the dashboard showed nothing until a manual Narrator run + API restart). Two directions, both required:
+- **Card → work (have it):** delegate / chat drives real work via Beacon.
+- **Work → card (the gap — close the loop):**
+  - **Link** a delegated card to the work it spawns (stamp the task / PR id back onto the item).
+  - **In-flight status** rides the existing `chain_events` derive — the same engine that already powers the missions/orphan lanes — so a card shows building → in-review automatically.
+  - **Completion:** *safe*-risk cards **auto-close on verified merge** (belt-and-suspenders gate, like the advancer/GC) with a "shipped in PR #X" note; *risky* cards get a **team-authored plain-language closeout** posted to the card — what we did · the outcome · anything to know — for Larry to **review before it closes** (the Narrator extends to closeout, not just the opening briefing).
+  - **Failure / blocked rings back** to the card (loud doorbell), not just the good news.
+- **No stale board (freshness layer — both layers in scope):** engineer out the lag class we kept hitting — **push-emit** work-state to the board instead of waiting on polls / the hourly sync; remove the "needs an API restart / batched commit / hourly pull before it shows" gaps so the board reflects reality promptly.
+
 ### Phase 4.2 — Spread to the other lanes + **generalize for reuse**  ·  (Larry's pick for after 4.1)
 Put the meaning layer on the **Orphans lane** (the ~97-item pile) and the **active missions**, so the *whole* board reads plainly — and **this is where the capability becomes a shelf component**:
 - Lift the Narrator + card + field contract out of the captures-only mold into a generic unit (see §2 reuse boundary).
@@ -106,6 +116,7 @@ Because this goes on the shelf and other products depend on it:
 - **Hardened** — robust LLM parsing with a deterministic fallback; atomic, single-committer writes; idempotent re-runs; a graceful unbriefed state that never leaks raw metadata.
 - **Generic** — decoupled from the captures schema so any lane/tab can carry it (the §4.2 lift).
 - **One voice** — all author/chat output is Beacon's; agents stay behind it.
+- **Closed-loop / no stale board** — every card reflects the true, current state of the work it represents; in-flight, completion, and failure all sync back automatically; the freshness-lag class (merged-but-not-visible, needs-a-restart, batched/hourly) is engineered out, not tolerated.
 - **Tested to the real gate** — unit tests *and* the operator-decidability gate (a human can decide unaided), per phase.
 
 ---
@@ -121,6 +132,7 @@ From the design conversation (2026-06-13/14):
 - **Chat feels live** — async on existing rails for the proof; the real-time front desk is Phase 4b.
 - **Prove on Parked first** — done + validated.
 - **Build as a reusable, shelf-able capability** — robust and generic, not a missions-only feature.
+- **Two-way / closed-loop sync** — the board never drifts behind the team's work. *Safe* cards auto-close on verified merge; *risky* cards get a plain-language team closeout for Larry to review before closing; failures ring back. Scope = **both** the card↔work loop and raw infra freshness.
 
 ---
 
@@ -130,6 +142,8 @@ From the design conversation (2026-06-13/14):
 - **4.2:** how generic is the component boundary on the first lift — Orphans + missions only, or design the contract for arbitrary registries now?
 - **4b:** what latency is "live enough," and the responder's architecture (a held session vs. per-message spawn)?
 - **Shelf:** where the descriptor lives and who keeps it current as the capability evolves.
+- **Sync (freshness):** the mechanism to kill the lag — push-emit vs. shortened poll; and does removing "needs an API restart on deploy" require a different serving/reload model on the droplet?
+- **Sync (linkage):** when a card is delegated, what does its spawned work register as — a mission, a tracked `task_id` stamped onto the item — and how does the closeout author learn the outcome to write it up?
 
 ---
 
@@ -139,6 +153,7 @@ From the design conversation (2026-06-13/14):
 |---|---|---|---|
 | Proof | Parked-lane meaning-layer card | ✅ shipped + validated | #499, #500, #502, dash #54 |
 | 4.1 | Schedule the Narrator (durability) | ⏭️ next | `cap-schedule-the-missions-narrator…` |
+| S | Two-way sync (close the loop) + no-stale-board | ⏭️ high priority | `chain_events` derive · GC retire-on-merge |
 | 4.2 | Spread to Orphans + missions; shelf the component | ▫️ planned | — |
 | 4b | Live chat (Beacon front desk) | ▫️ planned | — |
 | 4.3 | Proposed lane | ▫️ planned | backend: dash #53 / #481 |
