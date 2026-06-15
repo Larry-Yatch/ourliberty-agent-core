@@ -4,6 +4,105 @@
 
 ---
 
+## Iteration ~1931 — 2026-06-15 11:23Z UTC (interactive, /loop /cycle, Tier 1, signal)
+
+**Trigger:** Larry direct invocation (`/loop /cycle`).
+
+**Health:** ⚠️ Signal. heal_pipeline_stall.py --dry-run fired 3 new alerts (PRs #510/#512/#513 cooldowns expired) writing to larry-alerts.jsonl. G-rule fix APPROVAL_REQUEST (`alert-translation-unrouted-pr-001`) now in larry-alerts.jsonl — bot delivered to Larry.
+
+**VERIFY-BEFORE-REASSERT (iter ~1930 carries):**
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): `gh pr view 497` → MERGEABLE, reviewDecision="", state=OPEN. Mirror REVIEW_ESCALATE 04:05:31Z Jun-14. Age ≈ 31.4h. Under 72h (~Jun-17T04:05Z). **CARRY** [yellow].
+- PRs #509/#510/#512/#513: All OPEN, UNKNOWN. New stall alerts fired for #510/#512/#513 (cooldowns expired); #509 still cooldown-suppressed. **CARRY** [yellow].
+- unreg-approval-482eb78951ee: beacon-pending-approvals.json confirmed pending=1. **CARRY** [yellow].
+
+**Check 0 — Alert triage:** Watermark=989; file=978 lines (was 971 in iter ~1930, +7 new: 3 heal-pipeline-stall + approval_request + 3 medic-diagnosis). Watermark gap persists (989 > 978); workaround: manually read tail + triage.
+- **Lines 972–974** (`source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#513/512/510, route=escalate`, ts=11:18:16Z): Triage helper for representative PR#512 → Tier-4 (novel, no registry template, no translation match). Bot fallback delivers; G-rule fix in progress (approval_request out). No second DM from Pulse. → G-rule counter: post-dispatch recurrences noted (fix pending).
+- **Line 975** (`source=outbox-notifier, kind=approval_request, approval_id=alert-translation-unrouted-pr-001`, ts=11:19:00Z): Triage helper → **Tier-3** (known-pattern match: `kind=approval_request` from outbox-notifier silenced per PR #491). Decision=silence; journal-note only. **Significance:** This is the Forge build plan for the G-rule fix dispatched in iter ~1930. Bot already DM'd Larry. Reply "approve" to trigger Forge build.
+- **Lines 976–978** (`source=medic, kind=notification, intent=medic-diagnosis`, PRs #513/#512/#510, ts=11:19:23–38Z): Tier-4, chat_id present (DM already delivered directly). No second DM from Pulse.
+- Tier-reset: yes (Tier-4 findings).
+
+**Check 1 — Log noise:** outbox-notifier.log last WARN: `2026-06-15 01:10:53` auto-dispatch APPROVAL_REQUEST task-id mismatch (pre-existing G-rule 1/3). No new WARNs. Note: outbox-notifier log path is `/home/larry/agents/logs/outbox-notifier.log` (hyphen); prior iters used underscore and got file-not-found. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot log last delivery: idx=970 (medic-diagnosis at 11:13:40Z Jun-15) at time of read. Post-dry-run new deliveries expected (idx=971+) for pipeline stall alerts. No new Larry directives in the portion read. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` at 11:18Z → 3 new alerts fired (PRs #513/#512/#510 cooldowns expired), 1 suppressed (#509 still cooling), 0 recovered. Note: `--dry-run` DOES write to larry-alerts.jsonl when cooldowns expire (+7 lines to file, including medic-diagnosis). ⚠️ Signal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: pending=1 (`unreg-approval-482eb78951ee`, PR#509+#510 merge decision). No change. [yellow] carry. **Note:** `alert-translation-unrouted-pr-001` APPROVAL_REQUEST is in larry-alerts.jsonl (bot-delivered path, not beacon-pending-approvals.json path).
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T11:14:19Z`, age≈9 min. FRESH (< 60 min). ✅ Nominal.
+
+**Check A — Source repo:** On main, clean. HEAD=0d8e8c5a == origin/main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-15T10:24:19Z (~59 min ago), status=no-change. FRESH (< 2h). ✅ Nominal.
+
+**Check C — Agent liveness:**
+- inbox_watcher: PID 2530123 ✅ (Ssl)
+- chain_event_shipper: PID 2744551 ✅ (SNs)
+- beacon_telegram_bot: PID 2744840 ✅ (Ss)
+- outbox_notifier: PID 2744914 ✅ (Ss)
+- dashboard_api: PID 2868353 ✅ (Ssl)
+- No forge/mirror persistent sessions — expected. ✅
+
+**Check E — PRs:**
+ourliberty-agent-core (5 open):
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`), **MERGEABLE** (re-verified `gh pr view 497`), reviewDecision="". Mirror REVIEW_ESCALATE 04:05:31Z Jun-14. Age ≈ 31.4h. Under 72h. [yellow] carry.
+- **PR #509** (`docs/meaning-layer-roadmap`), UNKNOWN. Cooldown still active. [yellow] carry.
+- **PR #510** (`work/build-consult-restock`), UNKNOWN. Cooldown just re-armed (attempt 12; 13h+ old). [yellow] carry.
+- **PR #512** (`feat/new-mission-pulse-check-ix-catch-me-up-gap-2026-06-15`), UNKNOWN. Cooldown re-armed (attempt 4). [yellow] carry.
+- **PR #513** (`feat/new-mission-pulse-check-ix-alert-ignored-2026-06-15`), UNKNOWN. Cooldown re-armed (attempt 4). [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Conditional checks:** Today is Monday. Check I: sentinel `check-i-2026-06-15.json` exists (fired iter ~1899) — skip re-run. Check III: not Sunday — skip. ✅
+
+**Actions taken:**
+1. `cycle_prime_ledger.py append --tier 1 --kind intervention` — heal-pipeline-stall-unrouted-pr-recur (3 new alerts PRs #510/#512/#513) ✅
+2. `cycle_tier_state.py record --checks-clean false` → **Tier 1, consecutive_clean=0** (signal observed) ✅
+
+**Dispatches:** None.
+
+**Patterns:**
+- G-rule **heal-pipeline-stall:unrouted-pr** (DISPATCHED iter ~1930): 3 new recurrences this iter (#510/#512/#513). Fix in progress (approval_request `alert-translation-unrouted-pr-001` delivered to Larry). Awaiting Larry approve → Forge build.
+- G-rule **auto-dispatch-APPROVAL_REQUEST-task-id-mismatch-warn-vs-info**: 0 new. **1/3**. Carry.
+- G-rule **catalog-accuracy-drift-tier4**: 0 new. **1/3**. Carry.
+- G-rule **Forge-preflight-marker-error-retry**: 0 new. **2/3**. Carry.
+- G-rule **ledger/check-i Tier-4**: 0 new. **1/3**. Carry.
+- G-rule **missions-autoregister-warn-vs-info**: 0 new. **2/3**. Carry.
+- G-rule **missions-card-gc-warn-vs-info**: 0 new. **2/3**. Carry.
+- G-rule **F24-empty-prompt-envelope-rejected**: 0 new. **2/3**. Carry.
+- G-rule **health-notify-script-missing**: 0 new. **1/3**. Carry. (Note: outbox-notifier.log path uses hyphen, not underscore; Check 1 path corrected this iter.)
+- G-rule **timer-cycle-no-journal-entry**: 0 new. **0/3**. Carry.
+- G-rule **stuck-cycle-timer**: 0 new. **0/3**. Carry.
+- G-rule **Forge-timeout-worktree-missing-retry-loop**: 0 new. **1/3**. Carry.
+- G-rule **heal-stale-daemon-script_path-cosmetic**: 0 new. **1/3**. Carry.
+- G-rule **Forge-preflight-marker-error-retry**: 0 new. **2/3**. Carry.
+
+**Standing findings:**
+- [yellow] **PR #497 REVIEW_ESCALATE** — MERGEABLE (re-verified 11:23Z via `gh pr view`); reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ≈ 31.4h; 72h expires ~Jun-17T04:05Z. [carry]
+- [yellow] **PRs #509/510/512/513 pipeline-stall** — all cooldowns re-armed. #510 at attempt 12 (13h+ old). Options: `dispatch mirror review pr=<N>` OR merge/close. [carry; awaiting Larry]
+- [yellow] **unreg-approval-482eb78951ee** — pending=1 (PR#509+#510 merge decision). [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **unreviewed-merge:511/499/494/489** — [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **alert-translation-unrouted-pr-001 APPROVAL_REQUEST** — Forge build plan for G-rule heal-pipeline-stall Tier-3 translation. Bot DM sent to Larry at 11:19Z. Reply "approve" to trigger Forge build and stop pipeline-stall Tier-4 churn.
+- [blue] **catalog-accuracy-drift** — 9/34 ourliberty-graph shelf cards drifted. route=digest; journal-note only. G-rule **1/3**. [carry]
+- [blue] **Check I 2026-06-15** — 1 proposal dispatched to Beacon iter ~1899. [carry]
+- [blue] **Check IX missions** — PRs #512 + #513 open. [carry]
+- [blue] **g-rule-healer-unrouted-pr-tier3-translation-001** — fix plan ready (`alert-translation-unrouted-pr-001`); awaiting Larry approval.
+- [blue] G-rule counters: catalog-accuracy-drift-tier4 1/3, Forge-preflight-marker-error-retry 2/3, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, missions-autoregister-warn-vs-info 2/3, missions-card-gc-warn-vs-info 2/3, F24-empty-prompt-envelope-rejected 2/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, heal-stale-daemon-script_path-cosmetic 1/3.
+- [blue] **Check I medic-operator-scaffold-001** — 24.4σ; prior dispatch 2026-06-10. [carry]
+- [blue] **dag-preflight-revision gap** — PR #484 closed source=pulse gap; DAG markers still fall through. [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+- [blue] **Stale bash orphans** — PIDs 1834248 (17d+, Ss) + 2605007 (1d+, Ss). Low CPU. Not re-verified. [carry]
+- [blue] **dashboard_api PID 2868353** — Ssl, stable. [carry]
+- [blue] **Watermark gap** — watermark=989 above file length (978 lines); manual wc -l + tail triage each iter as workaround. Carry.
+
+**PRIME DIRECTIVE:** 1 intervention this iter. ratio≈20.49 (962/47), trend=improving.
+**Tier end-of-iter:** **Tier 1, consecutive_clean=0** (signal observed).
+
+---
+
 ## Iteration ~1930 — 2026-06-15 11:14Z UTC (interactive, /loop /cycle, Tier 2→1, signal)
 
 **Trigger:** Larry direct invocation (`/loop /cycle`).

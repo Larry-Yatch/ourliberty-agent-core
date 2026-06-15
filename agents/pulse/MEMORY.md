@@ -120,9 +120,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 11:14Z UTC (Iter ~1930, Tier 1)
+## Status snapshot — updated 2026-06-15 11:23Z UTC (Iter ~1931, Tier 1)
 
-**Iter ~1930 summary:** ⚠️ Signal. **Tier 2→1** (signal: PR#509 pipeline-stall cooldown expired at 11:06Z; 2 new alerts triaged Tier-4). 1 intervention + 1 systemic_fix. ratio≈20.89 pre-iter (961/46). All agent PIDs healthy. Watermark=989 (file=971 lines); watermark gap persists (manually triaged new lines). Sync last=10:24Z (~50min, FRESH). Bot last delivery idx=969 (PR#509 pipeline-stall, 11:08Z). **G-rule heal-pipeline-stall:unrouted-pr dispatched (3/3)** → `g-rule-healer-unrouted-pr-tier3-translation-001` in Beacon inbox. 5 open PRs: #497 (MERGEABLE re-verified 11:14Z; REVIEW_ESCALATE ~33h, expires Jun-17T04:05Z), #509/#510/#512/#513 (stall/cooldowns).
+**Iter ~1931 summary:** ⚠️ Signal. Tier 1, consecutive_clean=0. heal_pipeline_stall --dry-run fired 3 new alerts (PRs #510/#512/#513 cooldowns expired); G-rule fix APPROVAL_REQUEST `alert-translation-unrouted-pr-001` in larry-alerts.jsonl (11:19Z) — bot DM delivered to Larry. **Approve to trigger Forge build and stop pipeline-stall Tier-4 churn.** 1 intervention. ratio≈20.49 (962/47). All 5 PIDs healthy. Watermark=989 (file=978 lines); gap persists. Sync last=10:24Z (FRESH). 5 open PRs: #497 (MERGEABLE; REVIEW_ESCALATE ~31.4h, expires Jun-17T04:05Z), #509/#510/#512/#513 (stall/cooldowns).
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl. When cooldown expires, the alert fires in dry-run mode. Be aware: calling --dry-run in a cycle will write real alerts if the cooldown has passed. Always check wc -l of the file before and after.
 
@@ -156,7 +156,7 @@
 | Check I 2026-06-15 | [blue] 1 proposal dispatched iter ~1899, Beacon processed | Beacon spec in progress |
 | Check IX missions | [blue] PR #512 (catch-me-up-gap) + PR #513 (alert-ignored) open, no review yet | Larry review on kanban |
 | G-rule catalog-accuracy-drift-tier4 | [blue] **1/3** (new iter ~1926) | Watch; dispatch to Beacon at 3/3 for Tier-3 translation |
-| G-rule heal-pipeline-stall:unrouted-pr Tier-4 repeat | [blue] **DISPATCHED** iter ~1930 | Watch for Beacon spec + Forge PR |
+| G-rule heal-pipeline-stall:unrouted-pr Tier-4 repeat | [yellow] **APPROVAL_REQUEST** `alert-translation-unrouted-pr-001` delivered to Larry 11:19Z Jun-15 | Reply "approve" to trigger Forge build (config-only PR adding Tier-3 translation) |
 | G-rule ledger/check-i Tier-4 | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule health-notify-script-missing | [blue] **1/3** | Watch; dispatch at 3/3 |
 | catalog-accuracy-drift | [blue] 9/34 ourliberty-graph shelf cards drifted (↑ from 8/34) | route=digest; journal-note only |
