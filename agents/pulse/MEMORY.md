@@ -120,9 +120,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 10:29Z UTC (Iter ~1926, Tier 1)
+## Status snapshot — updated 2026-06-15 10:42Z UTC (Iter ~1928, Tier 1)
 
-**Iter ~1926 summary:** ⚠️ Drift. **Tier 1, consecutive_clean=0**. 2 new alerts (line 968: catalog-accuracy-drift Tier-4 9/34, bot delivered as digest; line 969: missions-autoregister Tier-3 suppressed). 1 intervention. ratio≈20.87 (960/46). All agent PIDs healthy. Watermark=989 (file=969 lines); watermark gap persists. Sync fresh (last_sync=10:24:19Z). No new Larry directives. 5 open PRs: #497 (MERGEABLE, REVIEW_ESCALATE ~30.5h, expires Jun-17T04:05Z), #509/#510/#512/#513 (stall/cooldowns). New G-rule: catalog-accuracy-drift-tier4 1/3.
+**Iter ~1928 summary:** ✅ Nominal. **Tier 1, consecutive_clean=2**. No new alerts (file=969 lines, unchanged). 0 interventions. ratio≈20.89 (961/46), trend=improving. All agent PIDs healthy. Watermark=989 (file=969 lines); watermark gap persists. Sync fresh (last_sync=10:24Z). No new Larry directives. 5 open PRs: #497 (MERGEABLE via gh pr view — list shows UNKNOWN, known cache artifact; REVIEW_ESCALATE ~31h, expires Jun-17T04:05Z), #509/#510/#512/#513 (stall/cooldowns). Consecutive_clean=2; promote to Tier 2 at next clean iter.
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl. When cooldown expires, the alert fires in dry-run mode. Be aware: calling --dry-run in a cycle will write real alerts if the cooldown has passed. Always check wc -l of the file before and after.
 
@@ -132,7 +132,7 @@
 
 ---
 
-## Key standing items (as of iter ~1926)
+## Key standing items (as of iter ~1928)
 
 | Item | Status | Action needed |
 |---|---|---|
