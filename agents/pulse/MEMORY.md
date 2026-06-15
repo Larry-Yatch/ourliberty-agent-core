@@ -90,9 +90,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 05:38Z UTC (Iter ~1891, Tier 2)
+## Status snapshot — updated 2026-06-15 05:58Z UTC (Iter ~1892, Tier 1)
 
-**Iter ~1891 summary:** ✅ Nominal. Tier 2, consecutive_clean=1 (need 2 more clean iters for Tier 3). 0 interventions (iter_clean). ratio≈20.43, trend=improving. Watermark=960. All daemons alive. 0 new alerts. PRs #497/#509/#510 carry. Forge/Beacon inboxes empty. G-rule stall-detector Forge build pending Larry's dashboard approval (Beacon spec confirmed complete).
+**Iter ~1892 summary:** ⚠️ Non-clean. Tier-reset 2→1. 2 Tier-4 alerts (lines 961-962): PR #509 pipeline stall (heal attempt 7) + medic-diagnosis; medic already DM'd Larry (chat_id=7998341473). PR #510 cooldown expiring in dry-run — expect new healer alert soon. 1 intervention recorded. ratio≈20.46. Watermark=962. All daemons alive. PRs #497/#509/#510 carry [yellow]. Forge/Beacon inboxes empty. G-rule stall-detector Forge build pending Larry's dashboard approval (Beacon spec confirmed complete).
 
 ---
 
