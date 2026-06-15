@@ -363,7 +363,9 @@
   "known_storage_locations": {
     "env_file:/home/larry/credentials/.env.larry": {
       "description": "Primary environment file for systemd unit EnvironmentFile= references",
-      "scanner_strategy": "parse KEY=value lines; ignore comments and blank lines; non-empty value = present"
+      "scanner_strategy": "parse KEY=value lines; ignore comments and blank lines; non-empty value = present",
+      "ignored_keys": ["OURLIBERTY_NEWMISSION_INGEST_ENABLED"],
+      "_ignored_keys_doc": "Allowlist of non-credential env keys (feature flags / tunables) the drift scan must skip — present in the env file but NOT credentials, so they should be neither reported as MISSING_REGISTRY_ENTRY nor expected as a registered credential. OURLIBERTY_NEWMISSION_INGEST_ENABLED gates the new-mission ingest feature (scripts/heal_orphan_autoregister.py)."
     },
     "gh_cli:/home/larry/.config/gh/hosts.yml": {
       "description": "gh CLI keychain set by `gh auth login`",

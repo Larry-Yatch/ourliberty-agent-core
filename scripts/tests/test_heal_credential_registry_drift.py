@@ -251,6 +251,69 @@ class DetectDriftTest(_IsolatedAgentsRoot):
         kinds = [(name, kind) for name, kind, _ in drifts]
         self.assertIn(('GHOST_TOKEN', 'MISSING_CREDENTIAL'), kinds)
 
+    def test_ignored_key_produces_no_drift(self):
+        # A non-credential key (feature flag) listed in the env_file location's
+        # ignored_keys allowlist must NOT be reported as MISSING_REGISTRY_ENTRY.
+        reg = _registry([_cred('FOO_TOKEN')])
+        env_loc = 'env_file:/home/larry/credentials/.env.larry'
+        reg['known_storage_locations'][env_loc]['ignored_keys'] = [
+            'OURLIBERTY_NEWMISSION_INGEST_ENABLED',
+        ]
+        scans = {
+            env_loc: {'FOO_TOKEN', 'OURLIBERTY_NEWMISSION_INGEST_ENABLED'},
+            'gh_cli:/home/larry/.config/gh/hosts.yml': set(),
+            'claude_cli:/home/larry/.claude/.credentials.json': set(),
+            'workspace_mcp:/home/larry/.google_workspace_mcp/credentials/': set(),
+        }
+        drifts, _ = h.detect_drift(reg, scan_overrides=scans)
+        names = [name for name, _, _ in drifts]
+        self.assertNotIn('OURLIBERTY_NEWMISSION_INGEST_ENABLED', names)
+        self.assertEqual(drifts, [])
+
+    def test_non_ignored_unregistered_key_still_drifts(self):
+        # Regression guard: an ignore-list present must NOT suppress a genuinely
+        # unregistered NON-ignored key — it still drifts as MISSING_REGISTRY_ENTRY.
+        reg = _registry([_cred('FOO_TOKEN')])
+        env_loc = 'env_file:/home/larry/credentials/.env.larry'
+        reg['known_storage_locations'][env_loc]['ignored_keys'] = [
+            'OURLIBERTY_NEWMISSION_INGEST_ENABLED',
+        ]
+        scans = {
+            env_loc: {
+                'FOO_TOKEN',
+                'OURLIBERTY_NEWMISSION_INGEST_ENABLED',
+                'BAR_TOKEN',
+            },
+            'gh_cli:/home/larry/.config/gh/hosts.yml': set(),
+            'claude_cli:/home/larry/.claude/.credentials.json': set(),
+            'workspace_mcp:/home/larry/.google_workspace_mcp/credentials/': set(),
+        }
+        drifts, _ = h.detect_drift(reg, scan_overrides=scans)
+        kinds = [(name, kind) for name, kind, _ in drifts]
+        self.assertIn(('BAR_TOKEN', 'MISSING_REGISTRY_ENTRY'), kinds)
+        self.assertNotIn(
+            ('OURLIBERTY_NEWMISSION_INGEST_ENABLED', 'MISSING_REGISTRY_ENTRY'),
+            kinds,
+        )
+
+    def test_ignored_keys_absent_is_backward_compatible(self):
+        # No ignored_keys configured → behaves exactly as before (key drifts).
+        reg = _registry([_cred('FOO_TOKEN')])
+        scans = {
+            'env_file:/home/larry/credentials/.env.larry': {
+                'FOO_TOKEN', 'OURLIBERTY_NEWMISSION_INGEST_ENABLED',
+            },
+            'gh_cli:/home/larry/.config/gh/hosts.yml': set(),
+            'claude_cli:/home/larry/.claude/.credentials.json': set(),
+            'workspace_mcp:/home/larry/.google_workspace_mcp/credentials/': set(),
+        }
+        drifts, _ = h.detect_drift(reg, scan_overrides=scans)
+        kinds = [(name, kind) for name, kind, _ in drifts]
+        self.assertIn(
+            ('OURLIBERTY_NEWMISSION_INGEST_ENABLED', 'MISSING_REGISTRY_ENTRY'),
+            kinds,
+        )
+
     def test_workspace_mcp_directory_prefix_matches_entry(self):
         reg = _registry([_cred(
             'GOOGLE_OAUTH_REFRESH_TOKEN',

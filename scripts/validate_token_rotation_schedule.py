@@ -226,6 +226,36 @@ def _validate_entry(
     return reasons
 
 
+def _validate_known_locations(known_locations: dict[str, Any]) -> list[str]:
+    """Validate the optional `ignored_keys` allowlist on storage locations.
+
+    `ignored_keys` is an optional array of non-empty strings — non-credential
+    env keys (feature flags / tunables) the drift scan skips. It is only
+    meaningful on env_file-type locations (the env_file scanner returns real
+    key names; the other scanners return synthetic credential names), so it is
+    rejected elsewhere. Returns a list of reasons (empty = valid)."""
+    reasons: list[str] = []
+    for loc, meta in known_locations.items():
+        if not isinstance(meta, dict):
+            continue
+        if 'ignored_keys' not in meta:
+            continue
+        ignored = meta['ignored_keys']
+        if not isinstance(loc, str) or not loc.startswith('env_file:'):
+            reasons.append(
+                f"known_storage_locations[{loc!r}]: ignored_keys is only "
+                f"allowed on env_file: locations"
+            )
+        if not isinstance(ignored, list) or not all(
+            isinstance(k, str) and k for k in ignored
+        ):
+            reasons.append(
+                f"known_storage_locations[{loc!r}]: ignored_keys must be a "
+                f"list of non-empty strings, got {ignored!r}"
+            )
+    return reasons
+
+
 def validate_registry(
     source: Union[str, Path, dict[str, Any]],
     repo_root: Optional[Path] = None,
@@ -282,6 +312,8 @@ def validate_registry(
             f'got {type(known_locations).__name__}'
         )
         known_locations = {}
+    else:
+        reasons.extend(_validate_known_locations(known_locations))
 
     repo_root = repo_root or _repo_root()
     seen_names: set[str] = set()
