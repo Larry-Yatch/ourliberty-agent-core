@@ -620,6 +620,112 @@ class RunOnceTest(unittest.TestCase):
             import shutil
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_concurrent_ingest_during_sweep_survives_write(self):
+        # § 2 lost-update guard: a capture the dashboard ingests DURING the slow
+        # Narrator sweep must survive the healer's write. The healer re-reads
+        # captures.json fresh just before writing and applies only its own
+        # per-capture deltas, so the concurrently-ingested capture is preserved.
+        now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+        tmp = tempfile.mkdtemp(prefix='run-once-lost-update-ingest-')
+        try:
+            core = Path(tmp) / 'agent-core'
+            (core / 'agents' / 'beacon').mkdir(parents=True)
+            cap_file = core / h.CAPTURES_REL
+            cap_file.write_text(json.dumps({
+                'schema_version': 1,
+                'captures': [{'id': 'cap-a', 'state': 'parked',
+                              'last_touched': now.isoformat()}],
+            }) + '\n')
+
+            def fake_author(registry, *, now=None, use_llm=True, **_):
+                # Simulate a SEPARATE process (dashboard API) ingesting a new
+                # capture onto disk mid-sweep, then brief cap-a in memory.
+                disk = json.loads(cap_file.read_text())
+                disk['captures'].append({'id': 'cap-b', 'state': 'parked',
+                                         'last_touched': now.isoformat()})
+                cap_file.write_text(json.dumps(disk) + '\n')
+                n = 0
+                for c in registry.get('captures', []):
+                    if c.get('id') == 'cap-a':
+                        c['briefing'] = {'what': 'w', 'why': 'y', 'suggest': 's'}
+                        n += 1
+                return (n, 0)
+
+            import larry_alerts
+            with mock.patch.object(h, 'load_repo_paths',
+                                   return_value={'ourliberty-agent-core': core}), \
+                    mock.patch.object(larry_alerts, 'append_alert'):
+                rc = h.run_once(
+                    dry_run=False,
+                    emit_fn=lambda **_: True,
+                    events_fetcher=lambda: [],
+                    author_fn=fake_author,
+                    now=now,
+                )
+            self.assertEqual(rc, 0)
+            reg = json.loads(cap_file.read_text())
+            by_id = {c['id']: c for c in reg['captures']}
+            # the concurrently-ingested capture survived the healer's write
+            self.assertEqual(set(by_id), {'cap-a', 'cap-b'})
+            # our briefing delta still landed on cap-a
+            self.assertEqual(by_id['cap-a']['briefing'],
+                             {'what': 'w', 'why': 'y', 'suggest': 's'})
+            # the untouched concurrent capture was not mutated by the healer
+            self.assertNotIn('briefing', by_id['cap-b'])
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_concurrent_state_change_on_briefed_capture_survives(self):
+        # § 2 lost-update guard, second failure mode: if the dashboard snoozes a
+        # capture WHILE it is being briefed, the field-level merge applies only the
+        # briefing fields — the dashboard's state change is NOT clobbered.
+        now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+        tmp = tempfile.mkdtemp(prefix='run-once-lost-update-state-')
+        try:
+            core = Path(tmp) / 'agent-core'
+            (core / 'agents' / 'beacon').mkdir(parents=True)
+            cap_file = core / h.CAPTURES_REL
+            cap_file.write_text(json.dumps({
+                'schema_version': 1,
+                'captures': [{'id': 'cap-a', 'state': 'parked',
+                              'last_touched': now.isoformat()}],
+            }) + '\n')
+
+            def fake_author(registry, *, now=None, use_llm=True, **_):
+                # dashboard flips cap-a parked→snoozed on disk mid-sweep
+                disk = json.loads(cap_file.read_text())
+                disk['captures'][0]['state'] = 'snoozed'
+                disk['captures'][0]['snooze_until'] = '2026-07-01T00:00:00+00:00'
+                cap_file.write_text(json.dumps(disk) + '\n')
+                for c in registry.get('captures', []):
+                    if c.get('id') == 'cap-a':
+                        c['briefing'] = {'what': 'w', 'why': 'y', 'suggest': 's'}
+                return (1, 0)
+
+            import larry_alerts
+            with mock.patch.object(h, 'load_repo_paths',
+                                   return_value={'ourliberty-agent-core': core}), \
+                    mock.patch.object(larry_alerts, 'append_alert'):
+                rc = h.run_once(
+                    dry_run=False,
+                    emit_fn=lambda **_: True,
+                    events_fetcher=lambda: [],
+                    author_fn=fake_author,
+                    now=now,
+                )
+            self.assertEqual(rc, 0)
+            cap = json.loads(cap_file.read_text())['captures'][0]
+            # the dashboard's concurrent state change survived (not clobbered)
+            self.assertEqual(cap['state'], 'snoozed')
+            self.assertEqual(cap['snooze_until'], '2026-07-01T00:00:00+00:00')
+            # and our briefing field was still merged on
+            self.assertEqual(cap['briefing'],
+                             {'what': 'w', 'why': 'y', 'suggest': 's'})
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
     def test_dry_run_narrator_uses_no_llm_and_writes_nothing(self):
         now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
         tmp = tempfile.mkdtemp(prefix='run-once-narrate-dry-')

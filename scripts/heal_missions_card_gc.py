@@ -575,6 +575,52 @@ def atomic_write_captures(path: Path, registry: dict[str, Any]) -> None:
     _atomic_write_json(path, registry)
 
 
+def _merge_capture_deltas(fresh: dict[str, Any],
+                          before_by_id: dict[str, dict[str, Any]],
+                          worked: dict[str, Any]) -> int:
+    """Apply only the per-capture field changes THIS tick made (``worked`` vs the
+    read-time snapshot ``before_by_id``) onto a freshly re-read ``fresh`` registry,
+    matching by capture id. Returns the count of captures whose delta was applied.
+
+    Why field-level, not whole-registry replace: the Narrator sweep can span
+    minutes of LLM round-trips, during which the dashboard (a separate process)
+    may ingest new captures or change a capture's state. Replacing the whole file
+    with the stale in-memory copy would silently lose those writes (§ 2 lost-update
+    class). By touching ONLY the keys we changed — never ``state``/``snooze_until``/
+    ``last_touched``, never a capture we didn't author, and never a capture missing
+    from the fresh file — concurrent dashboard writes survive. A capture the
+    dashboard moved out of ``parked`` mid-briefing keeps its new state and merely
+    carries a now-stale briefing that ``needs_briefing`` regenerates next tick."""
+    fresh_by_id = {
+        c['id']: c for c in fresh.get('captures', [])
+        if isinstance(c, dict) and c.get('id')
+    }
+    applied = 0
+    for cap in worked.get('captures', []):
+        if not isinstance(cap, dict):
+            continue
+        cid = cap.get('id')
+        if not cid:
+            continue
+        before = before_by_id.get(cid)
+        if before is None:
+            continue  # not present at read time — we never authored onto it
+        set_fields = {k: v for k, v in cap.items()
+                      if k not in before or before[k] != v}
+        removed = [k for k in before if k not in cap]
+        if not set_fields and not removed:
+            continue  # untouched this tick — leave the fresh copy alone
+        target = fresh_by_id.get(cid)
+        if target is None:
+            continue  # gone from the fresh file — drop our stale delta, don't re-add
+        for k, v in set_fields.items():
+            target[k] = v
+        for k in removed:
+            target.pop(k, None)
+        applied += 1
+    return applied
+
+
 # ---------- missions phase reconciliation (terminal-state spec § 3.3) -------
 
 
@@ -900,6 +946,15 @@ def run_once(*, dry_run: bool,
     else:
         registry = read_captures_registry(cap_path)
         if registry is not None:
+            # Snapshot the read-time state (shallow per capture is enough — aging
+            # and the sweep replace top-level keys, never mutate nested objects in
+            # place) so the pre-write merge can apply ONLY the fields this tick
+            # changed onto a fresh re-read (§ 2 lost-update guard).
+            before_by_id = {
+                c['id']: dict(c)
+                for c in registry.get('captures', [])
+                if isinstance(c, dict) and c.get('id')
+            }
             try:
                 aged = age_parked_captures(registry, now)
             except Exception as e:  # noqa: BLE001 — fail-safe
@@ -916,8 +971,26 @@ def run_once(*, dry_run: bool,
                 log(f'narrator sweep raised: {type(e).__name__}: {e}')
                 briefed, deferred = 0, 0
             if (aged or briefed) and not dry_run:
+                # The Narrator sweep can hold the registry for minutes (one claude
+                # spawn per pending capture, up to NARRATOR_MAX_PER_TICK ×
+                # CLAUDE_TIMEOUT_SEC). Writing the stale in-memory copy would clobber
+                # any capture the dashboard (a SEPARATE process) ingested or
+                # state-changed during that window — the #409→#413 lost-update class
+                # spec § 2 exists to prevent. Re-read the file FRESH and apply only
+                # this tick's per-capture field deltas by id, so the read→write
+                # window is sub-millisecond instead of the length of the LLM
+                # round-trips. Single git-committer invariant is unchanged: this is
+                # still the sole atomic write + the sole commit below.
                 try:
-                    atomic_write_captures(cap_path, registry)
+                    fresh = read_captures_registry(cap_path)
+                    if fresh is None:
+                        log('captures.json re-read malformed before write — '
+                            'skipping write this tick (avoids clobbering with stale)')
+                    else:
+                        merged = _merge_capture_deltas(fresh, before_by_id, registry)
+                        atomic_write_captures(cap_path, fresh)
+                        log(f'captures.json write: merged {merged} capture delta(s) '
+                            'onto a fresh re-read (lost-update guard)')
                 except Exception as e:  # noqa: BLE001 — fail-safe
                     log(f'captures.json write raised: {type(e).__name__}: {e}')
             if not dry_run:
