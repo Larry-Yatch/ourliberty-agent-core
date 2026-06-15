@@ -126,7 +126,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 19:40Z UTC (Iter ~1977, Tier 1, consecutive_clean=1)
+## Status snapshot — updated 2026-06-15 19:45Z UTC (Iter ~1978, Tier 1, consecutive_clean=2)
+
+**Iter ~1978 summary:** ✅ Nominal. 1 new alert (L1041 dispatch-branch-cleanup/summary) Tier-3 silenced. pending=1 forge-preflight-marker-selfcheck-001 (unchanged, awaiting Larry "go"). PR #520 Mirror review in progress (~18 min). PR #522 Mirror PASS, held behind #520. Watermark: 1040→1041. 3 open PRs: #497 (72h deadline Jun-17T04:02Z ~32.3h), #520 (Mirror review), #522 (held). PRIME ratio≈19.98. Tier 1, consecutive_clean=2.
 
 **Iter ~1977 summary:** ✅ Nominal. 2 new alerts, both Tier-3 silenced (L1039 review-pass PR #522, L1040 approval_request forge-preflight-marker-selfcheck-001). PR #521 CLOSED by heal_orphan_autoregister ✅. PR #522 Mirror PASS (19:35Z), auto-merge held behind PR #520 (file overlap). pending=1: forge-preflight-marker-selfcheck-001 (Beacon-DM'd Larry 13:35 MDT, awaiting "go"). G-rule Forge-preflight-marker-error-retry: DISPATCHED → Beacon spec → pending approval. Watermark: 1038→1040. 3 open PRs: #497 (MERGEABLE, 72h deadline Jun-17T04:02Z ~32.4h), #520 (Mirror review in progress), #522 (Mirror PASS, held). PRIME ratio≈19.98. Tier 1, consecutive_clean=1.
 
