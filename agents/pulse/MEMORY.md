@@ -126,7 +126,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 20:10Z UTC (Iter ~1980, Tier 1, consecutive_clean=0 — RESET, PR #520+#524 merged, PR #522 CONFLICTING)
+## Status snapshot — updated 2026-06-15 20:18Z UTC (Iter ~1981, Tier 1, consecutive_clean=0, PR #525 NEW Mirror reviewing, PR #522 CONFLICTING)
+
+**Iter ~1981 summary:** ⚠️ Signal. L1044 Tier-4 (heal-pipeline-stall:mirror-pass-unmerged:PR#522 — novel, no registry template; medic DM'd Larry at chat_id; no Pulse DM). L1045 Tier-3 silenced (medic-diagnosis). PR #525 NEW (`forge/p41-rebrief-on-change`, feat(missions): re-brief narrator cards on mission state change) — Mirror review dispatched 20:13Z. Watermark: 1043→1045. 3 open PRs: #525 (Mirror reviewing), #522 (CONFLICTING, needs Forge rebase), #497 (72h deadline Jun-17T04:02Z ~32h). PRIME ratio=20.0. **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4: 1/3 (new)**. Tier 1, consecutive_clean=0.
 
 **Iter ~1980 summary:** ⚠️ Tier-reset. Check A: repo behind 1 commit (PR #520 merge `cd9c44ca`); fast-forward executed. Check 0: L1042 Tier-3 silenced (review-pass PR #524 auto-merged → G-rule Forge-preflight-marker-error-retry COMPLETE ✅). L1043 Tier-4 novel (merge_conflict_manual_rebase PR #522; outbox-notifier DM'd Larry via chat_id; no second DM). PR #520 MERGED ✅ 20:03:42Z. PR #524 MERGED ✅. PR #522 CONFLICTING (needs Forge rebase). Watermark: 1041→1043. 2 open PRs: #522 (CONFLICTING), #497 (72h deadline Jun-17T04:02Z ~31h). PRIME ratio=20.0. **Tier 2 → Tier 1 RESET**. G-rule merge_conflict_manual_rebase-tier4: **1/3**.
 
@@ -168,10 +170,17 @@
 
 ---
 
-## Key standing items (as of iter ~1980)
+## heal-pipeline-stall-mirror-pass-unmerged-tier4 G-rule (observed iter ~1981)
+
+**Rule:** When `heal-pipeline-stall` fires `pipeline-stall:mirror-pass-unmerged:PR#N` into larry-alerts.jsonl, the triage helper returns Tier-4 (novel, no registry template). The medic module almost always diagnoses the same event and DMs Larry directly via chat_id. Do NOT send a second Pulse DM — journal-note only. G-rule count: **1/3** — dispatch to Beacon at 3/3 for Tier-3 translation in `config/alert-translations.json`.
+
+---
+
+## Key standing items (as of iter ~1981)
 
 | Item | Status | Action needed |
 |---|---|---|
+| PR #525 Mirror review in progress | [blue] feat(missions): re-brief narrator cards on mission state change. Mirror review dispatched 20:13Z Jun-15. | Watch for REVIEW_PASS + auto-merge. |
 | PR #522 CONFLICTING | [yellow] Mirror PASS; auto-merge BLOCKED by conflict with PR #520 (scripts/heal_missions_card_gc.py). G-rule missions-card-gc-warn-vs-info blocked. | Forge rebase PR #522 on origin/main. Larry has DM with rebase commands. |
 | PR #497 REVIEW_ESCALATE | [yellow] mergeable=UNKNOWN; Mirror REVIEW_ESCALATE Jun-14T04:05Z; age≈41h; 72h expires Jun-17T04:02Z (~31h remaining). | Escalate if still open at Jun-17T04:02Z |
 | unreviewed-merge:511/499/494/489/510/509/518/519 | [yellow] PRs merged by Larry without Mirror; bot-delivered for others. Larry's judgment call. | Reply appropriate shortcut or silence |
@@ -187,6 +196,7 @@
 | G-rule medic-diagnosis-tier4 | [blue] **COMPLETE ✅** PR #515 merged Jun-15T17:27:41Z. | Done. |
 | G-rule healer-unrouted-pr-tier3-translation | [blue] **COMPLETE ✅** PR #516 merged Jun-15T17:27:36Z. | Done. |
 | G-rule merge_conflict_manual_rebase-tier4 | [blue] **1/3** — outbox-notifier DMs Larry directly via chat_id; Pulse should NOT double-DM. | Watch; dispatch to Beacon at 3/3 for Tier-3 translation |
+| G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4 | [blue] **1/3** — heal-pipeline-stall fires Tier-4; medic DMs directly; Pulse no-DM. | Watch; dispatch to Beacon at 3/3 for Tier-3 translation |
 | Check I 2026-06-15 | [blue] 1 proposal dispatched iter ~1899, Beacon processed | Beacon spec in progress |
 | G-rule catalog-accuracy-drift-tier4 | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule ledger/check-i Tier-4 | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 |

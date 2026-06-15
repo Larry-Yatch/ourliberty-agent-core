@@ -4,6 +4,80 @@
 
 ---
 
+## Iteration ~1981 — 2026-06-15 20:18Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0, PR #525 NEW, L1044 Tier-4 no-DM, L1045 Tier-3)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Signal. Check 0: L1044 Tier-4 (heal-pipeline-stall:mirror-pass-unmerged:PR#522 — novel, helper confirms no registry template). L1045 Tier-3 silenced (medic-diagnosis). No second DM from Pulse — medic already delivered diagnosis directly to chat_id. PR #525 new (p41-rebrief-on-change, Mirror review dispatched at 20:13Z). **Tier 1, consecutive_clean=0** (Tier-4 finding).
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #522 (`forge/missions-card-gc-warn-demote-001`): Confirmed **CONFLICTING** — mergeable=UNKNOWN (GitHub lag), mergeStateStatus=UNKNOWN. Mirror PASS at 19:34:59Z still valid. AUTO_MERGE_HELD_STALE_CONFLICT (14:03:45 MDT, 20:03Z). Forge rebase needed. DM delivered to Larry via chat_id (outbox-notifier 20:03Z) + medic diagnosis (20:11Z). G-rule missions-card-gc-warn-vs-info: **NOT COMPLETE.** [yellow] carry.
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): Confirmed OPEN. mergeable=UNKNOWN. Mirror REVIEW_ESCALATE Jun-14T04:05Z. Age≈43h. 72h deadline Jun-17T04:02Z → **~32h remaining.** [yellow] carry.
+- All 5 daemons: PIDs 2530123 (Ssl), 2744551 (SNs), 2744840 (Ss), 2744914 (Ss), 2868353 (Ssl) — all alive. ✅
+- Repo HEAD: 6df0b2bb = origin/main. Clean tree, on main. ✅
+- 409 burst: no new occurrences in recent log. G-rule 2/3 unchanged. **CARRY** [yellow].
+
+**Check 0 — Alert triage:** Watermark=1043 (entering); file=1045 lines. **2 new alerts** (L1044-L1045):
+- L1044: `source=heal-pipeline-stall, severity=warning, subject=pipeline-stall:mirror-pass-unmerged:PR#522, route=escalate` — Mirror PASSED PR #522 32 min prior, PR still open, AUTO_MERGE never fired. → helper: **Tier-4** (novel, no registry template). Medic already DM'd Larry at chat_id 7998341473 (L1045, 20:11Z) with full rebase path. **No second DM from Pulse.** Journal-note + tier-reset. **G-rule `heal-pipeline-stall-mirror-pass-unmerged-tier4`: 1/3.**
+- L1045: `source=medic, kind=notification, intent=medic-diagnosis` (diagnosis of L1044 root cause: PR #522 conflict from PR #520 merge, AUTO_MERGE_HELD_STALE_CONFLICT, rebase path provided) → helper: **Tier-3** silenced ✅ (known-pattern match, PR #515). Journal-note only.
+- Watermark advanced: 1043→1045.
+
+**Check 1 — Log noise:** outbox-notifier.log: last entry 14:13:03 MDT (20:13Z), all INFO (p41-rebrief-on-change build-phase + mirror-review dispatch). Single WARN in window: AUTO_MERGE_HELD_STALE_CONFLICT at 14:03:45 MDT (already known, PR #522 conflict). No new WARNs/ERRORs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** PID 2744840 alive (Ss). Last Larry message: "Go" at 13:59:52 MDT — approved p41-rebrief-on-change build dispatch (Forge dispatched 14:05:46 MDT). No 409 errors in recent log. G-rule telegram-409-burst 2/3 unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → 0 new alerts, 1 suppressed (cooldown: mirror_pass_unmerged:missions-card-gc-warn-demote-001). Healer fresh, cooldown correct — same underlying stall already escalated. ✅ Nominal (root cause known carry).
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0**. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T19:46:43.207773+00:00`, age≈31 min at check time. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=6df0b2bb = origin/main. Clean tree, on main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-15T19:45:59Z, status=no-change, age≈32 min. FRESH (<2h). ✅ Nominal.
+
+**Check C — Agent liveness:** All 5 PIDs alive (2530123 Ssl, 2744551 SNs, 2744840 Ss, 2744914 Ss, 2868353 Ssl). ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (3 open):
+- **PR #525** (`forge/p41-rebrief-on-change`): **NEW** at 20:12:56Z. `feat(missions): re-brief narrator cards on mission state change`. Mirror review dispatched at 20:13:02Z (review-p41-rebrief-on-change.json in Mirror inbox). Pipeline flowing. [blue] watch.
+- **PR #522** (`forge/missions-card-gc-warn-demote-001`): CONFLICTING. Mirror PASS. Auto-merge blocked (conflict with scripts/heal_missions_card_gc.py from PR #520). Forge rebase needed. [yellow] carry.
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): OPEN. mergeable=UNKNOWN. Mirror REVIEW_ESCALATE Jun-14T04:05Z. Age≈43h, ~32h until 72h deadline Jun-17T04:02Z. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Conditional checks (Monday 2026-06-15):** Check I sentinel (check-i-2026-06-15.json) exists → skip. Check VIII/IX/X: sentinels exist → skip.
+
+**Actions taken:**
+1. Alert triage: L1044 Tier-4 (heal-pipeline-stall:mirror-pass-unmerged:PR#522, no DM — medic delivered), L1045 Tier-3 silenced.
+2. `alert_triage_state.py set-watermark --line 1045` → 1043→1045 ✅
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention --template heal-pipeline-stall-mirror-pass-unmerged-tier4` ✅
+4. `cycle_tier_state.py record --checks-clean false` → **Tier 1, consecutive_clean=0** (Tier-4 finding) ✅
+
+**Dispatches:** None.
+
+**G-rule updates this iter:**
+- **G-rule `heal-pipeline-stall-mirror-pass-unmerged-tier4`: NEW — 1/3** (L1044: heal-pipeline-stall fires Tier-4 novel for mirror-pass-unmerged stalls on CONFLICTING PRs; medic already DMs directly; Pulse should not double-DM; dispatch to Beacon at 3/3 for alert-translations.json Tier-3 template).
+- All other G-rule counters unchanged.
+
+**Standing findings (updated):**
+- [yellow] **PR #522 CONFLICTING** — Mirror PASS, blocked by merge conflict. Forge rebase needed. Larry has rebase instructions via DM (outbox-notifier 20:03Z + medic 20:11Z).
+- [yellow] **PR #497 REVIEW_ESCALATE** — Mirror REVIEW_ESCALATE Jun-14T04:05Z; age≈43h; ~32h until 72h deadline Jun-17T04:02Z.
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. FN=3027, TP=5. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. Last: 07:44:56 MDT Jun-15. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] **PR #525 (p41-rebrief-on-change)** — NEW. Mirror review dispatched 20:13Z. Watch for REVIEW_PASS + auto-merge. [blue]
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST 1/3, telegram-409-burst **2/3**, telegram-approval-self-dispatch-denied **1/3**, merge_conflict_manual_rebase-tier4 1/3, **heal-pipeline-stall-mirror-pass-unmerged-tier4 1/3 (new)**.
+- [blue] **Stale bash orphans** — PIDs 1834248 (17d+) + 2605007 (1d+). Low CPU. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention (heal-pipeline-stall-mirror-pass-unmerged-tier4). ratio=20.0. Trend: stable.
+**Tier end-of-iter:** **Tier 1** (Tier-4 finding L1044; consecutive_clean reset to 0).
+
+---
+
 ## Iteration ~1980 — 2026-06-15 20:06Z UTC (interactive, /cycle, Tier 2→1 RESET, PR #520+#524 merged, PR #522 CONFLICTING)
 
 **Trigger:** Larry direct invocation (`/cycle`).
