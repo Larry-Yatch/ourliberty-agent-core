@@ -78,9 +78,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 02:50Z UTC (Iter ~1874, Tier 1)
+## Status snapshot — updated 2026-06-15 02:55Z UTC (Iter ~1875, Tier 1)
 
-**Iter ~1874 summary:** 0 new alerts. All checks nominal. Clean iter. consecutive_clean=1 (need 2 more for Tier 2 de-escalation). watermark=951. ratio≈20.33.
+**Iter ~1875 summary:** 0 new alerts. All checks nominal. Clean iter. consecutive_clean=2 (need 1 more for Tier 2 de-escalation). watermark=951. ratio≈20.33.
 
 ---
 
