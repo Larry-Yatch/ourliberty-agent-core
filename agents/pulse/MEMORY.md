@@ -126,7 +126,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 21:01Z UTC (Iter ~1986, Tier 2, consecutive_clean=1, all checks nominal)
+## Status snapshot — updated 2026-06-15 21:23Z UTC (Iter ~1987, Tier 2, consecutive_clean=2, all checks nominal)
+
+**Iter ~1987 summary:** ✅ Nominal. 0 new alerts. All checks clean. Repo at 12475384=origin/main. Watermark: 1046 (unchanged). pending=0. **PR #522 MERGED ✅** (G-rule missions-card-gc-warn-vs-info COMPLETE ✅). 1 open PR: #497 (MERGEABLE/UNSTABLE, 72h deadline Jun-17T04:02Z ~30.7h). PRIME ratio=20.04. Tier 2, consecutive_clean=2.
 
 **Iter ~1986 summary:** ✅ Nominal. 0 new alerts. All checks clean. Repo at 76cf06b8=origin/main. Watermark: 1046 (unchanged). pending=0. 2 open PRs: #522 (CONFLICTING, Forge rebase needed), #497 (72h deadline Jun-17T04:02Z ~31h). PRIME ratio=20.04. Tier 2, consecutive_clean=1.
 
@@ -191,7 +193,7 @@
 | Item | Status | Action needed |
 |---|---|---|
 | PR #525 MERGED ✅ | feat(missions): re-brief narrator cards on mission state change. Merged 2026-06-15T20:21:50Z (`1bebe776`). missions-v2-phase4.1 sequence advancing. | DONE. Watch for next sequence step. |
-| PR #522 CONFLICTING | [yellow] Mirror PASS; auto-merge BLOCKED by conflict with PR #520 (scripts/heal_missions_card_gc.py). G-rule missions-card-gc-warn-vs-info blocked. | Forge rebase PR #522 on origin/main. Larry has DM with rebase commands. |
+| PR #522 MERGED ✅ | fix(missions-card-gc): stop emitting routine success summary as Pulse-claimed digest alert. Merged 2026-06-15 after iter ~1986. **G-rule missions-card-gc-warn-vs-info COMPLETE ✅**. | DONE. |
 | PR #497 REVIEW_ESCALATE | [yellow] mergeable=UNKNOWN; Mirror REVIEW_ESCALATE Jun-14T04:05Z; age≈41h; 72h expires Jun-17T04:02Z (~31h remaining). | Escalate if still open at Jun-17T04:02Z |
 | unreviewed-merge:511/499/494/489/510/509/518/519 | [yellow] PRs merged by Larry without Mirror; bot-delivered for others. Larry's judgment call. | Reply appropriate shortcut or silence |
 | G-rule stall-detector Forge build | [yellow] Beacon spec complete. Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
@@ -200,7 +202,7 @@
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
 | Telegram 409 burst | [yellow] G-rule **2/3**. All self-inflicted by calling get-messages. | Watch; dispatch at 3/3 |
 | G-rule telegram-approval-self-dispatch-denied | [yellow] **1/3** — Larry "Go" → dispatch failed (self-dispatch denied beacon→beacon). | Watch; dispatch to Beacon at 3/3 for bot routing fix |
-| G-rule missions-card-gc-warn-vs-info | [blue] **3/3 DISPATCHED** → PR #522 CONFLICTING (needs Forge rebase after PR #520 merge). | Forge rebase PR #522 → re-push → auto-merge → COMPLETE |
+| G-rule missions-card-gc-warn-vs-info | [blue] **COMPLETE ✅** PR #522 merged 2026-06-15 (iter ~1987 observation). | DONE. |
 | G-rule Forge-preflight-marker-error-retry | [blue] **COMPLETE ✅** PR #524 merged `97300fc1` Jun-15. | Done. |
 | G-rule missions-autoregister-warn-vs-info | [blue] **COMPLETE ✅** PR #514 merged Jun-15. | Done. |
 | G-rule medic-diagnosis-tier4 | [blue] **COMPLETE ✅** PR #515 merged Jun-15T17:27:41Z. | Done. |
