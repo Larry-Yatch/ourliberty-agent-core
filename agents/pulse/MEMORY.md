@@ -78,25 +78,25 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 01:18Z UTC (Iter ~1863, Tier 2, clean)
+## Status snapshot — updated 2026-06-15 01:40Z UTC (Iter ~1864, Tier 1, signal)
 
-**Iter ~1863 summary:** All checks nominal. No new alerts (watermark=942=file). Tier 2, consecutive_clean=1 (need 2 more clean iters to de-escalate to Tier 3). PR #497 UNKNOWN/UNKNOWN (139th iter). PR #509 + #510 both UNKNOWN/UNKNOWN (GitHub API flap). No Mirror review on either; stall-detector cooldown active. ratio≈20.64, trend=flat.
+**Iter ~1864 summary:** Check 0 fired: 2 new Tier-4 alerts (lines 943-944) about PR #509 unrouted to Mirror (medic attempt 3). Helper → Tier 4; DM [yellow] sent to Larry. Tier-reset 2→1. PR #509 state change: now CLEAN/MERGEABLE (was UNKNOWN at iter ~1863). PR #510 stall-detector cooldown expired (dry-run confirms would fire next real run). All other checks nominal. ratio≈20.64, trend=flat.
 
 ---
 
-## Key standing items (as of iter ~1863)
+## Key standing items (as of iter ~1864)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — mergeState=UNKNOWN/UNKNOWN (139th iter; GitHub API flap) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
-| PR #509 + #510 | [yellow] Both UNKNOWN/UNKNOWN (GitHub flap); no Mirror review; stall-detector cooldown active. | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — mergeState=UNKNOWN/UNKNOWN (140th iter; GitHub API flap) | Close PR: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #509 + #510 | [yellow] PR #509 CLEAN/MERGEABLE; PR #510 UNKNOWN; heal-pipeline-stall+medic fired attempt 3 on #509; [yellow] DM sent iter ~1864 | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
 | unreviewed-merge:489 | [yellow] DM sent iter ~1614 | Reply 'go: retroactive-review-489' if Mirror review wanted |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
 | Check III threshold proposals | [yellow] Pending Larry | `approve threshold-update-2026-06-11` |
 | cleanup-branch-success-alert-info-translation-001 | [blue] **CLOSED** — Forge REJECTED (already satisfied by PR #485). 5 residual baseline-red sources tracked under G-rules below. | No action; G-rules handle at 3/3 |
-| NEW G-rule stall-detector-docs-branch-overtrigger | [blue] **1/3** — medic confirmed stall detector fires on docs/* Larry-authored PRs (not real stalls) | Dispatch to Beacon at 3/3: exclude docs/* or author=Larry-Yatch from unrouted-pr alerts |
+| G-rule stall-detector-docs-branch-overtrigger | [blue] **2/3** — PR #509 fired new alert 01:24Z; PR #510 cooldown expired (dry-run). Both Larry-authored PRs outside Forge pipeline. | Dispatch to Beacon at 3/3: exclude externally-authored PRs from unrouted-pr stall alert |
 | G-rule health-notify-script-missing | [blue] **1/3** | Watch; dispatch at 3/3 |
 | catalog-accuracy-drift | [blue] 8/34 ourliberty-graph shelf cards drifted (attention rate 24%, gate 10%) | route=digest; journal-note only |
 | Check I medic-operator-scaffold-001 | [blue] 24.4σ; prior dispatch 2026-06-10 | `/dispatch 1` if re-run needed |
@@ -111,4 +111,4 @@
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
 | dashboard_api PID 2868353 | [blue] Ssl stable; prior restart cause still unknown | Note; watch for recurrence |
-| Stale bash orphans | [blue] PIDs 1834248 (17d 5h 21m+) + 2605007 (20h 12m+). Ss, 0% CPU. | Carry; cleanup when convenient |
+| Stale bash orphans | [blue] PIDs 1834248 (17d 6h 19m) + 2605007 (21h 17m). Ss, 0% CPU. | Carry; cleanup when convenient |
