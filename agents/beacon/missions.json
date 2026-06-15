@@ -2870,6 +2870,17 @@
       "repo": "ourliberty-agent-core",
       "created": "2026-06-15",
       "deferred_reason": null
+    },
+    {
+      "id": "test-promote-button-safe-to-drop",
+      "name": "TEST - promote button (safe to drop)",
+      "phase": "drafting",
+      "brief": "Throwaway card to test Promote end-to-end. Delete after.",
+      "spec_docs": [],
+      "task_ids": [],
+      "repo": "ol-work",
+      "created": "2026-06-15",
+      "deferred_reason": null
     }
   ]
 }
