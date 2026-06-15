@@ -90,9 +90,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 03:21Z UTC (Iter ~1878, Tier 1)
+## Status snapshot — updated 2026-06-15 03:27Z UTC (Iter ~1879, Tier 2)
 
-**Iter ~1878 summary:** Clean iter. 0 interventions. consecutive_clean=2 (one more clean iter → natural Tier 2 de-escalation). ratio≈20.35, trend=flat (stabilized after iter ~1876 intervention + two clean iters). Watermark=951. All daemons alive. PRs #497/#509/#510 carry.
+**Iter ~1879 summary:** Clean iter. 0 interventions. **Tier 1 → Tier 2 de-escalation** (3 consecutive clean iters; consecutive_clean reset to 0). ratio≈20.35, trend=flat. Watermark=952. All daemons alive. sync-push-failed at 03:24Z (Tier 3 silenced, self-heals). PRs #497/#509/#510 carry.
 
 ---
 
