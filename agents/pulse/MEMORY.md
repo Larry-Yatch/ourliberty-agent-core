@@ -90,9 +90,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 06:09Z UTC (Iter ~1893, Tier 1)
+## Status snapshot — updated 2026-06-15 06:14Z UTC (Iter ~1894, Tier 1)
 
-**Iter ~1893 summary:** ⚠️ Non-clean. Tier stays 1. 3 new alerts (lines 963-965): PR#510 pipeline-stall Tier-4 (bot DM delivered), medic-diagnosis Tier-4 (bot DM delivered), stuck-cycle-timer Tier-3 silence (ourliberty-cycle.timer had NextElapseUSecMonotonic=infinity; heal-systemd-install-drift auto-fixed at 06:00Z). 1 intervention recorded. ratio≈20.46. Watermark=965. All daemons alive. PRs #497/#509/#510 carry [yellow]. Forge/Beacon inboxes empty. G-rule stuck-cycle-timer: 1/3 (new). G-rule stall-detector Forge build pending Larry's dashboard approval.
+**Iter ~1894 summary:** ✅ Clean. Tier 1, consecutive_clean=1. 0 new alerts (watermark=965 unchanged). All daemons alive (PIDs 2530123/2744551/2744840/2744914/2868353). PRs #497/#509/#510 carry [yellow]. Forge/Beacon inboxes empty. ratio≈20.48. Day-of-week correction: prior iters labeled Jun-15 "Sunday" — it is Monday. Check I/III correctly skipped (Monday, artifact check-i-2026-06-14.json from Sunday Jun-14).
 
 ---
 
