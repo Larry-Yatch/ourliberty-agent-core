@@ -84,17 +84,17 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 03:07Z UTC (Iter ~1876, Tier 1)
+## Status snapshot — updated 2026-06-15 03:15Z UTC (Iter ~1877, Tier 1)
 
-**Iter ~1876 summary:** 1 intervention — self-inflicted Telegram 409 conflict (background get-messages subprocess vs. production bot; ~3min; resolved). PR #497 status changed from MERGEABLE to UNSTABLE (152nd iter; may be CI expiry on stale PR). All other checks nominal. consecutive_clean=0 (reset). watermark=951. ratio≈20.35.
+**Iter ~1877 summary:** Clean iter. 0 interventions. Telegram 409 conflict (from iter ~1876) CONFIRMED resolved — bot PID 2744840 alive and healthy, no new 409s since 03:04:35Z. PR #497 back to MERGEABLE (UNSTABLE was temporary). consecutive_clean=1. watermark=951. ratio≈20.35, trend=worsening (flipped after iter ~1876 intervention).
 
 ---
 
-## Key standing items (as of iter ~1876)
+## Key standing items (as of iter ~1877)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — UNSTABLE/MERGEABLE (gh pr view; 152nd iter; new UNSTABLE status this iter) | Verify next iter; close if still stuck: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — MERGEABLE (gh pr view; 153rd iter) | Close if still stuck: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
 | PR #509 + #510 | [yellow] Both UNKNOWN; pending approval `unreg-approval-482eb78951ee` registered (dashboard); cooldown suppressing new stall alerts | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
 | G-rule stall-detector Forge build | [yellow] Beacon spec done 01:51Z Jun-15 (stall-detector-exclude-external-pr-001). Forge build pending dashboard approval. Forge inbox empty; no PR yet. | Approve Forge build via dashboard |
 | unreviewed-merge:511 | [yellow] PR #511 (`feat/local-review-pass-marker`) merged by Larry at 23:58Z Jun-14 without Mirror routing | Reply 'go: retroactive-review-511' or 'silence: local-review-marker-counts' |
