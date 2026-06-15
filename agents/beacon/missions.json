@@ -2742,6 +2742,23 @@
       "proposed_at": "2026-06-15T10:25:39.826005+00:00",
       "orphan_branch": null,
       "orphan_last_activity_ts": "2026-06-04T05:59:41.428629+00:00"
+    },
+    {
+      "id": "proposed-medic-diagnosis-tier3-silence-001",
+      "name": "Medic Diagnosis Tier3 Silence 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `medic-diagnosis-tier3-silence-001`. Last activity 2026-06-15T15:41:35.214899+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "medic-diagnosis-tier3-silence-001"
+      ],
+      "repo": null,
+      "created": "2026-06-15",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-15T15:43:23.147186+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-15T15:41:35.214899+00:00"
     }
   ]
 }
