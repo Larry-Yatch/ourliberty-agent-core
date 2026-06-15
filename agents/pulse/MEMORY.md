@@ -90,9 +90,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 05:09Z UTC (Iter ~1889, Tier 1)
+## Status snapshot — updated 2026-06-15 05:17Z UTC (Iter ~1890, Tier 2)
 
-**Iter ~1889 summary:** ✅ Nominal. **Tier 1** (consecutive_clean=2; 1 more clean iter → Tier 2). 0 interventions (iter_clean). ratio≈20.43, trend=improving. Watermark=960. All daemons alive. 0 new alerts. PRs #497/#509/#510 carry. Forge/Beacon inboxes empty. G-rule stall-detector Forge build pending Larry's dashboard approval (Beacon spec confirmed complete).
+**Iter ~1890 summary:** ✅ Nominal. **Tier 1 → Tier 2** (3 consecutive clean iters achieved; promoted). 0 interventions (iter_clean). ratio≈20.43, trend=improving. Watermark=960. All daemons alive. 0 new alerts. PRs #497/#509/#510 carry. Forge/Beacon inboxes empty. G-rule stall-detector Forge build pending Larry's dashboard approval (Beacon spec confirmed complete).
 
 ---
 

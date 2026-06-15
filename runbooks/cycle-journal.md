@@ -4,6 +4,108 @@
 
 ---
 
+## Iteration ~1890 — 2026-06-15 05:17Z UTC (interactive, /cycle, Tier 1→2)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. All checks clean. 0 new alerts. **Tier promoted 1 → 2** (3 consecutive clean iters achieved).
+
+**VERIFY-BEFORE-REASSERT (iter ~1889 carries):**
+- PR #497: `gh pr list` → OPEN, UNKNOWN, reviewDecision="". Mirror REVIEW_ESCALATE at 04:05Z Jun-14. Age ~26h 12m; under 72h threshold. **CARRY** [yellow].
+- PR #509 (`docs/meaning-layer-roadmap`): OPEN, UNKNOWN/no-review. **CARRY** [yellow].
+- PR #510 (`work/build-consult-restock`): OPEN, UNKNOWN/no-review. **CARRY** [yellow].
+- G-rule stall-detector Forge build: Forge inbox empty (confirmed). Forge build pending Larry's dashboard approval. **CARRY** [yellow].
+- dashboard_api PID 2868353: `ps` alive (Ssl), stable. **CARRY** [blue].
+- Stale bash orphans: PID 1834248 (17d 10h 32m, Ss), PID 2605007 (24h 57m, Ss). Both alive. **CARRY** [blue].
+
+**Check 0 — Alert triage:** Watermark=960. File=960 lines. **0 new alerts.** ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log: 0 new WARNs/ERRORs in recent tail (standing WARN at 10:58Z Jun-14 no longer in last-50-line window; no recurrence). inbox-watcher.log: 0 WARNs/ERRORs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last bot delivery at 22:50Z Jun-14 (idxs 958-959; PR#510 medic attempt 6 — same as prior iters). 409 cluster at 21:04Z Jun-14 (03:04Z UTC Jun-15) confirmed resolved. No new Larry directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → 0 new alerts fired, 0 recovered, 2 suppressed (cooldown: PRs #509+#510). All FORGE_NO_PR_SKIP entries expected. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: 1 pending — `unreg-approval-482eb78951ee` (PR#509+#510 merge decision; chat_id=None; created 2026-06-15T01:45Z). No change. [yellow] carry.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T05:12:15Z`, age≈4.0 min. FRESH (< 60 min threshold). ✅ Nominal.
+
+**Check A — Source repo:** On main. Clean working tree. HEAD=98c35e95 == origin/main. 0 behind, 0 ahead. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json last_sync=2026-06-15T04:24:10Z, status=no-change, age≈51.8 min. ✅ Nominal.
+
+**Check C — Agent liveness:**
+- inbox_watcher: PID 2530123 ✅ (1d 10h+, Ssl)
+- chain_event_shipper: PID 2744551 ✅ (Ssl)
+- beacon_telegram_bot: PID 2744840 ✅ (Ss)
+- outbox_notifier: PID 2744914 ✅ (Ss)
+- dashboard_api: PID 2868353 ✅ (Ssl)
+- No forge/mirror persistent sessions — expected. ✅
+- [blue] PID 1834248: stale bash orphan (17d 10h 32m, Ss). [carry]
+- [blue] PID 2605007: stale bash orphan (24h 57m, Ss). [carry]
+
+**Check E — PRs:**
+ourliberty-agent-core (3 open — confirmed via `gh pr list`):
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`), UNKNOWN/reviewDecision="" — Mirror REVIEW_ESCALATE at 04:05Z Jun-14. Age ~26h. [yellow] carry.
+- **PR #509** (`docs/meaning-layer-roadmap`), UNKNOWN/no-review. Larry-authored. [yellow] carry.
+- **PR #510** (`work/build-consult-restock`), UNKNOWN/no-review. Larry-authored. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Check H — Forge/Beacon activity:** Both inboxes empty. ✅ Nominal.
+
+**§5.0 conditional checks (Sunday Jun-15 UTC):**
+- Check I: already ran this cycle day (iter ~1718). **SKIP**.
+- Check III: last artifact 2026-06-11 (4 days old, <14d). **SKIP**.
+
+**§4.6 Rotations:** 0 overdue. ✅ Nominal.
+
+**Actions taken:**
+1. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` ✅ (ratio≈20.43, trend=improving)
+2. `cycle_tier_state.py record --checks-clean true` → **Tier 1 → Tier 2** (consecutive_clean=3 → promoted; reset to 0) ✅
+
+**Dispatches:** None.
+
+**Patterns:**
+- PRIME DIRECTIVE ratio: **~20.43, trend=improving** (946 interventions / 46 systemic_fixes).
+- G-rule missions-autoregister-warn-vs-info: 0 new WARNs. **2/3**. Carry.
+- G-rule missions-card-gc-warn-vs-info: 0 new WARNs. **2/3**. Carry.
+- G-rule F24-empty-prompt-envelope-rejected: 0 new. **2/3**. Carry.
+- G-rule health-notify-script-missing: 0 new. **1/3**. Carry.
+- G-rule timer-cycle-no-journal-entry: **0/3**. Carry.
+- G-rule Forge-timeout-worktree-missing-retry-loop: **1/3**. Carry.
+- G-rule heal-stale-daemon-script_path-cosmetic: **1/3**. Carry.
+- G-rule Forge-preflight-marker-error-retry: **1/3** (last WARN 10:58Z Jun-14; no recurrence in recent log tail). Carry.
+
+**Standing findings:**
+- [yellow] **PR #497 REVIEW_ESCALATE** — UNKNOWN, reviewDecision=""; Mirror REVIEW_ESCALATE at 04:05Z Jun-14. Age ~26h; under 72h threshold. [carry]
+- [yellow] **PRs #509 + #510 — unrouted to Mirror** — UNKNOWN/no-review; medic DM'd Larry at 04:50Z UTC Jun-15 (attempt 6). Await Larry: `go:merge-509-510-direct` OR `go:mirror-review-509-510`. [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec confirmed complete (branch-prefix gate fix). Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **unreviewed-merge:511** — PR #511 merged by Larry at 23:58Z Jun-14 without Mirror routing. [carry]
+- [yellow] **unreviewed-merge:499** — [carry]
+- [yellow] **unreviewed-merge:494** — [carry]
+- [yellow] **unreviewed-merge:489** — [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry. [carry]
+- [blue] **G-rule missions-autoregister-warn-vs-info** — 2/3. Watch; dispatch at 3/3.
+- [blue] **G-rule missions-card-gc-warn-vs-info** — 2/3. Watch; dispatch at 3/3.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch; dispatch at 3/3.
+- [blue] **G-rule health-notify-script-missing** — 1/3. Carry.
+- [blue] **G-rule timer-cycle-no-journal-entry** — 0/3. Carry.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Carry.
+- [blue] **G-rule heal-stale-daemon-script_path-cosmetic** — 1/3. Carry.
+- [blue] **G-rule Forge-preflight-marker-error-retry** — 1/3. Carry.
+- [blue] **Check I medic-operator-scaffold-001** — 24.4σ; `/dispatch 1` if re-run needed. [carry]
+- [blue] **catalog-accuracy-drift** — 8/34 ourliberty-graph shelf cards. [carry]
+- [blue] **dag-preflight-revision gap** — PR #484 closed source=pulse gap; DAG markers still fall through. [carry]
+- [blue] **ccd-s1-envelope-builder PAUSED** — [carry]
+- [blue] **Stale bash orphans** — PID 1834248 (17d 10h 32m, Ss) + PID 2605007 (24h 57m, Ss). Low CPU. [carry]
+- [blue] **dashboard_api PID 2868353** — Ssl, stable. [carry]
+
+**PRIME DIRECTIVE:** 0 interventions this iter (iter_clean). ratio≈20.43, trend=improving.
+**Tier end-of-iter:** **Tier 2** (promoted from Tier 1; consecutive_clean=0; need 3 more clean iters to de-escalate to Tier 3).
+
+---
+
 ## Iteration ~1889 — 2026-06-15 05:09Z UTC (interactive, /cycle, Tier 1)
 
 **Trigger:** Larry direct invocation (`/cycle`).
