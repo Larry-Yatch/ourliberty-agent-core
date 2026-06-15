@@ -4,6 +4,76 @@
 
 ---
 
+## Iteration ~1990 — 2026-06-15 22:49Z UTC (interactive, /cycle, Tier 3, consecutive_clean=1→2)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 1 new alert (Tier-3 silenced). All daemons alive. Repo clean at origin/main. 1 open PR (known carry). G-rule Forge-preflight-CLARIFY_REQUEST: 1/3 → 2/3. Tier 3, consecutive_clean=2.
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): GitHub now shows mergeable=MERGEABLE (was UNKNOWN last iter — recomputation resolved). reviewDecision="" (no GitHub review decision; Mirror REVIEW_ESCALATE is internal). Mirror REVIEW_ESCALATE Jun-14T04:02:56Z unchanged. Age≈42.8h. 72h deadline Jun-17T04:02:56Z → **~29.3h remaining.** [yellow] carry.
+- All 5 daemons: PIDs 2530123 (Ssl), 2744551 (SNs), 2744840 (Ss), 2744914 (Ss), 2868353 (Ssl) — all alive. ✅
+- Repo HEAD: db15360c=origin/main. Clean tree, on main. ✅
+- 409 burst: no new occurrences. G-rule 2/3 unchanged.
+
+**Check 0 — Alert triage:** Watermark=1047 (entering); file=1048 lines. **1 new alert** (L1048).
+- L1048: `source=heal-credential-registry-drift, subject=credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_NEWMISSION_INGEST_ENABLED, route=escalate, ts=2026-06-15T22:19:22Z`. Triage helper → **Tier-3** (known-pattern match in alert-translations.json). Silenced. Note: bot already delivered DM at 16:23 MDT based on raw `route=escalate` — no second Pulse DM needed.
+Watermark advanced: 1047→1048.
+
+**Check 1 — Log noise:** outbox-notifier.log: last WARN is `AUTO_MERGE_HELD_STALE_CONFLICT` for PR #522 at 14:03:45 MDT — historical (PR merged Jun-15). No active WARNs/ERRORs since. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** PID 2744840 alive (Ss). Bot last delivered credential-drift alert at 16:23:13 MDT. Last Larry message: "Go" at 13:59:52 MDT (already handled iter ~1982). No new directives. No 409 errors. G-rule telegram-409-burst 2/3 unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → "no stalls detected". All FORGE_NO_PR_SKIP entries informational. Notable: `cleanup-branch-success-alert-info-translation-001` archived at 2026-06-15T00:23:34Z with `CLARIFY_REQUEST` — "goal may already be met on main (PR #485 added dispatch-branch-cleanup:summary translation); full-suite-green unachievable within declared scope (5 pre-existing CI failures)." **G-rule Forge-preflight-CLARIFY_REQUEST: 1/3 → 2/3.** (Distinct from p41-schedule-harden instance at iter ~1976.) ✅ Nominal (no stalls).
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0**. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T22:17:19.702360+00:00`, age≈29 min (at iter start). FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=db15360c=origin/main. Clean tree, on main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-15T21:46:15Z, age≈63 min at iter time. FRESH (<2h). Note: sync shows commit `5e59afd8` (one behind `db15360c`) — sync ran before wrapper committed iter ~1989; expected, will self-resolve on next sync. ✅ Nominal.
+
+**Check C — Agent liveness:** All 5 PIDs alive (2530123 Ssl, 2744551 SNs, 2744840 Ss, 2744914 Ss, 2868353 Ssl). ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (1 open):
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): MERGEABLE/"" (no GitHub review decision). Mirror REVIEW_ESCALATE Jun-14T04:02:56Z. Age≈42.8h, ~29.3h until 72h deadline Jun-17T04:02:56Z. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Conditional checks (Monday 2026-06-15):** Check I sentinel (`check-i-2026-06-15.json`) exists → skip.
+
+**Actions taken:**
+1. Alert L1048 triaged Tier-3 (known pattern), resolved. ✅
+2. `cycle_prime_ledger.py append --tier 3 --kind iter_clean` ✅
+3. `cycle_tier_state.py record --checks-clean true` → **Tier 3, consecutive_clean=2** ✅
+4. Watermark advanced 1047→1048. ✅
+
+**Dispatches:** None.
+
+**G-rule updates this iter:**
+- **Forge-preflight-CLARIFY_REQUEST: 1/3 → 2/3** (`cleanup-branch-success-alert-info-translation-001` archived 2026-06-15T00:23:34Z; CLARIFY_REQUEST — goal pre-satisfied by PR #485, CI gate unachievable within scope). Dispatch to Beacon at 3/3.
+- All other counters unchanged from iter ~1989.
+
+**Standing findings (updated):**
+- [yellow] **PR #497 REVIEW_ESCALATE** — MERGEABLE/"" (GitHub); Mirror REVIEW_ESCALATE Jun-14T04:02:56Z; age≈42.8h; ~29.3h until 72h deadline Jun-17T04:02:56Z.
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. FN=3027, TP=5. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, **Forge-preflight-CLARIFY_REQUEST 2/3**, telegram-409-burst **2/3**, telegram-approval-self-dispatch-denied **1/3**, merge_conflict_manual_rebase-tier4 1/3, heal-pipeline-stall-mirror-pass-unmerged-tier4 1/3. Updated: Forge-preflight-CLARIFY_REQUEST 1/3→2/3.
+- [blue] **cleanup-branch-success-alert-info-translation-001 CLARIFY_REQUEST** — goal pre-satisfied by PR #485; task is archived. G-rule Forge-preflight-CLARIFY_REQUEST now 2/3.
+- [blue] **Stale bash orphans** — PIDs 1834248 (17d+) + 2605007 (1d+). Low CPU. [carry]
+- [blue] **missions-v2-phase4.1 sequence** — p41-schedule-harden ✅ + p41-rebrief-on-change ✅. Remaining steps TBD; pipeline managing.
+
+**PRIME DIRECTIVE:** iter_clean. ratio=20.04. Trend: stable.
+**Tier end-of-iter:** **Tier 3, consecutive_clean=2** (1 more clean iter needed to confirm Tier 3 steady-state; de-escalation ceiling is Tier 3 per spec).
+
+---
+
 ## Iteration ~1989 — 2026-06-15 22:12Z UTC (interactive, /cycle, Tier 3, consecutive_clean=0→1, all checks nominal)
 
 **Trigger:** Larry direct invocation (`/cycle`).

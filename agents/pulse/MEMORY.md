@@ -126,7 +126,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 22:12Z UTC (Iter ~1989, Tier 3, consecutive_clean=1, all checks nominal)
+## Status snapshot — updated 2026-06-15 22:49Z UTC (Iter ~1990, Tier 3, consecutive_clean=2, all checks nominal)
+
+**Iter ~1990 summary:** ✅ Nominal. 1 new alert (L1048 Tier-3 silenced, credential-drift known-pattern; bot already DM'd Larry). G-rule Forge-preflight-CLARIFY_REQUEST: 1/3→2/3 (cleanup-branch-success-alert-info-translation-001 CLARIFY_REQUEST archived 00:23Z — goal pre-satisfied by PR #485). Repo at db15360c=origin/main. Watermark: 1047→1048. pending=0. 1 open PR: #497 (MERGEABLE/"", Mirror REVIEW_ESCALATE, 72h deadline Jun-17T04:02:56Z ~29.3h). PRIME ratio=20.04. Tier 3, consecutive_clean=2.
 
 **Iter ~1989 summary:** ✅ Nominal. 0 new alerts. All checks clean. Repo at 5e59afd8=origin/main. Watermark: 1047 (unchanged). pending=0. 1 open PR: #497 (UNKNOWN/UNKNOWN, 72h deadline Jun-17T04:02:56Z ~29.8h). PRIME ratio=20.04. Tier 3, consecutive_clean=1.
 
@@ -220,7 +222,7 @@
 | catalog-accuracy-drift | [blue] 9/34 ourliberty-graph shelf cards drifted | route=digest; journal-note only |
 | G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] **2/3** | Watch; dispatch at 3/3 |
-| G-rule Forge-preflight-CLARIFY_REQUEST | [blue] **1/3** | Watch; dispatch at 3/3 |
+| G-rule Forge-preflight-CLARIFY_REQUEST | [blue] **2/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 (warn-vs-info) |
 | G-rule telegram-409-burst | [yellow] **2/3** | Watch; dispatch at 3/3 |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
