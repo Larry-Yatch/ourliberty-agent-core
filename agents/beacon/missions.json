@@ -2870,17 +2870,6 @@
       "repo": "ourliberty-agent-core",
       "created": "2026-06-15",
       "deferred_reason": null
-    },
-    {
-      "id": "ingest-selftest-2026-06-15",
-      "name": "INGEST SELFTEST \u2014 safe to drop",
-      "phase": "drafting",
-      "brief": "Controlled end-to-end test of heal_orphan_autoregister new-mission ingestion. Safe to drop \u2014 created + removed by the ingest verification on 2026-06-15.",
-      "spec_docs": [],
-      "task_ids": [],
-      "repo": "ourliberty-agent-core",
-      "created": "2026-06-15",
-      "deferred_reason": null
     }
   ]
 }
