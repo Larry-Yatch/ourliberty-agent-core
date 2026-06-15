@@ -25,6 +25,12 @@
       "never_silence": true,
       "plain_language_summary": "Medic durably silenced a confirmed false-positive alert so it stops looping in your inbox — but Medic can only quiet the symptom, not patch the code. The underlying bug is still unfixed. This one-time notice carries the root cause and what to fix at the source; it will not repeat (the silence is the dedupe).",
       "recommended_action": "Apply the root-cause fix named in the alert body (the healer/source that emits the silenced fingerprint). Once shipped, lift the mask with `larry_alerts.unsilence(\"<fingerprint>\")` so a genuine future recurrence isn't hidden. Audit trail: medic-dispatcher.log; ledger classification=reversible."
+    },
+    "medic-diagnosis": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "Medic ran an autonomous diagnosis and already delivered its findings to you directly via a chat_id DM. By the time Pulse triages this alert the DM is in your Telegram thread, so a second Pulse-side escalation would just duplicate it. Surfaced here only for the digest record.",
+      "recommended_action": "None at the Pulse layer — the medic chat_id DM is the primary delivery and is already in your thread. If the diagnosed condition stays unresolved, Medic re-escalates via its own chat_id path. Producer: medic module; payload carries intent=medic-diagnosis + chat_id."
     }
   },
   "heal-pipeline-stall": {
