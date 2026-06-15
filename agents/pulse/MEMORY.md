@@ -102,9 +102,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 07:35Z UTC (Iter ~1903, Tier 2)
+## Status snapshot — updated 2026-06-15 07:53Z UTC (Iter ~1904, Tier 1)
 
-**Iter ~1903 summary:** ✅ Nominal. **Tier 2, consecutive_clean=0** (de-escalated from Tier 1). Check 0: 0 new alerts (watermark=973). All daemons alive. All checks clean. G-rule Forge-preflight-marker-error-retry stays at **2/3** (no new occurrence). ratio≈20.57 (946/46). Next de-escalation to Tier 3 requires 3 consecutive clean Tier-2 iters.
+**Iter ~1904 summary:** ⚠️ Signal. **Tier 1, consecutive_clean=0** (tier-reset from Tier 2). Check 0: 1 new alert (line 974, PR #509 pipeline-stall, Tier-4, bot already DM'd Larry via route=escalate, watermark=974). All daemons alive. No other findings. ratio≈20.59 (947/46). Awaiting Larry triage response for PR #509 alert.
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl for this script. When cooldown expires, the alert fires even in dry-run mode. Be aware: calling --dry-run in a cycle will generate real alerts if the cooldown has passed.
 
@@ -115,7 +115,7 @@
 | Item | Status | Action needed |
 |---|---|---|
 | PR #497 REVIEW_ESCALATE | [yellow] MERGEABLE; reviewDecision=""; Mirror REVIEW_ESCALATE confirmed 04:05:31Z Jun-14 (~27h actual). 72h expires ~Jun-17T04:05Z. | Carry; escalate if still open at Jun-17T04:05Z |
-| PR #509 + #510 | [yellow] UNKNOWN/no-review; cooldown suppressed this iter; pending approval `unreg-approval-482eb78951ee` (chat_id=None) | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
+| PR #509 + #510 | [yellow] UNKNOWN/no-review; PR#509 pipeline-stall Tier-4 alert DM'd iter ~1904 (bot route=escalate); PR#510 cooldown active; pending approval `unreg-approval-482eb78951ee` (chat_id=None) | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
 | G-rule stall-detector Forge build | [yellow] Beacon spec complete. Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
 | Check VIII rule=lower | [yellow] FN=3027, TP=5, FP=2 — threshold too high. DM queued iter ~1899. | `approve check-viii-update-2026-06-15` when shortcut lands |
 | unreviewed-merge:511 | [yellow] PR #511 merged by Larry at 23:58Z Jun-14 without Mirror routing | Reply 'go: retroactive-review-511' or 'silence: local-review-marker-counts' |
