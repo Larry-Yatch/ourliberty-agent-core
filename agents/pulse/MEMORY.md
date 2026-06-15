@@ -126,7 +126,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 23:22Z UTC (Iter ~1991, Tier 3, consecutive_clean=3, all checks nominal)
+## Status snapshot — updated 2026-06-15 23:52Z UTC (Iter ~1992, Tier 3, consecutive_clean=4, all checks nominal)
+
+**Iter ~1992 summary:** ✅ Nominal. 1 new alert (L1049 Tier-3 silenced, review-pass PR #529). **PR #529 MERGED ✅** (cred-drift-ignore-feature-flags-001 — OURLIBERTY_NEWMISSION_INGEST_ENABLED feature flag added to ignored_keys allowlist). All daemons alive. Repo at b7e51896=origin/main. Watermark: 1048→1049. pending=0. 1 open PR: #497 (MERGEABLE/"", Mirror REVIEW_ESCALATE, 72h deadline Jun-17T04:02:56Z ~28.2h). PRIME ratio=20.04. Tier 3, consecutive_clean=4 (steady-state ceiling).
 
 **Iter ~1991 summary:** ✅ Nominal. 0 new alerts. All daemons alive. Repo at 3455b1c7=origin/main. Watermark: 1048 (unchanged). pending=0. 1 open PR: #497 (UNKNOWN/"", Mirror REVIEW_ESCALATE, 72h deadline Jun-17T04:02:56Z ~28.7h). New Larry Telegram message at 17:13 MDT ("let's fix this now") — Beacon responded/handled. No Pulse action. PRIME ratio=20.04. Tier 3, consecutive_clean=3 (steady-state ceiling).
 
@@ -202,7 +204,8 @@
 |---|---|---|
 | PR #525 MERGED ✅ | feat(missions): re-brief narrator cards on mission state change. Merged 2026-06-15T20:21:50Z (`1bebe776`). missions-v2-phase4.1 sequence advancing. | DONE. Watch for next sequence step. |
 | PR #522 MERGED ✅ | fix(missions-card-gc): stop emitting routine success summary as Pulse-claimed digest alert. Merged 2026-06-15 after iter ~1986. **G-rule missions-card-gc-warn-vs-info COMPLETE ✅**. | DONE. |
-| PR #497 REVIEW_ESCALATE | [yellow] mergeable=UNKNOWN; Mirror REVIEW_ESCALATE Jun-14T04:05Z; age≈41h; 72h expires Jun-17T04:02Z (~31h remaining). | Escalate if still open at Jun-17T04:02Z |
+| PR #529 MERGED ✅ | `cred-drift-ignore-feature-flags-001`: adds `OURLIBERTY_NEWMISSION_INGEST_ENABLED` to ignored_keys allowlist in detect_drift. Merged 2026-06-15T23:48Z. | DONE. Credential drift false-positive resolved. |
+| PR #497 REVIEW_ESCALATE | [yellow] mergeable=MERGEABLE; Mirror REVIEW_ESCALATE Jun-14T04:02:56Z; age≈43.8h; 72h expires Jun-17T04:02:56Z (~28.2h remaining). | Escalate if still open at Jun-17T04:02:56Z |
 | unreviewed-merge:511/499/494/489/510/509/518/519 | [yellow] PRs merged by Larry without Mirror; bot-delivered for others. Larry's judgment call. | Reply appropriate shortcut or silence |
 | G-rule stall-detector Forge build | [yellow] Beacon spec complete. Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
 | Check VIII rule=lower | [yellow] FN=3027, TP=5, FP=2 — threshold too high. | `approve check-viii-update-2026-06-15` when shortcut lands |

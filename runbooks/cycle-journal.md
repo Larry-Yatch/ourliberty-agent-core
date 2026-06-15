@@ -4,6 +4,78 @@
 
 ---
 
+## Iteration ~1992 — 2026-06-15 23:52Z UTC (interactive, /cycle, Tier 3, consecutive_clean=3→4)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 1 new alert (Tier-3 silenced). All daemons alive. Repo clean at origin/main. **PR #529 MERGED ✅** (cred-drift-ignore-feature-flags-001). 1 open PR (known carry). Tier 3, consecutive_clean=4.
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #529 (`cred-drift-ignore-feature-flags-001`): Confirmed MERGED ✅ via outbox-notifier log (`AUTO_MERGE` at 17:48:15 MDT). Branch deleted. L1049 review-pass alert confirms. ✅
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): GitHub now shows mergeable=MERGEABLE (recomputed from UNKNOWN last iter). reviewDecision="" (no GitHub review; Mirror REVIEW_ESCALATE is internal state). Mirror REVIEW_ESCALATE Jun-14T04:02:56Z unchanged. Age≈43.8h. 72h deadline Jun-17T04:02:56Z → **~28.2h remaining.** [yellow] carry.
+- All 5 daemons: PIDs 2530123 (Ssl), 2744551 (SNs), 2744840 (Ss), 2744914 (Ss), 2868353 (Ssl) — all alive. ✅
+- Repo HEAD: b7e51896=origin/main (advanced from 3455b1c7; wrapper committed captures.json GC delta as expected). Clean tree, on main. ✅
+- 409 burst: no new occurrences. G-rule 2/3 unchanged.
+
+**Check 0 — Alert triage:** Watermark=1048 (entering); file=1049 lines. **1 new alert** (L1049).
+- L1049: `source=outbox-notifier, kind=notification, intent=review-pass, task_id=cred-drift-ignore-feature-flags-001, ts=2026-06-15T23:48:15Z`. Mirror approved PR #529; auto-merged + branch deleted. Triage helper → **Tier-3** (known-pattern match, review-pass). Silenced. Bot already DM'd Larry (chat_id queued completion DM). No second Pulse DM.
+Watermark advanced: 1048→1049. ✅
+
+**Check 1 — Log noise:** outbox-notifier.log: last entry at 17:48:15 MDT — all INFO, no WARNs or ERRORs. Pipeline activity for `cred-drift-ignore-feature-flags-001` complete (build → mirror-review → AUTO_MERGE). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** PID 2744840 alive (Ss). Last Larry activity: approved `cred-drift-ignore-feature-flags-001` at 17:24:50 MDT → dispatched → Forge built PR #529 → Mirror PASS → auto-merged 17:48:15 MDT. Completion DM queued by bot. No new directives since. No 409 errors. G-rule telegram-409-burst 2/3 unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → "no stalls detected". All FORGE_NO_PR_SKIP entries informational (preflight_non_proceed / pr_exists). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0**. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T23:48:06.438999+00:00`, age≈4 min. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=b7e51896=origin/main. Clean tree, on main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-15T23:46:16Z, status=no-change, age≈6 min. FRESH (<2h). ✅ Nominal.
+
+**Check C — Agent liveness:** All 5 PIDs alive (2530123 Ssl, 2744551 SNs, 2744840 Ss, 2744914 Ss, 2868353 Ssl). ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (1 open):
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): MERGEABLE/"" (GitHub). Mirror REVIEW_ESCALATE Jun-14T04:02:56Z. Age≈43.8h, ~28.2h until 72h deadline Jun-17T04:02:56Z. [yellow] carry.
+- **PR #529 MERGED ✅** (`cred-drift-ignore-feature-flags-001`): Auto-merged 17:48:15 MDT. Branch deleted. ✅
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Conditional checks (Monday 2026-06-15):** Check I sentinel (`check-i-2026-06-15.json`) exists → skip.
+
+**Actions taken:**
+1. Alert L1049 triaged Tier-3 (known pattern, review-pass), resolved. ✅
+2. `cycle_prime_ledger.py append --tier 3 --kind iter_clean` ✅
+3. `cycle_tier_state.py record --checks-clean true` → **Tier 3, consecutive_clean=4** ✅
+4. Watermark advanced 1048→1049. ✅
+
+**Dispatches:** None.
+
+**G-rule updates this iter:**
+- No new occurrences. All counters unchanged from iter ~1991.
+- **PR #529 MERGED:** cred-drift-ignore-feature-flags-001 resolves the OURLIBERTY_NEWMISSION_INGEST_ENABLED false-positive. Feature flag added to `.env.larry` ignored_keys allowlist; detector now subtracts it from drift results. G-rule catalog-accuracy-drift-tier4 1/3 unchanged (separate pattern).
+
+**Standing findings (updated from iter ~1991):**
+- [yellow] **PR #497 REVIEW_ESCALATE** — MERGEABLE/"" (GitHub); Mirror REVIEW_ESCALATE Jun-14T04:02:56Z; age≈43.8h; ~28.2h until 72h deadline Jun-17T04:02:56Z.
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. FN=3027, TP=5. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, **Forge-preflight-CLARIFY_REQUEST 2/3**, telegram-409-burst **2/3**, telegram-approval-self-dispatch-denied **1/3**, merge_conflict_manual_rebase-tier4 1/3, heal-pipeline-stall-mirror-pass-unmerged-tier4 1/3. All unchanged.
+- [blue] **PR #529 MERGED ✅** — `cred-drift-ignore-feature-flags-001` merged 2026-06-15T23:48:15Z. Credential drift false-positive for OURLIBERTY_NEWMISSION_INGEST_ENABLED resolved.
+- [blue] **Stale bash orphans** — PIDs 1834248 (17d+) + 2605007 (1d+). Low CPU. [carry]
+- [blue] **missions-v2-phase4.1 sequence** — p41-schedule-harden ✅ + p41-rebrief-on-change ✅. Remaining steps TBD; pipeline managing.
+
+**PRIME DIRECTIVE:** iter_clean. ratio=20.04. Trend: improving.
+**Tier end-of-iter:** **Tier 3, consecutive_clean=4** (steady-state ceiling; no further de-escalation possible).
+
+---
+
 ## Iteration ~1991 — 2026-06-15 23:22Z UTC (interactive, /cycle, Tier 3, consecutive_clean=2→3)
 
 **Trigger:** Larry direct invocation (`/cycle`).
