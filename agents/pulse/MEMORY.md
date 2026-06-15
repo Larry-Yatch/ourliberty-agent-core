@@ -90,9 +90,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 04:53Z UTC (Iter ~1887, Tier 1)
+## Status snapshot — updated 2026-06-15 05:04Z UTC (Iter ~1888, Tier 1)
 
-**Iter ~1887 summary:** Tier-4 alert. **Tier 1** (consecutive_clean=0). 1 intervention. ratio≈20.43, trend=improving. Watermark=960. All daemons alive. 2 new alerts (heal-pipeline-stall + medic notification, both PR#510 unrouted attempt 6; medic DM delivered at 04:50Z UTC). PRs #497/#509/#510 carry.
+**Iter ~1888 summary:** ✅ Nominal. **Tier 1** (consecutive_clean=1). 0 interventions (iter_clean). ratio≈20.43, trend=improving. Watermark=960. All daemons alive. 0 new alerts. PRs #497/#509/#510 carry. New material: Beacon stall-detector-exclude-external-pr-001 spec confirmed complete (notification archived); branch-prefix gate fix design done; Forge build pending Larry's dashboard approval. PR #508 confirmed MERGED.
 
 ---
 
@@ -100,9 +100,9 @@
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] Carry — UNKNOWN (transient in gh pr list; Mirror REVIEW_ESCALATE at 04:05Z Jun-14; 156th iter) | Close if still stuck: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
-| PR #509 + #510 | [yellow] UNKNOWN/no-review; medic DM'd Larry at 03:39Z UTC Jun-15 (5th attempt PR#509); pending approval `unreg-approval-482eb78951ee` (dashboard; chat_id=None) | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
-| G-rule stall-detector Forge build | [yellow] Beacon spec done (stall-detector-exclude-external-pr-001). Forge build pending dashboard approval. Forge inbox empty; no PR yet. | Approve Forge build via dashboard |
+| PR #497 REVIEW_ESCALATE | [yellow] Carry — UNKNOWN (transient in gh pr list; Mirror REVIEW_ESCALATE at 04:05Z Jun-14; ~25h old) | Close if still stuck: `gh pr close 497 --repo Larry-Yatch/ourliberty-agent-core` |
+| PR #509 + #510 | [yellow] UNKNOWN/no-review; medic DM'd Larry at 04:50Z UTC Jun-15 (attempt 6); pending approval `unreg-approval-482eb78951ee` (dashboard; chat_id=None) | Larry replies: go:merge-509-510-direct OR go:mirror-review-509-510 |
+| G-rule stall-detector Forge build | [yellow] Beacon spec CONFIRMED COMPLETE (branch-prefix gate; notification archived 01:51Z Jun-15). Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
 | unreviewed-merge:511 | [yellow] PR #511 (`feat/local-review-pass-marker`) merged by Larry at 23:58Z Jun-14 without Mirror routing | Reply 'go: retroactive-review-511' or 'silence: local-review-marker-counts' |
 | unreviewed-merge:499 | [yellow] PR #499 merged by Larry without Mirror | Reply 'go: retroactive-review-499' or 'silence: missions-spec-no-mirror-needed' |
 | unreviewed-merge:494 | [yellow] DM sent iter ~1694 (01:54Z Jun-14) | Reply 'go: retroactive-review-494' or 'silence: missions-promotions-no-mirror-needed' |
