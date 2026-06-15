@@ -120,31 +120,25 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 11:42Z UTC (Iter ~1934, Tier 2)
+## Status snapshot — updated 2026-06-15 12:27Z UTC (Iter ~1936, Tier 2→1)
 
-**Iter ~1934 summary:** ✅ Nominal. Tier 1→2 de-escalation (consecutive_clean=3). All checks clean. No new alerts. Pipeline stall cooldowns still active (PRs #509/#510/#512/#513). beacon-pending-approvals.json: pending=2 (unreg-approval-482eb78951ee + alert-translation-unrouted-pr-001). ratio≈20.49 (963/47). All 5 PIDs healthy. Watermark=989 (file=978 lines); gap persists. Sync last=11:24Z (FRESH). 5 open PRs: #497 (MERGEABLE re-verified; REVIEW_ESCALATE ~31.6h, expires Jun-17T04:05Z), #509/#510/#512/#513 (stall/cooldowns).
-
-**heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl. When cooldown expires, the alert fires in dry-run mode. Be aware: calling --dry-run in a cycle will write real alerts if the cooldown has passed. Always check wc -l of the file before and after.
-
-**medic-diagnosis alerts (learned iter ~1905):** The medic module sends `kind=notification, intent=medic-diagnosis` alerts with a chat_id when it performs detailed PR diagnoses. These carry a chat_id meaning the DM was already delivered directly. Triage helper classifies as Tier-4 (no registry template). No second DM from Pulse warranted.
-
-**Watermark gap (ongoing):** watermark=989, file grows toward 989 slowly. Lines added below the watermark are missed by the normal get-watermark path. Workaround: check `wc -l` vs watermark each iter; if file length < watermark AND file length has increased since prior iter, manually read the new tail lines and triage. Do NOT set watermark backward.
+**Iter ~1936 summary:** ⚠️ Signal. PRs #510/#512/#513 pipeline-stall cooldowns expired; 3 new alerts written to larry-alerts.jsonl (lines 981–983). Triaged Tier-4 via helper; no new DMs (bot already delivered). Watermark gap CLOSED (advanced to 986 = file length). Tier 2→1 reset (consecutive_clean=0). ratio≈20.51 (964/47). All 5 PIDs healthy. Sync last=12:24Z (FRESH). 5 open PRs: #497 (MERGEABLE re-verified; REVIEW_ESCALATE ~32.3h, expires Jun-17T04:05Z), #509/#510/#512/#513 (stall/cooldowns). beacon-pending-approvals.json: pending=2 (unreg-approval-482eb78951ee + alert-translation-unrouted-pr-001).
 
 **heal_pipeline_stall.py --dry-run note:** `--dry-run` does NOT suppress writes to larry-alerts.jsonl. When cooldown expires, the alert fires in dry-run mode. Be aware: calling --dry-run in a cycle will write real alerts if the cooldown has passed. Always check wc -l of the file before and after.
 
 **medic-diagnosis alerts (learned iter ~1905):** The medic module sends `kind=notification, intent=medic-diagnosis` alerts with a chat_id when it performs detailed PR diagnoses. These carry a chat_id meaning the DM was already delivered directly. Triage helper classifies as Tier-4 (no registry template). No second DM from Pulse warranted.
 
-**Watermark gap (ongoing):** watermark=989, file grows toward 989 slowly. Lines added below the watermark are missed by the normal get-watermark path. Workaround: check `wc -l` vs watermark each iter; if file length < watermark AND file length has increased since prior iter, manually read the new tail lines and triage. Do NOT set watermark backward.
+**Watermark gap (closed iter ~1936):** was watermark=989 >> file=978; advanced to 986 = file length. Gap closed. Standard get-watermark path works again. If gap re-forms: check `wc -l` vs watermark each iter; manually read new tail lines and triage if file < watermark. Do NOT set watermark backward.
 
 ---
 
-## Key standing items (as of iter ~1928)
+## Key standing items (as of iter ~1936)
 
 | Item | Status | Action needed |
 |---|---|---|
-| PR #497 REVIEW_ESCALATE | [yellow] MERGEABLE; reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ~30.5h; 72h expires ~Jun-17T04:05Z. | Carry; escalate if still open at Jun-17T04:05Z |
-| PR #509 | [yellow] UNKNOWN/no-review; pipeline stall cooldowns active; awaiting Larry | Merge/close or dispatch Mirror review |
-| PRs #510 + #512 + #513 | [yellow] UNKNOWN/no-review; cooldowns active | Larry to route to Mirror or merge/close |
+| PR #497 REVIEW_ESCALATE | [yellow] MERGEABLE; reviewDecision=""; Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ~32.3h; 72h expires ~Jun-17T04:05Z. | Carry; escalate if still open at Jun-17T04:05Z |
+| PR #509 | [yellow] New cooldown active (fired 12:14Z Jun-15). Next cooldown expires ~Jun-16. | Merge/close or dispatch Mirror review |
+| PRs #510 + #512 + #513 | [yellow] Cooldowns expired; new alerts fired 12:21Z Jun-15. Medic: attempt 5 for #512/#513, attempt 13 for #510. | Larry to route to Mirror or merge/close; OR reply "approve" for alert-translation-unrouted-pr-001 to silence |
 | G-rule stall-detector Forge build | [yellow] Beacon spec complete. Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
 | Check VIII rule=lower | [yellow] FN=3027, TP=5, FP=2 — threshold too high. DM queued iter ~1899. | `approve check-viii-update-2026-06-15` when shortcut lands |
 | unreviewed-merge:511 | [yellow] PR #511 merged by Larry at 23:58Z Jun-14 without Mirror routing | Reply 'go: retroactive-review-511' or 'silence: local-review-marker-counts' |
@@ -169,6 +163,7 @@
 | G-rule timer-cycle-no-journal-entry | [blue] **0/3** | Watch |
 | G-rule heal-stale-daemon-script_path-cosmetic | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule Forge-preflight-marker-error-retry | [blue] **2/3** | Watch; dispatch at 3/3 |
+| G-rule Forge-preflight-CLARIFY_REQUEST | [blue] **1/3** (first seen iter ~1935: cleanup-branch-success-alert-info-translation-001 archived with CLARIFY_REQUEST marker) | Watch; dispatch at 3/3 |
 | G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 (warn-vs-info) |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
 | ccd-s1-envelope-builder | [blue] PAUSED | Carry; unverified |
