@@ -4,6 +4,100 @@
 
 ---
 
+## Iteration ~1964 — 2026-06-15 17:00Z UTC (interactive, /loop /cycle, Tier 1, Check A always-fix, PRs #509+#510+#514 merged)
+
+**Trigger:** Larry direct invocation (`/loop /cycle`).
+
+**Health:** ⚠️ Signal. Check A: repo behind origin/main (auto-fixed, fast-forward to 9e0182ea). 1 new alert L1025 Tier-3 silenced. Pending directives: 0 (all 4 prior items resolved). Tier 1, consecutive_clean=0.
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): Confirmed still open (gh pr list). UNKNOWN mergeable, reviewDecision=''. Mirror REVIEW_ESCALATE 04:05:31Z Jun-14. Age ≈ 37.5h. 72h expires ~Jun-17T04:05Z (~34.5h remaining). **CARRY** [yellow].
+- PRs #509/#510: **MERGED ✅** (Mirror auto-merged at 16:56:52Z + 16:57:10Z after Larry's "Route to mirror on both" directive at 10:45:21 MDT). Not in open PR list.
+- PRs #512/#513: heal_pipeline_stall.py --dry-run → 0 new alerts, 2 suppressed (cooldowns). **CARRY** [yellow].
+- beacon-pending-approvals.json: **pending=0** (all 4 prior items resolved). MAJOR POSITIVE — down from 4.
+
+**Check 0 — Alert triage:** Watermark=1024 (entering); file=1025 lines. **1 new alert (L1025):**
+- L1025: `source=outbox-notifier, kind=notification, intent=review-pass` (ts=16:54:37Z) → **Tier-3 (silenced)** per helper (known-pattern match in alert-translations.json). Review-pass + auto-merge notification for PR #514 (`autoregister-warn-demote-optA-001`). No DM.
+Watermark: 1024 → 1025. ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier: no new WARNs since last iter (last WARN still 01:10:53Z Jun-15, G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3 unchanged). inbox_watcher: no WARNs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot log: last activity idx=1023 at 10:48:16 MDT (16:48:16Z) — prior to this iter. Larry's last message: 10:45:21 MDT "Route to mirror on both" → bot routed PRs #509+#510 to Mirror → both auto-merged. No new Larry messages this iter. 409 burst: last occurrence 07:44:56 MDT — G-rule telegram-409-burst 2/3 unchanged. PID 2744840 alive (Ss). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → 0 new alerts. PRs #512/#513 suppressed (cooldowns). PRs #509/#510 no longer tracked (merged). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0** (all cleared):
+- `autoregister-warn-demote-001`: RESOLVED — PR #514 merged 16:54:35Z.
+- `medic-diagnosis-tier3-silence-001`: RESOLVED — Forge built PR #515; approval cleared.
+- `alert-translation-unrouted-pr-001`: RESOLVED — approval cleared (PR build path unconfirmed but approval gone).
+- `unreg-approval-482eb78951ee`: RESOLVED — PRs #509+#510 routed to Mirror and auto-merged; direction-ask moot.
+✅ All clear.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-15T16:45:55.679728+00:00`, age≈14 min at check time. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=6aef5b14 ≠ origin/main (fetch: 9e0182ea). **BEHIND** — always-fix triggered.
+- Action: `git -C ~/agent-core pull --ff-only` → Fast-forwarded 6aef5b14→9e0182ea. 7 files changed, 299 insertions(+), 19 deletions(-).
+- Files pulled: agents/forge/CLAUDE.md, agents/mirror/CLAUDE.md, docs/meaning-layer-roadmap.md (+148), review/mirror-bughunt-lenses.md, scripts/heal_orphan_autoregister.py (-4), scripts/pulse_check_xi.py (+), scripts/tests/test_pulse_check_xi.py (+).
+- PRs included: #514 (autoregister fix), #509 (meaning-layer-roadmap), #510 (build-consult-restock). Clean tree after pull. ✅ Fixed.
+
+**Check B — Sync health:** last_sync=2026-06-15T16:25:16Z, age≈35 min. FRESH (<2h). ✅ Nominal.
+
+**Check C — Agent liveness:**
+- inbox_watcher: PID 2530123 ✅ (Ssl)
+- chain_event_shipper: PID 2744551 ✅ (SNs)
+- beacon_telegram_bot: PID 2744840 ✅ (Ss)
+- outbox_notifier: PID 2744914 ✅ (Ss)
+- dashboard_api: PID 2868353 ✅ (Ssl)
+- No forge/mirror persistent sessions — expected. ✅
+
+**Check E — PRs:**
+ourliberty-agent-core (4 open — down from 5):
+- **PR #515** (`forge/medic-diagnosis-tier3-silence-001`): NEW. UNKNOWN mergeable, reviewDecision=''. Forge's config PR implementing Tier-3 silence for medic-diagnosis alerts. Awaiting Mirror review. [yellow] new.
+- **PR #513** (`feat/new-mission-pulse-check-ix-alert-ignored-2026-06-15`): UNKNOWN mergeable, reviewDecision=''. Cooldown suppressed. [yellow] carry.
+- **PR #512** (`feat/new-mission-pulse-check-ix-catch-me-up-gap-2026-06-15`): UNKNOWN mergeable, reviewDecision=''. Cooldown suppressed. [yellow] carry.
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): UNKNOWN mergeable, reviewDecision=''. Mirror REVIEW_ESCALATE 04:05:31Z Jun-14. Age ≈ 37.5h. 72h expires ~Jun-17T04:05Z (~34.5h remaining). [yellow] carry.
+- PRs #509 + #510: MERGED ✅.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Conditional checks:** Check I: sentinel `check-i-2026-06-15.json` EXISTS and today is Monday (gate fires Mon/Wed/Fri/Sun per MEMORY) — but sentinel blocks same-day re-fire. Skip. Check III: not Sunday. Skip. ✅
+
+**Actions taken:**
+1. Triage L1025 via `alert_triage_state.py triage-alert` → Tier-3 silenced ✅
+2. `git -C ~/agent-core pull --ff-only` → 9e0182ea ✅
+3. Logged fast-forward to `runbooks/cycle-actions.jsonl` ✅
+4. `alert_triage_state.py set-watermark --line 1025` ✅ (1024 → 1025)
+5. `cycle_prime_ledger.py append --tier 1 --kind intervention --template ff-main-when-behind` ✅
+6. `cycle_tier_state.py record --checks-clean false` → Tier 1, consecutive_clean=0 ✅
+
+**Dispatches:** None.
+
+**G-rule updates this iter:**
+- `missions-autoregister-warn-vs-info` → **COMPLETE ✅**: PR #514 merged 16:54:35Z. Permanent fix shipped.
+- All other counters unchanged from iter ~1963.
+
+**Standing findings (updated from iter ~1963):**
+- [yellow] **PR #497 REVIEW_ESCALATE** — Mirror REVIEW_ESCALATE 04:05:31Z Jun-14; age ≈ 37.5h; 72h expires ~Jun-17T04:05Z (~34.5h remaining). Escalate if still open at deadline.
+- [yellow] **PR #515 new — medic-diagnosis-tier3-silence-001** — Forge config PR, awaiting Mirror review. Normal pipeline; watch next iter for Mirror outcome.
+- [yellow] **PRs #512/#513 pipeline-stall** — cooldowns suppressed this iter; G-rule alert-translation-unrouted-pr-001 cleared from pending (outcome unclear). Carry.
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **unreviewed-merge:511/499/494/489** — [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. [watch → dispatch at 3/3]
+- [blue] **G-rule missions-autoregister-warn-vs-info** — **COMPLETE ✅** iter ~1964. PR #514 merged. Routine autoregister digest row suppressed permanently.
+- [blue] **G-rule medic-diagnosis-tier4** — DISPATCHED iter ~1955; PR #515 built, Mirror review in progress. [carry]
+- [blue] **catalog-accuracy-drift** — G-rule 1/3. route=digest. [carry]
+- [blue] **Check I 2026-06-15** — sentinel exists. 1 proposal dispatched. [carry]
+- [blue] **Check IX missions** — PRs #512 + #513 open. [carry]
+- [blue] G-rule counters: Forge-preflight-marker-error-retry 2/3, missions-card-gc-warn-vs-info 2/3, F24-empty-prompt-envelope-rejected 2/3, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST 1/3, telegram-409-burst **2/3**, telegram-approval-self-dispatch-denied **1/3**, missions-autoregister-warn-vs-info **COMPLETE**, medic-diagnosis-tier4 DISPATCHED (PR #515 in review).
+- [blue] **Stale bash orphans** — PIDs 1834248 (17d+, Ss) + 2605007 (1d+, Ss). Low CPU. [carry]
+
+**PRIME DIRECTIVE:** intervention (Check A fast-forward + L1025 Tier-3 triage). ratio pending ledger compute.
+**Tier end-of-iter:** **Tier 1, consecutive_clean=0**.
+
+---
+
 ## Iteration ~1963 — 2026-06-15 16:49Z UTC (interactive, /loop /cycle, Tier 1, 7 new alerts 6×Tier-4)
 
 **Trigger:** Larry direct invocation (`/loop /cycle`).
