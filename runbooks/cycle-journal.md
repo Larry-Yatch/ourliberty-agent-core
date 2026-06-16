@@ -4,6 +4,58 @@
 
 ---
 
+## Iteration ~2064 — 2026-06-16 21:27Z UTC (interactive, /cycle, Tier 3→1, consecutive_clean=16→0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Drift — Check A: repo behind origin/main by 1 (PR #546 merged). Auto-fix applied; all other checks nominal.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** `gh pr list --state open` → 0 open PRs across all 3 repos. ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** 0 open PRs confirmed. ✅
+- **Pending approvals — CLEAR ✅:** pending=0. ✅
+- **Daemons same PIDs ✅:** beacon 3556778 (Ss), chain-event 2744551 (SNs), inbox-watcher 3434697 (Ssl), outbox_notifier 3556624 (Ss), dashboard_api 3593488 (Ssl). All alive, same PIDs as iter ~2063. ✅
+
+**Check 0 — Alert triage:** Watermark=1054 entering; file=1054 lines. **0 new alerts.** Watermark unchanged at 1054. ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log last entry 05:02:48Z (stale s-6-drain re-scan, consistent with prior iters — no WARN/ERROR since then). inbox_watcher.log: no WARNs/ERRORs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message 'status' at 13:17:41 MDT (19:17Z) — same as iter ~2063, already served by iter ~2060. No new messages in 4h window (17:27Z–21:27Z). No 409 errors. G-rule telegram-409-burst **2/3** unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → `no stalls detected`. FORGE_NO_PR_SKIP entries all reason=pr_exists or preflight_exit. ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0. No orphaned Larry directives in 24h window. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-16T21:23:12Z, age≈4 min at check time. FRESH (< 60 min threshold). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=641472c3 at iter start; fetch → origin/main=77277dd4 (**behind 1** — PR #546 `docs(projects): Projects-tab v3 North Star + reusable brainstorm template` merged to origin between iter ~2063 and this iter). Working tree clean, on main. **FINDING: always-fix triggered.** `git pull --ff-only` → Fast-forwarded 641472c3..77277dd4 (2 new docs files: `docs/projects-tab-v3-north-star.md`, `docs/templates/project-brainstorm-template.md`). ⚠️ Fixed.
+
+**Check B — Sync health:** last_sync=2026-06-16T20:30:31Z, status=no-change, age≈57 min at check time. FRESH (< 2h). ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3556778 (Ss) ✅, chain_event_shipper 2744551 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, outbox_notifier 3556624 (Ss) ✅, dashboard_api 3593488 (Ssl) ✅. All 5 alive, same PIDs as iter ~2063. ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core: **0 open PRs.** ✅
+ourliberty-dashboard: **0 open PRs.** ✅
+ourliberty-graph: **0 open PRs.** ✅
+
+**Check H — Forge digest:** 0 open Forge PRs. Phase S ALL 6/6 MERGED ✅. No Forge activity since s-6-drain merge at 10:52:38Z UTC. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** 21 credentials checked. No credentials due within 60d window. ✅ Nominal.
+
+**Conditional checks (Tuesday 2026-06-16 UTC, weekday=1):** Check I fires Mon/Wed/Fri/Sun — skip. Check III fires Sunday — skip.
+
+**G-rule tracking:** No new WARN events this iter. All G-rule counts unchanged from iter ~2063.
+
+**Actions taken:**
+1. Check A (always-fix): `git -C ~/agent-core/ pull --ff-only` → 641472c3..77277dd4. Logged to cycle-actions.jsonl.
+2. PRIME ledger: `intervention` appended (tier=3, template=ff-main-when-behind, ts=2026-06-16T21:27:54Z).
+3. Tier state: `record --checks-clean false` → tier reset 3→1, consecutive_clean=16→0.
+
+**Dispatches:** None.
+
+---
+
 ## Iteration ~2063 — 2026-06-16 20:56Z UTC (interactive, /cycle, Tier 3, consecutive_clean=15→16)
 
 **Trigger:** Larry direct invocation (`/cycle`).
