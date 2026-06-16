@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-16 08:11Z UTC (Iter ~2026, Tier 2→1 reset, consecutive_clean=0)
+
+**Iter ~2026 summary:** ✅ Nominal + 1 auto-fix. **Phase S s-2-completion: PR #542 MERGED ✅** at 08:07:41Z UTC (Mirror PASS + AUTO_MERGE). Phase S now 2/6 steps done; s-3-failure-cost-pause deps satisfied, advancer dispatch imminent (~08:10Z). Check A: repo behind 1 commit → fast-forwarded 3c81a7c7→dec70eae. 0 new alerts. All 5 daemons alive (beacon 3435953, chain-event 2744551, inbox-watcher 3434697, dashboard_api 3486940, outbox-notifier 3462678). PR #497 scope decision still with Larry (deadline Jun-17T04:02Z ~20h). Repo dec70eae=origin/main. Watermark: 1068 (unchanged). pending=0. PRIME ratio=20.20 (991 interventions, 49 systemic fixes). Tier 2→1 RESET, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-16 07:53Z UTC (Iter ~2025, Tier 2, consecutive_clean=1)
 
 **Iter ~2025 summary:** ✅ Nominal. 1 new alert (L1068 Tier-3 silenced: dashboard_api auto-restarted at 07:50Z, code from PR #541). **Phase S s-1-link-inflight: PR #541 MERGED ✅** at 07:32:46Z UTC (Mirror PASS + AUTO_MERGE). **Phase S s-2-completion Forge build ACTIVE** — build-phase dispatched 07:41:17Z UTC, worktree `wt-forge-s-2-completion` active, no PR yet (~12 min in, within window). PR #497 scope decision still with Larry (deadline Jun-17T04:02Z ~20.2h). Repo 0c0ec029=origin/main. Watermark: 1067→1068. pending=0. PRIME ratio=20.20. Tier 2, consecutive_clean=1. dashboard_api new PID: 3486940.
@@ -356,7 +360,7 @@
 | G-rule mirror-no-session-revision-loop | [blue] **2/3** | Mirror review NO_SESSION × 2+ for PR #497; Beacon re-dispatches Mirror instead of Forge. Watch; dispatch at 3/3 |
 | G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 (warn-vs-info) |
 | G-rule telegram-409-burst | [yellow] **2/3** | Watch; dispatch at 3/3 |
-| Phase S dag-preflight-3 PASSED ✅ / s-1 BUILD ACTIVE | [yellow] PASSED 07:06:41Z Jun-16. s-1-link-inflight Forge build dispatched 07:13:52Z. Stale dag-revision notify RESOLVED (Beacon processed, archived, no spurious dag-preflight-4). | Watch s-1 Forge PR + Mirror review |
-| PR #497 scope decision DELIVERED | [yellow] Binary choice now with Larry (bot DM'd 07:07:50Z Jun-16). APPROVE=add 'info' to VALID_SEVERITIES / REJECT=close PR #497. Deadline Jun-17T04:02Z (~21h). | Watch Larry reply: `approve cleanup-branch-info` or `reject cleanup-branch-info` |
+| Phase S s-1+s-2 MERGED ✅, s-3 ADVANCING | [yellow] s-1 (PR #541) merged 07:32:46Z, s-2 (PR #542) merged 08:07:41Z. s-3-failure-cost-pause deps satisfied; advancer dispatch expected ~08:10Z. | Watch s-3 Forge build + PR + Mirror review |
+| PR #497 scope decision DELIVERED | [yellow] Binary choice now with Larry (bot DM'd 07:07:50Z Jun-16). APPROVE=add 'info' to VALID_SEVERITIES / REJECT=close PR #497. Deadline Jun-17T04:02Z (~20h). | Watch Larry reply: `approve cleanup-branch-info` or `reject cleanup-branch-info` |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap. outbox-notifier also drops regular approval_request markers from Beacon inter-agent sessions (observed iter ~2020: both routing-signal and approval_request dropped in same 5-min window). | DAG markers and scope-decision markers still fall through; recover manually |
 | Stale bash orphans | [blue] PIDs 1834248 (17d+) + 2605007 (1d+). Ss, low CPU. | Carry |
