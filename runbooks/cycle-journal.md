@@ -4,6 +4,78 @@
 
 ---
 
+## Iteration ~2000 — 2026-06-16 02:35Z UTC (interactive, /loop /cycle, Tier 2, consecutive_clean=1→2)
+
+**Trigger:** Larry direct invocation (`/loop /cycle`).
+
+**Health:** ✅ Nominal. 1 new alert (Tier-3 silenced). All daemons alive. Repo at 7cc0538f=origin/main. PR #532 delegate-endpoint stuck in revision-retry-exhausted (carry). Tier 2, consecutive_clean=2.
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): mergeable=UNKNOWN (GitHub recomputing). Mirror REVIEW_ESCALATE Jun-14T04:02:56Z unchanged. Age≈49.5h. 72h deadline Jun-17T04:02:56Z → **~25.5h remaining.** [yellow] carry.
+- PR #532 (`forge/delegate-endpoint`): OPEN, MERGEABLE, reviewDecision="". Mirror requested revision at 20:22Z Jun-15; Forge revision-1 dispatched but outbox lacked "Revision N applied:" preamble × 3 retries (20:22, 20:26, 20:31 MDT). `marker-error-delegate-endpoint-3.json` now in Forge inbox. Pipeline stall: RETRY_EXHAUSTED_SKIP (reason=superseded_session). System has the envelope; monitoring.
+- PR #55 (chat-label-fix, ourliberty-dashboard) **MERGED ✅** at 02:27Z — missions-v2-delegate-fix sequence step 2 complete.
+- PR #56 (fix/newmission-queued-ux, ourliberty-dashboard) **MERGED ✅** at 02:25Z — newmission queued UX fix (companion to PR #533).
+- All 5 daemons: PIDs 2530123 (Ssl), 2744551 (SNs), 2744840 (Ss), 2744914 (Ss), 2868353 (Ssl) — all alive. ✅
+- Repo HEAD: 7cc0538f=origin/main (Pulse cycle 20260616T022149Z). Clean tree, on main. Sync: 02:28Z, no-change, age~6min. ✅
+
+**Check 0 — Alert triage:** Watermark=1052 (entering); file=1053 lines. **1 new alert.**
+- **L1053** `source=heal-wedged-review-sessions, subject=wedged-review-reaped:wt-forge-delegate-endpoint`: Reaped wedged Forge worktree (pid 3385841, terminal marker present, idle 789s > grace 300s). Helper: **Tier-3 silenced** (known-pattern match). Bot: route=closure, skipped DM. ✅ No Pulse action.
+
+**Check 1 — Log noise:** outbox-notifier.log WARNs in recent window:
+- `forge revision-phase outbox without "Revision N applied:" preamble: delegate-endpoint.json` × 3 (retry 1/3 @ 20:22, 2/3 @ 20:26, 3/3 @ 20:31 MDT Jun-15). All for the same task, sub-threshold (~2/hour for delegate-endpoint window). Within normal retry mechanics. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** PID 2744840 alive (Ss). Bot log: no 409 errors, no ERROR lines since last iter. Last Larry directive: "go" at 19:46:17-0600 Jun-15 (dag-preflight-missions-v2-delegate-fix — tracked, sequence active). No new untracked directives. G-rule telegram-409-burst 2/3 unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → "no stalls detected". RETRY_EXHAUSTED_SKIP for delegate-endpoint (reason=superseded_session) — stall detector correctly deferring to the marker-error-3 envelope in Forge inbox. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0**. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-16T02:18:21Z`, age≈16min. FRESH (<60min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=7cc0538f=origin/main (Pulse cycle 20260616T022149Z). Clean tree, on main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-16T02:28:59Z, status=no-change (already at 7cc0538f), age≈6min. FRESH. ✅ Nominal.
+
+**Check C — Agent liveness:** All 5 PIDs alive (2530123 Ssl, 2744551 SNs, 2744840 Ss, 2744914 Ss, 2868353 Ssl). ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (2 open):
+- **PR #532** (`forge/delegate-endpoint`): OPEN, MERGEABLE, reviewDecision="". Mirror revision requested at 20:22Z Jun-15; Forge revision-1 outbox had wrong preamble × 3 retries → RETRY_EXHAUSTED. `marker-error-delegate-endpoint-3.json` in Forge inbox awaiting processing. Pipeline stall treating as superseded_session. [yellow] carry.
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): UNKNOWN/"" (GitHub recomputing). Mirror REVIEW_ESCALATE Jun-14T04:02:56Z. Age≈49.5h, ~25.5h until 72h deadline. [yellow] carry.
+ourliberty-dashboard: **0 open PRs** (PR #55 merged 02:27Z, PR #56 merged 02:25Z). ✅
+
+**Conditional checks (Tuesday 2026-06-16 UTC):** Check I fires Mon/Wed/Fri/Sun — today is Tuesday, skip. Check III fires Sunday (14d anchor) — today is Tuesday, skip.
+
+**New G-rule tracking:**
+- **`revision-phase-preamble-missing` 1/3** (new): Forge responded to revision-1 dispatch for delegate-endpoint without "Revision N applied:" preamble format, triggering marker-error retry loop × 3 → RETRY_EXHAUSTED. First observed instance of revision-phase (not preflight-phase) preamble failure. Count: 1/3. Dispatch to Beacon at 3/3.
+
+**Actions taken:**
+1. Triaged L1053 via helper → Tier-3 silence. ✅
+2. `cycle_prime_ledger.py append --tier 2 --kind iter_clean` ✅
+3. `alert_triage_state.py set-watermark --line 1053` ✅
+4. `cycle_tier_state.py record` — not available; tracking via MEMORY.md: Tier 2, consecutive_clean=2.
+
+**Dispatches:** None.
+
+**Standing findings (carried):**
+- [yellow] **PR #532 delegate-endpoint STUCK** — Mirror revision requested, Forge retry × 3 exhausted. marker-error-3 in Forge inbox. Pipeline stall deferring. missions-v2-delegate-fix sequence: step 2 (chat-label-fix) DONE ✅; step 1 (delegate-endpoint) STUCK. Monitor next iter.
+- [yellow] **PR #497 REVIEW_ESCALATE** — UNKNOWN/""; Mirror REVIEW_ESCALATE Jun-14T04:02:56Z; age≈49.5h; ~25.5h until 72h deadline Jun-17T04:02:56Z.
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519/530/531** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — FN=3027, TP=5. `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, **Forge-preflight-CLARIFY_REQUEST 2/3**, telegram-409-burst **2/3**, telegram-approval-self-dispatch-denied **1/3**, merge_conflict_manual_rebase-tier4 1/3, heal-pipeline-stall-mirror-pass-unmerged-tier4 1/3, **revision-phase-preamble-missing 1/3 (new)**. All others unchanged.
+- [blue] **Stale bash orphans** — PIDs 1834248 (18d+) + 2605007 (2d+). Low CPU. [carry]
+- [blue] **missions-v2-delegate-fix sequence** — step 2 (chat-label-fix, PR #55) MERGED ✅. Step 1 (delegate-endpoint, PR #532) STUCK (revision-retry-exhausted). Watch for Forge to process marker-error-3 envelope.
+
+**PRIME DIRECTIVE:** iter_clean. ratio=20.06. trend=stable.
+**Tier end-of-iter:** **Tier 2, consecutive_clean=2** (1 more clean iter needed for Tier 3 de-escalation).
+
+---
+
 ## Iteration ~1999 — 2026-06-16 02:18Z UTC (interactive, /loop /cycle, Tier 2, consecutive_clean=0→1)
 
 **Trigger:** Larry direct invocation (`/loop /cycle`).

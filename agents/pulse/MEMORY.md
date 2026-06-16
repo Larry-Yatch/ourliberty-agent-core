@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-16 02:35Z UTC (Iter ~2000, Tier 2, consecutive_clean=2)
+
+**Iter ~2000 summary:** ✅ Nominal. 1 new alert (L1053 Tier-3 silenced, wedge-reap wt-forge-delegate-endpoint). PR #55 (chat-label-fix) MERGED ✅ 02:27Z — missions-v2-delegate-fix step 2 done. PR #56 (fix/newmission-queued-ux) MERGED ✅ 02:25Z. PR #532 (delegate-endpoint) STUCK: Mirror revision requested, Forge outbox missing preamble × 3 → RETRY_EXHAUSTED; marker-error-3 in Forge inbox; pipeline stall RETRY_EXHAUSTED_SKIP (superseded_session). All 5 daemons alive. Repo 7cc0538f=origin/main. Watermark: 1052→1053. pending=0. **New G-rule: revision-phase-preamble-missing 1/3**. PRIME ratio=20.06. Tier 2, consecutive_clean=2.
+
 ## Status snapshot — updated 2026-06-16 02:18Z UTC (Iter ~1999, Tier 2, consecutive_clean=1)
 
 **Iter ~1999 summary:** ✅ Nominal. 0 new alerts. All daemons alive. Repo at d2d8d908=origin/main. Watermark: 1052 (unchanged). pending=0. 2 open PRs in ourliberty-agent-core: #532 (delegate-endpoint, Mirror reviewing, missions-v2-delegate-fix) + #497 (UNKNOWN/"", Mirror REVIEW_ESCALATE, 72h deadline Jun-17T04:02:56Z ~23.9h). 1 open PR in ourliberty-dashboard: #55 (chat-label-fix, Mirror reviewing, missions-v2-delegate-fix). PR #531 unreviewed-merge alert not yet fired. PRIME ratio=20.06. Tier 2, consecutive_clean=1.
@@ -231,7 +235,9 @@
 | PR #525 MERGED ✅ | feat(missions): re-brief narrator cards on mission state change. Merged 2026-06-15T20:21:50Z (`1bebe776`). missions-v2-phase4.1 sequence advancing. | DONE. Watch for next sequence step. |
 | PR #522 MERGED ✅ | fix(missions-card-gc): stop emitting routine success summary as Pulse-claimed digest alert. Merged 2026-06-15 after iter ~1986. **G-rule missions-card-gc-warn-vs-info COMPLETE ✅**. | DONE. |
 | PR #529 MERGED ✅ | `cred-drift-ignore-feature-flags-001`: adds `OURLIBERTY_NEWMISSION_INGEST_ENABLED` to ignored_keys allowlist in detect_drift. Merged 2026-06-15T23:48Z. | DONE. Credential drift false-positive resolved. |
-| PR #497 REVIEW_ESCALATE | [yellow] mergeable=MERGEABLE; Mirror REVIEW_ESCALATE Jun-14T04:02:56Z; age≈43.8h; 72h expires Jun-17T04:02:56Z (~28.2h remaining). | Escalate if still open at Jun-17T04:02:56Z |
+| PR #532 delegate-endpoint STUCK | [yellow] OPEN, MERGEABLE; Mirror revision-requested 20:22Z Jun-15; Forge outbox wrong preamble × 3 → RETRY_EXHAUSTED; marker-error-3 in Forge inbox. missions-v2-delegate-fix sequence step 1. Pipeline stall: RETRY_EXHAUSTED_SKIP. | Watch for Forge inbox-watcher to process; escalate if PR still open and no Forge activity next iter |
+| PR #55 chat-label-fix MERGED ✅ | missions-v2-delegate-fix step 2. Merged 02:27Z 2026-06-16. | DONE |
+| PR #497 REVIEW_ESCALATE | [yellow] mergeable=UNKNOWN; Mirror REVIEW_ESCALATE Jun-14T04:02:56Z; age≈49.5h; 72h expires Jun-17T04:02:56Z (~25.5h remaining). | Escalate if still open at Jun-17T04:02:56Z |
 | unreviewed-merge:511/499/494/489/510/509/518/519/530 | [yellow] PRs merged by Larry without Mirror; bot-delivered for others. Larry's judgment call. | Reply appropriate shortcut or silence |
 | G-rule stall-detector Forge build | [yellow] Beacon spec complete. Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
 | Check VIII rule=lower | [yellow] FN=3027, TP=5, FP=2 — threshold too high. | `approve check-viii-update-2026-06-15` when shortcut lands |
@@ -254,6 +260,7 @@
 | G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] **2/3** | Watch; dispatch at 3/3 |
 | G-rule Forge-preflight-CLARIFY_REQUEST | [blue] **2/3** | Watch; dispatch to Beacon at 3/3 |
+| G-rule revision-phase-preamble-missing | [blue] **1/3 (new)** | Forge outbox missing "Revision N applied:" preamble → RETRY_EXHAUSTED. Watch; dispatch to Beacon at 3/3 |
 | G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 (warn-vs-info) |
 | G-rule telegram-409-burst | [yellow] **2/3** | Watch; dispatch at 3/3 |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
