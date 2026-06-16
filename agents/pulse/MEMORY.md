@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-16 01:02Z UTC (Iter ~1994, Tier 3, consecutive_clean=6, all checks nominal)
+
+**Iter ~1994 summary:** ✅ Nominal. 0 new alerts. All daemons alive. Repo at 1af16aab=origin/main. Watermark: 1049 (unchanged). pending=0. 1 open PR: #497 (UNKNOWN/"", Mirror REVIEW_ESCALATE, 72h deadline Jun-17T04:02:56Z ~27h). PRIME ratio stable. Tier 3, consecutive_clean=6 (steady-state ceiling).
+
 ## Status snapshot — updated 2026-06-16 00:27Z UTC (Iter ~1993, Tier 3, consecutive_clean=5, all checks nominal)
 
 **Iter ~1993 summary:** ✅ Nominal. 0 new alerts. All daemons alive. Repo at c58858f3=origin/main. Watermark: 1049 (unchanged). pending=0. 1 open PR: #497 (UNKNOWN/"", Mirror REVIEW_ESCALATE, 72h deadline Jun-17T04:02:56Z ~27.6h). PRIME ratio=20.04. Tier 3, consecutive_clean=5 (steady-state ceiling).
