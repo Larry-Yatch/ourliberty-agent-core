@@ -536,7 +536,7 @@
       "id": "cap-fix-delegate-to-team-button-is-broken-404-37ea",
       "title": "Fix: Delegate-to-team button is broken (404)",
       "note": "The primary one-click Delegate on Parked cards POSTs to /api/missions/captures/{id}/delegate and returns 404 \u2014 dashboard UI + proxy route shipped (dash #54) but the droplet backend endpoint in dashboard_api.py was never implemented. Found in button test 2026-06-15. Minor also: the card chat labels MY message as Forge asks (reused CLARIFY component) \u2014 should read You.",
-      "state": "parked",
+      "state": "dropped",
       "label": null,
       "origin": {
         "source": "desktop-chat",
