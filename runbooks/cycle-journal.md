@@ -144072,3 +144072,88 @@ ourliberty-dashboard: 0 open PRs. ✅
 **Next:** Mirror's inbox-watcher dispatches her on next poll → re-runs 4-check DAG verification on the serialized DAG (s-2→s-3→s-4 serialized, parallel-write hazard removed). On PASS: sequence activates (`pending`→`active`), advancer dispatches `s-1-link-inflight` to Forge.
 
 **Action from Pulse:** None. Chain is self-healing.
+
+---
+
+## Iteration ~2033 — 2026-06-16 09:35Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0)
+
+**Trigger:** Larry direct invocation via `/cycle`.
+
+**Health:** ⚠️ 1 auto-fix (Check A: repo behind). All other checks nominal.
+
+**Continuity:** Last MEMORY snapshot iter ~2032 (09:28Z): Tier 1, consecutive_clean=0. PR #543 s-3 scope decision stranded; L1071 fired. Pipeline: s-1✅ s-2✅ s-3 pending Mirror verdict. PR #497 scope decision with Larry (~18h remaining on deadline). PRIME=20.22 (991 interventions prior; 992 after automated cycle 09:31Z).
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #543 s-3 MERGED ✅ — confirmed via `gh pr view 543`: state=MERGED, mergedAt≈09:32:25Z UTC. MEMORY ~2032 said "Mirror retry 2/3 MalformedMirrorMarker active" — fully resolved ✅.
+- PR #497 (cleanup-branch-warn-to-info-001): MERGEABLE (was UNKNOWN in ~2032) — scope decision with Larry, Mirror REVIEW_ESCALATE. 72h deadline Jun-17T04:02Z (~18.5h remaining). [carry]
+- All 5 daemons alive: beacon_telegram_bot:3435953, chain_event_shipper:2744551, inbox_watcher:3434697, outbox_notifier:3462678, dashboard_api:3486940. ✅
+- Pending approvals: 1 item (unreg-approval-2639d31d157f — PR #543 s-3 scope decision). PR #543 NOW MERGED → approval is stale/moot. Self-resolves; no Pulse action.
+
+**Check 0 — Alert triage:** Watermark=1071; file=1071 lines. 0 new alerts. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u ourliberty-*.service --priority warning --since "60 min ago"` → No entries. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot log tail-40: bot alive (PID 3435953). Last Larry message 23:50 MDT Jun-15 ("yes"). No unhandled directives. 502 Bad Gateway burst at 03:28-03:32 MDT (L1069 delivery initially failed; handled in ~2032). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected` (16 tasks with pr_exists or preflight_exit). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: pending=1 (unreg-approval-2639d31d157f, scope decision for PR #543 s-3). PR #543 MERGED → stale, will self-resolve. No blocking directives. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=`2026-06-16T09:20:16.248100+00:00` (~15 min old). ✅ Nominal (<60 min).
+
+**Check A — Source repo:** HEAD=eb466f51 ≠ origin/main=81c2dd6b (behind by 1 commit; PR #543 s-3 merged at 09:32:25Z). Working tree clean; on main. → **always-fix: ff-main-when-behind**. Fast-forwarded to 81c2dd6b. 8 files changed, 1027 insertions +22 deletions (dashboard_api.py, heal_missions_card_gc.py, missions_doorbell.py, fixtures, tests). ✅ Done.
+
+**Check B — Sync health:** last_sync=2026-06-16T09:30:16Z (~5 min ago), status=no-change. ✅ Nominal.
+
+**Check C — Agent liveness:** All 5/5 alive:
+- beacon_telegram_bot: 3435953 ✅ (Ss)
+- chain_event_shipper: 2744551 ✅ (SNs)
+- inbox_watcher: 3434697 ✅ (Ssl)
+- outbox_notifier: 3462678 ✅ (Ss)
+- dashboard_api: 3486940 ✅ (Ssl)
+
+**Check D — Inboxes:** beacon: empty; forge: empty; mirror: empty. ✅ Nominal.
+
+**Check E — PRs:**
+- **PR #497** (`fix/cleanup-branches`): MERGEABLE (improved from UNKNOWN), reviewDecision='', Mirror REVIEW_ESCALATE 04:02:56Z Jun-14. 72h deadline Jun-17T04:02Z (~18.5h remaining). Scope decision with Larry: `approve cleanup-branch-info` = add 'info' to VALID_SEVERITIES; `reject cleanup-branch-info` = close PR. [yellow carry]
+- **Phase S missions-v2-phase-s:** s-1✅ (PR #541 07:32Z) + s-2✅ (PR #542 08:07Z) + s-3✅ (PR #543 09:32Z). s-4/s-5/s-6 pending; sequence status=active, current_steps=[]. Advancer will dispatch s-4 on next inbox_watcher poll. No stall.
+
+**Conditional checks:** Today is Tuesday UTC (weekday=1) — Check I (Mon/Wed/Fri/Sun) not triggered. Not Sunday — Check III not triggered. ✅ Skip.
+
+**Actions taken:**
+1. `git -C ~/agent-core pull --ff-only` → fast-forwarded eb466f51→81c2dd6b. ✅
+2. Appended fast-forward entry to `runbooks/cycle-actions.jsonl`. ✅
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention --template ff-main-when-behind`. ✅
+4. `cycle_tier_state.py record --checks-clean false` → Tier 1, consecutive_clean=0 (always-fix = tier-reset). ✅
+
+**Dispatches:** None.
+
+**G-rule updates:** No changes this iter. All counters unchanged.
+
+**Standing findings:**
+- [yellow] **Phase S s-4/s-5/s-6 PENDING** — s-1+s-2+s-3 merged; advancer dispatching s-4 next tick. Watch.
+- [yellow] **PR #497 scope decision** — MERGEABLE; 72h deadline Jun-17T04:02Z (~18.5h). Reply `approve cleanup-branch-info` or `reject cleanup-branch-info` to Beacon.
+- [yellow] **Check VIII rule=lower** — FN=3027, TP=5, FP=2. `approve check-viii-update-2026-06-15` when shortcut lands. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [blue] **Stale pending approval** — unreg-approval-2639d31d157f (PR #543 scope decision) is moot since #543 merged. Self-resolves.
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch; dispatch at 3/3.
+- [blue] **G-rule mirror-malformed-verdict-marker** — 1/3. Watch; dispatch at 3/3.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch; dispatch at 3/3.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule catalog-accuracy-drift-tier4** — 1/3. Watch.
+- [blue] **G-rule ledger/check-i Tier-4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule telegram-approval-self-dispatch-denied** — 1/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **Stale bash orphans** — PIDs 1834248 (17d+) + 2605007 (~2d). Low CPU. [carry]
+- [blue] **dag-preflight-revision gap** — PR #484 closed source=pulse gap; DAG markers still fall through. [carry]
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — PRs merged without Mirror; bot-delivered. Larry judgment. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention row (ff-main-when-behind). Trailing-30d (script): interventions=993, systemic_fixes=49, ratio=20.27, trend=improving.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0 (always-fix executed; tier-reset).
+
