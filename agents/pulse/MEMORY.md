@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-16 05:18Z UTC (Iter ~2008, Tier 1, consecutive_clean=0)
+
+**Iter ~2008 summary:** ✅ Nominal. 0 new alerts. All 5 mandatory checks clean. Inbox-watcher PID changed 2530123→3434697 (restarted ~23:14 MDT Jun-15, informational). **PR #532 CONFLICTING carry:** fix c8f8c615 on origin, no active Forge/Beacon task, session ended 22:55Z MDT Jun-15 without Forge rebase dispatch. PR #497 REVIEW_ESCALATE Jun-14T04:02:56Z, age≈49.2h, 72h deadline Jun-17T04:02:56Z (~22.8h). Repo 4be83115=origin/main. Watermark: 1057 (unchanged). pending=0. Tier 1, consecutive_clean=0. PRIME ratio=20.10.
+
 ## Status snapshot — updated 2026-06-16 05:13Z UTC (Iter ~2007, Tier 1, consecutive_clean=0)
 
 **Iter ~2007 summary:** ✅ Nominal. 0 new alerts. All 5 mandatory checks clean. **PR #532 CONFLICTING carry:** fix c8f8c615 on origin, no active Forge/Beacon task, Beacon session ended 6h ago without Forge rebase dispatch. Forge/Beacon inboxes empty. PR #497 REVIEW_ESCALATE Jun-14T04:02:56Z, age≈49.2h, 72h deadline Jun-17T04:02:56Z (~22.8h). Repo 67582e2a=origin/main. Watermark: 1057 (unchanged). pending=0. Tier 1, consecutive_clean=0. PRIME ratio=20.10.

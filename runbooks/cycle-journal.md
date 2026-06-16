@@ -4,6 +4,70 @@
 
 ---
 
+## Iteration ~2008 — 2026-06-16 05:18Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 0 new alerts. All mandatory checks clean. Standing carries from iter ~2007 unchanged: PR #532 CONFLICTING (no active Forge task), PR #497 22.8h to deadline. Inbox-watcher PID changed (informational).
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #532 (`forge/delegate-endpoint`): **CONFLICTING** — confirmed via `gh pr view 532` (mergeable=CONFLICTING, headRefOid=c8f8c615, updatedAt=04:55:46Z, reviews=0). No change since iter ~2007. No active Forge task; Forge inbox empty. Beacon session ended 22:55:30 MDT Jun-15 (~8.4h ago); no follow-up dispatch. [yellow] carry.
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): UNKNOWN/"". Mirror REVIEW_ESCALATE Jun-14T04:02:56Z. Age=49.2h. 72h deadline Jun-17T04:02:56Z → **~22.8h remaining.** [yellow] carry.
+- All 5 daemons: chain_event_shipper(2744551 SNs), beacon_telegram_bot(2744840 Ss), outbox_notifier(2744914 Ss), dashboard_api(3402371 Ssl), inbox_watcher(**3434697** Ssl — new PID since ~23:14 MDT Jun-15; prior PID 2530123 gone). All alive. Inbox-watcher restart ~6h ago is informational; no alert in larry-alerts.jsonl for it. ✅
+
+**Check 0 — Alert triage:** Watermark=1057 (entering); file=1057 lines. **0 new alerts.** ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log: last WARNs from Jun-15 20:31–20:37Z (delegate-endpoint preamble × 3, dead-letter). No new WARNs/ERRORs since prior iters. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** PID 2744840 alive (Ss). Last Larry message: 22:50:55 MDT Jun-15 ("yes dig in and tell me what is wrong and how to fix ti for good"). Last bot reply: 22:55:30 MDT Jun-15 (Beacon: "Root cause nailed — GH_TOKEN was a red herring"). No new messages. G-rule telegram-409-burst 2/3 unchanged. ✅ Nominal (Beacon session ended without Forge rebase dispatch; carry).
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → "no stalls detected". All FORGE_NO_PR_SKIP entries informational (pr_exists or preflight_exit for completed tasks). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0** (history=222). ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-16T04:49:19Z`, age≈29 min. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=4be83115=origin/main. Clean tree, on main. ✅ Nominal (no fast-forward needed).
+
+**Check B — Sync health:** last_sync=2026-06-16T04:29:19Z, status=no-change, age≈48 min. FRESH (<2h). ✅ Nominal.
+
+**Check C — Agent liveness:** PIDs 2744551 (SNs), 2744840 (Ss), 2744914 (Ss), 3402371 (Ssl), 3434697 (Ssl). All 5 alive. Inbox-watcher PID change (2530123 → 3434697) is informational — healed ~6h ago. ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (2 open):
+- **PR #532** (`forge/delegate-endpoint`): **CONFLICTING** (confirmed). headRefOid=c8f8c615. 0 reviews. No active Forge task. [yellow] carry.
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): UNKNOWN/"". Mirror REVIEW_ESCALATE Jun-14T04:02:56Z. Age=49.2h. 72h deadline Jun-17T04:02:56Z (~22.8h). [yellow] carry.
+ourliberty-dashboard: **0 open PRs.** ✅
+
+**Conditional checks (Tuesday 2026-06-16 UTC, weekday=1):** Check I fires Mon/Wed/Fri/Sun — skip. Check III fires Sunday — skip.
+
+**G-rule tracking:** No new advances this iter. All standing counts unchanged.
+
+**Actions taken:**
+1. `alert_triage_state.py set-watermark --line 1057` (unchanged) ✅
+2. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` ✅
+3. `cycle_tier_state.py record --checks-clean false` → Tier 1, consecutive_clean=0 ✅
+
+**Dispatches:** None. PR #532 unchanged 10h+ (CONFLICTING, no active Forge task). Beacon session ended without dispatch; no new information warrants a Pulse dispatch this iter.
+
+**Standing findings (carried):**
+- [yellow] **PR #532 delegate-endpoint CONFLICTING** — Fix c8f8c615 on origin/forge/delegate-endpoint. Branch needs rebase onto current main. Forge/Beacon inboxes empty; no active driver. 10h+ standing. Larry last active 22:50 MDT Jun-15; Beacon replied 22:55 "Root cause nailed — GH_TOKEN red herring" but no Forge rebase dispatch followed.
+- [yellow] **PR #497 REVIEW_ESCALATE** — UNKNOWN/"". Mirror REVIEW_ESCALATE Jun-14T04:02:56Z. Age=49.2h. 72h deadline Jun-17T04:02:56Z (~22.8h).
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519/530/531/534** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — pending Larry dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — FN=3027, TP=5. `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] G-rule counters (unchanged): F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST **2/3**, merge_conflict_manual_rebase-tier4 1/3, heal-pipeline-stall-mirror-pass-unmerged-tier4 1/3, revision-phase-preamble-missing 1/3.
+- [blue] **Stale bash orphans** — PIDs 1834248 (19d+) + 2605007 (2d+). Low CPU. [carry]
+
+**PRIME DIRECTIVE:** iter_clean (no Pulse corrective action). ratio=20.10.
+**Tier end-of-iter:** **Tier 1, consecutive_clean=0** (signal: PR #532 CONFLICTING no-active-task; PR #497 22.8h deadline).
+
+---
+
 ## Iteration ~2007 — 2026-06-16 05:13Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0)
 
 **Trigger:** Larry direct invocation (`/cycle`).
