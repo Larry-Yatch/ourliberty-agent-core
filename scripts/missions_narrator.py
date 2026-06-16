@@ -69,6 +69,7 @@ from heal_missions_card_gc import (  # noqa: E402
     captures_path,
     load_repo_paths,
     log,
+    pr_number_from_url,
     read_captures_registry,
 )
 from test_isolation_guard import refuse_under_test  # noqa: E402
@@ -87,6 +88,14 @@ CLAUDE_TIMEOUT_SEC = 180
 NARRATOR_MAX_PER_TICK = 8
 
 VALID_RISKS = ('safe', 'medium', 'careful')
+
+# Terminal completion states (Phase S S3). A card the GC healer has closed
+# (`done`) or moved to closeout review (`review_close`) is past the meaning-layer
+# lifecycle: its `briefing` was authored for `parked`, so a naive state-mismatch
+# check would re-brief it forever. Skip these states so a closed card is never
+# re-authored (the closeout briefing on a `review_close` card is owned by
+# `author_closeout`, not this parked-card sweep).
+_NARRATOR_SKIP_STATES = frozenset({'done', 'review_close'})
 
 # Keywords in a capture's title/note that mark the proposed work as
 # irreversible / outward-facing / spendy — the § 5 escalator that pushes a
@@ -329,11 +338,16 @@ def parse_briefing_json(text: str) -> Optional[dict[str, Any]]:
     return None
 
 
-def generate_briefing_voice(prompt: str) -> Optional[dict[str, str]]:
-    """Invoke the claude CLI to author the briefing. Returns the parsed
-    {what,why,suggest} dict, or None on any failure (timeout, non-zero exit,
-    parse failure, missing key) so the caller falls through to the raw
-    rendering. Never raises. Mirrors ceo_digest_generator.generate_ceo_voice."""
+def generate_briefing_voice(
+    prompt: str, *, keys: tuple[str, ...] = ('what', 'why', 'suggest'),
+) -> Optional[dict[str, str]]:
+    """Invoke the claude CLI to author a JSON object with exactly ``keys``.
+    Returns the parsed dict (all keys present, non-empty strings), or None on any
+    failure (timeout, non-zero exit, parse failure, missing key) so the caller
+    falls through to the deterministic raw rendering. Never raises. Mirrors
+    ceo_digest_generator.generate_ceo_voice. ``keys`` is parameterized so both the
+    parked-card briefing ({what,why,suggest}) and the S3 closeout
+    ({what,outcome,note}) share one CLI round-trip path."""
     refuse_under_test('claude-spawn')
     try:
         proc = subprocess.run(
@@ -361,7 +375,7 @@ def generate_briefing_voice(prompt: str) -> Optional[dict[str, str]]:
         log('narrator: claude result had no extractable JSON briefing; using raw briefing')
         return None
     out = {}
-    for k in ('what', 'why', 'suggest'):
+    for k in keys:
         v = briefing.get(k)
         if not (isinstance(v, str) and v.strip()):
             return None
@@ -415,6 +429,116 @@ def author_meaning_layer(
     return fields
 
 
+# ---------------- closeout authoring (Phase S S3) ----------------
+#
+# When a medium/careful card's spawned work reaches verified-merged, the GC
+# healer routes it to closeout (not auto-close): the Narrator authors a
+# plain-language *closeout briefing* (what we did · the outcome · anything to
+# know) and the card moves to `review_close` awaiting Larry's ack. This reuses
+# the Phase 4.1 fold — same claude round-trip + deterministic raw fallback — with
+# closeout-shaped keys.
+
+CLOSEOUT_KEYS = ('what', 'outcome', 'note')
+
+
+def render_raw_closeout(
+    capture: dict[str, Any], pr_url: Optional[str],
+) -> dict[str, str]:
+    """Deterministic plain-English closeout — the fallback when the LLM voice is
+    unavailable (and the value tests assert against). Operator language; the PR
+    reference is the only identifier (a number Larry can click), never task ids or
+    branches."""
+    title = (capture.get('title') or 'this idea').strip()
+    n = pr_number_from_url(pr_url)
+    pr_ref = f' (PR #{n})' if n else ''
+    what = f'The team picked up "{title}" and carried it through to a shipped change.'
+    outcome = (f'It merged{pr_ref} and is live now.' if pr_ref
+               else 'It merged and is live now.')
+    note = ('This one was above the auto-close bar, so it is parked for your '
+            'okay before it closes — give it a quick look and clear it.')
+    return {'what': what, 'outcome': outcome, 'note': note}
+
+
+def build_closeout_prompt(
+    capture: dict[str, Any], events: list[dict[str, Any]], pr_url: Optional[str],
+) -> str:
+    """CEO-voice authoring prompt for the closeout (mirrors build_briefing_prompt).
+    Beacon voice, plain outcomes, JSON-out for parse."""
+    origin = capture.get('origin') if isinstance(capture.get('origin'), dict) else {}
+    facts = {
+        'title': capture.get('title'),
+        'note': capture.get('note'),
+        'repo': origin.get('repo'),
+        'pr_number': pr_number_from_url(pr_url),
+        'context_events': [
+            {'type': e.get('event_type'), 'summary': (
+                e.get('payload', {}).get('summary')
+                if isinstance(e.get('payload'), dict) else None)}
+            for e in events[:8]
+        ],
+    }
+    return (
+        "You are Beacon, the operator's manager. A piece of work the operator "
+        "captured has just shipped (merged). Write a 3-part closeout so a busy CEO "
+        "can review and sign off in seconds — in his terms, never engineering "
+        "jargon.\n\n"
+        "Return ONLY a JSON object with exactly these keys (each one short, plain "
+        "English, no markdown):\n"
+        '  "what":    one sentence — what the team did.\n'
+        '  "outcome": one sentence — the result (that it shipped / is live).\n'
+        '  "note":    one sentence — anything to know before closing it out.\n\n'
+        "You MAY reference the PR number if present, but never task ids, branches, "
+        "commits, agents, or risk codes.\n\n"
+        "Here are the facts (JSON):\n"
+        f"{json.dumps(facts, indent=2)}\n\n"
+        "Write the closeout now. Output ONLY the JSON object."
+    )
+
+
+def author_closeout(
+    capture: dict[str, Any],
+    pr_url: Optional[str],
+    now: Optional[datetime] = None,
+    *,
+    events: Optional[list[dict[str, Any]]] = None,
+    client: Optional[Any] = None,
+    use_llm: bool = True,
+) -> dict[str, Any]:
+    """Author the S3 closeout for one merged card and return the field dict
+    (``closeout`` + ``closeout_provenance``) for the GC healer's reconcile to
+    merge onto the capture. Pure — does not mutate the capture or touch disk; the
+    healer owns the single write + commit (single-committer invariant). Signature
+    matches the healer's ``closeout_fn(capture, pr_url, now)`` seam.
+
+    ``use_llm=True`` (production) tries the claude voice and falls back to the
+    deterministic raw closeout on any failure, so the author never raises and a
+    head-less/test run still produces a usable closeout. Context events are
+    fetched best-effort (keyed by capture id) when not injected."""
+    now = now or datetime.now(timezone.utc)
+    if events is None:
+        cid = capture.get('id')
+        events = fetch_capture_events(cid, client=client) if cid else []
+
+    closeout = None
+    if use_llm:
+        closeout = generate_briefing_voice(
+            build_closeout_prompt(capture, events, pr_url), keys=CLOSEOUT_KEYS)
+    authored_by_llm = closeout is not None
+    if closeout is None:
+        closeout = render_raw_closeout(capture, pr_url)
+
+    return {
+        'closeout': closeout,
+        'closeout_provenance': {
+            'by': NARRATOR_BY,
+            'model': NARRATOR_MODEL if authored_by_llm else 'raw',
+            'at': now.isoformat(),
+            'from_state': capture.get('state'),
+            'pr_url': pr_url,
+        },
+    }
+
+
 def needs_briefing(capture: dict[str, Any]) -> bool:
     """True if a capture needs (re)briefing — missing briefing, or its provenance
     was stamped from a different state than the capture's current one (§ 4: fields
@@ -427,7 +551,15 @@ def needs_briefing(capture: dict[str, Any]) -> bool:
 
     (Snooze keeps state == 'parked' — it only defers resurfacing via
     `snoozed_until` — so it is intentionally NOT a re-brief trigger here: the
-    card's meaning is unchanged by a snooze.)"""
+    card's meaning is unchanged by a snooze.)
+
+    A card in a terminal completion state (`done`/`review_close`, Phase S S3) is
+    never re-briefed: its parked-state briefing is final, and a `review_close`
+    card carries its own closeout authored by `author_closeout`. Without this
+    guard the state-mismatch check below would re-brief every closed card on
+    every sweep (its from_state is `parked`, its state is now terminal)."""
+    if capture.get('state') in _NARRATOR_SKIP_STATES:
+        return False
     if not isinstance(capture.get('briefing'), dict):
         return True
     provenance = capture.get('briefing_provenance')

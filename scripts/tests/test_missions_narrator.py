@@ -194,6 +194,64 @@ class NeedsBriefingTest(unittest.TestCase):
             briefing_provenance={'by': 'beacon', 'from_state': 'promoted'})
         self.assertTrue(mn.needs_briefing(cap))
 
+    def test_done_card_is_never_rebriefed(self):
+        # Phase S S3: a card the GC healer auto-closed to `done` carries a
+        # parked-state briefing; without the skip-states guard the from_state
+        # mismatch would re-brief it on every sweep. The guard short-circuits.
+        cap = _capture(
+            state='done',
+            briefing={'what': 'x', 'why': 'y', 'suggest': 'z'},
+            briefing_provenance={'by': 'beacon', 'from_state': 'parked'})
+        self.assertFalse(mn.needs_briefing(cap))
+
+    def test_review_close_card_is_never_rebriefed(self):
+        # A `review_close` card owns its closeout (author_closeout), not a parked
+        # briefing — the parked-card sweep must skip it.
+        cap = _capture(
+            state='review_close',
+            briefing={'what': 'x', 'why': 'y', 'suggest': 'z'},
+            briefing_provenance={'by': 'beacon', 'from_state': 'parked'})
+        self.assertFalse(mn.needs_briefing(cap))
+
+
+class AuthorCloseoutTest(unittest.TestCase):
+    """Phase S S3: the Narrator authors a plain-language closeout (what · outcome
+    · note) for a merged risky card. use_llm=False forces the deterministic raw
+    path — no claude spawn — which is also the head-less fallback."""
+
+    def test_raw_closeout_shape_and_provenance(self):
+        cap = _capture(state='review_close')
+        fields = mn.author_closeout(
+            cap, 'https://github.com/o/r/pull/542', NOW, events=[], use_llm=False)
+        self.assertEqual(set(fields['closeout']), {'what', 'outcome', 'note'})
+        # PR number is the only identifier surfaced (operator-clickable).
+        self.assertIn('542', fields['closeout']['outcome'])
+        prov = fields['closeout_provenance']
+        self.assertEqual(prov['by'], 'beacon')
+        self.assertEqual(prov['model'], 'raw')  # no LLM under use_llm=False
+        self.assertEqual(prov['pr_url'], 'https://github.com/o/r/pull/542')
+        self.assertEqual(prov['from_state'], 'review_close')
+
+    def test_closeout_degrades_without_pr_url(self):
+        # A missing/unparseable pr_url still yields an operator-readable closeout.
+        fields = mn.author_closeout(_capture(), None, NOW, events=[], use_llm=False)
+        self.assertEqual(set(fields['closeout']), {'what', 'outcome', 'note'})
+        self.assertNotIn('PR #', fields['closeout']['outcome'])
+
+    def test_closeout_does_not_mutate_capture(self):
+        # Pure: author_closeout returns fields, never writes onto the capture
+        # (the GC healer owns the single write — single-committer invariant).
+        cap = _capture(state='review_close')
+        before = dict(cap)
+        mn.author_closeout(cap, None, NOW, events=[], use_llm=False)
+        self.assertEqual(cap, before)
+
+    def test_closeout_under_test_refuses_claude_spawn(self):
+        # use_llm=True must hit the claude-spawn guard under test (no real spawn).
+        with self.assertRaises(TestIsolationBreach):
+            mn.author_closeout(_capture(), 'https://github.com/o/r/pull/1', NOW,
+                               events=[], use_llm=True)
+
 
 class RunSweepTest(unittest.TestCase):
     """run() writes the delta to disk atomically and NEVER git-commits — the
