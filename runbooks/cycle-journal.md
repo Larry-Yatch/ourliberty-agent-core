@@ -4,6 +4,72 @@
 
 ---
 
+## Iteration ~2001 — 2026-06-16 02:50Z UTC (interactive, /cycle, Tier 2→3, consecutive_clean=2→DE-ESCALATE)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 0 new alerts. All checks clean. **Tier 2 → Tier 3 DE-ESCALATION** (3 consecutive clean iters: ~1999, ~2000, ~2001).
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #532 (`forge/delegate-endpoint`): OPEN, MERGEABLE, reviewDecision="", reviews=0. Forge inbox EMPTY — marker-error-3 moved to .archive at 20:31Z Jun-15 (4 min before iter ~2000 was written; iter ~2000 incorrectly stated it was "awaiting processing"). Dead-letter to Beacon processed (Beacon inbox empty), but no new Forge task created. PR is pipeline-orphaned: Mirror requested revision internally (not a formal GitHub review), Forge responded × 4 with wrong preamble format → RETRY_EXHAUSTED. No active driver. [yellow] carry — pipeline definitively stopped.
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): OPEN, now MERGEABLE (GitHub resolved computation from UNKNOWN). reviewDecision="". Age≈46.7h. 72h deadline Jun-17T04:02:56Z → **~25.3h remaining.** [yellow] carry.
+- All 5 daemons: PIDs 2530123 (Ssl), 2744551 (SNs), 2744840 (Ss), 2744914 (Ss), 2868353 (Ssl) — alive ✅.
+- Repo HEAD: 91264558=origin/main (Pulse cycle 20260616T023815Z). Clean tree, on main ✅.
+
+**Check 0 — Alert triage:** Watermark=1053 (entering); file=1053 lines. **0 new alerts.** ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log WARNs: all pre-existing from Jun-15 20:xx MDT (delegate-endpoint revision preamble × 4, all before iter ~2000, all already noted). No new WARNs since 02:35Z. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** PID 2744840 alive (Ss). Bot log: no 409 errors, no ERROR lines since last iter. Last Larry directive: "go" at 19:46:17-0600 Jun-15 (dag-preflight-missions-v2-delegate-fix — tracked, sequence active). G-rule telegram-409-burst 2/3 unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → "no stalls detected". RETRY_EXHAUSTED_SKIP for delegate-endpoint (reason=superseded_session). Stall detector correctly deferring. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0** (history=220). ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-16T02:18:21Z`, age≈28min. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=91264558=origin/main (Pulse cycle 20260616T023815Z). Clean tree, on main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-16T02:28:59Z, status=no-change, age≈17min. FRESH. ✅ Nominal.
+
+**Check C — Agent liveness:** All 5 PIDs alive (2530123 Ssl, 2744551 SNs, 2744840 Ss, 2744914 Ss, 2868353 Ssl). ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (2 open):
+- **PR #532** (`forge/delegate-endpoint`): OPEN, MERGEABLE, reviewDecision="", reviews=[]. Pipeline RETRY_EXHAUSTED_SKIP (superseded_session). Forge inbox empty. Dead-letter to Beacon processed; no new task. PR orphaned. [yellow] carry.
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): OPEN, MERGEABLE, reviewDecision="". Age≈46.7h. 72h deadline Jun-17T04:02:56Z (~25.3h). [yellow] carry.
+ourliberty-dashboard: **0 open PRs.** ✅
+
+**Conditional checks (Tuesday 2026-06-16 UTC, weekday=1):** Check I fires Mon/Wed/Fri/Sun — today is Tuesday, skip. Check III fires Sunday — skip.
+
+**G-rule tracking:** No new advances this iter. All standing G-rule counts unchanged from iter ~2000.
+
+**Actions taken:**
+1. `cycle_prime_ledger.py append --tier 2 --kind iter_clean --template nominal --detail "Iter 2001 all checks nominal"` ✅
+2. `cycle_tier_state.py record --checks-clean true` ×2 (once for this iter; once catchup for iter ~2000's failed write — state gap confirmed: state file showed consecutive_clean=1 but MEMORY.md tracked 2) → **Tier 2 → Tier 3 DE-ESCALATION** ✅ `cycle-tier.json` now: tier=3, consecutive_clean=0.
+3. Watermark=1053 unchanged (no new alerts).
+
+**Dispatches:** None.
+
+**Standing findings (carried):**
+- [yellow] **PR #532 delegate-endpoint PIPELINE-ORPHANED** — missions-v2-delegate-fix sequence step 1. Mirror revision request (internal pipeline only, no GitHub review) → Forge preamble failure × 4 → RETRY_EXHAUSTED → dead-letter to Beacon (processed, no new task). PR open/mergeable but no active driver. Needs Larry judgment: re-trigger Forge revision, or manual merge after manual Mirror check?
+- [yellow] **PR #497 REVIEW_ESCALATE** — MERGEABLE, reviewDecision="". Age≈46.7h. 72h deadline Jun-17T04:02:56Z (~25.3h).
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519/530/531** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; pending Larry dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — FN=3027, TP=5. `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] G-rule counters (unchanged): F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST **2/3**, merge_conflict_manual_rebase-tier4 1/3, heal-pipeline-stall-mirror-pass-unmerged-tier4 1/3, **revision-phase-preamble-missing 1/3**, telegram-approval-self-dispatch-denied **1/3**. All others unchanged.
+- [blue] **Stale bash orphans** — PIDs 1834248 (18d+) + 2605007 (2d+). Low CPU. [carry]
+- [blue] **missions-v2-delegate-fix** — step 2 (chat-label-fix PR #55) MERGED ✅. Step 1 (delegate-endpoint PR #532) PIPELINE-ORPHANED.
+
+**PRIME DIRECTIVE:** iter_clean. ratio=20.06. trend=improving.
+**Tier end-of-iter:** **Tier 3, consecutive_clean=0** (de-escalated from Tier 2; 30-min cadence now active).
+
+---
+
 ## Iteration ~2000 — 2026-06-16 02:35Z UTC (interactive, /loop /cycle, Tier 2, consecutive_clean=1→2)
 
 **Trigger:** Larry direct invocation (`/loop /cycle`).

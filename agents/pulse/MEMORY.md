@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-16 02:50Z UTC (Iter ~2001, Tier 3, consecutive_clean=0, DE-ESCALATED)
+
+**Iter ~2001 summary:** ✅ Nominal. 0 new alerts. All checks clean. **Tier 2 → Tier 3 DE-ESCALATION** (3 consecutive clean: ~1999, ~2000, ~2001). All 5 daemons alive. Repo 91264558=origin/main. Watermark: 1053 (unchanged). pending=0. PR #532 (delegate-endpoint): PIPELINE-ORPHANED — Forge inbox empty (marker-error-3 in .archive since 20:31Z Jun-15), dead-letter to Beacon processed, no new task, PR has 0 GitHub reviews; pipeline definitively stopped, needs Larry judgment. PR #497: MERGEABLE (resolved from UNKNOWN), age≈46.7h, deadline Jun-17T04:02:56Z (~25.3h). Tier 3, consecutive_clean=0. PRIME ratio=20.06.
+
 ## Status snapshot — updated 2026-06-16 02:35Z UTC (Iter ~2000, Tier 2, consecutive_clean=2)
 
 **Iter ~2000 summary:** ✅ Nominal. 1 new alert (L1053 Tier-3 silenced, wedge-reap wt-forge-delegate-endpoint). PR #55 (chat-label-fix) MERGED ✅ 02:27Z — missions-v2-delegate-fix step 2 done. PR #56 (fix/newmission-queued-ux) MERGED ✅ 02:25Z. PR #532 (delegate-endpoint) STUCK: Mirror revision requested, Forge outbox missing preamble × 3 → RETRY_EXHAUSTED; marker-error-3 in Forge inbox; pipeline stall RETRY_EXHAUSTED_SKIP (superseded_session). All 5 daemons alive. Repo 7cc0538f=origin/main. Watermark: 1052→1053. pending=0. **New G-rule: revision-phase-preamble-missing 1/3**. PRIME ratio=20.06. Tier 2, consecutive_clean=2.
@@ -235,7 +239,7 @@
 | PR #525 MERGED ✅ | feat(missions): re-brief narrator cards on mission state change. Merged 2026-06-15T20:21:50Z (`1bebe776`). missions-v2-phase4.1 sequence advancing. | DONE. Watch for next sequence step. |
 | PR #522 MERGED ✅ | fix(missions-card-gc): stop emitting routine success summary as Pulse-claimed digest alert. Merged 2026-06-15 after iter ~1986. **G-rule missions-card-gc-warn-vs-info COMPLETE ✅**. | DONE. |
 | PR #529 MERGED ✅ | `cred-drift-ignore-feature-flags-001`: adds `OURLIBERTY_NEWMISSION_INGEST_ENABLED` to ignored_keys allowlist in detect_drift. Merged 2026-06-15T23:48Z. | DONE. Credential drift false-positive resolved. |
-| PR #532 delegate-endpoint STUCK | [yellow] OPEN, MERGEABLE; Mirror revision-requested 20:22Z Jun-15; Forge outbox wrong preamble × 3 → RETRY_EXHAUSTED; marker-error-3 in Forge inbox. missions-v2-delegate-fix sequence step 1. Pipeline stall: RETRY_EXHAUSTED_SKIP. | Watch for Forge inbox-watcher to process; escalate if PR still open and no Forge activity next iter |
+| PR #532 delegate-endpoint PIPELINE-ORPHANED | [yellow] OPEN, MERGEABLE, 0 GitHub reviews. Forge preamble failure × 4 → RETRY_EXHAUSTED → dead-letter to Beacon (processed, Beacon inbox now empty) → no new Forge task. PR has no active pipeline driver. missions-v2-delegate-fix step 1. Needs Larry judgment. | Re-trigger Forge revision manually, or close PR and restart? Escalate if still stuck. |
 | PR #55 chat-label-fix MERGED ✅ | missions-v2-delegate-fix step 2. Merged 02:27Z 2026-06-16. | DONE |
 | PR #497 REVIEW_ESCALATE | [yellow] mergeable=UNKNOWN; Mirror REVIEW_ESCALATE Jun-14T04:02:56Z; age≈49.5h; 72h expires Jun-17T04:02:56Z (~25.5h remaining). | Escalate if still open at Jun-17T04:02:56Z |
 | unreviewed-merge:511/499/494/489/510/509/518/519/530 | [yellow] PRs merged by Larry without Mirror; bot-delivered for others. Larry's judgment call. | Reply appropriate shortcut or silence |
