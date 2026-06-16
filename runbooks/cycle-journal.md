@@ -4,6 +4,79 @@
 
 ---
 
+## Iteration ~1998 — 2026-06-16 02:10Z UTC (interactive, /loop /cycle, Tier 1 → Tier 2, consecutive_clean=2→0)
+
+**Trigger:** Larry direct invocation (`/loop /cycle`).
+
+**Health:** ✅ Nominal. 0 new alerts. All daemons alive. Repo at a4731185=origin/main. 1 open PR (known carry). **Tier 1 → Tier 2 DE-ESCALATION** (3 consecutive clean iters at Tier 1).
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): mergeable=UNKNOWN/"" (GitHub recomputing). Mirror REVIEW_ESCALATE Jun-14T04:02:56Z unchanged. Age≈46.1h. 72h deadline Jun-17T04:02:56Z → **~25.9h remaining.** [yellow] carry.
+- All 5 daemons: PIDs 2530123 (Ssl), 2744551 (SNs), 2744840 (Ss), 2744914 (Ss), 2868353 (Ssl) — all alive. ✅
+- Repo HEAD: a4731185=origin/main (Pulse cycle 20260616T015610Z). Clean tree, on main. ✅
+- 409 burst: no new occurrences in bot log. G-rule 2/3 unchanged.
+- PR #531 merged at 01:55:17Z (by Larry, branch `work/alert-translations-coverage`): "fix(alerts): translate 4 uncovered healer alert call sites". Unreviewed-merge; heal-unreviewed-merge-detector has not yet fired (no new alerts above watermark). Expected L1053 next iter.
+
+**Check 0 — Alert triage:** Watermark=1052 (entering); file=1052 lines. **0 new alerts.** ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log: 2 WARNs in recent history:
+- AUTO_MERGE_HELD_STALE_CONFLICT PR #522 (14:03 MDT Jun-15) — stale; #522 already merged.
+- forge marker error chat-label-fix.json (19:57 MDT Jun-15, retry 1/3 dispatched) — within normal recovery flow. Both isolated, well below 5/hour threshold. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** PID 2744840 alive (Ss). Bot log: no 409 errors. No ERROR lines. Last Larry directive: approved `dag-preflight-missions-v2-delegate-fix` at 19:46:17 MDT Jun-15 (tracked, mirror-dag-pass confirmed, sequence active). No new untracked directives. G-rule telegram-409-burst 2/3 unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → "no stalls detected". All FORGE_NO_PR_SKIP informational (pr_exists / preflight_exit). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0**. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-16T01:48:19.677772+00:00`, age≈22 min. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=a4731185=origin/main (includes PR #531 merge + iter ~1997 auto-commit). Clean tree, on main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-16T01:28:57Z, status=success, age≈41 min. FRESH (<2h). ✅ Nominal.
+
+**Check C — Agent liveness:** All 5 PIDs alive (2530123 Ssl, 2744551 SNs, 2744840 Ss, 2744914 Ss, 2868353 Ssl). ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (1 open):
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): UNKNOWN/"" (GitHub recomputing). Mirror REVIEW_ESCALATE Jun-14T04:02:56Z. Age≈46.1h, ~25.9h until 72h deadline Jun-17T04:02:56Z. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Conditional checks (Tuesday 2026-06-16 UTC):** Check I fires Mon/Wed/Fri/Sun — today is Tuesday, skip. Check III fires Sunday (14d anchor) — today is Tuesday, skip.
+
+**Notable:**
+- **PR #531 merged** by Larry at 01:55:17Z (`work/alert-translations-coverage`, "fix(alerts): translate 4 uncovered healer alert call sites"). Unreviewed by Mirror. heal-unreviewed-merge-detector alert expected next iter. Larry's judgment.
+- **missions-v2-delegate-fix sequence:**
+  - `delegate-endpoint`: Forge preflight PROCEED at 19:54:57 MDT; build-phase dispatched (`build-delegate-endpoint.json` in Forge inbox). Active.
+  - `chat-label-fix`: Forge preflight marker error at 19:57:03 MDT (MalformedForgeMarker — no PROCEED/CLARIFY_REQUEST/REJECT found). Retry 1/3 sent (`marker-error-chat-label-fix-1.json` in Forge inbox). Within normal recovery flow.
+
+**Actions taken:**
+1. No new alerts to triage (watermark=1052=file). ✅
+2. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` ✅
+3. `cycle_tier_state.py record --checks-clean true` → **Tier 1 → Tier 2, consecutive_clean=0** ✅
+
+**Dispatches:** None.
+
+**G-rule updates this iter:** No new occurrences. All counters unchanged from iter ~1997.
+
+**Standing findings (carried):**
+- [yellow] **PR #497 REVIEW_ESCALATE** — UNKNOWN/"" (GitHub); Mirror REVIEW_ESCALATE Jun-14T04:02:56Z; age≈46.1h; ~25.9h until 72h deadline Jun-17T04:02:56Z.
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519/530/531** — bot-delivered (531 pending). Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — FN=3027, TP=5. `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, **Forge-preflight-CLARIFY_REQUEST 2/3**, telegram-409-burst **2/3**, telegram-approval-self-dispatch-denied **1/3**, merge_conflict_manual_rebase-tier4 1/3, heal-pipeline-stall-mirror-pass-unmerged-tier4 1/3. All unchanged.
+- [blue] **Stale bash orphans** — PIDs 1834248 (18d+) + 2605007 (2d+). Low CPU. [carry]
+- [blue] **missions-v2-delegate-fix sequence** — delegate-endpoint build-phase active; chat-label-fix retry 1/3 in Forge inbox. Watch for PRs.
+
+**PRIME DIRECTIVE:** iter_clean. ratio=20.06. trend=stable.
+**Tier end-of-iter:** **Tier 2, consecutive_clean=0** (de-escalated from Tier 1).
+
+---
+
 ## Iteration ~1997 — 2026-06-16 01:53Z UTC (interactive, /cycle, Tier 1, consecutive_clean=1→2)
 
 **Trigger:** Larry direct invocation (`/cycle`).
