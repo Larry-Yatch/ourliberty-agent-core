@@ -4,6 +4,60 @@
 
 ---
 
+## Iteration ~2060 — 2026-06-16 19:23Z UTC (interactive, /cycle, Tier 3, consecutive_clean=12→13)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 0 new alerts. All mandatory checks clean.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** `gh pr list --state open` → 0 open PRs across all 3 repos. ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** 0 open PRs confirmed. ✅
+- **Pending approvals — CLEAR ✅:** pending=0 per Check 4. ✅
+- **Daemons same PIDs ✅:** beacon 3556778 (Ss), chain-event 2744551 (SNs), inbox-watcher 3434697 (Ssl), outbox_notifier 3556624 (Ss), dashboard_api 3593488 (Ssl). All alive, same PIDs as iter ~2059. ✅
+
+**Check 0 — Alert triage:** Watermark=1053 entering; file=1053 lines. **0 new alerts.** Watermark unchanged at 1053. ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log: no WARNs/ERRORs in last 30 min (last entry 05:02:48Z stale s-6-drain re-scan, known from prior iters). inbox_watcher.log: no WARNs/ERRORs. journalctl 30m: clean. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Larry sent 'status' at 13:17 MDT (19:17 UTC) — within 4h window but 'status' does not match directive keyword heuristics (?, please, should we, do X, please fix, why is); current cycle is the response. 03:28–03:35 MDT read-timeout cluster: same transient outage from iter ~2055, self-healed. G-rule telegram-409-burst **2/3** unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → `no stalls detected`. FORGE_NO_PR_SKIP entries for tasks p41-schedule-harden (#520), missions-card-gc-warn-demote-001 (#522), forge-preflight-marker-selfcheck-001 (#524), p41-rebrief-on-change (#525), cred-drift-ignore-feature-flags-001 (#529), delegate-endpoint (#532), adopt-sequence-step-stall-recovery-spec (#535), orphan-lane-prompt-blob-title-fallback-001 (#538), s-1 through s-6 Phase S PRs, and dashboard PRs — all reason=pr_exists; 0 open PRs confirmed by Check E. ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0. All Larry directives in 24h window resolved. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` not found. Heartbeat file `heal-stale-daemon-code.heartbeat` = 2026-06-16T19:22:15Z (age ≈ 1 min at check time). Healer is running and recent; appears to have migrated to heartbeat-only format (no state JSON written when no stale daemons found). No stale-daemon alerts in larry-alerts.jsonl. ✅ Nominal (note: spec references `heal-stale-daemon-code-state.json`; implementation uses heartbeat-only pattern consistent with other healers; no action required).
+
+**Check A — Source repo:** HEAD=cf500b04=origin/main. Working tree clean, on main. No divergence. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-16T18:30:20Z, status=no-change, age≈53 min at check time. FRESH (< 2h). ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3556778 (Ss) ✅, chain_event_shipper 2744551 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, outbox_notifier 3556624 (Ss) ✅, dashboard_api 3593488 (Ssl) ✅. All 5 alive, same PIDs as iter ~2059. ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core: **0 open PRs.** ✅
+ourliberty-dashboard: **0 open PRs.** ✅
+ourliberty-graph: **0 open PRs.** ✅
+
+**Check H — Forge digest:** 0 open Forge PRs. 0 merged in last 6h. Phase S ALL 6/6 MERGED ✅. No Forge activity since s-6-drain merge at 10:52:38Z UTC. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** No credentials due within 60d window. ✅ Nominal.
+
+**§5.0 Phase-2 (every cycle):** audit_due_nudge.py → no-op (no committed audit baseline). distill_detector.py → no-op (no un-distilled audits). audit_cadence_signal.py → no-op (no post-seed decision-grade distill artifacts). No `FIRED` output from any script. ✅ Nominal.
+
+**Conditional checks (Tuesday 2026-06-16 UTC, weekday=1):** Check I fires Mon/Wed/Fri/Sun — skip. Check III fires Sunday — skip.
+
+**G-rule tracking:** No new WARN events this iter. All counts unchanged from iter ~2059.
+
+**Actions taken:**
+1. PRIME ledger: `iter_clean` appended (tier=3, template=iter-clean, ts=2026-06-16T19:24:36Z).
+2. Tier state: `record --checks-clean true` → consecutive_clean 12→13. Tier 3 unchanged (steady-state).
+3. Watermark: 1053 (no advance — 0 new alerts).
+
+**Dispatches:** None.
+
+---
+
 ## Iteration ~2059 — 2026-06-16 18:51Z UTC (interactive, /cycle, Tier 3, consecutive_clean=11→12)
 
 **Trigger:** Larry direct invocation (`/cycle`).
