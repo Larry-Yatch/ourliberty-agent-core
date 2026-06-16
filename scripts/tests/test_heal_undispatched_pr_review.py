@@ -74,7 +74,7 @@ class TestTaskIdForBranch(unittest.TestCase):
 
 
 class TestSelectOrphanedPrs(unittest.TestCase):
-    def _none_dispatched(self, _task_id):
+    def _none_dispatched(self, _task_id, _head_sha=None):
         return False
 
     def test_selects_forge_pr_past_grace_with_no_review(self):
@@ -100,8 +100,41 @@ class TestSelectOrphanedPrs(unittest.TestCase):
 
     def test_skips_already_dispatched(self):
         prs = [_pr(5, 'forge/done', age_minutes=60)]
-        sel = h.select_orphaned_prs(prs, NOW, already_dispatched=lambda t: True)
+        sel = h.select_orphaned_prs(
+            prs, NOW, already_dispatched=lambda t, head=None: True)
         self.assertEqual(sel, [])
+
+    def test_forwards_current_head_sha_to_probe(self):
+        # The PR's headRefOid must reach the dedup probe so a review of an
+        # OLDER head doesn't mask a needed re-review of the current head.
+        seen = {}
+
+        def probe(task_id, head_sha=None):
+            seen['task_id'] = task_id
+            seen['head_sha'] = head_sha
+            return False
+
+        pr = _pr(9, 'forge/x', age_minutes=60)
+        pr['headRefOid'] = 'deadbeefcafe0000'
+        sel = h.select_orphaned_prs([pr], NOW, probe)
+        self.assertEqual([p['number'] for p in sel], [9])
+        self.assertEqual(seen['head_sha'], 'deadbeefcafe0000')
+
+    def test_re_reviews_when_only_older_head_dispatched(self):
+        # Probe says "dispatched" only for the OLD head; current head differs →
+        # the PR is selected for a fresh review (the head-drift fix).
+        reviewed_head = 'aaaaaaaaaaaa'
+
+        def probe(_task_id, head_sha=None):
+            return head_sha == reviewed_head
+
+        pr = _pr(10, 'forge/x', age_minutes=60)
+        pr['headRefOid'] = 'bbbbbbbbbbbb'  # PR advanced past the reviewed head
+        sel = h.select_orphaned_prs([pr], NOW, probe)
+        self.assertEqual([p['number'] for p in sel], [10])
+        # And when the current head IS the reviewed one, it's skipped.
+        pr['headRefOid'] = reviewed_head
+        self.assertEqual(h.select_orphaned_prs([pr], NOW, probe), [])
 
     def test_skips_unparseable_created_at(self):
         bad = _pr(6, 'forge/bad', age_minutes=60)
@@ -109,7 +142,7 @@ class TestSelectOrphanedPrs(unittest.TestCase):
         self.assertEqual(h.select_orphaned_prs([bad], NOW, self._none_dispatched), [])
 
     def test_dispatched_probe_exception_treated_as_undispatched(self):
-        def boom(_t):
+        def boom(_t, _head=None):
             raise RuntimeError('probe down')
         prs = [_pr(7, 'forge/x', age_minutes=60)]
         sel = h.select_orphaned_prs(prs, NOW, boom)
@@ -167,7 +200,7 @@ class _FakeNotifier:
         self.dispatch_succeeds = dispatch_succeeds
         self.pr_open = pr_open  # for the TOCTOU recheck
 
-    def _review_request_already_dispatched(self, fname):
+    def _review_request_already_dispatched(self, fname, current_head_sha=None):
         return fname in self.dispatched
 
     def _dispatch_mirror_review(self, data, url):
