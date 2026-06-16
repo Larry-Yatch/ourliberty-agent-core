@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-16 07:11Z UTC (Iter ~2021, Tier 1, consecutive_clean=0)
+
+**Iter ~2021 summary:** ⚠️ Signal. 2 new alerts. **Phase S dag-preflight-3 PASSED ✅** at 07:06:41Z: sequence missions-v2-phase-s now `active`, all 6 steps pending, advancer dispatching s-1-link-inflight next tick (~07:10Z). **PR #497 scope decision DELIVERED** to Larry via L1066 (bot DM'd 07:07:50Z): binary APPROVE=add 'info' to VALID_SEVERITIES / REJECT=close PR, deadline Jun-17T04:02Z (~21h). L1066 Tier-4 (novel; journal-note only); L1067 Tier-3 silenced (mirror-dag-pass:missions-v2-phase-s). Stale dag-revision notify in Beacon inbox — low risk (sequence now active). All 5 daemons alive. Repo d22331ad=origin/main. Watermark: 1065→1067. pending=0. PRIME ratio=20.20 (990 interventions, 49 systemic fixes). Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-16 07:04Z UTC (Iter ~2020, Tier 2→1 tier-reset, consecutive_clean=0)
 
 **Iter ~2020 summary:** ⚠️ Signal. 0 new alerts. Phase S dag-preflight-3 STUCK: Beacon session 4963f2d8 emitted routing-signal APPROVAL_REQUEST at 06:40:49Z; outbox-notifier dropped it; dispatched pulse-phase-s-dag-redispatch-002 to Beacon for direct Mirror inbox write. PR #497 scope decision NOT DELIVERED: Beacon session 7081f34b found PR #497 has invalid `severity='info'` (not in VALID_SEVERITIES=('warning','critical')) → append_alert() drops the digest line entirely; Beacon emitted cleanup-branch-info-severity-decision-001 APPROVAL_REQUEST; outbox-notifier dropped it; dispatched pulse-cleanup-branch-decision-reissue-001 to Beacon to re-issue via larry_alerts. All 5 daemons alive. Repo 821b68be=origin/main. Watermark: 1065 (unchanged). pending=0. PRIME ratio=20.18 (989 interventions, 49 systemic fixes). **Tier 2 → 1 RESET.** consecutive_clean=0.
@@ -336,7 +340,7 @@
 | G-rule mirror-no-session-revision-loop | [blue] **2/3** | Mirror review NO_SESSION × 2+ for PR #497; Beacon re-dispatches Mirror instead of Forge. Watch; dispatch at 3/3 |
 | G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 (warn-vs-info) |
 | G-rule telegram-409-burst | [yellow] **2/3** | Watch; dispatch at 3/3 |
-| Phase S dag-preflight-3 STUCK | [yellow] Beacon emitted routing-signal APPROVAL_REQUEST at 06:40:49Z Jun-16; outbox-notifier dropped it (last log entry 06:28:32Z). pulse-phase-s-dag-redispatch-002 dispatched to Beacon for direct Mirror inbox write. | Watch Mirror receiving dag-preflight-3 and PASS/REVISION verdict |
-| PR #497 scope decision pending | [yellow] Beacon found `severity='info'` invalid in cleanup_dispatch_branches.py (VALID_SEVERITIES=('warning','critical')); binary APPROVE=add INFO tier / REJECT=abandon. Beacon's cleanup-branch-info-severity-decision-001 APPROVAL_REQUEST dropped by outbox-notifier. pulse-cleanup-branch-decision-reissue-001 dispatched to Beacon. | Watch Beacon larry_alerts re-issue + Larry reply |
+| Phase S dag-preflight-3 PASSED ✅ | [blue] PASSED 07:06:41Z Jun-16. Sequence missions-v2-phase-s now `active`. s-1-link-inflight dispatching on advancer next tick (~07:10Z). Stale dag-revision notify in Beacon inbox (dag-preflight-2 REVISION, superseded); watch for spurious dag-preflight-4. | Watch s-1 Forge PR + Mirror review |
+| PR #497 scope decision DELIVERED | [yellow] Binary choice now with Larry (bot DM'd 07:07:50Z Jun-16). APPROVE=add 'info' to VALID_SEVERITIES / REJECT=close PR #497. Deadline Jun-17T04:02Z (~21h). | Watch Larry reply: `approve cleanup-branch-info` or `reject cleanup-branch-info` |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap. outbox-notifier also drops regular approval_request markers from Beacon inter-agent sessions (observed iter ~2020: both routing-signal and approval_request dropped in same 5-min window). | DAG markers and scope-decision markers still fall through; recover manually |
 | Stale bash orphans | [blue] PIDs 1834248 (17d+) + 2605007 (1d+). Ss, low CPU. | Carry |

@@ -4,6 +4,97 @@
 
 ---
 
+## Iteration ~2021 — 2026-06-16 07:11Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Signal. 2 new alerts. **Phase S dag-preflight-3 PASSED ✅** — sequence missions-v2-phase-s now `active`. PR #497 scope decision delivered to Larry via L1066. Tier-4 alert present → tier-reset, consecutive_clean=0.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S dag-preflight-3 PASS — CONFIRMED ✅:** outbox-notifier log at 01:06:41 MDT (07:06:41Z UTC): `MIRROR_DAG_PREFLIGHT seq=missions-v2-phase-s verdict=PASS status=pending->active task=dag-preflight-missions-v2-phase-s-3`. Sequence file at `~/agents/blackboard/build-sequences/missions-v2-phase-s.json`: `status=active`, all 6 steps `pending`, `current_steps=[]`. Build sequence advancer last ticked 07:05:11Z (before PASS); next tick ~07:10Z dispatches s-1-link-inflight (no deps). Phase S pipeline LIVE.
+- **PR #497 scope decision — NOW DELIVERED ✅:** L1066 confirmed in `larry-alerts.jsonl` at 07:06:24Z (source=beacon, route=escalate, subject=cleanup-branch-info-severity-decision). Telegram bot delivered at 07:07:50Z (log `alert idx=1065 delivered`). `pulse-cleanup-branch-decision-reissue-001` succeeded (Result-notification above). Larry has the binary choice: APPROVE=add 'info' to VALID_SEVERITIES / REJECT=close PR #497. Deadline Jun-17T04:02Z (~21h).
+- **Stale Beacon inbox notify:** `notify-dag-revision-missions-v2-phase-s.json` still in Beacon inbox (from dag-preflight-2 REVISION at 00:28:32Z). Sequence is now active/PASS; if Beacon processes this, it should skip amendment on seeing `status=active`. Risk is low but watch for spurious dag-preflight-4 dispatch. [blue] carry.
+
+**Check 0 — Alert triage:** Watermark=1065 entering; file=1067 lines. **2 new alerts:**
+- **L1066** (`source=beacon, route=escalate, subject=cleanup-branch-info-severity-decision`): Tier-4 (novel, no registry template). Helper: `triaged-tier-4`. Bot delivered (idx=1065 at 07:07:50Z). No second Pulse DM; journal-note only.
+- **L1067** (`source=outbox-notifier, route=escalate, subject=mirror-dag-pass:missions-v2-phase-s`): Tier-3 silenced ✅ (known-pattern match in alert-translations.json). Phase S PASS. Bot delivered (idx=1066). No Pulse action.
+- Watermark advanced to 1067.
+
+**Check 1 — Log noise:** outbox-notifier.log last entry 01:06:51 MDT (07:06:51Z): `notified pulse <- beacon (beacon-result, depth=1, file=notify-pulse-cleanup-branch-decision-reissue-001.json)`. All INFO-level since 06:28:32Z. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot PID 3435953 alive (Ss). Last log entry 07:07:50Z (both alerts delivered). No 409 errors. No new Larry messages. G-rule telegram-409-burst 2/3 unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → "no stalls detected". All FORGE_NO_PR_SKIP informational (pr_exists or preflight_exit). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0** (history=223). ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-16T06:49:57Z`, age≈21 min. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=d22331ad=origin/main (no divergence). Clean tree, on main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-16T06:29:59Z, status=error (push-failed race, known-pattern, self-heals). Repo itself at origin/main. ✅ Known-pattern nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3435953 (Ss) ✅, chain_event_shipper 2744551 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, dashboard_api 3462541 (Ssl) ✅, outbox_notifier 3462678 (Ss) ✅. All 5 alive. ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (1 open):
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): UNKNOWN/"". Binary scope decision now in Larry's hands (L1066, bot DM'd 07:07:50Z). Awaiting reply: `approve cleanup-branch-info` or `reject cleanup-branch-info`. Deadline Jun-17T04:02Z (~21h). [yellow] carry.
+ourliberty-dashboard: **0 open PRs.** ✅
+
+**Conditional checks (Tuesday 2026-06-16 UTC, weekday=1):** Check I fires Mon/Wed/Fri/Sun — skip. Check III fires Sunday — skip.
+
+**G-rule tracking:**
+- **mirror-no-session-revision-loop 2/3** — no new NO_SESSION occurrence this iter. Stale dag-revision notify still in Beacon inbox; if Beacon amends again → new NO_SESSION → advance to 3/3 and dispatch to Beacon at 3/3. Currently unchanged.
+- All other G-rule counts unchanged from iter ~2020.
+
+**Actions taken:**
+1. Alert triage: L1066 → Tier-4 (journal-note, bot already delivered). L1067 → Tier-3 silenced.
+2. Watermark 1065 → 1067.
+3. PRIME ledger: 1 intervention appended (alert-triage, L1066+L1067).
+4. Tier state: `record --checks-clean false` → Tier 1, consecutive_clean=0 (reset; L1066 Tier-4 signal).
+
+**Dispatches:** None.
+
+**Standing findings (carried):**
+- [yellow] **PR #497 scope decision** — binary choice now with Larry. `approve cleanup-branch-info` or `reject cleanup-branch-info`. Bot DM'd 07:07:50Z. Deadline Jun-17T04:02Z (~21h). Watch for Larry reply.
+- [yellow] **Phase S build sequence ACTIVE** — s-1-link-inflight dispatches on advancer's next tick (~07:10Z). Watch for Forge PR + Mirror review.
+- [yellow] **Stale Beacon inbox notify** — `notify-dag-revision-missions-v2-phase-s.json` (dag-preflight-2 REVISION, superseded). Sequence is active; Beacon should skip on next pickup. Watch for spurious dag-preflight-4. [risk: low]
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519/530/531/534** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — pending Larry dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — FN=3027, TP=5. `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST **2/3**, merge_conflict_manual_rebase-tier4 1/3, heal-pipeline-stall-mirror-pass-unmerged-tier4 1/3, revision-phase-preamble-missing 1/3, **mirror-no-session-revision-loop 2/3**.
+- [blue] **Stale worktrees** — `wt-forge-fix-delegate-endpoint-regression-gate-001`, `wt-mirror-dag-preflight-missions-v2-delegate-fix`, `wt-mirror-dag-preflight-missions-v2-phase-s`, `wt-mirror-dag-preflight-missions-v2-phase-s-2`, `wt-mirror-dag-preflight-missions-v2-phase-s-3`. dispatch-branch-cleanup will reap.
+- [blue] **Stale bash orphans** — PIDs 1834248 + 2605007. Low CPU. [carry]
+- [blue] **Beacon inbox stale dag-revision notify** — superseded by PASS; watch for spurious dag-preflight-4. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention this iter (L1066 Tier-4 alert triage). ratio=20.20 (990 interventions, 49 systemic fixes).
+**Tier end-of-iter:** **Tier 1, consecutive_clean=0** (tier-reset; L1066 Tier-4 signal).
+
+---
+
+## Result-notification — 2026-06-16 ~07:1xZ UTC (inter-cycle, task=pulse-cleanup-branch-decision-reissue-001, from=beacon, status=SUCCESS)
+
+**Type:** Beacon result-notification. No cycle; journaling material finding only.
+
+**Summary:** `pulse-cleanup-branch-decision-reissue-001` completed successfully. Beacon re-issued the PR #497 binary scope decision to Larry via `larry_alerts.append_alert` (severity=`warning`, `route=escalate`) and promoted it onto the Approvals tab via `heal_unregistered_approval.py`. Decision landed in `larry-alerts.jsonl` at 07:06:24Z. Original APPROVAL_REQUEST from Beacon session 7081f34b was dropped by outbox-notifier (confirmed by empty `pending=[]`); this re-issue used the direct-alerts path that bypasses the marker gap.
+
+**Decision now in front of Larry:**
+- **APPROVE** (`approve cleanup-branch-info`): add `'info'` to `VALID_SEVERITIES` + cooldown bucket + update `test_invalid_severity_rejected` + land branch-prune alert as INFO.
+- **REJECT** (`reject cleanup-branch-info`): close PR #497 (alert already `route='digest'`; `ceo_digest_generator` never renders severity token — only a cosmetic WARN token in the raw ledger).
+- Beacon's lean: APPROVE. Deadline Jun-17T04:02Z (~21h from now).
+
+**Standing updates:**
+- **PR #497 scope decision:** State transitions from "not delivered" → **awaiting Larry reply**. When Larry answers, Beacon emits the build dispatch (APPROVE) or closes PR (REJECT).
+- **outbox-notifier marker gap:** This is the 3rd confirmed drop in headless context (dag-preflight-3 routing-signal + two approval_request markers from back-to-back sessions). Recovery path (direct larry_alerts / direct inbox write) works reliably; systemic fix still pending. `project_pulse_direction_ask_marker_gap.md` tracks.
+
+**Actions taken:** None. Beacon recovery complete; Pulse no further action needed.
+
+---
+
 ## Result-notification — 2026-06-16 ~07:1xZ UTC (inter-cycle, task=pulse-phase-s-dag-redispatch-002, from=beacon, status=SUCCESS)
 
 **Type:** Beacon result-notification. No cycle; journaling material finding only.
