@@ -46,6 +46,7 @@ both daemons cleanly.
 
 from __future__ import annotations
 
+import glob
 import json
 import os
 import re
@@ -3651,7 +3652,33 @@ def _extract_pr_url_from_build_result(result_text: str) -> Optional[str]:
     return urls[0]
 
 
-def _review_request_already_dispatched(review_filename: str) -> bool:
+def _recorded_review_head_sha(path: Path) -> Optional[str]:
+    """Read the `head_sha` a review-request was dispatched for, or None.
+
+    Looks top-level first, then under `context` (chain envelope nesting). A
+    review-request written before head_sha was recorded returns None — the
+    caller treats that as "doesn't cover the current head" so the PR gets a
+    fresh review (the safe direction)."""
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    v = data.get('head_sha')
+    if isinstance(v, str) and v:
+        return v
+    ctx = data.get('context')
+    if isinstance(ctx, dict):
+        v = ctx.get('head_sha')
+        if isinstance(v, str) and v:
+            return v
+    return None
+
+
+def _review_request_already_dispatched(
+    review_filename: str, current_head_sha: Optional[str] = None,
+) -> bool:
     """True if a review-request with this filename is already in Mirror's
     inbox, its `.archive/`, or its `.invalid/`.
 
@@ -3660,13 +3687,49 @@ def _review_request_already_dispatched(review_filename: str) -> bool:
     reconciliation sweep can't diverge. Guards against re-dispatching a Mirror
     review for a PR she's already (or previously) reviewing — including a
     prior dispatch that was validator-rejected into `.invalid/`.
-    """
+
+    Head-awareness (default OFF): when `current_head_sha` is given, an ARCHIVED
+    or `.invalid` review only counts as "already dispatched" if it recorded
+    THAT head. A review of an older head no longer blocks re-review of new
+    commits — the gap that left a PR pushed-after-its-first-review stuck
+    forever (the dedup keyed on task-id, not commit, so commits after the first
+    reviewed head never got re-reviewed). A LIVE review in the inbox still
+    blocks regardless of head — Mirror is actively on it; never pile on.
+    Callers that pass None (the reconcile sweep) keep the exact prior
+    existence-only behavior. `move_to()` uniquifies archive collisions as
+    `<stem>.<i><suffix>`, so a task accrues one archived copy per reviewed head
+    — all are scanned for a head match."""
     mirror_inbox = safe_write_inbox.INBOXES_ROOT / 'mirror'
-    return (
-        (mirror_inbox / review_filename).exists()
-        or (mirror_inbox / '.archive' / review_filename).exists()
-        or (mirror_inbox / '.invalid' / review_filename).exists()
+    # A live in-flight review blocks regardless of head (anti-storm).
+    if (mirror_inbox / review_filename).exists():
+        return True
+    if current_head_sha is None:
+        # Back-compat: pure existence in archive / .invalid.
+        return (
+            (mirror_inbox / '.archive' / review_filename).exists()
+            or (mirror_inbox / '.invalid' / review_filename).exists()
+        )
+    # Head-aware: a prior review counts only if it covered the current head.
+    stem = (
+        review_filename[:-len('.json')]
+        if review_filename.endswith('.json') else review_filename
     )
+    for sub in ('.archive', '.invalid'):
+        d = mirror_inbox / sub
+        if not d.exists():
+            continue
+        # The exact name plus the `<stem>.<i>.json` uniquified collisions.
+        # glob.escape so a task_id with glob metacharacters can't turn the
+        # variant scan into a character class (which would miss its own
+        # archives → re-dispatch storm) or match a sibling task.
+        candidates = [
+            d / review_filename,
+            *sorted(d.glob(f'{glob.escape(stem)}.*.json')),
+        ]
+        for p in candidates:
+            if p.exists() and _recorded_review_head_sha(p) == current_head_sha:
+                return True
+    return False
 
 
 def _dispatch_mirror_review(data: dict[str, Any], pr_url: str) -> None:
@@ -3767,6 +3830,24 @@ def _dispatch_mirror_review(data: dict[str, Any], pr_url: str) -> None:
     for f_name in ('pr_title', 'pr_body', 'max_clarifications'):
         if data.get(f_name) is not None:
             review_base[f_name] = data[f_name]
+    # Record the PR head commit this review covers, so the round-0 dedup (and
+    # the heal-undispatched-pr-review backstop) can distinguish "this commit
+    # was reviewed" from "an older commit was reviewed". A PR pushed-to after
+    # its first review must be re-reviewed, not skipped. Prefer a head the
+    # caller already resolved (the healer threads the PR's headRefOid through
+    # `data`, so no second gh call); fall back to a direct lookup for the
+    # inline build-phase path. Best-effort: a gh hiccup leaves it unset and the
+    # dedup falls back to existence-only (the prior behavior).
+    review_head_sha: Optional[str] = None
+    _cand = data.get('head_sha')
+    if isinstance(_cand, str) and _cand:
+        review_head_sha = _cand
+    else:
+        _pr_coords = _parse_pr_url(pr_url)
+        if _pr_coords is not None:
+            review_head_sha = _gh_pr_head_sha(_pr_coords[0], _pr_coords[1])
+    if review_head_sha:
+        review_base['head_sha'] = review_head_sha
     # Chain context (M1). pr_url/target_repo are the PR under review; first
     # review starts the revision budget at 0. forge_build_session_id threads
     # Forge's build session (D3.5 5b) so a downstream REVIEW_REVISION can
@@ -3811,8 +3892,11 @@ def _dispatch_mirror_review(data: dict[str, Any], pr_url: str) -> None:
     # leg (D3.5 5a M-1 review fix) catches a prior dispatch that was
     # validator-rejected — don't re-dispatch a duplicate that hits the same
     # rejection. Shared with the reconciliation sweep via the helper so the
-    # two checks can't drift.
-    if _review_request_already_dispatched(review_filename):
+    # two checks can't drift. Round-0 passes the head so a review of an OLDER
+    # head doesn't block re-review of new commits; replan rounds keep the
+    # existence check (their filename already carries the round suffix).
+    _dedup_head = review_head_sha if replan_count == 0 else None
+    if _review_request_already_dispatched(review_filename, _dedup_head):
         log(
             f'review-request already dispatched for task {task_id} '
             f'(file or archive or .invalid present); skipping duplicate write'

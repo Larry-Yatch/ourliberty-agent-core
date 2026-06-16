@@ -208,13 +208,13 @@ def _parse_iso(ts: str) -> Optional[datetime]:
 def fetch_open_prs() -> Optional[list[dict[str, Any]]]:
     """List open PRs via gh. Returns parsed rows, or None on ANY gh failure
     (already logged) — a healer must never crash the timer. Each row carries
-    number, url, headRefName, createdAt, title."""
+    number, url, headRefName, createdAt, title, headRefOid."""
     cmd = [
         'gh', 'pr', 'list',
         '--repo', REPO,
         '--state', 'open',
         '--limit', str(_OPEN_PR_FETCH_LIMIT),
-        '--json', 'number,url,headRefName,createdAt,title',
+        '--json', 'number,url,headRefName,createdAt,title,headRefOid',
     ]
     try:
         proc = subprocess.run(
@@ -255,6 +255,10 @@ def parse_open_prs(raw_json: str) -> list[dict[str, Any]]:
             'headRefName': head,
             'createdAt': created,
             'title': r.get('title') or '',
+            # head commit SHA — lets the dedup distinguish "this PR's CURRENT
+            # head was reviewed" from "an EARLIER head was reviewed". Tolerated
+            # absent (older gh, mocks) → dedup falls back to existence-only.
+            'headRefOid': r.get('headRefOid'),
         })
     return out
 
@@ -281,10 +285,13 @@ def select_orphaned_prs(
     """Pure selection step. From the open-PR rows, return those that are Forge
     build PRs, older than the grace window, and have NO Mirror review task yet.
 
-    `already_dispatched(task_id) -> bool` is injected (the production caller passes
-    a thin wrapper over `outbox_notifier._review_request_already_dispatched`) so
-    this core is testable without the notifier or the filesystem. Each returned
-    row is the input row augmented with its derived `task_id`.
+    `already_dispatched(task_id, head_sha) -> bool` is injected (the production
+    caller passes a thin wrapper over
+    `outbox_notifier._review_request_already_dispatched`) so this core is
+    testable without the notifier or the filesystem. `head_sha` is the PR's
+    current head commit; the wrapper treats a review of a DIFFERENT (older) head
+    as not-yet-dispatched, so a PR updated after its first review is re-reviewed.
+    Each returned row is the input row augmented with its derived `task_id`.
     """
     cutoff = now - timedelta(minutes=grace_minutes)
     out: list[dict[str, Any]] = []
@@ -299,8 +306,8 @@ def select_orphaned_prs(
         if not task_id:
             continue  # degenerate 'forge/' branch → no dispatchable task_id
         try:
-            if already_dispatched(task_id):
-                continue  # review already in inbox / archive / .invalid
+            if already_dispatched(task_id, pr.get('headRefOid')):
+                continue  # CURRENT head already in inbox / archive / .invalid
         except Exception as e:  # noqa: BLE001 — never let a probe crash selection
             log(f'already_dispatched probe raised for task={task_id}: '
                 f'{type(e).__name__}: {e}; treating as undispatched', 'WARN')
@@ -323,6 +330,10 @@ def _synthesize_build_data(pr: dict[str, Any]) -> dict[str, Any]:
         'branch': pr['headRefName'],
         'pr_title': pr.get('title') or '',
         'dispatched_by': 'heal-undispatched-pr-review',
+        # Thread the PR head we already have from gh-pr-list so the dispatch
+        # records the right commit without a second gh round-trip (and the
+        # round-0 dedup keys on this exact head).
+        'head_sha': pr.get('headRefOid'),
     }
 
 
@@ -385,9 +396,9 @@ def main() -> int:
             f'skipping tick', 'ERROR')
         return 0
 
-    def _already_dispatched(task_id: str) -> bool:
+    def _already_dispatched(task_id: str, head_sha: Optional[str] = None) -> bool:
         fname = safe_write_inbox.canonical_inbox_name(f'review-{task_id}.json')
-        return notifier._review_request_already_dispatched(fname)
+        return notifier._review_request_already_dispatched(fname, head_sha)
 
     open_prs = fetch_open_prs()
     if open_prs is None:
