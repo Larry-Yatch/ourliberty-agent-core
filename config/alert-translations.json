@@ -167,8 +167,8 @@
     "gh-unavailable": {
       "severity": "WARNING",
       "tier": "SOON",
-      "plain_language_summary": "The dispatch-branch cleanup ran but the GitHub CLI was unavailable, so it skipped one or more repos. Branch pruning checks for open PRs before deleting a branch; without GitHub access that guard cannot run, so cleanup was held back on those repos rather than risk deleting a branch with live work. Stale branches will accumulate until GitHub access is restored.",
-      "recommended_action": "Check GitHub access with `gh auth status` (token may have expired) and confirm network reachability. Once restored, the hourly timer will catch up on the next run, or force one with `sudo systemctl start ourliberty-cleanup-dispatch-branches.service`. Detail on which repos were skipped is in ~/agents/logs/cleanup_dispatch_branches.log."
+      "plain_language_summary": "The hourly dispatch-branch cleanup couldn't reach GitHub (`gh` unavailable) for one or more repos, so it SKIPPED pruning their stale Forge/Mirror branches this run. Nothing was deleted unsafely — without `gh` it can't check which branches still back an open PR (the guard against deleting a live branch), so it skips rather than risk it. Stale branches just keep piling up until `gh` works again. Unlike the routine `summary` this is route=escalate, because a persistent `gh` outage means the cleanup backstop is effectively dark.",
+      "recommended_action": "Check `gh` on the droplet: `gh auth status`, then a probe like `gh pr list --repo Larry-Yatch/ourliberty-agent-core`. Re-auth with `gh auth login` if it's an auth failure (runbook: docs/runbooks/audit-github-gh-oauth.md); otherwise look for a network or rate-limit issue. Cleanup self-resumes on its next hourly run once `gh` is reachable. Per-repo detail is in ~/agents/logs/dispatch-branch-cleanup.log."
     }
   },
   "outbox-notifier": {
@@ -362,14 +362,6 @@
       "recommended_action": "One-off: no action needed, it self-recovered. If it recurs, inspect ~/agents/state/cycle-tier.json by hand for what is writing bad data."
     }
   },
-  "missions-card-gc": {
-    "failure": {
-      "severity": "WARNING",
-      "tier": "SOON",
-      "plain_language_summary": "The missions-card garbage-collector hit a hard failure while saving its work — a commit landed on the wrong branch, or the commit or push step failed outright. Capture briefs and/or shipped-mission updates were computed but did NOT persist, so the dashboard's mission and capture state is now behind the real work.",
-      "recommended_action": "Check ~/agents/logs/heal_missions_card_gc.log for the failing step, then inspect the agent-core git state (`git -C ~/agent-core status`) — a stuck branch checkout or an unpushed/aborted commit is the usual cause. Resolve the git state and the next hourly run will re-commit the pending changes."
-    }
-  },
   "missions-autoregister": {
     "summary": {
       "severity": "INFO",
@@ -380,8 +372,16 @@
     "failure": {
       "severity": "WARNING",
       "tier": "SOON",
-      "plain_language_summary": "The orphan-thread autoregister hit a hard failure while committing its proposal — a commit landed on the wrong branch, or the commit or push step failed. The proposed thread registration was computed but did NOT persist, so the orphan thread remains unregistered until the next successful run.",
-      "recommended_action": "Check ~/agents/logs/heal_orphan_autoregister.log for the failing step, then inspect the agent-core git state (`git -C ~/agent-core status`) — a stuck branch checkout or an unpushed/aborted commit is the usual cause. Resolve the git state and the next run will re-commit the proposal."
+      "plain_language_summary": "missions-autoregister proposed orphan-thread registrations (and/or ingested new-mission PRs) but couldn't commit and push the result to main — the subject suffix names the git problem (`wrong-branch`, `commit-failed`, or `push-failed`). The work was computed but didn't persist, so the Missions board won't reflect the new proposals until a later clean run lands them.",
+      "recommended_action": "Check the droplet repo state (`cd ~/agent-core && git status`) — a non-main checkout or a dirty/diverged tree is the usual cause; the change is retained locally and the next run retries. Detail is in ~/agents/logs/missions-autoregister.log around the alert time."
+    }
+  },
+  "missions-card-gc": {
+    "failure": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "The missions-card garbage collector (it retires stale desktop-session cards and ages out old parked captures, then commits captures.json) computed its cleanup but couldn't fully land it. The subject suffix names which: `wrong-branch`, `commit-failed`, or `push-failed` is a git problem persisting the captures.json change; otherwise one or more card-retirement events failed to emit. Stale cards may linger on the Missions board until a later clean run.",
+      "recommended_action": "Grep ~/agents/logs/missions-card-gc.log around the alert time for the exact git/emit error. For a wrong-branch / commit / push failure, check the droplet repo state (`cd ~/agent-core && git status`) — the captures.json change is retained locally and the next GC run retries. For emit-failures the affected card ids are in the alert body; verify Supabase / chain_event_emit health."
     }
   },
   "pulse-check-iv": {
@@ -508,10 +508,10 @@
       "recommended_action": "Run `python3 ~/agent-core/scripts/pulse_check_<id>.py` by hand and read the traceback; logs are under ~/agents/logs/pulse-check-*.log. Fix the underlying error so the check resumes emitting heartbeats."
     },
     "catalog-accuracy-drift": {
-      "severity": "WARNING",
-      "tier": "SOON",
-      "plain_language_summary": "The Pulse catalog-accuracy meter found that some shelf cards no longer match the live code they describe — their recorded facts (dependents, seams) have drifted. A drifted card can mislead a builder into reusing or extending the wrong component, so reuse decisions made off these cards may be wrong until they are re-characterized.",
-      "recommended_action": "In the ourliberty-graph repo, re-characterize the drifted cards named in the alert: `./pipeline/regen_descriptor.sh <id>` (or `batch_catalog.sh` for several), commit, then re-run `pipeline/accuracy_meter.py` to confirm the meter is back above its gate."
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "The shelf catalog-accuracy meter (in ourliberty-graph) found that some reusable-component shelf cards no longer verify against live code — their recorded facts (dependents, seams) have moved since the card was characterized. A drifted card can mislead component reuse, but nothing in the build chain is broken. Maintenance-grade, surfaced in the daily digest only (route=digest), never DM'd. The drifted card ids and the attention-rate-vs-gate numbers are in the alert body.",
+      "recommended_action": "No urgency. When convenient, re-characterize the drifted cards in ourliberty-graph: `./pipeline/regen_descriptor.sh <id>` (or `batch_catalog.sh` for several), then commit and re-run `pipeline/accuracy_meter.py` to confirm the attention rate is back under the gate. The drifted ids are named in the alert body."
     }
   },
   "pulse": {

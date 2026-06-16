@@ -126,6 +126,44 @@
 
 ---
 
+## Status snapshot — updated 2026-06-16 05:06Z UTC (Iter ~2006, Tier 1, consecutive_clean=0)
+
+**Iter ~2006 summary:** ✅ Nominal. 0 new alerts. **VERIFY-BEFORE-REASSERT PR #532:** push resolved ✅ — c8f8c615 now on origin/forge/delegate-endpoint (updatedAt=04:55:46Z); PR still CONFLICTING (needs Forge rebase, 10+ commits behind main), Forge inbox empty, no active task. Beacon session ended 22:55Z MDT Jun-15 with "Root cause nailed — GH_TOKEN red herring" (no follow-up dispatch). PR #497: MERGEABLE/"", Mirror REVIEW_ESCALATE Jun-14T04:02:56Z, age≈49h, deadline Jun-17T04:02:56Z (~23h). All 5 daemons alive. Repo 9ad777b8=origin/main. Watermark: 1057 (unchanged). pending=0. Tier 1, consecutive_clean=0. PRIME ratio=20.10.
+
+## Status snapshot — updated 2026-06-16 04:59Z UTC (Iter ~2005, Tier 1, consecutive_clean=0)
+
+**Iter ~2005 summary:** ⚠️ Signal. 1 new alert (L1057 Tier-3 silenced: dispatch-branch-cleanup pruned 2 local + 2 remote stale branches at 04:38Z). PR #532 (`forge/delegate-endpoint`): **CONFLICTING** (was BUILDING). Forge build exit_code=0 ($1.81), fix commit `c8f8c615` locally staged on `forge/delegate-endpoint`, push-blocked (no GH_TOKEN in Forge session). Fix: 4 alert-translation entries for config/alert-translations.json. Beacon diagnosing root cause with Larry at 22:55 MDT. Push cmd: `git -C /home/larry/agent-worktrees/wt-forge-fix-delegate-endpoint-regression-gate-001 push origin forge/delegate-endpoint`. All 5 daemons alive. Repo 9a51558d=origin/main. Watermark: 1056→1057. pending=0. PR #497: MERGEABLE/"", Mirror REVIEW_ESCALATE Jun-14T04:02:56Z, age≈49h, deadline Jun-17T04:02:56Z (~23h). **Tier 3→1 (tier-reset)**. consecutive_clean=0. PRIME ratio=20.10.
+
+## Status snapshot — updated 2026-06-16 04:30Z UTC (Iter ~2004, Tier 3, consecutive_clean=3)
+
+**Iter ~2004 summary:** ✅ Nominal. 1 new alert (L1056 Tier-3 silenced: review-pass PR #535 `adopt-sequence-step-stall-recovery-spec` auto-merged 04:24Z). Check A: repo behind 1 commit (PR #535 merged); fast-forward 0d7cef99→fd0e0a30. All 5 daemons alive (dashboard-api PID changed 3392206→3402371, informational, no healer alert). Watermark: 1055→1056. pending=0. **PR #532 (delegate-endpoint): BUILDING** — `fix-delegate-endpoint-regression-gate-001` dispatched to Forge build phase 04:22Z, pipeline restored. PR #497 (cleanup-branch-warn-to-info-001): UNKNOWN/"", Mirror REVIEW_ESCALATE Jun-14T04:02:56Z, age≈48.5h, deadline Jun-17T04:02:56Z (~23.5h). Tier 3, consecutive_clean=3. PRIME ratio=stable.
+
+## Status snapshot — updated 2026-06-16 04:00Z UTC (Iter ~2003, Tier 3, consecutive_clean=2)
+
+**Iter ~2003 summary:** ✅ Nominal. 1 new alert (L1055 Tier-3 silenced: dispatch-branch-cleanup pruned 2 local + 1 remote stale branches at 03:38Z). Check A: repo behind 1 commit (PR #534 `docs(mirror): retune Lens I reuse-check for TF-IDF librarian (T16)`, merged unreviewed by Larry ~03:56Z); fast-forward executed 1e5cc6bf→182352d8. All 5 daemons alive. Watermark: 1054→1055. pending=0. PR #532 (delegate-endpoint): PIPELINE-ORPHANED (carry). PR #497 (cleanup-branch-warn-to-info-001): UNKNOWN/"", Mirror REVIEW_ESCALATE Jun-14T04:02:56Z, age≈47.9h, deadline Jun-17T04:02:56Z (~24.1h). Tier 3, consecutive_clean=2. PRIME ratio=stable.
+
+## Status snapshot — updated 2026-06-16 03:22Z UTC (Iter ~2002, Tier 3, consecutive_clean=1)
+
+**Iter ~2002 summary:** ✅ Nominal. 1 new alert (L1054 Tier-3 silenced: heal-stale-daemon-code auto-restarted ourliberty-dashboard-api.service at 02:49Z, code from PR #533, new PID 3392206). All 5 daemons alive (old dashboard-api PID 2868353 dead; replaced by 3392206). Repo ae28f986=origin/main. Watermark: 1053→1054. pending=0. PR #532 (delegate-endpoint): PIPELINE-ORPHANED (carry). PR #497 (cleanup-branch-warn-to-info-001): UNKNOWN/"", Mirror REVIEW_ESCALATE Jun-14T04:02:56Z, age≈47.3h, deadline Jun-17T04:02:56Z (~24.7h). Tier 3, consecutive_clean=1. PRIME ratio=stable.
+
+**Iter ~2001 summary:** ✅ Nominal. 0 new alerts. All checks clean. **Tier 2 → Tier 3 DE-ESCALATION** (3 consecutive clean: ~1999, ~2000, ~2001). All 5 daemons alive. Repo 91264558=origin/main. Watermark: 1053 (unchanged). pending=0. PR #532 (delegate-endpoint): PIPELINE-ORPHANED — Forge inbox empty (marker-error-3 in .archive since 20:31Z Jun-15), dead-letter to Beacon processed, no new task, PR has 0 GitHub reviews; pipeline definitively stopped, needs Larry judgment. PR #497: MERGEABLE (resolved from UNKNOWN), age≈46.7h, deadline Jun-17T04:02:56Z (~25.3h). Tier 3, consecutive_clean=0. PRIME ratio=20.06.
+
+## Status snapshot — updated 2026-06-16 02:35Z UTC (Iter ~2000, Tier 2, consecutive_clean=2)
+
+**Iter ~2000 summary:** ✅ Nominal. 1 new alert (L1053 Tier-3 silenced, wedge-reap wt-forge-delegate-endpoint). PR #55 (chat-label-fix) MERGED ✅ 02:27Z — missions-v2-delegate-fix step 2 done. PR #56 (fix/newmission-queued-ux) MERGED ✅ 02:25Z. PR #532 (delegate-endpoint) STUCK: Mirror revision requested, Forge outbox missing preamble × 3 → RETRY_EXHAUSTED; marker-error-3 in Forge inbox; pipeline stall RETRY_EXHAUSTED_SKIP (superseded_session). All 5 daemons alive. Repo 7cc0538f=origin/main. Watermark: 1052→1053. pending=0. **New G-rule: revision-phase-preamble-missing 1/3**. PRIME ratio=20.06. Tier 2, consecutive_clean=2.
+
+## Status snapshot — updated 2026-06-16 02:18Z UTC (Iter ~1999, Tier 2, consecutive_clean=1)
+
+**Iter ~1999 summary:** ✅ Nominal. 0 new alerts. All daemons alive. Repo at d2d8d908=origin/main. Watermark: 1052 (unchanged). pending=0. 2 open PRs in ourliberty-agent-core: #532 (delegate-endpoint, Mirror reviewing, missions-v2-delegate-fix) + #497 (UNKNOWN/"", Mirror REVIEW_ESCALATE, 72h deadline Jun-17T04:02:56Z ~23.9h). 1 open PR in ourliberty-dashboard: #55 (chat-label-fix, Mirror reviewing, missions-v2-delegate-fix). PR #531 unreviewed-merge alert not yet fired. PRIME ratio=20.06. Tier 2, consecutive_clean=1.
+
+## Status snapshot — updated 2026-06-16 02:00Z UTC (Iter ~1998, Tier 2, consecutive_clean=0, de-escalated)
+
+**Iter ~1998 summary:** ✅ Nominal. 0 new alerts. All daemons alive. Repo at a4731185=origin/main. Watermark: 1052 (unchanged). pending=0. 1 open PR: #497 (UNKNOWN/"", Mirror REVIEW_ESCALATE, 72h deadline Jun-17T04:02:56Z ~25.9h). PR #531 merged by Larry at 01:55:17Z (unreviewed, alert expected next iter). missions-v2-delegate-fix: delegate-endpoint build-phase active, chat-label-fix retry 1/3 in Forge inbox. PRIME ratio=20.06. **Tier 1 → Tier 2 DE-ESCALATION** (3 consecutive clean iters). consecutive_clean=0.
+
+## Status snapshot — updated 2026-06-16 01:53Z UTC (Iter ~1997, Tier 1, consecutive_clean=2)
+
+**Iter ~1997 summary:** ✅ Nominal. 1 new alert (L1052 Tier-3 silenced, mirror-dag-pass:missions-v2-delegate-fix). `missions-v2-delegate-fix` sequence now active — Forge inbox has `chat-label-fix.json` + `delegate-endpoint.json`. All daemons alive. Repo at 40cfb999=origin/main. Watermark: 1051→1052. pending=0. 1 open PR: #497 (UNKNOWN/"", Mirror REVIEW_ESCALATE, 72h deadline Jun-17T04:02:56Z ~26.2h). PRIME ratio=20.06. Tier 1, consecutive_clean=2.
+
 ## Status snapshot — updated 2026-06-16 01:44Z UTC (Iter ~1996, Tier 1, consecutive_clean=1)
 
 **Iter ~1996 summary:** ✅ Nominal. 1 new alert (L1051 Tier-3 silenced, dispatch-branch-cleanup/summary, route=digest). All daemons alive. Repo at 83cd6881=origin/main. Watermark: 1050→1051. pending=0. 1 open PR: #497 (UNKNOWN/"", Mirror REVIEW_ESCALATE, 72h deadline Jun-17T04:02:56Z ~26.3h). PRIME ratio=20.06. Tier 1, consecutive_clean=1.
@@ -219,7 +257,9 @@
 | PR #525 MERGED ✅ | feat(missions): re-brief narrator cards on mission state change. Merged 2026-06-15T20:21:50Z (`1bebe776`). missions-v2-phase4.1 sequence advancing. | DONE. Watch for next sequence step. |
 | PR #522 MERGED ✅ | fix(missions-card-gc): stop emitting routine success summary as Pulse-claimed digest alert. Merged 2026-06-15 after iter ~1986. **G-rule missions-card-gc-warn-vs-info COMPLETE ✅**. | DONE. |
 | PR #529 MERGED ✅ | `cred-drift-ignore-feature-flags-001`: adds `OURLIBERTY_NEWMISSION_INGEST_ENABLED` to ignored_keys allowlist in detect_drift. Merged 2026-06-15T23:48Z. | DONE. Credential drift false-positive resolved. |
-| PR #497 REVIEW_ESCALATE | [yellow] mergeable=MERGEABLE; Mirror REVIEW_ESCALATE Jun-14T04:02:56Z; age≈43.8h; 72h expires Jun-17T04:02:56Z (~28.2h remaining). | Escalate if still open at Jun-17T04:02:56Z |
+| PR #532 delegate-endpoint CONFLICTING | [yellow] OPEN, CONFLICTING, 0 GitHub reviews. Forge build completed (exit_code=0, $1.81) — fix commit `c8f8c615` locally staged on `forge/delegate-endpoint`, push-blocked (no GH_TOKEN). Beacon diagnosing root cause with Larry at 22:55 MDT Jun-15. Push cmd: `git -C /home/larry/agent-worktrees/wt-forge-fix-delegate-endpoint-regression-gate-001 push origin forge/delegate-endpoint` | Beacon resolving. Watch for push + Mirror review. |
+| PR #55 chat-label-fix MERGED ✅ | missions-v2-delegate-fix step 2. Merged 02:27Z 2026-06-16. | DONE |
+| PR #497 REVIEW_ESCALATE | [yellow] mergeable=UNKNOWN; Mirror REVIEW_ESCALATE Jun-14T04:02:56Z; age≈49.5h; 72h expires Jun-17T04:02:56Z (~25.5h remaining). | Escalate if still open at Jun-17T04:02:56Z |
 | unreviewed-merge:511/499/494/489/510/509/518/519/530 | [yellow] PRs merged by Larry without Mirror; bot-delivered for others. Larry's judgment call. | Reply appropriate shortcut or silence |
 | G-rule stall-detector Forge build | [yellow] Beacon spec complete. Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
 | Check VIII rule=lower | [yellow] FN=3027, TP=5, FP=2 — threshold too high. | `approve check-viii-update-2026-06-15` when shortcut lands |
@@ -242,6 +282,7 @@
 | G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] **2/3** | Watch; dispatch at 3/3 |
 | G-rule Forge-preflight-CLARIFY_REQUEST | [blue] **2/3** | Watch; dispatch to Beacon at 3/3 |
+| G-rule revision-phase-preamble-missing | [blue] **1/3 (new)** | Forge outbox missing "Revision N applied:" preamble → RETRY_EXHAUSTED. Watch; dispatch to Beacon at 3/3 |
 | G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 (warn-vs-info) |
 | G-rule telegram-409-burst | [yellow] **2/3** | Watch; dispatch at 3/3 |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
