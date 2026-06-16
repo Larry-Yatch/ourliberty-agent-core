@@ -67,6 +67,11 @@ The **Parked-lane proof** (Missions v2 Phase 4) — shipped and **validated** (L
 - **Generic risk notes** — the "medium" note is a per-level template, not card-specific (→ §4.2).
 - **No re-brief on change** — a card's briefing should refresh when its state changes (→ §4.1).
 
+### Status update — 2026-06-15
+- **Phase 4.1 SHIPPED + VERIFIED LIVE** (agent-core #520 + #525): the Narrator now runs on the GC-healer tick (single-committer safe), re-briefs on state change, and the LLM-JSON parse is hardened. Confirmed self-running on the droplet — the dogfood card auto-briefed itself ~8 min after merge; 15/15 parked cards briefed. The four gaps above are **closed**.
+- **Live button test** (browser, all 5 Parked-card buttons): ✅ Talk-to-team · ✅ Snooze · ✅ Promote · ✅ Drop; ❌ **Delegate-to-team was broken (404 — the droplet endpoint was never built)**. Fix specced → [Delegate endpoint + chat-label fix](../agents/beacon/specs/missions-v2-delegate-fix.md). Same test found the chat labels the operator's own message "Forge asks" (should be "You") — folded into that fix.
+- **Board-staleness confirmed** (Larry: "very stale, I have not been using it"): Promote creates a `drafting` mission with **no work attached** and nothing auto-builds it; the Proposed lane holds **~50 unattended** items. Root cause = no closing/draining mechanism → exactly **Phase S's mandate**. Phase S is now specced + staged → [Phase S — two-way sync](../agents/beacon/specs/missions-v2-phase-s-two-way-sync.md).
+
 ---
 
 ## 4. The roadmap (phased, in priority order)
@@ -156,11 +161,12 @@ From the design conversation (2026-06-13/14):
 | Phase | What | Status | Refs |
 |---|---|---|---|
 | Proof | Parked-lane meaning-layer card | ✅ shipped + validated | #499, #500, #502, dash #54 |
-| 4.1 | Schedule the Narrator (durability) | ⏭️ next | `cap-schedule-the-missions-narrator…` |
-| S | Two-way sync (close the loop) + no-stale-board | ⏭️ high priority | `chain_events` derive · GC retire-on-merge |
+| 4.1 | Schedule the Narrator (durability) | ✅ shipped + live (#520, #525) | `cap-schedule-the-missions-narrator…` |
+| Delegate fix | Delegate endpoint (404) + "Forge asks"→"You" chat-label | 🚧 building | spec: `missions-v2-delegate-fix` |
+| S | Two-way sync (close the loop) + no-stale-board | ▫️ specced + staged (ready to dispatch) | spec: `missions-v2-phase-s-two-way-sync` |
 | 4.2 | Spread to Orphans + missions; shelf the component | ▫️ planned | — |
 | 4b | Live chat (Beacon front desk) | ▫️ planned | — |
-| 4.3 | Proposed lane | ▫️ planned | backend: dash #53 / #481 |
+| 4.3 | Proposed lane (drain the ~50 backlog) | ⚠️ live but unattended → drain via Phase S (S8) | dash #53 / #481 |
 | 4.4 | Dashboard-wide chat layer | ▫️ planned | — |
 | 4.5 | Autonomy dial (auto-handle safe) | ▫️ planned | `trust_policy.py` |
 
