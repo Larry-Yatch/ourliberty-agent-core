@@ -911,5 +911,141 @@ class OrphanLabelTitleFallbackTest(unittest.TestCase):
         self.assertEqual(label, 'Orphan Inreview Now')
 
 
+# ---------- Phase S (S1/S2): spawned-ref + derived in-flight phase ----------
+
+
+class SpawnedRefDeriveTest(unittest.TestCase):
+    """The parked lane surfaces a delegated card's linked-work phase through the
+    EXISTING chain_events derive (S2), keyed on the `spawned` ref's task_id (S1
+    join key). No new state machine — `derive_phase_for_task` is reused verbatim,
+    so the four event shapes map to the same vocabulary the missions/orphan lanes
+    use (in_flight / awaiting_merge / shipped); a card whose work hasn't emitted
+    an event yet stays neutral (spawned_phase=None)."""
+
+    NOW = datetime(2026, 6, 16, tzinfo=timezone.utc)
+
+    def setUp(self) -> None:
+        self._orig_env_token = os.environ.get('DASHBOARD_API_TOKEN')
+        os.environ['DASHBOARD_API_TOKEN'] = TOKEN
+        self.addCleanup(
+            lambda: os.environ.__setitem__('DASHBOARD_API_TOKEN', self._orig_env_token)
+            if self._orig_env_token is not None
+            else os.environ.pop('DASHBOARD_API_TOKEN', None),
+        )
+        self._tmp = Path(__import__('tempfile').mkdtemp(prefix='spawned_ref_'))
+        self.addCleanup(
+            lambda: __import__('shutil').rmtree(self._tmp, ignore_errors=True),
+        )
+        self._missions_path = self._tmp / 'missions.json'
+        self._captures_path = self._tmp / 'captures.json'
+        # No missions — isolate the parked-lane spawned-ref behaviour.
+        self._missions_path.write_text(
+            json.dumps({'schema_version': 1, 'missions': [],
+                        'last_synced_at': None}) + '\n')
+
+    def _seed_captures(self, *caps: dict) -> None:
+        self._captures_path.write_text(
+            json.dumps({'schema_version': 2, 'captures': list(caps)}) + '\n')
+
+    @staticmethod
+    def _parked_cap(cid: str, *, spawned=None, repo='ourliberty-agent-core') -> dict:
+        cap = {
+            'id': cid,
+            'title': f'card {cid}',
+            'state': 'parked',
+            'origin': {'repo': repo},
+            'last_touched': '2026-06-10T00:00:00+00:00',
+        }
+        if spawned is not None:
+            cap['spawned'] = spawned
+        return cap
+
+    def _derive(self, rows: list[dict]) -> dict:
+        return da._handle_missions_derived(
+            missions_path=self._missions_path,
+            captures_path=self._captures_path,
+            supabase_client=_StubClient(rows),
+            repo=None,
+            task_id=None,
+            now=self.NOW,
+        )
+
+    def _parked_by_id(self, rows: list[dict]) -> dict:
+        return {p['capture_id']: p for p in self._derive(rows)['parked']}
+
+    def test_no_spawned_ref_is_neutral_none(self) -> None:
+        self._seed_captures(self._parked_cap('cap-plain'))
+        p = self._parked_by_id([])['cap-plain']
+        self.assertIsNone(p['spawned'])
+        self.assertIsNone(p['spawned_phase'])
+        self.assertIsNone(p['spawned_pr_url'])
+
+    def test_spawned_ref_no_events_yet_stays_neutral(self) -> None:
+        # A freshly-delegated card whose work has emitted no event surfaces the
+        # ref (for traceability) but a None phase — never a misleading 'ready'.
+        ref = {'kind': 'delegate', 'task_id': 'delegate-cap-x',
+               'stamped_at': '2026-06-15T00:00:00+00:00'}
+        self._seed_captures(self._parked_cap('cap-x', spawned=ref))
+        p = self._parked_by_id([])['cap-x']
+        self.assertEqual(p['spawned'], ref)
+        self.assertIsNone(p['spawned_phase'])
+        self.assertIsNone(p['spawned_pr_url'])
+
+    def test_building_phase_from_forge_session_start(self) -> None:
+        ref = {'kind': 'delegate', 'task_id': 'delegate-cap-x'}
+        self._seed_captures(self._parked_cap('cap-x', spawned=ref))
+        rows = [{'event_type': 'session_start', 'task_id': 'delegate-cap-x',
+                 'agent': 'forge', 'pr_url': None,
+                 'ts': '2026-06-15T10:00:00+00:00', 'payload': {}}]
+        p = self._parked_by_id(rows)['cap-x']
+        self.assertEqual(p['spawned_phase'], 'in_flight')
+        self.assertIsNone(p['spawned_pr_url'])
+
+    def test_in_review_phase_and_pr_url_from_review_pass(self) -> None:
+        ref = {'kind': 'delegate', 'task_id': 'delegate-cap-x'}
+        self._seed_captures(self._parked_cap('cap-x', spawned=ref))
+        url = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/777'
+        rows = [
+            {'event_type': 'marker_emit', 'task_id': 'delegate-cap-x',
+             'agent': 'mirror', 'pr_url': url, 'ts': '2026-06-15T12:00:00+00:00',
+             'payload': {'marker_type': 'REVIEW_PASS'}},
+            {'event_type': 'session_start', 'task_id': 'delegate-cap-x',
+             'agent': 'forge', 'pr_url': None, 'ts': '2026-06-15T10:00:00+00:00',
+             'payload': {}},
+        ]
+        p = self._parked_by_id(rows)['cap-x']
+        self.assertEqual(p['spawned_phase'], 'awaiting_merge')
+        self.assertEqual(p['spawned_pr_url'], url)
+
+    def test_shipped_phase_from_auto_merge(self) -> None:
+        ref = {'kind': 'delegate', 'task_id': 'delegate-cap-x'}
+        self._seed_captures(self._parked_cap('cap-x', spawned=ref))
+        url = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/777'
+        rows = [{'event_type': 'auto_merge', 'task_id': 'delegate-cap-x',
+                 'agent': 'forge', 'pr_url': url,
+                 'ts': '2026-06-15T13:00:00+00:00', 'payload': {}}]
+        p = self._parked_by_id(rows)['cap-x']
+        self.assertEqual(p['spawned_phase'], 'shipped')
+        self.assertEqual(p['spawned_pr_url'], url)
+
+    def test_garbage_spawned_ref_degrades_to_neutral(self) -> None:
+        self._seed_captures(self._parked_cap('cap-x', spawned='not-a-dict'))
+        p = self._parked_by_id([])['cap-x']
+        self.assertIsNone(p['spawned'])
+        self.assertIsNone(p['spawned_phase'])
+
+    def test_spawned_events_are_fetched_alongside_missions(self) -> None:
+        # The handler must union the parked captures' spawned task_ids into the
+        # events fetch — otherwise the .in_() stub would filter them out and the
+        # phase would never surface.
+        ref = {'kind': 'delegate', 'task_id': 'delegate-cap-x'}
+        self._seed_captures(self._parked_cap('cap-x', spawned=ref))
+        rows = [{'event_type': 'auto_merge', 'task_id': 'delegate-cap-x',
+                 'agent': 'forge', 'pr_url': None,
+                 'ts': '2026-06-15T13:00:00+00:00', 'payload': {}}]
+        self.assertEqual(
+            self._parked_by_id(rows)['cap-x']['spawned_phase'], 'shipped')
+
+
 if __name__ == '__main__':
     unittest.main()

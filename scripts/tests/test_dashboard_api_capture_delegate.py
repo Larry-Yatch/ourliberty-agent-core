@@ -225,15 +225,33 @@ class DelegateProposalTest(_DelegateTestBase):
         self.assertEqual(r.status_code, 400, r.text)
         self.assertEqual(self.inbox.calls, [])
 
-    def test_capture_stays_parked_no_mutation(self):
+    def test_capture_stays_parked_and_gets_spawned_ref(self):
+        # Phase S (S1): delegating stamps a `spawned` ref back onto the capture
+        # (the join key to the work it created) but does NOT change `state` —
+        # the card stays parked; the spawned ref is additive.
         self._seed(_cap('cap-1'))
-        before = self.captures_path.read_text()
         r = self.client.post(_endpoint('cap-1'), headers=AUTH, json={})
         self.assertEqual(r.status_code, 200, r.text)
-        # No captures.json mutation — byte-for-byte identical, still parked.
-        self.assertEqual(self.captures_path.read_text(), before)
         cap = next(c for c in self._read_local()['captures'] if c['id'] == 'cap-1')
         self.assertEqual(cap['state'], 'parked')
+        self.assertEqual(cap['spawned']['kind'], 'delegate')
+        self.assertEqual(cap['spawned']['task_id'], 'delegate-cap-1')
+        self.assertIn('stamped_at', cap['spawned'])
+
+    def test_spawned_ref_stamp_is_idempotent_across_dedup_repost(self):
+        # A re-POST collapses onto the open proposal (deduped) and re-asserts the
+        # spawned ref idempotently — same identity, so stamped_at does not churn.
+        self._seed(_cap('cap-1'))
+        self.client.post(_endpoint('cap-1'), headers=AUTH, json={})
+        first_ref = next(
+            c for c in self._read_local()['captures'] if c['id'] == 'cap-1'
+        )['spawned']
+        second = self.client.post(_endpoint('cap-1'), headers=AUTH, json={})
+        self.assertTrue(second.json()['deduped'])
+        second_ref = next(
+            c for c in self._read_local()['captures'] if c['id'] == 'cap-1'
+        )['spawned']
+        self.assertEqual(first_ref, second_ref)  # no churn on the idempotent re-stamp
 
 
 # ==================== guards (404 / 409) ====================

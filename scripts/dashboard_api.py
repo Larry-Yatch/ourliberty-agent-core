@@ -3266,8 +3266,67 @@ def _meaning_layer_fields(cap: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _spawned_fields(
+    cap: dict[str, Any],
+    events_by_task_id: dict[str, list[dict[str, Any]]],
+) -> dict[str, Any]:
+    """Phase S (S1/S2): echo the capture's `spawned` ref (the join key back to the
+    work the card created) plus the linked work's derived phase + pr_url.
+
+    The phase is computed through the EXISTING chain_events derive
+    (`derive_phase_for_task`) — Phase S adds no new state machine. The `spawned`
+    ref is normalized to known string keys so a garbage stamp degrades to the
+    neutral None state (mirrors `_meaning_layer_fields`).
+
+    `spawned_phase` stays None until the linked work emits its first chain_event:
+    a freshly-delegated card whose work hasn't started surfaces None (neutral),
+    never a misleading 'ready' from an empty event list."""
+    raw = cap.get('spawned')
+    if not isinstance(raw, dict):
+        return {'spawned': None, 'spawned_phase': None, 'spawned_pr_url': None}
+    ref: dict[str, Any] = {}
+    for k in ('task_id', 'kind', 'mission_id', 'stamped_at'):
+        v = raw.get(k)
+        if isinstance(v, str) and v:
+            ref[k] = v
+    if not ref:
+        return {'spawned': None, 'spawned_phase': None, 'spawned_pr_url': None}
+
+    phase: Optional[str] = None
+    pr_url: Optional[str] = None
+    task_id = ref.get('task_id')
+    if task_id:
+        events = events_by_task_id.get(task_id) or []
+        if events:
+            phase = derive_phase_for_task(events, None)
+            pr_url = summarize_task_events(events)['pr_url']
+    return {'spawned': ref, 'spawned_phase': phase, 'spawned_pr_url': pr_url}
+
+
+def _parked_spawned_task_ids(captures: list[dict[str, Any]]) -> list[str]:
+    """The spawned task_ids linked to parked captures (Phase S S2). The derive
+    fetches chain_events for these alongside the registered mission task_ids so
+    the parked lane can surface the linked work's phase via the same derive.
+    De-dupes; order-stable."""
+    out: list[str] = []
+    seen: set[str] = set()
+    for cap in captures:
+        if not isinstance(cap, dict) or cap.get('state') != 'parked':
+            continue
+        spawned = cap.get('spawned')
+        if not isinstance(spawned, dict):
+            continue
+        tid = spawned.get('task_id')
+        if isinstance(tid, str) and tid and tid not in seen:
+            seen.add(tid)
+            out.append(tid)
+    return out
+
+
 def _parked_from_captures(
-    captures: list[dict[str, Any]], now: datetime,
+    captures: list[dict[str, Any]],
+    now: datetime,
+    events_by_task_id: Optional[dict[str, list[dict[str, Any]]]] = None,
 ) -> list[dict[str, Any]]:
     """Build the `parked[]` array (§ 3.3) from captures.json. Only state=='parked'
     captures; `aging` is the GC healer's persisted flag (Phase 1 — never
@@ -3279,7 +3338,12 @@ def _parked_from_captures(
     Phase 4 § 4: the meaning-layer fields (briefing/risk/risk_note/
     recommended_action/briefing_provenance) ride along, validated so an
     un-briefed capture surfaces None (neutral state) rather than raw machine
-    fields."""
+    fields.
+
+    Phase S (S1/S2): the spawned-ref fields (spawned/spawned_phase/
+    spawned_pr_url) ride along too — the linked work's derived phase comes from
+    the existing chain_events derive (`events_by_task_id`)."""
+    events_by_task_id = events_by_task_id or {}
     out: list[dict[str, Any]] = []
     for cap in captures:
         if not isinstance(cap, dict) or cap.get('state') != 'parked':
@@ -3297,6 +3361,7 @@ def _parked_from_captures(
             'last_touched': cap.get('last_touched'),
         }
         entry.update(_meaning_layer_fields(cap))
+        entry.update(_spawned_fields(cap, events_by_task_id))
         out.append(entry)
     return out
 
@@ -3439,7 +3504,7 @@ def _build_derived_response(
         'schema_version': 1,
         'missions': missions,
         'orphans': orphans,
-        'parked': _parked_from_captures(captures, now),
+        'parked': _parked_from_captures(captures, now, events_by_task_id),
         'last_synced_at': last_synced_at,
         'as_of': _now_utc_iso(now),
     }
@@ -3532,6 +3597,7 @@ def _handle_missions_derived(
     missions_data = _reader_missions(missions_path)
     captures_data = _reader_captures(captures_path)
     entries = missions_data.get('missions') or []
+    captures = captures_data.get('captures') or []
 
     registered: list[str] = []
     seen: set[str] = set()
@@ -3544,7 +3610,16 @@ def _handle_missions_derived(
                 seen.add(tid)
                 registered.append(tid)
 
-    events_by_task_id = _fetch_events_for_task_ids(supabase_client, registered)
+    # Phase S (S2): also fetch chain_events for the work spawned by parked
+    # captures so the parked lane can surface its derived phase via the same
+    # derive. Union with the registered mission task_ids → one query.
+    fetch_ids = list(registered)
+    for tid in _parked_spawned_task_ids(captures):
+        if tid not in seen:
+            seen.add(tid)
+            fetch_ids.append(tid)
+
+    events_by_task_id = _fetch_events_for_task_ids(supabase_client, fetch_ids)
     recent_events = _fetch_recent_chain_events(
         supabase_client, _ORPHAN_WINDOW_DAYS, now,
     )
@@ -3552,7 +3627,7 @@ def _handle_missions_derived(
     response = _build_derived_response(
         entries=entries,
         last_synced_at=missions_data.get('last_synced_at'),
-        captures=captures_data.get('captures') or [],
+        captures=captures,
         events_by_task_id=events_by_task_id,
         recent_events=recent_events,
         now=now,
@@ -4349,6 +4424,15 @@ def _handle_capture_promote(
         #    action is all-or-nothing.
         cap['promoted_to'] = mission_id
         cap['state'] = 'promoted'
+        # Phase S (S1): stamp the spawned ref back onto the capture — the join
+        # key to the mission this card created. The promoted card's live phase
+        # surfaces via the missions lane (the mission's aggregate_phase), so no
+        # task_id is needed here; mission_id is the join key.
+        cap['spawned'] = {
+            'kind': 'mission',
+            'mission_id': mission_id,
+            'stamped_at': _now_utc_iso(now),
+        }
         cap_registry['schema_version'] = CAPTURES_SCHEMA_VERSION
         try:
             _atomic_write_captures(captures_path, cap_registry)
@@ -4659,6 +4743,35 @@ def _handle_capture_message(
 _DELEGATE_DEFAULT_ACTION = 'delegate'
 
 
+def _stamp_spawned_on_capture(
+    captures_path: Path, capture_id: str, spawned: dict[str, Any],
+) -> None:
+    """Phase S (S1): stamp the `spawned` ref onto a capture under the shared
+    capture-ingest lock — the SAME single committer / writer path (_read +
+    _atomic_write_captures) the ingest, snooze, drop, and promote flows use, so
+    captures.json keeps exactly one writer. The capture's `state` is untouched
+    (a delegated card stays parked). Idempotent: a re-stamp with the same
+    spawned identity (task_id + kind) is a no-op — no rewrite — so a deduped
+    re-POST never thrashes the file or churns `stamped_at`."""
+    with _CAPTURE_INGEST_LOCK:
+        registry = _read_captures_registry(captures_path)
+        cap = next(
+            (c for c in registry.get('captures') or []
+             if isinstance(c, dict) and c.get('id') == capture_id),
+            None,
+        )
+        if cap is None:
+            return
+        existing = cap.get('spawned')
+        if (isinstance(existing, dict)
+                and existing.get('task_id') == spawned.get('task_id')
+                and existing.get('kind') == spawned.get('kind')):
+            return
+        cap['spawned'] = spawned
+        registry['schema_version'] = CAPTURES_SCHEMA_VERSION
+        _atomic_write_captures(captures_path, registry)
+
+
 def _handle_capture_delegate(
     *,
     capture_id: str,
@@ -4668,11 +4781,17 @@ def _handle_capture_delegate(
 ) -> dict[str, Any]:
     """POST /api/missions/captures/{id}/delegate (§ 2) — hand a parked card to
     the team. Emits a `human-approval-gate` APPROVAL_REQUEST proposal for Beacon
-    via safe_write_inbox; does NOT touch captures.json (the capture stays parked).
+    via safe_write_inbox.
+
+    Phase S (S1): also stamps a `spawned` ref (the join key back to the work this
+    card created — `delegate-<capture_id>`) onto the capture. The capture's
+    `state` stays parked — the spawned ref is additive — written through the
+    shared single-committer path (`_stamp_spawned_on_capture`).
 
     404 if the capture doesn't exist; 409 if it isn't parked; 400 on an
     unrecognized action. Idempotent: a re-POST that finds an already-open
-    proposal in Beacon's inbox collapses onto it (no second proposal)."""
+    proposal in Beacon's inbox collapses onto it (no second proposal), and the
+    spawned-ref stamp is idempotent too (no rewrite on an unchanged identity)."""
     import safe_write_inbox  # noqa: PLC0415 — lazy; sibling module (jail-guarded)
 
     registry = _read_captures_registry(captures_path)
@@ -4696,12 +4815,20 @@ def _handle_capture_delegate(
     # re-POST collapses onto the same proposal (the dedup the spec asks for —
     # mirrors the message handler's stable dedup_identity).
     task_id = f'delegate-{capture_id}'
+    spawned_ref = {
+        'kind': 'delegate',
+        'task_id': task_id,
+        'stamped_at': _now_utc_iso(),
+    }
     filename = f'{task_id}.json'
     safe_name = safe_write_inbox.canonical_inbox_name(filename)
     proposal_path = (safe_write_inbox.INBOXES_ROOT / 'beacon' / safe_name)
     if proposal_path.exists():
         # An open delegate proposal already sits in Beacon's inbox — collapse
-        # onto it rather than double-proposing. The capture is untouched.
+        # onto it rather than double-proposing. Re-assert the spawned ref
+        # (idempotent: a no-op when already stamped) so a card whose proposal
+        # predates Phase S still gets linked.
+        _stamp_spawned_on_capture(captures_path, capture_id, spawned_ref)
         return {'dispatched': True, 'deduped': True}
 
     title = cap.get('title') or capture_id
@@ -4745,6 +4872,10 @@ def _handle_capture_delegate(
         source_agent='dashboard',
         filename=filename,
     )
+    # Phase S (S1): stamp the spawned ref AFTER the proposal exists, so a crash
+    # before the proposal write leaves no dangling link — and the capture stays
+    # parked (the stamp is additive, not a state transition).
+    _stamp_spawned_on_capture(captures_path, capture_id, spawned_ref)
     return {'dispatched': True}
 
 

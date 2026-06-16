@@ -274,6 +274,12 @@ class PromoteTest(_ActionsTestBase):
         cap = next(c for c in self._read_local()['captures'] if c['id'] == 'cap-1')
         self.assertEqual(cap['state'], 'promoted')
         self.assertEqual(cap['promoted_to'], 'aging-idea')
+        # Phase S (S1): the spawned ref links the card back to the mission it
+        # created — join key = mission_id (the promoted card's live phase shows
+        # via the missions lane, so no task_id is stamped here).
+        self.assertEqual(cap['spawned']['kind'], 'mission')
+        self.assertEqual(cap['spawned']['mission_id'], 'aging-idea')
+        self.assertIn('stamped_at', cap['spawned'])
 
     def test_brief_defaults_to_capture_note(self):
         self._seed(_cap('cap-1', title='Aging idea', note='do the thing'))
