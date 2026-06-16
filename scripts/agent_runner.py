@@ -1020,6 +1020,19 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
             # the state file. HOME-swap stays even on the setup-token path
             # because --resume session files live under
             # ``HOME/.claude/projects/`` and are account-bound.
+            #
+            # GitHub auth, however, is account-INDEPENDENT: the ``gh`` OAuth
+            # token (~/.config/gh) and git's credential helper (~/.gitconfig)
+            # are the same regardless of which Claude tier runs the build. The
+            # HOME-swap below points them at the per-tier account home, which
+            # for a non-tier1 tier (e.g. .claude-larry-personal) has neither
+            # file — so ``git push`` dies with "could not read Username" and
+            # the build succeeds locally but never reaches GitHub. Pin gh's and
+            # git's config to the *invoking* user's real home so push survives
+            # the swap. setdefault keeps any explicit override authoritative.
+            _real_home = env.get('HOME') or os.path.expanduser('~')
+            env.setdefault('GH_CONFIG_DIR', os.path.join(_real_home, '.config', 'gh'))
+            env.setdefault('GIT_CONFIG_GLOBAL', os.path.join(_real_home, '.gitconfig'))
             env['HOME'] = active_tier.current_home()
             active_tier_name = active_tier.read()['tier']
             auth_source = _apply_tier_auth(env, active_tier_name, token)
