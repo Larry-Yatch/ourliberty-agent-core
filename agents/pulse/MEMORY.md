@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-16 09:28Z UTC (Iter ~2032, Tier 1, consecutive_clean=0, tier-reset)
+
+**Iter ~2032 summary:** ⚠️ Signal. 2 new alerts: L1070 Tier-3 silence (heal-claude-max-burn-rate 81%/10M 5h gate), L1071 Pulse escalation (stranded Beacon APPROVAL_REQUEST for s-3-failure-cost-pause). **Beacon scope decision for PR #543 NOT delivered to Larry** — reply_chat_id=null drop; surfaced via L1071 (route=escalate). Beacon recommends Option A (merge #543 as-is; S4+S7+S6 echo-rail correct; cost producer is new scope). Mirror fresh review (09:15Z) hit MalformedMirrorMarker retry 2/3 (09:21Z); pipeline active. PR #497 scope decision still with Larry (deadline Jun-17T04:02Z ~18.5h). Repo 7bca08ee=origin/main (clean). Sync fresh (08:30:10Z). Watermark: 1069→1071. pending=0. G-rules: revision-phase-preamble-missing 1/3→2/3; mirror-malformed-verdict-marker NEW 1/3. PRIME ratio=20.22 (991 interventions, 49 systemic fixes). **Tier 2→1 RESET**, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-16 09:08Z UTC (Iter ~2031, Tier 2, consecutive_clean=2)
 
 **Iter ~2031 summary:** ✅ Nominal. 0 new alerts. All 5 mandatory checks clean. **Phase S s-3-failure-cost-pause PR #543 IN MIRROR REVIEW-2:** Forge built PR #543, Mirror review-1 (revision requested 09:03:21Z UTC), revision-1 applied, Mirror review-2 dispatched 09:05:50Z UTC (active). No stall. PR #497 scope decision still with Larry (bot DM'd 07:07:50Z, deadline Jun-17T04:02Z ~18.9h). Repo b971b34d=origin/main (clean, no fast-forward needed). Sync fresh (last_sync=08:30:10Z, age≈37.7 min). Watermark: 1069 (unchanged). pending=0. PRIME ratio=20.22 (991 interventions, 49 systemic fixes). Tier 2, consecutive_clean=2.
@@ -372,11 +376,12 @@
 | G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] **2/3** | Watch; dispatch at 3/3 |
 | G-rule Forge-preflight-CLARIFY_REQUEST | [blue] **2/3** | Watch; dispatch to Beacon at 3/3 |
-| G-rule revision-phase-preamble-missing | [blue] **1/3** | Forge outbox missing "Revision N applied:" preamble → RETRY_EXHAUSTED. Watch; dispatch to Beacon at 3/3 |
+| G-rule revision-phase-preamble-missing | [blue] **2/3** | Forge outbox missing "Revision N applied:" preamble → retry chain. Watch; dispatch to Beacon at 3/3 |
+| G-rule mirror-malformed-verdict-marker | [blue] **1/3** (NEW) | Mirror produces output without canonical verdict marker (=== REVIEW_PASS === etc.) → MalformedMirrorMarker × 2/3 for s-3-failure-cost-pause. Distinct from mirror-no-session-revision-loop. Watch; dispatch at 3/3 |
 | G-rule mirror-no-session-revision-loop | [blue] **2/3** | Mirror review NO_SESSION × 2+ for PR #497; Beacon re-dispatches Mirror instead of Forge. Watch; dispatch at 3/3 |
 | G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 (warn-vs-info) |
 | G-rule telegram-409-burst | [yellow] **2/3** | Watch; dispatch at 3/3 |
-| Phase S s-1+s-2 MERGED ✅, s-3 ADVANCING | [yellow] s-1 (PR #541) merged 07:32:46Z, s-2 (PR #542) merged 08:07:41Z. s-3-failure-cost-pause headless dispatched 08:10:33Z — `s-3-failure-cost-pause.json` in Forge inbox, awaiting Forge ACK → build-phase → PR. | Watch Forge ACK + s-3 PR + Mirror review |
+| Phase S s-1+s-2 MERGED ✅, s-3 SCOPE DECISION PENDING | [yellow] s-1 (PR #541) merged 07:32:46Z, s-2 (PR #542) merged 08:07:41Z. s-3 PR #543 OPEN (UNKNOWN/""); Mirror ESCALATED (S6 cost-producer spec gap); Beacon APPROVAL_REQUEST stranded (reply_chat_id=null drop at 09:15:35Z); surfaced to Larry via L1071 (iter ~2032). Beacon recommends Option A = merge #543 as-is (S4+S7+S6 echo-rail correct; producer is new scope). Mirror fresh review (09:15Z) active, retry 2/3 MalformedMirrorMarker. | Watch Mirror verdict. If escalates again: Larry replies "approve s-3-merge" or "reject s-3-merge" via Beacon Telegram |
 | PR #497 scope decision DELIVERED | [yellow] Binary choice now with Larry (bot DM'd 07:07:50Z Jun-16). APPROVE=add 'info' to VALID_SEVERITIES / REJECT=close PR #497. Deadline Jun-17T04:02Z (~20h). | Watch Larry reply: `approve cleanup-branch-info` or `reject cleanup-branch-info` |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap. outbox-notifier also drops regular approval_request markers from Beacon inter-agent sessions (observed iter ~2020: both routing-signal and approval_request dropped in same 5-min window). | DAG markers and scope-decision markers still fall through; recover manually |
 | Stale bash orphans | [blue] PIDs 1834248 (17d+) + 2605007 (1d+). Ss, low CPU. | Carry |

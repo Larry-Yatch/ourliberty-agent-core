@@ -4,6 +4,83 @@
 
 ---
 
+## Iteration ~2032 — 2026-06-16 09:28Z UTC (interactive, /cycle, Tier 2→1 reset, consecutive_clean=2→0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Signal. **Stranded Beacon APPROVAL_REQUEST** for s-3-failure-cost-pause — Beacon authored a scope decision after Mirror ESCALATE but outbox-notifier dropped it (reply_chat_id=null). Larry has NOT been DM'd. Pulse surfaced it via larry_alerts escalation L1071 (route=escalate). **2 new alerts** (L1070 Tier-3 silence, L1071 written by Pulse). G-rule advances: revision-phase-preamble-missing 1/3→2/3; mirror-malformed-verdict-marker new 1/3.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S s-3-failure-cost-pause status UPDATE:** Previous iter ~2031 showed PR #543 in Mirror review-2 (dispatched 09:05:50Z UTC). VERIFIED NOW: outbox-notifier log shows significant pipeline activity since 09:05Z. Sequence: (1) Forge revision-1 completed at 09:09-09:10Z but WITHOUT "Revision N applied:" preamble — preamble-missing retry 1/3 (09:09:52Z), retry 2/3 (09:10:27Z); (2) outbox-notifier dispatched mirror-review-rerun round-1 at 09:10:47Z; (3) Mirror (session 91b17970) emitted REVIEW_ESCALATE at 09:12:08Z; (4) MIRROR_REVIEW_STATUS state=failure posted; (5) Beacon processed review-escalate at 09:12Z → analyzed → authored APPROVAL_REQUEST (Option A=merge, Option B=expand scope) → outbox-notifier dropped it at 09:15:35Z (reply_chat_id=null; "falling through"); (6) outbox-notifier dispatched a fresh review-request mirror <- beacon at 09:15:04Z (review-s-3-failure-cost-pause.json); (7) this fresh review hit MalformedMirrorMarker at 09:14:30Z (retry 1/3) and 09:21:56Z (retry 2/3). Current: Mirror inbox has review-s-3-failure-cost-pause.json + marker-error-s-3-failure-cost-pause-2.json; pipeline stall check "no stalls detected" at 09:27Z (fresh review still active). ✅ VERIFIED — state materially changed since ~2031.
+- **PR #497 scope decision — CARRY CONFIRMED ✅:** still UNKNOWN/"", updatedAt=2026-06-16T06:15:41Z. Deadline Jun-17T04:02Z (~18.5h). Pending Larry reply.
+- **PRIME ratio — CARRY CONFIRMED ✅:** ratio=20.22 (991 interventions, 49 systemic fixes, 11 verification_pending).
+
+**Check 0 — Alert triage:** Watermark=1069 entering; file grew to 1070 then 1071. **2 events:**
+- L1070: `source=heal-claude-max-burn-rate, route=escalate, subject=claude_max_5h_burn_threshold_breached` — trailing 5h token usage at 81% of 10M gate (8,062,577 tokens). Triage helper → **Tier-3 silence** (known-pattern). Bot will DM independently via route=escalate. Pulse no additional DM. ✅
+- L1071: written by Pulse (stranded s-3 APPROVAL_REQUEST escalation, route=escalate — see Actions below).
+Watermark advanced to 1071. ✅
+
+**Check 1 — Log noise:** outbox-notifier.log WARN events since iter ~2031:
+- 09:09:52Z + 09:10:27Z: `revision-phase-preamble-missing` for s-3-failure-cost-pause (retry 1/3 + retry 2/3). G-rule advance (see below).
+- 09:14:30Z + 09:21:56Z: `MalformedMirrorMarker` for s-3-failure-cost-pause (retry 1/3 + retry 2/3). New G-rule (see below).
+- 09:15:35Z: `beacon replan APPROVAL_REQUEST for task notify-s-3-failure-cost-pause has no valid reply_chat_id (got None); cannot route approval DM, falling through` — the stranded approval. ⚠️ Escalated.
+No sustained log spam. All events are pipeline mechanics. ✅ (beyond escalation above)
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot PID 3435953 alive (Ss). Bot log last entry: idx=1068 route=digest (02:43:40 MDT = 08:43:40Z UTC). L1069 (digest) and L1070 (escalate) and L1071 (escalate) queued for bot's next sweep. No 409 errors in log. G-rule telegram-409-burst 2/3 unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` at 09:21Z → "no stalls detected" (fresh Mirror review within window). At 09:27Z: same result. Mirror actively running review-s-3-failure-cost-pause.json (dispatched 09:15Z). MalformedMirrorMarker at retry 2/3 — if retry 3/3 also fails → RETRY_EXHAUSTED; monitor. ✅ Not stalled yet.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0** (history=223). Stranded APPROVAL_REQUEST NOT registered (dropped before storage). ✅ (gap noted + escalated)
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-16T09:20:16Z, age≈8 min. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=7bca08ee=origin/main. Clean tree, on main, up to date. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-16T08:30:10Z, age≈57 min. FRESH (within 2h threshold). ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3435953 (Ss) ✅, chain_event_shipper 2744551 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, dashboard_api 3486940 (Ssl) ✅, outbox_notifier 3462678 (Ss) ✅. All 5 alive. ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (2 open):
+- **PR #543** (`feat: S-3 failure ring-back + cost + in-flight-overrules-pause`): UNKNOWN/"". Mirror review active (fresh round dispatched 09:15Z UTC, MalformedMirrorMarker retry 2/3 at 09:21Z). Beacon APPROVAL_REQUEST stranded — surfaced via L1071. [yellow] active pipeline.
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): UNKNOWN/"". Scope decision with Larry (bot DM'd 07:07:50Z). Deadline Jun-17T04:02Z (~18.5h). [yellow] carry.
+ourliberty-dashboard: **0 open PRs.** ✅
+
+**Conditional checks (Tuesday 2026-06-16 UTC, weekday=1):** Check I fires Mon/Wed/Fri/Sun — skip. Check III fires Sunday — skip.
+
+**G-rule tracking:**
+- `revision-phase-preamble-missing`: **1/3 → 2/3** — Forge applied s-3 revision without "Revision N applied:" preamble (retry 1/3 at 09:09:52Z, retry 2/3 at 09:10:27Z). Same failure mode as prior occurrence. Dispatch direction-ask to Beacon at 3/3 for spec fix.
+- `mirror-malformed-verdict-marker` (NEW): **1/3** — Mirror session produced output without canonical verdict marker (=== REVIEW_PASS === / REVIEW_REVISION / REVIEW_ESCALATE / REVIEW_EMERGENCY_HALT); MalformedMirrorMarker logged twice for s-3-failure-cost-pause. This is distinct from mirror-no-session-revision-loop (which is a missing outbox; this is a malformed outbox). Dispatch at 3/3.
+- All other G-rule counts unchanged from iter ~2031.
+
+**Actions taken:**
+1. L1070 triage: Tier-3 silence (known-pattern, heal-claude-max-burn-rate). Watermark advanced 1069→1071 (including L1071 written by Pulse).
+2. **Escalation L1071 written** — `source=pulse, route=escalate, subject=s3-approval-request-stranded`: surfaced Beacon's APPROVAL_REQUEST binary (Option A=merge #543, Option B=expand scope for cost producer). Bot will DM Larry.
+3. PRIME ledger: `intervention` row appended (s3-approval-recovery; tier=1).
+4. Tier state: Tier 2 → Tier 1 RESET (signal observed). consecutive_clean=0.
+
+**Dispatches:** None (escalation path was larry_alerts; no Beacon/Forge/Mirror inbox dispatch needed).
+
+**Standing findings (carried):**
+- [yellow] **PR #543 — s-3 Beacon scope decision** — surfaced via L1071. Mirror re-review active (retry 2/3 MalformedMirrorMarker). If Mirror passes cleanly → auto-merge (decision moot). If Mirror escalates/fails → Larry's binary reply needed: tell Beacon "approve s-3-merge" (merge #543) or "reject s-3-merge" (expand scope).
+- [yellow] **PR #497 scope decision** — `approve cleanup-branch-info` or `reject cleanup-branch-info`. Deadline Jun-17T04:02Z (~18.5h). [carry]
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519/530/531/534** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — pending Larry dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — FN=3027, TP=5. `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST **2/3**, merge_conflict_manual_rebase-tier4 1/3, heal-pipeline-stall-mirror-pass-unmerged-tier4 1/3, **revision-phase-preamble-missing 2/3**, **mirror-malformed-verdict-marker 1/3** (NEW), mirror-no-session-revision-loop 2/3.
+- [blue] **Phase S s-1 + s-2 MERGED ✅, s-3 IN MIRROR REVIEW** (round 2, MalformedMirrorMarker retry 2/3). Watch for clean verdict or stall.
+- [blue] **Stale worktrees** — `wt-forge-fix-delegate-endpoint-regression-gate-001`, `wt-mirror-*` (multiple). dispatch-branch-cleanup will reap.
+- [blue] **Stale bash orphans** — PIDs 1834248 + 2605007. Low CPU. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention (s3-approval-recovery). ratio=20.22 (991 interventions, 49 systemic fixes), trend=improving.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0 (signal). Next cadence: 5-min.
+
+---
+
 ## Iteration ~2031 — 2026-06-16 09:08Z UTC (interactive, /cycle, Tier 2, consecutive_clean=1→2)
 
 **Trigger:** Larry direct invocation (`/cycle`).
