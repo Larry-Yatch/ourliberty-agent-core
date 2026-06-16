@@ -4,6 +4,57 @@
 
 ---
 
+## Iteration ~2067 — 2026-06-16 21:52Z UTC (interactive, /cycle, Tier 1→2, consecutive_clean=2→3→de-escalate)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 0 new alerts. All mandatory checks clean. Tier de-escalated 1→2.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** `gh pr list --state open` → 0 open PRs across all 3 repos. ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** 0 open PRs confirmed. ✅
+- **Pending approvals — CLEAR ✅:** pending=0. ✅
+- **Daemons same PIDs ✅:** beacon 3556778 (Ss), chain-event 2744551 (SNs), inbox-watcher 3434697 (Ssl), outbox_notifier 3556624 (Ss), dashboard_api 3593488 (Ssl). All alive, same PIDs as iter ~2066. ✅
+
+**Check 0 — Alert triage:** Watermark=1055 entering; file=1055 lines. **0 new alerts.** Watermark unchanged at 1055. ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log last entry 05:02:48Z (s-6-drain auto-merge re-scan, no WARNs/ERRORs — consistent with prior iters). inbox_watcher.log last entry 11:03:21Z (beacon notify-s-6-drain done, no WARNs/ERRORs). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message 'status' at 13:17:41 MDT (19:17Z) — same as prior iters, served by iter ~2060. No new messages in current window. G-rule telegram-409-burst **2/3** unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → `no stalls detected`. All FORGE_NO_PR_SKIP entries reason=pr_exists or preflight_exit. ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0. No orphaned Larry directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-16T21:23:12Z, age≈29 min at check time. FRESH (< 60 min threshold). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=5a68a283=origin/main (clean, on main, no divergence). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-16T21:30:41Z, status=error (known-pattern sync-blocked:auto-commit-push-failed, Tier-3 silenced). Prior successful sync 20:30:31Z (~81 min ago, within 2h threshold). ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3556778 (Ss) ✅, chain_event_shipper 2744551 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, outbox_notifier 3556624 (Ss) ✅, dashboard_api 3593488 (Ssl) ✅. All 5 alive, same PIDs as iter ~2066. ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core: **0 open PRs.** ✅
+ourliberty-dashboard: **0 open PRs.** ✅
+ourliberty-graph: **0 open PRs.** ✅
+
+**Check H — Forge digest:** 0 open PRs. Phase S ALL 6/6 MERGED ✅. No Forge activity since s-6-drain merge at 10:52:38Z UTC. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → `OK: schema_version=1 validates`. ✅ Nominal.
+
+**Conditional checks (Tuesday 2026-06-16 UTC, weekday=1):** Check I fires Mon/Wed/Fri/Sun — skip. Check III fires Sunday — skip.
+
+**G-rule tracking:** No new WARN events this iter. All G-rule counts unchanged from iter ~2066.
+
+**Actions taken:**
+1. PRIME ledger: `iter_clean` appended (tier=1, template=iter-clean, ts=2026-06-16T21:52:39Z).
+2. Tier state: `record --checks-clean true` → consecutive_clean 2→3 → **de-escalated: Tier 1→2**, consecutive_clean reset to 0.
+
+**Dispatches:** None.
+
+---
+
 ## Iteration ~2066 — 2026-06-16 21:42Z UTC (interactive, /cycle, Tier 1, consecutive_clean=1→2)
 
 **Trigger:** Larry direct invocation (`/cycle`).
