@@ -18,6 +18,13 @@
 #
 # Run AFTER `/code-review` has passed — this does not review, it only marks+merges.
 #
+# After merging, it nudges the droplet to pull main immediately (via
+# `ourliberty-sync.service`) so a freshly-merged spec/code change is visible to
+# the agent team within ~a minute instead of waiting up to an hour for the sync
+# timer. Best-effort (a failure never fails the merge; the hourly timer is the
+# backstop). Skip with OURLIBERTY_SKIP_DROPLET_SYNC=1; override the host with
+# OURLIBERTY_DROPLET_SSH (default larry@134.209.44.80).
+#
 # Usage:
 #   scripts/merge_reviewed_pr.sh <PR_NUMBER> [extra gh pr merge args...]
 # Examples:
@@ -82,3 +89,18 @@ echo "[merge_reviewed_pr] merging #${PR}: gh pr merge ${MERGE_ARGS[*]}"
 gh pr merge "$PR" --repo "$REPO" ${MERGE_ARGS[@]+"${MERGE_ARGS[@]}"}
 
 echo "[merge_reviewed_pr] done — #${PR} merged with LOCAL_REVIEW_PASS marker."
+
+# Nudge the droplet to pull main NOW so freshly-merged specs/code reach the agent
+# team within ~a minute instead of waiting up to an hour for ourliberty-sync.timer
+# (the recurring "spec merged but the team can't see it" friction). Best-effort:
+# a failure here never fails the merge — the hourly timer is the backstop. The
+# `if ssh ...` form keeps `set -e` from aborting on a non-zero ssh.
+DROPLET_SSH="${OURLIBERTY_DROPLET_SSH:-larry@134.209.44.80}"
+if [[ "${OURLIBERTY_SKIP_DROPLET_SYNC:-0}" != "1" && -n "$DROPLET_SSH" ]]; then
+  echo "[merge_reviewed_pr] nudging droplet (${DROPLET_SSH}) to sync main now..."
+  if ssh -o ConnectTimeout=10 -o BatchMode=yes "$DROPLET_SSH" 'sudo systemctl start ourliberty-sync.service' 2>/dev/null; then
+    echo "[merge_reviewed_pr] droplet synced — main is current for the team."
+  else
+    echo "[merge_reviewed_pr] WARN: droplet sync nudge failed; hourly timer will catch up (skip with OURLIBERTY_SKIP_DROPLET_SYNC=1)." >&2
+  fi
+fi
