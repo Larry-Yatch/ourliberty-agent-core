@@ -19,10 +19,7 @@ try:  # engage the test sandbox before any production import reads env/paths
 except ImportError:  # discover loads this module top-level (no package parent)
     import _bootstrap  # noqa: F401
 
-import json
-import os
 import sys
-import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -168,45 +165,66 @@ class IsolationTest(unittest.TestCase):
         self.assertEqual(env['source'], 'beacon')
 
 
-def _write_registry(dir_path: Path, missions: list) -> Path:
-    """Write a minimal missions.json fixture and return its path."""
-    path = dir_path / 'missions.json'
-    path.write_text(json.dumps({'schema_version': 1, 'missions': missions}))
-    return path
+def _chain_event(
+    event_type: str = 'session_start',
+    *,
+    repo=None,
+    branch=None,
+    title=None,
+    ts: str = '2026-06-16T00:00:00Z',
+) -> dict:
+    """Build a single chain_events row (the shape the Supabase select returns).
+    The repo/branch live in the event payload — the same place
+    ``dashboard_api._orphan_label_and_location`` reads them from."""
+    payload: dict = {}
+    if repo is not None:
+        payload['repo'] = repo
+    if branch is not None:
+        payload['branch'] = branch
+    if title is not None:
+        payload['title'] = title
+    return {'event_type': event_type, 'task_id': 'fixture',
+            'agent': 'forge', 'pr_url': None, 'ts': ts, 'payload': payload}
+
+
+def _patch_events(test, mapping: dict) -> None:
+    """Patch the chain_events fetch seam to return canned events per task_id
+    (newest-first), so the resolver derives repo without a live Supabase."""
+    patcher = mock.patch.object(
+        chain_envelope, '_fetch_task_chain_events',
+        lambda task_id: list(mapping.get(task_id, [])),
+    )
+    patcher.start()
+    test.addCleanup(patcher.stop)
 
 
 class BackfillTargetRepoTest(unittest.TestCase):
-    """M3: target_repo <- mission registry. The mission that owns a task_id
-    names the repo the work lands in; a dropped target_repo is recoverable
-    from it rather than a dead-end."""
+    """M3 (C1): target_repo <- chain_events. The task's dispatch/session events
+    carry the repo in their payload; a dropped target_repo is recoverable from
+    them via ``dashboard_api._orphan_label_and_location`` rather than a
+    dead-end."""
 
     def setUp(self):
-        self._tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(self._tmp.cleanup)
-        self.dir = Path(self._tmp.name)
-        registry = _write_registry(self.dir, [
-            {'id': 'm1', 'task_ids': ['alpha-1', 'alpha-2'],
-             'repo': 'ourliberty-agent-core'},
-            {'id': 'm2', 'task_ids': ['dash-1'],
-             'repo': 'ourliberty-dashboard'},
-        ])
-        patcher = mock.patch.dict(
-            os.environ, {'OURLIBERTY_MISSIONS_JSON': str(registry)},
-        )
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        _patch_events(self, {
+            'alpha-1': [_chain_event(repo='ourliberty-agent-core',
+                                     branch='forge/alpha-1')],
+            'alpha-2': [_chain_event(repo='ourliberty-agent-core',
+                                     branch='forge/alpha-2')],
+            'dash-1': [_chain_event(repo='ourliberty-dashboard')],
+        })
 
-    def test_resolver_finds_repo_of_owning_mission(self):
+    def test_resolver_finds_repo_from_events(self):
         self.assertEqual(backfill_target_repo('alpha-2'), 'ourliberty-agent-core')
         self.assertEqual(backfill_target_repo('dash-1'), 'ourliberty-dashboard')
 
-    def test_resolver_returns_none_for_unowned_task(self):
+    def test_resolver_returns_none_for_task_with_no_events(self):
         self.assertIsNone(backfill_target_repo('not-a-task'))
 
-    def test_resolver_returns_none_for_missing_registry(self):
-        with mock.patch.dict(
-            os.environ,
-            {'OURLIBERTY_MISSIONS_JSON': str(self.dir / 'nope.json')},
+    def test_resolver_returns_none_when_no_event_carries_repo(self):
+        with mock.patch.object(
+            chain_envelope, '_fetch_task_chain_events',
+            lambda task_id: [_chain_event(event_type='desktop_session_active',
+                                          title='Some chat title')],
         ):
             self.assertIsNone(backfill_target_repo('alpha-1'))
 
@@ -214,13 +232,50 @@ class BackfillTargetRepoTest(unittest.TestCase):
         self.assertIsNone(backfill_target_repo(''))
         self.assertIsNone(backfill_target_repo(None))
 
-    def test_resolver_survives_malformed_registry(self):
-        bad = self.dir / 'bad.json'
-        bad.write_text('{not json')
-        with mock.patch.dict(
-            os.environ, {'OURLIBERTY_MISSIONS_JSON': str(bad)},
+    def test_resolver_uses_newest_event_repo(self):
+        # _orphan_label_and_location takes the repo from the newest event
+        # (events arrive newest-first) — so a later repo wins over an earlier.
+        with mock.patch.object(
+            chain_envelope, '_fetch_task_chain_events',
+            lambda task_id: [
+                _chain_event(repo='ourliberty-agent-core',
+                             ts='2026-06-16T02:00:00Z'),
+                _chain_event(repo='ourliberty-dashboard',
+                             ts='2026-06-16T01:00:00Z'),
+            ],
         ):
+            self.assertEqual(
+                backfill_target_repo('alpha-1'), 'ourliberty-agent-core',
+            )
+
+    def test_resolver_survives_fetch_failure(self):
+        # An unreachable Supabase degrades the seam to [] → field absent.
+        with mock.patch.object(chain_envelope, '_fetch_task_chain_events',
+                               lambda task_id: []):
             self.assertIsNone(backfill_target_repo('alpha-1'))
+
+    def test_parity_with_old_missions_lookup_for_in_flight_task(self):
+        # Migrate-before-remove (spec § 5): for a real in-flight Forge task, the
+        # chain_events derive must return the SAME repo the old missions.json
+        # lookup did. A live in-flight task carries a multi-event trail
+        # (session_start + a desktop_session + a marker_emit); the repo lives in
+        # the session payload. The mission entry that USED to own this task
+        # recorded repo='ourliberty-agent-core' — the derive must agree.
+        in_flight_events = [
+            _chain_event(event_type='marker_emit',
+                         ts='2026-06-16T03:00:00Z'),  # no repo on this one
+            _chain_event(event_type='session_start',
+                         repo='ourliberty-agent-core', branch='forge/p1-target-repo',
+                         ts='2026-06-16T02:00:00Z'),
+            _chain_event(event_type='desktop_session_active',
+                         title='Building C1 target_repo derive',
+                         ts='2026-06-16T01:00:00Z'),
+        ]
+        with mock.patch.object(chain_envelope, '_fetch_task_chain_events',
+                               lambda task_id: in_flight_events):
+            self.assertEqual(
+                backfill_target_repo('p1-target-repo'), 'ourliberty-agent-core',
+            )
 
     def test_builder_backfills_missing_target_repo(self):
         env = build_chain_envelope(
@@ -240,7 +295,7 @@ class BackfillTargetRepoTest(unittest.TestCase):
         self.assertEqual(env['target_repo'], 'explicit-repo')
 
     def test_builder_omits_when_unrecoverable(self):
-        # No owning mission → field stays absent (the M2 fall-through case).
+        # No repo-bearing event → field stays absent (the M2 fall-through case).
         env = build_chain_envelope(
             {'task_id': 'orphan-task'}, None,
             carry=_all_drop(target_repo=DROP),
@@ -316,29 +371,25 @@ class BackfillPrUrlTest(unittest.TestCase):
         self.assertEqual(env['pr_url'], 'https://gh/pr#forge/alpha-1')
 
     def test_builder_backfills_both_repo_then_pr_url(self):
-        # target_repo is registry-derived first, then the pr_url resolver scopes
-        # its gh query to it — verifying the deterministic ordering invariant.
+        # target_repo is chain_events-derived first, then the pr_url resolver
+        # scopes its gh query to it — verifying the deterministic ordering.
         seen = {}
 
         def fake_gh(repo_full, branch):
             seen['repo_full'] = repo_full
             return 'https://gh/pr/9'
 
-        with tempfile.TemporaryDirectory() as td:
-            registry = _write_registry(Path(td), [
-                {'id': 'm', 'task_ids': ['alpha-1'],
-                 'repo': 'ourliberty-agent-core'},
-            ])
-            with mock.patch.dict(
-                os.environ, {'OURLIBERTY_MISSIONS_JSON': str(registry)},
-            ), mock.patch.object(
-                chain_envelope, '_gh_pr_url_for_branch', fake_gh,
-            ):
-                env = build_chain_envelope(
-                    {'task_id': 'alpha-1', 'branch': 'forge/alpha-1'}, None,
-                    carry=_all_drop(target_repo=DROP, pr_url=DROP),
-                    backfill={'target_repo', 'pr_url'},
-                )
+        with mock.patch.object(
+            chain_envelope, '_fetch_task_chain_events',
+            lambda task_id: [_chain_event(repo='ourliberty-agent-core')],
+        ), mock.patch.object(
+            chain_envelope, '_gh_pr_url_for_branch', fake_gh,
+        ):
+            env = build_chain_envelope(
+                {'task_id': 'alpha-1', 'branch': 'forge/alpha-1'}, None,
+                carry=_all_drop(target_repo=DROP, pr_url=DROP),
+                backfill={'target_repo', 'pr_url'},
+            )
         self.assertEqual(env['target_repo'], 'ourliberty-agent-core')
         self.assertEqual(env['pr_url'], 'https://gh/pr/9')
         self.assertEqual(seen['repo_full'], 'Larry-Yatch/ourliberty-agent-core')

@@ -71,7 +71,7 @@ from chain_envelope import (        # noqa: E402  # M1: sole envelope constructo
     CARRY,
     DROP,
     backfill_pr_url,        # M3: pr_url <- gh
-    backfill_target_repo,   # M3: target_repo <- mission registry
+    backfill_target_repo,   # M3: target_repo <- chain_events
     build_chain_envelope,
 )
 import dispatch_validator         # noqa: E402
@@ -3762,14 +3762,15 @@ def _dispatch_mirror_review(data: dict[str, Any], pr_url: str) -> None:
     target_repo = data.get('target_repo')
     if not target_repo:
         # M3 (chain-context-durability §4): a missing target_repo is usually
-        # *recoverable* — the mission registry maps this task_id to its repo.
-        # Backfill from the source of truth BEFORE concluding we must dead-end;
-        # only a task no mission owns falls through to the WARN below.
+        # *recoverable* — the task's chain_events carry the repo in their
+        # payload. Backfill from the source of truth BEFORE concluding we must
+        # dead-end; only a task with no repo-bearing event falls through to the
+        # WARN below.
         target_repo = backfill_target_repo(task_id)
         if target_repo:
             log(
                 f'target_repo backfilled to `{target_repo}` for task {task_id} '
-                f'from the mission registry (M3); proceeding with review dispatch',
+                f'from chain_events (M3); proceeding with review dispatch',
                 'INFO',
             )
     if not target_repo:
@@ -3779,7 +3780,7 @@ def _dispatch_mirror_review(data: dict[str, Any], pr_url: str) -> None:
         # to Larry rather than silently dropping.
         log(
             f'PR opened on task {task_id} but no target_repo on envelope and '
-            f'none derivable from the mission registry; cannot dispatch review '
+            f'none derivable from chain_events; cannot dispatch review '
             f'(Mirror requires target_repo for worktree gating). Larry must '
             f'manually re-dispatch.',
             'WARN',
@@ -4548,18 +4549,18 @@ def _dispatch_mirror_review_rerun(
     task_id = data.get('task_id') or 'unknown'
     target_repo = data.get('target_repo')
     if not target_repo:
-        # M3: derive target_repo from the mission registry before dead-ending.
+        # M3: derive target_repo from the task's chain_events before dead-ending.
         target_repo = backfill_target_repo(task_id)
         if target_repo:
             log(
                 f'target_repo backfilled to `{target_repo}` for task {task_id} '
-                f'from the mission registry (M3); proceeding with re-review',
+                f'from chain_events (M3); proceeding with re-review',
                 'INFO',
             )
     if not target_repo:
         log(
             f'Forge revision-{round_num} on task {task_id} has no target_repo '
-            f'and none derivable from the mission registry; '
+            f'and none derivable from chain_events; '
             f'cannot dispatch re-review — skipping.',
             'WARN',
         )

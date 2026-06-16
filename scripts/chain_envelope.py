@@ -44,8 +44,17 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Optional
+
+# Sibling modules (``supabase_factory``, ``dashboard_api``) live in ``scripts/``
+# beside this file. Add it to ``sys.path`` once at import so the lazy sibling
+# imports in the recovery-only backfill resolvers resolve regardless of how this
+# module was loaded.
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
 
 
 class _Sentinel:
@@ -98,30 +107,26 @@ def _passes_guard(value: Any, guard: str) -> bool:
 # M3 — derivable-context backfill (spec §4 M3, §5 S3).
 #
 # Several dead-ends in the chain fire because a whitelisted field is *missing*,
-# not *unrecoverable*: ``target_repo`` is derivable from the mission registry
-# (the mission that owns the task names its repo); ``pr_url`` is derivable via
-# ``gh`` (the Forge build PR's head branch is the ``forge/<task_id>``
-# convention). The builder backfills these from their source of truth so a
-# handler never concludes it must dead-end on a field that was recoverable all
-# along. Only genuinely unrecoverable context (e.g. a reaped build session)
-# falls through to M2's agent-route.
+# not *unrecoverable*: ``target_repo`` is derivable from the task's
+# ``chain_events`` activity log (the dispatch/session events carry the repo in
+# their payload); ``pr_url`` is derivable via ``gh`` (the Forge build PR's head
+# branch is the ``forge/<task_id>`` convention). The builder backfills these
+# from their source of truth so a handler never concludes it must dead-end on a
+# field that was recoverable all along. Only genuinely unrecoverable context
+# (e.g. a reaped build session) falls through to M2's agent-route.
 #
 # Backfill is OPT-IN per call (``backfill=`` arg, default off). The resolvers
-# do real I/O — a registry read, a ``gh`` shell-out — so the happy path that
-# already carries the field pays nothing; only the recovery/dead-end paths that
-# ask for backfill incur the lookup. Every resolver is fail-safe: it returns
-# ``None`` (→ field stays absent → the genuinely-unrecoverable case) rather
-# than raising, so a missing/malformed registry or a ``gh`` outage can never
+# do real I/O — a chain_events query, a ``gh`` shell-out — so the happy path
+# that already carries the field pays nothing; only the recovery/dead-end paths
+# that ask for backfill incur the lookup. Every resolver is fail-safe: it
+# returns ``None`` (→ field stays absent → the genuinely-unrecoverable case)
+# rather than raising, so an unreachable Supabase or a ``gh`` outage can never
 # crash envelope construction.
 # ---------------------------------------------------------------------------
 
 # Subset of CHAIN_CONTEXT_FIELDS that has a source of truth to derive from.
 BACKFILLABLE_FIELDS: frozenset[str] = frozenset({'target_repo', 'pr_url'})
 
-# Env-overridable so tests redirect the registry read to a fixture without
-# touching the real ``agents/beacon/missions.json``. Mirrors dashboard_api's
-# ``_missions_json_path`` convention.
-_MISSIONS_JSON_ENV = 'OURLIBERTY_MISSIONS_JSON'
 # Owner prefix used to expand a short repo name (``ourliberty-agent-core``) into
 # the ``owner/repo`` coordinates ``gh`` expects. Env-overridable for parity with
 # the rest of the chain's gh helpers.
@@ -130,39 +135,66 @@ _DEFAULT_GH_OWNER = 'Larry-Yatch'
 _GH_TIMEOUT_S = 20
 
 
-def _missions_json_path() -> Path:
-    override = os.environ.get(_MISSIONS_JSON_ENV)
-    if override:
-        return Path(override)
-    return Path(__file__).resolve().parent.parent / 'agents' / 'beacon' / 'missions.json'
+def _fetch_task_chain_events(task_id: str) -> list[dict[str, Any]]:
+    """Return the task's ``chain_events`` rows, newest-first, or ``[]``.
+
+    Test seam — tests monkeypatch this to inject canned events without a live
+    Supabase client. Selects the ``payload`` column (where the repo lives) so
+    ``_orphan_label_and_location`` can extract it. Fail-safe: missing creds, a
+    missing client, or any query error degrades to ``[]`` (→ the resolver
+    returns ``None`` → the genuinely-unrecoverable case). Never raises. Lazy
+    supabase import per the ``task_resolution`` / ``heal_pipeline_stall``
+    pattern so importing this module costs nothing on the happy path.
+    """
+    url = os.environ.get('SUPABASE_URL')
+    key = os.environ.get('SUPABASE_SERVICE_ROLE_KEY')
+    if not url or not key:
+        return []
+    try:
+        from supabase_factory import get_supabase_client  # type: ignore
+        client = get_supabase_client(url, key)
+        if client is None:
+            return []
+        resp = (
+            client.table('chain_events')
+            .select('event_type,task_id,agent,pr_url,ts,payload')
+            .eq('task_id', task_id)
+            .order('ts', desc=True)
+            .execute()
+        )
+    except Exception:  # noqa: BLE001 — failsafe, never raise on infra error
+        return []
+    rows = list(getattr(resp, 'data', None) or [])
+    # Defensive re-sort: the query orders by ts desc, but pin newest-first so
+    # the extraction (which takes the newest event carrying a repo) is stable.
+    rows.sort(key=lambda r: r.get('ts') or '', reverse=True)
+    return rows
 
 
 def backfill_target_repo(task_id: Optional[str]) -> Optional[str]:
-    """Derive ``target_repo`` from the mission registry.
+    """Derive ``target_repo`` from the task's ``chain_events`` activity log.
 
-    Returns the ``repo`` of the mission whose ``task_ids`` contains ``task_id``,
-    or ``None`` when unresolvable (no registry, malformed JSON, or no mission
-    owns the task). Never raises — an unreadable registry degrades to "absent",
+    Reuses ``dashboard_api._orphan_label_and_location`` — the same reader the
+    Missions board uses to pull ``repo``/``branch`` from a task's chain-event
+    payloads — and returns the resolved ``repo``, or ``None`` when unresolvable
+    (no events for the task, no event carries a repo, or Supabase is
+    unreachable). Recovery-only: envelopes normally carry ``target_repo``; this
+    fires only when a dropped field would otherwise dead-end the chain, and is
+    built to return the same answer the old ``missions.json`` lookup did for an
+    in-flight task. Never raises — an unrecoverable repo degrades to "absent",
     which is exactly the genuinely-unrecoverable case M2 handles.
     """
     if not task_id:
         return None
+    events = _fetch_task_chain_events(task_id)
+    if not events:
+        return None
     try:
-        data = json.loads(_missions_json_path().read_text())
-    except (OSError, json.JSONDecodeError, ValueError):
+        from dashboard_api import _orphan_label_and_location  # type: ignore
+        _label, repo, _branch = _orphan_label_and_location(events, task_id)
+    except Exception:  # noqa: BLE001 — failsafe; a bad import/derive is "absent"
         return None
-    missions = data.get('missions') if isinstance(data, dict) else None
-    if not isinstance(missions, list):
-        return None
-    for mission in missions:
-        if not isinstance(mission, dict):
-            continue
-        task_ids = mission.get('task_ids')
-        if isinstance(task_ids, list) and task_id in task_ids:
-            repo = mission.get('repo')
-            if isinstance(repo, str) and repo:
-                return repo
-    return None
+    return repo or None
 
 
 def _full_repo(target_repo: Optional[str]) -> Optional[str]:
@@ -218,7 +250,7 @@ def backfill_pr_url(
     The PR's head branch is the worktree convention ``forge/<task_id>`` unless
     ``branch`` is given explicitly. ``gh`` is scoped to the repo, so the lookup
     needs ``target_repo`` — passed in if the caller already resolved it, else
-    derived from the mission registry. Returns ``None`` when unresolvable (no
+    derived from the task's chain_events. Returns ``None`` when unresolvable (no
     repo, gh outage, or no matching PR). Never raises.
     """
     if not task_id:
@@ -232,7 +264,7 @@ def backfill_pr_url(
 
 # field -> resolver(task_id, env) used by the builder's ``backfill=`` path.
 # ``target_repo`` is ordered before ``pr_url`` in CHAIN_CONTEXT_FIELDS, so when
-# both are requested the registry-derived repo is already on ``env`` and the
+# both are requested the chain_events-derived repo is already on ``env`` and the
 # pr_url resolver can scope its gh query to it.
 _BACKFILL_RESOLVERS: dict[str, Callable[[Optional[str], Mapping[str, Any]], Optional[str]]] = {
     'target_repo': lambda task_id, env: backfill_target_repo(task_id),
@@ -271,7 +303,7 @@ def build_chain_envelope(
         backfill: optional collection of whitelisted field names to derive from
             their source of truth (M3) when, after ``carry`` resolution, the
             field is still absent. Must be a subset of ``BACKFILLABLE_FIELDS``
-            (``target_repo`` ← mission registry, ``pr_url`` ← gh). Backfill only
+            (``target_repo`` ← chain_events, ``pr_url`` ← gh). Backfill only
             fills a *missing* field — a value an explicit/``CARRY`` resolution
             already produced is never overwritten. Default ``None`` → no
             backfill (the happy path that already carries the field pays no
