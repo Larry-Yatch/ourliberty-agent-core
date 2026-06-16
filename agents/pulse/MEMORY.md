@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-16 06:21Z UTC (Iter ~2016, Tier 1, consecutive_clean=0)
+
+**Iter ~2016 summary:** ⚠️ Signal. Phase S dag-preflight REVISION at 06:08:15Z; Beacon session 06:08:18–06:09:48Z amended sequence (s-2→s-3→s-4 serialized, fix correct); no re-dispatch to Mirror (no audit_log `dag-preflight-redispatch`, Mirror inbox empty, notifier silent after 06:08:15Z). Direction-ask dispatched: `pulse-phase-s-dag-redispatch-001` → Beacon inbox. **PR #539 MERGED ✅** at 06:08:41Z (commit a4cfe198, fix(review-dispatch): head-aware dedup). PR #497: MERGEABLE/"" (changed from UNKNOWN; updatedAt=Jun-14T04:02:56Z unchanged; Mirror REVIEW_ESCALATE Jun-14T04:02:56Z; age≈50.3h; deadline Jun-17T04:02:56Z **~21.7h remaining**). All 5 daemons alive. Repo e0ea633a=origin/main. Watermark: 1062 unchanged. pending=0. Tier 1, consecutive_clean=0. PRIME ratio=20.14.
+
 ## Status snapshot — updated 2026-06-16 06:11Z UTC (Iter ~2015, Tier 1, consecutive_clean=2)
 
 **Iter ~2015 summary:** ✅ Nominal. 0 new alerts. All checks clean. **PR #538 MERGED ✅** at 06:05:09Z (orphan-lane fix). **PR #539 NEW** (`fix/review-dedup-sha-aware`, "fix(review-dispatch): re-review a PR after its head changes (head-aware dedup)"): MERGEABLE, no review, created 06:05:16Z — Phase S systemic fix for review-dedup issue. **Phase S dag-preflight:** Mirror worktree `wt-mirror-dag-preflight-missions-v2-phase-s` active (processing). PR #497 UNKNOWN/"", REVIEW_ESCALATE, age≈50.1h, deadline Jun-17T04:02:56Z (~21.9h). Stale worktrees: `wt-forge-fix-delegate-endpoint-regression-gate-001` + `wt-mirror-dag-preflight-missions-v2-delegate-fix` (both inactive, carry). Repo c90a4603=origin/main. Watermark: 1062 unchanged. pending=0. Tier 1, consecutive_clean=2. PRIME ratio=20.12.
