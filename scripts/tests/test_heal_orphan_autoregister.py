@@ -29,6 +29,7 @@ try:  # engage the test sandbox before any production import reads env/paths
 except ImportError:  # discover loads this module top-level (no package parent)
     import _bootstrap  # noqa: F401
 
+import contextlib
 import json
 import os
 import subprocess
@@ -754,6 +755,263 @@ class RunOnceIngestTest(unittest.TestCase):
         ids = [m['id'] for m in self._registry()['missions']]
         self.assertEqual(ids, ['foo'])           # ONLY the ingested entry
         self.assertNotIn('PARTIAL-junk', ids)    # partial scan work discarded
+
+
+# --------------------------------------------------- new-mission QUEUE drain
+
+
+def _write_queue(queue_dir: Path, entry: dict) -> Path:
+    """Drop a queue file `<id>.json` (the dashboard's atomic write equivalent)."""
+    queue_dir.mkdir(parents=True, exist_ok=True)
+    path = queue_dir / f"{entry['id']}.json"
+    path.write_text(json.dumps(entry) + '\n')
+    return path
+
+
+class ListQueuedNewMissionsTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix='queue-list-')
+        self.qd = Path(self.tmp) / 'new-mission-queue'
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_missing_dir_returns_empty(self):
+        self.assertEqual(h.list_queued_new_missions(self.qd), [])
+
+    def test_lists_json_name_sorted(self):
+        _write_queue(self.qd, _mentry('beta'))
+        _write_queue(self.qd, _mentry('alpha'))
+        out = h.list_queued_new_missions(self.qd)
+        self.assertEqual([e['id'] for _, e in out], ['alpha', 'beta'])
+
+    def test_skips_malformed_and_non_object_leaving_them(self):
+        self.qd.mkdir(parents=True)
+        (self.qd / 'bad.json').write_text('{not json')
+        (self.qd / 'arr.json').write_text('[1, 2]')
+        _write_queue(self.qd, _mentry('good'))
+        out = h.list_queued_new_missions(self.qd)
+        self.assertEqual([e['id'] for _, e in out], ['good'])
+        # malformed files are LEFT in place for a human, not deleted.
+        self.assertTrue((self.qd / 'bad.json').exists())
+
+    def test_ignores_non_json_and_tmp_files(self):
+        self.qd.mkdir(parents=True)
+        (self.qd / 'foo.json.tmp').write_text('partial')  # in-flight atomic write
+        (self.qd / 'note.txt').write_text('x')
+        _write_queue(self.qd, _mentry('good'))
+        out = h.list_queued_new_missions(self.qd)
+        self.assertEqual([e['id'] for _, e in out], ['good'])
+
+
+class DrainNewMissionQueueTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix='queue-drain-')
+        self.qd = Path(self.tmp) / 'new-mission-queue'
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_appends_and_marks_deletable(self):
+        p = _write_queue(self.qd, _mentry('foo'))
+        reg = {'schema_version': 1, 'missions': []}
+        drained, deletable = h.drain_new_mission_queue(reg, self.qd)
+        self.assertEqual([m['id'] for m in reg['missions']], ['foo'])
+        self.assertEqual(drained, ['foo'])
+        self.assertEqual(deletable, [(p, 'foo')])
+
+    def test_preserves_full_entry_fields(self):
+        entry = _mentry('foo')
+        entry['brief'] = 'keep me'
+        entry['spec_docs'] = ['a.md']
+        _write_queue(self.qd, entry)
+        reg = {'schema_version': 1, 'missions': []}
+        h.drain_new_mission_queue(reg, self.qd)
+        self.assertEqual(reg['missions'][0]['brief'], 'keep me')
+        self.assertEqual(reg['missions'][0]['spec_docs'], ['a.md'])
+
+    def test_duplicate_id_not_appended_but_deletable(self):
+        p = _write_queue(self.qd, _mentry('foo'))
+        reg = {'schema_version': 1, 'missions': [_mentry('foo')]}
+        drained, deletable = h.drain_new_mission_queue(reg, self.qd)
+        self.assertEqual(len(reg['missions']), 1)         # unchanged
+        self.assertEqual(drained, [])
+        self.assertEqual(deletable, [(p, 'foo')])         # redundant file → delete
+
+    def test_no_id_left_in_place(self):
+        self.qd.mkdir(parents=True)
+        (self.qd / 'weird.json').write_text(json.dumps({'name': 'x'}) + '\n')
+        reg = {'schema_version': 1, 'missions': []}
+        drained, deletable = h.drain_new_mission_queue(reg, self.qd)
+        self.assertEqual(reg['missions'], [])
+        self.assertEqual((drained, deletable), ([], []))
+
+    def test_malformed_entry_left_in_place(self):
+        # id present but missing required name/phase → invalid → not drained.
+        self.qd.mkdir(parents=True)
+        (self.qd / 'm.json').write_text(
+            json.dumps({'id': 'm', 'task_ids': []}) + '\n')
+        reg = {'schema_version': 1, 'missions': []}
+        drained, deletable = h.drain_new_mission_queue(reg, self.qd)
+        self.assertEqual(reg['missions'], [])
+        self.assertEqual((drained, deletable), ([], []))
+
+    def test_non_list_task_ids_rejected(self):
+        self.qd.mkdir(parents=True)
+        (self.qd / 'm.json').write_text(json.dumps(
+            {'id': 'm', 'name': 'M', 'phase': 'drafting',
+             'task_ids': 'oops'}) + '\n')
+        reg = {'schema_version': 1, 'missions': []}
+        drained, deletable = h.drain_new_mission_queue(reg, self.qd)
+        self.assertEqual((drained, deletable), ([], []))
+
+    def test_bounded_per_tick(self):
+        for i in range(5):
+            _write_queue(self.qd, _mentry(f'm{i}'))
+        reg = {'schema_version': 1, 'missions': []}
+        with mock.patch.object(h, 'NEWMISSION_MAX_PER_TICK', 2):
+            drained, _ = h.drain_new_mission_queue(reg, self.qd)
+        self.assertEqual(len(drained), 2)
+
+
+class QueueDirParityTest(unittest.TestCase):
+    def test_healer_and_dashboard_resolve_the_same_queue_dir(self):
+        # The dashboard WRITES queue files; this healer DRAINS them. The two paths
+        # are defined independently (different modules) but MUST agree — if they
+        # ever diverge, queued missions silently never register. Pin them together.
+        with mock.patch.dict(os.environ,
+                             {'OURLIBERTY_AGENTS_ROOT': '/tmp/agts-parity'}):
+            self.assertEqual(
+                str(h._new_mission_queue_dir()),
+                str(derive._new_mission_queue_dir()),
+            )
+
+
+class DeleteQueueFileTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix='queue-del-')
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_removes_existing(self):
+        p = Path(self.tmp) / 'x.json'
+        p.write_text('{}')
+        self.assertTrue(h.delete_queue_file(p))
+        self.assertFalse(p.exists())
+
+    def test_already_gone_is_success(self):
+        self.assertTrue(h.delete_queue_file(Path(self.tmp) / 'nope.json'))
+
+
+class RunOnceQueueDrainTest(unittest.TestCase):
+    """run_once drains the queue (primary) + closes the PR backstop, only when
+    ENABLED and only for missions confirmed on origin/main; defaults observe-only;
+    runs even when chain_events is unavailable."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix='run-once-queue-')
+        self.core = Path(self.tmp) / 'agent-core'
+        (self.core / 'agents' / 'beacon').mkdir(parents=True)
+        (self.core / h.MISSIONS_REL).write_text(
+            json.dumps({'schema_version': 1, 'missions': []}) + '\n')
+        self.qd = Path(self.tmp) / 'new-mission-queue'
+        self.now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _registry(self):
+        return json.loads((self.core / h.MISSIONS_REL).read_text())
+
+    def _ctx(self, on_main, prs=None, closed=None):
+        """Common run_once patches; caller supplies the on-main id set."""
+        return [
+            mock.patch.object(h, 'load_repo_paths',
+                              return_value={'ourliberty-agent-core': self.core}),
+            mock.patch.object(h, '_new_mission_queue_dir', return_value=self.qd),
+            mock.patch.object(h, 'list_open_new_mission_prs',
+                              return_value=prs if prs is not None else []),
+            mock.patch.object(h, 'commit_and_push_missions', return_value='committed'),
+            mock.patch.object(h, '_missions_ids_on_main', return_value=on_main),
+        ]
+
+    def _run(self, events_fetcher=lambda: []):
+        return h.run_once(dry_run=False, events_fetcher=events_fetcher,
+                          derive=derive, pr_state_resolver=lambda urls: {},
+                          now=self.now)
+
+    def test_drains_and_deletes_when_enabled_and_on_main(self):
+        p = _write_queue(self.qd, _mentry('foo'))
+        with mock.patch.dict(os.environ, {h.ENV_NEWMISSION_INGEST: 'true'}):
+            with contextlib.ExitStack() as es:
+                for cm in self._ctx({'foo'}):
+                    es.enter_context(cm)
+                rc = self._run()
+        self.assertEqual(rc, 0)
+        self.assertEqual([m['id'] for m in self._registry()['missions']], ['foo'])
+        self.assertFalse(p.exists())            # removed after on-main confirm
+
+    def test_does_not_delete_when_not_on_main(self):
+        # Drained + committed locally, but the mission is NOT yet on origin/main
+        # (push lagged) → leave the queue file, retry next tick.
+        p = _write_queue(self.qd, _mentry('foo'))
+        with mock.patch.dict(os.environ, {h.ENV_NEWMISSION_INGEST: 'true'}):
+            with contextlib.ExitStack() as es:
+                for cm in self._ctx(set()):
+                    es.enter_context(cm)
+                self._run()
+        self.assertEqual([m['id'] for m in self._registry()['missions']], ['foo'])
+        self.assertTrue(p.exists())             # NOT deleted — retry
+
+    def test_default_disabled_observes_only(self):
+        p = _write_queue(self.qd, _mentry('foo'))
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop(h.ENV_NEWMISSION_INGEST, None)
+            with contextlib.ExitStack() as es:
+                for cm in self._ctx({'foo'}):
+                    es.enter_context(cm)
+                rc = self._run()
+        self.assertEqual(rc, 0)
+        self.assertEqual(self._registry()['missions'], [])   # nothing drained
+        self.assertTrue(p.exists())                          # queue file untouched
+
+    def test_drains_even_when_chain_events_unavailable(self):
+        p = _write_queue(self.qd, _mentry('foo'))
+        with mock.patch.dict(os.environ, {h.ENV_NEWMISSION_INGEST: 'true'}):
+            with contextlib.ExitStack() as es:
+                for cm in self._ctx({'foo'}):
+                    es.enter_context(cm)
+                rc = self._run(events_fetcher=lambda: None)  # chain_events down
+        self.assertEqual(rc, 0)
+        self.assertEqual([m['id'] for m in self._registry()['missions']], ['foo'])
+        self.assertFalse(p.exists())
+
+    def test_queue_and_pr_backstop_both_register_same_tick(self):
+        # The queue (primary) and the PR backstop coexist: a queued mission AND an
+        # in-flight feat/new-mission-* PR both land in one commit.
+        p = _write_queue(self.qd, _mentry('foo'))
+        prs = [{'number': 9, 'branch': 'feat/new-mission-bar'}]
+        closed = []
+        with mock.patch.dict(os.environ, {h.ENV_NEWMISSION_INGEST: 'true'}):
+            with contextlib.ExitStack() as es:
+                for cm in self._ctx({'foo', 'bar'}, prs=prs):
+                    es.enter_context(cm)
+                es.enter_context(mock.patch.object(
+                    h, 'fetch_branch_mission_entry',
+                    side_effect=lambda r, b, mid: _mentry('bar')))
+                es.enter_context(mock.patch.object(
+                    h, 'close_new_mission_pr',
+                    side_effect=lambda r, n, m: closed.append((n, m)) or True))
+                self._run()
+        ids = sorted(m['id'] for m in self._registry()['missions'])
+        self.assertEqual(ids, ['bar', 'foo'])
+        self.assertFalse(p.exists())             # queue file removed
+        self.assertEqual(closed, [(9, 'bar')])   # PR backstop closed
 
 
 if __name__ == '__main__':

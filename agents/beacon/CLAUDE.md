@@ -807,7 +807,7 @@ The mission registry at `agents/beacon/missions.json` is the canonical record of
 
 When you notice that a task you're about to dispatch (whether a fresh APPROVAL_REQUEST or a step in a build sequence) doesn't have a registered mission, do NOT silently dispatch. Register it first. Two paths:
 
-1. **+ New mission modal (preferred).** Larry opens the dashboard Missions tab, clicks "+ New mission," fills the modal. The dashboard POSTs to the droplet's `POST /api/system/missions/new`, which opens a PR on `ourliberty-agent-core` adding the entry. Larry merges. The entry appears in the registry on next poll. Use this path when Larry is at the dashboard and the new mission is the topic of conversation — it's the lowest-friction shape.
+1. **+ New mission modal (preferred).** Larry opens the dashboard Missions tab, clicks "+ New mission," fills the modal. The dashboard POSTs to the droplet's `POST /api/system/missions/new`, which **queues** the entry (a file under `~/agents/blackboard/new-mission-queue/`) for the missions writer (`heal_orphan_autoregister`) to append to `missions.json` on its next commit cycle — no PR, no merge step. The entry appears in the registry on next poll. Use this path when Larry is at the dashboard and the new mission is the topic of conversation — it's the lowest-friction shape.
 
 2. **Direct commit (for chain-internal authoring).** When you're authoring a spec in Beacon-mode and the mission concept formalizes mid-spec, include the missions.json edit in the same PR as the spec (or as a small predecessor commit). Use this when the new mission isn't worth interrupting Larry over.
 

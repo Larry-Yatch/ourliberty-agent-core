@@ -94,18 +94,31 @@ GIT_TIMEOUT_SEC = 60
 PUSH_TIMEOUT_SEC = 180
 GH_TIMEOUT_SEC = 30
 
-# Dashboard "+New mission" PRs (branch `feat/new-mission-<id>`, one missions.json
-# append each) are opened via the GitHub API outside the Forge pipeline, so they
-# never get an auto-dispatched Mirror review — they sit open, page
-# heal-pipeline-stall every cycle, and go stale/CONFLICTING against the high-churn
-# missions.json. We reconcile them HERE, inside the missions writer: ingest the
-# single named mission into missions.json (append-only) and close the PR. No
-# stale-branch merge (so no conflicts), no `feat(missions):` unreviewed-merge page
-# (the mission lands via this healer's own commit, the PR is closed not merged).
-# Bounded per tick and fully fail-safe — a fault here never blocks propose/retire.
+# Dashboard "+New mission" registration is drained HERE, inside the missions
+# writer, so the dashboard never has to be a git committer (it just drops a queue
+# file) and no unroutable PR is ever created. Two sources, both append-only +
+# bounded + fail-safe (a fault in either never blocks propose/retire):
+#
+#   * PRIMARY — the queue. The dashboard drops one `<id>.json` per mission under
+#     `<agents_root>/blackboard/new-mission-queue/`; we append each into
+#     missions.json via this healer's own (single-committer) commit and remove the
+#     file once its mission is confirmed on origin/main. This is the canonical
+#     path now (dashboard_api._handle_new_mission).
+#   * BACKSTOP (transitional) — open `feat/new-mission-*` PRs. The OLD dashboard
+#     flow opened one PR per mission via the GitHub API outside the Forge pipeline;
+#     those never got a Mirror review, sat open, and paged heal-pipeline-stall. The
+#     dashboard no longer opens them, but in-flight PRs at deploy time (and any old
+#     dashboard-api process before its restart) still need closing — we ingest the
+#     single named mission (append-only) and close the PR (no stale-branch merge →
+#     no conflicts; no `feat(missions):` merge → no unreviewed-merge page). Remove
+#     this path once `gh pr list` shows zero feat/new-mission-* PRs for a few days.
 NEWMISSION_BRANCH_PREFIX = 'feat/new-mission-'
 NEWMISSION_MAX_PER_TICK = 20
 ENV_NEWMISSION_INGEST = 'OURLIBERTY_NEWMISSION_INGEST_ENABLED'
+# Subdir under the agents blackboard the dashboard +New mission flow drops queued
+# mission entries into (mirrors dashboard_api._new_mission_queue_dir). NOT inside
+# the git checkout, so a pending file is never untracked-file drift.
+NEWMISSION_QUEUE_SUBPATH = ('blackboard', 'new-mission-queue')
 
 
 # ---------- env-resolved paths (read at call time so tests can override) ----------
@@ -335,8 +348,10 @@ class ProposeResult:
     proposed: list[tuple[str, str]] = field(default_factory=list)  # (task_id, entry_id)
     retired: list[tuple[str, str]] = field(default_factory=list)  # (entry_id, reason)
     surviving_proposed: list[str] = field(default_factory=list)  # live proposed entry ids
-    ingested: list[tuple[int, str]] = field(default_factory=list)  # (pr_number, mission_id)
+    ingested: list[tuple[int, str]] = field(default_factory=list)  # (pr_number, mission_id) — PR backstop
     closeable_prs: list[tuple[int, str]] = field(default_factory=list)  # new-mission PRs to close
+    queue_drained: list[str] = field(default_factory=list)  # mission_ids drained from the queue this tick
+    deletable_queue: list[tuple[Path, str]] = field(default_factory=list)  # (queue_file, mission_id) to remove
     scanned_orphans: int = 0
     skipped_terminal_or_indeterminate: int = 0
     skipped_non_proposable: int = 0
@@ -796,6 +811,104 @@ def close_new_mission_pr(repo_full: str, number: int, mission_id: str) -> bool:
     return True
 
 
+# ---------- new-mission QUEUE drain (the PRIMARY +New mission source) ----------
+
+
+def _new_mission_queue_dir() -> Path:
+    """Dir the dashboard +New mission flow drops queued `<id>.json` entries into
+    for this healer to drain. Keyed off `_agents_root()` (OURLIBERTY_AGENTS_ROOT)
+    so it resolves to the SAME path dashboard_api._new_mission_queue_dir writes,
+    and so tests redirect both via one env override."""
+    return _agents_root().joinpath(*NEWMISSION_QUEUE_SUBPATH)
+
+
+def list_queued_new_missions(queue_dir: Path) -> list[tuple[Path, dict[str, Any]]]:
+    """Every `*.json` file in the +New mission queue, as (path, parsed entry),
+    name-sorted for deterministic order. Missing dir → []. A malformed / non-object
+    / unreadable file is logged and SKIPPED (left in place for a human) — never
+    crashes the tick. `*.tmp` files (an in-flight atomic write) are ignored."""
+    out: list[tuple[Path, dict[str, Any]]] = []
+    try:
+        if not queue_dir.is_dir():
+            return out
+        paths = sorted(
+            p for p in queue_dir.iterdir()
+            if p.is_file() and p.suffix == '.json'
+        )
+    except OSError as e:
+        log(f'new-mission queue list failed ({queue_dir}): {e}')
+        return out
+    for path in paths:
+        try:
+            data = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError) as e:
+            log(f'new-mission queue file {path.name} unreadable/malformed: {e} '
+                f'— leaving in place')
+            continue
+        if not isinstance(data, dict):
+            log(f'new-mission queue file {path.name} is not a JSON object '
+                f'— leaving in place')
+            continue
+        out.append((path, data))
+    return out
+
+
+def drain_new_mission_queue(
+    registry: dict[str, Any], queue_dir: Path,
+) -> tuple[list[str], list[tuple[Path, str]]]:
+    """Append each queued +New mission entry into the in-memory registry
+    (append-only, dedup by id, bounded), and report which queue files are now
+    safe to remove.
+
+    Returns (drained, deletable): `drained` = ids actually appended this tick;
+    `deletable` = (path, id) whose mission is present on main (just-appended OR
+    already there) and so can be removed once the registry is committed. A file
+    with no string id, a malformed entry, is left in place for a human.
+
+    The filename is advisory only — the AUTHORITATIVE id is `entry['id']`
+    (validated well-formed by _valid_mission_entry), so a misnamed file can't
+    smuggle a mismatched id, and we append exactly the entry the dashboard wrote
+    (preserving brief/spec_docs/repo/…)."""
+    drained: list[str] = []
+    deletable: list[tuple[Path, str]] = []
+    files = list_queued_new_missions(queue_dir)
+    if not files:
+        return drained, deletable
+    existing = existing_entry_ids(registry)
+    missions = registry.setdefault('missions', [])
+    for path, entry in files[:NEWMISSION_MAX_PER_TICK]:
+        mission_id = entry.get('id')
+        if not isinstance(mission_id, str) or not mission_id:
+            log(f'new-mission queue file {path.name}: entry has no string `id` '
+                f'— leaving in place')
+            continue
+        if mission_id in existing:
+            deletable.append((path, mission_id))  # already on main → redundant file
+            continue
+        if not _valid_mission_entry(entry, mission_id):
+            log(f'new-mission queue file {path.name}: entry for `{mission_id}` '
+                f'malformed — leaving in place for review')
+            continue
+        missions.append(entry)
+        existing.add(mission_id)
+        drained.append(mission_id)
+        deletable.append((path, mission_id))
+    return drained, deletable
+
+
+def delete_queue_file(path: Path) -> bool:
+    """Remove a drained +New mission queue file. Best-effort: an already-gone file
+    is success; logs + returns False on any other error (retry next tick)."""
+    try:
+        path.unlink()
+        return True
+    except FileNotFoundError:
+        return True
+    except OSError as e:
+        log(f'delete new-mission queue file {path.name} failed: {e}')
+        return False
+
+
 def _emit_summary(res: ProposeResult, commit_status: str, dry_run: bool) -> None:
     """One audit line (log) + a low-noise digest alert when something was proposed;
     escalate on a hard failure. Exact counts + the full id list go to the log."""
@@ -807,7 +920,8 @@ def _emit_summary(res: ProposeResult, commit_status: str, dry_run: bool) -> None
     summary = (
         f'missions-autoregister: {verb} {len(res.proposed)} orphan thread(s) '
         f'{proposed_ids}; {retire_verb} {len(res.retired)} stale proposal(s) '
-        f'{retired_ids}; ingested {len(res.ingested)} new-mission PR(s) '
+        f'{retired_ids}; drained {len(res.queue_drained)} queued mission(s) '
+        f'{res.queue_drained}; ingested {len(res.ingested)} new-mission PR(s) '
         f'{ingested_ids}; surviving proposed={len(res.surviving_proposed)} '
         f'{res.surviving_proposed}; scanned {res.scanned_orphans} orphan(s); '
         f'skipped {res.skipped_non_proposable} non-proposable, '
@@ -932,22 +1046,34 @@ def run_once(*, dry_run: bool,
                     log(f'retire-stale-proposals raised: {type(e).__name__}: {e} — retiring nothing')
                 res.surviving_proposed = surviving_proposed_ids(registry)
 
-    # New-mission PR ingestion: append each open feat/new-mission-* PR's named
-    # mission into the registry so it lands via this healer's single-committer
-    # commit (not a stale-branch merge). Isolated + fail-safe like the passes above
-    # — a fault here proposes/retires normally and ingests nothing. Default-off
-    # (soak): when disabled, observe + log what WOULD be reconciled, mutate nothing.
+    # New-mission registration: drain the queue (PRIMARY) + reconcile any open
+    # feat/new-mission-* PRs (transitional BACKSTOP) so each named mission lands
+    # via this healer's single-committer commit (not a stale-branch merge / a
+    # dashboard co-commit). Each source is isolated + fail-safe like the passes
+    # above — a fault here proposes/retires normally and registers nothing.
+    # Gated by the same soak flag (one kill switch); when disabled, observe + log
+    # pending work in BOTH sources so a queue can't silently pile up while off.
     if not dry_run and newmission_ingest_enabled():
+        try:
+            res.queue_drained, res.deletable_queue = drain_new_mission_queue(
+                registry, _new_mission_queue_dir())
+        except Exception as e:  # noqa: BLE001 — fail-safe: report, never corrupt
+            log(f'new-mission queue drain raised: {type(e).__name__}: {e} — draining nothing')
         try:
             res.ingested, res.closeable_prs = ingest_new_mission_prs(
                 registry, _missions_repo_full())
         except Exception as e:  # noqa: BLE001 — fail-safe: report, never corrupt
-            log(f'new-mission ingest raised: {type(e).__name__}: {e} — ingesting nothing')
+            log(f'new-mission PR ingest raised: {type(e).__name__}: {e} — ingesting nothing')
     elif not dry_run:
         try:
+            pending_q = list_queued_new_missions(_new_mission_queue_dir())
+            if pending_q:
+                log(f'new-mission queue drain DISABLED: {len(pending_q)} queued '
+                    f'mission(s) {[p.name for p, _ in pending_q]} would be '
+                    f'registered — set {ENV_NEWMISSION_INGEST}=true to act')
             pending = list_open_new_mission_prs(_missions_repo_full())
             if pending:
-                log(f'new-mission ingest DISABLED: {len(pending)} open '
+                log(f'new-mission PR ingest DISABLED: {len(pending)} open '
                     f'feat/new-mission-* PR(s) '
                     f'{[p["number"] for p in pending]} would be reconciled — set '
                     f'{ENV_NEWMISSION_INGEST}=true to act')
@@ -955,7 +1081,7 @@ def run_once(*, dry_run: bool,
             log(f'new-mission observe raised: {type(e).__name__}: {e}')
 
     commit_status = 'nothing'
-    if (res.proposed or res.retired or res.ingested) and not dry_run:
+    if (res.proposed or res.retired or res.ingested or res.queue_drained) and not dry_run:
         try:
             atomic_write_missions(mpath, registry)
         except Exception as e:  # noqa: BLE001 — fail-safe
@@ -970,14 +1096,15 @@ def run_once(*, dry_run: bool,
                 log(f'commit+push raised: {type(e).__name__}: {e}')
                 commit_status = 'push-failed'
 
-    # Close reconciled +New mission PRs whose mission is CONFIRMED present on
-    # origin/main (the pushed truth — read from the remote-tracking ref, not the
-    # local working tree). This is robust to every state: a just-ingested mission
+    # Clean up each reconciled +New mission source whose mission is CONFIRMED
+    # present on origin/main (the pushed truth — read from the remote-tracking ref,
+    # not the local working tree). Robust to every state: a just-registered mission
     # is on main only after this tick's push landed it; a redundant dup is already
-    # there; a not-yet-pushed mission (push failed) is absent so we leave its PR
-    # open and retry. We never close a PR whose mission isn't durably on main.
+    # there; a not-yet-pushed mission (push failed) is absent so we leave its
+    # PR/queue-file for the next tick. We never delete/close a source whose mission
+    # isn't durably on main.
     core = repo_paths.get('ourliberty-agent-core')
-    if res.closeable_prs and not dry_run and core:
+    if (res.closeable_prs or res.deletable_queue) and not dry_run and core:
         on_main = _missions_ids_on_main(core)
         repo_full = _missions_repo_full()
         for num, mid in res.closeable_prs:
@@ -987,6 +1114,14 @@ def run_once(*, dry_run: bool,
                 close_new_mission_pr(repo_full, num, mid)
             except Exception as e:  # noqa: BLE001 — fail-safe
                 log(f'close new-mission PR #{num} raised: {type(e).__name__}: {e}')
+        for path, mid in res.deletable_queue:
+            if mid not in on_main:
+                continue  # not on main yet — retry next tick
+            try:
+                delete_queue_file(path)
+            except Exception as e:  # noqa: BLE001 — fail-safe
+                log(f'delete new-mission queue file {path.name} raised: '
+                    f'{type(e).__name__}: {e}')
 
     _emit_summary(res, commit_status, dry_run)
     return 0
@@ -995,6 +1130,7 @@ def run_once(*, dry_run: bool,
 def _commit_audit(res: ProposeResult) -> str:
     return (f'Auto-committed by {PROPOSED_BY}. '
             f'proposed={len(res.proposed)} retired={len(res.retired)} '
+            f'drained-new-mission-queue={len(res.queue_drained)} '
             f'ingested-new-mission-prs={len(res.ingested)} '
             f'scanned={res.scanned_orphans} surviving={len(res.surviving_proposed)}.')
 

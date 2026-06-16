@@ -129,6 +129,40 @@ def _captures_json_path() -> Path:
     return _repo_root() / 'agents' / 'beacon' / 'captures.json'
 
 
+def _new_mission_queue_dir() -> Path:
+    """Directory the +New mission flow drops queued mission entries into for
+    the missions writer (heal_orphan_autoregister) to drain into missions.json
+    on its commit cycle.
+
+    Lives under the agents blackboard — NOT inside the git checkout — so a
+    pending file is never untracked-file drift, and keyed off
+    `_agents_root()` (OURLIBERTY_AGENTS_ROOT) so tests redirect it to a tmpdir.
+    The dashboard is deliberately NOT a git committer: it only produces queue
+    files here; the owning healer (the missions single-committer) appends them
+    to missions.json on its own commit and removes them once the mission is on
+    origin/main. See `heal_orphan_autoregister.drain_new_mission_queue`."""
+    return _agents_root() / 'blackboard' / 'new-mission-queue'
+
+
+def _atomic_write_json(path: Path, obj: Any) -> None:
+    """Write `obj` as pretty JSON atomically (unique tmp in the same dir +
+    os.replace) so a concurrent reader — the draining healer — never sees a
+    partial file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(
+        dir=str(path.parent), prefix=path.name + '.', suffix='.tmp')
+    try:
+        with os.fdopen(fd, 'w') as fh:
+            fh.write(json.dumps(obj, indent=2) + '\n')
+        os.replace(tmp_name, path)
+    except BaseException:
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
+
+
 # ---- agent + healer registries ----
 
 AGENT_NAMES: tuple[str, ...] = ('beacon', 'forge', 'mirror', 'pulse')
@@ -544,9 +578,16 @@ class NewMissionRequest(BaseModel):
 
 
 class NewMissionResponse(BaseModel):
+    # The +New mission flow no longer opens a PR — it queues the mission for
+    # the missions writer (heal_orphan_autoregister) to register on its commit
+    # cycle. `status` is 'queued'. `pr_url`/`branch` are retained as optional
+    # (always absent now) only so a transitional client reading them degrades
+    # to undefined rather than breaking; they can be dropped once no client
+    # references them.
     mission_id: str
-    pr_url: str
-    branch: str
+    status: str = 'queued'
+    pr_url: Optional[str] = None
+    branch: Optional[str] = None
 
 
 class CaptureActionRequest(BaseModel):
@@ -2505,22 +2546,30 @@ def _handle_new_mission(
     *,
     body: NewMissionRequest,
     missions_path: Path,
+    queue_dir: Path,
     now: Optional[datetime] = None,
 ) -> dict[str, Any]:
     """Pure handler for POST /api/system/missions/new.
 
-    Steps:
+    Registers a mission WITHOUT opening a PR or touching git. Steps:
       1. Derive kebab mission_id. Reject 400 if empty after kebab.
       2. Acquire in-process lock (serializes concurrent POSTs).
-      3. Read local missions.json (read-only); 409 on dup id.
-      4. Call GitHub REST: GET main ref → POST refs (atomic, 422 → 409) →
-         PUT contents on branch → POST pulls.
-      5. Return {mission_id, pr_url, branch}.
+      3. Read local missions.json (read-only); 409 on a duplicate id.
+      4. 409 if the same id is already queued (an in-flight dup not yet drained).
+      5. Atomically drop `<queue_dir>/<mission_id>.json` (the full mission
+         entry) and return {mission_id, status: 'queued'}.
 
-    Local missions.json is NOT mutated — it gets updated via `git pull`
-    once the PR merges. This avoids drift vs `origin/main` in the shared
-    `/home/larry/agent-core` checkout (heal-droplet-git-drift would alert
-    otherwise).
+    The dashboard is NOT a git committer: it never writes or commits
+    `agents/beacon/missions.json`. The owning healer (heal_orphan_autoregister,
+    the missions single-committer) drains the queue into missions.json on its
+    commit cycle and removes the file once the mission is confirmed on
+    origin/main. This honors the machine-owned-file single-committer invariant
+    (one committer per auto-committed runtime file) and ends the throwaway-PR
+    storm the old PR-per-mission flow created (each PR was unroutable through
+    the Forge pipeline, so it sat open and paged heal-pipeline-stall until a
+    reconciler closed it). The mission surfaces on the board on the next poll
+    after the healer commits it — the same post-merge latency the PR flow had,
+    minus the PR.
     """
     mission_id = _kebab_case(body.name)
     if not mission_id:
@@ -2532,19 +2581,18 @@ def _handle_new_mission(
             },
         )
 
-    token = _github_token()
-    if not token:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                'error': 'github token missing',
-                'detail': 'GITHUB_TOKEN env not set on dashboard-api service',
-            },
-        )
-
-    repo_full = _missions_repo_full()
-    branch = f'feat/new-mission-{mission_id}'
     now = now or datetime.now(timezone.utc)
+    new_entry: dict[str, Any] = {
+        'id': mission_id,
+        'name': body.name,
+        'phase': 'drafting',
+        'brief': body.brief,
+        'spec_docs': list(body.spec_docs),
+        'task_ids': [],
+        'repo': body.repo,
+        'created': now.date().isoformat(),
+        'deferred_reason': None,
+    }
 
     with _NEW_MISSION_LOCK:
         registry = _read_missions_registry(missions_path)
@@ -2559,174 +2607,34 @@ def _handle_new_mission(
                     },
                 )
 
-        new_entry: dict[str, Any] = {
-            'id': mission_id,
-            'name': body.name,
-            'phase': 'drafting',
-            'brief': body.brief,
-            'spec_docs': list(body.spec_docs),
-            'task_ids': [],
-            'repo': body.repo,
-            'created': now.date().isoformat(),
-            'deferred_reason': None,
-        }
-        updated_registry = {
-            'schema_version': registry.get('schema_version', 1),
-            'missions': registry['missions'] + [new_entry],
-        }
-
-        api_base = f'https://api.github.com/repos/{repo_full}'
-        api_headers = {
-            'Authorization': f'Bearer {token}',
-            'Accept': 'application/vnd.github+json',
-            'X-GitHub-Api-Version': '2022-11-28',
-        }
-
-        # 1. Resolve main's SHA.
-        ref_resp = _github_api_request(
-            'GET', f'{api_base}/git/refs/heads/main', headers=api_headers,
-        )
-        if ref_resp.status_code != 200:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail={
-                    'error': 'github get main ref failed',
-                    'detail': f'status={ref_resp.status_code}',
-                },
-            )
-        main_sha = ref_resp.json().get('object', {}).get('sha')
-        if not isinstance(main_sha, str) or not main_sha:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail={
-                    'error': 'github main ref missing sha',
-                    'detail': '',
-                },
-            )
-
-        # 2. Create the new branch — atomic at GitHub. 422 → branch
-        #    already exists → return 409 to the caller.
-        branch_resp = _github_api_request(
-            'POST', f'{api_base}/git/refs', headers=api_headers,
-            json_body={'ref': f'refs/heads/{branch}', 'sha': main_sha},
-        )
-        if branch_resp.status_code == 422:
+        # Already queued (registered to the queue but not yet drained into
+        # missions.json) → reject as an in-flight dup so a double-submit can't
+        # enqueue the same mission twice. (Even without this the healer dedups
+        # on append, so it's a UX nicety, not a correctness guard.)
+        queue_path = queue_dir / f'{mission_id}.json'
+        if queue_path.exists():
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail={
-                    'error': 'branch_exists',
-                    'branch': branch,
+                    'error': 'mission_id queued',
+                    'id': mission_id,
                     'hint': (
-                        'Mission name collides with an in-flight mission; '
-                        'pick a different name.'
+                        'A mission with this name is already queued for '
+                        'registration; it will appear on the board shortly.'
                     ),
                 },
             )
-        if branch_resp.status_code not in (200, 201):
+
+        try:
+            _atomic_write_json(queue_path, new_entry)
+        except OSError as e:
+            first_line = str(e).splitlines()[0] if str(e) else type(e).__name__
             raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail={
-                    'error': 'github create branch failed',
-                    'detail': f'status={branch_resp.status_code}',
-                },
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={'error': 'queue write failed', 'detail': first_line},
             )
 
-        # 3. Get current `agents/beacon/missions.json` blob sha on the
-        #    branch (which inherits main's content) so PUT can replace it.
-        contents_get = _github_api_request(
-            'GET',
-            f'{api_base}/contents/agents/beacon/missions.json?ref={branch}',
-            headers=api_headers,
-        )
-        file_sha: Optional[str] = None
-        if contents_get.status_code == 200:
-            sha_val = contents_get.json().get('sha')
-            if isinstance(sha_val, str):
-                file_sha = sha_val
-        elif contents_get.status_code != 404:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail={
-                    'error': 'github get contents failed',
-                    'detail': f'status={contents_get.status_code}',
-                },
-            )
-
-        # 4. PUT the updated missions.json onto the branch.
-        new_text = json.dumps(updated_registry, indent=2) + '\n'
-        put_body: dict[str, Any] = {
-            'message': (
-                f'feat(missions): register {mission_id} per +New mission flow'
-            ),
-            'content': __import__('base64').b64encode(
-                new_text.encode('utf-8'),
-            ).decode('ascii'),
-            'branch': branch,
-        }
-        if file_sha:
-            put_body['sha'] = file_sha
-        put_resp = _github_api_request(
-            'PUT', f'{api_base}/contents/agents/beacon/missions.json',
-            headers=api_headers, json_body=put_body,
-        )
-        if put_resp.status_code not in (200, 201):
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail={
-                    'error': 'github put contents failed',
-                    'detail': f'status={put_resp.status_code}',
-                },
-            )
-
-        # 5. Open the PR.
-        pr_body_parts = [
-            f'Register mission `{mission_id}`.',
-            '',
-            f'**Brief:** {body.brief}',
-        ]
-        if body.spec_docs:
-            pr_body_parts.append('')
-            pr_body_parts.append('**Spec docs:**')
-            for doc in body.spec_docs:
-                pr_body_parts.append(f'- `{doc}`')
-        pr_body_parts.append('')
-        pr_body_parts.append(
-            'Opened by the dashboard +New mission flow '
-            '(E4.4f PR-A). Manual review and merge.',
-        )
-        pr_resp = _github_api_request(
-            'POST', f'{api_base}/pulls', headers=api_headers,
-            json_body={
-                'title': f'feat(missions): register {mission_id}',
-                'head': branch,
-                'base': 'main',
-                'body': '\n'.join(pr_body_parts),
-            },
-        )
-        if pr_resp.status_code not in (200, 201):
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail={
-                    'error': 'github create pr failed',
-                    'detail': f'status={pr_resp.status_code}',
-                },
-            )
-        pr_json = pr_resp.json()
-        pr_url = pr_json.get('html_url') if isinstance(pr_json, dict) else None
-        if not isinstance(pr_url, str) or not pr_url:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail={
-                    'error': 'github create pr returned no html_url',
-                    'detail': '',
-                },
-            )
-
-    return {
-        'mission_id': mission_id,
-        'pr_url': pr_url,
-        'branch': branch,
-    }
+    return {'mission_id': mission_id, 'status': 'queued'}
 
 
 # ---------------------------------------------------------------------------
@@ -4058,12 +3966,14 @@ def _handle_capture_ingest(
 # Missions v2 Phase 3 — capture write-back (POST /api/missions/captures/{id}/action)
 # (spec: agents/beacon/specs/missions-v2-phase3-writeback-autoregister.md § 4)
 #
-# `promote` and `drop` are PR-backed: they reuse the _handle_new_mission
-# GitHub-REST mechanism (GET main ref → create branch → PUT contents → POST PR)
-# via the shared _open_registry_pr helper, so the LOCAL missions.json/captures.json
-# are never mutated — they update via `git pull` on merge (no drift in the shared
-# checkout). `promote` PUTs BOTH files onto one branch so the new mission entry
-# and the capture's promoted_to/state land atomically in ONE PR.
+# `promote` and `drop` are PR-backed: they open a PR via the shared
+# _open_registry_pr helper (GET main ref → create branch → PUT contents → POST PR),
+# so the LOCAL missions.json/captures.json are never mutated — they update via
+# `git pull` on merge (no drift in the shared checkout). `promote` PUTs BOTH files
+# onto one branch so the new mission entry and the capture's promoted_to/state land
+# atomically in ONE PR. (The +New mission flow used to share this mechanism but no
+# longer opens a PR — it queues the mission for the missions writer; see
+# _handle_new_mission.)
 #
 # `snooze` is the exception: a trivial, reversible date field that routes DIRECT
 # through the single captures.json committer primitives (_CAPTURE_INGEST_LOCK +
@@ -4084,7 +3994,7 @@ def _open_registry_pr(
     repo_full: str,
 ) -> str:
     """Open ONE PR editing one or more in-repo JSON files (the generalized
-    _handle_new_mission mechanism). `files` is a list of (repo-relative path,
+    registry-PR mechanism shared by promote/drop). `files` is a list of (repo-relative path,
     new registry dict); each is PUT onto the same fresh branch, so they land
     atomically in a single PR. Returns the PR html_url. Raises HTTPException on
     any GitHub error (502), a duplicate branch (409), or an empty html_url.
@@ -4683,7 +4593,7 @@ def _handle_capture_message(
 #
 # defer / resume / reprioritize are ALL PR-backed (missions.json is the curated
 # registry — every change auditable). Each is a single-field edit via the shared
-# _open_registry_pr helper (the generalized _handle_new_mission mechanism), so the
+# _open_registry_pr helper (the generalized registry-PR mechanism), so the
 # LOCAL missions.json is never mutated — it updates via `git pull` on merge.
 #
 #   defer        — phase: deferred + deferred_reason. The derive's
@@ -6180,7 +6090,11 @@ def get_missions_derived(
     dependencies=[Depends(_require_token)],
 )
 def post_system_missions_new(body: NewMissionRequest) -> dict[str, Any]:
-    return _handle_new_mission(body=body, missions_path=_missions_json_path())
+    return _handle_new_mission(
+        body=body,
+        missions_path=_missions_json_path(),
+        queue_dir=_new_mission_queue_dir(),
+    )
 
 
 # POST /api/missions/captures/{capture_id}/action — capture write-back (Missions
@@ -6252,7 +6166,7 @@ def post_capture_message(
 # POST /api/system/missions/{mission_id}/action — mission write-back (Missions
 # v2 Phase 3 § 5 + § 6). defer/resume/reprioritize/accept/dismiss are ALL
 # PR-backed (missions.json is the curated registry — every change auditable) and
-# reuse the new-mission GitHub-REST mechanism via _open_registry_pr. accept/dismiss
+# open a PR via the shared _open_registry_pr helper. accept/dismiss
 # act on auto-proposed orphan threads (§ 6): accept flips phase proposed->drafting,
 # dismiss sets the additive acknowledged flag (phase stays proposed). Same auth as
 # /api/larry/action: X-Dashboard-Token + an allowlisted X-Actor.
