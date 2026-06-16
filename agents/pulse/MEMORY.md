@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-16 06:11Z UTC (Iter ~2015, Tier 1, consecutive_clean=2)
+
+**Iter ~2015 summary:** ✅ Nominal. 0 new alerts. All checks clean. **PR #538 MERGED ✅** at 06:05:09Z (orphan-lane fix). **PR #539 NEW** (`fix/review-dedup-sha-aware`, "fix(review-dispatch): re-review a PR after its head changes (head-aware dedup)"): MERGEABLE, no review, created 06:05:16Z — Phase S systemic fix for review-dedup issue. **Phase S dag-preflight:** Mirror worktree `wt-mirror-dag-preflight-missions-v2-phase-s` active (processing). PR #497 UNKNOWN/"", REVIEW_ESCALATE, age≈50.1h, deadline Jun-17T04:02:56Z (~21.9h). Stale worktrees: `wt-forge-fix-delegate-endpoint-regression-gate-001` + `wt-mirror-dag-preflight-missions-v2-delegate-fix` (both inactive, carry). Repo c90a4603=origin/main. Watermark: 1062 unchanged. pending=0. Tier 1, consecutive_clean=2. PRIME ratio=20.12.
+
 ## Status snapshot — updated 2026-06-16 06:03Z UTC (Iter ~2014, Tier 1, consecutive_clean=1)
 
 **Iter ~2014 summary:** ✅ Nominal. 0 new alerts. All checks clean. All 5 daemons alive (dashboard_api PID changed 3402371→3449559, informational). **PR #538 NEW** (`forge/orphan-lane-prompt-blob-title-fallback-001`): MERGEABLE, Mirror review dispatched 05:57:12Z, active pipeline. **Phase S pipeline ACTIVE**: Beacon authored missions-v2-phase-s sequence, dag-preflight dispatched to Mirror 06:02:15Z, Larry approved. Repo 7afd7b25=origin/main. Watermark: 1062 unchanged. pending=0. Tier 1, consecutive_clean=1. PRIME ratio=20.12.
