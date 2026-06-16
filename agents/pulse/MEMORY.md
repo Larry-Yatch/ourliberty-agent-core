@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-16 08:33Z UTC (Iter ~2029, Tier 1→2 de-escalation, consecutive_clean=0)
+
+**Iter ~2029 summary:** ✅ Nominal. 0 new alerts. All 5 mandatory checks clean. **Tier 1 → Tier 2 DE-ESCALATION** (3 consecutive clean iters: ~2027, ~2028, ~2029). **Phase S s-3-failure-cost-pause BUILD ACTIVE:** Forge running since 08:17:49Z (resume=9b114165), ~15 min in, within 2h window, no PR yet. PR #497 scope decision still with Larry (bot DM'd 07:07:50Z, deadline Jun-17T04:02Z ~19.5h). Repo db65ce42=origin/main (clean, no fast-forward needed). Sync fresh (last_sync=08:30:10Z). Watermark: 1068 (unchanged). pending=0. PRIME ratio=20.22 (991 interventions, 49 systemic fixes). Tier 2, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-16 08:22Z UTC (Iter ~2028, Tier 1, consecutive_clean=2)
 
 **Iter ~2028 summary:** ✅ Nominal. 0 new alerts. All 5 mandatory checks clean. **Phase S s-3-failure-cost-pause BUILD-PHASE DISPATCHED:** Forge ACK'd 08:17:44Z, build-phase dispatched 08:17:44Z (`build-s-3-failure-cost-pause.json`, resume=9b114165). No PR yet (~4 min into build, within 2h window). PR #497 scope decision still with Larry (bot DM'd 07:07:50Z, deadline Jun-17T04:02Z ~19.5h). Repo b84ba7cf=origin/main (clean, no fast-forward). Watermark: 1068 (unchanged). pending=0. PRIME ratio=20.22 (991 interventions, 49 systemic fixes). Tier 1, consecutive_clean=2.
