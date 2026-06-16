@@ -4,6 +4,73 @@
 
 ---
 
+## Iteration ~2041 — 2026-06-16 10:57Z UTC (interactive, /cycle, Tier 2→1 reset, consecutive_clean=0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal + 1 auto-fix. **Phase S COMPLETE (6/6) — PR #545 (s-6-drain) MERGED at 10:52:38Z UTC.** Check A: repo behind 1 commit → fast-forwarded b2aadd15→d8f0f3ca.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S s-6-drain PR #545 MERGED ✅ CONFIRMED:** `gh pr view 545` → MERGED at 2026-06-16T10:52:38Z, mergeCommit=d8f0f3ca. outbox-notifier.log: `AUTO_MERGE task=s-6-drain pr=.../pull/545 outcome=merged (--squash --delete-branch)` at 04:52:40 MDT; `SEQUENCE_STEP_MERGED seq=missions-v2-phase-s step=s-6-drain`. Only 1 revision round before Mirror PASS. **Phase S sequence missions-v2-phase-s ALL 6 STEPS DONE.** ✅
+- **PR #497 scope decision — CARRY CONFIRMED ✅:** UNKNOWN/"", deadline Jun-17T04:02Z (~17h remaining). No change. ✅
+- **unreg-approval-2639d31d157f (PR #543) — MOOT CONFIRMED ✅:** pending=1 in beacon-pending-approvals.json; PR #543 confirmed merged 09:32Z. Self-resolves. ✅
+
+**Check 0 — Alert triage:** Watermark=1049 entering; file=1049 lines. **0 new alerts.** ✅ Nominal.
+
+**Check 1 — Log noise (outbox-notifier.log):** Last entry 04:52:40 MDT (10:52:40Z UTC). All INFO since iter ~2040. Key events: s-6-drain revision-1 dispatched to Forge at 04:42:41Z; re-review dispatched 04:44:17Z; Mirror REVIEW_PASS at 04:52:33Z; AUTO_MERGE at 04:52:40Z; SEQUENCE_STEP_MERGED. No WARNs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot PID 3556778 alive (Ss). Last log: 04:40:34 MDT (10:40:34Z) — alert idx=1048 route=digest skip. No 409 errors. G-rule telegram-409-burst **2/3** unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected`. Phase S fully merged. ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=1 (`unreg-approval-2639d31d157f`, PR #543 scope decision). MOOT — PR #543 merged 09:32Z. Self-resolves. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-16T10:50:17Z, age≈6.4 min. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=b2aadd15 ≠ origin/main=d8f0f3ca. **Behind 1 commit. Working tree clean, on main.** → **always-fix**: fast-forward. Executed: `git -C ~/agent-core pull --ff-only` → Updated b2aadd15..d8f0f3ca (scripts/heal_missions_board_drain.py + tests added, 801 lines). HEAD now d8f0f3ca=origin/main. ✅ Fixed.
+
+**Check B — Sync health:** last_sync=2026-06-16T10:30:16Z, age≈25.8 min. FRESH (within 2h). ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3556778 (Ss) ✅, chain_event_shipper 2744551 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, dashboard_api 3540633 (Ssl) ✅, outbox_notifier 3556624 (Ss) ✅. All 5 alive with same PIDs as iter ~2040. ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (1 open):
+- **PR #545** — MERGED ✅ 10:52:38Z. Phase S s-6-drain COMPLETE. [closed]
+- **PR #497** (`fix(cleanup-branches): success-prune alert is info, not warning`): UNKNOWN/"". Scope decision with Larry (deadline Jun-17T04:02Z, ~17h). [yellow] carry.
+ourliberty-dashboard: **0 open PRs.** ✅
+ourliberty-graph: **0 open PRs.** ✅
+
+**Conditional checks (Tuesday 2026-06-16 UTC, weekday=1):** Check I fires Mon/Wed/Fri/Sun — skip. Check III fires Sunday — skip.
+
+**G-rule tracking:** No new WARN events this iter. All counts unchanged from iter ~2040.
+
+**Actions taken:**
+1. Fast-forward: b2aadd15→d8f0f3ca (PR #545 s-6-drain merge commit). PRIME ledger: `intervention` appended (tier=2, template=ff-main-when-behind).
+2. Alert triage: 0 new alerts. Watermark 1049 (unchanged).
+3. Tier state: `record --checks-clean false` → **Tier 2→1 RESET** (Check A signal). consecutive_clean=0.
+
+**Dispatches:** None.
+
+**Standing findings (carried):**
+- [yellow] **PR #497 scope decision** — `approve cleanup-branch-info` or `reject cleanup-branch-info`. Bot DM'd 07:07:50Z. Deadline Jun-17T04:02Z (~17h). [carry]
+- [yellow] **unreg-approval-2639d31d157f (PR #543)** — MOOT; PR merged. Self-resolves. [carry until cleared]
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519/530/531/534** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — pending Larry dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — FN=3027, TP=5. `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST **2/3**, merge_conflict_manual_rebase-tier4 1/3, heal-pipeline-stall-mirror-pass-unmerged-tier4 1/3, revision-phase-preamble-missing **2/3**, mirror-malformed-verdict-marker **1/3**, mirror-no-session-revision-loop **2/3**, watermark-rotation-gap **2/3**.
+- [blue] **Phase S: s-1 ✅ s-2 ✅ s-3 ✅ s-4 ✅ s-5 ✅ s-6 ✅ ALL 6/6 MERGED. missions-v2-phase-s SEQUENCE COMPLETE.**
+- [blue] **Stale worktrees** — wt-forge-s-6-drain, wt-mirror-s-6-drain (s-6 teardown skipped, still in-flight per notifier), wt-mirror-dag-preflight-missions-v2-phase-s-{2,3}. dispatch-branch-cleanup will sweep. [carry]
+- [blue] **Stale bash orphans** — PIDs 1834248 + 2605007. Low CPU. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention this iter (ff-main-when-behind). ratio=20.29 (995 interventions, 49 systemic fixes), trend=stable.
+**Tier end-of-iter:** **Tier 1, consecutive_clean=0** (reset from Tier 2 on Check A signal). Next cadence: 5-min.
+
+---
+
 ## Iteration ~2040 — 2026-06-16 10:42Z UTC (interactive, /cycle, Tier 1→2 de-escalation, consecutive_clean=2→3)
 
 **Trigger:** Larry direct invocation (`/cycle`).

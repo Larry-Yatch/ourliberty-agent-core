@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-16 10:57Z UTC (Iter ~2041, Tier 2→1 reset, consecutive_clean=0)
+
+**Iter ~2041 summary:** ✅ Nominal + 1 auto-fix. **Phase S COMPLETE (6/6) — PR #545 (s-6-drain) MERGED 10:52:38Z UTC.** missions-v2-phase-s sequence ALL 6 STEPS DONE. Check A: repo behind 1 commit → fast-forwarded b2aadd15→d8f0f3ca. 0 new alerts (watermark=1049 unchanged). All 5 daemons alive (same PIDs: beacon 3556778, chain-event 2744551, inbox-watcher 3434697, dashboard_api 3540633, outbox_notifier 3556624). Sync 10:30:16Z (~27 min). No stalls. PR #497 scope decision with Larry (deadline Jun-17T04:02Z, ~17h). PRIME ratio=20.29 (995 interventions, 49 systemic fixes). **Tier 2→1 RESET** (Check A signal). consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-16 10:42Z UTC (Iter ~2040, Tier 1→2 de-escalation, consecutive_clean=0)
 
 **Iter ~2040 summary:** ✅ Nominal. 1 new alert (L1049 Tier-3 silenced: dispatch-branch-cleanup pruned 4 local + 2 remote branches). All 5 mandatory checks clean. **Phase S s-6-drain Mirror review ACTIVE** — PR #545 OPEN/MERGEABLE, `wt-mirror-s-6-drain` active since 10:30:20Z, 12 min into review at check time. All 5 daemons alive with same PIDs (beacon 3556778, chain-event 2744551, inbox-watcher 3434697, dashboard_api 3540633, outbox_notifier 3556624). Repo fa31dd61=origin/main (clean). Sync fresh (10:30:16Z). Watermark: 1048→1049. pending=1 (moot PR #543). PR #497 scope decision with Larry (deadline Jun-17T04:02Z, ~17.3h). PRIME ratio=20.29 (994 interventions, 49 systemic fixes). **Tier 1→2 DE-ESCALATION** (consecutive_clean=3). consecutive_clean=0.
@@ -414,7 +418,7 @@
 | G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 (warn-vs-info) |
 | G-rule telegram-409-burst | [yellow] **2/3** | Watch; dispatch at 3/3 |
 | **G-rule watermark-rotation-gap** | [blue] **2/3** (NEW iter ~2035) — larry-alerts-retention.py compacts file, watermark left > file length; new alerts missed until gap detected + repaired. Prior: iter ~1936. | Watch; dispatch to Beacon at 3/3 for auto-detect/repair fix in cycle startup |
-| Phase S 5/6 MERGED ✅, s-6-drain BUILD-PHASE | [yellow] s-1 PR#541 ✅, s-2 PR#542 ✅, s-3 PR#543 ✅, s-4 PR#544 ✅ (10:12:49Z), s-5 PR#58 ourliberty-dashboard ✅ (10:18:48Z). s-6-drain: `s-6-drain.json` in Forge inbox, `wt-forge-s-6-drain` active (mtime 10:15Z, ~8 min in). | Watch s-6 PR. |
+| Phase S ALL 6/6 MERGED ✅ | [blue] s-1 PR#541 ✅, s-2 PR#542 ✅, s-3 PR#543 ✅, s-4 PR#544 ✅, s-5 PR#58 ourliberty-dashboard ✅, s-6-drain PR#545 ✅ (10:52:38Z). missions-v2-phase-s SEQUENCE COMPLETE. | DONE. |
 | PR #497 scope decision DELIVERED | [yellow] Binary choice with Larry (bot DM'd 07:07:50Z Jun-16). APPROVE=add 'info' to VALID_SEVERITIES / REJECT=close PR #497. Deadline Jun-17T04:02Z (~18h). PR UNKNOWN/"". | Watch Larry reply: `approve cleanup-branch-info` or `reject cleanup-branch-info` |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap. outbox-notifier also drops regular approval_request markers from Beacon inter-agent sessions (observed iter ~2020: both routing-signal and approval_request dropped in same 5-min window). | DAG markers and scope-decision markers still fall through; recover manually |
 | Stale bash orphans | [blue] PIDs 1834248 (17d+) + 2605007 (1d+). Ss, low CPU. | Carry |
