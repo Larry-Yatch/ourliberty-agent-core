@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-16 10:42Z UTC (Iter ~2040, Tier 1→2 de-escalation, consecutive_clean=0)
+
+**Iter ~2040 summary:** ✅ Nominal. 1 new alert (L1049 Tier-3 silenced: dispatch-branch-cleanup pruned 4 local + 2 remote branches). All 5 mandatory checks clean. **Phase S s-6-drain Mirror review ACTIVE** — PR #545 OPEN/MERGEABLE, `wt-mirror-s-6-drain` active since 10:30:20Z, 12 min into review at check time. All 5 daemons alive with same PIDs (beacon 3556778, chain-event 2744551, inbox-watcher 3434697, dashboard_api 3540633, outbox_notifier 3556624). Repo fa31dd61=origin/main (clean). Sync fresh (10:30:16Z). Watermark: 1048→1049. pending=1 (moot PR #543). PR #497 scope decision with Larry (deadline Jun-17T04:02Z, ~17.3h). PRIME ratio=20.29 (994 interventions, 49 systemic fixes). **Tier 1→2 DE-ESCALATION** (consecutive_clean=3). consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-16 10:38Z UTC (Iter ~2039, Tier 1, consecutive_clean=2, nominal)
 
 **Iter ~2039 summary:** ✅ Nominal. 0 new alerts. All 5 mandatory checks clean. **Phase S s-6-drain MAJOR ADVANCE: PR #545 OPENED 10:30:04Z** (`feat: S-6 drain the stale board`), Mirror review dispatched 10:30:18Z, `wt-mirror-s-6-drain` active (~8 min in). Phase S 5/6 MERGED, s-6-drain one Mirror review from COMPLETE. All 5 daemons alive (beacon 3556778, chain-event 2744551, inbox-watcher 3434697, dashboard_api 3540633, outbox_notifier 3556624). Repo a8f8c8d2=origin/main (clean). Sync fresh (10:30:16Z). Watermark: 1048 (unchanged). pending=1 (moot). PRIME ratio=20.29 (994 interventions, 49 systemic fixes). Tier 1, consecutive_clean=2.

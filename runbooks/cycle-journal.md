@@ -4,6 +4,75 @@
 
 ---
 
+## Iteration ~2040 — 2026-06-16 10:42Z UTC (interactive, /cycle, Tier 1→2 de-escalation, consecutive_clean=2→3)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 1 new alert (L1049 Tier-3 silenced). All mandatory checks clean. **Phase S s-6-drain Mirror review active** — `wt-mirror-s-6-drain` (mtime 10:30:20Z), PR #545 OPEN/MERGEABLE, 12 min into review at check time, within 2h window.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S s-6-drain PR #545 Mirror review ACTIVE ✅:** `wt-mirror-s-6-drain` exists (mtime 04:30 MDT = 10:30:20Z). outbox-notifier.log last entry 04:30:19 MDT (10:30:19Z) = review dispatched; no MIRROR_REVIEW_STATUS yet (12 min in, normal). PR #545 state=OPEN, mergeable=MERGEABLE, reviewDecision="" (no decision yet). ✅
+- **PR #497 scope decision — CARRY CONFIRMED ✅:** UNKNOWN/"", deadline Jun-17T04:02Z (~17.3h). No change. ✅
+
+**Check 0 — Alert triage:** Watermark=1048 entering; file=1049 lines. **1 new alert (L1049):**
+- L1049: `source=dispatch-branch-cleanup, subject=summary, route=digest, ts=10:38:57Z` — pruned 4 local + 2 remote stale branches. Helper → **Tier-3 silence** (known-pattern). ✅
+Watermark: 1048 → 1049. No Pulse DM warranted.
+
+**Check 1 — Log noise (outbox-notifier.log):** Last entry 04:30:19 MDT (10:30:19Z). All INFO. No WARNs. Key events since iter ~2039: nothing new — outbox-notifier quiescent while Mirror review runs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot PID 3556778 alive (Ss). Last log: 04:40:34 MDT (10:40:34Z) — idx=1048 route=digest skip (dispatch-branch-cleanup summary). ~2 min before check. No 409 errors. G-rule telegram-409-burst **2/3** unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected`. s-6-drain Mirror review active (12 min, within 2h). ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=1 (`unreg-approval-2639d31d157f`, PR #543 scope decision). MOOT — PR #543 merged 09:32Z. Self-resolves. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-16T10:20:17Z, age≈22 min. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=fa31dd61=origin/main. Working tree clean. No divergence. ✅ Nominal (no fast-forward needed).
+
+**Check B — Sync health:** last_sync=2026-06-16T10:30:16Z, age≈12 min. FRESH. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3556778 (Ss) ✅, chain_event_shipper 2744551 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, dashboard_api 3540633 (Ssl) ✅, outbox_notifier 3556624 (Ss) ✅. All 5 alive with same PIDs as iter ~2039. ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (2 open):
+- **PR #545** (`feat: S-6 drain the stale board`): OPEN, MERGEABLE/"", Mirror review dispatched 10:30:18Z, `wt-mirror-s-6-drain` active. 12 min in. ✅
+- **PR #497** (`fix(cleanup-branches): success-prune alert is info, not warning`): UNKNOWN/"". Scope decision with Larry (deadline Jun-17T04:02Z, ~17.3h). [yellow] carry.
+ourliberty-dashboard: **0 open PRs.** ✅
+ourliberty-graph: **0 open PRs.** ✅
+
+**Conditional checks (Tuesday 2026-06-16 UTC, weekday=1):** Check I fires Mon/Wed/Fri/Sun — skip. Check III fires Sunday — skip.
+
+**G-rule tracking:** No new WARN events this iter. All counts unchanged from iter ~2039.
+
+**Actions taken:**
+1. Alert triage: L1049 Tier-3 (dispatch-branch-cleanup summary). Watermark 1048 → 1049.
+2. PRIME ledger: `iter_clean` appended (tier=1, template=iter-clean, ts=10:43:01Z).
+3. Tier state: `record --checks-clean true` → consecutive_clean 2→3 → **Tier 1→2 DE-ESCALATION**. consecutive_clean reset to 0.
+
+**Dispatches:** None.
+
+**Standing findings (carried):**
+- [yellow] **PR #497 scope decision** — `approve cleanup-branch-info` or `reject cleanup-branch-info`. Bot DM'd 07:07:50Z. Deadline Jun-17T04:02Z (~17.3h). [carry]
+- [yellow] **Phase S s-6-drain MIRROR REVIEW ACTIVE** — PR #545 OPEN, `wt-mirror-s-6-drain` active since 10:30:20Z. Watch for REVIEW_PASS → AUTO_MERGE → Phase S COMPLETE.
+- [yellow] **unreg-approval-2639d31d157f (PR #543)** — MOOT; PR merged. Self-resolves. [carry until cleared]
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519/530/531/534** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — pending Larry dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — FN=3027, TP=5. `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST **2/3**, merge_conflict_manual_rebase-tier4 1/3, heal-pipeline-stall-mirror-pass-unmerged-tier4 1/3, revision-phase-preamble-missing **2/3**, mirror-malformed-verdict-marker **1/3**, mirror-no-session-revision-loop **2/3**, watermark-rotation-gap **2/3**.
+- [blue] **Phase S: s-1 ✅ s-2 ✅ s-3 ✅ s-4 ✅ s-5 ✅ MERGED (5/6). s-6-drain: PR #545 OPEN, Mirror review active (~12 min). One review from COMPLETE.**
+- [blue] **Stale worktrees** — wt-mirror-cleanup-branch-warn-to-info-001 (06:15Z), wt-mirror-dag-preflight-missions-v2-phase-s-{2,3} (06:25Z/07:04Z), wt-mirror-s-3-failure-cost-pause (08:55Z). Active: wt-forge-s-6-drain + wt-mirror-s-6-drain (current pipeline). [carry]
+- [blue] **Stale bash orphans** — PIDs 1834248 + 2605007. Low CPU. [carry]
+
+**PRIME DIRECTIVE:** 0 interventions this iter (clean). ratio=20.29 (994 interventions, 49 systemic fixes), trend=stable.
+**Tier end-of-iter:** **Tier 2, consecutive_clean=0** (de-escalated from Tier 1 after 3 consecutive clean iters). Next cadence: 15-min.
+
+---
+
 ## Iteration ~2039 — 2026-06-16 10:38Z UTC (interactive, /cycle, Tier 1, consecutive_clean=1→2)
 
 **Trigger:** Larry direct invocation (`/cycle`).
