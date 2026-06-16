@@ -646,6 +646,22 @@ class CaptureMessageResponse(BaseModel):
     doorbell_resolved: bool = False
 
 
+class CaptureDelegateRequest(BaseModel):
+    # POST /api/missions/captures/{id}/delegate body (delegate-fix spec § 2).
+    # Optional — defaults to the capture's recommended_action, else "delegate".
+    action: Optional[str] = None  # delegate | promote | drop | snooze
+
+
+class CaptureDelegateResponse(BaseModel):
+    # The delegate proposal (a human-approval-gate APPROVAL_REQUEST) was dropped
+    # in Beacon's inbox. `dispatched` is True on both a fresh proposal and a
+    # dedup-collapse onto an already-open one; `deduped` distinguishes the two.
+    # `pr_url` is reserved for a future action that routes PR-backed (§ 2).
+    dispatched: bool
+    deduped: Optional[bool] = None
+    pr_url: Optional[str] = None
+
+
 class MissionActionRequest(BaseModel):
     # Missions v2 Phase 3 § 5 — POST /api/system/missions/{id}/action body.
     action: str = Field(..., min_length=1)  # defer | resume | reprioritize
@@ -4588,6 +4604,113 @@ def _handle_capture_message(
     }
 
 
+# Missions v2 — droplet delegate endpoint (POST /api/missions/captures/{id}/delegate)
+# (spec: agents/beacon/specs/missions-v2-delegate-fix.md § 2)
+#
+# "Delegate to team" — the primary Parked-card action. Mirrors the capture-action
+# route's auth + guards, but instead of mutating the capture it emits a
+# human-approval-gate APPROVAL_REQUEST proposal into Beacon's inbox (reusing the
+# #502 message-handler envelope shape + safe_write_inbox). The capture stays
+# `parked`; the delegation lives as a Beacon proposal, not a capture state — so
+# NO captures.json mutation here. trust_policy (the existing gate) decides whether
+# the resulting dispatch auto-fires or asks Larry again; this endpoint just
+# creates the proposal. A re-POST for a capture that already has an open delegate
+# proposal collapses onto it (deterministic filename + existence check) rather
+# than double-proposing.
+
+# The default action when neither the body nor the capture names one (§ 2).
+_DELEGATE_DEFAULT_ACTION = 'delegate'
+
+
+def _handle_capture_delegate(
+    *,
+    capture_id: str,
+    action: Optional[str],
+    actor: str,
+    captures_path: Path,
+) -> dict[str, Any]:
+    """POST /api/missions/captures/{id}/delegate (§ 2) — hand a parked card to
+    the team. Emits a `human-approval-gate` APPROVAL_REQUEST proposal for Beacon
+    via safe_write_inbox; does NOT touch captures.json (the capture stays parked).
+
+    404 if the capture doesn't exist; 409 if it isn't parked; 400 on an
+    unrecognized action. Idempotent: a re-POST that finds an already-open
+    proposal in Beacon's inbox collapses onto it (no second proposal)."""
+    import safe_write_inbox  # noqa: PLC0415 — lazy; sibling module (jail-guarded)
+
+    registry = _read_captures_registry(captures_path)
+    cap = _find_capture(registry.get('captures') or [], capture_id)  # 404
+    _require_parked(cap, capture_id)  # 409
+
+    # Resolve the action: explicit body wins, else the capture's recommendation,
+    # else the delegate default (§ 2). Validate against the shared enum so a
+    # garbage body surfaces as 400 rather than a malformed proposal.
+    resolved = action or cap.get('recommended_action') or _DELEGATE_DEFAULT_ACTION
+    if resolved not in _VALID_RECOMMENDED_ACTIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f'invalid action={resolved!r}; expected one of '
+                f'{list(_VALID_RECOMMENDED_ACTIONS)}'
+            ),
+        )
+
+    # Deterministic identity: task_id + filename key on the capture_id so a
+    # re-POST collapses onto the same proposal (the dedup the spec asks for —
+    # mirrors the message handler's stable dedup_identity).
+    task_id = f'delegate-{capture_id}'
+    filename = f'{task_id}.json'
+    safe_name = safe_write_inbox.canonical_inbox_name(filename)
+    proposal_path = (safe_write_inbox.INBOXES_ROOT / 'beacon' / safe_name)
+    if proposal_path.exists():
+        # An open delegate proposal already sits in Beacon's inbox — collapse
+        # onto it rather than double-proposing. The capture is untouched.
+        return {'dispatched': True, 'deduped': True}
+
+    title = cap.get('title') or capture_id
+    meaning = _meaning_layer_fields(cap)
+    briefing = meaning['briefing'] or {}
+    suggest = briefing.get('suggest')
+    summary = (suggest or title or capture_id)
+
+    # The proposal carries the APPROVAL_REQUEST required fields
+    # (beacon_approval_handler.REQUIRED_FIELDS: task_id, summary, target_agent,
+    # prompt) plus the capture identity, actor, a stable dedup identity, and a
+    # timeout — the same envelope shape as the #502 message handler.
+    prompt = (
+        f'Larry clicked "Delegate to team" on parked card `{capture_id}` '
+        f'("{title}"). His click IS the go — scope and propose/run this down '
+        'as the team. '
+        f'Recommended action: {resolved}. '
+        f'Briefing — what: {briefing.get("what") or "(none)"}; '
+        f'why: {briefing.get("why") or "(none)"}; '
+        f'suggested next step: {suggest or "(none)"}. '
+        'Treat this as a human-approval-gate proposal: whether the resulting '
+        'dispatch auto-fires or asks again is governed by trust_policy. Do NOT '
+        'mutate the capture — it stays parked; the delegation lives as this '
+        'proposal.'
+    )
+    envelope = {
+        'task_id': task_id,
+        'target_agent': 'beacon',
+        'summary': summary,
+        'prompt': prompt,
+        'source': 'dashboard',
+        'actor': actor,
+        'capture_id': capture_id,
+        'action': resolved,
+        'dedup_identity': f'delegate:{capture_id}',
+        'timeout': 600,
+    }
+    safe_write_inbox.safe_write_inbox(
+        target_agent='beacon',
+        task_dict=envelope,
+        source_agent='dashboard',
+        filename=filename,
+    )
+    return {'dispatched': True}
+
+
 # Missions v2 Phase 3 — mission write-back (POST /api/system/missions/{id}/action)
 # (spec: agents/beacon/specs/missions-v2-phase3-writeback-autoregister.md § 5)
 #
@@ -6160,6 +6283,30 @@ def post_capture_message(
         captures_path=_captures_json_path(),
         agents_root=_agents_root(),
         supabase_client=_get_larry_action_supabase_client(),
+    )
+
+
+# POST /api/missions/captures/{capture_id}/delegate — "Delegate to team" (the
+# primary Parked-card action; delegate-fix spec § 2). Emits a human-approval-gate
+# APPROVAL_REQUEST proposal into Beacon's inbox; the capture stays parked (no
+# captures.json mutation). Same auth as the action route: X-Dashboard-Token +
+# an allowlisted X-Actor.
+@app.post(
+    '/api/missions/captures/{capture_id}/delegate',
+    response_model=CaptureDelegateResponse,
+    response_model_exclude_none=True,
+    dependencies=[Depends(_require_token)],
+)
+def post_capture_delegate(
+    capture_id: str,
+    actor: str = Depends(_require_actor),
+    body: Optional[CaptureDelegateRequest] = None,
+) -> dict[str, Any]:
+    return _handle_capture_delegate(
+        capture_id=capture_id,
+        action=body.action if body else None,
+        actor=actor,
+        captures_path=_captures_json_path(),
     )
 
 
