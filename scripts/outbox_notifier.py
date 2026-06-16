@@ -66,6 +66,7 @@ if str(_SCRIPT_DIR) not in sys.path:
 
 import beacon_approval_handler as approval  # noqa: E402
 import chain_event_emit             # noqa: E402  # E4.4e PR-A: push writer
+import chain_event_shipper as ces    # noqa: E402  # S-4: auto_merge push parity
 from chain_envelope import (        # noqa: E402  # M1: sole envelope constructor
     CARRY,
     DROP,
@@ -1419,12 +1420,18 @@ _running = True
 _last_reconcile_ts = 0.0
 
 
-def log(msg: str, level: str = 'INFO') -> None:
+def log(msg: str, level: str = 'INFO', ts: Optional[str] = None) -> None:
     # The stamp is NAIVE HOST-LOCAL time (the droplet runs America/Denver,
     # not UTC). chain_event_shipper._normalize_iso_ts and
     # heal_pr_auto_merge._to_utc interpret naive timestamps as host-local —
     # don't switch this to UTC without migrating every log reader at once.
-    ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    #
+    # `ts` lets a caller pin the exact stamp written here. The auto_merge
+    # push-emit (S-4) needs the log line's ts and its own pushed row to share
+    # one stamp so the shipper's later poll of this same line computes an
+    # identical event_id (PK dedup) instead of double-writing the merge event.
+    if ts is None:
+        ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     line = f'[{ts}] [notifier] [{level}] {msg}\n'
     try:
         LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -5025,6 +5032,65 @@ def _post_mirror_review_commit_status(
     return state
 
 
+def _emit_auto_merge_chain_event(
+    *,
+    task_id: str,
+    pr_url: str,
+    outcome: str,
+    log_msg: str,
+    log_ts: str,
+) -> None:
+    """Push the verified-merge `auto_merge` chain_event at the merge moment.
+
+    S-4 freshness (spec § S5). The `auto_merge` row is what the board reads to
+    flip a linked card to "shipped" and what `build_sequence_advancer`'s
+    belt-and-suspenders merge gate reads to advance a sequence. Before S-4 it
+    reached Supabase ONLY via the shipper's log-tail poll of this very line —
+    a 30-60s lag, and zero rows whenever the shipper is down. Push-emitting it
+    here closes that lag to one short cycle with no restart/sync dependency.
+
+    ADDITIVE accelerator, NOT a replacement: the log line still ships via the
+    poll path, which stays the durable backstop (the push has no local spill,
+    so a Supabase blip drops the push — the shipper's EventBuffer then carries
+    the same event when it recovers). To keep the pair from double-writing, the
+    push reproduces the EXACT event_id the shipper's `parse_log_line` derives
+    for this line: same normalized ts (`ces._normalize_iso_ts(log_ts)`, where
+    `log_ts` is the stamp this line was actually written with) and same
+    `id_extra` (the full message `rest`, i.e. `log_msg`). The deterministic
+    event_id then collides and `ignore_duplicates=True` drops whichever lands
+    second. `payload.outcome` is set because the advancer's merge gate requires
+    `payload.get('outcome') in ('merged', 'already_merged')`.
+
+    Best-effort + daemon-never-wedge, same contract as the sibling push
+    helpers (`_emit_mirror_verdict_chain_event` et al.): emit_event logs WARN
+    and returns False on any Supabase failure; the merge / DM / archive flow
+    never depends on the row landing.
+    """
+    norm_ts = ces._normalize_iso_ts(log_ts)
+    chain_payload = {
+        'agent': 'forge',
+        'task_id': task_id,
+        'outcome': outcome,
+        'pr_url': pr_url,
+    }
+    try:
+        chain_event_emit.emit_event(
+            event_type='auto_merge',
+            agent='forge',
+            task_id=task_id,
+            payload=chain_payload,
+            ts=norm_ts,
+            pr_url=pr_url,
+            id_extra=log_msg,
+        )
+    except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+        log(
+            f'auto_merge chain_event emit raised unexpectedly for '
+            f'task {task_id!r}: {type(e).__name__}: {e}',
+            'WARN',
+        )
+
+
 def _auto_merge_pr(pr_url: str, task_id: str) -> dict[str, Any]:
     """Fire `gh pr merge <N> --squash --delete-branch` for a Mirror-PASSed PR.
 
@@ -5132,9 +5198,15 @@ def _auto_merge_pr(pr_url: str, task_id: str) -> dict[str, Any]:
         }
 
     if proc.returncode == 0:
-        log(
+        merge_msg = (
             f'AUTO_MERGE task={task_id} pr={pr_url} outcome=merged '
-            f'(--squash --delete-branch) agent=forge',
+            f'(--squash --delete-branch) agent=forge'
+        )
+        merge_ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        log(merge_msg, ts=merge_ts)
+        _emit_auto_merge_chain_event(
+            task_id=task_id, pr_url=pr_url, outcome='merged',
+            log_msg=merge_msg, log_ts=merge_ts,
         )
         return {
             'merge_outcome': 'merged',
@@ -5149,10 +5221,16 @@ def _auto_merge_pr(pr_url: str, task_id: str) -> dict[str, Any]:
     stderr_text = (proc.stderr or '').strip()
     state = _gh_pr_state(repo_coords, pr_number)
     if state == 'MERGED':
-        log(
+        already_msg = (
             f'AUTO_MERGE task={task_id} pr={pr_url} outcome=already_merged '
             f'(gh exit={proc.returncode} but state=MERGED — resume from '
-            f'prior crash; treating as success) agent=forge',
+            f'prior crash; treating as success) agent=forge'
+        )
+        already_ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        log(already_msg, ts=already_ts)
+        _emit_auto_merge_chain_event(
+            task_id=task_id, pr_url=pr_url, outcome='already_merged',
+            log_msg=already_msg, log_ts=already_ts,
         )
         return {
             'merge_outcome': 'already_merged',

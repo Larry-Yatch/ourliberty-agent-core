@@ -7590,6 +7590,117 @@ class AutoMergePRTest(unittest.TestCase):
         self.assertEqual(result['repo_coords'], 'Larry-Yatch/ourliberty-agent-core')
 
 
+class AutoMergePushEmitTest(unittest.TestCase):
+    """S-4 freshness (spec § S5) — `_auto_merge_pr` push-emits the `auto_merge`
+    chain_event at the merge moment so the board reflects the merge in one short
+    cycle instead of waiting on the shipper's 30-60s log-tail poll, and does so
+    with event_id parity to that poll so the pair dedups (no double row)."""
+
+    PR_URL = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/42'
+    TASK_ID = 'test-task-001'
+
+    def _mock_run(self, *, returncode=0, stdout='', stderr=''):
+        class _R:
+            pass
+        r = _R()
+        r.returncode = returncode
+        r.stdout = stdout
+        r.stderr = stderr
+        return r
+
+    def test_merged_pushes_auto_merge_event(self):
+        with mock.patch.object(on.subprocess, 'run') as m_run, \
+                mock.patch.object(on.chain_event_emit, 'emit_event') as m_emit:
+            m_run.return_value = self._mock_run(returncode=0)
+            result = on._auto_merge_pr(self.PR_URL, self.TASK_ID)
+        self.assertEqual(result['merge_outcome'], 'merged')
+        m_emit.assert_called_once()
+        _, kw = m_emit.call_args
+        self.assertEqual(kw['event_type'], 'auto_merge')
+        self.assertEqual(kw['agent'], 'forge')
+        self.assertEqual(kw['task_id'], self.TASK_ID)
+        self.assertEqual(kw['payload']['outcome'], 'merged')
+        self.assertEqual(kw['pr_url'], self.PR_URL)
+        # id_extra is the full log `rest` the shipper would key on.
+        self.assertTrue(kw['id_extra'].startswith('AUTO_MERGE '))
+        self.assertIn('outcome=merged', kw['id_extra'])
+
+    def test_already_merged_pushes_auto_merge_event(self):
+        merge_proc = self._mock_run(returncode=1, stderr='already merged')
+        view_proc = self._mock_run(
+            returncode=0, stdout=json.dumps({'state': 'MERGED'}),
+        )
+        with mock.patch.object(on.subprocess, 'run') as m_run, \
+                mock.patch.object(on.chain_event_emit, 'emit_event') as m_emit:
+            m_run.side_effect = [merge_proc, view_proc]
+            result = on._auto_merge_pr(self.PR_URL, self.TASK_ID)
+        self.assertEqual(result['merge_outcome'], 'already_merged')
+        m_emit.assert_called_once()
+        _, kw = m_emit.call_args
+        self.assertEqual(kw['payload']['outcome'], 'already_merged')
+        self.assertIn('outcome=already_merged', kw['id_extra'])
+
+    def test_failed_merge_does_not_push(self):
+        """A failed merge writes no auto_merge row — the board must not flip a
+        card to shipped on a failure."""
+        merge_proc = self._mock_run(returncode=1, stderr='not mergeable')
+        view_proc = self._mock_run(
+            returncode=0, stdout=json.dumps({'state': 'OPEN'}),
+        )
+        with mock.patch.object(on.subprocess, 'run') as m_run, \
+                mock.patch.object(on.chain_event_emit, 'emit_event') as m_emit:
+            m_run.side_effect = [merge_proc, view_proc]
+            result = on._auto_merge_pr(self.PR_URL, self.TASK_ID)
+        self.assertEqual(result['merge_outcome'], 'failed')
+        m_emit.assert_not_called()
+
+    def test_emit_failure_does_not_break_merge(self):
+        """daemon-never-wedge: a raising push emit never alters the merge."""
+        with mock.patch.object(on.subprocess, 'run') as m_run, \
+                mock.patch.object(
+                    on.chain_event_emit, 'emit_event',
+                    side_effect=RuntimeError('supabase down')):
+            m_run.return_value = self._mock_run(returncode=0)
+            result = on._auto_merge_pr(self.PR_URL, self.TASK_ID)
+        self.assertEqual(result['merge_outcome'], 'merged')
+
+    def test_event_id_parity_with_shipper(self):
+        """The push event_id must equal what the shipper's `parse_log_line`
+        derives from the very AUTO_MERGE line this merge writes, so the PK
+        absorbs the later poll-source row instead of double-writing."""
+        captured: dict[str, str] = {}
+        real_log = on.log
+
+        def _capture_log(msg, level='INFO', ts=None):
+            if msg.startswith('AUTO_MERGE '):
+                captured['msg'] = msg
+                captured['ts'] = ts
+            return real_log(msg, level, ts)
+
+        with mock.patch.object(on.subprocess, 'run') as m_run, \
+                mock.patch.object(on.chain_event_emit, 'emit_event') as m_emit, \
+                mock.patch.object(on, 'log', _capture_log):
+            m_run.return_value = self._mock_run(returncode=0)
+            on._auto_merge_pr(self.PR_URL, self.TASK_ID)
+
+        # Push side: recompute the event_id from the exact kwargs the helper
+        # handed emit_event.
+        _, kw = m_emit.call_args
+        push_event_id = on.ces.compute_event_id(
+            kw['task_id'], kw['event_type'], kw['ts'], extra=kw['id_extra'],
+        )
+
+        # Poll side: reconstruct the log line and parse it like the shipper.
+        self.assertIsNotNone(captured.get('ts'))
+        log_line = (
+            f"[{captured['ts']}] [notifier] [INFO] {captured['msg']}"
+        )
+        shipper_event = on.ces.parse_log_line(log_line)
+        self.assertIsNotNone(shipper_event)
+        self.assertEqual(shipper_event.event_type, 'auto_merge')
+        self.assertEqual(push_event_id, shipper_event.event_id)
+
+
 class AlreadyMergedResumeTest(unittest.TestCase):
     """D3.5 5d — resume after daemon crash: PR was merged on first pass,
     second pass sees gh failure but state=MERGED → success-shaped DM."""

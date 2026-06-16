@@ -144,6 +144,35 @@ class TestEmitEvent(unittest.TestCase):
             client_b.captured_rows[0]['event_id'],
         )
 
+    def test_id_extra_feeds_compute_event_id(self):
+        # S-4: a push writer that also ships the same event via the poll path
+        # passes id_extra so its event_id matches the shipper's parse_log_line
+        # (which keys on the full log `rest`). Same (ts) but different id_extra
+        # must produce different event_ids; matching id_extra must match.
+        client_with = _RecordingClient()
+        client_without = _RecordingClient()
+        cee.emit_event(
+            event_type='auto_merge', agent='forge', task_id='task-z',
+            payload={'outcome': 'merged'}, ts='2026-06-16T18:00:00+00:00',
+            id_extra='AUTO_MERGE task=task-z pr=u outcome=merged agent=forge',
+            client=client_with,
+        )
+        cee.emit_event(
+            event_type='auto_merge', agent='forge', task_id='task-z',
+            payload={'outcome': 'merged'}, ts='2026-06-16T18:00:00+00:00',
+            client=client_without,
+        )
+        row_with = client_with.captured_rows[0]
+        row_without = client_without.captured_rows[0]
+        self.assertNotEqual(row_with['event_id'], row_without['event_id'])
+        self.assertEqual(
+            row_with['event_id'],
+            ces.compute_event_id(
+                'task-z', 'auto_merge', '2026-06-16T18:00:00+00:00',
+                extra='AUTO_MERGE task=task-z pr=u outcome=merged agent=forge',
+            ),
+        )
+
     def test_payload_sanitized_before_insert(self):
         client = _RecordingClient()
         cee.emit_event(
