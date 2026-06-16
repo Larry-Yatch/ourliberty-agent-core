@@ -126,9 +126,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-16 05:39Z UTC (Iter ~2011, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-16 05:44Z UTC (Iter ~2012, Tier 1, consecutive_clean=0)
 
-**Iter ~2011 summary:** ✅ Nominal. 0 new alerts. All checks clean. **PR #532 head ref updated to 1ef9cf7... (fix-delegate-endpoint-regression-gate-001 result pushed); Mirror review dispatched by heal-undispatched-pr-review at 05:35:47Z.** PR #497 UNKNOWN/"", Mirror REVIEW_ESCALATE Jun-14T04:02:56Z, age≈51h, deadline Jun-17T04:02:56Z (~21h). All 5 daemons alive. Repo df938c81=origin/main. Watermark: 1061 (unchanged). pending=0. Tier 1, consecutive_clean=0. PRIME ratio=20.10.
+**Iter ~2012 summary:** ✅ Nominal. 1 new alert (L1062 dispatch-branch-cleanup Tier-3 silenced). All checks clean. **PR #532 in active Mirror review** (dispatched by heal-undispatched-pr-review backstop at 05:35:47Z; outbox-notifier confirms; healer 05:40Z tick shows orphaned=0). PR #497 UNKNOWN/"", Mirror REVIEW_ESCALATE Jun-14T04:02:56Z, age≈49.7h, deadline Jun-17T04:02:56Z (~22.3h). All 5 daemons alive. Repo 961df2e2=origin/main. Watermark: 1061→1062. pending=0. Tier 1, consecutive_clean=0. PRIME ratio=20.10.
 
 ## Status snapshot — updated 2026-06-16 05:25Z UTC (Iter ~2009, Tier 1, consecutive_clean=0)
 
