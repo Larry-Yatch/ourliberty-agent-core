@@ -4,6 +4,59 @@
 
 ---
 
+## Iteration ~2072 — 2026-06-16 22:54Z UTC (interactive, /cycle, Tier 2, consecutive_clean=0→1)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 0 new alerts. All mandatory checks clean.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** 0 open PRs on ourliberty-dashboard and ourliberty-graph; 1 open PR on agent-core (#549, new, Forge p1-target-repo output). ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** 0 open non-Forge PRs across all repos. ✅
+- **Pending approvals — CLEAR ✅:** pending=0. ✅
+- **Daemons same PIDs ✅:** beacon 3556778 (Ss), chain-event 2744551 (SNs), inbox-watcher 3434697 (Ssl), outbox_notifier 3556624 (Ss), dashboard_api 3593488 (Ssl). All alive, same PIDs as iter ~2071. ✅
+
+**Check 0 — Alert triage:** Watermark=1056 entering; file=1056 lines. **0 new alerts.** Watermark unchanged. ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log tail — `WARN forge marker error in p1-target-repo.json: MalformedForgeMarker: phase=preflight requires ONE marker block … none found. marker-error notify written to forge for task p1-target-repo (retry 1/3)` at 16:46:35 MDT. Build succeeded (PR #549 created 22:46:25Z, success=True, $3.44), retry mechanism active per completed G-rule PR #524. inbox_watcher.log — no WARN/ERROR; last entries: p1-target-repo done 22:46:35Z, p1-drain-archive started 22:46:42Z. ✅ Nominal (known-pattern retry).
+
+**Check 2 — Telegram sweep:** Last Larry message 16:25:01 MDT (22:25Z) 'go' — served iter ~2070. No new Larry messages. G-rule telegram-409-burst **2/3** unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → `no stalls detected`. All FORGE_NO_PR_SKIP entries reason=pr_exists or preflight_exit. ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0. No orphaned Larry directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-16T22:23:19Z, age≈31 min at check time. FRESH (< 60 min threshold). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=e23ed4db=origin/main (clean, on main, no divergence). 2 new commits since iter ~2071 landed on origin/main: `e23ed4db` (Pulse cycle 20260616T223435Z wrapper auto-commit). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-16T22:29:31Z, status=success (synced 87d147aa→d402d35c, PR #548 `fix(merge): nudge droplet to sync main right after a desktop merge`). Age ≈25 min. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3556778 (Ss) ✅, chain_event_shipper 2744551 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, outbox_notifier 3556624 (Ss) ✅, dashboard_api 3593488 (Ssl) ✅. All 5 alive, same PIDs as iter ~2071. ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core: **1 open PR — #549** `feat(chain_envelope): derive target_repo from chain_events (C1)`, branch=forge/p1-target-repo, created 22:46:25Z (7 min old at check time), mergeable=MERGEABLE, reviewDecision="" (Mirror not yet dispatched). Under 30-min threshold. Forge-preflight marker-error retry 1/3 in progress; build succeeded; pipeline expected to dispatch Mirror review on retry resolution. ✅ Watch.
+ourliberty-dashboard: **0 open PRs.** ✅
+ourliberty-graph: **0 open PRs.** ✅
+
+**Check H — Forge digest:** projects-v3-p1 sequence ACTIVE. p1-target-repo COMPLETE: PR #549 created 22:46:25Z, Forge done 22:46:35Z ($3.44). p1-drain-archive IN PROGRESS: started 22:46:42Z, active. Build sequence advancer last ticked 16:50:07 MDT (22:50Z), files=19 processed=1. Normal sequence advancement. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → `OK: schema_version=1 validates`. ✅ Nominal.
+
+**Conditional checks (Tuesday 2026-06-16 UTC, weekday=1):** Check I fires Mon/Wed/Fri/Sun — skip. Check III fires Sunday — skip.
+
+**G-rule tracking:** No new G-rule counts this iter. MalformedForgeMarker on p1-target-repo preflight covered by completed G-rule PR #524 retry mechanism. Counts unchanged from iter ~2071.
+
+**Actions taken:**
+1. PRIME ledger: `iter_clean` appended (tier=2, template=iter-clean, ts=2026-06-16T22:54:13Z).
+2. Tier state: `record --checks-clean true` → consecutive_clean 0→1. Tier 2 unchanged (need 3 consecutive clean to de-escalate to Tier 3).
+
+**PRIME ratio:** 20.35 (997 interventions, 49 systemic fixes). Unchanged.
+
+**Dispatches:** None.
+
+---
+
 ## Iteration ~2071 — 2026-06-16 22:33Z UTC (interactive, /cycle, Tier 1→2, consecutive_clean=2→3→de-escalate)
 
 **Trigger:** Larry direct invocation (`/cycle`).
