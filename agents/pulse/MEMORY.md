@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-16 06:36Z UTC (Iter ~2018, Tier 1, consecutive_clean=2)
+
+**Iter ~2018 summary:** ✅ Nominal. 1 new alert (L1065 Tier-3 silenced: sync.service push-failed race with run_cycle auto-commit, self-heals). Phase S dag-preflight-2 REVISION at 00:28Z: s-6 parallel-file-overlap with s-3/s-4 on captures.json; Beacon has notify, mechanical fix pending (add s-6 dep on s-4). PR #497: UNKNOWN/"", NO_SESSION × 2 (06:18Z+06:22Z), Beacon has second notify unprocessed, 72h deadline Jun-17T04:02:56Z (~21h). All 5 daemons alive. Repo f2289fee=origin/main. Watermark: 1064→1065. pending=0. Tier 1, consecutive_clean=2. PRIME ratio=20.14.
+
 ## Status snapshot — updated 2026-06-16 06:29Z UTC (Iter ~2017, Tier 1, consecutive_clean=1)
 
 **Iter ~2017 summary:** ✅ Nominal. 2 new alerts (L1063-L1064 Tier-3 silenced: heal-stale-daemon-code restarted dashboard_api PID→3462541 and outbox_notifier PID→3462678 after PR#538/539 code updates at 06:20Z). PR #540 MERGED ✅ (5853aced, feat(missions): one-click Drop + Promote). Phase S dag-preflight-2 ACTIVE: Beacon processed pulse-phase-s-dag-redispatch-001, dispatched dag-preflight-missions-v2-phase-s-2.json to Mirror; worktree wt-mirror-dag-preflight-missions-v2-phase-s-2 active (mtime 00:25 MDT). PR #497: NO_SESSION_REVISION loop × 2 (06:18Z + 06:22Z); second Beacon notify (mtime 00:22 MDT) unprocessed; active pipeline. New G-rule: mirror-no-session-revision-loop 1/3. Repo 674a2a5b=origin/main. Watermark: 1062→1064. pending=0. Tier 1, consecutive_clean=1. PRIME ratio=20.14.

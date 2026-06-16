@@ -4,6 +4,70 @@
 
 ---
 
+## Iteration ~2018 — 2026-06-16 06:36Z UTC (interactive, /cycle, Tier 1, consecutive_clean=1→2)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 1 new alert (Tier-3 silenced). Phase S dag-preflight-2 REVISION received by Beacon (autonomous amend pending). PR #497 NO_SESSION loop carries. All checks clean.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S dag-preflight-2:** Mirror completed review of `dag-preflight-missions-v2-phase-s-2` at 00:28:32 MDT (06:28:32Z UTC) — returned REVISION. Finding: s-6 (drain) hangs directly off s-2 in parallel with s-3/s-4, but s-6 also writes `heal_missions_card_gc.py`/`captures.json` (same file as s-3/s-4). Prior amend serialized s-2→s-3→s-4 but left s-6 dangling off s-2. Fix: add `s-6 depends_on s-4` (or s-5). This is a **mechanical DAG fix** — Beacon handles autonomously per CLAUDE.md "If it is a MECHANICAL DAG fix… amend the sequence file… WITHOUT pinging Larry." `notify-dag-revision-missions-v2-phase-s.json` in Beacon inbox (mtime 00:28 MDT). Beacon has not yet processed it; pipeline active, not a stall.
+- **PR #497 NO_SESSION:** Second `notify-no-session-revision-cleanup-branch-warn-to-info-001.json` (mtime 00:22 MDT) still in Beacon inbox. Beacon will route to Forge on next wakeup. Pipeline active. UNKNOWN/"" state; updatedAt=2026-06-16T06:15:41Z. 72h deadline Jun-17T04:02:56Z → **~21h remaining.**
+- **Sync error (L1065):** sync.service at 06:29:59Z reported "auto-committed Pulse runtime files but push to origin/main failed; rolled back Pulse paths to 674a2a5b." Repo HEAD=f2289fee=origin/main (current, clean). Push race between run_cycle.sh auto-commit and sync.service tick. Self-heals per message. Tier-3 silenced. ✅
+
+**Check 0 — Alert triage:** Watermark=1064 entering; file=1065 lines. **1 new alert (L1065):**
+- **L1065** (`sync.service`, route=digest, `sync-blocked:auto-commit-push-failed`): Tier-3 silenced ✅ (known-pattern in alert-translations.json, route=digest, self-heals next sync tick). Helper returned tier=3. Watermark advanced to 1065.
+
+**Check 1 — Log noise:** outbox-notifier.log. Last entries: MIRROR_DAG_PREFLIGHT seq=missions-v2-phase-s verdict=REVISION × 2 (dag-preflight-1 at 00:08Z, dag-preflight-2 at 00:28Z) — both INFO, routed to Beacon. NO_SESSION_REVISION for cleanup-branch-warn-to-info-001 × 2 — both INFO. All entries INFO-level; 0 WARNs/ERRORs since Jun-15 20:37Z. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot PID 3435953 alive (Ss). Last log entry 00:32:31 MDT (alert idx=1064, sync-blocked, route=digest). No new Larry messages. No 409 errors. G-rule telegram-409-burst 2/3 unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → "no stalls detected". All FORGE_NO_PR_SKIP informational (pr_exists or preflight_exit). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0** (history=223). ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-16T06:19:56Z`, age≈16 min. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=f2289fee=origin/main (`## main...origin/main`, no divergence). Clean tree, on main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-16T06:29:59Z, status=error (push-failed, self-heals). L1065 → Tier-3 silenced (known-pattern). Repo itself at origin/main. Single error, not persistent. ✅ Nominal (known-pattern).
+
+**Check C — Agent liveness:** beacon_telegram_bot 3435953 (Ss) ✅, chain_event_shipper 2744551 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, dashboard_api 3462541 (Ssl) ✅, outbox_notifier 3462678 (Ss) ✅. All 5 alive. ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (1 open):
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): UNKNOWN/"". updatedAt=2026-06-16T06:15:41Z. In NO_SESSION revision loop. Beacon has second notify pending. 72h deadline Jun-17T04:02:56Z (~21h). [yellow] carry.
+ourliberty-dashboard: **0 open PRs.** ✅
+
+**Conditional checks (Tuesday 2026-06-16 UTC, weekday=1):** Check I fires Mon/Wed/Fri/Sun — skip. Check III fires Sunday — skip.
+
+**G-rule tracking:**
+- **mirror-no-session-revision-loop 1/3** — no new occurrence this iter (same 2 events from iter ~2017). Unchanged.
+- All other G-rule counts unchanged from iter ~2017.
+
+**Actions taken:** Alert triage: L1065 → Tier-3 silenced. Watermark 1064 → 1065. Prime ledger: iter_clean appended. Tier state recorded clean.
+
+**Dispatches:** None.
+
+**Standing findings (carried):**
+- [yellow] **PR #497 REVISION LOOP** — cleanup-branch-warn-to-info-001, NO_SESSION × 2 (06:18Z/06:22Z). Beacon has second notify. 72h deadline Jun-17T04:02:56Z (~21h). Escalate if Beacon dispatch stalls before deadline.
+- [yellow] **Phase S dag-preflight REVISION (3rd pass)** — s-6 parallel-file-overlap (captures.json) with s-3/s-4. Mechanical fix: add s-6 dep on s-4. Beacon has notify (06:28Z). Autonomous amend + re-dispatch pending. Watch for dag-preflight-3 and Mirror PASS.
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519/530/531/534** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — pending Larry dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — FN=3027, TP=5. `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST **2/3**, merge_conflict_manual_rebase-tier4 1/3, heal-pipeline-stall-mirror-pass-unmerged-tier4 1/3, revision-phase-preamble-missing 1/3, **mirror-no-session-revision-loop 1/3**.
+- [blue] **Stale worktrees** — `wt-forge-fix-delegate-endpoint-regression-gate-001`, `wt-mirror-dag-preflight-missions-v2-delegate-fix`, `wt-mirror-dag-preflight-missions-v2-phase-s`, `wt-mirror-dag-preflight-missions-v2-phase-s-2`. Low risk; dispatch-branch-cleanup will reap.
+- [blue] **Stale bash orphans** — PIDs 1834248 + 2605007. Low CPU. [carry]
+
+**PRIME DIRECTIVE:** 0 interventions this iter. iter_clean appended. ratio=20.14 (987 interventions, 49 systemic fixes).
+**Tier end-of-iter:** **Tier 1, consecutive_clean=2** (1 more clean iter → de-escalate to Tier 2).
+
+---
+
 ## Iteration ~2017 — 2026-06-16 06:29Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0→1)
 
 **Trigger:** Larry direct invocation (`/cycle`).
