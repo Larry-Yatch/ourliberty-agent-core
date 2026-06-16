@@ -838,5 +838,78 @@ class IsProposableInitiativeTest(unittest.TestCase):
         self.assertFalse(da.is_proposable_initiative('anything', agent='deploy-notifier'))
 
 
+class OrphanLabelTitleFallbackTest(unittest.TestCase):
+    """A prompt-blob desktop title must not pre-empt repo/branch in the Orphans
+    lane label; short meaningful titles still win; the resolver stays graceful
+    when fields are absent."""
+
+    _BLOB = (
+        'You are characterizing a software component into a v2 Component '
+        'Descriptor for a...'
+    )
+
+    @staticmethod
+    def _desktop(title=None, repo=None, branch=None):
+        payload = {}
+        if title is not None:
+            payload['title'] = title
+        if repo is not None:
+            payload['repo'] = repo
+        if branch is not None:
+            payload['branch'] = branch
+        return [{'event_type': 'desktop_session_active', 'payload': payload}]
+
+    def test_is_prompt_blob_long_title(self) -> None:
+        self.assertTrue(da._is_prompt_blob_title('x' * 61))
+        self.assertFalse(da._is_prompt_blob_title('x' * 60))
+
+    def test_is_prompt_blob_ellipsis(self) -> None:
+        self.assertTrue(da._is_prompt_blob_title('Short but truncated...'))
+        self.assertTrue(da._is_prompt_blob_title('Short but truncated…'))
+
+    def test_short_meaningful_title_is_not_blob(self) -> None:
+        self.assertFalse(da._is_prompt_blob_title('Scene graph interface'))
+
+    def test_blob_title_does_not_preempt_repo_branch(self) -> None:
+        label, repo, branch = da._orphan_label_and_location(
+            self._desktop(title=self._BLOB, repo='ourliberty-graph',
+                          branch='feat/scene'),
+            'desktop-blobrepo01',
+        )
+        self.assertEqual(label, 'ourliberty-graph/feat/scene')
+        self.assertEqual(repo, 'ourliberty-graph')
+        self.assertEqual(branch, 'feat/scene')
+
+    def test_blob_title_prefers_repo_when_no_branch(self) -> None:
+        label, _repo, _branch = da._orphan_label_and_location(
+            self._desktop(title=self._BLOB, repo='ourliberty-graph'),
+            'desktop-blobreponobranch',
+        )
+        self.assertEqual(label, 'ourliberty-graph')
+
+    def test_short_meaningful_title_still_wins_over_repo(self) -> None:
+        label, _repo, _branch = da._orphan_label_and_location(
+            self._desktop(title='Scene graph interface', repo='ourliberty-graph',
+                          branch='main'),
+            'desktop-ab12cd34',
+        )
+        self.assertEqual(label, 'Scene graph interface')
+
+    def test_blob_title_used_when_no_repo(self) -> None:
+        label, repo, branch = da._orphan_label_and_location(
+            self._desktop(title=self._BLOB),
+            'desktop-blobonly01',
+        )
+        self.assertEqual(label, self._BLOB)
+        self.assertIsNone(repo)
+        self.assertIsNone(branch)
+
+    def test_no_title_no_repo_falls_back_to_humanized_task_id(self) -> None:
+        label, _repo, _branch = da._orphan_label_and_location(
+            [], 'orphan-inreview-now',
+        )
+        self.assertEqual(label, 'Orphan Inreview Now')
+
+
 if __name__ == '__main__':
     unittest.main()

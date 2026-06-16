@@ -119,6 +119,18 @@
       "pr_url": "https://github.com/Larry-Yatch/ourliberty-agent-core/pull/505"
     },
     {
+      "task_id": "desktop-blobrepo01",
+      "last_event_ts": "2026-06-09T15:45:00+00:00",
+      "agent": "desktop-claude",
+      "pr_url": null
+    },
+    {
+      "task_id": "desktop-blobonly01",
+      "last_event_ts": "2026-06-09T15:30:00+00:00",
+      "agent": "desktop-claude",
+      "pr_url": null
+    },
+    {
       "task_id": "desktop-ab12cd34",
       "last_event_ts": "2026-06-09T15:00:00+00:00",
       "agent": "desktop-claude",

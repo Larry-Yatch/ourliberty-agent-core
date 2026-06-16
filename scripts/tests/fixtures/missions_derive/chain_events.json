@@ -58,6 +58,22 @@
       "payload": {"title": "Scene graph interface", "repo": "ourliberty-graph", "branch": "main"}
     },
     {
+      "event_type": "desktop_session_active",
+      "task_id": "desktop-blobrepo01",
+      "agent": "desktop-claude",
+      "pr_url": null,
+      "ts": "2026-06-09T15:45:00+00:00",
+      "payload": {"title": "You are characterizing a software component into a v2 Component Descriptor for a...", "repo": "ourliberty-graph", "branch": "feat/scene"}
+    },
+    {
+      "event_type": "desktop_session_active",
+      "task_id": "desktop-blobonly01",
+      "agent": "desktop-claude",
+      "pr_url": null,
+      "ts": "2026-06-09T15:30:00+00:00",
+      "payload": {"title": "You are characterizing a software component into a v2 Component Descriptor for a..."}
+    },
+    {
       "event_type": "session_start",
       "task_id": "orphan-building-now",
       "agent": "forge",
