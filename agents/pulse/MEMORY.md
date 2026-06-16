@@ -126,7 +126,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-16 02:50Z UTC (Iter ~2001, Tier 3, consecutive_clean=0, DE-ESCALATED)
+## Status snapshot — updated 2026-06-16 03:22Z UTC (Iter ~2002, Tier 3, consecutive_clean=1)
+
+**Iter ~2002 summary:** ✅ Nominal. 1 new alert (L1054 Tier-3 silenced: heal-stale-daemon-code auto-restarted ourliberty-dashboard-api.service at 02:49Z, code from PR #533, new PID 3392206). All 5 daemons alive (old dashboard-api PID 2868353 dead; replaced by 3392206). Repo ae28f986=origin/main. Watermark: 1053→1054. pending=0. PR #532 (delegate-endpoint): PIPELINE-ORPHANED (carry). PR #497 (cleanup-branch-warn-to-info-001): UNKNOWN/"", Mirror REVIEW_ESCALATE Jun-14T04:02:56Z, age≈47.3h, deadline Jun-17T04:02:56Z (~24.7h). Tier 3, consecutive_clean=1. PRIME ratio=stable.
 
 **Iter ~2001 summary:** ✅ Nominal. 0 new alerts. All checks clean. **Tier 2 → Tier 3 DE-ESCALATION** (3 consecutive clean: ~1999, ~2000, ~2001). All 5 daemons alive. Repo 91264558=origin/main. Watermark: 1053 (unchanged). pending=0. PR #532 (delegate-endpoint): PIPELINE-ORPHANED — Forge inbox empty (marker-error-3 in .archive since 20:31Z Jun-15), dead-letter to Beacon processed, no new task, PR has 0 GitHub reviews; pipeline definitively stopped, needs Larry judgment. PR #497: MERGEABLE (resolved from UNKNOWN), age≈46.7h, deadline Jun-17T04:02:56Z (~25.3h). Tier 3, consecutive_clean=0. PRIME ratio=20.06.
 
