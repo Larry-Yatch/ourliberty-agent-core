@@ -126,7 +126,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-15 23:52Z UTC (Iter ~1992, Tier 3, consecutive_clean=4, all checks nominal)
+## Status snapshot — updated 2026-06-16 00:27Z UTC (Iter ~1993, Tier 3, consecutive_clean=5, all checks nominal)
+
+**Iter ~1993 summary:** ✅ Nominal. 0 new alerts. All daemons alive. Repo at c58858f3=origin/main. Watermark: 1049 (unchanged). pending=0. 1 open PR: #497 (UNKNOWN/"", Mirror REVIEW_ESCALATE, 72h deadline Jun-17T04:02:56Z ~27.6h). PRIME ratio=20.04. Tier 3, consecutive_clean=5 (steady-state ceiling).
 
 **Iter ~1992 summary:** ✅ Nominal. 1 new alert (L1049 Tier-3 silenced, review-pass PR #529). **PR #529 MERGED ✅** (cred-drift-ignore-feature-flags-001 — OURLIBERTY_NEWMISSION_INGEST_ENABLED feature flag added to ignored_keys allowlist). All daemons alive. Repo at b7e51896=origin/main. Watermark: 1048→1049. pending=0. 1 open PR: #497 (MERGEABLE/"", Mirror REVIEW_ESCALATE, 72h deadline Jun-17T04:02:56Z ~28.2h). PRIME ratio=20.04. Tier 3, consecutive_clean=4 (steady-state ceiling).
 
