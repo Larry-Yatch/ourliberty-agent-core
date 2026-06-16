@@ -343,6 +343,29 @@ class RunDrainTest(unittest.TestCase):
         self._run(dry_run=False)  # c-safe is now `done`, no longer promoted
         self.assertEqual(self.cap_path.read_text(), before)
 
+    def test_concurrent_write_survives_lost_update_guard(self):
+        # Simulate the GC daemon / dashboard ingest writing captures.json mid-run:
+        # the verify_fn (called inside the reconcile loop, after the read and
+        # before the write) appends a brand-new capture to the file on disk. The
+        # drain's fresh re-read + per-capture merge must preserve it while still
+        # applying the c-safe delta.
+        def _v(task_id, dispatched_at):  # noqa: ARG001
+            data = json.loads(self.cap_path.read_text())
+            if not any(c['id'] == 'c-concurrent' for c in data['captures']):
+                data['captures'].append(
+                    _promoted('c-concurrent', risk='safe', spawned={'task_id': 'tz'}))
+                self.cap_path.write_text(json.dumps(data))
+            return (task_id == 't1', _PR if task_id == 't1' else None)
+
+        rc = d.run_drain(
+            dry_run=False, verify_fn=_v,
+            captures_reg_path=self.cap_path, missions_reg_path=self.miss_path, now=_NOW)
+        self.assertEqual(rc, 0)
+        by_id = {c['id']: c for c in json.loads(self.cap_path.read_text())['captures']}
+        self.assertEqual(by_id['c-safe']['state'], 'done')        # our delta applied
+        self.assertIn('c-concurrent', by_id)                       # concurrent write kept
+        self.assertEqual(by_id['c-concurrent']['state'], 'promoted')
+
 
 if __name__ == '__main__':
     unittest.main()

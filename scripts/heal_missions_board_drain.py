@@ -334,6 +334,15 @@ def run_drain(
         if captures_registry is None:
             gc.log('drain: captures.json unreadable/malformed — skipping promoted-draft pass')
         else:
+            # Snapshot read-time state so the pre-write merge applies ONLY this
+            # run's per-capture field deltas onto a fresh re-read (shallow per
+            # capture is enough — reconcile_promoted_drafts replaces top-level
+            # keys, never mutates nested objects in place).
+            before_by_id = {
+                c['id']: dict(c)
+                for c in captures_registry.get('captures', [])
+                if isinstance(c, dict) and c.get('id')
+            }
             if verify_fn is None:
                 try:
                     verify_fn = gc._default_completion_verify_fn()
@@ -348,12 +357,28 @@ def run_drain(
                 except Exception as e:  # noqa: BLE001 — fail-safe: report, never corrupt
                     gc.log(f'drain: promoted-draft pass raised: {type(e).__name__}: {e}')
                     promoted = PromotedDrainResult()
-                # Write the captures delta atomically; the GC healer commits it
-                # (single-committer invariant — the drain never commits).
+                # Write the captures delta; the GC healer commits it (single-
+                # committer invariant — the drain never commits). The verify loop
+                # above can span minutes of `gh pr view` round-trips on a stale
+                # board, during which the GC daemon or the dashboard ingest (both
+                # SEPARATE processes) may add or state-change a capture. Writing
+                # the stale in-memory snapshot back wholesale would clobber those
+                # (#409→#413 lost-update class, spec § 2). So mirror the healer's
+                # guard: re-read FRESH and apply only this run's per-capture field
+                # deltas by id, shrinking the read→write window to sub-millisecond.
                 if promoted.changed and not dry_run:
                     try:
-                        gc.atomic_write_captures(cap_path, captures_registry)
-                    except OSError as e:
+                        fresh = gc.read_captures_registry(cap_path)
+                        if fresh is None:
+                            gc.log('drain: captures.json re-read malformed before '
+                                   'write — skipping write (avoids clobbering with stale)')
+                        else:
+                            merged = gc._merge_capture_deltas(
+                                fresh, before_by_id, captures_registry)
+                            gc.atomic_write_captures(cap_path, fresh)
+                            gc.log(f'drain: captures.json write: merged {merged} '
+                                   'capture delta(s) onto a fresh re-read (lost-update guard)')
+                    except Exception as e:  # noqa: BLE001 — fail-safe
                         gc.log(f'drain: captures.json write failed: {type(e).__name__}: {e}')
 
     # --- pass B: surface unattended proposed-lane items ---
