@@ -130,6 +130,7 @@ def emit_event(
     table: str = 'chain_events',
     logger: Optional[logging.Logger] = None,
     client: Optional[Any] = None,
+    id_extra: Optional[str] = None,
 ) -> bool:
     """Direct-write a single chain_event row. Best-effort; never raises.
 
@@ -143,8 +144,16 @@ def emit_event(
     event_type → WARN + return False, no insert attempted.
 
     `ts` defaults to now (UTC ISO-8601). The event_id is deterministic
-    over (task_id, event_type, ts) so two emitters racing on the same
-    semantic event upsert to the same row.
+    over (task_id, event_type, ts[, id_extra]) so two emitters racing on
+    the same semantic event upsert to the same row.
+
+    `id_extra` is the optional `compute_event_id` disambiguator. A push
+    writer that ALSO ships the same event via the poll path (the shipper's
+    log-tail) must pass the exact (normalized ts, id_extra) the shipper's
+    `parse_log_line` will derive, so the deterministic event_id matches and
+    the PK absorbs the later poll-source row instead of double-writing. See
+    `outbox_notifier._emit_auto_merge_chain_event` for the auto_merge parity
+    case. Pure push-only event types (no log line shipped) omit it.
 
     `client` arg is for tests; production callers omit it and the module
     builds + caches its own client.
@@ -158,7 +167,7 @@ def emit_event(
         )
         return False
     use_ts = ts or ces.datetime.now(ces.timezone.utc).isoformat()
-    event_id = ces.compute_event_id(task_id, event_type, use_ts)
+    event_id = ces.compute_event_id(task_id, event_type, use_ts, extra=id_extra)
     row: dict[str, Any] = {
         'event_id': event_id,
         'ts': use_ts,
