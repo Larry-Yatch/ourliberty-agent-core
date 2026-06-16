@@ -89,7 +89,8 @@
       },
       "spawned": null,
       "spawned_phase": null,
-      "spawned_pr_url": null
+      "spawned_pr_url": null,
+      "spawned_expected_cost_usd": null
     },
     {
       "capture_id": "cap-fresh-two",
@@ -106,7 +107,8 @@
       "briefing_provenance": null,
       "spawned": null,
       "spawned_phase": null,
-      "spawned_pr_url": null
+      "spawned_pr_url": null,
+      "spawned_expected_cost_usd": null
     }
   ]
 }

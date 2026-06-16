@@ -620,6 +620,12 @@ class CaptureActionResponse(BaseModel):
     state: Optional[str] = None
     applied: Optional[bool] = None
     snoozed_until: Optional[str] = None
+    # Phase S (S7): a pause(=snooze)/drop on a card whose linked work is in-flight
+    # is recorded (not applied) so it never interrupts the run — applied={false},
+    # deferred={true}, and pending_action carries the action the healer replays
+    # after a safe stop.
+    deferred: Optional[bool] = None
+    pending_action: Optional[dict[str, Any]] = None
 
 
 class CaptureThreadMessage(BaseModel):
@@ -3266,12 +3272,24 @@ def _meaning_layer_fields(cap: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _spawned_expected_cost_usd(raw: dict[str, Any]) -> Optional[float]:
+    """Phase S (S6): the work's *estimated* cost captured on the spawned ref
+    (`expected_cost_usd`, sourced from the build-sequence step's estimate), as a
+    number — or None when absent/non-numeric. A bool is rejected (JSON booleans
+    are ints in Python, but a cost is never a flag)."""
+    v = raw.get('expected_cost_usd')
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return None
+    return float(v)
+
+
 def _spawned_fields(
     cap: dict[str, Any],
     events_by_task_id: dict[str, list[dict[str, Any]]],
 ) -> dict[str, Any]:
-    """Phase S (S1/S2): echo the capture's `spawned` ref (the join key back to the
-    work the card created) plus the linked work's derived phase + pr_url.
+    """Phase S (S1/S2/S6): echo the capture's `spawned` ref (the join key back to
+    the work the card created) plus the linked work's derived phase + pr_url and
+    the work's estimated cost (S6).
 
     The phase is computed through the EXISTING chain_events derive
     (`derive_phase_for_task`) — Phase S adds no new state machine. The `spawned`
@@ -3280,17 +3298,23 @@ def _spawned_fields(
 
     `spawned_phase` stays None until the linked work emits its first chain_event:
     a freshly-delegated card whose work hasn't started surfaces None (neutral),
-    never a misleading 'ready' from an empty event list."""
+    never a misleading 'ready' from an empty event list.
+
+    `spawned_expected_cost_usd` (S6) echoes the build-sequence step's estimated
+    cost stamped on the ref, degrading to None — a card whose spawned ref carries
+    no estimate surfaces no cost rather than a misleading 0."""
     raw = cap.get('spawned')
     if not isinstance(raw, dict):
-        return {'spawned': None, 'spawned_phase': None, 'spawned_pr_url': None}
+        return {'spawned': None, 'spawned_phase': None, 'spawned_pr_url': None,
+                'spawned_expected_cost_usd': None}
     ref: dict[str, Any] = {}
     for k in ('task_id', 'kind', 'mission_id', 'stamped_at'):
         v = raw.get(k)
         if isinstance(v, str) and v:
             ref[k] = v
     if not ref:
-        return {'spawned': None, 'spawned_phase': None, 'spawned_pr_url': None}
+        return {'spawned': None, 'spawned_phase': None, 'spawned_pr_url': None,
+                'spawned_expected_cost_usd': None}
 
     phase: Optional[str] = None
     pr_url: Optional[str] = None
@@ -3300,7 +3324,8 @@ def _spawned_fields(
         if events:
             phase = derive_phase_for_task(events, None)
             pr_url = summarize_task_events(events)['pr_url']
-    return {'spawned': ref, 'spawned_phase': phase, 'spawned_pr_url': pr_url}
+    return {'spawned': ref, 'spawned_phase': phase, 'spawned_pr_url': pr_url,
+            'spawned_expected_cost_usd': _spawned_expected_cost_usd(raw)}
 
 
 def _parked_spawned_task_ids(captures: list[dict[str, Any]]) -> list[str]:
@@ -4274,18 +4299,82 @@ def _require_parked(cap: dict[str, Any], capture_id: str) -> None:
         )
 
 
+# Phase S (S7): a pause(=snooze)/drop on a card whose linked work is in-flight
+# must NOT interrupt the run (spec § 3 S7). The action is recorded as a
+# `pending_action` and applied by heal_missions_card_gc only after the work
+# reaches a safe stop. `promote` is excluded — it creates new work rather than
+# pausing the running work, so it never defers.
+_IN_FLIGHT_PHASES = frozenset({'in_flight', 'awaiting_merge'})
+
+
+def _spawned_work_in_flight(cap: dict[str, Any], supabase_client: Any) -> bool:
+    """True iff the capture's spawned work is currently in-flight (spec § 3 S7).
+
+    Uses the SAME chain_events phase-derive the parked lane surfaces
+    (`derive_phase_for_task`) so the in-flight gate matches what the board shows —
+    no parallel state machine. Conservative: a card with no spawned task_id, or
+    whose work has emitted no events yet, is NOT in-flight (the action applies
+    immediately) — only KNOWN-in-flight work defers.
+
+    A detected terminal FAILURE is a safe stop, not in-flight (S4<->S7): failed
+    work keeps its `session_start` but never merges, so `derive_phase_for_task`
+    would report in_flight/awaiting_merge forever — without this short-circuit a
+    pause/drop on a failed card would defer indefinitely and never apply. Reuses
+    the SAME recognizer the S4 ring uses
+    (`build_sequence_advancer.chain_event_says_failed`) so both sides agree on
+    what "failed" means."""
+    spawned = cap.get('spawned')
+    if not isinstance(spawned, dict):
+        return False
+    task_id = spawned.get('task_id')
+    if not (isinstance(task_id, str) and task_id):
+        return False
+    import build_sequence_advancer as bsa  # noqa: PLC0415
+    if bsa.chain_event_says_failed(supabase_client, task_id):
+        return False
+    events = _fetch_events_for_task_ids(supabase_client, [task_id]).get(task_id) or []
+    if not events:
+        return False
+    return derive_phase_for_task(events, None) in _IN_FLIGHT_PHASES
+
+
+def _make_pending_action(
+    action: str, args: dict[str, Any], now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """The `pending_action` record stamped on a card when a pause/drop is deferred
+    behind in-flight work (spec § 3 S7). Carries the action + its non-null args so
+    heal_missions_card_gc replays the exact intent after the safe stop."""
+    return {
+        'action': action,
+        'args': {k: v for k, v in args.items() if v is not None},
+        'requested_at': _now_utc_iso(now),
+    }
+
+
+def _defer_response(pending: dict[str, Any]) -> dict[str, Any]:
+    """The response for an action deferred behind in-flight work (spec § 3 S7):
+    recorded, not applied — the healer applies it after a safe stop."""
+    return {'applied': False, 'deferred': True, 'pending_action': pending}
+
+
 def _handle_capture_snooze(
     *,
     capture_id: str,
     snoozed_until: Any,
     captures_path: Path,
     now: Optional[datetime] = None,
+    in_flight_resolver: Optional[Callable[[dict[str, Any]], bool]] = None,
 ) -> dict[str, Any]:
     """`snooze` — set or clear a capture's `snoozed_until` (§ 4.3). DIRECT write
     via the single captures.json committer (NOT PR-backed): `snoozed_until=None`
     clears the snooze; an ISO-8601 datetime defers resurfacing until it passes.
     Returns {applied: True, snoozed_until}. 404 if no such capture; 409 if it
-    isn't parked; 400 on a malformed or non-future date."""
+    isn't parked; 400 on a malformed or non-future date.
+
+    Phase S (S7): if ``in_flight_resolver`` reports the card's linked work
+    in-flight, the snooze is RECORDED as a pending_action (not applied) and
+    {applied: False, deferred: True, pending_action} is returned — the healer
+    applies it once the work reaches a safe stop, never interrupting the run."""
     now = now or datetime.now(timezone.utc)
     parsed: Optional[datetime] = None
     if snoozed_until is not None:
@@ -4305,6 +4394,16 @@ def _handle_capture_snooze(
         registry = _read_captures_registry(captures_path)
         cap = _find_capture(registry['captures'], capture_id)
         _require_parked(cap, capture_id)
+        if in_flight_resolver is not None and in_flight_resolver(cap):
+            pending = _make_pending_action(
+                'snooze',
+                {'snoozed_until': parsed.isoformat() if parsed else None},
+                now,
+            )
+            cap['pending_action'] = pending
+            registry['schema_version'] = CAPTURES_SCHEMA_VERSION
+            _atomic_write_captures(captures_path, registry)
+            return _defer_response(pending)
         cap['snoozed_until'] = parsed.isoformat() if parsed else None
         registry['schema_version'] = CAPTURES_SCHEMA_VERSION
         _atomic_write_captures(captures_path, registry)
@@ -4456,6 +4555,7 @@ def _handle_capture_drop(
     reason: Any,
     captures_path: Path,
     now: Optional[datetime] = None,
+    in_flight_resolver: Optional[Callable[[dict[str, Any]], bool]] = None,
 ) -> dict[str, Any]:
     """`drop` — retire a capture (§ 4.2). One-click DIRECT write through the
     single captures.json committer (NOT PR-backed — mirrors `snooze`): sets
@@ -4464,7 +4564,12 @@ def _handle_capture_drop(
     the delta on its next tick and collapses the card to the dropped lane. Never
     a silent delete — that GC commit IS the audit record. Returns
     {applied: True, state: 'dropped'}. 404 if no such capture; 409 if it isn't
-    parked; 400 on a non-string reason."""
+    parked; 400 on a non-string reason.
+
+    Phase S (S7): if ``in_flight_resolver`` reports the card's linked work
+    in-flight, the drop is RECORDED as a pending_action (not applied) and
+    {applied: False, deferred: True, pending_action} is returned — the healer
+    drops the card once the work reaches a safe stop, never interrupting the run."""
     if reason is not None and not isinstance(reason, str):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -4475,6 +4580,13 @@ def _handle_capture_drop(
         registry = _read_captures_registry(captures_path)
         cap = _find_capture(registry['captures'], capture_id)
         _require_parked(cap, capture_id)
+
+        if in_flight_resolver is not None and in_flight_resolver(cap):
+            pending = _make_pending_action('drop', {'reason': reason}, now)
+            cap['pending_action'] = pending
+            registry['schema_version'] = CAPTURES_SCHEMA_VERSION
+            _atomic_write_captures(captures_path, registry)
+            return _defer_response(pending)
 
         cap['state'] = 'dropped'
         if reason:
@@ -4494,12 +4606,18 @@ def _handle_capture_action(
     missions_path: Path,
     queue_dir: Path,
     now: Optional[datetime] = None,
+    in_flight_resolver: Optional[Callable[[dict[str, Any]], bool]] = None,
 ) -> dict[str, Any]:
     """Dispatch POST /api/missions/captures/{id}/action to the per-action
     handler. All three are one-click (no PR): `promote` queues the mission +
     flips the capture → {mission_id, status:'queued', applied}; `drop` and
     `snooze` are direct captures.json committer writes → {applied, state} /
-    {applied, snoozed_until}. Unknown action → 400."""
+    {applied, snoozed_until}. Unknown action → 400.
+
+    Phase S (S7): ``in_flight_resolver`` is threaded into the pausing actions
+    (`drop`/`snooze`) so one whose linked work is in-flight is recorded as a
+    pending_action instead of applied. `promote` creates new work rather than
+    pausing the running work, so it never defers."""
     if action == 'promote':
         return _handle_capture_promote(
             capture_id=capture_id,
@@ -4518,6 +4636,7 @@ def _handle_capture_action(
             reason=args.get('reason'),
             captures_path=captures_path,
             now=now,
+            in_flight_resolver=in_flight_resolver,
         )
     if action == 'snooze':
         return _handle_capture_snooze(
@@ -4525,6 +4644,7 @@ def _handle_capture_action(
             snoozed_until=args.get('snoozed_until'),
             captures_path=captures_path,
             now=now,
+            in_flight_resolver=in_flight_resolver,
         )
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
@@ -6404,6 +6524,14 @@ def post_capture_action(
     body: CaptureActionRequest,
     actor: str = Depends(_require_actor),
 ) -> dict[str, Any]:
+    # Phase S (S7): the in-flight gate uses the live chain_events client. When no
+    # client is available (no creds) it stays None so the resolver is skipped —
+    # the action applies immediately rather than being held indefinitely.
+    client = _get_larry_action_supabase_client()
+    in_flight_resolver = (
+        (lambda cap: _spawned_work_in_flight(cap, client))
+        if client is not None else None
+    )
     return _handle_capture_action(
         capture_id=capture_id,
         action=body.action,
@@ -6411,6 +6539,7 @@ def post_capture_action(
         captures_path=_captures_json_path(),
         missions_path=_missions_json_path(),
         queue_dir=_new_mission_queue_dir(),
+        in_flight_resolver=in_flight_resolver,
     )
 
 

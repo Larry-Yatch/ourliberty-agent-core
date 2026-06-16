@@ -35,6 +35,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_REPO_SCRIPTS) not in sys.path:
@@ -113,9 +114,16 @@ class _ActionsTestBase(unittest.TestCase):
         self._orig_queue_dir = da._new_mission_queue_dir
         self._orig_github = da._github_api_request
         self._orig_gh_token = da._github_token
+        self._orig_la_client = da._get_larry_action_supabase_client
         da._captures_json_path = lambda: self.captures_path  # type: ignore[assignment]
         da._missions_json_path = lambda: self.missions_path  # type: ignore[assignment]
         da._new_mission_queue_dir = lambda: self.queue_dir  # type: ignore[assignment]
+        # Phase S (S7): the route resolves the in-flight gate from the live
+        # chain_events client. Pin it to None so the resolver is skipped (actions
+        # apply immediately, as before) — the defer/apply branch is covered by
+        # InFlightDeferTest with an injected resolver, and a real SUPABASE_URL in
+        # the env would otherwise trip the test-isolation guard.
+        da._get_larry_action_supabase_client = lambda: None  # type: ignore[assignment]
         self.gh = _GithubRecorder()
         da._github_api_request = self.gh  # type: ignore[assignment]
 
@@ -127,6 +135,7 @@ class _ActionsTestBase(unittest.TestCase):
         da._new_mission_queue_dir = self._orig_queue_dir  # type: ignore[assignment]
         da._github_api_request = self._orig_github  # type: ignore[assignment]
         da._github_token = self._orig_gh_token  # type: ignore[assignment]
+        da._get_larry_action_supabase_client = self._orig_la_client  # type: ignore[assignment]
         if self._prev_gh_token is None:
             os.environ.pop('GITHUB_TOKEN', None)
         else:
@@ -382,6 +391,123 @@ class DropTest(_ActionsTestBase):
         self.assertEqual(r.status_code, 409, r.text)
         self.assertEqual(self.gh.calls, [])
         self.assertEqual(self.captures_path.read_text(), before)
+
+
+# ====== S7: in-flight overrules a late pause (drop/snooze defer, never interrupt) ======
+
+
+class InFlightDeferTest(_ActionsTestBase):
+    """A pause(=snooze)/drop on a card whose linked work is in-flight is RECORDED
+    as a pending_action (not applied) so the run is never interrupted; the same
+    action on a card whose work has reached a safe stop applies immediately. The
+    handlers are called directly with an injected resolver — the route resolves
+    the resolver from the live chain_events client (covered by _spawned_work_in_flight
+    unit coverage), so injecting here keeps the defer/apply branch deterministic."""
+
+    FUTURE = '2099-01-01T00:00:00+00:00'
+
+    def _drop(self, cap, *, in_flight, reason='stale'):
+        self._seed(cap)
+        return da._handle_capture_drop(
+            capture_id=cap['id'], reason=reason,
+            captures_path=self.captures_path,
+            in_flight_resolver=lambda _c: in_flight)
+
+    def _snooze(self, cap, *, in_flight):
+        self._seed(cap)
+        return da._handle_capture_snooze(
+            capture_id=cap['id'], snoozed_until=self.FUTURE,
+            captures_path=self.captures_path,
+            in_flight_resolver=lambda _c: in_flight)
+
+    def test_drop_defers_when_in_flight(self):
+        out = self._drop(_cap('cap-1'), in_flight=True, reason='obsolete')
+        self.assertFalse(out['applied'])
+        self.assertTrue(out['deferred'])
+        self.assertEqual(out['pending_action']['action'], 'drop')
+        self.assertEqual(out['pending_action']['args'], {'reason': 'obsolete'})
+        self.assertIn('requested_at', out['pending_action'])
+        # the card is NOT dropped — the run continues; the intent is recorded.
+        cap = next(c for c in self._read_local()['captures'] if c['id'] == 'cap-1')
+        self.assertEqual(cap['state'], 'parked')
+        self.assertEqual(cap['pending_action']['action'], 'drop')
+
+    def test_drop_applies_when_not_in_flight(self):
+        out = self._drop(_cap('cap-1'), in_flight=False)
+        self.assertTrue(out['applied'])
+        self.assertEqual(out['state'], 'dropped')
+        cap = next(c for c in self._read_local()['captures'] if c['id'] == 'cap-1')
+        self.assertEqual(cap['state'], 'dropped')
+        self.assertNotIn('pending_action', cap)
+
+    def test_snooze_defers_when_in_flight(self):
+        out = self._snooze(_cap('cap-1'), in_flight=True)
+        self.assertFalse(out['applied'])
+        self.assertTrue(out['deferred'])
+        self.assertEqual(out['pending_action']['action'], 'snooze')
+        self.assertEqual(out['pending_action']['args']['snoozed_until'], self.FUTURE)
+        cap = next(c for c in self._read_local()['captures'] if c['id'] == 'cap-1')
+        self.assertEqual(cap['state'], 'parked')
+        self.assertNotIn('snoozed_until', cap)  # not applied yet
+        self.assertEqual(cap['pending_action']['action'], 'snooze')
+
+    def test_snooze_applies_when_not_in_flight(self):
+        out = self._snooze(_cap('cap-1'), in_flight=False)
+        self.assertTrue(out['applied'])
+        self.assertEqual(out['snoozed_until'], self.FUTURE)
+        cap = next(c for c in self._read_local()['captures'] if c['id'] == 'cap-1')
+        self.assertEqual(cap['snoozed_until'], self.FUTURE)
+        self.assertNotIn('pending_action', cap)
+
+    def test_no_resolver_applies_directly(self):
+        # Backward-compatible: with no resolver the action applies as before.
+        self._seed(_cap('cap-1'))
+        out = da._handle_capture_drop(
+            capture_id='cap-1', reason=None, captures_path=self.captures_path)
+        self.assertTrue(out['applied'])
+        self.assertEqual(out['state'], 'dropped')
+
+
+class SpawnedWorkInFlightTest(unittest.TestCase):
+    """S4<->S7: the in-flight gate (`_spawned_work_in_flight`) must treat a detected
+    terminal failure as a safe stop. Failed work keeps its `session_start` but never
+    merges, so `derive_phase_for_task` would report it in-flight forever — without the
+    failure short-circuit a deferred pause/drop on a failed card would never apply."""
+
+    @staticmethod
+    def _cap(task_id='delegate-x'):
+        return {'spawned': {'kind': 'delegate', 'task_id': task_id}}
+
+    def test_no_spawned_ref_is_not_in_flight(self):
+        self.assertFalse(da._spawned_work_in_flight({}, object()))
+
+    def test_no_task_id_is_not_in_flight(self):
+        self.assertFalse(da._spawned_work_in_flight({'spawned': {}}, object()))
+
+    def test_failure_is_safe_stop_short_circuits_before_fetch(self):
+        import build_sequence_advancer as bsa
+        with mock.patch.object(bsa, 'chain_event_says_failed',
+                               return_value='forge_reject: tests broke'), \
+                mock.patch.object(da, '_fetch_events_for_task_ids') as fetch:
+            self.assertFalse(da._spawned_work_in_flight(self._cap(), object()))
+            fetch.assert_not_called()
+
+    def test_in_flight_when_not_failed(self):
+        import build_sequence_advancer as bsa
+        events = [{'task_id': 'delegate-x', 'event_type': 'session_start',
+                   'agent': 'forge', 'pr_url': None,
+                   'ts': '2026-06-15T10:00:00+00:00', 'payload': {}}]
+        with mock.patch.object(bsa, 'chain_event_says_failed', return_value=None), \
+                mock.patch.object(da, '_fetch_events_for_task_ids',
+                                  return_value={'delegate-x': events}):
+            self.assertTrue(da._spawned_work_in_flight(self._cap(), object()))
+
+    def test_no_events_and_not_failed_is_not_in_flight(self):
+        import build_sequence_advancer as bsa
+        with mock.patch.object(bsa, 'chain_event_says_failed', return_value=None), \
+                mock.patch.object(da, '_fetch_events_for_task_ids',
+                                  return_value={}):
+            self.assertFalse(da._spawned_work_in_flight(self._cap(), object()))
 
 
 # ==================== dispatch ====================

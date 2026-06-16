@@ -1046,6 +1046,35 @@ class SpawnedRefDeriveTest(unittest.TestCase):
         self.assertEqual(
             self._parked_by_id(rows)['cap-x']['spawned_phase'], 'shipped')
 
+    # ---------- S6: the work's estimated cost on the card ----------
+
+    def test_spawned_expected_cost_surfaces_on_the_card(self) -> None:
+        ref = {'kind': 'delegate', 'task_id': 'delegate-cap-x',
+               'expected_cost_usd': 2.5}
+        self._seed_captures(self._parked_cap('cap-x', spawned=ref))
+        p = self._parked_by_id([])['cap-x']
+        self.assertEqual(p['spawned_expected_cost_usd'], 2.5)
+
+    def test_missing_cost_is_none_not_zero(self) -> None:
+        ref = {'kind': 'delegate', 'task_id': 'delegate-cap-x'}
+        self._seed_captures(self._parked_cap('cap-x', spawned=ref))
+        self.assertIsNone(
+            self._parked_by_id([])['cap-x']['spawned_expected_cost_usd'])
+
+    def test_non_numeric_or_bool_cost_degrades_to_none(self) -> None:
+        for bad in ('lots', True, None, [1]):
+            with self.subTest(cost=bad):
+                ref = {'kind': 'delegate', 'task_id': 'delegate-cap-x',
+                       'expected_cost_usd': bad}
+                self._seed_captures(self._parked_cap('cap-x', spawned=ref))
+                self.assertIsNone(
+                    self._parked_by_id([])['cap-x']['spawned_expected_cost_usd'])
+
+    def test_no_spawned_ref_carries_none_cost(self) -> None:
+        self._seed_captures(self._parked_cap('cap-plain'))
+        self.assertIsNone(
+            self._parked_by_id([])['cap-plain']['spawned_expected_cost_usd'])
+
 
 if __name__ == '__main__':
     unittest.main()

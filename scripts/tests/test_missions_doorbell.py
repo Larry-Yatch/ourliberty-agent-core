@@ -120,6 +120,22 @@ class RingDoorbellTest(unittest.TestCase):
         self.assertEqual(tkw['decision'], 'ring-blocked-on-you')
         self.assertEqual(tkw['route'], 'escalate')
 
+    def test_detail_reason_replaces_generic_blocked_phrasing(self):
+        # S4 failure ring-back: a plain-English reason is surfaced in the message
+        # in place of the generic "team has a question" phrasing.
+        with mock.patch.object(md, 'larry_alerts') as alerts, \
+                mock.patch.object(md, 'alert_triage_state'):
+            alerts.append_alert.return_value = True
+            md.ring_doorbell(
+                capture_id='cap-d', blocked=True, risk='careful',
+                title='Ship it?', deep_link='https://dash/cap-d',
+                detail='forge_reject: tests broke')
+        _, akw = alerts.append_alert.call_args
+        self.assertIn('Linked work for "Ship it?" needs you', akw['message'])
+        self.assertIn('forge_reject: tests broke', akw['message'])
+        self.assertNotIn('has a question', akw['message'])
+        self.assertIn('https://dash/cap-d', akw['message'])
+
     def test_fyi_rings_quiet_digest_tier4(self):
         with mock.patch.object(md, 'larry_alerts') as alerts, \
                 mock.patch.object(md, 'alert_triage_state') as triage:
