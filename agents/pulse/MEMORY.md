@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-16 23:57Z UTC (Iter ~2078, Tier 1, consecutive_clean=0→1, NOMINAL)
+
+**Iter ~2078 summary:** ✅ Nominal. 1 Tier-3 alert (L1058 heal-stale-daemon-code auto-restarted dashboard_api; known pattern, digest-only). All 5 daemons alive (dashboard_api new PID 3688711 post-restart, PR #551 code live). Repo HEAD=18b08f31=origin/main (clean). Last sync 23:29:16Z (~28 min). No stalls. pending=0. Credential rotation: all clear. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs.** projects-v3-p1 SEQUENCE COMPLETE ✅. PRIME ratio=20.39 (999 interventions, 49 systemic fixes). **Tier 1, consecutive_clean=0→1.**
+
 ## Status snapshot — updated 2026-06-16 23:52Z UTC (Iter ~2077, Tier 1, consecutive_clean=2→0, DRIFT/FIXED)
 
 **Iter ~2077 summary:** ⚠️ Drift (auto-fixed). 0 new alerts. All 5 daemons alive (beacon 3556778, chain-event 2744551, inbox-watcher 3434697, outbox_notifier 3676902, dashboard_api 3593488). Repo HEAD=bb6ab1b3→822c24d2=origin/main (fast-forwarded, clean). Last sync 23:29:16Z (~23 min). No stalls. pending=0. Credential rotation: all clear. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs.** **projects-v3-p1 SEQUENCE COMPLETE ✅** (PR #551 p1-funnel-derive C4 MERGED 23:44:39Z). PRIME ratio=20.37 (999 interventions, 49 systemic fixes). **Tier 1, consecutive_clean=2→0.**

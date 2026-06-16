@@ -4,6 +4,61 @@
 
 ---
 
+## Iteration ~2078 — 2026-06-16 23:57Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0→1, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 1 Tier-3 alert (known pattern, no DM). All mandatory checks clean.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** 0 open PRs across all three repos. ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** Not open. ✅
+- **projects-v3-p1 SEQUENCE COMPLETE ✅ CONFIRMED:** PR #551 merged iter ~2077. 0 open PRs. ✅
+- **Pending approvals — CLEAR ✅:** pending=0. ✅
+- **Daemons alive ✅:** beacon 3556778 (Ss), chain-event 2744551 (SNs), inbox-watcher 3434697 (Ssl), outbox_notifier 3676902 (Ss), dashboard_api NEW PID 3688711 (Ssl, post-restart). All 5 alive. ✅
+
+**Check 0 — Alert triage:** Watermark=1057 entering; file=1058 lines. **1 new alert (L1058):** `source=heal-stale-daemon-code`, `subject=auto-restarted:ourliberty-dashboard-api.service`, ts=23:53:51Z, route=digest. Helper: **Tier-3 silence** (known-pattern match in `config/alert-translations.json`). Bot already delivered as digest, no DM. Dashboard_api restarted to pick up PR #551's updated `scripts/dashboard_api.py`. Watermark advanced to 1058. ✅ Nominal (no tier-reset per Tier-3 carve-out).
+
+**Check 1 — Log noise:** outbox_notifier.log — no WARN/ERROR since iter ~2077. Bot log last significant entries: idx=1056 mirror-dag-pass delivered 17:28:06 MDT; idx=1057 dashboard-api restart digest skipped 17:53:52 MDT. No new WARN/ERROR beyond the known-pattern MalformedForgeMarker retry (covered G-rule PR #524). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message 16:25:01 MDT (22:25Z) 'go' — served iter ~2070. No new messages. G-rule telegram-409-burst **2/3** unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → `no stalls detected`. All FORGE_NO_PR_SKIP entries reason=pr_exists or preflight_exit. ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0. No orphaned Larry directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-16T23:53:46Z, age≈4 min at check time. FRESH (< 60 min threshold). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=18b08f31=origin/main. Working tree clean, on main, no divergence. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-16T23:29:16Z, status=no-change, age≈28 min at check time. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3556778 (Ss) ✅, chain_event_shipper 2744551 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, outbox_notifier 3676902 (Ss) ✅, dashboard_api 3688711 (Ssl) ✅. All 5 alive. Note: dashboard_api has new PID (was 3593488; restarted by heal-stale-daemon-code at 23:53:46Z to deploy PR #551 code). ✅ Nominal.
+
+**Check E — PRs:**
+- ourliberty-agent-core: **0 open PRs.** ✅
+- ourliberty-dashboard: **0 open PRs.** ✅
+- ourliberty-graph: **0 open PRs.** ✅
+
+**Check H — Forge digest:** projects-v3-p1 sequence COMPLETE ✅ (all 4 steps merged as of iter ~2077). No active sequences. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → `OK: schema_version=1 validates`. ✅ Nominal.
+
+**Conditional checks (Tuesday 2026-06-17 UTC, weekday=1):** Check I fires Mon/Wed/Fri/Sun → skip. Check III fires Sunday → skip.
+
+**G-rule tracking:** No new G-rule counts this iter. All counts unchanged from iter ~2077.
+
+**Actions taken:**
+1. PRIME ledger: `iter_clean` appended (tier=1, template=iter-clean, ts=2026-06-16T23:57:52Z).
+2. Tier state: `record --checks-clean true` → consecutive_clean 0→1. Tier 1 unchanged (need 3 consecutive clean to de-escalate to Tier 2).
+3. Alert watermark: advanced 1057→1058.
+
+**PRIME ratio:** 20.39 (999 interventions, 49 systemic fixes). Trend: improving.
+
+**Dispatches:** None.
+
+---
+
 ## Iteration ~2077 — 2026-06-16 23:52Z UTC (interactive, /cycle, Tier 1, consecutive_clean=2→0, DRIFT/FIXED)
 
 **Trigger:** Larry direct invocation (`/cycle`).
