@@ -4,6 +4,78 @@
 
 ---
 
+## Iteration ~2035 — 2026-06-16 09:56Z UTC (interactive, /cycle, Tier 1, consecutive_clean=1→2)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 1 new alert (L1045 Tier-3 silenced). All mandatory checks clean. Phase S pipeline active: s-4 build-phase in progress, s-5 pre-flight clarification round 1 active. Watermark rotation gap found and repaired.
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #543 MERGED ✅ CONFIRMED:** Verified in outbox-notifier.log: `AUTO_MERGE … outcome=merged` at 09:32:24Z UTC, `SEQUENCE_STEP_MERGED seq=missions-v2-phase-s step=s-3-failure-cost-pause`. unreg-approval-2639d31d157f is definitively moot. ✅
+- **Phase S s-4 UPDATE:** iter ~2034 noted build-phase dispatched 09:43:07Z. VERIFIED: outbox-notifier.log confirms `classified forge proceed marker … task='s-4-freshness'` at 09:43:07Z, `build-phase dispatched forge <- beacon (task=s-4-freshness, resume=1419994c-3d0...)`. Forge inbox has `build-s-4-freshness.json` (created 09:43Z). `wt-forge-s-4-freshness` worktree active. ~13 min into build. Within 2h window. ✅
+- **Phase S s-5 UPDATE:** iter ~2034 noted pre-flight started 09:43:13Z. VERIFIED NOW (new state since last iter): Forge hit CLARIFY_REQUEST at 09:48:03Z (session 30edf107-6fe); outbox-notifier dispatched clarification-response to Forge at 09:52:19Z (`resume-s-5-board-ui-r1.json` in Forge inbox, created 09:52Z). Pipeline active, no stall. ✅ Materially changed from iter ~2034.
+- **dashboard_api PID UPDATED:** Old PID 3486940 is dead. heal-stale-daemon-code auto-restarted ourliberty-dashboard-api.service at 09:50:21Z (detected race-window during code update scan). New PID: 3540633 (Ssl, running). ✅
+- **PR #497 scope decision — CARRY CONFIRMED ✅:** UNKNOWN/"", updatedAt=2026-06-16T06:15:41Z (unchanged). Deadline Jun-17T04:02Z (~18h). Pending Larry reply.
+
+**Check 0 — Alert triage:** Watermark=1072 entering; file=1044 physical lines (rotation gap: file was compacted, 28 lines removed from top, watermark now higher than file). Standard `get-watermark`→read-lines-above would show 0 new lines. **BUT**: verified gap caused missed alert. Manually scanned tail: **1 new event at physical L1045:**
+- L1045: `source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-dashboard-api.service, severity=warning, ts=2026-06-16T09:50:21Z` — Triggered by code update from recent PR merges. Helper → **Tier-3 silence** (known-pattern match in alert-translations.json, route=digest). ✅
+Watermark repaired: advanced 1072 → 1045 (set to current file end to fix rotation gap; safe — all lines 1-1044 previously triaged). ✅
+
+**Check 1 — Log noise (outbox-notifier.log):** No new WARNs since iter ~2032's events (last WARN at 09:21:56Z MalformedMirrorMarker, already documented). Recent INFO since iter ~2034: s-3 MERGED 09:32:24Z ✅; s-4 build dispatched 09:43:07Z; s-5 CLARIFY_REQUEST 09:48:03Z; s-5 clarification-response dispatched 09:52:19Z. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot PID 3435953 alive (Ss). Last log entry: 09:40:10Z (idx=1071 digest skip, ~16 min ago). No new queued alerts. No 409 errors. G-rule telegram-409-burst **2/3** unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → "no stalls detected" at 09:49:23Z. s-4 build-phase active (~13 min), s-5 clarification-response in Forge inbox (~3 min). Both within window. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: pending=1 (`unreg-approval-2639d31d157f` for PR #543 scope decision). **MOOT** — PR #543 confirmed MERGED 09:32:24Z; approval self-resolves. No action. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-16T09:50:16Z, age≈6 min. FRESH. heal-stale-daemon-code ran at 09:50:21Z (auto-restarted=1, race-window=1, fresh=73, unparseable=50). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=39c99748=origin/main. Clean tree, on main, up to date. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-16T09:30:16Z, age≈26 min. FRESH. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3435953 (Ss) ✅, chain_event_shipper 2744551 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, **dashboard_api 3540633 (Ssl)** ✅ [new PID, restarted 09:50Z], outbox_notifier 3462678 (Ss) ✅. All 5 alive. ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (1 open):
+- **PR #497** (`fix(cleanup-branches): success-prune alert is info, not warning`): UNKNOWN/"". Scope decision with Larry (deadline Jun-17T04:02Z, ~18h). [yellow] carry.
+ourliberty-dashboard: **0 open PRs.** ✅
+
+**Conditional checks (Tuesday 2026-06-16 UTC, weekday=1):** Check I fires Mon/Wed/Fri/Sun — skip. Check III fires Sunday — skip.
+
+**G-rule tracking:**
+- **watermark-rotation-gap (NEW G-rule):** **2/3** — File compacted from 1072 physical lines to 1044; watermark (1072) left higher than file length, causing new alerts to be missed until detected and repaired. Prior occurrence: iter ~1936 (watermark 989 >> file 978). Systemic fix: auto-detect and repair watermark-rotation gap in cycle startup, OR fix the retention script to update the watermark file before truncating. Dispatch to Beacon at 3/3.
+- All other G-rule counts unchanged from iter ~2034.
+
+**Actions taken:**
+1. L1045 triage: Tier-3 silence (known-pattern, heal-stale-daemon-code restart). Watermark repaired 1072 → 1045.
+2. PRIME ledger: `iter_clean` appended (2026-06-16T09:56:50Z, tier=1).
+3. Tier state: `record --checks-clean true` → consecutive_clean=1→2, Tier 1.
+
+**Dispatches:** None.
+
+**Standing findings (carried):**
+- [yellow] **PR #497 scope decision** — `approve cleanup-branch-info` or `reject cleanup-branch-info`. Bot DM'd 07:07:50Z. Deadline Jun-17T04:02Z (~18h). [carry]
+- [yellow] **Phase S s-4-freshness BUILD-PHASE ACTIVE** — build-s-4-freshness.json in Forge inbox (09:43:07Z), ~13 min in. `wt-forge-s-4-freshness` active.
+- [yellow] **Phase S s-5-board-ui CLARIFY ROUND 1** — Beacon responded 09:52:19Z; `resume-s-5-board-ui-r1.json` in Forge inbox. Watch for CLARIFY_REQUEST resolution or PROCEED marker.
+- [yellow] **unreg-approval-2639d31d157f (PR #543)** — MOOT; PR merged. Self-resolves. [carry until cleared]
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519/530/531/534** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — pending Larry dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — FN=3027, TP=5. `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST **2/3**, merge_conflict_manual_rebase-tier4 1/3, heal-pipeline-stall-mirror-pass-unmerged-tier4 1/3, revision-phase-preamble-missing **2/3**, mirror-malformed-verdict-marker **1/3**, mirror-no-session-revision-loop **2/3**, **watermark-rotation-gap NEW 2/3**.
+- [blue] **Phase S: s-1 ✅ s-2 ✅ s-3 ✅ MERGED. s-4 build-phase active (~13 min). s-5 pre-flight clarification round 1 active. s-6 pending (deps: s-2 ✅ + s-4 🔄).**
+- [blue] **Stale bash orphans** — PIDs 1834248 + 2605007. Low CPU. [carry]
+
+**PRIME DIRECTIVE:** Clean iter. 0 interventions (watermark housekeeping = admin, not billable). ratio=20.27 (993 interventions, 49 systemic fixes), trend=improving.
+**Tier end-of-iter:** Tier 1, consecutive_clean=2 (1 more clean → Tier 2 de-escalation). Next cadence: 5-min.
+
+---
+
 ## Iteration ~2034 — 2026-06-16 09:45Z UTC (interactive, /cycle via /loop, Tier 1, consecutive_clean=0→1)
 
 **Trigger:** Larry direct invocation (`/loop /cycle`).
