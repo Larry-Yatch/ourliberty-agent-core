@@ -4,6 +4,65 @@
 
 ---
 
+## Iteration ~2074 — 2026-06-16 23:29Z UTC (interactive, /cycle, Tier 2→1, consecutive_clean=2→0, DRIFT/FIXED)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Drift (auto-fixed). 1 new alert (Tier-3 silence). Check A: repo behind 1 commit → fast-forwarded.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** 0 open PRs across dashboard, graph; 0 open on agent-core (PRs #549 + #550 both merged since last iter). ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** No such PR open. ✅
+- **Pending approvals — CLEAR ✅:** pending=0. ✅
+- **Daemons:** beacon 3556778 (Ss) ✅, chain-event 2744551 (SNs) ✅, inbox-watcher 3434697 (Ssl) ✅, outbox_notifier RESTARTED (old PID 3556624 down; new PIDs 3676902+3677736 alive) ✅, dashboard_api 3593488 (Ssl) ✅.
+
+**Check 0 — Alert triage:** Watermark=1056 entering; file=1057 lines. **1 new alert:**
+- L1057 `source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-outbox-notifier.service, route=digest, ts=2026-06-16T23:23:51Z` — helper: Tier-3 (known-pattern match) → silence, no DM. Watermark advanced 1056→1057. ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log: Last entries before restart — p1-target-repo AUTO_MERGE merged (#549) at 23:09:36Z, p1-drain-archive AUTO_MERGE merged (#550) at 23:19:03Z, headless-approval-request dispatched forge←beacon (p1-funnel-derive) at 23:20:34Z. Restart at 23:23:48Z (signal 15, clean exit, restarted). Post-restart last line: "outbox-notifier starting" — no subsequent output yet (new process just launched, nominal). inbox_watcher.log: Forge p1-funnel-derive started 23:20:38Z, worktree wt-forge-p1-funnel-derive, model=claude-opus-4-8 — IN PROGRESS (≈9 min elapsed). No WARN/ERROR. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message 16:25:01 MDT (22:25Z) 'go' — served iter ~2070 (dag-preflight-projects-v3-p1 approved + dispatched). No new messages. G-rule telegram-409-burst **2/3** unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → `no stalls detected`. All FORGE_NO_PR_SKIP entries reason=pr_exists (Phase S completed PRs). ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0. No orphaned Larry directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-16T23:23:46Z, age≈5 min at check time. FRESH (< 60 min threshold). ✅ Nominal.
+
+**Check A — Source repo:** Repo was **behind origin/main by 1 commit** (HEAD=c1842eaf, ORIGIN=e41da8ea). Working tree clean, on main. **Auto-fixed: `git pull --ff-only` → c1842eaf→e41da8ea.** New commit is PR #550 merge: `Drain terminal orphan proposals + archive legacy drafts (spec §4 C2/C3)` — brings in updated `scripts/heal_missions_board_drain.py` (+400 lines) and new test file `scripts/tests/test_heal_missions_board_drain.py` (+329 lines). Tier-reset applied.
+
+**Check B — Sync health:** last_sync=2026-06-16T22:29:31Z, status=success. Age≈60 min at check time. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon 3556778 ✅, chain_event_shipper 2744551 ✅, inbox_watcher 3434697 ✅, outbox_notifier restarted at 23:23:48Z by heal-stale-daemon-code (script mtime 769.5 min newer than active-since; new code from PR #549 chain_envelope derive now live; new PIDs 3676902+3677736 alive) ✅, dashboard_api 3593488 ✅. All 5 daemons alive. ✅ Nominal.
+
+**Check E — PRs:**
+- ourliberty-agent-core: **0 open PRs.** Both #549 (p1-target-repo, merged 23:09:36Z) and #550 (p1-drain-archive, merged 23:19:03Z) merged since iter ~2073. ✅
+- ourliberty-dashboard: **0 open PRs.** ✅
+- ourliberty-graph: **0 open PRs.** ✅
+
+**Check H — Forge digest:** projects-v3-p1 sequence ACTIVE and advancing:
+- p1-target-repo (C1): PR #549 MERGED 23:09:36Z ✅
+- p1-drain-archive (C2/C3): PR #550 MERGED 23:19:03Z ✅
+- p1-funnel-derive (next step): Beacon seq-step completed 23:20:32Z; Forge worktree created 23:20:36Z; Forge IN PROGRESS since 23:20:38Z (≈9 min elapsed, within normal range). ✅ Watch.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → `OK: schema_version=1 validates`. ✅ Nominal.
+
+**Conditional checks (Tuesday 2026-06-16 UTC, weekday=1):** Check I fires Mon/Wed/Fri/Sun — skip. Check III fires Sunday — skip.
+
+**G-rule tracking:** No new G-rule counts this iter. All counts unchanged from iter ~2073.
+
+**Actions taken:**
+1. Check A auto-fix: `git -C ~/agent-core pull --ff-only` → c1842eaf→e41da8ea (PR #550 merge). Tier-reset applied.
+2. Alert watermark: 1056→1057 (L1057 triaged Tier-3).
+3. PRIME ledger: `intervention` appended (tier=1, template=ff-main-when-behind, ts=2026-06-16T23:29:03Z).
+4. Tier state: `record --checks-clean false` → tier reset 2→1, consecutive_clean=0.
+
+**PRIME ratio:** 20.37 (998 interventions, 49 systemic fixes). Trend: improving.
+
+**Dispatches:** None.
+
+---
+
 ## Iteration ~2073 — 2026-06-16 23:08Z UTC (interactive, /cycle, Tier 2, consecutive_clean=1→2)
 
 **Trigger:** Larry direct invocation (`/cycle`).
