@@ -561,6 +561,36 @@
         "from_state": "dropped"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "cap-kill-the-merge-droplet-sync-lag-push-on-merge-b996",
+      "title": "Kill the merge\u2192droplet sync lag (push-on-merge)",
+      "note": "Recurring friction (Phase 4 + Projects-v3 P1): a spec merged to main isn't visible to the droplet team until the hourly ourliberty-sync.timer (:30) runs, forcing a manual 'sudo systemctl start ourliberty-sync.service'. Bites every phase-spec merge in the Projects build. Fix (cheap/targeted): have the desktop merge step (merge_reviewed_pr.sh) trigger the droplet ff-pull on merge so a just-merged spec is visible in ~1 min. Broader fix = push every main advance to the droplet instantly = the Projects North Star freshness mandate (Phase S S-5). Risk: low (ff-pull is the same op the hourly timer runs).",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ol-work",
+        "branch": "pr476-review",
+        "captured_at": "2026-06-16T22:22:57.389904+00:00"
+      },
+      "last_touched": "2026-06-16T22:22:57.389904+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "Right now when our team finishes a piece of work, the people who need it don't see it for up to an hour because the system only refreshes on a slow timer.",
+        "why": "That hour of waiting creates repeated friction and manual fixes on every project handoff, slowing the team and making the work feel stale.",
+        "suggest": "Worth doing, but let's make the small, contained change first \u2014 refresh the moment work is finished so it shows up in about a minute \u2014 and confirm it's solid before considering anything bigger."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-16T22:25:15.921130+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
