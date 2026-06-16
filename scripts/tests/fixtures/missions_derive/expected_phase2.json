@@ -18,6 +18,24 @@
       "repo": "ourliberty-graph",
       "branch": "main"
     },
+    "desktop-blobrepo01": {
+      "derived_phase": "ready",
+      "state_badge": "building",
+      "terminal": false,
+      "stalled": false,
+      "label": "ourliberty-graph/feat/scene",
+      "repo": "ourliberty-graph",
+      "branch": "feat/scene"
+    },
+    "desktop-blobonly01": {
+      "derived_phase": "ready",
+      "state_badge": "building",
+      "terminal": false,
+      "stalled": false,
+      "label": "You are characterizing a software component into a v2 Component Descriptor for a...",
+      "repo": null,
+      "branch": null
+    },
     "orphan-building-now": {
       "derived_phase": "in_flight",
       "state_badge": "building",

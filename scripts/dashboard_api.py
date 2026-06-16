@@ -3002,16 +3002,31 @@ def _humanize_task_id(task_id: str) -> str:
     return ' '.join(out)
 
 
+def _is_prompt_blob_title(title: str) -> bool:
+    """True when a desktop_session payload.title looks like a truncated prompt
+    fragment rather than a real conversation title. The desktop emitter
+    populates payload.title with the first ~80 chars of the chat's prompt text,
+    so ~20 desktop orphans all render the same blob ("You are characterizing a
+    software component...") — less readable than repo/branch. A title is
+    prompt-like when it is long (> 60 chars) OR ends with a truncation ellipsis
+    (unicode horizontal ellipsis or a literal three-dot run)."""
+    t = title.strip()
+    return len(t) > 60 or t.endswith('…') or t.endswith('...')
+
+
 def _orphan_label_and_location(
     events: list[dict[str, Any]],
     task_id: str,
 ) -> tuple[str, Optional[str], Optional[str]]:
     """Resolve an orphan's readable label + repo/branch (§ 3.4).
 
-    Label resolution order: desktop chat title (latest desktop_session_*
-    event's payload.title) > repo/branch (from event payload) > humanized
-    task_id. Events are newest-first. Degrades gracefully when title is absent
-    (the desktop emitter may not yet populate payload.title)."""
+    Label resolution order: a MEANINGFUL desktop chat title (latest
+    desktop_session_* event's payload.title) > repo/branch (from event payload)
+    > a prompt-blob title (last resort, still better than the raw hash) >
+    humanized task_id. Events are newest-first. A prompt-like title (see
+    `_is_prompt_blob_title`) does not pre-empt repo/branch. Degrades gracefully
+    when fields are absent (the desktop emitter may not yet populate
+    payload.title)."""
     title: Optional[str] = None
     repo: Optional[str] = None
     branch: Optional[str] = None
@@ -3028,12 +3043,14 @@ def _orphan_label_and_location(
                 repo = r.strip()
                 b = payload.get('branch')
                 branch = b.strip() if isinstance(b, str) and b.strip() else None
-    if title:
+    if title and not _is_prompt_blob_title(title):
         label = title
     elif repo and branch:
         label = f'{repo}/{branch}'
     elif repo:
         label = repo
+    elif title:  # prompt-blob title — last resort, still beats the raw hash
+        label = title
     else:
         label = _humanize_task_id(task_id)
     return label, repo, branch
