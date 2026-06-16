@@ -35,6 +35,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_REPO_SCRIPTS) not in sys.path:
@@ -465,6 +466,48 @@ class InFlightDeferTest(_ActionsTestBase):
             capture_id='cap-1', reason=None, captures_path=self.captures_path)
         self.assertTrue(out['applied'])
         self.assertEqual(out['state'], 'dropped')
+
+
+class SpawnedWorkInFlightTest(unittest.TestCase):
+    """S4<->S7: the in-flight gate (`_spawned_work_in_flight`) must treat a detected
+    terminal failure as a safe stop. Failed work keeps its `session_start` but never
+    merges, so `derive_phase_for_task` would report it in-flight forever — without the
+    failure short-circuit a deferred pause/drop on a failed card would never apply."""
+
+    @staticmethod
+    def _cap(task_id='delegate-x'):
+        return {'spawned': {'kind': 'delegate', 'task_id': task_id}}
+
+    def test_no_spawned_ref_is_not_in_flight(self):
+        self.assertFalse(da._spawned_work_in_flight({}, object()))
+
+    def test_no_task_id_is_not_in_flight(self):
+        self.assertFalse(da._spawned_work_in_flight({'spawned': {}}, object()))
+
+    def test_failure_is_safe_stop_short_circuits_before_fetch(self):
+        import build_sequence_advancer as bsa
+        with mock.patch.object(bsa, 'chain_event_says_failed',
+                               return_value='forge_reject: tests broke'), \
+                mock.patch.object(da, '_fetch_events_for_task_ids') as fetch:
+            self.assertFalse(da._spawned_work_in_flight(self._cap(), object()))
+            fetch.assert_not_called()
+
+    def test_in_flight_when_not_failed(self):
+        import build_sequence_advancer as bsa
+        events = [{'task_id': 'delegate-x', 'event_type': 'session_start',
+                   'agent': 'forge', 'pr_url': None,
+                   'ts': '2026-06-15T10:00:00+00:00', 'payload': {}}]
+        with mock.patch.object(bsa, 'chain_event_says_failed', return_value=None), \
+                mock.patch.object(da, '_fetch_events_for_task_ids',
+                                  return_value={'delegate-x': events}):
+            self.assertTrue(da._spawned_work_in_flight(self._cap(), object()))
+
+    def test_no_events_and_not_failed_is_not_in_flight(self):
+        import build_sequence_advancer as bsa
+        with mock.patch.object(bsa, 'chain_event_says_failed', return_value=None), \
+                mock.patch.object(da, '_fetch_events_for_task_ids',
+                                  return_value={}):
+            self.assertFalse(da._spawned_work_in_flight(self._cap(), object()))
 
 
 # ==================== dispatch ====================

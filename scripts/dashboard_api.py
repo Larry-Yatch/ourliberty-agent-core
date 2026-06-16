@@ -4314,12 +4314,23 @@ def _spawned_work_in_flight(cap: dict[str, Any], supabase_client: Any) -> bool:
     (`derive_phase_for_task`) so the in-flight gate matches what the board shows —
     no parallel state machine. Conservative: a card with no spawned task_id, or
     whose work has emitted no events yet, is NOT in-flight (the action applies
-    immediately) — only KNOWN-in-flight work defers."""
+    immediately) — only KNOWN-in-flight work defers.
+
+    A detected terminal FAILURE is a safe stop, not in-flight (S4<->S7): failed
+    work keeps its `session_start` but never merges, so `derive_phase_for_task`
+    would report in_flight/awaiting_merge forever — without this short-circuit a
+    pause/drop on a failed card would defer indefinitely and never apply. Reuses
+    the SAME recognizer the S4 ring uses
+    (`build_sequence_advancer.chain_event_says_failed`) so both sides agree on
+    what "failed" means."""
     spawned = cap.get('spawned')
     if not isinstance(spawned, dict):
         return False
     task_id = spawned.get('task_id')
     if not (isinstance(task_id, str) and task_id):
+        return False
+    import build_sequence_advancer as bsa  # noqa: PLC0415
+    if bsa.chain_event_says_failed(supabase_client, task_id):
         return False
     events = _fetch_events_for_task_ids(supabase_client, [task_id]).get(task_id) or []
     if not events:

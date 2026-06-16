@@ -1199,12 +1199,23 @@ def _default_in_flight_fn() -> Callable[[str], bool]:
     awaiting_merge. Lazy imports keep module-load stdlib-only and mirror the
     dashboard's gate exactly, so a deferred action applies on the same safe-stop
     boundary the board shows. (heal_orphan_autoregister reuses dashboard_api's
-    derive the same way — zero drift over re-porting the state machine.)"""
+    derive the same way — zero drift over re-porting the state machine.)
+
+    A detected terminal FAILURE counts as a safe stop, not in-flight (S4<->S7):
+    failed work derives as in_flight/awaiting_merge forever, so without this a
+    pending pause/drop recorded against work that later fails would be stranded
+    (in_flight every tick → never applied). Same recognizer the S4 ring uses
+    (`build_sequence_advancer.chain_event_says_failed`), so the apply side and the
+    ring side agree on what "failed" means — the deferred action applies on the
+    failure boundary instead of waiting forever."""
+    import build_sequence_advancer as bsa  # noqa: PLC0415
     import chain_event_emit  # noqa: PLC0415
     import dashboard_api  # noqa: PLC0415
 
     def _in_flight(task_id: str) -> bool:
         client = chain_event_emit._get_client()
+        if bsa.chain_event_says_failed(client, task_id):
+            return False
         events = _fetch_task_events(client, task_id)
         if not events:
             return False

@@ -881,6 +881,48 @@ class ReconcileDeferredActionsTest(unittest.TestCase):
         self.assertEqual(res.kept, 0)
 
 
+# ---------------------------------------- _default_in_flight_fn (S4<->S7 gate)
+
+
+class DefaultInFlightFnTest(unittest.TestCase):
+    """The production in-flight probe must treat a detected terminal failure as a
+    safe stop (S4<->S7) so a deferred pause/drop on work that later fails applies
+    instead of deferring forever (failed work derives in_flight/awaiting_merge
+    permanently)."""
+
+    def test_failure_is_safe_stop_short_circuits_before_fetch(self):
+        import build_sequence_advancer as bsa
+        import chain_event_emit
+        with mock.patch.object(chain_event_emit, '_get_client', return_value=object()), \
+                mock.patch.object(bsa, 'chain_event_says_failed',
+                                  return_value='forge_reject: tests broke'), \
+                mock.patch.object(h, '_fetch_task_events') as fetch:
+            fn = h._default_in_flight_fn()
+            self.assertFalse(fn('delegate-x'))
+            fetch.assert_not_called()
+
+    def test_in_flight_when_not_failed(self):
+        import build_sequence_advancer as bsa
+        import chain_event_emit
+        events = [{'task_id': 'delegate-x', 'event_type': 'session_start',
+                   'agent': 'forge', 'pr_url': None,
+                   'ts': '2026-06-15T10:00:00+00:00', 'payload': {}}]
+        with mock.patch.object(chain_event_emit, '_get_client', return_value=object()), \
+                mock.patch.object(bsa, 'chain_event_says_failed', return_value=None), \
+                mock.patch.object(h, '_fetch_task_events', return_value=events):
+            fn = h._default_in_flight_fn()
+            self.assertTrue(fn('delegate-x'))
+
+    def test_not_in_flight_when_no_events_and_not_failed(self):
+        import build_sequence_advancer as bsa
+        import chain_event_emit
+        with mock.patch.object(chain_event_emit, '_get_client', return_value=object()), \
+                mock.patch.object(bsa, 'chain_event_says_failed', return_value=None), \
+                mock.patch.object(h, '_fetch_task_events', return_value=[]):
+            fn = h._default_in_flight_fn()
+            self.assertFalse(fn('delegate-x'))
+
+
 # ---------------------------------------- commit + push (real temp git repo)
 
 
