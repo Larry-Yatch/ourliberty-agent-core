@@ -4,6 +4,75 @@
 
 ---
 
+## Iteration ~1997 — 2026-06-16 01:53Z UTC (interactive, /cycle, Tier 1, consecutive_clean=1→2)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 1 new alert (L1052 Tier-3 silenced, mirror-dag-pass:missions-v2-delegate-fix). All daemons alive. Repo at 40cfb999=origin/main. 1 open PR (known carry). Tier 1, consecutive_clean=2.
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): mergeable=UNKNOWN/"" (GitHub recomputing). Mirror REVIEW_ESCALATE Jun-14T04:02:56Z unchanged. Age≈45.8h. 72h deadline Jun-17T04:02:56Z → **~26.2h remaining.** [yellow] carry.
+- All 5 daemons: PIDs 2530123 (Ssl), 2744551 (SNs), 2744840 (Ss), 2744914 (Ss), 2868353 (Ssl) — all alive. ✅
+- Repo HEAD: 40cfb999=origin/main (Pulse cycle 20260616T014536Z). Clean tree, on main. ✅
+- 409 burst: no new occurrences in bot log. G-rule 2/3 unchanged.
+
+**Check 0 — Alert triage:** Watermark=1051 (entering); file=1052 lines. **1 new alert** (L1052).
+- L1052: `source=outbox-notifier, severity=warning, subject=mirror-dag-pass:missions-v2-delegate-fix, ts=2026-06-16T01:47:26Z, route=escalate`. "Mirror DAG-preflight PASS for sequence `missions-v2-delegate-fix`. Sequence transitioned `pending → active`; build sequence advancer dispatching first step." Triage helper → **Tier-3** (known-pattern match in alert-translations.json). Silenced. No second Pulse DM. No tier-reset.
+Watermark advanced: 1051→1052. ✅
+
+**Check 1 — Log noise:** outbox-notifier.log: no WARNs or ERRORs in recent log. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** PID 2744840 alive (Ss). Bot log: no 409 errors, no ERROR lines. Last Larry directive: approved `dag-preflight-missions-v2-delegate-fix` at 19:46:17 MDT 2026-06-15 (dispatched to Mirror inbox; Mirror DAG-preflight PASS at 01:47Z, seq now active, Forge tasks dispatched). No new untracked directives. G-rule telegram-409-burst 2/3 unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → "no stalls detected". All FORGE_NO_PR_SKIP informational (pr_exists / preflight_exit). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0**. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-16T01:48:19.677772+00:00`, age≈2.9 min. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=40cfb999=origin/main. Clean tree, on main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-16T01:28:57Z, status=success, age≈22 min. FRESH (<2h). ✅ Nominal.
+
+**Check C — Agent liveness:** All 5 PIDs alive (2530123 Ssl, 2744551 SNs, 2744840 Ss, 2744914 Ss, 2868353 Ssl). ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (1 open):
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): UNKNOWN/"" (GitHub recomputing). Mirror REVIEW_ESCALATE Jun-14T04:02:56Z. Age≈45.8h, ~26.2h until 72h deadline Jun-17T04:02:56Z. [yellow] carry.
+ourliberty-dashboard: 0 open PRs. ✅
+
+**Conditional checks (Tuesday 2026-06-16 UTC):** Check I fires Mon/Wed/Fri/Sun — today is Tuesday, skip. Check III fires Sunday (14d anchor) — today is Tuesday, skip.
+
+**Notable:** `missions-v2-delegate-fix` sequence now **active**. Larry approved DAG preflight at 19:46 MDT 2026-06-15; Mirror PASS fired at 01:47Z (L1052, Tier-3 silenced). Forge inbox now has `chat-label-fix.json` + `delegate-endpoint.json` (first sequence steps). No action needed from Pulse; normal pipeline progression. Watch for PR creation in next iter.
+
+**Actions taken:**
+1. Alert L1052 triaged Tier-3 (known pattern, mirror-dag-pass:missions-v2-delegate-fix). ✅
+2. Watermark advanced 1051→1052. ✅
+3. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` ✅
+4. `cycle_tier_state.py record --checks-clean true` → **Tier 1, consecutive_clean=2** ✅
+
+**Dispatches:** None.
+
+**G-rule updates this iter:** No new occurrences. All counters unchanged from iter ~1996.
+
+**Standing findings (carried):**
+- [yellow] **PR #497 REVIEW_ESCALATE** — UNKNOWN/"" (GitHub); Mirror REVIEW_ESCALATE Jun-14T04:02:56Z; age≈45.8h; ~26.2h until 72h deadline Jun-17T04:02:56Z.
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519/530** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — Beacon spec complete; Forge build pending Larry's dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — FN=3027, TP=5. `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, **Forge-preflight-CLARIFY_REQUEST 2/3**, telegram-409-burst **2/3**, telegram-approval-self-dispatch-denied **1/3**, merge_conflict_manual_rebase-tier4 1/3, heal-pipeline-stall-mirror-pass-unmerged-tier4 1/3. All unchanged.
+- [blue] **Stale bash orphans** — PIDs 1834248 (18d+) + 2605007 (2d+). Low CPU. [carry]
+- [blue] **missions-v2-delegate-fix sequence active** — Forge building `chat-label-fix` + `delegate-endpoint` steps. Watch for PRs.
+
+**PRIME DIRECTIVE:** iter_clean. ratio=20.06. trend=stable.
+**Tier end-of-iter:** **Tier 1, consecutive_clean=2**.
+
+---
+
 ## Iteration ~1996 — 2026-06-16 01:44Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0→1)
 
 **Trigger:** Larry direct invocation (`/cycle`).

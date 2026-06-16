@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-16 01:53Z UTC (Iter ~1997, Tier 1, consecutive_clean=2)
+
+**Iter ~1997 summary:** ✅ Nominal. 1 new alert (L1052 Tier-3 silenced, mirror-dag-pass:missions-v2-delegate-fix). `missions-v2-delegate-fix` sequence now active — Forge inbox has `chat-label-fix.json` + `delegate-endpoint.json`. All daemons alive. Repo at 40cfb999=origin/main. Watermark: 1051→1052. pending=0. 1 open PR: #497 (UNKNOWN/"", Mirror REVIEW_ESCALATE, 72h deadline Jun-17T04:02:56Z ~26.2h). PRIME ratio=20.06. Tier 1, consecutive_clean=2.
+
 ## Status snapshot — updated 2026-06-16 01:44Z UTC (Iter ~1996, Tier 1, consecutive_clean=1)
 
 **Iter ~1996 summary:** ✅ Nominal. 1 new alert (L1051 Tier-3 silenced, dispatch-branch-cleanup/summary, route=digest). All daemons alive. Repo at 83cd6881=origin/main. Watermark: 1050→1051. pending=0. 1 open PR: #497 (UNKNOWN/"", Mirror REVIEW_ESCALATE, 72h deadline Jun-17T04:02:56Z ~26.3h). PRIME ratio=20.06. Tier 1, consecutive_clean=1.
