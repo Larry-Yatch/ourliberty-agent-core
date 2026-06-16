@@ -163,6 +163,12 @@
       "tier": "FYI",
       "plain_language_summary": "The hourly dispatch-branch GC backstop (ourliberty-cleanup-dispatch-branches.timer) ran and pruned stale Forge/Mirror dispatch branches — the routine housekeeping success path. It runs every hour and almost always has something small to prune, so it fires frequently by design. route=digest means it is already surfaced only in the daily CEO digest, never DM'd. By-design FYI, not a failure.",
       "recommended_action": "None — by-design housekeeping confirmation. Per-run detail (how many local/remote branches pruned, any deferred by batch cap) is in the digest line and ~/agents/logs/cleanup_dispatch_branches.log. The sibling `gh-unavailable` subject is route=escalate and DOES still surface — only this routine `summary` is silenced."
+    },
+    "gh-unavailable": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "The dispatch-branch cleanup ran but the GitHub CLI was unavailable, so it skipped one or more repos. Branch pruning checks for open PRs before deleting a branch; without GitHub access that guard cannot run, so cleanup was held back on those repos rather than risk deleting a branch with live work. Stale branches will accumulate until GitHub access is restored.",
+      "recommended_action": "Check GitHub access with `gh auth status` (token may have expired) and confirm network reachability. Once restored, the hourly timer will catch up on the next run, or force one with `sudo systemctl start ourliberty-cleanup-dispatch-branches.service`. Detail on which repos were skipped is in ~/agents/logs/cleanup_dispatch_branches.log."
     }
   },
   "outbox-notifier": {
@@ -356,12 +362,26 @@
       "recommended_action": "One-off: no action needed, it self-recovered. If it recurs, inspect ~/agents/state/cycle-tier.json by hand for what is writing bad data."
     }
   },
+  "missions-card-gc": {
+    "failure": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "The missions-card garbage-collector hit a hard failure while saving its work — a commit landed on the wrong branch, or the commit or push step failed outright. Capture briefs and/or shipped-mission updates were computed but did NOT persist, so the dashboard's mission and capture state is now behind the real work.",
+      "recommended_action": "Check ~/agents/logs/heal_missions_card_gc.log for the failing step, then inspect the agent-core git state (`git -C ~/agent-core status`) — a stuck branch checkout or an unpushed/aborted commit is the usual cause. Resolve the git state and the next hourly run will re-commit the pending changes."
+    }
+  },
   "missions-autoregister": {
     "summary": {
       "severity": "INFO",
       "tier": "FYI",
       "plain_language_summary": "missions-autoregister periodically scans orphan threads and proposes auto-registration for the best candidate. This is routine housekeeping — the result is a committed thread proposal with route=digest. No operator action required.",
       "recommended_action": "None. The autoregister healer handles this automatically. Review the proposed thread in ~/agent-core/agents/ if the proposal looks unexpected."
+    },
+    "failure": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "The orphan-thread autoregister hit a hard failure while committing its proposal — a commit landed on the wrong branch, or the commit or push step failed. The proposed thread registration was computed but did NOT persist, so the orphan thread remains unregistered until the next successful run.",
+      "recommended_action": "Check ~/agents/logs/heal_orphan_autoregister.log for the failing step, then inspect the agent-core git state (`git -C ~/agent-core status`) — a stuck branch checkout or an unpushed/aborted commit is the usual cause. Resolve the git state and the next run will re-commit the proposal."
     }
   },
   "pulse-check-iv": {
@@ -486,6 +506,12 @@
       "never_silence": true,
       "plain_language_summary": "A Pulse self-optimization check (I-X) ran but did not complete cleanly (it raised or exited nonzero), so it did NOT refresh its liveness heartbeat. This is the same-cycle complement to the staleness watcher -- it names the failing check immediately instead of waiting out the staleness window. The subject carries the check id after the colon.",
       "recommended_action": "Run `python3 ~/agent-core/scripts/pulse_check_<id>.py` by hand and read the traceback; logs are under ~/agents/logs/pulse-check-*.log. Fix the underlying error so the check resumes emitting heartbeats."
+    },
+    "catalog-accuracy-drift": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "The Pulse catalog-accuracy meter found that some shelf cards no longer match the live code they describe — their recorded facts (dependents, seams) have drifted. A drifted card can mislead a builder into reusing or extending the wrong component, so reuse decisions made off these cards may be wrong until they are re-characterized.",
+      "recommended_action": "In the ourliberty-graph repo, re-characterize the drifted cards named in the alert: `./pipeline/regen_descriptor.sh <id>` (or `batch_catalog.sh` for several), commit, then re-run `pipeline/accuracy_meter.py` to confirm the meter is back above its gate."
     }
   },
   "pulse": {
