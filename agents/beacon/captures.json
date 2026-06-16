@@ -33,8 +33,8 @@
     },
     {
       "id": "cap-orphan-lane-show-desktop-chat-title-fallback-rep-dd23",
-      "title": "Orphan lane: show desktop chat title (fallback repo/branch), not the alphanumeric task_id",
-      "note": "Desktop orphans render desktop-<id> which is unreadable. Capture the Claude Code session title (needs a desktop_session_active re-emit since the title appears after a chat starts; verify the hook exposes it) and render title > repo/branch fallback in OrphansLane instead of the humanized task_id. Phase 2.",
+      "title": "Orphan lane: prefer repo/branch over a prompt-blob desktop title (real title when we have one)",
+      "note": "Re-scoped 2026-06-16. The readability fallback already shipped (no raw desktop-<hash>). Remaining need: desktop_session payload.title is just the first ~80 chars of the prompt, so ~20 orphans render the same truncated blob -- less readable than repo/branch. Fix in dashboard_api._orphan_label_and_location: only let a title win when it's a MEANINGFUL title (not prompt-like: long or trailing-ellipsis); when the only title is a prompt blob, prefer repo/branch. Server-only; frontend renders label verbatim. Build dispatched: orphan-lane-prompt-blob-title-fallback-001.",
       "state": "parked",
       "origin": {
         "source": "desktop-chat",
@@ -43,7 +43,7 @@
         "branch": "fix/install-drift-just-fired-grace",
         "captured_at": "2026-06-10T06:35:23.978896+00:00"
       },
-      "last_touched": "2026-06-10T06:35:23.978896+00:00",
+      "last_touched": "2026-06-16T05:48:00+00:00",
       "promoted_to": null,
       "briefing": {
         "what": "A small fix so parked desktop chats show their real name instead of a meaningless code.",
@@ -548,17 +548,17 @@
       "last_touched": "2026-06-15T23:32:59.329619+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "The one-click 'Delegate' button on parked idea cards looks like it works but does nothing \u2014 clicking it just fails silently behind the scenes.",
-        "why": "It's the main way you hand parked ideas off to the team, so right now every delegation attempt dies and those ideas sit stuck instead of moving forward.",
-        "suggest": "Worth fixing soon since it blocks a core action, but it's a contained repair \u2014 schedule it into the next round of work rather than scrambling on it today."
+        "what": "The one-click \"Delegate to team\" button on your Parked idea cards is broken \u2014 clicking it does nothing because the part that actually hands the work off was never finished.",
+        "why": "Delegating is the main action you take on a parked idea, so right now ideas can stall on the board instead of moving to someone who can run with them.",
+        "suggest": "Worth fixing soon, but have someone confirm the button truly works end-to-end before calling it done; also tidy a small label that wrongly shows your own messages as if they came from the team."
       },
       "risk": "medium",
       "recommended_action": "delegate",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-06-15T23:39:04.838378+00:00",
-        "from_state": "parked"
+        "at": "2026-06-16T05:53:33.317535+00:00",
+        "from_state": "dropped"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
