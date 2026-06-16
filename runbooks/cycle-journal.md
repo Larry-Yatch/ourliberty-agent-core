@@ -4,6 +4,61 @@
 
 ---
 
+## Iteration ~2073 — 2026-06-16 23:08Z UTC (interactive, /cycle, Tier 2, consecutive_clean=1→2)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 0 new alerts. All mandatory checks clean.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** 0 open PRs on dashboard + graph; 2 open Forge PRs on agent-core (#549, #550 — both new projects-v3-p1 work). ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** No such PR open. ✅
+- **Pending approvals — CLEAR ✅:** pending=0. ✅
+- **Daemons same PIDs ✅:** beacon 3556778 (Ss), chain-event 2744551 (SNs), inbox-watcher 3434697 (Ssl), outbox_notifier 3556624 (Ss), dashboard_api 3593488 (Ssl). All alive, same PIDs as iter ~2072. ✅
+
+**Check 0 — Alert triage:** Watermark=1056 entering; file=1056 lines. **0 new alerts.** Watermark unchanged. ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log: 1 WARN since iter ~2072 — `forge marker error in p1-drain-archive.json: MalformedForgeMarker: phase=preflight requires ONE marker block` at 23:04:12Z (retry 1/3). Covered by completed G-rule PR #524 retry mechanism. Followed at 23:05:24Z by Forge done (25s, $0.057) — preflight retry resolved; proceed marker found. Build-phase dispatched to Forge at 23:05:28Z. inbox_watcher.log nominal (last entries: p1-drain-archive build-phase started 23:06:51Z). ✅ Nominal (known-pattern retry).
+
+**Check 2 — Telegram sweep:** Last Larry message 16:25:01 MDT (22:25Z) 'go' — already served in iter ~2070. No new messages since. G-rule telegram-409-burst **2/3** unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → `no stalls detected`. All FORGE_NO_PR_SKIP entries reason=pr_exists or preflight_exit. ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0. No orphaned Larry directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-16T22:53:44Z, age≈15 min at check time. FRESH (< 60 min threshold). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=0690ef87=origin/main (clean, on main, no divergence; this commit is the iter ~2072 wrapper auto-commit). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-16T22:29:31Z, status=success. Age ≈39 min. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3556778 (Ss) ✅, chain_event_shipper 2744551 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, outbox_notifier 3556624 (Ss) ✅, dashboard_api 3593488 (Ssl) ✅. All 5 alive, same PIDs as iter ~2072. ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core: **2 open PRs.**
+- **#549** `feat(chain_envelope): derive target_repo from chain_events (C1)` — created 22:46:25Z (~22 min old at check), mergeable=MERGEABLE, reviewDecision="" (Mirror review in progress, dispatched 23:00:17Z). Under 30-min threshold. ✅ Watch.
+- **#550** `Drain terminal orphan proposals + archive legacy drafts (spec §4 C2/C3)` — NEW, created 23:03:54Z (~5 min old at check). Forge build-phase still active (started 23:06:51Z). Under 30-min threshold. ✅ Watch.
+ourliberty-dashboard: **0 open PRs.** ✅
+ourliberty-graph: **0 open PRs.** ✅
+
+**Check H — Forge digest:** projects-v3-p1 sequence ACTIVE. C1 (p1-target-repo): PR #549 created 22:46:25Z, Mirror reviewing (dispatched 23:00:17Z). C2/C3 (p1-drain-archive): PR #550 created 23:03:54Z, Forge build-phase active (started 23:06:51Z, last inbox_watcher entry 23:07:12Z beacon done). Both PRs < 72h old. Build sequence advancer last ticked 17:05:14 MDT (23:05:14Z) files=19 processed=1. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → `OK: schema_version=1 validates`. ✅ Nominal.
+
+**Conditional checks (Tuesday 2026-06-16 UTC, weekday=1):** Check I fires Mon/Wed/Fri/Sun — skip. Check III fires Sunday — skip.
+
+**G-rule tracking:** No new G-rule counts this iter. MalformedForgeMarker on p1-drain-archive preflight covered by completed G-rule PR #524. All counts unchanged from iter ~2072.
+
+**Actions taken:**
+1. PRIME ledger: `iter_clean` appended (tier=2, template=iter-clean, ts=2026-06-16T23:08:44Z).
+2. Tier state: `record --checks-clean true` → consecutive_clean 1→2. Tier 2 unchanged (need 3 consecutive clean to de-escalate to Tier 3).
+
+**PRIME ratio:** 20.35 (997 interventions, 49 systemic fixes). Unchanged.
+
+**Dispatches:** None.
+
+---
+
 ## Iteration ~2072 — 2026-06-16 22:54Z UTC (interactive, /cycle, Tier 2, consecutive_clean=0→1)
 
 **Trigger:** Larry direct invocation (`/cycle`).
