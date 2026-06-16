@@ -566,6 +566,10 @@ class MissionsDerivedResponse(BaseModel):
     missions: list[dict[str, Any]]
     orphans: list[dict[str, Any]]
     parked: list[dict[str, Any]]
+    # C4 (projects-v3 P1): additive funnel grouping — {primary, secondary} lanes
+    # of intake (parked + team-suggested vs orphaned, auto-filtered). Additive:
+    # the live board reads missions/orphans/parked; P2 consumes funnel.
+    funnel: dict[str, list[dict[str, Any]]]
     last_synced_at: Optional[str]
     as_of: str
 
@@ -3446,6 +3450,142 @@ def _fetch_recent_chain_events(
     return rows
 
 
+# ---------------------------------------------------------------------------
+# Projects Tab v3 — P1 C4: the additive funnel grouping
+# (spec: agents/beacon/specs/projects-v3-p1-funnel-retire-missions.md § 4 C4)
+#
+# A PURE re-view over the already-derived missions/orphans/parked sections — it
+# adds NO new data source and removes/renames NO existing field. The live board
+# keeps rendering off missions[]/orphans[]/parked[]; P2 consumes `funnel`. Intake
+# is triaged into two lanes:
+#   primary   — parked captures + genuinely team-suggested missions (front-and-
+#               -centre: your stuff + the team's suggestions)
+#   secondary — orphaned work, AUTO-FILTERED (verifiably-terminal items dropped —
+#               the dead orphan clutter is cleared; live/uncertain ones kept)
+# Suggested-source (Beacon / Medic / Pulse) is tagged where the provenance is
+# known ("where available" per C4); Larry's own desktop captures and
+# builder-emitted orphans carry suggested_source=None.
+# ---------------------------------------------------------------------------
+
+# Canonical suggesting agents. A provenance hint normalizes to one of these or
+# to None — the funnel never invents a source it can't identify.
+_SUGGESTED_AGENTS: tuple[str, ...] = ('beacon', 'medic', 'pulse')
+# Capture `label` provenance → canonical suggesting agent. 'pulse-check-i' is the
+# recurring Pulse proposal parked in the Missions lane (see CAPTURE_ALLOWED_LABELS).
+_CAPTURE_LABEL_SUGGESTED_SOURCE: dict[str, str] = {'pulse-check-i': 'pulse'}
+
+
+def _normalize_suggested_source(*candidates: Any) -> Optional[str]:
+    """Map a raw provenance hint (capture label, mission proposed_by, orphan
+    agent) to a canonical suggesting agent {beacon, medic, pulse}, or None when
+    no team agent is identifiable. First identifiable candidate wins."""
+    for c in candidates:
+        if not isinstance(c, str):
+            continue
+        v = c.strip().lower()
+        if not v:
+            continue
+        mapped = _CAPTURE_LABEL_SUGGESTED_SOURCE.get(v)
+        if mapped:
+            return mapped
+        for agent in _SUGGESTED_AGENTS:
+            if v == agent or v.startswith(agent + '-') or v.startswith(agent + '_'):
+                return agent
+    return None
+
+
+def _proposed_mission_is_dead(mission: dict[str, Any]) -> bool:
+    """A `proposed` orphan-mission is verifiably dead once the drain (C2/C3)
+    acknowledges, retires, or archives it. The funnel's auto-filter drops these
+    from the secondary lane — never on a clock, only on a real terminal flag."""
+    if mission.get('acknowledged') is True:
+        return True
+    if mission.get('retired_at'):
+        return True
+    return (mission.get('phase') or '') in ('retired', 'archived', 'closed')
+
+
+def _funnel_item(
+    kind: str,
+    ref: Any,
+    label: Any,
+    repo: Any,
+    suggested_source: Optional[str],
+) -> dict[str, Any]:
+    """A lightweight funnel entry referencing a source intake item by id, so P2
+    can render the lane and join back to the full missions/orphans/parked object."""
+    return {
+        'kind': kind,
+        'ref': ref,
+        'label': label,
+        'repo': repo,
+        'suggested_source': suggested_source,
+    }
+
+
+def _build_funnel(
+    missions: list[dict[str, Any]],
+    orphans: list[dict[str, Any]],
+    parked: list[dict[str, Any]],
+) -> dict[str, list[dict[str, Any]]]:
+    """Group the existing intake (parked + proposed missions + orphans) into the
+    primary/secondary funnel (C4). Pure over its three inputs — call it with the
+    POST-filter arrays so the funnel tracks any ?repo=/?task_id= narrowing."""
+    primary: list[dict[str, Any]] = []
+    secondary: list[dict[str, Any]] = []
+
+    # Parked captures are always primary intake. A capture whose provenance maps
+    # to a team agent is a 'suggested' item; otherwise it's Larry's own 'parked'
+    # capture. (parked[] carries `label` as its provenance tag.)
+    for p in parked:
+        src = _normalize_suggested_source(p.get('label'))
+        primary.append(_funnel_item(
+            'suggested' if src else 'parked',
+            p.get('capture_id'),
+            p.get('label') or p.get('title'),
+            p.get('repo'),
+            src,
+        ))
+
+    # Only INTAKE missions belong in the funnel: a `proposed` mission is awaiting
+    # accept/dismiss triage. Established work (drafting/ready/in_flight/shipped/
+    # deferred) renders via the existing missions[] section / the P3 pipeline and
+    # is intentionally excluded here. A proposed mission is either a genuine team
+    # suggestion (→ primary) or orphan-derived auto-register clutter (→ secondary,
+    # auto-filtered once dead).
+    for m in missions:
+        if (m.get('phase') or '') != 'proposed':
+            continue
+        proposed_by = m.get('proposed_by')
+        src = _normalize_suggested_source(proposed_by)
+        if src is not None:
+            primary.append(_funnel_item(
+                'suggested', m.get('id'), m.get('name'), m.get('repo'), src,
+            ))
+        elif not _proposed_mission_is_dead(m):
+            # Orphan-derived (heal_orphan_autoregister) or unknown proposer:
+            # keep visible in secondary until a real terminal signal retires it.
+            secondary.append(_funnel_item(
+                'orphan', m.get('id'), m.get('name'), m.get('repo'), None,
+            ))
+
+    # Orphans are secondary, AUTO-FILTERED: a verifiably-terminal orphan (merged
+    # or explicitly-closed PR) is dropped (dead clutter cleared); every live /
+    # stalled / uncertain orphan stays.
+    for o in orphans:
+        if o.get('terminal') is True:
+            continue
+        secondary.append(_funnel_item(
+            'orphan',
+            o.get('task_id'),
+            o.get('label') or o.get('task_id'),
+            o.get('repo'),
+            _normalize_suggested_source(o.get('agent')),
+        ))
+
+    return {'primary': primary, 'secondary': secondary}
+
+
 def _build_derived_response(
     *,
     entries: list[dict[str, Any]],
@@ -3525,11 +3665,15 @@ def _build_derived_response(
             pr_state=pr_state_by_url.get(o.get('pr_url')),
         ))
 
+    parked = _parked_from_captures(captures, now, events_by_task_id)
     return {
         'schema_version': 1,
         'missions': missions,
         'orphans': orphans,
-        'parked': _parked_from_captures(captures, now, events_by_task_id),
+        'parked': parked,
+        # C4: additive funnel grouping. Built post-derive; re-derived against the
+        # filtered arrays in _apply_derived_filters so it tracks ?repo=/?task_id=.
+        'funnel': _build_funnel(missions, orphans, parked),
         'last_synced_at': last_synced_at,
         'as_of': _now_utc_iso(now),
     }
@@ -3598,6 +3742,9 @@ def _apply_derived_filters(
     response['missions'] = missions
     response['orphans'] = orphans
     response['parked'] = parked
+    # C4: re-derive the funnel against the filtered arrays so the grouping stays
+    # consistent with the narrowed missions/orphans/parked sections.
+    response['funnel'] = _build_funnel(missions, orphans, parked)
     return response
 
 

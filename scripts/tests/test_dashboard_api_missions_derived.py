@@ -341,7 +341,7 @@ class EndpointTest(_DerivedTestBase):
         body = resp.json()
         self.assertEqual(
             set(body),
-            {'schema_version', 'missions', 'orphans', 'parked',
+            {'schema_version', 'missions', 'orphans', 'parked', 'funnel',
              'last_synced_at', 'as_of'},
         )
         self.assertEqual(body['schema_version'], 1)
@@ -1074,6 +1074,140 @@ class SpawnedRefDeriveTest(unittest.TestCase):
         self._seed_captures(self._parked_cap('cap-plain'))
         self.assertIsNone(
             self._parked_by_id([])['cap-plain']['spawned_expected_cost_usd'])
+
+
+# ---------- P1 C4: additive funnel grouping ----------
+
+
+class FunnelDeriveTest(_DerivedTestBase):
+    """C4 — the additive primary/secondary funnel over the existing intake.
+    Built off the same fixtures as the parity gate, so it also proves the funnel
+    is purely additive (the byte-for-byte missions/orphans parity tests above
+    still pass with the funnel key present)."""
+
+    def test_funnel_key_is_additive_and_shaped(self) -> None:
+        funnel = self._derive()['funnel']
+        self.assertEqual(set(funnel), {'primary', 'secondary'})
+        for lane in (funnel['primary'], funnel['secondary']):
+            for item in lane:
+                self.assertEqual(
+                    set(item),
+                    {'kind', 'ref', 'label', 'repo', 'suggested_source'},
+                )
+
+    def test_parked_captures_are_primary(self) -> None:
+        primary = self._derive()['funnel']['primary']
+        refs = {i['ref'] for i in primary}
+        self.assertEqual(refs, {'cap-aging-one', 'cap-fresh-two'})
+        # No agent provenance on these fixtures → plain parked, no source tag.
+        for i in primary:
+            self.assertEqual(i['kind'], 'parked')
+            self.assertIsNone(i['suggested_source'])
+
+    def test_live_orphans_are_secondary(self) -> None:
+        secondary = self._derive()['funnel']['secondary']
+        refs = {i['ref'] for i in secondary}
+        self.assertEqual(refs, {
+            'orphan-inreview-now', 'desktop-ab12cd34', 'desktop-blobrepo01',
+            'desktop-blobonly01', 'orphan-building-now', 'orphan-stalled-old',
+        })
+        self.assertTrue(all(i['kind'] == 'orphan' for i in secondary))
+
+    def test_terminal_orphan_is_auto_filtered_out(self) -> None:
+        # orphan-shipped-pr is terminal (shipped) → cleared from the funnel,
+        # though it still rides in the existing orphans[] section (unchanged).
+        out = self._derive()
+        self.assertIn('orphan-shipped-pr',
+                      {o['task_id'] for o in out['orphans']})
+        self.assertNotIn('orphan-shipped-pr',
+                         {i['ref'] for i in out['funnel']['secondary']})
+
+    def test_funnel_tracks_repo_filter(self) -> None:
+        out = self._derive(repo='ourliberty-agent-core')
+        primary = {i['ref'] for i in out['funnel']['primary']}
+        secondary = {i['ref'] for i in out['funnel']['secondary']}
+        self.assertEqual(primary, {'cap-aging-one'})
+        # Only non-terminal agent-core orphans remain.
+        self.assertEqual(secondary, {'orphan-building-now', 'orphan-stalled-old'})
+
+
+class BuildFunnelUnitTest(unittest.TestCase):
+    """Direct tests of the pure `_build_funnel` classifier over synthetic intake
+    — proves the mission-source rules that the fixtures (no `proposed` missions)
+    don't exercise."""
+
+    def test_team_suggested_mission_is_primary_with_source(self) -> None:
+        missions = [{
+            'id': 'm-pulse', 'name': 'Pulse idea', 'repo': 'r',
+            'phase': 'proposed', 'proposed_by': 'pulse',
+        }]
+        out = da._build_funnel(missions, [], [])
+        self.assertEqual(len(out['primary']), 1)
+        item = out['primary'][0]
+        self.assertEqual(item['kind'], 'suggested')
+        self.assertEqual(item['suggested_source'], 'pulse')
+        self.assertEqual(item['ref'], 'm-pulse')
+        self.assertEqual(out['secondary'], [])
+
+    def test_orphan_autoregistered_mission_is_secondary(self) -> None:
+        missions = [{
+            'id': 'm-orphan', 'name': 'Auto idea', 'repo': 'r',
+            'phase': 'proposed', 'proposed_by': 'heal_orphan_autoregister',
+        }]
+        out = da._build_funnel(missions, [], [])
+        self.assertEqual(out['primary'], [])
+        self.assertEqual(len(out['secondary']), 1)
+        self.assertEqual(out['secondary'][0]['kind'], 'orphan')
+        self.assertIsNone(out['secondary'][0]['suggested_source'])
+
+    def test_dead_proposed_mission_is_auto_filtered(self) -> None:
+        for dead in (
+            {'acknowledged': True},
+            {'retired_at': '2026-06-16T00:00:00+00:00'},
+            {'phase': 'archived'},
+        ):
+            m = {'id': 'm', 'name': 'n', 'repo': 'r',
+                 'phase': 'proposed', 'proposed_by': 'heal_orphan_autoregister'}
+            m.update(dead)
+            out = da._build_funnel([m], [], [])
+            self.assertEqual(out['secondary'], [], dead)
+
+    def test_established_missions_excluded_from_funnel(self) -> None:
+        missions = [
+            {'id': 'a', 'name': 'A', 'repo': 'r', 'phase': 'in_flight'},
+            {'id': 'b', 'name': 'B', 'repo': 'r', 'phase': 'drafting'},
+            {'id': 'c', 'name': 'C', 'repo': 'r', 'phase': 'ready'},
+            {'id': 'd', 'name': 'D', 'repo': 'r', 'phase': 'deferred'},
+        ]
+        out = da._build_funnel(missions, [], [])
+        self.assertEqual(out['primary'], [])
+        self.assertEqual(out['secondary'], [])
+
+    def test_capture_label_tags_suggested_source(self) -> None:
+        parked = [{'capture_id': 'cap-1', 'label': 'pulse-check-i',
+                   'title': 't', 'repo': 'r'}]
+        out = da._build_funnel([], [], parked)
+        item = out['primary'][0]
+        self.assertEqual(item['kind'], 'suggested')
+        self.assertEqual(item['suggested_source'], 'pulse')
+
+
+class NormalizeSuggestedSourceUnitTest(unittest.TestCase):
+    def test_known_agents_normalize(self) -> None:
+        self.assertEqual(da._normalize_suggested_source('beacon'), 'beacon')
+        self.assertEqual(da._normalize_suggested_source('Medic'), 'medic')
+        self.assertEqual(da._normalize_suggested_source('pulse-cycle'), 'pulse')
+
+    def test_capture_label_maps(self) -> None:
+        self.assertEqual(da._normalize_suggested_source('pulse-check-i'), 'pulse')
+
+    def test_unknown_and_non_str_return_none(self) -> None:
+        for bad in ('forge', 'mirror', 'heal_orphan_autoregister', '', None, 5):
+            self.assertIsNone(da._normalize_suggested_source(bad), bad)
+
+    def test_first_identifiable_candidate_wins(self) -> None:
+        self.assertEqual(
+            da._normalize_suggested_source(None, 'forge', 'beacon'), 'beacon')
 
 
 if __name__ == '__main__':
