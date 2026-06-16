@@ -330,6 +330,10 @@ def _synthesize_build_data(pr: dict[str, Any]) -> dict[str, Any]:
         'branch': pr['headRefName'],
         'pr_title': pr.get('title') or '',
         'dispatched_by': 'heal-undispatched-pr-review',
+        # Thread the PR head we already have from gh-pr-list so the dispatch
+        # records the right commit without a second gh round-trip (and the
+        # round-0 dedup keys on this exact head).
+        'head_sha': pr.get('headRefOid'),
     }
 
 

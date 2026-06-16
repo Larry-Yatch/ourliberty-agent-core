@@ -133,6 +133,17 @@ class TestHeadAwareDedup(_DedupBase):
         self._write('.archive', 'review-t-extra.json', head_sha='zzz')
         self.assertFalse(ob_check('review-t.json', 'zzz'))
 
+    def test_glob_metacharacter_task_id_finds_own_variant(self):
+        # A task_id with glob metacharacters (validator-permitted) must not turn
+        # the variant scan into a character class — else its own uniquified
+        # same-head archive is missed and the head is re-dispatched every tick.
+        check = ob._review_request_already_dispatched
+        self._write('.archive', 'review-cpu[high].json', head_sha='head-A')
+        self._write('.archive', 'review-cpu[high].1.json', head_sha='head-B')
+        self.assertTrue(check('review-cpu[high].json', 'head-B'))  # variant hit
+        self.assertTrue(check('review-cpu[high].json', 'head-A'))  # exact hit
+        self.assertFalse(check('review-cpu[high].json', 'head-C'))  # re-review
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -166,6 +166,14 @@ class TestSynthesizeBuildData(unittest.TestCase):
         # No claude_session_id — the build session is gone; revisions start fresh.
         self.assertNotIn('claude_session_id', data)
 
+    def test_threads_head_sha_from_headRefOid(self):
+        # The PR head we already have from gh-pr-list rides the envelope so the
+        # dispatch records the right commit without a second gh round-trip.
+        pr = {**_pr(412, 'forge/harden-x-001'), 'task_id': 'harden-x-001',
+              'headRefOid': 'cafe1234beef5678'}
+        self.assertEqual(
+            h._synthesize_build_data(pr)['head_sha'], 'cafe1234beef5678')
+
 
 class TestHealerEnabled(unittest.TestCase):
     def test_default_on(self):

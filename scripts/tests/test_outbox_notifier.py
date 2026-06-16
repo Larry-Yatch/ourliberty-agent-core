@@ -3527,6 +3527,13 @@ class MirrorReviewDispatchTest(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self._root = Path(self._tmp.name)
+        # _dispatch_mirror_review records the PR head; stub the gh lookup so
+        # these dispatch tests stay hermetic (no live `gh pr view`). None keeps
+        # the round-0 dedup on its existence-only path, exactly as before this
+        # field existed.
+        self._orig_gh_head = on._gh_pr_head_sha
+        on._gh_pr_head_sha = lambda *a, **k: None
+        self.addCleanup(setattr, on, '_gh_pr_head_sha', self._orig_gh_head)
         self._originals = {}
         for name in [
             'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',

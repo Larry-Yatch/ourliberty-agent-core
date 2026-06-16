@@ -46,6 +46,7 @@ both daemons cleanly.
 
 from __future__ import annotations
 
+import glob
 import json
 import os
 import re
@@ -3718,7 +3719,13 @@ def _review_request_already_dispatched(
         if not d.exists():
             continue
         # The exact name plus the `<stem>.<i>.json` uniquified collisions.
-        candidates = [d / review_filename, *sorted(d.glob(f'{stem}.*.json'))]
+        # glob.escape so a task_id with glob metacharacters can't turn the
+        # variant scan into a character class (which would miss its own
+        # archives → re-dispatch storm) or match a sibling task.
+        candidates = [
+            d / review_filename,
+            *sorted(d.glob(f'{glob.escape(stem)}.*.json')),
+        ]
         for p in candidates:
             if p.exists() and _recorded_review_head_sha(p) == current_head_sha:
                 return True
@@ -3826,13 +3833,19 @@ def _dispatch_mirror_review(data: dict[str, Any], pr_url: str) -> None:
     # Record the PR head commit this review covers, so the round-0 dedup (and
     # the heal-undispatched-pr-review backstop) can distinguish "this commit
     # was reviewed" from "an older commit was reviewed". A PR pushed-to after
-    # its first review must be re-reviewed, not skipped. Best-effort: a gh
-    # hiccup leaves it unset and the dedup falls back to existence-only (the
-    # prior behavior).
+    # its first review must be re-reviewed, not skipped. Prefer a head the
+    # caller already resolved (the healer threads the PR's headRefOid through
+    # `data`, so no second gh call); fall back to a direct lookup for the
+    # inline build-phase path. Best-effort: a gh hiccup leaves it unset and the
+    # dedup falls back to existence-only (the prior behavior).
     review_head_sha: Optional[str] = None
-    _pr_coords = _parse_pr_url(pr_url)
-    if _pr_coords is not None:
-        review_head_sha = _gh_pr_head_sha(_pr_coords[0], _pr_coords[1])
+    _cand = data.get('head_sha')
+    if isinstance(_cand, str) and _cand:
+        review_head_sha = _cand
+    else:
+        _pr_coords = _parse_pr_url(pr_url)
+        if _pr_coords is not None:
+            review_head_sha = _gh_pr_head_sha(_pr_coords[0], _pr_coords[1])
     if review_head_sha:
         review_base['head_sha'] = review_head_sha
     # Chain context (M1). pr_url/target_repo are the PR under review; first
