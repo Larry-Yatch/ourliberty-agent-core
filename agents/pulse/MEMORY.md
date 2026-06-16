@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-16 07:32Z UTC (Iter ~2024, Tier 1→2 de-escalation, consecutive_clean=0)
+
+**Iter ~2024 summary:** ✅ Nominal. 0 new alerts. All checks clean. **Phase S s-1-link-inflight: PR #541 OPEN, Mirror review dispatched 07:23:29Z** (`review-s-1-link-inflight.json` in Mirror inbox, `wt-mirror-s-1-link-inflight` created 07:23:31Z — review active). PR #497 scope decision still with Larry (bot DM'd 07:07:50Z, deadline Jun-17T04:02Z ~20.5h). Sync health IMPROVED: last_sync=07:30:03Z status=no-change (clean). Repo adca5e7d=origin/main. Watermark: 1067 (unchanged). pending=0. PRIME ratio=20.20. **Tier 1 → Tier 2 DE-ESCALATION** (consecutive_clean=3). consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-16 07:23Z UTC (Iter ~2023, Tier 1, consecutive_clean=2)
 
 **Iter ~2023 summary:** ✅ Nominal. 0 new alerts. All checks clean. **Phase S s-1-link-inflight Forge build still ACTIVE** — worktree `wt-forge-s-1-link-inflight` active (mtime 07:10Z), build-phase dispatched 07:13:52Z, ~10 min into build, no PR yet (within 2h window). Stale Beacon dag-revision notify RESOLVED ✅ (Beacon inbox empty, confirmed). PR #497 scope decision still with Larry (bot DM'd 07:07:50Z, deadline Jun-17T04:02Z ~20h40m). Repo 2305cfd4=origin/main. Watermark: 1067 (unchanged). pending=0. PRIME ratio=20.20. Tier 1, consecutive_clean=1→2.
