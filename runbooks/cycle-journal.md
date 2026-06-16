@@ -4,6 +4,75 @@
 
 ---
 
+## Iteration ~2009 — 2026-06-16 05:25Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 4 new alerts, all Tier-3 silenced. **Key state change: PR #532 delegate-endpoint became MERGEABLE** (was CONFLICTING in ~2008 — conflict resolved by merge commit 221d3ff4 at 05:18:31Z). Pipeline auto-recovering. PR #497 ~22h to deadline. All 5 daemons alive.
+
+**VERIFY-BEFORE-REASSERT:**
+- PR #532 (`forge/delegate-endpoint`): **MERGEABLE** — confirmed via `gh pr view 532`. headRefOid=221d3ff4 ("Merge main into forge/delegate-endpoint (resolve alert-translations.j…)"), updatedAt=2026-06-16T05:18:31Z, reviewDecision="". Conflict resolved. heal-undispatched-pr-review scanned at 05:20Z: 0 orphaned PRs (within grace period — dispatch will fire ~05:48Z). Pipeline self-recovering. ✅ (no Pulse action needed)
+- PR #497 (`forge/cleanup-branch-warn-to-info-001`): MERGEABLE/"". Mirror REVIEW_ESCALATE Jun-14T04:02:56Z. Age≈50h. 72h deadline Jun-17T04:02:56Z → **~22h remaining.** [yellow] carry.
+- All 5 daemons: beacon_telegram_bot **3435953** (new — restarted by heal-stale-daemon-code at 05:19:42Z; was 2744840), chain_event_shipper 2744551, outbox_notifier 2744914, dashboard_api 3402371 (Ssl), inbox_watcher 3434697. All alive. ✅
+
+**Check 0 — Alert triage:** Watermark=1057 (entering); file=1061 lines. **4 new alerts (L1058–1061):**
+- L1058 heal-stale-daemon-code: auto-restarted ourliberty-beacon-bot.service (agent_runner.py mtime newer; PR #536). → Tier-3 silenced (known-pattern). ✅
+- L1059 heal-stale-daemon-code: auto-restarted ourliberty-forge-bot.service (same). → Tier-3 silenced. ✅
+- L1060 heal-stale-daemon-code: auto-restarted ourliberty-mirror-bot.service (same). → Tier-3 silenced. ✅
+- L1061 heal-stale-daemon-code: auto-restarted ourliberty-pulse-bot.service (same). → Tier-3 silenced. ✅
+Watermark advanced to 1061.
+
+**Check 1 — Log noise:** outbox-notifier.log: last entry 04:41Z Jun-16 (SEQUENCE_STEP_MERGED → last Forge notification). No new WARNs/ERRORs. heal-undispatched-pr-review.log: 05:20Z tick, "open=2 orphaned=0 dispatched=0". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon-bot new PID 3435953 (restarted 05:19:42Z by heal-stale-daemon-code post-PR-#536). Larry active at 23:22:18 MDT (05:22:18Z) — feeding context about agent_runner HOME-swap fix to newly restarted bot. Ongoing session. No 409 errors. G-rule telegram-409-burst 2/3 unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → "no stalls detected". All FORGE_NO_PR_SKIP entries informational. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0** (history=222). ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-16T05:19:40Z`, age≈6 min. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=1b9e372e=origin/main. Clean tree, on main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-16T04:29:19Z, status=no-change, age≈56 min. FRESH (<2h). ✅ Nominal.
+
+**Check C — Agent liveness:** All 5 alive. beacon_telegram_bot: 3435953 (new PID post-heal restart, informational). chain_event_shipper: 2744551. outbox_notifier: 2744914. dashboard_api: 3402371. inbox_watcher: 3434697. ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (2 open):
+- **PR #532** (`forge/delegate-endpoint`): **NEWLY MERGEABLE** — merge commit 221d3ff4 pushed at 05:18:31Z resolves conflict. 0 reviews. heal-undispatched-pr-review will auto-dispatch Mirror ~05:48Z. ✅ Pipeline self-recovering (no Pulse action; [blue] carry).
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): MERGEABLE/"". Mirror REVIEW_ESCALATE Jun-14T04:02:56Z. Age≈50h. 72h deadline Jun-17T04:02:56Z (~22h). [yellow] carry.
+ourliberty-dashboard: **0 open PRs.** ✅
+
+**Conditional checks (Tuesday 2026-06-16 UTC, weekday=1):** Check I fires Mon/Wed/Fri/Sun — skip. Check III fires Sunday — skip.
+
+**G-rule tracking:** No new advances this iter. All standing counts unchanged.
+
+**Actions taken:**
+1. `alert_triage_state.py set-watermark --line 1061` ✅
+2. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` ✅
+3. `cycle_tier_state.py record --checks-clean false` → Tier 1, consecutive_clean=0 ✅
+
+**Dispatches:** None. PR #532 pipeline self-recovering (heal-undispatched-pr-review will dispatch Mirror on next grace-expiry tick). PR #497 approaching deadline but not yet at 72h. No action warranted this iter.
+
+**Standing findings (carried):**
+- [yellow] **PR #532 delegate-endpoint** — NEWLY MERGEABLE. Merge commit 221d3ff4 pushed 05:18:31Z. 0 reviews. heal-undispatched-pr-review dispatches Mirror ~05:48Z. Watch for Mirror review + auto-merge. Beacon session active with Larry.
+- [yellow] **PR #497 REVIEW_ESCALATE** — MERGEABLE/"". Mirror REVIEW_ESCALATE Jun-14T04:02:56Z. Age≈50h. 72h deadline Jun-17T04:02:56Z (~22h).
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519/530/531/534** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — pending Larry dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — FN=3027, TP=5. `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] G-rule counters (unchanged): F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST **2/3**, merge_conflict_manual_rebase-tier4 1/3, heal-pipeline-stall-mirror-pass-unmerged-tier4 1/3, revision-phase-preamble-missing 1/3.
+- [blue] **Stale bash orphans** — PIDs 1834248 (20d+) + 2605007 (3d+). Low CPU. [carry]
+
+**PRIME DIRECTIVE:** iter_clean (signals observed; no Pulse corrective action — PR #532 self-recovering via auto-healer). ratio=20.10.
+**Tier end-of-iter:** **Tier 1, consecutive_clean=0** (signals: PR #532 MERGEABLE but no Mirror review yet + PR #497 22h deadline).
+
+---
+
 ## Iteration ~2008 — 2026-06-16 05:18Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0)
 
 **Trigger:** Larry direct invocation (`/cycle`).

@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-16 05:25Z UTC (Iter ~2009, Tier 1, consecutive_clean=0)
+
+**Iter ~2009 summary:** ✅ Nominal. 4 new alerts (L1058–1061), all Tier-3 silenced (heal-stale-daemon-code restarted beacon/forge/mirror/pulse-bot at 05:19Z triggered by PR #536 fix(agent_runner) mtime). **PR #532 KEY CHANGE: MERGEABLE** — merge commit 221d3ff4 pushed at 05:18:31Z, was CONFLICTING. 0 reviews; heal-undispatched-pr-review dispatches Mirror ~05:48Z. beacon_telegram_bot new PID 3435953. PR #497 REVIEW_ESCALATE Jun-14T04:02:56Z, age≈50h, deadline Jun-17T04:02:56Z (~22h). Repo 1b9e372e=origin/main. Watermark: 1057→1061. pending=0. Tier 1, consecutive_clean=0. PRIME ratio=20.10.
+
 ## Status snapshot — updated 2026-06-16 05:18Z UTC (Iter ~2008, Tier 1, consecutive_clean=0)
 
 **Iter ~2008 summary:** ✅ Nominal. 0 new alerts. All 5 mandatory checks clean. Inbox-watcher PID changed 2530123→3434697 (restarted ~23:14 MDT Jun-15, informational). **PR #532 CONFLICTING carry:** fix c8f8c615 on origin, no active Forge/Beacon task, session ended 22:55Z MDT Jun-15 without Forge rebase dispatch. PR #497 REVIEW_ESCALATE Jun-14T04:02:56Z, age≈49.2h, 72h deadline Jun-17T04:02:56Z (~22.8h). Repo 4be83115=origin/main. Watermark: 1057 (unchanged). pending=0. Tier 1, consecutive_clean=0. PRIME ratio=20.10.
@@ -265,7 +269,7 @@
 | PR #525 MERGED ✅ | feat(missions): re-brief narrator cards on mission state change. Merged 2026-06-15T20:21:50Z (`1bebe776`). missions-v2-phase4.1 sequence advancing. | DONE. Watch for next sequence step. |
 | PR #522 MERGED ✅ | fix(missions-card-gc): stop emitting routine success summary as Pulse-claimed digest alert. Merged 2026-06-15 after iter ~1986. **G-rule missions-card-gc-warn-vs-info COMPLETE ✅**. | DONE. |
 | PR #529 MERGED ✅ | `cred-drift-ignore-feature-flags-001`: adds `OURLIBERTY_NEWMISSION_INGEST_ENABLED` to ignored_keys allowlist in detect_drift. Merged 2026-06-15T23:48Z. | DONE. Credential drift false-positive resolved. |
-| PR #532 delegate-endpoint CONFLICTING | [yellow] OPEN, CONFLICTING, 0 GitHub reviews. Forge build completed (exit_code=0, $1.81) — fix commit `c8f8c615` locally staged on `forge/delegate-endpoint`, push-blocked (no GH_TOKEN). Beacon diagnosing root cause with Larry at 22:55 MDT Jun-15. Push cmd: `git -C /home/larry/agent-worktrees/wt-forge-fix-delegate-endpoint-regression-gate-001 push origin forge/delegate-endpoint` | Beacon resolving. Watch for push + Mirror review. |
+| PR #532 delegate-endpoint MERGEABLE ⬆️ | [yellow] OPEN, MERGEABLE, 0 GitHub reviews. Merge commit 221d3ff4 pushed 05:18:31Z Jun-16 (resolves conflict). heal-undispatched-pr-review will dispatch Mirror ~05:48Z. Beacon active with Larry (05:22Z session). PR #536 fix(agent_runner) enabled GitHub push. | Watch for Mirror review + auto-merge. |
 | PR #55 chat-label-fix MERGED ✅ | missions-v2-delegate-fix step 2. Merged 02:27Z 2026-06-16. | DONE |
 | PR #497 REVIEW_ESCALATE | [yellow] mergeable=UNKNOWN; Mirror REVIEW_ESCALATE Jun-14T04:02:56Z; age≈49.5h; 72h expires Jun-17T04:02:56Z (~25.5h remaining). | Escalate if still open at Jun-17T04:02:56Z |
 | unreviewed-merge:511/499/494/489/510/509/518/519/530 | [yellow] PRs merged by Larry without Mirror; bot-delivered for others. Larry's judgment call. | Reply appropriate shortcut or silence |
