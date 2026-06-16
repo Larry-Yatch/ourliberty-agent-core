@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-16 02:18Z UTC (Iter ~1999, Tier 2, consecutive_clean=1)
+
+**Iter ~1999 summary:** ✅ Nominal. 0 new alerts. All daemons alive. Repo at d2d8d908=origin/main. Watermark: 1052 (unchanged). pending=0. 2 open PRs in ourliberty-agent-core: #532 (delegate-endpoint, Mirror reviewing, missions-v2-delegate-fix) + #497 (UNKNOWN/"", Mirror REVIEW_ESCALATE, 72h deadline Jun-17T04:02:56Z ~23.9h). 1 open PR in ourliberty-dashboard: #55 (chat-label-fix, Mirror reviewing, missions-v2-delegate-fix). PR #531 unreviewed-merge alert not yet fired. PRIME ratio=20.06. Tier 2, consecutive_clean=1.
+
 ## Status snapshot — updated 2026-06-16 02:00Z UTC (Iter ~1998, Tier 2, consecutive_clean=0, de-escalated)
 
 **Iter ~1998 summary:** ✅ Nominal. 0 new alerts. All daemons alive. Repo at a4731185=origin/main. Watermark: 1052 (unchanged). pending=0. 1 open PR: #497 (UNKNOWN/"", Mirror REVIEW_ESCALATE, 72h deadline Jun-17T04:02:56Z ~25.9h). PR #531 merged by Larry at 01:55:17Z (unreviewed, alert expected next iter). missions-v2-delegate-fix: delegate-endpoint build-phase active, chat-label-fix retry 1/3 in Forge inbox. PRIME ratio=20.06. **Tier 1 → Tier 2 DE-ESCALATION** (3 consecutive clean iters). consecutive_clean=0.
