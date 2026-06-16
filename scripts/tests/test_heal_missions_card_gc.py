@@ -463,6 +463,182 @@ class ReconcileMissionPhasesTest(unittest.TestCase):
         self.assertNotIn('shipped_at', by_id['m-shipped'])
 
 
+# ----------------------------------- Phase S (S3) completion reconcile
+
+
+class PrNoteHelpersTest(unittest.TestCase):
+    def test_pr_number_from_url(self):
+        self.assertEqual(h.pr_number_from_url('https://github.com/o/r/pull/541'), '541')
+        self.assertIsNone(h.pr_number_from_url('https://github.com/o/r/issues/9'))
+        self.assertIsNone(h.pr_number_from_url(None))
+
+    def test_shipped_note(self):
+        self.assertEqual(h.shipped_note('https://github.com/o/r/pull/541'),
+                         'shipped in PR #541')
+        # Degrades to a PR-less phrasing when unparseable.
+        self.assertEqual(h.shipped_note(None), 'shipped (linked work merged)')
+
+    def test_pr_url_from_events_picks_first_nonnull(self):
+        events = [
+            {'event_type': 'a', 'pr_url': None},
+            {'event_type': 'b', 'pr_url': 'https://github.com/o/r/pull/7'},
+            {'event_type': 'c', 'pr_url': 'https://github.com/o/r/pull/8'},
+        ]
+        self.assertEqual(h._pr_url_from_events(events),
+                         'https://github.com/o/r/pull/7')
+        self.assertIsNone(h._pr_url_from_events([{'event_type': 'x'}]))
+
+
+class ClassifyCompletionTest(unittest.TestCase):
+    def test_not_verified_keeps(self):
+        d = h.classify_completion({'risk': 'safe'}, verified_merged=False)
+        self.assertEqual(d.action, 'keep')
+
+    def test_safe_verified_auto_closes(self):
+        d = h.classify_completion({'risk': 'safe'}, verified_merged=True)
+        self.assertEqual(d.action, 'auto_close')
+
+    def test_medium_verified_closeouts(self):
+        d = h.classify_completion({'risk': 'medium'}, verified_merged=True)
+        self.assertEqual(d.action, 'closeout')
+
+    def test_careful_verified_closeouts(self):
+        d = h.classify_completion({'risk': 'careful'}, verified_merged=True)
+        self.assertEqual(d.action, 'closeout')
+
+    def test_unbriefed_verified_closeouts_fail_toward_caution(self):
+        # No risk field yet ⇒ route to closeout (Larry review), never auto-close.
+        d = h.classify_completion({}, verified_merged=True)
+        self.assertEqual(d.action, 'closeout')
+
+
+class ReconcileCompletedCardsTest(unittest.TestCase):
+    """safe⇒done auto-close, risky⇒review_close closeout, gate-mismatch⇒keep,
+    verify/author error⇒keep, idempotent on closed cards, dry-run no-mutate."""
+
+    def _now(self):
+        return datetime(2026, 6, 16, 12, 0, 0, tzinfo=timezone.utc)
+
+    def _cap(self, cid, risk, **over):
+        cap = {
+            'id': cid, 'state': 'parked', 'risk': risk,
+            'title': f'card {cid}',
+            'spawned': {'kind': 'delegate', 'task_id': f'delegate-{cid}',
+                        'stamped_at': '2026-06-15T00:00:00+00:00'},
+        }
+        cap.update(over)
+        return cap
+
+    def _registry(self, *caps):
+        return {'schema_version': 1, 'captures': list(caps)}
+
+    def _verify_merged(self, pr_url):
+        return lambda task_id, dispatched_at: (True, pr_url)
+
+    def _closeout_stub(self, cap, pr_url, now):
+        return {'closeout': {'what': 'w', 'outcome': 'o', 'note': 'n'},
+                'closeout_provenance': {'by': 'beacon', 'pr_url': pr_url}}
+
+    def test_safe_card_auto_closes_with_shipped_note(self):
+        reg = self._registry(self._cap('c1', 'safe', aging=True))
+        res = h.reconcile_completed_cards(
+            reg, self._now(),
+            verify_fn=self._verify_merged('https://github.com/o/r/pull/541'),
+            closeout_fn=self._closeout_stub, dry_run=False)
+        cap = reg['captures'][0]
+        self.assertEqual(cap['state'], 'done')
+        self.assertEqual(cap['shipped_note'], 'shipped in PR #541')
+        self.assertEqual(cap['shipped_pr_url'], 'https://github.com/o/r/pull/541')
+        self.assertEqual(cap['closed_by'], 'heal_missions_card_gc')
+        self.assertIn('closed_at', cap)
+        self.assertNotIn('aging', cap)  # a closed card is no longer an aging nudge
+        self.assertEqual([cid for cid, _ in res.closed], ['c1'])
+        self.assertTrue(res.changed)
+
+    def test_medium_card_routes_to_closeout_review(self):
+        reg = self._registry(self._cap('c2', 'medium'))
+        res = h.reconcile_completed_cards(
+            reg, self._now(),
+            verify_fn=self._verify_merged('https://github.com/o/r/pull/9'),
+            closeout_fn=self._closeout_stub, dry_run=False)
+        cap = reg['captures'][0]
+        self.assertEqual(cap['state'], 'review_close')
+        self.assertTrue(cap['awaiting_ack'])
+        self.assertEqual(cap['closeout'], {'what': 'w', 'outcome': 'o', 'note': 'n'})
+        self.assertEqual(cap['shipped_pr_url'], 'https://github.com/o/r/pull/9')
+        self.assertEqual(res.closeouts, ['c2'])
+
+    def test_unbriefed_card_routes_to_closeout(self):
+        cap = self._cap('c3', None)
+        cap.pop('risk')
+        reg = self._registry(cap)
+        h.reconcile_completed_cards(
+            reg, self._now(),
+            verify_fn=self._verify_merged('https://github.com/o/r/pull/3'),
+            closeout_fn=self._closeout_stub, dry_run=False)
+        self.assertEqual(reg['captures'][0]['state'], 'review_close')
+
+    def test_gate_mismatch_keeps_card_parked(self):
+        # One leg of the belt-and-suspenders gate fails ⇒ verify_fn returns
+        # (False, pr_url); the card stays parked for a retry next tick.
+        reg = self._registry(self._cap('c4', 'safe'))
+        res = h.reconcile_completed_cards(
+            reg, self._now(),
+            verify_fn=lambda t, d: (False, 'https://github.com/o/r/pull/4'),
+            closeout_fn=self._closeout_stub, dry_run=False)
+        self.assertEqual(reg['captures'][0]['state'], 'parked')
+        self.assertEqual(res.closed, [])
+        self.assertFalse(res.changed)
+        self.assertEqual(res.kept, 1)
+
+    def test_verify_error_keeps_card(self):
+        def _boom(task_id, dispatched_at):
+            raise RuntimeError('supabase down')
+        reg = self._registry(self._cap('c5', 'safe'))
+        res = h.reconcile_completed_cards(
+            reg, self._now(), verify_fn=_boom,
+            closeout_fn=self._closeout_stub, dry_run=False)
+        self.assertEqual(reg['captures'][0]['state'], 'parked')
+        self.assertEqual(res.kept, 1)
+
+    def test_closeout_author_error_keeps_card(self):
+        def _boom(cap, pr_url, now):
+            raise RuntimeError('claude down')
+        reg = self._registry(self._cap('c6', 'careful'))
+        res = h.reconcile_completed_cards(
+            reg, self._now(),
+            verify_fn=self._verify_merged('https://github.com/o/r/pull/6'),
+            closeout_fn=_boom, dry_run=False)
+        self.assertEqual(reg['captures'][0]['state'], 'parked')
+        self.assertEqual(res.kept, 1)
+
+    def test_non_parked_and_no_spawn_are_skipped(self):
+        already_done = self._cap('c7', 'safe', state='done')
+        no_spawn = {'id': 'c8', 'state': 'parked', 'risk': 'safe'}
+        reg = self._registry(already_done, no_spawn)
+        res = h.reconcile_completed_cards(
+            reg, self._now(),
+            verify_fn=self._verify_merged('https://github.com/o/r/pull/7'),
+            closeout_fn=self._closeout_stub, dry_run=False)
+        # Idempotent: a done card is untouched; a card with no spawned.task_id
+        # is not a completion candidate.
+        self.assertEqual(reg['captures'][0]['state'], 'done')
+        self.assertEqual(reg['captures'][1]['state'], 'parked')
+        self.assertFalse(res.changed)
+
+    def test_dry_run_does_not_mutate(self):
+        reg = self._registry(self._cap('c9', 'safe'), self._cap('c10', 'medium'))
+        res = h.reconcile_completed_cards(
+            reg, self._now(),
+            verify_fn=self._verify_merged('https://github.com/o/r/pull/9'),
+            closeout_fn=self._closeout_stub, dry_run=True)
+        # Reported as would-close, but both captures stay parked.
+        self.assertTrue(res.changed)
+        self.assertEqual(reg['captures'][0]['state'], 'parked')
+        self.assertEqual(reg['captures'][1]['state'], 'parked')
+        self.assertNotIn('closeout', reg['captures'][1])
+
+
 # ---------------------------------------- commit + push (real temp git repo)
 
 
@@ -790,6 +966,47 @@ class RunOnceTest(unittest.TestCase):
                 )
             self.assertEqual(rc, 0)
             spy.assert_called_once()
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_completion_closes_safe_card_through_write(self):
+        # End-to-end: a parked card whose spawned work is verified-merged is
+        # auto-closed to `done` and the healer's SINGLE write lands it on disk
+        # (proving completion rides the same single-committer write path).
+        now = datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc)
+        tmp = tempfile.mkdtemp(prefix='run-once-complete-')
+        try:
+            core = Path(tmp) / 'agent-core'
+            (core / 'agents' / 'beacon').mkdir(parents=True)
+            (core / h.CAPTURES_REL).write_text(json.dumps({
+                'schema_version': 1,
+                'captures': [{
+                    'id': 'cap-x', 'state': 'parked', 'risk': 'safe',
+                    'last_touched': now.isoformat(),
+                    'spawned': {'kind': 'delegate', 'task_id': 'delegate-cap-x',
+                                'stamped_at': '2026-06-15T00:00:00+00:00'},
+                }],
+            }) + '\n')
+
+            import larry_alerts
+            with mock.patch.object(h, 'load_repo_paths',
+                                   return_value={'ourliberty-agent-core': core}), \
+                    mock.patch.object(larry_alerts, 'append_alert'):
+                rc = h.run_once(
+                    dry_run=False,
+                    emit_fn=lambda **_: True,
+                    events_fetcher=lambda: [],
+                    author_fn=lambda registry, **_: (0, 0),  # skip the narrator
+                    completion_verify_fn=lambda t, d: (
+                        True, 'https://github.com/o/r/pull/600'),
+                    completion_closeout_fn=lambda c, p, n: {},
+                    now=now,
+                )
+            self.assertEqual(rc, 0)
+            cap = json.loads((core / h.CAPTURES_REL).read_text())['captures'][0]
+            self.assertEqual(cap['state'], 'done')
+            self.assertEqual(cap['shipped_note'], 'shipped in PR #600')
         finally:
             import shutil
             shutil.rmtree(tmp, ignore_errors=True)
