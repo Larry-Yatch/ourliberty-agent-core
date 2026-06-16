@@ -605,12 +605,19 @@ class CaptureActionRequest(BaseModel):
 
 
 class CaptureActionResponse(BaseModel):
-    # promote/drop are PR-backed → {pr_url, branch[, mission_id]}; snooze is a
-    # direct committer write → {applied, snoozed_until}. All optional so one
-    # model covers both shapes (§ 4 contract).
+    # All three actions are now one-click (no PR): `drop` and `snooze` are direct
+    # captures.json committer writes → {applied, state|snoozed_until}; `promote`
+    # queues the mission for the missions writer and flips the capture →
+    # {mission_id, status: 'queued', applied}. Every field is optional so one
+    # model covers all shapes (§ 4 contract). `pr_url`/`branch` are retained as
+    # optional (always absent now) only so a transitional client reading them
+    # degrades to undefined rather than breaking; drop once no client references
+    # them.
     pr_url: Optional[str] = None
     branch: Optional[str] = None
     mission_id: Optional[str] = None
+    status: Optional[str] = None
+    state: Optional[str] = None
     applied: Optional[bool] = None
     snoozed_until: Optional[str] = None
 
@@ -3999,19 +4006,32 @@ def _handle_capture_ingest(
 # Missions v2 Phase 3 — capture write-back (POST /api/missions/captures/{id}/action)
 # (spec: agents/beacon/specs/missions-v2-phase3-writeback-autoregister.md § 4)
 #
-# `promote` and `drop` are PR-backed: they open a PR via the shared
-# _open_registry_pr helper (GET main ref → create branch → PUT contents → POST PR),
-# so the LOCAL missions.json/captures.json are never mutated — they update via
-# `git pull` on merge (no drift in the shared checkout). `promote` PUTs BOTH files
-# onto one branch so the new mission entry and the capture's promoted_to/state land
-# atomically in ONE PR. (The +New mission flow used to share this mechanism but no
-# longer opens a PR — it queues the mission for the missions writer; see
-# _handle_new_mission.)
+# All three actions are now ONE-CLICK — none opens a PR for Larry to hand-merge.
+# Each write routes through the single committer that owns the file it touches,
+# honoring the machine-owned-file single-committer invariant:
 #
-# `snooze` is the exception: a trivial, reversible date field that routes DIRECT
-# through the single captures.json committer primitives (_CAPTURE_INGEST_LOCK +
-# _atomic_write_captures — the SAME writer the ingest path uses, NOT a second
-# one), per the § 4.3 decision. It returns {applied: true} rather than a PR.
+#   * `drop` and `snooze` mutate ONLY captures.json. They write the LOCAL file
+#     directly through the captures committer primitives (_CAPTURE_INGEST_LOCK +
+#     _atomic_write_captures — the SAME writer the ingest path uses, NOT a second
+#     one); heal_missions_card_gc (the SOLE captures.json git committer) version-
+#     controls the delta on its next tick. drop returns {applied, state:dropped};
+#     snooze returns {applied, snoozed_until} (§ 4.2 / § 4.3).
+#
+#   * `promote` touches TWO machine-owned files owned by TWO committers, so it
+#     splits the write: it QUEUES the new mission entry for the missions writer
+#     (heal_orphan_autoregister drains <queue_dir>/<mission_id>.json into
+#     missions.json — the exact +New mission mechanism, see _handle_new_mission)
+#     AND flips the capture (promoted_to + state:promoted) locally through the
+#     captures committer (committed by heal_missions_card_gc). Returns
+#     {mission_id, status:'queued', applied}. The board reflects both on the next
+#     poll after the two healers commit — the same post-merge latency the old PR
+#     flow had, minus the PR. (Cross-file atomicity is best-effort: the mission
+#     is queued first so a mid-write crash never loses it; a failed capture flip
+#     rolls the queue file back.)
+#
+# This ends the throwaway-PR-per-action friction the old _open_registry_pr flow
+# created (each PR was unroutable through Forge, so it sat open until Larry went
+# to GitHub to squash-merge + delete the branch by hand).
 
 _MISSIONS_REPO_REL = 'agents/beacon/missions.json'
 _CAPTURES_REPO_REL = 'agents/beacon/captures.json'
@@ -4222,26 +4242,33 @@ def _handle_capture_promote(
     overrides: dict[str, Any],
     captures_path: Path,
     missions_path: Path,
+    queue_dir: Path,
     now: Optional[datetime] = None,
 ) -> dict[str, Any]:
-    """`promote` — capture → mission (§ 4.1). Opens ONE PR editing BOTH
-    missions.json (new `phase: drafting` entry) and captures.json (the capture's
-    `promoted_to` + `state: promoted`) so they land atomically. The local files
-    are NOT mutated. Optional overrides: name / brief / repo / spec_docs
-    (defaults inferred from the capture). Returns {pr_url, branch, mission_id}."""
-    now = now or datetime.now(timezone.utc)
-    token = _github_token()
-    if not token:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                'error': 'github token missing',
-                'detail': 'no GITHUB_TOKEN env nor gh auth token on dashboard-api host',
-            },
-        )
-    repo_full = _missions_repo_full()
+    """`promote` — capture → mission (§ 4.1). One-click, no PR. The new mission
+    lives in missions.json (owned by the missions writer) and the capture's
+    `promoted_to`/`state` live in captures.json (owned by the captures
+    committer), so the write splits across BOTH single-committers:
+      1. QUEUE `<queue_dir>/<mission_id>.json` (the full `phase: drafting` entry)
+         for heal_orphan_autoregister to drain into missions.json — the SAME
+         mechanism +New mission uses (see _handle_new_mission).
+      2. Flip the capture (`promoted_to` + `state: promoted`) on the LOCAL
+         captures.json; heal_missions_card_gc commits the delta.
+    Optional overrides: name / brief / repo / spec_docs (defaults inferred from
+    the capture). Returns {mission_id, status: 'queued', applied: True}.
 
-    with _NEW_MISSION_LOCK:
+    The mission is queued BEFORE the capture is flipped so a mid-write crash
+    leaves the mission recoverable rather than silently lost; if the capture
+    flip fails the queue file is rolled back so the action is all-or-nothing."""
+    now = now or datetime.now(timezone.utc)
+
+    # One lock for the whole transition: _CAPTURE_INGEST_LOCK both guards the
+    # captures.json read-modify-write against the ingest/snooze/drop writers AND
+    # serializes concurrent promotes of the same capture (the _require_parked
+    # guard is then the idempotency gate against a double-click). The queue write
+    # never touches _NEW_MISSION_LOCK, so there is no nested-lock inversion with
+    # _handle_new_mission.
+    with _CAPTURE_INGEST_LOCK:
         cap_registry = _read_captures_registry(captures_path)
         cap = _find_capture(cap_registry['captures'], capture_id)
         _require_parked(cap, capture_id)
@@ -4258,6 +4285,8 @@ def _handle_capture_promote(
                 },
             )
 
+        # Reject a mission_id already registered in missions.json, or already
+        # queued (in-flight, not yet drained) — mirrors _handle_new_mission.
         missions_registry = _read_missions_registry(missions_path)
         for existing in missions_registry['missions']:
             if isinstance(existing, dict) and existing.get('id') == mission_id:
@@ -4269,6 +4298,19 @@ def _handle_capture_promote(
                         'existing_entry_brief': existing.get('brief', ''),
                     },
                 )
+        queue_path = queue_dir / f'{mission_id}.json'
+        if queue_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    'error': 'mission_id queued',
+                    'id': mission_id,
+                    'hint': (
+                        'A mission with this name is already queued for '
+                        'registration; it will appear on the board shortly.'
+                    ),
+                },
+            )
 
         brief = (
             overrides.get('brief')
@@ -4289,42 +4331,39 @@ def _handle_capture_promote(
             'created': now.date().isoformat(),
             'deferred_reason': None,
         }
-        updated_missions = {
-            'schema_version': missions_registry.get('schema_version', 1),
-            'missions': missions_registry['missions'] + [new_entry],
-        }
 
-        # Mutate the in-memory capture (never written to disk locally — only PUT
-        # to the branch): promoted_to + terminal state.
+        # 1) Queue the mission for the missions writer. FIRST, so a crash after
+        #    this point still registers the mission (recoverable) rather than
+        #    losing it.
+        try:
+            _atomic_write_json(queue_path, new_entry)
+        except OSError as e:
+            first_line = str(e).splitlines()[0] if str(e) else type(e).__name__
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={'error': 'queue write failed', 'detail': first_line},
+            )
+
+        # 2) Flip the capture on the local captures.json (the captures committer
+        #    commits the delta). Roll the queue file back on failure so the
+        #    action is all-or-nothing.
         cap['promoted_to'] = mission_id
         cap['state'] = 'promoted'
         cap_registry['schema_version'] = CAPTURES_SCHEMA_VERSION
+        try:
+            _atomic_write_captures(captures_path, cap_registry)
+        except OSError as e:
+            try:
+                queue_path.unlink()
+            except OSError:
+                pass
+            first_line = str(e).splitlines()[0] if str(e) else type(e).__name__
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={'error': 'captures write failed', 'detail': first_line},
+            )
 
-        branch = f'feat/promote-capture-{capture_id}'
-        title = f'chore(missions): promote capture {capture_id} -> mission {mission_id}'
-        pr_body = '\n'.join([
-            f'Promote capture `{capture_id}` to mission `{mission_id}`.',
-            '',
-            f'**Brief:** {brief}',
-            '',
-            'Edits both `missions.json` (new `drafting` entry) and '
-            '`captures.json` (`promoted_to` + `state: promoted`) in one PR so '
-            'they land atomically. No dispatch — Larry dispatches the mission '
-            '(Missions v2 Phase 3 § 4.1).',
-        ])
-        pr_url = _open_registry_pr(
-            branch=branch,
-            title=title,
-            pr_body=pr_body,
-            files=[
-                (_MISSIONS_REPO_REL, updated_missions),
-                (_CAPTURES_REPO_REL, cap_registry),
-            ],
-            token=token,
-            repo_full=repo_full,
-        )
-
-    return {'pr_url': pr_url, 'branch': branch, 'mission_id': mission_id}
+    return {'mission_id': mission_id, 'status': 'queued', 'applied': True}
 
 
 def _handle_capture_drop(
@@ -4334,54 +4373,32 @@ def _handle_capture_drop(
     captures_path: Path,
     now: Optional[datetime] = None,
 ) -> dict[str, Any]:
-    """`drop` — retire a capture (§ 4.2). PR-backed (auditable — never a silent
-    delete): sets `state: dropped` (+ optional `drop_reason`). The local file is
-    NOT mutated. Returns {pr_url, branch}."""
-    token = _github_token()
-    if not token:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                'error': 'github token missing',
-                'detail': 'no GITHUB_TOKEN env nor gh auth token on dashboard-api host',
-            },
-        )
-    repo_full = _missions_repo_full()
+    """`drop` — retire a capture (§ 4.2). One-click DIRECT write through the
+    single captures.json committer (NOT PR-backed — mirrors `snooze`): sets
+    `state: dropped` (+ optional `drop_reason`) on the LOCAL captures.json;
+    heal_missions_card_gc (the SOLE captures.json git committer) version-controls
+    the delta on its next tick and collapses the card to the dropped lane. Never
+    a silent delete — that GC commit IS the audit record. Returns
+    {applied: True, state: 'dropped'}. 404 if no such capture; 409 if it isn't
+    parked; 400 on a non-string reason."""
     if reason is not None and not isinstance(reason, str):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail='reason must be a string',
         )
 
-    with _NEW_MISSION_LOCK:
-        cap_registry = _read_captures_registry(captures_path)
-        cap = _find_capture(cap_registry['captures'], capture_id)
+    with _CAPTURE_INGEST_LOCK:
+        registry = _read_captures_registry(captures_path)
+        cap = _find_capture(registry['captures'], capture_id)
         _require_parked(cap, capture_id)
 
         cap['state'] = 'dropped'
         if reason:
             cap['drop_reason'] = reason
-        cap_registry['schema_version'] = CAPTURES_SCHEMA_VERSION
+        registry['schema_version'] = CAPTURES_SCHEMA_VERSION
+        _atomic_write_captures(captures_path, registry)
 
-        branch = f'chore/drop-capture-{capture_id}'
-        title = f'chore(missions): drop capture {capture_id}'
-        pr_body = '\n'.join([
-            f'Drop capture `{capture_id}` (`state: dropped`).',
-            *(['', f'**Reason:** {reason}'] if reason else []),
-            '',
-            'Auditable retire — the GC healer moves dropped captures to the '
-            'collapsed lane (Missions v2 Phase 3 § 4.2).',
-        ])
-        pr_url = _open_registry_pr(
-            branch=branch,
-            title=title,
-            pr_body=pr_body,
-            files=[(_CAPTURES_REPO_REL, cap_registry)],
-            token=token,
-            repo_full=repo_full,
-        )
-
-    return {'pr_url': pr_url, 'branch': branch}
+    return {'applied': True, 'state': 'dropped'}
 
 
 def _handle_capture_action(
@@ -4391,12 +4408,14 @@ def _handle_capture_action(
     args: dict[str, Any],
     captures_path: Path,
     missions_path: Path,
+    queue_dir: Path,
     now: Optional[datetime] = None,
 ) -> dict[str, Any]:
     """Dispatch POST /api/missions/captures/{id}/action to the per-action
-    handler. `promote`/`drop` are PR-backed → {pr_url, branch}; `snooze` is a
-    direct committer write → {applied: True, snoozed_until}. Unknown action →
-    400."""
+    handler. All three are one-click (no PR): `promote` queues the mission +
+    flips the capture → {mission_id, status:'queued', applied}; `drop` and
+    `snooze` are direct captures.json committer writes → {applied, state} /
+    {applied, snoozed_until}. Unknown action → 400."""
     if action == 'promote':
         return _handle_capture_promote(
             capture_id=capture_id,
@@ -4406,6 +4425,7 @@ def _handle_capture_action(
             },
             captures_path=captures_path,
             missions_path=missions_path,
+            queue_dir=queue_dir,
             now=now,
         )
     if action == 'drop':
@@ -6238,10 +6258,10 @@ def post_system_missions_new(body: NewMissionRequest) -> dict[str, Any]:
 
 
 # POST /api/missions/captures/{capture_id}/action — capture write-back (Missions
-# v2 Phase 3 § 4). promote/drop are PR-backed (reuse the new-mission GitHub-REST
-# mechanism; promote edits missions.json + captures.json in ONE PR); snooze
-# routes direct through the single captures.json committer. Same auth as
-# /api/larry/action: X-Dashboard-Token + an allowlisted X-Actor.
+# v2 Phase 3 § 4). All one-click (no PR): promote queues the mission for the
+# missions writer + flips the capture locally; drop/snooze are direct captures.json
+# committer writes. Same auth as /api/larry/action: X-Dashboard-Token + an
+# allowlisted X-Actor.
 @app.post(
     '/api/missions/captures/{capture_id}/action',
     response_model=CaptureActionResponse,
@@ -6259,6 +6279,7 @@ def post_capture_action(
         args=body.model_dump(exclude={'action'}, exclude_none=True),
         captures_path=_captures_json_path(),
         missions_path=_missions_json_path(),
+        queue_dir=_new_mission_queue_dir(),
     )
 
 
