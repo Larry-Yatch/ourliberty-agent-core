@@ -4,6 +4,75 @@
 
 ---
 
+## Iteration ~2036 — 2026-06-16 10:02Z UTC (interactive, /cycle, Tier 1→2 de-escalation, consecutive_clean=2→3)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 0 new alerts. All mandatory checks clean. **Tier 1 → Tier 2 DE-ESCALATION** (3 consecutive clean iters: ~2034, ~2035, ~2036). Phase S s-4-freshness and s-5-board-ui Forge builds active.
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #543 MERGED ✅ CONFIRMED:** outbox-notifier.log shows `AUTO_MERGE task=s-3-failure-cost-pause ... outcome=merged` at 09:32:24Z UTC + `SEQUENCE_STEP_MERGED seq=missions-v2-phase-s step=s-3-failure-cost-pause`. Confirmed merged. ✅
+- **Phase S s-4-freshness BUILD ACTIVE ✅:** Forge inbox has `build-s-4-freshness.json` (created 09:43Z). Worktree `wt-forge-s-4-freshness` active (scripts dir mtime 10:01Z UTC — writing within last 2 min). ~19 min in, within 2h window. No PR yet. ✅
+- **Phase S s-5-board-ui BUILD ACTIVE ✅:** Forge inbox has `resume-s-5-board-ui-r1.json` (clarification-response dispatched 09:52:19Z UTC). Worktree `wt-forge-s-5-board-ui` exists. ~10 min into resumed build. Within window. ✅
+- **dashboard_api PID 3540633 ✅:** Confirmed alive (Ssl). ✅
+- **PR #497 scope decision — CARRY CONFIRMED ✅:** UNKNOWN/"", deadline Jun-17T04:02Z (~18h). No change. ✅
+
+**Check 0 — Alert triage:** Watermark=1045 entering; file=1045 lines. **0 new alerts.** ✅ Nominal.
+
+**Check 1 — Log noise (outbox-notifier.log):** Last entry 03:52:19 MDT = 09:52:19Z UTC: `clarification-response continuation dispatched forge <- beacon (task=s-5-board-ui, round=1)`. All INFO since 09:21:56Z UTC. No new WARNs since iter ~2032's events (MalformedMirrorMarker for s-3, already documented). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot PID 3435953 alive (Ss). Last log: 03:55:18 MDT = 09:55:18Z UTC (idx=1044 digest skip — heal-stale-daemon-code). ~7 min ago. No 409 errors (prior HTTP timeout errors 03:28–03:35 MDT = 09:28–09:35Z UTC outage already documented in iter ~2034). G-rule telegram-409-burst **2/3** unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → "no stalls detected" at 10:00:22Z. s-4 worktree actively writing (mtime 10:01Z). s-5 resumed build ~10 min in. Both within 2h window. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: pending=1 (`unreg-approval-2639d31d157f` — PR #543 scope decision). **MOOT** — PR #543 confirmed MERGED 09:32:24Z UTC. Self-resolves. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-16T09:50:16Z, age≈12 min. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=origin/main=068fcc8b. Clean tree, on main, up to date. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-16T09:30:16Z, age≈32 min. FRESH (within 2h). ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3435953 (Ss) ✅, chain_event_shipper 2744551 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, dashboard_api 3540633 (Ssl) ✅, outbox_notifier 3462678 (Ss) ✅. All 5 alive. ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (1 open):
+- **PR #497** (`fix(cleanup-branches): success-prune alert is info, not warning`): UNKNOWN/"". Scope decision with Larry (deadline Jun-17T04:02Z, ~18h). [yellow] carry.
+ourliberty-dashboard: **0 open PRs.** ✅
+ourliberty-graph: **0 open PRs.** ✅
+
+**Conditional checks (Tuesday 2026-06-16 UTC, weekday=1):** Check I fires Mon/Wed/Fri/Sun — skip. Check III fires Sunday — skip.
+
+**G-rule tracking:** All counts unchanged from iter ~2035. No new WARN events this iter.
+
+**Actions taken:**
+1. Alert triage: watermark 1045 unchanged (0 new alerts).
+2. PRIME ledger: `iter_clean` appended (2026-06-16T10:02:38Z, tier=1).
+3. Tier state: `record --checks-clean true` → consecutive_clean=2→3 → **Tier 1→2 DE-ESCALATION**. tier=2, consecutive_clean=0.
+
+**Dispatches:** None.
+
+**Standing findings (carried):**
+- [yellow] **PR #497 scope decision** — `approve cleanup-branch-info` or `reject cleanup-branch-info`. Bot DM'd 07:07:50Z. Deadline Jun-17T04:02Z (~18h). [carry]
+- [yellow] **Phase S s-4-freshness BUILD-PHASE ACTIVE** — `wt-forge-s-4-freshness` actively writing (mtime 10:01Z). ~19 min in. Watch for PR.
+- [yellow] **Phase S s-5-board-ui RESUMED BUILD** — `resume-s-5-board-ui-r1.json` in Forge inbox (dispatched 09:52Z). Watch for PROCEED or new CLARIFY.
+- [yellow] **unreg-approval-2639d31d157f (PR #543)** — MOOT; PR merged. Self-resolves. [carry until cleared]
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519/530/531/534** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — pending Larry dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — FN=3027, TP=5. `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST **2/3**, merge_conflict_manual_rebase-tier4 1/3, heal-pipeline-stall-mirror-pass-unmerged-tier4 1/3, revision-phase-preamble-missing **2/3**, mirror-malformed-verdict-marker **1/3**, mirror-no-session-revision-loop **2/3**, watermark-rotation-gap **2/3**.
+- [blue] **Phase S: s-1 ✅ s-2 ✅ s-3 ✅ MERGED. s-4 build-phase active (~19 min). s-5 resumed build (~10 min). s-6 pending (deps: s-2 ✅ + s-4 🔄).**
+- [blue] **Stale bash orphans** — PIDs 1834248 + 2605007. Low CPU. [carry]
+
+**PRIME DIRECTIVE:** Clean iter (de-escalation). 0 interventions. ratio=20.27 (993 interventions, 49 systemic fixes), trend=improving.
+**Tier end-of-iter:** **Tier 2, consecutive_clean=0** (3 more clean iters → Tier 3 de-escalation). Next cadence: 15-min.
+
+---
+
 ## Iteration ~2035 — 2026-06-16 09:56Z UTC (interactive, /cycle, Tier 1, consecutive_clean=1→2)
 
 **Trigger:** Larry direct invocation (`/cycle`).

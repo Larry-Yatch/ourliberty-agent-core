@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-16 10:02Z UTC (Iter ~2036, Tier 1→2 de-escalation, consecutive_clean=3→0)
+
+**Iter ~2036 summary:** ✅ Nominal. 0 new alerts. All 5 mandatory checks clean. **Tier 1 → Tier 2 DE-ESCALATION** (3 consecutive clean: ~2034, ~2035, ~2036). Phase S s-4-freshness Forge build active (worktree mtime 10:01Z, ~19 min in); s-5-board-ui resumed build (clarification-response dispatched 09:52Z, ~10 min in); s-6-drain pending (deps: s-2 ✅ + s-4 🔄). PR #497 scope decision still with Larry (deadline Jun-17T04:02Z, ~18h). unreg-approval-2639d31d157f moot (PR #543 merged). Repo 068fcc8b=origin/main (clean). Sync fresh (09:30:16Z). Watermark: 1045 (unchanged). pending=1 (moot). PRIME ratio=20.27 (993 interventions, 49 systemic fixes). Tier 2, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-16 09:56Z UTC (Iter ~2035, Tier 1, consecutive_clean=2, nominal)
 
 **Iter ~2035 summary:** ✅ Nominal. 1 new alert (L1045 Tier-3 silenced: heal-stale-daemon-code auto-restarted ourliberty-dashboard-api.service at 09:50:21Z — discovered via watermark rotation gap repair). Watermark gap repaired: file rotated from 1072 to 1044 physical lines, watermark advanced backward 1072→1045 (safe; all content previously triaged). **G-rule watermark-rotation-gap: NEW 2/3** — two occurrences (iter ~1936 + iter ~2035). Dispatch to Beacon at 3/3 for auto-detect/repair fix. **dashboard_api PID changed 3486940→3540633** (heal-stale-daemon-code restart 09:50Z). **Phase S ACTIVE:** s-1/s-2/s-3 MERGED ✅; s-4-freshness build-phase (~13 min); s-5-board-ui clarification round 1 (Beacon responded 09:52:19Z). s-6-drain pending. PR #497 scope decision with Larry (~18h deadline Jun-17T04:02Z). Repo 39c99748=origin/main (clean). Sync fresh (09:30:16Z). Watermark: 1072→1045. pending=1 (moot). PRIME ratio=20.27 (993 interventions, 49 systemic fixes). Tier 1, consecutive_clean=2.
