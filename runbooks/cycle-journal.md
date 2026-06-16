@@ -4,6 +4,90 @@
 
 ---
 
+## Result-notification — 2026-06-16 ~07:1xZ UTC (inter-cycle, task=pulse-phase-s-dag-redispatch-002, from=beacon, status=SUCCESS)
+
+**Type:** Beacon result-notification. No cycle; journaling material finding only.
+
+**Summary:** `pulse-phase-s-dag-redispatch-002` completed successfully. Beacon wrote `dag-preflight-missions-v2-phase-s-3.json` directly to Mirror's inbox (`/home/larry/agents/inboxes/mirror/`, chmod 600), using the dag-preflight-2 direct-write format (the path that worked). Beacon verified: sequence file correctly amended (`s-6-drain depends_on=['s-2-completion', 's-4-freshness']`, status=pending); corrective audit entry appended to sequence file noting the dropped marker and the direct-write recovery.
+
+The routing-signal APPROVAL_REQUEST marker emitted at 06:40:40Z is confirmed dropped — outbox-notifier had zero log entries after 06:28:32Z; this is the third occurrence of the marker-drop gap in headless context.
+
+**Standing updates:**
+- **Phase S dag-preflight-3:** CONFIRMED IN MIRROR INBOX via direct write. Iter ~2020 correctly diagnosed the drop and dispatched recovery. Recovery complete. Next: Mirror returns PASS (sequence auto-activates) or REVISION (routes back to Beacon).
+- **Routing-signal marker gap:** 3rd headless occurrence confirmed. `project_pulse_direction_ask_marker_gap.md` already tracks; systemic fix still pending.
+- **PR #497 scope decision (pulse-cleanup-branch-decision-reissue-001):** No result yet. Carry.
+
+**Actions taken:** None. Pipeline active; Pulse no further action needed.
+
+---
+
+## Iteration ~2020 — 2026-06-16 07:04Z UTC (interactive, /cycle, Tier 2→1 tier-reset, consecutive_clean=0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Signal. 0 new alerts. 2 findings: Phase S dag-preflight-3 stuck (APPROVAL_REQUEST marker dropped by outbox-notifier); PR #497 binary scope decision (cleanup-branch-info-severity-decision-001) not delivered to Larry (same marker-drop gap). **Tier 2 → Tier 1 RESET.**
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S dag-preflight-3 — STUCK ⚠️:** Beacon session 4963f2d8 (06:39:33-06:40:53Z) amended missions-v2-phase-s.json (s-6-drain deps=['s-2-completion', 's-4-freshness'] ✅) and emitted an APPROVAL_REQUEST marker (`phase=routing-signal`, `task_id=dag-preflight-missions-v2-phase-s-3`). outbox-notifier last log entry was 00:28:32 MDT (06:28:32Z) — 11 min BEFORE Beacon's session. No log entry after 06:28:32Z despite 20+ min elapsed. Mirror inbox empty (newest archive: dag-preflight-2 at 00:25 MDT). **Verdict: dag-preflight-3 APPROVAL_REQUEST marker dropped by outbox-notifier. Mirror has not received dag-preflight-3. Pipeline stalled.**
+- **PR #497 scope decision — NOT DELIVERED ⚠️:** Beacon session 7081f34b (06:39:16Z, processed second NO_SESSION notify) investigated PR #497 and found a genuine code bug: `scripts/cleanup_dispatch_branches.py` uses `severity='info'` but `VALID_SEVERITIES=('warning','critical')` at `larry_alerts.py:77` — `append_alert()` rejects 'info' and drops the digest line entirely. Alert was already `route='digest'` before the PR; `ceo_digest_generator` never renders the severity token. Beacon correctly concluded this is a scope call (not a mechanical fix): binary choice between APPROVE=add INFO severity tier (Forge builds it) or REJECT=abandon PR #497. Beacon emitted `cleanup-branch-info-severity-decision-001` APPROVAL_REQUEST marker. outbox-notifier dropped it — `beacon-pending-approvals.json` shows pending=0, no new larry-alerts entry, no new Telegram bot log entry after 00:32:31 MDT. **Larry has NOT seen the binary decision.**
+- **PR #497 G-rule re-assessment:** The mirror-no-session-revision-loop was at 2/3. Beacon's session 7081f34b DID process the second NO_SESSION notify, but instead of re-dispatching Mirror (which would advance the loop count), it found the scope issue and escalated. The loop is effectively broken by the scope escalation — no third NO_SESSION occurrence this iter. G-rule stays **2/3**.
+
+**Check 0 — Alert triage:** Watermark=1065 entering; file=1065 lines. **0 new alerts.** ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log last entry 00:28:32 MDT (dag-preflight-2 REVISION routed to Beacon). No new entries. 31+ min silence while two Beacon sessions produced markers — confirms marker-drop gap. No WARNs/ERRORs. ✅ Nominal on surface; systemic gap noted.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot PID 3435953 alive (Ss). Last log entry 00:32:31 MDT (alert idx=1064, digest). No new Larry messages. No 409 errors. G-rule telegram-409-burst 2/3 unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → "no stalls detected". All FORGE_NO_PR_SKIP informational. ✅ Nominal. (dag-preflight-3 stall not captured by heal_pipeline_stall because it's a DAG-preflight task, not a standard Forge inbox task.)
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0** (history=223). ✅ Nominal. (cleanup-branch-info-severity-decision-001 never reached pending — dropped by outbox-notifier before entry.)
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-16T06:49:57Z`, age≈14 min. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=821b68be=origin/main (auto-committed by run_cycle.sh after iter ~2019). `## main...origin/main` (no divergence). Clean tree, on main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-16T06:29:59Z, status=error (push-failed race, known-pattern, self-heals). Repo itself at origin/main. ✅ Known-pattern nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3435953 (Ss) ✅, chain_event_shipper 2744551 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, dashboard_api 3462541 (Ssl) ✅, outbox_notifier 3462678 (Ss) ✅. All 5 alive. ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (1 open):
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): UNKNOWN/"". Code bug confirmed: `severity='info'` invalid. Binary scope decision pending Beacon's re-issue. 72h original deadline Jun-17T04:02:56Z (~21.5h) — now moot as a time-blocker since this is a scope call, not a pipeline block. [yellow] carry.
+ourliberty-dashboard: **0 open PRs.** ✅
+
+**Conditional checks (Tuesday 2026-06-16 UTC, weekday=1):** Check I fires Mon/Wed/Fri/Sun — skip. Check III fires Sunday — skip.
+
+**Systemic observation — outbox-notifier APPROVAL_REQUEST marker gap:** Both markers from back-to-back Beacon sessions (06:39:16Z and 06:40:49Z) were dropped — one `phase=routing-signal` and one `phase=approval_request`. This extends the known gap beyond just dag-preflight-revision to include regular approval_request markers from Beacon inter-agent sessions. Recovery dispatches sent; systemic fix already tracked in MEMORY.md note "dag-preflight-revision DAG re-dispatch markers still fall through."
+
+**Actions taken:**
+1. Dispatched `pulse-phase-s-dag-redispatch-002` → Beacon inbox. Ask: re-dispatch dag-preflight-3 directly to Mirror inbox (bypass marker.py/outbox-notifier). Route: `route-to-beacon`.
+2. Dispatched `pulse-cleanup-branch-decision-reissue-001` → Beacon inbox. Ask: re-issue PR #497 binary scope decision to Larry via larry_alerts.append_alert. Route: `route-to-beacon`.
+3. PRIME ledger: 2 interventions recorded (dag-preflight-stuck-recovery, approval-request-marker-drop). ratio=20.18 (989 interventions, 49 systemic fixes).
+4. Tier state: `python3 scripts/cycle_tier_state.py record --checks-clean false` → Tier 2 → Tier 1 reset (consecutive_clean=0).
+5. Watermark: unchanged at 1065.
+
+**Dispatches:** 2 to Beacon (pulse-phase-s-dag-redispatch-002, pulse-cleanup-branch-decision-reissue-001).
+
+**Standing findings (carried):**
+- [yellow] **Phase S dag-preflight-3 STUCK** — Beacon emitted routing-signal APPROVAL_REQUEST at 06:40:49Z; outbox-notifier dropped it; dispatched Beacon recovery (pulse-phase-s-dag-redispatch-002). Watch for Mirror receiving dag-preflight-3 and returning PASS/REVISION.
+- [yellow] **PR #497 scope decision pending** — cleanup-branch-info-severity-decision-001 APPROVAL_REQUEST dropped; dispatched Beacon re-issue (pulse-cleanup-branch-decision-reissue-001). Binary: APPROVE=add INFO severity tier / REJECT=abandon PR. Watch for Larry reply and beacon-pending-approvals update.
+- [yellow] **outbox-notifier APPROVAL_REQUEST marker gap** — affects routing-signal AND approval_request markers from Beacon inter-agent sessions. Recovery dispatched. Systemic fix per MEMORY.md "recover manually until separate fix lands."
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519/530/531/534** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — pending Larry dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — FN=3027, TP=5. `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST **2/3**, merge_conflict_manual_rebase-tier4 1/3, heal-pipeline-stall-mirror-pass-unmerged-tier4 1/3, revision-phase-preamble-missing 1/3, **mirror-no-session-revision-loop 2/3**.
+- [blue] **Stale worktrees** — `wt-forge-fix-delegate-endpoint-regression-gate-001`, `wt-mirror-dag-preflight-missions-v2-delegate-fix`, `wt-mirror-dag-preflight-missions-v2-phase-s`, `wt-mirror-dag-preflight-missions-v2-phase-s-2`. Low risk; dispatch-branch-cleanup will reap.
+- [blue] **Stale bash orphans** — PIDs 1834248 + 2605007. Low CPU. [carry]
+
+**PRIME DIRECTIVE:** 2 interventions this iter (dag-preflight-3 stuck recovery, PR #497 decision re-issue). ratio=20.18 (989 interventions, 49 systemic fixes).
+**Tier end-of-iter:** **Tier 1, consecutive_clean=0** (tier-reset from Tier 2; signal: dag-preflight-3 stuck + PR #497 scope decision not delivered).
+
+---
+
 ## Iteration ~2019 — 2026-06-16 06:47Z UTC (interactive, /cycle, Tier 1→2, consecutive_clean=2→0)
 
 **Trigger:** Larry direct invocation (`/cycle`).

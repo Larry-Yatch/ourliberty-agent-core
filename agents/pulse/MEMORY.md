@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-16 07:04Z UTC (Iter ~2020, Tier 2→1 tier-reset, consecutive_clean=0)
+
+**Iter ~2020 summary:** ⚠️ Signal. 0 new alerts. Phase S dag-preflight-3 STUCK: Beacon session 4963f2d8 emitted routing-signal APPROVAL_REQUEST at 06:40:49Z; outbox-notifier dropped it; dispatched pulse-phase-s-dag-redispatch-002 to Beacon for direct Mirror inbox write. PR #497 scope decision NOT DELIVERED: Beacon session 7081f34b found PR #497 has invalid `severity='info'` (not in VALID_SEVERITIES=('warning','critical')) → append_alert() drops the digest line entirely; Beacon emitted cleanup-branch-info-severity-decision-001 APPROVAL_REQUEST; outbox-notifier dropped it; dispatched pulse-cleanup-branch-decision-reissue-001 to Beacon to re-issue via larry_alerts. All 5 daemons alive. Repo 821b68be=origin/main. Watermark: 1065 (unchanged). pending=0. PRIME ratio=20.18 (989 interventions, 49 systemic fixes). **Tier 2 → 1 RESET.** consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-16 06:47Z UTC (Iter ~2019, Tier 2, consecutive_clean=0)
 
 **Iter ~2019 summary:** ✅ Nominal. 0 new alerts. Phase S dag-preflight-3 dispatched by Beacon autonomously at 06:40Z: sequence amended (s-6-drain deps now ['s-2-completion', 's-4-freshness']), dag-preflight-3 marker emitted, outbox-notifier routing pending. PR #497: NO_SESSION confirmed 2nd occurrence; G-rule mirror-no-session-revision-loop **2/3** (dispatch to Beacon at 3/3). All 5 daemons alive. Repo 342b883b=origin/main. Watermark: 1065 (unchanged). pending=0. **Tier 1→2 DE-ESCALATION** (3 consecutive clean iters). PRIME ratio=20.14.
@@ -305,7 +309,7 @@
 | PR #529 MERGED ✅ | `cred-drift-ignore-feature-flags-001`: adds `OURLIBERTY_NEWMISSION_INGEST_ENABLED` to ignored_keys allowlist in detect_drift. Merged 2026-06-15T23:48Z. | DONE. Credential drift false-positive resolved. |
 | PR #532 delegate-endpoint MERGED ✅ | [blue] MERGED 2026-06-16T05:46:10Z. missions-v2-delegate-fix sequence COMPLETE. | DONE. |
 | PR #55 chat-label-fix MERGED ✅ | missions-v2-delegate-fix step 2. Merged 02:27Z 2026-06-16. | DONE |
-| PR #497 REVISION LOOP | [yellow] In NO_SESSION revision loop (× 2 at 06:18Z/06:22Z Jun-16). Beacon has second notify (00:22 MDT). Active pipeline; Beacon routes next. 72h deadline Jun-17T04:02:56Z (~21.5h). | Watch Beacon dispatch |
+| PR #497 SCOPE DECISION PENDING | [yellow] Code bug found: `severity='info'` invalid (VALID_SEVERITIES=('warning','critical')); append_alert() drops digest line entirely. Beacon's binary decision (APPROVE=add INFO tier / REJECT=abandon) dropped by outbox-notifier. pulse-cleanup-branch-decision-reissue-001 dispatched to Beacon. 72h original deadline Jun-17T04:02:56Z (~21.5h) now moot as scope call. | Watch Beacon re-issue + Larry reply |
 | unreviewed-merge:511/499/494/489/510/509/518/519/530 | [yellow] PRs merged by Larry without Mirror; bot-delivered for others. Larry's judgment call. | Reply appropriate shortcut or silence |
 | G-rule stall-detector Forge build | [yellow] Beacon spec complete. Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
 | Check VIII rule=lower | [yellow] FN=3027, TP=5, FP=2 — threshold too high. | `approve check-viii-update-2026-06-15` when shortcut lands |
@@ -332,5 +336,7 @@
 | G-rule mirror-no-session-revision-loop | [blue] **2/3** | Mirror review NO_SESSION × 2+ for PR #497; Beacon re-dispatches Mirror instead of Forge. Watch; dispatch at 3/3 |
 | G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 (warn-vs-info) |
 | G-rule telegram-409-burst | [yellow] **2/3** | Watch; dispatch at 3/3 |
-| dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
+| Phase S dag-preflight-3 STUCK | [yellow] Beacon emitted routing-signal APPROVAL_REQUEST at 06:40:49Z Jun-16; outbox-notifier dropped it (last log entry 06:28:32Z). pulse-phase-s-dag-redispatch-002 dispatched to Beacon for direct Mirror inbox write. | Watch Mirror receiving dag-preflight-3 and PASS/REVISION verdict |
+| PR #497 scope decision pending | [yellow] Beacon found `severity='info'` invalid in cleanup_dispatch_branches.py (VALID_SEVERITIES=('warning','critical')); binary APPROVE=add INFO tier / REJECT=abandon. Beacon's cleanup-branch-info-severity-decision-001 APPROVAL_REQUEST dropped by outbox-notifier. pulse-cleanup-branch-decision-reissue-001 dispatched to Beacon. | Watch Beacon larry_alerts re-issue + Larry reply |
+| dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap. outbox-notifier also drops regular approval_request markers from Beacon inter-agent sessions (observed iter ~2020: both routing-signal and approval_request dropped in same 5-min window). | DAG markers and scope-decision markers still fall through; recover manually |
 | Stale bash orphans | [blue] PIDs 1834248 (17d+) + 2605007 (1d+). Ss, low CPU. | Carry |
