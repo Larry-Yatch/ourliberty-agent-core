@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-16 06:47Z UTC (Iter ~2019, Tier 2, consecutive_clean=0)
+
+**Iter ~2019 summary:** ✅ Nominal. 0 new alerts. Phase S dag-preflight-3 dispatched by Beacon autonomously at 06:40Z: sequence amended (s-6-drain deps now ['s-2-completion', 's-4-freshness']), dag-preflight-3 marker emitted, outbox-notifier routing pending. PR #497: NO_SESSION confirmed 2nd occurrence; G-rule mirror-no-session-revision-loop **2/3** (dispatch to Beacon at 3/3). All 5 daemons alive. Repo 342b883b=origin/main. Watermark: 1065 (unchanged). pending=0. **Tier 1→2 DE-ESCALATION** (3 consecutive clean iters). PRIME ratio=20.14.
+
 ## Status snapshot — updated 2026-06-16 06:36Z UTC (Iter ~2018, Tier 1, consecutive_clean=2)
 
 **Iter ~2018 summary:** ✅ Nominal. 1 new alert (L1065 Tier-3 silenced: sync.service push-failed race with run_cycle auto-commit, self-heals). Phase S dag-preflight-2 REVISION at 00:28Z: s-6 parallel-file-overlap with s-3/s-4 on captures.json; Beacon has notify, mechanical fix pending (add s-6 dep on s-4). PR #497: UNKNOWN/"", NO_SESSION × 2 (06:18Z+06:22Z), Beacon has second notify unprocessed, 72h deadline Jun-17T04:02:56Z (~21h). All 5 daemons alive. Repo f2289fee=origin/main. Watermark: 1064→1065. pending=0. Tier 1, consecutive_clean=2. PRIME ratio=20.14.
@@ -274,9 +278,9 @@
 
 ---
 
-## mirror-no-session-revision-loop G-rule (observed iter ~2017)
+## mirror-no-session-revision-loop G-rule (observed iter ~2017, advanced iter ~2019)
 
-**Rule:** When Mirror reviews a PR and its session ends without proper outbox delivery, outbox_notifier classifies the REVISION marker via session-log scan and routes `code-review-revision-no-session` to Beacon. Beacon re-dispatches a fresh Mirror review (same task_id) rather than routing to Forge. If the PR genuinely has issues, Mirror finds them again → same NO_SESSION outcome → loop. Pattern: `MIRROR_REVIEW_STATUS state=failure` + `NO_SESSION_REVISION` in outbox_notifier log. First observed for PR #497 (cleanup-branch-warn-to-info-001), twice in 10 min at 06:18Z and 06:22Z on 2026-06-16. **G-rule count: 1/3** — dispatch to Beacon at 3/3 for a fix to the NO_SESSION path (route to Forge with extracted revision notes instead of re-dispatching Mirror).
+**Rule:** When Mirror reviews a PR and its session ends without proper outbox delivery, outbox_notifier classifies the REVISION marker via session-log scan and routes `code-review-revision-no-session` to Beacon. Beacon re-dispatches a fresh Mirror review (same task_id) rather than routing to Forge. If the PR genuinely has issues, Mirror finds them again → same NO_SESSION outcome → loop. Pattern: `MIRROR_REVIEW_STATUS state=failure` + `NO_SESSION_REVISION` in outbox_notifier log. First observed for PR #497 (cleanup-branch-warn-to-info-001), twice in 10 min at 06:18Z and 06:22Z on 2026-06-16. Second occurrence confirmed iter ~2019 (Beacon processed 2nd NO_SESSION notify, no new Mirror dispatch observed). **G-rule count: 2/3** — dispatch to Beacon at 3/3 for a fix to the NO_SESSION path (route to Forge with extracted revision notes instead of re-dispatching Mirror).
 
 ---
 
@@ -325,7 +329,7 @@
 | G-rule F24-empty-prompt-envelope-rejected | [blue] **2/3** | Watch; dispatch at 3/3 |
 | G-rule Forge-preflight-CLARIFY_REQUEST | [blue] **2/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule revision-phase-preamble-missing | [blue] **1/3** | Forge outbox missing "Revision N applied:" preamble → RETRY_EXHAUSTED. Watch; dispatch to Beacon at 3/3 |
-| G-rule mirror-no-session-revision-loop | [blue] **1/3 (new)** | Mirror review NO_SESSION × 2 for PR #497; Beacon re-dispatches Mirror instead of Forge. Watch; dispatch at 3/3 |
+| G-rule mirror-no-session-revision-loop | [blue] **2/3** | Mirror review NO_SESSION × 2+ for PR #497; Beacon re-dispatches Mirror instead of Forge. Watch; dispatch at 3/3 |
 | G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 (warn-vs-info) |
 | G-rule telegram-409-burst | [yellow] **2/3** | Watch; dispatch at 3/3 |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |
