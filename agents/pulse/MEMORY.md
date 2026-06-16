@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-16 12:03Z UTC (Iter ~2046, Tier 2, consecutive_clean=2)
+
+**Iter ~2046 summary:** ✅ Nominal. 0 new alerts. All mandatory checks clean. **PR #497 CLOSED ✅** (state=CLOSED, updatedAt=2026-06-16T11:54:52Z — Larry closed manually at 05:54 MDT). All 5 daemons alive (beacon 3556778, chain-event 2744551, inbox-watcher 3434697, outbox_notifier 3556624, dashboard_api **3593488** new PID — auto-restarted ~11:54Z UTC). Repo 03de516f=origin/main (clean). Sync 11:30:16Z (33 min). No stalls. pending=0. Phase S ALL 6/6 MERGED ✅. PRIME ratio=20.31 (995 interventions, 49 systemic fixes). **Tier 2, consecutive_clean=2.**
+
 ## Status snapshot — updated 2026-06-16 11:42Z UTC (Iter ~2045, Tier 2, consecutive_clean=1)
 
 **Iter ~2045 summary:** ✅ Nominal. 0 new alerts. All mandatory checks clean. All 5 daemons alive (same PIDs: beacon 3556778, chain-event 2744551, inbox-watcher 3434697, dashboard_api 3540633, outbox_notifier 3556624). Repo 7446e4df=origin/main (clean). Sync 11:30:16Z (12 min). No stalls. pending=0. Phase S ALL 6/6 MERGED ✅. PR #497 OPEN/UNKNOWN — Larry chose option B (close); Beacon can't close (read-only). Larry needs to close manually. PRIME ratio=20.31 (995 interventions, 49 systemic fixes). **Tier 2, consecutive_clean=1.**
@@ -405,7 +409,7 @@
 | PR #529 MERGED ✅ | `cred-drift-ignore-feature-flags-001`: adds `OURLIBERTY_NEWMISSION_INGEST_ENABLED` to ignored_keys allowlist in detect_drift. Merged 2026-06-15T23:48Z. | DONE. Credential drift false-positive resolved. |
 | PR #532 delegate-endpoint MERGED ✅ | [blue] MERGED 2026-06-16T05:46:10Z. missions-v2-delegate-fix sequence COMPLETE. | DONE. |
 | PR #55 chat-label-fix MERGED ✅ | missions-v2-delegate-fix step 2. Merged 02:27Z 2026-06-16. | DONE |
-| PR #497 SCOPE DECISION PENDING | [yellow] Code bug found: `severity='info'` invalid (VALID_SEVERITIES=('warning','critical')); append_alert() drops digest line entirely. Beacon's binary decision (APPROVE=add INFO tier / REJECT=abandon) dropped by outbox-notifier. pulse-cleanup-branch-decision-reissue-001 dispatched to Beacon. 72h original deadline Jun-17T04:02:56Z (~21.5h) now moot as scope call. | Watch Beacon re-issue + Larry reply |
+| PR #497 CLOSED ✅ | [blue] Larry closed manually at 2026-06-16T11:54:52Z (05:54 MDT). **RESOLVED.** | DONE. |
 | unreviewed-merge:511/499/494/489/510/509/518/519/530 | [yellow] PRs merged by Larry without Mirror; bot-delivered for others. Larry's judgment call. | Reply appropriate shortcut or silence |
 | G-rule stall-detector Forge build | [yellow] Beacon spec complete. Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
 | Check VIII rule=lower | [yellow] FN=3027, TP=5, FP=2 — threshold too high. | `approve check-viii-update-2026-06-15` when shortcut lands |
@@ -435,6 +439,6 @@
 | G-rule telegram-409-burst | [yellow] **2/3** | Watch; dispatch at 3/3 |
 | **G-rule watermark-rotation-gap** | [blue] **2/3** (NEW iter ~2035) — larry-alerts-retention.py compacts file, watermark left > file length; new alerts missed until gap detected + repaired. Prior: iter ~1936. | Watch; dispatch to Beacon at 3/3 for auto-detect/repair fix in cycle startup |
 | Phase S ALL 6/6 MERGED ✅ | [blue] s-1 PR#541 ✅, s-2 PR#542 ✅, s-3 PR#543 ✅, s-4 PR#544 ✅, s-5 PR#58 ourliberty-dashboard ✅, s-6-drain PR#545 ✅ (10:52:38Z). missions-v2-phase-s SEQUENCE COMPLETE. | DONE. |
-| PR #497 scope decision DELIVERED | [yellow] Binary choice with Larry (bot DM'd 07:07:50Z Jun-16). APPROVE=add 'info' to VALID_SEVERITIES / REJECT=close PR #497. Deadline Jun-17T04:02Z (~18h). PR UNKNOWN/"". | Watch Larry reply: `approve cleanup-branch-info` or `reject cleanup-branch-info` |
+| PR #497 CLOSED ✅ | [blue] Larry closed manually 2026-06-16T11:54:52Z. RESOLVED. | DONE. |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap. outbox-notifier also drops regular approval_request markers from Beacon inter-agent sessions (observed iter ~2020: both routing-signal and approval_request dropped in same 5-min window). | DAG markers and scope-decision markers still fall through; recover manually |
 | Stale bash orphans | [blue] PIDs 1834248 (17d+) + 2605007 (1d+). Ss, low CPU. | Carry |
