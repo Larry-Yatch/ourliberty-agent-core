@@ -86,7 +86,10 @@
         "model": "claude-opus-4-8",
         "at": "2026-06-02T00:00:00+00:00",
         "from_state": "parked"
-      }
+      },
+      "spawned": null,
+      "spawned_phase": null,
+      "spawned_pr_url": null
     },
     {
       "capture_id": "cap-fresh-two",
@@ -100,7 +103,10 @@
       "risk": null,
       "risk_note": null,
       "recommended_action": null,
-      "briefing_provenance": null
+      "briefing_provenance": null,
+      "spawned": null,
+      "spawned_phase": null,
+      "spawned_pr_url": null
     }
   ]
 }
