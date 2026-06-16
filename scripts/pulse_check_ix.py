@@ -854,11 +854,14 @@ def register_findings(
         registered.append({
             'signal': finding.signal,
             'mission_id': payload.get('mission_id'),
-            'pr_url': payload.get('pr_url'),
+            # The +New mission endpoint queues the mission for the missions
+            # writer (no PR); 'queued' on success. (Older responses returned a
+            # pr_url; payload.get keeps this forward/backward compatible.)
+            'status': payload.get('status'),
         })
         log(
             f'registered {finding.signal} mission: '
-            f'{payload.get("mission_id")} (PR: {payload.get("pr_url")})'
+            f'{payload.get("mission_id")} (status: {payload.get("status")})'
         )
 
     return CycleResult(

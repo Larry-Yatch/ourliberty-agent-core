@@ -5,10 +5,13 @@ Spec: `agents/beacon/specs/e4-4f-missions-tab-v1.md` § 5.1 (schema),
 § 5.5 (+ New mission flow), § 5.8 (droplet endpoint).
 
 Path-isolation pattern mirrors `test_dashboard_api_build_sequences.py`:
-each test owns a fresh tmpdir; `da._missions_json_path` is rebound onto
-that tmpdir's missions.json so live `agents/beacon/missions.json` is
-never touched. All GitHub REST calls are intercepted via a recording
-stub installed onto `da._github_api_request`; no live HTTPS is made.
+each test owns a fresh tmpdir; `da._missions_json_path` and
+`da._new_mission_queue_dir` are rebound onto that tmpdir so the live
+`agents/beacon/missions.json` and the real queue dir are never touched.
+The +New mission flow (§ 5.5) no longer opens a PR — it queues a file for
+the missions writer (heal_orphan_autoregister) to drain — so POST makes no
+GitHub calls; the recording stub on `da._github_api_request` doubles as a
+guard that proves zero GitHub I/O. No live HTTPS is made.
 
 Run:
     cd ~/agent-core && python3 -m unittest \\
@@ -133,18 +136,30 @@ class _MissionsTestBase(unittest.TestCase):
 
         self.tmp = Path(tempfile.mkdtemp(prefix='dash-missions-'))
         self.missions_path = self.tmp / 'agents' / 'beacon' / 'missions.json'
+        self.queue_dir = self.tmp / 'agents' / 'blackboard' / 'new-mission-queue'
 
-        # Rebind module-level helpers onto our tmpdir + GH recorder.
+        # Rebind module-level helpers onto our tmpdir + GH recorder. The +New
+        # mission flow makes NO GitHub calls now (it queues a file), so the
+        # recorder doubles as a guard: any GH call raises, proving zero I/O.
         self._orig_missions_path = da._missions_json_path
+        self._orig_queue_dir = da._new_mission_queue_dir
         self._orig_github = da._github_api_request
         da._missions_json_path = lambda: self.missions_path  # type: ignore[assignment]
+        da._new_mission_queue_dir = lambda: self.queue_dir  # type: ignore[assignment]
         self.gh = _GithubRecorder()
         da._github_api_request = self.gh  # type: ignore[assignment]
 
         self.client = TestClient(da.app)
 
+    def _queued_ids(self) -> set:
+        """Mission ids currently sitting in the queue dir (by filename)."""
+        if not self.queue_dir.is_dir():
+            return set()
+        return {p.stem for p in self.queue_dir.iterdir() if p.suffix == '.json'}
+
     def tearDown(self):
         da._missions_json_path = self._orig_missions_path  # type: ignore[assignment]
+        da._new_mission_queue_dir = self._orig_queue_dir  # type: ignore[assignment]
         da._github_api_request = self._orig_github  # type: ignore[assignment]
         if self._prev_gh_token is None:
             os.environ.pop('GITHUB_TOKEN', None)
@@ -231,33 +246,6 @@ class GetMissionsMalformedTest(_MissionsTestBase):
 # ==================== POST /api/system/missions/new ====================
 
 
-def _happy_path_github_script(
-    gh: _GithubRecorder,
-    *,
-    branch: str = 'feat/new-mission-shiny-thing',
-    pr_url: str = 'https://github.com/test-owner/test-repo/pull/9999',
-) -> None:
-    """Script the four expected GitHub calls for a successful POST."""
-    gh.script('GET', '/git/refs/heads/main', _FakeResponse(
-        200, {'object': {'sha': 'abc123main'}},
-    ))
-    gh.script('POST', '/git/refs', _FakeResponse(
-        201, {'ref': f'refs/heads/{branch}'},
-    ))
-    gh.script(
-        'GET',
-        f'/contents/agents/beacon/missions.json?ref={branch}',
-        _FakeResponse(200, {'sha': 'blob-sha'}),
-    )
-    gh.script(
-        'PUT', '/contents/agents/beacon/missions.json',
-        _FakeResponse(200, {'content': {'sha': 'new-blob-sha'}}),
-    )
-    gh.script('POST', '/pulls', _FakeResponse(
-        201, {'html_url': pr_url, 'number': 9999},
-    ))
-
-
 class PostMissionsAuthTest(_MissionsTestBase):
     def test_missing_token_returns_401(self):
         r = self.client.post(POST_ENDPOINT, json={
@@ -265,14 +253,14 @@ class PostMissionsAuthTest(_MissionsTestBase):
             'repo': 'ourliberty-dashboard',
         })
         self.assertEqual(r.status_code, 401)
-        # No GitHub calls should have been made on auth failure.
+        # No queue file + no GitHub calls on auth failure.
+        self.assertEqual(self._queued_ids(), set())
         self.assertEqual(self.gh.calls, [])
 
 
 class PostMissionsHappyPathTest(_MissionsTestBase):
-    def test_creates_pr_and_returns_url(self):
+    def test_queues_mission_and_returns_status(self):
         _seed_two_missions(self.missions_path)
-        _happy_path_github_script(self.gh)
         r = self.client.post(POST_ENDPOINT, headers=AUTH, json={
             'name': 'Shiny Thing',
             'brief': 'A new shiny mission.',
@@ -282,50 +270,44 @@ class PostMissionsHappyPathTest(_MissionsTestBase):
         self.assertEqual(r.status_code, 200, r.text)
         body = r.json()
         self.assertEqual(body['mission_id'], 'shiny-thing')
-        self.assertEqual(body['branch'], 'feat/new-mission-shiny-thing')
-        self.assertEqual(
-            body['pr_url'],
-            'https://github.com/test-owner/test-repo/pull/9999',
-        )
-        # All five expected GH calls fired in order.
-        self.assertEqual(len(self.gh.calls), 5)
-        # The PUT body should include the new entry in the registry.
-        put_call = self.gh.calls[3]
-        self.assertEqual(put_call['method'], 'PUT')
-        self.assertEqual(
-            put_call['json_body']['branch'],
-            'feat/new-mission-shiny-thing',
-        )
-        import base64
-        new_text = base64.b64decode(
-            put_call['json_body']['content'],
-        ).decode('utf-8')
-        updated = json.loads(new_text)
-        self.assertEqual(updated['schema_version'], 1)
-        ids = {m['id'] for m in updated['missions']}
-        self.assertEqual(
-            ids,
-            {'missions-tab-v1', 'e4-4b-projects-kanban', 'shiny-thing'},
-        )
+        self.assertEqual(body['status'], 'queued')
+        # No PR is created → no pr_url/branch (optional, absent → null).
+        self.assertIsNone(body.get('pr_url'))
+        self.assertIsNone(body.get('branch'))
+        # CRITICAL: the +New mission flow makes ZERO GitHub calls now.
+        self.assertEqual(self.gh.calls, [])
+        # The full mission entry is written to the queue, shaped like a
+        # registry entry, for the healer to drain.
+        queue_file = self.queue_dir / 'shiny-thing.json'
+        self.assertTrue(queue_file.is_file())
+        entry = json.loads(queue_file.read_text())
+        self.assertEqual(entry['id'], 'shiny-thing')
+        self.assertEqual(entry['name'], 'Shiny Thing')
+        self.assertEqual(entry['phase'], 'drafting')
+        self.assertEqual(entry['brief'], 'A new shiny mission.')
+        self.assertEqual(entry['spec_docs'], ['agents/beacon/specs/shiny.md'])
+        self.assertEqual(entry['task_ids'], [])
+        self.assertEqual(entry['repo'], 'ourliberty-dashboard')
+        self.assertIsNone(entry['deferred_reason'])
+        self.assertIn('created', entry)
 
-    def test_authorization_header_is_bearer_github_token(self):
-        _seed_two_missions(self.missions_path)
-        _happy_path_github_script(self.gh)
-        self.client.post(POST_ENDPOINT, headers=AUTH, json={
-            'name': 'Shiny Thing', 'brief': 'b', 'repo': 'r',
+    def test_no_github_token_still_queues(self):
+        # The queue flow needs no GitHub token — removing it must NOT block
+        # registration (proves the GitHub dependency is fully gone).
+        os.environ.pop('GITHUB_TOKEN', None)
+        r = self.client.post(POST_ENDPOINT, headers=AUTH, json={
+            'name': 'No Token Mission', 'brief': 'b', 'repo': 'r',
         })
-        # Every GH call carries the Bearer token from GITHUB_TOKEN env.
-        for call in self.gh.calls:
-            self.assertEqual(
-                call['headers']['Authorization'], 'Bearer test-gh-token',
-            )
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(r.json()['status'], 'queued')
+        self.assertIn('no-token-mission', self._queued_ids())
+        self.assertEqual(self.gh.calls, [])
 
     def test_local_missions_json_not_mutated(self):
-        # The POST flow opens a PR via GitHub REST; the local file is
-        # NOT touched (drift-vs-main avoidance).
+        # The dashboard is NOT a git committer: queueing must leave the local
+        # missions.json byte-identical (the healer is the sole writer).
         _seed_two_missions(self.missions_path)
         before = self.missions_path.read_text()
-        _happy_path_github_script(self.gh)
         self.client.post(POST_ENDPOINT, headers=AUTH, json={
             'name': 'Shiny Thing', 'brief': 'b', 'repo': 'r',
         })
@@ -334,7 +316,7 @@ class PostMissionsHappyPathTest(_MissionsTestBase):
 
 
 class PostMissionsDupIdTest(_MissionsTestBase):
-    def test_local_dup_id_returns_409_no_github_calls(self):
+    def test_local_dup_id_returns_409_no_queue_write(self):
         _seed_two_missions(self.missions_path)
         # 'Missions Tab V1' kebabs to 'missions-tab-v1' — matches seed.
         r = self.client.post(POST_ENDPOINT, headers=AUTH, json={
@@ -347,29 +329,26 @@ class PostMissionsDupIdTest(_MissionsTestBase):
         self.assertEqual(body['detail']['error'], 'mission_id collision')
         self.assertEqual(body['detail']['id'], 'missions-tab-v1')
         self.assertIn('existing_entry_brief', body['detail'])
-        # CRITICAL: no GitHub calls on local dup-id detection.
+        # No queue file written + no GitHub calls on dup-id detection.
+        self.assertEqual(self._queued_ids(), set())
         self.assertEqual(self.gh.calls, [])
 
 
-class PostMissionsRemoteBranchExistsTest(_MissionsTestBase):
-    def test_422_on_branch_creation_returns_409(self):
-        # No local seed → local dup check passes. GitHub reports the
-        # branch already exists (422) — we must map to 409.
-        self.gh.script('GET', '/git/refs/heads/main', _FakeResponse(
-            200, {'object': {'sha': 'abc123main'}},
-        ))
-        self.gh.script('POST', '/git/refs', _FakeResponse(
-            422, {'message': 'Reference already exists'},
-        ))
+class PostMissionsQueuedDupTest(_MissionsTestBase):
+    def test_already_queued_id_returns_409(self):
+        # A mission already sitting in the queue (not yet drained) → reject the
+        # second submit as an in-flight dup rather than enqueue it twice.
+        self.queue_dir.mkdir(parents=True, exist_ok=True)
+        (self.queue_dir / 'shiny-thing.json').write_text(
+            json.dumps({'id': 'shiny-thing', 'name': 'Shiny Thing',
+                        'phase': 'drafting', 'task_ids': []}) + '\n')
         r = self.client.post(POST_ENDPOINT, headers=AUTH, json={
             'name': 'Shiny Thing', 'brief': 'b', 'repo': 'r',
         })
         self.assertEqual(r.status_code, 409, r.text)
-        body = r.json()
-        self.assertEqual(body['detail']['error'], 'branch_exists')
-        self.assertEqual(
-            body['detail']['branch'], 'feat/new-mission-shiny-thing',
-        )
+        self.assertEqual(r.json()['detail']['error'], 'mission_id queued')
+        self.assertEqual(r.json()['detail']['id'], 'shiny-thing')
+        self.assertEqual(self.gh.calls, [])
 
 
 class PostMissionsBodyValidationTest(_MissionsTestBase):
@@ -379,6 +358,7 @@ class PostMissionsBodyValidationTest(_MissionsTestBase):
         })
         # FastAPI's Pydantic validation returns 422 for missing required.
         self.assertEqual(r.status_code, 422)
+        self.assertEqual(self._queued_ids(), set())
         self.assertEqual(self.gh.calls, [])
 
     def test_empty_brief_returns_422(self):
@@ -386,6 +366,7 @@ class PostMissionsBodyValidationTest(_MissionsTestBase):
             'name': 'X', 'brief': '', 'repo': 'r',
         })
         self.assertEqual(r.status_code, 422)
+        self.assertEqual(self._queued_ids(), set())
         self.assertEqual(self.gh.calls, [])
 
     def test_name_kebabs_to_empty_returns_400(self):
@@ -399,59 +380,23 @@ class PostMissionsBodyValidationTest(_MissionsTestBase):
         self.assertEqual(
             r.json()['detail']['error'], 'invalid mission name',
         )
+        self.assertEqual(self._queued_ids(), set())
         self.assertEqual(self.gh.calls, [])
 
 
-class PostMissionsGithubFailureTest(_MissionsTestBase):
-    def test_get_main_ref_fails_returns_502(self):
-        self.gh.script('GET', '/git/refs/heads/main', _FakeResponse(
-            500, {'message': 'internal'},
-        ))
-        r = self.client.post(POST_ENDPOINT, headers=AUTH, json={
-            'name': 'X', 'brief': 'b', 'repo': 'r',
-        })
-        self.assertEqual(r.status_code, 502, r.text)
-        self.assertEqual(
-            r.json()['detail']['error'], 'github get main ref failed',
-        )
-
-    def test_pr_create_fails_returns_502(self):
-        self.gh.script('GET', '/git/refs/heads/main', _FakeResponse(
-            200, {'object': {'sha': 'abc'}},
-        ))
-        self.gh.script('POST', '/git/refs', _FakeResponse(201, {}))
-        self.gh.script(
-            'GET', '/contents/agents/beacon/missions.json?ref=feat/new-mission-x',
-            _FakeResponse(404, {}),
-        )
-        self.gh.script(
-            'PUT', '/contents/agents/beacon/missions.json',
-            _FakeResponse(201, {}),
-        )
-        self.gh.script('POST', '/pulls', _FakeResponse(
-            500, {'message': 'gateway'},
-        ))
-        r = self.client.post(POST_ENDPOINT, headers=AUTH, json={
-            'name': 'X', 'brief': 'b', 'repo': 'r',
-        })
-        self.assertEqual(r.status_code, 502, r.text)
-        self.assertEqual(
-            r.json()['detail']['error'], 'github create pr failed',
-        )
-
-
-class PostMissionsTokenMissingTest(_MissionsTestBase):
-    def test_missing_github_token_returns_500(self):
-        # The fixture sets GITHUB_TOKEN; remove it for this test only.
-        os.environ.pop('GITHUB_TOKEN', None)
-        r = self.client.post(POST_ENDPOINT, headers=AUTH, json={
-            'name': 'X', 'brief': 'b', 'repo': 'r',
-        })
+class PostMissionsQueueWriteFailureTest(_MissionsTestBase):
+    def test_queue_write_oserror_returns_500(self):
+        # An OSError from the atomic queue write surfaces as a clean 500 with a
+        # single-line detail (not a traceback) — never a partial file.
+        import unittest.mock as mock
+        with mock.patch.object(
+                da, '_atomic_write_json', side_effect=OSError('disk full')):
+            r = self.client.post(POST_ENDPOINT, headers=AUTH, json={
+                'name': 'X', 'brief': 'b', 'repo': 'r',
+            })
         self.assertEqual(r.status_code, 500, r.text)
-        self.assertEqual(
-            r.json()['detail']['error'], 'github token missing',
-        )
-        self.assertEqual(self.gh.calls, [])
+        self.assertEqual(r.json()['detail']['error'], 'queue write failed')
+        self.assertNotIn('\n', r.json()['detail']['detail'])
 
 
 # ==================== kebab helper ====================
