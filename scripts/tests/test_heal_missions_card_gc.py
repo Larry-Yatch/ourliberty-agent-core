@@ -639,6 +639,248 @@ class ReconcileCompletedCardsTest(unittest.TestCase):
         self.assertNotIn('closeout', reg['captures'][1])
 
 
+# ---------------------------------------- S4: failure rings back (§ 3 S4 / § 9)
+
+
+class CardDeepLinkTest(unittest.TestCase):
+    def test_deep_link_targets_the_card(self):
+        self.assertEqual(
+            h.card_deep_link('c1'),
+            'https://dashboard.ourliberty.dev/missions?card=c1')
+
+
+class ReconcileFailedCardsTest(unittest.TestCase):
+    def _now(self):
+        return datetime(2026, 6, 16, 12, 0, 0, tzinfo=timezone.utc)
+
+    def _cap(self, cid, risk, **over):
+        cap = {
+            'id': cid, 'state': 'parked', 'risk': risk,
+            'title': f'card {cid}',
+            'spawned': {'kind': 'delegate', 'task_id': f'delegate-{cid}',
+                        'stamped_at': '2026-06-15T00:00:00+00:00'},
+        }
+        cap.update(over)
+        return cap
+
+    def _registry(self, *caps):
+        return {'schema_version': 1, 'captures': list(caps)}
+
+    def test_failed_card_rings_loud_and_stamps_but_stays_parked(self):
+        reg = self._registry(self._cap('c1', 'careful'))
+        ring = mock.Mock(return_value={'rung': True})
+        res = h.reconcile_failed_cards(
+            reg, self._now(),
+            failure_fn=lambda t: 'forge_reject: tests broke',
+            ring_fn=ring, dry_run=False)
+        cap = reg['captures'][0]
+        # card surfaces for Larry — it does NOT close.
+        self.assertEqual(cap['state'], 'parked')
+        self.assertEqual(cap['failure_signaled']['reason'], 'forge_reject: tests broke')
+        self.assertEqual(cap['failure_signaled']['by'], h.COMPLETED_BY)
+        self.assertIn('at', cap['failure_signaled'])
+        self.assertEqual(res.rung, [('c1', 'forge_reject: tests broke')])
+        self.assertTrue(res.changed)
+        # ring is loud blocked-on-you, carrying the plain-English reason + deep link.
+        _, kw = ring.call_args
+        self.assertEqual(kw['capture_id'], 'c1')
+        self.assertTrue(kw['blocked'])
+        self.assertEqual(kw['risk'], 'careful')
+        self.assertEqual(kw['title'], 'card c1')
+        self.assertEqual(kw['detail'], 'forge_reject: tests broke')
+        self.assertEqual(kw['deep_link'],
+                         'https://dashboard.ourliberty.dev/missions?card=c1')
+
+    def test_healthy_card_is_not_rung(self):
+        reg = self._registry(self._cap('c2', 'safe'))
+        ring = mock.Mock()
+        res = h.reconcile_failed_cards(
+            reg, self._now(), failure_fn=lambda t: None,
+            ring_fn=ring, dry_run=False)
+        ring.assert_not_called()
+        self.assertNotIn('failure_signaled', reg['captures'][0])
+        self.assertFalse(res.changed)
+        self.assertEqual(res.kept, 1)
+
+    def test_already_signaled_card_is_skipped(self):
+        cap = self._cap('c3', 'safe', failure_signaled={'reason': 'x', 'at': 'y'})
+        reg = self._registry(cap)
+        failure_fn = mock.Mock()
+        ring = mock.Mock()
+        res = h.reconcile_failed_cards(
+            reg, self._now(), failure_fn=failure_fn, ring_fn=ring, dry_run=False)
+        failure_fn.assert_not_called()
+        ring.assert_not_called()
+        self.assertFalse(res.changed)
+
+    def test_non_parked_and_no_spawn_are_skipped(self):
+        done = self._cap('c4', 'safe', state='done')
+        no_spawn = {'id': 'c5', 'state': 'parked', 'risk': 'safe'}
+        reg = self._registry(done, no_spawn)
+        failure_fn = mock.Mock(return_value='boom')
+        ring = mock.Mock()
+        res = h.reconcile_failed_cards(
+            reg, self._now(), failure_fn=failure_fn, ring_fn=ring, dry_run=False)
+        failure_fn.assert_not_called()
+        ring.assert_not_called()
+        self.assertFalse(res.changed)
+
+    def test_detect_error_keeps_card_unstamped(self):
+        def _boom(task_id):
+            raise RuntimeError('supabase down')
+        reg = self._registry(self._cap('c6', 'safe'))
+        res = h.reconcile_failed_cards(
+            reg, self._now(), failure_fn=_boom,
+            ring_fn=mock.Mock(), dry_run=False)
+        self.assertNotIn('failure_signaled', reg['captures'][0])
+        self.assertEqual(res.kept, 1)
+        self.assertFalse(res.changed)
+
+    def test_ring_error_keeps_card_unstamped_for_retry(self):
+        def _boom(**kw):
+            raise RuntimeError('alerts down')
+        reg = self._registry(self._cap('c7', 'safe'))
+        res = h.reconcile_failed_cards(
+            reg, self._now(), failure_fn=lambda t: 'mirror_emergency_halt: stuck',
+            ring_fn=_boom, dry_run=False)
+        self.assertNotIn('failure_signaled', reg['captures'][0])
+        self.assertEqual(res.kept, 1)
+
+    def test_dry_run_reports_without_ringing_or_stamping(self):
+        reg = self._registry(self._cap('c8', 'careful'))
+        ring = mock.Mock()
+        res = h.reconcile_failed_cards(
+            reg, self._now(), failure_fn=lambda t: 'forge_reject: nope',
+            ring_fn=ring, dry_run=True)
+        ring.assert_not_called()
+        self.assertNotIn('failure_signaled', reg['captures'][0])
+        self.assertTrue(res.changed)
+        self.assertIn('(dry-run)', res.rung[0][1])
+
+
+# ---------------------------------------- S7: in-flight overrules a late pause
+
+
+class ApplyPendingActionTest(unittest.TestCase):
+    def _now(self):
+        return datetime(2026, 6, 16, 12, 0, 0, tzinfo=timezone.utc)
+
+    def test_drop_sets_dropped_state_and_reason(self):
+        cap = {'id': 'c1', 'state': 'parked',
+               'pending_action': {'action': 'drop', 'args': {'reason': 'stale'}}}
+        action = h.apply_pending_action(cap, self._now())
+        self.assertEqual(action, 'drop')
+        self.assertEqual(cap['state'], 'dropped')
+        self.assertEqual(cap['drop_reason'], 'stale')
+        self.assertNotIn('pending_action', cap)
+        self.assertEqual(cap['pending_action_applied']['action'], 'drop')
+
+    def test_snooze_sets_snoozed_until(self):
+        cap = {'id': 'c2', 'state': 'parked',
+               'pending_action': {'action': 'snooze',
+                                  'args': {'snoozed_until': '2026-07-01'}}}
+        action = h.apply_pending_action(cap, self._now())
+        self.assertEqual(action, 'snooze')
+        self.assertEqual(cap['snoozed_until'], '2026-07-01')
+        self.assertNotIn('pending_action', cap)
+
+    def test_unknown_action_returns_none_and_does_not_mutate(self):
+        cap = {'id': 'c3', 'state': 'parked',
+               'pending_action': {'action': 'promote', 'args': {}}}
+        self.assertIsNone(h.apply_pending_action(cap, self._now()))
+        self.assertEqual(cap['state'], 'parked')
+        self.assertIn('pending_action', cap)
+
+    def test_no_pending_returns_none(self):
+        cap = {'id': 'c4', 'state': 'parked'}
+        self.assertIsNone(h.apply_pending_action(cap, self._now()))
+
+
+class ReconcileDeferredActionsTest(unittest.TestCase):
+    def _now(self):
+        return datetime(2026, 6, 16, 12, 0, 0, tzinfo=timezone.utc)
+
+    def _cap(self, cid, action, *, args=None, task_id=f'delegate-x', **over):
+        cap = {
+            'id': cid, 'state': 'parked',
+            'pending_action': {'action': action, 'args': args or {}},
+        }
+        if task_id is not None:
+            cap['spawned'] = {'kind': 'delegate', 'task_id': task_id}
+        cap.update(over)
+        return cap
+
+    def _registry(self, *caps):
+        return {'schema_version': 1, 'captures': list(caps)}
+
+    def test_in_flight_keeps_pending_uninterrupted(self):
+        reg = self._registry(self._cap('c1', 'drop', task_id='delegate-c1'))
+        res = h.reconcile_deferred_actions(
+            reg, self._now(), in_flight_fn=lambda t: True, dry_run=False)
+        cap = reg['captures'][0]
+        self.assertEqual(cap['state'], 'parked')  # never interrupted
+        self.assertIn('pending_action', cap)
+        self.assertFalse(res.changed)
+        self.assertEqual(res.kept, 1)
+
+    def test_safe_stop_applies_drop(self):
+        reg = self._registry(
+            self._cap('c2', 'drop', args={'reason': 'obsolete'}, task_id='delegate-c2'))
+        res = h.reconcile_deferred_actions(
+            reg, self._now(), in_flight_fn=lambda t: False, dry_run=False)
+        cap = reg['captures'][0]
+        self.assertEqual(cap['state'], 'dropped')
+        self.assertEqual(cap['drop_reason'], 'obsolete')
+        self.assertEqual(res.applied, [('c2', 'drop')])
+        self.assertTrue(res.changed)
+
+    def test_safe_stop_applies_snooze(self):
+        reg = self._registry(
+            self._cap('c3', 'snooze', args={'snoozed_until': '2026-07-01'},
+                      task_id='delegate-c3'))
+        res = h.reconcile_deferred_actions(
+            reg, self._now(), in_flight_fn=lambda t: False, dry_run=False)
+        self.assertEqual(reg['captures'][0]['snoozed_until'], '2026-07-01')
+        self.assertEqual(res.applied, [('c3', 'snooze')])
+
+    def test_no_task_id_applies_immediately_without_probing(self):
+        reg = self._registry(self._cap('c4', 'drop', task_id=None))
+        probe = mock.Mock()
+        res = h.reconcile_deferred_actions(
+            reg, self._now(), in_flight_fn=probe, dry_run=False)
+        probe.assert_not_called()
+        self.assertEqual(reg['captures'][0]['state'], 'dropped')
+        self.assertEqual(res.applied, [('c4', 'drop')])
+
+    def test_probe_error_keeps_pending(self):
+        def _boom(task_id):
+            raise RuntimeError('events down')
+        reg = self._registry(self._cap('c5', 'drop', task_id='delegate-c5'))
+        res = h.reconcile_deferred_actions(
+            reg, self._now(), in_flight_fn=_boom, dry_run=False)
+        self.assertEqual(reg['captures'][0]['state'], 'parked')
+        self.assertIn('pending_action', reg['captures'][0])
+        self.assertEqual(res.kept, 1)
+
+    def test_dry_run_reports_without_applying(self):
+        reg = self._registry(self._cap('c6', 'drop', task_id='delegate-c6'))
+        res = h.reconcile_deferred_actions(
+            reg, self._now(), in_flight_fn=lambda t: False, dry_run=True)
+        self.assertEqual(reg['captures'][0]['state'], 'parked')
+        self.assertIn('pending_action', reg['captures'][0])
+        self.assertTrue(res.changed)
+        self.assertIn('(dry-run)', res.applied[0][1])
+
+    def test_non_deferred_pending_is_skipped(self):
+        reg = self._registry(self._cap('c7', 'promote', task_id='delegate-c7'))
+        res = h.reconcile_deferred_actions(
+            reg, self._now(), in_flight_fn=lambda t: False, dry_run=False)
+        self.assertEqual(reg['captures'][0]['state'], 'parked')
+        self.assertIn('pending_action', reg['captures'][0])
+        self.assertFalse(res.changed)
+        self.assertEqual(res.kept, 0)
+
+
 # ---------------------------------------- commit + push (real temp git repo)
 
 
@@ -1007,6 +1249,100 @@ class RunOnceTest(unittest.TestCase):
             cap = json.loads((core / h.CAPTURES_REL).read_text())['captures'][0]
             self.assertEqual(cap['state'], 'done')
             self.assertEqual(cap['shipped_note'], 'shipped in PR #600')
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_failure_rings_doorbell_through_write(self):
+        # End-to-end S4: a parked card whose linked work failed rings the loud
+        # blocked-on-you doorbell, stays parked, and the failure_signaled stamp
+        # lands on disk via the healer's SINGLE write (single-committer invariant).
+        now = datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc)
+        tmp = tempfile.mkdtemp(prefix='run-once-failure-')
+        try:
+            core = Path(tmp) / 'agent-core'
+            (core / 'agents' / 'beacon').mkdir(parents=True)
+            (core / h.CAPTURES_REL).write_text(json.dumps({
+                'schema_version': 1,
+                'captures': [{
+                    'id': 'cap-f', 'state': 'parked', 'risk': 'careful',
+                    'title': 'ship the thing',
+                    'last_touched': now.isoformat(),
+                    'spawned': {'kind': 'delegate', 'task_id': 'delegate-cap-f',
+                                'stamped_at': '2026-06-15T00:00:00+00:00'},
+                }],
+            }) + '\n')
+
+            rings = []
+            import larry_alerts
+            with mock.patch.object(h, 'load_repo_paths',
+                                   return_value={'ourliberty-agent-core': core}), \
+                    mock.patch.object(larry_alerts, 'append_alert'):
+                rc = h.run_once(
+                    dry_run=False,
+                    emit_fn=lambda **_: True,
+                    events_fetcher=lambda: [],
+                    author_fn=lambda registry, **_: (0, 0),
+                    completion_verify_fn=lambda t, d: (False, None),
+                    completion_closeout_fn=lambda c, p, n: {},
+                    failure_fn=lambda t: 'forge_reject: tests broke',
+                    ring_fn=lambda **kw: rings.append(kw) or {'rung': True},
+                    in_flight_fn=lambda t: False,
+                    now=now,
+                )
+            self.assertEqual(rc, 0)
+            cap = json.loads((core / h.CAPTURES_REL).read_text())['captures'][0]
+            self.assertEqual(cap['state'], 'parked')  # surfaced, not closed
+            self.assertEqual(cap['failure_signaled']['reason'],
+                             'forge_reject: tests broke')
+            self.assertEqual(len(rings), 1)
+            self.assertTrue(rings[0]['blocked'])
+            self.assertEqual(rings[0]['detail'], 'forge_reject: tests broke')
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_deferred_drop_applies_after_safe_stop_through_write(self):
+        # End-to-end S7: a card carrying a pending drop whose linked work has
+        # reached a safe stop (in_flight_fn False) is dropped, and the new state
+        # lands on disk via the healer's SINGLE write.
+        now = datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc)
+        tmp = tempfile.mkdtemp(prefix='run-once-deferred-')
+        try:
+            core = Path(tmp) / 'agent-core'
+            (core / 'agents' / 'beacon').mkdir(parents=True)
+            (core / h.CAPTURES_REL).write_text(json.dumps({
+                'schema_version': 1,
+                'captures': [{
+                    'id': 'cap-d', 'state': 'parked', 'risk': 'safe',
+                    'last_touched': now.isoformat(),
+                    'spawned': {'kind': 'delegate', 'task_id': 'delegate-cap-d',
+                                'stamped_at': '2026-06-15T00:00:00+00:00'},
+                    'pending_action': {'action': 'drop', 'args': {'reason': 'obsolete'}},
+                }],
+            }) + '\n')
+
+            import larry_alerts
+            with mock.patch.object(h, 'load_repo_paths',
+                                   return_value={'ourliberty-agent-core': core}), \
+                    mock.patch.object(larry_alerts, 'append_alert'):
+                rc = h.run_once(
+                    dry_run=False,
+                    emit_fn=lambda **_: True,
+                    events_fetcher=lambda: [],
+                    author_fn=lambda registry, **_: (0, 0),
+                    completion_verify_fn=lambda t, d: (False, None),
+                    completion_closeout_fn=lambda c, p, n: {},
+                    failure_fn=lambda t: None,
+                    ring_fn=lambda **kw: {'rung': True},
+                    in_flight_fn=lambda t: False,
+                    now=now,
+                )
+            self.assertEqual(rc, 0)
+            cap = json.loads((core / h.CAPTURES_REL).read_text())['captures'][0]
+            self.assertEqual(cap['state'], 'dropped')
+            self.assertEqual(cap['drop_reason'], 'obsolete')
+            self.assertNotIn('pending_action', cap)
         finally:
             import shutil
             shutil.rmtree(tmp, ignore_errors=True)

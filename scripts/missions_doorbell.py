@@ -113,10 +113,16 @@ def decide_doorbell(
 def _format_message(
     loudness: str, capture_id: str,
     title: Optional[str], deep_link: Optional[str],
+    detail: Optional[str] = None,
 ) -> str:
     label = title or capture_id
     if loudness == 'blocked-on-you':
-        body = f'The team has a question on "{label}" and is waiting on you.'
+        if detail:
+            # S4 failure ring-back: a plain-English reason the linked work needs
+            # Larry, in place of the generic team-question phrasing.
+            body = f'Linked work for "{label}" needs you: {detail}'
+        else:
+            body = f'The team has a question on "{label}" and is waiting on you.'
     else:
         body = f'Briefed parked card "{label}" is ready for your review.'
     if deep_link:
@@ -131,6 +137,7 @@ def ring_doorbell(
     risk: Optional[str],
     title: Optional[str] = None,
     deep_link: Optional[str] = None,
+    detail: Optional[str] = None,
     now: Optional[datetime] = None,
 ) -> dict[str, Any]:
     """Ring the doorbell for a capture card per the risk + blocked-state policy.
@@ -151,7 +158,7 @@ def ring_doorbell(
     if plan is None:
         return {'rung': False, 'capture_id': capture_id, 'loudness': None}
 
-    message = _format_message(plan['loudness'], capture_id, title, deep_link)
+    message = _format_message(plan['loudness'], capture_id, title, deep_link, detail)
     appended = larry_alerts.append_alert(
         source=SOURCE,
         severity=plan['severity'],

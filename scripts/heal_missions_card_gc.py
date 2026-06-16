@@ -974,6 +974,245 @@ def _default_completion_closeout_fn() -> Callable[[dict[str, Any], Optional[str]
     return author_closeout
 
 
+# ---------- Phase S (S4): failure/blocked rings back loud -------------------
+
+# The dashboard frontend base — a doorbell ping deep-links back to the card (§ 9).
+_DASHBOARD_BASE = 'https://dashboard.ourliberty.dev'
+
+# Linked-work phases that count as in-flight (spec § 3 S7). Mirrors the
+# dashboard's in-flight gate (dashboard_api._IN_FLIGHT_PHASES) so a deferred
+# pause/drop applies on the exact safe-stop boundary the board shows.
+_IN_FLIGHT_PHASES = ('in_flight', 'awaiting_merge')
+
+# A deferred operator action the healer applies after a safe stop (spec § 3 S7).
+_DEFERRED_ACTIONS = ('drop', 'snooze')
+
+
+def card_deep_link(capture_id: str) -> str:
+    """The dashboard deep-link a doorbell ping carries back to the card (§ 9)."""
+    return f'{_DASHBOARD_BASE}/missions?card={capture_id}'
+
+
+@dataclass
+class FailureResult:
+    rung: list[tuple[str, str]] = field(default_factory=list)   # (id, reason)
+    kept: int = 0
+
+    @property
+    def changed(self) -> bool:
+        """True iff this tick stamped a capture (so the caller writes+commits)."""
+        return bool(self.rung)
+
+
+def reconcile_failed_cards(
+    registry: dict[str, Any],
+    now: datetime,
+    *,
+    failure_fn: Callable[[str], Optional[str]],
+    ring_fn: Callable[..., dict[str, Any]],
+    dry_run: bool,
+) -> FailureResult:
+    """Phase S S4: surface failed/blocked linked work as a loud blocked-on-you
+    doorbell on the parked card, carrying a plain-English reason.
+
+    For each parked capture carrying a `spawned.task_id`, ``failure_fn`` resolves
+    the chain_events terminal-failure signal (production:
+    build_sequence_advancer.chain_event_says_failed — recognizes
+    mirror_revision_exhausted / mirror_emergency_halt / forge_reject) into a
+    reason string, or None when the work is healthy. On a reason, ``ring_fn``
+    (production: missions_doorbell.ring_doorbell) rings blocked-on-you LOUD
+    (route escalate; severity critical for a `careful` card) through the shared
+    larry_alerts + alert_triage_state rails — no bespoke notifier (spec § 3 reuse
+    map / § 9).
+
+    Idempotent: the ring stamps `failure_signaled` on the capture, and a stamped
+    card is skipped on every later tick (record_triage would otherwise rewrite
+    the triage row each pass). Effectful ONLY on the in-memory registry — the
+    caller (run_once) owns the single write+commit (single-committer invariant).
+    Fail-safe per capture: a failure_fn / ring_fn error keeps the card (retried
+    next tick). The card STAYS parked — failure surfaces for Larry, it does not
+    close the card."""
+    res = FailureResult()
+    for cap in registry.get('captures', []):
+        if not isinstance(cap, dict) or cap.get('state') != 'parked':
+            continue
+        if cap.get('failure_signaled'):  # already rung — idempotent skip
+            continue
+        spawned = cap.get('spawned')
+        if not isinstance(spawned, dict):
+            continue
+        task_id = spawned.get('task_id')
+        if not (isinstance(task_id, str) and task_id):
+            continue
+        try:
+            reason = failure_fn(task_id)
+        except Exception as e:  # noqa: BLE001 — per-capture fail-safe
+            log(f'failure: detect failed for {task_id}: {type(e).__name__}: {e} — keep')
+            res.kept += 1
+            continue
+        if not reason:
+            res.kept += 1
+            continue
+        cid = cap.get('id') if isinstance(cap.get('id'), str) else '<unknown>'
+        if dry_run:
+            res.rung.append((cid, reason + ' (dry-run)'))
+            continue
+        try:
+            ring_fn(
+                capture_id=cid,
+                blocked=True,
+                risk=cap.get('risk'),
+                title=cap.get('title'),
+                deep_link=card_deep_link(cid),
+                detail=reason,
+            )
+        except Exception as e:  # noqa: BLE001 — per-capture fail-safe
+            log(f'failure: ring failed for {cid}: {type(e).__name__}: {e} — keep')
+            res.kept += 1
+            continue
+        cap['failure_signaled'] = {
+            'reason': reason,
+            'at': now.isoformat(),
+            'by': COMPLETED_BY,
+        }
+        res.rung.append((cid, reason))
+        log(f'failure: capture {cid} rang blocked-on-you [{reason}]')
+    return res
+
+
+def _default_failure_fn() -> Callable[[str], Optional[str]]:
+    """Production failure detector (spec § 3 S4): the chain_events terminal-failure
+    signal for a task. Lazy imports keep module-load stdlib-only (the advancer's
+    module-level is constants-only, so this is side-effect-free to import)."""
+    import build_sequence_advancer as bsa  # noqa: PLC0415
+    import chain_event_emit  # noqa: PLC0415
+
+    def _failed(task_id: str) -> Optional[str]:
+        client = chain_event_emit._get_client()
+        return bsa.chain_event_says_failed(client, task_id)
+
+    return _failed
+
+
+def _default_ring_fn() -> Callable[..., dict[str, Any]]:
+    """Production doorbell ring (spec § 3 S4 / § 9): missions_doorbell.ring_doorbell,
+    which sits on the shared larry_alerts + alert_triage_state rails."""
+    import missions_doorbell  # noqa: PLC0415
+    return missions_doorbell.ring_doorbell
+
+
+# ---------- Phase S (S7): apply a deferred pause/drop after a safe stop ------
+
+
+@dataclass
+class DeferredActionResult:
+    applied: list[tuple[str, str]] = field(default_factory=list)  # (id, action)
+    kept: int = 0
+
+    @property
+    def changed(self) -> bool:
+        """True iff this tick applied a deferred action (so the caller writes)."""
+        return bool(self.applied)
+
+
+def apply_pending_action(cap: dict[str, Any], now: datetime) -> Optional[str]:
+    """Apply a capture's recorded `pending_action` (drop|snooze), mirroring the
+    dashboard handlers' own state writes, and clear the marker. Returns the
+    applied action name, or None when there's nothing applicable."""
+    pending = cap.get('pending_action')
+    if not isinstance(pending, dict):
+        return None
+    action = pending.get('action')
+    args = pending.get('args') if isinstance(pending.get('args'), dict) else {}
+    if action == 'drop':
+        cap['state'] = 'dropped'
+        reason = args.get('reason')
+        if isinstance(reason, str) and reason:
+            cap['drop_reason'] = reason
+    elif action == 'snooze':
+        cap['snoozed_until'] = args.get('snoozed_until')
+    else:
+        return None
+    cap.pop('pending_action', None)
+    cap['pending_action_applied'] = {'action': action, 'at': now.isoformat()}
+    return action
+
+
+def reconcile_deferred_actions(
+    registry: dict[str, Any],
+    now: datetime,
+    *,
+    in_flight_fn: Callable[[str], bool],
+    dry_run: bool,
+) -> DeferredActionResult:
+    """Phase S S7: apply a card's deferred pause/drop once its linked work stops.
+
+    A `pending_action` was recorded by the dashboard because the action landed
+    while the spawned work was in-flight (S7: never interrupt a run). Each tick
+    we re-check ``in_flight_fn(task_id)`` (production: the SAME chain_events
+    phase-derive the dashboard's in-flight gate uses); while it's still in-flight
+    we keep waiting, and once it reaches a safe stop the recorded action is
+    applied (drop → dropped; snooze → snoozed_until) and the marker cleared. A
+    card with a pending action but no spawned task_id has nothing in-flight to
+    wait on, so it applies immediately.
+
+    Effectful ONLY on the in-memory registry — the caller owns the single
+    write+commit. Idempotent: applying clears `pending_action`, so a card is
+    processed once. Fail-safe per capture: an in_flight_fn error keeps the card
+    (waits — never applies mid-flight on an indeterminate signal)."""
+    res = DeferredActionResult()
+    for cap in registry.get('captures', []):
+        if not isinstance(cap, dict):
+            continue
+        pending = cap.get('pending_action')
+        if not isinstance(pending, dict) or pending.get('action') not in _DEFERRED_ACTIONS:
+            continue
+        cid = cap.get('id') if isinstance(cap.get('id'), str) else '<unknown>'
+        spawned = cap.get('spawned')
+        task_id = spawned.get('task_id') if isinstance(spawned, dict) else None
+        if isinstance(task_id, str) and task_id:
+            try:
+                still_in_flight = in_flight_fn(task_id)
+            except Exception as e:  # noqa: BLE001 — per-capture fail-safe
+                log(f'deferred: in-flight probe failed for {task_id}: '
+                    f'{type(e).__name__}: {e} — keep')
+                res.kept += 1
+                continue
+            if still_in_flight:
+                res.kept += 1
+                continue
+        if dry_run:
+            res.applied.append((cid, f"{pending.get('action')} (dry-run)"))
+            continue
+        action = apply_pending_action(cap, now)
+        if action is None:
+            res.kept += 1
+            continue
+        res.applied.append((cid, action))
+        log(f'deferred: capture {cid} applied {action} (linked work reached safe stop)')
+    return res
+
+
+def _default_in_flight_fn() -> Callable[[str], bool]:
+    """Production in-flight probe (spec § 3 S7): the linked work is in-flight iff
+    the SAME chain_events phase-derive the dashboard uses reports in_flight /
+    awaiting_merge. Lazy imports keep module-load stdlib-only and mirror the
+    dashboard's gate exactly, so a deferred action applies on the same safe-stop
+    boundary the board shows. (heal_orphan_autoregister reuses dashboard_api's
+    derive the same way — zero drift over re-porting the state machine.)"""
+    import chain_event_emit  # noqa: PLC0415
+    import dashboard_api  # noqa: PLC0415
+
+    def _in_flight(task_id: str) -> bool:
+        client = chain_event_emit._get_client()
+        events = _fetch_task_events(client, task_id)
+        if not events:
+            return False
+        return dashboard_api.derive_phase_for_task(events, None) in _IN_FLIGHT_PHASES
+
+    return _in_flight
+
+
 # ---------- commit + push the captures.json delta to main (§ 6.3) ----------
 
 
@@ -1061,7 +1300,9 @@ def _emit_summary(retire: RetireResult, aged: list[str], commit_status: str,
                   missions: Optional[MissionReconcileResult] = None,
                   missions_commit_status: str = 'nothing',
                   briefed: int = 0, deferred: int = 0,
-                  completed: Optional[CompletionResult] = None) -> None:
+                  completed: Optional[CompletionResult] = None,
+                  failed: Optional[FailureResult] = None,
+                  deferred_actions: Optional[DeferredActionResult] = None) -> None:
     """One audit line (log) + a low-noise digest alert when something happened;
     escalate on a hard failure. Exact counts only — never a silently truncated
     list (full ids live in the log line above)."""
@@ -1077,6 +1318,15 @@ def _emit_summary(retire: RetireResult, aged: list[str], commit_status: str,
         closed_ids = [cid for cid, _ in completed.closed]
         summary += (f'; {close_verb} {len(completed.closed)} card(s) {closed_ids}; '
                     f'{len(completed.closeouts)} closeout(s) {completed.closeouts}')
+    if failed is not None and failed.changed:
+        ring_verb = 'would ring' if dry_run else 'rang'
+        rung_ids = [cid for cid, _ in failed.rung]
+        summary += f'; {ring_verb} {len(failed.rung)} failure doorbell(s) {rung_ids}'
+    if deferred_actions is not None and deferred_actions.changed:
+        apply_verb = 'would apply' if dry_run else 'applied'
+        applied = [f'{cid}:{act}' for cid, act in deferred_actions.applied]
+        summary += (f'; {apply_verb} {len(deferred_actions.applied)} '
+                    f'deferred action(s) {applied}')
     if missions is not None:
         ship_verb = 'would ship' if dry_run else 'shipped'
         shipped_ids = [mid for mid, _ in missions.shipped]
@@ -1119,12 +1369,17 @@ def run_once(*, dry_run: bool,
              author_fn: Optional[Callable[..., tuple[int, int]]] = None,
              completion_verify_fn: Optional[Callable[[str, Optional[str]], tuple[bool, Optional[str]]]] = None,
              completion_closeout_fn: Optional[Callable[[dict[str, Any], Optional[str], datetime], dict[str, Any]]] = None,
+             failure_fn: Optional[Callable[[str], Optional[str]]] = None,
+             ring_fn: Optional[Callable[..., dict[str, Any]]] = None,
+             in_flight_fn: Optional[Callable[[str], bool]] = None,
              now: Optional[datetime] = None) -> int:
     """One healer tick. The injectable seams (emit_fn / events_fetcher /
     mission_probe_fn / author_fn / completion_verify_fn / completion_closeout_fn /
-    now) keep the effectful edges test-controllable; production resolves them from
-    chain_event_emit + the live Supabase client + the shared terminal-state probe
-    + the Narrator sweep + the belt-and-suspenders verified-merge gate."""
+    failure_fn / ring_fn / in_flight_fn / now) keep the effectful edges
+    test-controllable; production resolves them from chain_event_emit + the live
+    Supabase client + the shared terminal-state probe + the Narrator sweep + the
+    belt-and-suspenders verified-merge gate + the chain_events failure signal +
+    the doorbell rails + the shared phase-derive in-flight gate."""
     now = now or datetime.now(timezone.utc)
     repo_paths = load_repo_paths()
     if mission_probe_fn is None:
@@ -1180,6 +1435,8 @@ def run_once(*, dry_run: bool,
     briefed = 0
     deferred = 0
     completed = CompletionResult()
+    failed = FailureResult()
+    deferred_actions = DeferredActionResult()
     commit_status = 'nothing'
     cap_path = captures_path(repo_paths)
     if cap_path is None:
@@ -1196,6 +1453,24 @@ def run_once(*, dry_run: bool,
                 for c in registry.get('captures', [])
                 if isinstance(c, dict) and c.get('id')
             }
+            # --- phase S (S7): apply a deferred pause/drop whose linked work has
+            # reached a safe stop. Runs FIRST so an operator's late pause/drop
+            # wins the moment the work finishes — before completion might close
+            # the same card (a dropped card is no longer parked, so completion's
+            # state==parked guard then skips it). Production resolves the in-flight
+            # gate (chain_events phase-derive) lazily. ---
+            if in_flight_fn is None:
+                try:
+                    in_flight_fn = _default_in_flight_fn()
+                except Exception as e:  # noqa: BLE001 — degrade: skip deferred this tick
+                    log(f'deferred: in-flight seam unavailable: {type(e).__name__}: {e}')
+            if in_flight_fn is not None:
+                try:
+                    deferred_actions = reconcile_deferred_actions(
+                        registry, now, in_flight_fn=in_flight_fn, dry_run=dry_run)
+                except Exception as e:  # noqa: BLE001 — fail-safe: report, never corrupt
+                    log(f'deferred-reconcile raised: {type(e).__name__}: {e}')
+                    deferred_actions = DeferredActionResult()
             # --- phase S (S3): complete linked work — auto-close safe / closeout
             # risky. Runs BEFORE aging + the Narrator sweep so terminal work is
             # resolved first (a card closing this tick is never also aged), and so
@@ -1222,6 +1497,30 @@ def run_once(*, dry_run: bool,
                 except Exception as e:  # noqa: BLE001 — fail-safe: report, never corrupt
                     log(f'completion-reconcile raised: {type(e).__name__}: {e}')
                     completed = CompletionResult()
+            # --- phase S (S4): ring the loud blocked-on-you doorbell for parked
+            # cards whose linked work failed/blocked. Runs after completion (a
+            # failed card never verify-merges, so completion keeps it) and before
+            # aging (a card that just rang isn't also aged this tick). Production
+            # resolves the chain_events failure signal + the doorbell rails
+            # lazily; both seams are independent so a missing one skips only S4. ---
+            if failure_fn is None:
+                try:
+                    failure_fn = _default_failure_fn()
+                except Exception as e:  # noqa: BLE001 — degrade: skip failure this tick
+                    log(f'failure: detect seam unavailable: {type(e).__name__}: {e}')
+            if ring_fn is None:
+                try:
+                    ring_fn = _default_ring_fn()
+                except Exception as e:  # noqa: BLE001 — degrade: skip failure this tick
+                    log(f'failure: ring seam unavailable: {type(e).__name__}: {e}')
+            if failure_fn is not None and ring_fn is not None:
+                try:
+                    failed = reconcile_failed_cards(
+                        registry, now,
+                        failure_fn=failure_fn, ring_fn=ring_fn, dry_run=dry_run)
+                except Exception as e:  # noqa: BLE001 — fail-safe: report, never corrupt
+                    log(f'failure-reconcile raised: {type(e).__name__}: {e}')
+                    failed = FailureResult()
             try:
                 aged = age_parked_captures(registry, now)
             except Exception as e:  # noqa: BLE001 — fail-safe
@@ -1237,7 +1536,8 @@ def run_once(*, dry_run: bool,
             except Exception as e:  # noqa: BLE001 — fail-safe: never abort the tick
                 log(f'narrator sweep raised: {type(e).__name__}: {e}')
                 briefed, deferred = 0, 0
-            if (completed.changed or aged or briefed) and not dry_run:
+            if (completed.changed or failed.changed or deferred_actions.changed
+                    or aged or briefed) and not dry_run:
                 # The Narrator sweep can hold the registry for minutes (one claude
                 # spawn per pending capture, up to NARRATOR_MAX_PER_TICK ×
                 # CLAUDE_TIMEOUT_SEC). Writing the stale in-memory copy would clobber
@@ -1265,7 +1565,8 @@ def run_once(*, dry_run: bool,
                 if core:
                     try:
                         commit_status = commit_and_push_captures(
-                            core, _commit_audit(retire, aged, briefed, completed))
+                            core, _commit_audit(retire, aged, briefed, completed,
+                                                failed, deferred_actions))
                     except Exception as e:  # noqa: BLE001 — fail-safe
                         log(f'commit+push raised: {type(e).__name__}: {e}')
                         commit_status = 'push-failed'
@@ -1299,17 +1600,23 @@ def run_once(*, dry_run: bool,
 
     _emit_summary(retire, aged, commit_status, dry_run,
                   missions=missions, missions_commit_status=missions_commit_status,
-                  briefed=briefed, deferred=deferred, completed=completed)
+                  briefed=briefed, deferred=deferred, completed=completed,
+                  failed=failed, deferred_actions=deferred_actions)
     return 0
 
 
 def _commit_audit(retire: RetireResult, aged: list[str], briefed: int = 0,
-                  completed: Optional['CompletionResult'] = None) -> str:
+                  completed: Optional['CompletionResult'] = None,
+                  failed: Optional['FailureResult'] = None,
+                  deferred_actions: Optional['DeferredActionResult'] = None) -> str:
     closed = len(completed.closed) if completed else 0
     closeouts = len(completed.closeouts) if completed else 0
+    rang = len(failed.rung) if failed else 0
+    applied = len(deferred_actions.applied) if deferred_actions else 0
     return (f'Auto-committed by heal_missions_card_gc. '
             f'retired={len(retire.retired)} aged={len(aged)} briefed={briefed} '
-            f'closed={closed} closeouts={closeouts}.')
+            f'closed={closed} closeouts={closeouts} failure-rings={rang} '
+            f'deferred-applied={applied}.')
 
 
 def _missions_commit_audit(missions: MissionReconcileResult) -> str:
