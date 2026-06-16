@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-16 07:18Z UTC (Iter ~2022, Tier 1, consecutive_clean=1)
+
+**Iter ~2022 summary:** ✅ Nominal. 0 new alerts. All checks clean. **Phase S s-1-link-inflight Forge build ACTIVE** — dispatched 07:13:52Z, `build-s-1-link-inflight.json` in Forge inbox. **Stale dag-revision notify RESOLVED** — Beacon processed + archived, no spurious dag-preflight-4. PR #497 scope decision still with Larry (bot DM'd 07:07:50Z, deadline Jun-17T04:02Z ~21h). Beacon inbox empty. All 5 daemons alive. Repo a01de921=origin/main. Watermark: 1067 (unchanged). pending=0. PRIME ratio=20.20. Tier 1, consecutive_clean=0→1.
+
 ## Status snapshot — updated 2026-06-16 07:11Z UTC (Iter ~2021, Tier 1, consecutive_clean=0)
 
 **Iter ~2021 summary:** ⚠️ Signal. 2 new alerts. **Phase S dag-preflight-3 PASSED ✅** at 07:06:41Z: sequence missions-v2-phase-s now `active`, all 6 steps pending, advancer dispatching s-1-link-inflight next tick (~07:10Z). **PR #497 scope decision DELIVERED** to Larry via L1066 (bot DM'd 07:07:50Z): binary APPROVE=add 'info' to VALID_SEVERITIES / REJECT=close PR, deadline Jun-17T04:02Z (~21h). L1066 Tier-4 (novel; journal-note only); L1067 Tier-3 silenced (mirror-dag-pass:missions-v2-phase-s). Stale dag-revision notify in Beacon inbox — low risk (sequence now active). All 5 daemons alive. Repo d22331ad=origin/main. Watermark: 1065→1067. pending=0. PRIME ratio=20.20 (990 interventions, 49 systemic fixes). Tier 1, consecutive_clean=0.
@@ -340,7 +344,7 @@
 | G-rule mirror-no-session-revision-loop | [blue] **2/3** | Mirror review NO_SESSION × 2+ for PR #497; Beacon re-dispatches Mirror instead of Forge. Watch; dispatch at 3/3 |
 | G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 (warn-vs-info) |
 | G-rule telegram-409-burst | [yellow] **2/3** | Watch; dispatch at 3/3 |
-| Phase S dag-preflight-3 PASSED ✅ | [blue] PASSED 07:06:41Z Jun-16. Sequence missions-v2-phase-s now `active`. s-1-link-inflight dispatching on advancer next tick (~07:10Z). Stale dag-revision notify in Beacon inbox (dag-preflight-2 REVISION, superseded); watch for spurious dag-preflight-4. | Watch s-1 Forge PR + Mirror review |
+| Phase S dag-preflight-3 PASSED ✅ / s-1 BUILD ACTIVE | [yellow] PASSED 07:06:41Z Jun-16. s-1-link-inflight Forge build dispatched 07:13:52Z. Stale dag-revision notify RESOLVED (Beacon processed, archived, no spurious dag-preflight-4). | Watch s-1 Forge PR + Mirror review |
 | PR #497 scope decision DELIVERED | [yellow] Binary choice now with Larry (bot DM'd 07:07:50Z Jun-16). APPROVE=add 'info' to VALID_SEVERITIES / REJECT=close PR #497. Deadline Jun-17T04:02Z (~21h). | Watch Larry reply: `approve cleanup-branch-info` or `reject cleanup-branch-info` |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap. outbox-notifier also drops regular approval_request markers from Beacon inter-agent sessions (observed iter ~2020: both routing-signal and approval_request dropped in same 5-min window). | DAG markers and scope-decision markers still fall through; recover manually |
 | Stale bash orphans | [blue] PIDs 1834248 (17d+) + 2605007 (1d+). Ss, low CPU. | Carry |
