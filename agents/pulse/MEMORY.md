@@ -126,9 +126,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-16 05:44Z UTC (Iter ~2012, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-16 05:52Z UTC (Iter ~2013, Tier 1, consecutive_clean=0)
 
-**Iter ~2012 summary:** ✅ Nominal. 1 new alert (L1062 dispatch-branch-cleanup Tier-3 silenced). All checks clean. **PR #532 in active Mirror review** (dispatched by heal-undispatched-pr-review backstop at 05:35:47Z; outbox-notifier confirms; healer 05:40Z tick shows orphaned=0). PR #497 UNKNOWN/"", Mirror REVIEW_ESCALATE Jun-14T04:02:56Z, age≈49.7h, deadline Jun-17T04:02:56Z (~22.3h). All 5 daemons alive. Repo 961df2e2=origin/main. Watermark: 1061→1062. pending=0. Tier 1, consecutive_clean=0. PRIME ratio=20.10.
+**Iter ~2013 summary:** ✅ Nominal + 1 auto-fix. **PR #532 MERGED ✅** at 05:46:10Z ("feat: droplet delegate endpoint for mission captures"). missions-v2-delegate-fix sequence COMPLETE. Check A: repo behind → fast-forwarded 8c446535→35a52a5ac. 0 new alerts (watermark=1062 unchanged). All 5 daemons alive. PR #497 UNKNOWN/"", Mirror REVIEW_ESCALATE Jun-14T04:02:56Z, age≈49.8h, deadline Jun-17T04:02:56Z (~22.2h). Repo now 35a52a5ac=origin/main. Watermark: 1062 unchanged. pending=0. Tier 1, consecutive_clean=0. PRIME ratio=20.10.
 
 ## Status snapshot — updated 2026-06-16 05:25Z UTC (Iter ~2009, Tier 1, consecutive_clean=0)
 
@@ -273,7 +273,7 @@
 | PR #525 MERGED ✅ | feat(missions): re-brief narrator cards on mission state change. Merged 2026-06-15T20:21:50Z (`1bebe776`). missions-v2-phase4.1 sequence advancing. | DONE. Watch for next sequence step. |
 | PR #522 MERGED ✅ | fix(missions-card-gc): stop emitting routine success summary as Pulse-claimed digest alert. Merged 2026-06-15 after iter ~1986. **G-rule missions-card-gc-warn-vs-info COMPLETE ✅**. | DONE. |
 | PR #529 MERGED ✅ | `cred-drift-ignore-feature-flags-001`: adds `OURLIBERTY_NEWMISSION_INGEST_ENABLED` to ignored_keys allowlist in detect_drift. Merged 2026-06-15T23:48Z. | DONE. Credential drift false-positive resolved. |
-| PR #532 delegate-endpoint — Mirror reviewing | [yellow] OPEN, MERGEABLE, head=1ef9cf7... Mirror review dispatched 05:35:47Z Jun-16 by heal-undispatched-pr-review (backstop). Pipeline actively in Mirror review. | Watch for Mirror pass + auto-merge. |
+| PR #532 delegate-endpoint MERGED ✅ | [blue] MERGED 2026-06-16T05:46:10Z. missions-v2-delegate-fix sequence COMPLETE. | DONE. |
 | PR #55 chat-label-fix MERGED ✅ | missions-v2-delegate-fix step 2. Merged 02:27Z 2026-06-16. | DONE |
 | PR #497 REVIEW_ESCALATE | [yellow] mergeable=UNKNOWN; Mirror REVIEW_ESCALATE Jun-14T04:02:56Z; age≈49.5h; 72h expires Jun-17T04:02:56Z (~25.5h remaining). | Escalate if still open at Jun-17T04:02:56Z |
 | unreviewed-merge:511/499/494/489/510/509/518/519/530 | [yellow] PRs merged by Larry without Mirror; bot-delivered for others. Larry's judgment call. | Reply appropriate shortcut or silence |
