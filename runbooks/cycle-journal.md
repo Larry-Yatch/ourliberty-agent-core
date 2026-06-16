@@ -4,6 +4,73 @@
 
 ---
 
+## Iteration ~2025 — 2026-06-16 07:53Z UTC (interactive, /loop /cycle, Tier 2, consecutive_clean=0→1)
+
+**Trigger:** Larry direct invocation (`/loop /cycle`, dynamic mode).
+
+**Health:** ✅ Nominal. 1 new alert (Tier-3 silenced). Phase S **s-1-link-inflight MERGED ✅** (confirmed this iter — happened at 07:32Z UTC) and **s-2-completion Forge build ACTIVE** (~12 min). All checks clean.
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #541 s-1-link-inflight — MERGED ✅ (confirmed):** outbox-notifier log: `AUTO_MERGE task=s-1-link-inflight pr=.../pull/541 outcome=merged` at 01:32:46 MDT (07:32:46Z UTC). `SEQUENCE_STEP_MERGED seq=missions-v2-phase-s step=s-1-link-inflight`. Both worktrees (`wt-forge-s-1-link-inflight`, `wt-mirror-s-1-link-inflight`) torn down. Phase S step s-1 DONE.
+- **s-2-completion ACTIVE:** headless-approval-request dispatched at 01:35:36 MDT (07:35:36Z UTC). Proceed ACK at 01:41:17 MDT. Build-phase dispatched 07:41:17Z UTC. Worktree `wt-forge-s-2-completion` active. `build-s-2-completion.json` in Forge inbox. No PR yet (~12 min into build — within normal window). No stall concern.
+- **PR #497 scope decision — CARRY CONFIRMED ✅:** still UNKNOWN/"", updatedAt=06:15:41Z (unchanged). Deadline Jun-17T04:02Z (~20.2h remaining). Pending Larry reply.
+- **dashboard_api restart — RESOLVED ✅:** L1068 Tier-3 silenced (heal-stale-daemon-code auto-restarted at 07:50:15Z; code from PR #541+PR #540, 2 commits since last start; new PID 3486940). Known pattern, no action required.
+
+**Check 0 — Alert triage:** Watermark=1067 entering; file=1068 lines. **1 new alert (L1068):** `{"source":"heal-stale-daemon-code","subject":"auto-restarted:ourliberty-dashboard-api.service","route":"digest"}`. Triage helper → **Tier-3 silence** (known-pattern match in alert-translations.json). Resolved. Watermark advanced 1067→1068. ✅ No tier-reset.
+
+**Check 1 — Log noise:** outbox-notifier.log last entry 01:41:17 MDT (07:41:17Z UTC): `build-phase dispatched forge <- beacon (task=s-2-completion)`. All INFO-level. No WARNs or ERRORs in tail-30. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot PID 3435953 alive (Ss). Last delivery 01:07:50 MDT (L1065+L1066, PR #497 scope decision + mirror-dag-pass). No new messages since. No 409 errors. G-rule telegram-409-burst 2/3 unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → "no stalls detected". All FORGE_NO_PR_SKIP informational. s-2-completion not yet stale (12 min, within 2h window). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0** (history=223). ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-16T07:50:15Z, age≈3 min. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=0c0ec029 (Pulse cycle 20260616T073411Z), on main, clean, up to date with origin/main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-16T07:30:03Z, status=no-change. Age≈23 min (well under 2h). ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3435953 (Ss) ✅, chain_event_shipper 2744551 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, dashboard_api **3486940** (Ssl, restarted 07:50Z — new PID, code live) ✅, outbox_notifier 3462678 (Ss) ✅. All 5 alive. ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (1 open):
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): UNKNOWN/"". Scope decision with Larry (bot DM'd 07:07:50Z). Deadline Jun-17T04:02Z (~20.2h). [yellow] carry.
+- No PR for s-2-completion yet (Forge still building). Watch over next 2h.
+ourliberty-dashboard: **0 open PRs.** ✅
+
+**Conditional checks (Tuesday 2026-06-16 UTC, weekday=1):** Check I fires Mon/Wed/Fri/Sun — skip. Check III fires Sunday — skip.
+
+**G-rule tracking:** All counts unchanged from iter ~2024. No new advances.
+
+**Actions taken:**
+1. Alert triage: watermark 1067→1068 (L1068 Tier-3 silenced: dashboard_api restart, code live after PR #541).
+2. PRIME ledger: `iter_clean` appended (2026-06-16T07:53:39Z).
+3. Tier state: `record --checks-clean true` → consecutive_clean=1, Tier 2.
+
+**Dispatches:** None.
+
+**Standing findings (carried):**
+- [yellow] **PR #497 scope decision** — `approve cleanup-branch-info` or `reject cleanup-branch-info`. Bot DM'd 07:07:50Z. Deadline Jun-17T04:02Z (~20.2h). Watch for Larry reply.
+- [yellow] **Phase S s-2-completion Forge build ACTIVE** — dispatched 07:41:17Z, worktree active. Watch for Forge PR + Mirror review (within 2h window, no stall yet).
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519/530/531/534** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — pending Larry dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — FN=3027, TP=5. `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST **2/3**, merge_conflict_manual_rebase-tier4 1/3, heal-pipeline-stall-mirror-pass-unmerged-tier4 1/3, revision-phase-preamble-missing 1/3, **mirror-no-session-revision-loop 2/3**.
+- [blue] **Phase S s-1-link-inflight MERGED ✅** — PR #541 merged 07:32:46Z UTC. SEQUENCE_STEP_MERGED. Phase S advancing to s-2-completion. [done]
+- [blue] **Stale worktrees** — `wt-forge-fix-delegate-endpoint-regression-gate-001`, `wt-mirror-dag-preflight-missions-v2-delegate-fix`, `wt-mirror-dag-preflight-missions-v2-phase-s`, `wt-mirror-dag-preflight-missions-v2-phase-s-2`, `wt-mirror-dag-preflight-missions-v2-phase-s-3`, `wt-mirror-cleanup-branch-warn-to-info-001`. dispatch-branch-cleanup will reap.
+- [blue] **Stale bash orphans** — PIDs 1834248 + 2605007. Low CPU. [carry]
+
+**PRIME DIRECTIVE:** Clean iter. 0 interventions. ratio=20.20 (990 interventions, 49 systemic fixes, 11 verification_pending), trend=improving.
+**Tier end-of-iter:** Tier 2, consecutive_clean=1 (2 more consecutive clean → Tier 3 de-escalation). Next cadence: 15-min.
+
+---
+
 ## Iteration ~2024 — 2026-06-16 07:32Z UTC (interactive, /cycle, Tier 1→2 de-escalation, consecutive_clean=2→3)
 
 **Trigger:** Larry direct invocation (`/cycle`).
