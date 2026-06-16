@@ -95,13 +95,20 @@ part and trivial helpers. For such an addition:
 2. **Query the shelf librarian** — run it by ABSOLUTE path (like the corpus), it lives in the
    sibling ourliberty-graph repo, not your worktree:
    `python3 /home/larry/ourliberty-graph/pipeline/librarian.py "<capability phrase>"`
-   It prints ranked candidates: `[score] <id> [profile] reuse=<mode>` + capability statement +
-   `location:`.
-3. If a high-scoring candidate describes the **same** capability the diff is building **and** the
-   diff does not import/reference/extend that part, surface a reuse note: name the shelf part, its
-   `location` and `reuse_mode`, and what to reuse/extend instead of reinventing. A near-variant
-   (same job, different implementation) is also worth a note — it seeds the portfolio layer.
-4. If NO candidate matches (the librarian's top score is low / the capability is genuinely new),
+   It prints ranked candidates as `[score] <id> [profile] reuse=<mode>` + capability statement +
+   `location:`. The leading `[score]` is now a **TF-IDF cosine** float in `0..1` (e.g. `[0.490]`),
+   not the old v1 integer token-overlap count (e.g. `[12]`).
+3. **Read the librarian's top score against these 0..1 bands** (the same bands `build_check.py` uses,
+   so the build-time consult and this gate agree):
+   - **top score ≥ 0.25 → STRONG overlap.** If a candidate at this band describes the **same**
+     capability the diff is building **and** the diff does not import/reference/extend that part,
+     surface a reuse note: name the shelf part, its `location` and `reuse_mode`, and what to
+     reuse/extend instead of reinventing.
+   - **0.13 ≤ top score < 0.25 → POSSIBLE overlap.** Mention it only if the diff *clearly* reinvents
+     the candidate's capability (a near-variant — same job, different implementation — is worth a note
+     because it seeds the portfolio layer); otherwise stay quiet.
+   - **top score < 0.13 → net-new.** Don't surface a reuse note; go to step 4 (restock).
+4. If NO candidate matches (the librarian's top score is **< 0.13** / the capability is genuinely new),
    surface a **restock note** instead: name the new component and its file(s) and flag it to be
    catalogued after merge, so the next builder finds it rather than reinventing it. This is the
    *catalog-on-build* half of the loop — reuse what exists (steps 1–3), catalogue what's new (this
@@ -110,9 +117,12 @@ part and trivial helpers. For such an addition:
 
 **Fail-safe — this lens can never block or fail the review.** If the librarian or the
 ourliberty-graph checkout is absent or errors, write one line ("reuse-check skipped: librarian
-unavailable") and move on. The shelf is young and the matcher is v1 token-overlap, so Lens I is
-**advisory only**: findings are sub-blocking narrative notes (see Wiring), never `REVIEW_REVISION`
-/ `REVIEW_ESCALATE` / `REVIEW_EMERGENCY_HALT`. It surfaces a reuse opportunity; Forge/Larry decide.
+unavailable") and move on. The matcher is now **TF-IDF cosine similarity** (T16, shipped 2026-06-15;
+a recall eval moved recall@1 80%→97% and recall@3 87%→100%), so the 0..1 score bands above are
+reliable — no longer the brittle v1 token-overlap matcher. Lens I stays **advisory only** by design
+(reuse is a forward-looking judgment call, not a correctness gate): findings are sub-blocking
+narrative notes (see Wiring), never `REVIEW_REVISION` / `REVIEW_ESCALATE` / `REVIEW_EMERGENCY_HALT`.
+It surfaces a reuse opportunity; Forge/Larry decide.
 (This is Mission A's connect-before-build behavior applied at the gate Mirror already runs —
 PLAN §5-#3 / §9-Q4. Graduate it toward a real gate only once Pulse Check XI's accuracy meter earns
 the trust.)
@@ -132,9 +142,12 @@ class:
 | reuse-reinvention (advisory) | 70 | (never blocks) |
 
 A finding marked `blocking: true` in the corpus inherits the lower (blocking)
-threshold for its class. Lens I (reuse-reinvention) is `blocking: false` and a
-high surface threshold by design — the v1 librarian is brittle, so only a
-confident reinvention is worth a narrative note.
+threshold for its class. Lens I (reuse-reinvention) is `blocking: false` and
+keyed to the librarian's 0..1 cosine bands — STRONG (≥ 0.25) → flag; POSSIBLE
+(0.13–0.25) → mention only on a clear reinvention; net-new (< 0.13) → don't flag.
+These are the same bands `build_check.py` uses, so the build-time consult and this
+gate agree. The librarian is now TF-IDF cosine (eval-proven, not brittle), so a
+STRONG band is a reliable reuse signal worth a narrative note.
 
 ## Wiring into Mirror's verdict
 
