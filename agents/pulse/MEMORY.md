@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-16 01:39Z UTC (Iter ~1995, Tier 1, consecutive_clean=0, tier-reset)
+
+**Iter ~1995 summary:** ⚠️ Signal. 1 new alert: L1050 unreviewed-merge:530 (spec+docs: delegate-endpoint fix + chat-label, Phase S, roadmap status; actor=Larry-Yatch). Tier-4, bot already DM'd Larry at 19:30 MDT via route=escalate; journal-note only; no second Pulse DM. Watermark: 1049→1050. All daemons alive. Repo at 5c338200=origin/main. pending=0. 1 open PR: #497 (UNKNOWN/"", Mirror REVIEW_ESCALATE, 72h deadline Jun-17T04:02:56Z ~26.5h). PRIME ratio=20.06. Tier 3→1 (tier-reset). consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-16 01:02Z UTC (Iter ~1994, Tier 3, consecutive_clean=6, all checks nominal)
 
 **Iter ~1994 summary:** ✅ Nominal. 0 new alerts. All daemons alive. Repo at 1af16aab=origin/main. Watermark: 1049 (unchanged). pending=0. 1 open PR: #497 (UNKNOWN/"", Mirror REVIEW_ESCALATE, 72h deadline Jun-17T04:02:56Z ~27h). PRIME ratio stable. Tier 3, consecutive_clean=6 (steady-state ceiling).
@@ -212,7 +216,7 @@
 | PR #522 MERGED ✅ | fix(missions-card-gc): stop emitting routine success summary as Pulse-claimed digest alert. Merged 2026-06-15 after iter ~1986. **G-rule missions-card-gc-warn-vs-info COMPLETE ✅**. | DONE. |
 | PR #529 MERGED ✅ | `cred-drift-ignore-feature-flags-001`: adds `OURLIBERTY_NEWMISSION_INGEST_ENABLED` to ignored_keys allowlist in detect_drift. Merged 2026-06-15T23:48Z. | DONE. Credential drift false-positive resolved. |
 | PR #497 REVIEW_ESCALATE | [yellow] mergeable=MERGEABLE; Mirror REVIEW_ESCALATE Jun-14T04:02:56Z; age≈43.8h; 72h expires Jun-17T04:02:56Z (~28.2h remaining). | Escalate if still open at Jun-17T04:02:56Z |
-| unreviewed-merge:511/499/494/489/510/509/518/519 | [yellow] PRs merged by Larry without Mirror; bot-delivered for others. Larry's judgment call. | Reply appropriate shortcut or silence |
+| unreviewed-merge:511/499/494/489/510/509/518/519/530 | [yellow] PRs merged by Larry without Mirror; bot-delivered for others. Larry's judgment call. | Reply appropriate shortcut or silence |
 | G-rule stall-detector Forge build | [yellow] Beacon spec complete. Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
 | Check VIII rule=lower | [yellow] FN=3027, TP=5, FP=2 — threshold too high. | `approve check-viii-update-2026-06-15` when shortcut lands |
 | Tier-2 weekly probe auth_401 | [yellow] Pending Larry | docs/runbooks/rotate-claude-setup-tokens.md |
