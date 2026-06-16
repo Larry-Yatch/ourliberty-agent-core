@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-16 04:30Z UTC (Iter ~2004, Tier 3, consecutive_clean=3)
+
+**Iter ~2004 summary:** ✅ Nominal. 1 new alert (L1056 Tier-3 silenced: review-pass PR #535 `adopt-sequence-step-stall-recovery-spec` auto-merged 04:24Z). Check A: repo behind 1 commit (PR #535 merged); fast-forward 0d7cef99→fd0e0a30. All 5 daemons alive (dashboard-api PID changed 3392206→3402371, informational, no healer alert). Watermark: 1055→1056. pending=0. **PR #532 (delegate-endpoint): BUILDING** — `fix-delegate-endpoint-regression-gate-001` dispatched to Forge build phase 04:22Z, pipeline restored. PR #497 (cleanup-branch-warn-to-info-001): UNKNOWN/"", Mirror REVIEW_ESCALATE Jun-14T04:02:56Z, age≈48.5h, deadline Jun-17T04:02:56Z (~23.5h). Tier 3, consecutive_clean=3. PRIME ratio=stable.
+
 ## Status snapshot — updated 2026-06-16 04:00Z UTC (Iter ~2003, Tier 3, consecutive_clean=2)
 
 **Iter ~2003 summary:** ✅ Nominal. 1 new alert (L1055 Tier-3 silenced: dispatch-branch-cleanup pruned 2 local + 1 remote stale branches at 03:38Z). Check A: repo behind 1 commit (PR #534 `docs(mirror): retune Lens I reuse-check for TF-IDF librarian (T16)`, merged unreviewed by Larry ~03:56Z); fast-forward executed 1e5cc6bf→182352d8. All 5 daemons alive. Watermark: 1054→1055. pending=0. PR #532 (delegate-endpoint): PIPELINE-ORPHANED (carry). PR #497 (cleanup-branch-warn-to-info-001): UNKNOWN/"", Mirror REVIEW_ESCALATE Jun-14T04:02:56Z, age≈47.9h, deadline Jun-17T04:02:56Z (~24.1h). Tier 3, consecutive_clean=2. PRIME ratio=stable.
@@ -245,7 +249,7 @@
 | PR #525 MERGED ✅ | feat(missions): re-brief narrator cards on mission state change. Merged 2026-06-15T20:21:50Z (`1bebe776`). missions-v2-phase4.1 sequence advancing. | DONE. Watch for next sequence step. |
 | PR #522 MERGED ✅ | fix(missions-card-gc): stop emitting routine success summary as Pulse-claimed digest alert. Merged 2026-06-15 after iter ~1986. **G-rule missions-card-gc-warn-vs-info COMPLETE ✅**. | DONE. |
 | PR #529 MERGED ✅ | `cred-drift-ignore-feature-flags-001`: adds `OURLIBERTY_NEWMISSION_INGEST_ENABLED` to ignored_keys allowlist in detect_drift. Merged 2026-06-15T23:48Z. | DONE. Credential drift false-positive resolved. |
-| PR #532 delegate-endpoint PIPELINE-ORPHANED | [yellow] OPEN, MERGEABLE, 0 GitHub reviews. Forge preamble failure × 4 → RETRY_EXHAUSTED → dead-letter to Beacon (processed, Beacon inbox now empty) → no new Forge task. PR has no active pipeline driver. missions-v2-delegate-fix step 1. Needs Larry judgment. | Re-trigger Forge revision manually, or close PR and restart? Escalate if still stuck. |
+| PR #532 delegate-endpoint BUILDING | [yellow] OPEN, UNKNOWN/"", 0 GitHub reviews. Previous pipeline orphaned; Beacon dispatched `fix-delegate-endpoint-regression-gate-001` → Forge ack-proceed → build-phase active as of 04:22Z Jun-16. Pipeline restored. Watch for Forge PR. | Watch next iter for new PR or Forge outbox marker. |
 | PR #55 chat-label-fix MERGED ✅ | missions-v2-delegate-fix step 2. Merged 02:27Z 2026-06-16. | DONE |
 | PR #497 REVIEW_ESCALATE | [yellow] mergeable=UNKNOWN; Mirror REVIEW_ESCALATE Jun-14T04:02:56Z; age≈49.5h; 72h expires Jun-17T04:02:56Z (~25.5h remaining). | Escalate if still open at Jun-17T04:02:56Z |
 | unreviewed-merge:511/499/494/489/510/509/518/519/530 | [yellow] PRs merged by Larry without Mirror; bot-delivered for others. Larry's judgment call. | Reply appropriate shortcut or silence |
