@@ -163,6 +163,12 @@
       "tier": "FYI",
       "plain_language_summary": "The hourly dispatch-branch GC backstop (ourliberty-cleanup-dispatch-branches.timer) ran and pruned stale Forge/Mirror dispatch branches — the routine housekeeping success path. It runs every hour and almost always has something small to prune, so it fires frequently by design. route=digest means it is already surfaced only in the daily CEO digest, never DM'd. By-design FYI, not a failure.",
       "recommended_action": "None — by-design housekeeping confirmation. Per-run detail (how many local/remote branches pruned, any deferred by batch cap) is in the digest line and ~/agents/logs/cleanup_dispatch_branches.log. The sibling `gh-unavailable` subject is route=escalate and DOES still surface — only this routine `summary` is silenced."
+    },
+    "gh-unavailable": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "The hourly dispatch-branch cleanup couldn't reach GitHub (`gh` unavailable) for one or more repos, so it SKIPPED pruning their stale Forge/Mirror branches this run. Nothing was deleted unsafely — without `gh` it can't check which branches still back an open PR (the guard against deleting a live branch), so it skips rather than risk it. Stale branches just keep piling up until `gh` works again. Unlike the routine `summary` this is route=escalate, because a persistent `gh` outage means the cleanup backstop is effectively dark.",
+      "recommended_action": "Check `gh` on the droplet: `gh auth status`, then a probe like `gh pr list --repo Larry-Yatch/ourliberty-agent-core`. Re-auth with `gh auth login` if it's an auth failure (runbook: docs/runbooks/audit-github-gh-oauth.md); otherwise look for a network or rate-limit issue. Cleanup self-resumes on its next hourly run once `gh` is reachable. Per-repo detail is in ~/agents/logs/dispatch-branch-cleanup.log."
     }
   },
   "outbox-notifier": {
@@ -362,6 +368,20 @@
       "tier": "FYI",
       "plain_language_summary": "missions-autoregister periodically scans orphan threads and proposes auto-registration for the best candidate. This is routine housekeeping — the result is a committed thread proposal with route=digest. No operator action required.",
       "recommended_action": "None. The autoregister healer handles this automatically. Review the proposed thread in ~/agent-core/agents/ if the proposal looks unexpected."
+    },
+    "failure": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "missions-autoregister proposed orphan-thread registrations (and/or ingested new-mission PRs) but couldn't commit and push the result to main — the subject suffix names the git problem (`wrong-branch`, `commit-failed`, or `push-failed`). The work was computed but didn't persist, so the Missions board won't reflect the new proposals until a later clean run lands them.",
+      "recommended_action": "Check the droplet repo state (`cd ~/agent-core && git status`) — a non-main checkout or a dirty/diverged tree is the usual cause; the change is retained locally and the next run retries. Detail is in ~/agents/logs/missions-autoregister.log around the alert time."
+    }
+  },
+  "missions-card-gc": {
+    "failure": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "The missions-card garbage collector (it retires stale desktop-session cards and ages out old parked captures, then commits captures.json) computed its cleanup but couldn't fully land it. The subject suffix names which: `wrong-branch`, `commit-failed`, or `push-failed` is a git problem persisting the captures.json change; otherwise one or more card-retirement events failed to emit. Stale cards may linger on the Missions board until a later clean run.",
+      "recommended_action": "Grep ~/agents/logs/missions-card-gc.log around the alert time for the exact git/emit error. For a wrong-branch / commit / push failure, check the droplet repo state (`cd ~/agent-core && git status`) — the captures.json change is retained locally and the next GC run retries. For emit-failures the affected card ids are in the alert body; verify Supabase / chain_event_emit health."
     }
   },
   "pulse-check-iv": {
@@ -486,6 +506,12 @@
       "never_silence": true,
       "plain_language_summary": "A Pulse self-optimization check (I-X) ran but did not complete cleanly (it raised or exited nonzero), so it did NOT refresh its liveness heartbeat. This is the same-cycle complement to the staleness watcher -- it names the failing check immediately instead of waiting out the staleness window. The subject carries the check id after the colon.",
       "recommended_action": "Run `python3 ~/agent-core/scripts/pulse_check_<id>.py` by hand and read the traceback; logs are under ~/agents/logs/pulse-check-*.log. Fix the underlying error so the check resumes emitting heartbeats."
+    },
+    "catalog-accuracy-drift": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "The shelf catalog-accuracy meter (in ourliberty-graph) found that some reusable-component shelf cards no longer verify against live code — their recorded facts (dependents, seams) have moved since the card was characterized. A drifted card can mislead component reuse, but nothing in the build chain is broken. Maintenance-grade, surfaced in the daily digest only (route=digest), never DM'd. The drifted card ids and the attention-rate-vs-gate numbers are in the alert body.",
+      "recommended_action": "No urgency. When convenient, re-characterize the drifted cards in ourliberty-graph: `./pipeline/regen_descriptor.sh <id>` (or `batch_catalog.sh` for several), then commit and re-run `pipeline/accuracy_meter.py` to confirm the attention rate is back under the gate. The drifted ids are named in the alert body."
     }
   },
   "pulse": {
