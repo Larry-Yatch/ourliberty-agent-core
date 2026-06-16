@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-16 10:23Z UTC (Iter ~2037, Tier 2→1 reset, consecutive_clean=0)
+
+**Iter ~2037 summary:** ⚠️ Signal + 1 auto-fix. 3 new alerts (L1046–1048, all Tier-3 silenced: wedged-review-reaped:s-5-board-ui + outbox-notifier restart + beacon-bot restart via PR #544 code deploy). **Phase S MAJOR ADVANCE: s-4 ✅ MERGED (PR #544 10:12:49Z) + s-5 ✅ MERGED (PR #58 ourliberty-dashboard 10:18:48Z). s-6-drain ACTIVE (Forge building, mtime 10:15Z, ~8 min in).** Check A: repo behind 1 commit (PR #544) → fast-forwarded eb628c9c→2b461530. New PIDs: outbox_notifier=3556624, beacon_telegram_bot=3556778 (restarted via heal-stale-daemon-code 10:20Z). PR #497 scope decision still with Larry (deadline Jun-17T04:02Z, ~17.6h). Repo 2b461530=origin/main (clean). Sync fresh (09:30:16Z). Watermark: 1048. pending=1 (moot PR #543). PRIME ratio=20.27 (994 interventions, 49 systemic fixes). Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-16 10:02Z UTC (Iter ~2036, Tier 1→2 de-escalation, consecutive_clean=3→0)
 
 **Iter ~2036 summary:** ✅ Nominal. 0 new alerts. All 5 mandatory checks clean. **Tier 1 → Tier 2 DE-ESCALATION** (3 consecutive clean: ~2034, ~2035, ~2036). Phase S s-4-freshness Forge build active (worktree mtime 10:01Z, ~19 min in); s-5-board-ui resumed build (clarification-response dispatched 09:52Z, ~10 min in); s-6-drain pending (deps: s-2 ✅ + s-4 🔄). PR #497 scope decision still with Larry (deadline Jun-17T04:02Z, ~18h). unreg-approval-2639d31d157f moot (PR #543 merged). Repo 068fcc8b=origin/main (clean). Sync fresh (09:30:16Z). Watermark: 1045 (unchanged). pending=1 (moot). PRIME ratio=20.27 (993 interventions, 49 systemic fixes). Tier 2, consecutive_clean=0.
@@ -398,7 +402,7 @@
 | G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 (warn-vs-info) |
 | G-rule telegram-409-burst | [yellow] **2/3** | Watch; dispatch at 3/3 |
 | **G-rule watermark-rotation-gap** | [blue] **2/3** (NEW iter ~2035) — larry-alerts-retention.py compacts file, watermark left > file length; new alerts missed until gap detected + repaired. Prior: iter ~1936. | Watch; dispatch to Beacon at 3/3 for auto-detect/repair fix in cycle startup |
-| Phase S s-1+s-2+s-3 MERGED ✅, s-4 BUILD-PHASE, s-5 CLARIFY R1 | [yellow] s-1 PR#541 merged 07:32Z, s-2 PR#542 merged 08:07Z, s-3 PR#543 merged 09:32Z. s-4-freshness build dispatched 09:43Z (~13 min). s-5-board-ui CLARIFY_REQUEST 09:48Z; Beacon responded 09:52Z. s-6-drain pending (deps: s-2 ✅ + s-4 🔄). | Watch s-4 PR + s-5 PROCEED/BUILD dispatch |
+| Phase S 5/6 MERGED ✅, s-6-drain BUILD-PHASE | [yellow] s-1 PR#541 ✅, s-2 PR#542 ✅, s-3 PR#543 ✅, s-4 PR#544 ✅ (10:12:49Z), s-5 PR#58 ourliberty-dashboard ✅ (10:18:48Z). s-6-drain: `s-6-drain.json` in Forge inbox, `wt-forge-s-6-drain` active (mtime 10:15Z, ~8 min in). | Watch s-6 PR. |
 | PR #497 scope decision DELIVERED | [yellow] Binary choice with Larry (bot DM'd 07:07:50Z Jun-16). APPROVE=add 'info' to VALID_SEVERITIES / REJECT=close PR #497. Deadline Jun-17T04:02Z (~18h). PR UNKNOWN/"". | Watch Larry reply: `approve cleanup-branch-info` or `reject cleanup-branch-info` |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap. outbox-notifier also drops regular approval_request markers from Beacon inter-agent sessions (observed iter ~2020: both routing-signal and approval_request dropped in same 5-min window). | DAG markers and scope-decision markers still fall through; recover manually |
 | Stale bash orphans | [blue] PIDs 1834248 (17d+) + 2605007 (1d+). Ss, low CPU. | Carry |

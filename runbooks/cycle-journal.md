@@ -4,6 +4,79 @@
 
 ---
 
+## Iteration ~2037 — 2026-06-16 10:23Z UTC (interactive, /cycle, Tier 2→1 reset, consecutive_clean=0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Signal + 1 auto-fix. 3 new alerts (all Tier-3 silenced). Check A: repo behind origin/main by 1 commit → fast-forwarded. **Phase S MAJOR ADVANCE: s-4 ✅ MERGED + s-5 ✅ MERGED since iter ~2036; s-6-drain Forge build ACTIVE.**
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S s-4-freshness MERGED ✅ CONFIRMED:** outbox-notifier.log `AUTO_MERGE task=s-4-freshness outcome=merged` at 10:12:49Z UTC; `SEQUENCE_STEP_MERGED seq=missions-v2-phase-s step=s-4-freshness`. PR #544 (`feat: S-4 freshness — push-emit, kill restart/sync lag`). ✅
+- **Phase S s-5-board-ui MERGED ✅ CONFIRMED:** outbox-notifier.log `AUTO_MERGE task=s-5-board-ui outcome=merged` at 10:18:48Z UTC; `SEQUENCE_STEP_MERGED seq=missions-v2-phase-s step=s-5-board-ui`. PR #58 (ourliberty-dashboard). ✅
+- **Phase S s-6-drain DISPATCHED + ACTIVE ✅:** `headless-approval-request dispatched forge <- beacon (task=s-6-drain)` at 10:15:31Z; `wt-forge-s-6-drain` worktree mtime=10:15Z MDT (~8 min in at check time, within 2h window). ✅
+- **PR #497 scope decision — CARRY CONFIRMED ✅:** UNKNOWN/"", deadline Jun-17T04:02Z (~17.6h). No change. ✅
+- **unreg-approval-2639d31d157f — MOOT CONFIRMED ✅:** pending=1 in beacon-pending-approvals.json for PR #543 scope decision; PR #543 merged 09:32Z; self-resolves. ✅
+
+**Check 0 — Alert triage:** Watermark=1045 entering; file=1048 lines. **3 new alerts (L1046–L1048):**
+- L1046: `source=heal-wedged-review-sessions, subject=wedged-review-reaped:wt-forge-s-5-board-ui, route=closure, ts=10:03:48Z` — heal-wedged-review-sessions reaped wt-forge-s-5-board-ui (pid 3545722, idle 939s > grace 300s, terminal marker present, worktree removed). Delivered to Telegram 10:05:23Z. Helper → **Tier-3 silence** (known-pattern). ✅
+- L1047: `source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-outbox-notifier.service, route=digest, ts=10:20:22Z` — heal-stale-daemon-code restarted outbox-notifier after PR #544 (outbox_notifier.py mtime 239.7 min newer than active-since). Helper → **Tier-3 silence** (known-pattern). ✅
+- L1048: `source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-beacon-bot.service, route=digest, ts=10:20:26Z` — heal-stale-daemon-code restarted beacon-bot.service after PR #544 (chain_event_emit.py mtime 300 min newer). Helper → **Tier-3 silence** (known-pattern). ✅
+Watermark: 1045 → 1048. All 3 silenced by helper; no Pulse DM warranted.
+
+**Check 1 — Log noise (outbox-notifier.log):** Active through 10:20:19Z. All INFO. Key events since iter ~2036: s-5-board-ui proceed marker classified + build dispatched (10:07Z); s-4-freshness Mirror PASS + AUTO_MERGE (10:12:49Z); s-5-board-ui Mirror review dispatched (10:13:25Z); s-6-drain headless-approval dispatched (10:15:31Z); s-5-board-ui Mirror PASS + AUTO_MERGE (10:18:48Z); signal 15 restart (10:20:19Z → 10:20:20Z). No WARNs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot PID changed 3435953 → 3556778 (restarted 10:20Z via L1048 heal-stale-daemon-code). Process alive (Ss). Last log before restart: 10:05:23Z (L1045 delivery). No 409 errors. G-rule telegram-409-burst **2/3** unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `RETRY_EXHAUSTED_SKIP task=s-5-board-ui reason=superseded_session` (expected: s-5 session was reaped, then a fresh build completed; stall-detector skips the archived task) + "no stalls detected". s-6-drain in Forge inbox + worktree active (~8 min in). ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=1 (`unreg-approval-2639d31d157f`, PR #543 scope decision). MOOT — PR #543 merged. Self-resolves. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-16T09:50:16Z, age≈33 min. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=eb628c9c, origin=2b461530. **Behind by 1 commit (PR #544 `feat: S-4 freshness — push-emit, kill restart/sync lag` merged at 10:12:49Z). Always-fix: fast-forwarded eb628c9c → 2b461530.** ✅ After: HEAD=2b461530=origin/main, tree clean. Tier-reset triggered.
+
+**Check B — Sync health:** last_sync=2026-06-16T09:30:16Z, age≈53 min. FRESH (within 2h). ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot **3556778** (Ss) ✅ [new PID, restarted 10:20Z], chain_event_shipper 2744551 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, dashboard_api 3540633 (Ssl) ✅, outbox_notifier **3556624** (Ss) ✅ [new PID, restarted 10:20Z]. All 5 alive. ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (1 open):
+- **PR #497** (`fix(cleanup-branches): success-prune alert is info, not warning`): UNKNOWN/"". Scope decision with Larry (deadline Jun-17T04:02Z, ~17.6h). [yellow] carry.
+ourliberty-dashboard: **0 open PRs** (PR #58 s-5-board-ui merged 10:18:48Z). ✅
+ourliberty-graph: **0 open PRs.** ✅
+
+**Conditional checks (Tuesday 2026-06-16 UTC, weekday=1):** Check I fires Mon/Wed/Fri/Sun — skip. Check III fires Sunday — skip.
+
+**G-rule tracking:** No new WARN events this iter. All counts unchanged from iter ~2036.
+
+**Actions taken:**
+1. Alert triage: L1046 Tier-3 (wedged-review-reaped:s-5-board-ui). L1047 Tier-3 (heal-stale-daemon-code outbox-notifier restart). L1048 Tier-3 (heal-stale-daemon-code beacon-bot restart). Watermark 1045 → 1048.
+2. Auto-fix (ff-main-when-behind): fast-forwarded eb628c9c → 2b461530. Logged to cycle-actions.jsonl.
+3. PRIME ledger: `intervention` appended (tier=2, template=ff-main-when-behind).
+4. Tier state: `record --checks-clean false` → tier reset 2 → 1, consecutive_clean=0.
+
+**Dispatches:** None.
+
+**Standing findings (carried):**
+- [yellow] **PR #497 scope decision** — `approve cleanup-branch-info` or `reject cleanup-branch-info`. Bot DM'd 07:07:50Z. Deadline Jun-17T04:02Z (~17.6h). [carry]
+- [yellow] **Phase S s-6-drain ACTIVE** — `s-6-drain.json` in Forge inbox, `wt-forge-s-6-drain` active (mtime 10:15Z, ~8 min in). Watch for PR.
+- [yellow] **unreg-approval-2639d31d157f (PR #543)** — MOOT; PR merged. Self-resolves. [carry until cleared]
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519/530/531/534** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — pending Larry dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — FN=3027, TP=5. `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST **2/3**, merge_conflict_manual_rebase-tier4 1/3, heal-pipeline-stall-mirror-pass-unmerged-tier4 1/3, revision-phase-preamble-missing **2/3**, mirror-malformed-verdict-marker **1/3**, mirror-no-session-revision-loop **2/3**, watermark-rotation-gap **2/3**.
+- [blue] **Phase S: s-1 ✅ s-2 ✅ s-3 ✅ s-4 ✅ s-5 ✅ MERGED (5/6). s-6-drain Forge build ACTIVE (~8 min). Sequence nearing completion.**
+- [blue] **Stale bash orphans** — PIDs 1834248 + 2605007. Low CPU. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention (ff-main-when-behind). ratio=20.27 (994 interventions, 49 systemic fixes), trend=improving.
+**Tier end-of-iter:** **Tier 1, consecutive_clean=0** (need 3 clean iters → Tier 2 de-escalation). Next cadence: 5-min.
+
+---
+
 ## Iteration ~2036 — 2026-06-16 10:02Z UTC (interactive, /cycle, Tier 1→2 de-escalation, consecutive_clean=2→3)
 
 **Trigger:** Larry direct invocation (`/cycle`).
