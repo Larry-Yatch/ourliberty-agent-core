@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-16 06:29Z UTC (Iter ~2017, Tier 1, consecutive_clean=1)
+
+**Iter ~2017 summary:** ✅ Nominal. 2 new alerts (L1063-L1064 Tier-3 silenced: heal-stale-daemon-code restarted dashboard_api PID→3462541 and outbox_notifier PID→3462678 after PR#538/539 code updates at 06:20Z). PR #540 MERGED ✅ (5853aced, feat(missions): one-click Drop + Promote). Phase S dag-preflight-2 ACTIVE: Beacon processed pulse-phase-s-dag-redispatch-001, dispatched dag-preflight-missions-v2-phase-s-2.json to Mirror; worktree wt-mirror-dag-preflight-missions-v2-phase-s-2 active (mtime 00:25 MDT). PR #497: NO_SESSION_REVISION loop × 2 (06:18Z + 06:22Z); second Beacon notify (mtime 00:22 MDT) unprocessed; active pipeline. New G-rule: mirror-no-session-revision-loop 1/3. Repo 674a2a5b=origin/main. Watermark: 1062→1064. pending=0. Tier 1, consecutive_clean=1. PRIME ratio=20.14.
+
 ## Status snapshot — updated 2026-06-16 06:21Z UTC (Iter ~2016, Tier 1, consecutive_clean=0)
 
 **Iter ~2016 summary:** ⚠️ Signal. Phase S dag-preflight REVISION at 06:08:15Z; Beacon session 06:08:18–06:09:48Z amended sequence (s-2→s-3→s-4 serialized, fix correct); no re-dispatch to Mirror (no audit_log `dag-preflight-redispatch`, Mirror inbox empty, notifier silent after 06:08:15Z). Direction-ask dispatched: `pulse-phase-s-dag-redispatch-001` → Beacon inbox. **PR #539 MERGED ✅** at 06:08:41Z (commit a4cfe198, fix(review-dispatch): head-aware dedup). PR #497: MERGEABLE/"" (changed from UNKNOWN; updatedAt=Jun-14T04:02:56Z unchanged; Mirror REVIEW_ESCALATE Jun-14T04:02:56Z; age≈50.3h; deadline Jun-17T04:02:56Z **~21.7h remaining**). All 5 daemons alive. Repo e0ea633a=origin/main. Watermark: 1062 unchanged. pending=0. Tier 1, consecutive_clean=0. PRIME ratio=20.14.
@@ -266,6 +270,12 @@
 
 ---
 
+## mirror-no-session-revision-loop G-rule (observed iter ~2017)
+
+**Rule:** When Mirror reviews a PR and its session ends without proper outbox delivery, outbox_notifier classifies the REVISION marker via session-log scan and routes `code-review-revision-no-session` to Beacon. Beacon re-dispatches a fresh Mirror review (same task_id) rather than routing to Forge. If the PR genuinely has issues, Mirror finds them again → same NO_SESSION outcome → loop. Pattern: `MIRROR_REVIEW_STATUS state=failure` + `NO_SESSION_REVISION` in outbox_notifier log. First observed for PR #497 (cleanup-branch-warn-to-info-001), twice in 10 min at 06:18Z and 06:22Z on 2026-06-16. **G-rule count: 1/3** — dispatch to Beacon at 3/3 for a fix to the NO_SESSION path (route to Forge with extracted revision notes instead of re-dispatching Mirror).
+
+---
+
 ## telegram-approval-self-dispatch-denied G-rule (observed iter ~1963)
 
 **Rule:** When Larry replies "Go" (or similar approval shortcut) in Telegram for a Beacon-authored APPROVAL_REQUEST plan, the bot attempts to dispatch the plan back to Beacon (its own source), resulting in "self-dispatch denied (beacon → beacon)". The approval is NOT processed. The plan stays pending in beacon-pending-approvals.json. Recovery: Larry must re-approve explicitly via Telegram or dashboard. **G-rule count: 1/3** — dispatch to Beacon at 3/3 for a routing fix in the bot's approval handler.
@@ -287,7 +297,7 @@
 | PR #529 MERGED ✅ | `cred-drift-ignore-feature-flags-001`: adds `OURLIBERTY_NEWMISSION_INGEST_ENABLED` to ignored_keys allowlist in detect_drift. Merged 2026-06-15T23:48Z. | DONE. Credential drift false-positive resolved. |
 | PR #532 delegate-endpoint MERGED ✅ | [blue] MERGED 2026-06-16T05:46:10Z. missions-v2-delegate-fix sequence COMPLETE. | DONE. |
 | PR #55 chat-label-fix MERGED ✅ | missions-v2-delegate-fix step 2. Merged 02:27Z 2026-06-16. | DONE |
-| PR #497 REVIEW_ESCALATE | [yellow] mergeable=UNKNOWN; Mirror REVIEW_ESCALATE Jun-14T04:02:56Z; age≈49.5h; 72h expires Jun-17T04:02:56Z (~25.5h remaining). | Escalate if still open at Jun-17T04:02:56Z |
+| PR #497 REVISION LOOP | [yellow] In NO_SESSION revision loop (× 2 at 06:18Z/06:22Z Jun-16). Beacon has second notify (00:22 MDT). Active pipeline; Beacon routes next. 72h deadline Jun-17T04:02:56Z (~21.5h). | Watch Beacon dispatch |
 | unreviewed-merge:511/499/494/489/510/509/518/519/530 | [yellow] PRs merged by Larry without Mirror; bot-delivered for others. Larry's judgment call. | Reply appropriate shortcut or silence |
 | G-rule stall-detector Forge build | [yellow] Beacon spec complete. Forge build pending Larry's dashboard approval. | Approve Forge build via dashboard |
 | Check VIII rule=lower | [yellow] FN=3027, TP=5, FP=2 — threshold too high. | `approve check-viii-update-2026-06-15` when shortcut lands |
@@ -310,7 +320,8 @@
 | G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3 | Watch; dispatch at 3/3 |
 | G-rule F24-empty-prompt-envelope-rejected | [blue] **2/3** | Watch; dispatch at 3/3 |
 | G-rule Forge-preflight-CLARIFY_REQUEST | [blue] **2/3** | Watch; dispatch to Beacon at 3/3 |
-| G-rule revision-phase-preamble-missing | [blue] **1/3 (new)** | Forge outbox missing "Revision N applied:" preamble → RETRY_EXHAUSTED. Watch; dispatch to Beacon at 3/3 |
+| G-rule revision-phase-preamble-missing | [blue] **1/3** | Forge outbox missing "Revision N applied:" preamble → RETRY_EXHAUSTED. Watch; dispatch to Beacon at 3/3 |
+| G-rule mirror-no-session-revision-loop | [blue] **1/3 (new)** | Mirror review NO_SESSION × 2 for PR #497; Beacon re-dispatches Mirror instead of Forge. Watch; dispatch at 3/3 |
 | G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 (warn-vs-info) |
 | G-rule telegram-409-burst | [yellow] **2/3** | Watch; dispatch at 3/3 |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap | DAG markers still fall through |

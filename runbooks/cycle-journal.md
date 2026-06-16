@@ -4,6 +4,74 @@
 
 ---
 
+## Iteration ~2017 — 2026-06-16 06:29Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0→1)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 2 new alerts (Tier-3 silenced). Phase S dag-preflight-2 CONFIRMED active. PR #497 in Beacon-handled NO_SESSION revision loop. PR #540 merged. All checks clean.
+
+**VERIFY-BEFORE-REASSERT:**
+- **`pulse-phase-s-dag-redispatch-001` direction-ask (iter ~2016 action) → VERIFIED ✅:** Beacon processed the envelope and dispatched `dag-preflight-missions-v2-phase-s-2.json` to Mirror at ~00:25 MDT (06:25Z UTC). Worktree `wt-mirror-dag-preflight-missions-v2-phase-s-2` present (mtime 00:25 MDT). Phase S dag-preflight pipeline is active.
+- **PR #540 MERGED ✅** — 5853aced "feat(missions): one-click Drop + Promote (no PR to hand-merge)" in git log. Merged between iter ~2016 check (06:21Z) and cycle auto-commit (06:23:58Z). Not in prior iter's open PR list; confirms normal pipeline merge.
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): UNKNOWN/"" — updatedAt=2026-06-16T06:15:41Z (changed from Jun-14T04:02:56Z). Active pipeline: Mirror reviewed twice (NO_SESSION_REVISION × 2 at 06:18Z and 06:22Z). Second `notify-no-session-revision-cleanup-branch-warn-to-info-001.json` in Beacon inbox (mtime 00:22 MDT). Beacon has not yet processed the second notify. Pipeline active; not a stall. 72h REVIEW_ESCALATE deadline (Jun-17T04:02:56Z) is superseded by the new review activity; PR now in REVISION loop, ~21.5h to original deadline. [yellow] carry.
+- **Repo:** HEAD=674a2a5b=origin/main (`## main...origin/main`, no divergence). Clean tree, on main. ✅
+
+**Check 0 — Alert triage:** Watermark=1062 entering; file=1064 lines. **2 new alerts (L1063–L1064):**
+- **L1063** (`heal-stale-daemon-code`, route=digest, `auto-restarted:ourliberty-dashboard-api.service`): Tier-3 silenced ✅. Dashboard-api PID 3449559 → 3462541 (code from PR #538 now live). New PID alive (Ssl).
+- **L1064** (`heal-stale-daemon-code`, route=digest, `auto-restarted:ourliberty-outbox-notifier.service`): Tier-3 silenced ✅. Outbox-notifier PID 2744914 → 3462678 (code from PR #539 now live). New PID alive (Ss).
+Watermark advanced to 1064.
+
+**Check 1 — Log noise:** outbox_notifier.log (restarted 00:20:02 MDT after PR #539 deploy). Pre-restart entries: MIRROR_REVIEW_STATUS failure × 2 + NO_SESSION_REVISION × 2 for cleanup-branch-warn-to-info-001 (all INFO). Post-restart: review-request re-dispatched to Mirror at 00:20:04 MDT (cleanup-branch-warn-to-info-001), returned REVISION (NO_SESSION) at 00:22:28 MDT. Last entry: 00:22:31 MDT — NO_SESSION_REVISION routed to Beacon. All log entries are INFO-level; no WARNs or ERRORs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot PID 3435953 alive (Ss). No new entries since last iter (00:02:15 MDT dag-preflight dispatch). No 409 errors. G-rule telegram-409-burst 2/3 unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → "no stalls detected". All FORGE_NO_PR_SKIP informational (pr_exists or preflight_exit). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: **pending=0** (history=223). ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=`2026-06-16T06:19:56Z`, age≈10 min. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=674a2a5b=origin/main. `## main...origin/main` (no divergence). Clean tree, on main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-16T05:29:42Z, status=no-change, age≈60 min. FRESH (<2h). ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3435953 (Ss) ✅, chain_event_shipper 2744551 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, dashboard_api **3462541** (Ssl, new PID post-restart) ✅, outbox_notifier **3462678** (Ss, new PID post-restart) ✅. All 5 alive. ✅ Nominal.
+
+**Check E — PRs:**
+ourliberty-agent-core (1 open):
+- **PR #540** (`feat(missions): one-click Drop + Promote (no PR to hand-merge)`): **MERGED ✅** 5853aced. ✅
+- **PR #497** (`forge/cleanup-branch-warn-to-info-001`): UNKNOWN/"". In NO_SESSION revision loop. Active pipeline; Beacon processing second NO_SESSION notify. 72h deadline Jun-17T04:02:56Z (~21.5h). [yellow] carry.
+ourliberty-dashboard: **0 open PRs.** ✅
+
+**Conditional checks (Tuesday 2026-06-16 UTC, weekday=1):** Check I fires Mon/Wed/Fri/Sun — skip. Check III fires Sunday — skip.
+
+**G-rule tracking:**
+- **NEW: mirror-no-session-revision-loop 1/3** — Mirror review session ends without outbox delivery (NO_SESSION); outbox_notifier classifies via log scan; Beacon re-dispatches to Mirror instead of Forge. For PR #497 (cleanup-branch-warn-to-info-001), happened twice in ~10 min. Distinct from revision-phase-preamble-missing (Forge outbox preamble). Dispatch to Beacon at 3/3.
+- All other G-rule counts unchanged.
+
+**Actions taken:** None (clean iter). Alert triage: L1063 → Tier-3 silenced, L1064 → Tier-3 silenced. Watermark 1062 → 1064. Prime ledger: iter_clean appended. Tier state recorded clean.
+
+**Dispatches:** None.
+
+**Standing findings (carried):**
+- [yellow] **PR #497 REVISION LOOP** — cleanup-branch-warn-to-info-001, NO_SESSION × 2. Beacon has second notify. Pipeline active; watch next iter for Beacon dispatch to Forge or new Mirror review. 72h deadline Jun-17T04:02:56Z (~21.5h).
+- [yellow] **Phase S dag-preflight-2 active** — Mirror worktree `wt-mirror-dag-preflight-missions-v2-phase-s-2` active (mtime 00:25 MDT). Watch for verdict next iter.
+- [yellow] **unreviewed-merge:511/499/494/489/510/509/518/519/530/531/534** — bot-delivered. Larry's judgment. [carry]
+- [yellow] **G-rule stall-detector Forge build** — pending Larry dashboard approval. [carry]
+- [yellow] **Check VIII rule=lower** — FN=3027, TP=5. `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Telegram 409 burst** — G-rule **2/3**. [watch → dispatch at 3/3]
+- [yellow] **G-rule telegram-approval-self-dispatch-denied** — **1/3**. [carry]
+- [blue] G-rule counters: F24-empty-prompt-envelope-rejected **2/3**, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch 1/3, ledger/check-i Tier-4 1/3, catalog-accuracy-drift-tier4 1/3, health-notify-script-missing 1/3, Forge-timeout-worktree-missing-retry-loop 1/3, Forge-preflight-CLARIFY_REQUEST **2/3**, merge_conflict_manual_rebase-tier4 1/3, heal-pipeline-stall-mirror-pass-unmerged-tier4 1/3, revision-phase-preamble-missing 1/3, **mirror-no-session-revision-loop 1/3 (new)**.
+- [blue] **Stale worktrees** — `wt-forge-fix-delegate-endpoint-regression-gate-001` (Jun 15 22:18 MDT), `wt-mirror-dag-preflight-missions-v2-delegate-fix` (Jun 15 19:46 MDT). Low risk; carry.
+- [blue] **Stale bash orphans** — PIDs 1834248 + 2605007. Low CPU. [carry]
+
+**PRIME DIRECTIVE:** 0 interventions this iter. iter_clean appended. ratio=20.14 (986 interventions, 49 systemic fixes).
+**Tier end-of-iter:** **Tier 1, consecutive_clean=1** (all checks clean; 2 more clean iters → de-escalate to Tier 2).
+
+---
+
 ## Iteration ~2016 — 2026-06-16 06:21Z UTC (interactive, /cycle, Tier 1, consecutive_clean=2→0)
 
 **Trigger:** Larry direct invocation (`/cycle`).
@@ -142956,3 +143024,19 @@ ourliberty-dashboard: 0 open PRs. ✅
 
 **PRIME DIRECTIVE:** iter_clean. Trailing-30d (script-authoritative): interventions=973, systemic_fixes=47, ratio=20.72, trend=improving.
 **Tier end-of-iter:** **Tier 1, consecutive_clean=0** (Tier-4 signal; no consecutive clean increment).
+
+---
+
+## Inter-agent notify receipt — 2026-06-16 (from Beacon | task=pulse-phase-s-dag-redispatch-001)
+
+**Status:** SUCCESS — Beacon re-dispatched `dag-preflight-missions-v2-phase-s-2.json` to Mirror's inbox via `dispatch_approved` path.
+
+**Root cause confirmed:** outbox-notifier `_BEACON_REPLAN_INBOUND_INTENTS` = `{'review-escalate'}` only; `source=mirror-result`/`inbound_intent=dag-preflight-revision` has no extraction branch, so a `marker.py` block would silently drop in headless context. Matches open gap `project_pulse_direction_ask_marker_gap`.
+
+**What Beacon did:**
+1. Dispatched directly to Mirror inbox (`dispatch_approved` — documented manual recovery for this gap), fresh task_id to avoid inbox-watcher dedup.
+2. Appended `dag-preflight-redispatch` audit entry to sequence file; status stays `pending`.
+
+**Next:** Mirror's inbox-watcher dispatches her on next poll → re-runs 4-check DAG verification on the serialized DAG (s-2→s-3→s-4 serialized, parallel-write hazard removed). On PASS: sequence activates (`pending`→`active`), advancer dispatches `s-1-link-inflight` to Forge.
+
+**Action from Pulse:** None. Chain is self-healing.
