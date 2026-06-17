@@ -2749,7 +2749,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:15:09.727315+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-02T19:01:36.923823+00:00"
+      "orphan_last_activity_ts": "2026-06-02T19:01:36.923823+00:00",
+      "briefing": {
+        "what": "A change that hides routine, expected alerts so they stop cluttering your notifications.",
+        "why": "Cutting the noise means the alerts you do see are ones that actually need your attention, so nothing important gets buried.",
+        "suggest": "Worth doing, but have someone double-check it only silences the expected alerts and nothing real before it goes live."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:40:20.347632+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-harden-approval-tab-direction-ask-coverage",
@@ -2766,7 +2780,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:30:16.072570+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-04T06:21:59.10768+00:00"
+      "orphan_last_activity_ts": "2026-06-04T06:21:59.10768+00:00",
+      "briefing": {
+        "what": "Work to make sure that when a decision needs your sign-off, the request reliably shows up in your approval queue instead of slipping through.",
+        "why": "If approval requests get dropped, decisions stall silently and you may never see things that need your call \u2014 which slows the team and creates blind spots.",
+        "suggest": "Let the team finish tightening this and confirm it with a quick test before counting it as done \u2014 worth doing, but verify it holds before moving on."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:40:20.347632+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-catalog-accuracy-drift",
@@ -2783,7 +2811,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T10:32:00.690568+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-12T10:20:37.131051+00:00"
+      "orphan_last_activity_ts": "2026-06-12T10:20:37.131051+00:00",
+      "briefing": {
+        "what": "Your product catalog has been slowly slipping out of sync with reality, and the team started fixing it on their own before it became an official project.",
+        "why": "When catalog details are wrong, customers see incorrect information and the business loses sales and trust without anyone noticing right away.",
+        "suggest": "Give this a quick green light to continue, but ask for a clear scope and a check-in before it grows into something bigger."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:40:20.347632+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-ceo-digest-daily-2026-06-11",
@@ -2884,7 +2926,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T13:49:59.775710+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-12T13:47:05.224814+00:00"
+      "orphan_last_activity_ts": "2026-06-12T13:47:05.224814+00:00",
+      "briefing": {
+        "what": "Some early work the team picked up on their own that isn't yet attached to any approved project or goal.",
+        "why": "Unassigned work can quietly consume time and money without a clear payoff, so it's worth a quick look before it grows.",
+        "suggest": "Hold off on greenlighting it and ask the team to tie it to a real business goal first, or set it aside if there isn't one."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:40:20.347632+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-failure:commit-failed",
@@ -3006,7 +3062,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T16:51:56.432332+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-04T06:20:41.547108+00:00"
+      "orphan_last_activity_ts": "2026-06-04T06:20:41.547108+00:00",
+      "briefing": {
+        "what": "A cleanup fix to keep our test checks from interfering with each other and giving false results.",
+        "why": "Reliable tests catch real problems before customers do, protecting product quality and the team's time.",
+        "suggest": "Let the team finish and verify it, then fold it under a proper project so it doesn't stay loose work."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:40:20.347632+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-direction-ask-beacon-pending-approvals-missing-002",
@@ -3023,7 +3093,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T17:22:41.761986+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-12T17:19:22.351906+00:00"
+      "orphan_last_activity_ts": "2026-06-12T17:19:22.351906+00:00",
+      "briefing": {
+        "what": "Your team started looking into why some approval requests weren't showing up in your pending-approvals list.",
+        "why": "If approvals quietly go missing, decisions you need to weigh in on can slip through unnoticed, which slows things down and erodes trust in the system.",
+        "suggest": "Give them a quick go-ahead to keep digging, but ask for a clear summary of what broke and how they'll confirm it's fully fixed before calling it done."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:40:20.347632+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-alert-triage-intent-fallback-001",
@@ -3061,7 +3145,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T17:22:41.761986+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-12T17:15:32.298833+00:00"
+      "orphan_last_activity_ts": "2026-06-12T17:15:32.298833+00:00",
+      "briefing": {
+        "what": "Your team began building a helper that sorts incoming questions needing your direction, but it isn't connected to any active project yet.",
+        "why": "Loose work that isn't tied to a goal can quietly eat time and stall without anyone owning it.",
+        "suggest": "Take a quick look to confirm it's worth keeping, then either attach it to a real priority or shelve it before more effort goes in."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:40:20.347632+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-build-test-suite-green-001",
@@ -3078,7 +3176,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T17:22:41.761986+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-02T18:47:46.110406+00:00"
+      "orphan_last_activity_ts": "2026-06-02T18:47:46.110406+00:00",
+      "briefing": {
+        "what": "The team is getting the product's automated quality checks to pass cleanly, so every part is verified working before anything ships.",
+        "why": "Reliable checks mean we catch problems before customers do and can release new features faster and with confidence.",
+        "suggest": "Let the team finish this, but ask them to tie it to a named goal and confirm it's done before moving on."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:40:20.347632+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pulse-park-and-silence",
