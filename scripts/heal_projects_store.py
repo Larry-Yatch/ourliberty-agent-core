@@ -167,6 +167,15 @@ def _git(repo: Path, *args: str, timeout: int = GIT_TIMEOUT_SEC) -> subprocess.C
         return subprocess.CompletedProcess(args, returncode=255, stdout='', stderr=str(e))
 
 
+def _projects_git_dirty(repo: Path) -> bool:
+    """True iff projects.json differs from git HEAD (working tree or index).
+    Read-only — used only by the dry-run report. The live path relies on
+    commit_and_push_projects, which performs the same check authoritatively."""
+    unstaged = _git(repo, 'diff', '--quiet', '--', PROJECTS_REL).returncode != 0
+    staged = _git(repo, 'diff', '--quiet', '--cached', '--', PROJECTS_REL).returncode != 0
+    return unstaged or staged
+
+
 def commit_and_push_projects(repo: Path, audit_msg: str) -> str:
     """Commit + push any projects.json delta to origin/main. Returns a status
     token:
@@ -244,23 +253,43 @@ def run_once(*, dry_run: bool, now: Optional[datetime] = None) -> int:
 
     changed = (normalized != raw) or not path.exists()
     n_projects = len(normalized.get('projects', []))
+    core = repo_paths.get('ourliberty-agent-core')
+
     if dry_run:
-        log(f'DRY-RUN: {n_projects} project(s); '
-            f'{"would write+commit" if changed else "no delta"}; dropped={len(dropped)}')
+        # Report the *git* delta too, not just the normalization delta: the
+        # dashboard/Beacon write a well-formed, already-normalized projects.json
+        # to disk, so `changed` is False on the common path even though there is
+        # a real git delta the live tick must commit. Read-only here.
+        git_dirty = core is not None and _projects_git_dirty(core)
+        if changed:
+            disp = 'would write + commit (normalization delta)'
+        elif git_dirty:
+            disp = 'would commit (git delta; no normalization change)'
+        else:
+            disp = 'no delta'
+        log(f'DRY-RUN: {n_projects} project(s); {disp}; dropped={len(dropped)}')
         return 0
 
-    commit_status = 'nothing'
     if changed:
         try:
             _atomic_write_json(path, normalized)
         except OSError as e:
             log(f'atomic write failed ({path}): {e}')
             return 1
-        core = repo_paths.get('ourliberty-agent-core')
-        if core is not None:
-            audit = f'projects={n_projects} dropped={len(dropped)} normalized@{now.isoformat()}'
-            commit_status = commit_and_push_projects(core, audit)
-            log(f'commit status: {commit_status}')
+
+    # ALWAYS attempt the commit — NOT only when normalization changed something.
+    # The dashboard/Beacon are non-committers: they write projects.json atomically
+    # ON DISK (well-formed + already-normalized → `changed` is False), and rely on
+    # this healer to drain the git delta. Gating the commit on `changed` left
+    # those writes uncommitted forever, blocking ourliberty-sync. Match the
+    # captures/missions GC healer: gate the WRITE on our own normalization, but
+    # always attempt the commit — commit_and_push_projects checks the git delta
+    # and returns 'nothing' on a clean tree, so an idle tick stays quiet.
+    commit_status = 'nothing'
+    if core is not None:
+        audit = f'projects={n_projects} dropped={len(dropped)} normalized@{now.isoformat()}'
+        commit_status = commit_and_push_projects(core, audit)
+        log(f'commit status: {commit_status}')
 
     log(f'Done. projects={n_projects} changed={changed} commit={commit_status} dropped={len(dropped)}')
     # A wrong-branch / commit-failed / push-failed is a soft failure (the write
