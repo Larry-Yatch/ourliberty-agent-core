@@ -4,6 +4,64 @@
 
 ---
 
+## Iteration ~2117 — 2026-06-17 09:57Z UTC (interactive, /cycle, Tier 3→1, consecutive_clean=2→0, DRIFT/FIXED)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Drift (auto-fixed + G-rule dispatch). Check 0: watermark-rotation-gap detected (watermark=1076, file=986 lines — retention script compacted). Repaired watermark 1076→986. G-rule watermark-rotation-gap **3/3 COMPLETE ✅** — dispatched direction-ask to Beacon. All other checks nominal.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** 0 open PRs across all repos. ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** 0 open PRs in ourliberty-agent-core. ✅
+- **projects-v3-p1 SEQUENCE COMPLETE ✅ CONFIRMED:** FORGE_NO_PR_SKIP p1-drain-archive (#550), p1-funnel-derive (#551) pr_exists. ✅
+- **projects-v3-p4 COMPLETE ✅ CONFIRMED:** FORGE_NO_PR_SKIP p4-cleanup-committer (#555), p4-complete-signal (#554), p4-postmerge-exec (#556) pr_exists. ✅
+- **projects-v3-p2 SEQUENCE COMPLETE ✅ CONFIRMED:** FORGE_NO_PR_SKIP p2-meaning-layer (#558), p2-actions (#559), p2-suggest-intake (#560), p2-funnel-card-ui (#59-dashboard) all pr_exists. 0 open PRs in all repos. ✅
+- **Daemons ✅:** beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), outbox_notifier 3769291 (Ss), dashboard_api 3809960 (Ssl). All 5 alive, same PIDs as iter ~2116. ✅
+
+**Check 0 — Alert triage:** Watermark=1076 entering; file=986 lines. **Watermark-rotation-gap detected** — larry-alerts-retention.py compacted file between iter ~2116 and this iter (1076→986 lines). 0 new alerts exist beyond line 986. **Always-fix applied:** `alert_triage_state.py set-watermark --line 986` → watermark repaired 1076→986. G-rule count: 2/3→**3/3 COMPLETE ✅** → dispatch to Beacon. ⚠️ DRIFT/FIXED.
+
+**Check 1 — Log noise:** outbox-notifier.log: no WARN/ERROR. inbox-watcher.log: no WARN/ERROR. beacon_telegram_bot.log: last 409 burst still at 23:24–23:25 local (05:24–05:25Z UTC) — same burst as G-rule dual-bot-instance-409-external 1/3 (iter ~2102); no new 409s since. Last delivery: idx=1075 at 00:54:23-0600 (06:54Z UTC, sequence-complete:projects-v3-p2). Bot PID 3734671 alive (Ss). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** No new messages from Larry since `go` at 04:54Z. Last bot delivery idx=1075 at 06:54Z. No agent-distress keywords. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → `no stalls detected`. All FORGE_NO_PR_SKIP entries pr_exists (Phase S s-1→s-6 + p1 + p4 + p2). ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-17T09:56:19Z, age≈1 min at check time. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=d97a1ffa=origin/main (clean, on main, no divergence). Latest commit: `Pulse cycle 20260617T092821Z` (iter ~2116 wrapper). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-17T09:47:48Z, status=no-change, age≈9 min. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3734671 (Ss) ✅, chain_event_shipper 3734305 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, outbox_notifier 3769291 (Ss) ✅, dashboard_api 3809960 (Ssl) ✅. All 5 alive, same PIDs as iter ~2116. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open ✅. ourliberty-dashboard: 0 open ✅. ourliberty-graph: 0 open ✅. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Conditional checks (Wednesday 2026-06-17 UTC, weekday=2 ∈ {0,2,4,6}):**
+- Check I: artifact `pulse-check-i/check-i-2026-06-17.json` EXISTS → SKIP (same-day dedup). ✅
+- Check III: Sunday-anchored → skip.
+
+**G-rule tracking:**
+- **watermark-rotation-gap: 2/3→3/3 COMPLETE ✅** — Dispatched `pulse-watermark-gap-autofix-001` to Beacon inbox. Fix: add auto-detect/repair to `alert_triage_state.py` when watermark > file_length.
+- G-rule dual-bot-instance-409-external: still 1/3 (same burst, no new 409s this iter).
+- All other G-rule counts unchanged.
+
+**Actions taken:**
+1. PRIME ledger: `intervention` appended (tier=3, template=watermark-repair).
+2. PRIME ledger: `systemic_fix` appended (tier=3, template=watermark-rotation-gap-dispatch).
+3. Watermark repaired: 1076→986 (`alert_triage_state.py set-watermark --line 986`).
+4. Beacon dispatch written: `/home/larry/agents/inboxes/beacon/pulse-watermark-gap-autofix-001.json`.
+5. Tier state: `record --checks-clean false` → Tier 3→1, consecutive_clean=2→0.
+
+**PRIME ratio:** 20.14 (1007 interventions, 50 systemic fixes). Trend: improving.
+
+**Dispatches:** `pulse-watermark-gap-autofix-001` → Beacon (direction-ask: auto-detect/repair watermark when > file_length after retention compaction).
+
+---
+
 ## Iteration ~2116 — 2026-06-17 09:26Z UTC (interactive, /cycle, Tier 3, consecutive_clean=1→2, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).

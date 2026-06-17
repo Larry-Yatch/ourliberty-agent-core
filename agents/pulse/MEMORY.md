@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-17 09:57Z UTC (Iter ~2117, Tier 3→1, consecutive_clean=2→0, DRIFT/FIXED)
+
+**Iter ~2117 summary:** ⚠️ Drift (auto-fixed + G-rule dispatch). Check 0: watermark-rotation-gap detected — larry-alerts-retention.py compacted larry-alerts.jsonl 1076→986 lines between iter ~2116 and this iter; watermark was stale at 1076; repaired to 986. 0 actual new alerts missed. G-rule watermark-rotation-gap **3/3 COMPLETE ✅** — dispatched `pulse-watermark-gap-autofix-001` to Beacon. All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3769291, dashboard_api 3809960). Repo HEAD=d97a1ffa=origin/main (clean). Last sync 09:47:48Z (~9 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs across all repos.** projects-v3-p1 SEQUENCE COMPLETE ✅. projects-v3-p4 COMPLETE ✅. **projects-v3-p2 SEQUENCE COMPLETE ✅.** Check I skipped (artifact exists 2026-06-17). PRIME ratio=20.14 (1007 interventions, 50 systemic fixes). **Tier 3→1, consecutive_clean=2→0.**
+
 ## Status snapshot — updated 2026-06-17 09:26Z UTC (Iter ~2116, Tier 3, consecutive_clean=1→2, NOMINAL)
 
 **Iter ~2116 summary:** ✅ Nominal. 0 new alerts. All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3769291, dashboard_api 3809960). Repo HEAD=b911208f=origin/main (clean). Last sync 08:47:39Z (~39 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs across all repos.** projects-v3-p1 SEQUENCE COMPLETE ✅. projects-v3-p4 COMPLETE ✅. **projects-v3-p2 SEQUENCE COMPLETE ✅.** Check I skipped (artifact exists 2026-06-17). PRIME ratio=20.53 (1006 interventions, 49 systemic fixes). **Tier 3, consecutive_clean=1→2.**
@@ -239,7 +243,7 @@
 | G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 (warn-vs-info) |
 | G-rule telegram-409-burst | [yellow] **2/3** | Watch; dispatch at 3/3 |
 | G-rule dual-bot-instance-409-external | [blue] **1/3** (NEW iter ~2102) — 409 burst 05:21–05:25Z 2026-06-17, NOT Pulse-caused. Two competing getUpdates loops. Possible trigger: Beacon P2 session start. Distinct from self-inflicted 409. | Watch; dispatch to Beacon at 3/3 |
-| **G-rule watermark-rotation-gap** | [blue] **2/3** (NEW iter ~2035) — larry-alerts-retention.py compacts file, watermark left > file length; new alerts missed until gap detected + repaired. Prior: iter ~1936. | Watch; dispatch to Beacon at 3/3 for auto-detect/repair fix in cycle startup |
+| **G-rule watermark-rotation-gap** | [blue] **COMPLETE ✅** (iter ~2117, 3/3) — dispatched `pulse-watermark-gap-autofix-001` to Beacon. Fix: add auto-detect/repair to `alert_triage_state.py` when watermark > file_length. Prior occurrences: iters ~1936, ~2035, ~2117. | Beacon pending spec. Watch for Forge PR. |
 | Phase S ALL 6/6 MERGED ✅ | [blue] s-1 PR#541 ✅, s-2 PR#542 ✅, s-3 PR#543 ✅, s-4 PR#544 ✅, s-5 PR#58 ourliberty-dashboard ✅, s-6-drain PR#545 ✅ (10:52:38Z). missions-v2-phase-s SEQUENCE COMPLETE. | DONE. |
 | PR #497 CLOSED ✅ | [blue] Larry closed manually 2026-06-16T11:54:52Z. RESOLVED. | DONE. |
 | projects-v3-p4 COMPLETE ✅ | [blue] PR#554 (p4-complete-signal) + PR#555 (p4-cleanup-committer) + **PR#556 (p4-postmerge-exec, 03:17:42Z)** ALL MERGED. GC healer Contract D live (ab8353aa). outbox-notifier sent sequence-complete DM 03:17:44Z. | DONE. All 3/3. |
