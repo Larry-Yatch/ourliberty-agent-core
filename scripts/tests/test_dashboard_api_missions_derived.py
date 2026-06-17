@@ -1210,5 +1210,66 @@ class NormalizeSuggestedSourceUnitTest(unittest.TestCase):
             da._normalize_suggested_source(None, 'forge', 'beacon'), 'beacon')
 
 
+class TTLCacheUnitTest(unittest.TestCase):
+    """The ~10s in-process derive cache (p2fix-derive-cache).
+
+    Uses an injectable clock so hit + expiry are deterministic without sleeping.
+    """
+
+    def _make(self, ttl=10.0):
+        clock = {'t': 1000.0}
+        cache = da._TTLCache(ttl_seconds=ttl, clock=lambda: clock['t'])
+        return cache, clock
+
+    def test_hit_within_ttl_skips_recompute(self) -> None:
+        cache, clock = self._make(ttl=10.0)
+        calls = {'n': 0}
+
+        def compute():
+            calls['n'] += 1
+            return f'v{calls["n"]}'
+
+        first = cache.get_or_compute('k', compute)
+        # Advance the clock, but stay inside the TTL window.
+        clock['t'] += 9.0
+        second = cache.get_or_compute('k', compute)
+
+        self.assertEqual(first, 'v1')
+        self.assertEqual(second, 'v1')  # served from cache, not recomputed
+        self.assertEqual(calls['n'], 1)
+
+    def test_expiry_after_ttl_recomputes(self) -> None:
+        cache, clock = self._make(ttl=10.0)
+        calls = {'n': 0}
+
+        def compute():
+            calls['n'] += 1
+            return f'v{calls["n"]}'
+
+        first = cache.get_or_compute('k', compute)
+        # Step past the TTL window: the entry is stale and must be recomputed.
+        clock['t'] += 10.0
+        second = cache.get_or_compute('k', compute)
+
+        self.assertEqual(first, 'v1')
+        self.assertEqual(second, 'v2')
+        self.assertEqual(calls['n'], 2)
+
+    def test_distinct_keys_cached_independently(self) -> None:
+        cache, _clock = self._make(ttl=10.0)
+        calls = {'n': 0}
+
+        def compute():
+            calls['n'] += 1
+            return calls['n']
+
+        self.assertEqual(cache.get_or_compute(('r', None), compute), 1)
+        self.assertEqual(cache.get_or_compute(('r', 't'), compute), 2)
+        # Re-fetching each key inside the window returns the per-key value.
+        self.assertEqual(cache.get_or_compute(('r', None), compute), 1)
+        self.assertEqual(cache.get_or_compute(('r', 't'), compute), 2)
+        self.assertEqual(calls['n'], 2)
+
+
 if __name__ == '__main__':
     unittest.main()

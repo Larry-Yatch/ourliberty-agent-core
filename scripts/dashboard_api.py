@@ -6957,6 +6957,52 @@ def get_missions_captures() -> dict[str, Any]:
     return _reader_captures(_captures_json_path())
 
 
+class _TTLCache:
+    """Tiny thread-safe in-process single-value-per-key TTL cache.
+
+    Throttles the relatively expensive /api/missions/derived derive (file
+    reads + chain_events fetch + a bounded GitHub PR-state read) to at most
+    one recompute per `ttl_seconds` window per key. Bounded by design: a short
+    TTL means nothing is served older than the window, and the keyspace is the
+    small set of (repo, task_id) filter combinations the dashboard issues.
+
+    `clock` defaults to `time.monotonic` (immune to wall-clock jumps) and is
+    injectable so expiry is unit-testable without sleeping.
+    """
+
+    def __init__(
+        self,
+        ttl_seconds: float,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self._ttl = ttl_seconds
+        self._clock = clock
+        self._lock = __import__('threading').Lock()
+        self._entries: dict[Any, tuple[float, Any]] = {}
+
+    def get_or_compute(self, key: Any, compute: Callable[[], Any]) -> Any:
+        now = self._clock()
+        with self._lock:
+            entry = self._entries.get(key)
+            if entry is not None and (now - entry[0]) < self._ttl:
+                return entry[1]
+        # Compute outside the lock: holding it across the file/network read
+        # would serialize every concurrent request (the endpoint is a sync def
+        # run in uvicorn's threadpool). The cost is that two callers racing a
+        # cold key both compute once — a bounded inefficiency, never staleness.
+        value = compute()
+        with self._lock:
+            self._entries[key] = (self._clock(), value)
+        return value
+
+
+# ~10s window: bounds the derive cost while keeping the board near-live. The
+# single uvicorn worker (systemd/ourliberty-dashboard-api.service) runs this
+# sync endpoint in a threadpool, so the cache is shared across request threads
+# and must be thread-safe — hence _TTLCache's internal lock.
+_DERIVED_CACHE = _TTLCache(ttl_seconds=10.0)
+
+
 # GET /api/missions/derived — the relocated mission-phase derive (Missions v2
 # Phase 2 § 3). Source-of-truth phase/aggregate/orphan derivation, ported
 # byte-faithfully from the dashboard's lib/mission-queries.ts (parity-gated,
@@ -6965,6 +7011,9 @@ def get_missions_captures() -> dict[str, Any]:
 # /api/system/missions. Orphan terminal detection does a bounded, fail-safe
 # GitHub PR-state read (_resolve_orphan_pr_states, § 3.4) — reusing the existing
 # GITHUB_TOKEN, degrading to the event-only derive on any error.
+#
+# Wrapped in a ~10s in-process TTL cache (_DERIVED_CACHE) keyed on the filter
+# tuple so dashboard polling doesn't re-run the full derive on every request.
 @app.get(
     '/api/missions/derived',
     response_model=MissionsDerivedResponse,
@@ -6974,13 +7023,16 @@ def get_missions_derived(
     repo: Optional[str] = Query(None),
     task_id: Optional[str] = Query(None),
 ) -> dict[str, Any]:
-    return _handle_missions_derived(
-        missions_path=_missions_json_path(),
-        captures_path=_captures_json_path(),
-        supabase_client=_get_larry_action_supabase_client(),
-        repo=repo,
-        task_id=task_id,
-        pr_state_resolver=_resolve_orphan_pr_states,
+    return _DERIVED_CACHE.get_or_compute(
+        (repo, task_id),
+        lambda: _handle_missions_derived(
+            missions_path=_missions_json_path(),
+            captures_path=_captures_json_path(),
+            supabase_client=_get_larry_action_supabase_client(),
+            repo=repo,
+            task_id=task_id,
+            pr_state_resolver=_resolve_orphan_pr_states,
+        ),
     )
 
 
