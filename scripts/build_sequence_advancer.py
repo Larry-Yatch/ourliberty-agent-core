@@ -129,6 +129,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 import build_sequence_validator as bsv  # noqa: E402
+import projects_status_writeback as psw  # noqa: E402 — phase status writeback (p3f)
 import task_terminal_state as tts  # noqa: E402 — shared terminal-state probe kernel
 from id_match import id_matches  # noqa: E402
 
@@ -518,6 +519,44 @@ def _dispatch_step(seq: dict[str, Any], step: dict[str, Any]) -> Optional[str]:
 # -------------------- per-sequence processing --------------------
 
 
+def _launch_sequence_project_id(seq: dict[str, Any]) -> Optional[str]:
+    """The project id a ``launch-<phase_id>`` sequence was authored for, read
+    from the ``authored-by-launch-drain`` audit entry the drain wrote (it
+    carries ``phase_id`` + ``project_id``). None if absent (e.g. an ordinary
+    sequence, or one not authored by the launch drain)."""
+    for entry in seq.get('audit_log') or []:
+        if isinstance(entry, dict) and entry.get('event') == 'authored-by-launch-drain':
+            pid = entry.get('project_id')
+            return pid if isinstance(pid, str) and pid else None
+    return None
+
+
+def _maybe_stamp_phase_building(seq: dict[str, Any], step_id: str) -> None:
+    """On dispatch of a launch sequence's step, stamp its phase ``building`` +
+    pin the ``sequence_ref`` (p3f-status-writeback). A launch sequence is keyed
+    ``launch-<phase_id>`` and its sole ``step_id`` IS the ``phase_id``; the
+    project id comes from the drain's authoring audit entry. No-op for ordinary
+    sequences and fail-safe (the writeback never raises into the tick)."""
+    seq_id = seq.get('seq_id')
+    if not isinstance(seq_id, str) or not seq_id.startswith('launch-'):
+        return
+    project_id = _launch_sequence_project_id(seq)
+    if not project_id:
+        logger = logging.getLogger('build_sequence_advancer')
+        logger.warning(
+            'launch sequence %s has no project_id in its audit log; '
+            'skipping building-stamp', seq_id,
+        )
+        return
+    try:
+        psw.stamp_building(seq_id=seq_id, project_id=project_id, phase_id=step_id)
+    except Exception as e:  # noqa: BLE001 — defensive; psw is already fail-safe
+        logging.getLogger('build_sequence_advancer').warning(
+            'building-stamp for %s/%s raised %s: %s',
+            project_id, step_id, type(e).__name__, e,
+        )
+
+
 def _handle_unparseable_sequence(path: Path, error: str, logger: logging.Logger) -> None:
     """Per spec § 5.4 failure mode 'malformed sequence file': the daemon
     must DM Larry without crashing, and other sequences must keep
@@ -792,6 +831,11 @@ def _process_active_sequence(
                 audit_log.append(_audit_entry(
                     'step-dispatched', step_id=step_id,
                 ))
+                # p3f-status-writeback: a launch-<phase_id> sequence dispatching
+                # its step IS the phase's launch dispatching → stamp the phase
+                # `building` + pin its sequence_ref (event-driven, idempotent,
+                # non-committer). No-op for ordinary (non-launch) sequences.
+                _maybe_stamp_phase_building(seq, step_id)
             else:
                 # Dispatch failure — log + DM + RESET step to 'pending' so
                 # the next tick's pending-only filter re-enters this branch

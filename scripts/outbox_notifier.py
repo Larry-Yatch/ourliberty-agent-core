@@ -5723,6 +5723,25 @@ def _emit_sequence_complete_chain_event(seq: dict[str, Any]) -> None:
         )
 
 
+def _stamp_phase_done_for_sequence(seq_id: str) -> None:
+    """p3f-status-writeback: stamp the phase whose ``sequence_ref == seq_id`` to
+    ``done`` (the board reflects reality once the build sequence completes). The
+    writer is a NON-committer (heal_projects_store commits) and is itself
+    idempotent + fail-safe; this wrapper adds a daemon-never-wedge guard and a
+    one-line log on a real transition. A non-launch sequence (no matching phase)
+    is a silent no-op."""
+    try:
+        import projects_status_writeback as psw  # local import: optional dep
+        if psw.stamp_done(seq_id=seq_id):
+            log(f'phase status: stamped done for sequence_ref={seq_id}')
+    except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+        log(
+            f'phase done-stamp for seq={seq_id} raised '
+            f'{type(e).__name__}: {e}; swallowing',
+            'WARN',
+        )
+
+
 def _maybe_signal_sequence_complete(seq_id: str) -> None:
     """Emit the one-time completion signal (chain event + Larry DM) for a
     sequence that has just reached `complete`, exactly once.
@@ -5778,6 +5797,12 @@ def _maybe_signal_sequence_complete(seq_id: str) -> None:
         report = ssh.execute_post_merge(
             seq, propose_gated=_propose_gated_finish_step,
         )
+        # p3f-status-writeback: SEQUENCE_COMPLETE is the phase's done event.
+        # Stamp the phase whose sequence_ref == seq_id to `done` on disk
+        # (non-committer; heal_projects_store commits). Idempotent (done->done
+        # no-op), event-driven, fail-safe — a non-launch sequence has no
+        # matching phase and this is a logged no-op.
+        _stamp_phase_done_for_sequence(seq_id)
         _emit_sequence_complete_chain_event(seq)
         larry_alerts.append_alert(
             source='outbox-notifier',

@@ -293,6 +293,92 @@ def new_single_phase_project(
 
 
 # --------------------------------------------------------------------------- #
+# phase status writeback — pure lookups + idempotent stamps
+# (projects-v3 P3 step p3f-status-writeback). These are PURE: they locate /
+# mutate a phase dict in place and return whether anything changed. The on-disk
+# read-modify-atomic-write (the NON-committer) lives in
+# `projects_status_writeback.py`; the git commit stays with the SOLE committer
+# `heal_projects_store.py`. Keeping the decision logic here (no IO) is what lets
+# both writers and the committer share one definition of "what a stamp means".
+# --------------------------------------------------------------------------- #
+def find_phase(
+    registry: dict[str, Any], project_id: str, phase_id: str,
+) -> tuple[Optional[dict[str, Any]], Optional[dict[str, Any]]]:
+    """Return ``(project, phase)`` for the phase ``phase_id`` inside project
+    ``project_id``, or ``(None, None)``. Pure lookup over a registry dict; safe
+    on junk (non-dict entries are skipped)."""
+    if not isinstance(registry, dict) or not project_id or not phase_id:
+        return None, None
+    for proj in registry.get('projects', []) or []:
+        if not isinstance(proj, dict) or proj.get('id') != project_id:
+            continue
+        for phase in proj.get('phases', []) or []:
+            if isinstance(phase, dict) and phase.get('id') == phase_id:
+                return proj, phase
+    return None, None
+
+
+def find_phase_by_sequence_ref(
+    registry: dict[str, Any], sequence_ref: str,
+) -> tuple[Optional[dict[str, Any]], Optional[dict[str, Any]]]:
+    """Return ``(project, phase)`` for the phase whose ``sequence_ref`` equals
+    ``sequence_ref``, or ``(None, None)``. This is the linkage the done-stamp
+    uses: SEQUENCE_COMPLETE carries a ``seq_id``; the building-stamp pinned that
+    same ``seq_id`` onto the phase, so a completing sequence finds its phase by
+    this back-reference. Pure; safe on junk."""
+    if not isinstance(registry, dict) or not sequence_ref:
+        return None, None
+    for proj in registry.get('projects', []) or []:
+        if not isinstance(proj, dict):
+            continue
+        for phase in proj.get('phases', []) or []:
+            if isinstance(phase, dict) and phase.get('sequence_ref') == sequence_ref:
+                return proj, phase
+    return None, None
+
+
+def stamp_phase_building(
+    phase: dict[str, Any], sequence_ref: str, *, now: Optional[datetime] = None,
+) -> bool:
+    """Idempotently move ``phase`` to ``building`` and pin its ``sequence_ref``.
+    Returns True iff the phase dict was mutated.
+
+    Idempotent / forward-only: a no-op (returns False, NO mutation) when the
+    phase is already ``done`` (never regress a completed phase back to building —
+    a late/duplicate launch dispatch must not undo completion) or already
+    ``building`` with this same ``sequence_ref``. Otherwise stamps building +
+    the ref + ``updated_at``. Event-driven: the caller invokes this on the launch
+    dispatch event, never on a clock."""
+    if not isinstance(phase, dict):
+        return False
+    state = phase.get('lifecycle_state')
+    if state == 'done':
+        return False
+    if state == 'building' and phase.get('sequence_ref') == sequence_ref:
+        return False
+    phase['lifecycle_state'] = 'building'
+    phase['sequence_ref'] = sequence_ref
+    phase['updated_at'] = _iso_now(now)
+    return True
+
+
+def stamp_phase_done(
+    phase: dict[str, Any], *, now: Optional[datetime] = None,
+) -> bool:
+    """Idempotently move ``phase`` to ``done``. Returns True iff mutated;
+    ``done``→``done`` is a no-op (returns False) — the SEQUENCE_COMPLETE
+    idempotency guard so a double completion signal never re-writes the store.
+    Event-driven: the caller invokes this on the SEQUENCE_COMPLETE event."""
+    if not isinstance(phase, dict):
+        return False
+    if phase.get('lifecycle_state') == 'done':
+        return False
+    phase['lifecycle_state'] = 'done'
+    phase['updated_at'] = _iso_now(now)
+    return True
+
+
+# --------------------------------------------------------------------------- #
 # the "Actively working" derive (the read surface)
 # --------------------------------------------------------------------------- #
 def _phase_card(phase: dict[str, Any]) -> dict[str, Any]:
