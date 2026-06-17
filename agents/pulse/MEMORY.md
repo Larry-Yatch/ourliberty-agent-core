@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-17 07:04Z UTC (Iter ~2108, Tier 2→1, consecutive_clean=0, SIGNAL/NO-ACTION)
+
+**Iter ~2108 summary:** ⚠️ Signal (tier-reset). 1 new Tier-4 alert (L1076: outbox-notifier/sequence-complete:projects-v3-p2, 06:50Z; bot delivered idx=1075 at 06:54Z via route=escalate; Pulse no-DM). All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3769291, dashboard_api 3809960). Repo HEAD=04a3264b=origin/main (clean). Last sync 06:47:19Z (~17 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs across all repos.** projects-v3-p1 SEQUENCE COMPLETE ✅. projects-v3-p4 COMPLETE ✅. **projects-v3-p2 SEQUENCE COMPLETE ✅ (all 4 steps: PR #558+#559+#560+PR #59-dashboard).** Check I skipped (artifact exists 2026-06-17). PRIME ratio=20.51 (1005 interventions, 49 systemic fixes). **Tier 2→1, consecutive_clean=0.** G-rule sequence-complete-tier4 2/3.
+
 ## Status snapshot — updated 2026-06-17 06:47Z UTC (Iter ~2107, Tier 1→2, consecutive_clean=2→3→de-escalate, NOMINAL)
 
 **Iter ~2107 summary:** ✅ Nominal. 0 new alerts. All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3769291, dashboard_api 3809960). Repo HEAD=59a4753c=origin/main (clean). Last sync 05:47:08Z (~60 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs in ourliberty-agent-core.** PR #560 (Contract C: multi-source suggestion intake) MERGED ✅. PR #59 in ourliberty-dashboard (p2-funnel-card-ui, created 06:45:06Z, 2 min old, Vercel SUCCESS, Mirror review pending). projects-v3-p1 SEQUENCE COMPLETE ✅. projects-v3-p4 COMPLETE ✅. **projects-v3-p2 ACTIVE:** PR #558 (A) ✅ + PR #559 (B) ✅ + PR #560 (C) ✅ MERGED; PR #59 ourliberty-dashboard (p2-funnel-card-ui) OPEN. Check I skipped (artifact exists 2026-06-17). PRIME ratio=20.51 (1005 interventions, 49 systemic fixes). **Tier 1→2 DE-ESCALATED, consecutive_clean=2→3.**
@@ -188,7 +192,7 @@
 | G-rule merge_conflict_manual_rebase-tier4 | [blue] **1/3** — outbox-notifier DMs Larry directly via chat_id; Pulse should NOT double-DM. | Watch; dispatch to Beacon at 3/3 for Tier-3 translation |
 | G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4 | [blue] **1/3** — heal-pipeline-stall fires Tier-4; medic DMs directly; Pulse no-DM. | Watch; dispatch to Beacon at 3/3 for Tier-3 translation |
 | Check I 2026-06-15 | [blue] 1 proposal dispatched iter ~1899, Beacon processed | Beacon spec in progress |
-| G-rule sequence-complete-tier4 | [blue] **1/3** (NEW iter ~2093) — outbox-notifier sequence-complete:* alerts classify Tier-4 (novel); bot delivers via route=escalate; Pulse no-DM. | Watch; propose Tier-3 translation to Beacon at 3/3 |
+| G-rule sequence-complete-tier4 | [blue] **2/3** (iter ~2108: 2nd occurrence) — outbox-notifier sequence-complete:* alerts classify Tier-4 (novel); bot delivers via route=escalate; Pulse no-DM. | Watch; dispatch to Beacon at 3/3 for Tier-3 translation |
 | G-rule catalog-accuracy-drift-tier4 | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule dirty-tree-beacon-data-files-tier4 | [blue] **1/3** (NEW iter ~2085) — pulse-self-escalates dirty tree (Beacon runtime files); GC healer auto-resolves; Tier-4 (novel). | Watch; propose Tier-3 translation at 3/3 |
 | G-rule ledger/check-i Tier-4 | [blue] **2/3** | Watch; dispatch to Beacon at 3/3 |
@@ -208,5 +212,5 @@
 | PR #497 CLOSED ✅ | [blue] Larry closed manually 2026-06-16T11:54:52Z. RESOLVED. | DONE. |
 | projects-v3-p4 COMPLETE ✅ | [blue] PR#554 (p4-complete-signal) + PR#555 (p4-cleanup-committer) + **PR#556 (p4-postmerge-exec, 03:17:42Z)** ALL MERGED. GC healer Contract D live (ab8353aa). outbox-notifier sent sequence-complete DM 03:17:44Z. | DONE. All 3/3. |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap. outbox-notifier also drops regular approval_request markers from Beacon inter-agent sessions (observed iter ~2020: both routing-signal and approval_request dropped in same 5-min window). | DAG markers and scope-decision markers still fall through; recover manually |
-| **projects-v3-p2 ACTIVE** | [blue] Larry approved dag-preflight 04:54Z 2026-06-17; Mirror PASSED 04:56Z; Beacon new session started 05:21Z. PR #557 (`spec(projects-v3): P2 — universal action card on the funnel`) already merged. Build steps incoming. | Watch for PR creation + stalls |
+| projects-v3-p2 COMPLETE ✅ | [blue] All 4 steps merged: PR #558 (meaning-layer) + PR #559 (actions) + PR #560 (suggest-intake) in ourliberty-agent-core; PR #59 (funnel-card-ui) in ourliberty-dashboard. Sequence-complete DM delivered 06:54Z 2026-06-17. | DONE. |
 | Stale bash orphans | [blue] PIDs 1834248 (17d+) + 2605007 (1d+). Ss, low CPU. | Carry |
