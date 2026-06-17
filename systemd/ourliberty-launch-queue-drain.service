@@ -1,0 +1,39 @@
+[Unit]
+Description=Launch-queue drain — authors a Mirror-gated build sequence from each queued dashboard "Launch build" request (projects-v3 P3 p3-launch-queue-drain)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/launch_queue_drain.py
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/agents/beacon/specs/projects-v3-p3-pipeline.md
+After=network.target ourliberty-inbox-watcher.service
+Wants=ourliberty-inbox-watcher.service
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/launch_queue_drain.py
+TimeoutStartSec=120
+Nice=10
+# Hardening (matches ourliberty-build-sequence-advancer.service). The drain is a
+# pure-filesystem non-committer: it reads the launch queue + dead-letters under
+# blackboard, writes the authored sequence file under blackboard/build-sequences,
+# dispatches the Mirror DAG-preflight into inboxes, and appends a routing-events
+# audit line under logs. NO git, NO network, NO credentials — it never commits
+# the repo or the projects store (the single-committer invariant holds).
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents/blackboard /home/larry/agents/logs /home/larry/agents/inboxes
+NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+# Bounded memory — a runaway tick must not starve the droplet's bot processes.
+MemoryMax=256M
+MemoryHigh=128M
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-launch-queue-drain
+
+[Install]
+WantedBy=multi-user.target

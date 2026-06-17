@@ -160,6 +160,31 @@ def _new_mission_queue_dir() -> Path:
     return _agents_root() / 'blackboard' / 'new-mission-queue'
 
 
+def _build_launch_queue_dir() -> Path:
+    """Directory the Launch-build flow drops queued launch requests into for
+    the Beacon-side drainer (`launch_queue_drain.py`) to author the build
+    sequence from.
+
+    Lives under the agents blackboard — NOT inside the git checkout — so a
+    pending request is never untracked-file drift, and keyed off
+    `_agents_root()` (OURLIBERTY_AGENTS_ROOT) so tests redirect it to a tmpdir.
+    The dashboard is deliberately NOT a committer (to the repo OR to the
+    projects store): it only produces a queue file here; the drainer authors
+    the sequence, runs Mirror DAG preflight, and kicks the build. This mirrors
+    the `+New mission` non-committer precedent (`_new_mission_queue_dir`) so the
+    single-committer invariant holds (projects.json's sole committer is
+    `heal_projects_store.py`; the dashboard and the drainer are non-committers
+    to it). See `launch_queue_drain.drain_once`."""
+    return _agents_root() / 'blackboard' / 'build-launch-queue'
+
+
+# Serializes concurrent Launch POSTs in-process (a rapid double-click), mirroring
+# `_NEW_MISSION_LOCK`. The drain's deterministic-seq-id existence check is the
+# durable idempotency backstop across the post-drain double-click (the queue file
+# is gone by then); this lock only collapses simultaneous in-flight POSTs.
+_LAUNCH_QUEUE_LOCK = __import__('threading').Lock()
+
+
 def _atomic_write_json(path: Path, obj: Any) -> None:
     """Write `obj` as pretty JSON atomically (unique tmp in the same dir +
     os.replace) so a concurrent reader — the draining healer — never sees a
@@ -766,6 +791,29 @@ class FunnelPromoteResponse(BaseModel):
     status: str
     applied: bool
     source_kind: str
+
+
+class LaunchBuildRequest(BaseModel):
+    # projects-v3 P3 (p3-launch-queue-drain) — POST /api/projects/launch body.
+    # The dashboard Launch-build click on a spec-ready phase. `project_id` +
+    # `phase_id` locate the phase in projects.json; the dashboard reads the
+    # store read-only and queues a launch request for the Beacon-side drainer
+    # (it never commits the repo or the projects store — non-committer, the
+    # `+New mission` precedent).
+    project_id: str = Field(..., min_length=1)
+    phase_id: str = Field(..., min_length=1)
+
+
+class LaunchBuildResponse(BaseModel):
+    # The launch request was queued for the drainer. `status` is 'queued'.
+    # Idempotency on phase id ultimately rides on the drain's deterministic
+    # `launch-<phase_id>` sequence-file existence check (a re-launch after the
+    # queue drained never double-dispatches a build); this endpoint additionally
+    # 409s a rapid double-click whose first request is still queued.
+    phase_id: str
+    project_id: str
+    status: str = 'queued'
+    seq_id: str
 
 
 class MissionThreadResponse(BaseModel):
@@ -6232,6 +6280,158 @@ def _handle_funnel_promote(
     )
 
 
+def _find_active_phase(
+    projects: list[Any], project_id: str, phase_id: str,
+) -> Optional[dict[str, Any]]:
+    """The phase dict `phase_id` inside ACTIVE project `project_id`, or None.
+    Only active projects count — an archived (dropped-back) project is not
+    launchable (spec § 5 reversibility: archiving leaves the pipeline)."""
+    for proj in projects:
+        if not isinstance(proj, dict) or proj.get('id') != project_id:
+            continue
+        if proj.get('state', projects_store.DEFAULT_PROJECT_STATE) != 'active':
+            return None
+        phases = proj.get('phases')
+        if not isinstance(phases, list):
+            return None
+        for phase in phases:
+            if isinstance(phase, dict) and phase.get('id') == phase_id:
+                return phase
+        return None
+    return None
+
+
+def _handle_launch_build(
+    *,
+    project_id: str,
+    phase_id: str,
+    actor: str,
+    projects_path: Path,
+    queue_dir: Path,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Pure handler for POST /api/projects/launch (projects-v3 P3,
+    p3-launch-queue-drain). Queues a build-launch request for the Beacon-side
+    drainer WITHOUT opening a PR, committing the repo, or touching the projects
+    store. Steps:
+
+      1. Read projects.json (read-only) and locate the phase. 404 if the active
+         project / phase doesn't exist.
+      2. 409 if the phase isn't spec-ready (no `spec_ref` — the drain authors
+         the build sequence from the spec) or has already been launched
+         (`sequence_ref` set, or lifecycle already building/done).
+      3. Acquire the in-process lock, 409 if the same phase is already queued
+         (a rapid double-click whose first request hasn't drained yet).
+      4. Atomically drop `<queue_dir>/<phase_id>.json` (the launch request the
+         drain authors from) and return {phase_id, project_id, status:'queued',
+         seq_id}.
+
+    The dashboard is NOT a committer — to the repo OR to projects.json. The
+    request is keyed on the phase id; the drain's deterministic
+    `launch-<phase_id>` sequence-file existence check is the durable
+    idempotency backstop that makes a re-launch (after this queue file drained
+    and was removed) a no-op rather than a second build dispatch. This honors
+    the single-committer invariant (projects.json's sole committer is
+    `heal_projects_store.py`) and the non-committer dispatch discipline (the
+    `+New mission` precedent)."""
+    now = now or datetime.now(timezone.utc)
+    seq_id = f'launch-{phase_id}'
+
+    projects = _reader_projects(projects_path)
+    phase = _find_active_phase(projects, project_id, phase_id)
+    if phase is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                'error': 'phase not found',
+                'project_id': project_id,
+                'phase_id': phase_id,
+                'hint': (
+                    'phase_id must name a phase inside an ACTIVE project_id in '
+                    'the projects store'
+                ),
+            },
+        )
+
+    spec_ref = phase.get('spec_ref')
+    if not isinstance(spec_ref, str) or not spec_ref.strip():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                'error': 'phase not spec-ready',
+                'phase_id': phase_id,
+                'hint': (
+                    'Launch build requires a phase with a spec_ref; author + '
+                    'attach the spec before launching.'
+                ),
+            },
+        )
+
+    lifecycle = phase.get('lifecycle_state', projects_store.DEFAULT_LIFECYCLE_STATE)
+    if phase.get('sequence_ref') or lifecycle in ('building', 'done'):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                'error': 'phase already launched',
+                'phase_id': phase_id,
+                'lifecycle_state': lifecycle,
+                'sequence_ref': phase.get('sequence_ref'),
+            },
+        )
+
+    request_entry: dict[str, Any] = {
+        'phase_id': phase_id,
+        'project_id': project_id,
+        'seq_id': seq_id,
+        'spec_ref': spec_ref.strip(),
+        'phase_title': phase.get('title') or phase_id,
+        'desired_end_state': phase.get('desired_end_state', '') or '',
+        'repo': phase.get('repo') or _project_repo(projects, project_id),
+        'requested_at': now.isoformat(),
+        'requested_by': actor,
+    }
+
+    with _LAUNCH_QUEUE_LOCK:
+        queue_path = queue_dir / f'{phase_id}.json'
+        if queue_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    'error': 'phase launch queued',
+                    'phase_id': phase_id,
+                    'hint': (
+                        'A launch for this phase is already queued; the drain '
+                        'will dispatch the build shortly.'
+                    ),
+                },
+            )
+        try:
+            _atomic_write_json(queue_path, request_entry)
+        except OSError as e:
+            first_line = str(e).splitlines()[0] if str(e) else type(e).__name__
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={'error': 'queue write failed', 'detail': first_line},
+            )
+
+    return {
+        'phase_id': phase_id,
+        'project_id': project_id,
+        'status': 'queued',
+        'seq_id': seq_id,
+    }
+
+
+def _project_repo(projects: list[Any], project_id: str) -> Optional[str]:
+    """The `repo` of project `project_id` (a phase inherits its project's repo
+    when it has none of its own), or None."""
+    for proj in projects:
+        if isinstance(proj, dict) and proj.get('id') == project_id:
+            repo = proj.get('repo')
+            return repo if isinstance(repo, str) and repo else None
+    return None
+
+
 # Test seam: tests monkeypatch this to inject a recording mock.
 def _get_larry_action_supabase_client():
     """Build a service-role supabase client for the larry-action endpoint.
@@ -7554,6 +7754,33 @@ def post_funnel_promote(
         captures_path=_captures_json_path(),
         missions_path=_missions_json_path(),
         projects_path=_projects_json_path(),
+    )
+
+
+# POST /api/projects/launch — the dashboard "Launch build" gate (projects-v3 P3,
+# p3-launch-queue-drain). Queues a build-launch request for a spec-ready phase;
+# the Beacon-side drainer (`launch_queue_drain.py`) authors the build sequence
+# from the phase's spec, runs Mirror DAG preflight, and kicks the build —
+# Telegram is never in the loop. The dashboard stays a NON-committer: it only
+# writes a queue file under the agents blackboard (the `+New mission`
+# precedent); it never commits the repo or the projects store. Same auth as the
+# other write routes: X-Dashboard-Token + an allowlisted X-Actor.
+@app.post(
+    '/api/projects/launch',
+    response_model=LaunchBuildResponse,
+    response_model_exclude_none=True,
+    dependencies=[Depends(_require_token)],
+)
+def post_launch_build(
+    body: LaunchBuildRequest,
+    actor: str = Depends(_require_actor),
+) -> dict[str, Any]:
+    return _handle_launch_build(
+        project_id=body.project_id,
+        phase_id=body.phase_id,
+        actor=actor,
+        projects_path=_projects_json_path(),
+        queue_dir=_build_launch_queue_dir(),
     )
 
 
