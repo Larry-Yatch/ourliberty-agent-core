@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-17 19:27Z UTC (Iter ~2154, Tier 1, consecutive_clean=1→2, NOMINAL)
+
+**Iter ~2154 summary:** ✅ Nominal. 0 new alerts. All 5 daemons alive — beacon 3734671, chain-event 3734305, inbox-watcher 3434697, dashboard_api 4021271, outbox_notifier 4021501 (same PIDs as iter ~2153). Repo HEAD=49a21f90=origin/main (clean). Last sync 19:13:03Z (~14 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **1 open PR: #570** (forge/p3-launch-queue-drain `feat: build-launch-queue + Beacon-side drain`, created 19:24:11Z, Mirror review pending). **projects-v3-p3 ACTIVE step 4:** PRs #567+#568+#569 MERGED ✅; PR #570 (p3-launch-queue-drain) in pipeline. Check I skipped (artifact exists 2026-06-17). PRIME ratio=19.52 (1015 interventions, 52 systemic fixes, trend=improving). **Tier 1, consecutive_clean=1→2.**
+
 ## Status snapshot — updated 2026-06-17 19:22Z UTC (Iter ~2153, Tier 1, consecutive_clean=0→1, NOMINAL)
 
 **Iter ~2153 summary:** ✅ Nominal. 0 new alerts. All 5 daemons alive — beacon 3734671, chain-event 3734305, inbox-watcher 3434697, dashboard_api 4021271, outbox_notifier 4021501 (same PIDs as iter ~2152). Repo HEAD=bbf4c295=origin/main (clean). Last sync 19:13:03Z (~8 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs across all repos.** **Full projects-v3-p3 pipeline COMPLETE ✅** (PR #567+#568+#569 all merged). Check I skipped (artifact exists 2026-06-17). PRIME ratio=19.52 (1015 interventions, 52 systemic fixes, trend=improving). **Tier 1, consecutive_clean=0→1.**
@@ -190,13 +194,6 @@
 
 **Iter ~2138 summary:** ⚠️ Drift (auto-fixed). Check A: repo behind 1 commit (PR #567 `feat: Project+Phase data model + single-committer store + pipeline derive (p3-project-store)` merged 14:50Z) → fast-forwarded d995d2a5→67fbff5d. All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3938657, dashboard_api 3924466). Repo HEAD=67fbff5d=origin/main (clean post-ff). Last sync 14:12:19Z (~42 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs.** **projects-v3-p3 ACTIVE step 2:** p3-project-store (step 1) MERGED ✅ 14:50Z; `p3-promote-endpoint` dispatched to Forge 14:51Z (inbox-watcher will spawn new Forge session). Check I skipped (artifact exists 2026-06-17). PRIME ratio=19.48 (1013 interventions, 52 systemic fixes). Note: heal-stale-daemon-code will restart dashboard_api + outbox_notifier on next run (PR #567 added projects_store.py to watch_paths). **Tier 2→1, consecutive_clean=2→0.**
 
-## Status snapshot — updated 2026-06-17 14:40Z UTC (Iter ~2137, Tier 2, consecutive_clean=1→2, NOMINAL)
-
-**Iter ~2137 summary:** ✅ Nominal. 0 new alerts. All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3938657, dashboard_api 3924466). Repo HEAD=1fa0a624=origin/main (clean). Last sync 14:12:19Z (~28 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **1 open PR: #567** (p3-project-store, created 14:25:52Z, ~14 min old, MERGEABLE, no review yet — Forge session PID 3938869 still active ~42 min, normal pipeline). Check I skipped (artifact exists 2026-06-17). PRIME ratio=19.46 (1012 interventions, 52 systemic fixes). **Tier 2, consecutive_clean=1→2.**
-
-## Status snapshot — updated 2026-06-17 14:22Z UTC (Iter ~2136, Tier 2, consecutive_clean=0→1, NOMINAL)
-
-**Iter ~2136 summary:** ✅ Nominal. 0 new alerts. All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3938657, dashboard_api 3924466). Repo HEAD=7dd29e02=origin/main (clean). Last sync 14:12:19Z (~9 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs across all repos.** **projects-v3-p3 ACTIVE:** Forge building p3-project-store (task dispatched ~13:55Z, ~27 min old, no PR yet — normal build time). Check I skipped (artifact exists 2026-06-17). PRIME ratio=19.46 (1012 interventions, 52 systemic fixes). **Tier 2, consecutive_clean=0→1.**
 
 ## Status snapshot — updated 2026-06-17 14:02Z UTC (Iter ~2135, Tier 1→2, consecutive_clean=2→3→de-escalate, NOMINAL)
 
