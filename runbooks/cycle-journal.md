@@ -4,6 +4,69 @@
 
 ---
 
+## Iteration ~2138 — 2026-06-17 14:54Z UTC (interactive, /cycle, Tier 2→1, consecutive_clean=2→0, DRIFT/FIXED)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Drift (auto-fixed). Check A: repo behind 1 commit — PR #567 p3-project-store merged at 14:50Z. No DM to Larry.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** No regression. ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** No regression. ✅
+- **projects-v3-p1/p4/p2/p2-followup ALL SEQUENCE COMPLETE ✅ CONFIRMED:** heal_pipeline_stall --dry-run → 0 stalls; all FORGE_NO_PR_SKIP entries pr_exists. ✅
+- **G-rule sequence-complete-tier4 COMPLETE ✅ CONFIRMED:** PR #566 merged 13:39:39Z, fix live (unchanged). ✅
+- **G-rule mirror-malformed-verdict-marker COMPLETE ✅ CONFIRMED:** PR #565 merged 13:27:40Z, fix live (unchanged). ✅
+- **Daemons ✅:** beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), outbox_notifier 3938657 (Ss), dashboard_api 3924466 (Ssl). All 5 alive, same PIDs as iter ~2137. ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 998, "file_length": 998}` (no repair needed). 0 new alerts. Watermark stays at 998. ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log last entries show active pipeline: Mirror approved PR #567 at 14:49Z → auto-merged at 14:50Z → SEQUENCE_STEP_MERGED seq=projects-v3-p3 step=p3-project-store → p3-promote-endpoint dispatched to Forge at 14:51Z. 0 WARNs/ERRORs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** No new Larry messages since "Go" at 07:29:35 MDT (13:29:35Z). No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → 0 stalls. All FORGE_NO_PR_SKIP entries pr_exists (p1/p4/p2/p2-followup completed tasks). ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-17T14:28:05Z, age≈26 min. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=d995d2a5, origin/main=67fbff5d — **behind 1 commit**. Working tree clean, on main. **ALWAYS-FIX: fast-forwarded d995d2a5→67fbff5d.** ✅ Resolved.
+- PR #567 merged: `feat: Project+Phase data model + single-committer store + pipeline derive (p3-project-store)` — 8 files, 1154 lines. New: `scripts/projects_store.py`, `scripts/heal_projects_store.py`, `agents/beacon/projects.json`, tests. Modified: `config/daemon-restart-manifest.json` (added projects_store.py to dashboard-api + outbox-notifier watch_paths), `scripts/dashboard_api.py`. **projects-v3-p3 step 1 (p3-project-store) COMPLETE. ✅**
+
+**Check B — Sync health:** last_sync=2026-06-17T14:12:19Z, age≈42 min. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3734671 (Ss) ✅, chain_event_shipper 3734305 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, outbox_notifier 3938657 (Ss) ✅, dashboard_api 3924466 (Ssl) ✅. All 5 alive, same PIDs as iter ~2137. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open (PR #567 auto-merged 14:50Z) ✅. ourliberty-dashboard: 0 open ✅. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Conditional checks (Wednesday 2026-06-17 UTC, weekday=2 ∈ {0,2,4,6}):**
+- Check I: artifact `pulse-check-i/check-i-2026-06-17.json` EXISTS → SKIP (same-day dedup). ✅
+- Check III: Sunday-anchored → skip.
+
+**Pipeline observation — projects-v3-p3 ACTIVE, step 2 starting:**
+Step 1 (p3-project-store, PR #567): MERGED ✅ at 14:50Z via auto-merge (Mirror passed 14:49:56Z). Sequence advancer dispatched step 2 (`p3-promote-endpoint`) to Forge at 14:51:03Z. Forge inbox: `p3-promote-endpoint.json` (brand new, 08:51 MDT) + `build-p3-project-store.json` (completed session, PID 3938869 running ~57 min — normal post-merge verification phase). inbox-watcher (PID 3434697) will spawn new Forge session for p3-promote-endpoint on next scan. **Note:** PR #567 added `projects_store.py` to daemon-restart-manifest.json watch_paths for dashboard_api + outbox_notifier — heal-stale-daemon-code will restart both services on next heartbeat cycle to load new code. 4 stale Mirror dag-preflight worktrees on disk (wt-mirror-dag-preflight-*) — informational, no auto-teardown path.
+
+**G-rule tracking:**
+- **G-rule sequence-complete-tier4: COMPLETE ✅** (unchanged).
+- **G-rule mirror-malformed-verdict-marker: COMPLETE ✅** (unchanged).
+- G-rule catalog-accuracy-drift-tier4: **2/3** (unchanged).
+- G-rule ledger/check-i Tier-4: **2/3** (unchanged).
+- G-rule dual-bot-instance-409-external: **1/3** (unchanged).
+- All other G-rule counts unchanged from iter ~2137.
+
+**Actions taken:**
+1. Check A: fast-forward d995d2a5→67fbff5d (PR #567 p3-project-store).
+2. PRIME ledger: `intervention` appended (tier=2, template=repo-ff-main, ts=2026-06-17T14:54:36Z).
+3. Tier state: `record --checks-clean false` → tier reset 2→1, consecutive_clean=2→0.
+
+**PRIME ratio:** 19.48 (1013 interventions, 52 systemic fixes).
+
+**Dispatches:** None.
+
+---
+
 ## Iteration ~2137 — 2026-06-17 14:40Z UTC (interactive, /cycle, Tier 2, consecutive_clean=1→2, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).

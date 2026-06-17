@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-17 14:54Z UTC (Iter ~2138, Tier 2→1, consecutive_clean=2→0, DRIFT/FIXED)
+
+**Iter ~2138 summary:** ⚠️ Drift (auto-fixed). Check A: repo behind 1 commit (PR #567 `feat: Project+Phase data model + single-committer store + pipeline derive (p3-project-store)` merged 14:50Z) → fast-forwarded d995d2a5→67fbff5d. All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3938657, dashboard_api 3924466). Repo HEAD=67fbff5d=origin/main (clean post-ff). Last sync 14:12:19Z (~42 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs.** **projects-v3-p3 ACTIVE step 2:** p3-project-store (step 1) MERGED ✅ 14:50Z; `p3-promote-endpoint` dispatched to Forge 14:51Z (inbox-watcher will spawn new Forge session). Check I skipped (artifact exists 2026-06-17). PRIME ratio=19.48 (1013 interventions, 52 systemic fixes). Note: heal-stale-daemon-code will restart dashboard_api + outbox_notifier on next run (PR #567 added projects_store.py to watch_paths). **Tier 2→1, consecutive_clean=2→0.**
+
 ## Status snapshot — updated 2026-06-17 14:40Z UTC (Iter ~2137, Tier 2, consecutive_clean=1→2, NOMINAL)
 
 **Iter ~2137 summary:** ✅ Nominal. 0 new alerts. All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3938657, dashboard_api 3924466). Repo HEAD=1fa0a624=origin/main (clean). Last sync 14:12:19Z (~28 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **1 open PR: #567** (p3-project-store, created 14:25:52Z, ~14 min old, MERGEABLE, no review yet — Forge session PID 3938869 still active ~42 min, normal pipeline). Check I skipped (artifact exists 2026-06-17). PRIME ratio=19.46 (1012 interventions, 52 systemic fixes). **Tier 2, consecutive_clean=1→2.**
