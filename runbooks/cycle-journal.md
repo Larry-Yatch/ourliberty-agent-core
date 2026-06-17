@@ -4,6 +4,63 @@
 
 ---
 
+## Iteration ~2121 — 2026-06-17 10:42Z UTC (interactive, /cycle, Tier 2, consecutive_clean=0→1, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 0 new alerts. All mandatory checks clean. No DM to Larry.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** 0 open PRs across all repos. ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** 0 open PRs in ourliberty-agent-core. ✅
+- **projects-v3-p1 SEQUENCE COMPLETE ✅ CONFIRMED:** FORGE_NO_PR_SKIP p1-drain-archive (#550), p1-funnel-derive (#551) pr_exists. ✅
+- **projects-v3-p4 COMPLETE ✅ CONFIRMED:** FORGE_NO_PR_SKIP p4-cleanup-committer (#555), p4-complete-signal (#554), p4-postmerge-exec (#556) pr_exists. ✅
+- **projects-v3-p2 SEQUENCE COMPLETE ✅ CONFIRMED:** FORGE_NO_PR_SKIP p2-meaning-layer (#558), p2-actions (#559), p2-suggest-intake (#560), p2-funnel-card-ui (#59-dashboard) all pr_exists. 0 open PRs in all repos. ✅
+- **Daemons ✅:** beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), outbox_notifier 3769291 (Ss), dashboard_api 3809960 (Ssl). All 5 alive, same PIDs as iter ~2120. ✅
+
+**Check 0 — Alert triage:** Watermark=988 entering; file=988 lines. **0 new alerts.** ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log: all INFO, no WARN/ERROR. Last entry 04:02:56Z (pulse-watermark-gap-autofix-001 APPROVAL_REQUEST queued, fallback to Larry chat — normal). inbox_watcher.log: all INFO, no WARN/ERROR. Last entry 10:02:54Z (beacon done pulse-watermark-gap-autofix-001, $0.91). beacon_telegram_bot.log: last 409 burst at 23:24–23:25 local (same burst tracked as G-rule dual-bot-instance-409-external 1/3 in iter ~2102); no new 409s. Bot PID 3734671 alive (Ss). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** No new messages from Larry since last iter. Last bot entries: approval_request idx=986 at 04:06Z (pulse-watermark-rotation-repair-001), alert idx=987 route=digest at 04:21Z (catalog-accuracy-drift). No agent-distress keywords. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → `no stalls detected`. All FORGE_NO_PR_SKIP entries pr_exists (Phase S s-1→s-6 + p1 + p4 + p2). ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=1 (`pulse-watermark-rotation-repair-001` — Beacon's Forge build spec for watermark autofix, created 10:02:56Z, delivered to Larry at 10:06Z; awaiting Larry's "approve"). Normal pipeline flow — not a stall. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-17T10:26:23Z, age≈14.6 min at check time. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=e9959c9a=origin/main (clean, on main, no divergence). Latest commit: `Pulse cycle 20260617T102430Z` (iter ~2120 wrapper). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-17T09:47:48Z, status=no-change, age≈53 min. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3734671 (Ss) ✅, chain_event_shipper 3734305 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, outbox_notifier 3769291 (Ss) ✅, dashboard_api 3809960 (Ssl) ✅. All 5 alive, same PIDs as iter ~2120. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open ✅. ourliberty-dashboard: 0 open ✅. ourliberty-graph: 0 open ✅. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Conditional checks (Wednesday 2026-06-17 UTC, weekday=2 ∈ {0,2,4,6}):**
+- Check I: artifact `pulse-check-i/check-i-2026-06-17.json` EXISTS → SKIP (same-day dedup). ✅
+- Check III: Sunday-anchored → skip.
+
+**G-rule tracking:**
+- All counts unchanged from iter ~2120. (0 new alerts → no increments.)
+- G-rule catalog-accuracy-drift-tier4: **2/3** (unchanged).
+- G-rule dual-bot-instance-409-external: **1/3** (unchanged, same 23:24–23:25Z burst, no new 409s).
+- G-rule sequence-complete-tier4: **2/3** (unchanged).
+- G-rule ledger/check-i Tier-4: **2/3** (unchanged).
+
+**Actions taken:**
+1. PRIME ledger: `iter_clean` appended (tier=2, ts=2026-06-17T10:42:19Z).
+2. Tier state: `record --checks-clean true` → consecutive_clean 0→1. Tier remains 2.
+
+**PRIME ratio:** 20.14 (1007 interventions, 50 systemic fixes). Trend: improving.
+
+**Dispatches:** None.
+
+---
+
 ## Iteration ~2120 — 2026-06-17 10:23Z UTC (interactive, /cycle, Tier 1→2, consecutive_clean=2→0, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).
