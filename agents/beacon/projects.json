@@ -1,4 +1,32 @@
 {
   "schema_version": 1,
-  "projects": []
+  "projects": [
+    {
+      "id": "tier-alert-cycle-3-pr-close-out-plan",
+      "title": "Tier-alert cycle: 3-PR close-out plan",
+      "north_star_ref": null,
+      "repo": "ourliberty-agent-core",
+      "state": "active",
+      "phases": [
+        {
+          "id": "tier-alert-cycle-3-pr-close-out-plan",
+          "title": "Tier-alert cycle: 3-PR close-out plan",
+          "desired_end_state": "Root causes verified 6/10: (1) classify_tier1_failure bare-401 regex matched UUID digits in 'No conversation found with session ID: 32401737\u2026' \u2014 the 18:57Z alert was session_lost (reaper fallout), not auth and not fixtures; (2) unittest discover -s scripts/tests NEVER runs tests/__init__.py so #412 sandbox + #428 tripwire are dead code under the production gate (proven; 9 mock events hit real ledger 18:39:48Z). Plan: PR-1 classifier envelope fix (session_lost class + fresh-dispatch recovery, word-boundary 401, fix 'Tier 1' hardcoded alert text); PR-2 gate env-injection at test_regression_check.py:137 + meta-test proving sandbox engages under the EXACT production invocation; PR-3 Beacon's mock sanitization (defense-in-depth); then re-kick reaper fix FRESH (session 32401737 unreachable \u2014 do not resume); purge 9 poisoned 18:39:48Z ledger events (quarantine pattern); add alert-translations entry for claude_tier1_failed_tier2_unavailable; then re-kick S1. Memory: tier-alert-cycle-final-rootcause.md",
+          "lifecycle_state": "brainstorm",
+          "order": 0,
+          "spec_ref": null,
+          "sequence_ref": null,
+          "created_at": "2026-06-17T22:06:11.667613+00:00",
+          "updated_at": "2026-06-17T22:06:11.667613+00:00"
+        }
+      ],
+      "one_off": true,
+      "created_at": "2026-06-17T22:06:11.667613+00:00",
+      "updated_at": "2026-06-17T22:06:11.667613+00:00",
+      "promoted_from": {
+        "kind": "capture",
+        "capture_id": "cap-tier-alert-cycle-3-pr-close-out-plan-3819"
+      }
+    }
+  ]
 }
