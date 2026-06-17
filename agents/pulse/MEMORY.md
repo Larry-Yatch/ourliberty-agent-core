@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-17 17:17Z UTC (Iter ~2146, Tier 3, consecutive_clean=1→2, NOMINAL)
+
+**Iter ~2146 summary:** ✅ Nominal. 2 Tier-3 alerts silenced: L1001 (sentinel/inbox-stall:forge/build-p3-project-store.json — 3.17h threshold, Tier-3 known pattern) + L1002 (medic-diagnosis — medic: Forge PID 3938869 running 3h 19min, legitimate build, no action needed). All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3964779, dashboard_api 3964550). Repo HEAD=ffadcd77=origin/main (clean). Last sync 17:12:55Z (~3 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs across all repos.** **projects-v3-p3 ACTIVE step 2:** Forge session 3938869 still running ELAPSED=03:18:46 (~3h 19min) — sentinel fired (Tier-3 silenced), medic diagnosed as legitimate long build. p3-promote-endpoint.json queued (14:51Z), inbox-watcher waiting for session exit. Check I skipped (artifact exists 2026-06-17). PRIME ratio=19.48 (1013 interventions, 52 systemic fixes). **Tier 3, consecutive_clean=1→2.**
+
 ## Status snapshot — updated 2026-06-17 16:42Z UTC (Iter ~2145, Tier 3, consecutive_clean=0→1, NOMINAL)
 
 **Iter ~2145 summary:** ✅ Nominal. 0 new alerts. All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3964779, dashboard_api 3964550). Repo HEAD=36570729=origin/main (clean). Last sync 16:12:33Z (~29 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs across all repos.** **projects-v3-p3 ACTIVE step 2:** Forge session 3938869 still running ELAPSED=02:43:35 (~116 min post-merge for p3-project-store) — 0 stalls per heal_pipeline_stall. p3-promote-endpoint.json queued in Forge inbox (14:51Z), inbox-watcher waiting for session exit to spawn. Check I skipped (artifact exists 2026-06-17). PRIME ratio=19.48 (1013 interventions, 52 systemic fixes). **Tier 3, consecutive_clean=0→1.**

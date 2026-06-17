@@ -4,6 +4,73 @@
 
 ---
 
+## Iteration ~2146 — 2026-06-17 17:17Z UTC (interactive, /cycle, Tier 3, consecutive_clean=1→2, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 2 Tier-3 alerts silenced. All checks clean. No DM to Larry.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** Check E → 0 open PRs. ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** No regression. ✅
+- **projects-v3-p1/p4/p2/p2-followup ALL SEQUENCE COMPLETE ✅ CONFIRMED:** heal_pipeline_stall --dry-run → 0 stalls. ✅
+- **G-rule sequence-complete-tier4 COMPLETE ✅ CONFIRMED:** PR #566 not in open PRs. ✅
+- **G-rule mirror-malformed-verdict-marker COMPLETE ✅ CONFIRMED:** PR #565 not in open PRs. ✅
+- **Daemons ✅:** All 5 alive. Same PIDs as iter ~2145: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3964779, dashboard_api 3964550. ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 1000, "file_length": 1002}` (no repair needed). **2 new alerts (L1001–L1002):**
+- L1001: `source=sentinel, subject=inbox-stall:/home/larry/agents/inboxes/forge/build-p3-project-store.json` — sentinel inbox-stall threshold fired (3.17h). Triage helper → **Tier-3 silenced** (known pattern, route=digest). No DM.
+- L1002: `source=medic, intent=medic-diagnosis` — medic diagnosed L1001: Forge PID 3938869 IS actively running (started 07:57 local, ~3.2h), inbox file stays in place until completion, legitimate long-running build, no remediation needed. Triage helper → **Tier-3 silenced** (COMPLETE G-rule, route=digest). No DM.
+- Watermark advanced 1000→1002. ✅
+
+**Check 1 — Log noise:** outbox-notifier.log: 0 WARNs/ERRORs. inbox_watcher.log: 0 WARNs/ERRORs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot log last entry 11:12:18-0600 MDT (17:12:18Z) — notification idx=1001 (medic-diagnosis). Last Larry message: "Go" at 07:29:35 MDT (13:29:35Z, already processed). No new messages since iter ~2145. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → 0 stalls. All FORGE_NO_PR_SKIP entries pr_exists. ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-17T16:58:19Z, age≈18.6 min. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=ffadcd77=origin/main (clean, on main, behind=0, ahead=0). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-17T17:12:55Z, age≈3.1 min. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3734671 (Ss) ✅, chain_event_shipper 3734305 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, outbox_notifier 3964779 (Ss) ✅, dashboard_api 3964550 (Ssl) ✅. All 5 alive, same PIDs as iter ~2145. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open ✅. ourliberty-dashboard: 0 open ✅. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Conditional checks (Wednesday 2026-06-17 UTC, weekday=2 ∈ {0,2,4,6}):**
+- Check I: artifact `pulse-check-i/check-i-2026-06-17.json` EXISTS → SKIP (same-day dedup). ✅
+- Check III: Sunday-anchored → skip.
+
+**Pipeline observation — projects-v3-p3 ACTIVE, step 2 (p3-promote-endpoint) queued:**
+- p3-project-store (step 1, PR #567): MERGED ✅ 14:50:03Z.
+- Forge session 3938869: STILL RUNNING at 17:17Z, ELAPSED=03:18:46 (~3h 19min). PID alive (Ssl). heal_pipeline_stall → 0 stalls. Sentinel fired at 3.17h threshold (Tier-3 silenced); medic diagnosed as legitimate long-running build.
+- `p3-promote-endpoint.json` queued in Forge inbox (14:51Z). inbox-watcher (3434697) will spawn new Forge session when 3938869 exits.
+
+**G-rule tracking:**
+- **G-rule sequence-complete-tier4: COMPLETE ✅** (unchanged).
+- **G-rule mirror-malformed-verdict-marker: COMPLETE ✅** (unchanged).
+- G-rule catalog-accuracy-drift-tier4: **2/3** (no new occurrence → unchanged).
+- G-rule ledger/check-i Tier-4: **2/3** (no new occurrence → unchanged).
+- G-rule dual-bot-instance-409-external: **1/3** (no new occurrence → unchanged).
+- All other G-rule counts unchanged from iter ~2145.
+
+**Actions taken:**
+1. PRIME ledger: `iter_clean` appended (tier=3, ts=2026-06-17T17:17:59Z).
+2. Tier state: `record --checks-clean true` → consecutive_clean=1→2. Tier stays 3.
+3. Alert watermark advanced: 1000→1002.
+
+**PRIME ratio:** 19.48 (1013 interventions, 52 systemic fixes).
+
+**Dispatches:** None.
+
+---
+
 ## Iteration ~2145 — 2026-06-17 16:42Z UTC (interactive, /cycle, Tier 3, consecutive_clean=0→1, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).
