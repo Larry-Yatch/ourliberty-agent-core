@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-17 20:22Z UTC (Iter ~2159, Tier 2, consecutive_clean=0→1, NOMINAL)
+
+**Iter ~2159 summary:** ✅ Nominal. 1 Tier-3 alert silenced: L1014 (outbox-notifier/sequence-complete:projects-v3-p3 — all 4 PRs #567+#568+#570+dashboard#62 confirmed merged; Tier-3 per PR #566 config). All 5 daemons alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4048770 (Ssl), outbox_notifier 4049089 (Ss). Same PIDs as iter ~2158. Repo HEAD=5ed1c891=origin/main (clean). Last sync 20:13:19Z (~8 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs across all repos.** **projects-v3-p3 COMPLETE ✅** (PRs #567+#568+#570 all merged, sequence-complete DM delivered). Check I skipped (artifact exists 2026-06-17). PRIME ratio=~19.54 (1018 interventions, 52 systemic fixes, trend=improving). **Tier 2, consecutive_clean=0→1.**
+
 ## Status snapshot — updated 2026-06-17 20:03Z UTC (Iter ~2158, Tier 1→2, consecutive_clean=2→3→de-escalate, NOMINAL)
 
 **Iter ~2158 summary:** ✅ Nominal. 2 Tier-3 alerts silenced: L1012 (heal-stale-daemon-code/auto-restarted:ourliberty-dashboard-api.service — PR #570 code deploy at 19:59Z) + L1013 (heal-stale-daemon-code/auto-restarted:ourliberty-outbox-notifier.service — same deploy). All 5 daemons alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api **4048770** (Ssl) NEW PID, outbox_notifier **4049089** (Ss) NEW PID. Repo HEAD=11aaa5d1=origin/main (clean). Last sync 19:13:03Z (~48 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs across all repos.** **projects-v3-p3 COMPLETE ✅** (PRs #567+#568+#569+#570 all merged). Check I skipped (artifact exists 2026-06-17). PRIME ratio=~19.54 (1018 interventions, 52 systemic fixes, trend=improving). **Tier 1→2 de-escalation, consecutive_clean reset to 0.**
