@@ -4,6 +4,58 @@
 
 ---
 
+## Iteration ~2097 — 2026-06-17 04:12Z UTC (interactive, /cycle, Tier 2, consecutive_clean=0→1, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 1 Tier-3 alert (heal-stale-daemon-code auto-restarted outbox_notifier; known pattern, silenced). No DM to Larry.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** 0 open PRs. ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** 0 open PRs. ✅
+- **projects-v3-p1 SEQUENCE COMPLETE ✅ CONFIRMED:** 0 open PRs. ✅
+- **projects-v3-p4 COMPLETE ✅ CONFIRMED:** All 3/3 steps (#554, #555, #556) merged. 0 open PRs. ✅
+- **Daemons all alive ✅:** beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), outbox_notifier **NEW PID 3769291** (Ss, restarted 03:54Z by heal-stale-daemon-code), dashboard_api 3734769 (Ssl). All 5 alive. ✅
+
+**Check 0 — Alert triage:** Watermark=1070 entering; file=1071 lines. **1 new alert (L1071).** source=heal-stale-daemon-code, route=digest, subject=auto-restarted:ourliberty-outbox-notifier.service, ts=03:54:39Z. Auto-restarted because outbox_notifier.py mtime exceeded active-since by 63.3 min (PR #556 code: 03:27:41Z mtime vs 02:24:26Z active-since). Triage helper: **Tier 3** (known-pattern match in alert-translations.json). Silenced; no DM. Watermark advanced 1070→1071. No tier-reset. ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log: 1 WARN (MalformedForgeMarker p4-cleanup-committer, 20:21 MDT 2026-06-16 — same recurring sub-threshold WARN from prior iters, covered by G-rule PR #524). inbox-watcher.log: no WARN/ERROR. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message: `go` at 2026-06-16T19:16:03-0600 (01:16Z) for dag-preflight-projects-v3-p4. Fully tracked — sequence COMPLETE. No new directives in last 4h, no agent-distress keywords. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → `no stalls detected`. All FORGE_NO_PR_SKIP entries are previously-merged tasks (pr_exists, normal). ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-17T03:54:34Z, age≈17 min at check time. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=0529dbff=origin/main (clean, on main, no divergence). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-17T04:09:59Z, status=no-change, age≈2 min. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3734671 (Ss) ✅, chain_event_shipper 3734305 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, outbox_notifier 3769291 (Ss, NEW PID post-restart 03:54Z) ✅, dashboard_api 3734769 (Ssl) ✅. All 5 alive. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open ✅. ourliberty-dashboard: 0 ✅. ourliberty-graph: 0 ✅. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Conditional checks (Wednesday 2026-06-17 UTC, weekday=2 ∈ {0,2,4,6}):**
+- Check I: artifact `pulse-check-i/check-i-2026-06-17.json` EXISTS → SKIP (same-day dedup).
+- Check III: fires Sunday → skip.
+
+**G-rule tracking:** No new G-rule counts this iter. All counts unchanged from iter ~2096.
+
+**Actions taken:**
+1. Alert L1071 triaged Tier-3 (known-pattern); watermark advanced 1070→1071.
+2. PRIME ledger: `iter_clean` appended (tier=2, template=iter-clean, ts=2026-06-17T04:12:17Z).
+3. Tier state: `record --checks-clean true` → consecutive_clean 0→1. Tier 2 unchanged.
+
+**PRIME ratio:** 20.47 (1003 interventions, 49 systemic fixes). Trend: improving.
+
+**Dispatches:** None.
+
+---
+
 ## Iteration ~2096 — 2026-06-17 03:51Z UTC (interactive, /cycle, Tier 1→2, consecutive_clean=2→3→de-escalate, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).
