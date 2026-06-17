@@ -234,9 +234,20 @@ class RunOnceTest(unittest.TestCase):
             {'projects': [{'id': 'proj-a', 'phases': [{'id': 'ph-1'}]}]}, now=NOW)
         self.proj.write_text(json.dumps(normalized, indent=2) + '\n')
         before = self.proj.read_text()
-        rc = h.run_once(dry_run=True, now=NOW)
+        # Capture the healer's log so we can assert the report itself, not just
+        # the side effects — the old 'no delta' wording is what hid this state.
+        lines: list[str] = []
+        orig_log = h.log
+        h.log = lambda msg: lines.append(msg)
+        try:
+            rc = h.run_once(dry_run=True, now=NOW)
+        finally:
+            h.log = orig_log
         self.assertEqual(rc, 0)
         self.assertEqual(self.proj.read_text(), before)  # dry-run writes nothing
+        report = ' '.join(lines)
+        self.assertIn('git delta', report)       # reports the real (git) delta
+        self.assertNotIn('no delta', report)      # not the masking message
         # And the tree is still dirty (dry-run did not commit).
         dirty = subprocess.run(
             ['git', 'status', '--porcelain', h.PROJECTS_REL],
