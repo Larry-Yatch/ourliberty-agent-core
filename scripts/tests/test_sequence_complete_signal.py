@@ -448,5 +448,138 @@ class EndToEndThroughStepMerged(_Harness):
         self.assertEqual(len(self._signaled_markers('e3')), 0)
 
 
+# ===================================================================
+# Layer 4 — post_merge executor wiring (Contracts B + C)
+# ===================================================================
+
+
+class PostMergeWiring(_Harness):
+    """The completion chokepoint runs the post_merge block (B) and the DM
+    reports the verified go-live result (C). Auto steps run; risky steps are
+    proposed via the approval gate, never executed; a failure never blocks
+    completion."""
+
+    def _seq_with_post_merge(self, seq_id, post_merge):
+        seq = _make_sequence(seq_id=seq_id, status='complete')
+        seq['post_merge'] = post_merge
+        return seq
+
+    def test_auto_runs_verify_and_safe_run_then_reports(self):
+        seq = self._seq_with_post_merge('pm1', {
+            'verify': ['curl -sf http://localhost/health'],
+            'run': [{'cmd': 'scripts/drain.py --apply', 'safe': True}],
+        })
+        self._write_sequence(seq)
+        ran = []
+
+        def fake_runner(cmd):
+            ran.append(cmd)
+            return True, 'ok'
+
+        with mock.patch.object(
+            on.chain_event_emit, 'emit_event', return_value=True,
+        ), mock.patch.object(
+            on.ssh, '_run_post_merge_command', side_effect=fake_runner,
+        ):
+            on._maybe_signal_sequence_complete('pm1')
+
+        # Both auto steps executed.
+        self.assertIn('curl -sf http://localhost/health', ran)
+        self.assertIn('scripts/drain.py --apply', ran)
+        body = self._read_alerts()[0]['message']
+        self.assertIn('Auto-ran:', body)
+        self.assertIn('Verified:', body)
+        self.assertIn('scripts/drain.py --apply', body)
+
+    def test_restart_and_plain_run_are_proposed_not_executed(self):
+        seq = self._seq_with_post_merge('pm2', {
+            'restart': ['ourliberty-dashboard-api.service'],
+            'run': ['scripts/risky.py'],  # plain string → gated
+        })
+        self._write_sequence(seq)
+
+        proposed = []
+
+        def fake_add_pending(payload, chat_id=0, **kw):
+            proposed.append(payload['task_id'])
+            return {'id': payload['task_id']}
+
+        with mock.patch.object(
+            on.chain_event_emit, 'emit_event', return_value=True,
+        ), mock.patch.object(
+            on.ssh, '_run_post_merge_command',
+            side_effect=AssertionError('gated steps must NOT execute'),
+        ), mock.patch.object(
+            on.approval, 'find_by_id_any_state', return_value=None,
+        ), mock.patch.object(
+            on.approval, 'add_pending', side_effect=fake_add_pending,
+        ), mock.patch.object(
+            on.approval, 'build_approval_request_chain_event',
+            return_value={'event_type': 'approval_request', 'agent': 'beacon',
+                          'task_id': 'x', 'payload': {}},
+        ), mock.patch.object(on, '_primary_chat_id', return_value=None):
+            on._maybe_signal_sequence_complete('pm2')
+
+        # Both gated steps registered on the approval gate.
+        self.assertEqual(len(proposed), 2)
+        body = self._read_alerts()[0]['message']
+        self.assertIn('Awaiting your tap', body)
+        self.assertIn('ourliberty-dashboard-api.service', body)
+        self.assertIn('scripts/risky.py', body)
+
+    def test_failed_verify_reports_loudly_but_completes(self):
+        seq = self._seq_with_post_merge('pm3', {
+            'verify': ['scripts/probe.py'],
+        })
+        self._write_sequence(seq)
+
+        with mock.patch.object(
+            on.chain_event_emit, 'emit_event', return_value=True,
+        ), mock.patch.object(
+            on.ssh, '_run_post_merge_command',
+            return_value=(False, 'exit 1: down'),
+        ):
+            on._maybe_signal_sequence_complete('pm3')
+
+        # Completion still fired (marker + DM) despite the failed check.
+        self.assertEqual(len(self._signaled_markers('pm3')), 1)
+        body = self._read_alerts()[0]['message']
+        self.assertIn('FAILED', body)
+        self.assertIn('scripts/probe.py', body)
+
+    def test_executor_exception_never_blocks_completion(self):
+        # Even a runner that raises must not stop the completion DM/event.
+        seq = self._seq_with_post_merge('pm4', {
+            'verify': ['scripts/probe.py'],
+        })
+        self._write_sequence(seq)
+
+        with mock.patch.object(
+            on.chain_event_emit, 'emit_event', return_value=True,
+        ) as emit, mock.patch.object(
+            on.ssh, '_run_post_merge_command',
+            side_effect=RuntimeError('boom'),
+        ):
+            on._maybe_signal_sequence_complete('pm4')
+
+        self.assertEqual(len(self._signaled_markers('pm4')), 1)
+        self.assertEqual(len(self._read_alerts()), 1)
+        self.assertEqual(
+            len([c for c in emit.call_args_list
+                 if c.kwargs.get('event_type') == 'sequence_complete']), 1)
+
+    def test_no_post_merge_block_renders_legacy_dm(self):
+        # A sequence without a post_merge block produces the original DM shape.
+        self._write_sequence(_make_sequence(seq_id='pm5', status='complete'))
+        with mock.patch.object(
+            on.chain_event_emit, 'emit_event', return_value=True,
+        ):
+            on._maybe_signal_sequence_complete('pm5')
+        body = self._read_alerts()[0]['message']
+        self.assertIn('✅', body)
+        self.assertNotIn('Awaiting your tap', body)
+        self.assertNotIn('Auto-ran:', body)
+
+
 if __name__ == '__main__':
     unittest.main()
