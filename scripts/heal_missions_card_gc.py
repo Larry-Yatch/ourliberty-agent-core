@@ -1236,11 +1236,12 @@ def commit_and_push_captures(repo: Path, audit_msg: str) -> str:
 
 
 def commit_and_push_missions(repo: Path, audit_msg: str) -> str:
-    """Commit + push any missions.json delta to origin/main (the durability
-    half of the § 3.3 phase reconcile). Thin wrapper over _commit_and_push_path."""
+    """Commit + push any missions.json delta to origin/main (the durability half
+    of the § 3.3 phase reconcile AND any cleanup delta the GC healer absorbs as
+    the single committer). Thin wrapper over _commit_and_push_path."""
     return _commit_and_push_path(
         repo, MISSIONS_REL,
-        'chore(missions): GC healer — reconcile terminal mission phases', audit_msg)
+        'chore(missions): GC healer — commit missions.json delta', audit_msg)
 
 
 def _commit_and_push_path(repo: Path, rel_path: str, commit_subject: str,
@@ -1599,7 +1600,17 @@ def run_once(*, dry_run: bool,
             except Exception as e:  # noqa: BLE001 — fail-safe: report, never corrupt
                 log(f'mission-reconcile raised: {type(e).__name__}: {e}')
                 missions = MissionReconcileResult()
-            if missions.shipped and not dry_run:
+            # Single-committer durability (Contract D): commit ANY pending
+            # missions.json delta on disk — our own reconcile write above OR a
+            # delta a separate machine-owned cleanup left uncommitted (e.g. a
+            # dashboard retire) — so it persists within ONE tick instead of
+            # lingering as dirt that jams the next sync (the P1 incident). The GC
+            # healer is the SOLE committer: it never writes a delta it didn't
+            # author (no new writer), it only commits whatever is already on
+            # disk. Mirrors the captures.json commit above; commit_and_push_
+            # missions returns 'nothing' on a clean tree, so this is cheap when
+            # there is nothing to persist.
+            if not dry_run:
                 core = repo_paths.get('ourliberty-agent-core')
                 if core:
                     try:

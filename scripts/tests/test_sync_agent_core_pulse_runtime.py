@@ -498,5 +498,108 @@ class CapturesJsonToleratedTest(_SyncResilienceBase):
         self.assertIn('sync-blocked:auto-commit-push-failed', subjects)
 
 
+class MissionsJsonToleratedTest(_SyncResilienceBase):
+    """agents/beacon/missions.json is healer-owned: heal_missions_card_gc.py is
+    its SOLE committer (Contract D — it commits ANY pending missions.json delta
+    on its tick). Sync must absorb the write↔commit race by TOLERATING the dirt
+    the same way it does captures.json — neither committing nor resetting it — so
+    a cleanup's delta no longer jams sync (the P1 incident)."""
+
+    MISSIONS_REL = 'agents/beacon/missions.json'
+
+    def _seed_missions(self) -> None:
+        """missions.json isn't part of the base seed commit; track it so a later
+        modification registers as tracked-modified."""
+        (self.repo_dir / 'agents' / 'beacon' / 'missions.json').write_text(
+            '{"schema_version": 1, "missions": []}\n',
+        )
+        self._git('add', self.MISSIONS_REL)
+        self._git('commit', '-q', '-m', 'seed missions')
+        self._git('push', '-q', 'origin', 'main')
+
+    def _missions_dirty(self) -> bool:
+        rc = subprocess.run(
+            ['git', 'diff', '--quiet', '--', self.MISSIONS_REL],
+            cwd=self.repo_dir,
+        ).returncode
+        return rc != 0
+
+    def test_missions_json_only_dirt_is_tolerated_not_committed(self):
+        self._seed_missions()
+        pre_head = self._head()
+        pre_origin = self._origin_head()
+        # Dirty exactly missions.json (tracked-modified), simulating the gap
+        # between a cleanup's write and the GC healer's next commit tick.
+        (self.repo_dir / 'agents' / 'beacon' / 'missions.json').write_text(
+            '{"schema_version": 1, "missions": '
+            '[{"id": "m-x", "phase": "shipped"}]}\n',
+        )
+
+        result = self._run_sync()
+        self.assertEqual(
+            result.returncode, 0,
+            f'sync should tolerate missions.json and proceed; '
+            f'stdout={result.stdout!r} stderr={result.stderr!r}',
+        )
+        # Sync did NOT commit or push: HEAD and origin are unchanged.
+        self.assertEqual(self._head(), pre_head)
+        self.assertEqual(self._origin_head(), pre_origin)
+        # The dirt is left on disk for the healer.
+        self.assertTrue(
+            self._missions_dirty(),
+            'missions.json should still be dirty (left for the GC healer)',
+        )
+        # No page of any kind.
+        alerts = self._read_alerts()
+        sync_blocked = [
+            a for a in alerts if a.get('subject', '').startswith('sync-blocked')
+        ]
+        self.assertEqual(sync_blocked, [], f'unexpected alerts: {alerts}')
+
+    def test_missions_plus_captures_dirt_both_tolerated(self):
+        # Both healer-owned extras dirty together: sync tolerates the pair,
+        # commits neither, and proceeds (no Pulse file dirty → no auto-commit).
+        self._seed_missions()
+        pre_head = self._head()
+        pre_origin = self._origin_head()
+        (self.repo_dir / 'agents' / 'beacon' / 'missions.json').write_text(
+            '{"schema_version": 1, "missions": [{"id": "m-y"}]}\n',
+        )
+        (self.repo_dir / 'agents' / 'beacon' / 'captures.json').write_text(
+            '{"captures": [{"title": "note"}]}\n',
+        )
+
+        result = self._run_sync()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self._head(), pre_head)
+        self.assertEqual(self._origin_head(), pre_origin)
+        self.assertTrue(self._missions_dirty())
+        alerts = self._read_alerts()
+        sync_blocked = [
+            a for a in alerts if a.get('subject', '').startswith('sync-blocked')
+        ]
+        self.assertEqual(sync_blocked, [], f'unexpected alerts: {alerts}')
+
+    def test_missions_plus_non_allowlist_file_still_blocks(self):
+        # missions.json (tolerated) + README (not) is still mixed dirt: the
+        # refuse-and-alert path is unchanged so genuine human dirt never gets
+        # silently swept past the gate. (The alert-emission half of this path is
+        # asserted by CapturesJsonToleratedTest; here we assert the block +
+        # no-commit, which doesn't depend on the alert CLI.)
+        self._seed_missions()
+        pre_head = self._head()
+        pre_origin = self._origin_head()
+        (self.repo_dir / 'agents' / 'beacon' / 'missions.json').write_text(
+            '{"schema_version": 1, "missions": [{"id": "m-z"}]}\n',
+        )
+        (self.repo_dir / 'README').write_text('human edit\n')
+
+        result = self._run_sync()
+        self.assertNotEqual(result.returncode, 0)
+        # No commit landed locally or on origin; the mixed dirt was refused.
+        self.assertEqual(self._head(), pre_head)
+        self.assertEqual(self._origin_head(), pre_origin)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -148,17 +148,20 @@ fi
 #    is otherwise pull-only, auto-commits + pushes EXACTLY ONE commit of these so
 #    it isn't blocked for hours until run_cycle.sh's next tick.
 #
-#  * captures.json (SYNC_EXTRA_RUNTIME_PATHS): machine-owned missions-capture
-#    state whose SOLE committer is heal_missions_card_gc.py (every ~10min). Sync
-#    must NOT also commit it. #409 originally made sync a second committer, which
-#    created a dual-committer race on origin/main and, on a failing push, sync's
-#    `git reset --hard` reverted captures.json on disk and lost the ingests
-#    written during the push window. Sync now TOLERATES this dirt: it neither
-#    commits nor resets captures.json and proceeds to the ff-pull. The healer
-#    remains the single committer and persists it on its own tick. The ff-pull is
-#    safe because the healer commits to THIS working tree first, so its
-#    captures.json commits are already in local HEAD before origin advances — an
-#    incoming ff never carries a captures.json change, and git fast-forwards
+#  * captures.json + missions.json (SYNC_EXTRA_RUNTIME_PATHS): machine-owned
+#    missions state whose SOLE committer is heal_missions_card_gc.py (every
+#    ~10min — captures via the aging/sweep commit, missions.json via the
+#    single-committer "commit ANY pending delta" path, Contract D). Sync must NOT
+#    also commit them. #409 originally made sync a second committer of
+#    captures.json, which created a dual-committer race on origin/main and, on a
+#    failing push, sync's `git reset --hard` reverted it on disk and lost the
+#    ingests written during the push window. A missions.json delta left by a
+#    cleanup similarly jammed sync (the P1 incident). Sync now TOLERATES this
+#    dirt: it neither commits nor resets these files and proceeds to the ff-pull.
+#    The healer remains the single committer and persists them on its own tick.
+#    The ff-pull is safe because the healer commits to THIS working tree first,
+#    so its commits are already in local HEAD before origin advances — an
+#    incoming ff never carries one of these changes, and git fast-forwards
 #    cleanly past commits that don't touch a dirty file.
 #
 # Any dirt outside both sets falls through to the refuse-and-alert path below.
@@ -217,13 +220,13 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
 fi
 
 # Refuse to operate with uncommitted changes — UNLESS the only remaining dirt is
-# healer-owned captures.json (SYNC_EXTRA_RUNTIME_PATHS), which sync tolerates and
-# the GC healer commits on its own tick. Any other dirt (human edits, or Pulse
-# dirt mixed with non-allowlisted files that the block above declined to commit)
-# falls through to refuse-and-alert.
+# healer-owned runtime state (SYNC_EXTRA_RUNTIME_PATHS: captures.json +
+# missions.json), which sync tolerates and the GC healer commits on its own tick.
+# Any other dirt (human edits, or Pulse dirt mixed with non-allowlisted files
+# that the block above declined to commit) falls through to refuse-and-alert.
 if ! git diff --quiet || ! git diff --cached --quiet; then
     if all_modified_in_sync_extra_allowlist "$REPO_DIR"; then
-        log "Only healer-owned runtime dirt (captures.json) present — tolerating; heal_missions_card_gc.py is its committer. Proceeding to pull."
+        log "Only healer-owned runtime dirt (captures.json/missions.json) present — tolerating; heal_missions_card_gc.py is its committer. Proceeding to pull."
     else
         log "ERROR: Working tree has uncommitted changes. Sync refuses to operate."
         write_status "error" "Uncommitted changes in working tree"

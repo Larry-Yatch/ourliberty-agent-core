@@ -1,6 +1,7 @@
 {
   "paths": [
-    "agents/beacon/captures.json"
+    "agents/beacon/captures.json",
+    "agents/beacon/missions.json"
   ],
   "_meta": {
     "purpose": "Working-tree files written by a healer/ingest on its own cadence and committed by a SOLE healer-committer on a timer. A working tree whose ONLY dirt is these paths is nominal-by-design, not a discipline violation. Consumed by sync_agent_core.sh, heal_droplet_git_drift.py, and Pulse cycle Check A."
