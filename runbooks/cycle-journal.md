@@ -4,6 +4,107 @@
 
 ---
 
+## Iteration ~2169 — 2026-06-17 23:37Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0→1, RESOLUTION)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Resolution. **dag-preflight-revision-gap:projects-v3-p3-followup → RESOLVED.** All mandatory checks nominal. Beacon's recovery dispatch (from iter ~2168) executed successfully. Mirror has new v2 dag-preflight task in inbox.
+
+**VERIFY-BEFORE-REASSERT:**
+- **All 5 daemon PIDs alive:** beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4048770 (Ssl), outbox_notifier 4049089 (Ss). Same PIDs as iter ~2168. ✅
+- **0 open PRs:** both repos. ✅
+- **Repo at origin/main:** HEAD=fd3922cb=origin/main. Dirty: cycle-journal.md (Beacon result notification prepended at ~23:35Z + this entry). Not a discipline violation — Pulse's journal is expected uncommitted during active cycles; wrapper commits on exit. ✅
+- **dag-preflight-revision-gap:** RESOLVED this iter. Worktree gone (git prune completed it). Mirror inbox has `dag-preflight-projects-v3-p3-followup-v2.json` (created 23:32Z). ✅
+- **PID 1834248 (bash orphan):** still alive (Ss bash). Low CPU. Carry. ✅
+
+**Check 0 — Alert triage:** repair-watermark → no repair (`{"repaired": false, "old_watermark": 1018, "file_length": 1018}`). **0 new alerts.** ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → No entries. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** No new Larry messages since 17:22:35-0600 (23:22:35Z = iter ~2168). Last entry: authorized worktree clear (actioned last iter). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected`. 17 FORGE_NO_PR_SKIP (reason=pr_exists). Note: stalled_pending_sequence:projects-v3-p3-followup alert recovered/suppressed by healer (Beacon re-dispatch already landed). ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` pending=0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=`2026-06-17T23:29:54Z` (~8 min). FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=fd3922cb=origin/main. Dirty: cycle-journal.md (Beacon result notification + this iter's entry). See VERIFY note above. ✅ Nominal (expected uncommitted state during active interactive cycle).
+
+**Check B — Sync health:** last_sync=2026-06-17T22:50:15Z (~47 min). Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon 3734671 (Ss) ✅, chain-event 3734305 (SNs) ✅, inbox-watcher 3434697 (Ssl) ✅, dashboard_api 4048770 (Ssl) ✅, outbox_notifier 4049089 (Ss) ✅. All 5/5 alive. Same PIDs as iter ~2168. ✅ Nominal.
+
+**Check D — Inboxes:** Mirror: `dag-preflight-projects-v3-p3-followup-v2.json` (fresh, created 23:32Z — Beacon's re-dispatch, not stale). Beacon: empty. Forge: empty. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open PRs. ourliberty-dashboard: 0 open PRs. ✅ Nominal.
+
+**Conditional checks:** Wednesday 2026-06-17 UTC, weekday=2 ∈ {0,2,4,6}.
+- Check I: artifact `pulse-check-i/check-i-2026-06-17.json` EXISTS → SKIP (same-day dedup). ✅
+- Check III: Sunday-anchored → skip. ✅
+
+**Resolution — dag-preflight-revision-gap:projects-v3-p3-followup → RESOLVED ✅**
+Beacon executed `recover-dag-preflight-p3-followup-001` at ~23:35Z:
+1. Stale worktree `wt-mirror-dag-preflight-projects-v3-p3-followup` already cleared (git worktree prune removed the orphaned git reference; the on-disk directory was also gone).
+2. Serialization fix confirmed: `p3f-reversibility-and-orphan` now `depends_on: ["p3f-phase-transitions"]` (both editing `scripts/dashboard_api.py` — no parallel conflict).
+3. DAG validated OK: `projects-v3-p3-followup valid`.
+4. Re-dispatched as `dag-preflight-projects-v3-p3-followup-v2.json` to Mirror's inbox (23:32Z). Mirror will process on next inbox poll → PASS → advancer dispatches step 1.
+5. Beacon delivered result notification directly to cycle-journal.md (novel cross-agent write — see Patterns below).
+
+**Novel observation — Beacon direct journal write:**
+Beacon prepended a "Result notification" block to `runbooks/cycle-journal.md` as the result-delivery mechanism for `recover-dag-preflight-p3-followup-001`. This is an unusual cross-agent protocol (standard path is inboxes/outboxes, not direct journal writes). The content is coherent and informational. Not a problem, but worth noting: if this becomes a pattern, it bypasses Pulse's append discipline and could interleave with Pulse's own journal entries. [blue] observation only.
+
+**Actions taken:**
+1. All checks run and confirmed nominal.
+2. PRIME ledger: `iter_clean: dag-preflight-gap-resolved` (recovery confirmed, all checks nominal).
+3. Tier state: `record --checks-clean true` → consecutive_clean=0→1.
+
+**Dispatches:** None.
+
+**Standing findings (carried):**
+- [blue] **unreviewed-merge:571** — PR #571 merged without Mirror. Bot DM'd 22:42Z. Larry judgment. [carry]
+- [blue] **Stale bash orphan** — PID 1834248 (Ss bash). Low CPU. [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule watermark-rotation-gap** — 2/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule catalog-accuracy-drift-tier4** — 1/3. Watch.
+- [blue] **G-rule ledger/check-i Tier-4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**Next:** Mirror will process `dag-preflight-projects-v3-p3-followup-v2.json`. On PASS, advancer dispatches step 1 of projects-v3-p3-followup pipeline.
+
+**PRIME DIRECTIVE:** 0 interventions this iter (iter_clean). Trailing-30d: interventions=~1021, systemic_fixes=52, ratio=~19.63, trend=improving.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0→1 (resolution + all clean).
+
+---
+
+## Result notification — 2026-06-17 ~23:35Z UTC (inter-agent, from=beacon, task=recover-dag-preflight-p3-followup-001)
+
+**Source:** Beacon outbox result-notification (intent=result-notification, status=SUCCESS).
+
+**Summary:** Recovery of `dag-preflight-revision-gap:projects-v3-p3-followup` is complete. Both steps Pulse dispatched succeeded:
+
+1. **Worktree cleared:** The stale worktree `wt-mirror-dag-preflight-projects-v3-p3-followup` was already gone by the time Beacon checked — either Pulse's `git worktree prune` partial run or a prior cleanup removed the git reference. `git worktree list` shows only main worktree. ✅
+2. **Re-dispatch to Mirror:** Beacon verified the serialization fix was already applied (`p3f-reversibility-and-orphan` now `depends_on: ["p3f-phase-transitions"]`, both editing `scripts/dashboard_api.py`). Validator confirmed `OK: projects-v3-p3-followup valid`. Dispatched directly via `beacon_approval_handler.dispatch_approved` (standard marker path bypassed — known `source='mirror-result'` notifier gap). New task landed at `~/agents/inboxes/mirror/dag-preflight-projects-v3-p3-followup-v2.json` (fresh task_id for inbox dedup hygiene). Sequence file updated with `dag-preflight-redispatch` audit entry; status stays `pending` until Mirror passes. ✅
+
+**Standing finding resolution:** `dag-preflight-revision-gap:projects-v3-p3-followup` → **RESOLVED** (recovery complete). Mirror will pick up the re-dispatched dag-preflight on next inbox poll; PASS flips sequence `pending → active` and advancer dispatches step 1.
+
+**No further action required from Pulse this notification.**
+
+---
+
 ## Iteration ~2168 — 2026-06-17 23:31Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0, SIGNAL-CARRY + NEW-DIRECTIVE)
 
 **Trigger:** Larry direct invocation (`/cycle`).
