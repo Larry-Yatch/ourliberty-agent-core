@@ -1511,5 +1511,199 @@ class RunOnceTest(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+class RunOnceMissionNarratorTest(unittest.TestCase):
+    """projects-v3 P2 Contract A: the GC-tick folds a funnel-mission Narrator
+    sweep (orphan + suggested) into the SAME single missions.json write+commit —
+    the healer stays the sole committer, lost-update safe, no spawn on dry-run."""
+
+    def test_mission_sweep_briefs_and_writes_before_commit(self):
+        # LIVE mode (use_llm=True): the sweep mutates the in-memory registry and
+        # the healer's SINGLE write lands the briefing on disk.
+        now = datetime(2026, 6, 17, 12, 0, tzinfo=timezone.utc)
+        tmp = tempfile.mkdtemp(prefix='run-once-mission-narrate-')
+        try:
+            core = Path(tmp) / 'agent-core'
+            (core / 'agents' / 'beacon').mkdir(parents=True)
+            (core / h.CAPTURES_REL).write_text(
+                json.dumps({'schema_version': 1, 'captures': []}) + '\n')
+            (core / h.MISSIONS_REL).write_text(json.dumps({
+                'schema_version': 1,
+                'missions': [{'id': 'm-a', 'phase': 'proposed',
+                              'name': 'Reviewer bot bug',
+                              'proposed_by': 'heal_orphan_autoregister'}],
+            }) + '\n')
+
+            calls = {}
+
+            def fake_mission_author(registry, *, now=None, use_llm=True, **_):
+                calls['use_llm'] = use_llm
+                n = 0
+                for m in registry.get('missions', []):
+                    if m.get('phase') == 'proposed' and 'briefing' not in m:
+                        m['briefing'] = {'what': 'w', 'why': 'y', 'suggest': 's'}
+                        m['risk'] = 'medium'
+                        n += 1
+                return (n, 0)
+
+            import larry_alerts
+            with mock.patch.object(h, 'load_repo_paths',
+                                   return_value={'ourliberty-agent-core': core}), \
+                    mock.patch.object(larry_alerts, 'append_alert'):
+                rc = h.run_once(
+                    dry_run=False,
+                    emit_fn=lambda **_: True,
+                    events_fetcher=lambda: [],
+                    author_fn=lambda registry, **_: (0, 0),  # skip capture narrator
+                    mission_author_fn=fake_mission_author,
+                    mission_probe_fn=lambda tid: 'open',
+                    now=now,
+                )
+            self.assertEqual(rc, 0)
+            self.assertTrue(calls['use_llm'])
+            reg = json.loads((core / h.MISSIONS_REL).read_text())
+            self.assertEqual(reg['missions'][0]['briefing'],
+                             {'what': 'w', 'why': 'y', 'suggest': 's'})
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_concurrent_mission_change_during_sweep_survives(self):
+        # § 2 lost-update guard for missions: a dashboard accept/drop landing on
+        # disk DURING the slow sweep must survive the healer's write. The healer
+        # re-reads fresh and applies only its own per-mission briefing deltas.
+        now = datetime(2026, 6, 17, 12, 0, tzinfo=timezone.utc)
+        tmp = tempfile.mkdtemp(prefix='run-once-mission-lost-update-')
+        try:
+            core = Path(tmp) / 'agent-core'
+            (core / 'agents' / 'beacon').mkdir(parents=True)
+            (core / h.CAPTURES_REL).write_text(
+                json.dumps({'schema_version': 1, 'captures': []}) + '\n')
+            miss_file = core / h.MISSIONS_REL
+            miss_file.write_text(json.dumps({
+                'schema_version': 1,
+                'missions': [{'id': 'm-a', 'phase': 'proposed',
+                              'name': 'Reviewer bot bug',
+                              'proposed_by': 'beacon'}],
+            }) + '\n')
+
+            def fake_mission_author(registry, *, now=None, use_llm=True, **_):
+                # A separate process (dashboard) ingests a new proposed mission
+                # AND flips m-a's phase on disk mid-sweep; brief m-a in memory.
+                disk = json.loads(miss_file.read_text())
+                disk['missions'][0]['phase'] = 'drafting'  # dashboard accepted it
+                disk['missions'].append({'id': 'm-b', 'phase': 'proposed',
+                                         'name': 'New suggestion',
+                                         'proposed_by': 'medic'})
+                miss_file.write_text(json.dumps(disk) + '\n')
+                for m in registry.get('missions', []):
+                    if m.get('id') == 'm-a':
+                        m['briefing'] = {'what': 'w', 'why': 'y', 'suggest': 's'}
+                return (1, 0)
+
+            import larry_alerts
+            with mock.patch.object(h, 'load_repo_paths',
+                                   return_value={'ourliberty-agent-core': core}), \
+                    mock.patch.object(larry_alerts, 'append_alert'):
+                rc = h.run_once(
+                    dry_run=False,
+                    emit_fn=lambda **_: True,
+                    events_fetcher=lambda: [],
+                    author_fn=lambda registry, **_: (0, 0),
+                    mission_author_fn=fake_mission_author,
+                    mission_probe_fn=lambda tid: 'open',
+                    now=now,
+                )
+            self.assertEqual(rc, 0)
+            reg = json.loads(miss_file.read_text())
+            by_id = {m['id']: m for m in reg['missions']}
+            # the concurrently-ingested mission survived the healer's write
+            self.assertEqual(set(by_id), {'m-a', 'm-b'})
+            # the dashboard's concurrent phase change survived (not clobbered)
+            self.assertEqual(by_id['m-a']['phase'], 'drafting')
+            # our briefing delta still merged onto m-a
+            self.assertEqual(by_id['m-a']['briefing'],
+                             {'what': 'w', 'why': 'y', 'suggest': 's'})
+            # the untouched concurrent mission was not mutated by the healer
+            self.assertNotIn('briefing', by_id['m-b'])
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_dry_run_mission_sweep_uses_no_llm_and_writes_nothing(self):
+        now = datetime(2026, 6, 17, 12, 0, tzinfo=timezone.utc)
+        tmp = tempfile.mkdtemp(prefix='run-once-mission-narrate-dry-')
+        try:
+            core = Path(tmp) / 'agent-core'
+            (core / 'agents' / 'beacon').mkdir(parents=True)
+            (core / h.CAPTURES_REL).write_text(
+                json.dumps({'schema_version': 1, 'captures': []}) + '\n')
+            (core / h.MISSIONS_REL).write_text(json.dumps({
+                'schema_version': 1,
+                'missions': [{'id': 'm-a', 'phase': 'proposed',
+                              'name': 'Reviewer bot bug'}],
+            }) + '\n')
+            before = (core / h.MISSIONS_REL).read_text()
+
+            calls = {}
+
+            def fake_mission_author(registry, *, now=None, use_llm=True, **_):
+                calls['use_llm'] = use_llm
+                for m in registry.get('missions', []):
+                    m['briefing'] = {'what': 'w', 'why': 'y', 'suggest': 's'}
+                return (1, 0)
+
+            with mock.patch.object(h, 'load_repo_paths',
+                                   return_value={'ourliberty-agent-core': core}):
+                rc = h.run_once(
+                    dry_run=True,
+                    emit_fn=lambda **_: True,
+                    events_fetcher=lambda: [],
+                    author_fn=lambda registry, **_: (0, 0),
+                    mission_author_fn=fake_mission_author,
+                    mission_probe_fn=lambda tid: 'open',
+                    now=now,
+                )
+            self.assertEqual(rc, 0)
+            self.assertFalse(calls['use_llm'])  # dry-run → deterministic raw, no spawn
+            self.assertEqual((core / h.MISSIONS_REL).read_text(), before)
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_default_mission_author_fn_resolves_to_narrator_sweep(self):
+        # No mission_author_fn injected → run_once lazily binds the real
+        # missions_narrator.author_missions_in_registry (no circular import).
+        import missions_narrator as mn_mod
+        now = datetime(2026, 6, 17, 12, 0, tzinfo=timezone.utc)
+        tmp = tempfile.mkdtemp(prefix='run-once-mission-default-author-')
+        try:
+            core = Path(tmp) / 'agent-core'
+            (core / 'agents' / 'beacon').mkdir(parents=True)
+            (core / h.CAPTURES_REL).write_text(
+                json.dumps({'schema_version': 1, 'captures': []}) + '\n')
+            (core / h.MISSIONS_REL).write_text(json.dumps({
+                'schema_version': 1, 'missions': [],
+            }) + '\n')
+            import larry_alerts
+            with mock.patch.object(h, 'load_repo_paths',
+                                   return_value={'ourliberty-agent-core': core}), \
+                    mock.patch.object(larry_alerts, 'append_alert'), \
+                    mock.patch.object(mn_mod, 'author_missions_in_registry',
+                                      return_value=(0, 0)) as spy:
+                rc = h.run_once(
+                    dry_run=False,
+                    emit_fn=lambda **_: True,
+                    events_fetcher=lambda: [],
+                    author_fn=lambda registry, **_: (0, 0),
+                    mission_probe_fn=lambda tid: 'open',
+                    now=now,
+                )
+            self.assertEqual(rc, 0)
+            spy.assert_called_once()
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 if __name__ == '__main__':
     unittest.main()

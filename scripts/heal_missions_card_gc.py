@@ -589,28 +589,29 @@ def atomic_write_captures(path: Path, registry: dict[str, Any]) -> None:
     _atomic_write_json(path, registry)
 
 
-def _merge_capture_deltas(fresh: dict[str, Any],
-                          before_by_id: dict[str, dict[str, Any]],
-                          worked: dict[str, Any]) -> int:
-    """Apply only the per-capture field changes THIS tick made (``worked`` vs the
+def _merge_registry_deltas(fresh: dict[str, Any],
+                           before_by_id: dict[str, dict[str, Any]],
+                           worked: dict[str, Any], *, list_key: str) -> int:
+    """Apply only the per-item field changes THIS tick made (``worked`` vs the
     read-time snapshot ``before_by_id``) onto a freshly re-read ``fresh`` registry,
-    matching by capture id. Returns the count of captures whose delta was applied.
+    matching items in ``fresh[list_key]`` by ``id``. Returns the count of items
+    whose delta was applied.
 
     Why field-level, not whole-registry replace: the Narrator sweep can span
-    minutes of LLM round-trips, during which the dashboard (a separate process)
-    may ingest new captures or change a capture's state. Replacing the whole file
-    with the stale in-memory copy would silently lose those writes (§ 2 lost-update
-    class). By touching ONLY the keys we changed — never ``state``/``snooze_until``/
-    ``last_touched``, never a capture we didn't author, and never a capture missing
-    from the fresh file — concurrent dashboard writes survive. A capture the
-    dashboard moved out of ``parked`` mid-briefing keeps its new state and merely
-    carries a now-stale briefing that ``needs_briefing`` regenerates next tick."""
+    minutes of LLM round-trips, during which a separate process (the dashboard
+    API, the orphan-autoregister drain) may ingest new items or change an item's
+    state. Replacing the whole file with the stale in-memory copy would silently
+    lose those writes (§ 2 lost-update class). By touching ONLY the keys we
+    changed — never an item we didn't author, and never an item missing from the
+    fresh file — concurrent writes survive. An item another writer moved out from
+    under us mid-briefing keeps its new state and merely carries a now-stale
+    briefing that the next sweep regenerates."""
     fresh_by_id = {
-        c['id']: c for c in fresh.get('captures', [])
+        c['id']: c for c in fresh.get(list_key, [])
         if isinstance(c, dict) and c.get('id')
     }
     applied = 0
-    for cap in worked.get('captures', []):
+    for cap in worked.get(list_key, []):
         if not isinstance(cap, dict):
             continue
         cid = cap.get('id')
@@ -633,6 +634,16 @@ def _merge_capture_deltas(fresh: dict[str, Any],
             target.pop(k, None)
         applied += 1
     return applied
+
+
+def _merge_capture_deltas(fresh: dict[str, Any],
+                          before_by_id: dict[str, dict[str, Any]],
+                          worked: dict[str, Any]) -> int:
+    """Capture-registry view of `_merge_registry_deltas` (matches by capture id on
+    the ``captures`` list). A capture the dashboard moved out of ``parked``
+    mid-briefing keeps its new state and merely carries a now-stale briefing that
+    ``needs_briefing`` regenerates next tick."""
+    return _merge_registry_deltas(fresh, before_by_id, worked, list_key='captures')
 
 
 # ---------- missions phase reconciliation (terminal-state spec § 3.3) -------
@@ -1312,6 +1323,7 @@ def _emit_summary(retire: RetireResult, aged: list[str], commit_status: str,
                   missions: Optional[MissionReconcileResult] = None,
                   missions_commit_status: str = 'nothing',
                   briefed: int = 0, deferred: int = 0,
+                  mission_briefed: int = 0, mission_deferred: int = 0,
                   completed: Optional[CompletionResult] = None,
                   failed: Optional[FailureResult] = None,
                   deferred_actions: Optional[DeferredActionResult] = None) -> None:
@@ -1342,7 +1354,10 @@ def _emit_summary(retire: RetireResult, aged: list[str], commit_status: str,
     if missions is not None:
         ship_verb = 'would ship' if dry_run else 'shipped'
         shipped_ids = [mid for mid, _ in missions.shipped]
+        m_brief_verb = 'would brief' if dry_run else 'briefed'
         summary += (f'; {ship_verb} {len(missions.shipped)} mission(s) {shipped_ids}; '
+                    f'{m_brief_verb} {mission_briefed} funnel mission(s), '
+                    f'deferred {mission_deferred}; '
                     f'missions-commit={missions_commit_status}')
     if retire.emit_failures:
         summary += f'; {len(retire.emit_failures)} emit-failure(s) {retire.emit_failures}'
@@ -1379,6 +1394,7 @@ def run_once(*, dry_run: bool,
              events_fetcher: Optional[Callable[[], Optional[list[dict[str, Any]]]]] = None,
              mission_probe_fn: Optional[Callable[[str], str]] = None,
              author_fn: Optional[Callable[..., tuple[int, int]]] = None,
+             mission_author_fn: Optional[Callable[..., tuple[int, int]]] = None,
              completion_verify_fn: Optional[Callable[[str, Optional[str]], tuple[bool, Optional[str]]]] = None,
              completion_closeout_fn: Optional[Callable[[dict[str, Any], Optional[str], datetime], dict[str, Any]]] = None,
              failure_fn: Optional[Callable[[str], Optional[str]]] = None,
@@ -1583,8 +1599,16 @@ def run_once(*, dry_run: bool,
                         log(f'commit+push raised: {type(e).__name__}: {e}')
                         commit_status = 'push-failed'
 
-    # --- phase 4: reconcile shipped mission phases (terminal-state § 3.3) ---
+    # --- phase 4: reconcile shipped mission phases (terminal-state § 3.3) +
+    # author the funnel meaning layer (projects-v3 P2 Contract A). The Narrator
+    # mission sweep briefs proposed orphan/suggested missions in-memory BEFORE the
+    # single missions.json write+commit, so the GC healer stays the SOLE
+    # missions.json committer (single-committer invariant): the narrator only
+    # mutates the in-memory registry; the one atomic write + git commit below
+    # batches the reconcile and the briefing deltas together. ---
     missions = MissionReconcileResult()
+    mission_briefed = 0
+    mission_deferred = 0
     missions_commit_status = 'nothing'
     miss_path = missions_path(repo_paths)
     if miss_path is None:
@@ -1592,14 +1616,53 @@ def run_once(*, dry_run: bool,
     else:
         registry = read_missions_registry(miss_path)
         if registry is not None:
+            # Read-time snapshot (shallow per mission) so the pre-write merge can
+            # apply ONLY this tick's field deltas onto a fresh re-read (§ 2
+            # lost-update guard — same shape as the captures path above).
+            before_missions_by_id = {
+                m['id']: dict(m)
+                for m in registry.get('missions', [])
+                if isinstance(m, dict) and m.get('id')
+            }
             try:
                 missions = reconcile_mission_phases(
                     registry, now, probe_fn=mission_probe_fn, dry_run=dry_run)
-                if missions.shipped and not dry_run:
-                    _atomic_write_json(miss_path, registry)
             except Exception as e:  # noqa: BLE001 — fail-safe: report, never corrupt
                 log(f'mission-reconcile raised: {type(e).__name__}: {e}')
                 missions = MissionReconcileResult()
+            if mission_author_fn is None:
+                from missions_narrator import author_missions_in_registry  # noqa: PLC0415
+                mission_author_fn = author_missions_in_registry
+            try:
+                # use_llm only in LIVE mode; a dry-run uses the deterministic raw
+                # briefing (no claude spawn, no cost) and writes nothing.
+                mission_briefed, mission_deferred = mission_author_fn(
+                    registry, now=now, use_llm=not dry_run)
+            except Exception as e:  # noqa: BLE001 — fail-safe: never abort the tick
+                log(f'narrator mission sweep raised: {type(e).__name__}: {e}')
+                mission_briefed, mission_deferred = 0, 0
+            if (missions.shipped or mission_briefed) and not dry_run:
+                # Lost-update guard (mirrors the captures path): the mission sweep
+                # can hold the registry for minutes (one claude spawn per pending
+                # mission). Re-read fresh and apply only this tick's per-mission
+                # field deltas by id so a concurrent dashboard accept/drop or the
+                # orphan-autoregister drain landing mid-sweep isn't clobbered by
+                # the stale in-memory copy. Single git-committer invariant is
+                # unchanged: still the sole atomic write + the sole commit below.
+                try:
+                    fresh = read_missions_registry(miss_path)
+                    if fresh is None:
+                        log('missions.json re-read malformed before write — '
+                            'skipping write this tick (avoids clobbering with stale)')
+                    else:
+                        merged = _merge_registry_deltas(
+                            fresh, before_missions_by_id, registry,
+                            list_key='missions')
+                        _atomic_write_json(miss_path, fresh)
+                        log(f'missions.json write: merged {merged} mission delta(s) '
+                            'onto a fresh re-read (lost-update guard)')
+                except Exception as e:  # noqa: BLE001 — fail-safe
+                    log(f'missions.json write raised: {type(e).__name__}: {e}')
             # Single-committer durability (Contract D): commit ANY pending
             # missions.json delta on disk — our own reconcile write above OR a
             # delta a separate machine-owned cleanup left uncommitted (e.g. a
@@ -1622,7 +1685,9 @@ def run_once(*, dry_run: bool,
 
     _emit_summary(retire, aged, commit_status, dry_run,
                   missions=missions, missions_commit_status=missions_commit_status,
-                  briefed=briefed, deferred=deferred, completed=completed,
+                  briefed=briefed, deferred=deferred,
+                  mission_briefed=mission_briefed, mission_deferred=mission_deferred,
+                  completed=completed,
                   failed=failed, deferred_actions=deferred_actions)
     return 0
 
