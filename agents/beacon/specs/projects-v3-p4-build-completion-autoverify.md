@@ -54,26 +54,36 @@ On completion the executor runs them, classifying each: **`verify` (read-only) a
 ### C — Verified go-live report in the DM
 The completion DM states, in plain language: **done · shipped (PRs) · auto-ran (cleanups/restarts + result) · verified (checks passed/failed) · awaiting your tap (any gated step)**. If a verify check fails, the DM says so loudly (blocked-on-you doorbell).
 
+### D — Cleanups persist via their owner (no sync jam)  *(added after the P1 drain jammed sync, 2026-06-16)*
+An auto-run cleanup (B) that writes a machine-owned file (`missions.json`, `captures.json`) **must leave it committed by its sole owner** — it may NOT leave the working tree dirty. Today the GC healer (`heal_missions_card_gc`) commits `captures.json` and only commits `missions.json` when *it* ships a phase, so an externally-written `missions.json` delta sits uncommitted → `ourliberty-sync` refuses (dirty tree) → **all merges stop reaching the team** (exactly the P1 incident). Fix: **the owner (GC healer) commits ANY pending `missions.json` delta on its tick** (single committer preserved — no other writer commits it), so a cleanup's output is persisted within one tick. Defense-in-depth: **`sync_agent_core.sh` tolerates machine-owned-file dirt** (skip/stash the known machine files rather than hard-failing the whole sync) — a non-owner tolerating owner dirt, per the single-committer invariant. Either alone closes the jam; do both.
+
 ## 5. Risks & guardrails
 - **Never auto-execute irreversible/prod-risky steps** — those go through `human-approval-gate` (honors the standing "explicit go for prod" rule); only fail-safe idempotent steps auto-run.
 - **`outbox_notifier` is high-traffic (10 deps)** — the DM change must be surgical + unit-tested; do not regress existing step DMs.
 - **Exactly-once completion DM** — guard against double-fire on re-detect / advancer re-tick.
 - **Auto-run cleanups must be idempotent + fail-safe** — re-running on a re-detect is a no-op; the drain already meets this.
 - **Don't block the build** — a verify/cleanup failure reports loudly but never corrupts the sequence record.
+- **A cleanup must never jam sync** (Contract D) — its machine-file output is committed by the owner within one tick; sync tolerates machine-owned dirt. This is the P1 failure mode; it must not recur.
+- **Single-committer preserved** — D centralizes the commit in the owner (GC healer); no second committer is introduced (no direct pushes of machine files).
 
 ## 6. Done-gate
 - A sequence finishing emits one plain-language completion DM to Larry within a short cycle of the last merge (no more silent done-but-unnoticed).
 - `post_merge` cleanups auto-run (proven: a build that ships a drain runs it automatically); risky steps surface as a one-tap, not silence.
 - The DM reports verified go-live (shipped / auto-ran / verified / awaiting-tap).
-- Tests cover A–C; the `outbox_notifier` change regresses nothing.
+- **A machine-file-writing cleanup leaves a clean tree within one tick and never jams sync** (Contract D) — provable by running the drain and confirming `ourliberty-sync` still succeeds.
+- Tests cover A–D; the `outbox_notifier` change regresses nothing.
 - Proven end-to-end on a real sequence completion.
 
 ## 7. Build sequence (recommended — finalize via DAG-preflight)
-Single repo. **Serialization hazard:** both steps touch `outbox_notifier.py` / the advancer / `sequence_shortcut_helpers` — serialize them.
+Single repo. **Serialization hazard:** these steps touch `outbox_notifier.py` / the advancer / `sequence_shortcut_helpers` / the GC healer — serialize them.
 
 | Step | Contract | File(s) | depends_on |
 |---|---|---|---|
 | **p4-complete-signal** | A | `scripts/outbox_notifier.py`, `scripts/sequence_shortcut_helpers.py`, `scripts/larry_alerts.py` | — |
-| **p4-postmerge-exec** | B + C | `scripts/build_sequence_advancer.py`, `scripts/sequence_shortcut_helpers.py` (+ `human-approval-gate`) | p4-complete-signal |
+| **p4-cleanup-committer** | D | `scripts/heal_missions_card_gc.py`, `scripts/sync_agent_core.sh` | — |
+| **p4-postmerge-exec** | B + C | `scripts/build_sequence_advancer.py`, `scripts/sequence_shortcut_helpers.py` (+ `human-approval-gate`) | p4-complete-signal, p4-cleanup-committer |
 
 Each step ends at its done-gate (tests green + the contract demonstrably holds). Mirror's DAG-preflight finalizes ordering.
+
+## 8. After P4 ships
+**Re-run the P1 board drain** (`scripts/heal_missions_board_drain.py --apply`) to restore the cleanup discarded during the 2026-06-16 sync-jam incident — with Contract D live it now persists cleanly (the GC owner commits the `missions.json` delta, no jam). Expected: drop 4 terminal orphans + archive 9 legacy drafts (idempotent — identical to the dry-run). Ideally driven by P4's own `post_merge` auto-run as the first dogfood of the new machinery.
