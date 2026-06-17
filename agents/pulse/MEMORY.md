@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-17 03:28Z UTC (Iter ~2093, Tier 3→1, consecutive_clean=1→0, DRIFT/FIXED)
+
+**Iter ~2093 summary:** ⚠️ Drift (auto-fixed). 1 new alert (L1070 outbox-notifier/sequence-complete:projects-v3-p4 Tier-4 novel; bot DM'd Larry via route=escalate; no Pulse DM; G-rule 1/3 new). Check A: repo behind 1 commit (PR #556 "feat: declarative post_merge executor + verified go-live DM", merged 03:17:42Z) → fast-forwarded cdf86fe7→94fe5ffc. All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3734446, dashboard_api 3734769). Repo HEAD=94fe5ffc=origin/main (clean, post-ff). Last sync 03:09:56Z (no-change, ~19 min). No stalls. pending=0. Credential rotation: all clear. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs.** projects-v3-p1 SEQUENCE COMPLETE ✅. **projects-v3-p4 SEQUENCE COMPLETE ✅ (all 3/3 PRs: #554, #555, #556 MERGED).** Check I skipped (artifact exists for 2026-06-17). PRIME ratio=20.47 (1003 interventions, 49 systemic fixes). **Tier 3→1, consecutive_clean=1→0.**
+
 ## Status snapshot — updated 2026-06-17 02:54Z UTC (Iter ~2092, Tier 3, consecutive_clean=0→1, NOMINAL)
 
 **Iter ~2092 summary:** ✅ Nominal. 4 Tier-3 alerts (L1066-L1069 heal-stale-daemon-code auto-restarts for chain_event/outbox/beacon/dashboard following PR #554/555 code deploy at 02:24Z, silenced). All 5 daemons alive with NEW PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697 (unchanged), outbox_notifier 3734446, dashboard_api 3734769. Repo HEAD=ab8353aa=origin/main (clean). Last sync 02:09:42Z (~41 min). No stalls. pending=0. Credential rotation: all clear. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs.** projects-v3-p1 SEQUENCE COMPLETE ✅. **projects-v3-p4 SEQUENCE COMPLETE ✅:** PR #554 (p4-complete-signal) MERGED + PR #555 (p4-cleanup-committer) MERGED. GC healer Contract D live (ab8353aa autoregister commit). Check I skipped (artifact exists for 2026-06-17). PRIME ratio=20.43 (1001 interventions, 49 systemic fixes). **Tier 3, consecutive_clean=0→1.**
@@ -245,6 +249,7 @@
 | G-rule merge_conflict_manual_rebase-tier4 | [blue] **1/3** — outbox-notifier DMs Larry directly via chat_id; Pulse should NOT double-DM. | Watch; dispatch to Beacon at 3/3 for Tier-3 translation |
 | G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4 | [blue] **1/3** — heal-pipeline-stall fires Tier-4; medic DMs directly; Pulse no-DM. | Watch; dispatch to Beacon at 3/3 for Tier-3 translation |
 | Check I 2026-06-15 | [blue] 1 proposal dispatched iter ~1899, Beacon processed | Beacon spec in progress |
+| G-rule sequence-complete-tier4 | [blue] **1/3** (NEW iter ~2093) — outbox-notifier sequence-complete:* alerts classify Tier-4 (novel); bot delivers via route=escalate; Pulse no-DM. | Watch; propose Tier-3 translation to Beacon at 3/3 |
 | G-rule catalog-accuracy-drift-tier4 | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule dirty-tree-beacon-data-files-tier4 | [blue] **1/3** (NEW iter ~2085) — pulse-self-escalates dirty tree (Beacon runtime files); GC healer auto-resolves; Tier-4 (novel). | Watch; propose Tier-3 translation at 3/3 |
 | G-rule ledger/check-i Tier-4 | [blue] **2/3** | Watch; dispatch to Beacon at 3/3 |
@@ -261,6 +266,6 @@
 | **G-rule watermark-rotation-gap** | [blue] **2/3** (NEW iter ~2035) — larry-alerts-retention.py compacts file, watermark left > file length; new alerts missed until gap detected + repaired. Prior: iter ~1936. | Watch; dispatch to Beacon at 3/3 for auto-detect/repair fix in cycle startup |
 | Phase S ALL 6/6 MERGED ✅ | [blue] s-1 PR#541 ✅, s-2 PR#542 ✅, s-3 PR#543 ✅, s-4 PR#544 ✅, s-5 PR#58 ourliberty-dashboard ✅, s-6-drain PR#545 ✅ (10:52:38Z). missions-v2-phase-s SEQUENCE COMPLETE. | DONE. |
 | PR #497 CLOSED ✅ | [blue] Larry closed manually 2026-06-16T11:54:52Z. RESOLVED. | DONE. |
-| projects-v3-p4 COMPLETE ✅ | [blue] p4-complete-signal PR#554 MERGED, p4-cleanup-committer PR#555 MERGED (85859358, 2026-06-17). GC healer Contract D live (autoregister commit ab8353aa). | DONE. |
+| projects-v3-p4 COMPLETE ✅ | [blue] PR#554 (p4-complete-signal) + PR#555 (p4-cleanup-committer) + **PR#556 (p4-postmerge-exec, 03:17:42Z)** ALL MERGED. GC healer Contract D live (ab8353aa). outbox-notifier sent sequence-complete DM 03:17:44Z. | DONE. All 3/3. |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap. outbox-notifier also drops regular approval_request markers from Beacon inter-agent sessions (observed iter ~2020: both routing-signal and approval_request dropped in same 5-min window). | DAG markers and scope-decision markers still fall through; recover manually |
 | Stale bash orphans | [blue] PIDs 1834248 (17d+) + 2605007 (1d+). Ss, low CPU. | Carry |

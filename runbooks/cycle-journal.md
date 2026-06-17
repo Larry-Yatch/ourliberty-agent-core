@@ -4,6 +4,61 @@
 
 ---
 
+## Iteration ~2093 — 2026-06-17 03:28Z UTC (interactive, /loop /cycle, Tier 3→1, consecutive_clean=1→0, DRIFT/FIXED)
+
+**Trigger:** Larry direct invocation (`/loop /cycle`).
+
+**Health:** ⚠️ Drift (auto-fixed). Repo behind by 1 commit (PR #556 p4-postmerge-exec merged 03:17:42Z post-iter ~2092); fast-forwarded. projects-v3-p4 NOW COMPLETE — all 3 PRs merged. No DM to Larry.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** 0 open PRs. ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** 0 open PRs. ✅
+- **projects-v3-p1 SEQUENCE COMPLETE ✅ CONFIRMED:** 0 open PRs. ✅
+- **projects-v3-p4 COMPLETE ✅ CONFIRMED:** All 3 steps merged: p4-complete-signal PR #554 ✅, p4-cleanup-committer PR #555 ✅, p4-postmerge-exec PR #556 ✅ (merged 03:17:42Z, "feat: declarative post_merge executor + verified go-live DM"). outbox-notifier sent sequence-complete DM to Larry at 03:17:44Z. ✅
+- **Daemons same PIDs ✅:** beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), outbox_notifier 3734446 (Ss), dashboard_api 3734769 (Ssl). All 5 alive. ✅
+
+**Check 0 — Alert triage:** Watermark=1069 entering; file=1070 lines. **1 new alert (L1070).** source=outbox-notifier, route=escalate, subject=sequence-complete:projects-v3-p4, ts=03:17:44Z. Triage helper: **Tier 4** (novel, no registry template). Bot already DM'd Larry via route=escalate. No Pulse double-DM. Journal note only. Watermark advanced to 1070. G-rule: sequence-complete:* Tier-4 → **1/3** (new).
+
+**Check 1 — Log noise:** outbox-notifier.log tail: No WARN/ERROR in recent window. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message: `go` at 19:16:04 MDT (01:16Z) for dag-preflight-projects-v3-p4. Bot restarted 02:24:30Z post-deploy. No new messages. G-rule telegram-409-burst **2/3** unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → `no stalls detected`. All FORGE_NO_PR_SKIP entries are previously-merged tasks (pr_exists, normal). ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-17T03:24:29Z, age≈4 min at check time. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=cdf86fe7, behind origin/main by 1 commit (94fe5ffc "feat: declarative post_merge executor + verified go-live DM (#556)"). ⚠️ **Drift — auto-fixed: fast-forwarded cdf86fe7→94fe5ffc.** PR #556 merged 03:17:42Z (post-iter ~2092; first visible this iter). Tier reset 3→1.
+
+**Check B — Sync health:** Last sync 2026-06-17T03:09:56Z, status=no-change, age≈19 min at check time. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3734671 (Ss) ✅, chain_event_shipper 3734305 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, outbox_notifier 3734446 (Ss) ✅, dashboard_api 3734769 (Ssl) ✅. All 5 alive, same PIDs as iter ~2092. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open ✅. ourliberty-dashboard: 0 ✅. ourliberty-graph: 0 ✅. **projects-v3-p4 COMPLETE** — all 3 steps merged (#554, #555, #556). ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Conditional checks (Wednesday 2026-06-17 UTC, weekday=2 ∈ {0,2,4,6}):**
+- Check I: artifact `pulse-check-i/check-i-2026-06-17.json` EXISTS → SKIP (same-day dedup).
+- Check III: fires Sunday → skip.
+
+**G-rule tracking:**
+- G-rule **sequence-complete:* Tier-4** → **1/3** (new): source=outbox-notifier sequence-complete alerts classify Tier-4 (novel); bot delivers via route=escalate; Pulse no-DM. Watch; propose Tier-3 translation to Beacon at 3/3.
+- All other G-rule counts unchanged from iter ~2092.
+
+**Actions taken:**
+1. Check A: Fast-forwarded cdf86fe7→94fe5ffc (PR #556 p4-postmerge-exec). Logged to cycle-actions.jsonl.
+2. Check 0: L1070 claimed + triaged Tier-4 (novel, sequence-complete). Watermark advanced to 1070.
+3. PRIME ledger: 2 intervention rows appended (ff-main-when-behind, alert-triage).
+4. Tier state: `record --checks-clean false` → tier reset 3→1, consecutive_clean=0.
+
+**PRIME ratio:** 20.47 (1003 interventions, 49 systemic fixes). Trend: improving.
+
+**Dispatches:** None.
+
+---
+
 ## Iteration ~2092 — 2026-06-17 02:54Z UTC (interactive, /cycle, Tier 3, consecutive_clean=0→1, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).
