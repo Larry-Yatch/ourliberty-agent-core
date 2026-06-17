@@ -4,6 +4,74 @@
 
 ---
 
+## Iteration ~2139 — 2026-06-17 15:00Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0→1, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 2 Tier-3 alerts silenced (expected code-deploy restarts). No DM to Larry.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** No regression. ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** No regression. ✅
+- **projects-v3-p1/p4/p2/p2-followup ALL SEQUENCE COMPLETE ✅ CONFIRMED:** heal_pipeline_stall --dry-run → 0 stalls. ✅
+- **G-rule sequence-complete-tier4 COMPLETE ✅ CONFIRMED:** PR #566 merged 13:39:39Z, fix live. ✅
+- **G-rule mirror-malformed-verdict-marker COMPLETE ✅ CONFIRMED:** PR #565 merged 13:27:40Z, fix live. ✅
+- **Daemons ✅:** All 5 alive. outbox_notifier + dashboard_api **NEW PIDs** (3964779 / 3964550) after heal-stale-daemon-code auto-restart at 14:58Z to deploy PR #567 code. beacon 3734671, chain-event 3734305, inbox-watcher 3434697 unchanged. ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 998, "file_length": 998}` (no repair needed at cycle start). Post-checks: file grew to 1000 lines (2 new alerts L999-L1000). Triaged via helper:
+- L999: `heal-stale-daemon-code` / `auto-restarted:ourliberty-dashboard-api.service` (14:58:20Z, PR #567 code deploy) → **Tier-3 silence** (known pattern, route=digest). ✅
+- L1000: `heal-stale-daemon-code` / `auto-restarted:ourliberty-outbox-notifier.service` (14:58:26Z, PR #567 code deploy) → **Tier-3 silence** (known pattern, route=digest). ✅
+Watermark advanced 998→1000. No tier-reset (Tier-3 carve-out).
+
+**Check 1 — Log noise:** outbox-notifier.log: last entries at 08:58:24 MDT — notifier restarted (signal 15 at 08:58:23). New instance (PID 3964779) started; no new events yet. 0 WARNs/ERRORs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message "Go" at 07:29:35 MDT (13:29:35Z) — already processed. Bot last delivered idx=997 at 08:00:23 MDT (route=digest for outbox_notifier restart). No new messages. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → 0 stalls. All FORGE_NO_PR_SKIP entries pr_exists. ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-17T14:28:05Z, age≈29.6 min. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=26b858a1=origin/main (clean, on main, behind=0, ahead=0). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-17T14:12:19Z, age≈45 min. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3734671 (Ss) ✅, chain_event_shipper 3734305 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, outbox_notifier **3964779** NEW (Ss, started 14:58Z) ✅, dashboard_api **3964550** NEW (Ssl, started 14:58Z) ✅. All 5 alive. PID update: heal-stale-daemon-code auto-restarted both services to deploy PR #567 (`projects_store.py` added to watch_paths in daemon-restart-manifest.json). ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open ✅. ourliberty-dashboard: 0 open ✅. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Conditional checks (Wednesday 2026-06-17 UTC, weekday=2 ∈ {0,2,4,6}):**
+- Check I: artifact `pulse-check-i/check-i-2026-06-17.json` EXISTS → SKIP (same-day dedup). ✅
+- Check III: Sunday-anchored → skip.
+
+**Pipeline observation — projects-v3-p3 ACTIVE, step 2 (p3-promote-endpoint) pending:**
+- p3-project-store (step 1, PR #567): MERGED ✅ 14:50Z. Sequence advancer dispatched p3-promote-endpoint to Forge at 14:51Z.
+- Forge session 3938869 (`--resume 9785c19d`, p3-project-store): still running, 61 min elapsed, post-merge verification phase. Normal.
+- Forge inbox: `build-p3-project-store.json` (active session, will self-archive on completion) + `p3-promote-endpoint.json` (queued, waiting for current session to exit).
+- heal-stale-daemon-code restarted dashboard_api (3964550) + outbox_notifier (3964779) at 14:58Z to load PR #567 `projects_store.py` code. Expected — projects_store.py was added to daemon-restart-manifest.json watch_paths in PR #567. Both services now running new code.
+
+**G-rule tracking:**
+- **G-rule sequence-complete-tier4: COMPLETE ✅** (unchanged).
+- **G-rule mirror-malformed-verdict-marker: COMPLETE ✅** (unchanged).
+- G-rule catalog-accuracy-drift-tier4: **2/3** (unchanged).
+- G-rule ledger/check-i Tier-4: **2/3** (unchanged).
+- G-rule dual-bot-instance-409-external: **1/3** (unchanged).
+- All other G-rule counts unchanged from iter ~2138.
+
+**Actions taken:**
+1. Check 0: watermark advanced 998→1000 (2 Tier-3 alerts silenced).
+2. PRIME ledger: `iter_clean` appended (tier=1, ts=2026-06-17T15:00:55Z).
+3. Tier state: `record --checks-clean true` → consecutive_clean=0→1. Tier stays 1.
+
+**PRIME ratio:** 19.48 (1013 interventions, 52 systemic fixes).
+
+**Dispatches:** None.
+
+---
+
 ## Iteration ~2138 — 2026-06-17 14:54Z UTC (interactive, /cycle, Tier 2→1, consecutive_clean=2→0, DRIFT/FIXED)
 
 **Trigger:** Larry direct invocation (`/cycle`).
