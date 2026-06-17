@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-17 19:12Z UTC (Iter ~2152, Tier 1, consecutive_clean=2→0, DRIFT/FIXED)
+
+**Iter ~2152 summary:** ⚠️ Drift (auto-fixed). 1 Tier-3 alert silenced: L1010 (outbox-notifier/review-pass PR #569 — auto-merged + branch deleted at 19:09:46Z). Check A: repo behind 1 commit (PR #569 `feat(systemd): timer for the projects-store single-committer healer`) → fast-forwarded fbdd764c→23813b6d. All 5 daemons alive — beacon 3734671, chain-event 3734305, inbox-watcher 3434697, dashboard_api 4021271, outbox_notifier 4021501 (same PIDs as iter ~2151). Repo HEAD=23813b6d=origin/main (clean post-ff). Last sync 18:12:56Z (~59 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs.** **PR #569 install-heal-projects-store-timer MERGED ✅.** **Full projects-v3-p3 pipeline COMPLETE ✅.** Check I skipped (artifact exists 2026-06-17). PRIME ratio=19.52 (1015 interventions, 52 systemic fixes, trend=improving). **Tier 1, consecutive_clean=2→0.**
+
 ## Status snapshot — updated 2026-06-17 19:07Z UTC (Iter ~2151, Tier 1, consecutive_clean=1→2, NOMINAL)
 
 **Iter ~2151 summary:** ✅ Nominal. 0 new alerts. All 5 daemons alive — beacon 3734671, chain-event 3734305, inbox-watcher 3434697, dashboard_api 4021271, outbox_notifier 4021501 (same PIDs as iter ~2150). Repo HEAD=b8a0422d=origin/main (clean). Last sync 18:12:56Z (~53 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **1 open PR: #569** (install-heal-projects-store-timer-001, ~15 min old, Mirror review in progress). **projects-v3-p3 COMPLETE ✅** (PR #567+#568 both merged). Check I skipped (artifact exists 2026-06-17). PRIME ratio=19.5 (1014 interventions, 52 systemic fixes, trend=improving). **Tier 1, consecutive_clean=1→2.**
