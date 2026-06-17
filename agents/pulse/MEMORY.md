@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-17 06:09Z UTC (Iter ~2102, Tier 1, consecutive_clean=0→1, NOMINAL)
+
+**Iter ~2102 summary:** ✅ Nominal. 1 Tier-3 alert (L1074 heal-systemd-install-drift/stuck-timer-healed:ourliberty-cycle.timer at 06:00:05Z, silenced — cycle timer stuck, auto-recovered by healer). All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3769291, dashboard_api 3734769). Repo HEAD=d82220c3=origin/main (clean). Last sync 05:47:08Z (~22 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **1 open PR: #559** (P2 Contract B universal action card for mission-backed funnel cards, created 06:02Z, Mirror review dispatched 06:07Z, normal pipeline). projects-v3-p1 SEQUENCE COMPLETE ✅. projects-v3-p4 COMPLETE ✅. **projects-v3-p2 ACTIVE:** PR #558 (P2 Contract A meaning-layer) MERGED 05:43Z ✅; PR #559 (P2 Contract B actions) Mirror review IN PROGRESS. Check I skipped (artifact exists for 2026-06-17). PRIME ratio=20.49 (1004 interventions, 49 systemic fixes). **Tier 1, consecutive_clean=0→1.**
+
 ## Status snapshot — updated 2026-06-17 05:59Z UTC (Iter ~2101, Tier 3→1, consecutive_clean=1→0, DRIFT/FIXED)
 
 **Iter ~2101 summary:** ⚠️ Drift (auto-fixed). 1 Tier-3 alert (L1073 heal-wedged-review-sessions/wedged-review-reaped:wt-forge-p2-meaning-layer, silenced — forge review session reaped post-merge). Check A: repo behind 1 commit (PR #558 `feat(narrator): meaning layer for orphan + suggested funnel missions (P2 Contract A)`) → fast-forwarded 5f98b7e0→65561e8b. All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3769291, dashboard_api 3734769). Repo HEAD=65561e8b=origin/main (clean post-ff). Last sync 05:47:08Z (no-change, ~9 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs.** projects-v3-p1 SEQUENCE COMPLETE ✅. projects-v3-p4 COMPLETE ✅. **projects-v3-p2 ACTIVE:** PR #558 (P2 Contract A meaning-layer, 4 files, 814 lines) MERGED 05:43Z. Step 1 COMPLETE. Next steps pending from sequence advancer. Check I skipped (artifact exists for 2026-06-17). PRIME ratio=20.49 (1004 interventions, 49 systemic fixes). **Tier 3→1, consecutive_clean=1→0.**
@@ -295,6 +299,7 @@
 | G-rule mirror-no-session-revision-loop | [blue] **2/3** | Mirror review NO_SESSION × 2+ for PR #497; Beacon re-dispatches Mirror instead of Forge. Watch; dispatch at 3/3 |
 | G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 (warn-vs-info) |
 | G-rule telegram-409-burst | [yellow] **2/3** | Watch; dispatch at 3/3 |
+| G-rule dual-bot-instance-409-external | [blue] **1/3** (NEW iter ~2102) — 409 burst 05:21–05:25Z 2026-06-17, NOT Pulse-caused. Two competing getUpdates loops. Possible trigger: Beacon P2 session start. Distinct from self-inflicted 409. | Watch; dispatch to Beacon at 3/3 |
 | **G-rule watermark-rotation-gap** | [blue] **2/3** (NEW iter ~2035) — larry-alerts-retention.py compacts file, watermark left > file length; new alerts missed until gap detected + repaired. Prior: iter ~1936. | Watch; dispatch to Beacon at 3/3 for auto-detect/repair fix in cycle startup |
 | Phase S ALL 6/6 MERGED ✅ | [blue] s-1 PR#541 ✅, s-2 PR#542 ✅, s-3 PR#543 ✅, s-4 PR#544 ✅, s-5 PR#58 ourliberty-dashboard ✅, s-6-drain PR#545 ✅ (10:52:38Z). missions-v2-phase-s SEQUENCE COMPLETE. | DONE. |
 | PR #497 CLOSED ✅ | [blue] Larry closed manually 2026-06-16T11:54:52Z. RESOLVED. | DONE. |
