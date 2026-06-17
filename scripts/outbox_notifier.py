@@ -2839,6 +2839,142 @@ def _recover_forge_marker_text_from_session_log(
     )
 
 
+# mirror-prose-verdict-fallback-001 (2026-06-17). A STRICT, line-anchored
+# prose-verdict declaration (e.g. `**Verdict: PASS.**`). Modeled on the
+# anchoring discipline of `_BARE_MIRROR_KEYWORD_RE` (mirror_review_handler.py):
+# the verdict must be essentially the WHOLE line (only surrounding markdown
+# emphasis / leading quote-bullet and trailing punctuation allowed), so a
+# mid-sentence mention ("I considered REVISION but...") or the marker-discipline
+# reminder text never matches. Token set mirrors the canonical verdicts;
+# `EMERGENCY HALT` (space) and `EMERGENCY_HALT` (underscore) both match.
+_MIRROR_PROSE_VERDICT_RE = re.compile(
+    r'(?im)^[\s>*_~`#-]*verdict[\s*_~`]*:[\s*_~`]*'
+    r'(PASS|REVISION|ESCALATE|EMERGENCY[\s_]HALT)\b[\s*_~`.!)\]]*$'
+)
+
+
+def _scan_mirror_prose_verdicts(text: Optional[str]) -> set[str]:
+    """Return the set of DISTINCT prose verdict tokens declared in ``text``.
+
+    Tokens are normalized to the canonical set
+    {PASS, REVISION, ESCALATE, EMERGENCY_HALT}. Only strict, line-anchored
+    `Verdict: <TOKEN>` declarations count (see ``_MIRROR_PROSE_VERDICT_RE``);
+    loose mid-sentence mentions do not. Empty set when ``text`` is empty or
+    declares no verdict.
+    """
+    if not isinstance(text, str) or not text:
+        return set()
+    found: set[str] = set()
+    for m in _MIRROR_PROSE_VERDICT_RE.finditer(text):
+        found.add(re.sub(r'\s+', '_', m.group(1).upper()))
+    return found
+
+
+def _recover_full_session_text(session_id: Optional[str]) -> str:
+    """Concatenate ALL assistant text turns from a session log.
+
+    Unlike `_recover_marker_text_from_session_log` — which retains only the
+    text of turns that PARSED as a canonical marker, and is therefore empty
+    for a session that emitted no marker at all — this returns every
+    assistant turn's text joined. The prose-verdict fallback in
+    `_classify_mirror_marker` needs the WHOLE session to apply its
+    no-contradiction gate (synthesize a PASS only when no OTHER verdict is
+    declared anywhere). Returns '' when the log is unavailable; the caller
+    then falls back to the outbox `result` (final-turn) text.
+    """
+    if not session_id:
+        return ''
+    try:
+        candidates = list(CLAUDE_PROJECTS_ROOT.glob(f'*/{session_id}.jsonl'))
+    except OSError:
+        return ''
+    if not candidates:
+        return ''
+    parts: list[str] = []
+    try:
+        with candidates[0].open('r', encoding='utf-8') as fh:
+            for line in fh:
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                msg = entry.get('message')
+                if not isinstance(msg, dict) or msg.get('role') != 'assistant':
+                    continue
+                content = msg.get('content')
+                if not isinstance(content, list):
+                    continue
+                for c in content:
+                    if isinstance(c, dict) and c.get('type') == 'text':
+                        t = c.get('text', '')
+                        if t:
+                            parts.append(t)
+    except OSError:
+        return ''
+    return '\n'.join(parts)
+
+
+def _maybe_synthesize_prose_pass(
+    data: dict[str, Any], result_text: str,
+) -> Optional[tuple[str, dict[str, Any]]]:
+    """PASS-only prose-verdict fallback for a phase=review Mirror session.
+
+    When Mirror finishes a review successfully but states her verdict in
+    prose (`**Verdict: PASS.**`) instead of the canonical
+    `=== REVIEW_PASS ===` marker, synthesize the REVIEW_PASS payload from
+    the review envelope so the EXISTING auto-merge path fires — instead of
+    burning a marker-error retry round (~$1 / ~7 min) that re-runs the whole
+    review. Strict, PASS-only, irreversibility-guarded:
+
+      * SCOPE — synthesize ONLY PASS. REVIEW_PASS's required fields
+        (task_id, pr_url, summary) are fully derivable from the envelope
+        with zero fabrication. REVISION/ESCALATE/EMERGENCY_HALT require
+        findings/severity/confidence/reason that cannot be faithfully
+        reconstructed from prose, so those keep raising (a retry yields a
+        real structured marker, not a fabricated one).
+      * NO-CONTRADICTION GATE — the set of prose verdicts declared across
+        the WHOLE session must be EXACTLY {PASS}. Zero declarations, PASS
+        co-occurring with any other verdict, or any non-PASS verdict → no
+        synthesis (fall through to the existing raise/retry). A PASS routes
+        to irreversible auto-merge; never guess it when any contradicting
+        signal is present (same conservative-priority philosophy as the
+        cross-turn verdict-conflict rule).
+      * Requires a non-empty envelope `pr_url` (the PR to merge against).
+        Absent/empty → no synthesis.
+
+    Returns ``('review_pass', payload)`` on synthesis, else ``None``.
+    """
+    pr_url = data.get('pr_url')
+    if not isinstance(pr_url, str) or not pr_url.strip():
+        return None
+    session_text = _recover_full_session_text(data.get('claude_session_id'))
+    scan_text = session_text or (
+        result_text if isinstance(result_text, str) else ''
+    )
+    verdicts = _scan_mirror_prose_verdicts(scan_text)
+    if verdicts != {'PASS'}:
+        return None
+    task_id = data.get('task_id')
+    payload = {
+        'task_id': task_id,
+        'pr_url': pr_url,
+        'summary': (
+            'Verdict recovered from an unambiguous prose PASS '
+            '("Verdict: PASS"); no canonical REVIEW_PASS marker was emitted, '
+            'so it was synthesized at classification to proceed with '
+            'auto-merge.'
+        ),
+    }
+    match = _MIRROR_PROSE_VERDICT_RE.search(scan_text)
+    snippet = match.group(0).strip() if match is not None else ''
+    log(
+        f'MIRROR_PROSE_VERDICT_SYNTHESIZED task={task_id!r} '
+        f'synthesized REVIEW_PASS from prose verdict {snippet!r} '
+        f'(pr_url={pr_url!r})'
+    )
+    return 'review_pass', payload
+
+
 def _classify_mirror_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
     """Inspect a Mirror outbox for a review marker. Returns routing decision or None.
 
@@ -2968,15 +3104,26 @@ def _classify_mirror_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
         # _handle_mirror_dag_preflight_result before we get here. Mirror's
         # chat-mode outputs (no phase=review) also keep returning None.
         if data.get('phase') == 'review':
-            raise mrh.MalformedMirrorMarker(
-                'phase=review requires ONE canonical verdict marker at end '
-                'of response (=== REVIEW_PASS === / REVIEW_REVISION / '
-                'REVIEW_ESCALATE / REVIEW_EMERGENCY_HALT) — none found. A '
-                'PROSE verdict (e.g. "Verdict: PASS") is silently invisible '
-                'to auto-merge and leaves the PR stuck. Re-emit via marker.py '
-                "(see agents/mirror/CLAUDE.md 'Marker formats')."
-            )
-        return None
+            # mirror-prose-verdict-fallback-001 (2026-06-17). Before the
+            # retry-triggering raise, try to RECOVER an unambiguous prose
+            # PASS. When Mirror states `**Verdict: PASS.**` (no canonical
+            # marker), synthesizing REVIEW_PASS from the envelope lets the
+            # existing auto-merge path fire and skips the ~$1/~7min
+            # marker-error retry. PASS-only + no-contradiction gated; any
+            # ambiguity or non-PASS verdict falls through to the raise.
+            synthesized = _maybe_synthesize_prose_pass(data, result_text)
+            if synthesized is None:
+                raise mrh.MalformedMirrorMarker(
+                    'phase=review requires ONE canonical verdict marker at end '
+                    'of response (=== REVIEW_PASS === / REVIEW_REVISION / '
+                    'REVIEW_ESCALATE / REVIEW_EMERGENCY_HALT) — none found. A '
+                    'PROSE verdict (e.g. "Verdict: PASS") is silently invisible '
+                    'to auto-merge and leaves the PR stuck. Re-emit via marker.py '
+                    "(see agents/mirror/CLAUDE.md 'Marker formats')."
+                )
+            marker_type, payload = synthesized
+        else:
+            return None
 
     # Marker discipline: payload task_id MUST match envelope task_id
     # (same shape as Forge handler's 4b check). Drift here means Mirror
