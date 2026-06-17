@@ -4,6 +4,64 @@
 
 ---
 
+## Iteration ~2123 — 2026-06-17 11:17Z UTC (interactive, /cycle, Tier 2→3, consecutive_clean=2→3→de-escalate, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 0 new alerts. All mandatory checks clean. No DM to Larry.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** outbox-notifier confirms all p2 sequence steps merged. 0 legacy PRs open. ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** 0 legacy open PRs. ✅
+- **projects-v3-p1 SEQUENCE COMPLETE ✅ CONFIRMED:** FORGE_NO_PR_SKIP p1-target-repo (#549), p1-drain-archive (#550), p1-funnel-derive (#551) pr_exists. ✅
+- **projects-v3-p4 COMPLETE ✅ CONFIRMED:** FORGE_NO_PR_SKIP p4-cleanup-committer (#555), p4-complete-signal (#554), p4-postmerge-exec (#556) pr_exists. ✅
+- **projects-v3-p2 SEQUENCE COMPLETE ✅ CONFIRMED:** FORGE_NO_PR_SKIP p2-meaning-layer (#558), p2-actions (#559), p2-suggest-intake (#560), p2-funnel-card-ui (#59-dashboard) all pr_exists. ✅
+- **Daemons ✅:** beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), outbox_notifier 3769291 (Ss), dashboard_api 3809960 (Ssl). All 5 alive, same PIDs as iter ~2122. ✅
+
+**Check 0 — Alert triage:** Watermark=988 entering; file=988 lines. **0 new alerts.** ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log: 1 WARN at 05:14:42 MDT — `MalformedMirrorMarker` for pulse-watermark-rotation-repair-001 (Mirror first pass emitted no canonical verdict; retry 1/3 dispatched at 05:15:12 MDT — normal chain behavior). Sub-threshold. inbox_watcher.log: all INFO; Mirror started retry at 05:14:47 MDT (11:14:47Z UTC) — in progress. beacon_telegram_bot.log: same 23:24–23:25 MDT 409 burst (G-rule dual-bot-instance-409-external 1/3, unchanged). No new 409s. mirror.log: last entry "Running" at 05:14:47 MDT — retry in progress. ✅ Nominal (sub-threshold, expected retry behavior).
+
+**Check 2 — Telegram sweep:** No new messages from Larry since "Go" at 04:43 MDT (10:43Z). No agent-distress keywords. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → `no stalls detected`. All FORGE_NO_PR_SKIP entries pr_exists. ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0. Pipeline flowing (Larry approved `pulse-watermark-rotation-repair-001` → Forge PR #561 created 10:55Z → Mirror retry in progress). ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-17T10:56:30Z, age≈21 min. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=0058f5ef=origin/main (clean, on main, no divergence). Latest commit: `Pulse cycle 20260617T105850Z` (iter ~2122 wrapper). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-17T10:47:55Z, status=no-change, age≈28 min. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3734671 (Ss) ✅, chain_event_shipper 3734305 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, outbox_notifier 3769291 (Ss) ✅, dashboard_api 3809960 (Ssl) ✅. All 5 alive, same PIDs as iter ~2122. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 1 open PR — #561 `fix: auto-repair Pulse Check 0 watermark after alert-log compaction` (created 10:55Z, mergeable=MERGEABLE, reviewDecision="" — Mirror retry 1/3 in progress, not a stall). ourliberty-dashboard: 0 open ✅. ourliberty-graph: 0 open ✅. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Conditional checks (Wednesday 2026-06-17 UTC, weekday=2 ∈ {0,2,4,6}):**
+- Check I: artifact `pulse-check-i/check-i-2026-06-17.json` EXISTS → SKIP (same-day dedup). ✅
+- Check III: Sunday-anchored → skip.
+
+**Pipeline observation — PR #561 Mirror retry:**
+Mirror's first pass on PR #561 (pulse-watermark-rotation-repair-001) at 05:05:51–05:14:41 MDT produced no canonical verdict marker (MalformedMirrorMarker). outbox-notifier dispatched retry 1/3 at 05:15:12 MDT; Mirror started retry at 05:14:47 MDT. Retry is in progress (~8 min duration expected). Not a stall.
+
+**G-rule tracking:**
+- G-rule mirror-malformed-verdict-marker: **1/3 → 2/3** (pulse-watermark-rotation-repair-001 MalformedMirrorMarker). Dispatch to Beacon at 3/3.
+- G-rule watermark-rotation-gap: COMPLETE ✅ (PR #561 pipeline active — Forge done, Mirror retry in progress).
+- All other G-rule counts unchanged from iter ~2122.
+
+**Actions taken:**
+1. PRIME ledger: `iter_clean` appended (tier=2, ts=2026-06-17T11:17:47Z).
+2. Tier state: `record --checks-clean true` → consecutive_clean 2→3 → **de-escalated Tier 2→3**; consecutive_clean reset to 0.
+
+**PRIME ratio:** 20.14 (1007 interventions, 50 systemic fixes). Trend: improving.
+
+**Dispatches:** None.
+
+---
+
 ## Iteration ~2122 — 2026-06-17 10:57Z UTC (interactive, /loop /cycle, Tier 2, consecutive_clean=1→2, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle` via /loop).

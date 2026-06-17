@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-17 11:17Z UTC (Iter ~2123, Tier 2→3, consecutive_clean=2→3→de-escalate, NOMINAL)
+
+**Iter ~2123 summary:** ✅ Nominal. 0 new alerts. All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3769291, dashboard_api 3809960). Repo HEAD=0058f5ef=origin/main (clean). Last sync 10:47:55Z (~28 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **1 open PR: #561** (watermark autofix, Mirror retry 1/3 in progress — MalformedMirrorMarker on first pass, normal pipeline). projects-v3-p1 SEQUENCE COMPLETE ✅. projects-v3-p4 COMPLETE ✅. **projects-v3-p2 SEQUENCE COMPLETE ✅.** Check I skipped (artifact exists 2026-06-17). PRIME ratio=20.14 (1007 interventions, 50 systemic fixes). G-rule mirror-malformed-verdict-marker **1/3→2/3**. **Tier 2→3, consecutive_clean=2→3→de-escalate.**
+
 ## Status snapshot — updated 2026-06-17 10:57Z UTC (Iter ~2122, Tier 2, consecutive_clean=1→2, NOMINAL)
 
 **Iter ~2122 summary:** ✅ Nominal. 0 new alerts. All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3769291, dashboard_api 3809960). Repo HEAD=957b828b=origin/main (clean). Last sync 10:47:55Z (~8 min). No stalls. pending=0 (Larry approved `pulse-watermark-rotation-repair-001` at 10:43Z; Forge PR #561 created 10:55Z — watermark autofix in pipeline). Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **1 open PR: #561** (watermark autofix, brand-new, Mirror review pending dispatch). projects-v3-p1 SEQUENCE COMPLETE ✅. projects-v3-p4 COMPLETE ✅. **projects-v3-p2 SEQUENCE COMPLETE ✅.** Check I skipped (artifact exists 2026-06-17). PRIME ratio=20.14 (1007 interventions, 50 systemic fixes). **Tier 2, consecutive_clean=1→2.**
@@ -258,7 +262,7 @@
 | G-rule F24-empty-prompt-envelope-rejected | [blue] **2/3** | Watch; dispatch at 3/3 |
 | G-rule Forge-preflight-CLARIFY_REQUEST | [blue] **2/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule revision-phase-preamble-missing | [blue] **2/3** | Forge outbox missing "Revision N applied:" preamble → retry chain. Watch; dispatch to Beacon at 3/3 |
-| G-rule mirror-malformed-verdict-marker | [blue] **1/3** (NEW) | Mirror produces output without canonical verdict marker (=== REVIEW_PASS === etc.) → MalformedMirrorMarker × 2/3 for s-3-failure-cost-pause. Distinct from mirror-no-session-revision-loop. Watch; dispatch at 3/3 |
+| G-rule mirror-malformed-verdict-marker | [blue] **2/3** | Mirror produces output without canonical verdict marker (=== REVIEW_PASS === etc.) → 1st: s-3-failure-cost-pause; 2nd: pulse-watermark-rotation-repair-001. Dispatch to Beacon at 3/3. |
 | G-rule mirror-no-session-revision-loop | [blue] **2/3** | Mirror review NO_SESSION × 2+ for PR #497; Beacon re-dispatches Mirror instead of Forge. Watch; dispatch at 3/3 |
 | G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 (warn-vs-info) |
 | G-rule telegram-409-burst | [yellow] **2/3** | Watch; dispatch at 3/3 |
