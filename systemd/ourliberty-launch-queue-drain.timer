@@ -1,0 +1,15 @@
+[Unit]
+Description=Run launch_queue_drain every 5 minutes (projects-v3 P3 p3-launch-queue-drain)
+
+[Timer]
+# Same 5-min cadence as the build-sequence advancer (its partner daemon): a
+# Launch-build click should surface as an in-flight build within a tick. The
+# drain is idempotent per phase id, so an empty tick is a cheap no-op. Boot
+# offset staggers it off the advancer's *:0/5 so the two don't contend.
+OnBootSec=4min
+OnUnitActiveSec=5min
+Unit=ourliberty-launch-queue-drain.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target
