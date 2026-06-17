@@ -743,7 +743,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-11T01:49:09.685581+00:00"
+      "orphan_last_activity_ts": "2026-06-11T01:49:09.685581+00:00",
+      "briefing": {
+        "what": "A piece of cleanup work the team picked up to fix a recurring glitch, but it isn't attached to any active initiative yet.",
+        "why": "Loose work that nobody owns tends to either stall and waste the effort already spent, or quietly expand without anyone deciding it's worth it.",
+        "suggest": "Before it goes further, decide whether this belongs to a current priority \u2014 fold it in if it does, or shelve it if it doesn't."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:10:10.187179+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-medic-diagnosis",
@@ -824,7 +838,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-10T08:44:27.287145+00:00"
+      "orphan_last_activity_ts": "2026-06-10T08:44:27.287145+00:00",
+      "briefing": {
+        "what": "A new tool that automatically turns activity into a regular plain-language summary for your team.",
+        "why": "It saves you and your people from manually piecing together what happened, so everyone stays informed with less effort.",
+        "suggest": "It's moving along but isn't tied to a clear goal yet, so confirm what you want it to deliver before the team invests more time."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:10:10.187179+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-p2-derive-endpoint",
@@ -841,7 +869,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-10T08:44:20.602711+00:00"
+      "orphan_last_activity_ts": "2026-06-10T08:44:20.602711+00:00",
+      "briefing": {
+        "what": "A new feature your team has built and tested that lets the product automatically calculate results instead of doing it by hand.",
+        "why": "It can save time and reduce errors in a core part of how the product works, but it's not yet attached to a planned initiative.",
+        "suggest": "Worth a quick look to decide which goal it should serve before the team invests more in it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:10:10.187179+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-dag-preflight-revision-autonomy-001",
@@ -858,7 +900,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-10T08:30:36.833471+00:00"
+      "orphan_last_activity_ts": "2026-06-10T08:30:36.833471+00:00",
+      "briefing": {
+        "what": "A new piece of work the team has begun that lets our system check its own readiness before kicking off a job, without a person hovering over it.",
+        "why": "If it works reliably, routine work moves faster with fewer hands needed \u2014 but because nothing has formally signed off on it yet, it's still unproven.",
+        "suggest": "Let it keep running but give it a short trial with a quick check-in before we lean on it for anything important."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:10:10.187179+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-seq-missions-v2-phase2-step-p2-digest-generator",
@@ -917,7 +973,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-10T08:24:38.26856+00:00"
+      "orphan_last_activity_ts": "2026-06-10T08:24:38.26856+00:00",
+      "briefing": {
+        "what": "A behind-the-scenes quality-control upgrade the team picked up on their own to catch problems earlier before work goes out.",
+        "why": "It isn't attached to any of our funded priorities yet, so it's quietly using team time without a clear payoff we've agreed to.",
+        "suggest": "Take a quick look and decide whether it earns a spot on the roadmap or gets paused until it does \u2014 worth a short check before it grows further."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:10:10.187179+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-unreg-approval-8ba8e3b472a8",
@@ -1270,7 +1340,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-10T07:02:02.870213+00:00"
+      "orphan_last_activity_ts": "2026-06-10T07:02:02.870213+00:00",
+      "briefing": {
+        "what": "A piece of safety work the team has been building to make sure test activity can never accidentally touch or change live customer data.",
+        "why": "It protects the real business from costly mistakes during testing \u2014 the kind that could corrupt production data or cause an outage \u2014 but it isn't yet attached to a formal project or goal.",
+        "suggest": "It's passed its first quality check and looks sound, so give it a quick green light to continue, but ask the team to tie it to a named priority before it goes any further."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:10:10.187179+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-desktop-bc57cca6",
@@ -1497,7 +1581,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-10T03:59:50.156017+00:00"
+      "orphan_last_activity_ts": "2026-06-10T03:59:50.156017+00:00",
+      "briefing": {
+        "what": "Your team has begun early groundwork to make the system better at catching problems before they happen, but this effort isn't yet attached to a formal project.",
+        "why": "Loose, unassigned work can quietly consume time and drift off-course, so deciding its place now protects your team's focus and budget.",
+        "suggest": "Give it a quick look before greenlighting \u2014 either fold it into a real project with a clear owner, or pause it until you know it's worth the investment."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:10:10.187179+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-desktop-64c6ad47",
@@ -1598,7 +1696,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": "feat/missions-phase0-desktop-feed",
-      "orphan_last_activity_ts": "2026-06-10T00:15:40.133053+00:00"
+      "orphan_last_activity_ts": "2026-06-10T00:15:40.133053+00:00",
+      "briefing": {
+        "what": "A new piece of work to bring your team's mission feed onto the desktop, started on its own without being attached to any current project.",
+        "why": "Loose work that isn't tied to a goal can quietly soak up time and drift from what the business actually needs right now.",
+        "suggest": "Take a quick look and either fold it into a real priority or pause it until it has a clear owner and purpose."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:10:10.187179+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-fix-notifier-review-dispatch-reliability",
