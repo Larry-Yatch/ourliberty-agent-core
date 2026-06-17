@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-17 23:47Z UTC (Iter ~2171, Tier 1→2 de-escalate, consecutive_clean=2→3→0, NOMINAL)
+
+**Iter ~2171 summary:** ✅ Nominal. 1 Tier-3 alert silenced: L1020 (dispatch-branch-cleanup/summary — pruned 2 local + 1 remote stale branches, known-pattern). All 5 daemons alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4048770 (Ssl), outbox_notifier 4049089 (Ss). Same PIDs as iter ~2170. Repo HEAD=f235ebe0=origin/main (clean). Last sync 22:50:15Z (~57 min). 0 open PRs. 0 stalls. pending=0. Credential rotation: OK. Heartbeat 23:29:54Z (~17 min, fresh). Check I skipped (artifact exists 2026-06-17). **projects-v3-p3-followup pipeline ACTIVE** — Forge inbox has p3f-phase-transitions + p3f-status-writeback (fresh). PRIME ratio=~19.63 (1021 interventions, 52 systemic fixes, trend=improving). **Tier 1→2 de-escalation, consecutive_clean reset to 0.**
+
 ## Status snapshot — updated 2026-06-17 23:42Z UTC (Iter ~2170, Tier 1, consecutive_clean=1→2, NOMINAL)
 
 **Iter ~2170 summary:** ✅ Nominal. 1 Tier-3 alert silenced: L1019 (outbox-notifier/mirror-dag-pass:projects-v3-p3-followup — DAG PASS, sequence active, advancer dispatched p3f-phase-transitions + p3f-status-writeback to Forge inbox). All 5 daemons alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4048770 (Ssl), outbox_notifier 4049089 (Ss). Repo HEAD=ae8ca436=origin/main (clean). Last sync 22:50:15Z (~52 min). 0 open PRs. 0 stalls. pending=0. Credential rotation: OK. Heartbeat 23:29:54Z (~12 min, fresh). Check I skipped (artifact exists 2026-06-17). PRIME ratio=~19.63 (1021 interventions, 52 systemic fixes, trend=improving). **projects-v3-p3-followup pipeline ACTIVE** — advancer dispatched p3f-phase-transitions + p3f-status-writeback to Forge. **Tier 1, consecutive_clean=1→2.**
