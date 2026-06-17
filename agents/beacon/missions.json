@@ -1727,7 +1727,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-04T06:31:42.084249+00:00"
+      "orphan_last_activity_ts": "2026-06-04T06:31:42.084249+00:00",
+      "briefing": {
+        "what": "Work is underway to make sure alerts that need your attention actually reach you instead of silently failing.",
+        "why": "If these notifications drop, you could miss something important that needs a decision, which erodes trust in the whole system.",
+        "suggest": "Let the team finish and confirm it's been double-checked before you sign off, since reliability fixes like this deserve a careful look."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:20:16.057578+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-forge-claude-md-canonical-pr-line-discipline",
@@ -1744,7 +1758,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-04T06:27:11.151478+00:00"
+      "orphan_last_activity_ts": "2026-06-04T06:27:11.151478+00:00",
+      "briefing": {
+        "what": "A cleanup effort to tidy up the team's internal documentation so it follows one consistent standard.",
+        "why": "Clean, consistent docs keep the team moving quickly and prevent small mix-ups that slow future work, though this isn't tied to a customer-facing goal yet.",
+        "suggest": "Let the team finish this quick housekeeping, but hold off on dedicating more resources until it's clearly connected to a priority that moves the business."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:20:16.057578+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-cycle-timer-daemon-reload-checkpoint",
@@ -1761,7 +1789,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-04T06:18:49.709423+00:00"
+      "orphan_last_activity_ts": "2026-06-04T06:18:49.709423+00:00",
+      "briefing": {
+        "what": "The team started routine maintenance work on the system that keeps our automated cycles running on schedule, but it isn't yet attached to a specific project.",
+        "why": "This timing system underpins how reliably our automated work kicks off, so loose ends here can quietly affect day-to-day operations down the line.",
+        "suggest": "Let's confirm where this work belongs and what it's meant to achieve before greenlighting more time on it, rather than letting it run unscoped."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:20:16.057578+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-build-forge-queue-ui-move-20260604T042018Z",
@@ -1821,7 +1863,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-02T19:07:31.139062+00:00"
+      "orphan_last_activity_ts": "2026-06-02T19:07:31.139062+00:00",
+      "briefing": {
+        "what": "Work has begun on an automated tool that produces digests, and it's already passed a quality check.",
+        "why": "It's a head start on something useful, but right now it's floating on its own without being attached to a clear business goal.",
+        "suggest": "Have the team confirm which goal this serves and fold it into that effort before investing more time, rather than letting it drift."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:20:16.057578+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-step-digest-generator",
@@ -2153,7 +2209,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-05-30T23:01:36.78547+00:00"
+      "orphan_last_activity_ts": "2026-05-30T23:01:36.78547+00:00",
+      "briefing": {
+        "what": "The team has started wiring up the login system's setup tokens, but this work isn't yet attached to any specific project or goal.",
+        "why": "Login and account security touch every customer, so unplanned work here can quietly shape how people sign in and how safe their accounts are.",
+        "suggest": "Hold off on letting this run further until we connect it to a clear goal and confirm it's the right priority before more time goes in."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:20:16.057578+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     },
     {
       "id": "proposed-sync-push-failure-g-rule-117",
@@ -2233,7 +2303,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-05-30T22:09:22.796143+00:00"
+      "orphan_last_activity_ts": "2026-05-30T22:09:22.796143+00:00",
+      "briefing": {
+        "what": "The team began building an automatic backup that keeps your recurring cycles running on schedule even if the main timer slips.",
+        "why": "Reliable timing keeps the whole operation humming on its own, so nothing important quietly stalls without anyone noticing.",
+        "suggest": "Worth finishing, but have someone confirm it actually catches a missed cycle before you count on it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:20:16.057578+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-extend-fixture-gate-outbox-side",
@@ -2250,7 +2334,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-05-29T20:21:55.62396+00:00"
+      "orphan_last_activity_ts": "2026-05-29T20:21:55.62396+00:00",
+      "briefing": {
+        "what": "A safeguard your team is building to catch test data before it can leak out and look like a real customer-facing event.",
+        "why": "Without it, fake test signals can slip into live operations and trigger false alarms or bad decisions, wasting your team's time chasing problems that don't exist.",
+        "suggest": "Worth finishing, but give it a careful review before it goes live since it touches what counts as a real event \u2014 confirm it's solid before you greenlight."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:20:16.057578+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-dag-preflight-clarify-round-visibility-rollout",
@@ -2267,7 +2365,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-05-29T16:25:19.569597+00:00"
+      "orphan_last_activity_ts": "2026-05-29T16:25:19.569597+00:00",
+      "briefing": {
+        "what": "The team has begun rolling out a new way to give you clearer visibility into the questions that come up before work gets approved.",
+        "why": "Better visibility here means fewer things slip through unnoticed and you can sign off on work faster and with more confidence.",
+        "suggest": "Worth a green light, but ask to see it working on a small slice first before turning it on everywhere."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:20:16.057578+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-test-isolation-v3",
