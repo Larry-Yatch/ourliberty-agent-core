@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-17 16:13Z UTC (Iter ~2144, Tier 2→3, consecutive_clean=2→3→de-escalate, NOMINAL)
+
+**Iter ~2144 summary:** ✅ Nominal. 0 new alerts. All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3964779, dashboard_api 3964550). Repo HEAD=e638ac41=origin/main (clean). Last sync 15:12:19Z (~59 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs across all repos.** **projects-v3-p3 ACTIVE step 2:** Forge session 3938869 still running ELAPSED=02:13:41 (~83 min post-merge for p3-project-store) — 0 stalls per heal_pipeline_stall. p3-promote-endpoint.json queued in Forge inbox (14:51Z), inbox-watcher waiting for session exit to spawn. Check I skipped (artifact exists 2026-06-17). PRIME ratio=19.48 (1013 interventions, 52 systemic fixes). **Tier 2→3, consecutive_clean=2→3→de-escalate.**
+
 ## Status snapshot — updated 2026-06-17 15:51Z UTC (Iter ~2143, Tier 2, consecutive_clean=1→2, NOMINAL)
 
 **Iter ~2143 summary:** ✅ Nominal. 0 new alerts. All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3964779, dashboard_api 3964550). Repo HEAD=7c45f004=origin/main (clean). Last sync 15:12:19Z (~39 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs across all repos.** **projects-v3-p3 ACTIVE step 2:** Forge session 3938869 still running ELAPSED=01:54:22 (~61 min post-merge for p3-project-store) — 0 stalls per heal_pipeline_stall. p3-promote-endpoint.json queued in Forge inbox (14:51Z), inbox-watcher waiting for session exit to spawn. Check I skipped (artifact exists 2026-06-17). PRIME ratio=19.48 (1013 interventions, 52 systemic fixes). **Tier 2, consecutive_clean=1→2.**
@@ -301,11 +305,6 @@
 ## Status snapshot — updated 2026-06-17 05:24Z UTC (Iter ~2100, Tier 3, consecutive_clean=0→1, NOMINAL)
 
 **Iter ~2100 summary:** ✅ Nominal. 1 Tier-3 alert (L1072 outbox-notifier/mirror-dag-pass:projects-v3-p2, silenced — known pattern). All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3769291, dashboard_api 3734769). Repo HEAD=00b85223=origin/main (clean; 3 new commits since iter ~2099: PR #557 spec/projects-v3-p2, Pulse cycle wrapper, GC healer autoregister). Last sync 04:47:32Z (~37 min). No stalls. pending=0. Credential rotation: all clear. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs.** projects-v3-p1 SEQUENCE COMPLETE ✅. projects-v3-p4 COMPLETE ✅ (all 3/3 PRs merged). **projects-v3-p2 ACTIVE** (Larry approved dag-preflight 04:54Z; Mirror PASSED 04:56Z; Beacon new session started 05:21Z — first step building). Check I skipped (artifact exists for 2026-06-17). PRIME ratio=20.47 (1003 interventions, 49 systemic fixes). **Tier 3, consecutive_clean=0→1.**
-
-## Status snapshot — updated 2026-06-17 04:47Z UTC (Iter ~2099, Tier 2→3, consecutive_clean=2→3→de-escalate, NOMINAL)
-
-**Iter ~2099 summary:** ✅ Nominal. 0 new alerts. All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3769291, dashboard_api 3734769). Repo HEAD=935eb29b=origin/main (clean; newest commit = GC healer auto-committed missions.json delta). Last sync 04:40:50Z (no-change, ~6 min). No stalls. pending=0. Credential rotation: all clear. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs.** projects-v3-p1 SEQUENCE COMPLETE ✅. projects-v3-p4 COMPLETE ✅ (all 3/3 PRs merged). Check I skipped (artifact exists for 2026-06-17). PRIME ratio=20.47 (1003 interventions, 49 systemic fixes). **Tier 2→3, consecutive_clean=2→3→de-escalate.**
-
 
 ## Key standing items (as of iter ~1982)
 
