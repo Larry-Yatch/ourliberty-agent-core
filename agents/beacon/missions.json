@@ -285,7 +285,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-12T05:09:20.161842+00:00"
+      "orphan_last_activity_ts": "2026-06-12T05:09:20.161842+00:00",
+      "briefing": {
+        "what": "A few requests are sitting in your approval queue, plus some work the team kicked off that hasn't been tied to a clear project yet.",
+        "why": "Approvals left waiting can stall work and let loose ends pile up without anyone owning them.",
+        "suggest": "Take a quick look to clear the pending approvals and decide whether the loose work is worth keeping or dropping \u2014 worth a glance before it grows."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:00:01.633456+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-p3-dashboard-proposed-lane",
@@ -302,7 +316,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-12T04:47:19.071308+00:00"
+      "orphan_last_activity_ts": "2026-06-12T04:47:19.071308+00:00",
+      "briefing": {
+        "what": "Your team has started building a new dashboard feature, but it isn't yet attached to any approved project or goal.",
+        "why": "Unassigned work can quietly consume your team's time without a clear payoff, and this one has already hit a few false starts and back-and-forth questions.",
+        "suggest": "Take a few minutes to decide whether this dashboard supports a current priority \u2014 if yes, fold it into a project; if not, pause it before more effort goes in."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:00:01.633456+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-seq-missions-v2-phase3-step-p3-dashboard-proposed-lane",
@@ -340,7 +368,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-11T04:40:11.123622+00:00"
+      "orphan_last_activity_ts": "2026-06-11T04:40:11.123622+00:00",
+      "briefing": {
+        "what": "A team member started looking into why software updates sometimes don't install cleanly after changes are merged in.",
+        "why": "If updates drift out of sync, the product can break for users in ways that are hard to spot until something goes wrong.",
+        "suggest": "Let it continue but ask the team to tie it to a clear goal and report back before investing more time, so it doesn't wander."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:00:01.633456+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-desktop-7807b99c",
@@ -441,7 +483,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-11T04:26:31.363826+00:00"
+      "orphan_last_activity_ts": "2026-06-11T04:26:31.363826+00:00",
+      "briefing": {
+        "what": "Some behind-the-scenes cleanup work the team kicked off to stop duplicate records from piling up, but it isn't attached to any active project yet.",
+        "why": "Duplicate records quietly inflate your numbers and erode trust in reports, so cleaning them up keeps your data honest and decisions sound.",
+        "suggest": "Worth doing, but ask the team to tie it to a clear goal and confirm it won't disrupt live data before they go further."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:00:01.633456+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-rotation-mode",
@@ -458,7 +514,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-11T04:26:00.706836+00:00"
+      "orphan_last_activity_ts": "2026-06-11T04:26:00.706836+00:00",
+      "briefing": {
+        "what": "A new capability called Rotation Mode that the team has begun building on its own, not yet attached to any approved initiative.",
+        "why": "Effort is being spent here without a clear business goal behind it, so it could either fill a real need or quietly drain time from priorities you've already set.",
+        "suggest": "Before this goes further, have the team tie it to a specific goal or pause it \u2014 worth a quick check rather than letting it run unguided."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:00:01.633456+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-fix-headless-approval-dedup-spawn-failure-wedge-002",
@@ -475,7 +545,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-11T04:20:46.446389+00:00"
+      "orphan_last_activity_ts": "2026-06-11T04:20:46.446389+00:00",
+      "briefing": {
+        "what": "A fix for a glitch in the automatic approval system that was getting stuck and stalling the work that depends on it.",
+        "why": "When this stalls, approvals back up and the team's work waits \u2014 so unblocking it keeps day-to-day operations moving smoothly.",
+        "suggest": "Let the team finish and verify the fix, then give it a quick confirmation before it goes live so we're sure it holds."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:00:01.633456+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-transcript-not-persisted:tier1",
@@ -597,7 +681,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-11T01:53:59.746735+00:00"
+      "orphan_last_activity_ts": "2026-06-11T01:53:59.746735+00:00",
+      "briefing": {
+        "what": "This is a behind-the-scenes housekeeping effort to tidy up one of our internal record-keeping ledgers.",
+        "why": "Clean, accurate records keep day-to-day operations running smoothly and prevent small bookkeeping messes from turning into bigger problems later.",
+        "suggest": "Let the team finish the cleanup, but ask them to confirm what was changed before we consider it done."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:00:01.633456+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-dag-preflight-park-the-nudge",
@@ -614,7 +712,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-11T01:53:56.465555+00:00"
+      "orphan_last_activity_ts": "2026-06-11T01:53:56.465555+00:00",
+      "briefing": {
+        "what": "A piece of work the team kicked off on its own that hasn't been attached to any active project yet.",
+        "why": "Loose, unassigned work can quietly consume time and attention without moving any of your current priorities forward.",
+        "suggest": "Take a quick look before greenlighting it \u2014 either tie it to a real goal you care about or set it aside until it earns a place."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:00:01.633456+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-rekick-reaper-fix-20260610",
