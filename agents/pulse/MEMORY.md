@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-17 14:02Z UTC (Iter ~2135, Tier 1→2, consecutive_clean=2→3→de-escalate, NOMINAL)
+
+**Iter ~2135 summary:** ✅ Nominal. 1 Tier-3 alert silenced: L998 (heal-stale-daemon-code/auto-restarted:ourliberty-outbox-notifier.service — healer restarted outbox_notifier at 13:57Z to deploy PR #565 mirror-prose-verdict-fallback code). All 5 daemons alive (beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier **3938657** NEW PID, dashboard_api 3924466). Repo HEAD=1ede60f7=origin/main (clean). Last sync 13:12:49Z (~49 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs across all repos.** **projects-v3-p3 ACTIVE:** Forge building p3-project-store (task dispatched ~13:55Z, Forge inbox: build-p3-project-store.json). Check I skipped (artifact exists 2026-06-17). PRIME ratio=19.46 (1012 interventions, 52 systemic fixes). **Tier 1→2, consecutive_clean=2→3→de-escalate.**
+
 ## Status snapshot — updated 2026-06-17 13:57Z UTC (Iter ~2134, Tier 1, consecutive_clean=1→2, NOMINAL)
 
 **Iter ~2134 summary:** ✅ Nominal. 1 Tier-3 alert silenced: L997 (outbox-notifier/mirror-dag-pass:projects-v3-p3 — bot delivered via route=escalate). All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3769291, dashboard_api 3924466). Repo HEAD=337a9627=origin/main (clean). Last sync 13:12:49Z (~43 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs across all repos.** **projects-v3-p3 ACTIVE:** Mirror DAG-preflight PASS 13:50:57Z (L997 Tier-3); Beacon dispatched `p3-project-store` to Forge at 13:55:37Z; Forge inbox: p3-project-store.json present (building). **G-rule sequence-complete-tier4 COMPLETE ✅ LIVE VERIFIED** (L997 Tier-3 by helper = 2nd post-PR#566 confirmation). Check I skipped (artifact exists 2026-06-17). PRIME ratio=19.46 (1012 interventions, 52 systemic fixes). **Tier 1, consecutive_clean=1→2.**
