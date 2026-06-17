@@ -4,6 +4,61 @@
 
 ---
 
+## Iteration ~2086 — 2026-06-17 01:22Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0→1, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 1 new alert (Tier-3 silenced). All infrastructure clean. No DM to Larry. projects-v3-p4 sequence active and flowing.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** 0 open PRs. ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** Not open. ✅
+- **projects-v3-p1 SEQUENCE COMPLETE ✅ CONFIRMED:** 0 open PRs. ✅
+- **projects-v3-p4 ACTIVE ✅ CONFIRMED:** DAG preflight PASSED (L1064 at 01:17Z); sequence advancer dispatched `p4-cleanup-committer` + `p4-complete-signal` to Beacon inbox at 19:20 MDT. Beacon inbox watcher will pick up both steps. ✅
+- **Dirty tree (iter ~2084) RESOLVED ✅ CONFIRMED:** git status = clean. HEAD=d2ecb15b=origin/main. ✅
+- **Daemons same PIDs ✅:** beacon 3556778 (Ss), chain-event 2744551 (SNs), inbox-watcher 3434697 (Ssl), outbox_notifier 3676902 (Ss), dashboard_api 3688711 (Ssl). All 5 alive. ✅
+
+**Check 0 — Alert triage:** Watermark=1063 entering; triaged line 1064.
+- L1064: `source=outbox-notifier, subject=mirror-dag-pass:projects-v3-p4` — Helper: **Tier-3** (known-pattern match in alert-translations.json). Silence. No DM, no tier-reset. Journal-note: Mirror DAG-preflight PASSED for projects-v3-p4; sequence transitioned pending→active; advancer dispatched first steps at 01:20Z.
+- Watermark advanced 1063→1064.
+
+**Check 1 — Log noise:** outbox-notifier.log — only WARN is MalformedForgeMarker for p1-funnel-derive at 17:28:29 MDT (yesterday; covered by completed G-rule PR #524). No new WARN/ERROR. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message: `go` at 19:16 MDT (approved dag-preflight-projects-v3-p4 → dispatched to Mirror 19:16:04). No new messages since. DAG preflight PASSED at 01:17Z per L1064; sequence advancer dispatched both steps at 01:20Z. G-rule telegram-409-burst **2/3** unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → `no stalls detected`. All FORGE_NO_PR_SKIP entries reason=pr_exists or preflight_exit. Beacon inbox steps `p4-cleanup-committer` + `p4-complete-signal` created 01:20Z (2 min old at check time — within threshold). ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0 in beacon-pending-approvals.json. No orphaned Larry directives. projects-v3-p4 `go` directive tracked (DAG preflight dispatched + PASSED + sequence active). ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-17T00:54:09Z, age≈28 min at check time (01:22Z). FRESH (< 60 min threshold). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=d2ecb15b=origin/main (clean, on main, no divergence). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-17T01:09:59Z, status=success, age≈12 min at check time. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3556778 (Ss) ✅, chain_event_shipper 2744551 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, outbox_notifier 3676902 (Ss) ✅, dashboard_api 3688711 (Ssl) ✅. All 5 alive, same PIDs as iter ~2085. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open PRs ✅. ourliberty-dashboard: 0 open PRs ✅. ourliberty-graph: 0 open PRs ✅.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → `OK: schema_version=1 validates`. ✅ Nominal.
+
+**Conditional checks (Wednesday 2026-06-17 UTC, weekday=2 ∈ {0,2,4,6}):**
+- Check I: Already fired iter ~2080 today (artifact `pulse-check-i/check-i-2026-06-17.json` confirmed EXISTS). → SKIP (same-day dedup).
+- Check III: fires Sunday → skip.
+
+**G-rule tracking:** No new G-rule counts this iter. All counts unchanged from iter ~2085.
+
+**Actions taken:**
+1. Alert watermark advanced 1063→1064.
+2. PRIME ledger: `iter_clean` appended (tier=1, template=iter-clean, ts=2026-06-17T01:22Z).
+3. Tier state: `record --checks-clean true` → consecutive_clean 0→1. Tier 1 unchanged (need 3 consecutive clean for Tier 1→2 de-escalation).
+
+**PRIME ratio:** 20.43 (1001 interventions, 49 systemic fixes). Trend: improving.
+
+**Dispatches:** None.
+
+---
+
 ## Iteration ~2085 — 2026-06-17 01:16Z UTC (interactive, /loop /cycle, Tier 1, consecutive_clean=0, TIER-4-SELF-RESOLVED)
 
 **Trigger:** Larry direct invocation (`/loop /cycle`).

@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-17 01:22Z UTC (Iter ~2086, Tier 1, consecutive_clean=0→1, NOMINAL)
+
+**Iter ~2086 summary:** ✅ Nominal. 1 new alert (L1064 outbox-notifier/mirror-dag-pass:projects-v3-p4 Tier-3 silenced). All 5 daemons alive (same PIDs: beacon 3556778, chain-event 2744551, inbox-watcher 3434697, outbox_notifier 3676902, dashboard_api 3688711). Repo HEAD=d2ecb15b=origin/main (clean). Last sync 01:09:59Z (success). No stalls. pending=0. Credential rotation: all clear. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs.** projects-v3-p1 SEQUENCE COMPLETE ✅. **projects-v3-p4 ACTIVE:** DAG preflight PASSED 01:17Z; steps `p4-cleanup-committer` + `p4-complete-signal` dispatched to Beacon inbox at 01:20Z; Beacon inbox watcher will process. Check I already fired today (check-i-2026-06-17.json). PRIME ratio=20.43 (1001 interventions, 49 systemic fixes). **Tier 1, consecutive_clean=0→1.**
+
 ## Status snapshot — updated 2026-06-17 01:16Z UTC (Iter ~2085, Tier 1, consecutive_clean=0, TIER-4-SELF-RESOLVED)
 
 **Iter ~2085 summary:** ⚠️ Tier-4 alert (self-resolved). 2 new alerts: L1062 pulse/dirty-tree-beacon-data-files Tier-4 (condition self-resolved before iter; GC healer b55a7cd8 committed captures.json; tree clean; no DM); L1063 sync.service/sync-blocked Tier-3 silenced. All 5 daemons alive (same PIDs: beacon 3556778, chain-event 2744551, inbox-watcher 3434697, outbox_notifier 3676902, dashboard_api 3688711). Repo HEAD=3762f672=origin/main (clean). Last sync 01:09:59Z (success). No stalls. pending=0. Credential rotation: all clear. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs.** projects-v3-p1 SEQUENCE COMPLETE ✅. **projects-v3-p4 ACTIVE:** Beacon dispatched at 19:14 MDT, approval DM for dag-preflight-projects-v3-p4 pending Larry's "go". Check I already fired today (check-i-2026-06-17.json). PRIME ratio=20.41 (1000 interventions, 49 systemic fixes). **Tier 1, consecutive_clean=0.**
