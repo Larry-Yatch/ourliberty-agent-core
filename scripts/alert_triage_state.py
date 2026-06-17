@@ -345,6 +345,65 @@ def write_watermark(line: int) -> None:
     atomic_write_json(path, doc, indent=2, sort_keys=True)
 
 
+def _alerts_file_length() -> int:
+    """Count newline-terminated lines of ``larry_alerts.ALERTS_FILE``.
+
+    Returns 0 if the file is missing or unreadable — consistent with
+    ``read_watermark``'s degrade-to-None philosophy: a length we cannot observe
+    is treated as 0, which (since a concrete watermark is always >= 0) makes
+    ``repair_watermark`` a safe no-op rather than a spurious reset on a transient
+    read error. Referenced via the module attribute so tests can repoint it."""
+    path = larry_alerts.ALERTS_FILE
+    try:
+        if not path.exists():
+            return 0
+        with path.open(encoding='utf-8') as fh:
+            return sum(1 for _ in fh)
+    except OSError:
+        return 0
+
+
+def repair_watermark() -> dict[str, Any]:
+    """Self-heal a stale (too-large) watermark after alert-log compaction.
+
+    The retention/compaction job periodically removes OLD lines from
+    ``larry-alerts.jsonl``, shrinking the file. The watermark tracks ABSOLUTE
+    line numbers, so after compaction ``watermark > file_length`` and Check 0's
+    'read lines AFTER the watermark' yields nothing — every new alert is silently
+    skipped until manual repair. This guard detects that rotation gap and resets
+    the watermark to ``file_length`` exactly (Larry's explicit choice — NOT a
+    trailing-N re-claim), so the next iter reads the new alerts.
+
+    No-op unless the watermark is a concrete int strictly greater than the file
+    length. A MISSING watermark (``read_watermark`` -> None) is left alone — the
+    existing 'claim trailing 100 lines as catchup' path owns that case.
+
+    Returns a machine-readable dict Pulse branches + journals on:
+      - repaired: ``{"repaired": True, "old_watermark": int, "file_length": int,
+        "new_watermark": int}``
+      - no-op:    ``{"repaired": False, "old_watermark": int|None,
+        "file_length": int}``
+    """
+    old = read_watermark()
+    file_length = _alerts_file_length()
+    if old is not None and old > file_length:
+        # NOTE: do NOT _log() here — _log writes to stdout, and the repair-watermark
+        # CLI's stdout MUST be a single parseable JSON object Pulse branches on.
+        # The repair is self-reported in the returned dict and journaled by Pulse.
+        write_watermark(file_length)
+        return {
+            'repaired': True,
+            'old_watermark': old,
+            'file_length': file_length,
+            'new_watermark': file_length,
+        }
+    return {
+        'repaired': False,
+        'old_watermark': old,
+        'file_length': file_length,
+    }
+
+
 # -------------------- per-template execution track record (Phase C) --------------------
 
 
@@ -755,6 +814,13 @@ def _cli_set_watermark(args) -> int:
     return 0
 
 
+def _cli_repair_watermark(_args) -> int:
+    """Print ONE JSON object describing the rotation-gap repair (or no-op) so
+    Pulse can branch + journal. Runs FIRST in Check 0, before get-watermark."""
+    print(json.dumps(repair_watermark()))
+    return 0
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(prog='alert_triage_state.py',
                                      description=__doc__)
@@ -787,6 +853,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     p_sw = sub.add_parser('set-watermark',
                           help='Set the last-claimed line watermark.')
     p_sw.add_argument('--line', required=True, type=int)
+    sub.add_parser('repair-watermark',
+                   help='Reset a stale (too-large) watermark after log '
+                        'compaction; prints a JSON repair/no-op report.')
     args = parser.parse_args(argv)
     if args.cmd == 'read':
         return _cli_read(args)
@@ -804,6 +873,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         return _cli_get_watermark(args)
     if args.cmd == 'set-watermark':
         return _cli_set_watermark(args)
+    if args.cmd == 'repair-watermark':
+        return _cli_repair_watermark(args)
     return 2
 
 
