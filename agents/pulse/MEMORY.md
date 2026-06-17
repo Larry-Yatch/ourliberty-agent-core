@@ -126,9 +126,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-17 02:04Z UTC (Iter ~2090, Tier 2, consecutive_clean=1→2, NOMINAL)
+## Status snapshot — updated 2026-06-17 02:26Z UTC (Iter ~2091, Tier 2→3, consecutive_clean=2→3→de-escalate, NOMINAL)
 
-**Iter ~2090 summary:** ✅ Nominal. 0 new alerts. All 5 daemons alive (same PIDs: beacon 3556778, chain-event 2744551, inbox-watcher 3434697, outbox_notifier 3676902, dashboard_api 3688711). Repo HEAD=19ad104f=origin/main (clean). Last sync 01:09:59Z (~54 min). No stalls. pending=0. Credential rotation: all clear. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **1 open PR: #554** (p4-complete-signal, created 01:53:47Z, 10 min old, Mirror review pending, normal pipeline flow). projects-v3-p1 SEQUENCE COMPLETE ✅. **projects-v3-p4 ACTIVE:** Forge completed p4-complete-signal session (PR #554 created 01:53:47Z); p4-cleanup-committer queued. Check I already fired today (check-i-2026-06-17.json). PRIME ratio=20.43 (1001 interventions, 49 systemic fixes). **Tier 2, consecutive_clean=1→2.**
+**Iter ~2091 summary:** ✅ Nominal. 1 Tier-3 alert (L1065 heal-wedged-review-sessions/wedged-review-reaped:wt-forge-p4-complete-signal, silenced). All 5 daemons alive (same PIDs: beacon 3556778, chain-event 2744551, inbox-watcher 3434697, outbox_notifier 3676902, dashboard_api 3688711). Repo HEAD=1fda2d88=origin/main (clean). Last sync 02:09:42Z (~16 min). No stalls. pending=0. Credential rotation: all clear. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **1 open PR: #555** (p4-cleanup-committer "Contract D: GC healer commits any pending missions.json delta; sync tolerates it", created 02:21:29Z, Mirror review pending dispatch, normal pipeline flow). **PR #554 MERGED ✅** (ce8752f0, p4-complete-signal, 02:14:30Z). projects-v3-p1 SEQUENCE COMPLETE ✅. **projects-v3-p4 ACTIVE:** p4-complete-signal MERGED, p4-cleanup-committer PR #555 open. Check I already fired today (check-i-2026-06-17.json). PRIME ratio=20.43 (1001 interventions, 49 systemic fixes). **Tier 2→3, consecutive_clean=2→3→de-escalate.**
 
 ## Status snapshot — updated 2026-06-17 01:48Z UTC (Iter ~2089, Tier 2, consecutive_clean=0→1, NOMINAL)
 

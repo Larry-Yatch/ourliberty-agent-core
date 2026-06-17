@@ -4,6 +4,60 @@
 
 ---
 
+## Iteration ~2091 — 2026-06-17 02:26Z UTC (interactive, /cycle, Tier 2→3, consecutive_clean=2→3→de-escalate, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 1 Tier-3 alert (silenced). projects-v3-p4 sequence advancing: PR #554 merged, PR #555 (p4-cleanup-committer) just created. No DM to Larry.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** 0 open PRs in Phase S. ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** Not open. ✅
+- **projects-v3-p1 SEQUENCE COMPLETE ✅ CONFIRMED:** 0 open PRs for p1 sequence. ✅
+- **projects-v3-p4 ACTIVE ✅ CONFIRMED:** PR #554 (p4-complete-signal) MERGED 02:14:30Z (`ce8752f0`). PR #555 (p4-cleanup-committer, `forge/p4-cleanup-committer`) created 02:21:29Z, MERGEABLE, Mirror review pending dispatch. MalformedForgeMarker retry 1/3 fired for both steps (covered by G-rule PR #524 retry mechanism); retry PROCEED classified 02:24:12Z, build-phase re-dispatched. No stalls (heal_pipeline_stall --dry-run confirms). ✅
+- **Daemons same PIDs ✅:** beacon 3556778 (Ss), chain-event 2744551 (SNs), inbox-watcher 3434697 (Ssl), outbox_notifier 3676902 (Ss), dashboard_api 3688711 (Ssl). All 5 alive. ✅
+
+**Check 0 — Alert triage:** Watermark=1064 entering; file=1065 lines. **1 new alert (L1065).** `source=heal-wedged-review-sessions, subject=wedged-review-reaped:wt-forge-p4-complete-signal, ts=02:07:54Z`. Route=closure. Triage helper: **Tier 3 silenced** (known-pattern match in alert-translations.json). No DM. Watermark advanced to 1065. ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log — 3 MalformedForgeMarker WARNs today: p1-funnel-derive (17:28 MDT, covered PR #524), p4-complete-signal (20:10 MDT), p4-cleanup-committer (20:21 MDT). The p4-complete and p4-cleanup ones are new this window (sub-threshold, 2 occurrences < 5/hr threshold). Retry mechanism (PR #524) fired correctly for both: p4-complete-signal retry classified REJECT 20:23 MDT (PR already merged); p4-cleanup-committer retry classified PROCEED 20:24 MDT → build-phase re-dispatched. Both are expected behavior of the retry mechanism. ✅ Nominal (sub-threshold, covered by completed G-rule PR #524).
+
+**Check 2 — Telegram sweep:** Last Larry message: `go` at 19:16:03 MDT (01:16Z) for dag-preflight-projects-v3-p4. Fully tracked by active projects-v3-p4 sequence. No new messages. No orphaned directives. G-rule telegram-409-burst **2/3** unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → `no stalls detected`. `RETRY_EXHAUSTED_SKIP task=p4-complete-signal reason=superseded_session` (PR #554 merged — correct skip). PR #555 created 02:21:29Z, within threshold. ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0 in beacon-pending-approvals.json. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-17T01:54:15Z, age≈32 min at check time (~02:26Z). FRESH (< 60 min threshold). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=1fda2d88=origin/main (clean, on main, no divergence). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-17T02:09:42Z, status=no-change (at commit 817a3085), age≈16 min. Repo is at 1fda2d88 (newer commits landed via post-sync fast-forward). Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3556778 (Ss) ✅, chain_event_shipper 2744551 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, outbox_notifier 3676902 (Ss) ✅, dashboard_api 3688711 (Ssl) ✅. All 5 alive, same PIDs as iter ~2090. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 1 open PR (#555 "Contract D: GC healer commits any pending missions.json delta; sync tolerates it", forge/p4-cleanup-committer, created 02:21:29Z, MERGEABLE, no review yet — ~4 min old at journal time, within 30-min threshold; Mirror review pending outbox-notifier dispatch). ourliberty-dashboard: 0 ✅. ourliberty-graph: 0 ✅. ✅ Nominal.
+
+**Check H — Forge digest:** PR #554 (p4-complete-signal) MERGED 02:14:30Z ✅. PR #555 (p4-cleanup-committer) created 02:21:29Z, in normal pipeline flow. Forge inbox: marker-error-p4-complete-signal-1.json + marker-error-p4-cleanup-committer-1.json (retry envelopes from MalformedForgeMarker, being processed by retry mechanism). ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → `OK: schema_version=1 validates`. ✅ Nominal.
+
+**Conditional checks (Wednesday 2026-06-17 UTC, weekday=2 ∈ {0,2,4,6}):**
+- Check I: artifact `pulse-check-i/check-i-2026-06-17.json` EXISTS → SKIP (same-day dedup).
+- Check III: fires Sunday → skip.
+
+**G-rule tracking:** No new G-rule counts this iter. All counts unchanged from iter ~2090.
+
+**Actions taken:**
+1. Check 0: L1065 claimed + triaged Tier 3 (heal-wedged-review-sessions/wedged-review-reaped). Watermark advanced to 1065.
+2. PRIME ledger: `iter_clean` appended (tier=2, template=iter-clean, ts=2026-06-17T02:26:05Z).
+3. Tier state: `record --checks-clean true` → consecutive_clean 2→3 → **Tier promoted 2→3**. consecutive_clean reset to 0.
+
+**PRIME ratio:** 20.43 (1001 interventions, 49 systemic fixes). Trend: improving.
+
+**Dispatches:** None.
+
+---
+
 ## Iteration ~2090 — 2026-06-17 02:04Z UTC (interactive, /loop /cycle, Tier 2, consecutive_clean=1→2, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/loop /cycle`).
