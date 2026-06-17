@@ -4,6 +4,73 @@
 
 ---
 
+## Iteration ~2080 — 2026-06-17 00:11Z UTC (interactive, /cycle, Tier 1, consecutive_clean=2→0, TIER-RESET)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Tier-reset. 2 new Tier-4 alerts (routine Check I + ledger digest outputs, bot-delivered; no Pulse second-DM). All infrastructure checks nominal. Check I fired (Wednesday = firing day).
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** 0 open PRs across all three repos. ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** Not open. ✅
+- **projects-v3-p1 SEQUENCE COMPLETE ✅ CONFIRMED:** 0 open PRs. ✅
+- **Pending approvals — CLEAR ✅:** pending=0. ✅
+- **Daemons same PIDs ✅:** beacon 3556778 (Ss), chain-event 2744551 (SNs), inbox-watcher 3434697 (Ssl), outbox_notifier 3676902 (Ss), dashboard_api 3688711 (Ssl). All 5 alive. ✅
+
+**Check 0 — Alert triage:** Watermark=1058 entering; file=1060 lines. **2 new alerts:**
+- L1059: `source=ledger, subject=weekly-2026-06-15, route=escalate` — Helper: **Tier-4** (novel, no translation match). Bot already DM'd Larry via route=escalate. No Pulse double-DM. Tier-reset.
+- L1060: `source=pulse, subject=check-i-2026-06-15, route=escalate` — Helper: **Tier-4** (novel, no translation match). Bot already DM'd Larry via route=escalate. No Pulse double-DM. Tier-reset.
+- G-rule **ledger/check-i Tier-4: 1/3 → 2/3**. Dispatch to Beacon at 3/3.
+- Watermark advanced 1058→1060.
+
+**Check 1 — Log noise:** outbox-notifier.log tail — last entry 17:44:40 MDT (23:44:40Z) AUTO_MERGE_QUEUE_UNKNOWN_RETRY for p1-funnel-derive (sequence complete). Only WARN since iter ~2079: MalformedForgeMarker at 17:28:29 MDT — covered by completed G-rule PR #524. Bot log last: alert idx=1057 (heal-stale-daemon-code digest) at 17:53:52 MDT. No new Larry messages. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message 16:25:01 MDT (22:25Z) 'go' — served iter ~2070. No new messages. G-rule telegram-409-burst **2/3** unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → `no stalls detected`. All FORGE_NO_PR_SKIP entries reason=pr_exists or preflight_exit. ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0. No orphaned Larry directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-16T23:53:46Z, age≈17 min at check time (00:11Z). FRESH (< 60 min threshold). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=17aafd32=origin/main. Working tree clean, on main, no divergence. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-16T23:29:16Z, status=no-change, age≈41 min at check time. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3556778 (Ss) ✅, chain_event_shipper 2744551 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, outbox_notifier 3676902 (Ss) ✅, dashboard_api 3688711 (Ssl) ✅. All 5 alive, same PIDs as iter ~2079. ✅ Nominal.
+
+**Check E — PRs:**
+- ourliberty-agent-core: **0 open PRs.** ✅
+- ourliberty-dashboard: **0 open PRs.** ✅
+- ourliberty-graph: **0 open PRs.** ✅
+
+**Check H — Forge digest:** projects-v3-p1 SEQUENCE COMPLETE ✅. No active sequences. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → `OK: schema_version=1 validates`. ✅ Nominal.
+
+**Check I (Wednesday 2026-06-17 UTC, weekday=2 ∈ {0,2,4,6} — FIRES):**
+- Note: iter ~2079 incorrectly labeled today "Tuesday" and skipped — corrected this iter.
+- `python3 pulse_check_i.py --force` → mode=digest. Sidecar refresh OK (2.1s). Journal block for week-of-2026-06-15 already present (no duplicate). New artifact: `pulse-check-i/check-i-2026-06-17.json`.
+- Week of 2026-06-15: $1135.74 total (+$94.09, +9.0% vs prior). 360 σ-anomalies. Retry overhead: $12.09 (1.1%).
+- Top anomaly: `cycle-202606111240000000` at $2.80 (21.5σ; baseline $0.81/cycle).
+- 1 proposal: [small] review cycle-202606111240000000. Auto-dispatch dedup-skipped (key=04807c018d dispatched 2026-06-15T07:02Z). No new dispatch.
+- Bot DM delivered as L1059+L1060 above.
+
+**G-rule tracking:**
+- **ledger/check-i Tier-4: 1/3 → 2/3.** Both routine outputs re-classified Tier-4 again. Dispatch to Beacon at 3/3.
+- All other G-rule counts unchanged from iter ~2079.
+
+**Actions taken:**
+1. Alert watermark: advanced 1058→1060.
+2. PRIME ledger: `iter_clean` appended (tier=1, template=iter-clean, ts=2026-06-17T00:14:14Z). [No Pulse intervention; Tier-4 alerts were bot-delivered informational outputs.]
+3. Tier state: `record --checks-clean false` → tier-reset Tier 1, consecutive_clean=2→0.
+
+**PRIME ratio:** 20.39 (999 interventions, 49 systemic fixes). Trend: improving.
+
+**Dispatches:** None.
+
+---
+
 ## Iteration ~2079 — 2026-06-17 00:02Z UTC (interactive, /cycle, Tier 1, consecutive_clean=1→2, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).

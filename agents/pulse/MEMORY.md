@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-17 00:14Z UTC (Iter ~2080, Tier 1, consecutive_clean=2→0, TIER-RESET)
+
+**Iter ~2080 summary:** ⚠️ Tier-reset. 2 Tier-4 alerts (L1059 ledger-weekly-2026-06-15 + L1060 check-i-2026-06-15; routine Check I outputs, bot-delivered via route=escalate; no Pulse double-DM). All 5 daemons alive (same PIDs: beacon 3556778, chain-event 2744551, inbox-watcher 3434697, outbox_notifier 3676902, dashboard_api 3688711). Repo HEAD=17aafd32=origin/main (clean). Last sync 23:29:16Z (~41 min). No stalls. pending=0. Credential rotation: all clear. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs.** projects-v3-p1 SEQUENCE COMPLETE ✅. Check I fired (Wednesday, mode=digest, no new dispatch, dedup-skip on 04807c018d). iter ~2079 incorrectly labeled Wed as "Tuesday" — corrected this iter. PRIME ratio=20.39 (999 interventions, 49 systemic fixes). **Tier 1, consecutive_clean=2→0.**
+
 ## Status snapshot — updated 2026-06-17 00:02Z UTC (Iter ~2079, Tier 1, consecutive_clean=1→2, NOMINAL)
 
 **Iter ~2079 summary:** ✅ Nominal. 0 new alerts. All 5 daemons alive (same PIDs: beacon 3556778, chain-event 2744551, inbox-watcher 3434697, outbox_notifier 3676902, dashboard_api 3688711). Repo HEAD=2ead9913=origin/main (clean). Last sync 23:29:16Z (~32 min). No stalls. pending=0. Credential rotation: all clear. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs.** projects-v3-p1 SEQUENCE COMPLETE ✅. PRIME ratio=20.39 (999 interventions, 49 systemic fixes). **Tier 1, consecutive_clean=1→2.**
@@ -206,7 +210,7 @@
 | G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4 | [blue] **1/3** — heal-pipeline-stall fires Tier-4; medic DMs directly; Pulse no-DM. | Watch; dispatch to Beacon at 3/3 for Tier-3 translation |
 | Check I 2026-06-15 | [blue] 1 proposal dispatched iter ~1899, Beacon processed | Beacon spec in progress |
 | G-rule catalog-accuracy-drift-tier4 | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 |
-| G-rule ledger/check-i Tier-4 | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 |
+| G-rule ledger/check-i Tier-4 | [blue] **2/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule health-notify-script-missing | [blue] **1/3** | Watch; dispatch at 3/3 |
 | catalog-accuracy-drift | [blue] 9/34 ourliberty-graph shelf cards drifted | route=digest; journal-note only |
 | G-rule Forge-timeout-worktree-missing-retry-loop | [blue] 1/3 | Watch; dispatch at 3/3 |
