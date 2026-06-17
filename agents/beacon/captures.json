@@ -239,7 +239,7 @@
       "id": "cap-tier-alert-cycle-3-pr-close-out-plan-3819",
       "title": "Tier-alert cycle: 3-PR close-out plan",
       "note": "Root causes verified 6/10: (1) classify_tier1_failure bare-401 regex matched UUID digits in 'No conversation found with session ID: 32401737\u2026' \u2014 the 18:57Z alert was session_lost (reaper fallout), not auth and not fixtures; (2) unittest discover -s scripts/tests NEVER runs tests/__init__.py so #412 sandbox + #428 tripwire are dead code under the production gate (proven; 9 mock events hit real ledger 18:39:48Z). Plan: PR-1 classifier envelope fix (session_lost class + fresh-dispatch recovery, word-boundary 401, fix 'Tier 1' hardcoded alert text); PR-2 gate env-injection at test_regression_check.py:137 + meta-test proving sandbox engages under the EXACT production invocation; PR-3 Beacon's mock sanitization (defense-in-depth); then re-kick reaper fix FRESH (session 32401737 unreachable \u2014 do not resume); purge 9 poisoned 18:39:48Z ledger events (quarantine pattern); add alert-translations entry for claude_tier1_failed_tier2_unavailable; then re-kick S1. Memory: tier-alert-cycle-final-rootcause.md",
-      "state": "parked",
+      "state": "promoted",
       "origin": {
         "source": "desktop-chat",
         "session_id": null,
@@ -248,21 +248,26 @@
         "captured_at": "2026-06-10T20:02:36.962016+00:00"
       },
       "last_touched": "2026-06-10T20:02:36.962016+00:00",
-      "promoted_to": null,
+      "promoted_to": "tier-alert-cycle-3-pr-close-out-plan",
       "briefing": {
-        "what": "Our automated alert system has been crying wolf \u2014 flagging fake emergencies \u2014 while a safety net we thought was protecting us turned out to be switched off.",
-        "why": "False alarms waste attention and erode trust in the system, and the disabled safety check means bad data has been slipping through unnoticed.",
-        "suggest": "Approve a careful, staged clean-up that fixes the false alarms first, then re-enables and proves the safety net actually works before we rely on it again."
+        "what": "A cleanup plan to fix our alerting system, which has been raising false alarms and quietly let a broken safety check slip test data into our real records.",
+        "why": "Every false alarm burns the team's attention on non-problems, and the failed safety net means we can't fully trust what our records are telling us until it's fixed.",
+        "suggest": "Worth doing, but tackle it in careful, verified stages rather than all at once \u2014 and double-check the cleanup of the bad data before moving on."
       },
       "risk": "careful",
       "recommended_action": "delegate",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-06-14T17:52:43.946307+00:00",
-        "from_state": "parked"
+        "at": "2026-06-17T22:13:26.976930+00:00",
+        "from_state": "promoted"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "spawned": {
+        "kind": "project",
+        "project_id": "tier-alert-cycle-3-pr-close-out-plan",
+        "stamped_at": "2026-06-17T22:06:11.667613+00:00"
+      }
     },
     {
       "id": "cap-erofs-tier2-home-systemd-unit-fix-pr-5-b0ef",
