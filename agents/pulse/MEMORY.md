@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-17 15:05Z UTC (Iter ~2140, Tier 1, consecutive_clean=1→2, NOMINAL)
+
+**Iter ~2140 summary:** ✅ Nominal. 0 new alerts. All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3964779, dashboard_api 3964550). Repo HEAD=023f209e=origin/main (clean). Last sync 14:12:19Z (~51 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs across all repos.** **projects-v3-p3 ACTIVE step 2:** Forge session 3938869 (p3-project-store, --resume 9785c19d) still running, ~67 min total / ~15 min post-merge verification phase — not yet stuck per heal_pipeline_stall. p3-promote-endpoint.json queued in Forge inbox (14:51Z), will auto-start when session exits. Check I skipped (artifact exists 2026-06-17). PRIME ratio=19.48 (1013 interventions, 52 systemic fixes). **Tier 1, consecutive_clean=1→2.**
+
 ## Status snapshot — updated 2026-06-17 15:00Z UTC (Iter ~2139, Tier 1, consecutive_clean=0→1, NOMINAL)
 
 **Iter ~2139 summary:** ✅ Nominal. 2 Tier-3 alerts silenced: L999 (heal-stale-daemon-code/auto-restarted:ourliberty-dashboard-api.service — PR #567 code deploy) + L1000 (heal-stale-daemon-code/auto-restarted:ourliberty-outbox-notifier.service — PR #567 code deploy). Dashboard_api + outbox_notifier now have NEW PIDs (3964550 / 3964779) after heal-stale-daemon-code restart at 14:58Z (projects_store.py added to watch_paths in PR #567). beacon 3734671, chain-event 3734305, inbox-watcher 3434697 unchanged. Repo HEAD=26b858a1=origin/main (clean). Last sync 14:12:19Z (~45 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs across all repos.** **projects-v3-p3 step 2 (p3-promote-endpoint) queued:** Forge session 3938869 (p3-project-store post-merge verification, ~61 min) still running; p3-promote-endpoint.json in Forge inbox pending that session exit. Check I skipped (artifact exists 2026-06-17). PRIME ratio=19.48 (1013 interventions, 52 systemic fixes). **Tier 1, consecutive_clean=0→1.**
