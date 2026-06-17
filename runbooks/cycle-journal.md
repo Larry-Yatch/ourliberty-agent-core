@@ -4,6 +4,91 @@
 
 ---
 
+## Iteration ~2168 — 2026-06-17 23:31Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0, SIGNAL-CARRY + NEW-DIRECTIVE)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Signal-carry + new finding. Mandatory checks nominal. 1 new finding (Check 2): Larry sent Telegram directive "Can you clear the stale worktree?" at 23:22Z UTC — the authorized "go" for dag-preflight-revision-gap recovery. Beacon attempted, hit 429. Pulse attempted worktree remove, hit EROFS (sandbox ReadOnly restriction on `/home/larry/agent-worktrees/`). Recovery dispatch sent to Beacon inbox.
+
+**VERIFY-BEFORE-REASSERT:**
+- **All 5 daemon PIDs alive:** beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4048770 (Ssl), outbox_notifier 4049089 (Ss). Same PIDs as iter ~2167. ✅
+- **0 open PRs:** both repos. ✅
+- **Repo at origin/main:** HEAD=9b770393=origin/main (Pulse cycle 20260617T231931Z). Clean tree. ✅
+- **dag-preflight-revision-gap still active:** worktree `wt-mirror-dag-preflight-projects-v3-p3-followup` confirmed present. Removal attempted — failed EROFS. Recovery dispatch sent to Beacon. ✅ (carry confirmed, new action taken)
+- **PID 1834248 (bash orphan):** still alive (Ss bash). Low CPU. Carry. ✅
+
+**Check 0 — Alert triage:** repair-watermark → no repair (`{"repaired": false, "old_watermark": 1018, "file_length": 1018}`). **0 new alerts.** ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → No entries. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** New finding. Bot log shows at 17:22:35-0600 (23:22:35Z UTC): `← 7998341473: 'Can you clear the stale worktree?'`. Beacon invoked, got claude exit 1 (api_error_status=429, server-side rate limit) at 17:23:20-0600. This is the "go" for dag-preflight-revision-gap recovery. ⚠️ New directive.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected`. 19 FORGE_NO_PR_SKIP (all reason=pr_exists). ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` pending=0. Beacon/forge/mirror inboxes: empty (before Pulse dispatch). ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=`2026-06-17T22:59:36Z` (~32 min at journal write). FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=9b770393=origin/main. Clean tree. On main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-17T22:50:15Z (~41 min), status=success. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon 3734671 (Ss) ✅, chain-event 3734305 (SNs) ✅, inbox-watcher 3434697 (Ssl) ✅, dashboard_api 4048770 (Ssl) ✅, outbox_notifier 4049089 (Ss) ✅. All 5/5 alive. Same PIDs as iter ~2167. ✅ Nominal.
+
+**Check D — Inboxes:** beacon: empty (before dispatch), forge: empty, mirror: empty. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open PRs. ourliberty-dashboard: 0 open PRs. ✅ Nominal.
+
+**Conditional checks:** Wednesday 2026-06-17 UTC, weekday=2 ∈ {0,2,4,6}.
+- Check I: artifact `pulse-check-i/check-i-2026-06-17.json` EXISTS → SKIP (same-day dedup). ✅
+- Check III: Sunday-anchored → skip. ✅
+
+**Active finding — dag-preflight-revision-gap (recovery attempted this iter):**
+Context: Mirror ran dag-preflight-projects-v3-p3-followup, returned REVISION (two parallel tasks editing dashboard_api.py). Beacon autonomously serialized. APPROVAL_REQUEST for re-dispatch fell through (known source=pulse gap). Stale worktree `wt-mirror-dag-preflight-projects-v3-p3-followup` (branch `mirror/dag-preflight-projects-v3-p3-followup`, b57bdc5d) remains at `/home/larry/agent-worktrees/`. Mirror inbox is empty (old task consumed).
+
+This iter: Larry authorized worktree clear at 23:22Z. Beacon failed (429). Pulse attempted `git -C ~/agent-core worktree remove ~/agent-worktrees/wt-mirror-dag-preflight-projects-v3-p3-followup --force` → `error: failed to delete ... : Read-only file system` (systemd sandbox restriction: `/home/larry/agent-worktrees/` is ReadOnly in Pulse's service context). Also pruned stale /tmp/tj4 worktree git reference (zombie prune succeeded). Dispatched `recover-dag-preflight-p3-followup-001` to Beacon's inbox asking Beacon to: (1) clear the worktree (Beacon's service likely has ReadWritePaths on agent-worktrees), (2) re-dispatch dag-preflight with serialized DAG to Mirror.
+
+Manual fallback if Beacon can't clear: `git -C ~/agent-core worktree remove ~/agent-worktrees/wt-mirror-dag-preflight-projects-v3-p3-followup --force` in a terminal outside any systemd sandbox.
+
+**Actions taken:**
+1. Check 2: Telegram directive noted (23:22Z UTC) — Larry authorized worktree clear.
+2. Pruned zombie worktree git reference `/tmp/tj4` (gitdir pointed to non-existent location — safe cleanup). ✅
+3. Attempted `git worktree remove --force` on stale worktree → EROFS (sandbox restriction). ❌
+4. Dispatched `recover-dag-preflight-p3-followup-001` to Beacon's inbox for recovery. ✅
+5. Check 0 watermark: confirmed at 1018=file_length, no change needed.
+6. PRIME ledger: `intervention: dag-preflight-revision-gap-carry` (recovery dispatch sent, not yet resolved).
+7. Tier state: `record --checks-clean false` → Tier 1, consecutive_clean=0 (new finding + standing unresolved).
+
+**Dispatches:** `recover-dag-preflight-p3-followup-001` → Beacon inbox (/home/larry/agents/inboxes/beacon/).
+
+**Standing findings (carried):**
+- [yellow] **dag-preflight-revision-gap:projects-v3-p3-followup** — stale worktree + recovery dispatch sent to Beacon. Awaiting Beacon to clear worktree + re-dispatch dag-preflight. [active — recovery in flight]
+- [blue] **unreviewed-merge:571** — PR #571 merged without Mirror. Bot DM'd 22:42Z. Larry judgment. [carry]
+- [blue] **Stale bash orphan** — PID 1834248 (Ss bash). Low CPU. [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule watermark-rotation-gap** — 2/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule catalog-accuracy-drift-tier4** — 1/3. Watch.
+- [blue] **G-rule ledger/check-i Tier-4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention this iter. Trailing-30d: interventions=~1021, systemic_fixes=52, ratio=~19.6, trend=improving.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0 (new finding + standing unresolved dag-preflight-revision-gap).
+
+---
+
 ## Iteration ~2167 — 2026-06-17 23:18Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0, SIGNAL-CARRY)
 
 **Trigger:** Larry direct invocation (`/cycle`).

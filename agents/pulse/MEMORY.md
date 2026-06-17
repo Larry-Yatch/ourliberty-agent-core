@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-17 23:31Z UTC (Iter ~2168, Tier 1, consecutive_clean=0, SIGNAL-CARRY+DISPATCH)
+
+**Iter ~2168 summary:** ⚠️ Signal-carry + new action. Check 2: Larry Telegram directive 23:22Z UTC "Can you clear the stale worktree?" — authorized "go" for dag-preflight-revision-gap recovery. Beacon attempt: 429 (rate-limited). Pulse attempt: EROFS (sandbox ReadOnly restriction on /home/larry/agent-worktrees/ in Pulse systemd context). Zombie worktree git ref /tmp/tj4 pruned. Dispatched `recover-dag-preflight-p3-followup-001` to Beacon inbox — Beacon to: (1) clear stale worktree, (2) re-dispatch dag-preflight with serialized DAG to Mirror. All 5 daemons alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4048770 (Ssl), outbox_notifier 4049089 (Ss). Repo HEAD=9b770393=origin/main (clean). Last sync 22:50:15Z (success, ~41 min). 0 open PRs. 0 stalls. pending=0. Credential rotation: OK. Heartbeat 22:59:36Z (~32 min, fresh). Check I skipped (artifact exists 2026-06-17). PRIME ratio=~19.6 (1021 interventions, 52 systemic fixes, trend=improving). **Tier 1, consecutive_clean=0.**
+
 ## Status snapshot — updated 2026-06-17 23:18Z UTC (Iter ~2167, Tier 1, consecutive_clean=0, SIGNAL-CARRY)
 
 **Iter ~2167 summary:** ⚠️ Signal-carry. 0 new alerts (watermark=1018=file_length). dag-preflight-revision-gap:projects-v3-p3-followup still active — stale worktree `wt-mirror-dag-preflight-projects-v3-p3-followup` confirmed; awaiting Larry go to clean + re-dispatch. All 5 daemons alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4048770 (Ssl), outbox_notifier 4049089 (Ss). Same PIDs as iter ~2166. Repo HEAD=e8d61d87=origin/main (clean). Last sync 22:50:15Z (success, ~28 min). 0 open PRs. 0 stalls. pending=0. Credential rotation: OK. Heartbeat 22:59:36Z (~18 min, fresh). Check I skipped (artifact exists 2026-06-17). PRIME ratio=~19.6 (1020 interventions, 52 systemic fixes, trend=improving). **Tier 1, consecutive_clean=0.**
