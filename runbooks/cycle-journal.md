@@ -4,6 +4,81 @@
 
 ---
 
+## Iteration ~2128 — 2026-06-17 13:14Z UTC (interactive, /cycle, Tier 1, consecutive_clean=1→0, SIGNAL/G-RULE-DISPATCH)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Signal (G-rule dispatch). 2 new alerts: L991 Tier-3 silence (approval_request delivery confirmation), L992 Tier-4 (sequence-complete:projects-v3-p2-followup → G-rule 3/3 COMPLETE → dispatched). pipeline clean. No DM to Larry.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** No regression. ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** No regression. ✅
+- **projects-v3-p1 SEQUENCE COMPLETE ✅ CONFIRMED:** FORGE_NO_PR_SKIP entries all pr_exists per heal_pipeline_stall --dry-run. ✅
+- **projects-v3-p4 COMPLETE ✅ CONFIRMED:** FORGE_NO_PR_SKIP entries all pr_exists. ✅
+- **projects-v3-p2 SEQUENCE COMPLETE ✅ CONFIRMED:** p2-meaning-layer (#558), p2-actions (#559), p2-suggest-intake (#560), p2-funnel-card-ui (#59-dashboard) all pr_exists. ✅
+- **PR #564 MERGED ✅ CONFIRMED (NEW):** outbox-notifier AUTO_MERGE 13:06:07Z. ourliberty-agent-core 0 open PRs. ✅
+- **PR #60 MERGED ✅ CONFIRMED (NEW):** outbox-notifier AUTO_MERGE 13:06:58Z. ourliberty-dashboard 0 open PRs. ✅
+- **PR #61 MERGED ✅ CONFIRMED:** outbox-notifier AUTO_MERGE 12:57:15Z. ✅
+- **projects-v3-p2-followup SEQUENCE COMPLETE ✅ CONFIRMED:** SEQUENCE_COMPLETE event fired 13:06:59Z (all 3 steps: #60, #61, #564). ✅
+- **Daemons ✅:** beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), outbox_notifier 3769291 (Ss), dashboard_api 3809960 (Ssl). All 5 alive, same PIDs. ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 990, "file_length": 992}` (no repair needed). Watermark=990, file=992 lines. **2 new alerts:**
+- **L991** (13:04:39Z): `source=outbox-notifier, kind=approval_request, approval_id=mirror-prose-verdict-fallback-001` — delivery confirmation (outbox-notifier already sent approval DM to Larry). Helper → **Tier-3 silence** (known-pattern match). No DM from Pulse. ✅
+- **L992** (13:06:59Z): `source=outbox-notifier, subject=sequence-complete:projects-v3-p2-followup` — bot delivered via route=escalate. Helper → **Tier-4** (novel, no registry template). Bot already DM'd Larry; Pulse no second DM. **G-rule sequence-complete-tier4: 3/3 COMPLETE ✅** (prior occurrences: ~2108 sequence-complete:projects-v3-p2, ~2128 this iter). Dispatched `sequence-complete-tier3-translation-001` to Beacon. Watermark advanced 990→992. → tier-reset.
+
+**Check 1 — Log noise:** No new WARNs in outbox-notifier.log after iter ~2127. Last WARN was MalformedMirrorMarker at 12:51:58Z (iter ~2126, already handled; G-rule dispatch done). Post-iter-~2127 log clean: 3× AUTO_MERGE (p2fix-funnel-refresh, p2fix-derive-cache, p2fix-proposed-meaning) + SEQUENCE_COMPLETE + worktree teardowns. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Same 409 burst at 23:24–23:25 local June 16 (unchanged, G-rule dual-bot-instance-409-external 1/3). New events since iter ~2127: approval_request idx=990 (mirror-prose-verdict-fallback-001) delivered 13:09Z; alert idx=991 (sequence-complete:projects-v3-p2-followup) delivered 13:09Z. Larry sent "Go" at 13:10Z → approved mirror-prose-verdict-fallback-001 → dispatched to Forge. No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → no stalls detected. All FORGE_NO_PR_SKIP entries pr_exists. ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-17T12:57:15Z, age≈17 min. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=db4b6cb7 (1 commit ahead of origin/main=ea91af38 — the iter ~2127 Pulse cycle wrapper commit not yet pushed by sync). Working tree clean. On main. Sub-threshold: expected transient for interactive cycles; sync handles push on next run. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-17T12:12:38Z, age≈62 min. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3734671 (Ss) ✅, chain_event_shipper 3734305 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, outbox_notifier 3769291 (Ss) ✅, dashboard_api 3809960 (Ssl) ✅. All 5 alive. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open ✅ (PR #564 merged 13:06:07Z). ourliberty-dashboard: 0 open ✅ (PR #60 merged 13:06:58Z, PR #61 merged 12:57:15Z). ourliberty-graph: 0 open ✅. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Conditional checks (Wednesday 2026-06-17 UTC, weekday=2 ∈ {0,2,4,6}):**
+- Check I: artifact `pulse-check-i/check-i-2026-06-17.json` EXISTS → SKIP (same-day dedup). ✅
+- Check III: Sunday-anchored → skip.
+
+**Pipeline observation — projects-v3-p2-followup COMPLETE ✅:**
+All 3 steps merged: PR #60 (p2fix-proposed-meaning, ourliberty-dashboard) merged 13:06:58Z; PR #61 (p2fix-funnel-refresh, ourliberty-dashboard) merged 12:57:15Z; PR #564 (p2fix-derive-cache, ourliberty-agent-core) merged 13:06:07Z. SEQUENCE_COMPLETE event + DM fired 13:06:59Z. **projects-v3-p2-followup SEQUENCE COMPLETE ✅.**
+
+**Pipeline observation — mirror-prose-verdict-fallback-001:**
+Larry approved "Go" at 13:10Z. Forge picked up task → worktree created 13:10:08Z → Forge done success=True at 13:12:10Z ($0.38, 120s) → Forge resume (preflight/preamble) started 13:12:16Z → Beacon notify-mirror-prose-verdict-fallback-001 started 13:12:16Z. PR not yet open at check time (13:14Z — only 2 min into preflight, normal). Active pipeline, not a stall.
+
+**Pipeline observation — projects-v3-p3:**
+Staged at 06:59Z. Beacon likely authoring DAG-preflight. No pending-approval yet. Watch next iter.
+
+**G-rule tracking:**
+- **G-rule sequence-complete-tier4: 3/3 COMPLETE ✅** — dispatched `sequence-complete-tier3-translation-001` to Beacon (this iter). Fix: Tier-3 silence entry in config/alert-translations.json for source=outbox-notifier subject_prefix=sequence-complete:
+- G-rule mirror-malformed-verdict-marker: **COMPLETE ✅** (iter ~2126 dispatch). mirror-prose-verdict-fallback-001 Forge build done, in preflight. Watch for PR.
+- G-rule dual-bot-instance-409-external: **1/3** (unchanged, same June 16 burst).
+- G-rule catalog-accuracy-drift-tier4: **2/3** (unchanged).
+- G-rule ledger/check-i Tier-4: **2/3** (unchanged).
+- All other G-rule counts unchanged from iter ~2127.
+
+**Actions taken:**
+1. Dispatch: `sequence-complete-tier3-translation-001` → Beacon inbox (G-rule 3/3 → Tier-3 silence for sequence-complete:* alerts).
+2. Watermark: advanced 990→992.
+3. PRIME ledger: `intervention` appended (sequence-complete-tier4-g-rule-3of3); `systemic_fix` appended (sequence-complete-tier3-translation).
+4. Tier state: `record --checks-clean false` → consecutive_clean 1→0. Tier stays 1.
+
+**PRIME ratio:** 19.42 (1010 interventions, 52 systemic fixes). Trend: improving.
+
+**Dispatches:** `sequence-complete-tier3-translation-001` → Beacon inbox.
+
+---
+
 ## Iteration ~2127 — 2026-06-17 13:04Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0→1, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).

@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-17 13:14Z UTC (Iter ~2128, Tier 1, consecutive_clean=1→0, SIGNAL/G-RULE-DISPATCH)
+
+**Iter ~2128 summary:** ⚠️ Signal. G-rule sequence-complete-tier4 **3/3 COMPLETE ✅** — dispatched `sequence-complete-tier3-translation-001` to Beacon (Tier-3 silence for outbox-notifier sequence-complete:* alerts). L991 Tier-3 silenced (approval_request mirror-prose-verdict-fallback-001 delivery confirmation). L992 Tier-4 (sequence-complete:projects-v3-p2-followup; bot already DM'd, Pulse no-DM). All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3769291, dashboard_api 3809960). Repo HEAD=db4b6cb7 ahead of origin/main=ea91af38 by 1 Pulse wrapper commit (sync will push). Last sync 12:12:38Z (~62 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs.** projects-v3-p2-followup SEQUENCE COMPLETE ✅ (all 3 PRs #60+#61+#564 merged, sequence-complete DM 13:07Z). mirror-prose-verdict-fallback-001: Forge done 13:12Z ($0.38), preflight/preamble in progress — PR expected shortly. projects-v3-p3 STAGED. Check I skipped (artifact exists 2026-06-17). PRIME ratio=19.42 (1010 interventions, 52 systemic fixes). **Tier 1, consecutive_clean=1→0.**
+
 ## Status snapshot — updated 2026-06-17 13:04Z UTC (Iter ~2127, Tier 1, consecutive_clean=0→1, NOMINAL)
 
 **Iter ~2127 summary:** ✅ Nominal. 0 new alerts. PR #61 (p2fix-funnel-refresh, ourliberty-dashboard) MERGED 12:57:14Z ✅ — 2/3 projects-v3-p2-followup steps complete. All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3769291, dashboard_api 3809960). Repo HEAD=0a75586e=origin/main (clean). Last sync 12:12:38Z (~52 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **2 open PRs:** #60 (dashboard, p2fix-proposed-meaning, Mirror retry 1/3 in flight), #564 (agent-core, p2fix-derive-cache, Mirror review in progress 12:57:09Z). projects-v3-p3 STAGED ✅ (Beacon building spec). Beacon mirror-malformed-verdict-fix-001 building 12:59:41Z. Check I skipped (artifact exists 2026-06-17). PRIME ratio=19.76 (1008 interventions, 51 systemic fixes). **Tier 1, consecutive_clean=0→1.**
@@ -268,7 +272,7 @@
 | G-rule merge_conflict_manual_rebase-tier4 | [blue] **1/3** — outbox-notifier DMs Larry directly via chat_id; Pulse should NOT double-DM. | Watch; dispatch to Beacon at 3/3 for Tier-3 translation |
 | G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4 | [blue] **1/3** — heal-pipeline-stall fires Tier-4; medic DMs directly; Pulse no-DM. | Watch; dispatch to Beacon at 3/3 for Tier-3 translation |
 | Check I 2026-06-15 | [blue] 1 proposal dispatched iter ~1899, Beacon processed | Beacon spec in progress |
-| G-rule sequence-complete-tier4 | [blue] **2/3** (iter ~2108: 2nd occurrence) — outbox-notifier sequence-complete:* alerts classify Tier-4 (novel); bot delivers via route=escalate; Pulse no-DM. | Watch; dispatch to Beacon at 3/3 for Tier-3 translation |
+| **G-rule sequence-complete-tier4** | [blue] **COMPLETE ✅** (iter ~2128) — dispatched `sequence-complete-tier3-translation-001` to Beacon. Fix: add Tier-3 silence to config/alert-translations.json for source=outbox-notifier subject_prefix=sequence-complete: | Watch for Beacon spec + Forge PR. |
 | G-rule catalog-accuracy-drift-tier4 | [blue] **2/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule dirty-tree-beacon-data-files-tier4 | [blue] **1/3** (NEW iter ~2085) — pulse-self-escalates dirty tree (Beacon runtime files); GC healer auto-resolves; Tier-4 (novel). | Watch; propose Tier-3 translation at 3/3 |
 | G-rule ledger/check-i Tier-4 | [blue] **2/3** | Watch; dispatch to Beacon at 3/3 |
@@ -289,4 +293,5 @@
 | projects-v3-p4 COMPLETE ✅ | [blue] PR#554 (p4-complete-signal) + PR#555 (p4-cleanup-committer) + **PR#556 (p4-postmerge-exec, 03:17:42Z)** ALL MERGED. GC healer Contract D live (ab8353aa). outbox-notifier sent sequence-complete DM 03:17:44Z. | DONE. All 3/3. |
 | dag-preflight-revision gap | [blue] PR #484 closed source=pulse gap. outbox-notifier also drops regular approval_request markers from Beacon inter-agent sessions (observed iter ~2020: both routing-signal and approval_request dropped in same 5-min window). | DAG markers and scope-decision markers still fall through; recover manually |
 | projects-v3-p2 COMPLETE ✅ | [blue] All 4 steps merged: PR #558 (meaning-layer) + PR #559 (actions) + PR #560 (suggest-intake) in ourliberty-agent-core; PR #59 (funnel-card-ui) in ourliberty-dashboard. Sequence-complete DM delivered 06:54Z 2026-06-17. | DONE. |
+| projects-v3-p2-followup COMPLETE ✅ | [blue] All 3 steps merged: PR #60 (p2fix-proposed-meaning, ourliberty-dashboard) + PR #61 (p2fix-funnel-refresh, ourliberty-dashboard) + PR #564 (p2fix-derive-cache, ourliberty-agent-core). Sequence-complete DM delivered 13:07Z 2026-06-17. | DONE. |
 | Stale bash orphans | [blue] PIDs 1834248 (17d+) + 2605007 (1d+). Ss, low CPU. | Carry |
