@@ -680,18 +680,58 @@ class CaptureDelegateResponse(BaseModel):
 
 
 class MissionActionRequest(BaseModel):
-    # Missions v2 Phase 3 § 5 — POST /api/system/missions/{id}/action body.
-    action: str = Field(..., min_length=1)  # defer | resume | reprioritize
+    # Missions v2 Phase 3 § 5 + Projects v3 P2 Contract B — POST
+    # /api/system/missions/{id}/action body.
+    action: str = Field(..., min_length=1)
     # defer: optional human-readable reason recorded in deferred_reason.
     reason: Optional[str] = None
     # reprioritize: new optional priority int (additive schema; null clears it).
     priority: Optional[int] = None
+    # snooze (Contract B): ISO-8601 datetime; null clears the snooze.
+    snoozed_until: Optional[str] = None
 
 
 class MissionActionResponse(BaseModel):
-    # All three mission write-backs are PR-backed → {pr_url, branch} (§ 5).
+    # The mission write-backs are PR-backed → {pr_url, branch} (§ 5 + Contract B).
     pr_url: Optional[str] = None
     branch: Optional[str] = None
+
+
+class MissionThreadResponse(BaseModel):
+    # GET /api/system/missions/{id}/thread — oldest-first conversation, mirroring
+    # the capture thread (Projects v3 P2 Contract B).
+    mission_id: str
+    messages: list[CaptureThreadMessage] = Field(default_factory=list)
+    last_synced_at: str
+
+
+class MissionMessageRequest(BaseModel):
+    # POST /api/system/missions/{id}/message body (Contract B).
+    text: str = Field(..., min_length=1)
+
+
+class MissionMessageResponse(BaseModel):
+    # The card_message was emitted + a resume envelope dropped in Beacon's inbox.
+    posted: bool
+    event_id: str
+    direction: str
+    envelope_written: Optional[str] = None
+    doorbell_resolved: bool = False
+
+
+class MissionDelegateRequest(BaseModel):
+    # POST /api/system/missions/{id}/delegate body (Contract B). Optional —
+    # defaults to "delegate".
+    action: Optional[str] = None  # delegate | promote | drop | snooze
+
+
+class MissionDelegateResponse(BaseModel):
+    # The delegate proposal (a human-approval-gate APPROVAL_REQUEST) was dropped
+    # in Beacon's inbox. `dispatched` is True on both a fresh proposal and a
+    # dedup-collapse; `deduped` distinguishes the two.
+    dispatched: bool
+    deduped: Optional[bool] = None
+    pr_url: Optional[str] = None
 
 
 # ---- /api/larry/* response + request models (E4.4e PR-B2) ----
@@ -3527,10 +3567,17 @@ def _build_funnel(
     missions: list[dict[str, Any]],
     orphans: list[dict[str, Any]],
     parked: list[dict[str, Any]],
+    now: Optional[datetime] = None,
 ) -> dict[str, list[dict[str, Any]]]:
     """Group the existing intake (parked + proposed missions + orphans) into the
     primary/secondary funnel (C4). Pure over its three inputs — call it with the
-    POST-filter arrays so the funnel tracks any ?repo=/?task_id= narrowing."""
+    POST-filter arrays so the funnel tracks any ?repo=/?task_id= narrowing.
+
+    P2 Contract B: a proposed mission snoozed past `now` (`snoozed_until` in the
+    future) is suppressed from the funnel until the snooze elapses, mirroring the
+    parked-capture lane (`_parked_from_captures`). Parked captures arrive already
+    snooze-filtered by the derive; missions are filtered here."""
+    now = now or datetime.now(timezone.utc)
     primary: list[dict[str, Any]] = []
     secondary: list[dict[str, Any]] = []
 
@@ -3555,6 +3602,11 @@ def _build_funnel(
     # auto-filtered once dead).
     for m in missions:
         if (m.get('phase') or '') != 'proposed':
+            continue
+        # Contract B: a snoozed proposed mission hides until the snooze elapses
+        # (mirrors the parked-capture lane). Applies to both suggested → primary
+        # and orphan-derived → secondary threads.
+        if _is_snoozed(m, now):
             continue
         proposed_by = m.get('proposed_by')
         src = _normalize_suggested_source(proposed_by)
@@ -3673,7 +3725,7 @@ def _build_derived_response(
         'parked': parked,
         # C4: additive funnel grouping. Built post-derive; re-derived against the
         # filtered arrays in _apply_derived_filters so it tracks ?repo=/?task_id=.
-        'funnel': _build_funnel(missions, orphans, parked),
+        'funnel': _build_funnel(missions, orphans, parked, now),
         'last_synced_at': last_synced_at,
         'as_of': _now_utc_iso(now),
     }
@@ -3684,6 +3736,7 @@ def _apply_derived_filters(
     *,
     repo: Optional[str],
     task_id: Optional[str],
+    now: Optional[datetime] = None,
 ) -> dict[str, Any]:
     """Apply the optional, AND-combined ?repo= / ?task_id= filters (§ 3.2).
 
@@ -3744,7 +3797,7 @@ def _apply_derived_filters(
     response['parked'] = parked
     # C4: re-derive the funnel against the filtered arrays so the grouping stays
     # consistent with the narrowed missions/orphans/parked sections.
-    response['funnel'] = _build_funnel(missions, orphans, parked)
+    response['funnel'] = _build_funnel(missions, orphans, parked, now)
     return response
 
 
@@ -3805,7 +3858,7 @@ def _handle_missions_derived(
         now=now,
         pr_state_resolver=pr_state_resolver,
     )
-    return _apply_derived_filters(response, repo=repo, task_id=task_id)
+    return _apply_derived_filters(response, repo=repo, task_id=task_id, now=now)
 
 
 # ---- /api/larry/* handler (E4.4e PR-B2) ----
@@ -4843,6 +4896,25 @@ def _shape_thread_message(ev: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _card_thread_messages(
+    item_id: str, supabase_client: Any,
+) -> list[dict[str, Any]]:
+    """Read a card's `card_message` chain_events (keyed by ``item_id``) back
+    oldest-first (§ 8). Store-agnostic: ``item_id`` is the capture_id for a
+    parked capture or the mission_id for a mission-backed funnel card — the
+    conversation lives in the SAME chain_events store keyed by that id, so one
+    reader serves both. Degrades to [] when Supabase is unavailable."""
+    by_task = _fetch_events_for_task_ids(supabase_client, [item_id])
+    events = by_task.get(item_id) or []  # newest-first from the fetch
+    messages = [
+        _shape_thread_message(ev)
+        for ev in events
+        if (ev.get('event_type') or '') == 'card_message'
+    ]
+    messages.reverse()  # oldest-first for natural thread render
+    return messages
+
+
 def _handle_capture_thread(
     *,
     capture_id: str,
@@ -4858,18 +4930,148 @@ def _handle_capture_thread(
     registry = _read_captures_registry(captures_path)
     _find_capture(registry.get('captures') or [], capture_id)
 
-    by_task = _fetch_events_for_task_ids(supabase_client, [capture_id])
-    events = by_task.get(capture_id) or []  # newest-first from the fetch
-    messages = [
-        _shape_thread_message(ev)
-        for ev in events
-        if (ev.get('event_type') or '') == 'card_message'
-    ]
-    messages.reverse()  # oldest-first for natural thread render
     return {
         'capture_id': capture_id,
-        'messages': messages,
+        'messages': _card_thread_messages(capture_id, supabase_client),
         'last_synced_at': now.isoformat(),
+    }
+
+
+# Card-message kinds → the noun + thread URL a Beacon resume prompt reads back.
+# Store-agnostic: a parked capture and a mission-backed funnel card share the same
+# conversation mechanism, differing only in the id key + where the thread lives.
+_CARD_KIND_CAPTURE = 'capture'
+_CARD_KIND_MISSION = 'mission'
+_CARD_KIND_META: dict[str, dict[str, str]] = {
+    _CARD_KIND_CAPTURE: {
+        'id_key': 'capture_id',
+        'noun': 'parked card',
+        'thread_url': '/api/missions/captures/{id}/thread',
+    },
+    _CARD_KIND_MISSION: {
+        'id_key': 'mission_id',
+        'noun': 'mission card',
+        'thread_url': '/api/system/missions/{id}/thread',
+    },
+}
+
+
+def _post_card_message(
+    *,
+    item_id: str,
+    item_title: Optional[str],
+    item_kind: str,
+    text: str,
+    actor: str,
+    agents_root: Path,
+    supabase_client: Any,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Shared core for "Larry posts on a card" (§ 8) — store-agnostic over
+    captures vs missions. ``item_kind`` selects the id key + thread URL + noun so
+    the same three effects serve both a parked capture and a mission-backed
+    funnel card:
+      1. Emit one `card_message` chain_event (direction=larry_to_team) keyed by
+         ``item_id`` (the conversation join key), so GET .../thread reads it back.
+      2. Drop a resume/notify envelope into Beacon's inbox so she answers next
+         cycle (the team is the single voice — § 2 decision #5).
+      3. Resolve any pending blocked-on-you doorbell for this card (§ 9).
+
+    The CALLER does the find/404 (the backing store differs); this core assumes
+    the item exists. 400 on empty text; 503 if Supabase is unavailable (the
+    message must be durable, so we refuse rather than silently drop it)."""
+    text = (text or '').strip()
+    if not text:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='message text must be non-empty',
+        )
+    if supabase_client is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail='supabase unavailable',
+        )
+    meta = _CARD_KIND_META[item_kind]
+    id_key = meta['id_key']
+    now = now or datetime.now(timezone.utc)
+    ts_iso = now.isoformat()
+
+    compute_event_id, sanitize_payload = _import_chain_event_helpers()
+    event_id = compute_event_id(item_id, 'card_message', ts_iso, extra=actor)
+    payload = {
+        id_key: item_id,
+        'direction': _CARD_MSG_LARRY,
+        'text': text,
+        'actor': actor,
+        # Larry asked/answered → the team owes a reply on its next cycle.
+        'needs_reply': True,
+    }
+    row: dict[str, Any] = {
+        'event_id': event_id,
+        'ts': ts_iso,
+        'agent': actor,
+        'event_type': 'card_message',
+        'task_id': item_id,
+        'actor': actor,
+        'payload': sanitize_payload(payload),
+    }
+    supabase_client.table('chain_events').upsert(
+        [row], on_conflict='event_id', ignore_duplicates=True,
+    ).execute()
+
+    # Resume/notify envelope → Beacon's inbox. Beacon answers on her next cycle
+    # (§ 8). Filename keyed on the event_id so concurrent messages never collide.
+    inbox = (agents_root / 'inboxes' / 'beacon').resolve()
+    filename = f'card-message-{event_id}.json'
+    envelope_candidate = (inbox / filename).resolve()
+    if envelope_candidate.parent != inbox:
+        # Defense-in-depth: item_id flows into the event_id (a hex digest),
+        # not the filename, so this should be unreachable — but never write
+        # outside Beacon's inbox.
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='invalid envelope filename',
+        )
+    thread_url = meta['thread_url'].replace('{id}', item_id)
+    envelope = {
+        'task_id': f'card-message-{item_id}',
+        'source': 'dashboard',
+        'actor': actor,
+        id_key: item_id,
+        'dedup_identity': f'card-message:{event_id}',
+        'timeout': 600,
+        'prompt': (
+            f'Larry posted a message on {meta["noun"]} `{item_id}` '
+            f'("{item_title or item_id}"). Read the card thread via '
+            f'GET {thread_url}, answer in your '
+            'single-voice as the team, and post your reply as a '
+            f'team_to_larry card_message event for the same {id_key}. '
+            f'Larry\'s message: {text}'
+        ),
+    }
+    _atomic_write_envelope(envelope_candidate, envelope)
+    envelope_written = str(envelope_candidate)
+
+    # § 9: a Larry reply clears the blocked-on-you doorbell for this card.
+    doorbell_resolved = False
+    try:
+        import missions_doorbell  # noqa: PLC0415 — lazy; sibling module
+        result = missions_doorbell.resolve_doorbell(
+            capture_id=item_id, now=now,
+        )
+        doorbell_resolved = bool(result.get('resolved'))
+    except Exception:  # noqa: BLE001 — doorbell resolve is best-effort
+        logger.exception(
+            'doorbell resolve failed for card %s (message still posted)',
+            item_id,
+        )
+
+    return {
+        'posted': True,
+        'event_id': event_id,
+        'direction': _CARD_MSG_LARRY,
+        'envelope_written': envelope_written,
+        'doorbell_resolved': doorbell_resolved,
     }
 
 
@@ -4883,113 +5085,22 @@ def _handle_capture_message(
     supabase_client: Any,
     now: Optional[datetime] = None,
 ) -> dict[str, Any]:
-    """POST /api/missions/captures/{id}/message (§ 8) — Larry posts on a card.
-
-    Three effects, in order:
-      1. Emit one `card_message` chain_event (direction=larry_to_team) keyed by
-         the capture_id, so GET .../thread reads it back and the audit trail
-         records the operator turn.
-      2. Drop a resume/notify envelope into Beacon's inbox so she answers on her
-         next cycle (the team is the single voice — § 2 decision #5).
-      3. Resolve any pending blocked-on-you doorbell for this card (§ 9) — the
-         operator just replied, so the loud ping is stale.
-
-    404 if the capture doesn't exist; 503 if Supabase is unavailable (the
-    message must be durable, so we refuse rather than silently drop it)."""
-    text = (text or '').strip()
-    if not text:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail='message text must be non-empty',
-        )
-    if supabase_client is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail='supabase unavailable',
-        )
-    now = now or datetime.now(timezone.utc)
-    ts_iso = now.isoformat()
-
+    """POST /api/missions/captures/{id}/message (§ 8) — Larry posts on a parked
+    card. Finds the capture (404 if absent) then defers to the store-agnostic
+    `_post_card_message` core. 503 if Supabase is unavailable (the message must
+    be durable, so we refuse rather than silently drop it)."""
     registry = _read_captures_registry(captures_path)
     cap = _find_capture(registry.get('captures') or [], capture_id)
-
-    compute_event_id, sanitize_payload = _import_chain_event_helpers()
-    event_id = compute_event_id(capture_id, 'card_message', ts_iso, extra=actor)
-    payload = {
-        'capture_id': capture_id,
-        'direction': _CARD_MSG_LARRY,
-        'text': text,
-        'actor': actor,
-        # Larry asked/answered → the team owes a reply on its next cycle.
-        'needs_reply': True,
-    }
-    row: dict[str, Any] = {
-        'event_id': event_id,
-        'ts': ts_iso,
-        'agent': actor,
-        'event_type': 'card_message',
-        'task_id': capture_id,
-        'actor': actor,
-        'payload': sanitize_payload(payload),
-    }
-    supabase_client.table('chain_events').upsert(
-        [row], on_conflict='event_id', ignore_duplicates=True,
-    ).execute()
-
-    # Resume/notify envelope → Beacon's inbox. Beacon answers on her next cycle
-    # (§ 8). Filename keyed on the event_id so concurrent messages never collide.
-    inbox = (agents_root / 'inboxes' / 'beacon').resolve()
-    filename = f'card-message-{event_id}.json'
-    envelope_candidate = (inbox / filename).resolve()
-    envelope_written: Optional[str] = None
-    if envelope_candidate.parent != inbox:
-        # Defense-in-depth: capture_id flows into the event_id (a hex digest),
-        # not the filename, so this should be unreachable — but never write
-        # outside Beacon's inbox.
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail='invalid envelope filename',
-        )
-    envelope = {
-        'task_id': f'card-message-{capture_id}',
-        'source': 'dashboard',
-        'actor': actor,
-        'capture_id': capture_id,
-        'dedup_identity': f'card-message:{event_id}',
-        'timeout': 600,
-        'prompt': (
-            f'Larry posted a message on parked card `{capture_id}` '
-            f'("{cap.get("title") or capture_id}"). Read the card thread via '
-            f'GET /api/missions/captures/{capture_id}/thread, answer in your '
-            'single-voice as the team, and post your reply as a '
-            'team_to_larry card_message event for the same capture_id. '
-            f'Larry\'s message: {text}'
-        ),
-    }
-    _atomic_write_envelope(envelope_candidate, envelope)
-    envelope_written = str(envelope_candidate)
-
-    # § 9: a Larry reply clears the blocked-on-you doorbell for this card.
-    doorbell_resolved = False
-    try:
-        import missions_doorbell  # noqa: PLC0415 — lazy; sibling module
-        result = missions_doorbell.resolve_doorbell(
-            capture_id=capture_id, now=now,
-        )
-        doorbell_resolved = bool(result.get('resolved'))
-    except Exception:  # noqa: BLE001 — doorbell resolve is best-effort
-        logger.exception(
-            'doorbell resolve failed for capture %s (message still posted)',
-            capture_id,
-        )
-
-    return {
-        'posted': True,
-        'event_id': event_id,
-        'direction': _CARD_MSG_LARRY,
-        'envelope_written': envelope_written,
-        'doorbell_resolved': doorbell_resolved,
-    }
+    return _post_card_message(
+        item_id=capture_id,
+        item_title=cap.get('title'),
+        item_kind=_CARD_KIND_CAPTURE,
+        text=text,
+        actor=actor,
+        agents_root=agents_root,
+        supabase_client=supabase_client,
+        now=now,
+    )
 
 
 # Missions v2 — droplet delegate endpoint (POST /api/missions/captures/{id}/delegate)
@@ -5493,6 +5604,224 @@ def _handle_mission_dismiss(
     return {'pr_url': pr_url, 'branch': branch}
 
 
+def _handle_mission_snooze(
+    *,
+    mission_id: str,
+    snoozed_until: Any,
+    missions_path: Path,
+) -> dict[str, Any]:
+    """`snooze` — defer a proposed mission-backed funnel card until a future
+    instant (Contract B). Sets the additive `snoozed_until` (ISO-8601, or null to
+    clear) on the registry entry; `phase` STAYS `proposed`. PR-backed (the SAME
+    curated missions.json single-committer the other mission write-backs use — no
+    local tree write, so the no-dirty-tree invariant holds). 404 if no such
+    mission; 409 if not proposed (only a funnel-card thread is snoozable); 400 on
+    a malformed or non-future date. Returns {pr_url, branch}.
+
+    The funnel's snooze filter (`_build_funnel`) hides a mission whose
+    `snoozed_until` is still in the future, mirroring the parked-capture lane —
+    so the card resurfaces only once the snooze elapses."""
+    parsed: Optional[datetime] = None
+    if snoozed_until is not None:
+        parsed = _parse_iso_utc(snoozed_until)
+        if parsed is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail='snoozed_until must be an ISO-8601 datetime or null',
+            )
+        if parsed <= datetime.now(timezone.utc):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail='snoozed_until must be in the future',
+            )
+    token = _github_token()
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                'error': 'github token missing',
+                'detail': 'no GITHUB_TOKEN env nor gh auth token on dashboard-api host',
+            },
+        )
+    repo_full = _missions_repo_full()
+
+    with _NEW_MISSION_LOCK:
+        registry = _read_missions_registry(missions_path)
+        mission = _find_mission(registry['missions'], mission_id)
+        if mission.get('phase') != 'proposed':
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    'error': 'mission not proposed',
+                    'mission_id': mission_id,
+                    'phase': mission.get('phase'),
+                    'hint': 'only a proposed mission can be snoozed',
+                },
+            )
+
+        iso = parsed.isoformat() if parsed else None
+        mission['snoozed_until'] = iso
+        until_label = iso or 'cleared'
+
+        branch = f'chore/snooze-mission-{mission_id}'
+        title = f'chore(missions): snooze proposed mission {mission_id}'
+        pr_body = '\n'.join([
+            f'Snooze proposed mission `{mission_id}` '
+            f'(`snoozed_until: {until_label}`).',
+            '',
+            'Single-field additive registry edit (`phase` stays `proposed`). The '
+            'funnel hides a mission whose `snoozed_until` is still in the future, '
+            'mirroring the parked-capture lane, so the card resurfaces only once '
+            'the snooze elapses (Projects v3 P2 Contract B).',
+        ])
+        pr_url = _open_registry_pr(
+            branch=branch,
+            title=title,
+            pr_body=pr_body,
+            files=[(_MISSIONS_REPO_REL, registry)],
+            token=token,
+            repo_full=repo_full,
+        )
+
+    return {'pr_url': pr_url, 'branch': branch}
+
+
+def _handle_mission_delegate(
+    *,
+    mission_id: str,
+    action: Optional[str],
+    actor: str,
+    missions_path: Path,
+) -> dict[str, Any]:
+    """POST /api/system/missions/{id}/delegate (Contract B) — hand a proposed
+    mission-backed funnel card to the team, mirroring the parked-capture Delegate.
+    Emits a `human-approval-gate` APPROVAL_REQUEST proposal for Beacon via
+    safe_write_inbox; it does NOT mutate missions.json (the registry is PR-backed
+    and the delegation lives as a Beacon proposal, not a mission-state edit — so
+    the no-dirty-tree invariant holds, same as the capture Delegate leaves the
+    capture parked).
+
+    404 if no such mission; 409 if not proposed; 400 on an unrecognized action.
+    Idempotent: a re-POST that finds an already-open proposal in Beacon's inbox
+    collapses onto it (deterministic filename `delegate-{mission_id}.json`)."""
+    import safe_write_inbox  # noqa: PLC0415 — lazy; sibling module (jail-guarded)
+
+    registry = _read_missions_registry(missions_path)
+    mission = _find_mission(registry['missions'], mission_id)  # 404
+    if mission.get('phase') != 'proposed':
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                'error': 'mission not proposed',
+                'mission_id': mission_id,
+                'phase': mission.get('phase'),
+                'hint': 'only a proposed mission can be delegated',
+            },
+        )
+
+    resolved = action or _DELEGATE_DEFAULT_ACTION
+    if resolved not in _VALID_RECOMMENDED_ACTIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f'invalid action={resolved!r}; expected one of '
+                f'{list(_VALID_RECOMMENDED_ACTIONS)}'
+            ),
+        )
+
+    task_id = f'delegate-{mission_id}'
+    filename = f'{task_id}.json'
+    safe_name = safe_write_inbox.canonical_inbox_name(filename)
+    proposal_path = (safe_write_inbox.INBOXES_ROOT / 'beacon' / safe_name)
+    if proposal_path.exists():
+        # An open delegate proposal already sits in Beacon's inbox — collapse
+        # onto it rather than double-proposing.
+        return {'dispatched': True, 'deduped': True}
+
+    name = mission.get('name') or mission_id
+    brief = mission.get('brief') or ''
+    summary = brief or name
+
+    prompt = (
+        f'Larry clicked "Delegate to team" on proposed mission card '
+        f'`{mission_id}` ("{name}"). His click IS the go — scope and propose/run '
+        'this down as the team. '
+        f'Recommended action: {resolved}. '
+        f'Brief: {brief or "(none)"}. '
+        'Treat this as a human-approval-gate proposal: whether the resulting '
+        'dispatch auto-fires or asks again is governed by trust_policy. Do NOT '
+        'mutate the mission registry — the proposed thread stays as-is; the '
+        'delegation lives as this proposal.'
+    )
+    envelope = {
+        'task_id': task_id,
+        'target_agent': 'beacon',
+        'summary': summary,
+        'prompt': prompt,
+        'source': 'dashboard',
+        'actor': actor,
+        'mission_id': mission_id,
+        'action': resolved,
+        'dedup_identity': f'delegate:{mission_id}',
+        'timeout': 600,
+    }
+    safe_write_inbox.safe_write_inbox(
+        target_agent='beacon',
+        task_dict=envelope,
+        source_agent='dashboard',
+        filename=filename,
+    )
+    return {'dispatched': True}
+
+
+def _handle_mission_thread(
+    *,
+    mission_id: str,
+    missions_path: Path,
+    supabase_client: Any,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """GET /api/system/missions/{id}/thread (Contract B) — the mission card's
+    conversation, oldest-first. Mirrors the capture thread: 404 if the mission
+    doesn't exist, degrades to an empty thread when Supabase is unavailable."""
+    now = now or datetime.now(timezone.utc)
+    registry = _read_missions_registry(missions_path)
+    _find_mission(registry['missions'], mission_id)
+    return {
+        'mission_id': mission_id,
+        'messages': _card_thread_messages(mission_id, supabase_client),
+        'last_synced_at': now.isoformat(),
+    }
+
+
+def _handle_mission_message(
+    *,
+    mission_id: str,
+    text: str,
+    actor: str,
+    missions_path: Path,
+    agents_root: Path,
+    supabase_client: Any,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """POST /api/system/missions/{id}/message (Contract B) — Larry posts on a
+    mission card. Finds the mission (404 if absent) then defers to the
+    store-agnostic `_post_card_message` core (same three effects as the capture
+    message)."""
+    registry = _read_missions_registry(missions_path)
+    mission = _find_mission(registry['missions'], mission_id)
+    return _post_card_message(
+        item_id=mission_id,
+        item_title=mission.get('name'),
+        item_kind=_CARD_KIND_MISSION,
+        text=text,
+        actor=actor,
+        agents_root=agents_root,
+        supabase_client=supabase_client,
+        now=now,
+    )
+
+
 def _handle_mission_action(
     *,
     mission_id: str,
@@ -5501,8 +5830,11 @@ def _handle_mission_action(
     missions_path: Path,
 ) -> dict[str, Any]:
     """Dispatch POST /api/system/missions/{id}/action to the per-action handler.
-    defer / resume / reprioritize / accept / dismiss are all PR-backed →
-    {pr_url, branch}. Unknown action → 400."""
+    defer / resume / reprioritize / accept / dismiss / drop / snooze are all
+    PR-backed → {pr_url, branch}. `drop` is the funnel-facing verb for the
+    dismiss semantics (acknowledged=true, phase stays proposed — keeps the
+    autoregister healer from re-proposing); `dismiss` is kept as its alias.
+    Unknown action → 400."""
     if action == 'defer':
         return _handle_mission_defer(
             mission_id=mission_id,
@@ -5525,16 +5857,26 @@ def _handle_mission_action(
             mission_id=mission_id,
             missions_path=missions_path,
         )
-    if action == 'dismiss':
+    # `drop` is the funnel-facing verb (Contract B) for the dismiss semantics —
+    # it supersedes bare `dismiss` while preserving them byte-for-byte
+    # (acknowledged=true, phase stays proposed → stop re-proposing). `dismiss` is
+    # kept as an alias so existing clients/tests keep working.
+    if action in ('dismiss', 'drop'):
         return _handle_mission_dismiss(
             mission_id=mission_id,
+            missions_path=missions_path,
+        )
+    if action == 'snooze':
+        return _handle_mission_snooze(
+            mission_id=mission_id,
+            snoozed_until=args.get('snoozed_until'),
             missions_path=missions_path,
         )
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail=(
             f'invalid action={action!r}; expected '
-            'defer|resume|reprioritize|accept|dismiss'
+            'defer|resume|reprioritize|accept|dismiss|drop|snooze'
         ),
     )
 
@@ -6778,6 +7120,69 @@ def post_mission_action(
         action=body.action,
         args=body.model_dump(exclude={'action'}, exclude_none=True),
         missions_path=_missions_json_path(),
+    )
+
+
+# POST /api/system/missions/{id}/delegate — "Delegate to team" for a proposed
+# mission-backed funnel card (Projects v3 P2 Contract B). Mirrors the parked-card
+# Delegate: emits a human-approval-gate APPROVAL_REQUEST proposal into Beacon's
+# inbox without mutating missions.json. Same auth: X-Dashboard-Token + X-Actor.
+@app.post(
+    '/api/system/missions/{mission_id}/delegate',
+    response_model=MissionDelegateResponse,
+    response_model_exclude_none=True,
+    dependencies=[Depends(_require_token)],
+)
+def post_mission_delegate(
+    mission_id: str,
+    actor: str = Depends(_require_actor),
+    body: Optional[MissionDelegateRequest] = None,
+) -> dict[str, Any]:
+    return _handle_mission_delegate(
+        mission_id=mission_id,
+        action=body.action if body else None,
+        actor=actor,
+        missions_path=_missions_json_path(),
+    )
+
+
+# GET /api/system/missions/{id}/thread — a mission card's async conversation
+# (Contract B). Reads back the mission's card_message chain_events, oldest-first.
+# Read-only → X-Dashboard-Token suffices.
+@app.get(
+    '/api/system/missions/{mission_id}/thread',
+    response_model=MissionThreadResponse,
+    dependencies=[Depends(_require_token)],
+)
+def get_mission_thread(mission_id: str) -> dict[str, Any]:
+    return _handle_mission_thread(
+        mission_id=mission_id,
+        missions_path=_missions_json_path(),
+        supabase_client=_get_larry_action_supabase_client(),
+    )
+
+
+# POST /api/system/missions/{id}/message — Larry posts on a mission card
+# (Contract B). Emits a card_message event, drops a resume envelope in Beacon's
+# inbox, clears any blocked-on-you doorbell. Same auth: X-Dashboard-Token + X-Actor.
+@app.post(
+    '/api/system/missions/{mission_id}/message',
+    response_model=MissionMessageResponse,
+    response_model_exclude_none=True,
+    dependencies=[Depends(_require_token)],
+)
+def post_mission_message(
+    mission_id: str,
+    body: MissionMessageRequest,
+    actor: str = Depends(_require_actor),
+) -> dict[str, Any]:
+    return _handle_mission_message(
+        mission_id=mission_id,
+        text=body.text,
+        actor=actor,
+        missions_path=_missions_json_path(),
+        agents_root=_agents_root(),
+        supabase_client=_get_larry_action_supabase_client(),
     )
 
 
