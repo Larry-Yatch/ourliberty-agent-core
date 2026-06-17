@@ -4,6 +4,71 @@
 
 ---
 
+## Iteration ~2147 — 2026-06-17 17:52Z UTC (interactive, /cycle, Tier 3, consecutive_clean=2→3, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 1 Tier-3 alert silenced. All checks clean. No DM to Larry.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** Check E → 0 open PRs in both repos. ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** Not in open PRs. ✅
+- **projects-v3-p1/p4/p2/p2-followup ALL SEQUENCE COMPLETE ✅ CONFIRMED:** heal_pipeline_stall --dry-run → 0 stalls. ✅
+- **G-rule sequence-complete-tier4 COMPLETE ✅ CONFIRMED:** PR #566 not in open PRs. ✅
+- **G-rule mirror-malformed-verdict-marker COMPLETE ✅ CONFIRMED:** PR #565 not in open PRs. ✅
+- **Daemons ✅:** All 5 alive. Same PIDs as iter ~2146: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3964779, dashboard_api 3964550. ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 1002, "file_length": 1003}` (no repair needed). **1 new alert (L1003):**
+- L1003: `source=dispatch-branch-cleanup, subject=summary` — "pruned 7 local + 4 remote stale branch(es)" at 17:42:25Z. Triage helper → **Tier-3 silenced** (known-pattern match, route=digest). Bot already delivered at 17:43:07Z. No DM.
+- Watermark advanced 1002→1003. ✅
+
+**Check 1 — Log noise:** outbox-notifier.log: 0 WARNs/ERRORs. inbox_watcher.log: 0 WARNs/ERRORs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot log last entry 17:43:07Z — alert idx=1002 route=digest (dispatch-branch-cleanup). No new Larry messages since "Go" at 13:29:35Z. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → 0 stalls. All FORGE_NO_PR_SKIP entries pr_exists. ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-17T17:28:19Z, age≈23 min. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=e4e7c2e5=origin/main (clean, on main, behind=0, ahead=0). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-17T17:12:55Z, age≈39 min. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3734671 (Ss) ✅, chain_event_shipper 3734305 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, outbox_notifier 3964779 (Ss) ✅, dashboard_api 3964550 (Ssl) ✅. All 5 alive, same PIDs as iter ~2146. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open ✅. ourliberty-dashboard: 0 open ✅. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Conditional checks (Wednesday 2026-06-17 UTC, weekday=2 ∈ {0,2,4,6}):**
+- Check I: artifact `pulse-check-i/check-i-2026-06-17.json` EXISTS → SKIP (same-day dedup). ✅
+- Check III: Sunday-anchored → skip.
+
+**Pipeline observation — projects-v3-p3 ACTIVE, step 2 (p3-promote-endpoint) queued:**
+- p3-project-store (step 1, PR #567): MERGED ✅ 14:50:03Z.
+- Forge session 3938869: STILL RUNNING at 17:52Z, ELAPSED=03:54:03 (~3h 54min). PID alive (Ssl). heal_pipeline_stall → 0 stalls. Sentinel fired at 3.17h (L1001, Tier-3 silenced); medic diagnosed as legitimate long-running build (L1002, Tier-3). No new alerts this iter.
+- `build-p3-project-store.json` remains in Forge inbox (file stays until session exits).
+- `p3-promote-endpoint.json` queued at 14:51Z; inbox-watcher will spawn new Forge session when 3938869 exits.
+
+**G-rule tracking (no changes this iter):**
+- G-rule catalog-accuracy-drift-tier4: **2/3** (no new occurrence).
+- G-rule ledger/check-i Tier-4: **2/3** (no new occurrence).
+- G-rule dual-bot-instance-409-external: **1/3** (no new occurrence).
+- All other G-rule counts unchanged from iter ~2146.
+
+**Actions taken:**
+1. Alert watermark advanced: 1002→1003.
+2. PRIME ledger: `iter_clean` appended (tier=3, ts=2026-06-17T17:52:41Z).
+3. Tier state: `record --checks-clean true` → consecutive_clean=2→3. Tier stays 3 (already at max tier; no further de-escalation path).
+
+**PRIME ratio:** 19.48 (1013 interventions, 52 systemic fixes).
+
+**Dispatches:** None.
+
+---
+
 ## Iteration ~2146 — 2026-06-17 17:17Z UTC (interactive, /cycle, Tier 3, consecutive_clean=1→2, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).
