@@ -1,0 +1,14 @@
+[Unit]
+Description=~10-min tick for the projects-store single-committer healer (normalize + commit projects.json delta to main)
+
+[Timer]
+# projects-v3 P3 § "Store ownership": timer healer, ~10 min cadence. Distinct
+# boot offset (GC@7min, orphan-autoregister@12min) so it doesn't contend with
+# the other git-touching healers on round boundaries.
+OnBootSec=9min
+OnUnitActiveSec=10min
+Unit=ourliberty-heal-projects-store.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

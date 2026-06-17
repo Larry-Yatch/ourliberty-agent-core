@@ -1,0 +1,37 @@
+[Unit]
+Description=Projects-store single-committer healer — normalize agents/beacon/projects.json + commit the on-disk delta to main (projects-v3 P3, step p3-project-store)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/heal_projects_store.py
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/agents/beacon/specs/projects-v3-p3-pipeline.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+# Carries gh auth token + git credentials (commit/push projects.json to main).
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/heal_projects_store.py
+# A tick normalizes the registry, then (on a delta) a push round-trip with a
+# pull --rebase --autostash retry — generous headroom for the network legs.
+TimeoutStartSec=600
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-heal-projects-store
+
+# Hardening (matches ourliberty-heal-missions-card-gc.service). ReadWritePaths
+# covers agent-core (projects.json write + git commit/push), the agents tree
+# (kill switch, logs), and credentials.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /home/larry/agent-core /home/larry/credentials /home/larry/.claude /home/larry/.claude.json /home/larry/.local /home/larry/.cache /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+Nice=10
