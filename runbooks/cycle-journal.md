@@ -4,6 +4,72 @@
 
 ---
 
+## Iteration ~2160 — 2026-06-17 20:43Z UTC (interactive, /loop /cycle, Tier 2, consecutive_clean=1→2, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/loop /cycle`).
+
+**Health:** ✅ Nominal. 0 new alerts. All checks clean. No DM to Larry.
+
+**VERIFY-BEFORE-REASSERT:**
+- **All 5 daemon PIDs alive:** confirmed via `ps -p 3734671,3734305,3434697,4048770,4049089` → all present. ✅
+- **0 open PRs:** `gh pr list` → [] in both repos. ✅
+- **Repo at origin/main:** HEAD=f18502bb=origin/main, clean. ✅
+- **projects-v3-p3 COMPLETE:** 0 open PRs, 0 stalls, 0 inbox tasks. ✅
+
+**Check 0 — Alert triage:** `repair-watermark` → no repair (watermark=1014=file_length). **0 new alerts.** ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → No entries. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot log: last Larry msg 12:20:08-0600 MDT (install-heal-projects-store-timer-001 "Go", handled in iter ~2152). No new messages since. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected`. 18 FORGE_NO_PR_SKIP (existing merged PRs). ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` pending=0. Beacon/forge/mirror inboxes: empty. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=`2026-06-17T20:29:08Z` (~14 min). FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=f18502bb=origin/main. Clean tree. On main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-17T20:13:19Z (~30 min), status=no-change. ✅ Nominal.
+
+**Check C — Agent liveness:** All 5/5 alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4048770 (Ssl), outbox_notifier 4049089 (Ss). Same PIDs as iter ~2159. ✅ Nominal.
+
+**Check D — Inboxes:** beacon: empty, forge: empty, mirror: empty. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open PRs. ourliberty-dashboard: 0 open PRs. ✅ Nominal.
+
+**Conditional checks:** Today is Tuesday UTC (weekday=1) — Check I (Mon/Wed/Fri/Sun) not triggered. Not Sunday — Check III not triggered. Skip.
+
+**Actions taken:**
+1. `cycle_prime_ledger.py append --tier 2 --kind iter_clean` ✅
+2. `cycle_tier_state.py record --checks-clean true` → Tier 2, consecutive_clean=1→2 ✅
+
+**Dispatches:** None.
+
+**Standing findings (carried):**
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule catalog-accuracy-drift-tier4** — 1/3. Watch.
+- [blue] **G-rule ledger/check-i Tier-4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule watermark-rotation-gap** — 2/3. Watch.
+- [blue] **Stale bash orphans** — PIDs 1834248 + 2605007. Low CPU. [carry]
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — merged without Mirror; bot-delivered. Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**PRIME DIRECTIVE:** iter_clean. Trailing-30d: interventions=1018, systemic_fixes=52, ratio=19.54, trend=improving.
+**Tier end-of-iter:** Tier 2, consecutive_clean=1→2.
+
+---
+
 ## Iteration ~2159 — 2026-06-17 20:22Z UTC (interactive, /loop /cycle, Tier 2, consecutive_clean=0→1, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/loop /cycle`).
