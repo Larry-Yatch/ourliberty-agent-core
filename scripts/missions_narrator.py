@@ -7,6 +7,14 @@ instead of machine metadata. One Beacon-owned step, reusing the
 `ceo_digest_generator` read pattern (LLM voice with a deterministic raw
 fallback) and `trust_policy.evaluate` for the risk dial.
 
+Projects-v3 P2 (Contract A) extends the same meaning layer to the rest of the
+funnel: orphan-derived and team-suggested intake items, which live as `proposed`
+missions in missions.json. Those funnel missions get the identical
+briefing/risk field contract via `author_missions_in_registry` — same GC-tick
+schedule, same single-committer invariant, same fail-safe raw fallback — so an
+orphan/suggested card is no longer raw machine names. See the
+"funnel-mission meaning layer" section below.
+
 Field contract authored here (spec § 4), all optional on a capture:
 
     "briefing": { "what": ..., "why": ..., "suggest": ... },
@@ -622,6 +630,293 @@ def author_captures_in_registry(
     deferred = max(0, len(pending) - briefed)
     log(f'narrator sweep: briefed {briefed} capture(s); deferred {deferred} '
         f'(max {max_per_tick}/tick)')
+    return (briefed, deferred)
+
+
+# ---------------- funnel-mission meaning layer (orphan + suggested) ----------
+#
+# Contract A (projects-v3 P2 § 4): the Narrator briefs not only parked captures
+# but the orphan-derived and team-suggested funnel items, which live as
+# `proposed` missions in missions.json (`heal_orphan_autoregister` registers an
+# orphan task as a proposed mission; Beacon/Medic/Pulse land a suggestion the
+# same way). Same field contract (briefing/risk/risk_note/recommended_action/
+# briefing_provenance), same fail-safe authoring (deterministic raw fallback —
+# never a raw-metadata leak), same single-committer invariant: this only mutates
+# the in-memory registry; the GC healer is the SOLE missions.json committer and
+# batches the briefing delta into its next commit.
+#
+# A funnel mission's lifecycle "state" is its `phase`; only a `proposed` mission
+# is an un-triaged funnel card worth briefing. Once accepted it leaves the
+# intake lane (phase != proposed); once dead (acknowledged/retired) it is
+# auto-filtered out of the funnel (dashboard `_proposed_mission_is_dead`).
+# `mission_needs_briefing` is idempotent so the event-driven and periodic paths
+# converge, mirroring `needs_briefing` for captures.
+
+_MISSION_FUNNEL_PHASE = 'proposed'
+
+# Canonical suggesting agents — mirrors dashboard_api._SUGGESTED_AGENTS. A
+# proposed mission whose `proposed_by` maps to one of these is a team
+# *suggestion*; anything else (the orphan-autoregister healer, or an
+# unidentifiable proposer) is *orphan-derived*. We replicate the small
+# normalizer here rather than import dashboard_api (a heavy FastAPI module the
+# headless narrator must not pull in).
+_SUGGESTED_AGENTS = ('beacon', 'medic', 'pulse')
+
+
+def mission_suggested_source(mission: dict[str, Any]) -> Optional[str]:
+    """Map a mission's `proposed_by` to a canonical suggesting agent
+    {beacon, medic, pulse}, or None when no team agent is identifiable (an
+    orphan-derived auto-register, e.g. proposed_by='heal_orphan_autoregister')."""
+    raw = mission.get('proposed_by')
+    if not isinstance(raw, str):
+        return None
+    v = raw.strip().lower()
+    for agent in _SUGGESTED_AGENTS:
+        if v == agent or v.startswith(agent + '-') or v.startswith(agent + '_'):
+            return agent
+    return None
+
+
+def mission_is_dead(mission: dict[str, Any]) -> bool:
+    """A proposed mission the orphan-drain has acknowledged / retired / archived
+    is filtered out of the funnel (mirrors dashboard_api._proposed_mission_is_dead)
+    — never brief it: it shows on no card. Keeps the Narrator and the funnel
+    agreeing on what is live."""
+    if mission.get('acknowledged') is True:
+        return True
+    if mission.get('retired_at'):
+        return True
+    return (mission.get('phase') or '') in ('retired', 'archived', 'closed')
+
+
+def mission_to_task(mission: dict[str, Any]) -> dict[str, Any]:
+    """Build the dispatch-shaped task `trust_policy.evaluate` consumes from a
+    funnel mission. A proposed mission proposes work the team would take on, so
+    the task is shaped like the dispatch that accepting it would emit
+    (Beacon → Forge in the mission's repo). Mirrors `capture_to_task`."""
+    return {
+        'source': 'beacon',
+        'target_agent': 'forge',
+        'task_type': mission.get('task_type') or 'feature-development',
+        'target_repo': mission.get('repo'),
+        'changed_files': mission.get('changed_files') or [],
+    }
+
+
+def classify_mission_careful(mission: dict[str, Any]) -> bool:
+    """True if the proposed work looks irreversible / outward-facing / spendy —
+    the § 5 escalator from medium to careful. Scans name + brief. (Only the
+    boolean flag is derived from these; the raw `brief` text is NEVER surfaced on
+    the card.)"""
+    haystack = ' '.join(str(mission.get(k) or '') for k in ('name', 'brief'))
+    return _CAREFUL_PATTERN.search(haystack) is not None
+
+
+def derive_mission_risk(
+    mission: dict[str, Any], policy: Optional[dict[str, Any]] = None,
+) -> tuple[str, bool]:
+    """Return (risk, careful) for a funnel mission. Mirrors `derive_risk` for
+    captures: the risk LEVEL is deterministic (trust_policy view), testable with
+    an injected policy."""
+    action, _rule = trust_policy.evaluate(mission_to_task(mission), policy)
+    careful = classify_mission_careful(mission)
+    return map_risk(action, careful), careful
+
+
+def render_raw_mission_briefing(
+    mission: dict[str, Any], risk: str, careful: bool, *, suggested: bool,
+) -> dict[str, str]:
+    """Deterministic plain-English briefing for a funnel mission — the fallback
+    when the LLM voice is unavailable (and the value tests assert against). Plain
+    operator language ONLY: the human-facing `name`, never the machine `brief` /
+    id / task_ids (the no-raw-metadata-leak guard, § 5)."""
+    name = (mission.get('name') or 'this item').strip()
+    repo = mission.get('repo')
+    where = f' (in {repo})' if repo else ''
+    what = name
+    if suggested:
+        why = f"The team flagged this{where} as worth a look."
+    else:
+        why = (f"Work the team started{where} that isn't tied to a tracked "
+               "project yet — worth a decision.")
+    if risk == 'careful':
+        suggest = ('Have the team look at this carefully before any change — '
+                   'it could be hard to undo.')
+    elif risk == 'medium':
+        suggest = 'Have the team run it down and propose next steps.'
+    else:
+        suggest = 'Low-risk — let the team take it from here.'
+    return {'what': what, 'why': why, 'suggest': suggest}
+
+
+def build_mission_briefing_prompt(
+    mission: dict[str, Any], events: list[dict[str, Any]], risk: str,
+    *, suggested: bool,
+) -> str:
+    """CEO-voice authoring prompt for a funnel-mission briefing (mirrors
+    `build_briefing_prompt`). Beacon voice, plain outcomes, JSON-out for parse.
+    Passes the human-facing `name` + lane kind ONLY — never the machine `brief`,
+    id, or task_ids — so the model has no raw metadata to echo."""
+    facts = {
+        'title': mission.get('name'),
+        'kind': ('a suggestion the team surfaced for you' if suggested
+                 else "work the team started that isn't tied to a project yet"),
+        'repo': mission.get('repo'),
+        'risk_level': risk,
+        'context_events': [
+            {'type': e.get('event_type'), 'summary': (
+                e.get('payload', {}).get('summary')
+                if isinstance(e.get('payload'), dict) else None)}
+            for e in events[:8]
+        ],
+    }
+    return (
+        "You are Beacon, the operator's manager. Write a 3-part briefing about an "
+        "item on the operator's funnel so a busy CEO can decide on it in seconds — "
+        "in his terms, never engineering jargon.\n\n"
+        "Return ONLY a JSON object with exactly these keys (each one short, "
+        "plain English, no markdown):\n"
+        '  "what":    one sentence — what this is.\n'
+        '  "why":     one sentence — why it matters to the business.\n'
+        '  "suggest": one sentence — what you recommend doing.\n\n'
+        "Never mention task ids, branches, PRs, commits, agents, or risk codes. "
+        f"The risk level is already computed as \"{risk}\"; reflect its caution "
+        "in the suggestion's tone but don't name it.\n\n"
+        "Here are the facts (JSON):\n"
+        f"{json.dumps(facts, indent=2)}\n\n"
+        "Write the briefing now. Output ONLY the JSON object."
+    )
+
+
+def author_mission_meaning_layer(
+    mission: dict[str, Any],
+    events: Optional[list[dict[str, Any]]] = None,
+    *,
+    now: Optional[datetime] = None,
+    policy: Optional[dict[str, Any]] = None,
+    use_llm: bool = True,
+) -> dict[str, Any]:
+    """Author the full meaning layer for one funnel mission and return the field
+    dict (briefing/risk/risk_note/recommended_action/briefing_provenance). Pure —
+    does not mutate the mission or touch disk; the caller (the GC healer) decides
+    whether to write it back. Mirrors `author_meaning_layer` for captures, with a
+    mission-shaped raw fallback. `use_llm=False` forces the deterministic raw
+    briefing (the test path and the head-less fallback)."""
+    events = events or []
+    now = now or datetime.now(timezone.utc)
+
+    risk, careful = derive_mission_risk(mission, policy)
+    suggested = mission_suggested_source(mission) is not None
+    # A mission carries no `aging` flag, so derive_recommended_action returns the
+    # recommend-first default (`delegate`) — the right one-click for a funnel card.
+    recommended_action = derive_recommended_action(mission, risk)
+
+    briefing = None
+    if use_llm:
+        briefing = generate_briefing_voice(
+            build_mission_briefing_prompt(mission, events, risk, suggested=suggested))
+    if briefing is None:
+        briefing = render_raw_mission_briefing(
+            mission, risk, careful, suggested=suggested)
+
+    fields: dict[str, Any] = {
+        'briefing': briefing,
+        'risk': risk,
+        'recommended_action': recommended_action,
+        'briefing_provenance': {
+            'by': NARRATOR_BY,
+            'model': NARRATOR_MODEL if use_llm else 'raw',
+            'at': now.isoformat(),
+            'from_state': mission.get('phase'),
+        },
+    }
+    risk_note = build_risk_note(mission, risk, careful)
+    if risk_note is not None:
+        fields['risk_note'] = risk_note
+    return fields
+
+
+def mission_needs_briefing(mission: dict[str, Any]) -> bool:
+    """True if a funnel mission needs (re)briefing — a live `proposed` mission
+    (orphan-derived or suggested) that is either un-briefed or whose provenance
+    was stamped from a different phase than it now carries. Idempotent: a mission
+    already briefed for its current phase returns False, so the periodic sweep and
+    the event-driven path converge and an unchanged card is never re-authored.
+
+    Non-`proposed` missions are skipped: an accepted mission (drafting/ready/…)
+    has left the funnel intake lane and renders via the established missions view,
+    not as a funnel card; a dead (acknowledged/retired/archived) mission is
+    auto-filtered out of the funnel entirely."""
+    if not isinstance(mission, dict):
+        return False
+    if (mission.get('phase') or '') != _MISSION_FUNNEL_PHASE:
+        return False
+    if mission_is_dead(mission):
+        return False
+    if not isinstance(mission.get('briefing'), dict):
+        return True
+    provenance = mission.get('briefing_provenance')
+    if not isinstance(provenance, dict):
+        return True
+    return provenance.get('from_state') != mission.get('phase')
+
+
+def author_missions_in_registry(
+    registry: dict[str, Any],
+    *,
+    now: Optional[datetime] = None,
+    client: Optional[Any] = None,
+    use_llm: bool = True,
+    policy: Optional[dict[str, Any]] = None,
+    max_per_tick: int = NARRATOR_MAX_PER_TICK,
+) -> tuple[int, int]:
+    """Author the meaning layer onto funnel missions (orphan-derived + suggested)
+    in ``registry`` that need briefing, bounded by ``max_per_tick`` (spec § 3).
+    Mutates the registry IN PLACE — the caller (the GC healer) owns the single
+    atomic write + git commit, so this never becomes a second writer of
+    missions.json (single-committer invariant). Mirrors
+    `author_captures_in_registry`.
+
+    Returns ``(briefed, deferred)``. Fail-safe per mission: an author error on one
+    mission is logged and skipped — never aborts the sweep, never corrupts the
+    registry (the deterministic fallback already guarantees a usable briefing).
+    The per-tick bound counts AUTHORING ATTEMPTS, not successes."""
+    now = now or datetime.now(timezone.utc)
+    missions = registry.get('missions')
+    if not isinstance(missions, list):
+        return (0, 0)
+    pending = [m for m in missions if mission_needs_briefing(m)]
+
+    attempted = 0
+    briefed = 0
+    for m in pending:
+        if attempted >= max_per_tick:
+            break
+        mid = m.get('id')
+        if not mid:
+            continue  # no stable id — can't author a meaningful card; skip.
+        attempted += 1
+        try:
+            # Context lives under the orphan task_id (chain_events key), not the
+            # mission id; use the first task_id when present (best-effort, []).
+            task_ids = m.get('task_ids')
+            tid = task_ids[0] if isinstance(task_ids, list) and task_ids else None
+            events = fetch_capture_events(tid, client=client) if tid else []
+            fields = author_mission_meaning_layer(
+                m, events, now=now, policy=policy, use_llm=use_llm)
+        except Exception as e:  # noqa: BLE001 — per-mission fail-safe
+            log(f'narrator: author failed for mission {mid}: '
+                f'{type(e).__name__}: {e} — skipped (retries next tick)')
+            continue
+        # risk_note is optional (absent for safe) — clear any stale one so a
+        # mission dropping medium→safe doesn't keep a dangling note.
+        m.pop('risk_note', None)
+        m.update(fields)
+        briefed += 1
+
+    deferred = max(0, len(pending) - briefed)
+    log(f'narrator mission sweep: briefed {briefed} funnel mission(s); '
+        f'deferred {deferred} (max {max_per_tick}/tick)')
     return (briefed, deferred)
 
 

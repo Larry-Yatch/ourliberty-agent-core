@@ -510,5 +510,246 @@ class AuthorCapturesInRegistryTest(unittest.TestCase):
         self.assertNotIn('risk_note', cap)
 
 
+# ----------------- projects-v3 P2 Contract A: funnel-mission layer -----------
+
+
+def _mission(**over):
+    m = {
+        'id': 'mission-test-1',
+        'name': 'Reviewer bot loses comments on rebase',
+        'brief': 'When a branch is rebased the reviewer drops comments.',
+        'phase': 'proposed',
+        'repo': 'ourliberty-agent-core',
+        'proposed_by': 'heal_orphan_autoregister',
+        'task_ids': ['orphan-task-1'],
+    }
+    m.update(over)
+    return m
+
+
+class MissionSuggestedSourceTest(unittest.TestCase):
+    def test_canonical_agents_map_through(self):
+        self.assertEqual(mn.mission_suggested_source(_mission(proposed_by='beacon')), 'beacon')
+        self.assertEqual(mn.mission_suggested_source(_mission(proposed_by='medic-healer')), 'medic')
+        self.assertEqual(mn.mission_suggested_source(_mission(proposed_by='pulse_cycle')), 'pulse')
+
+    def test_orphan_autoregister_is_not_suggested(self):
+        self.assertIsNone(mn.mission_suggested_source(_mission()))
+        self.assertIsNone(mn.mission_suggested_source(_mission(proposed_by=None)))
+        self.assertIsNone(mn.mission_suggested_source(_mission(proposed_by='forge')))
+
+
+class MissionIsDeadTest(unittest.TestCase):
+    def test_live_proposed_is_not_dead(self):
+        self.assertFalse(mn.mission_is_dead(_mission()))
+
+    def test_acknowledged_retired_or_archived_is_dead(self):
+        self.assertTrue(mn.mission_is_dead(_mission(acknowledged=True)))
+        self.assertTrue(mn.mission_is_dead(_mission(retired_at='2026-06-14T00:00:00+00:00')))
+        for phase in ('retired', 'archived', 'closed'):
+            self.assertTrue(mn.mission_is_dead(_mission(phase=phase)))
+
+
+class MissionRiskMappingTest(unittest.TestCase):
+    def test_auto_approve_is_safe(self):
+        risk, careful = mn.derive_mission_risk(_mission(), _POLICY_SAFE)
+        self.assertEqual(risk, 'safe')
+        self.assertFalse(careful)
+
+    def test_force_ask_is_medium(self):
+        risk, _ = mn.derive_mission_risk(_mission(), _POLICY_ASK)
+        self.assertEqual(risk, 'medium')
+
+    def test_careful_keyword_escalates_to_careful(self):
+        risk, careful = mn.derive_mission_risk(
+            _mission(name='Delete the production database'), _POLICY_ASK)
+        self.assertEqual(risk, 'careful')
+        self.assertTrue(careful)
+
+    def test_reject_is_careful(self):
+        risk, _ = mn.derive_mission_risk(_mission(), _POLICY_REJECT)
+        self.assertEqual(risk, 'careful')
+
+
+class RenderRawMissionBriefingTest(unittest.TestCase):
+    def test_three_part_contract_non_empty(self):
+        b = mn.render_raw_mission_briefing(_mission(), 'medium', False, suggested=False)
+        self.assertEqual(set(b), {'what', 'why', 'suggest'})
+        for v in b.values():
+            self.assertIsInstance(v, str)
+            self.assertTrue(v)
+
+    def test_never_leaks_machine_fields(self):
+        # The card must never surface the machine brief, id, or task_ids — only
+        # the human-facing name (the no-raw-metadata-leak guard, § 5).
+        m = _mission(brief='SECRET-MACHINE-BRIEF', id='mission-xyz-id',
+                     task_ids=['orphan-task-leak'])
+        for suggested in (True, False):
+            b = mn.render_raw_mission_briefing(m, 'medium', False, suggested=suggested)
+            blob = ' '.join(b.values())
+            self.assertNotIn('SECRET-MACHINE-BRIEF', blob)
+            self.assertNotIn('mission-xyz-id', blob)
+            self.assertNotIn('orphan-task-leak', blob)
+            self.assertIn('Reviewer bot loses comments on rebase', b['what'])
+
+    def test_suggested_vs_orphan_why_differs(self):
+        s = mn.render_raw_mission_briefing(_mission(), 'medium', False, suggested=True)
+        o = mn.render_raw_mission_briefing(_mission(), 'medium', False, suggested=False)
+        self.assertNotEqual(s['why'], o['why'])
+
+
+class BuildMissionBriefingPromptTest(unittest.TestCase):
+    def test_prompt_excludes_machine_metadata(self):
+        m = _mission(brief='SECRET-MACHINE-BRIEF', id='mission-xyz-id',
+                     task_ids=['orphan-task-leak'])
+        prompt = mn.build_mission_briefing_prompt(m, [], 'medium', suggested=False)
+        self.assertNotIn('SECRET-MACHINE-BRIEF', prompt)
+        self.assertNotIn('mission-xyz-id', prompt)
+        self.assertNotIn('orphan-task-leak', prompt)
+        self.assertIn('Reviewer bot loses comments on rebase', prompt)
+
+
+class AuthorMissionMeaningLayerTest(unittest.TestCase):
+    def test_authors_deterministic_fields(self):
+        fields = mn.author_mission_meaning_layer(
+            _mission(), now=NOW, policy=_POLICY_ASK, use_llm=False)
+        self.assertEqual(set(fields['briefing']), {'what', 'why', 'suggest'})
+        self.assertEqual(fields['risk'], 'medium')
+        self.assertIn('risk_note', fields)
+        self.assertIn(fields['recommended_action'],
+                      ('delegate', 'promote', 'drop', 'snooze'))
+        prov = fields['briefing_provenance']
+        self.assertEqual(prov['by'], 'beacon')
+        self.assertEqual(prov['model'], 'raw')
+        self.assertEqual(prov['from_state'], 'proposed')
+        self.assertEqual(prov['at'], NOW.isoformat())
+
+    def test_safe_risk_has_no_risk_note(self):
+        fields = mn.author_mission_meaning_layer(
+            _mission(), now=NOW, policy=_POLICY_SAFE, use_llm=False)
+        self.assertEqual(fields['risk'], 'safe')
+        self.assertNotIn('risk_note', fields)
+
+    def test_does_not_mutate_mission(self):
+        m = _mission()
+        before = dict(m)
+        mn.author_mission_meaning_layer(m, now=NOW, policy=_POLICY_ASK, use_llm=False)
+        self.assertEqual(m, before)
+
+    def test_llm_path_is_guarded_under_test(self):
+        with self.assertRaises(TestIsolationBreach):
+            mn.author_mission_meaning_layer(
+                _mission(), now=NOW, policy=_POLICY_ASK, use_llm=True)
+
+
+class MissionNeedsBriefingTest(unittest.TestCase):
+    def test_unbriefed_proposed_orphan_needs_briefing(self):
+        self.assertTrue(mn.mission_needs_briefing(_mission()))
+
+    def test_unbriefed_proposed_suggested_needs_briefing(self):
+        self.assertTrue(mn.mission_needs_briefing(_mission(proposed_by='beacon')))
+
+    def test_non_proposed_is_skipped(self):
+        for phase in ('drafting', 'ready', 'in_progress'):
+            self.assertFalse(mn.mission_needs_briefing(_mission(phase=phase)))
+
+    def test_dead_mission_is_skipped(self):
+        self.assertFalse(mn.mission_needs_briefing(_mission(acknowledged=True)))
+        self.assertFalse(mn.mission_needs_briefing(_mission(phase='retired')))
+
+    def test_briefed_for_current_phase_is_idempotent(self):
+        m = _mission(
+            briefing={'what': 'x', 'why': 'y', 'suggest': 'z'},
+            briefing_provenance={'by': 'beacon', 'from_state': 'proposed'})
+        self.assertFalse(mn.mission_needs_briefing(m))
+
+    def test_stale_from_state_restamps(self):
+        m = _mission(
+            briefing={'what': 'x', 'why': 'y', 'suggest': 'z'},
+            briefing_provenance={'by': 'beacon', 'from_state': 'drafting'})
+        self.assertTrue(mn.mission_needs_briefing(m))
+
+    def test_non_dict_is_failsafe(self):
+        self.assertFalse(mn.mission_needs_briefing('nope'))
+
+
+class AuthorMissionsInRegistryTest(unittest.TestCase):
+    """Contract A (spec § 3): the GC-tick sweep authors needs_briefing funnel
+    missions (orphan + suggested) in place, bounded per tick, fail-safe per
+    mission, never writing/committing (the GC healer owns the single write)."""
+
+    def _reg(self, *missions):
+        return {'schema_version': 1, 'missions': list(missions)}
+
+    def test_briefs_orphan_and_suggested_in_place_and_counts(self):
+        reg = self._reg(
+            _mission(id='orphan', proposed_by='heal_orphan_autoregister'),
+            _mission(id='suggested', proposed_by='beacon'),
+            # already briefed for proposed ⇒ a valid skip.
+            _mission(id='done', briefing={'what': 'x', 'why': 'y', 'suggest': 'z'},
+                     briefing_provenance={'by': 'beacon', 'from_state': 'proposed'}),
+            # non-proposed ⇒ skipped.
+            _mission(id='accepted', phase='drafting'),
+        )
+        briefed, deferred = mn.author_missions_in_registry(
+            reg, now=NOW, use_llm=False, policy=_POLICY_ASK)
+        self.assertEqual((briefed, deferred), (2, 0))
+        by_id = {m['id']: m for m in reg['missions']}
+        self.assertEqual(by_id['orphan']['risk'], 'medium')
+        self.assertEqual(set(by_id['orphan']['briefing']), {'what', 'why', 'suggest'})
+        self.assertEqual(by_id['suggested']['risk'], 'medium')
+        self.assertEqual(by_id['done']['briefing'],
+                         {'what': 'x', 'why': 'y', 'suggest': 'z'})
+        self.assertNotIn('briefing', by_id['accepted'])
+
+    def test_respects_max_per_tick_and_defers_rest(self):
+        reg = self._reg(*[_mission(id=f'm{i}') for i in range(5)])
+        briefed, deferred = mn.author_missions_in_registry(
+            reg, now=NOW, use_llm=False, policy=_POLICY_ASK, max_per_tick=2)
+        self.assertEqual((briefed, deferred), (2, 3))
+
+    def test_per_mission_error_skipped_not_fatal(self):
+        reg = self._reg(_mission(id='a'), _mission(id='boom'), _mission(id='c'))
+        real_author = mn.author_mission_meaning_layer
+
+        def flaky(m, *a, **k):
+            if m.get('id') == 'boom':
+                raise RuntimeError('author exploded')
+            return real_author(m, *a, **k)
+
+        mn.author_mission_meaning_layer = flaky
+        try:
+            briefed, deferred = mn.author_missions_in_registry(
+                reg, now=NOW, use_llm=False, policy=_POLICY_ASK)
+        finally:
+            mn.author_mission_meaning_layer = real_author
+        self.assertEqual((briefed, deferred), (2, 1))
+        by_id = {m['id']: m for m in reg['missions']}
+        self.assertEqual(by_id['a']['risk'], 'medium')
+        self.assertNotIn('briefing', by_id['boom'])
+        self.assertEqual(by_id['c']['risk'], 'medium')
+
+    def test_idempotent_second_sweep_is_noop(self):
+        reg = self._reg(_mission(id='a'))
+        mn.author_missions_in_registry(reg, now=NOW, use_llm=False, policy=_POLICY_ASK)
+        briefed, deferred = mn.author_missions_in_registry(
+            reg, now=NOW, use_llm=False, policy=_POLICY_ASK)
+        self.assertEqual((briefed, deferred), (0, 0))
+
+    def test_empty_or_malformed_registry_is_failsafe(self):
+        self.assertEqual(mn.author_missions_in_registry({}, now=NOW, use_llm=False), (0, 0))
+        self.assertEqual(
+            mn.author_missions_in_registry({'missions': 'nope'}, now=NOW, use_llm=False),
+            (0, 0))
+
+    def test_stale_risk_note_cleared_on_rebrief_to_safe(self):
+        reg = self._reg(_mission(id='a', risk='medium', risk_note='old note'))
+        mn.author_missions_in_registry(
+            reg, now=NOW, use_llm=False, policy=_POLICY_SAFE)
+        m = reg['missions'][0]
+        self.assertEqual(m['risk'], 'safe')
+        self.assertNotIn('risk_note', m)
+
+
 if __name__ == '__main__':
     unittest.main()
