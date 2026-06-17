@@ -4,6 +4,65 @@
 
 ---
 
+## Iteration ~2158 — 2026-06-17 20:03Z UTC (interactive, /cycle, Tier 1→2, consecutive_clean=2→3→de-escalate, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 2 Tier-3 alerts silenced (heal-stale-daemon-code auto-restarts for dashboard_api + outbox_notifier post-PR#570 deploy). All checks clean. No DM to Larry. **Tier 1→2 de-escalation.**
+
+**VERIFY-BEFORE-REASSERT:**
+- **projects-v3-p3 COMPLETE ✅ CONFIRMED:** Check E → 0 open PRs in both repos, Check 3 → 0 stalls. ✅
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** 0 open PRs in ourliberty-agent-core and ourliberty-dashboard. ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** Not in open PRs. ✅
+- **PR #570 p3-launch-queue-drain MERGED ✅ CONFIRMED:** HEAD=11aaa5d1=origin/main. ✅
+- **Daemons ✅:** All 5 alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api **4048770** (Ssl) NEW PID, outbox_notifier **4049089** (Ss) NEW PID. ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 1011, "file_length": 1013}` (no repair). **2 new alerts:**
+- L1012: `heal-stale-daemon-code/auto-restarted:ourliberty-dashboard-api.service` (19:59:03Z, PR #570 code deploy) → Tier-3 SILENCED (known pattern).
+- L1013: `heal-stale-daemon-code/auto-restarted:ourliberty-outbox-notifier.service` (19:59:10Z, PR #570 code deploy) → Tier-3 SILENCED (known pattern).
+Watermark advanced 1011→1013. ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log: 0 WARNs/ERRORs. inbox-watcher.log: 0 WARNs/ERRORs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message was "Go" at 12:20:08 MDT (18:20Z) approving install-heal-projects-store-timer-001. All activity tracked and resolved. No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → 0 stalls. All FORGE_NO_PR_SKIP entries pr_exists. ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0. beacon-pending-approvals.json: 0 pending. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-17T19:58:59Z, age≈3.2 min. FRESH (< 60 min). Healer ran at 19:59Z and restarted dashboard_api + outbox_notifier with PR #570 code (as expected). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=11aaa5d1=origin/main (clean, on main, behind=0, ahead=0). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-17T19:13:03Z, age≈48 min. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3734671 (Ss) ✅, chain_event_shipper 3734305 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, dashboard_api **4048770** (Ssl) ✅, outbox_notifier **4049089** (Ss) ✅. All 5 alive. New PIDs for dashboard_api + outbox_notifier reflect heal-stale-daemon-code restart at 19:59Z. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open ✅. ourliberty-dashboard: 0 open ✅. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK (schema_version=1 validates). ✅ Nominal.
+
+**Conditional checks (Wednesday 2026-06-17 UTC, weekday=2 ∈ {0,2,4,6}):**
+- Check I: artifact `pulse-check-i/check-i-2026-06-17.json` EXISTS → SKIP (same-day dedup). ✅
+- Check III: Sunday-anchored → skip.
+
+**G-rule tracking (no changes this iter):**
+- G-rule catalog-accuracy-drift-tier4: **2/3** (no new occurrence).
+- G-rule ledger/check-i Tier-4: **2/3** (no new occurrence).
+- G-rule dual-bot-instance-409-external: **1/3** (no new occurrence).
+- G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: **1/3** (no new occurrence).
+
+**Actions taken:**
+1. Check 0 triage: L1012 + L1013 Tier-3 silenced; watermark advanced 1011→1013.
+2. PRIME ledger: `iter_clean` appended (tier=1, ts=2026-06-17T20:03:05Z).
+3. Tier state: `record --checks-clean true` → consecutive_clean=2→3→de-escalate. **Tier 1→2.** consecutive_clean reset to 0.
+
+**PRIME ratio:** ~19.54 (1018 interventions, 52 systemic fixes, trend=improving).
+
+**Dispatches:** None.
+
+---
+
 ## Iteration ~2157 — 2026-06-17 19:57Z UTC (interactive, /cycle, Tier 1, consecutive_clean=1→2, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).
