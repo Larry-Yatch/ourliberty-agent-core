@@ -673,6 +673,100 @@ class TestWatermark(_ATSTestBase):
         self.assertEqual(buf.getvalue().strip(), '777')
 
 
+class TestWatermarkRepair(_ATSTestBase):
+    """repair-watermark self-heals a stale (too-large) watermark after the
+    retention/compaction job shrinks larry-alerts.jsonl below the recorded
+    absolute line number. Reset is to file_length EXACTLY (not trailing-N)."""
+
+    def setUp(self):
+        super().setUp()
+        # Point the file-length source at a tmp alerts log we control; the
+        # helper reads it via the module attribute so this patch takes effect.
+        self._prior_alerts_file = ats.larry_alerts.ALERTS_FILE
+        self._alerts = self.tmp / 'larry-alerts.jsonl'
+        ats.larry_alerts.ALERTS_FILE = self._alerts
+
+    def tearDown(self):
+        ats.larry_alerts.ALERTS_FILE = self._prior_alerts_file
+        super().tearDown()
+
+    def _write_alerts(self, n: int) -> None:
+        self._alerts.write_text(''.join(f'{{"i": {i}}}\n' for i in range(n)))
+
+    def test_gap_resets_to_file_length(self):
+        # File compacted down to 5 lines but watermark still points at 1200.
+        self._write_alerts(5)
+        ats.write_watermark(1200)
+        result = ats.repair_watermark()
+        self.assertEqual(result, {
+            'repaired': True, 'old_watermark': 1200,
+            'file_length': 5, 'new_watermark': 5,
+        })
+        self.assertEqual(ats.read_watermark(), 5)
+
+    def test_noop_when_watermark_within_file(self):
+        self._write_alerts(50)
+        ats.write_watermark(40)
+        result = ats.repair_watermark()
+        self.assertEqual(result, {
+            'repaired': False, 'old_watermark': 40, 'file_length': 50,
+        })
+        self.assertEqual(ats.read_watermark(), 40)
+
+    def test_noop_when_watermark_equals_file_length(self):
+        # Boundary: watermark == file_length is NOT a gap (nothing after it).
+        self._write_alerts(30)
+        ats.write_watermark(30)
+        result = ats.repair_watermark()
+        self.assertFalse(result['repaired'])
+        self.assertEqual(ats.read_watermark(), 30)
+
+    def test_missing_watermark_is_noop(self):
+        # None is owned by the trailing-100 catchup path, not repair.
+        self._write_alerts(10)
+        result = ats.repair_watermark()
+        self.assertEqual(result, {
+            'repaired': False, 'old_watermark': None, 'file_length': 10,
+        })
+        self.assertIsNone(ats.read_watermark())
+
+    def test_missing_alerts_file_is_zero_length(self):
+        # No alerts file -> file_length 0; any concrete watermark > 0 repairs to 0.
+        ats.write_watermark(7)
+        result = ats.repair_watermark()
+        self.assertEqual(result, {
+            'repaired': True, 'old_watermark': 7,
+            'file_length': 0, 'new_watermark': 0,
+        })
+        self.assertEqual(ats.read_watermark(), 0)
+
+    def test_idempotent_second_run_is_noop(self):
+        self._write_alerts(3)
+        ats.write_watermark(900)
+        first = ats.repair_watermark()
+        self.assertTrue(first['repaired'])
+        second = ats.repair_watermark()
+        self.assertEqual(second, {
+            'repaired': False, 'old_watermark': 3, 'file_length': 3,
+        })
+        self.assertEqual(ats.read_watermark(), 3)
+
+    def test_cli_emits_single_json_object(self):
+        from io import StringIO
+        from contextlib import redirect_stdout
+        self._write_alerts(2)
+        ats.write_watermark(500)
+        buf = StringIO()
+        with redirect_stdout(buf):
+            rc = ats.main(['repair-watermark'])
+        self.assertEqual(rc, 0)
+        payload = json.loads(buf.getvalue())  # parses as exactly one object
+        self.assertEqual(payload, {
+            'repaired': True, 'old_watermark': 500,
+            'file_length': 2, 'new_watermark': 2,
+        })
+
+
 class TestLoaders(_ATSTestBase):
 
     def test_missing_registry_is_empty(self):
