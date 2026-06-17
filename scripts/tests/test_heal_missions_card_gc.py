@@ -973,6 +973,39 @@ class CommitAndPushTest(unittest.TestCase):
         # A second call finds nothing to commit (idempotent).
         self.assertEqual(h.commit_and_push_captures(self.repo, 'audit'), 'nothing')
 
+    def test_missions_nothing_when_clean(self):
+        # No missions.json delta → 'nothing' (the GC healer's per-tick missions
+        # commit is cheap on a clean tree).
+        miss = self.repo / h.MISSIONS_REL
+        miss.write_text(json.dumps({'schema_version': 1, 'missions': []}) + '\n')
+        self._git('add', '.')
+        self._git('commit', '-q', '-m', 'seed missions')
+        self.assertEqual(h.commit_and_push_missions(self.repo, 'audit'), 'nothing')
+
+    def test_missions_commits_any_pending_delta(self):
+        # Contract D: a missions.json delta authored by a SEPARATE cleanup (the
+        # GC healer didn't ship it) is still committed by the healer as the
+        # single committer. No remote → push fails, but the commit lands.
+        miss = self.repo / h.MISSIONS_REL
+        miss.write_text(json.dumps({'schema_version': 1, 'missions': []}) + '\n')
+        self._git('add', '.')
+        self._git('commit', '-q', '-m', 'seed missions')
+        # A cleanup removes a mission / edits the file on disk (uncommitted).
+        miss.write_text(json.dumps(
+            {'schema_version': 1, 'missions': [{'id': 'm-cleanup'}]}) + '\n')
+        status = h.commit_and_push_missions(self.repo, 'cleanup-delta-audit')
+        self.assertEqual(status, 'push-failed')  # no origin remote in the test
+        log = subprocess.run(['git', 'log', '-1', '--pretty=%B'],
+                             cwd=str(self.repo), capture_output=True, text=True)
+        self.assertIn('commit missions.json delta', log.stdout)
+        self.assertIn('cleanup-delta-audit', log.stdout)
+        # Working tree is clean for missions.json (the delta is now committed).
+        self.assertEqual(
+            subprocess.run(['git', 'diff', '--quiet', '--', h.MISSIONS_REL],
+                           cwd=str(self.repo)).returncode, 0)
+        # Idempotent: a second call finds nothing.
+        self.assertEqual(h.commit_and_push_missions(self.repo, 'audit'), 'nothing')
+
 
 # ----------------------------------------------------- run_once integration
 
@@ -1417,6 +1450,62 @@ class RunOnceTest(unittest.TestCase):
                     now=now,
                 )
             self.assertEqual(rc, 0)
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_pending_missions_delta_is_committed_even_when_nothing_ships(self):
+        # Contract D end-to-end: a missions.json delta left by a SEPARATE cleanup
+        # (the GC healer's own reconcile ships nothing this tick) is committed by
+        # the healer within ONE tick. Uses a real git repo so the commit lands.
+        now = datetime(2026, 6, 17, 12, 0, tzinfo=timezone.utc)
+        tmp = tempfile.mkdtemp(prefix='run-once-missions-cleanup-')
+        try:
+            core = Path(tmp) / 'agent-core'
+            (core / 'agents' / 'beacon').mkdir(parents=True)
+
+            def git(*args):
+                subprocess.run(['git', *args], cwd=str(core), check=True,
+                               capture_output=True, text=True)
+
+            git('init', '-q', '-b', 'main')
+            git('config', 'user.email', 'test@test')
+            git('config', 'user.name', 'Test')
+            (core / h.CAPTURES_REL).write_text(
+                json.dumps({'schema_version': 1, 'captures': []}) + '\n')
+            (core / h.MISSIONS_REL).write_text(json.dumps(
+                {'schema_version': 1,
+                 'missions': [{'id': 'm-old', 'phase': 'proposed'}]}) + '\n')
+            git('add', '.')
+            git('commit', '-q', '-m', 'seed')
+
+            # A cleanup retires the mission on disk (uncommitted) — the healer's
+            # reconcile won't ship anything, but it must still persist this delta.
+            (core / h.MISSIONS_REL).write_text(
+                json.dumps({'schema_version': 1, 'missions': []}) + '\n')
+
+            import larry_alerts
+            with mock.patch.object(h, 'load_repo_paths',
+                                   return_value={'ourliberty-agent-core': core}), \
+                    mock.patch.object(larry_alerts, 'append_alert'):
+                rc = h.run_once(
+                    dry_run=False,
+                    emit_fn=lambda **_: True,
+                    events_fetcher=lambda: [],
+                    author_fn=lambda registry, **_: (0, 0),
+                    mission_probe_fn=lambda tid: 'open',
+                    now=now,
+                )
+            self.assertEqual(rc, 0)
+            # The cleanup delta is now committed: working tree is clean for
+            # missions.json and the audit names the GC-healer commit.
+            self.assertEqual(
+                subprocess.run(['git', 'diff', '--quiet', '--', h.MISSIONS_REL],
+                               cwd=str(core)).returncode, 0,
+                'missions.json delta should be committed within one tick')
+            log = subprocess.run(['git', 'log', '-1', '--pretty=%B'],
+                                 cwd=str(core), capture_output=True, text=True)
+            self.assertIn('commit missions.json delta', log.stdout)
         finally:
             import shutil
             shutil.rmtree(tmp, ignore_errors=True)

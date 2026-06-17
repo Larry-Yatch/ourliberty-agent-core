@@ -56,6 +56,12 @@ PULSE_RUNTIME_PATHS=(
 # (dashboard_api.py) and committed every ~10min by heal_missions_card_gc.py.
 # The hourly sync tick can land in that gap and refuse-and-page on a purely
 # machine-owned file — the Pulse iter-98 class, different file.
+# missions.json (2026-06-17): same shape — written by automation (the missions
+# queue drain / dashboard cleanups, never hand-edited; atomic tmp+rename) and
+# committed by heal_missions_card_gc.py as the single committer of ANY pending
+# missions.json delta on its tick (Contract D). A sync tick landing in the gap
+# between a cleanup's write and the healer's commit refused-and-paged — the P1
+# incident. Sync now tolerates it, same as captures.json.
 #
 # IMPORTANT (#409 follow-up): sync does NOT auto-commit these. #409 originally
 # made sync a second committer of captures.json; that created a dual-committer
@@ -75,6 +81,7 @@ PULSE_RUNTIME_PATHS=(
 # this kept-untouched-on-purpose bash literal in lock-step with that JSON.
 SYNC_EXTRA_RUNTIME_PATHS=(
     "agents/beacon/captures.json"
+    "agents/beacon/missions.json"
 )
 
 # The full machine-owned set: Pulse runtime (sync auto-commits) + healer-owned

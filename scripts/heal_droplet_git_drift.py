@@ -70,7 +70,10 @@ HEALER_MANAGED_RUNTIME_PATHS_FILE = (
 # silences a real stale-edit alert. Kept consistent with the canonical JSON and
 # with _lib_pulse_runtime.sh SYNC_EXTRA_RUNTIME_PATHS by the drift test in
 # scripts/tests/test_heal_droplet_git_drift.py.
-_HEALER_MANAGED_PATHS_FALLBACK = ('agents/beacon/captures.json',)
+_HEALER_MANAGED_PATHS_FALLBACK = (
+    'agents/beacon/captures.json',
+    'agents/beacon/missions.json',
+)
 
 GIT_TIMEOUT_S = 30
 
