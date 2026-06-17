@@ -4,6 +4,68 @@
 
 ---
 
+## Iteration ~2155 — 2026-06-17 19:37Z UTC (interactive, /cycle, Tier 1, consecutive_clean=2→0, DRIFT/FIXED)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Drift (auto-fixed). Check A: repo behind 1 commit (PR #570 p3-launch-queue-drain merged 19:35:51Z) → fast-forwarded 37021866→9ceded9f. All other checks clean. No DM to Larry.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** Check E → 0 open PRs in ourliberty-dashboard; 0 in agent-core post-#570 merge. ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** Not in open PRs. ✅
+- **G-rule sequence-complete-tier4 COMPLETE ✅ CONFIRMED:** PR #566 not in open PRs. ✅
+- **G-rule mirror-malformed-verdict-marker COMPLETE ✅ CONFIRMED:** PR #565 not in open PRs. ✅
+- **Daemons ✅:** All 5 alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4021271 (Ssl), outbox_notifier 4021501 (Ss). Same PIDs as iter ~2154. ✅
+- **PR #570 p3-launch-queue-drain MERGED ✅ (NEW):** Merged 19:35:51Z while Pulse cycle was in flight. Fast-forward applied.
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 1010, "file_length": 1010}` (no repair). **0 new alerts.** Watermark stays at 1010. ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log: 0 WARNs/ERRORs. inbox-watcher.log: 0 WARNs/ERRORs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot log last entry 13:13:05 MDT (19:13:05Z) — notification idx=1009 (review-pass PR #569, delivered iter ~2154). No new Larry messages since "Go" at 12:20:08 MDT (18:20Z). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → 0 stalls. All FORGE_NO_PR_SKIP entries pr_exists. ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0. beacon-pending-approvals.json: 0 pending. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-17T19:28:59Z, age≈8 min. FRESH (< 60 min). ✅ Nominal. Note: PR #570 updated `scripts/dashboard_api.py`; heal-stale-daemon-code will restart dashboard_api (and possibly outbox_notifier) on next healer run — expected, no action needed.
+
+**Check A — Source repo:** HEAD=37021866, origin/main=9ceded9f — behind by 1 commit (PR #570 `feat: build-launch-queue + Beacon-side drain (projects-v3-p3 p3-launch-queue-drain)` merged 19:35:51Z). **ALWAYS-FIX: fast-forwarded 37021866→9ceded9f.** Tier-reset. PR #570 adds `scripts/launch_queue_drain.py`, `systemd/ourliberty-launch-queue-drain.{service,timer}`, updated `scripts/dashboard_api.py`, and tests. ✅
+
+**Check B — Sync health:** last_sync=2026-06-17T19:13:03Z, age≈24 min. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3734671 (Ss) ✅, chain_event_shipper 3734305 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, dashboard_api 4021271 (Ssl) ✅, outbox_notifier 4021501 (Ss) ✅. All 5 alive. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open ✅ (PR #570 merged). ourliberty-dashboard: 0 open ✅. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK (schema_version=1 validates). ✅ Nominal.
+
+**§5.0 Phase-2 gates:** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal → script not found (pre-existing). ✅ Nominal.
+
+**Conditional checks (Wednesday 2026-06-17 UTC, weekday=2 ∈ {0,2,4,6}):**
+- Check I: artifact `pulse-check-i/check-i-2026-06-17.json` EXISTS → SKIP (same-day dedup). ✅
+- Check III: Sunday-anchored → skip.
+
+**Pipeline observation — projects-v3-p3 COMPLETE ✅:**
+- PR #567 (p3-project-store) MERGED ✅, PR #568 (p3-promote-endpoint) MERGED ✅, PR #569 (install-heal-projects-store-timer) MERGED ✅, PR #570 (p3-launch-queue-drain) MERGED ✅ 19:35:51Z.
+- All 4 projects-v3-p3 steps complete. 0 open PRs across both repos.
+
+**G-rule tracking (no changes this iter):**
+- G-rule catalog-accuracy-drift-tier4: **2/3** (no new occurrence).
+- G-rule ledger/check-i Tier-4: **2/3** (no new occurrence).
+- G-rule dual-bot-instance-409-external: **1/3** (no new occurrence).
+
+**Actions taken:**
+1. Check A auto-fix: fast-forward 37021866→9ceded9f (PR #570 p3-launch-queue-drain merged). ✅
+2. PRIME ledger: `intervention` appended (tier=1, template=ff-main-when-behind, ts=2026-06-17T19:37:36Z).
+3. Tier state: `record --checks-clean false` → consecutive_clean=2→0. Tier stays 1.
+
+**PRIME ratio:** ~19.52 (1016 interventions, 52 systemic fixes, trend=improving).
+
+**Dispatches:** None.
+
+---
+
 ## Iteration ~2154 — 2026-06-17 19:27Z UTC (interactive, /cycle, Tier 1, consecutive_clean=1→2, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).

@@ -126,9 +126,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-17 19:27Z UTC (Iter ~2154, Tier 1, consecutive_clean=1→2, NOMINAL)
+## Status snapshot — updated 2026-06-17 19:37Z UTC (Iter ~2155, Tier 1, consecutive_clean=2→0, DRIFT/FIXED)
 
-**Iter ~2154 summary:** ✅ Nominal. 0 new alerts. All 5 daemons alive — beacon 3734671, chain-event 3734305, inbox-watcher 3434697, dashboard_api 4021271, outbox_notifier 4021501 (same PIDs as iter ~2153). Repo HEAD=49a21f90=origin/main (clean). Last sync 19:13:03Z (~14 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **1 open PR: #570** (forge/p3-launch-queue-drain `feat: build-launch-queue + Beacon-side drain`, created 19:24:11Z, Mirror review pending). **projects-v3-p3 ACTIVE step 4:** PRs #567+#568+#569 MERGED ✅; PR #570 (p3-launch-queue-drain) in pipeline. Check I skipped (artifact exists 2026-06-17). PRIME ratio=19.52 (1015 interventions, 52 systemic fixes, trend=improving). **Tier 1, consecutive_clean=1→2.**
+**Iter ~2155 summary:** ⚠️ Drift (auto-fixed). Check A: repo behind 1 commit (PR #570 `feat: build-launch-queue + Beacon-side drain (projects-v3-p3 p3-launch-queue-drain)` merged 19:35:51Z) → fast-forwarded 37021866→9ceded9f. All 5 daemons alive — beacon 3734671, chain-event 3734305, inbox-watcher 3434697, dashboard_api 4021271, outbox_notifier 4021501. Heartbeat=19:28:59Z; expect heal-stale-daemon-code to restart dashboard_api (dashboard_api.py updated in PR #570). Last sync 19:13:03Z (~24 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs across all repos.** **projects-v3-p3 COMPLETE ✅** (PRs #567+#568+#569+#570 all merged). PR #570 ships `scripts/launch_queue_drain.py` + `systemd/ourliberty-launch-queue-drain.{service,timer}`. Check I skipped (artifact exists 2026-06-17). PRIME ratio=~19.52 (1016 interventions, 52 systemic fixes, trend=improving). **Tier 1, consecutive_clean=2→0.**
 
 ## Status snapshot — updated 2026-06-17 19:22Z UTC (Iter ~2153, Tier 1, consecutive_clean=0→1, NOMINAL)
 
