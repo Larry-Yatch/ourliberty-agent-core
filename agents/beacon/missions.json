@@ -2907,7 +2907,28 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-17T02:45:19.746197+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-17T02:40:38.096174+00:00"
+      "orphan_last_activity_ts": "2026-06-17T02:40:38.096174+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-17T03:30:30.623428+00:00",
+      "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-projects-v3-p4",
+      "name": "Projects V3 P4",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `projects-v3-p4`. Last activity 2026-06-17T03:17:44.281127+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "projects-v3-p4"
+      ],
+      "repo": null,
+      "created": "2026-06-17",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-17T03:30:30.623428+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-17T03:17:44.281127+00:00"
     }
   ]
 }
