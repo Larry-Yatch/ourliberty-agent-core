@@ -5418,10 +5418,73 @@ def _sequence_complete_gh_veto(seq: dict[str, Any]) -> Optional[str]:
     return None
 
 
-def _render_sequence_complete_dm(seq: dict[str, Any]) -> str:
+def _finish_step_slug(command: str) -> str:
+    """Stable, filesystem/id-safe slug from a post_merge command — used to build
+    a deterministic approval task_id so a re-detect never double-proposes the
+    same gated finish-step."""
+    safe = ''.join(c if c.isalnum() else '-' for c in command).strip('-')
+    return (safe[:48] or 'step').lower()
+
+
+def _propose_gated_finish_step(seq_id: str, kind: str, command: str) -> str:
+    """Register one risky post_merge finish-step on the human-approval-gate as a
+    one-tap (Contract B). A `restart` / non-fail-safe `run` step is NEVER
+    executed here — it's proposed so Larry taps Approve; the approve-envelope
+    routes the execution prompt to forge (the existing gate's job).
+
+    Returns a short note (the approval task_id) for the completion DM. Dedup by
+    a stable task_id so a re-tick / crash-resume never double-proposes. This is
+    invoked from inside `ssh.execute_post_merge`, which wraps it — but we also
+    keep it self-contained and best-effort so a propose failure surfaces as a
+    note rather than blocking the build.
+    """
+    task_id = f'postmerge-{seq_id}-{kind}-{_finish_step_slug(command)}'
+    existing = approval.find_by_id_any_state(task_id)
+    if existing is not None:
+        return f'awaiting tap (already proposed: {task_id})'
+    verb = 'restart service' if kind == 'restart' else 'run cleanup'
+    summary = f'Build `{seq_id}` finished — approve to {verb}: `{command}`'
+    prompt = (
+        f'Post-merge finish-step for completed build sequence `{seq_id}`.\n'
+        f'Approve to {verb}:\n    {command}\n\n'
+        f'This step is human-gated because it is a `{kind}` (not a fail-safe '
+        f'idempotent auto-run). On approve, execute exactly that command in '
+        f'the deploy context and report the result back to Larry.'
+    )
+    payload = {
+        'task_id': task_id,
+        'summary': summary,
+        'target_agent': 'forge',
+        'target_repo': 'ourliberty-agent-core',
+        'prompt': prompt,
+        'kind': 'post_merge_finish_step',
+        'seq_id': seq_id,
+    }
+    chat = _primary_chat_id()
+    approval.add_pending(payload, chat_id=chat if chat is not None else 0)
+    chain_event_emit.emit_event(
+        **approval.build_approval_request_chain_event(payload),
+    )
+    if chat is not None:
+        larry_alerts.append_approval_request(
+            chat_id=chat,
+            approval_id=task_id,
+            body=summary,
+            source='outbox-notifier',
+        )
+    return f'awaiting tap ({task_id})'
+
+
+def _render_sequence_complete_dm(
+    seq: dict[str, Any],
+    report: Optional[Any] = None,
+) -> str:
     """Plain-language completion DM body for Larry: what the build was, the PRs
-    that shipped, and a one-line summary. No markdown chrome beyond the simple
-    bullets the alert DM renderer already handles.
+    that shipped, and a one-line summary. When a post_merge `report` is given
+    (Contract C), append the verified go-live result: what auto-ran, what was
+    verified, and what's awaiting a one-tap. A failed verify check is surfaced
+    loudly at the top (blocked-on-you doorbell). No markdown chrome beyond the
+    simple bullets the alert DM renderer already handles.
     """
     seq_id = seq.get('seq_id') or '?'
     label = seq.get('label') or seq.get('title') or seq_id
@@ -5443,7 +5506,42 @@ def _render_sequence_complete_dm(seq: dict[str, Any]) -> str:
             f'Summary: the `{label}` build sequence finished — '
             f'all {n} step{"s" if n != 1 else ""} are merged to main.'
         )
+    if report is not None and getattr(report, 'has_steps', False):
+        _append_post_merge_report_lines(lines, report)
     return '\n'.join(lines)
+
+
+def _append_post_merge_report_lines(lines: list[str], report: Any) -> None:
+    """Append the Contract C go-live sections to the completion DM body."""
+    auto = report.auto_results
+    verify = [r for r in auto if r.kind == 'verify']
+    ran = [r for r in auto if r.kind != 'verify']
+    gated = report.gated_results
+    failures = report.verify_failures
+    if failures:
+        lines.append('')
+        lines.append(
+            f'⚠️ {len(failures)} go-live check(s) FAILED — needs your eyes:'
+        )
+        for r in failures:
+            lines.append(f'  • {r.command} → {r.detail}')
+    if ran:
+        lines.append('')
+        lines.append('Auto-ran:')
+        for r in ran:
+            mark = '✓' if r.ok else '✗'
+            lines.append(f'  {mark} {r.command} → {r.detail}')
+    if verify:
+        lines.append('')
+        lines.append('Verified:')
+        for r in verify:
+            mark = '✓' if r.ok else '✗'
+            lines.append(f'  {mark} {r.command} → {r.detail}')
+    if gated:
+        lines.append('')
+        lines.append('Awaiting your tap (one-tap approval):')
+        for r in gated:
+            lines.append(f'  • [{r.kind}] {r.command} — {r.detail}')
 
 
 def _emit_sequence_complete_chain_event(seq: dict[str, Any]) -> None:
@@ -5525,12 +5623,19 @@ def _maybe_signal_sequence_complete(seq_id: str) -> None:
                 f'SEQUENCE_COMPLETE seq={seq_id} no-op ({result.reason})',
             )
             return
-        # We won the claim — emit the one chain event + the one DM.
+        # We won the claim — run the post_merge finish-steps (Contract B),
+        # then emit the one chain event + the one verified go-live DM
+        # (Contract C). execute_post_merge never raises and never mutates the
+        # sequence, so a failing cleanup/verify reports loudly but can't block
+        # or corrupt completion.
+        report = ssh.execute_post_merge(
+            seq, propose_gated=_propose_gated_finish_step,
+        )
         _emit_sequence_complete_chain_event(seq)
         larry_alerts.append_alert(
             source='outbox-notifier',
             severity='warning',
-            message=_render_sequence_complete_dm(seq),
+            message=_render_sequence_complete_dm(seq, report=report),
             subject=f'sequence-complete:{seq_id}',
             route='escalate',
         )

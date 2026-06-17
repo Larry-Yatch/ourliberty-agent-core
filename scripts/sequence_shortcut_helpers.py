@@ -36,11 +36,13 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
+import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 # Import the validator for read + schema-check.
 _SCRIPT_DIR = Path(__file__).resolve().parent
@@ -290,6 +292,189 @@ def claim_completion_signal(seq_id: str, actor: str = 'notifier') -> Result:
         reason=f'Sequence `{seq_id}` completion signal claimed',
         sequence_path=path,
     )
+
+
+# -------------------- post_merge executor (Contract B + C) --------------------
+
+# projects-v3 P4 Contract B (p4-postmerge-exec): a finishing sequence may carry
+# a declarative `post_merge` block of finish-steps. The executor runs them once
+# the sequence completes, classifying each:
+#   - `verify` (read-only go-live probes)              → ALWAYS auto-run.
+#   - `run` marked `safe: true` (idempotent/fail-safe) → auto-run.
+#   - `run` plain-string + every `restart`             → GATED (proposed via
+#     human-approval-gate for a one-tap; NEVER auto-executed here).
+# The executor NEVER raises and NEVER mutates the sequence record — a failing
+# verify/cleanup reports loudly (Contract C) but can't block or corrupt the
+# build. Stdlib only: the heavy propose→approval-gate wiring is injected by the
+# caller as a `propose_gated` callback so this module stays import-light.
+POST_MERGE_STEP_TIMEOUT_SEC = 120
+
+
+@dataclass
+class PostMergeStepResult:
+    """Outcome of one post_merge finish-step.
+
+    Attributes:
+        kind: 'verify' | 'run' | 'restart'.
+        command: the raw command (or service name, for restart).
+        classification: 'auto' (executed here) or 'gated' (proposed for tap).
+        executed: True iff the executor actually ran the command.
+        ok: True/False for auto steps; None for gated (not run here).
+        detail: stdout/stderr tail for auto steps; the proposal note for gated.
+    """
+
+    kind: str
+    command: str
+    classification: str
+    executed: bool
+    ok: Optional[bool]
+    detail: str
+
+
+@dataclass
+class PostMergeReport:
+    """Aggregate result of running a sequence's post_merge block."""
+
+    seq_id: str
+    results: list[PostMergeStepResult] = field(default_factory=list)
+
+    @property
+    def auto_results(self) -> list[PostMergeStepResult]:
+        return [r for r in self.results if r.classification == 'auto']
+
+    @property
+    def gated_results(self) -> list[PostMergeStepResult]:
+        return [r for r in self.results if r.classification == 'gated']
+
+    @property
+    def verify_failures(self) -> list[PostMergeStepResult]:
+        """Auto verify probes that returned non-zero — Contract C reports these
+        loudly (a failed go-live check is a blocked-on-you doorbell)."""
+        return [
+            r for r in self.results
+            if r.kind == 'verify' and r.executed and r.ok is False
+        ]
+
+    @property
+    def has_steps(self) -> bool:
+        return bool(self.results)
+
+
+def _iter_post_merge_steps(block: dict[str, Any]):
+    """Yield (kind, command, is_safe) for each well-formed entry in a
+    post_merge block, in report order: verify → run → restart (go-live checks
+    first so they surface even when a later gated step is still pending).
+    Malformed entries are silently skipped — the validator is the gate for
+    shape; the executor is defensive against a hand-edited file."""
+    if not isinstance(block, dict):
+        return
+    for cmd in block.get('verify') or []:
+        if isinstance(cmd, str) and cmd.strip():
+            yield 'verify', cmd, True  # read-only → always auto
+    for entry in block.get('run') or []:
+        if isinstance(entry, str) and entry.strip():
+            yield 'run', entry, False  # plain string → gated by default
+        elif isinstance(entry, dict):
+            cmd = entry.get('cmd')
+            if isinstance(cmd, str) and cmd.strip():
+                yield 'run', cmd, bool(entry.get('safe'))
+    for svc in block.get('restart') or []:
+        if isinstance(svc, str) and svc.strip():
+            yield 'restart', svc, False  # restart → always gated
+
+
+def _classify_post_merge_step(kind: str, is_safe: bool) -> str:
+    """'auto' for read-only verify + fail-safe (safe:true) run steps; 'gated'
+    for everything else (plain run strings and every restart)."""
+    if kind == 'verify':
+        return 'auto'
+    if kind == 'run' and is_safe:
+        return 'auto'
+    return 'gated'
+
+
+def _run_post_merge_command(
+    command: str, timeout: int = POST_MERGE_STEP_TIMEOUT_SEC,
+) -> tuple[bool, str]:
+    """Run one auto-classified command with shell=False + a bounded timeout.
+
+    Returns (ok, detail). NEVER raises — an unparseable command, a timeout, a
+    non-zero exit, or an OS error all become (False, <detail>). shell=False +
+    shlex.split avoids shell-injection: the command is argv, not a shell line.
+    """
+    try:
+        argv = shlex.split(command)
+    except ValueError as e:
+        return False, f'unparseable command: {e}'
+    if not argv:
+        return False, 'empty command'
+    try:
+        proc = subprocess.run(
+            argv, capture_output=True, text=True, timeout=timeout, check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return False, f'timed out after {timeout}s'
+    except OSError as e:
+        return False, f'{type(e).__name__}: {e}'
+    out = ((proc.stdout or '') + (proc.stderr or '')).strip()
+    tail = out[-400:]
+    if proc.returncode == 0:
+        return True, tail or 'ok (no output)'
+    return False, f'exit {proc.returncode}: {tail}'
+
+
+def execute_post_merge(
+    seq: dict[str, Any],
+    *,
+    propose_gated: Optional[Callable[[str, str, str], Any]] = None,
+    runner: Optional[Callable[[str], tuple[bool, str]]] = None,
+) -> PostMergeReport:
+    """Run a sequence's optional `post_merge` block (Contract B) and return a
+    PostMergeReport for the completion DM (Contract C).
+
+    Args:
+        seq: the (already-complete) sequence dict.
+        propose_gated: callback `(seq_id, kind, command) -> note` invoked once
+            per gated step to register it on the human-approval-gate. Its return
+            value (e.g. a task_id) is captured into the result detail. If None,
+            gated steps are still listed in the report as awaiting a tap, just
+            not registered (keeps this module stdlib-only + unit-testable).
+        runner: injectable command runner for tests; defaults to
+            `_run_post_merge_command`.
+
+    NEVER raises and NEVER mutates `seq` — a failure becomes a result with
+    ok=False so the build is never blocked or corrupted (spec § 5 guardrail).
+    """
+    seq_id = seq.get('seq_id') or '?'
+    report = PostMergeReport(seq_id=seq_id, results=[])
+    block = seq.get('post_merge')
+    if not isinstance(block, dict):
+        return report
+    run = runner or _run_post_merge_command
+    for kind, command, is_safe in _iter_post_merge_steps(block):
+        if _classify_post_merge_step(kind, is_safe) == 'auto':
+            try:
+                ok, detail = run(command)
+            except Exception as e:  # noqa: BLE001 — a runner must never wedge
+                ok, detail = False, f'runner raised: {type(e).__name__}: {e}'
+            report.results.append(PostMergeStepResult(
+                kind=kind, command=command, classification='auto',
+                executed=True, ok=ok, detail=detail,
+            ))
+            continue
+        detail = 'proposed for one-tap approval'
+        if propose_gated is not None:
+            try:
+                note = propose_gated(seq_id, kind, command)
+                if note:
+                    detail = str(note)
+            except Exception as e:  # noqa: BLE001 — propose must never block
+                detail = f'propose failed: {type(e).__name__}: {e}'
+        report.results.append(PostMergeStepResult(
+            kind=kind, command=command, classification='gated',
+            executed=False, ok=None, detail=detail,
+        ))
+    return report
 
 
 # -------------------- pause / resume --------------------
@@ -716,5 +901,9 @@ __all__ = [
     'is_completion_signaled',
     'claim_completion_signal',
     'SEQUENCE_COMPLETE_SIGNALED_EVENT',
+    'execute_post_merge',
+    'PostMergeReport',
+    'PostMergeStepResult',
+    'POST_MERGE_STEP_TIMEOUT_SEC',
     'AGENTS_ROOT',
 ]

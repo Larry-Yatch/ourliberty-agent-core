@@ -98,6 +98,16 @@ REQUIRED_STEP_FIELDS = (
 # unresolved); the validator type-checks but doesn't constrain the value.
 REQUIRED_GAP_LOG_ENTRY_FIELDS = ('ts', 'severity', 'finding', 'surfaced_by')
 
+# Per spec `agents/beacon/specs/projects-v3-p4-build-completion-autoverify.md`
+# § 4 Contract B: an optional sequence-level `post_merge` block carrying
+# finish-steps run by the executor when the sequence completes. Three optional
+# list keys: `restart` (services, always human-gated), `run` (one-time
+# cleanups — a plain string is gated; a `{"cmd": str, "safe": bool}` object may
+# auto-run when `safe` is true), `verify` (read-only go-live probes, always
+# auto). The validator type-checks shape only; it does NOT execute or judge
+# command safety (the executor's classification owns that).
+POST_MERGE_LIST_KEYS = ('restart', 'run', 'verify')
+
 
 @dataclass
 class ValidationResult:
@@ -198,6 +208,58 @@ def _check_gap_log(seq: dict[str, Any], errors: list[str]) -> None:
                 errors.append(
                     f'gap_log[{idx}] {field_name} must be a non-empty string'
                 )
+
+
+def _check_post_merge(seq: dict[str, Any], errors: list[str]) -> None:
+    """Validate the optional `post_merge` block if present.
+
+    Absent post_merge is fine (existing sequences validate unchanged). When
+    present, must be a dict with optional `restart` / `run` / `verify` list
+    keys. `restart` and `verify` entries are non-empty strings. `run` entries
+    are EITHER a non-empty string (gated by default) OR an object
+    `{"cmd": <non-empty str>, "safe": <bool>}` (auto-runs only when
+    `safe: true`). Unknown keys inside the block are tolerated — the validator
+    is permissive about extension, strict about the shapes it knows."""
+    if 'post_merge' not in seq:
+        return
+    block = seq['post_merge']
+    if not isinstance(block, dict):
+        errors.append('post_merge must be a dict')
+        return
+    for key in POST_MERGE_LIST_KEYS:
+        if key not in block:
+            continue
+        entries = block[key]
+        if not isinstance(entries, list):
+            errors.append(f'post_merge.{key} must be a list')
+            continue
+        for idx, entry in enumerate(entries):
+            if key == 'run':
+                _check_run_entry(entry, idx, errors)
+            elif not isinstance(entry, str) or not entry.strip():
+                errors.append(
+                    f'post_merge.{key}[{idx}] must be a non-empty string'
+                )
+
+
+def _check_run_entry(entry: Any, idx: int, errors: list[str]) -> None:
+    """A post_merge.run entry: a non-empty string, or an object carrying a
+    non-empty string `cmd` and a bool `safe`."""
+    if isinstance(entry, str):
+        if not entry.strip():
+            errors.append(f'post_merge.run[{idx}] must be a non-empty string')
+        return
+    if not isinstance(entry, dict):
+        errors.append(
+            f'post_merge.run[{idx}] must be a string or '
+            f'{{"cmd": str, "safe": bool}} object'
+        )
+        return
+    cmd = entry.get('cmd')
+    if not isinstance(cmd, str) or not cmd.strip():
+        errors.append(f'post_merge.run[{idx}].cmd must be a non-empty string')
+    if 'safe' in entry and not isinstance(entry['safe'], bool):
+        errors.append(f'post_merge.run[{idx}].safe must be a bool')
 
 
 def _check_step_shape(step: Any, idx: int, errors: list[str]) -> bool:
@@ -383,6 +445,7 @@ def validate_dag(sequence_dict: Any) -> ValidationResult:
         return ValidationResult(valid=False, errors=errors, seq_id=seq_id)
     _check_top_level_types(sequence_dict, errors)
     _check_gap_log(sequence_dict, errors)
+    _check_post_merge(sequence_dict, errors)
     steps = sequence_dict.get('steps')
     if not isinstance(steps, list) or not steps:
         # Already flagged in _check_top_level_types.
