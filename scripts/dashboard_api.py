@@ -816,6 +816,49 @@ class LaunchBuildResponse(BaseModel):
     seq_id: str
 
 
+class PhaseAdvanceRequest(BaseModel):
+    # p3f-phase-transitions — POST /api/projects/advance body. The checkpoint
+    # "Ready to spec / go" gesture: advance a phase one forward step in the
+    # lifecycle. This endpoint owns ONLY the Brainstorm→Spec checkpoint (the
+    # human "refine → go" gate); Spec→Building is owned by Launch + status
+    # writeback, Building→Done by status writeback. `project_id` + `phase_id`
+    # locate the phase in projects.json; the dashboard writes the lifecycle bump
+    # to disk and the projects-store healer commits (non-committer discipline).
+    project_id: str = Field(..., min_length=1)
+    phase_id: str = Field(..., min_length=1)
+
+
+class PhaseAdvanceResponse(BaseModel):
+    # The phase moved forward one lifecycle step. `from_state`/`to_state` record
+    # the transition (brainstorm → spec for the checkpoint this endpoint owns).
+    project_id: str
+    phase_id: str
+    from_state: str
+    to_state: str
+    status: str = 'advanced'
+
+
+class SpecAttachRequest(BaseModel):
+    # p3f-phase-transitions — POST /api/projects/attach-spec body. Points a Spec-
+    # stage phase at its (already-authored) spec doc, making it spec-ready so the
+    # Launch button appears. `spec_ref` is a repo-relative path to an EXISTING
+    # spec doc — a non-existent path is rejected loudly (spec § 4 guardrail), never
+    # written. Non-committer: the dashboard writes the `spec_ref` to disk and the
+    # projects-store healer commits.
+    project_id: str = Field(..., min_length=1)
+    phase_id: str = Field(..., min_length=1)
+    spec_ref: str = Field(..., min_length=1)
+
+
+class SpecAttachResponse(BaseModel):
+    # The spec doc was attached to the phase (`spec_ref` set; phase now spec-ready).
+    project_id: str
+    phase_id: str
+    spec_ref: str
+    lifecycle_state: str
+    status: str = 'spec-attached'
+
+
 class MissionThreadResponse(BaseModel):
     # GET /api/system/missions/{id}/thread — oldest-first conversation, mirroring
     # the capture thread (Projects v3 P2 Contract B).
@@ -6432,6 +6475,218 @@ def _project_repo(projects: list[Any], project_id: str) -> Optional[str]:
     return None
 
 
+# ---------------------------------------------------------------------------
+# Phase transitions — the checkpoint-advance + spec-attach write side
+# (projects-v3 P3 follow-up, step p3f-phase-transitions, spec § 0 / § 6 step 1).
+#
+# Both endpoints MUTATE projects.json on disk and stay NON-committers: they
+# atomically rewrite the registry under `_PROJECTS_INGEST_LOCK` (so a concurrent
+# reader / the healer never sees a partial file) and rely on `heal_projects_
+# store.py` (the SOLE committer) to version-control the delta on its next tick —
+# the same single-committer invariant Promote uses (spec § 5; #571). They read
+# via `_read_projects_registry` (which 500s on a corrupt file) so a transition
+# never appends onto malformed JSON, and locate the phase with `_find_active_
+# phase` (archived projects are not transition-able — they've left the pipeline).
+# ---------------------------------------------------------------------------
+def _resolve_spec_ref(spec_ref: str) -> Optional[Path]:
+    """Resolve a repo-relative `spec_ref` to an absolute path INSIDE the repo,
+    or None if it escapes the repo root (path traversal / an absolute path).
+    The attach-spec endpoint additionally requires the resolved path to be an
+    existing file; this helper only does the safe-resolution half so the route
+    can distinguish "unsafe ref" from "missing file" uniformly (both reject)."""
+    root = _repo_root().resolve()
+    candidate = (root / spec_ref).resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        return None
+    return candidate
+
+
+def _handle_phase_advance(
+    *,
+    project_id: str,
+    phase_id: str,
+    projects_path: Path,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Pure handler for POST /api/projects/advance (p3f-phase-transitions). The
+    checkpoint "Ready to spec" gesture: advance an ACTIVE project's phase one
+    forward lifecycle step, via `projects_store.next_lifecycle_state` +
+    `can_transition`. This endpoint owns ONLY the Brainstorm→Spec checkpoint —
+    Spec→Building is owned by Launch + status writeback, Building→Done by status
+    writeback — so a phase NOT at Brainstorm is rejected (409). Steps:
+
+      1. 404 if the active project / phase doesn't exist.
+      2. 409 if the phase isn't at Brainstorm (already advanced, or a stage this
+         endpoint doesn't own).
+      3. Bump `lifecycle_state` to `next_lifecycle_state` (guarded by
+         `can_transition`), stamp `updated_at`, atomic-write the registry.
+
+    Non-committer: the bump lands on disk; `heal_projects_store.py` commits the
+    delta. Returns {project_id, phase_id, from_state, to_state, status}."""
+    now = now or datetime.now(timezone.utc)
+    with _PROJECTS_INGEST_LOCK:
+        registry = _read_projects_registry(projects_path)
+        phase = _find_active_phase(registry['projects'], project_id, phase_id)
+        if phase is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    'error': 'phase not found',
+                    'project_id': project_id,
+                    'phase_id': phase_id,
+                    'hint': (
+                        'phase_id must name a phase inside an ACTIVE project_id '
+                        'in the projects store'
+                    ),
+                },
+            )
+
+        from_state = phase.get(
+            'lifecycle_state', projects_store.DEFAULT_LIFECYCLE_STATE)
+        if from_state != 'brainstorm':
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    'error': 'phase not at brainstorm checkpoint',
+                    'phase_id': phase_id,
+                    'lifecycle_state': from_state,
+                    'hint': (
+                        'The advance endpoint owns only the Brainstorm→Spec '
+                        'checkpoint; Spec→Building is driven by Launch and '
+                        'Building→Done by status writeback.'
+                    ),
+                },
+            )
+
+        to_state = projects_store.next_lifecycle_state(from_state)
+        if to_state is None or not projects_store.can_transition(from_state, to_state):
+            # Defensive: brainstorm→spec is always legal, so this only trips if
+            # the lifecycle model changes underneath us — fail loudly, don't write.
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    'error': 'illegal transition',
+                    'phase_id': phase_id,
+                    'from_state': from_state,
+                    'to_state': to_state,
+                },
+            )
+
+        phase['lifecycle_state'] = to_state
+        phase['updated_at'] = now.isoformat()
+        try:
+            _atomic_write_json(projects_path, registry)
+        except OSError as e:
+            first_line = str(e).splitlines()[0] if str(e) else type(e).__name__
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={'error': 'projects write failed', 'detail': first_line},
+            )
+
+    return {
+        'project_id': project_id,
+        'phase_id': phase_id,
+        'from_state': from_state,
+        'to_state': to_state,
+        'status': 'advanced',
+    }
+
+
+def _handle_spec_attach(
+    *,
+    project_id: str,
+    phase_id: str,
+    spec_ref: str,
+    projects_path: Path,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Pure handler for POST /api/projects/attach-spec (p3f-phase-transitions).
+    Points a Spec-stage phase at its already-authored spec doc, making it
+    spec-ready (the Launch button keys off `spec_ref`). Steps:
+
+      1. 400 if `spec_ref` doesn't resolve to an EXISTING file inside the repo
+         (spec § 4 guardrail: a non-existent spec path fails loudly, never
+         creates an un-launchable "spec-ready" phase). Validated BEFORE any
+         write so a bad ref leaves projects.json byte-identical.
+      2. 404 if the active project / phase doesn't exist.
+      3. 409 if the phase isn't at the Spec stage (attach is the Spec affordance;
+         advance Brainstorm→Spec first).
+      4. Set `spec_ref`, stamp `updated_at`, atomic-write the registry.
+
+    Non-committer: the `spec_ref` lands on disk; `heal_projects_store.py` commits
+    the delta. Returns {project_id, phase_id, spec_ref, lifecycle_state, status}."""
+    now = now or datetime.now(timezone.utc)
+    spec_ref = spec_ref.strip()
+    resolved = _resolve_spec_ref(spec_ref)
+    if resolved is None or not resolved.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                'error': 'spec doc not found',
+                'spec_ref': spec_ref,
+                'hint': (
+                    'spec_ref must be a repo-relative path to an existing spec '
+                    'doc (e.g. agents/beacon/specs/<slug>.md); attach points the '
+                    'phase at an authored spec, it does not create one.'
+                ),
+            },
+        )
+
+    with _PROJECTS_INGEST_LOCK:
+        registry = _read_projects_registry(projects_path)
+        phase = _find_active_phase(registry['projects'], project_id, phase_id)
+        if phase is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    'error': 'phase not found',
+                    'project_id': project_id,
+                    'phase_id': phase_id,
+                    'hint': (
+                        'phase_id must name a phase inside an ACTIVE project_id '
+                        'in the projects store'
+                    ),
+                },
+            )
+
+        lifecycle = phase.get(
+            'lifecycle_state', projects_store.DEFAULT_LIFECYCLE_STATE)
+        if lifecycle != 'spec':
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    'error': 'phase not at spec stage',
+                    'phase_id': phase_id,
+                    'lifecycle_state': lifecycle,
+                    'hint': (
+                        'Attach is the Spec-stage affordance; advance the phase '
+                        'Brainstorm→Spec before attaching its spec doc.'
+                    ),
+                },
+            )
+
+        phase['spec_ref'] = spec_ref
+        phase['updated_at'] = now.isoformat()
+        try:
+            _atomic_write_json(projects_path, registry)
+        except OSError as e:
+            first_line = str(e).splitlines()[0] if str(e) else type(e).__name__
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={'error': 'projects write failed', 'detail': first_line},
+            )
+
+    return {
+        'project_id': project_id,
+        'phase_id': phase_id,
+        'spec_ref': spec_ref,
+        'lifecycle_state': lifecycle,
+        'status': 'spec-attached',
+    }
+
+
 # Test seam: tests monkeypatch this to inject a recording mock.
 def _get_larry_action_supabase_client():
     """Build a service-role supabase client for the larry-action endpoint.
@@ -7781,6 +8036,53 @@ def post_launch_build(
         actor=actor,
         projects_path=_projects_json_path(),
         queue_dir=_build_launch_queue_dir(),
+    )
+
+
+# POST /api/projects/advance — the checkpoint "Ready to spec" gesture (projects-v3
+# P3 follow-up, p3f-phase-transitions). Advances an ACTIVE project's phase one
+# forward lifecycle step (Brainstorm→Spec, the human checkpoint this endpoint
+# owns). The dashboard stays a NON-committer: the lifecycle bump is written to
+# projects.json on disk and `heal_projects_store.py` commits it. Same auth as the
+# other write routes: X-Dashboard-Token + an allowlisted X-Actor.
+@app.post(
+    '/api/projects/advance',
+    response_model=PhaseAdvanceResponse,
+    response_model_exclude_none=True,
+    dependencies=[Depends(_require_token)],
+)
+def post_phase_advance(
+    body: PhaseAdvanceRequest,
+    actor: str = Depends(_require_actor),
+) -> dict[str, Any]:
+    return _handle_phase_advance(
+        project_id=body.project_id,
+        phase_id=body.phase_id,
+        projects_path=_projects_json_path(),
+    )
+
+
+# POST /api/projects/attach-spec — point a Spec-stage phase at its authored spec
+# doc, making it spec-ready so the Launch button appears (projects-v3 P3 follow-up,
+# p3f-phase-transitions). Validates the spec doc EXISTS (a non-existent path is
+# rejected loudly, never written). The dashboard stays a NON-committer: the
+# `spec_ref` is written to projects.json on disk and `heal_projects_store.py`
+# commits it. Same auth: X-Dashboard-Token + an allowlisted X-Actor.
+@app.post(
+    '/api/projects/attach-spec',
+    response_model=SpecAttachResponse,
+    response_model_exclude_none=True,
+    dependencies=[Depends(_require_token)],
+)
+def post_spec_attach(
+    body: SpecAttachRequest,
+    actor: str = Depends(_require_actor),
+) -> dict[str, Any]:
+    return _handle_spec_attach(
+        project_id=body.project_id,
+        phase_id=body.phase_id,
+        spec_ref=body.spec_ref,
+        projects_path=_projects_json_path(),
     )
 
 
