@@ -4,6 +4,59 @@
 
 ---
 
+## Iteration ~2089 — 2026-06-17 01:48Z UTC (interactive, /loop /cycle, Tier 2, consecutive_clean=0→1, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/loop /cycle`).
+
+**Health:** ✅ Nominal. 0 new alerts. All infrastructure clean. No DM to Larry. projects-v3-p4 actively building in Forge.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** 0 open PRs in agent-core, dashboard, graph. ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** 0 open PRs confirmed. ✅
+- **projects-v3-p1 SEQUENCE COMPLETE ✅ CONFIRMED:** 0 open PRs. ✅
+- **projects-v3-p4 ACTIVE ✅ CONFIRMED:** Forge building `p4-complete-signal` (started 01:20:53Z, ~27 min at check time); forge.log last entry "Running" at 19:20:53 with no completion yet — normal for feature-dev; `heal_pipeline_stall --dry-run` confirms no stalls. `p4-cleanup-committer.json` remains queued in Forge inbox. ✅
+- **Daemons same PIDs ✅:** beacon 3556778 (Ss), chain-event 2744551 (SNs), inbox-watcher 3434697 (Ssl), outbox_notifier 3676902 (Ss), dashboard_api 3688711 (Ssl). All 5 alive. ✅
+
+**Check 0 — Alert triage:** Watermark=1064 entering; file=1064 lines. **0 new alerts.** Watermark unchanged. ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log — last WARN was MalformedForgeMarker for p1-funnel-derive at 17:28:29 MDT (covered by completed G-rule PR #524). No new WARN/ERROR. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message: `go` at 19:16 MDT (01:16Z) for dag-preflight-projects-v3-p4 — fully tracked, DAG preflight PASSED, sequence active. No new messages. G-rule telegram-409-burst **2/3** unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → `no stalls detected`. Forge building p4-complete-signal (~27 min at check time, within threshold for feature-dev). p4-cleanup-committer queued. ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0 in beacon-pending-approvals.json. No orphaned Larry directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-17T01:24:15Z, age≈22 min at check time (01:47Z). FRESH (< 60 min threshold). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=a25ea307=origin/main (clean, on main, no divergence). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-17T01:09:59Z, status=success, age≈37.6 min at check time. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3556778 (Ss) ✅, chain_event_shipper 2744551 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, outbox_notifier 3676902 (Ss) ✅, dashboard_api 3688711 (Ssl) ✅. All 5 alive, same PIDs as iter ~2088. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open PRs ✅. ourliberty-dashboard: 0 open PRs ✅. ourliberty-graph: 0 open PRs ✅.
+
+**Check H — Forge digest:** Forge building p4-complete-signal (started 01:20:53Z). p4-cleanup-committer queued in Forge inbox. No PRs created yet (build in progress). ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → `OK: schema_version=1 validates`. ✅ Nominal.
+
+**Conditional checks (Wednesday 2026-06-17 UTC, weekday=2 ∈ {0,2,4,6}):**
+- Check I: artifact `pulse-check-i/check-i-2026-06-17.json` EXISTS → SKIP (same-day dedup).
+- Check III: fires Sunday → skip.
+
+**G-rule tracking:** No new G-rule counts this iter. All counts unchanged from iter ~2088.
+
+**Actions taken:**
+1. PRIME ledger: `iter_clean` appended (tier=2, template=iter-clean, ts=2026-06-17T01:47:53Z).
+2. Tier state: `record --checks-clean true` → consecutive_clean 0→1. Tier 2 unchanged (need 3 consecutive clean for Tier 2→3 de-escalation).
+
+**PRIME ratio:** 20.43 (1001 interventions, 49 systemic fixes). Trend: improving.
+
+**Dispatches:** None.
+
+---
+
 ## Iteration ~2088 — 2026-06-17 01:32Z UTC (interactive, /cycle, Tier 1, consecutive_clean=2→3→de-escalate, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).
