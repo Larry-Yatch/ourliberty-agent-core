@@ -591,6 +591,36 @@
         "from_state": "parked"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-build-completion-auto-report-auto-verify-auto-ru-58c8",
+      "title": "Build-completion auto-report + auto-verify + auto-run cleanups (P4 slice)",
+      "note": "Root cause of the P1 'wasted hour' (2026-06-16): P1 finished 17:44 MDT but NEITHER notification fired. (1) My desktop completion-watcher died with the session (laptop-bound, unreliable for long waits). (2) The droplet sent NO sequence-COMPLETE DM \u2014 the per-step closing DM was suppressed on the AUTO_MERGE_DEFERRED_UNKNOWN path ('final DM fires on retry/conflict') and there is no whole-sequence-complete alert at all. So P1 sat done-but-unverified ~50min. ALSO recurring: cleanups (the drain) ship as code but don't auto-run (Phase S + P1 both needed a manual --apply). FIX = a droplet-side build-completion pass (slice of Projects-tab P4 closeout) that on sequence-complete: DMs Larry 'done + what shipped', runs go-live verification (dashboard-api restart + derive checks), and AUTO-RUNS one-time cleanups. Makes P2-P7 hands-free + self-reporting and ends reliance on fragile desktop watchers. RECOMMEND building BEFORE P2.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ol-work",
+        "branch": "pr476-review",
+        "captured_at": "2026-06-17T00:48:56.579090+00:00"
+      },
+      "last_touched": "2026-06-17T00:48:56.579090+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "An automatic system that tells you the moment a big job is finished, double-checks it actually went live, and finishes the leftover tidy-up steps on its own.",
+        "why": "Last time, a finished job sat unnoticed for nearly an hour because no one got the message and a cleanup step was skipped \u2014 wasting time and leaving work half-done.",
+        "suggest": "Worth building this next, before the upcoming round of projects, though I'd want to test it carefully first so we can trust it to report and verify on its own."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T00:56:19.915890+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
