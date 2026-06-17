@@ -4,6 +4,80 @@
 
 ---
 
+## Iteration ~2164 — 2026-06-17 22:28Z UTC (interactive, /cycle, Tier 3, consecutive_clean=2→3, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 1 Tier-3 alert silenced (sync-blocked:uncommitted-changes, transient). All checks clean. No DM to Larry.
+
+**VERIFY-BEFORE-REASSERT:**
+- **All 5 daemon PIDs alive:** beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4048770 (Ssl), outbox_notifier 4049089 (Ss). Same PIDs as iter ~2163. ✅
+- **0 open PRs:** `gh pr list` → [] in both repos. ✅
+- **Repo at origin/main:** HEAD=554b02a1=origin/main, clean. ✅ (2 new commits since iter ~2163: 406c36f6 missions GC healer, 554b02a1 projects delta drain — both from healer scripts.)
+- **projects-v3-p3 COMPLETE:** 0 open PRs, 0 stalls, 0 inbox tasks. ✅
+- **Stale bash orphans UPDATE:** PID 2605007 gone (self-reaped ✅). PID 1834248 still alive (Ss bash, low CPU, carry).
+
+**Check 0 — Alert triage:** watermark=1015, file_length=1016. **1 new alert (L1016):**
+- L1016: `sync-blocked:uncommitted-changes` (sync.service at 22:13Z) — repo had uncommitted changes when sync timer fired (in the window between iter ~2163 cycle write and healer commits 406c36f6+554b02a1). Helper returned Tier-3, decision=silence, route=digest, known-pattern match. Transient: repo is now at 554b02a1=origin/main, clean. ✅
+Watermark advanced 1015→1016. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → No entries. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot log: last Larry msg 12:20:08-0600 MDT (install-heal-projects-store-timer-001 "Go", handled in iter ~2152). No new messages since. No 409 errors. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected`. 19 FORGE_NO_PR_SKIP (all reason=pr_exists). ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` pending=0. Beacon/forge/mirror inboxes: empty. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK (schema_version=1 validates). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=`2026-06-17T21:59:19Z` (~29 min). FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=554b02a1=origin/main. Clean tree. On main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-17T22:13:28Z, status=error "Uncommitted changes in working tree". Alert L1016 Tier-3 silenced. Last successful sync ~21:13Z (75 min prior), within 2h threshold. Repo clean now; next scheduled sync will succeed. ✅ Nominal (transient).
+
+**Check C — Agent liveness:** beacon 3734671 (Ss) ✅, chain-event 3734305 (SNs) ✅, inbox-watcher 3434697 (Ssl) ✅, dashboard_api 4048770 (Ssl) ✅, outbox_notifier 4049089 (Ss) ✅. All 5/5 alive. Same PIDs as iter ~2163. ✅ Nominal.
+
+**Check D — Inboxes:** beacon: empty, forge: empty, mirror: empty. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open PRs. ourliberty-dashboard: 0 open PRs. ✅ Nominal.
+
+**Conditional checks:** Wednesday 2026-06-17 UTC, weekday=2 ∈ {0,2,4,6}.
+- Check I: artifact `pulse-check-i/check-i-2026-06-17.json` EXISTS → SKIP (same-day dedup). ✅
+- Check III: Sunday-anchored → skip.
+
+**Actions taken:**
+1. Check 0 triage: L1016 Tier-3 silenced; watermark advanced 1015→1016.
+2. PRIME ledger: `iter_clean` appended (tier=3, ts=2026-06-17T22:28:34Z).
+3. Tier state: `record --checks-clean true` → Tier 3, consecutive_clean=2→3 ✅
+
+**Dispatches:** None.
+
+**Standing findings (carried):**
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule catalog-accuracy-drift-tier4** — 1/3. Watch.
+- [blue] **G-rule ledger/check-i Tier-4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule watermark-rotation-gap** — 2/3. Watch.
+- [blue] **Stale bash orphan** — PID 1834248 (Ss bash). Low CPU. PID 2605007 self-reaped ✅. [carry]
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — merged without Mirror; bot-delivered. Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**PRIME DIRECTIVE:** iter_clean. Trailing-30d: interventions=1016, systemic_fixes=52, ratio=19.54, trend=improving.
+**Tier end-of-iter:** Tier 3, consecutive_clean=2→3.
+
+---
+
 ## Iteration ~2163 — 2026-06-17 21:56Z UTC (interactive, /cycle, Tier 3, consecutive_clean=1→2, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).
