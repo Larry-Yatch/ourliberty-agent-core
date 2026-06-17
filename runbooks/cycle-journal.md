@@ -4,6 +4,68 @@
 
 ---
 
+## Iteration ~2149 — 2026-06-17 18:57Z UTC (interactive, /cycle, Tier 3→1, consecutive_clean=4→0, DRIFT/FIXED)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Drift (auto-fixed). Check A: repo behind 1 commit → fast-forwarded. All other checks clean. No DM to Larry.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** Check E → 0 open PRs in ourliberty-dashboard; 1 in agent-core (PR #569, brand-new, normal pipeline). ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** Not in open PRs. ✅
+- **projects-v3-p1/p4/p2/p2-followup ALL SEQUENCE COMPLETE ✅ CONFIRMED:** heal_pipeline_stall --dry-run → 0 stalls (all FORGE_NO_PR_SKIP entries pr_exists). ✅
+- **G-rule sequence-complete-tier4 COMPLETE ✅ CONFIRMED:** PR #566 not in open PRs. ✅
+- **G-rule mirror-malformed-verdict-marker COMPLETE ✅ CONFIRMED:** PR #565 not in open PRs. ✅
+- **Daemons ✅:** All 5 alive. Same PIDs as iter ~2148: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3964779, dashboard_api 3964550. ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 1007, "file_length": 1007}` (no repair needed). **0 new alerts.** Watermark stays at 1007. ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log: 0 WARNs/ERRORs. inbox_watcher.log: 0 WARNs/ERRORs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot log last entry 12:21:41 MDT (18:21:41Z) — notification idx=1006 (medic-diagnosis) delivered. Last Larry message: "Go" at 12:20:08 MDT (18:20Z, already processed in iter ~2148). No new messages. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → 0 stalls. All FORGE_NO_PR_SKIP entries pr_exists. ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-17T18:28:35Z, age≈28 min. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=910008ef, origin/main=b581181b — behind by 1 commit (PR #568 `feat: promote funnel item into a project at Brainstorm (P3 p3-promote-endpoint)` merged). **ALWAYS-FIX: fast-forwarded 910008ef→b581181b.** Tier-reset. ✅
+
+**Check B — Sync health:** sync status=no-change, last_sync=2026-06-17T18:12:56Z, age≈44 min. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3734671 (Ss) ✅, chain_event_shipper 3734305 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, outbox_notifier 3964779 (Ss) ✅, dashboard_api 3964550 (Ssl) ✅. All 5 alive, same PIDs as iter ~2148. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: **1 open PR #569** (`feat(systemd): timer for the projects-store single-committer healer (close the #567 install gap)`, created 18:51:40Z, ~6 min old, MERGEABLE=UNKNOWN, Mirror review dispatched). Normal pipeline. ourliberty-dashboard: 0 open. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Conditional checks (Wednesday 2026-06-17 UTC, weekday=2 ∈ {0,2,4,6}):**
+- Check I: artifact `pulse-check-i/check-i-2026-06-17.json` EXISTS → SKIP (same-day dedup). ✅
+- Check III: Sunday-anchored → skip.
+
+**Pipeline observation — projects-v3-p3 ADVANCING:**
+- p3-project-store (step 1, PR #567): MERGED ✅ 14:50:03Z.
+- p3-promote-endpoint (step 2, PR #568): MERGED ✅ (fast-forwarded to this commit, branch forge/p3-promote-endpoint). Forge session 3989613 exited cleanly. **projects-v3-p3 step 2 COMPLETE ✅.**
+- install-heal-projects-store-timer-001: Forge built PR #569 (`feat(systemd): timer for the projects-store single-committer healer`) at 18:51:40Z. Mirror inbox: `review-install-heal-projects-store-timer-001.json` present. Mirror review IN PROGRESS.
+
+**G-rule tracking (no changes this iter):**
+- G-rule catalog-accuracy-drift-tier4: **2/3** (no new occurrence).
+- G-rule ledger/check-i Tier-4: **2/3** (no new occurrence).
+- G-rule dual-bot-instance-409-external: **1/3** (no new occurrence).
+- All other G-rule counts unchanged from iter ~2148.
+
+**Actions taken:**
+1. Check A auto-fix: fast-forward 910008ef→b581181b (PR #568 p3-promote-endpoint merged). ✅
+2. PRIME ledger: `intervention` appended (tier=3, template=ff-main-when-behind, ts=2026-06-17T18:57:20Z).
+3. Tier state: `record --checks-clean false` → tier reset 3→1, consecutive_clean=4→0.
+
+**PRIME ratio:** 19.48 (1014 interventions, 52 systemic fixes).
+
+**Dispatches:** None.
+
+---
+
 ## Iteration ~2148 — 2026-06-17 18:23Z UTC (interactive, /cycle, Tier 3, consecutive_clean=3→4, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).
