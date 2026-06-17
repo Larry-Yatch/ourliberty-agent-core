@@ -3093,6 +3093,170 @@ class ClassifyMirrorMarkerSessionLogFallbackTest(unittest.TestCase):
         )
 
 
+class ClassifyMirrorProseVerdictSynthesisTest(unittest.TestCase):
+    """mirror-prose-verdict-fallback-001 (2026-06-17).
+
+    A phase=review session whose ONLY verdict signal is an unambiguous prose
+    PASS (`**Verdict: PASS.**`, no canonical marker) should synthesize a
+    REVIEW_PASS and route down the existing auto-merge path — skipping the
+    ~$1/~7min marker-error retry. Strict + irreversibility-guarded: PASS-only,
+    no-contradiction gate over the WHOLE session, envelope pr_url required.
+    Everything that is NOT an unambiguous prose PASS still raises (retry).
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._projects_root = Path(self._tmp.name)
+        self._patcher = mock.patch.object(
+            on, 'CLAUDE_PROJECTS_ROOT', self._projects_root,
+        )
+        self._patcher.start()
+
+    def tearDown(self):
+        self._patcher.stop()
+        self._tmp.cleanup()
+
+    def _write_session_log(self, session_id, assistant_turns):
+        project_dir = self._projects_root / '-fake-project'
+        project_dir.mkdir(parents=True, exist_ok=True)
+        path = project_dir / f'{session_id}.jsonl'
+        with path.open('w') as fh:
+            for text in assistant_turns:
+                fh.write(json.dumps({
+                    'type': 'assistant',
+                    'message': {
+                        'role': 'assistant',
+                        'content': [{'type': 'text', 'text': text}],
+                    },
+                }) + '\n')
+        return path
+
+    def test_prose_pass_only_synthesizes_review_pass(self):
+        # SUCCESS CRITERION 1: only signal is a prose `Verdict: PASS` →
+        # classifies review_pass and routes to auto-merge, NO retry. Here the
+        # session log is absent (session_id unresolved), so the fallback
+        # scans result_text.
+        data = _mirror_outbox_body(
+            result=(
+                'Reviewed the PR diff. Coverage clean, all ACs met.\n\n'
+                '**Verdict: PASS.**'
+            ),
+            claude_session_id='sess-prose-pass-only',
+            pr_url=PR_URL_FIXTURE,
+        )
+        decision = on._classify_mirror_marker(data)
+        self.assertIsNotNone(decision)
+        self.assertEqual(decision['marker_type'], 'review_pass')
+        self.assertEqual(decision['intent'], 'review-pass')
+        self.assertFalse(decision['auto_promoted'])
+        # Synthesized payload anchors to the ENVELOPE pr_url — so the
+        # merge-boundary mismatch gate merges exactly the PR Mirror reviewed.
+        self.assertEqual(decision['intent_kwargs']['pr_url'], PR_URL_FIXTURE)
+        self.assertEqual(decision['payload']['pr_url'], PR_URL_FIXTURE)
+        self.assertEqual(decision['payload']['task_id'], data['task_id'])
+        self.assertIn('prose', decision['payload']['summary'].lower())
+
+    def test_prose_pass_synthesis_emits_info_log_token(self):
+        # SUCCESS CRITERION (logging): synthesis emits ONE log line with the
+        # stable greppable token MIRROR_PROSE_VERDICT_SYNTHESIZED at INFO (no
+        # WARN/ERROR on the happy path) so Pulse's G-rule detector can track
+        # prose-verdict frequency without it reading as an error.
+        data = _mirror_outbox_body(
+            result='Coverage clean.\n\n**Verdict: PASS.**',
+            claude_session_id='sess-prose-pass-log',
+            pr_url=PR_URL_FIXTURE,
+        )
+        with mock.patch.object(on, 'log') as mock_log:
+            on._classify_mirror_marker(data)
+        synth_calls = [
+            c for c in mock_log.call_args_list
+            if 'MIRROR_PROSE_VERDICT_SYNTHESIZED' in c.args[0]
+        ]
+        self.assertEqual(len(synth_calls), 1)
+        # INFO-level: the call must not pass an elevated level positionally.
+        level = (
+            synth_calls[0].args[1] if len(synth_calls[0].args) > 1
+            else synth_calls[0].kwargs.get('level', 'INFO')
+        )
+        self.assertEqual(level, 'INFO')
+
+    def test_prose_pass_with_contradicting_verdict_raises(self):
+        # SUCCESS CRITERION 2: a prose PASS co-occurring with ANY other prose
+        # verdict declaration → still raises (no synthesis of an ambiguous
+        # PASS that routes to irreversible auto-merge).
+        data = _mirror_outbox_body(
+            result=(
+                'On reflection:\n\nVerdict: REVISION\n\n'
+                'Actually re-reading the diff —\n\nVerdict: PASS'
+            ),
+            claude_session_id='sess-prose-conflict',
+            pr_url=PR_URL_FIXTURE,
+        )
+        with self.assertRaises(on.mrh.MalformedMirrorMarker):
+            on._classify_mirror_marker(data)
+
+    def test_cross_turn_contradiction_scans_full_session(self):
+        # The no-contradiction gate must see the WHOLE session, not just the
+        # final turn: an earlier-turn prose REVISION must veto a final-turn
+        # prose PASS. result_text carries ONLY the PASS, so this passes only
+        # if the fallback scans the full session log (not result_text alone).
+        session_id = 'sess-prose-cross-turn'
+        self._write_session_log(session_id, [
+            'Reviewing the diff.',
+            'Verdict: REVISION',
+            'Verdict: PASS',
+        ])
+        data = _mirror_outbox_body(
+            result='Verdict: PASS',
+            claude_session_id=session_id,
+            pr_url=PR_URL_FIXTURE,
+        )
+        with self.assertRaises(on.mrh.MalformedMirrorMarker):
+            on._classify_mirror_marker(data)
+
+    def test_loose_keyword_mention_still_raises(self):
+        # SUCCESS CRITERION 3: a loose mid-sentence keyword mention with no
+        # anchored verdict declaration → still raises. The strict line-anchored
+        # regex never matches a token buried in a sentence.
+        data = _mirror_outbox_body(
+            result=(
+                'I considered REVIEW_ESCALATE but the diff is clean, so no '
+                'escalation is warranted.'
+            ),
+            claude_session_id='sess-loose-mention',
+            pr_url=PR_URL_FIXTURE,
+        )
+        with self.assertRaises(on.mrh.MalformedMirrorMarker):
+            on._classify_mirror_marker(data)
+
+    def test_prose_non_pass_verdict_still_raises(self):
+        # SUCCESS CRITERION 4: a prose NON-PASS verdict (`Verdict: REVISION`)
+        # → still raises. We never fabricate findings/severity/confidence from
+        # prose; the retry yields a real structured marker.
+        data = _mirror_outbox_body(
+            result='Found a blocking issue.\n\n**Verdict: REVISION.**',
+            claude_session_id='sess-prose-revision',
+            pr_url=PR_URL_FIXTURE,
+        )
+        with self.assertRaises(on.mrh.MalformedMirrorMarker):
+            on._classify_mirror_marker(data)
+
+    def test_prose_pass_without_envelope_pr_url_still_raises(self):
+        # SUCCESS CRITERION 5: an absent/empty envelope pr_url with a prose
+        # PASS → still raises. With no PR to merge against there is nothing to
+        # synthesize a faithful REVIEW_PASS for.
+        data = _mirror_outbox_body(
+            result='Coverage clean.\n\n**Verdict: PASS.**',
+            claude_session_id='sess-prose-no-prurl',
+        )
+        data.pop('pr_url', None)
+        with self.assertRaises(on.mrh.MalformedMirrorMarker):
+            on._classify_mirror_marker(data)
+        data['pr_url'] = ''
+        with self.assertRaises(on.mrh.MalformedMirrorMarker):
+            on._classify_mirror_marker(data)
+
+
 class MirrorMarkerRoutingTest(unittest.TestCase):
     """process_outbox integration: Mirror outbox → Beacon notify, marker-error
     cascade on malformed markers."""
