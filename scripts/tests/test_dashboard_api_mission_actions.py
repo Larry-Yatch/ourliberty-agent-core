@@ -131,11 +131,18 @@ class _MissionActionsTestBase(unittest.TestCase):
 
         self.tmp = Path(tempfile.mkdtemp(prefix='dash-mission-actions-'))
         self.missions_path = self.tmp / 'agents' / 'beacon' / 'missions.json'
+        # projects-v3 P3: accept now MOVES the proposed mission into a new
+        # single-phase project on projects.json (heal_projects_store is the SOLE
+        # committer) — bind the projects path onto the tmpdir so the live store
+        # is never touched.
+        self.projects_path = self.tmp / 'agents' / 'beacon' / 'projects.json'
 
         self._orig_missions_path = da._missions_json_path
+        self._orig_projects_path = da._projects_json_path
         self._orig_github = da._github_api_request
         self._orig_gh_token = da._github_token
         da._missions_json_path = lambda: self.missions_path  # type: ignore[assignment]
+        da._projects_json_path = lambda: self.projects_path  # type: ignore[assignment]
         self.gh = _GithubRecorder()
         da._github_api_request = self.gh  # type: ignore[assignment]
 
@@ -143,6 +150,7 @@ class _MissionActionsTestBase(unittest.TestCase):
 
     def tearDown(self):
         da._missions_json_path = self._orig_missions_path  # type: ignore[assignment]
+        da._projects_json_path = self._orig_projects_path  # type: ignore[assignment]
         da._github_api_request = self._orig_github  # type: ignore[assignment]
         da._github_token = self._orig_gh_token  # type: ignore[assignment]
         if self._prev_gh_token is None:
@@ -167,6 +175,9 @@ class _MissionActionsTestBase(unittest.TestCase):
         put = next(c for c in self.gh.calls if c['method'] == 'PUT')
         new_registry = self._decode_put(put)
         return next(m for m in new_registry['missions'] if m['id'] == mission_id)
+
+    def _read_projects(self) -> list:
+        return json.loads(self.projects_path.read_text())['projects']
 
 
 # ==================== auth ====================
@@ -369,64 +380,108 @@ class ReprioritizeTest(_MissionActionsTestBase):
         self.assertEqual(self.missions_path.read_text(), before)
 
 
-# ==================== accept ====================
+# ==================== accept (projects-v3 P3: unified onto Promote, no PR) ====================
+#
+# Accept is now the SAME gesture as Promote (spec § 4 decision 2): it MOVES the
+# proposed mission into a new single-phase project at Brainstorm carrying
+# `promoted_from: {kind: mission, mission_id}`. The mission is NOT mutated (no
+# missions.json PR, no GitHub call); the funnel derive suppresses it via the
+# project's cross-ref. Reversible with no data loss: archiving the project
+# un-suppresses the mission (the mission record was never touched).
 
 
 class AcceptTest(_MissionActionsTestBase):
-    def test_opens_pr_flipping_proposed_to_drafting(self):
-        # The orphan's task_id is already on the proposed entry (the healer put
-        # it there); accept graduates the proposal into a drafting mission.
+    def test_creates_project_no_pr_no_mission_mutation(self):
         self._seed(_mission('proposed-orphan-x', phase='proposed',
+                            name='Orphan X', brief='close the gap',
                             task_ids=['orphan-x']))
-        branch = 'chore/accept-mission-proposed-orphan-x'
-        _mission_edit_github_script(self.gh, branch=branch)
         r = self.client.post(_endpoint('proposed-orphan-x'), headers=AUTH,
                              json={'action': 'accept'})
         self.assertEqual(r.status_code, 200, r.text)
         body = r.json()
-        self.assertEqual(body['branch'], branch)
-        self.assertEqual(body['pr_url'],
-                         'https://github.com/test-owner/test-repo/pull/77')
+        self.assertEqual(body['project_id'], 'orphan-x')
+        self.assertEqual(body['phase_id'], 'orphan-x')
+        self.assertEqual(body['status'], 'promoted')
+        self.assertTrue(body['applied'])
+        # No PR — unified onto Promote: never a branch/pr_url, never a GitHub call.
+        self.assertNotIn('pr_url', body)
+        self.assertNotIn('branch', body)
+        self.assertEqual(self.gh.calls, [])
 
-        # Exactly one branch + one PR — single-field auditable edit.
-        self.assertEqual(len(self.gh.calls), 5)
+        # A new single-phase project landed on projects.json at Brainstorm,
+        # active, carrying the mission provenance (the suppression cross-ref).
+        projects = self._read_projects()
+        self.assertEqual(len(projects), 1)
+        proj = projects[0]
+        self.assertEqual(proj['id'], 'orphan-x')
+        self.assertEqual(proj['title'], 'Orphan X')           # from mission name
+        self.assertEqual(proj['state'], 'active')
+        self.assertTrue(proj['one_off'])
+        self.assertEqual(proj['repo'], 'ourliberty-agent-core')
+        self.assertEqual(proj['promoted_from'],
+                         {'kind': 'mission', 'mission_id': 'proposed-orphan-x'})
+        self.assertEqual(proj['phases'][0]['lifecycle_state'], 'brainstorm')
+        self.assertEqual(proj['phases'][0]['desired_end_state'], 'close the gap')
 
-        entry = self._put_entry('proposed-orphan-x')
-        self.assertEqual(entry['phase'], 'drafting')
-        # The claimed task_id stays on the entry (it was the claim anchor).
-        self.assertEqual(entry['task_ids'], ['orphan-x'])
+    def test_mission_not_mutated(self):
+        # The mission stays exactly as-is (proposed) — the cross-ref, not a phase
+        # flip, is the 'accepted' signal, so re-accept stays idempotent.
+        self._seed(_mission('proposed-orphan-x', phase='proposed',
+                            task_ids=['orphan-x']))
+        before = self.missions_path.read_text()
+        self.client.post(_endpoint('proposed-orphan-x'), headers=AUTH,
+                         json={'action': 'accept'})
+        self.assertEqual(self.missions_path.read_text(), before)
 
-    def test_accept_non_proposed_returns_409_no_github(self):
+    def test_re_accept_is_idempotent_one_project(self):
+        # A second accept finds the existing active project by promoted_from and
+        # returns it (applied=False) instead of minting a duplicate.
+        self._seed(_mission('proposed-orphan-x', phase='proposed',
+                            task_ids=['orphan-x']))
+        r1 = self.client.post(_endpoint('proposed-orphan-x'), headers=AUTH,
+                              json={'action': 'accept'})
+        self.assertEqual(r1.status_code, 200, r1.text)
+        self.assertTrue(r1.json()['applied'])
+        r2 = self.client.post(_endpoint('proposed-orphan-x'), headers=AUTH,
+                              json={'action': 'accept'})
+        self.assertEqual(r2.status_code, 200, r2.text)
+        self.assertFalse(r2.json()['applied'])
+        self.assertEqual(r2.json()['project_id'], r1.json()['project_id'])
+        self.assertEqual(len(self._read_projects()), 1)
+
+    def test_archived_project_lets_re_accept_recreate(self):
+        # Reversibility: archiving the project (the escape hatch) un-suppresses
+        # the mission, so accepting again creates a fresh project (no data loss).
+        self._seed(_mission('proposed-orphan-x', phase='proposed',
+                            name='Orphan X', task_ids=['orphan-x']))
+        self.client.post(_endpoint('proposed-orphan-x'), headers=AUTH,
+                         json={'action': 'accept'})
+        # Archive the project (what the reversibility path does).
+        registry = json.loads(self.projects_path.read_text())
+        registry['projects'][0]['state'] = 'archived'
+        self.projects_path.write_text(json.dumps(registry, indent=2) + '\n')
+        r = self.client.post(_endpoint('proposed-orphan-x'), headers=AUTH,
+                             json={'action': 'accept'})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertTrue(r.json()['applied'])
+        # The archived project persists; a fresh active one is created alongside.
+        states = sorted(p['state'] for p in self._read_projects())
+        self.assertEqual(states, ['active', 'archived'])
+
+    def test_accept_non_proposed_returns_409_no_write(self):
         self._seed(_mission('m-1', phase='drafting'))
         r = self.client.post(_endpoint('m-1'), headers=AUTH, json={'action': 'accept'})
         self.assertEqual(r.status_code, 409, r.text)
         self.assertEqual(r.json()['detail']['error'], 'mission not proposed')
         self.assertEqual(self.gh.calls, [])
+        self.assertFalse(self.projects_path.exists())
 
-    def test_missing_mission_returns_404_no_github(self):
+    def test_missing_mission_returns_404_no_write(self):
         self._seed(_mission('proposed-orphan-x', phase='proposed'))
         r = self.client.post(_endpoint('nope'), headers=AUTH, json={'action': 'accept'})
         self.assertEqual(r.status_code, 404, r.text)
         self.assertEqual(self.gh.calls, [])
-
-    def test_local_missions_not_mutated(self):
-        self._seed(_mission('proposed-orphan-x', phase='proposed',
-                            task_ids=['orphan-x']))
-        before = self.missions_path.read_text()
-        _mission_edit_github_script(
-            self.gh, branch='chore/accept-mission-proposed-orphan-x')
-        self.client.post(_endpoint('proposed-orphan-x'), headers=AUTH,
-                         json={'action': 'accept'})
-        self.assertEqual(self.missions_path.read_text(), before)
-
-    def test_token_missing_returns_500_no_github(self):
-        self._seed(_mission('proposed-orphan-x', phase='proposed'))
-        da._github_token = lambda: None  # type: ignore[assignment]
-        r = self.client.post(_endpoint('proposed-orphan-x'), headers=AUTH,
-                             json={'action': 'accept'})
-        self.assertEqual(r.status_code, 500, r.text)
-        self.assertEqual(r.json()['detail']['error'], 'github token missing')
-        self.assertEqual(self.gh.calls, [])
+        self.assertFalse(self.projects_path.exists())
 
 
 # ==================== dismiss ====================

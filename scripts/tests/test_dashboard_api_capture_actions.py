@@ -104,19 +104,24 @@ class _ActionsTestBase(unittest.TestCase):
         self.tmp = Path(tempfile.mkdtemp(prefix='dash-actions-'))
         self.captures_path = self.tmp / 'agents' / 'beacon' / 'captures.json'
         self.missions_path = self.tmp / 'agents' / 'beacon' / 'missions.json'
-        # promote queues the mission for the missions writer — bind the queue
-        # dir onto the tmpdir so the live blackboard is never touched (mirrors
-        # test_dashboard_api_missions).
+        # projects-v3 P3: promote now MOVES the capture into a new single-phase
+        # project on projects.json (heal_projects_store is the SOLE committer) —
+        # bind the projects path onto the tmpdir so the live store is never
+        # touched. The queue dir is bound too: an absent file there is the
+        # assertion that promote no longer queues a mission.
+        self.projects_path = self.tmp / 'agents' / 'beacon' / 'projects.json'
         self.queue_dir = self.tmp / 'agents' / 'blackboard' / 'new-mission-queue'
 
         self._orig_captures_path = da._captures_json_path
         self._orig_missions_path = da._missions_json_path
+        self._orig_projects_path = da._projects_json_path
         self._orig_queue_dir = da._new_mission_queue_dir
         self._orig_github = da._github_api_request
         self._orig_gh_token = da._github_token
         self._orig_la_client = da._get_larry_action_supabase_client
         da._captures_json_path = lambda: self.captures_path  # type: ignore[assignment]
         da._missions_json_path = lambda: self.missions_path  # type: ignore[assignment]
+        da._projects_json_path = lambda: self.projects_path  # type: ignore[assignment]
         da._new_mission_queue_dir = lambda: self.queue_dir  # type: ignore[assignment]
         # Phase S (S7): the route resolves the in-flight gate from the live
         # chain_events client. Pin it to None so the resolver is skipped (actions
@@ -132,6 +137,7 @@ class _ActionsTestBase(unittest.TestCase):
     def tearDown(self):
         da._captures_json_path = self._orig_captures_path  # type: ignore[assignment]
         da._missions_json_path = self._orig_missions_path  # type: ignore[assignment]
+        da._projects_json_path = self._orig_projects_path  # type: ignore[assignment]
         da._new_mission_queue_dir = self._orig_queue_dir  # type: ignore[assignment]
         da._github_api_request = self._orig_github  # type: ignore[assignment]
         da._github_token = self._orig_gh_token  # type: ignore[assignment]
@@ -161,6 +167,9 @@ class _ActionsTestBase(unittest.TestCase):
 
     def _read_queued(self, mission_id: str) -> dict:
         return json.loads((self.queue_dir / f'{mission_id}.json').read_text())
+
+    def _read_projects(self) -> list:
+        return json.loads(self.projects_path.read_text())['projects']
 
 
 # ==================== auth ====================
@@ -256,87 +265,126 @@ class SnoozeTest(_ActionsTestBase):
         self.assertEqual(r.status_code, 400, r.text)
 
 
-# ============ promote (one-click: queue the mission + flip the capture) ============
+# ====== promote (projects-v3 P3: MOVE the capture into a new project, no PR) ======
+#
+# Promote is a move, not a record (spec § 0 / § 4 decision 2): it creates a new
+# single-phase project at Brainstorm on projects.json (heal_projects_store is the
+# SOLE committer — the dashboard is a non-committer) AND flips the capture out of
+# the parked/funnel lane. No mission is minted, no queue file, no GitHub PR.
 
 
 class PromoteTest(_ActionsTestBase):
-    def test_queues_mission_and_flips_capture_no_github(self):
+    def test_creates_project_and_flips_capture_no_github(self):
         self._seed(_cap('cap-1', title='Aging idea'))
         r = self.client.post(_endpoint('cap-1'), headers=AUTH,
                              json={'action': 'promote'})
         self.assertEqual(r.status_code, 200, r.text)
         body = r.json()
-        self.assertEqual(body['mission_id'], 'aging-idea')
-        self.assertEqual(body['status'], 'queued')
+        self.assertEqual(body['project_id'], 'aging-idea')
+        self.assertEqual(body['phase_id'], 'aging-idea')
+        self.assertEqual(body['status'], 'promoted')
         self.assertTrue(body['applied'])
-        # No PR — never a branch/pr_url, never a GitHub call.
+        # No mission, no PR — never a mission_id/branch/pr_url, never a GitHub call.
+        self.assertNotIn('mission_id', body)
         self.assertNotIn('pr_url', body)
         self.assertNotIn('branch', body)
         self.assertEqual(self.gh.calls, [])
+        # Promote does NOT queue a mission anymore.
+        self.assertFalse((self.queue_dir / 'aging-idea.json').exists())
 
-        # The mission entry was queued for the missions writer (drafting).
-        entry = self._read_queued('aging-idea')
-        self.assertEqual(entry['phase'], 'drafting')
-        self.assertEqual(entry['repo'], 'ourliberty-agent-core')
+        # A new single-phase project landed on projects.json at Brainstorm,
+        # active, carrying the capture provenance (the reversibility cross-ref).
+        projects = self._read_projects()
+        self.assertEqual(len(projects), 1)
+        proj = projects[0]
+        self.assertEqual(proj['id'], 'aging-idea')
+        self.assertEqual(proj['title'], 'Aging idea')
+        self.assertEqual(proj['state'], 'active')
+        self.assertTrue(proj['one_off'])
+        self.assertEqual(proj['promoted_from'], {'kind': 'capture', 'capture_id': 'cap-1'})
+        self.assertEqual(proj['phases'][0]['lifecycle_state'], 'brainstorm')
 
-        # The LOCAL captures.json is flipped in place (the GC healer commits it).
+        # The LOCAL captures.json is flipped in place (the GC healer commits it) —
+        # state:promoted removes it from the parked/funnel lane.
         cap = next(c for c in self._read_local()['captures'] if c['id'] == 'cap-1')
         self.assertEqual(cap['state'], 'promoted')
         self.assertEqual(cap['promoted_to'], 'aging-idea')
-        # Phase S (S1): the spawned ref links the card back to the mission it
-        # created — join key = mission_id (the promoted card's live phase shows
-        # via the missions lane, so no task_id is stamped here).
-        self.assertEqual(cap['spawned']['kind'], 'mission')
-        self.assertEqual(cap['spawned']['mission_id'], 'aging-idea')
+        # Phase S (S1): the spawned ref links the card back to the PROJECT it
+        # created — join key = project_id.
+        self.assertEqual(cap['spawned']['kind'], 'project')
+        self.assertEqual(cap['spawned']['project_id'], 'aging-idea')
         self.assertIn('stamped_at', cap['spawned'])
+
+    def test_brief_override_seeds_phase_desired_end_state(self):
+        self._seed(_cap('cap-1', title='Aging idea', note='do the thing'))
+        self.client.post(_endpoint('cap-1'), headers=AUTH,
+                         json={'action': 'promote', 'brief': 'so the loop closes'})
+        proj = self._read_projects()[0]
+        self.assertEqual(proj['phases'][0]['desired_end_state'], 'so the loop closes')
 
     def test_brief_defaults_to_capture_note(self):
         self._seed(_cap('cap-1', title='Aging idea', note='do the thing'))
         self.client.post(_endpoint('cap-1'), headers=AUTH, json={'action': 'promote'})
-        self.assertEqual(self._read_queued('aging-idea')['brief'], 'do the thing')
+        proj = self._read_projects()[0]
+        self.assertEqual(proj['phases'][0]['desired_end_state'], 'do the thing')
 
-    def test_overrides_name_and_repo(self):
+    def test_overrides_name_repo_and_north_star(self):
         self._seed(_cap('cap-1', title='Aging idea'))
         r = self.client.post(_endpoint('cap-1'), headers=AUTH, json={
-            'action': 'promote', 'name': 'Shiny Mission', 'repo': 'ourliberty-dashboard',
+            'action': 'promote', 'name': 'Shiny Project',
+            'repo': 'ourliberty-dashboard', 'north_star_ref': 'docs/ns.md#p3',
         })
         self.assertEqual(r.status_code, 200, r.text)
-        self.assertEqual(r.json()['mission_id'], 'shiny-mission')
-        self.assertEqual(self._read_queued('shiny-mission')['repo'], 'ourliberty-dashboard')
+        self.assertEqual(r.json()['project_id'], 'shiny-project')
+        proj = self._read_projects()[0]
+        self.assertEqual(proj['title'], 'Shiny Project')
+        self.assertEqual(proj['repo'], 'ourliberty-dashboard')
+        self.assertEqual(proj['north_star_ref'], 'docs/ns.md#p3')
+
+    def test_repo_defaults_to_capture_origin(self):
+        self._seed(_cap('cap-1', title='Aging idea', repo='ourliberty-agent-core'))
+        self.client.post(_endpoint('cap-1'), headers=AUTH, json={'action': 'promote'})
+        self.assertEqual(self._read_projects()[0]['repo'], 'ourliberty-agent-core')
 
     def test_missing_capture_returns_404_no_write(self):
         self._seed(_cap('cap-1'))
         r = self.client.post(_endpoint('nope'), headers=AUTH, json={'action': 'promote'})
         self.assertEqual(r.status_code, 404, r.text)
         self.assertEqual(self.gh.calls, [])
-        self.assertFalse(self.queue_dir.exists())
+        self.assertFalse(self.projects_path.exists())
 
     def test_non_parked_returns_409_no_write(self):
         self._seed(_cap('cap-1', state='dropped'))
         r = self.client.post(_endpoint('cap-1'), headers=AUTH, json={'action': 'promote'})
         self.assertEqual(r.status_code, 409, r.text)
         self.assertEqual(self.gh.calls, [])
-        self.assertFalse(self.queue_dir.exists())
+        self.assertFalse(self.projects_path.exists())
 
-    def test_mission_id_collision_returns_409_no_write(self):
-        # A mission already registered under the derived id blocks promote — and
-        # leaves the capture parked (no queue file, capture unchanged).
+    def test_double_promote_returns_409_and_one_project(self):
+        # The first promote flips the capture to state:promoted; the second
+        # hits the _require_parked guard (409). No duplicate project is minted.
         self._seed(_cap('cap-1', title='Aging idea'))
-        self._seed_missions({'id': 'aging-idea', 'name': 'Aging idea', 'brief': 'x'})
-        r = self.client.post(_endpoint('cap-1'), headers=AUTH, json={'action': 'promote'})
-        self.assertEqual(r.status_code, 409, r.text)
-        self.assertEqual(r.json()['detail']['error'], 'mission_id collision')
-        self.assertFalse((self.queue_dir / 'aging-idea.json').exists())
-        cap = next(c for c in self._read_local()['captures'] if c['id'] == 'cap-1')
-        self.assertEqual(cap['state'], 'parked')
+        r1 = self.client.post(_endpoint('cap-1'), headers=AUTH, json={'action': 'promote'})
+        self.assertEqual(r1.status_code, 200, r1.text)
+        r2 = self.client.post(_endpoint('cap-1'), headers=AUTH, json={'action': 'promote'})
+        self.assertEqual(r2.status_code, 409, r2.text)
+        self.assertEqual(len(self._read_projects()), 1)
 
-    def test_already_queued_returns_409(self):
+    def test_id_collision_disambiguates_not_overwrites(self):
+        # A project already using the slug forces a unique id (no overwrite).
+        self.projects_path.parent.mkdir(parents=True, exist_ok=True)
+        self.projects_path.write_text(json.dumps({
+            'schema_version': 1,
+            'projects': [{'id': 'aging-idea', 'title': 'Pre-existing',
+                          'state': 'active', 'phases': [{'id': 'aging-idea'}],
+                          'promoted_from': {'kind': 'capture', 'capture_id': 'other'}}],
+        }, indent=2) + '\n')
         self._seed(_cap('cap-1', title='Aging idea'))
-        self.queue_dir.mkdir(parents=True, exist_ok=True)
-        (self.queue_dir / 'aging-idea.json').write_text('{"id": "aging-idea"}')
         r = self.client.post(_endpoint('cap-1'), headers=AUTH, json={'action': 'promote'})
-        self.assertEqual(r.status_code, 409, r.text)
-        self.assertEqual(r.json()['detail']['error'], 'mission_id queued')
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(r.json()['project_id'], 'aging-idea-2')
+        ids = sorted(p['id'] for p in self._read_projects())
+        self.assertEqual(ids, ['aging-idea', 'aging-idea-2'])
 
 
 # ============ drop (one-click: direct captures.json committer write) ============

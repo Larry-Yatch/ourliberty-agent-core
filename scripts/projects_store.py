@@ -230,6 +230,69 @@ def slugify(text: str, *, max_len: int = 48) -> str:
 
 
 # --------------------------------------------------------------------------- #
+# project builder — Promote = relocate a funnel item into a new project
+# (P3 step 2, p3-promote-endpoint). Pure: builds the dict; the on-disk write +
+# the single-committer commit happen in dashboard_api / heal_projects_store.
+# --------------------------------------------------------------------------- #
+def new_single_phase_project(
+    *,
+    title: str,
+    desired_end_state: str = '',
+    north_star_ref: Optional[str] = None,
+    repo: Optional[str] = None,
+    promoted_from: Optional[dict[str, Any]] = None,
+    project_id: Optional[str] = None,
+    phase_id: Optional[str] = None,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Build a normalized single-phase project at Brainstorm — the shape Promote
+    lands a funnel item into (spec § 0 "Promote is a move, not a record", § 4
+    decision 2). One model for everything: a one-off is a 1-phase project
+    (``one_off=True``), state ``active`` so it shows in the "Actively working"
+    pipeline immediately; a mis-promote is reversible by archiving it (it never
+    duplicates the source — the caller removes the item from its funnel lane).
+
+    ``promoted_from`` is the provenance back-reference (e.g.
+    ``{'kind': 'capture', 'capture_id': ...}`` or
+    ``{'kind': 'mission', 'mission_id': ...}``) the funnel derive reads to
+    suppress the now-promoted item from its lane and to make the move reversible
+    without data loss.
+
+    Returns an already-normalized dict: feeding it back through
+    ``normalize_registry`` is a no-op (the single-committer healer therefore
+    sees no spurious delta)."""
+    now_iso = _iso_now(now)
+    pid = _coerce_str(project_id) or slugify(title)
+    phid = _coerce_str(phase_id) or pid
+    title = _coerce_str(title) or pid
+    phase = {
+        'id': phid,
+        'title': title,
+        'desired_end_state': desired_end_state if isinstance(desired_end_state, str) else '',
+        'lifecycle_state': DEFAULT_LIFECYCLE_STATE,
+        'order': 0,
+        'spec_ref': None,
+        'sequence_ref': None,
+        'created_at': now_iso,
+        'updated_at': now_iso,
+    }
+    project: dict[str, Any] = {
+        'id': pid,
+        'title': title,
+        'north_star_ref': _coerce_str(north_star_ref),
+        'repo': _coerce_str(repo),
+        'state': DEFAULT_PROJECT_STATE,
+        'phases': [phase],
+        'one_off': True,
+        'created_at': now_iso,
+        'updated_at': now_iso,
+    }
+    if isinstance(promoted_from, dict):
+        project['promoted_from'] = dict(promoted_from)
+    return project
+
+
+# --------------------------------------------------------------------------- #
 # the "Actively working" derive (the read surface)
 # --------------------------------------------------------------------------- #
 def _phase_card(phase: dict[str, Any]) -> dict[str, Any]:

@@ -1192,6 +1192,136 @@ class BuildFunnelUnitTest(unittest.TestCase):
         self.assertEqual(item['suggested_source'], 'pulse')
 
 
+# ---------- projects-v3 P3: promote suppression + reversibility ----------
+
+
+class PromotedMissionIdsUnitTest(unittest.TestCase):
+    """`_promoted_mission_ids` reads ONLY active projects' mission provenance —
+    archived projects drop out so the mission returns to the funnel (reversible)."""
+
+    def test_active_mission_project_contributes_its_mission_id(self) -> None:
+        projects = [{
+            'id': 'p1', 'state': 'active',
+            'promoted_from': {'kind': 'mission', 'mission_id': 'm-1'},
+        }]
+        self.assertEqual(da._promoted_mission_ids(projects), {'m-1'})
+
+    def test_archived_project_is_excluded(self) -> None:
+        projects = [{
+            'id': 'p1', 'state': 'archived',
+            'promoted_from': {'kind': 'mission', 'mission_id': 'm-1'},
+        }]
+        self.assertEqual(da._promoted_mission_ids(projects), set())
+
+    def test_capture_provenance_and_junk_ignored(self) -> None:
+        projects = [
+            {'id': 'p1', 'state': 'active',
+             'promoted_from': {'kind': 'capture', 'capture_id': 'cap-1'}},
+            {'id': 'p2', 'state': 'active', 'promoted_from': None},
+            {'id': 'p3', 'state': 'active'},
+            'not-a-dict',
+        ]
+        self.assertEqual(da._promoted_mission_ids(projects), set())
+
+    def test_state_defaults_to_active_when_missing(self) -> None:
+        projects = [{
+            'id': 'p1',
+            'promoted_from': {'kind': 'mission', 'mission_id': 'm-1'},
+        }]
+        self.assertEqual(da._promoted_mission_ids(projects), {'m-1'})
+
+
+class FunnelPromoteSuppressionUnitTest(unittest.TestCase):
+    """`_build_funnel` drops a proposed mission whose id was promoted into an
+    active project, and never touches the mission record itself."""
+
+    def _proposed(self, mid: str, by: str = 'pulse') -> dict:
+        return {'id': mid, 'name': mid.title(), 'repo': 'r',
+                'phase': 'proposed', 'proposed_by': by}
+
+    def test_promoted_proposed_mission_leaves_primary(self) -> None:
+        m = self._proposed('m-pulse')
+        out = da._build_funnel([m], [], [], None, {'m-pulse'})
+        self.assertEqual(out['primary'], [])
+        self.assertEqual(out['secondary'], [])
+
+    def test_promoted_orphan_derived_mission_leaves_secondary(self) -> None:
+        m = self._proposed('m-orphan', by='heal_orphan_autoregister')
+        out = da._build_funnel([m], [], [], None, {'m-orphan'})
+        self.assertEqual(out['secondary'], [])
+
+    def test_unpromoted_sibling_still_surfaces(self) -> None:
+        kept = self._proposed('m-keep')
+        gone = self._proposed('m-gone')
+        out = da._build_funnel([kept, gone], [], [], None, {'m-gone'})
+        refs = {i['ref'] for i in out['primary']}
+        self.assertEqual(refs, {'m-keep'})
+
+    def test_empty_promoted_set_suppresses_nothing(self) -> None:
+        m = self._proposed('m-pulse')
+        out = da._build_funnel([m], [], [], None, set())
+        self.assertEqual({i['ref'] for i in out['primary']}, {'m-pulse'})
+
+    def test_input_mission_not_mutated(self) -> None:
+        m = self._proposed('m-pulse')
+        snapshot = dict(m)
+        da._build_funnel([m], [], [], None, {'m-pulse'})
+        self.assertEqual(m, snapshot)
+
+
+class FunnelPromoteReversibilityTest(_DerivedTestBase):
+    """End-to-end through `_handle_missions_derived`: a proposed mission MOVED
+    into an active project is suppressed from the funnel; archiving the project
+    returns it (reversible, no data loss); the mission file is never rewritten."""
+
+    def _seed(self) -> None:
+        self._missions_path.write_text(json.dumps({
+            'schema_version': 1,
+            'missions': [{
+                'id': 'm-pulse', 'name': 'Pulse Idea', 'repo': 'r',
+                'phase': 'proposed', 'proposed_by': 'pulse', 'task_ids': [],
+            }],
+        }))
+        # No captures/orphans to keep the funnel scoped to this one mission.
+        self._captures_path.write_text(json.dumps(
+            {'schema_version': 1, 'captures': []}))
+        self._projects_path = self._tmp / 'projects.json'
+
+    def _write_projects(self, state: str) -> None:
+        self._projects_path.write_text(json.dumps({'projects': [{
+            'id': 'pulse-idea', 'title': 'Pulse Idea', 'state': state,
+            'promoted_from': {'kind': 'mission', 'mission_id': 'm-pulse'},
+        }]}))
+
+    def _funnel_refs(self) -> set[str]:
+        out = da._handle_missions_derived(
+            missions_path=self._missions_path,
+            captures_path=self._captures_path,
+            supabase_client=self._stub,
+            repo=None, task_id=None, now=NOW,
+            projects_path=self._projects_path,
+        )
+        return ({i['ref'] for i in out['funnel']['primary']}
+                | {i['ref'] for i in out['funnel']['secondary']})
+
+    def test_active_project_suppresses_then_archive_restores(self) -> None:
+        self._seed()
+        before = dict(json.loads(self._missions_path.read_text()))
+
+        self._write_projects('active')
+        self.assertNotIn('m-pulse', self._funnel_refs())
+
+        self._write_projects('archived')
+        self.assertIn('m-pulse', self._funnel_refs())
+
+        # Reversibility means NO data loss: the mission record is byte-identical.
+        self.assertEqual(json.loads(self._missions_path.read_text()), before)
+
+    def test_no_projects_file_leaves_mission_in_funnel(self) -> None:
+        self._seed()  # _projects_path points at a non-existent file
+        self.assertIn('m-pulse', self._funnel_refs())
+
+
 class NormalizeSuggestedSourceUnitTest(unittest.TestCase):
     def test_known_agents_normalize(self) -> None:
         self.assertEqual(da._normalize_suggested_source('beacon'), 'beacon')
