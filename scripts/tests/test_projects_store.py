@@ -238,5 +238,63 @@ class SlugifyTest(unittest.TestCase):
         self.assertEqual(ps.slugify('***'), 'untitled')
 
 
+class NewSinglePhaseProjectTest(unittest.TestCase):
+    """The Promote builder (p3-promote-endpoint): a funnel item becomes a NEW
+    single-phase project at Brainstorm, state active, one_off=True."""
+
+    def test_shape_and_defaults(self):
+        proj = ps.new_single_phase_project(title='Aging idea', now=NOW)
+        self.assertEqual(proj['id'], 'aging-idea')        # slugified title
+        self.assertEqual(proj['title'], 'Aging idea')
+        self.assertEqual(proj['state'], 'active')         # shows in pipeline now
+        self.assertTrue(proj['one_off'])
+        self.assertIsNone(proj['north_star_ref'])
+        self.assertIsNone(proj['repo'])
+        self.assertNotIn('promoted_from', proj)           # absent when not given
+        self.assertEqual(len(proj['phases']), 1)
+        phase = proj['phases'][0]
+        self.assertEqual(phase['id'], 'aging-idea')       # defaults to project id
+        self.assertEqual(phase['lifecycle_state'], 'brainstorm')   # enters at Brainstorm
+        self.assertEqual(phase['order'], 0)
+        self.assertEqual(phase['desired_end_state'], '')
+        self.assertIsNone(phase['spec_ref'])
+        self.assertIsNone(phase['sequence_ref'])
+
+    def test_brief_seeds_phase_desired_end_state(self):
+        proj = ps.new_single_phase_project(
+            title='Ship X', desired_end_state='so the loop closes', now=NOW)
+        self.assertEqual(proj['phases'][0]['desired_end_state'], 'so the loop closes')
+
+    def test_explicit_ids_and_provenance_carried(self):
+        pf = {'kind': 'capture', 'capture_id': 'cap-1'}
+        proj = ps.new_single_phase_project(
+            title='T', project_id='proj-7', phase_id='phase-7',
+            north_star_ref='docs/ns.md', repo='ourliberty-dashboard',
+            promoted_from=pf, now=NOW)
+        self.assertEqual(proj['id'], 'proj-7')
+        self.assertEqual(proj['phases'][0]['id'], 'phase-7')
+        self.assertEqual(proj['north_star_ref'], 'docs/ns.md')
+        self.assertEqual(proj['repo'], 'ourliberty-dashboard')
+        self.assertEqual(proj['promoted_from'], pf)
+        # a COPY, not the caller's dict (no aliasing back into the registry)
+        self.assertIsNot(proj['promoted_from'], pf)
+
+    def test_normalize_registry_is_a_noop(self):
+        # The builder returns an already-normalized project: feeding it back
+        # through normalize_registry must produce an equal registry (so the
+        # single-committer healer sees no spurious delta).
+        proj = ps.new_single_phase_project(
+            title='Aging idea', desired_end_state='why',
+            promoted_from={'kind': 'mission', 'mission_id': 'm-1'}, now=NOW)
+        reg, dropped = ps.normalize_registry({'projects': [proj]}, now=NOW)
+        self.assertEqual(dropped, [])
+        self.assertEqual(reg['projects'][0], proj)
+
+    def test_empty_title_falls_back_to_untitled_slug(self):
+        proj = ps.new_single_phase_project(title='', now=NOW)
+        self.assertEqual(proj['id'], 'untitled')
+        self.assertEqual(proj['title'], 'untitled')
+
+
 if __name__ == '__main__':
     unittest.main()

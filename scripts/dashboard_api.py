@@ -620,10 +620,15 @@ class NewMissionResponse(BaseModel):
 class CaptureActionRequest(BaseModel):
     # Missions v2 Phase 3 § 4 — POST /api/missions/captures/{id}/action body.
     action: str = Field(..., min_length=1)  # promote | drop | snooze
-    # promote overrides (all optional — defaults inferred from the capture):
+    # promote overrides (all optional — defaults inferred from the capture).
+    # projects-v3 P3: promote MOVES into a project; `brief` seeds the phase's
+    # plain-language Desired End State, `north_star_ref` the project's North Star
+    # link. `spec_docs` is retained (ignored by project-promote) for a
+    # transitional client that still sends it.
     name: Optional[str] = None
     brief: Optional[str] = None
     repo: Optional[str] = None
+    north_star_ref: Optional[str] = None
     spec_docs: Optional[list[str]] = None
     # drop:
     reason: Optional[str] = None
@@ -643,6 +648,14 @@ class CaptureActionResponse(BaseModel):
     pr_url: Optional[str] = None
     branch: Optional[str] = None
     mission_id: Optional[str] = None
+    # projects-v3 P3 (p3-promote-endpoint): `promote` now MOVES the capture into
+    # a new single-phase project at Brainstorm instead of minting a mission —
+    # {project_id, phase_id, status: 'promoted', applied}. The capture flips to
+    # state:'promoted' (its own committer); the project lands on projects.json
+    # (heal_projects_store commits). mission_id stays optional (absent now) for a
+    # transitional client.
+    project_id: Optional[str] = None
+    phase_id: Optional[str] = None
     status: Optional[str] = None
     state: Optional[str] = None
     applied: Optional[bool] = None
@@ -715,9 +728,44 @@ class MissionActionRequest(BaseModel):
 
 
 class MissionActionResponse(BaseModel):
-    # The mission write-backs are PR-backed → {pr_url, branch} (§ 5 + Contract B).
+    # `defer`/`reprioritize`/`snooze` write-backs are PR-backed → {pr_url, branch}
+    # (§ 5 + Contract B). projects-v3 P3 (p3-promote-endpoint): `accept` is now
+    # unified onto Promote — it MOVES the proposed mission into a new single-phase
+    # project at Brainstorm (no missions.json PR; the mission is suppressed from
+    # the funnel by the project's `promoted_from` cross-ref) → {project_id,
+    # phase_id, status: 'promoted', applied}.
     pr_url: Optional[str] = None
     branch: Optional[str] = None
+    project_id: Optional[str] = None
+    phase_id: Optional[str] = None
+    status: Optional[str] = None
+    applied: Optional[bool] = None
+
+
+class FunnelPromoteRequest(BaseModel):
+    # projects-v3 P3 (p3-promote-endpoint) — POST /api/funnel/promote body. The
+    # ONE unified Promote gesture for any funnel item, regardless of lane: `ref`
+    # is the item id (a capture_id or a proposed-mission id). `kind` is an
+    # optional disambiguator ('capture' | 'mission'); when absent the handler
+    # auto-resolves (captures first, then missions).
+    ref: str = Field(..., min_length=1)
+    kind: Optional[str] = None
+    # Optional project overrides (defaults inferred from the source item):
+    name: Optional[str] = None
+    brief: Optional[str] = None  # seeds the phase's Desired End State
+    repo: Optional[str] = None
+    north_star_ref: Optional[str] = None
+
+
+class FunnelPromoteResponse(BaseModel):
+    # The funnel item was MOVED into a new single-phase project at Brainstorm.
+    # `applied` is False on an idempotent re-promote (the project already
+    # existed). `source_kind` records which lane the item came from.
+    project_id: str
+    phase_id: Optional[str] = None
+    status: str
+    applied: bool
+    source_kind: str
 
 
 class MissionThreadResponse(BaseModel):
@@ -2627,6 +2675,172 @@ def _reader_projects(projects_path: Path) -> list[dict[str, Any]]:
     return projects if isinstance(projects, list) else []
 
 
+# ---------------------------------------------------------------------------
+# Projects-tab-v3 P3 — the on-disk write side of Promote (p3-promote-endpoint).
+#
+# Promote is a MOVE (spec § 0 / § 4 decision 2): it relocates a funnel item
+# (parked capture / proposed mission) into a NEW single-phase project at
+# Brainstorm and removes it from its funnel lane. The dashboard stays a
+# NON-committer to projects.json: this writes the new project to disk ATOMICALLY
+# under a lock; `heal_projects_store.py` (the SOLE committer) version-controls
+# the delta on its next tick (single-committer invariant, spec § 5).
+#
+# A capture and a mission are removed from the funnel by DIFFERENT mechanisms,
+# both reversible with no data loss:
+#   * capture — flipped to state:'promoted' on captures.json (its own committer);
+#     the parked lane already excludes non-parked captures.
+#   * mission — NOT mutated. The funnel derive (_build_funnel) suppresses a
+#     proposed mission whose id appears as `promoted_from.mission_id` in an
+#     ACTIVE project. Archiving the project un-suppresses it → it returns to the
+#     funnel. This avoids a throwaway missions.json PR and keeps the mission's
+#     single committer untouched.
+# ---------------------------------------------------------------------------
+_PROJECTS_INGEST_LOCK = __import__('threading').Lock()
+
+
+def _read_projects_registry(projects_path: Path) -> dict[str, Any]:
+    """Load projects.json as a mutable registry dict ({schema_version,
+    projects}). Missing/empty file → a fresh empty registry. Malformed JSON →
+    HTTPException(500), so the write path never appends onto a corrupt file
+    (mirrors `_read_captures_registry`)."""
+    empty = projects_store.empty_registry()
+    if not projects_path.exists():
+        return empty
+    try:
+        raw = projects_path.read_text()
+        data = json.loads(raw) if raw.strip() else empty
+    except (OSError, json.JSONDecodeError) as e:
+        first_line = str(e).splitlines()[0] if str(e) else type(e).__name__
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={'error': 'projects.json malformed', 'detail': first_line},
+        )
+    if not isinstance(data, dict):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                'error': 'projects.json malformed',
+                'detail': 'top-level JSON is not an object',
+            },
+        )
+    if not isinstance(data.get('projects'), list):
+        data['projects'] = []
+    data.setdefault('schema_version', projects_store.SCHEMA_VERSION)
+    return data
+
+
+def _promoted_from_matches(project: Any, promoted_from: dict[str, Any]) -> bool:
+    """True iff `project`'s provenance back-reference matches `promoted_from`
+    on (kind + the kind's id key). Used for both idempotency (a double-click
+    finds the project it already created) and funnel suppression."""
+    if not isinstance(project, dict):
+        return False
+    pf = project.get('promoted_from')
+    if not isinstance(pf, dict):
+        return False
+    kind = promoted_from.get('kind')
+    if pf.get('kind') != kind:
+        return False
+    id_key = 'capture_id' if kind == 'capture' else 'mission_id'
+    return bool(promoted_from.get(id_key)) and pf.get(id_key) == promoted_from.get(id_key)
+
+
+def _find_active_project_by_promoted_from(
+    projects: list[Any], promoted_from: dict[str, Any],
+) -> Optional[dict[str, Any]]:
+    """The ACTIVE project already created from this funnel item, or None. Only
+    ACTIVE projects count: archiving a project (the reversibility escape hatch)
+    must let the item be re-promoted, so an archived match is not idempotent."""
+    for proj in projects:
+        if not isinstance(proj, dict):
+            continue
+        if proj.get('state', projects_store.DEFAULT_PROJECT_STATE) != 'active':
+            continue
+        if _promoted_from_matches(proj, promoted_from):
+            return proj
+    return None
+
+
+def _unique_project_id(base_id: str, projects: list[Any]) -> str:
+    """`base_id`, or `base_id-2`, `base_id-3`, … — the first id not already used
+    by ANY project (active or archived), so a new promote never silently
+    overwrites an existing or archived project."""
+    existing = {p.get('id') for p in projects if isinstance(p, dict)}
+    if base_id not in existing:
+        return base_id
+    for n in range(2, 1000):
+        candidate = f'{base_id}-{n}'
+        if candidate not in existing:
+            return candidate
+    # Astronomically unlikely; fall back to a length-disambiguated id.
+    return f'{base_id}-{len(projects)}'
+
+
+def _create_project_from_funnel(
+    *,
+    projects_path: Path,
+    title: str,
+    desired_end_state: str,
+    repo: Optional[str],
+    north_star_ref: Optional[str],
+    promoted_from: dict[str, Any],
+    now: datetime,
+) -> dict[str, Any]:
+    """Atomically append a NEW single-phase project at Brainstorm to
+    projects.json (the dashboard is a non-committer — heal_projects_store commits
+    the delta). Idempotent: if an ACTIVE project already carries this
+    `promoted_from`, return it instead of minting a duplicate (a double-click /
+    re-drain is a no-op). Returns
+    {project_id, phase_id, status: 'created'|'exists', applied}.
+
+    Caller-held locks: capture-promote holds _CAPTURE_INGEST_LOCK then nests
+    _PROJECTS_INGEST_LOCK here (CAPTURE→PROJECTS); the funnel/mission paths take
+    only _PROJECTS_INGEST_LOCK — no path takes them in the reverse order, so
+    there is no lock inversion."""
+    with _PROJECTS_INGEST_LOCK:
+        registry = _read_projects_registry(projects_path)
+        projects = registry['projects']
+
+        existing = _find_active_project_by_promoted_from(projects, promoted_from)
+        if existing is not None:
+            phases = existing.get('phases') or []
+            phase_id = phases[0].get('id') if phases and isinstance(phases[0], dict) else None
+            return {
+                'project_id': existing.get('id'),
+                'phase_id': phase_id,
+                'status': 'exists',
+                'applied': False,
+            }
+
+        project_id = _unique_project_id(projects_store.slugify(title), projects)
+        project = projects_store.new_single_phase_project(
+            title=title,
+            desired_end_state=desired_end_state,
+            north_star_ref=north_star_ref,
+            repo=repo,
+            promoted_from=promoted_from,
+            project_id=project_id,
+            phase_id=project_id,
+            now=now,
+        )
+        projects.append(project)
+        registry['schema_version'] = projects_store.SCHEMA_VERSION
+        try:
+            _atomic_write_json(projects_path, registry)
+        except OSError as e:
+            first_line = str(e).splitlines()[0] if str(e) else type(e).__name__
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={'error': 'projects write failed', 'detail': first_line},
+            )
+    return {
+        'project_id': project_id,
+        'phase_id': project_id,
+        'status': 'created',
+        'applied': True,
+    }
+
+
 def _read_missions_registry(missions_path: Path) -> dict[str, Any]:
     """Load the registry as a dict (raw schema), or return a fresh empty
     registry shape if the file is missing. Raises HTTPException(500) on
@@ -3610,6 +3824,7 @@ def _build_funnel(
     orphans: list[dict[str, Any]],
     parked: list[dict[str, Any]],
     now: Optional[datetime] = None,
+    promoted_mission_ids: Optional[set[str]] = None,
 ) -> dict[str, list[dict[str, Any]]]:
     """Group the existing intake (parked + proposed missions + orphans) into the
     primary/secondary funnel (C4). Pure over its three inputs — call it with the
@@ -3618,8 +3833,15 @@ def _build_funnel(
     P2 Contract B: a proposed mission snoozed past `now` (`snoozed_until` in the
     future) is suppressed from the funnel until the snooze elapses, mirroring the
     parked-capture lane (`_parked_from_captures`). Parked captures arrive already
-    snooze-filtered by the derive; missions are filtered here."""
+    snooze-filtered by the derive; missions are filtered here.
+
+    projects-v3 P3 (p3-promote-endpoint): a proposed mission whose id is in
+    ``promoted_mission_ids`` (an ACTIVE project's `promoted_from.mission_id`) has
+    been MOVED into the pipeline by Accept/Promote → it is suppressed from the
+    funnel. The mission is never mutated; archiving the project drops it from this
+    set, returning the mission to the funnel (reversible, no data loss)."""
     now = now or datetime.now(timezone.utc)
+    promoted_mission_ids = promoted_mission_ids or set()
     primary: list[dict[str, Any]] = []
     secondary: list[dict[str, Any]] = []
 
@@ -3644,6 +3866,10 @@ def _build_funnel(
     # auto-filtered once dead).
     for m in missions:
         if (m.get('phase') or '') != 'proposed':
+            continue
+        # projects-v3 P3: a mission already MOVED into the pipeline (its id is an
+        # active project's promoted_from.mission_id) leaves the funnel.
+        if m.get('id') in promoted_mission_ids:
             continue
         # Contract B: a snoozed proposed mission hides until the snooze elapses
         # (mirrors the parked-capture lane). Applies to both suggested → primary
@@ -3680,6 +3906,26 @@ def _build_funnel(
     return {'primary': primary, 'secondary': secondary}
 
 
+def _promoted_mission_ids(projects: list[dict[str, Any]]) -> set[str]:
+    """The mission ids that ACTIVE projects were promoted from (projects-v3 P3).
+    Read from each active project's `promoted_from.mission_id`; the funnel derive
+    uses this to suppress a proposed mission already MOVED into the pipeline.
+    Archived projects are excluded so archiving one returns its mission to the
+    funnel (reversible)."""
+    out: set[str] = set()
+    for proj in projects:
+        if not isinstance(proj, dict):
+            continue
+        if proj.get('state', projects_store.DEFAULT_PROJECT_STATE) != 'active':
+            continue
+        pf = proj.get('promoted_from')
+        if isinstance(pf, dict) and pf.get('kind') == 'mission':
+            mid = pf.get('mission_id')
+            if isinstance(mid, str) and mid:
+                out.add(mid)
+    return out
+
+
 def _build_derived_response(
     *,
     entries: list[dict[str, Any]],
@@ -3691,6 +3937,7 @@ def _build_derived_response(
     pr_state_resolver: Optional[
         Callable[[list[str]], dict[str, str]]
     ] = None,
+    promoted_mission_ids: Optional[set[str]] = None,
 ) -> dict[str, Any]:
     """Pure derive: build the full /api/missions/derived response (pre-filter).
 
@@ -3767,7 +4014,7 @@ def _build_derived_response(
         'parked': parked,
         # C4: additive funnel grouping. Built post-derive; re-derived against the
         # filtered arrays in _apply_derived_filters so it tracks ?repo=/?task_id=.
-        'funnel': _build_funnel(missions, orphans, parked, now),
+        'funnel': _build_funnel(missions, orphans, parked, now, promoted_mission_ids),
         'last_synced_at': last_synced_at,
         'as_of': _now_utc_iso(now),
     }
@@ -3779,6 +4026,7 @@ def _apply_derived_filters(
     repo: Optional[str],
     task_id: Optional[str],
     now: Optional[datetime] = None,
+    promoted_mission_ids: Optional[set[str]] = None,
 ) -> dict[str, Any]:
     """Apply the optional, AND-combined ?repo= / ?task_id= filters (§ 3.2).
 
@@ -3839,7 +4087,7 @@ def _apply_derived_filters(
     response['parked'] = parked
     # C4: re-derive the funnel against the filtered arrays so the grouping stays
     # consistent with the narrowed missions/orphans/parked sections.
-    response['funnel'] = _build_funnel(missions, orphans, parked, now)
+    response['funnel'] = _build_funnel(missions, orphans, parked, now, promoted_mission_ids)
     return response
 
 
@@ -3896,6 +4144,12 @@ def _handle_missions_derived(
         supabase_client, _ORPHAN_WINDOW_DAYS, now,
     )
 
+    # projects-v3 P3: read the pipeline store once. `promoted_mission_ids` feeds
+    # the funnel derive (suppress a mission already MOVED into a project); the
+    # project list also serves the additive "Actively working" pipeline below.
+    projects = _reader_projects(projects_path) if projects_path else []
+    promoted_mission_ids = _promoted_mission_ids(projects)
+
     response = _build_derived_response(
         entries=entries,
         last_synced_at=missions_data.get('last_synced_at'),
@@ -3904,15 +4158,18 @@ def _handle_missions_derived(
         recent_events=recent_events,
         now=now,
         pr_state_resolver=pr_state_resolver,
+        promoted_mission_ids=promoted_mission_ids,
     )
-    response = _apply_derived_filters(response, repo=repo, task_id=task_id, now=now)
+    response = _apply_derived_filters(
+        response, repo=repo, task_id=task_id, now=now,
+        promoted_mission_ids=promoted_mission_ids,
+    )
 
     # projects-v3 P3: additive "Actively working" pipeline. Built AFTER the
     # existing-board filters and injected as a NEW key, so it cannot perturb the
     # missions/orphans/parked/funnel sections. Repo filter applies (a project
     # carries an optional repo); the task_id filter narrows the active task-set
     # view of missions/orphans and does not apply to the project-level pipeline.
-    projects = _reader_projects(projects_path) if projects_path else []
     pipeline = projects_store.build_pipeline(projects, now)
     if repo:
         pipeline = [p for p in pipeline if p.get('repo') == repo]
@@ -4674,138 +4931,100 @@ def _handle_capture_promote(
     capture_id: str,
     overrides: dict[str, Any],
     captures_path: Path,
-    missions_path: Path,
-    queue_dir: Path,
+    projects_path: Path,
     now: Optional[datetime] = None,
 ) -> dict[str, Any]:
-    """`promote` — capture → mission (§ 4.1). One-click, no PR. The new mission
-    lives in missions.json (owned by the missions writer) and the capture's
-    `promoted_to`/`state` live in captures.json (owned by the captures
-    committer), so the write splits across BOTH single-committers:
-      1. QUEUE `<queue_dir>/<mission_id>.json` (the full `phase: drafting` entry)
-         for heal_orphan_autoregister to drain into missions.json — the SAME
-         mechanism +New mission uses (see _handle_new_mission).
-      2. Flip the capture (`promoted_to` + `state: promoted`) on the LOCAL
-         captures.json; heal_missions_card_gc commits the delta.
-    Optional overrides: name / brief / repo / spec_docs (defaults inferred from
-    the capture). Returns {mission_id, status: 'queued', applied: True}.
+    """`promote` — MOVE a parked capture into the pipeline (projects-v3 P3, spec
+    § 0 / § 4 decision 2). One-click, no PR. Promote is a move, not a record: it
+    creates a NEW single-phase project at Brainstorm AND removes the capture from
+    the funnel (parked) lane. Two single-committers, no dual-write to one file:
+      1. APPEND the new project to projects.json on disk (heal_projects_store is
+         the SOLE committer of that file — the dashboard is a non-committer).
+      2. Flip the capture (`promoted_to` = project_id, `state: promoted`,
+         `spawned: {kind: 'project', ...}`) on the LOCAL captures.json; the
+         captures committer (heal_missions_card_gc) commits the delta. The parked
+         lane already excludes non-parked captures, so the flip removes it from
+         the funnel.
+    Optional overrides: name / brief (→ phase Desired End State) / repo /
+    north_star_ref (defaults inferred from the capture). Returns
+    {project_id, phase_id, status: 'promoted', applied: True}.
 
-    The mission is queued BEFORE the capture is flipped so a mid-write crash
-    leaves the mission recoverable rather than silently lost; if the capture
-    flip fails the queue file is rolled back so the action is all-or-nothing."""
+    Reversible with no data loss: archiving the project (PROJECT_STATES) takes it
+    out of the pipeline; both the capture record and the archived project persist.
+    Idempotent: the _require_parked guard rejects a double-click (409), and
+    _create_project_from_funnel collapses any retry onto the existing project."""
     now = now or datetime.now(timezone.utc)
 
-    # One lock for the whole transition: _CAPTURE_INGEST_LOCK both guards the
-    # captures.json read-modify-write against the ingest/snooze/drop writers AND
-    # serializes concurrent promotes of the same capture (the _require_parked
-    # guard is then the idempotency gate against a double-click). The queue write
-    # never touches _NEW_MISSION_LOCK, so there is no nested-lock inversion with
-    # _handle_new_mission.
+    # _CAPTURE_INGEST_LOCK guards the captures.json read-modify-write against the
+    # ingest/snooze/drop writers AND serializes concurrent promotes of the same
+    # capture (the _require_parked guard is then the idempotency gate against a
+    # double-click). _create_project_from_funnel nests _PROJECTS_INGEST_LOCK
+    # underneath (CAPTURE→PROJECTS); no path takes them reversed → no inversion.
     with _CAPTURE_INGEST_LOCK:
         cap_registry = _read_captures_registry(captures_path)
         cap = _find_capture(cap_registry['captures'], capture_id)
         _require_parked(cap, capture_id)
 
         cap_origin = cap.get('origin') if isinstance(cap.get('origin'), dict) else {}
-        name = (overrides.get('name') or cap.get('title') or '').strip()
-        mission_id = _kebab_case(name)
-        if not mission_id:
+        title = (overrides.get('name') or cap.get('title') or '').strip()
+        if not title:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
-                    'error': 'invalid mission name',
-                    'detail': 'name (override or capture title) kebab-cases to empty',
+                    'error': 'invalid project title',
+                    'detail': 'name (override or capture title) is empty',
                 },
             )
-
-        # Reject a mission_id already registered in missions.json, or already
-        # queued (in-flight, not yet drained) — mirrors _handle_new_mission.
-        missions_registry = _read_missions_registry(missions_path)
-        for existing in missions_registry['missions']:
-            if isinstance(existing, dict) and existing.get('id') == mission_id:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail={
-                        'error': 'mission_id collision',
-                        'id': mission_id,
-                        'existing_entry_brief': existing.get('brief', ''),
-                    },
-                )
-        queue_path = queue_dir / f'{mission_id}.json'
-        if queue_path.exists():
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail={
-                    'error': 'mission_id queued',
-                    'id': mission_id,
-                    'hint': (
-                        'A mission with this name is already queued for '
-                        'registration; it will appear on the board shortly.'
-                    ),
-                },
-            )
-
-        brief = (
+        desired_end_state = (
             overrides.get('brief')
             or cap.get('note')
             or cap.get('title')
             or ''
         )
-        repo = overrides.get('repo') or cap_origin.get('repo') or ''
-        spec_docs = overrides.get('spec_docs') or []
-        new_entry: dict[str, Any] = {
-            'id': mission_id,
-            'name': name,
-            'phase': 'drafting',
-            'brief': brief,
-            'spec_docs': list(spec_docs),
-            'task_ids': [],
-            'repo': repo,
-            'created': now.date().isoformat(),
-            'deferred_reason': None,
-        }
+        repo = overrides.get('repo') or cap_origin.get('repo') or None
+        north_star_ref = overrides.get('north_star_ref')
 
-        # 1) Queue the mission for the missions writer. FIRST, so a crash after
-        #    this point still registers the mission (recoverable) rather than
-        #    losing it.
-        try:
-            _atomic_write_json(queue_path, new_entry)
-        except OSError as e:
-            first_line = str(e).splitlines()[0] if str(e) else type(e).__name__
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail={'error': 'queue write failed', 'detail': first_line},
-            )
+        # 1) Create the project on disk FIRST. If the capture flip then fails, a
+        #    retry is idempotent: _create_project_from_funnel re-finds this active
+        #    project by `promoted_from` and the still-parked capture is flipped.
+        result = _create_project_from_funnel(
+            projects_path=projects_path,
+            title=title,
+            desired_end_state=desired_end_state,
+            repo=repo,
+            north_star_ref=north_star_ref,
+            promoted_from={'kind': 'capture', 'capture_id': capture_id},
+            now=now,
+        )
+        project_id = result['project_id']
 
-        # 2) Flip the capture on the local captures.json (the captures committer
-        #    commits the delta). Roll the queue file back on failure so the
-        #    action is all-or-nothing.
-        cap['promoted_to'] = mission_id
+        # 2) Flip the capture on the local captures.json (its committer commits
+        #    the delta), removing it from the parked/funnel lane.
+        cap['promoted_to'] = project_id
         cap['state'] = 'promoted'
-        # Phase S (S1): stamp the spawned ref back onto the capture — the join
-        # key to the mission this card created. The promoted card's live phase
-        # surfaces via the missions lane (the mission's aggregate_phase), so no
-        # task_id is needed here; mission_id is the join key.
+        # Phase S (S1): stamp the spawned ref — the join key to the project this
+        # card created. The project's lifecycle surfaces via the pipeline lane.
         cap['spawned'] = {
-            'kind': 'mission',
-            'mission_id': mission_id,
+            'kind': 'project',
+            'project_id': project_id,
             'stamped_at': _now_utc_iso(now),
         }
         cap_registry['schema_version'] = CAPTURES_SCHEMA_VERSION
         try:
             _atomic_write_captures(captures_path, cap_registry)
         except OSError as e:
-            try:
-                queue_path.unlink()
-            except OSError:
-                pass
             first_line = str(e).splitlines()[0] if str(e) else type(e).__name__
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail={'error': 'captures write failed', 'detail': first_line},
             )
 
-    return {'mission_id': mission_id, 'status': 'queued', 'applied': True}
+    return {
+        'project_id': project_id,
+        'phase_id': result['phase_id'],
+        'status': 'promoted',
+        'applied': True,
+    }
 
 
 def _handle_capture_drop(
@@ -4862,15 +5081,15 @@ def _handle_capture_action(
     action: str,
     args: dict[str, Any],
     captures_path: Path,
-    missions_path: Path,
-    queue_dir: Path,
+    projects_path: Path,
     now: Optional[datetime] = None,
     in_flight_resolver: Optional[Callable[[dict[str, Any]], bool]] = None,
 ) -> dict[str, Any]:
     """Dispatch POST /api/missions/captures/{id}/action to the per-action
-    handler. All three are one-click (no PR): `promote` queues the mission +
-    flips the capture → {mission_id, status:'queued', applied}; `drop` and
-    `snooze` are direct captures.json committer writes → {applied, state} /
+    handler. All three are one-click (no PR): `promote` MOVES the capture into a
+    new single-phase project at Brainstorm + flips the capture →
+    {project_id, phase_id, status:'promoted', applied} (projects-v3 P3); `drop`
+    and `snooze` are direct captures.json committer writes → {applied, state} /
     {applied, snoozed_until}. Unknown action → 400.
 
     Phase S (S7): ``in_flight_resolver`` is threaded into the pausing actions
@@ -4881,12 +5100,11 @@ def _handle_capture_action(
         return _handle_capture_promote(
             capture_id=capture_id,
             overrides={
-                k: args[k] for k in ('name', 'brief', 'repo', 'spec_docs')
+                k: args[k] for k in ('name', 'brief', 'repo', 'north_star_ref')
                 if k in args and args[k] is not None
             },
             captures_path=captures_path,
-            missions_path=missions_path,
-            queue_dir=queue_dir,
+            projects_path=projects_path,
             now=now,
         )
     if action == 'drop':
@@ -5539,61 +5757,61 @@ def _handle_mission_accept(
     *,
     mission_id: str,
     missions_path: Path,
+    projects_path: Path,
+    now: Optional[datetime] = None,
 ) -> dict[str, Any]:
-    """`accept` — claim an auto-proposed orphan thread into a real mission (§ 6).
-    Flips `phase: proposed -> drafting` (the orphan's task_id is already in the
-    entry's `task_ids` from when the healer proposed it; the flip graduates the
-    proposal into a drafting mission). PR-backed (missions.json only) — mirrors
-    `resume`'s shape. 404 if no such mission; 409 if not proposed (nothing to
-    accept). Returns {pr_url, branch}."""
-    token = _github_token()
-    if not token:
+    """`accept` — MOVE a proposed funnel mission into the pipeline (projects-v3
+    P3, spec § 4 decision 2: Proposed-lane Accept is UNIFIED onto Promote — the
+    same gesture, one code path). It creates a NEW single-phase project at
+    Brainstorm carrying `promoted_from: {kind: mission, mission_id}`; the mission
+    is NOT mutated (no missions.json PR). The funnel derive (_build_funnel)
+    suppresses a proposed mission whose id matches an ACTIVE project's
+    `promoted_from`, so the card leaves the funnel lane. 404 if no such mission;
+    409 if not proposed (only a funnel-card thread is acceptable). Returns
+    {project_id, phase_id, status: 'promoted', applied}.
+
+    Reversible with no data loss: archiving the project (PROJECT_STATES)
+    un-suppresses the mission → it returns to the funnel; the mission record was
+    never touched. Idempotent: a re-accept finds the existing active project via
+    `promoted_from` and returns it (applied=False) instead of a duplicate — that
+    is why the mission stays `proposed` (the cross-ref, not a phase flip, is the
+    'accepted' signal)."""
+    now = now or datetime.now(timezone.utc)
+
+    # Read-only on missions.json (no mutation → no lock needed; the read is a
+    # whole-file atomic read against the missions writer's atomic replace).
+    registry = _read_missions_registry(missions_path)
+    mission = _find_mission(registry['missions'], mission_id)
+    if mission.get('phase') != 'proposed':
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=status.HTTP_409_CONFLICT,
             detail={
-                'error': 'github token missing',
-                'detail': 'no GITHUB_TOKEN env nor gh auth token on dashboard-api host',
+                'error': 'mission not proposed',
+                'mission_id': mission_id,
+                'phase': mission.get('phase'),
+                'hint': 'only a proposed mission can be accepted',
             },
         )
-    repo_full = _missions_repo_full()
 
-    with _NEW_MISSION_LOCK:
-        registry = _read_missions_registry(missions_path)
-        mission = _find_mission(registry['missions'], mission_id)
-        if mission.get('phase') != 'proposed':
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail={
-                    'error': 'mission not proposed',
-                    'mission_id': mission_id,
-                    'phase': mission.get('phase'),
-                    'hint': 'only a proposed mission can be accepted',
-                },
-            )
+    title = (mission.get('name') or mission_id or '').strip() or mission_id
+    desired_end_state = mission.get('brief') or mission.get('name') or ''
+    repo = mission.get('repo') or None
 
-        mission['phase'] = 'drafting'
-
-        branch = f'chore/accept-mission-{mission_id}'
-        title = f'chore(missions): accept proposed mission {mission_id}'
-        pr_body = '\n'.join([
-            f'Accept proposed mission `{mission_id}` — claims the orphan into a '
-            'drafting mission (`phase: proposed -> drafting`).',
-            '',
-            'Single-field registry edit. The orphan\'s task_id is already in the '
-            'entry\'s `task_ids` (the healer registered it on propose); accepting '
-            'graduates the proposal into a real mission the derive ranks normally '
-            '(Missions v2 Phase 3 § 6).',
-        ])
-        pr_url = _open_registry_pr(
-            branch=branch,
-            title=title,
-            pr_body=pr_body,
-            files=[(_MISSIONS_REPO_REL, registry)],
-            token=token,
-            repo_full=repo_full,
-        )
-
-    return {'pr_url': pr_url, 'branch': branch}
+    result = _create_project_from_funnel(
+        projects_path=projects_path,
+        title=title,
+        desired_end_state=desired_end_state,
+        repo=repo,
+        north_star_ref=None,
+        promoted_from={'kind': 'mission', 'mission_id': mission_id},
+        now=now,
+    )
+    return {
+        'project_id': result['project_id'],
+        'phase_id': result['phase_id'],
+        'status': 'promoted',
+        'applied': result['applied'],
+    }
 
 
 def _handle_mission_dismiss(
@@ -5887,13 +6105,16 @@ def _handle_mission_action(
     action: str,
     args: dict[str, Any],
     missions_path: Path,
+    projects_path: Path,
 ) -> dict[str, Any]:
     """Dispatch POST /api/system/missions/{id}/action to the per-action handler.
-    defer / resume / reprioritize / accept / dismiss / drop / snooze are all
-    PR-backed → {pr_url, branch}. `drop` is the funnel-facing verb for the
-    dismiss semantics (acknowledged=true, phase stays proposed — keeps the
-    autoregister healer from re-proposing); `dismiss` is kept as its alias.
-    Unknown action → 400."""
+    defer / resume / reprioritize / dismiss / drop / snooze are PR-backed →
+    {pr_url, branch}. `accept` is UNIFIED onto Promote (projects-v3 P3): it
+    MOVES the proposed mission into a new project at Brainstorm → {project_id,
+    phase_id, status, applied} (no missions.json PR). `drop` is the funnel-facing
+    verb for the dismiss semantics (acknowledged=true, phase stays proposed —
+    keeps the autoregister healer from re-proposing); `dismiss` is kept as its
+    alias. Unknown action → 400."""
     if action == 'defer':
         return _handle_mission_defer(
             mission_id=mission_id,
@@ -5915,6 +6136,7 @@ def _handle_mission_action(
         return _handle_mission_accept(
             mission_id=mission_id,
             missions_path=missions_path,
+            projects_path=projects_path,
         )
     # `drop` is the funnel-facing verb (Contract B) for the dismiss semantics —
     # it supersedes bare `dismiss` while preserving them byte-for-byte
@@ -5937,6 +6159,76 @@ def _handle_mission_action(
             f'invalid action={action!r}; expected '
             'defer|resume|reprioritize|accept|dismiss|drop|snooze'
         ),
+    )
+
+
+def _handle_funnel_promote(
+    *,
+    ref: str,
+    kind: Optional[str],
+    overrides: dict[str, Any],
+    captures_path: Path,
+    missions_path: Path,
+    projects_path: Path,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """The ONE unified Promote gesture (projects-v3 P3, spec § 0 / § 4 decision
+    2). MOVES a funnel item — a parked capture OR a proposed mission — into a new
+    single-phase project at Brainstorm, removing it from its funnel lane. Both
+    lanes route through the SAME project-create core so there is no divergent
+    path: a capture delegates to `_handle_capture_promote` (flip the capture), a
+    mission to `_handle_mission_accept` (project `promoted_from` cross-ref
+    suppresses it).
+
+    `kind` is optional; when absent the item is auto-resolved — captures first,
+    then proposed missions. An unresolvable `ref` → 404. Returns
+    {project_id, phase_id, status, applied, source_kind}."""
+    now = now or datetime.now(timezone.utc)
+
+    resolved = kind if kind in ('capture', 'mission') else None
+    if resolved is None and kind is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f'invalid kind={kind!r}; expected capture|mission or omit it',
+        )
+    if resolved is None:
+        cap_registry = _read_captures_registry(captures_path)
+        if any(isinstance(c, dict) and c.get('id') == ref
+               for c in cap_registry['captures']):
+            resolved = 'capture'
+        else:
+            missions_registry = _read_missions_registry(missions_path)
+            if any(isinstance(m, dict) and m.get('id') == ref
+                   for m in missions_registry['missions']):
+                resolved = 'mission'
+
+    if resolved == 'capture':
+        result = _handle_capture_promote(
+            capture_id=ref,
+            overrides=overrides,
+            captures_path=captures_path,
+            projects_path=projects_path,
+            now=now,
+        )
+        result['source_kind'] = 'capture'
+        return result
+    if resolved == 'mission':
+        result = _handle_mission_accept(
+            mission_id=ref,
+            missions_path=missions_path,
+            projects_path=projects_path,
+            now=now,
+        )
+        result['source_kind'] = 'mission'
+        return result
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail={
+            'error': 'funnel item not found',
+            'ref': ref,
+            'hint': 'ref must be a parked capture id or a proposed mission id',
+        },
     )
 
 
@@ -7138,8 +7430,7 @@ def post_capture_action(
         action=body.action,
         args=body.model_dump(exclude={'action'}, exclude_none=True),
         captures_path=_captures_json_path(),
-        missions_path=_missions_json_path(),
-        queue_dir=_new_mission_queue_dir(),
+        projects_path=_projects_json_path(),
         in_flight_resolver=in_flight_resolver,
     )
 
@@ -7232,6 +7523,37 @@ def post_mission_action(
         action=body.action,
         args=body.model_dump(exclude={'action'}, exclude_none=True),
         missions_path=_missions_json_path(),
+        projects_path=_projects_json_path(),
+    )
+
+
+# POST /api/funnel/promote — the unified Promote gesture (projects-v3 P3,
+# p3-promote-endpoint). MOVES any funnel item (a parked capture OR a proposed
+# mission, auto-resolved from `ref`) into a new single-phase project at
+# Brainstorm and removes it from its funnel lane. The dashboard stays a
+# non-committer: the project is written to projects.json on disk (heal_projects_
+# store commits) and the capture flip rides the captures committer; no missions
+# PR. Same auth as the action routes: X-Dashboard-Token + an allowlisted X-Actor.
+@app.post(
+    '/api/funnel/promote',
+    response_model=FunnelPromoteResponse,
+    response_model_exclude_none=True,
+    dependencies=[Depends(_require_token)],
+)
+def post_funnel_promote(
+    body: FunnelPromoteRequest,
+    actor: str = Depends(_require_actor),
+) -> dict[str, Any]:
+    return _handle_funnel_promote(
+        ref=body.ref,
+        kind=body.kind,
+        overrides=body.model_dump(
+            include={'name', 'brief', 'repo', 'north_star_ref'},
+            exclude_none=True,
+        ),
+        captures_path=_captures_json_path(),
+        missions_path=_missions_json_path(),
+        projects_path=_projects_json_path(),
     )
 
 
