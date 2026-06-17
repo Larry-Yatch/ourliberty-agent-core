@@ -3487,7 +3487,45 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-17T05:47:07.951427+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-17T05:45:59.498289+00:00"
+      "orphan_last_activity_ts": "2026-06-17T05:45:59.498289+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-17T06:32:15.836481+00:00",
+      "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-p2-suggest-intake",
+      "name": "P2 Suggest Intake",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `p2-suggest-intake`. Last activity 2026-06-17T06:29:59.44015+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "p2-suggest-intake"
+      ],
+      "repo": null,
+      "created": "2026-06-17",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-17T06:32:15.836481+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-17T06:29:59.44015+00:00"
+    },
+    {
+      "id": "proposed-p2-funnel-card-ui",
+      "name": "P2 Funnel Card UI",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `p2-funnel-card-ui`. Last activity 2026-06-17T06:27:13.216828+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "p2-funnel-card-ui"
+      ],
+      "repo": null,
+      "created": "2026-06-17",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-17T06:32:15.836481+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-17T06:27:13.216828+00:00"
     }
   ]
 }
