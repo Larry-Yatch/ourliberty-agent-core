@@ -342,7 +342,7 @@ class EndpointTest(_DerivedTestBase):
         self.assertEqual(
             set(body),
             {'schema_version', 'missions', 'orphans', 'parked', 'funnel',
-             'last_synced_at', 'as_of'},
+             'pipeline', 'last_synced_at', 'as_of'},
         )
         self.assertEqual(body['schema_version'], 1)
 

@@ -59,6 +59,11 @@ _scripts_dir = Path(__file__).resolve().parent
 if str(_scripts_dir) not in sys.path:
     sys.path.insert(0, str(_scripts_dir))
 
+# projects_store is the single source of the Project+Phase schema + the
+# "Actively working" pipeline derive (projects-v3 P3). stdlib-only, so a
+# top-level import is safe (no supabase/heavy deps that force lazy import).
+import projects_store  # noqa: E402
+
 
 # ---- AGENTS_ROOT + derived paths (env-overridable for test isolation) ----
 
@@ -127,6 +132,17 @@ def _captures_json_path() -> Path:
     if override:
         return Path(override)
     return _repo_root() / 'agents' / 'beacon' / 'captures.json'
+
+
+def _projects_json_path() -> Path:
+    """Path to the Projects-tab-v3 pipeline store (projects-v3 P3). The SOLE
+    committer is `heal_projects_store.py`; this read surface only reads it.
+    Env-overridable so tests redirect reads to a tmpdir without touching the
+    deployed checkout's `agents/beacon/projects.json`."""
+    override = os.environ.get('OURLIBERTY_PROJECTS_JSON')
+    if override:
+        return Path(override)
+    return _repo_root() / 'agents' / 'beacon' / 'projects.json'
 
 
 def _new_mission_queue_dir() -> Path:
@@ -570,6 +586,13 @@ class MissionsDerivedResponse(BaseModel):
     # of intake (parked + team-suggested vs orphaned, auto-filtered). Additive:
     # the live board reads missions/orphans/parked; P2 consumes funnel.
     funnel: dict[str, list[dict[str, Any]]]
+    # projects-v3 P3 (p3-project-store): additive "Actively working" pipeline —
+    # the list of active Projects, each with ordered phase cards (lifecycle
+    # state + Desired End State + optional spec/sequence refs) + coarse status +
+    # one-off collapse. Additive: the live board reads missions/orphans/parked/
+    # funnel; the P3 pipeline UI consumes `pipeline`. Empty list when the store
+    # is absent/empty/malformed (the derive never breaks the board).
+    pipeline: list[dict[str, Any]]
     last_synced_at: Optional[str]
     as_of: str
 
@@ -2585,6 +2608,25 @@ def _reader_captures(captures_path: Path) -> dict[str, Any]:
     }
 
 
+def _reader_projects(projects_path: Path) -> list[dict[str, Any]]:
+    """Return the raw `projects` list from the Projects-tab-v3 store, fail-safe.
+    Missing file → empty list (the pipeline is just empty). Malformed JSON /
+    non-dict / missing key → empty list too: the additive pipeline derive must
+    NEVER break the existing board (mirrors `_reader_captures` but degrades to
+    empty rather than raising, since the pipeline is an additive section)."""
+    if not projects_path.exists():
+        return []
+    try:
+        raw = projects_path.read_text()
+        data = json.loads(raw) if raw.strip() else {}
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(data, dict):
+        return []
+    projects = data.get('projects')
+    return projects if isinstance(projects, list) else []
+
+
 def _read_missions_registry(missions_path: Path) -> dict[str, Any]:
     """Load the registry as a dict (raw schema), or return a fresh empty
     registry shape if the file is missing. Raises HTTPException(500) on
@@ -3812,13 +3854,18 @@ def _handle_missions_derived(
     pr_state_resolver: Optional[
         Callable[[list[str]], dict[str, str]]
     ] = None,
+    projects_path: Optional[Path] = None,
 ) -> dict[str, Any]:
     """Pure handler for GET /api/missions/derived. Reads the registry +
     captures, fetches chain_events, derives, applies filters.
 
     `pr_state_resolver` defaults to None (no PR-state read) so direct callers
     and unit tests are network-free; the route passes the real
-    `_resolve_orphan_pr_states`. See `_build_derived_response`."""
+    `_resolve_orphan_pr_states`. See `_build_derived_response`.
+
+    `projects_path` (projects-v3 P3) is read for the additive "Actively working"
+    pipeline; None → the pipeline section is an empty list, so existing callers
+    and tests that don't pass it are unaffected."""
     missions_data = _reader_missions(missions_path)
     captures_data = _reader_captures(captures_path)
     entries = missions_data.get('missions') or []
@@ -3858,7 +3905,19 @@ def _handle_missions_derived(
         now=now,
         pr_state_resolver=pr_state_resolver,
     )
-    return _apply_derived_filters(response, repo=repo, task_id=task_id, now=now)
+    response = _apply_derived_filters(response, repo=repo, task_id=task_id, now=now)
+
+    # projects-v3 P3: additive "Actively working" pipeline. Built AFTER the
+    # existing-board filters and injected as a NEW key, so it cannot perturb the
+    # missions/orphans/parked/funnel sections. Repo filter applies (a project
+    # carries an optional repo); the task_id filter narrows the active task-set
+    # view of missions/orphans and does not apply to the project-level pipeline.
+    projects = _reader_projects(projects_path) if projects_path else []
+    pipeline = projects_store.build_pipeline(projects, now)
+    if repo:
+        pipeline = [p for p in pipeline if p.get('repo') == repo]
+    response['pipeline'] = pipeline
+    return response
 
 
 # ---- /api/larry/* handler (E4.4e PR-B2) ----
@@ -7032,6 +7091,7 @@ def get_missions_derived(
             repo=repo,
             task_id=task_id,
             pr_state_resolver=_resolve_orphan_pr_states,
+            projects_path=_projects_json_path(),
         ),
     )
 

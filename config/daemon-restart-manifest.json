@@ -11,6 +11,7 @@
       "watch_paths": [
         "scripts/active_tier.py",
         "scripts/agent_runner.py",
+        "scripts/atomic_io.py",
         "scripts/beacon_approval_handler.py",
         "scripts/beacon_telegram_bot.py",
         "scripts/catch_me_up.py",
@@ -18,25 +19,58 @@
         "scripts/chain_event_shipper.py",
         "scripts/concurrency_guard.py",
         "scripts/dispatch_validator.py",
+        "scripts/file_lock.py",
         "scripts/larry_alerts.py",
+        "scripts/log_ts.py",
         "scripts/routing_validator.py",
         "scripts/safe_write_inbox.py",
+        "scripts/supabase_factory.py",
         "scripts/telegram_text_utils.py",
+        "scripts/test_isolation_guard.py",
         "scripts/trust_policy.py"
       ]
     },
     "ourliberty-chain-event-shipper.service": {
       "entrypoint": "scripts/chain_event_shipper.py",
       "watch_paths": [
-        "scripts/chain_event_shipper.py"
+        "scripts/atomic_io.py",
+        "scripts/chain_event_shipper.py",
+        "scripts/file_lock.py",
+        "scripts/log_ts.py",
+        "scripts/supabase_factory.py",
+        "scripts/test_isolation_guard.py"
       ]
     },
     "ourliberty-dashboard-api.service": {
       "entrypoint": "scripts/dashboard_api.py",
       "watch_paths": [
+        "scripts/alert_triage_state.py",
+        "scripts/atomic_io.py",
+        "scripts/beacon_approval_handler.py",
+        "scripts/build_sequence_advancer.py",
+        "scripts/build_sequence_validator.py",
+        "scripts/chain_event_emit.py",
         "scripts/chain_event_shipper.py",
+        "scripts/cycle_prime_ledger.py",
         "scripts/dashboard_api.py",
-        "scripts/triage_decisions.py"
+        "scripts/dispatch_validator.py",
+        "scripts/file_lock.py",
+        "scripts/id_match.py",
+        "scripts/larry_alerts.py",
+        "scripts/log_ts.py",
+        "scripts/missions_doorbell.py",
+        "scripts/projects_store.py",
+        "scripts/pulse_check_heartbeat.py",
+        "scripts/pulse_check_v.py",
+        "scripts/routing_validator.py",
+        "scripts/safe_write_inbox.py",
+        "scripts/sequence_shortcut_helpers.py",
+        "scripts/supabase_chunk.py",
+        "scripts/supabase_factory.py",
+        "scripts/task_terminal_state.py",
+        "scripts/test_isolation_guard.py",
+        "scripts/triage_decisions.py",
+        "scripts/trust_policy.py"
       ]
     },
     "ourliberty-forge-bot.service": {
@@ -45,9 +79,12 @@
         "scripts/active_tier.py",
         "scripts/agent_runner.py",
         "scripts/agent_telegram_bot.py",
+        "scripts/atomic_io.py",
         "scripts/concurrency_guard.py",
+        "scripts/file_lock.py",
         "scripts/larry_alerts.py",
-        "scripts/telegram_text_utils.py"
+        "scripts/telegram_text_utils.py",
+        "scripts/test_isolation_guard.py"
       ]
     },
     "ourliberty-inbox-watcher.service": {
@@ -55,14 +92,19 @@
       "watch_paths": [
         "scripts/active_tier.py",
         "scripts/agent_runner.py",
+        "scripts/atomic_io.py",
         "scripts/concurrency_guard.py",
         "scripts/dispatch_lease.py",
         "scripts/dispatch_validator.py",
+        "scripts/file_lock.py",
         "scripts/fixture_patterns.py",
         "scripts/inbox_watcher.py",
         "scripts/larry_alerts.py",
+        "scripts/pid_identity.py",
         "scripts/routing_validator.py",
+        "scripts/safe_write_inbox.py",
         "scripts/task_type_inference.py",
+        "scripts/test_isolation_guard.py",
         "scripts/worktree_manager.py"
       ]
     },
@@ -72,27 +114,48 @@
         "scripts/active_tier.py",
         "scripts/agent_runner.py",
         "scripts/agent_telegram_bot.py",
+        "scripts/atomic_io.py",
         "scripts/concurrency_guard.py",
+        "scripts/file_lock.py",
         "scripts/larry_alerts.py",
-        "scripts/telegram_text_utils.py"
+        "scripts/telegram_text_utils.py",
+        "scripts/test_isolation_guard.py"
       ]
     },
     "ourliberty-outbox-notifier.service": {
       "entrypoint": "scripts/outbox_notifier.py",
       "watch_paths": [
+        "scripts/alert_triage_state.py",
+        "scripts/atomic_io.py",
         "scripts/beacon_approval_handler.py",
+        "scripts/build_sequence_advancer.py",
         "scripts/build_sequence_validator.py",
+        "scripts/chain_envelope.py",
         "scripts/chain_event_emit.py",
         "scripts/chain_event_shipper.py",
+        "scripts/cycle_prime_ledger.py",
+        "scripts/dashboard_api.py",
         "scripts/dispatch_validator.py",
+        "scripts/file_lock.py",
         "scripts/fixture_patterns.py",
         "scripts/forge_preflight_handler.py",
+        "scripts/id_match.py",
         "scripts/larry_alerts.py",
+        "scripts/log_ts.py",
         "scripts/mirror_review_handler.py",
+        "scripts/missions_doorbell.py",
         "scripts/outbox_notifier.py",
+        "scripts/projects_store.py",
+        "scripts/pulse_check_heartbeat.py",
+        "scripts/pulse_check_v.py",
         "scripts/routing_validator.py",
         "scripts/safe_write_inbox.py",
         "scripts/sequence_shortcut_helpers.py",
+        "scripts/supabase_chunk.py",
+        "scripts/supabase_factory.py",
+        "scripts/task_terminal_state.py",
+        "scripts/test_isolation_guard.py",
+        "scripts/triage_decisions.py",
         "scripts/trust_policy.py",
         "scripts/worktree_manager.py"
       ]
@@ -103,9 +166,12 @@
         "scripts/active_tier.py",
         "scripts/agent_runner.py",
         "scripts/agent_telegram_bot.py",
+        "scripts/atomic_io.py",
         "scripts/concurrency_guard.py",
+        "scripts/file_lock.py",
         "scripts/larry_alerts.py",
-        "scripts/telegram_text_utils.py"
+        "scripts/telegram_text_utils.py",
+        "scripts/test_isolation_guard.py"
       ]
     }
   }
