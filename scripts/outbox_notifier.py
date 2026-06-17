@@ -5364,6 +5364,13 @@ def _signal_sequence_step_merged(
                     f'SEQUENCE_STEP_MERGED seq={seq_id} step={task_id} '
                     f'pr={pr_url} no-op ({result.reason})',
                 )
+            # Contract A (p4-complete-signal): if THIS merge was the last step,
+            # apply_step_merged flipped the sequence to `complete`. Emit the
+            # one-time completion signal (chain event + Larry DM). Runs on the
+            # no-op branch too: a crash-resume re-fire of an already-merged last
+            # step re-detects completion, and the signal's own idempotency guard
+            # (sequence-complete-signaled marker) ensures no double-DM.
+            _maybe_signal_sequence_complete(seq_id)
             return seq_id
     except Exception as e:  # noqa: BLE001 — daemon-never-wedge
         log(
@@ -5372,6 +5379,172 @@ def _signal_sequence_step_merged(
             'WARN',
         )
     return None
+
+
+# ============================================================================
+# projects-v3 P4 Contract A (p4-complete-signal) — one-time completion signal
+# ============================================================================
+
+def _sequence_complete_gh_veto(seq: dict[str, Any]) -> Optional[str]:
+    """Belt-and-suspenders gh check for a `complete` sequence: return a short
+    veto reason if any step's PR is observably NOT merged on GitHub, else None.
+
+    The completion signal trusts the chain_events `auto_merge` signal (which is
+    what flipped every step to `merged` in the first place). This is the second
+    belt: before DMing Larry "everything shipped", confirm GitHub agrees. It is
+    VETO-ONLY — only an authoritative `OPEN` or `CLOSED` state vetoes. A `None`
+    from `_gh_pr_state` (transport error / rate-limit / gh missing), a `MERGED`,
+    or an unparseable pr_url all PASS. Rationale (spec § 5): the detect site is
+    the merge chokepoint, not a periodic poll, so transient gh flakiness must
+    not permanently strand the completion DM — at worst we trust the auto_merge
+    signal we already acted on.
+
+    Returns the veto reason string (for the log line) or None to proceed.
+    """
+    for step in seq.get('steps') or []:
+        if not isinstance(step, dict):
+            continue
+        pr_url = step.get('pr_url')
+        parsed = _parse_pr_url(pr_url) if pr_url else None
+        if parsed is None:
+            continue
+        repo_coords, pr_number = parsed
+        state = _gh_pr_state(repo_coords, pr_number)
+        if state in ('OPEN', 'CLOSED'):
+            return (
+                f'step `{step.get("step_id")}` pr={pr_url} gh-state={state} '
+                f'(expected MERGED)'
+            )
+    return None
+
+
+def _render_sequence_complete_dm(seq: dict[str, Any]) -> str:
+    """Plain-language completion DM body for Larry: what the build was, the PRs
+    that shipped, and a one-line summary. No markdown chrome beyond the simple
+    bullets the alert DM renderer already handles.
+    """
+    seq_id = seq.get('seq_id') or '?'
+    label = seq.get('label') or seq.get('title') or seq_id
+    steps = [s for s in (seq.get('steps') or []) if isinstance(s, dict)]
+    n = len(steps)
+    lines = [
+        f'✅ Build complete: {label}',
+        f'All {n} step{"s" if n != 1 else ""} merged. PRs that shipped:',
+    ]
+    for step in steps:
+        step_id = step.get('step_id') or '?'
+        pr_url = step.get('pr_url') or '(no pr_url recorded)'
+        lines.append(f'  • {step_id}: {pr_url}')
+    summary = seq.get('summary') or seq.get('description')
+    if summary:
+        lines.append(f'Summary: {summary}')
+    else:
+        lines.append(
+            f'Summary: the `{label}` build sequence finished — '
+            f'all {n} step{"s" if n != 1 else ""} are merged to main.'
+        )
+    return '\n'.join(lines)
+
+
+def _emit_sequence_complete_chain_event(seq: dict[str, Any]) -> None:
+    """Push-emit the one `sequence_complete` chain event. Best-effort +
+    daemon-never-wedge — emit_event logs WARN and returns False on any
+    Supabase failure; nothing downstream depends on the row landing.
+    """
+    seq_id = seq.get('seq_id') or '?'
+    steps = [s for s in (seq.get('steps') or []) if isinstance(s, dict)]
+    pr_urls = [s.get('pr_url') for s in steps if s.get('pr_url')]
+    payload = {
+        'agent': 'build_sequence_advancer',
+        'seq_id': seq_id,
+        'label': seq.get('label') or seq.get('title') or seq_id,
+        'spec_doc': seq.get('spec_doc'),
+        'pr_urls': pr_urls,
+        'steps': [s.get('step_id') for s in steps],
+        'completed_at': ces.datetime.now(ces.timezone.utc).isoformat(),
+    }
+    try:
+        chain_event_emit.emit_event(
+            event_type='sequence_complete',
+            agent='build_sequence_advancer',
+            task_id=seq_id,
+            payload=payload,
+        )
+    except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+        log(
+            f'sequence_complete chain_event emit raised unexpectedly for '
+            f'seq {seq_id!r}: {type(e).__name__}: {e}',
+            'WARN',
+        )
+
+
+def _maybe_signal_sequence_complete(seq_id: str) -> None:
+    """Emit the one-time completion signal (chain event + Larry DM) for a
+    sequence that has just reached `complete`, exactly once.
+
+    Flow: re-read the sequence fresh; bail unless status is `complete`; cheap
+    pre-check the `sequence-complete-signaled` marker (skip a finished+already-
+    signaled sequence without a gh round-trip); run the belt-and-suspenders gh
+    veto; then ATOMICALLY claim the signal via `ssh.claim_completion_signal`
+    (writes the marker before returning applied=True). Only the claim winner
+    emits the chain event + DM, so a re-tick / crash-resume never double-DMs.
+
+    Best-effort + daemon-never-wedge: any failure is logged and swallowed; the
+    step-merged signal and the rest of the merge flow never depend on it. The
+    DM goes via `larry_alerts.append_alert` (the doorbell) because a sequence
+    has no reply-chat thread to post into — same sink the advancer uses.
+    """
+    try:
+        seq, err = ssh._read_sequence(seq_id)
+        if err is not None or not isinstance(seq, dict):
+            return
+        if seq.get('status') != 'complete':
+            return
+        # Cheap pre-filter: skip the gh veto + claim entirely if already signaled.
+        if ssh.is_completion_signaled(seq):
+            return
+        veto = _sequence_complete_gh_veto(seq)
+        if veto is not None:
+            log(
+                f'SEQUENCE_COMPLETE seq={seq_id} gh-veto: {veto}; '
+                f'deferring completion signal (will retry on next merge tick)',
+                'WARN',
+            )
+            return
+        result = ssh.claim_completion_signal(seq_id, actor='notifier')
+        if result.error:
+            log(
+                f'SEQUENCE_COMPLETE seq={seq_id} claim hard-error: '
+                f'{result.reason}',
+                'WARN',
+            )
+            return
+        if not result.applied:
+            # Lost the race / already signaled — exactly-once guard held.
+            log(
+                f'SEQUENCE_COMPLETE seq={seq_id} no-op ({result.reason})',
+            )
+            return
+        # We won the claim — emit the one chain event + the one DM.
+        _emit_sequence_complete_chain_event(seq)
+        larry_alerts.append_alert(
+            source='outbox-notifier',
+            severity='warning',
+            message=_render_sequence_complete_dm(seq),
+            subject=f'sequence-complete:{seq_id}',
+            route='escalate',
+        )
+        n = len([s for s in (seq.get('steps') or []) if isinstance(s, dict)])
+        log(
+            f'SEQUENCE_COMPLETE seq={seq_id} signaled (steps={n}) '
+            f'event+DM emitted',
+        )
+    except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+        log(
+            f'sequence-complete signal for seq={seq_id} raised '
+            f'{type(e).__name__}: {e}; swallowing',
+            'WARN',
+        )
 
 
 # ============================================================================

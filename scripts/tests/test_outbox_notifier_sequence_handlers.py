@@ -801,6 +801,16 @@ class SignalSequenceStepMergedHarness(_KickoffHandlerHarness):
         super().setUp()
         self._ssh_original_root = ssh.AGENTS_ROOT
         ssh.AGENTS_ROOT = self._root
+        # Contract A (p4-complete-signal): the last-step merge now flips the
+        # sequence to `complete`, which runs `_maybe_signal_sequence_complete`
+        # and its belt-and-suspenders gh veto. Stub `_gh_pr_state` → 'MERGED'
+        # so the single-step `test_idempotent_when_step_already_merged` (and
+        # any future last-step case) never shells out to real `gh`.
+        self._gh_state_patcher = mock.patch.object(
+            on, '_gh_pr_state', return_value='MERGED',
+        )
+        self._gh_state_patcher.start()
+        self.addCleanup(self._gh_state_patcher.stop)
 
     def tearDown(self):
         ssh.AGENTS_ROOT = self._ssh_original_root

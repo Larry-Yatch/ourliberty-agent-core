@@ -202,6 +202,96 @@ def _check_sequence_completion(seq: dict[str, Any], actor: str) -> bool:
     return True
 
 
+# -------------------- completion signal (Contract A) --------------------
+
+# projects-v3 P4 Contract A (p4-complete-signal): the audit_log event marking
+# that the one-time `sequence_complete` chain event + Larry completion DM have
+# been emitted for a finished sequence. This is the exactly-once guard: the DM
+# fires only on the FIRST claim, so a re-tick or notifier crash-resume that
+# re-detects the same merged sequence never double-DMs.
+#
+# Distinct from the `sequence-complete` audit event (written by
+# _check_sequence_completion when status flips to `complete`). That marks the
+# state transition; THIS marks that the outward-facing signal went out. The two
+# are deliberately separate so the signal can be claimed idempotently even if
+# the status flip happened on a prior tick.
+SEQUENCE_COMPLETE_SIGNALED_EVENT = 'sequence-complete-signaled'
+
+
+def is_completion_signaled(seq: dict[str, Any]) -> bool:
+    """True iff `seq`'s audit_log already carries the completion-signaled
+    marker — i.e. the one-time completion event + DM have already fired.
+
+    Cheap in-memory check the notifier uses as a pre-filter before paying for
+    a gh veto or a write. The authoritative claim is `claim_completion_signal`,
+    which re-checks under the read-modify-write so two racing ticks can't both
+    win.
+    """
+    for entry in seq.get('audit_log') or []:
+        if (
+            isinstance(entry, dict)
+            and entry.get('event') == SEQUENCE_COMPLETE_SIGNALED_EVENT
+        ):
+            return True
+    return False
+
+
+def claim_completion_signal(seq_id: str, actor: str = 'notifier') -> Result:
+    """Atomically claim the right to emit the one-time completion signal.
+
+    Returns `Result(applied=True)` ONLY on the first successful claim for a
+    sequence that is `complete` and has no prior signaled-marker; the marker is
+    appended and the file atomically rewritten BEFORE returning, so the marker
+    is durable the instant the caller learns it won. The caller then emits the
+    `sequence_complete` chain event + Larry DM.
+
+    Returns `Result(applied=False, error=False)` — a benign no-op — when the
+    sequence is not yet `complete`, or when the marker is already present (a
+    re-tick / crash-resume that re-detected the same merge). Returns
+    `Result(error=True)` only on hard read/write failure.
+
+    Ordering rationale (spec § 5 governing constraint — exactly-once DM): the
+    marker is written before the DM. If the process crashes after the write but
+    before the DM, the sequence is silently un-DM'd — a single missed DM is the
+    accepted failure mode, strictly preferred over any double-DM.
+    """
+    seq, err = _read_sequence(seq_id)
+    if err is not None:
+        return err
+    path = _seq_path(seq_id)
+    if seq.get('status') != 'complete':
+        return Result(
+            applied=False,
+            reason=(
+                f'Sequence `{seq_id}` has status `{seq.get("status")}`; '
+                f'completion signal is only claimable on `complete`'
+            ),
+            sequence_path=path,
+        )
+    if is_completion_signaled(seq):
+        return Result(
+            applied=False,
+            reason=(
+                f'Sequence `{seq_id}` completion signal already claimed; '
+                f'no-op (idempotent re-detect is safe — no double-DM)'
+            ),
+            sequence_path=path,
+        )
+    _append_audit(seq, {
+        'ts': _now_iso(),
+        'event': SEQUENCE_COMPLETE_SIGNALED_EVENT,
+        'actor': actor,
+    })
+    write_err = _atomic_write(path, seq)
+    if write_err is not None:
+        return write_err
+    return Result(
+        applied=True,
+        reason=f'Sequence `{seq_id}` completion signal claimed',
+        sequence_path=path,
+    )
+
+
 # -------------------- pause / resume --------------------
 
 
@@ -623,5 +713,8 @@ __all__ = [
     'apply_retry',
     'apply_skip',
     'apply_step_merged',
+    'is_completion_signaled',
+    'claim_completion_signal',
+    'SEQUENCE_COMPLETE_SIGNALED_EVENT',
     'AGENTS_ROOT',
 ]
