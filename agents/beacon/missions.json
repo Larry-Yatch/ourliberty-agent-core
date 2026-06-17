@@ -2985,6 +2985,40 @@
       "proposed_at": "2026-06-17T03:30:30.623428+00:00",
       "orphan_branch": null,
       "orphan_last_activity_ts": "2026-06-17T03:17:44.281127+00:00"
+    },
+    {
+      "id": "proposed-p2-meaning-layer",
+      "name": "P2 Meaning Layer",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `p2-meaning-layer`. Last activity 2026-06-17T05:00:57.161964+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "p2-meaning-layer"
+      ],
+      "repo": null,
+      "created": "2026-06-17",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-17T05:01:14.890926+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-17T05:00:57.161964+00:00"
+    },
+    {
+      "id": "proposed-dag-preflight-projects-v3-p2",
+      "name": "DAG Preflight Projects V3 P2",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `dag-preflight-projects-v3-p2`. Last activity 2026-06-17T04:56:11.861566+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "dag-preflight-projects-v3-p2"
+      ],
+      "repo": null,
+      "created": "2026-06-17",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-17T05:01:14.890926+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-17T04:56:11.861566+00:00"
     }
   ]
 }
