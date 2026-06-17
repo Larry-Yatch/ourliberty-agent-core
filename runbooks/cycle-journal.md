@@ -4,6 +4,71 @@
 
 ---
 
+## Iteration ~2124 — 2026-06-17 11:53Z UTC (interactive, /cycle, Tier 3, consecutive_clean=0→1, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 1 new alert (Tier-3 silenced). PR #561 merged. No DM to Larry.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** 0 open PRs in agent-core, dashboard, graph. ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** 0 legacy open PRs. ✅
+- **projects-v3-p1 SEQUENCE COMPLETE ✅ CONFIRMED:** FORGE_NO_PR_SKIP p1-funnel-derive (#551) pr_exists. ✅
+- **projects-v3-p4 COMPLETE ✅ CONFIRMED:** FORGE_NO_PR_SKIP p4-complete-signal (#554), p4-cleanup-committer (#555), p4-postmerge-exec (#556) pr_exists. ✅
+- **projects-v3-p2 SEQUENCE COMPLETE ✅ CONFIRMED:** FORGE_NO_PR_SKIP p2-meaning-layer (#558), p2-actions (#559), p2-suggest-intake (#560), p2-funnel-card-ui (#59-dashboard) all pr_exists. ✅
+- **PR #561 MERGED ✅ CONFIRMED:** git HEAD=5bc7e28f "fix: auto-repair Pulse Check 0 watermark after alert-log compaction (#561)" = origin/main. Auto-merged 05:22:09Z UTC. ✅
+- **Daemons ✅:** beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), outbox_notifier 3769291 (Ss), dashboard_api 3809960 (Ssl). All 5 alive, same PIDs as iter ~2123. ✅
+
+**Check 0 — Alert triage:** Watermark=988 entering; file=989 lines. **1 new alert (L989):** `source=heal-wedged-review-sessions, subject=wedged-review-reaped:wt-forge-pulse-watermark-rotation-repair-001` (11:23:27Z — forge review session reaped post-merge, pid 3846992, idle 1680s). Triage helper → **Tier-3 silence** (known-pattern match in alert-translations.json). Bot already delivered closure DM at 05:26:58 local (11:26:58Z UTC). Watermark advanced 988→989. No second DM from Pulse. ✅
+
+**Check 1 — Log noise:** outbox-notifier.log: PR #561 pipeline clean — Mirror review_pass classified 05:22:03Z (retry 1/3 of 2), AUTO_MERGE executed 05:22:09Z (merged). Retry 2/3 also PASS at 05:29:55Z, AUTO_MERGE skipped (already merged). Forge session success=False at 11:25:55Z (superseded_session, expected). All INFO post-merge. inbox_watcher.log: Mirror retry 1/3 done 11:22:02Z ($0.38), Mirror retry 2/3 done 11:29:53Z ($0.46), Beacon notify sessions all completed. beacon_telegram_bot.log: same 23:24–23:25 local 409 burst (G-rule dual-bot-instance-409-external 1/3, unchanged). Last real entry: idx=988 delivered (closure DM for L989) at 05:26:58 local. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** No new messages from Larry since "Go" at 04:43 local (10:43Z). No agent-distress keywords. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → `no stalls detected`. RETRY_EXHAUSTED_SKIP for pulse-watermark-rotation-repair-001 (reason=superseded_session — PR already merged, normal). ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-17T11:26:39Z, age≈24.5 min. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=5bc7e28f=origin/main (clean, on main, no divergence). Latest commit: PR #561 merge. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-17T11:47:59Z, status=no-change, age≈5 min. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3734671 (Ss) ✅, chain_event_shipper 3734305 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, outbox_notifier 3769291 (Ss) ✅, dashboard_api 3809960 (Ssl) ✅. All 5 alive, same PIDs as iter ~2123. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open ✅ (PR #561 merged). ourliberty-dashboard: 0 open ✅. ourliberty-graph: 0 open ✅. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Conditional checks (Wednesday 2026-06-17 UTC, weekday=2 ∈ {0,2,4,6}):**
+- Check I: artifact `pulse-check-i/check-i-2026-06-17.json` EXISTS → SKIP (same-day dedup). ✅
+- Check III: Sunday-anchored → skip.
+
+**Notable: PR #561 — G-rule watermark-rotation-gap COMPLETE ✅**
+`fix: auto-repair Pulse Check 0 watermark after alert-log compaction (#561)` auto-merged 05:22:09Z UTC (Mirror retry 1/3 review_pass at 05:22:03Z → auto-merge). This closes the G-rule watermark-rotation-gap (3/3, dispatched iter ~2117, Beacon spec, Larry approved 10:43Z, Forge PR created 10:55Z, merged 05:22:09Z next iter). The patch adds auto-detect/repair to `alert_triage_state.py` for stale watermarks after log compaction.
+
+**G-rule tracking:**
+- G-rule watermark-rotation-gap: **COMPLETE ✅** (PR #561 merged).
+- G-rule mirror-malformed-verdict-marker: **2/3** (unchanged — retries 1/3 and 2/3 for PR #561 both produced valid REVIEW_PASS markers; no new MalformedMirrorMarker this iter). Dispatch to Beacon at 3/3.
+- G-rule catalog-accuracy-drift-tier4: **2/3** (unchanged).
+- G-rule sequence-complete-tier4: **2/3** (unchanged).
+- G-rule ledger/check-i Tier-4: **2/3** (unchanged).
+- G-rule dual-bot-instance-409-external: **1/3** (same burst; no new 409s).
+- All other G-rule counts unchanged from iter ~2123.
+
+**Actions taken:**
+1. Alert triage: L989 → Tier-3 silence (triage-helper).
+2. Watermark: 988→989.
+3. PRIME ledger: `iter_clean` appended (tier=3, ts=2026-06-17T11:53:02Z).
+4. Tier state: `record --checks-clean true` → consecutive_clean 0→1. Tier remains 3.
+
+**PRIME ratio:** 20.14 (1007 interventions, 50 systemic fixes). Trend: improving.
+
+**Dispatches:** None.
+
+---
+
 ## Iteration ~2123 — 2026-06-17 11:17Z UTC (interactive, /cycle, Tier 2→3, consecutive_clean=2→3→de-escalate, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).
