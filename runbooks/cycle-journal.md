@@ -4,6 +4,69 @@
 
 ---
 
+## Iteration ~2137 — 2026-06-17 14:40Z UTC (interactive, /cycle, Tier 2, consecutive_clean=1→2, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 0 new alerts. All checks clean. No DM to Larry.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** No regression. ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** No regression. ✅
+- **projects-v3-p1/p4/p2/p2-followup ALL SEQUENCE COMPLETE ✅ CONFIRMED:** heal_pipeline_stall --dry-run → 0 stalls; all FORGE_NO_PR_SKIP entries pr_exists. ✅
+- **G-rule sequence-complete-tier4 COMPLETE ✅ CONFIRMED:** PR #566 merged 13:39:39Z, fix live (unchanged). ✅
+- **G-rule mirror-malformed-verdict-marker COMPLETE ✅ CONFIRMED:** PR #565 merged 13:27:40Z, fix live (unchanged). ✅
+- **Daemons ✅:** beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), outbox_notifier 3938657 (Ss), dashboard_api 3924466 (Ssl). All 5 alive, same PIDs as iter ~2136. ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 998, "file_length": 998}` (no repair needed). 0 new alerts. Watermark stays at 998. ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log last modified 07:57:44 MDT — unchanged since iter ~2136. Expected: Forge session still active, no events to process. Bot log last entry 08:00:23 MDT (alert idx=997 route=digest). 0 WARNs/ERRORs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message "Go" at 07:29:35 MDT (13:29:35Z) — already processed (approved silence-sequence-complete-triage-001). No new messages. No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → 0 stalls. All FORGE_NO_PR_SKIP entries pr_exists (p1/p4/p2/p2-followup completed tasks). ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-17T14:28:05Z, age≈12 min. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=1fa0a624=origin/main (clean, on main, behind=0, ahead=0). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-17T14:12:19Z, age≈28 min. FRESH. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3734671 (Ss) ✅, chain_event_shipper 3734305 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, outbox_notifier 3938657 (Ss) ✅, dashboard_api 3924466 (Ssl) ✅. All 5 alive, same PIDs as iter ~2136. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: **1 open PR #567** (`feat: Project+Phase data model + single-committer store + pipeline derive (p3-project-store)`, created 14:25:52Z, ~14 min old, MERGEABLE, reviewDecision="" — normal pipeline; Forge session still active). ourliberty-dashboard: 0 open. ✅ Normal pipeline progress; no stall.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Check F — Forge session observation:** Forge PID 3938869 (`claude-opus-4-8 --resume 9785c19d-...`) running ~42 min. PR #567 created at 14:25:52Z (28 min after session start; 14 min ago). Forge task `build-p3-project-store.json` still in inbox (session active). Session progressing normally (PR exists = code written); preamble/verification in progress post-PR-creation. Not classified as stuck — process alive, PR evidence of build completion. Monitor next iter for Mirror review dispatch.
+
+**Conditional checks (Wednesday 2026-06-17 UTC, weekday=2 ∈ {0,2,4,6}):**
+- Check I: artifact `pulse-check-i/check-i-2026-06-17.json` EXISTS → SKIP (same-day dedup). ✅
+- Check III: Sunday-anchored → skip.
+
+**Pipeline observation — projects-v3-p3 ACTIVE:**
+Forge inbox: `build-p3-project-store.json` + `p3-project-store.json` present (session active, PID 3938869, ~42 min). PR #567 OPEN (MERGEABLE, no review yet). Beacon inbox: empty. Mirror inbox: empty. Outbox-notifier will dispatch Mirror review when Forge session completes and writes result marker. 5 stale Mirror worktrees on disk (`wt-mirror-dag-preflight-*`, `wt-mirror-pulse-watermark-rotation-repair-001`) — informational, not blocking, dag-preflight worktrees have no auto-teardown path.
+
+**G-rule tracking:**
+- **G-rule sequence-complete-tier4: COMPLETE ✅** (unchanged).
+- **G-rule mirror-malformed-verdict-marker: COMPLETE ✅** (unchanged).
+- G-rule catalog-accuracy-drift-tier4: **2/3** (unchanged).
+- G-rule ledger/check-i Tier-4: **2/3** (unchanged).
+- G-rule dual-bot-instance-409-external: **1/3** (unchanged).
+- All other G-rule counts unchanged from iter ~2136.
+
+**Actions taken:**
+1. PRIME ledger: `iter_clean` appended (tier=2, ts=2026-06-17T14:40:03Z).
+2. Tier state: `record --checks-clean true` → consecutive_clean=1→2. Tier stays 2.
+
+**PRIME ratio:** 19.46 (1012 interventions, 52 systemic fixes).
+
+**Dispatches:** None.
+
+---
+
 ## Iteration ~2136 — 2026-06-17 14:22Z UTC (interactive, /cycle, Tier 2, consecutive_clean=0→1, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).
