@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-17 00:18Z UTC (Iter ~2081, Tier 1, consecutive_clean=0→1, NOMINAL)
+
+**Iter ~2081 summary:** ✅ Nominal. 0 new alerts. All 5 daemons alive (same PIDs: beacon 3556778, chain-event 2744551, inbox-watcher 3434697, outbox_notifier 3676902, dashboard_api 3688711). Repo HEAD=329295b5=origin/main (clean). Last sync 23:29:16Z (~49 min). No stalls. pending=0. Credential rotation: all clear. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs.** projects-v3-p1 SEQUENCE COMPLETE ✅. Check I skipped (already fired iter ~2080, artifact confirmed). PRIME ratio=20.39 (999 interventions, 49 systemic fixes). **Tier 1, consecutive_clean=0→1.**
+
 ## Status snapshot — updated 2026-06-17 00:14Z UTC (Iter ~2080, Tier 1, consecutive_clean=2→0, TIER-RESET)
 
 **Iter ~2080 summary:** ⚠️ Tier-reset. 2 Tier-4 alerts (L1059 ledger-weekly-2026-06-15 + L1060 check-i-2026-06-15; routine Check I outputs, bot-delivered via route=escalate; no Pulse double-DM). All 5 daemons alive (same PIDs: beacon 3556778, chain-event 2744551, inbox-watcher 3434697, outbox_notifier 3676902, dashboard_api 3688711). Repo HEAD=17aafd32=origin/main (clean). Last sync 23:29:16Z (~41 min). No stalls. pending=0. Credential rotation: all clear. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs.** projects-v3-p1 SEQUENCE COMPLETE ✅. Check I fired (Wednesday, mode=digest, no new dispatch, dedup-skip on 04807c018d). iter ~2079 incorrectly labeled Wed as "Tuesday" — corrected this iter. PRIME ratio=20.39 (999 interventions, 49 systemic fixes). **Tier 1, consecutive_clean=2→0.**
