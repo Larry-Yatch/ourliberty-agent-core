@@ -126,9 +126,13 @@
 
 ---
 
+## Status snapshot — updated 2026-06-17 20:57Z UTC (Iter ~2161, Tier 2→3, consecutive_clean=2→3→de-escalate, NOMINAL)
+
+**Iter ~2161 summary:** ✅ Nominal. 1 Tier-3 alert silenced: L1015 (dispatch-branch-cleanup/summary — pruned 5 local + 2 remote stale branches, known-pattern). All 5 daemons alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4048770 (Ssl), outbox_notifier 4049089 (Ss). Same PIDs as iter ~2160. Repo HEAD=76475c75=origin/main (clean). Last sync 20:13:19Z (~44 min). No stalls. pending=0. Credential rotation: OK. Heartbeat 20:29:08Z (28 min, fresh). 0 open PRs. **projects-v3-p3 COMPLETE ✅.** Check I skipped (artifact exists 2026-06-17). Note: iter ~2160 stated weekday=Tuesday (wrong); actual weekday=2=Wednesday; Check I skip was correct (artifact existed). PRIME ratio=19.54 (1016 interventions, 52 systemic fixes, trend=improving). **Tier 2→3 de-escalation, consecutive_clean reset to 0.**
+
 ## Status snapshot — updated 2026-06-17 20:43Z UTC (Iter ~2160, Tier 2, consecutive_clean=1→2, NOMINAL)
 
-**Iter ~2160 summary:** ✅ Nominal. 0 new alerts (watermark=1014=file_length). All 5 daemons alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4048770 (Ssl), outbox_notifier 4049089 (Ss). Same PIDs as iter ~2159. Repo HEAD=f18502bb=origin/main (clean). Last sync 20:13:19Z (~30 min). No stalls. pending=0. Heartbeat 20:29:08Z (14 min, fresh). 0 open PRs. **projects-v3-p3 COMPLETE ✅.** Check I skipped (Tuesday, not Mon/Wed/Fri/Sun). PRIME ratio=19.54 (1018 interventions, 52 systemic fixes, trend=improving). **Tier 2, consecutive_clean=1→2.**
+**Iter ~2160 summary:** ✅ Nominal. 0 new alerts (watermark=1014=file_length). All 5 daemons alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4048770 (Ssl), outbox_notifier 4049089 (Ss). Same PIDs as iter ~2159. Repo HEAD=f18502bb=origin/main (clean). Last sync 20:13:19Z (~30 min). No stalls. pending=0. Heartbeat 20:29:08Z (14 min, fresh). 0 open PRs. **projects-v3-p3 COMPLETE ✅.** Check I skipped (artifact exists 2026-06-17; weekday incorrectly stated as Tuesday — was Wednesday). PRIME ratio=19.54 (1018 interventions, 52 systemic fixes, trend=improving). **Tier 2, consecutive_clean=1→2.**
 
 ## Status snapshot — updated 2026-06-17 20:22Z UTC (Iter ~2159, Tier 2, consecutive_clean=0→1, NOMINAL)
 

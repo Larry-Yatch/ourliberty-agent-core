@@ -4,6 +4,80 @@
 
 ---
 
+## Iteration ~2161 — 2026-06-17 20:57Z UTC (interactive, /cycle, Tier 2→3, consecutive_clean=2→3→de-escalate, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 1 Tier-3 alert silenced (dispatch-branch-cleanup/summary). All checks clean. No DM to Larry. **Tier 2→3 de-escalation.**
+
+**VERIFY-BEFORE-REASSERT:**
+- **All 5 daemon PIDs alive:** beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4048770 (Ssl), outbox_notifier 4049089 (Ss). Same PIDs as iter ~2160. ✅
+- **0 open PRs:** `gh pr list` → [] in both repos. ✅
+- **Repo at origin/main:** HEAD=76475c75=origin/main, clean. ✅
+- **projects-v3-p3 COMPLETE:** 0 open PRs, 0 stalls, 0 inbox tasks. ✅
+
+**Check 0 — Alert triage:** repair-watermark → no repair (watermark=1014, file_length=1015). **1 new alert:**
+- L1015: `dispatch-branch-cleanup/summary` (20:42:41Z — pruned 5 local + 2 remote stale branches) → Tier-3 SILENCED (known-pattern match). ✅
+Watermark advanced 1014→1015. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → No entries. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot log: last Larry msg 12:20:08-0600 MDT (install-heal-projects-store-timer-001 "Go", handled in iter ~2152). No new messages. No 409 errors in recent log. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected`. 19 FORGE_NO_PR_SKIP (all reason=pr_exists, up from 18 — install-heal-projects-store-timer-001 now pr_exists=#569). ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` pending=0. Beacon/forge/mirror inboxes: empty. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=`2026-06-17T20:29:08Z` (~28 min). FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=76475c75=origin/main. Clean tree. On main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-17T20:13:19Z (~44 min), status=no-change. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon 3734671 (Ss) ✅, chain-event 3734305 (SNs) ✅, inbox-watcher 3434697 (Ssl) ✅, dashboard_api 4048770 (Ssl) ✅, outbox_notifier 4049089 (Ss) ✅. All 5 alive. Same PIDs as iter ~2160. ✅ Nominal.
+
+**Check D — Inboxes:** beacon: empty, forge: empty, mirror: empty. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open PRs. ourliberty-dashboard: 0 open PRs. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK (schema_version=1 validates). ✅ Nominal.
+
+**Conditional checks:** Wednesday 2026-06-17 UTC, weekday=2 ∈ {0,2,4,6}.
+- Check I: artifact `pulse-check-i/check-i-2026-06-17.json` EXISTS → SKIP (same-day dedup). ✅
+- Check III: Sunday-anchored → skip.
+- Calibration note: iter ~2160 incorrectly stated "Today is Tuesday UTC (weekday=1)" — actual Python weekday is 2 (Wednesday). Practical effect was identical (Check I skipped due to existing artifact), but the weekday reasoning was wrong. No action required; noting for MEMORY.md.
+
+**Actions taken:**
+1. Check 0 triage: L1015 Tier-3 silenced; watermark advanced 1014→1015.
+2. PRIME ledger: `iter_clean` appended (tier=2, ts=2026-06-17T20:57:37Z).
+3. Tier state: `record --checks-clean true` → consecutive_clean=2→3→de-escalate. **Tier 2→3.** consecutive_clean reset to 0.
+
+**Dispatches:** None.
+
+**Standing findings (carried):**
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule catalog-accuracy-drift-tier4** — 1/3. Watch.
+- [blue] **G-rule ledger/check-i Tier-4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule watermark-rotation-gap** — 2/3. Watch.
+- [blue] **Stale bash orphans** — PIDs 1834248 + 2605007. Low CPU. [carry]
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — merged without Mirror; bot-delivered. Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**PRIME DIRECTIVE:** iter_clean. Trailing-30d: interventions=1016, systemic_fixes=52, ratio=19.54, trend=improving.
+**Tier end-of-iter:** Tier 3, consecutive_clean=0 (de-escalated from Tier 2).
+
+---
+
 ## Iteration ~2160 — 2026-06-17 20:43Z UTC (interactive, /loop /cycle, Tier 2, consecutive_clean=1→2, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/loop /cycle`).
