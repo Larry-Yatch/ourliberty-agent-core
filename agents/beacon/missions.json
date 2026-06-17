@@ -3620,7 +3620,11 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-17T06:32:15.836481+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-17T06:29:59.44015+00:00"
+      "orphan_last_activity_ts": "2026-06-17T06:29:59.44015+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-17T06:47:19.762182+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-p2-funnel-card-ui",
