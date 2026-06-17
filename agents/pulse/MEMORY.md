@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-17 19:47Z UTC (Iter ~2156, Tier 1, consecutive_clean=0→1, NOMINAL)
+
+**Iter ~2156 summary:** ✅ Nominal. 1 Tier-3 alert silenced: L1011 (dispatch-branch-cleanup/summary — pruned 4 local + 3 remote stale branches, known-pattern). All 5 daemons alive — beacon 3734671, chain-event 3734305, inbox-watcher 3434697, dashboard_api 4021271, outbox_notifier 4021501 (same PIDs as iter ~2155). Repo HEAD=c0487780=origin/main (clean). Last sync 19:13:03Z (~33 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs across all repos.** **projects-v3-p3 COMPLETE ✅** (PRs #567+#568+#569+#570 all merged). Check I skipped (artifact exists 2026-06-17). Note: heal-stale-daemon-code heartbeat 19:28:59Z (pre-PR#570 merge); expect restart of dashboard_api + outbox_notifier on next healer run. PRIME ratio=~19.54 (1016 interventions, 52 systemic fixes, trend=improving). **Tier 1, consecutive_clean=0→1.**
+
 ## Status snapshot — updated 2026-06-17 19:37Z UTC (Iter ~2155, Tier 1, consecutive_clean=2→0, DRIFT/FIXED)
 
 **Iter ~2155 summary:** ⚠️ Drift (auto-fixed). Check A: repo behind 1 commit (PR #570 `feat: build-launch-queue + Beacon-side drain (projects-v3-p3 p3-launch-queue-drain)` merged 19:35:51Z) → fast-forwarded 37021866→9ceded9f. All 5 daemons alive — beacon 3734671, chain-event 3734305, inbox-watcher 3434697, dashboard_api 4021271, outbox_notifier 4021501. Heartbeat=19:28:59Z; expect heal-stale-daemon-code to restart dashboard_api (dashboard_api.py updated in PR #570). Last sync 19:13:03Z (~24 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs across all repos.** **projects-v3-p3 COMPLETE ✅** (PRs #567+#568+#569+#570 all merged). PR #570 ships `scripts/launch_queue_drain.py` + `systemd/ourliberty-launch-queue-drain.{service,timer}`. Check I skipped (artifact exists 2026-06-17). PRIME ratio=~19.52 (1016 interventions, 52 systemic fixes, trend=improving). **Tier 1, consecutive_clean=2→0.**
