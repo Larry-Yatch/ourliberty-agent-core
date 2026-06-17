@@ -115,9 +115,9 @@ This entire process — **funnel → pipeline → brainstorm → spec → build 
 | Phase | What | Status |
 |---|---|---|
 | (foundation) | Phase 4 meaning layer · 4.1 Narrator schedule · Phase S sync · delegate fix | ✅ shipped |
-| P1 | Funnel + Missions retirement | ▫️ planned |
-| P2 | Universal action card on funnel | ▫️ planned |
-| P3 | Pipeline (Projects → Phases) | ▫️ planned |
+| P1 | Funnel + Missions retirement | ✅ shipped |
+| P2 | Universal action card on funnel | ✅ shipped (+ follow-up: meaning layer on Proposed lane + reliable refresh) |
+| P3 | Pipeline (Projects → Phases) | 🚧 specced — `projects-v3-p3-pipeline` |
 | P4 | Closeout pass | ▫️ planned |
 | P5 | DAG status on cards | ▫️ planned |
 | P6 | Brainstorm template + auto-fill | ▫️ planned |
