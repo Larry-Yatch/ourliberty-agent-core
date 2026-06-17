@@ -182,6 +182,67 @@ class RunOnceTest(unittest.TestCase):
         rc = h.run_once(dry_run=False, now=NOW)
         self.assertEqual(rc, 1)
 
+    def test_uncommitted_already_normalized_store_is_committed(self):
+        # Regression for the commit being gated on the *normalization* delta
+        # instead of the *git* delta. The dashboard (a non-committer) writes a
+        # well-formed, ALREADY-normalized projects.json to disk but does not
+        # commit it. normalize_registry is then a no-op (changed=False), yet the
+        # healer MUST still drain the git delta — otherwise the file sits
+        # uncommitted forever and blocks ourliberty-sync (the live incident).
+        import projects_store
+        # HEAD holds the empty registry (production's committed state).
+        self.proj.write_text(
+            json.dumps({'schema_version': 1, 'projects': []}) + '\n')
+        self._git('add', '.')
+        self._git('commit', '-q', '-m', 'seed empty')
+        # The dashboard writes an already-normalized registry to disk (uncommitted).
+        normalized, _ = projects_store.normalize_registry(
+            {'projects': [{'id': 'proj-a', 'phases': [{'id': 'ph-1'}]}]}, now=NOW)
+        self.proj.write_text(json.dumps(normalized, indent=2) + '\n')
+        # Precondition: normalize is a no-op on this content (the changed=False
+        # path), yet the working tree is git-dirty.
+        renorm, _ = projects_store.normalize_registry(normalized, now=NOW)
+        self.assertEqual(renorm, normalized, 'fixture must be already-normalized')
+        dirty = subprocess.run(
+            ['git', 'status', '--porcelain', h.PROJECTS_REL],
+            cwd=str(self.repo), capture_output=True, text=True)
+        self.assertTrue(dirty.stdout.strip(), 'precondition: store must be git-dirty')
+        # The tick must commit the delta (push-failed only because no remote).
+        rc = h.run_once(dry_run=False, now=NOW)
+        self.assertIn(rc, (0, 2))
+        after = subprocess.run(
+            ['git', 'status', '--porcelain', h.PROJECTS_REL],
+            cwd=str(self.repo), capture_output=True, text=True)
+        self.assertEqual(
+            after.stdout.strip(), '',
+            'healer must drain the uncommitted (already-normalized) store')
+        log = subprocess.run(
+            ['git', 'log', '-1', '--pretty=%B'],
+            cwd=str(self.repo), capture_output=True, text=True)
+        self.assertIn('projects-store healer', log.stdout)
+
+    def test_dry_run_reports_git_delta_for_already_normalized_store(self):
+        # The dry-run report must distinguish a git delta (uncommitted but
+        # already-normalized) from a truly clean tree — the "no delta" message
+        # previously masked exactly the state that blocked sync.
+        import projects_store
+        self.proj.write_text(
+            json.dumps({'schema_version': 1, 'projects': []}) + '\n')
+        self._git('add', '.')
+        self._git('commit', '-q', '-m', 'seed empty')
+        normalized, _ = projects_store.normalize_registry(
+            {'projects': [{'id': 'proj-a', 'phases': [{'id': 'ph-1'}]}]}, now=NOW)
+        self.proj.write_text(json.dumps(normalized, indent=2) + '\n')
+        before = self.proj.read_text()
+        rc = h.run_once(dry_run=True, now=NOW)
+        self.assertEqual(rc, 0)
+        self.assertEqual(self.proj.read_text(), before)  # dry-run writes nothing
+        # And the tree is still dirty (dry-run did not commit).
+        dirty = subprocess.run(
+            ['git', 'status', '--porcelain', h.PROJECTS_REL],
+            cwd=str(self.repo), capture_output=True, text=True)
+        self.assertTrue(dirty.stdout.strip())
+
 
 if __name__ == '__main__':
     unittest.main()
