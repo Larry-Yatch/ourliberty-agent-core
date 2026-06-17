@@ -16,7 +16,11 @@
       ],
       "repo": "ourliberty-dashboard",
       "created": "2026-05-28",
-      "deferred_reason": null
+      "deferred_reason": null,
+      "archived": true,
+      "archived_by": "heal_missions_board_drain",
+      "archived_at": "2026-06-17T04:39:36.506469+00:00",
+      "archived_reason": "legacy-drafting-never-advanced"
     },
     {
       "id": "e4-4b-projects-kanban",
@@ -42,7 +46,11 @@
       "task_ids": [],
       "repo": "ourliberty-dashboard",
       "created": "2026-05-28",
-      "deferred_reason": null
+      "deferred_reason": null,
+      "archived": true,
+      "archived_by": "heal_missions_board_drain",
+      "archived_at": "2026-06-17T04:39:36.506469+00:00",
+      "archived_reason": "legacy-drafting-never-advanced"
     },
     {
       "id": "operator-ux-alert-taxonomy",
@@ -55,7 +63,11 @@
       "task_ids": [],
       "repo": "ourliberty-agent-core",
       "created": "2026-05-28",
-      "deferred_reason": null
+      "deferred_reason": null,
+      "archived": true,
+      "archived_by": "heal_missions_board_drain",
+      "archived_at": "2026-06-17T04:39:36.506469+00:00",
+      "archived_reason": "legacy-drafting-never-advanced"
     },
     {
       "id": "operator-ux-rescue-runbook",
@@ -68,7 +80,11 @@
       "task_ids": [],
       "repo": "ourliberty-dashboard",
       "created": "2026-05-28",
-      "deferred_reason": null
+      "deferred_reason": null,
+      "archived": true,
+      "archived_by": "heal_missions_board_drain",
+      "archived_at": "2026-06-17T04:39:36.506469+00:00",
+      "archived_reason": "legacy-drafting-never-advanced"
     },
     {
       "id": "operator-ux-catch-me-up-shortcut",
@@ -81,7 +97,11 @@
       "task_ids": [],
       "repo": "ourliberty-agent-core",
       "created": "2026-05-28",
-      "deferred_reason": null
+      "deferred_reason": null,
+      "archived": true,
+      "archived_by": "heal_missions_board_drain",
+      "archived_at": "2026-06-17T04:39:36.506469+00:00",
+      "archived_reason": "legacy-drafting-never-advanced"
     },
     {
       "id": "operator-ux-gap-log-field",
@@ -94,7 +114,11 @@
       "task_ids": [],
       "repo": "ourliberty-agent-core",
       "created": "2026-05-28",
-      "deferred_reason": null
+      "deferred_reason": null,
+      "archived": true,
+      "archived_by": "heal_missions_board_drain",
+      "archived_at": "2026-06-17T04:39:36.506469+00:00",
+      "archived_reason": "legacy-drafting-never-advanced"
     },
     {
       "id": "operator-ux-clarify-visibility",
@@ -624,7 +648,12 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-11T01:28:07.425858+00:00"
+      "orphan_last_activity_ts": "2026-06-11T01:28:07.425858+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_missions_board_drain",
+      "retired_at": "2026-06-17T04:39:36.506469+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#515"
     },
     {
       "id": "proposed-transcript-not-persisted:post-pr438-unit-install-gap",
@@ -1525,7 +1554,12 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-04T04:37:48.591897+00:00"
+      "orphan_last_activity_ts": "2026-06-04T04:37:48.591897+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_missions_board_drain",
+      "retired_at": "2026-06-17T04:39:36.506469+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#36"
     },
     {
       "id": "proposed-pipeline-stall:clarify1-suppress-needed",
@@ -2708,7 +2742,11 @@
       "task_ids": [],
       "repo": "ourliberty-agent-core",
       "created": "2026-06-14",
-      "deferred_reason": null
+      "deferred_reason": null,
+      "archived": true,
+      "archived_by": "heal_missions_board_drain",
+      "archived_at": "2026-06-17T04:39:36.506469+00:00",
+      "archived_reason": "legacy-drafting-never-advanced"
     },
     {
       "id": "missions-proposed-lane-signal-hardening-001",
@@ -2758,7 +2796,12 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-15T15:43:23.147186+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-15T15:41:35.214899+00:00"
+      "orphan_last_activity_ts": "2026-06-15T15:41:35.214899+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_missions_board_drain",
+      "retired_at": "2026-06-17T04:39:36.506469+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#515"
     },
     {
       "id": "proposed-autoregister-warn-demote-001",
@@ -2826,7 +2869,12 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-15T16:44:39.758328+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-15T16:43:55.414146+00:00"
+      "orphan_last_activity_ts": "2026-06-15T16:43:55.414146+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_missions_board_drain",
+      "retired_at": "2026-06-17T04:39:36.506469+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#514"
     },
     {
       "id": "proposed-deploy-notifier-ready-logonly",
@@ -2856,7 +2904,11 @@
       "task_ids": [],
       "repo": "ourliberty-agent-core",
       "created": "2026-06-15",
-      "deferred_reason": null
+      "deferred_reason": null,
+      "archived": true,
+      "archived_by": "heal_missions_board_drain",
+      "archived_at": "2026-06-17T04:39:36.506469+00:00",
+      "archived_reason": "legacy-drafting-never-advanced"
     },
     {
       "id": "pulse-check-ix-alert-ignored-2026-06-15",
@@ -2869,7 +2921,11 @@
       "task_ids": [],
       "repo": "ourliberty-agent-core",
       "created": "2026-06-15",
-      "deferred_reason": null
+      "deferred_reason": null,
+      "archived": true,
+      "archived_by": "heal_missions_board_drain",
+      "archived_at": "2026-06-17T04:39:36.506469+00:00",
+      "archived_reason": "legacy-drafting-never-advanced"
     },
     {
       "id": "proposed-p4-cleanup-committer",
