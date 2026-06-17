@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-17 12:57Z UTC (Iter ~2126, Tier 3→1, consecutive_clean=2→0, SIGNAL/G-RULE-DISPATCH)
+
+**Iter ~2126 summary:** ⚠️ Signal. MalformedMirrorMarker 3/3 COMPLETE → dispatched `mirror-malformed-verdict-fix-001` to Beacon (prose-verdict fallback fix in outbox-notifier). All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3769291, dashboard_api 3809960). Repo HEAD=74446381=origin/main (clean). Last sync 12:12:38Z (~44 min). 0 new alerts. No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **3 open PRs:** #60 (dashboard, p2fix-proposed-meaning, Mirror retry 1/3 in flight), #61 (dashboard, p2fix-funnel-refresh, Mirror review started 12:52:01Z), #564 (agent-core, p2fix-derive-cache, Mirror review dispatched 12:51:07Z). All in active pipeline. **projects-v3-p2 SEQUENCE COMPLETE ✅. projects-v3-p2-followup sequence ACTIVE** (3 of 3 Forge builds done, Mirror reviews in progress). Larry sent "Stage" at 12:56:37Z for p3 — Beacon handling. Check I skipped (artifact exists 2026-06-17). PRIME ratio=19.76 (1008 interventions, 51 systemic fixes). **Tier 3→1, consecutive_clean=2→0.**
+
 ## Status snapshot — updated 2026-06-17 12:23Z UTC (Iter ~2125, Tier 3, consecutive_clean=1→2, NOMINAL)
 
 **Iter ~2125 summary:** ✅ Nominal. 1 Tier-3 alert silenced (L990 outbox-notifier/mirror-dag-pass:projects-v3-p2-followup, bot delivered via route=escalate). All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3769291, dashboard_api 3809960). Repo HEAD=7a7e1315=origin/main (clean; 2 new commits since iter ~2124: #562 p2-followup spec, #563 p3 spec). Last sync 12:12:38Z (~11 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **1 open PR: #60 in ourliberty-dashboard** (p2fix-proposed-meaning, created 12:21:37Z, MalformedForgeMarker preflight retry 1/3 in flight — normal pipeline; projects-v3-p2-followup sequence active). **projects-v3-p2 SEQUENCE COMPLETE ✅.** Check I skipped (artifact exists 2026-06-17). PRIME ratio=20.14 (1007 interventions, 50 systemic fixes). **Tier 3, consecutive_clean=1→2.**
@@ -270,7 +274,7 @@
 | G-rule F24-empty-prompt-envelope-rejected | [blue] **2/3** | Watch; dispatch at 3/3 |
 | G-rule Forge-preflight-CLARIFY_REQUEST | [blue] **2/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule revision-phase-preamble-missing | [blue] **2/3** | Forge outbox missing "Revision N applied:" preamble → retry chain. Watch; dispatch to Beacon at 3/3 |
-| G-rule mirror-malformed-verdict-marker | [blue] **2/3** | Mirror produces output without canonical verdict marker (=== REVIEW_PASS === etc.) → 1st: s-3-failure-cost-pause; 2nd: pulse-watermark-rotation-repair-001. Dispatch to Beacon at 3/3. |
+| **G-rule mirror-malformed-verdict-marker** | [blue] **COMPLETE ✅** (iter ~2126) — dispatched `mirror-malformed-verdict-fix-001` to Beacon. 3rd: p2fix-proposed-meaning 12:51:58Z. Fix: prose-verdict fallback in outbox-notifier OR post-session wrapper in inbox-watcher. | Watch for Beacon spec + Forge PR. |
 | G-rule mirror-no-session-revision-loop | [blue] **2/3** | Mirror review NO_SESSION × 2+ for PR #497; Beacon re-dispatches Mirror instead of Forge. Watch; dispatch at 3/3 |
 | G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 (warn-vs-info) |
 | G-rule telegram-409-burst | [yellow] **2/3** | Watch; dispatch at 3/3 |
