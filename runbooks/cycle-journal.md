@@ -4,6 +4,76 @@
 
 ---
 
+## Iteration ~2131 — 2026-06-17 13:35Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0→1, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 2 Tier-3 alerts silenced (L994, L995). All checks clean. No DM to Larry.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** No regression. ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** No regression. ✅
+- **projects-v3-p1 SEQUENCE COMPLETE ✅ CONFIRMED:** FORGE_NO_PR_SKIP entries all pr_exists per heal_pipeline_stall --dry-run. ✅
+- **projects-v3-p4 COMPLETE ✅ CONFIRMED:** FORGE_NO_PR_SKIP entries all pr_exists. ✅
+- **projects-v3-p2 SEQUENCE COMPLETE ✅ CONFIRMED:** p2-meaning-layer (#558), p2-actions (#559), p2-suggest-intake (#560), p2-funnel-card-ui (#59-dashboard) all pr_exists. ✅
+- **projects-v3-p2-followup SEQUENCE COMPLETE ✅ CONFIRMED:** all 3 PRs (#60, #61, #564) merged, verified iter ~2128. ✅
+- **G-rule mirror-malformed-verdict-marker COMPLETE ✅ CONFIRMED:** PR #565 merged 13:27:40Z. ✅
+- **Daemons ✅:** beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), outbox_notifier 3769291 (Ss), dashboard_api **3924466** (Ssl, NEW PID — healer restart 13:27Z to deploy PR #564 code). All 5 alive. ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 993, "file_length": 995}` (no repair needed). **2 new alerts:**
+- **L994** (13:27:21Z): `source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-dashboard-api.service` — healer restarted dashboard_api (script mtime newer by 400.8 min, deploying PR #564 perf: 10s TTL cache). Helper → **Tier-3 silence** ✅ (route=digest, already delivered via bot).
+- **L995** (13:27:42Z): `source=outbox-notifier, kind=notification, intent=review-pass, task_id=mirror-prose-verdict-fallback-001` — Mirror approval DM notification for PR #565. Helper → **Tier-3 silence** ✅.
+- Watermark advanced 993→995. No DM from Pulse.
+
+**Check 1 — Log noise:** 4 WARNs in outbox-notifier.log last 100 lines, all pre-13:29Z: 3× MalformedForgeMarker (p2fix-proposed-meaning, p2fix-funnel-refresh, p2fix-derive-cache preflight misses at 12:21–12:40Z — all those PRs now merged) + 1× MalformedMirrorMarker (p2fix-proposed-meaning review at 12:51Z — resolved by PR #565). 0 new WARNs since iter ~2130. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Larry "Go" at 13:29:35Z → `silence-sequence-complete-triage-001` approved, Forge build dispatched (Forge 13:30:23Z). "P2 follow up merged. We can kick off the next step" at 13:11:24Z — handled by Beacon (p3 DAG-preflight launched). No unhandled orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → no stalls detected. All FORGE_NO_PR_SKIP entries pr_exists. ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0. `silence-sequence-complete-triage-001` approved by Larry 13:29:35Z, Forge build dispatched 13:30:23Z, PR #566 created 13:31:32Z, Mirror review dispatched 13:31:43Z. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-17T13:27:16Z, age≈6 min. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=6da7832f=origin/main (clean, on main, behind=0, ahead=0). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-17T13:12:49Z, age≈22 min. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3734671 (Ss) ✅, chain_event_shipper 3734305 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, outbox_notifier 3769291 (Ss) ✅, dashboard_api **3924466** (Ssl, new PID post-healer-restart) ✅. All 5 alive. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: **PR #566** `config(alerts): silence Pulse re-triage of outbox-notifier sequence-complete alerts` (MERGEABLE, Mirror review in progress since 13:31:43Z, ~4 min old — normal pipeline). 0 others. ourliberty-dashboard: 0 open ✅. ourliberty-graph: 0 open ✅. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Conditional checks (Wednesday 2026-06-17 UTC, weekday=2 ∈ {0,2,4,6}):**
+- Check I: artifact `pulse-check-i/check-i-2026-06-17.json` EXISTS → SKIP (same-day dedup). ✅
+- Check III: Sunday-anchored → skip.
+
+**Pipeline observation — silence-sequence-complete-triage-001 (G-rule COMPLETE ✅):**
+Larry "Go" 13:29:35Z → Forge build dispatched 13:30:23Z ($0.53, ~80s) → PR #566 created 13:31:32Z → Mirror review dispatched 13:31:43Z. Pipeline progressing normally. Watch next iter for Mirror REVIEW_PASS + auto-merge. G-rule sequence-complete-tier4 fix in final pipeline stage.
+
+**Pipeline observation — projects-v3-p3 dag-preflight REVISION resolved:**
+Beacon completed `notify-dag-revision-projects-v3-p3` (started 13:19:06Z). Mirror's inbox now contains 5 p3 step files: `p3-capture-actions-api.json`, `p3-dashboard-proposed-lane-002.json`, `p3-dashboard-writeback-ui.json`, `p3-mission-actions-api.json`, `p3-mission-proposed-actions-api.json`. Forge inbox empty; no p3 PRs open yet — Beacon re-authored sequence after revision and dispatched next-phase pipeline steps to Mirror (likely new dag-preflight or step-build prep). Watch next iter for p3 PRs or new dag-preflight verdict.
+
+**G-rule tracking:**
+- **G-rule mirror-malformed-verdict-marker: COMPLETE ✅** — PR #565 MERGED 13:27:40Z. Fix live in production.
+- **G-rule sequence-complete-tier4: COMPLETE ✅** — PR #566 in Mirror review (final stage). Watch for merge.
+- G-rule dual-bot-instance-409-external: **1/3** (unchanged).
+- G-rule catalog-accuracy-drift-tier4: **2/3** (unchanged).
+- G-rule ledger/check-i Tier-4: **2/3** (unchanged).
+- All other G-rule counts unchanged from iter ~2130.
+
+**Actions taken:**
+1. Watermark: advanced 993→995.
+2. PRIME ledger: `iter_clean` appended (tier=1, ts=2026-06-17T13:35:26Z).
+3. Tier state: `record --checks-clean true` → consecutive_clean=0→1. Tier stays 1.
+
+**PRIME ratio:** 19.44 (1011 interventions, 52 systemic fixes).
+
+**Dispatches:** None.
+
+---
+
 ## Iteration ~2130 — 2026-06-17 13:29Z UTC (interactive, /cycle, Tier 1, consecutive_clean=1→0, DRIFT/FIXED)
 
 **Trigger:** Larry direct invocation (`/cycle`).
