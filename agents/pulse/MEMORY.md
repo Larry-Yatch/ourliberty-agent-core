@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-17 10:23Z UTC (Iter ~2120, Tier 1→2, consecutive_clean=2→0, NOMINAL)
+
+**Iter ~2120 summary:** ✅ Nominal. 1 new alert (L988 Tier-3 silenced: pulse-check/catalog-accuracy-drift, 8/42 shelf cards drifted, route=digest). All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3769291, dashboard_api 3809960). Repo HEAD=2f1f0e8d=origin/main (clean). Last sync 09:47:48Z (~36 min). No stalls. pending=1 (pulse-watermark-rotation-repair-001 awaiting Larry "approve"). Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs across all repos.** projects-v3-p1 SEQUENCE COMPLETE ✅. projects-v3-p4 COMPLETE ✅. **projects-v3-p2 SEQUENCE COMPLETE ✅.** Check I skipped (artifact exists 2026-06-17). PRIME ratio=20.14 (1007 interventions, 50 systemic fixes). G-rule catalog-accuracy-drift-tier4: 1/3→**2/3**. **Tier 1→2, consecutive_clean=2→0 (de-escalate).**
+
 ## Status snapshot — updated 2026-06-17 10:13Z UTC (Iter ~2119, Tier 1, consecutive_clean=1→2, NOMINAL)
 
 **Iter ~2119 summary:** ✅ Nominal. 1 new alert (L987 Tier-3 silenced: outbox-notifier approval_request for pulse-watermark-rotation-repair-001). All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3769291, dashboard_api 3809960). Repo HEAD=e2373663=origin/main (clean). Last sync 09:47:48Z (~25 min). No stalls. pending=1 (pulse-watermark-rotation-repair-001 awaiting Larry "approve"). Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs across all repos.** projects-v3-p1 SEQUENCE COMPLETE ✅. projects-v3-p4 COMPLETE ✅. **projects-v3-p2 SEQUENCE COMPLETE ✅.** Check I skipped (artifact exists 2026-06-17). PRIME ratio=20.14 (1007 interventions, 50 systemic fixes). **Tier 1, consecutive_clean=1→2.** Chain observation: Beacon completed pulse-watermark-gap-autofix-001 at 10:02:54Z ($0.91) → APPROVAL_REQUEST delivered to Larry at 10:06Z; pending his "approve".
@@ -237,7 +241,7 @@
 | G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4 | [blue] **1/3** — heal-pipeline-stall fires Tier-4; medic DMs directly; Pulse no-DM. | Watch; dispatch to Beacon at 3/3 for Tier-3 translation |
 | Check I 2026-06-15 | [blue] 1 proposal dispatched iter ~1899, Beacon processed | Beacon spec in progress |
 | G-rule sequence-complete-tier4 | [blue] **2/3** (iter ~2108: 2nd occurrence) — outbox-notifier sequence-complete:* alerts classify Tier-4 (novel); bot delivers via route=escalate; Pulse no-DM. | Watch; dispatch to Beacon at 3/3 for Tier-3 translation |
-| G-rule catalog-accuracy-drift-tier4 | [blue] **1/3** | Watch; dispatch to Beacon at 3/3 |
+| G-rule catalog-accuracy-drift-tier4 | [blue] **2/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule dirty-tree-beacon-data-files-tier4 | [blue] **1/3** (NEW iter ~2085) — pulse-self-escalates dirty tree (Beacon runtime files); GC healer auto-resolves; Tier-4 (novel). | Watch; propose Tier-3 translation at 3/3 |
 | G-rule ledger/check-i Tier-4 | [blue] **2/3** | Watch; dispatch to Beacon at 3/3 |
 | G-rule health-notify-script-missing | [blue] **1/3** | Watch; dispatch at 3/3 |
