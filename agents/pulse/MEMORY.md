@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-17 12:23Z UTC (Iter ~2125, Tier 3, consecutive_clean=1→2, NOMINAL)
+
+**Iter ~2125 summary:** ✅ Nominal. 1 Tier-3 alert silenced (L990 outbox-notifier/mirror-dag-pass:projects-v3-p2-followup, bot delivered via route=escalate). All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3769291, dashboard_api 3809960). Repo HEAD=7a7e1315=origin/main (clean; 2 new commits since iter ~2124: #562 p2-followup spec, #563 p3 spec). Last sync 12:12:38Z (~11 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **1 open PR: #60 in ourliberty-dashboard** (p2fix-proposed-meaning, created 12:21:37Z, MalformedForgeMarker preflight retry 1/3 in flight — normal pipeline; projects-v3-p2-followup sequence active). **projects-v3-p2 SEQUENCE COMPLETE ✅.** Check I skipped (artifact exists 2026-06-17). PRIME ratio=20.14 (1007 interventions, 50 systemic fixes). **Tier 3, consecutive_clean=1→2.**
+
 ## Status snapshot — updated 2026-06-17 11:53Z UTC (Iter ~2124, Tier 3, consecutive_clean=0→1, NOMINAL)
 
 **Iter ~2124 summary:** ✅ Nominal. 1 Tier-3 alert silenced (L989 heal-wedged-review-sessions/wedged-review-reaped:wt-forge-pulse-watermark-rotation-repair-001, bot closure DM already delivered). **PR #561 MERGED ✅** (fix: auto-repair Pulse Check 0 watermark after alert-log compaction; auto-merged 05:22:09Z UTC). **G-rule watermark-rotation-gap COMPLETE ✅**. All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3769291, dashboard_api 3809960). Repo HEAD=5bc7e28f=origin/main (clean). Last sync 11:47:59Z (~5 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **0 open PRs across all repos.** projects-v3-p1 SEQUENCE COMPLETE ✅. projects-v3-p4 COMPLETE ✅. **projects-v3-p2 SEQUENCE COMPLETE ✅.** Check I skipped (artifact exists 2026-06-17). PRIME ratio=20.14 (1007 interventions, 50 systemic fixes). **Tier 3, consecutive_clean=0→1.**

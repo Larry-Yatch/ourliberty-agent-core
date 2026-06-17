@@ -4,6 +4,69 @@
 
 ---
 
+## Iteration ~2125 — 2026-06-17 12:23Z UTC (interactive, /cycle, Tier 3, consecutive_clean=1→2, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 1 new alert (Tier-3 silenced). Pipeline flowing (projects-v3-p2-followup sequence active, PR #60 brand-new). No DM to Larry.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** 0 open PRs in ourliberty-agent-core. ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** 0 legacy open PRs. ✅
+- **projects-v3-p1 SEQUENCE COMPLETE ✅ CONFIRMED:** unchanged from iter ~2124. ✅
+- **projects-v3-p4 COMPLETE ✅ CONFIRMED:** unchanged from iter ~2124. ✅
+- **projects-v3-p2 SEQUENCE COMPLETE ✅ CONFIRMED:** FORGE_NO_PR_SKIP p2-meaning-layer (#558), p2-actions (#559), p2-suggest-intake (#560), p2-funnel-card-ui (#59-dashboard) all pr_exists. ✅
+- **PR #561 MERGED ✅ CONFIRMED:** HEAD=7a7e1315 includes two NEW commits ahead of PR #561 (#562 p2-followup spec, #563 p3 spec). ✅
+- **Daemons ✅:** beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), outbox_notifier 3769291 (Ss), dashboard_api 3809960 (Ssl). All 5 alive, same PIDs as iter ~2124. ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 989, "file_length": 990}` (no repair needed). Watermark=989 entering; file=990 lines. **1 new alert (L990):** `source=outbox-notifier, subject=mirror-dag-pass:projects-v3-p2-followup` (12:12:32Z — Mirror DAG-preflight PASS for projects-v3-p2-followup, sequence transitioned pending→active). Triage helper → **Tier-3 silence** (known-pattern match in alert-translations.json). Bot already delivered via route=escalate. Watermark advanced 989→990. No second DM from Pulse. ✅
+
+**Check 1 — Log noise:** outbox-notifier.log: 1 WARN at 06:21:48 local (12:21:48Z UTC) — `MalformedForgeMarker: phase=preflight requires ONE marker block ... none found` for `p2fix-proposed-meaning`. marker-error notify written (retry 1/3 dispatched at 06:21:49 local). PR #60 exists (created 12:21:37Z, 11 sec before the WARN) — Forge completed the build; preflight marker format issue caught by outbox-notifier, retry chain handling it. Sub-threshold (1 occurrence, chain recovering). inbox_watcher.log: sequence pipeline flowing — Mirror dag-preflight done 12:12:31Z ($0.43, 90s), Beacon stepped p2fix-proposed-meaning (25s) + p2fix-funnel-refresh (25s) + p2fix-derive-cache (25s), Forge started p2fix-proposed-meaning 12:15:48Z. ✅ Nominal (1 sub-threshold WARN, chain recovering).
+
+**Check 2 — Telegram sweep:** 409 burst at 23:24–23:25 local (G-rule dual-bot-instance-409-external 1/3, unchanged). Larry messages: "Go" at 04:43 (watermark repair — already processed), "Beacon — kick off build sequence projects-v3-p2-followup" at 05:59 (tracked by sequence activity — Mirror PASS, Forge building), "Go" at 06:10 (tracked by dag-preflight approval). No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → `no stalls detected`. All FORGE_NO_PR_SKIP entries pr_exists. ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-17T11:56:59Z, age≈26 min. FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=7a7e1315=origin/main (clean, on main). 2 new commits since iter ~2124: PR #562 (spec/projects-v3: P2 follow-up — funnel meaning layer + reliable refresh), PR #563 (spec/projects-v3: P3 — the pipeline). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-17T12:12:38Z (age≈11 min at check). Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3734671 (Ss) ✅, chain_event_shipper 3734305 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, outbox_notifier 3769291 (Ss) ✅, dashboard_api 3809960 (Ssl) ✅. All 5 alive, same PIDs as iter ~2124. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open ✅. ourliberty-dashboard: 1 open PR — **#60** `feat(missions): Narrator briefing on Proposed lane cards (p2fix-proposed-meaning)` (created 12:21:37Z, MERGEABLE, reviewDecision="" — MalformedForgeMarker retry 1/3 in flight, Mirror review will follow after Forge retry succeeds; brand-new, not a stall). ourliberty-graph: 0 open ✅. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Conditional checks (Wednesday 2026-06-17 UTC, weekday=2 ∈ {0,2,4,6}):**
+- Check I: artifact `pulse-check-i/check-i-2026-06-17.json` EXISTS → SKIP (same-day dedup). ✅
+- Check III: Sunday-anchored → skip.
+
+**Pipeline observation — projects-v3-p2-followup sequence:**
+Larry kicked off `projects-v3-p2-followup` at 05:59 local (spec: agents/beacon/specs/projects-v3-p2-followup-funnel-me). Larry "Go" at 06:10. Mirror dag-preflight PASS at 12:12:31Z ($0.43, 90s). Sequence active. Beacon dispatched steps: p2fix-proposed-meaning, p2fix-funnel-refresh, p2fix-derive-cache. Forge building p2fix-proposed-meaning → PR #60 created. MalformedForgeMarker (preflight, none-found) caught by outbox-notifier → retry 1/3 dispatched. Normal pipeline.
+
+**G-rule tracking:**
+- G-rule dual-bot-instance-409-external: **1/3** (unchanged — same 23:24–23:25 local burst, no new 409s).
+- G-rule catalog-accuracy-drift-tier4: **2/3** (unchanged).
+- G-rule sequence-complete-tier4: **2/3** (unchanged).
+- G-rule ledger/check-i Tier-4: **2/3** (unchanged).
+- G-rule mirror-malformed-verdict-marker: **2/3** (unchanged).
+- All other G-rule counts unchanged from iter ~2124.
+
+**Actions taken:**
+1. Alert triage: L990 → Tier-3 silence (triage-helper). Watermark 989→990.
+2. PRIME ledger: `iter_clean` appended (tier=3, ts=2026-06-17T12:23:45Z).
+3. Tier state: `record --checks-clean true` → consecutive_clean 1→2. Tier remains 3.
+
+**PRIME ratio:** 20.14 (1007 interventions, 50 systemic fixes). Trend: improving.
+
+**Dispatches:** None.
+
+---
+
 ## Iteration ~2124 — 2026-06-17 11:53Z UTC (interactive, /cycle, Tier 3, consecutive_clean=0→1, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).
