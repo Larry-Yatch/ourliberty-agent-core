@@ -3753,7 +3753,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-17T06:32:15.836481+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-17T06:27:13.216828+00:00"
+      "orphan_last_activity_ts": "2026-06-17T06:27:13.216828+00:00",
+      "briefing": {
+        "what": "A new screen that shows the items moving through your sales funnel at a glance.",
+        "why": "Clearer visibility into your funnel helps the team spot where deals stall and act on them faster.",
+        "suggest": "The work is moving along on its own, but it isn't tied to a clear goal yet \u2014 take a quick look and confirm it's worth the team's time before it goes further."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T07:01:05.782109+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
