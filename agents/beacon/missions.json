@@ -3207,7 +3207,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T19:38:22.991425+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-11T03:20:20.041456+00:00"
+      "orphan_last_activity_ts": "2026-06-11T03:20:20.041456+00:00",
+      "briefing": {
+        "what": "A piece of work called \"Pulse Park And Silence\" is underway, but it isn't connected to any approved project or goal yet.",
+        "why": "Effort is being spent on something with no clear business owner or objective, which means time could be going toward work that doesn't move the needle.",
+        "suggest": "Hold off on letting this go further until someone confirms what it's for and ties it to a real priority \u2014 if no one can, set it aside."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:50:47.007169+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-wire-pulse-check-iv-cadence-001",
@@ -3339,7 +3353,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-15T10:25:39.826005+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-04T05:59:41.428629+00:00"
+      "orphan_last_activity_ts": "2026-06-04T05:59:41.428629+00:00",
+      "briefing": {
+        "what": "The team is fixing a glitch where a work request looked like it was claimed but never actually got picked up.",
+        "why": "Left alone, requests can silently stall \u2014 work appears handled when nothing is happening, which erodes trust that things get done.",
+        "suggest": "Let the team finish the fix, but have someone confirm it actually resolves the stalls before we consider it closed."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:50:47.007169+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-medic-diagnosis-tier3-silence-001",
@@ -3378,7 +3406,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-15T15:58:37.926399+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-15T15:57:12.482915+00:00"
+      "orphan_last_activity_ts": "2026-06-15T15:57:12.482915+00:00",
+      "briefing": {
+        "what": "A small piece of work the team kicked off on its own to ease up how strictly the system flags certain warnings, but it isn't attached to any active project yet.",
+        "why": "Loose ends like this can quietly change how the system behaves and waste effort if no one decides whether it actually fits the priorities.",
+        "suggest": "Hold off on greenlighting it until someone confirms it belongs to a real goal \u2014 ask the team what prompted it before letting it move forward."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:50:47.007169+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-larry-approval-8aa50bfa8aec52113f9405772937021ca0fa7689",
@@ -3395,7 +3437,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-15T16:44:39.758328+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-15T16:44:20.849583+00:00"
+      "orphan_last_activity_ts": "2026-06-15T16:44:20.849583+00:00",
+      "briefing": {
+        "what": "Your team kicked off a piece of work that hasn't been tied to any specific project or goal yet.",
+        "why": "Unassigned work can quietly eat time and money without anyone knowing what it's meant to deliver, so it needs a clear purpose before it goes further.",
+        "suggest": "Hold off on greenlighting it until someone confirms what it's for and which goal it serves \u2014 a quick check before it grows."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:50:47.007169+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-larry-approval-45a1464c4cea2a71e1291bd5b6e96830c5175f12",
@@ -3412,7 +3468,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-15T16:44:39.758328+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-15T16:44:15.839488+00:00"
+      "orphan_last_activity_ts": "2026-06-15T16:44:15.839488+00:00",
+      "briefing": {
+        "what": "The team kicked off a piece of work on its own that hasn't been attached to any project or goal yet.",
+        "why": "Unassigned work can quietly eat time and resources without anyone deciding whether it actually serves the business.",
+        "suggest": "Hold off on a blanket yes \u2014 take a quick look at what they're building and confirm it's worth continuing before it goes further."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:50:47.007169+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-autoregister-warn-demote-optA-001",
@@ -3451,7 +3521,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-15T16:44:39.758328+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-04T05:53:59.062152+00:00"
+      "orphan_last_activity_ts": "2026-06-04T05:53:59.062152+00:00",
+      "briefing": {
+        "what": "A new alert system that tells the team the moment something goes live, starting in a quiet watch-only mode before it sends real notifications.",
+        "why": "Knowing instantly when changes go out means problems get caught and fixed faster, instead of customers finding them first.",
+        "suggest": "Let it run silently for a bit to confirm it's accurate, then switch it on for real once you're confident it won't cry wolf."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:50:47.007169+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     },
     {
       "id": "pulse-check-ix-catch-me-up-gap-2026-06-15",
@@ -3544,7 +3628,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-17T03:30:30.623428+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-17T03:17:44.281127+00:00"
+      "orphan_last_activity_ts": "2026-06-17T03:17:44.281127+00:00",
+      "briefing": {
+        "what": "A new phase of the Projects initiative that the team has begun working on but hasn't yet been formally set up as its own project.",
+        "why": "Active work is happening without a clear home, so effort and progress could go untracked or drift from the bigger goals.",
+        "suggest": "Take a quick look to confirm it's worth pursuing, then give it an official place on the roadmap before the team goes further."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:50:47.007169+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-p2-meaning-layer",
@@ -3582,7 +3680,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-17T05:01:14.890926+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-17T04:56:11.861566+00:00"
+      "orphan_last_activity_ts": "2026-06-17T04:56:11.861566+00:00",
+      "briefing": {
+        "what": "The team kicked off a new piece of work to improve how a part of your projects system gets checked before it runs, and it's now waiting on your go-ahead.",
+        "why": "It's effort already underway that isn't yet attached to a clear project goal, so it could quietly consume time without a defined payoff for the business.",
+        "suggest": "Before approving, take a moment to confirm what business outcome this is meant to serve and which project it belongs to, then green-light it once that's clear."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:50:47.007169+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-p2-actions",
