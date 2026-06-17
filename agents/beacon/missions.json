@@ -2870,6 +2870,23 @@
       "repo": "ourliberty-agent-core",
       "created": "2026-06-15",
       "deferred_reason": null
+    },
+    {
+      "id": "proposed-p4-cleanup-committer",
+      "name": "P4 Cleanup Committer",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `p4-cleanup-committer`. Last activity 2026-06-17T02:10:25.990699+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "p4-cleanup-committer"
+      ],
+      "repo": null,
+      "created": "2026-06-17",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-17T02:15:15.869545+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-17T02:10:25.990699+00:00"
     }
   ]
 }
