@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-17 23:18Z UTC (Iter ~2167, Tier 1, consecutive_clean=0, SIGNAL-CARRY)
+
+**Iter ~2167 summary:** ⚠️ Signal-carry. 0 new alerts (watermark=1018=file_length). dag-preflight-revision-gap:projects-v3-p3-followup still active — stale worktree `wt-mirror-dag-preflight-projects-v3-p3-followup` confirmed; awaiting Larry go to clean + re-dispatch. All 5 daemons alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4048770 (Ssl), outbox_notifier 4049089 (Ss). Same PIDs as iter ~2166. Repo HEAD=e8d61d87=origin/main (clean). Last sync 22:50:15Z (success, ~28 min). 0 open PRs. 0 stalls. pending=0. Credential rotation: OK. Heartbeat 22:59:36Z (~18 min, fresh). Check I skipped (artifact exists 2026-06-17). PRIME ratio=~19.6 (1020 interventions, 52 systemic fixes, trend=improving). **Tier 1, consecutive_clean=0.**
+
 ## Status snapshot — updated 2026-06-17 23:14Z UTC (Iter ~2166, Tier 1, consecutive_clean=0, SIGNAL-CARRY)
 
 **Iter ~2166 summary:** ⚠️ Signal-carry. 1 new alert (L1018) = Pulse's own dag-preflight escalation from iter ~2165; bot delivered as idx=1017 at 23:13:30Z UTC. Triage: Tier-4, no re-DM (already sent last iter). All 5 daemons alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4048770 (Ssl), outbox_notifier 4049089 (Ss). Same PIDs as iter ~2165. Repo HEAD=07a4aad7=origin/main (clean, Pulse cycle commit). Last sync 22:50:15Z (success, 24 min). 0 open PRs. 0 stalls. pending=0. Credential rotation: OK. Heartbeat 22:59:36Z (15 min, fresh). **dag-preflight-revision-gap:projects-v3-p3-followup still active** — stale worktree wt-mirror-dag-preflight-projects-v3-p3-followup still present; awaiting Larry go. Check I skipped (artifact exists 2026-06-17). PRIME ratio=~19.6 (1019 interventions, 52 systemic fixes, trend=improving). **Tier 1, consecutive_clean=0.**
