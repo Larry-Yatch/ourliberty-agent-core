@@ -2438,7 +2438,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-05-27T17:58:45.684077+00:00"
+      "orphan_last_activity_ts": "2026-05-27T17:58:45.684077+00:00",
+      "briefing": {
+        "what": "A piece of work the team kicked off to fix and clean up part of the operation, but it hasn't been tied to a clear goal yet.",
+        "why": "It's already flagged for your attention and waiting on a sign-off, so it's stalled until someone decides where it fits.",
+        "suggest": "Take a quick look and confirm what business goal this serves before approving \u2014 it's worth a moment's pause rather than a blind yes."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:30:16.494096+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pulse-check-iii-tune-forge-stuck-threshold",
@@ -2455,7 +2469,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-05-27T17:56:31.088256+00:00"
+      "orphan_last_activity_ts": "2026-05-27T17:56:31.088256+00:00",
+      "briefing": {
+        "what": "The team is fine-tuning how long a stalled work item should sit before the system flags it as stuck and steps in.",
+        "why": "Get it right and problems get caught fast without false alarms; too sensitive and you'll drown in noise, too loose and real holdups slip by unnoticed.",
+        "suggest": "Worth doing, but review the proposed threshold before it goes live since a few questions and approvals are still open."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:30:16.494096+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-build-sequence-orchestrator-pr-s4-shortcuts-routing-and-mirror-dag-verify",
@@ -2472,7 +2500,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-05-27T14:24:37.765981+00:00"
+      "orphan_last_activity_ts": "2026-05-27T14:24:37.765981+00:00",
+      "briefing": {
+        "what": "A piece of work your team kicked off to streamline how key requests get routed and double-checked behind the scenes, but it hasn't been tied to a clear business goal yet.",
+        "why": "It's already pulling in your team's attention and a few open questions are waiting on a decision, so it's quietly consuming effort without a defined payoff.",
+        "suggest": "Before greenlighting more time on it, ask the team to spell out what business outcome this serves \u2014 and hold off on full approval until that's clear."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:30:16.494096+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-fix-pr-s2-test-isolation-leak-plus-ast-walk-regression-gate",
@@ -2489,7 +2531,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-05-27T06:07:13.698743+00:00"
+      "orphan_last_activity_ts": "2026-05-27T06:07:13.698743+00:00",
+      "briefing": {
+        "what": "The team is fixing a quality-control glitch where one batch of automated checks was interfering with another, and adding a safeguard to catch that kind of problem automatically going forward.",
+        "why": "Unreliable checks can let real defects slip into the product or raise false alarms that slow the team down, so tightening this protects both product quality and the team's speed.",
+        "suggest": "Worth doing, but since it touches shared testing machinery, give it a quick review before approving rather than waving it straight through."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:30:16.494096+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-build-sequence-orchestrator-pr-s3b-dashboard-ladder-ui",
@@ -2506,7 +2562,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-05-27T05:39:48.906463+00:00"
+      "orphan_last_activity_ts": "2026-05-27T05:39:48.906463+00:00",
+      "briefing": {
+        "what": "A new dashboard screen your team started building to show work progressing through its stages, step by step.",
+        "why": "It gives you a clear at-a-glance view of where things stand, but it was kicked off on its own without being tied to any current priority.",
+        "suggest": "Take a quick look before greenlighting it \u2014 confirm it fits something you actually need right now rather than letting it run ahead unchecked."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:30:16.494096+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-build-sequence-orchestrator-pr-s3a-droplet-api-endpoint",
@@ -2523,7 +2593,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-05-27T05:15:27.058021+00:00"
+      "orphan_last_activity_ts": "2026-05-27T05:15:27.058021+00:00",
+      "briefing": {
+        "what": "A new piece of behind-the-scenes plumbing the team started to let your systems talk to a hosting service, but it isn't attached to any active project goal yet.",
+        "why": "Loose work that isn't tied to a clear objective can quietly soak up time and money, and this one has already raised a flag and a question that need your call before it goes further.",
+        "suggest": "Hold off on green-lighting it until the team tells you which goal it serves; if there isn't one, set it aside rather than letting it run."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:30:16.494096+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-build-sequence-orchestrator-pr-s2-advancer-validator-healer",
@@ -2540,7 +2624,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-05-27T04:09:44.514204+00:00"
+      "orphan_last_activity_ts": "2026-05-27T04:09:44.514204+00:00",
+      "briefing": {
+        "what": "A piece of unassigned work your team kicked off to keep the automated build line running smoothly and catch problems before they spread.",
+        "why": "It touches the machinery that keeps work moving, so if it goes sideways it could quietly stall other things the team is shipping.",
+        "suggest": "Give it a quick look and a green light before it goes further \u2014 it's worth a moment of your attention since a few questions and sign-offs are still open."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:30:16.494096+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-fix-heal-pipeline-stall-preflight-clean-exit-detection",
@@ -2557,7 +2655,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-12T06:00:06.074119+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-05-27T03:56:30.402155+00:00"
+      "orphan_last_activity_ts": "2026-05-27T03:56:30.402155+00:00",
+      "briefing": {
+        "what": "Our team caught a glitch in the automated system that keeps your operation running smoothly, and they've started fixing it so it can properly tell when a routine cleanup has finished.",
+        "why": "If this self-healing system can't reliably detect when its own work is done, it can quietly stall and let small problems pile up unnoticed until they disrupt operations.",
+        "suggest": "Give the team the go-ahead to finish and verify the fix, but ask them to confirm it's fully tested before calling it done."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-17T06:30:16.494096+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-fix-alert-triage-watermark-durability-001",
