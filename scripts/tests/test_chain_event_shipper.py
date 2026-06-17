@@ -851,6 +851,10 @@ class TestKnownEventTypesContract(unittest.TestCase):
         # (missions-v2-phase4-meaning-layer.md § 8) — the capture-scoped
         # conversation thread, push-emitted by the dashboard
         # POST /api/missions/captures/{id}/message route and Beacon's reply.
+        # The sequence_complete type was added by projects-v3 P4 Contract A
+        # (p4-complete-signal) — push-emitted by outbox_notifier when a
+        # build-sequence's final step reaches verified-merged (exactly-once,
+        # guarded by a sequence-complete-signaled audit marker).
         spec_listed = {
             'session_start', 'session_done', 'marker_emit', 'auto_merge',
             'marker_error', 'cost_budget', 'review_request',
@@ -865,6 +869,7 @@ class TestKnownEventTypesContract(unittest.TestCase):
             'desktop_session_start', 'desktop_session_active',
             'desktop_session_done',
             'card_message',
+            'sequence_complete',
         }
         self.assertEqual(ces.KNOWN_EVENT_TYPES, frozenset(spec_listed))
 

@@ -166,6 +166,14 @@ KNOWN_EVENT_TYPES: frozenset[str] = frozenset({
     # shipper never produces these rows; listing the type here admits it to
     # the weekly chain-event-type audit (heal_chain_event_type_audit.py).
     'card_message',
+    # projects-v3 P4 Contract A (p4-complete-signal): when a build-sequence's
+    # final step reaches verified-merged, outbox_notifier push-emits ONE of
+    # these (agent='build_sequence_advancer', task_id=seq_id) alongside the
+    # plain-language completion DM to Larry. Exactly-once: guarded by a
+    # `sequence-complete-signaled` audit_log marker on the sequence file, so a
+    # re-tick / notifier crash-resume never double-emits. The shipper never
+    # produces these rows; listing the type here admits it to the weekly audit.
+    'sequence_complete',
 })
 
 # PII / credential redaction. Any payload field key matching one of these
