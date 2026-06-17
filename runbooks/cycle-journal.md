@@ -4,6 +4,57 @@
 
 ---
 
+## Iteration ~2083 — 2026-06-17 00:32Z UTC (interactive, /cycle, Tier 1→2, consecutive_clean=2→3→de-escalate, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 0 new alerts. All checks clean. Tier 1→2 de-escalation.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** 0 open PRs across all three repos. ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** Not open. ✅
+- **projects-v3-p1 SEQUENCE COMPLETE ✅ CONFIRMED:** 0 open PRs. ✅
+- **Pending approvals — CLEAR ✅:** pending=0. ✅
+- **Daemons same PIDs ✅:** beacon 3556778 (Ss), chain-event 2744551 (SNs), inbox-watcher 3434697 (Ssl), outbox_notifier 3676902 (Ss), dashboard_api 3688711 (Ssl). All 5 alive. ✅
+
+**Check 0 — Alert triage:** Watermark=1060 entering; file=1060 lines. **0 new alerts.** Watermark unchanged. ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log — last entry 17:44:40 MDT (23:44:40Z) AUTO_MERGE_QUEUE_UNKNOWN_RETRY for p1-funnel-derive (merged, sequence complete). All INFO. No WARN/ERROR since iter ~2082. Bot log: last alert idx=1059 (source=pulse, check-i-2026-06-15) delivered at 18:14:05 MDT. No new Telegram activity. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message 16:25:01 MDT (22:25Z) 'go' — served iter ~2070. No new messages. G-rule telegram-409-burst **2/3** unchanged. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → `no stalls detected`. All FORGE_NO_PR_SKIP entries reason=pr_exists. ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0. No orphaned Larry directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-17T00:23:49Z, age≈8.5 min at check time (00:32Z). FRESH (< 60 min threshold). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=bcde056c=origin/main (clean, on main, no divergence). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-17T00:29:19Z, status=no-change, age≈3 min at check time. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3556778 (Ss) ✅, chain_event_shipper 2744551 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, outbox_notifier 3676902 (Ss) ✅, dashboard_api 3688711 (Ssl) ✅. All 5 alive, same PIDs as iter ~2082. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open PRs ✅. ourliberty-dashboard: 0 open PRs ✅. ourliberty-graph: 0 open PRs ✅.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → `OK: schema_version=1 validates`. ✅ Nominal.
+
+**Conditional checks (Wednesday 2026-06-17 UTC, weekday=2 ∈ {0,2,4,6}):**
+- Check I: Already fired iter ~2080 today (artifact `pulse-check-i/check-i-2026-06-17.json` confirmed). → SKIP (same-day dedup).
+- Check III: fires Sunday → skip.
+
+**G-rule tracking:** No new G-rule counts this iter. All counts unchanged from iter ~2082.
+
+**Actions taken:**
+1. PRIME ledger: `iter_clean` appended (tier=1, template=iter-clean, ts=2026-06-17T00:32:33Z).
+2. Tier state: `record --checks-clean true` → consecutive_clean 2→3 → **Tier promoted 1→2**. consecutive_clean reset to 0.
+
+**PRIME ratio:** 20.39 (999 interventions, 49 systemic fixes). Trend: improving.
+
+**Dispatches:** None.
+
+---
+
 ## Iteration ~2082 — 2026-06-17 00:26Z UTC (interactive, /cycle, Tier 1, consecutive_clean=1→2, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).
