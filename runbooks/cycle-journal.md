@@ -4,6 +4,65 @@
 
 ---
 
+## Iteration ~2085 — 2026-06-17 01:16Z UTC (interactive, /loop /cycle, Tier 1, consecutive_clean=0, TIER-4-SELF-RESOLVED)
+
+**Trigger:** Larry direct invocation (`/loop /cycle`).
+
+**Health:** ⚠️ Tier-4 alert (self-resolved before iter). 2 new alerts (1 Tier-4 resolved + 1 Tier-3 silenced). All infrastructure clean. No DM to Larry.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Phase S ALL 6/6 MERGED ✅ CONFIRMED:** 0 open PRs across all three repos. ✅
+- **PR #497 CLOSED ✅ CONFIRMED:** Not open. ✅
+- **projects-v3-p1 SEQUENCE COMPLETE ✅ CONFIRMED:** 0 open PRs. ✅
+- **projects-v3-p4 SEQUENCE ACTIVE:** Beacon authored + dispatched at 19:14 MDT; approval DM for `dag-preflight-projects-v3-p4` sent to Larry; pending Larry's "go".
+- **Dirty tree (iter ~2084) SELF-RESOLVED ✅:** git status = clean. GC healer committed captures.json delta (b55a7cd8). missions.json changes also resolved. Sync running normally (01:09:59Z success).
+- **Daemons same PIDs ✅:** beacon 3556778 (Ss), chain-event 2744551 (SNs), inbox-watcher 3434697 (Ssl), outbox_notifier 3676902 (Ss), dashboard_api 3688711 (Ssl). All 5 alive. ✅
+
+**Check 0 — Alert triage:** Watermark=1061 entering; triaged lines 1062–1063 (line 1061 re-checked idempotently).
+- L1062: `source=pulse, subject=dirty-tree-beacon-data-files, route=escalate` — Helper: **Tier-4** (novel, no translation match). VERIFY-BEFORE-REASSERT: current git status = clean, sync = success. Condition self-resolved by GC healer before this iter. **No DM** (nothing for Larry to act on). Journal-note only. Tier-reset.
+- L1063: `source=sync.service, subject=sync-blocked:uncommitted-changes, route=digest` — Helper: **Tier-3** silenced (known pattern). Journal-note only. No tier-reset.
+- Watermark advanced 1061→1063.
+- G-rule: `source=pulse, subject=dirty-tree-beacon-data-files` Tier-4 novel alert — **1/3**. If this recurs (Beacon runtime files modified by Beacon session, GC healer auto-commits), propose Tier-3 translation at 3/3.
+
+**Check 1 — Log noise:** outbox-notifier.log — only WARN is MalformedForgeMarker for p1-funnel-derive at 17:28:29 MDT (from yesterday, covered by completed G-rule PR #524). No new WARN/ERROR. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** New Larry directive at 19:12 MDT: "Beacon: author and dispatch the projects-v3-p4 build sequence from the spec at agents/beacon/specs/projects-v3-p4-build-". Beacon responded 19:14 MDT with sequence authored + approval DM sent for `dag-preflight-projects-v3-p4`. **Tracked** by active Beacon session. ✅ Nominal (journal note: projects-v3-p4 sequence in flight, awaiting Larry's "go"). G-rule telegram-409-burst **2/3** unchanged.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → `no stalls detected`. All FORGE_NO_PR_SKIP entries reason=pr_exists or preflight_exit. ✅ Nominal.
+
+**Check 4 — Pending directives:** pending=0. projects-v3-p4 approval DM sent (pending Larry's response to Beacon, not yet in beacon-pending-approvals.json). ✅ Nominal.
+
+**Check 5 — Stale daemon:** Heartbeat=2026-06-17T00:54:09Z, age≈22 min at check time (01:16Z). FRESH (< 60 min threshold). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=3762f672=origin/main (clean, on main, no divergence). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-17T01:09:59Z, status=success, age≈6 min. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot 3556778 (Ss) ✅, chain_event_shipper 2744551 (SNs) ✅, inbox_watcher 3434697 (Ssl) ✅, outbox_notifier 3676902 (Ss) ✅, dashboard_api 3688711 (Ssl) ✅. All 5 alive, same PIDs as iter ~2083. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open PRs ✅. ourliberty-dashboard: 0 open PRs ✅. ourliberty-graph: 0 open PRs ✅.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → `OK: schema_version=1 validates`. ✅ Nominal.
+
+**Conditional checks (Wednesday 2026-06-17 UTC, weekday=2 ∈ {0,2,4,6}):**
+- Check I: Already fired iter ~2080 today (artifact `pulse-check-i/check-i-2026-06-17.json` confirmed). → SKIP (same-day dedup).
+- Check III: fires Sunday → skip.
+
+**G-rule tracking:**
+- `dirty-tree-beacon-data-files` Tier-4 novel: **1/3** (new this iter)
+- All other G-rule counts unchanged from iter ~2083.
+
+**Actions taken:**
+1. Alert watermark advanced 1061→1063.
+2. PRIME ledger: `intervention` appended (tier=1, template=tier4-self-resolved-alert, detail=L1062 dirty-tree self-resolved before iter).
+3. Tier state: `record --checks-clean false` → consecutive_clean stays 0, Tier 1 unchanged (Tier-4 classification = non-clean iter even though condition resolved).
+
+**PRIME ratio:** 20.41 (1000 interventions, 49 systemic fixes). Trend: improving.
+
+**Dispatches:** None.
+
+---
+
 ## Iteration ~2083 — 2026-06-17 00:32Z UTC (interactive, /cycle, Tier 1→2, consecutive_clean=2→3→de-escalate, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).
