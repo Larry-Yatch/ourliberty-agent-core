@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-17 19:02Z UTC (Iter ~2150, Tier 1, consecutive_clean=0→1, NOMINAL)
+
+**Iter ~2150 summary:** ✅ Nominal. 2 Tier-3 alerts silenced: L1008 (heal-stale-daemon-code/auto-restarted:ourliberty-dashboard-api.service — PR #568 deploy) + L1009 (heal-stale-daemon-code/auto-restarted:ourliberty-outbox-notifier.service — same deploy). All 5 daemons alive — beacon 3734671, chain-event 3734305, inbox-watcher 3434697 unchanged; dashboard_api **4021271** (new PID), outbox_notifier **4021501** (new PID). Repo HEAD=33153e26=origin/main (clean). Last sync 18:12:56Z (~49 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **1 open PR: #569** (install-heal-projects-store-timer-001, Mirror review in progress). **projects-v3-p3 COMPLETE ✅** (PR #567+#568 both merged). install-heal-projects-store-timer-001 in final pipeline (PR #569). Check I skipped (artifact exists 2026-06-17). PRIME ratio=19.5 (1014 interventions, 52 systemic fixes, trend=improving). **Tier 1, consecutive_clean=0→1.**
+
 ## Status snapshot — updated 2026-06-17 18:57Z UTC (Iter ~2149, Tier 3→1, consecutive_clean=4→0, DRIFT/FIXED)
 
 **Iter ~2149 summary:** ⚠️ Drift (auto-fixed). Check A: repo behind 1 commit (PR #568 `feat: promote funnel item into a project at Brainstorm (P3 p3-promote-endpoint)` merged) → fast-forwarded 910008ef→b581181b. All 5 daemons alive (same PIDs: beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 3964779, dashboard_api 3964550). Repo HEAD=b581181b=origin/main (clean post-ff). Last sync 18:12:56Z (~44 min). No stalls. pending=0. Credential rotation: OK. Phase S ALL 6/6 MERGED ✅. PR #497 CLOSED ✅. **1 open PR: #569** (install-heal-projects-store-timer-001, created 18:51:40Z, Mirror review in progress). **projects-v3-p3 step 2 COMPLETE ✅** (PR #568 merged). install-heal-projects-store-timer-001 in pipeline (PR #569, Mirror reviewing). Check I skipped (artifact exists 2026-06-17). PRIME ratio=19.48 (1014 interventions, 52 systemic fixes). **Tier 3→1, consecutive_clean=4→0.**
