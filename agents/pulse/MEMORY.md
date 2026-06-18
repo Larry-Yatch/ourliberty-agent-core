@@ -132,6 +132,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-18 02:37Z UTC (Iter ~2184, Tier 2→3 de-escalate, consecutive_clean=2→3, NOMINAL)
+
+**Iter ~2184 summary:** ✅ Nominal. 0 new alerts (watermark=1027=file_length). All 5 daemons alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4159159 (Ssl), outbox_notifier 4159430 (Ss). Repo HEAD=4f99d401=origin/main (clean). Last sync 01:50:16Z (~47 min). 0 open PRs. 0 stalls. pending=0. Credential rotation: OK. Heartbeat 02:30:19Z (~7 min, fresh). Check I skipped (Thursday). §5.0 all no-ops. PRIME ratio=19.69 (1024 interventions, 52 systemic_fixes, trend=improving). **Tier 2→3 de-escalation, consecutive_clean reset to 0.**
+
 ## Status snapshot — updated 2026-06-18 02:18Z UTC (Iter ~2183, Tier 2, consecutive_clean=1→2, NOMINAL)
 
 **Iter ~2183 summary:** ✅ Nominal. 0 new alerts (watermark=1027=file_length). Forge PID 4161224 gone (p3f-pipeline-controls complete; projects-v3-p3-followup DONE). All 5 daemons alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4159159 (Ssl), outbox_notifier 4159430 (Ss). Repo HEAD=44c64f26=origin/main (clean). Last sync 01:50:16Z (~28 min). 0 open PRs. 0 stalls. pending=0. Credential rotation: OK. Heartbeat 02:00:18Z (~18 min, fresh). Check I skipped (Thursday). §5.0 PATH CORRECTION: audit_due_nudge+distill_detector live in scripts/, not review/distill/; all three no-ops. PRIME ratio=19.69 (1024 interventions, 52 systemic_fixes, trend=improving). **Tier 2, consecutive_clean=1→2.**
