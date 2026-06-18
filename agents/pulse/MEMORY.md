@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-18 02:02Z UTC (Iter ~2182, Tier 2, consecutive_clean=0→1, NOMINAL)
+
+**Iter ~2182 summary:** ✅ Nominal. 1 Tier-3 alert: L1027 (sequence-complete:projects-v3-p3-followup — outbox-notifier, Tier-3 silenced, bot DM'd Larry 02:01Z). **projects-v3-p3-followup COMPLETE** — all 4 P3F steps shipped: PR #573 (transitions), PR #574 (status-writeback), PR #575 (reversibility+orphan), PR #63/dashboard (pipeline-controls). Forge PID 4161224 completed. All 5 daemons alive — same PIDs as iter ~2181 (beacon 3734671, chain-event 3734305, inbox-watcher 3434697, dashboard_api 4159159, outbox_notifier 4159430). Repo HEAD=43ece187=origin/main (clean). Last sync 01:50:16Z (~12 min). 0 open PRs. 0 stalls. pending=0. Credential rotation: OK. Heartbeat 02:00:18Z (~2 min, fresh). Check I skipped (Thursday). PRIME ratio=19.69 (1024 interventions, 52 systemic_fixes, trend=improving). **Tier 2, consecutive_clean=0→1.**
+
 ## Status snapshot — updated 2026-06-18 01:43Z UTC (Iter ~2181, Tier 1→2, consecutive_clean=2→3→de-escalate, NOMINAL)
 
 **Iter ~2181 summary:** ✅ Nominal. 0 new alerts (watermark=1026=file_length). All 5 daemons alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4159159 (Ssl), outbox_notifier 4159430 (Ss). Same PIDs as iter ~2180. Repo HEAD=c4104ec3=origin/main (clean). Last sync 00:50:16Z (~53 min). 0 open PRs. 0 stalls. pending=0. Credential rotation: OK. Heartbeat 01:30:16Z (~13 min, fresh). Check I skipped (Thursday). **Forge PID 4161224 active** (started 01:35Z, ~7 min in — building p3f-pipeline-controls). **§5.0 CORRECTED:** audit_cadence_signal.py was NEVER missing — script is at `review/distill/audit_cadence_signal.py` per spec; prior cycles checked wrong path (`scripts/`). [yellow] carry + G-rule 2/3 dropped. PRIME ratio=19.69 (1024 interventions, 52 systemic_fixes, trend=improving). **Tier 1→2 de-escalation, consecutive_clean reset to 0.**
