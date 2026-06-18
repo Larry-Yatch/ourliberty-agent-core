@@ -3784,7 +3784,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-18T10:32:09.777219+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-18T10:26:04.546043+00:00"
+      "orphan_last_activity_ts": "2026-06-18T10:26:04.546043+00:00",
+      "briefing": {
+        "what": "A small fix to keep customer records from being wiped out too early when the system resets.",
+        "why": "Losing this data ahead of schedule could break promises you've made to customers about how long you keep their information.",
+        "suggest": "Worth approving, but have the team confirm it does only what's intended before it goes live."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-18T10:34:59.762305+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pulse-grule-watermark-rotation-gap-001",
@@ -3801,7 +3815,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-18T10:32:09.777219+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-18T10:26:02.350945+00:00"
+      "orphan_last_activity_ts": "2026-06-18T10:26:02.350945+00:00",
+      "briefing": {
+        "what": "Some early work has been started on tightening how one of our automated systems keeps its records current, but it hasn't been attached to any larger project yet.",
+        "why": "Loose, unsponsored work like this can quietly consume the team's time and may signal a real gap worth closing, but it's hard to judge its value until someone owns it.",
+        "suggest": "Hold off on greenlighting more effort and have the team confirm what problem this solves and who owns it before it goes further."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-18T10:34:59.762305+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
