@@ -39,11 +39,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-# The canonical suggesting agents — the same set the funnel derive recognizes
+# The canonical suggesting sources — the same set the funnel derive recognizes
 # (`dashboard_api._SUGGESTED_AGENTS`). A `proposed_by` outside this set would be
 # treated as orphan/unknown provenance and routed to the SECONDARY lane, so the
 # interface refuses it up front rather than silently mis-laning the card.
-SUGGESTING_AGENTS: tuple[str, ...] = ('beacon', 'medic', 'pulse')
+# `closeout` is a non-agent source (projects-v3 P4): the phase-closeout pass
+# drops the loose ends it finds here, alongside the team agents.
+SUGGESTING_AGENTS: tuple[str, ...] = ('beacon', 'medic', 'pulse', 'closeout')
 
 # Where queued `<id>.json` entries are dropped for the healer to drain. Mirrors
 # `dashboard_api._new_mission_queue_dir` / `heal_orphan_autoregister`'s

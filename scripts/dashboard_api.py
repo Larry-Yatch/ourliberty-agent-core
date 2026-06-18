@@ -3883,9 +3883,11 @@ def _fetch_recent_chain_events(
 # builder-emitted orphans carry suggested_source=None.
 # ---------------------------------------------------------------------------
 
-# Canonical suggesting agents. A provenance hint normalizes to one of these or
-# to None — the funnel never invents a source it can't identify.
-_SUGGESTED_AGENTS: tuple[str, ...] = ('beacon', 'medic', 'pulse')
+# Canonical suggesting sources. A provenance hint normalizes to one of these or
+# to None — the funnel never invents a source it can't identify. `closeout` is a
+# non-agent source (projects-v3 P4): the phase-closeout pass drops loose ends it
+# finds into the suggested lane, tagged `proposed_by='closeout'`.
+_SUGGESTED_AGENTS: tuple[str, ...] = ('beacon', 'medic', 'pulse', 'closeout')
 # Capture `label` provenance → canonical suggesting agent. 'pulse-check-i' is the
 # recurring Pulse proposal parked in the Missions lane (see CAPTURE_ALLOWED_LABELS).
 _CAPTURE_LABEL_SUGGESTED_SOURCE: dict[str, str] = {'pulse-check-i': 'pulse'}

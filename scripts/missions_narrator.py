@@ -654,13 +654,13 @@ def author_captures_in_registry(
 
 _MISSION_FUNNEL_PHASE = 'proposed'
 
-# Canonical suggesting agents — mirrors dashboard_api._SUGGESTED_AGENTS. A
+# Canonical suggesting sources — mirrors dashboard_api._SUGGESTED_AGENTS. A
 # proposed mission whose `proposed_by` maps to one of these is a team
 # *suggestion*; anything else (the orphan-autoregister healer, or an
 # unidentifiable proposer) is *orphan-derived*. We replicate the small
 # normalizer here rather than import dashboard_api (a heavy FastAPI module the
-# headless narrator must not pull in).
-_SUGGESTED_AGENTS = ('beacon', 'medic', 'pulse')
+# headless narrator must not pull in). `closeout` is the non-agent P4 source.
+_SUGGESTED_AGENTS = ('beacon', 'medic', 'pulse', 'closeout')
 
 
 def mission_suggested_source(mission: dict[str, Any]) -> Optional[str]:

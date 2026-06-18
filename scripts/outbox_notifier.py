@@ -5625,13 +5625,18 @@ def _propose_gated_finish_step(seq_id: str, kind: str, command: str) -> str:
 def _render_sequence_complete_dm(
     seq: dict[str, Any],
     report: Optional[Any] = None,
+    closeout: Optional[dict] = None,
 ) -> str:
     """Plain-language completion DM body for Larry: what the build was, the PRs
     that shipped, and a one-line summary. When a post_merge `report` is given
     (Contract C), append the verified go-live result: what auto-ran, what was
     verified, and what's awaiting a one-tap. A failed verify check is surfaced
-    loudly at the top (blocked-on-you doorbell). No markdown chrome beyond the
-    simple bullets the alert DM renderer already handles.
+    loudly at the top (blocked-on-you doorbell). When `closeout` outputs are
+    given (p4-closeout-outputs), append the phase-closeout handoff: 'Phase X
+    done: [summary]. Next up: Phase Y — ready for you to brainstorm', any
+    decision-needed flags, and a count of follow-ups dropped into the funnel's
+    Suggested lane. No markdown chrome beyond the simple bullets the alert DM
+    renderer already handles.
     """
     seq_id = seq.get('seq_id') or '?'
     label = seq.get('label') or seq.get('title') or seq_id
@@ -5655,7 +5660,49 @@ def _render_sequence_complete_dm(
         )
     if report is not None and getattr(report, 'has_steps', False):
         _append_post_merge_report_lines(lines, report)
+    if closeout:
+        _append_closeout_lines(lines, closeout)
     return '\n'.join(lines)
+
+
+def _append_closeout_lines(lines: list[str], closeout: dict) -> None:
+    """Append the p4-closeout-outputs handoff to the completion DM body: the
+    'Phase X done: [summary]' headline, the 'Next up: Phase Y — ready for you to
+    brainstorm' next-phase handoff, a loud '⚠️ Needs your call' block when the
+    closeout flagged a decision (done-gate missed / build diverged from spec / a
+    risky follow-up), and a count of the loose ends dropped into the funnel's
+    Suggested lane. All fields are optional/defensive — a partial outputs dict
+    degrades to just the lines it can render."""
+    phase_title = (closeout.get('phase_title') or '').strip()
+    summary = (closeout.get('summary') or '').strip()
+    next_title = (closeout.get('next_phase_title') or '').strip()
+    flags = [f for f in (closeout.get('flags') or []) if str(f).strip()]
+    queued = [q for q in (closeout.get('follow_ups_queued') or []) if q]
+
+    if not phase_title and not summary and not next_title and not flags \
+            and not queued:
+        return
+    lines.append('')
+    head = f'Phase {phase_title} done' if phase_title else 'Phase done'
+    if summary:
+        head = f'{head}: {summary}'
+    lines.append(head)
+    if next_title:
+        lines.append(
+            f'Next up: {next_title} — ready for you to brainstorm.'
+        )
+    if flags:
+        lines.append('')
+        lines.append('⚠️ Needs your call:')
+        for flag in flags:
+            lines.append(f'  • {flag}')
+    if queued:
+        n = len(queued)
+        lines.append('')
+        lines.append(
+            f'Dropped {n} follow-up{"s" if n != 1 else ""} into the funnel’s '
+            f'Suggested lane for you to triage.'
+        )
 
 
 def _append_post_merge_report_lines(lines: list[str], report: Any) -> None:
@@ -5742,25 +5789,37 @@ def _stamp_phase_done_for_sequence(seq_id: str) -> None:
         )
 
 
-def _author_phase_closeout_for_sequence(seq: dict) -> None:
-    """p4-closeout-author: on SEQUENCE_COMPLETE, author the phase's closeout — a
-    plain-language summary + structured schema (shipped / changed-vs-spec /
-    learnings / cost / done-gate) — onto its card and tick the North Star
-    tracker. Runs right after the done-stamp so the just-completed phase writes
-    its own story. The author does only NON-committer writes (heal_projects_store
-    commits both the card and the ticked doc); this wrapper adds a
-    daemon-never-wedge guard so closeout authoring can NEVER block or corrupt the
-    completion signal. A non-launch sequence (no matching phase) is a no-op."""
+def _author_phase_closeout_for_sequence(seq: dict) -> Optional[dict]:
+    """p4-closeout-author + p4-closeout-outputs: on SEQUENCE_COMPLETE, author the
+    phase's closeout — a plain-language summary + structured schema (shipped /
+    changed-vs-spec / learnings / cost / done-gate) — onto its card, tick the
+    North Star tracker, and drop the loose ends it finds into the funnel's
+    Suggested lane (source='closeout', deduped). Runs right after the done-stamp
+    so the just-completed phase writes its own story. The author does only
+    NON-committer writes (heal_projects_store commits the card, the ticked doc,
+    and the drained funnel cards); this wrapper adds a daemon-never-wedge guard so
+    closeout authoring can NEVER block or corrupt the completion signal.
+
+    Returns the closeout OUTPUTS dict the completion DM renders (summary +
+    next-phase handoff + needs-you flags + queued follow-ups), or None for a
+    non-launch sequence (no matching phase) or any swallowed failure."""
     try:
         import projects_closeout_author as closeout  # local import: optional dep
-        if closeout.run_closeout_for_sequence(seq):
-            log(f'phase closeout: authored for seq={seq.get("seq_id")}')
+        outputs = closeout.run_closeout_for_sequence(seq)
+        if outputs:
+            log(
+                f'phase closeout: authored for seq={seq.get("seq_id")} '
+                f'(follow_ups={len(outputs.get("follow_ups_queued") or [])}, '
+                f'flags={len(outputs.get("flags") or [])})'
+            )
+        return outputs
     except Exception as e:  # noqa: BLE001 — daemon-never-wedge
         log(
             f'phase closeout for seq={seq.get("seq_id")} raised '
             f'{type(e).__name__}: {e}; swallowing',
             'WARN',
         )
+        return None
 
 
 def _maybe_signal_sequence_complete(seq_id: str) -> None:
@@ -5824,15 +5883,18 @@ def _maybe_signal_sequence_complete(seq_id: str) -> None:
         # no-op), event-driven, fail-safe — a non-launch sequence has no
         # matching phase and this is a logged no-op.
         _stamp_phase_done_for_sequence(seq_id)
-        # p4-closeout-author: the just-done phase authors its own closeout onto
-        # the card + ticks the North Star tracker (non-committer writes; the
-        # healer commits). Fail-safe — never wedges the completion signal.
-        _author_phase_closeout_for_sequence(seq)
+        # p4-closeout-author + p4-closeout-outputs: the just-done phase authors
+        # its own closeout onto the card + ticks the North Star tracker, and
+        # returns the OUTPUTS the completion DM renders (summary + next-phase
+        # handoff + needs-you flags + queued follow-ups). Non-committer writes
+        # (the healer commits). Fail-safe — never wedges the completion signal.
+        closeout_outputs = _author_phase_closeout_for_sequence(seq)
         _emit_sequence_complete_chain_event(seq)
         larry_alerts.append_alert(
             source='outbox-notifier',
             severity='warning',
-            message=_render_sequence_complete_dm(seq, report=report),
+            message=_render_sequence_complete_dm(
+                seq, report=report, closeout=closeout_outputs),
             subject=f'sequence-complete:{seq_id}',
             route='escalate',
         )
