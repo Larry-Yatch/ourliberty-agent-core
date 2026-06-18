@@ -126,9 +126,15 @@
 
 ---
 
-## Status snapshot — updated 2026-06-18 02:02Z UTC (Iter ~2182, Tier 2, consecutive_clean=0→1, NOMINAL)
+## §5.0 script paths — ground-truth (confirmed iter ~2183)
 
-**Iter ~2182 summary:** ✅ Nominal. 1 Tier-3 alert: L1027 (sequence-complete:projects-v3-p3-followup — outbox-notifier, Tier-3 silenced, bot DM'd Larry 02:01Z). **projects-v3-p3-followup COMPLETE** — all 4 P3F steps shipped: PR #573 (transitions), PR #574 (status-writeback), PR #575 (reversibility+orphan), PR #63/dashboard (pipeline-controls). Forge PID 4161224 completed. All 5 daemons alive — same PIDs as iter ~2181 (beacon 3734671, chain-event 3734305, inbox-watcher 3434697, dashboard_api 4159159, outbox_notifier 4159430). Repo HEAD=43ece187=origin/main (clean). Last sync 01:50:16Z (~12 min). 0 open PRs. 0 stalls. pending=0. Credential rotation: OK. Heartbeat 02:00:18Z (~2 min, fresh). Check I skipped (Thursday). PRIME ratio=19.69 (1024 interventions, 52 systemic_fixes, trend=improving). **Tier 2, consecutive_clean=0→1.**
+**Rule:** `audit_due_nudge.py` and `distill_detector.py` live in `scripts/`, NOT `review/distill/`. Only `audit_cadence_signal.py` is in `review/distill/`. Always invoke: `python3 scripts/audit_due_nudge.py`, `python3 scripts/distill_detector.py`, `python3 review/distill/audit_cadence_signal.py`.
+
+---
+
+## Status snapshot — updated 2026-06-18 02:18Z UTC (Iter ~2183, Tier 2, consecutive_clean=1→2, NOMINAL)
+
+**Iter ~2183 summary:** ✅ Nominal. 0 new alerts (watermark=1027=file_length). Forge PID 4161224 gone (p3f-pipeline-controls complete; projects-v3-p3-followup DONE). All 5 daemons alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4159159 (Ssl), outbox_notifier 4159430 (Ss). Repo HEAD=44c64f26=origin/main (clean). Last sync 01:50:16Z (~28 min). 0 open PRs. 0 stalls. pending=0. Credential rotation: OK. Heartbeat 02:00:18Z (~18 min, fresh). Check I skipped (Thursday). §5.0 PATH CORRECTION: audit_due_nudge+distill_detector live in scripts/, not review/distill/; all three no-ops. PRIME ratio=19.69 (1024 interventions, 52 systemic_fixes, trend=improving). **Tier 2, consecutive_clean=1→2.**
 
 ## Status snapshot — updated 2026-06-18 01:43Z UTC (Iter ~2181, Tier 1→2, consecutive_clean=2→3→de-escalate, NOMINAL)
 
