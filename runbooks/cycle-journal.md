@@ -154536,3 +154536,88 @@ Watermark: 1049 → 1050. No tier-reset (Tier-3 silence).
 **PRIME DIRECTIVE:** iter_clean. Trailing-30d: interventions=1024, systemic_fixes=52, ratio=19.69, trend=improving.
 **Tier end-of-iter:** Tier 3, consecutive_clean=13 (steady-state).
 
+
+## Iteration ~2198 — 2026-06-18 10:24Z UTC (interactive, /cycle, Tier 3→1, consecutive_clean=13→0, SIGNAL)
+
+**Trigger:** Larry direct invocation (`/cycle` via /loop).
+
+**Health:** ⚠️ Signal. G-rule 3/3 hit: watermark-rotation-gap dispatched to Beacon. All other checks nominal.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Stale bash orphan PID 1834248:** Still alive (Ss, 20d 15h 03m). Low CPU, naming-mismatch exit. [blue carry]
+- **All 5 daemon PIDs:** beacon 3734671 (Ss) ✅, chain-event 3734305 (SNs) ✅, inbox-watcher 3434697 (Ssl) ✅, dashboard_api 4159159 (Ssl) ✅, outbox_notifier 4159430 (Ss) ✅.
+- **Repo HEAD:** b2a2d1de=origin/main (Pulse cycle 20260618T095310Z). Clean tree. ✅
+
+**Check 0 — Alert triage:** repair-watermark → repaired=true, old_watermark=1036, file_length=913, new_watermark=913. Watermark-rotation-gap auto-repaired (1036→913). larry_alerts_retention.py compacted the file between iter ~2197 and this iter. After repair: watermark=913=file_length. **0 new alerts.** No DM. G-rule watermark-rotation-gap: 2/3 → **3/3** → DISPATCH fired.
+
+**Check 1 — Log noise:** journalctl -u ourliberty-*.service --priority warning --since "60 min ago" → No entries. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon PID 3734671 alive (Ss). Last Larry directive: "Can you clear the stale worktree?" at 2026-06-17 23:22Z — RE-VERIFIED: heal-wedged-review-sessions reaped wt-forge-p3f-reversibility-and-orphan at 01:00Z 2026-06-18 (bot log idx=1023). No worktrees dir exists. ✅ Resolved. No new orphaned directives. Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → 0 stalls. 4 FORGE_NO_PR_SKIP (reason=pr_exists: PRs #573/#574/#575 agent-core, #63 dashboard — all merged). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json pending=0. All inboxes empty. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-18T10:02:00Z, age=~22 min. FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=b2a2d1de=origin/main. Clean tree. On main. Up to date. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-18T09:50:40Z (~34 min ago), status=no-change. Within 2h. ✅ Nominal.
+
+**Check C — Agent liveness:** All 5/5 alive:
+- beacon_telegram_bot: PID 3734671 ✅ (Ss, 1d+)
+- chain_event_shipper: PID 3734305 ✅ (SNs, 1d+)
+- inbox_watcher: PID 3434697 ✅ (Ssl, 2d+)
+- dashboard_api: PID 4159159 ✅ (Ssl, 8h+)
+- outbox_notifier: PID 4159430 ✅ (Ss, 8h+)
+
+**Check D — Inboxes:** beacon: 1 (pulse-grule-watermark-rotation-gap-001 — just dispatched this iter), forge: empty, mirror: empty. ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs on ourliberty-agent-core and ourliberty-dashboard. ✅ Nominal.
+
+**Check H — Forge digest:** 0 open Forge PRs. 0 merged in last 4h. Pipeline quiet. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:**
+- audit_due_nudge.py: no-op (no committed audit baseline). ✅
+- distill_detector.py: no-op. ✅
+- audit_cadence_signal.py (at review/distill/): no-op. ✅
+
+**Conditional checks:** Thursday 2026-06-18 UTC (weekday=3, not in Mon/Wed/Fri/Sun set). Check I: skip. Check III: skip. Check VIII/IX/X: skip (non-Monday). ✅
+
+**Actions taken:**
+1. Check 0: repair-watermark → auto-repaired (1036→913). ✅
+2. G-rule watermark-rotation-gap 3/3: wrote pulse-grule-watermark-rotation-gap-001.json to /home/larry/agents/inboxes/beacon/. ✅
+3. PRIME ledger: intervention appended (watermark-rotation-gap, Tier 3). ✅
+4. PRIME ledger: verification_pending appended (watermark-rotation-gap-fix, Tier 3). ✅
+5. cycle_tier_state.py record --checks-clean false → Tier 3→1, consecutive_clean=0. ✅
+
+**Dispatches:** pulse-grule-watermark-rotation-gap-001 → Beacon inbox. Direction-ask: update larry_alerts_retention.py to atomically reset alert-triage-watermark.json to new file_length immediately after compacting larry-alerts.jsonl, eliminating the one-cycle repair lag.
+
+**G-rule updates this iter:**
+- **watermark-rotation-gap: 2/3 → 3/3 → DISPATCHED ✅** (pulse-grule-watermark-rotation-gap-001). Verification pending.
+
+**Standing findings (carried):**
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch; dispatch at 3/3.
+- [blue] **G-rule mirror-malformed-verdict-marker** — 1/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule catalog-accuracy-drift-tier4** — 1/3. Watch.
+- [blue] **G-rule ledger/check-i Tier-4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule watermark-rotation-gap** — **3/3 DISPATCHED** ✅ (pulse-grule-watermark-rotation-gap-001)
+- [blue] **Stale bash orphan** — PID 1834248 (20d 15h+, naming-mismatch exit, low CPU). [carry]
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — PRs merged without Mirror; bot-delivered. Larry judgment. [carry]
+- [blue] **projects-v3-p3 COMPLETE ✅ and projects-v3-p3-followup COMPLETE ✅** — all PRs merged 2026-06-18.
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention + 1 verification_pending this iter. Trailing-30d: interventions=1025, systemic_fixes=52, ratio=19.71, trend=improving.
+**Tier end-of-iter:** Tier 3→1, consecutive_clean=0. Last signal: 2026-06-18T10:23:58Z.

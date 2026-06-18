@@ -132,6 +132,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-18 10:24Z UTC (Iter ~2198, Tier 3→1, consecutive_clean=13→0, SIGNAL)
+
+**Iter ~2198 summary:** ⚠️ Signal. **G-rule 3/3 watermark-rotation-gap DISPATCHED.** repair-watermark auto-repaired (1036→913 — larry_alerts_retention.py compacted alerts file between iters). Dispatch: pulse-grule-watermark-rotation-gap-001 → Beacon inbox (fix: larry_alerts_retention.py to atomically update watermark on compaction). All 5 daemons alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4159159 (Ssl), outbox_notifier 4159430 (Ss). Repo HEAD=b2a2d1de=origin/main (clean). Last sync 09:50:40Z (~34 min). 0 open PRs. 0 stalls. pending=0. Credential rotation: OK. Heartbeat 10:02:00Z (~22 min, fresh). Check I skipped (Thursday). §5.0 all no-ops. Stale bash orphan PID 1834248: still alive (20d 15h+, naming-mismatch exit, low CPU). PRIME ratio=19.71 (1025 interventions, 52 systemic_fixes, trend=improving). **Tier 3→1, consecutive_clean=0.**
+
 ## Status snapshot — updated 2026-06-18 09:50Z UTC (Iter ~2197, Tier 3, consecutive_clean=12→13, NOMINAL)
 
 **Iter ~2197 summary:** ✅ Nominal. 1 Tier-3 alert: L1036 (dispatch-branch-cleanup/summary — pruned 2 local + 1 remote stale branches, known-pattern, silenced). All 5 daemons alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4159159 (Ssl), outbox_notifier 4159430 (Ss). Repo HEAD=0d354d60=origin/main (clean). Last sync 08:50:29Z (~60 min). 0 open PRs. 0 stalls. pending=0. Credential rotation: OK. Heartbeat 09:32:00Z (~18 min, fresh). Check I skipped (Thursday). §5.0 all no-ops. Stale bash orphan PID 1834248: still alive (20d+, naming-mismatch exit, low CPU). PRIME ratio=19.69 (1024 interventions, 52 systemic_fixes, trend=improving). **Tier 3, consecutive_clean=12→13 — steady-state.**
