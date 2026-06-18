@@ -4,6 +4,82 @@
 
 ---
 
+## Iteration ~2172 — 2026-06-18 00:08Z UTC (interactive, /cycle, Tier 2, consecutive_clean=0→1, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. All checks clean. projects-v3-p3-followup pipeline advancing (PRs #573/#574 open, Mirror reviewing).
+
+**VERIFY-BEFORE-REASSERT:**
+- **projects-v3-p3-followup pipeline:** Forge processed p3f-phase-transitions + p3f-status-writeback (dispatched iter ~2171); PRs #573 (feat: phase checkpoint-advance, created 23:48Z) and #574 (feat: phase status writeback, created 23:59Z) are OPEN, MERGEABLE, no reviewDecision yet. Mirror inbox has `review-p3f-phase-transitions.json` + `review-p3f-status-writeback.json` (both created 00:00Z, ~8 min old). Pipeline advancing normally. ✅
+- **Stale bash orphan PID 1834248:** Still alive (Ss bash). Waiting for `outboxes/forge/.archive/build-check-viii-pr-2b-analyzer-001.json`. Low CPU (sleep 20 loop). [carry] ✅
+- **All 5 daemon PIDs:** beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4048770 (Ssl), outbox_notifier 4049089 (Ss). Same PIDs as iter ~2171. ✅
+- **Repo at origin/main:** HEAD=70f18ea7=origin/main. Clean tree. ✅ (Wrapper committed Pulse cycle 20260617T234840Z; origin advanced.)
+
+**Check 0 — Alert triage:** repair-watermark → no repair (`{"repaired": false, "old_watermark": 1020, "file_length": 1020}`). **0 new alerts.** Watermark unchanged at 1020. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → No entries. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** No new Larry messages since 17:22:35-0600 (23:22:35Z = iter ~2168 worktree-clear directive, actioned). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → no stalls detected. 18 FORGE_NO_PR_SKIP entries (all reason=pr_exists — expected). ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` (state path) pending=0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=`2026-06-18T00:00:03Z` (~8 min). FRESH (<60 min). ✅ Nominal. (Note: state file absent; heartbeat file is current indicator per prior iters.)
+
+**Check A — Source repo:** HEAD=70f18ea7=origin/main. Clean tree. On main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-17T23:50:16Z (~18 min), status=no-change (already at latest commit). Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon 3734671 (Ss) ✅, chain-event 3734305 (SNs) ✅, inbox-watcher 3434697 (Ssl) ✅, dashboard_api 4048770 (Ssl) ✅, outbox_notifier 4049089 (Ss) ✅. All 5/5 alive. ✅ Nominal.
+
+**Check D — Inboxes:** Forge: empty (pipeline steps picked up → PRs opened). Beacon: empty. Mirror: `review-p3f-phase-transitions.json` + `review-p3f-status-writeback.json` (fresh, 00:00Z, ~8 min — not stale). ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 2 open (#573, #574 — both Forge PRs, both < 30 min old, Mirror reviewing). ourliberty-dashboard: 0 open. Within grace window. ✅ Nominal.
+
+**Check H — Forge digest:** 2 open Forge PRs (#573/#574, created within last 20 min, < 72h). 0 merged in last 4h (last merges were #571/#572 from prior cycle). Forge inbox empty — pipeline steps submitted. ✅ Nominal.
+
+**Conditional checks:** Wednesday 2026-06-17/Thursday 2026-06-18 UTC, weekday check:
+- Check I: artifact `pulse-check-i/check-i-2026-06-17.json` EXISTS → SKIP (same-day dedup). ✅
+- Check III: Sunday-anchored → skip. ✅
+- §5.0: `audit_due_nudge.py` → no-op; `distill_detector.py` → no-op; `audit_cadence_signal.py` → no-op. ✅
+
+**Actions taken:**
+1. Check 0: No alerts to triage.
+2. Tier state: `record --checks-clean true` → consecutive_clean=0→1 (Tier 2).
+
+**Dispatches:** None.
+
+**Standing findings (carried):**
+- [blue] **unreviewed-merge:571** — PR #571 merged without Mirror. Bot DM'd 22:42Z. Larry judgment. [carry]
+- [blue] **Stale bash orphan** — PID 1834248 (Ss bash). Waiting for check-viii-pr-2b target file. Low CPU. [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule watermark-rotation-gap** — 2/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule catalog-accuracy-drift-tier4** — 1/3. Watch.
+- [blue] **G-rule ledger/check-i Tier-4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**Next:** Mirror will review PRs #573/#574 (review-p3f-phase-transitions + review-p3f-status-writeback). On PASS, auto-merge fires, advancer dispatches next pipeline steps. Pulse at Tier 2 (15-min cadence), consecutive_clean=1 (needs 2 more clean iters to reach Tier 3).
+
+**PRIME DIRECTIVE:** 0 interventions this iter (iter_clean). Trailing-30d: interventions=~1021, systemic_fixes=52, ratio=~19.63, trend=improving.
+**Tier end-of-iter:** Tier 2, consecutive_clean=0→1. Last signal 23:31:38Z.
+
+---
+
 ## Iteration ~2171 — 2026-06-17 23:47Z UTC (interactive, /cycle, Tier 1→2 de-escalate, consecutive_clean=2→3→0, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).
