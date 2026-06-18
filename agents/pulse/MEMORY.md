@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-18 00:57Z UTC (Iter ~2177, Tier 1→2 de-escalate, consecutive_clean=2→3→0, NOMINAL)
+
+**Iter ~2177 summary:** ✅ Nominal. 0 new alerts (watermark=1022=file_length). All 5 daemons alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4119820 (Ssl), outbox_notifier 4120066 (Ss). Same PIDs as iter ~2176. Repo HEAD=3f87278e=origin/main (clean). Last sync 00:50:16Z (~7 min). **PR #575 open** (p3f-reversibility-and-orphan, 00:43Z, MERGEABLE — Mirror review dispatched 00:55Z). 0 stalls. pending=0. Credential rotation: OK. Heartbeat 00:30:16Z (~27 min, fresh). Check I skipped (weekday=Thursday). Healer next run ~01:00Z (expect outbox_notifier restart for PR #574 code — Tier-3 silence). PRIME ratio=19.65 (1022 interventions, 52 systemic fixes, trend=improving). **Tier 1→2 de-escalation, consecutive_clean reset to 0.**
+
 ## Status snapshot — updated 2026-06-18 00:53Z UTC (Iter ~2176, Tier 1, consecutive_clean=1→2, NOMINAL)
 
 **Iter ~2176 summary:** ✅ Nominal. 0 new alerts (watermark=1022=file_length). All 5 daemons alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4119820 (Ssl), outbox_notifier 4120066 (Ss). Same PIDs as iter ~2175. Repo HEAD=2ba98939=origin/main (clean). Last sync 00:50:16Z (~3 min). **PR #575 open** (p3f-reversibility-and-orphan, created 00:43Z, MERGEABLE — Forge PID 4111313 completed build, post-PR wrap-up). 0 stalls. pending=0. Credential rotation: OK. Heartbeat 00:30:16Z (~23 min, fresh). Check I skipped (weekday=Thursday). Bot network timeout at 00:43Z (transient; delivered at 00:35Z). PRIME ratio=19.65 (1022 interventions, 52 systemic fixes, trend=improving). **Tier 1, consecutive_clean=1→2.**
