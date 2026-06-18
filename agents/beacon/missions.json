@@ -3982,7 +3982,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-18T16:21:24.450771+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-18T16:15:38.414577+00:00"
+      "orphan_last_activity_ts": "2026-06-18T16:15:38.414577+00:00",
+      "briefing": {
+        "what": "A small piece of work the team picked up to make a screen automatically pull in fresh data, started on its own without being attached to any larger project.",
+        "why": "Loose, unassigned work tends to drift or get forgotten, and even though it's already been checked and folded in, untracked efforts can quietly cause surprises later.",
+        "suggest": "Decide whether this belongs to a real initiative \u2014 if yes, fold it in and keep an eye on it; if not, confirm it's truly finished before letting it close out."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-18T16:30:17.663614+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
