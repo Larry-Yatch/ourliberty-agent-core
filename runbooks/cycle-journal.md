@@ -4,6 +4,91 @@
 
 ---
 
+## Iteration ~2178 — 2026-06-18 01:24Z UTC (interactive, /cycle, Tier 2→1, consecutive_clean=0, SIGNAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Signal. Two new alerts (L1023/L1024). PR #575 Mirror REVIEW_ESCALATE at 01:12Z — APPROVAL_REQUEST DM routing failed (reply_chat_id=null, known seq-advancer gap). Notify files queued in Beacon inbox; chain self-resolves pending inbox_watcher dispatch.
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #575 state:** OPEN, MERGEABLE, reviewDecision="" (GitHub), but Mirror CI check=failure (REVIEW_ESCALATE posted at 01:12Z). Pipeline in replan state. ✅ verified.
+- **Stale bash orphan PID 1834248:** Still alive (Ss bash, 20d 6h uptime, sleep-loop waiting for build-check-viii-pr-2b-analyzer-001.json). Low CPU. [carry] ✅
+- **All 5 daemon PIDs:** beacon 3734671 (Ss) ✅, chain-event 3734305 (SNs) ✅, inbox-watcher 3434697 (Ssl) ✅, dashboard_api 4119820 (Ssl) ✅, outbox_notifier 4120066 (Ss) ✅. All alive, same PIDs. ✅
+
+**Check 0 — Alert triage:** repair-watermark → no repair (`{"repaired": false, "old_watermark": 1022, "file_length": 1024}`). **2 new alerts (L1023, L1024).**
+- L1023 (`still-stale-after-restart:ourliberty-outbox-notifier.service`, heal-stale-daemon-code, route=escalate): **Tier 4** — novel, no registry template. Bot already DM'd Larry at 01:00:34Z (idx=1022). No second Pulse DM. Service operational (PID 4120066 processing tasks normally — handled mirror-result at 01:12Z). Root cause: outbox_notifier.py updated at 00:38:31Z by git pull (PR #574 changes), but healer restarted service at 00:30:28Z (before the pull). At 01:00Z healer found still-stale and gave up. Larry decides restart. PRIME: `intervention` recorded.
+- L1024 (`wedged-review-reaped:wt-forge-p3f-reversibility-and-orphan`, heal-wedged-review-sessions, route=closure): **Tier 3** — known-pattern, silenced. Forge session PID 4111313 reaped (terminal marker present, idle 1009s > grace 300s). Normal cleanup after PR #575 created at 00:43Z. Resolved.
+- Watermark advanced 1022→1024. ✅
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → No entries. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry directive 23:22:35Z (worktree-clear, actioned iter ~2168). Bot log last entry 01:00:34Z (L1022/L1023 deliveries). No new directives. Network timeouts at 00:23Z and 00:43Z (transient). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → 0 stalls. RETRY_EXHAUSTED_SKIP for p3f-reversibility-and-orphan (reason=superseded_session — expected after Forge session reaped post-PR#575). ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` pending=0. Nominal on file, BUT — **sub-finding (non-nominal):** Mirror REVIEW_ESCALATE for PR #575 at 01:12Z. outbox_notifier wrote `notify-p3f-reversibility-and-orphan.json` + `.1.json` + `.2.json` to Beacon inbox at 01:12-01:15Z. outbox_notifier's secondary DM path tried to route APPROVAL_REQUEST but failed: `reply_chat_id=null` (seq-advancer-dispatched context — same root cause as the known dag-preflight-revision gap in MEMORY). Larry NOT DM'd about the escalation. inbox_watcher will dispatch Beacon to handle the notify files; Beacon will process the replan. If Beacon re-emits APPROVAL_REQUEST with null reply_chat_id, DM will fail again. Escalated to Larry via `larry_alerts.append_alert` (source=pulse, subject=mirror-escalate:p3f-reversibility-and-orphan:pr-575, route=escalate). PRIME: `intervention` recorded. ⚠️ tier-reset.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=`2026-06-18T01:00:16Z` (~24 min). FRESH (<60 min). ✅ Nominal. (Healer already restarted outbox_notifier at 00:30Z; still-stale alert handled via L1023.)
+
+**Check A — Source repo:** HEAD=c4b59a25=origin/main (Pulse cycle 20260618T005912Z). Clean tree. On main. 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-18T00:50:16Z (~34 min), status=no-change. Within 2h. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon 3734671 (Ss) ✅, chain-event 3734305 (SNs) ✅, inbox-watcher 3434697 (Ssl) ✅, dashboard_api 4119820 (Ssl) ✅, outbox_notifier 4120066 (Ss) ✅. All 5/5 alive, same PIDs. ✅ Nominal.
+
+**Check D — Inboxes:** Beacon: `notify-p3f-reversibility-and-orphan.json` + `.1.json` + `.2.json` (FRESH, 01:12-01:15Z, mirror-result/review-escalate queued) + `seq-projects-v3-p3-followup-step-p3f-reversibility-and-orphan.json` (stale, already in outbox archive — inbox_watcher dedup will skip). Forge: empty. Mirror: empty. Beacon inbox_watcher dispatch of notify files is the active next step. ✅ Nominal flow (notify files present is expected state).
+
+**Check E — PRs:** ourliberty-agent-core: PR #575 open (00:43Z, MERGEABLE, reviewDecision="" on GitHub — Mirror CI status=failure / ESCALATE). Not auto-merge eligible (CI failure). Replan in progress. ourliberty-dashboard: 0 open. ✅ Nominal (pipeline in expected replan state).
+
+**Check H — Forge digest:** PR #575 open (00:43Z, p3f-reversibility-and-orphan, CI=failure/replan). Forge session 4111313 reaped at 01:00Z (normal post-PR cleanup). 0 stuck Forge PRs. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** `audit_due_nudge.py` → no-op; `distill_detector.py` → no-op; `audit_cadence_signal.py` → no-op. ✅
+
+**Conditional checks:** Thursday 2026-06-18 UTC, weekday=3 ∉ {0,2,4,6}.
+- Check I: skip. ✅
+- Check III: skip. ✅
+
+**Actions taken:**
+1. Check 0: watermark advanced 1022→1024. L1023 triaged Tier 4 (journal note; bot already delivered). L1024 triaged Tier 3 (silenced).
+2. Check 4 sub-finding: `larry_alerts.append_alert` (source=pulse, mirror-escalate:p3f-reversibility-and-orphan:pr-575, route=escalate) → appended L1025; bot will DM Larry.
+3. PRIME ledger: 2× `intervention` appended (outbox-notifier-stale-post-restart, mirror-escalate-approval-routing-failed).
+4. Tier state: `record --checks-clean false` → **tier reset Tier 2→1**, consecutive_clean=0, last_signal_at=01:24:33Z.
+
+**Dispatches:** None (chain self-resolves via Beacon inbox notify files; escalation via larry_alerts L1025).
+
+**Standing findings (carried):**
+- [yellow] **outbox_notifier stale** — PID 4120066 running pre-PR#574 code (mtime 00:38Z, started 00:30Z). Healer exhausted retries. Service operational. Larry DM'd at 01:00Z. Manual restart: `systemctl restart ourliberty-outbox-notifier.service`. [carry]
+- [yellow] **PR #575 Mirror ESCALATE** — Beacon inbox has 3 notify files; APPROVAL_REQUEST routing gap (reply_chat_id=null); L1025 dispatched to Larry. Replan pending Beacon processing.
+- [blue] **unreviewed-merge:571** — bot DM'd 22:42Z. Larry judgment. [carry]
+- [blue] **Stale bash orphan** — PID 1834248 (20d+ sleep-loop, low CPU). [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule watermark-rotation-gap** — 2/3. Watch.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3 (new). reply_chat_id=null blocks APPROVAL_REQUEST DM in seq-advancer-dispatched tasks; same root as dag-preflight-revision gap but in replan path. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule catalog-accuracy-drift-tier4** — 1/3. Watch.
+- [blue] **G-rule ledger/check-i Tier-4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule mirror-marker-parse-error** — 1/3. Watch.
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**Next:** Bot delivers L1025 (mirror-escalate escalation) to Larry. inbox_watcher dispatches Beacon on 3 notify-p3f-reversibility files → Beacon processes replan → new APPROVAL_REQUEST (risk: null reply_chat_id again). Monitor for Beacon processing and DM delivery. Manual restart of outbox_notifier deferred to Larry. Pulse at Tier 1 (5-min cadence), consecutive_clean=0.
+
+**PRIME DIRECTIVE:** 2 interventions this iter (outbox-notifier-stale, mirror-escalate-routing-gap). Trailing-30d: interventions=1024, systemic_fixes=52, ratio=19.69, trend=improving.
+**Tier end-of-iter:** Tier 2→1 (signal), consecutive_clean=0. Last signal 01:24:33Z.
+
+---
+
 ## Iteration ~2177 — 2026-06-18 00:57Z UTC (interactive, /cycle, Tier 1, consecutive_clean=2→3→de-escalate, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).
