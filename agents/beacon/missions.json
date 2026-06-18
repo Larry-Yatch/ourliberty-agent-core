@@ -3768,6 +3768,40 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-fix-retention-watermark-inline-reset-001",
+      "name": "Fix Retention Watermark Inline Reset 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `fix-retention-watermark-inline-reset-001`. Last activity 2026-06-18T10:26:04.546043+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "fix-retention-watermark-inline-reset-001"
+      ],
+      "repo": null,
+      "created": "2026-06-18",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-18T10:32:09.777219+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-18T10:26:04.546043+00:00"
+    },
+    {
+      "id": "proposed-pulse-grule-watermark-rotation-gap-001",
+      "name": "Pulse Grule Watermark Rotation Gap 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pulse-grule-watermark-rotation-gap-001`. Last activity 2026-06-18T10:26:02.350945+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pulse-grule-watermark-rotation-gap-001"
+      ],
+      "repo": null,
+      "created": "2026-06-18",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-18T10:32:09.777219+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-18T10:26:02.350945+00:00"
     }
   ]
 }
