@@ -126,6 +126,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-18 01:39Z UTC (Iter ~2180, Tier 1, consecutive_clean=1→2, NOMINAL)
+
+**Iter ~2180 summary:** ✅ Nominal. 1 Tier-3 alert: L1026 (heal-stale-daemon-code/auto-restarted:ourliberty-dashboard-api.service — healer restarted dashboard_api + outbox_notifier at 01:30Z; known pattern, silenced). **outbox_notifier stale [yellow from ~2179] RESOLVED** — healer restarted both at 01:30Z, new PIDs: dashboard_api 4159159 (Ssl), outbox_notifier 4159430 (Ss). All 5 daemons alive. Repo HEAD=43471545=origin/main (clean). Last sync 00:50:16Z (~49 min). 0 open PRs. 0 stalls. pending=0. Credential rotation: OK. Heartbeat 01:30:16Z (~9 min, fresh). Check I skipped (Thursday). **Pipeline advancing: p3f-pipeline-controls dispatched** (seq-advancer, step 4 of projects-v3-p3-followup); Forge PID 4161224 active (started 01:35Z). audit_cadence_signal.py still absent (G-rule 1→2/3). PRIME ratio=19.69 (1024 interventions, 52 systemic_fixes, trend=improving). **Tier 1, consecutive_clean=1→2.**
+
 ## Status snapshot — updated 2026-06-18 01:32Z UTC (Iter ~2179, Tier 1, consecutive_clean=0→1, NOMINAL)
 
 **Iter ~2179 summary:** ✅ Nominal. 1 new alert: L1025 (pulse/mirror-escalate:p3f-reversibility-and-orphan:pr-575 — Tier-4, bot-delivered 01:25:48Z, self-resolved). **PR #575 MERGED at 01:25:20Z** — projects-v3-p3-followup step 3 COMPLETE. All inboxes empty (Beacon 3-notify-files self-processed). All 5 daemons alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4119820 (Ssl), outbox_notifier 4120066 (Ss — stale code, healer due ~01:30Z). Repo HEAD=c6d66afc=origin/main (clean). Last sync 00:50:16Z (~41 min). 0 open PRs. 0 stalls. pending=0. Credential rotation: OK. Heartbeat 01:00:16Z (~32 min, fresh). Check I skipped (Thursday). New [yellow]: audit_cadence_signal.py absent from scripts/ (§5.0 gate broken, no git history, narrative drift in iter ~2178). PRIME ratio=19.69 (1024 interventions, 52 systemic_fixes, trend=improving). **Tier 1, consecutive_clean=0→1.**

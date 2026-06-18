@@ -4,6 +4,88 @@
 
 ---
 
+## Iteration ~2180 — 2026-06-18 01:39Z UTC (interactive, /cycle, Tier 1, consecutive_clean=1→2, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. All checks clean. 1 Tier-3 alert (dashboard_api healer auto-restart, silenced). outbox_notifier stale [carry from ~2179] RESOLVED — healer restarted both dashboard_api and outbox_notifier at 01:30Z (new PIDs). Pipeline advancing: p3f-pipeline-controls dispatched; Forge PID 4161224 active.
+
+**VERIFY-BEFORE-REASSERT:**
+- **outbox_notifier stale [yellow from ~2179]:** PID 4120066 — gone. New PID 4159430 running (Ss, started 01:30:30Z). healer auto-restarted at 01:30Z. ✅ **RESOLVED — dropping carry.**
+- **audit_cadence_signal.py missing [yellow from ~2179]:** `ls /home/larry/agent-core/scripts/audit_cadence_signal.py` → still absent. ✅ Confirmed, carry + G-rule counter increments 1→2.
+- **All 5 daemon PIDs:** beacon 3734671 (Ss) ✅, chain-event 3734305 (SNs) ✅, inbox-watcher 3434697 (Ssl) ✅, dashboard_api **4159159** (Ssl — NEW, healer-restarted 01:30Z) ✅, outbox_notifier **4159430** (Ss — NEW, healer-restarted 01:30Z) ✅.
+- **Stale bash orphan PID 1834248:** Still alive (Ss bash, 20d 6h+, sleep-loop). Low CPU. [carry] ✅
+- **Repo HEAD:** 43471545=origin/main (Pulse cycle 20260618T013405Z). Clean tree. ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 1025, "file_length": 1026}`. **1 new alert (L1026).**
+- L1026 (`auto-restarted:ourliberty-dashboard-api.service`, heal-stale-daemon-code, route=digest, ts=01:30:21Z): Helper → **Tier 3** (known-pattern match). dashboard_api restarted with PR #575 code (script mtime newer by 56.6 min; commit ba9cbf6b). Silenced. No DM. Note: outbox_notifier also restarted at 01:30Z (new PID 4159430) — no separate alert in larry-alerts.jsonl yet; expect next healer run or already handled without alert.
+- Watermark advanced 1025→1026. ✅
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → No entries. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot log last entry 01:30:51Z (alert idx=1025, dashboard_api auto-restart digest — this is L1026 above, bot confirmed delivery). No new Larry directives since 23:22:35Z (worktree-clear, actioned iter ~2168). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → 0 stalls. 19 FORGE_NO_PR_SKIP entries (all reason=pr_exists — expected). ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` pending=0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=`2026-06-18T01:30:16Z` (~9 min). FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=43471545=origin/main (Pulse cycle 20260618T013405Z). Clean tree. On main. 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-18T00:50:16Z (~49 min), status=no-change. Within 2h. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon 3734671 (Ss) ✅, chain-event 3734305 (SNs) ✅, inbox-watcher 3434697 (Ssl) ✅, dashboard_api 4159159 (Ssl, new, ~9 min elapsed) ✅, outbox_notifier 4159430 (Ss, new, ~9 min elapsed) ✅. All 5/5 alive. ✅ Nominal.
+
+**Check D — Inboxes:** Beacon: `build-p3f-pipeline-controls.json` (842 bytes, 01:35Z — fresh, seq-advancer dispatched next pipeline step). `notify-p3f-pipeline-controls.json` already processed by inbox_watcher. Forge: empty. Mirror: empty. Forge PID 4161224 active (started 01:35Z, building p3f-pipeline-controls). ✅ Nominal pipeline activity.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open. ✅ Nominal.
+
+**Check H — Forge digest:** Forge PID 4161224 active (claude-opus-4-8, started 01:35Z, ~4 min in — building p3f-pipeline-controls). 0 stuck PRs. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** `audit_due_nudge.py` → no-op; `distill_detector.py` → no-op; `audit_cadence_signal.py` → absent (confirmed — same as iter ~2179). ✅ 
+
+**Conditional checks:** Thursday 2026-06-18 UTC, weekday=3 ∉ {0,2,4,6}. Check I: skip. Check III: skip. ✅
+
+**Actions taken:**
+1. Check 0: watermark advanced 1025→1026. L1026 triaged Tier-3 (journal note; no DM).
+2. PRIME ledger: `iter_clean` appended.
+3. Tier state: `record --checks-clean true` → consecutive_clean=1→2 (Tier 1).
+
+**Dispatches:** None.
+
+**Standing findings (carried):**
+- [yellow] **audit_cadence_signal.py missing** — §5.0 gate script absent; no git history. G-rule 1→2/3. Next iter at 2/3 → dispatch to Beacon at 3/3.
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [blue] **unreviewed-merge:571** — bot DM'd 22:42Z. Larry judgment. [carry]
+- [blue] **Stale bash orphan** — PID 1834248 (20d+ sleep-loop, low CPU). [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule watermark-rotation-gap** — 2/3. Watch.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule catalog-accuracy-drift-tier4** — 1/3. Watch.
+- [blue] **G-rule ledger/check-i Tier-4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule mirror-marker-parse-error** — 1/3. Watch.
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+
+**Next:** Forge builds p3f-pipeline-controls (~5 min). Expect PR + Mirror review + auto-merge cycle. Sync due at ~02:50Z. Healer at ~02:00Z (may emit outbox_notifier restart alert). Pulse at Tier 1 (5-min cadence), consecutive_clean=1→2 (1 more clean iter to de-escalate to Tier 2).
+
+**PRIME DIRECTIVE:** 0 interventions this iter (iter_clean). Trailing-30d: interventions=1024, systemic_fixes=52, ratio=19.69, trend=improving.
+**Tier end-of-iter:** Tier 1, consecutive_clean=1→2. Last signal 01:24:33Z.
+
+---
+
 ## Iteration ~2179 — 2026-06-18 01:32Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0→1, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).
