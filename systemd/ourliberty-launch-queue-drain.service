@@ -11,6 +11,7 @@ User=larry
 Group=larry
 Environment="HOME=/home/larry"
 Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+WorkingDirectory=/home/larry/agent-core
 ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/launch_queue_drain.py
 TimeoutStartSec=120
 Nice=10

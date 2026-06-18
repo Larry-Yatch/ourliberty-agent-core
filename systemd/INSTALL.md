@@ -349,6 +349,39 @@ journalctl -u ourliberty-build-sequence-advancer.service -n 50 --no-pager
 
 Full operating detail (ad-hoc pause/resume/cancel by direct file edit; corrupted-sequence handling; gate-mismatch diagnosis; spec-drift note on `auto_merge` event type) is at `runbooks/build-sequence-advancer.md`.
 
+### Projects-store healer + launch-queue drain (projects-v3 P3 / P3 follow-up)
+
+Two timer-driven oneshots complete the dashboard pipeline (`agents/beacon/specs/projects-v3-p3-pipeline.md` + `…-p3-followup-pipeline-flow.md`):
+
+- `ourliberty-heal-projects-store.{service,timer}` — the projects-store **single committer** (~10 min). The dashboard write-endpoints (promote / advance / attach-spec / **archive** / launch) only land their deltas on `agents/beacon/projects.json` on disk; this healer normalizes the registry and commits the delta to `main`. It is the ONLY committer of that file (single-committer invariant) and carries `EnvironmentFile=.env.larry` for the git push.
+- `ourliberty-launch-queue-drain.{service,timer}` — drains dashboard "Launch build" requests into Mirror-gated build sequences (5 min). Pure-filesystem non-committer (no git, no network, no credentials); see the service file header.
+
+```bash
+# Install (both service + timer pairs).
+sudo cp ~/agent-core/systemd/ourliberty-heal-projects-store.service /etc/systemd/system/
+sudo cp ~/agent-core/systemd/ourliberty-heal-projects-store.timer /etc/systemd/system/
+sudo cp ~/agent-core/systemd/ourliberty-launch-queue-drain.service /etc/systemd/system/
+sudo cp ~/agent-core/systemd/ourliberty-launch-queue-drain.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+
+# Enable + start both timers.
+sudo systemctl enable --now ourliberty-heal-projects-store.timer
+sudo systemctl enable --now ourliberty-launch-queue-drain.timer
+
+# Verify install landed AND the timers are active (the [[install-drift-timer-
+# false-negative]] guard — "merged" never implies "installed"; confirm with
+# is-active, not just list-timers).
+systemctl is-active ourliberty-heal-projects-store.timer
+systemctl is-active ourliberty-launch-queue-drain.timer
+systemctl list-timers 'ourliberty-heal-projects-store.timer' 'ourliberty-launch-queue-drain.timer'
+```
+
+Both are auto-covered by the `systemd-install-drift` healer (it discovers every `systemd/*.{service,timer}` in the repo), so a missed `cp` DMs Larry the exact install commands within one 12 h tick.
+
+| Healer | Cadence | What it watches for |
+|---|---|---|
+| `heal-projects-store` (projects-v3 P3) | 10 min | An on-disk delta on `agents/beacon/projects.json` (from a dashboard promote / advance / attach-spec / archive / launch write) → normalize + commit it to `main`. The single committer of the projects store; needs `EnvironmentFile=.env.larry` for git push. |
+
 ## Checking state
 
 ```bash
