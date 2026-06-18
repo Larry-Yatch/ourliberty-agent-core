@@ -4,6 +4,85 @@
 
 ---
 
+## Iteration ~2174 — 2026-06-18 00:39Z UTC (interactive, /cycle, Tier 2→1, consecutive_clean=2→0, DRIFT/FIXED)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Drift (auto-fixed). Check A: repo behind 1 commit (PR #574 `feat: phase status writeback` merged 00:28Z) → fast-forwarded bee4aac0→8a99e142. All other checks nominal. projects-v3-p3-followup pipeline advancing: Forge has p3f-reversibility-and-orphan.
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #574 (p3f-status-writeback):** MERGED at 00:28:47Z (Mirror retry 1/3 self-healed the ```json parse error from iter ~2173). ships: `scripts/projects_status_writeback.py` (new), `scripts/tests/test_projects_status_writeback.py` (new), updates to `outbox_notifier.py`, `projects_store.py`, `build_sequence_advancer.py`, `config/daemon-restart-manifest.json`. ✅
+- **Repo HEAD:** bee4aac0 → 8a99e142=origin/main (post-ff). ✅
+- **Daemon PIDs (post-PR #573 healer restart at 00:30Z):** beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api **4119820** (new, Ssl), outbox_notifier **4120066** (new, Ss). All 5/5 alive. Note: PR #574 also updated `outbox_notifier.py` — healer will detect stale code (~01:00Z next run) and auto-restart outbox_notifier again. ✅
+- **Stale bash orphan PID 1834248:** Still alive (Ss bash). Low CPU. [carry] ✅
+
+**Check 0 — Alert triage:** repair-watermark → no repair (`{"repaired": false, "old_watermark": 1020, "file_length": 1022}`). **2 new alerts:**
+- L1021: `heal-stale-daemon-code / auto-restarted:ourliberty-dashboard-api.service` (00:30Z, PR #573 deploy) → helper: Tier-3 silence ✅
+- L1022: `heal-stale-daemon-code / auto-restarted:ourliberty-outbox-notifier.service` (00:30Z, PR #573 deploy) → helper: Tier-3 silence ✅
+Watermark advanced 1020→1022. Nominal (Tier-3 silences = no tier reset).
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → No entries. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot log: transient network errors at 00:23:30Z (read timeout) + 00:24:08Z (EHOSTUNREACH), recovered by 00:35Z (idx=1021/1022 delivered as digest). No new Larry directives since 17:22:35-0600 (23:22:35Z — worktree-clear, actioned). No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → no stalls. 18 FORGE_NO_PR_SKIP entries (all reason=pr_exists). ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` pending=0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=`2026-06-18T00:30:16Z` (~9 min). FRESH (<60 min). ✅ Nominal. (Next healer run ~01:00Z will detect outbox_notifier.py stale vs 8a99e142.)
+
+**Check A — Source repo:** Before fetch: HEAD=bee4aac0 (showed up-to-date from cache). After `git fetch`: behind origin/main by 1 commit. → **always-fix: fast-forwarded bee4aac0→8a99e142** (PR #574). **Tier-reset.** ✅ Fixed.
+
+**Check B — Sync health:** last_sync=2026-06-17T23:50:16Z (~49 min), status=no-change. Within 2h. ✅ Nominal. (Sync will catch 8a99e142 on next run.)
+
+**Check C — Agent liveness:** beacon 3734671 (Ss) ✅, chain-event 3734305 (SNs) ✅, inbox-watcher 3434697 (Ssl) ✅, dashboard_api 4119820 (Ssl) ✅ (new PID), outbox_notifier 4120066 (Ss) ✅ (new PID). All 5/5 alive. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open. ✅ Nominal.
+
+**Check H — Forge digest:** PR #574 merged 00:28Z. 0 open PRs. Forge inbox has `p3f-reversibility-and-orphan.json` (fresh, dispatched ~00:20Z — next projects-v3-p3-followup step). ✅ Nominal.
+
+**Conditional checks:** Thursday 2026-06-18 UTC, weekday=3 ∉ {0,2,4,6}.
+- Check I: skip. ✅
+- Check III: skip. ✅
+
+**Actions taken:**
+1. Check 0: Triaged L1021+L1022 → Tier-3 silence. Watermark 1020→1022.
+2. Check A: `git -C ~/agent-core pull --ff-only` → bee4aac0→8a99e142. Logged to cycle-actions.jsonl.
+3. PRIME ledger: `intervention` appended (ff-main-when-behind, Tier 2).
+4. Tier state: `record --checks-clean false` → 2→1, consecutive_clean=2→0.
+
+**Dispatches:** None.
+
+**Standing findings (carried):**
+- [blue] **unreviewed-merge:571** — PR #571 merged without Mirror. Bot DM'd 22:42Z. Larry judgment. [carry]
+- [blue] **Stale bash orphan** — PID 1834248 (Ss bash). Low CPU. [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule watermark-rotation-gap** — 2/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule catalog-accuracy-drift-tier4** — 1/3. Watch.
+- [blue] **G-rule ledger/check-i Tier-4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule mirror-marker-parse-error** — 1/3. Watch.
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**Next:** Forge picks up p3f-reversibility-and-orphan (step 3 of projects-v3-p3-followup). Healer will auto-restart outbox_notifier on next cycle (~01:00Z, stale vs PR #574 code). Pulse at Tier 1 (5-min cadence), consecutive_clean=0.
+
+**PRIME DIRECTIVE:** 1 intervention this iter (fast-forward). Trailing-30d: interventions=~1022, systemic_fixes=52, ratio=~19.65.
+**Tier end-of-iter:** Tier 2→1, consecutive_clean=2→0. Last signal 00:38:47Z.
+
+---
+
 ## Iteration ~2173 — 2026-06-18 00:23Z UTC (interactive, /cycle, Tier 2, consecutive_clean=1→2, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).
