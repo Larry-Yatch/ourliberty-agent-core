@@ -4017,7 +4017,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-18T16:36:47.572125+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-11T02:33:57.027831+00:00"
+      "orphan_last_activity_ts": "2026-06-11T02:33:57.027831+00:00",
+      "briefing": {
+        "what": "A new piece of work to standardize how incoming items get labeled and tagged, started by the team but not yet attached to any approved project.",
+        "why": "Loose, unowned work can quietly consume time and drift from your priorities, but getting labeling consistent now keeps everything downstream organized and searchable.",
+        "suggest": "Have the team confirm which business goal this serves and fold it into a proper project before they go further \u2014 worth a quick check rather than a blank check."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-18T16:40:19.904560+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
