@@ -871,10 +871,14 @@ class ProjectArchiveRequest(BaseModel):
 
 class ProjectArchiveResponse(BaseModel):
     # The project was archived (or already was — `applied` is False on an
-    # idempotent re-archive). `state` is always 'archived'.
+    # idempotent re-archive). `state` is always 'archived'. p3f2: `status` /
+    # `message` are HONEST — 'returned-to-funnel'/'returned to the funnel' when the
+    # project came from a funnel source (capture/mission/orphan) that returns,
+    # else 'archived'/'Archived'. The UI toast reads `message` verbatim.
     project_id: str
     state: str = 'archived'
     status: str = 'archived'
+    message: str = 'Archived'
     applied: bool
 
 
@@ -6828,71 +6832,203 @@ def _handle_spec_attach(
     }
 
 
+# A project's `promoted_from.kind` → the funnel lane archiving returns it to.
+# Only these kinds carry a funnel source that un-suppresses on archive; a project
+# with no (or unrecognized) provenance is archive-only and must NOT claim a return.
+_FUNNEL_SOURCE_KINDS = frozenset({'capture', 'mission', 'orphan'})
+
+
+def _archive_outcome(promoted_from: Any) -> dict[str, str]:
+    """The honest Drop/Archive outcome for a project's `promoted_from` (p3f2,
+    spec § 6 step 2 — "Drop does what it says"). A project promoted from a funnel
+    source (capture / mission / orphan) RETURNS to the funnel when archived (the
+    capture is re-parked here; mission/orphan are structurally un-suppressed by
+    the funnel derive's active-only sets) → "returned to the funnel". A project
+    with no funnel provenance is archive-only → "Archived". The toast must match
+    behavior, so this is the single source of truth for the message both the flip
+    and the idempotent no-op return."""
+    kind = promoted_from.get('kind') if isinstance(promoted_from, dict) else None
+    if kind in _FUNNEL_SOURCE_KINDS:
+        return {'status': 'returned-to-funnel', 'message': 'returned to the funnel'}
+    return {'status': 'archived', 'message': 'Archived'}
+
+
+def _capture_is_parked(
+    captures_path: Optional[Path], capture_id: Optional[str],
+) -> bool:
+    """Read-only: is the capture CURRENTLY in the parked/funnel lane? Used by the
+    idempotent (already-archived) archive path so the toast reflects the capture's
+    present state rather than its provenance kind — a capture re-parked by an
+    earlier archive but since GC'd/dropped (or re-promoted) must NOT claim
+    "returned to the funnel" on a re-archive (p3f2 honesty contract, spec §4). No
+    mutation, no write. MUST be called holding `_CAPTURE_INGEST_LOCK`."""
+    if captures_path is None or not capture_id:
+        return False
+    registry = _read_captures_registry(captures_path)
+    for c in registry.get('captures') or []:
+        if isinstance(c, dict) and c.get('id') == capture_id:
+            return c.get('state') == 'parked'
+    return False
+
+
+def _return_capture_to_funnel(
+    captures_path: Optional[Path], capture_id: Optional[str], now: datetime,
+) -> bool:
+    """Un-flip a capture promoted into a now-archived project so it RETURNS to the
+    parked/funnel lane (p3f2 — capture→parked, the reverse of
+    `_handle_capture_promote` step 2). Reverses exactly the three fields promote
+    set: `state` 'promoted'→'parked', drop `promoted_to`, drop `spawned`. The
+    parked lane filters `state=='parked'`, so this is what actually makes the
+    capture re-appear (mission/orphan return structurally; a capture is mutated on
+    its own store and so must be mutated back). Returns True iff a capture was
+    actually re-parked — the caller uses this so the toast only claims a return
+    that really happened.
+
+    Non-committer, like promote: the flip lands on captures.json ON DISK; its sole
+    committer `heal_missions_card_gc` version-controls the delta. Idempotent +
+    fail-safe: a missing capture, or one no longer in `promoted` state, is left
+    untouched (returns False — nothing to return). MUST be called holding
+    `_CAPTURE_INGEST_LOCK` (CAPTURE→PROJECTS order) to serialize against
+    ingest/promote."""
+    if captures_path is None or not capture_id:
+        return False
+    registry = _read_captures_registry(captures_path)
+    cap = None
+    for c in registry.get('captures') or []:
+        if isinstance(c, dict) and c.get('id') == capture_id:
+            cap = c
+            break
+    if cap is None or cap.get('state') != 'promoted':
+        return False
+    cap['state'] = 'parked'
+    cap.pop('promoted_to', None)
+    cap.pop('spawned', None)
+    cap['updated_at'] = _now_utc_iso(now)
+    registry['schema_version'] = CAPTURES_SCHEMA_VERSION
+    try:
+        _atomic_write_captures(captures_path, registry)
+    except OSError as e:
+        first_line = str(e).splitlines()[0] if str(e) else type(e).__name__
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={'error': 'captures write failed', 'detail': first_line},
+        )
+    return True
+
+
 def _handle_project_archive(
     *,
     project_id: str,
     projects_path: Path,
+    captures_path: Optional[Path] = None,
     now: Optional[datetime] = None,
 ) -> dict[str, Any]:
-    """Pure handler for POST /api/projects/archive (p3f-reversibility-and-orphan,
-    spec § 5 / § 6 step 3). The Drop/Archive gesture: flip a project's `state` to
-    `archived` so it LEAVES "Actively working" and its original funnel source item
-    returns to the funnel — a mis-promote is reversible, not a dead end. Steps:
+    """Handler for POST /api/projects/archive (p3f-reversibility-and-orphan +
+    p3f2-archive-honest, spec § 6 step 2/3). The Drop/Archive gesture: flip a
+    project's `state` to `archived` so it LEAVES "Actively working", AND make the
+    outcome match the toast — a mis-promote returns to the funnel, an archive-only
+    drop says so. Steps:
 
       1. 404 if no project carries `project_id`.
       2. Idempotent: a project already `archived` is a no-op (applied=False) — no
-         write, no spurious heal-commit delta.
+         write, no spurious heal-commit delta — but still reports the honest
+         outcome from its provenance.
       3. Set `state='archived'`, stamp `updated_at`, atomic-write the registry.
+      4. If the project came from the funnel, RETURN the source: a capture is
+         re-parked here (`_return_capture_to_funnel`); a mission/orphan is
+         un-suppressed STRUCTURALLY — the funnel derive's promoted-source sets
+         (`_promoted_mission_ids`, `_promoted_orphan_task_ids`) and the
+         idempotency guard (`_find_active_project_by_promoted_from`) count ONLY
+         active projects, so flipping `state` to `archived` returns it to its lane
+         and lets it be re-promoted.
 
-    The un-suppression is structural, not a side effect coded here: the funnel
-    derive's promoted-source sets (`_promoted_mission_ids`,
-    `_promoted_orphan_task_ids`) and the idempotency guard
-    (`_find_active_project_by_promoted_from`) count ONLY active projects, so
-    flipping `state` to `archived` automatically returns the capture / mission /
-    orphan to its lane and lets it be re-promoted. Non-committer: the flip lands
-    on disk; `heal_projects_store.py` commits the delta. Returns
-    {project_id, state: 'archived', status: 'archived', applied}."""
+    Honesty contract (p3f2): the returned `status`/`message` is
+    "returned-to-funnel"/"returned to the funnel" iff the project carries a funnel
+    `promoted_from` (capture/mission/orphan); otherwise "archived"/"Archived". The
+    toast never claims a return that didn't happen.
+
+    Single-committer preserved: the project flip lands on projects.json ON DISK
+    (`heal_projects_store.py` is the SOLE committer of THAT file); the capture
+    un-flip lands on captures.json ON DISK (its own sole committer
+    `heal_missions_card_gc`). The dashboard commits neither. Locks taken in the
+    global CAPTURE→PROJECTS order (matching `_handle_capture_promote`) so an
+    archive's capture un-flip can't deadlock a concurrent promote. Returns
+    {project_id, state: 'archived', status, message, applied}."""
     now = now or datetime.now(timezone.utc)
-    with _PROJECTS_INGEST_LOCK:
-        registry = _read_projects_registry(projects_path)
-        project = None
-        for proj in registry['projects']:
-            if isinstance(proj, dict) and proj.get('id') == project_id:
-                project = proj
-                break
-        if project is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={
-                    'error': 'project not found',
+    # CAPTURE→PROJECTS lock order (same as _handle_capture_promote). The capture
+    # lock is taken unconditionally — archive is a rare human gesture and we don't
+    # know the provenance until the project is read under the projects lock, so
+    # acquiring capture-first is the only inversion-free order. The capture WRITE
+    # only happens for capture-provenance projects.
+    with _CAPTURE_INGEST_LOCK:
+        with _PROJECTS_INGEST_LOCK:
+            registry = _read_projects_registry(projects_path)
+            project = None
+            for proj in registry['projects']:
+                if isinstance(proj, dict) and proj.get('id') == project_id:
+                    project = proj
+                    break
+            if project is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail={
+                        'error': 'project not found',
+                        'project_id': project_id,
+                        'hint': 'project_id must name a project in the projects store',
+                    },
+                )
+
+            promoted_from = project.get('promoted_from')
+            outcome = _archive_outcome(promoted_from)
+
+            if project.get(
+                    'state', projects_store.DEFAULT_PROJECT_STATE) == 'archived':
+                # Idempotent no-op, but the toast must stay honest. Mission/orphan
+                # return structurally (kind-based outcome is correct), but a
+                # capture's return is only real if its row is STILL parked —
+                # deriving from kind alone would re-claim a return for a capture
+                # since GC'd/dropped (the exact leak this PR fixes, on the
+                # already-archived path).
+                idempotent_outcome = outcome
+                if (isinstance(promoted_from, dict)
+                        and promoted_from.get('kind') == 'capture'
+                        and not _capture_is_parked(
+                            captures_path, promoted_from.get('capture_id'))):
+                    idempotent_outcome = _archive_outcome(None)
+                return {
                     'project_id': project_id,
-                    'hint': 'project_id must name a project in the projects store',
-                },
-            )
+                    'state': 'archived',
+                    'status': idempotent_outcome['status'],
+                    'message': idempotent_outcome['message'],
+                    'applied': False,
+                }
 
-        if project.get('state', projects_store.DEFAULT_PROJECT_STATE) == 'archived':
-            return {
-                'project_id': project_id,
-                'state': 'archived',
-                'status': 'archived',
-                'applied': False,
-            }
+            project['state'] = 'archived'
+            project['updated_at'] = now.isoformat()
+            try:
+                _atomic_write_json(projects_path, registry)
+            except OSError as e:
+                first_line = str(e).splitlines()[0] if str(e) else type(e).__name__
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail={'error': 'projects write failed', 'detail': first_line},
+                )
 
-        project['state'] = 'archived'
-        project['updated_at'] = now.isoformat()
-        try:
-            _atomic_write_json(projects_path, registry)
-        except OSError as e:
-            first_line = str(e).splitlines()[0] if str(e) else type(e).__name__
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail={'error': 'projects write failed', 'detail': first_line},
-            )
+        # Project flip is persisted. For a capture source, re-park it so the
+        # "returned to the funnel" message is actually true (mission/orphan need
+        # no write — they return structurally). Still under _CAPTURE_INGEST_LOCK.
+        # If the capture row is gone (can't be re-parked), downgrade to an honest
+        # "Archived" — the toast must not claim a return that didn't happen.
+        if isinstance(promoted_from, dict) and promoted_from.get('kind') == 'capture':
+            if not _return_capture_to_funnel(
+                    captures_path, promoted_from.get('capture_id'), now):
+                outcome = _archive_outcome(None)
 
     return {
         'project_id': project_id,
         'state': 'archived',
-        'status': 'archived',
+        'status': outcome['status'],
+        'message': outcome['message'],
         'applied': True,
     }
 
@@ -8319,6 +8455,7 @@ def post_project_archive(
     return _handle_project_archive(
         project_id=body.project_id,
         projects_path=_projects_json_path(),
+        captures_path=_captures_json_path(),
     )
 
 
