@@ -4,6 +4,81 @@
 
 ---
 
+## Iteration ~2226 — 2026-06-18T23:34Z UTC (interactive, /cycle, Tier 3, consecutive_clean=21→22, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. All checks clean. Tier 3 steady-state continues (consecutive_clean=21→22).
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #576 verification window (closes 2026-06-19T13:35Z):** repair-watermark → `{"repaired": false, "old_watermark": 923, "file_length": 923}`. Watermark=file_length. Fix still holding. ✅
+- **PR #583 (p4-closeout-author):** CONFIRMED MERGED — `git log` shows `3bb474c9 feat(projects): author phase closeout on Done (#583)`. HEAD=origin/main=3bb474c9. Drop from standing findings. ✅
+- **All 5 daemon PIDs:** beacon 3734671 (Ss, ~45.1h) ✅, chain-event 3734305 (SNs, ~45.1h) ✅, inbox-watcher 3434697 (Ssl, ~66.3h) ✅, dashboard_api 130620 (Ssl, ~6.95h) ✅, outbox_notifier 130853 (Ss, ~6.95h) ✅.
+- **Stale bash orphan PID 1834248:** CONFIRMED alive (Ss, etimes=1829620s ≈ 21.17d). [blue carry]
+
+**Check 0 — Alert triage:** repair-watermark no-op (watermark=923=file_length=923). 0 new alerts. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → No entries. Outbox-notifier WARN at 17:23:29 local (MalformedForgeMarker for p4-closeout-outputs preflight) self-resolved at 17:28:45 (Forge emitted PROCEED after retry 1/3). Sub-threshold, transient, resolved. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot PID 3734671 alive (Ss). No Larry directives in last 4h. p4-closeout sequence active: build-phase dispatched for p4-closeout-outputs and p4-closeout-ui at 23:28Z. PR #584 created at 23:23Z (likely during preflight window for p4-closeout task, sequence progressing). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → 0 stalls. 8 FORGE_NO_PR_SKIP (all reason=pr_exists, all PRs merged). ✅ Nominal.
+
+**Check 4 — Pending directives:** watermark=923=file_length=923. beacon-pending-approvals.json: pending=0, history=237. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-18T23:05:22Z (~29 min ago). FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=3bb474c9=origin/main. Clean tree (untracked agents/pulse/trim_memory.py). On main. New commit since iter ~2225 (3bb474c9 = PR #583 merge). ✅
+
+**Check B — Sync health:** last_sync=2026-06-18T22:32:19Z (~62 min ago). Within 2h threshold. ✅
+
+**Check C — Agent liveness:** beacon 3734671 (Ss) ✅, chain-event 3734305 (SNs) ✅, inbox-watcher 3434697 (Ssl) ✅, dashboard_api 130620 (Ssl) ✅, outbox_notifier 130853 (Ss) ✅. 5/5. ✅
+
+**Check D — Inboxes:** beacon=0, forge=2 (build-p4-closeout-outputs.json + build-p4-closeout-ui.json, dispatched 23:28Z, ~6 min old — in-flight sequence tasks, not stale), mirror=0. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: PR #584 open ("feat(projects): P4 closeout DM handoff + loose-ends to funnel", created 23:23Z, ~11 min old, MERGEABLE, no review decision). In-flight p4-closeout sequence; 2 build tasks actively processing. ourliberty-dashboard: 0 open. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks:** Thursday 2026-06-18 UTC, weekday=3 ∉ {0,2,4,6}. Check I/III/VIII/IX/X: skip. ✅
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op (watermark=923=file_length). 0 new alerts.
+2. PRIME ledger: `iter_clean` appended (Tier 3).
+3. Tier state: `record --checks-clean true` → consecutive_clean=21→22, Tier 3 steady-state continues.
+
+**Dispatches:** None.
+
+**Standing findings (carried):**
+- [blue] **PR #576 verification window** — watermark-rotation-gap systemic fix; closes 2026-06-19T13:35Z; fix holding. [watch — closes tomorrow]
+- [blue] **PR #584 in-flight** — p4-closeout-ui/outputs (DM handoff + loose-ends); created 23:23Z; 2 build tasks in Forge inbox (dispatched 23:28Z). [watch]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [blue] **unreviewed-merge:571** — bot DM'd. Larry judgment. [carry]
+- [blue] **Stale bash orphan** — PID 1834248 (~21.17d+, sleep-loop). [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule catalog-accuracy-drift-tier4** — 1/3. Watch.
+- [blue] **G-rule ledger/check-i Tier-4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule mirror-marker-parse-error** — 1/3. Watch.
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+
+**PRIME DIRECTIVE:** 0 interventions this iter (iter_clean). Trailing-30d: interventions=1025, systemic_fixes=52, ratio=19.71, trend=improving.
+**Tier end-of-iter:** Tier 3, consecutive_clean=22. Last signal: 2026-06-18T10:23:58Z.
+
+---
+
 ## Iteration ~2225 — 2026-06-18T23:04Z UTC (interactive, /cycle, Tier 3, consecutive_clean=20→21, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).
