@@ -244,6 +244,134 @@ class ArchiveTest(_Base):
         self.assertEqual(build_pipeline(self._read_projects()), [])
 
 
+# ============ archive: honest message + durable return-to-funnel (p3f2) ======
+
+
+def _capture(cid='cap-1', *, state='promoted', title='Cap One', **extra):
+    cap = {'id': cid, 'state': state, 'title': title}
+    if state == 'promoted':
+        cap['promoted_to'] = extra.pop('promoted_to', f'{cid}-proj')
+        cap['spawned'] = extra.pop(
+            'spawned', {'kind': 'project', 'project_id': f'{cid}-proj'})
+    cap.update(extra)
+    return cap
+
+
+class ArchiveHonestMessageTest(_Base):
+    """p3f2-archive-honest: the toast must match behavior. A project promoted from
+    a funnel source returns to the funnel ('returned to the funnel'); a project
+    with no funnel provenance is archive-only ('Archived'). Reload-stable."""
+
+    def _capture_on_disk(self, cid) -> dict:
+        registry = json.loads(self.captures_path.read_text())
+        for cap in registry['captures']:
+            if cap['id'] == cid:
+                return cap
+        raise AssertionError(f'capture {cid} not on disk')
+
+    # ---- no provenance → honest "Archived" ----
+    def test_archive_without_provenance_says_archived(self):
+        self._seed_projects(_project())
+        r = self.client.post(ARCHIVE, headers=AUTH, json={'project_id': 'aging-idea'})
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(body['status'], 'archived')
+        self.assertEqual(body['message'], 'Archived')
+        self.assertTrue(body['applied'])
+        self.assertEqual(self.gh.calls, [])
+
+    # ---- mission provenance → honest "returned to the funnel", no capture write ----
+    def test_archive_mission_says_returned_to_funnel(self):
+        self._seed_projects(_project(
+            promoted_from={'kind': 'mission', 'mission_id': 'm-1'}))
+        before_caps = self.captures_path.read_text()
+        r = self.client.post(ARCHIVE, headers=AUTH, json={'project_id': 'aging-idea'})
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(body['status'], 'returned-to-funnel')
+        self.assertEqual(body['message'], 'returned to the funnel')
+        # mission/orphan return structurally — captures.json is untouched.
+        self.assertEqual(self.captures_path.read_text(), before_caps)
+        self.assertEqual(self.gh.calls, [])
+
+    # ---- orphan provenance → honest "returned to the funnel" ----
+    def test_archive_orphan_says_returned_to_funnel(self):
+        self._seed_projects(_project(
+            promoted_from={'kind': 'orphan', 'task_id': 'orphan-task-1'}))
+        r = self.client.post(ARCHIVE, headers=AUTH, json={'project_id': 'aging-idea'})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['message'], 'returned to the funnel')
+
+    # ---- capture provenance → re-park the capture so the return is REAL ----
+    def test_archive_capture_re_parks_and_says_returned(self):
+        self._seed_captures(_capture('cap-1', promoted_to='cap-1-proj'))
+        self._seed_projects(_project(
+            'cap-1-proj',
+            promoted_from={'kind': 'capture', 'capture_id': 'cap-1'}))
+
+        r = self.client.post(ARCHIVE, headers=AUTH, json={'project_id': 'cap-1-proj'})
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(body['status'], 'returned-to-funnel')
+        self.assertEqual(body['message'], 'returned to the funnel')
+        self.assertEqual(self.gh.calls, [])
+
+        # The capture is actually back in the parked lane — state flipped, the
+        # promote-stamped fields cleared (so it's a clean re-park, not a ghost).
+        cap = self._capture_on_disk('cap-1')
+        self.assertEqual(cap['state'], 'parked')
+        self.assertNotIn('promoted_to', cap)
+        self.assertNotIn('spawned', cap)
+
+        # Reload-stable: re-derive the funnel from disk → the capture is back in
+        # the parked lane, and the project is gone from the pipeline.
+        from datetime import datetime, timezone
+        caps = json.loads(self.captures_path.read_text())['captures']
+        parked = da._parked_from_captures(caps, datetime.now(timezone.utc))
+        self.assertIn('cap-1', {p['capture_id'] for p in parked})
+
+        from projects_store import build_pipeline
+        self.assertEqual(build_pipeline(self._read_projects()), [])
+        self.assertEqual(self._project_on_disk('cap-1-proj')['state'], 'archived')
+
+    def test_archive_capture_missing_capture_is_fail_safe(self):
+        # The project claims capture provenance but the capture row is gone — the
+        # un-flip is a no-op (nothing to return) and the archive still succeeds.
+        self._seed_captures()  # no captures
+        self._seed_projects(_project(
+            'cap-1-proj',
+            promoted_from={'kind': 'capture', 'capture_id': 'cap-1'}))
+        r = self.client.post(ARCHIVE, headers=AUTH, json={'project_id': 'cap-1-proj'})
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        # Nothing was re-parked → the toast must NOT claim a return.
+        self.assertEqual(body['message'], 'Archived')
+        self.assertEqual(body['status'], 'archived')
+        self.assertEqual(self._project_on_disk('cap-1-proj')['state'], 'archived')
+
+    # ---- idempotent re-archive still reports the honest outcome, no 2nd write ----
+    def test_re_archive_capture_idempotent_reports_outcome(self):
+        self._seed_captures(_capture('cap-1', promoted_to='cap-1-proj'))
+        self._seed_projects(_project(
+            'cap-1-proj',
+            promoted_from={'kind': 'capture', 'capture_id': 'cap-1'}))
+        first = self.client.post(ARCHIVE, headers=AUTH,
+                                 json={'project_id': 'cap-1-proj'})
+        self.assertTrue(first.json()['applied'])
+        caps_after_first = self.captures_path.read_text()
+        projs_after_first = self.projects_path.read_text()
+
+        second = self.client.post(ARCHIVE, headers=AUTH,
+                                  json={'project_id': 'cap-1-proj'})
+        self.assertEqual(second.status_code, 200)
+        body = second.json()
+        self.assertFalse(body['applied'])
+        self.assertEqual(body['message'], 'returned to the funnel')
+        # No second write to either store (no spurious heal-commit churn).
+        self.assertEqual(self.captures_path.read_text(), caps_after_first)
+        self.assertEqual(self.projects_path.read_text(), projs_after_first)
+
+
 # ==================== orphan promote ====================
 
 
