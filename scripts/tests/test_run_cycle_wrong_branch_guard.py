@@ -39,10 +39,18 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from ._runtime_script_test_support import (
-    copy_larry_alerts_cli,
-    install_timeout_shim,
-)
+try:  # dotted/pytest path: relative import within the scripts.tests package
+    from ._runtime_script_test_support import (
+        copy_larry_alerts_cli,
+        install_timeout_shim,
+        scrub_run_sentinel,
+    )
+except ImportError:  # discover loads this module top-level (no package parent)
+    from _runtime_script_test_support import (
+        copy_larry_alerts_cli,
+        install_timeout_shim,
+        scrub_run_sentinel,
+    )
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 _RUN_CYCLE = _REPO_ROOT / 'scripts' / 'run_cycle.sh'
@@ -130,6 +138,10 @@ class _RunCycleTestBase(unittest.TestCase):
         env = os.environ.copy()
         env['HOME'] = str(self.home)
         env['PATH'] = f'{self.stub_bin}:{env["PATH"]}'
+        # HOME-sandboxed tree → let the larry_alerts subprocess emit for real
+        # (subprocess equivalent of test_isolation_guard.allow()); the inherited
+        # run sentinel would otherwise make the choke guard drop the alert.
+        scrub_run_sentinel(env)
         return subprocess.run(
             ['bash', str(self.scripts_dir / 'run_cycle.sh')],
             env=env, cwd=self.repo_dir,

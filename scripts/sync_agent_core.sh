@@ -23,6 +23,19 @@ BACKUP_ROOT="${BACKUP_ROOT:-/home/larry/agents/.sync-backup}"
 # tmpdir, doesn't trip write_status on the hardcoded /home/larry path.
 BLACKBOARD_DIR="${BLACKBOARD_DIR:-${LIVE_ROOT}/blackboard}"
 SYNC_STATUS_FILE="${BLACKBOARD_DIR}/agent-core-sync.json"
+# One-tick grace marker for the uncommitted-changes refusal (see the dirty-tree
+# block below). Presence means "the previous sync tick already saw
+# non-allowlisted uncommitted dirt". We alert only when the condition persists
+# across two consecutive ticks, and the EXIT trap clears the marker on every
+# non-dirty-refuse exit — so a single-tick blip (the common case: Pulse's
+# auto-commit or the GC healer commits the dirt by the next ~5min tick) never
+# pages.
+UNCOMMITTED_GRACE_MARKER="${BLACKBOARD_DIR}/agent-core-sync-uncommitted-grace"
+# Set to 1 ONLY on the tick that refuses because of non-allowlisted uncommitted
+# dirt. The EXIT trap reads it: it preserves the grace marker on a dirty-refuse
+# tick and clears it on every other exit, so the marker strictly tracks
+# *consecutive* dirty-refuse ticks (see the uncommitted-changes block).
+UNCOMMITTED_DIRTY_REFUSE=0
 SCRIPTS_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Directories that must NEVER be touched by sync
@@ -110,9 +123,43 @@ write_status() {
 STATUSEOF
 }
 
+# One-tick grace for the uncommitted-changes refusal -------------------------
+# The dirty working tree almost always clears by the next sync tick (~5min) when
+# Pulse's auto-commit or heal_missions_card_gc.py lands, so alerting on the FIRST
+# dirty tick cries wolf — and because larry_alerts is append-only with no resolve,
+# the 🟡 SOON board warning never retracts (the 2026-06-18 07:51→07:56 one-tick
+# false alarm). We defer: suppress the alert on the first dirty tick, fire only
+# when the dirt is STILL present on a second consecutive tick. The refusal/exit-1
+# itself is unconditional — sync never pulls onto a dirty tree; only the
+# *alerting* is graced. The EXIT trap clears the marker on every non-dirty-refuse
+# exit, so it tracks *consecutive* dirty ticks and can't go stale.
+uncommitted_grace_marker_present() {
+    [ -f "$UNCOMMITTED_GRACE_MARKER" ]
+}
+set_uncommitted_grace_marker() {
+    # Best-effort: advisory state must never break the sync safety flow. If it
+    # can't persist, the next tick simply re-defers (fail-safe-quiet) rather
+    # than the script exiting under `set -e`.
+    mkdir -p "$(dirname "$UNCOMMITTED_GRACE_MARKER")" 2>/dev/null || true
+    date -u '+%Y-%m-%dT%H:%M:%SZ' > "$UNCOMMITTED_GRACE_MARKER" 2>/dev/null || true
+}
+clear_uncommitted_grace_marker() {
+    rm -f "$UNCOMMITTED_GRACE_MARKER" 2>/dev/null || true
+}
+
 cleanup() {
     if [ -d "$STAGING_ROOT" ]; then
         rm -rf "$STAGING_ROOT"
+    fi
+    # One-tick grace bookkeeping (see the uncommitted-changes block). The marker
+    # must track ONLY consecutive dirty-refuse ticks, so clear it on EVERY exit
+    # except the dirty-refuse path that just set/kept it. Centralising the clear
+    # here — rather than at each clean/tolerate/abort site — means no early exit
+    # (wrong-branch, auto-commit-push-failed, validation/quiescence abort, or an
+    # unexpected `set -e` death) can leave a stale marker that would spuriously
+    # page on a later genuine first dirty tick.
+    if [ "${UNCOMMITTED_DIRTY_REFUSE:-0}" != "1" ]; then
+        clear_uncommitted_grace_marker
     fi
 }
 trap cleanup EXIT
@@ -227,15 +274,37 @@ fi
 if ! git diff --quiet || ! git diff --cached --quiet; then
     if all_modified_in_sync_extra_allowlist "$REPO_DIR"; then
         log "Only healer-owned runtime dirt (captures.json/missions.json) present — tolerating; heal_missions_card_gc.py is its committer. Proceeding to pull."
+        # Proceeding (tolerated dirt) is not a dirty-refuse, so the EXIT trap
+        # clears the grace marker and a future first dirty tick starts fresh.
     else
+        # This tick refuses because of non-allowlisted dirt. Flag it so the EXIT
+        # trap PRESERVES the grace marker (every other exit clears it) — that is
+        # what makes the marker track *consecutive* dirty-refuse ticks.
+        UNCOMMITTED_DIRTY_REFUSE=1
         log "ERROR: Working tree has uncommitted changes. Sync refuses to operate."
         write_status "error" "Uncommitted changes in working tree"
         DIRTY_FILES=$(git status --short | head -10)
-        alert_larry "uncommitted changes block sync" "sync_agent_core.sh refused to run because ${REPO_DIR} has uncommitted modifications. First 10 files: $DIRTY_FILES. Action: ssh ourliberty-vm, commit or stash the changes."
-        emit_larry_alert_envelope "sync-blocked:uncommitted-changes" "ourliberty-sync.service refusing to pull: ${REPO_DIR} has uncommitted modifications. Working tree will not receive PR merges from origin/main until cleaned. Recovery: cd ${REPO_DIR} && git status; commit or stash the changes."
+        # One-tick grace: in practice this non-allowlisted dirt clears by the
+        # next tick (~5min) when Pulse's auto-commit or the GC healer commits it,
+        # so the first dirty tick is almost always a false alarm. Suppress the
+        # alert on the first occurrence; page only when the dirt is STILL present
+        # on a second consecutive tick. The refusal/exit-1 below is unconditional
+        # either way — sync never pulls onto a dirty tree.
+        if uncommitted_grace_marker_present; then
+            log "Uncommitted changes still present on a second consecutive tick — alerting."
+            alert_larry "uncommitted changes block sync" "sync_agent_core.sh refused to run because ${REPO_DIR} has uncommitted modifications across two consecutive sync ticks. First 10 files: $DIRTY_FILES. Action: ssh ourliberty-vm, commit or stash the changes."
+            emit_larry_alert_envelope "sync-blocked:uncommitted-changes" "ourliberty-sync.service refusing to pull: ${REPO_DIR} has uncommitted modifications (persisted across two consecutive sync ticks). Working tree will not receive PR merges from origin/main until cleaned. Recovery: cd ${REPO_DIR} && git status; commit or stash the changes."
+        else
+            set_uncommitted_grace_marker
+            log "First dirty tick — deferring the uncommitted-changes alert one tick (usually clears when Pulse auto-commit / the GC healer lands by the next tick). Will alert if still dirty next tick."
+        fi
         exit 1
     fi
 fi
+# Clean (or tolerated) fall-through: this tick is not a dirty-refuse, so the EXIT
+# trap clears any grace marker left by a prior tick. Keeping the clear in the
+# trap (not here) closes the stale-marker gap on the early wrong-branch and
+# auto-commit-push-failed exits above, which never reach this point.
 
 # Store current HEAD before fetch
 OLD_HEAD="$(git rev-parse HEAD)"
