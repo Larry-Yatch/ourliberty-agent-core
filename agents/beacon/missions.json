@@ -3947,7 +3947,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-18T15:51:16.887178+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-18T15:40:56.364377+00:00"
+      "orphan_last_activity_ts": "2026-06-18T15:40:56.364377+00:00",
+      "briefing": {
+        "what": "A piece of work the team has been building over several sessions that isn't yet attached to any approved project.",
+        "why": "Effort is being spent on something with no clear business owner or goal, so it could be drifting without delivering value.",
+        "suggest": "Pause to confirm what this is meant to achieve and tie it to a real priority before the team puts more time into it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-18T16:00:16.260562+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
