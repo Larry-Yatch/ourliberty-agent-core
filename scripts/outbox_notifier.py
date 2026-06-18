@@ -5742,6 +5742,27 @@ def _stamp_phase_done_for_sequence(seq_id: str) -> None:
         )
 
 
+def _author_phase_closeout_for_sequence(seq: dict) -> None:
+    """p4-closeout-author: on SEQUENCE_COMPLETE, author the phase's closeout — a
+    plain-language summary + structured schema (shipped / changed-vs-spec /
+    learnings / cost / done-gate) — onto its card and tick the North Star
+    tracker. Runs right after the done-stamp so the just-completed phase writes
+    its own story. The author does only NON-committer writes (heal_projects_store
+    commits both the card and the ticked doc); this wrapper adds a
+    daemon-never-wedge guard so closeout authoring can NEVER block or corrupt the
+    completion signal. A non-launch sequence (no matching phase) is a no-op."""
+    try:
+        import projects_closeout_author as closeout  # local import: optional dep
+        if closeout.run_closeout_for_sequence(seq):
+            log(f'phase closeout: authored for seq={seq.get("seq_id")}')
+    except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+        log(
+            f'phase closeout for seq={seq.get("seq_id")} raised '
+            f'{type(e).__name__}: {e}; swallowing',
+            'WARN',
+        )
+
+
 def _maybe_signal_sequence_complete(seq_id: str) -> None:
     """Emit the one-time completion signal (chain event + Larry DM) for a
     sequence that has just reached `complete`, exactly once.
@@ -5803,6 +5824,10 @@ def _maybe_signal_sequence_complete(seq_id: str) -> None:
         # no-op), event-driven, fail-safe — a non-launch sequence has no
         # matching phase and this is a logged no-op.
         _stamp_phase_done_for_sequence(seq_id)
+        # p4-closeout-author: the just-done phase authors its own closeout onto
+        # the card + ticks the North Star tracker (non-committer writes; the
+        # healer commits). Fail-safe — never wedges the completion signal.
+        _author_phase_closeout_for_sequence(seq)
         _emit_sequence_complete_chain_event(seq)
         larry_alerts.append_alert(
             source='outbox-notifier',

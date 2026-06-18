@@ -176,13 +176,51 @@ def _projects_git_dirty(repo: Path) -> bool:
     return unstaged or staged
 
 
-def commit_and_push_projects(repo: Path, audit_msg: str) -> str:
-    """Commit + push any projects.json delta to origin/main. Returns a status
-    token:
+def _north_star_doc_rels(repo: Path, registry: dict[str, Any]) -> list[str]:
+    """Repo-relative paths of the North Star docs referenced by the registry's
+    projects (each project's ``north_star_ref``, ``#anchor`` stripped). The
+    closeout's status-tracker tick writes one of these docs to disk
+    (non-committer); the healer — SOLE committer — drains that delta in the SAME
+    commit as the projects.json card write, so the card and its North Star tick
+    land atomically (single-committer invariant, spec § 2 / § 3). Only in-repo,
+    on-disk paths are returned (a null / stale / traversal ref is skipped)."""
+    rels: list[str] = []
+    seen: set[str] = set()
+    repo_resolved = repo.resolve()
+    for proj in registry.get('projects', []) or []:
+        if not isinstance(proj, dict):
+            continue
+        ref = proj.get('north_star_ref')
+        if not isinstance(ref, str):
+            continue
+        rel = ref.split('#', 1)[0].strip()
+        if not rel or rel in seen:
+            continue
+        p = repo / rel
+        try:
+            p.resolve().relative_to(repo_resolved)
+        except (ValueError, OSError):
+            continue  # absolute / traversal / unresolvable — never stage it
+        if not p.exists():
+            continue
+        seen.add(rel)
+        rels.append(rel)
+    return rels
+
+
+def commit_and_push_projects(
+    repo: Path, audit_msg: str, *, extra_rels: tuple[str, ...] = (),
+) -> str:
+    """Commit + push any projects.json (and referenced North Star doc) delta to
+    origin/main. Returns a status token:
       'nothing'       — no delta to commit
       'wrong-branch'  — repo not on main; refuse to commit — caller escalates
       'committed'     — committed and pushed
       'commit-failed' / 'push-failed' — git step failed; commit retained locally
+
+    ``extra_rels`` are additional repo-relative paths (the North Star tracker
+    docs) staged into the SAME commit so the closeout's two artifacts — the phase
+    card and its North Star tick — are durable together under the one committer.
 
     Push uses heal_missions_card_gc's strategy: try push; on a non-FF refusal,
     pull --rebase --autostash and retry; abort the rebase on conflict. Never
@@ -193,14 +231,21 @@ def commit_and_push_projects(repo: Path, audit_msg: str) -> str:
     if branch != 'main':
         return 'wrong-branch'
 
-    clean = _git(repo, 'diff', '--quiet', '--', PROJECTS_REL)
-    clean_cached = _git(repo, 'diff', '--quiet', '--cached', '--', PROJECTS_REL)
-    # rc 0 == no diff; rc 1 == differs. Both clean → nothing to do.
-    if clean.returncode == 0 and clean_cached.returncode == 0:
+    rels = [PROJECTS_REL, *extra_rels]
+    # rc 0 == no diff; rc 1 == differs. Tree is clean iff EVERY rel is clean in
+    # both the working tree and the index — else there is a delta to commit.
+    any_delta = False
+    for rel in rels:
+        unstaged = _git(repo, 'diff', '--quiet', '--', rel).returncode != 0
+        staged = _git(repo, 'diff', '--quiet', '--cached', '--', rel).returncode != 0
+        if unstaged or staged:
+            any_delta = True
+    if not any_delta:
         return 'nothing'
 
-    if _git(repo, 'add', PROJECTS_REL).returncode != 0:
-        return 'commit-failed'
+    for rel in rels:
+        if _git(repo, 'add', rel).returncode != 0:
+            return 'commit-failed'
     commit = _git(
         repo, 'commit',
         '-m', 'chore(projects): projects-store healer — commit projects.json delta',
@@ -254,13 +299,20 @@ def run_once(*, dry_run: bool, now: Optional[datetime] = None) -> int:
     changed = (normalized != raw) or not path.exists()
     n_projects = len(normalized.get('projects', []))
     core = repo_paths.get('ourliberty-agent-core')
+    # North Star docs the closeout may have ticked (non-committer wrote them to
+    # disk); the healer drains them into the same commit as the card.
+    extra_rels = tuple(_north_star_doc_rels(core, normalized)) if core else ()
 
     if dry_run:
         # Report the *git* delta too, not just the normalization delta: the
         # dashboard/Beacon write a well-formed, already-normalized projects.json
         # to disk, so `changed` is False on the common path even though there is
         # a real git delta the live tick must commit. Read-only here.
-        git_dirty = core is not None and _projects_git_dirty(core)
+        git_dirty = core is not None and (
+            _projects_git_dirty(core)
+            or any(_git(core, 'diff', '--quiet', '--', r).returncode != 0
+                   or _git(core, 'diff', '--quiet', '--cached', '--', r).returncode != 0
+                   for r in extra_rels))
         if changed:
             disp = 'would write + commit (normalization delta)'
         elif git_dirty:
@@ -288,7 +340,7 @@ def run_once(*, dry_run: bool, now: Optional[datetime] = None) -> int:
     commit_status = 'nothing'
     if core is not None:
         audit = f'projects={n_projects} dropped={len(dropped)} normalized@{now.isoformat()}'
-        commit_status = commit_and_push_projects(core, audit)
+        commit_status = commit_and_push_projects(core, audit, extra_rels=extra_rels)
         log(f'commit status: {commit_status}')
 
     log(f'Done. projects={n_projects} changed={changed} commit={commit_status} dropped={len(dropped)}')

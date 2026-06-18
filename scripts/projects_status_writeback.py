@@ -166,6 +166,33 @@ def stamp_building(
     return _apply(_mut, now=now)
 
 
+def attach_closeout(
+    *, seq_id: str, closeout_fields: dict[str, Any],
+    now: Optional[datetime] = None,
+) -> bool:
+    """Merge an authored ``closeout`` (the schema dict + ``closeout_provenance``,
+    as returned by ``projects_closeout_author.author_phase_closeout``) onto the
+    phase whose ``sequence_ref == seq_id``, on disk (NON-committer). Returns True
+    iff a write happened. Idempotent (re-attaching the same closeout is a no-op,
+    so a duplicate SEQUENCE_COMPLETE leaves no spurious delta) and fail-safe (a
+    sequence with no matching phase — e.g. a non-launch build sequence — is a
+    logged no-op). Event-driven: invoked on the SEQUENCE_COMPLETE event, right
+    after the done-stamp. The decision logic (idempotency, shape) lives in the
+    pure ``projects_store.attach_phase_closeout``; this only adds the IO."""
+    def _mut(registry: dict[str, Any]) -> bool:
+        _, phase = projects_store.find_phase_by_sequence_ref(registry, seq_id)
+        if phase is None:
+            _log(f'closeout attach: no phase with sequence_ref={seq_id!r} — no-op')
+            return False
+        changed = projects_store.attach_phase_closeout(
+            phase, closeout_fields, now=now)
+        if changed:
+            _log(f'attached closeout: sequence_ref={seq_id} phase={phase.get("id")}')
+        return changed
+
+    return _apply(_mut, now=now)
+
+
 def stamp_done(*, seq_id: str, now: Optional[datetime] = None) -> bool:
     """Stamp the phase whose ``sequence_ref == seq_id`` to ``done``, on disk
     (non-committer). Returns True iff a write happened. Idempotent
