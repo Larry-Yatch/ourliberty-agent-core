@@ -3895,7 +3895,11 @@
         "at": "2026-06-18T15:29:39.795842+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-18T15:51:16.887178+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-dag-preflight-projects-v3-p3-followup2-v2",
@@ -3927,6 +3931,23 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-p3f2-archive-honest",
+      "name": "P3f2 Archive Honest",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `p3f2-archive-honest`. Last activity 2026-06-18T15:40:56.364377+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "p3f2-archive-honest"
+      ],
+      "repo": null,
+      "created": "2026-06-18",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-18T15:51:16.887178+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-18T15:40:56.364377+00:00"
     }
   ]
 }
