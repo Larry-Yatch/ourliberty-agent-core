@@ -4,6 +4,88 @@
 
 ---
 
+## Iteration ~2211 — 2026-06-18 15:39Z UTC (interactive, /cycle, Tier 3, consecutive_clean=6→7, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. All checks clean. Tier 3 steady-state continues (consecutive_clean=6→7).
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #576 verification window (closes 2026-06-19T13:35Z):** repair-watermark → `{"repaired": false, "old_watermark": 917, "file_length": 918}`. Fix confirmed still holding. ✅
+- **All 5 daemon PIDs:** beacon 3734671 (Ss, 1d 13h 12m) ✅, chain-event 3734305 (SNs, 1d 13h 13m) ✅, inbox-watcher 3434697 (Ssl, 2d 10h 23m) ✅, dashboard_api 4159159 (Ssl, 14h 7m) ✅, outbox_notifier 4159430 (Ss, 14h 7m) ✅.
+- **Repo HEAD:** 61f958d6=origin/main (spec(projects-v3): P4 — closeout pass, PR #580). Clean tree. ✅ (New since iter ~2210 — P4 spec merged.)
+- **Stale bash orphan PID 1834248:** CONFIRMED alive (20d 20h 19m). Naming-mismatch exit condition; loop will never self-exit. Low CPU. [blue carry]
+- **Orphan worktree `wt-mirror-dag-preflight-projects-v3-p3-followup`:** CONFIRMED directory persists at `/home/larry/agent-worktrees/` (Jun 17 16:57). Git registration pruned (not in `git worktree list`). Not blocking. [blue carry]
+- **Pipeline projects-v3-p3-followup2:** DAG preflight PASSED (L918, 15:10Z). Sequence advancer dispatched first build. Forge built PR #579 (15:25Z). Mirror picked up `review-p3f2-promote-lands-proposed.json` (inbox now empty → .archive). PROGRESSING. ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 917, "file_length": 918}`. **1 new alert at L918.** `source=outbox-notifier, subject=mirror-dag-pass:projects-v3-p3-followup2, ts=2026-06-18T15:10:56Z`. Triage helper → **Tier-3 silence** (known-pattern match, route=digest). Bot already delivered (log: `alert idx=917 delivered` at 15:13Z). Watermark advanced 917→918. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → No entries. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot PID 3734671 (Ss). Last log entry 09:13:31-0600 (15:13:31Z) — `alert idx=917 delivered (source=outbox-notifier, subject=mirror-dag-pass:projects-v3-p3-followup2)`. No new Larry directives since 08:22Z (`go` for dag-preflight). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → 0 stalls. 9 FORGE_NO_PR_SKIP (all reason=pr_exists; 8→9 because p3f2-promote-lands-proposed now has PR #579). ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` pending=0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=`2026-06-18T15:34:01Z` (~5 min). FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=61f958d6=origin/main. Clean tree. On main. Up to date. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-18T15:31:57Z (~8 min), status=success. Within 2h. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon 3734671 (Ss) ✅, chain-event 3734305 (SNs) ✅, inbox-watcher 3434697 (Ssl) ✅, dashboard_api 4159159 (Ssl) ✅, outbox_notifier 4159430 (Ss) ✅. All 5/5 alive. ✅ Nominal.
+
+**Check D — Inboxes:** beacon=0, forge=0, mirror=0 (review-p3f2-promote-lands-proposed.json archived between checks — Mirror picked up). ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: PR #579 `fix(projects-v3): promote creates+persists project for proposed/raw-orphan source`, created 15:25Z (~14 min at check time), mergeable=UNKNOWN, reviewDecision="", autoMerge=null. Under 30-min threshold — no action this iter. Watch next iter. ourliberty-dashboard: 0 open. ✅ Nominal.
+
+**Check H — Forge digest:** New since iter ~2210: PR #580 (spec(projects-v3): P4 — closeout pass) merged — new HEAD 61f958d6. P4 phase scoped. PR #579 opened (first p3-followup2 build task). Two p3-followup2 dag-preflight worktrees registered in git: `wt-mirror-dag-preflight-projects-v3-p3-followup2` (14:22Z) + `wt-mirror-dag-preflight-projects-v3-p3-followup2-v2` (15:08Z) — normal Mirror retry pass. Pipeline active and flowing. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** `audit_due_nudge.py` no-op. `distill_detector.py` no-op. `audit_cadence_signal.py` no-op. ✅
+
+**Conditional checks:** Thursday 2026-06-18 UTC, weekday=3 ∉ {0,2,4,6}. Check I/III/VIII/IX/X: skip. ✅
+
+**Actions taken:**
+1. Check 0: Triaged L918 → Tier-3 silence. Watermark advanced 917→918.
+2. PRIME ledger: `iter_clean` appended (Tier 3).
+3. Tier state: `record --checks-clean true` → consecutive_clean=6→7, Tier 3 steady-state continues.
+
+**Dispatches:** None.
+
+**Standing findings (carried):**
+- [blue] **PR #576 verification window** — watermark-rotation-gap systemic fix; closes 2026-06-19T13:35Z; repair-watermark no-op confirms fix holding. [watch]
+- [blue] **projects-v3-p3-followup2 pipeline active** — PR #579 in Mirror review; expect more Forge build tasks next iter(s).
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [blue] **unreviewed-merge:571** — bot DM'd. Larry judgment. [carry]
+- [blue] **Stale bash orphan** — PID 1834248 (20d 20h+ sleep-loop). [carry]
+- [blue] **Orphan worktree** — `wt-mirror-dag-preflight-projects-v3-p3-followup` (dir only, Jun 17, git reg pruned). [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule catalog-accuracy-drift-tier4** — 1/3. Watch.
+- [blue] **G-rule ledger/check-i Tier-4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule mirror-marker-parse-error** — 1/3. Watch.
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+
+**Next:** Tier 3 steady-state (30-min cadence). Watch PR #579 for Mirror PASS + auto-merge.
+
+**PRIME DIRECTIVE:** 0 interventions this iter (iter_clean). Trailing-30d: interventions=1025, systemic_fixes=52, ratio=19.71, trend=improving.
+**Tier end-of-iter:** Tier 3, consecutive_clean=6→7 (steady-state). Last signal 10:23:58Z.
+
+---
+
 ## Iteration ~2209 — 2026-06-18 14:31Z UTC (interactive, /cycle, Tier 3, consecutive_clean=4→5, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).
