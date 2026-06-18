@@ -4,6 +4,90 @@
 
 ---
 
+## Iteration ~2213 — 2026-06-18 16:39Z UTC (interactive, /cycle, Tier 3, consecutive_clean=8→9, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. All checks clean. Tier 3 steady-state continues (consecutive_clean=8→9).
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #576 verification window (closes 2026-06-19T13:35Z):** repair-watermark → `{"repaired": false, "old_watermark": 920, "file_length": 921}`. No compaction gap. Fix still holding. ✅
+- **Pipeline projects-v3-p3-followup2:** L921 `sequence-complete` alert confirms all 3 steps merged (PR #579 + PR #582 + dashboard PR #64). COMPLETE. ✅
+- **PR #582:** CONFIRMED merged 16:08Z (`fix(projects-v3): p3f2 — make Drop/Archive honest + durable`). ✅
+- **All 5 daemon PIDs:** beacon 3734671 (Ss, 1d 14h+) ✅, chain-event 3734305 (SNs, 1d 14h+) ✅, inbox-watcher 3434697 (Ssl, 2d 11h+) ✅, dashboard_api **130620** (Ssl, ~2:27 — healer restart 16:34Z per PR #582 mtime drift) ✅, outbox_notifier **130853** (Ss, ~2:19 — same restart) ✅.
+- **Repo HEAD:** 87149b91=origin/main (chore: missions healer auto-commits × 2 since iter ~2212). Clean tree. ✅
+- **Stale bash orphan PID 1834248:** not re-verified this iter (last confirmed alive iter ~2212, pattern stable). [blue carry]
+- **Orphan worktree `wt-mirror-dag-preflight-projects-v3-p3-followup`:** not re-verified this iter (last confirmed dir-only, git reg pruned). [blue carry]
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 920, "file_length": 921}`. **1 new alert (L921).**
+- L921: `source=outbox-notifier, subject=sequence-complete:projects-v3-p3-followup2, ts=16:27:07Z` — pipeline complete, all 3 steps merged. Bot delivered DM at 16:29:44Z. Triage helper → **Tier-3 silence** (known pattern). Route=digest. ✅
+Watermark advanced 920→921. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → No entries. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot PID 3734671 alive (Ss). Last Larry directive: 08:22:30-0600 (14:22:30Z) `go` for dag-preflight-projects-v3-p3-followup2 — tracked to completion by chain. Last bot message: `alert idx=920 delivered (sequence-complete)` at 10:29:44-0600 (16:29:44Z). No orphaned directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → 0 stalls. 9 FORGE_NO_PR_SKIP (all reason=pr_exists). ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` pending=0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=`2026-06-18T16:34:14Z` (~5 min). FRESH (<60 min). Dashboard_api + outbox_notifier restarted by healer at 16:34Z (mtime drift from PR #582 code update, working as designed). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=87149b91=origin/main. Clean tree. On main. Up to date. 2 missions-healer auto-commits since iter ~2212. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-18T16:31:38Z (~8 min), status=no-change. Within 2h. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon 3734671 (Ss) ✅, chain-event 3734305 (SNs) ✅, inbox-watcher 3434697 (Ssl) ✅, dashboard_api 130620 (Ssl) ✅, outbox_notifier 130853 (Ss) ✅. All 5/5 alive. ✅ Nominal.
+
+**Check D — Inboxes:** beacon=0, forge=0, mirror=0. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open. ✅ Nominal.
+
+**Check H — Forge digest:** Shipped since iter ~2212: PR #582 (fix(projects-v3): p3f2 — make Drop/Archive honest + durable, agent-core) merged 16:08Z; dashboard PR #64 (feat(projects-v3): p3f2 — refetch board after actions + error surfacing + copy fix) merged 16:27Z. **Pipeline projects-v3-p3-followup2 COMPLETE** — all 3 steps shipped. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** `audit_due_nudge.py` no-op. `distill_detector.py` no-op. `audit_cadence_signal.py` no-op. ✅
+
+**Conditional checks:** Thursday 2026-06-18 UTC, weekday=3 ∉ {0,2,4,6}. Check I/III/VIII/IX/X: skip. ✅
+
+**Actions taken:**
+1. Check 0: Triaged L921 → Tier-3 silence (sequence-complete). Watermark advanced 920→921.
+2. PRIME ledger: `iter_clean` appended (Tier 3).
+3. Tier state: `record --checks-clean true` → consecutive_clean=8→9, Tier 3 steady-state continues.
+
+**Dispatches:** None.
+
+**Standing findings (carried):**
+- [blue] **PR #576 verification window** — watermark-rotation-gap systemic fix; closes 2026-06-19T13:35Z; repair-watermark no-op confirms fix holding. [watch]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [blue] **unreviewed-merge:571** — bot DM'd. Larry judgment. [carry]
+- [blue] **Stale bash orphan** — PID 1834248 (20d+ sleep-loop). [carry]
+- [blue] **Orphan worktree** — `wt-mirror-dag-preflight-projects-v3-p3-followup` (dir only, git reg pruned). [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule catalog-accuracy-drift-tier4** — 1/3. Watch.
+- [blue] **G-rule ledger/check-i Tier-4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule mirror-marker-parse-error** — 1/3. Watch.
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+
+**Next:** Tier 3 steady-state (30-min cadence). PR #576 verification window closes 2026-06-19T13:35Z.
+
+**PRIME DIRECTIVE:** 0 interventions this iter (iter_clean). Trailing-30d: interventions=1025, systemic_fixes=52, ratio=19.71, trend=improving.
+**Tier end-of-iter:** Tier 3, consecutive_clean=8→9 (steady-state). Last signal 10:23:58Z.
+
+---
+
 ## Iteration ~2212 — 2026-06-18 16:07Z UTC (interactive, /cycle, Tier 3, consecutive_clean=7→8, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).
