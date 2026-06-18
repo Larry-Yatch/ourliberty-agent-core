@@ -27,6 +27,33 @@
         "kind": "capture",
         "capture_id": "cap-tier-alert-cycle-3-pr-close-out-plan-3819"
       }
+    },
+    {
+      "id": "pending-approvals-3-plus-unregistered-ar-iter-15",
+      "title": "Pending Approvals 3 Plus Unregistered Ar Iter 1559",
+      "north_star_ref": null,
+      "repo": null,
+      "state": "archived",
+      "phases": [
+        {
+          "id": "pending-approvals-3-plus-unregistered-ar-iter-15",
+          "title": "Pending Approvals 3 Plus Unregistered Ar Iter 1559",
+          "desired_end_state": "Auto-proposed from orphan task `pending-approvals-3-plus-unregistered-ar-iter-1559`. Last activity 2026-06-12T05:09:20.161842+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+          "lifecycle_state": "brainstorm",
+          "order": 0,
+          "spec_ref": null,
+          "sequence_ref": null,
+          "created_at": "2026-06-18T22:02:06.789554+00:00",
+          "updated_at": "2026-06-18T22:02:06.789554+00:00"
+        }
+      ],
+      "one_off": true,
+      "created_at": "2026-06-18T22:02:06.789554+00:00",
+      "updated_at": "2026-06-18T22:03:01.091449+00:00",
+      "promoted_from": {
+        "kind": "mission",
+        "mission_id": "proposed-pending-approvals-3-plus-unregistered-ar-iter-1559"
+      }
     }
   ]
 }
