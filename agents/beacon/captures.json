@@ -87,7 +87,8 @@
         "at": "2026-06-14T17:52:43.946307+00:00",
         "from_state": "parked"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "aging": true
     },
     {
       "id": "cap-projects-pm-layer-data-is-stale-separate-system-84ec",
@@ -116,7 +117,8 @@
         "at": "2026-06-14T17:52:43.946307+00:00",
         "from_state": "parked"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "aging": true
     },
     {
       "id": "cap-operator-action-queue-is-full-of-benign-auto-han-3c39",
@@ -174,7 +176,8 @@
         "at": "2026-06-14T17:52:43.946307+00:00",
         "from_state": "parked"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "aging": true
     },
     {
       "id": "cap-decide-full-codebase-audit-cadence-abac",
@@ -233,7 +236,8 @@
         "at": "2026-06-14T17:52:43.946307+00:00",
         "from_state": "parked"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "aging": true
     },
     {
       "id": "cap-tier-alert-cycle-3-pr-close-out-plan-3819",
@@ -296,7 +300,8 @@
         "at": "2026-06-14T17:52:43.946307+00:00",
         "from_state": "parked"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "aging": true
     },
     {
       "id": "cap-phantom-build-phase-after-marker-error-retry-pr-4d78",
@@ -325,7 +330,8 @@
         "at": "2026-06-14T17:52:43.946307+00:00",
         "from_state": "parked"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "aging": true
     },
     {
       "id": "cap-direct-discover-test-leak-still-open-pr-7-514a",
