@@ -319,6 +319,49 @@ def _refresh_shipper_cursor(cursors_file: Path, key: str, alerts_file: Path) -> 
         return False
 
 
+# -------------------- triage watermark repair (inline, same pass) --------------------
+
+def _repair_triage_watermark(counts: dict[str, Any]) -> None:
+    """Reset Check 0's stale (too-large) line watermark to the rewritten file's
+    length IN THE SAME PASS that shrank larry-alerts.jsonl, closing the
+    one-cycle gap where only Pulse's next-cycle repair-watermark self-heals it.
+
+    Reuses alert_triage_state.repair_watermark() verbatim — identical,
+    already-tested reset-to-file-length semantics (a no-op unless the stored
+    watermark is a concrete int strictly greater than the file length; a MISSING
+    watermark is left alone). Best-effort + isolated exactly like
+    _refresh_shipper_cursor: lazy/local import wrapped in try/except, WARN on
+    failure, NEVER raising into the retention transaction — a watermark-repair
+    failure must not strand the archive/rewrite. Pulse's repair-watermark stays
+    the defense-in-depth backstop for any best-effort miss.
+
+    Records the outcome in `counts` (watermark_repaired + watermark_new) so the
+    tick log line reports whether the watermark was reset, consistent with
+    cursor_refreshed.
+    """
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import alert_triage_state as ats  # noqa: E402
+    except Exception as e:  # noqa: BLE001
+        log(f'could not import alert_triage_state to repair triage watermark '
+            f'({type(e).__name__}); relying on Pulse repair-watermark backstop',
+            'WARN')
+        return
+
+    try:
+        result = ats.repair_watermark()
+    except Exception as e:  # noqa: BLE001
+        log(f'triage watermark repair failed ({type(e).__name__}: {e}); relying '
+            f'on Pulse repair-watermark backstop', 'WARN')
+        return
+
+    if result.get('repaired'):
+        counts['watermark_repaired'] = True
+        counts['watermark_new'] = result.get('new_watermark')
+        log(f"reset triage watermark: {result.get('old_watermark')} → "
+            f"{result.get('new_watermark')} (file length; closes rotation gap)")
+
+
 # -------------------- archive + atomic rewrite --------------------
 
 def _archive_lines(lines: list[str], now: datetime, archive_dir: Path) -> Path:
@@ -458,6 +501,9 @@ def _recover_pending(
     counts['cursor_refreshed'] = _refresh_shipper_cursor(
         shipper_cursors_file, SHIPPER_CURSOR_KEY, alerts_file,
     )
+    # A pass that completes via crash recovery shrank the file too, so close the
+    # rotation gap here as well rather than waiting on Pulse's next cycle.
+    _repair_triage_watermark(counts)
     _clear_journal(journal_path)
     counts['recovered'] = True
     log(f'recovery complete: beacon→{target_beacon}, medic→{target_medic}')
@@ -494,6 +540,8 @@ def run_once(
         'archived': 0,
         'remaining': 0,
         'cursor_refreshed': False,
+        'watermark_repaired': False,
+        'watermark_new': None,
         'recovered': False,
     }
 
@@ -614,6 +662,11 @@ def run_once(
         counts['cursor_refreshed'] = _refresh_shipper_cursor(
             shipper_cursors_file, SHIPPER_CURSOR_KEY, alerts_file,
         )
+
+        # 5b. Reset Check 0's stale line watermark to the now-shorter file's
+        #     length in THIS pass (best-effort; never aborts the transaction),
+        #     so the rotation gap is closed without waiting on Pulse's next cycle.
+        _repair_triage_watermark(counts)
 
         # 6. Transaction complete — drop the journal.
         _clear_journal(journal_path)

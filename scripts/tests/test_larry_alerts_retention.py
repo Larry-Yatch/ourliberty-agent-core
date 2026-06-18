@@ -299,6 +299,77 @@ class TestShipperCursorRefresh(_Base):
         self.assertEqual(data['outbox_log']['offset'], 5)
 
 
+# -------------------- inline triage-watermark repair --------------------
+
+class TestWatermarkRepair(_Base):
+    """The retention pass repairs Check 0's stale (too-large) line watermark to
+    the rewritten file's length IN THE SAME pass, so the rotation gap closes
+    without waiting on Pulse's next repair-watermark cycle.
+
+    repair_watermark() reads the file length via the module-level
+    ``larry_alerts.ALERTS_FILE`` (not run_once()'s injectable ``alerts_file``) and
+    the watermark via ``OURLIBERTY_AGENTS_ROOT`` (already repointed by _Base), so
+    we repoint ``larry_alerts.ALERTS_FILE`` at the temp alerts file here.
+    """
+
+    def setUp(self):
+        super().setUp()
+        import larry_alerts
+        import alert_triage_state
+        self.larry_alerts = larry_alerts
+        self.ats = alert_triage_state
+        self._prev_alerts_file = larry_alerts.ALERTS_FILE
+        larry_alerts.ALERTS_FILE = self.alerts
+
+    def tearDown(self):
+        self.larry_alerts.ALERTS_FILE = self._prev_alerts_file
+        super().tearDown()
+
+    def test_inline_reset_on_shrinking_compaction(self):
+        # 700 old lines, consumers caught up → safe_cut=200, survivors=500.
+        # A watermark of 700 is now stale (> new file length 500) and must be
+        # reset to 500 in THIS pass — no intervening Pulse cycle.
+        lines = [_alert_line(i, 40) for i in range(700)]
+        self._write_alerts(lines)
+        self.beacon.write_text('700')
+        self.medic.write_text('700')
+        self.ats.write_watermark(700)
+        counts = self._run()
+        self.assertEqual(counts['safe_cut'], 200)
+        self.assertEqual(len(self.alerts.read_text().splitlines()), 500)
+        self.assertTrue(counts['watermark_repaired'])
+        self.assertEqual(counts['watermark_new'], 500)
+        self.assertEqual(self.ats.read_watermark(), 500)
+
+    def test_noop_when_watermark_already_valid(self):
+        # New file length is 500; a watermark <= 500 is not stale → untouched.
+        lines = [_alert_line(i, 40) for i in range(700)]
+        self._write_alerts(lines)
+        self.beacon.write_text('700')
+        self.medic.write_text('700')
+        self.ats.write_watermark(300)
+        counts = self._run()
+        self.assertEqual(counts['safe_cut'], 200)
+        self.assertEqual(len(self.alerts.read_text().splitlines()), 500)
+        self.assertFalse(counts['watermark_repaired'])
+        self.assertIsNone(counts['watermark_new'])
+        self.assertEqual(self.ats.read_watermark(), 300)
+
+    def test_dry_run_leaves_watermark_untouched(self):
+        # Watermark 9999 WOULD be reset to the file length if repair ran, but a
+        # dry-run must not mutate it (nor shrink the file).
+        lines = [_alert_line(i, 40) for i in range(700)]
+        self._write_alerts(lines)
+        self.beacon.write_text('700')
+        self.medic.write_text('700')
+        self.ats.write_watermark(9999)
+        counts = self._run(dry_run=True)
+        self.assertEqual(counts['safe_cut'], 200)  # still computed
+        self.assertFalse(counts['watermark_repaired'])
+        self.assertEqual(len(self.alerts.read_text().splitlines()), 700)
+        self.assertEqual(self.ats.read_watermark(), 9999)
+
+
 # -------------------- kill switch --------------------
 
 class TestKillSwitch(_Base):
