@@ -132,6 +132,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-18 21:22Z UTC (Iter ~2222, Tier 3, consecutive_clean=17→18, NOMINAL)
+
+**Iter ~2222 summary:** ✅ Nominal. 0 new alerts (watermark=921=file_length). All 5 daemons alive — beacon 3734671 (Ss, ~42.9h), chain-event 3734305 (SNs, ~42.9h), inbox-watcher 3434697 (Ssl, ~64.1h), dashboard_api 130620 (Ssl, ~4.8h), outbox_notifier 130853 (Ss, ~4.8h). Repo HEAD=edcd644e=origin/main (clean). Last sync 20:32:15Z (~50 min). 0 open PRs. 0 stalls. pending=0. Credential rotation: OK. Heartbeat 21:05:11Z (~16 min, fresh). Thursday: Check I/III/VIII/IX/X skip. §5.0 all no-ops. PR #576 verification window open (closes 2026-06-19T13:35Z; repair-watermark no-op confirms fix holding). Stale bash orphan PID 1834248: CONFIRMED alive (~21.08d+). PRIME ratio=19.71 (1025 interventions, 52 systemic_fixes, trend=improving). **Tier 3, consecutive_clean=17→18 — steady-state continues.**
+
 ## Status snapshot — updated 2026-06-18 20:52Z UTC (Iter ~2221, Tier 3, consecutive_clean=16→17, NOMINAL)
 
 **Iter ~2221 summary:** ✅ Nominal. 0 new alerts (watermark=921=file_length). All 5 daemons alive — beacon 3734671 (Ss, ~1d18h+), chain-event 3734305 (SNs, ~1d18h+), inbox-watcher 3434697 (Ssl, ~2d15h+), dashboard_api 130620 (Ssl, ~4h16m), outbox_notifier 130853 (Ss, ~4h16m). Repo HEAD=c513a66d=origin/main (clean). Last sync 20:32:15Z (~20 min). 0 open PRs. 0 stalls. pending=0. Credential rotation: OK. Heartbeat 20:35:09Z (~17 min, fresh). Thursday: Check I/III/VIII/IX/X skip. §5.0 all no-ops. p3f2 sequence FULLY COMPLETE — PRs #573–#582 + dashboard #63/#64 all merged today. PR #581 closed sync-blocked alert gap. PR #576 verification window open (closes 2026-06-19T13:35Z; fix holding). Stale bash orphan PID 1834248: CONFIRMED alive (~21.06d+). PRIME ratio=19.71 (1025 interventions, 52 systemic_fixes, trend=improving). **Tier 3, consecutive_clean=16→17 — steady-state continues.**
@@ -147,7 +151,3 @@
 ## Status snapshot — updated 2026-06-18 19:17Z UTC (Iter ~2218, Tier 3, consecutive_clean=13→14, NOMINAL)
 
 **Iter ~2218 summary:** ✅ Nominal. 0 new alerts (watermark=921=file_length). All 5 daemons alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 130620 (Ssl, ~2h41m), outbox_notifier 130853 (Ss, ~2h40m). Repo HEAD=13ae2c8c=origin/main (clean). Last sync 18:31:56Z (~45 min). 0 open PRs. 0 stalls. 0 pending approvals. Credential rotation: OK. Heartbeat 19:04:57Z (~12 min, fresh). Thursday: Check I/III/VIII/IX/X skip. §5.0 all no-ops. PR #576 verification window open (closes 2026-06-19T13:35Z; repair-watermark no-op confirms fix holding). Stale bash orphan PID 1834248: confirmed alive (~20d23h+). PRIME ratio=19.71 (1025 interventions, 52 systemic_fixes, trend=improving). **Tier 3, consecutive_clean=13→14 — steady-state continues.**
-
-## Status snapshot — updated 2026-06-18 18:47Z UTC (Iter ~2217, Tier 3, consecutive_clean=12→13, NOMINAL)
-
-**Iter ~2217 summary:** ✅ Nominal. 0 new alerts (watermark=921=file_length). All 5 daemons alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 130620 (Ssl, ~2h11m), outbox_notifier 130853 (Ss, ~2h11m). Repo HEAD=7b99b797=origin/main (clean). Last sync 18:31:56Z (~15 min). 0 open PRs. 0 stalls. 0 pending approvals. Credential rotation: OK. Heartbeat 18:34:49Z (~12 min, fresh). Thursday: Check I/III/VIII/IX/X skip. §5.0 all no-ops. PR #576 verification window open (closes 2026-06-19T13:35Z; repair-watermark no-op confirms fix holding). Stale bash orphan PID 1834248: confirmed alive (~20d 23h+). PRIME ratio=19.71 (1025 interventions, 52 systemic_fixes, trend=improving). **Tier 3, consecutive_clean=12→13 — steady-state continues.**
