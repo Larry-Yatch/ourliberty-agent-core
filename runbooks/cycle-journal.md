@@ -4,6 +4,83 @@
 
 ---
 
+## Iteration ~2181 — 2026-06-18 01:43Z UTC (interactive, /cycle, Tier 1→2, consecutive_clean=2→3→de-escalate, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. All checks clean. Forge PID 4161224 building p3f-pipeline-controls (7 min, active). Tier 1 → Tier 2 de-escalation.
+
+**VERIFY-BEFORE-REASSERT:**
+- **[yellow] audit_cadence_signal.py missing [carry from ~2179/~2180]:** RE-VERIFIED. `ls /home/larry/agent-core/scripts/audit_cadence_signal.py` → NOT FOUND. `ls /home/larry/agent-core/review/distill/audit_cadence_signal.py` → FOUND. **Script exists at the correct spec path (`review/distill/`). Prior cycles checked the wrong path (`scripts/`). §5.0 script ran cleanly → "no post-seed decision-grade distill artifacts yet; no-op." Dropping [yellow] carry + resetting G-rule (was counting wrong-path failures, not real missing-script occurrences).**
+- **All 5 daemon PIDs:** beacon 3734671 (Ss) ✅, chain-event 3734305 (SNs) ✅, inbox-watcher 3434697 (Ssl) ✅, dashboard_api 4159159 (Ssl, ~11 min) ✅, outbox_notifier 4159430 (Ss, ~11 min) ✅.
+- **Repo HEAD:** c4104ec3=origin/main (Pulse cycle 20260618T014038Z). Clean tree. ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 1026, "file_length": 1026}`. **0 new alerts.** Watermark stays at 1026. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → No entries. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot log last entry 19:30:51-0600 = 01:30:51Z UTC (alert idx=1025 digest skip). No new Larry directives after 23:22:35Z UTC (worktree-clear, actioned iter ~2168). Forge PID 4161224 active (7min, normal build). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → 0 stalls. 19 FORGE_NO_PR_SKIP (all reason=pr_exists). ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` pending=0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=`2026-06-18T01:30:16Z` (~13 min). FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=c4104ec3=origin/main. Clean tree. On main. 0 behind. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-18T00:50:16Z (~53 min), status=no-change. Within 2h. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon 3734671 (Ss) ✅, chain-event 3734305 (SNs) ✅, inbox-watcher 3434697 (Ssl) ✅, dashboard_api 4159159 (Ssl, ~11 min) ✅, outbox_notifier 4159430 (Ss, ~11 min) ✅. All 5/5 alive. ✅ Nominal.
+
+**Check D — Inboxes:** Beacon: empty. Forge: `build-p3f-pipeline-controls.json` (842 bytes, 01:35Z) — being processed by Forge PID 4161224 (active, 7 min). Mirror: empty. ✅ Nominal pipeline activity.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open. ✅ Nominal.
+
+**Check H — Forge digest:** Forge PID 4161224 active (claude-opus-4-8, started 01:35Z, 7 min in — building p3f-pipeline-controls). 0 stuck PRs. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** `audit_due_nudge.py` → no-op (no committed audit baseline); `distill_detector.py` → no-op; `audit_cadence_signal.py` (review/distill/) → no-op. ✅ All three ran cleanly.
+
+**Conditional checks:** Thursday 2026-06-18 UTC, weekday=3 ∉ {0,2,4,6}. Check I: skip. Check III: skip. ✅
+
+**Actions taken:**
+1. PRIME ledger: `iter_clean` appended (Tier 1).
+2. Tier state: `record --checks-clean true` → consecutive_clean=2→3 → **de-escalate to Tier 2** (consecutive_clean reset to 0).
+3. [yellow] audit_cadence_signal.py finding dropped (path was wrong in prior narrative; script confirmed present at correct spec path).
+
+**Dispatches:** None.
+
+**Standing findings (carried):**
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [blue] **unreviewed-merge:571** — bot DM'd 22:42Z. Larry judgment. [carry]
+- [blue] **Stale bash orphan** — PID 1834248 (20d+ sleep-loop, low CPU). [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule watermark-rotation-gap** — 2/3. Watch.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule catalog-accuracy-drift-tier4** — 1/3. Watch.
+- [blue] **G-rule ledger/check-i Tier-4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule mirror-marker-parse-error** — 1/3. Watch.
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+
+**Next:** Forge builds p3f-pipeline-controls (~5–15 min remaining). Expect PR + Mirror review + auto-merge cycle. Sync due ~02:50Z. Healer at ~02:00Z. Pulse now at Tier 2 (15-min cadence).
+
+**PRIME DIRECTIVE:** 0 interventions this iter (iter_clean). Trailing-30d: interventions=1024, systemic_fixes=52, ratio=19.69, trend=improving.
+**Tier end-of-iter:** Tier 1→2 de-escalation, consecutive_clean=2→3→0. Last signal 01:24:33Z.
+
+---
+
 ## Iteration ~2180 — 2026-06-18 01:39Z UTC (interactive, /cycle, Tier 1, consecutive_clean=1→2, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).
