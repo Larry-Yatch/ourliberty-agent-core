@@ -4,6 +4,89 @@
 
 ---
 
+## Iteration ~2209 — 2026-06-18 14:31Z UTC (interactive, /cycle, Tier 3, consecutive_clean=4→5, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. All checks clean. Tier 3 steady-state continues (consecutive_clean=4→5).
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #576 (watermark-rotation-gap fix) verification window:** OPEN — merged 13:35Z. This iter: repair-watermark returned `{"repaired": false, "old_watermark": 917, "file_length": 917}` confirming fix is working (no compaction gap). Window closes 2026-06-19T13:35Z. ✅
+- **Stale bash orphan PID 1834248:** CONFIRMED alive (Ss, 20d 19h 13m). Naming-mismatch exit condition; loop will never self-exit. Low CPU. [blue carry]
+- **All 5 daemon PIDs:** beacon 3734671 (Ss) ✅, chain-event 3734305 (SNs) ✅, inbox-watcher 3434697 (Ssl) ✅, dashboard_api 4159159 (Ssl) ✅, outbox_notifier 4159430 (Ss) ✅.
+- **Repo HEAD:** 8f612c16=origin/main (spec(projects-v3): p3f2 — reword Brainstorm card, PR #578). Clean tree. ✅
+- **Orphan worktree `wt-mirror-dag-preflight-projects-v3-p3-followup`:** CONFIRMED still present (modified Jun 17 16:57). Git registration pruned (fatal: not a git repository). Directory persists; not blocking. [blue carry]
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 917, "file_length": 917}`. **0 new alerts.** Watermark=917=file_length. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → No entries. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot PID 3734671 alive (Ss). Last activity: 08:22:31-0600 (14:22:31Z) — `approved dag-preflight-projects-v3-p3-followup2 -> dispatched to Mirror inbox`. Prior: Larry 08:20Z directive `Beacon — kick off build sequence projects-v3-p3-followup2` auto-processed by Beacon (DAG authored, DM'd, Larry 'go' at 08:22Z, dispatch at 14:22Z). All tracked by chain. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → 0 stalls. 8 FORGE_NO_PR_SKIP (all reason=pr_exists; tasks from prior pipelines). ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` pending=0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=`2026-06-18T14:03:19Z` (~28 min). FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=8f612c16=origin/main. Clean tree. On main. Up to date. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-18T14:18:11Z (~13 min), status=success. Within 2h. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon 3734671 (Ss) ✅, chain-event 3734305 (SNs) ✅, inbox-watcher 3434697 (Ssl) ✅, dashboard_api 4159159 (Ssl) ✅, outbox_notifier 4159430 (Ss) ✅. All 5/5 alive. ✅ Nominal.
+
+**Check D — Inboxes:** beacon=0, forge=0, mirror=0 (dag-preflight-projects-v3-p3-followup2 archived at 14:24Z — Mirror picked up). ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open. ✅ Nominal.
+
+**Check H — Forge digest:** 0 open PRs. Merges since iter ~2207: PR #576 (fix: reset alert-triage watermark inline after larry-alerts compaction, 13:35Z), PR #577 (spec(projects-v3): P3 follow-up 2 — close the pipeline edges), PR #578 (spec(projects-v3): p3f2 — reword Brainstorm card). **Pipeline active:** `projects-v3-p3-followup2` — Beacon authored spec + DAG (PRs #577/#578 merged as spec), Mirror dag-preflight dispatched 14:22Z, worktree `wt-mirror-dag-preflight-projects-v3-p3-followup2` fresh (14:22Z), Mirror review in progress. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:**
+- `audit_due_nudge.py`: no-op (no committed audit baseline). ✅
+- `distill_detector.py`: no-op. ✅
+- `audit_cadence_signal.py` (at `review/distill/`): no-op. ✅
+
+**Conditional checks:** Thursday 2026-06-18 UTC, weekday=3 ∉ {0,2,4,6}. Check I: skip. Check III: skip. Check VIII/IX/X: skip (non-Monday). ✅
+
+**Actions taken:**
+1. PRIME ledger: `iter_clean` appended (Tier 3).
+2. Tier state: `record --checks-clean true` → consecutive_clean=4→5, Tier 3 steady-state continues.
+
+**Dispatches:** None.
+
+**Standing findings (carried):**
+- [blue] **PR #576 verification window** — watermark-rotation-gap systemic fix; closes 2026-06-19T13:35Z; repair-watermark no-op this iter confirms fix working. [watch]
+- [blue] **projects-v3-p3-followup2 pipeline active** — DAG preflight in Mirror review (14:22Z); expect Forge build tasks next iter.
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [blue] **unreviewed-merge:571** — bot DM'd. Larry judgment. [carry]
+- [blue] **Stale bash orphan** — PID 1834248 (20d 19h+ sleep-loop, naming-mismatch exit condition). [carry]
+- [blue] **Orphan worktree** — `wt-mirror-dag-preflight-projects-v3-p3-followup` (Jun 17 16:57, git reg pruned, dir persists). [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule catalog-accuracy-drift-tier4** — 1/3. Watch.
+- [blue] **G-rule ledger/check-i Tier-4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule mirror-marker-parse-error** — 1/3. Watch.
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+
+**Next:** Tier 3 steady-state (30-min cadence). Watch projects-v3-p3-followup2 pipeline progress next iter.
+
+**PRIME DIRECTIVE:** 0 interventions this iter (iter_clean). Trailing-30d: interventions=?, systemic_fixes=52, ratio=19.71, trend=improving.
+**Tier end-of-iter:** Tier 3, consecutive_clean=4→5 (steady-state). Last signal 10:23:58Z.
+
+---
+
 ## Iteration ~2207 — 2026-06-18 13:28Z UTC (interactive, /cycle, Tier 3, consecutive_clean=2→3 steady-state, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).
