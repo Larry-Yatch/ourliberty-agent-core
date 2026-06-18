@@ -3850,7 +3850,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-18T14:35:19.754163+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-18T14:24:26.582159+00:00"
+      "orphan_last_activity_ts": "2026-06-18T14:24:26.582159+00:00",
+      "briefing": {
+        "what": "Your team has started some early work tied to the next phase of the Projects initiative, but it isn't yet attached to a formal project.",
+        "why": "Loose work that isn't tracked can quietly consume time and effort without a clear payoff, and it's now waiting on your go-ahead to continue.",
+        "suggest": "Hold off on a blanket approval until you've confirmed where this fits in your priorities, since it's not yet anchored to a defined goal."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-18T14:39:10.374825+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
