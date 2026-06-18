@@ -34,10 +34,22 @@ import tempfile
 import unittest
 from pathlib import Path
 
+try:  # dotted/pytest path: relative import within the scripts.tests package
+    from ._runtime_script_test_support import (
+        copy_larry_alerts_cli,
+        install_timeout_shim,
+        scrub_run_sentinel,
+    )
+except ImportError:  # discover loads this module top-level (no package parent)
+    from _runtime_script_test_support import (
+        copy_larry_alerts_cli,
+        install_timeout_shim,
+        scrub_run_sentinel,
+    )
+
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 _SYNC_SCRIPT = _REPO_ROOT / 'scripts' / 'sync_agent_core.sh'
-_LARRY_ALERTS = _REPO_ROOT / 'scripts' / 'larry_alerts.py'
 _LIB_PULSE = _REPO_ROOT / 'scripts' / '_lib_pulse_runtime.sh'
 # sync_agent_core.sh sources this for the push rebase-fallback (c0e238e); the
 # fake scripts dir must carry it or every run dies at the `source` line.
@@ -63,7 +75,10 @@ class _SyncTestBase(unittest.TestCase):
         self.scripts_dir.mkdir()
         # Copy the production scripts the test exercises.
         (self.scripts_dir / 'sync_agent_core.sh').write_bytes(_SYNC_SCRIPT.read_bytes())
-        (self.scripts_dir / 'larry_alerts.py').write_bytes(_LARRY_ALERTS.read_bytes())
+        # larry_alerts.py + its sibling-module deps (atomic_io, file_lock,
+        # test_isolation_guard) via the single source of truth, so the envelope
+        # CLI imports cleanly when sync shells out to it.
+        copy_larry_alerts_cli(self.scripts_dir)
         (self.scripts_dir / '_lib_pulse_runtime.sh').write_bytes(_LIB_PULSE.read_bytes())
         (self.scripts_dir / '_lib_push_with_rebase.sh').write_bytes(_LIB_PUSH.read_bytes())
         os.chmod(self.scripts_dir / 'sync_agent_core.sh', 0o755)
@@ -84,6 +99,13 @@ class _SyncTestBase(unittest.TestCase):
         # Blackboard dir for the sync status file.
         (self.live_root / 'blackboard').mkdir()
 
+        # sync_agent_core.sh wraps its alert CLI calls in `timeout 10 …`; shim it
+        # on PATH so the alert-asserting subtests run where GNU `timeout` is
+        # absent (macOS). See _runtime_script_test_support.
+        self.shim_bin = self.tmp_path / 'bin'
+        self.shim_bin.mkdir()
+        install_timeout_shim(self.shim_bin)
+
     def tearDown(self):
         self._tmp.cleanup()
 
@@ -101,6 +123,11 @@ class _SyncTestBase(unittest.TestCase):
         env['LIVE_ROOT'] = str(self.live_root)
         env['STAGING_ROOT'] = str(self.staging_root)
         env['BACKUP_ROOT'] = str(self.backup_root)
+        env['PATH'] = f"{self.shim_bin}{os.pathsep}{env.get('PATH', '')}"
+        # HOME-sandboxed tree → let the larry_alerts subprocess emit for real
+        # (subprocess equivalent of test_isolation_guard.allow()); the inherited
+        # run sentinel would otherwise make the choke guard drop the alert.
+        scrub_run_sentinel(env)
         return subprocess.run(
             ['bash', str(self.scripts_dir / 'sync_agent_core.sh')],
             env=env, cwd=self.repo_dir,
@@ -142,13 +169,25 @@ class WrongBranchAlertTest(_SyncTestBase):
 
 
 class UncommittedChangesAlertTest(_SyncTestBase):
-    def test_dirty_tree_on_main_emits_envelope_and_exits_nonzero(self):
-        # Stay on main, but make the tree dirty.
+    def test_dirty_tree_two_consecutive_ticks_emit_envelope_and_exit_nonzero(self):
+        # One-tick grace: the FIRST dirty tick refuses (non-zero) but defers the
+        # alert — the dirt almost always clears by the next tick when Pulse's
+        # auto-commit / the GC healer lands. Stay on main, dirty the tree.
         (self.repo_dir / 'README').write_text('dirty\n')
 
-        result = self._run_sync()
+        first = self._run_sync()
+        # Safety refusal is unconditional: sync still exits non-zero so it never
+        # pulls onto a dirty tree.
+        self.assertNotEqual(first.returncode, 0)
+        # ...but no alert fired on the first occurrence.
+        self.assertEqual(
+            self._read_alerts(), [],
+            'first dirty tick must defer the alert (one-tick grace)',
+        )
 
-        self.assertNotEqual(result.returncode, 0)
+        # Second consecutive dirty tick: still dirty, so now it pages.
+        second = self._run_sync()
+        self.assertNotEqual(second.returncode, 0)
         alerts = self._read_alerts()
         self.assertEqual(len(alerts), 1, f'expected 1 alert, got {alerts}')
         record = alerts[0]
@@ -156,6 +195,35 @@ class UncommittedChangesAlertTest(_SyncTestBase):
         self.assertEqual(record['severity'], 'warning')
         self.assertEqual(record['subject'], 'sync-blocked:uncommitted-changes')
         self.assertIn('Recovery', record['message'])
+
+    def test_early_exit_clears_stale_grace_marker(self):
+        # A prior dirty tick may have set the one-tick grace marker. A later tick
+        # that exits EARLY for a different reason (here: wrong branch, which
+        # returns before the uncommitted-changes block) must still clear the
+        # marker via the EXIT trap — otherwise a stale marker would spuriously
+        # page on a future genuine FIRST dirty tick. The trap covers every
+        # non-dirty-refuse exit, so wrong-branch is representative of the class
+        # (auto-commit-push-failed, validation/quiescence abort, etc.).
+        marker = (
+            self.live_root / 'blackboard' / 'agent-core-sync-uncommitted-grace'
+        )
+        # Tick 1: dirty on main → first dirty tick sets the grace marker.
+        (self.repo_dir / 'README').write_text('dirty\n')
+        first = self._run_sync()
+        self.assertNotEqual(first.returncode, 0)
+        self.assertTrue(
+            marker.exists(), 'first dirty tick should set the grace marker',
+        )
+
+        # Tick 2: now on a non-main branch (tree still dirty) → early wrong-branch
+        # exit, which never reaches the uncommitted block.
+        self._git('checkout', '-q', '-b', 'chore/foo')
+        second = self._run_sync()
+        self.assertNotEqual(second.returncode, 0)
+        self.assertFalse(
+            marker.exists(),
+            'a wrong-branch (early-exit) tick must clear a stale grace marker',
+        )
 
 
 if __name__ == '__main__':

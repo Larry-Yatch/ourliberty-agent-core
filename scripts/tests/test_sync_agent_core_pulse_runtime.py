@@ -52,10 +52,18 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from ._runtime_script_test_support import (
-    copy_larry_alerts_cli,
-    install_timeout_shim,
-)
+try:  # dotted/pytest path: relative import within the scripts.tests package
+    from ._runtime_script_test_support import (
+        copy_larry_alerts_cli,
+        install_timeout_shim,
+        scrub_run_sentinel,
+    )
+except ImportError:  # discover loads this module top-level (no package parent)
+    from _runtime_script_test_support import (
+        copy_larry_alerts_cli,
+        install_timeout_shim,
+        scrub_run_sentinel,
+    )
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 _SYNC_SCRIPT = _REPO_ROOT / 'scripts' / 'sync_agent_core.sh'
@@ -169,6 +177,11 @@ class _SyncResilienceBase(unittest.TestCase):
         env['STAGING_ROOT'] = str(self.staging_root)
         env['BACKUP_ROOT'] = str(self.backup_root)
         env['PATH'] = f"{self.shim_bin}{os.pathsep}{env.get('PATH', '')}"
+        # The fake tree is HOME-sandboxed, so let the script's larry_alerts
+        # subprocess emit for real (subprocess equivalent of
+        # test_isolation_guard.allow()); without this the inherited run sentinel
+        # makes the choke guard raise and the alert is silently dropped.
+        scrub_run_sentinel(env)
         return subprocess.run(
             ['bash', str(self.scripts_dir / 'sync_agent_core.sh')],
             env=env, cwd=self.repo_dir,
@@ -261,7 +274,9 @@ class AllowlistOnlyDirtAutoCommitsTest(_SyncResilienceBase):
 
 
 class MixedDirtStillBlocksTest(_SyncResilienceBase):
-    """Mixed dirt: refuse exactly as before, emit the unchanged alert."""
+    """Mixed dirt: refuse exactly as before. The uncommitted-changes alert now
+    fires only when the dirt persists across two consecutive ticks (one-tick
+    grace), so two runs are needed to observe it."""
 
     def test_journal_plus_unrelated_file_still_blocks(self):
         pre_head = self._head()
@@ -271,11 +286,20 @@ class MixedDirtStillBlocksTest(_SyncResilienceBase):
         # Non-allowlist tracked-modified.
         (self.repo_dir / 'README').write_text('non-allowlist dirt\n')
 
-        result = self._run_sync()
-        self.assertNotEqual(result.returncode, 0)
-        # No commit landed.
+        # First tick: refuse (non-zero), but defer the alert (one-tick grace).
+        first = self._run_sync()
+        self.assertNotEqual(first.returncode, 0)
         self.assertEqual(self._head(), pre_head)
-        # Existing uncommitted-changes alert still fires unchanged.
+        self.assertEqual(
+            self._read_alerts(), [],
+            'first dirty tick must defer the alert (one-tick grace)',
+        )
+
+        # Second consecutive dirty tick: now the uncommitted-changes alert fires.
+        second = self._run_sync()
+        self.assertNotEqual(second.returncode, 0)
+        # Still no commit landed.
+        self.assertEqual(self._head(), pre_head)
         alerts = self._read_alerts()
         self.assertEqual(len(alerts), 1, f'expected 1 alert, got {alerts}')
         self.assertEqual(
@@ -433,16 +457,25 @@ class CapturesJsonToleratedTest(_SyncResilienceBase):
 
     def test_captures_json_plus_non_allowlist_file_still_blocks(self):
         # captures.json (tolerated) + README (not) is still mixed dirt: the
-        # refuse-and-alert path is unchanged so genuine human dirt never gets
-        # silently swept past the gate.
+        # refuse path is unchanged so genuine human dirt never gets silently
+        # swept past the gate. The alert now fires on the SECOND consecutive
+        # dirty tick (one-tick grace), so two runs are needed to observe it.
         pre_head = self._head()
         (self.repo_dir / 'agents' / 'beacon' / 'captures.json').write_text(
             '{"captures": [{"title": "b"}]}\n',
         )
         (self.repo_dir / 'README').write_text('human edit\n')
 
-        result = self._run_sync()
-        self.assertNotEqual(result.returncode, 0)
+        first = self._run_sync()
+        self.assertNotEqual(first.returncode, 0)
+        self.assertEqual(self._head(), pre_head)
+        self.assertEqual(
+            self._read_alerts(), [],
+            'first dirty tick must defer the alert (one-tick grace)',
+        )
+
+        second = self._run_sync()
+        self.assertNotEqual(second.returncode, 0)
         self.assertEqual(self._head(), pre_head)
         alerts = self._read_alerts()
         self.assertEqual(len(alerts), 1, f'expected 1 alert, got {alerts}')
@@ -599,6 +632,91 @@ class MissionsJsonToleratedTest(_SyncResilienceBase):
         # No commit landed locally or on origin; the mixed dirt was refused.
         self.assertEqual(self._head(), pre_head)
         self.assertEqual(self._origin_head(), pre_origin)
+
+
+class UncommittedChangesOneTickGraceTest(_SyncResilienceBase):
+    """One-tick grace on the sync-blocked:uncommitted-changes path.
+
+    The first dirty tick refuses (sync never pulls onto a dirty tree) but DEFERS
+    the alert, because the dirt almost always clears by the next ~5min tick when
+    Pulse's auto-commit or the GC healer lands. The alert fires only when the
+    dirt is still present on a second consecutive tick. (2026-06-18 07:51→07:56
+    false alarm: sync refused at 07:51 then synced cleanly one tick later at
+    07:56, yet a 🟡 board warning had already fired and — larry_alerts being
+    append-only with no resolve — never retracted.)"""
+
+    def _grace_marker(self) -> Path:
+        return (
+            self.live_root / 'blackboard' / 'agent-core-sync-uncommitted-grace'
+        )
+
+    def test_first_dirty_tick_defers_alert_and_sets_marker(self):
+        pre_head = self._head()
+        # Non-allowlisted dirt — the auto-commit block won't touch it.
+        (self.repo_dir / 'README').write_text('human edit\n')
+
+        result = self._run_sync()
+        # Safety refusal is unconditional: still non-zero, still no commit.
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self._head(), pre_head)
+        # No alert on the first occurrence.
+        self.assertEqual(
+            self._read_alerts(), [],
+            'first dirty tick must defer the alert (one-tick grace)',
+        )
+        # The grace marker is persisted so the next tick can escalate.
+        self.assertTrue(
+            self._grace_marker().exists(),
+            'first dirty tick must persist the grace marker',
+        )
+
+    def test_single_dirty_tick_then_clean_emits_no_alert(self):
+        # The real-world false-alarm shape: dirty for one tick, then the dirt
+        # clears before the next tick. No alert should ever fire.
+        (self.repo_dir / 'README').write_text('human edit\n')
+
+        first = self._run_sync()
+        self.assertNotEqual(first.returncode, 0)
+        self.assertEqual(self._read_alerts(), [])
+        self.assertTrue(self._grace_marker().exists())
+
+        # The dirt clears before the next tick (revert to committed content).
+        (self.repo_dir / 'README').write_text('seed\n')
+
+        second = self._run_sync()
+        # Clean tree, HEAD == origin → no-change sync, exit 0.
+        self.assertEqual(second.returncode, 0, second.stderr)
+        self.assertEqual(
+            self._read_alerts(), [],
+            'a single dirty tick followed by a clean tick must emit no alert',
+        )
+        # The clean path cleared the marker so the next first-occurrence is fresh.
+        self.assertFalse(
+            self._grace_marker().exists(),
+            'clean tick must clear the one-tick grace marker',
+        )
+
+    def test_captures_json_tolerated_tick_clears_grace_marker(self):
+        # The tolerate branch (captures.json-only dirt) is also a "proceed" path
+        # and must clear the marker too, so a prior dirty tick doesn't carry over
+        # into a spurious second-tick alert once the human dirt is gone.
+        (self.repo_dir / 'README').write_text('human edit\n')
+        first = self._run_sync()
+        self.assertNotEqual(first.returncode, 0)
+        self.assertTrue(self._grace_marker().exists())
+
+        # Next tick: clear the human dirt; leave only tolerated captures.json.
+        (self.repo_dir / 'README').write_text('seed\n')
+        (self.repo_dir / 'agents' / 'beacon' / 'captures.json').write_text(
+            '{"captures": [{"title": "x"}]}\n',
+        )
+        second = self._run_sync()
+        self.assertEqual(second.returncode, 0, second.stderr)
+        self.assertEqual(self._read_alerts(), [])
+        self.assertFalse(
+            self._grace_marker().exists(),
+            'tolerated (captures.json) tick must clear the grace marker',
+        )
 
 
 if __name__ == '__main__':
