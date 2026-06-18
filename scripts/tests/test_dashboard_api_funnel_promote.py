@@ -148,6 +148,22 @@ class _FunnelPromoteTestBase(unittest.TestCase):
     def _read_projects(self) -> list:
         return json.loads(self.projects_path.read_text())['projects']
 
+    def _pipeline_ids(self) -> list:
+        """The project ids the "Actively working" derive surfaces (the `pipeline`
+        key of GET /api/missions/derived). Calls the pure derive handler
+        network-free (supabase_client=None, no pr_state_resolver) over the SAME
+        on-disk projects.json the promote wrote, so a project that landed in the
+        store but is missing here would fail the spec's `store + derive` gate."""
+        resp = da._handle_missions_derived(
+            missions_path=self.missions_path,
+            captures_path=self.captures_path,
+            supabase_client=None,
+            repo=None,
+            task_id=None,
+            projects_path=self.projects_path,
+        )
+        return [p.get('id') for p in resp['pipeline']]
+
 
 # ==================== auth ====================
 
@@ -325,6 +341,102 @@ class AutoResolutionOrderTest(_FunnelPromoteTestBase):
         self.assertEqual(r.json()['source_kind'], 'capture')
         # The mission was untouched — capture lane handled it.
         self.assertEqual(self._read_captures()[0]['state'], 'promoted')
+
+
+# ==================== orphan lane (explicit kind) ====================
+
+
+class OrphanPromoteTest(_FunnelPromoteTestBase):
+    """A raw orphan (a chain_events task_id with NO capture/mission registry row)
+    is promoted by passing kind='orphan' explicitly — there is no registry row to
+    auto-resolve against. projects-v3-p3-followup2 § 6 step 1: this lane must
+    CREATE + PERSIST the project like the capture lane, and an unresolvable
+    promote must be a REAL error, not a silent 200 no-op."""
+
+    def test_explicit_kind_orphan_creates_and_persists_project(self):
+        r = self.client.post(ENDPOINT, headers=AUTH, json={
+            'ref': 'orphan-task-7', 'kind': 'orphan', 'name': 'Orphan Seven',
+            'brief': 'close the loose end',
+        })
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(body['source_kind'], 'orphan')
+        self.assertEqual(body['status'], 'promoted')
+        self.assertTrue(body['applied'])
+        self.assertEqual(body['project_id'], 'orphan-seven')
+        self.assertNotIn('pr_url', body)
+        self.assertEqual(self.gh.calls, [])
+
+        proj = self._read_projects()[0]
+        self.assertEqual(proj['state'], 'active')
+        self.assertEqual(proj['phases'][0]['lifecycle_state'], 'brainstorm')
+        self.assertEqual(proj['phases'][0]['desired_end_state'], 'close the loose end')
+        self.assertEqual(
+            proj['promoted_from'], {'kind': 'orphan', 'task_id': 'orphan-task-7'})
+
+    def test_unresolvable_ref_is_real_error_not_silent_200(self):
+        # No kind, no matching capture/mission → the handler cannot resolve a
+        # source. The spec's headline guardrail: this returns a real error, NOT a
+        # green 200 that created nothing.
+        r = self.client.post(ENDPOINT, headers=AUTH, json={'ref': 'ghost-task'})
+        self.assertEqual(r.status_code, 404)
+        self.assertFalse(self.projects_path.exists())
+        self.assertEqual(self.gh.calls, [])
+
+    def test_re_promote_orphan_is_idempotent_one_project(self):
+        first = self.client.post(ENDPOINT, headers=AUTH, json={
+            'ref': 'orphan-task-7', 'kind': 'orphan', 'name': 'Orphan Seven'})
+        second = self.client.post(ENDPOINT, headers=AUTH, json={
+            'ref': 'orphan-task-7', 'kind': 'orphan', 'name': 'Orphan Seven'})
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        self.assertTrue(first.json()['applied'])
+        self.assertFalse(second.json()['applied'])  # re-promote is a no-op, not a dup
+        self.assertEqual(second.json()['project_id'], first.json()['project_id'])
+        self.assertEqual(len(self._read_projects()), 1)
+
+
+# ==================== store + derive landing (the § 6 step-1 gate) ====================
+
+
+class PromoteLandsInStoreAndDeriveTest(_FunnelPromoteTestBase):
+    """The spec's explicit success criterion (projects-v3-p3-followup2 § 6 step 1,
+    done-gate § 5): for EACH source kind a promote lands a project in the store
+    AND in the "Actively working" derive — not just a 200. These lock the
+    capture-parity the spec demanded the proposed/orphan lanes reach."""
+
+    def test_capture_promote_lands_in_store_and_derive(self):
+        self._seed_captures(_cap('cap-1', title='Aging idea'))
+        r = self.client.post(ENDPOINT, headers=AUTH, json={'ref': 'cap-1'})
+        self.assertEqual(r.status_code, 200)
+        pid = r.json()['project_id']
+        self.assertEqual([p['id'] for p in self._read_projects()], [pid])
+        self.assertIn(pid, self._pipeline_ids())
+
+    def test_mission_accept_lands_in_store_and_derive(self):
+        self._seed_missions(_mission('proposed-orphan-x', name='Orphan X'))
+        r = self.client.post(ENDPOINT, headers=AUTH,
+                             json={'ref': 'proposed-orphan-x'})
+        self.assertEqual(r.status_code, 200)
+        pid = r.json()['project_id']
+        self.assertEqual([p['id'] for p in self._read_projects()], [pid])
+        self.assertIn(pid, self._pipeline_ids())
+
+    def test_orphan_promote_lands_in_store_and_derive(self):
+        r = self.client.post(ENDPOINT, headers=AUTH, json={
+            'ref': 'orphan-task-7', 'kind': 'orphan', 'name': 'Orphan Seven'})
+        self.assertEqual(r.status_code, 200)
+        pid = r.json()['project_id']
+        self.assertEqual([p['id'] for p in self._read_projects()], [pid])
+        self.assertIn(pid, self._pipeline_ids())
+
+    def test_failed_promote_leaves_derive_empty(self):
+        # A promote that can't create returns a real error AND surfaces nothing in
+        # the derive — the inverse of the silent-200 failure mode.
+        self._seed_missions(_mission('m-flight', phase='in_flight'))
+        r = self.client.post(ENDPOINT, headers=AUTH, json={'ref': 'm-flight'})
+        self.assertEqual(r.status_code, 409)
+        self.assertEqual(self._pipeline_ids(), [])
 
 
 if __name__ == '__main__':
