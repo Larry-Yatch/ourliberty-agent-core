@@ -378,13 +378,45 @@ def stamp_phase_done(
     return True
 
 
+def attach_phase_closeout(
+    phase: dict[str, Any], closeout_fields: dict[str, Any],
+    *, now: Optional[datetime] = None,
+) -> bool:
+    """Merge an authored closeout (the ``closeout`` schema dict + its
+    ``closeout_provenance``) onto ``phase``. Returns True iff the phase dict was
+    mutated. Pure — the decision (what an attach means, idempotency) lives here;
+    the IO/commit is the writer's/healer's job (single-committer invariant).
+
+    Idempotent: re-attaching an identical closeout is a no-op (returns False, NO
+    mutation) so a duplicate SEQUENCE_COMPLETE never produces a spurious store
+    delta for the healer to commit. Fail-safe on junk: a non-dict phase or a
+    closeout payload without a ``closeout`` body is a no-op."""
+    if not isinstance(phase, dict) or not isinstance(closeout_fields, dict):
+        return False
+    closeout = closeout_fields.get('closeout')
+    if not isinstance(closeout, dict):
+        return False
+    provenance = closeout_fields.get('closeout_provenance')
+    if phase.get('closeout') == closeout and (
+        provenance is None or phase.get('closeout_provenance') == provenance
+    ):
+        return False
+    phase['closeout'] = closeout
+    if provenance is not None:
+        phase['closeout_provenance'] = provenance
+    phase['updated_at'] = _iso_now(now)
+    return True
+
+
 # --------------------------------------------------------------------------- #
 # the "Actively working" derive (the read surface)
 # --------------------------------------------------------------------------- #
 def _phase_card(phase: dict[str, Any]) -> dict[str, Any]:
     """The lightweight phase card the pipeline UI renders: lifecycle state +
-    the plain-language Desired End State + the optional spec/sequence refs."""
-    return {
+    the plain-language Desired End State + the optional spec/sequence refs, plus
+    the authored ``closeout`` once the phase is done (the live surface the UI
+    renders — spec § 0.24)."""
+    card = {
         'id': phase.get('id'),
         'title': phase.get('title'),
         'desired_end_state': phase.get('desired_end_state', ''),
@@ -393,6 +425,10 @@ def _phase_card(phase: dict[str, Any]) -> dict[str, Any]:
         'spec_ref': phase.get('spec_ref'),
         'sequence_ref': phase.get('sequence_ref'),
     }
+    closeout = phase.get('closeout')
+    if isinstance(closeout, dict):
+        card['closeout'] = closeout
+    return card
 
 
 def _project_status(phases: list[dict[str, Any]]) -> str:
