@@ -3881,7 +3881,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-18T15:21:04.424331+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-18T15:15:35.672838+00:00"
+      "orphan_last_activity_ts": "2026-06-18T15:15:35.672838+00:00",
+      "briefing": {
+        "what": "A piece of work the team picked up on its own that isn't yet attached to any approved initiative.",
+        "why": "Effort is being spent here without a clear business owner or goal, so it could be valuable or it could be a distraction.",
+        "suggest": "Take a quick look to confirm it's worth pursuing and tie it to a real priority before letting it go further."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-18T15:29:39.795842+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-dag-preflight-projects-v3-p3-followup2-v2",
@@ -3898,7 +3912,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-18T15:21:04.424331+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-18T15:10:53.982251+00:00"
+      "orphan_last_activity_ts": "2026-06-18T15:10:53.982251+00:00",
+      "briefing": {
+        "what": "A piece of in-progress work the team picked up on its own that hasn't been attached to any goal or initiative yet.",
+        "why": "Effort is being spent without a clear business reason behind it, so you can't tell if it's moving a priority forward or just drifting.",
+        "suggest": "Before it goes further, have the team tie it to a real goal or pause it \u2014 worth a quick check rather than letting it run unchecked."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-18T15:29:39.795842+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
