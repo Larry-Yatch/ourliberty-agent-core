@@ -859,6 +859,25 @@ class SpecAttachResponse(BaseModel):
     status: str = 'spec-attached'
 
 
+class ProjectArchiveRequest(BaseModel):
+    # p3f-reversibility-and-orphan — POST /api/projects/archive body. The
+    # Drop/Archive gesture: flip a project's state to `archived` so it leaves
+    # "Actively working" and its original funnel source item (capture / mission /
+    # orphan) returns to the funnel — a mis-promote is reversible, not a dead end.
+    # `project_id` locates the project; the dashboard writes the state flip to
+    # disk and the projects-store healer commits (non-committer discipline).
+    project_id: str = Field(..., min_length=1)
+
+
+class ProjectArchiveResponse(BaseModel):
+    # The project was archived (or already was — `applied` is False on an
+    # idempotent re-archive). `state` is always 'archived'.
+    project_id: str
+    state: str = 'archived'
+    status: str = 'archived'
+    applied: bool
+
+
 class MissionThreadResponse(BaseModel):
     # GET /api/system/missions/{id}/thread — oldest-first conversation, mirroring
     # the capture thread (Projects v3 P2 Contract B).
@@ -2832,7 +2851,13 @@ def _promoted_from_matches(project: Any, promoted_from: dict[str, Any]) -> bool:
     kind = promoted_from.get('kind')
     if pf.get('kind') != kind:
         return False
-    id_key = 'capture_id' if kind == 'capture' else 'mission_id'
+    id_key = {
+        'capture': 'capture_id',
+        'mission': 'mission_id',
+        'orphan': 'task_id',
+    }.get(kind)
+    if id_key is None:
+        return False
     return bool(promoted_from.get(id_key)) and pf.get(id_key) == promoted_from.get(id_key)
 
 
@@ -3916,6 +3941,7 @@ def _build_funnel(
     parked: list[dict[str, Any]],
     now: Optional[datetime] = None,
     promoted_mission_ids: Optional[set[str]] = None,
+    promoted_orphan_task_ids: Optional[set[str]] = None,
 ) -> dict[str, list[dict[str, Any]]]:
     """Group the existing intake (parked + proposed missions + orphans) into the
     primary/secondary funnel (C4). Pure over its three inputs — call it with the
@@ -3930,9 +3956,16 @@ def _build_funnel(
     ``promoted_mission_ids`` (an ACTIVE project's `promoted_from.mission_id`) has
     been MOVED into the pipeline by Accept/Promote → it is suppressed from the
     funnel. The mission is never mutated; archiving the project drops it from this
-    set, returning the mission to the funnel (reversible, no data loss)."""
+    set, returning the mission to the funnel (reversible, no data loss).
+
+    projects-v3 P3 follow-up (p3f-reversibility-and-orphan): a raw orphan whose
+    task_id is in ``promoted_orphan_task_ids`` (an ACTIVE project's
+    `promoted_from.task_id` where kind=='orphan') has likewise been MOVED into
+    the pipeline → it is suppressed from the secondary lane. Archiving the project
+    drops it from this set, returning the orphan to the funnel."""
     now = now or datetime.now(timezone.utc)
     promoted_mission_ids = promoted_mission_ids or set()
+    promoted_orphan_task_ids = promoted_orphan_task_ids or set()
     primary: list[dict[str, Any]] = []
     secondary: list[dict[str, Any]] = []
 
@@ -3986,6 +4019,11 @@ def _build_funnel(
     for o in orphans:
         if o.get('terminal') is True:
             continue
+        # p3f-reversibility-and-orphan: an orphan already MOVED into an active
+        # project (its task_id is a project's promoted_from.task_id) leaves the
+        # funnel; archiving the project returns it here.
+        if o.get('task_id') in promoted_orphan_task_ids:
+            continue
         secondary.append(_funnel_item(
             'orphan',
             o.get('task_id'),
@@ -4017,6 +4055,26 @@ def _promoted_mission_ids(projects: list[dict[str, Any]]) -> set[str]:
     return out
 
 
+def _promoted_orphan_task_ids(projects: list[dict[str, Any]]) -> set[str]:
+    """The orphan task_ids that ACTIVE projects were promoted from (projects-v3
+    P3 follow-up, p3f-reversibility-and-orphan). Read from each active project's
+    `promoted_from.task_id` where kind=='orphan'; the funnel derive uses this to
+    suppress a raw orphan already MOVED into the pipeline. Archived projects are
+    excluded so archiving one returns its orphan to the funnel (reversible)."""
+    out: set[str] = set()
+    for proj in projects:
+        if not isinstance(proj, dict):
+            continue
+        if proj.get('state', projects_store.DEFAULT_PROJECT_STATE) != 'active':
+            continue
+        pf = proj.get('promoted_from')
+        if isinstance(pf, dict) and pf.get('kind') == 'orphan':
+            tid = pf.get('task_id')
+            if isinstance(tid, str) and tid:
+                out.add(tid)
+    return out
+
+
 def _build_derived_response(
     *,
     entries: list[dict[str, Any]],
@@ -4029,6 +4087,7 @@ def _build_derived_response(
         Callable[[list[str]], dict[str, str]]
     ] = None,
     promoted_mission_ids: Optional[set[str]] = None,
+    promoted_orphan_task_ids: Optional[set[str]] = None,
 ) -> dict[str, Any]:
     """Pure derive: build the full /api/missions/derived response (pre-filter).
 
@@ -4105,7 +4164,10 @@ def _build_derived_response(
         'parked': parked,
         # C4: additive funnel grouping. Built post-derive; re-derived against the
         # filtered arrays in _apply_derived_filters so it tracks ?repo=/?task_id=.
-        'funnel': _build_funnel(missions, orphans, parked, now, promoted_mission_ids),
+        'funnel': _build_funnel(
+            missions, orphans, parked, now,
+            promoted_mission_ids, promoted_orphan_task_ids,
+        ),
         'last_synced_at': last_synced_at,
         'as_of': _now_utc_iso(now),
     }
@@ -4118,6 +4180,7 @@ def _apply_derived_filters(
     task_id: Optional[str],
     now: Optional[datetime] = None,
     promoted_mission_ids: Optional[set[str]] = None,
+    promoted_orphan_task_ids: Optional[set[str]] = None,
 ) -> dict[str, Any]:
     """Apply the optional, AND-combined ?repo= / ?task_id= filters (§ 3.2).
 
@@ -4178,7 +4241,10 @@ def _apply_derived_filters(
     response['parked'] = parked
     # C4: re-derive the funnel against the filtered arrays so the grouping stays
     # consistent with the narrowed missions/orphans/parked sections.
-    response['funnel'] = _build_funnel(missions, orphans, parked, now, promoted_mission_ids)
+    response['funnel'] = _build_funnel(
+        missions, orphans, parked, now,
+        promoted_mission_ids, promoted_orphan_task_ids,
+    )
     return response
 
 
@@ -4240,6 +4306,7 @@ def _handle_missions_derived(
     # project list also serves the additive "Actively working" pipeline below.
     projects = _reader_projects(projects_path) if projects_path else []
     promoted_mission_ids = _promoted_mission_ids(projects)
+    promoted_orphan_task_ids = _promoted_orphan_task_ids(projects)
 
     response = _build_derived_response(
         entries=entries,
@@ -4250,10 +4317,12 @@ def _handle_missions_derived(
         now=now,
         pr_state_resolver=pr_state_resolver,
         promoted_mission_ids=promoted_mission_ids,
+        promoted_orphan_task_ids=promoted_orphan_task_ids,
     )
     response = _apply_derived_filters(
         response, repo=repo, task_id=task_id, now=now,
         promoted_mission_ids=promoted_mission_ids,
+        promoted_orphan_task_ids=promoted_orphan_task_ids,
     )
 
     # projects-v3 P3: additive "Actively working" pipeline. Built AFTER the
@@ -5905,6 +5974,60 @@ def _handle_mission_accept(
     }
 
 
+def _handle_orphan_promote(
+    *,
+    task_id: str,
+    overrides: dict[str, Any],
+    projects_path: Path,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """`orphan` — MOVE a raw orphan funnel card (a chain_events task_id with no
+    registered mission) into the pipeline (projects-v3 P3 follow-up,
+    p3f-reversibility-and-orphan, spec § 6 step 3). A raw orphan has no
+    capture/mission registry row, so it is identified by its task_id alone: the
+    new project records `promoted_from={'kind':'orphan','task_id':task_id}`, and
+    the funnel derive (`_promoted_orphan_task_ids`) suppresses an orphan already
+    MOVED into an ACTIVE project. Nothing outside projects.json is touched (no
+    missions/captures PR — orphans have no source registry to flip).
+
+    Reversible with no data loss: archiving the project un-suppresses the orphan
+    → it returns to the funnel (the orphan is re-derived from chain_events, never
+    mutated). Idempotent: a re-promote finds the existing active project via
+    `promoted_from` and returns it (applied=False) instead of a duplicate.
+    Returns {project_id, phase_id, status: 'promoted', applied}."""
+    now = now or datetime.now(timezone.utc)
+
+    task_id = (task_id or '').strip()
+    if not task_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                'error': 'orphan task_id missing',
+                'hint': "kind='orphan' requires a non-empty task_id ref",
+            },
+        )
+
+    title = (overrides.get('name') or _humanize_task_id(task_id) or task_id).strip()
+    desired_end_state = overrides.get('brief') or ''
+    repo = overrides.get('repo') or None
+
+    result = _create_project_from_funnel(
+        projects_path=projects_path,
+        title=title,
+        desired_end_state=desired_end_state,
+        repo=repo,
+        north_star_ref=overrides.get('north_star_ref'),
+        promoted_from={'kind': 'orphan', 'task_id': task_id},
+        now=now,
+    )
+    return {
+        'project_id': result['project_id'],
+        'phase_id': result['phase_id'],
+        'status': 'promoted',
+        'applied': result['applied'],
+    }
+
+
 def _handle_mission_dismiss(
     *,
     mission_id: str,
@@ -6272,15 +6395,21 @@ def _handle_funnel_promote(
     suppresses it).
 
     `kind` is optional; when absent the item is auto-resolved — captures first,
-    then proposed missions. An unresolvable `ref` → 404. Returns
-    {project_id, phase_id, status, applied, source_kind}."""
+    then proposed missions. A `raw orphan` card (a task_id in chain_events with
+    no registered mission) carries no capture/mission registry row to auto-resolve
+    against, so its promote MUST pass `kind='orphan'` explicitly; `ref` is then the
+    orphan's task_id and the project records
+    `promoted_from={'kind':'orphan','task_id':ref}`. An unresolvable `ref` → 404.
+    Returns {project_id, phase_id, status, applied, source_kind}."""
     now = now or datetime.now(timezone.utc)
 
-    resolved = kind if kind in ('capture', 'mission') else None
+    resolved = kind if kind in ('capture', 'mission', 'orphan') else None
     if resolved is None and kind is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f'invalid kind={kind!r}; expected capture|mission or omit it',
+            detail=(
+                f'invalid kind={kind!r}; expected capture|mission|orphan or omit it'
+            ),
         )
     if resolved is None:
         cap_registry = _read_captures_registry(captures_path)
@@ -6312,13 +6441,25 @@ def _handle_funnel_promote(
         )
         result['source_kind'] = 'mission'
         return result
+    if resolved == 'orphan':
+        result = _handle_orphan_promote(
+            task_id=ref,
+            overrides=overrides,
+            projects_path=projects_path,
+            now=now,
+        )
+        result['source_kind'] = 'orphan'
+        return result
 
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
         detail={
             'error': 'funnel item not found',
             'ref': ref,
-            'hint': 'ref must be a parked capture id or a proposed mission id',
+            'hint': (
+                'ref must be a parked capture id, a proposed mission id, or a '
+                "raw orphan task_id with kind='orphan'"
+            ),
         },
     )
 
@@ -6684,6 +6825,75 @@ def _handle_spec_attach(
         'spec_ref': spec_ref,
         'lifecycle_state': lifecycle,
         'status': 'spec-attached',
+    }
+
+
+def _handle_project_archive(
+    *,
+    project_id: str,
+    projects_path: Path,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Pure handler for POST /api/projects/archive (p3f-reversibility-and-orphan,
+    spec § 5 / § 6 step 3). The Drop/Archive gesture: flip a project's `state` to
+    `archived` so it LEAVES "Actively working" and its original funnel source item
+    returns to the funnel — a mis-promote is reversible, not a dead end. Steps:
+
+      1. 404 if no project carries `project_id`.
+      2. Idempotent: a project already `archived` is a no-op (applied=False) — no
+         write, no spurious heal-commit delta.
+      3. Set `state='archived'`, stamp `updated_at`, atomic-write the registry.
+
+    The un-suppression is structural, not a side effect coded here: the funnel
+    derive's promoted-source sets (`_promoted_mission_ids`,
+    `_promoted_orphan_task_ids`) and the idempotency guard
+    (`_find_active_project_by_promoted_from`) count ONLY active projects, so
+    flipping `state` to `archived` automatically returns the capture / mission /
+    orphan to its lane and lets it be re-promoted. Non-committer: the flip lands
+    on disk; `heal_projects_store.py` commits the delta. Returns
+    {project_id, state: 'archived', status: 'archived', applied}."""
+    now = now or datetime.now(timezone.utc)
+    with _PROJECTS_INGEST_LOCK:
+        registry = _read_projects_registry(projects_path)
+        project = None
+        for proj in registry['projects']:
+            if isinstance(proj, dict) and proj.get('id') == project_id:
+                project = proj
+                break
+        if project is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    'error': 'project not found',
+                    'project_id': project_id,
+                    'hint': 'project_id must name a project in the projects store',
+                },
+            )
+
+        if project.get('state', projects_store.DEFAULT_PROJECT_STATE) == 'archived':
+            return {
+                'project_id': project_id,
+                'state': 'archived',
+                'status': 'archived',
+                'applied': False,
+            }
+
+        project['state'] = 'archived'
+        project['updated_at'] = now.isoformat()
+        try:
+            _atomic_write_json(projects_path, registry)
+        except OSError as e:
+            first_line = str(e).splitlines()[0] if str(e) else type(e).__name__
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={'error': 'projects write failed', 'detail': first_line},
+            )
+
+    return {
+        'project_id': project_id,
+        'state': 'archived',
+        'status': 'archived',
+        'applied': True,
     }
 
 
@@ -8082,6 +8292,29 @@ def post_spec_attach(
         project_id=body.project_id,
         phase_id=body.phase_id,
         spec_ref=body.spec_ref,
+        projects_path=_projects_json_path(),
+    )
+
+
+# POST /api/projects/archive — the Drop/Archive gesture (projects-v3 P3 follow-up,
+# p3f-reversibility-and-orphan). Flips a project's state to `archived` so it leaves
+# "Actively working" and its original funnel source item (capture / mission /
+# orphan) returns to the funnel — a mis-promote is reversible, not a dead end. The
+# dashboard stays a NON-committer: the state flip is written to projects.json on
+# disk and `heal_projects_store.py` commits it. Same auth as the other write
+# routes: X-Dashboard-Token + an allowlisted X-Actor.
+@app.post(
+    '/api/projects/archive',
+    response_model=ProjectArchiveResponse,
+    response_model_exclude_none=True,
+    dependencies=[Depends(_require_token)],
+)
+def post_project_archive(
+    body: ProjectArchiveRequest,
+    actor: str = Depends(_require_actor),
+) -> dict[str, Any]:
+    return _handle_project_archive(
+        project_id=body.project_id,
         projects_path=_projects_json_path(),
     )
 
