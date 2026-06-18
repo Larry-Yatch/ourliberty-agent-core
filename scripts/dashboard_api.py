@@ -8166,12 +8166,15 @@ def post_capture_delegate(
 
 
 # POST /api/system/missions/{mission_id}/action — mission write-back (Missions
-# v2 Phase 3 § 5 + § 6). defer/resume/reprioritize/accept/dismiss are ALL
+# v2 Phase 3 § 5 + § 6). defer/resume/reprioritize/dismiss/drop/snooze are
 # PR-backed (missions.json is the curated registry — every change auditable) and
-# open a PR via the shared _open_registry_pr helper. accept/dismiss
-# act on auto-proposed orphan threads (§ 6): accept flips phase proposed->drafting,
-# dismiss sets the additive acknowledged flag (phase stays proposed). Same auth as
-# /api/larry/action: X-Dashboard-Token + an allowlisted X-Actor.
+# open a PR via the shared _open_registry_pr helper. `accept` is UNIFIED onto
+# Promote (projects-v3 P3): it MOVES the proposed mission into a new single-phase
+# project at Brainstorm (no missions.json PR; the mission is suppressed from the
+# funnel by the project's `promoted_from` cross-ref) → {project_id, phase_id,
+# status, applied}. `dismiss`/`drop` set the additive acknowledged flag (phase
+# stays proposed). Same auth as /api/larry/action: X-Dashboard-Token + an
+# allowlisted X-Actor.
 @app.post(
     '/api/system/missions/{mission_id}/action',
     response_model=MissionActionResponse,
