@@ -6853,6 +6853,24 @@ def _archive_outcome(promoted_from: Any) -> dict[str, str]:
     return {'status': 'archived', 'message': 'Archived'}
 
 
+def _capture_is_parked(
+    captures_path: Optional[Path], capture_id: Optional[str],
+) -> bool:
+    """Read-only: is the capture CURRENTLY in the parked/funnel lane? Used by the
+    idempotent (already-archived) archive path so the toast reflects the capture's
+    present state rather than its provenance kind — a capture re-parked by an
+    earlier archive but since GC'd/dropped (or re-promoted) must NOT claim
+    "returned to the funnel" on a re-archive (p3f2 honesty contract, spec §4). No
+    mutation, no write. MUST be called holding `_CAPTURE_INGEST_LOCK`."""
+    if captures_path is None or not capture_id:
+        return False
+    registry = _read_captures_registry(captures_path)
+    for c in registry.get('captures') or []:
+        if isinstance(c, dict) and c.get('id') == capture_id:
+            return c.get('state') == 'parked'
+    return False
+
+
 def _return_capture_to_funnel(
     captures_path: Optional[Path], capture_id: Optional[str], now: datetime,
 ) -> bool:
@@ -6965,11 +6983,23 @@ def _handle_project_archive(
 
             if project.get(
                     'state', projects_store.DEFAULT_PROJECT_STATE) == 'archived':
+                # Idempotent no-op, but the toast must stay honest. Mission/orphan
+                # return structurally (kind-based outcome is correct), but a
+                # capture's return is only real if its row is STILL parked —
+                # deriving from kind alone would re-claim a return for a capture
+                # since GC'd/dropped (the exact leak this PR fixes, on the
+                # already-archived path).
+                idempotent_outcome = outcome
+                if (isinstance(promoted_from, dict)
+                        and promoted_from.get('kind') == 'capture'
+                        and not _capture_is_parked(
+                            captures_path, promoted_from.get('capture_id'))):
+                    idempotent_outcome = _archive_outcome(None)
                 return {
                     'project_id': project_id,
                     'state': 'archived',
-                    'status': outcome['status'],
-                    'message': outcome['message'],
+                    'status': idempotent_outcome['status'],
+                    'message': idempotent_outcome['message'],
                     'applied': False,
                 }
 

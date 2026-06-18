@@ -349,6 +349,16 @@ class ArchiveHonestMessageTest(_Base):
         self.assertEqual(body['status'], 'archived')
         self.assertEqual(self._project_on_disk('cap-1-proj')['state'], 'archived')
 
+        # Re-archive (idempotent path): the honesty contract must hold here too —
+        # the capture row is still gone, so the no-op return must stay 'Archived'
+        # and not regress to a kind-based "returned to the funnel" claim.
+        again = self.client.post(ARCHIVE, headers=AUTH, json={'project_id': 'cap-1-proj'})
+        self.assertEqual(again.status_code, 200)
+        again_body = again.json()
+        self.assertFalse(again_body['applied'])
+        self.assertEqual(again_body['message'], 'Archived')
+        self.assertEqual(again_body['status'], 'archived')
+
     # ---- idempotent re-archive still reports the honest outcome, no 2nd write ----
     def test_re_archive_capture_idempotent_reports_outcome(self):
         self._seed_captures(_capture('cap-1', promoted_to='cap-1-proj'))
