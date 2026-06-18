@@ -4,6 +4,80 @@
 
 ---
 
+## Iteration ~2215 — 2026-06-18T17:49Z UTC (interactive, /cycle, Tier 3, consecutive_clean=10→11, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. All checks clean. Tier 3 steady-state continues (consecutive_clean=10→11).
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #576 verification window (closes 2026-06-19T13:35Z):** repair-watermark → `{"repaired": false, "old_watermark": 921, "file_length": 921}`. No compaction gap. Fix still holding. ✅
+- **All 5 daemon PIDs:** beacon 3734671 (Ss, ~1d15h) ✅, chain-event 3734305 (SNs, ~1d15h) ✅, inbox-watcher 3434697 (Ssl, ~2d12h) ✅, dashboard_api 130620 (Ssl, ~71m) ✅, outbox_notifier 130853 (Ss, ~71m) ✅.
+- **Repo HEAD:** cfc3fdf9=origin/main (clean, on main). ✅
+- **projects-v3-p3-followup2 COMPLETE:** All 3 steps merged (PR #579 15:37Z, PR #582 16:08Z, dashboard#64). heal-pipeline-stall-state.json stale entry (`stalled_pending_sequence:…:14:24Z`) is stale — verified via 0 open PRs + 0 active inboxes. No real stall. ✅
+- **Stale bash orphan PID 1834248:** CONFIRMED alive (Ss, ~20d 22h). Naming-mismatch exit, low CPU. [blue carry]
+
+**Check 0 — Alert triage:** repair-watermark no-op (watermark=921=file_length=921). 0 new alerts. ✅ Nominal.
+
+**Check 1 — Log noise:** 2 WARNs in outbox-notifier.log today (09:25Z + 09:51Z, forge preflight marker missing for p3f2-promote-lands-proposed + p3f2-archive-honest). Both historical — PRs merged, pipeline complete. Last WARN 8h ago. ~0.25/h well below 5/h threshold. 0 WARNs in inbox-watcher.log. 0 WARNs in journalctl last 30 min. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Latest Larry message: "go" at 14:22Z (approved dag-preflight-projects-v3-p3-followup2 — pipeline COMPLETE). No orphaned directives in 4h window. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall-state.json is 6h+ stale (mtime 11:32Z, no active timer). Ran own verification: 0 open PRs, 0 active inboxes, all sequences complete. 0 real stalls. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json pending=0. All Larry directives tracked+resolved. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-18T17:34:27Z (~15 min ago). FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=cfc3fdf9=origin/main. Clean tree. On main. ✅
+
+**Check B — Sync health:** last_sync=2026-06-18T17:31:50Z (~17 min ago). Within 2h. ✅
+
+**Check C — Agent liveness:** beacon 3734671 (Ss) ✅, chain-event 3734305 (SNs) ✅, inbox-watcher 3434697 (Ssl) ✅, dashboard_api 130620 (Ssl) ✅, outbox_notifier 130853 (Ss) ✅. 5/5. ✅
+
+**Check D — Inboxes:** beacon=0, forge=0, mirror=0. ✅
+
+**Check E — PRs:** 0 open PRs (agent-core + dashboard). ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks:** Thursday 2026-06-18 UTC, weekday=3. Check I/III/VIII/IX/X: skip. ✅
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op (watermark=921=file_length).
+2. PRIME ledger: iter_clean appended (Tier 3).
+3. Tier state: record --checks-clean true → consecutive_clean=10→11, Tier 3 steady-state continues.
+
+**Dispatches:** None.
+
+**Standing findings (carried):**
+- [blue] **PR #576 verification window** — watermark-rotation-gap systemic fix; closes 2026-06-19T13:35Z; repair-watermark no-op confirms fix holding. [watch]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [blue] **unreviewed-merge:571** — bot DM'd. Larry judgment. [carry]
+- [blue] **Stale bash orphan** — PID 1834248 (~20d 22h, sleep-loop). [carry]
+- [blue] **Orphan worktree** — `wt-mirror-dag-preflight-projects-v3-p3-followup` (dir only, Jun 17, git reg pruned). [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule catalog-accuracy-drift-tier4** — 1/3. Watch.
+- [blue] **G-rule ledger/check-i Tier-4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule mirror-marker-parse-error** — 1/3. Watch.
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+
+**PRIME DIRECTIVE:** 0 interventions this iter (iter_clean). Trailing-30d: interventions=1025, systemic_fixes=52, ratio=19.71, trend=improving.
+**Tier end-of-iter:** Tier 3, consecutive_clean=11. Last signal: 2026-06-18T10:23:58Z.
+
+---
+
 ## Iteration ~2214 — 2026-06-18 17:12Z UTC (interactive, /cycle, Tier 3, consecutive_clean=9→10, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).
