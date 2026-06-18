@@ -132,6 +132,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-18 14:04Z UTC (Iter ~2208, Tier 3, consecutive_clean=3→4, NOMINAL)
+
+**Iter ~2208 summary:** ✅ Nominal. 2 Tier-3 alerts: L916 (review-pass/outbox-notifier for PR #576 auto-merged, silenced) + L917 (sync-blocked/sync.service transient, silenced, self-resolved). PR #576 fix-retention-watermark-inline-reset-001 MERGED at 07:35Z — watermark-rotation-gap G-rule COMPLETE, 24h verification window open. All 5 daemons alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4159159 (Ssl), outbox_notifier 4159430 (Ss). Repo HEAD=d272663d=origin/main (clean). Last sync 13:32:56Z (~31 min). 0 open PRs. 0 stalls. pending=0. Heartbeat 13:32:56Z (~31 min, fresh). Thursday: Check I/III/VIII/IX/X skip. §5.0 all no-ops. Stale bash orphan PID 1834248: still alive (20.77 days+). PRIME ratio=19.71 (1025 interventions, 52 systemic_fixes, trend=improving). **Tier 3, consecutive_clean=3→4 — steady-state.**
+
 ## Status snapshot — updated 2026-06-18 13:28Z UTC (Iter ~2207, Tier 3, consecutive_clean=2→3 steady-state, NOMINAL)
 
 **Iter ~2207 summary:** ✅ Nominal. 0 new alerts (watermark=915=file_length). All 5 daemons alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4159159 (Ssl), outbox_notifier 4159430 (Ss). Repo HEAD=00e94c70=origin/main (clean). Last sync 12:51:01Z (~38 min). **fix-retention-watermark-inline-reset-001 CLEARED** — Larry's 'Go' at 13:23Z, dispatched to Forge, PR #576 opened 13:26:36Z (MERGEABLE, Mirror review pending). 0 stalls. Credential rotation: OK. Heartbeat 13:02:38Z (~26 min, fresh). Thursday: Check I/III/VIII/IX/X skip. §5.0 all no-ops. Stale bash orphan PID 1834248: still alive (20d 18h+). PRIME ratio=19.71 (1025 interventions, 52 systemic_fixes, trend=improving). **Tier 3 steady-state achieved (consecutive_clean=3).**
