@@ -132,6 +132,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-18 10:50Z UTC (Iter ~2201, Tier 1→2 de-escalate, consecutive_clean=2→3→0, NOMINAL)
+
+**Iter ~2201 summary:** ✅ Nominal. 1 Tier-3 alert: L915 (dispatch-branch-cleanup/summary — pruned 6 local + 3 remote stale branches, known-pattern, silenced). All 5 daemons alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4159159 (Ssl), outbox_notifier 4159430 (Ss). Repo HEAD=cddd6cee=origin/main (clean). Last sync 09:50:40Z (~60 min). 0 open PRs. 0 stalls. pending=1 (fix-retention-watermark-inline-reset-001 awaiting Larry's `approve`). Git worktrees clean (Larry's "clear stale worktree" directive resolved by healer). Credential rotation: OK. Heartbeat 10:32:09Z (~18 min, fresh). Check I skipped (Thursday). §5.0 all no-ops. Stale bash orphan PID 1834248: still alive (20d 15h 28m). PRIME ratio=19.71 (1025 interventions, 52 systemic_fixes, trend=improving). **Tier 1→2 de-escalation, consecutive_clean reset to 0. 3 clean iters needed for Tier 3.**
+
 ## Status snapshot — updated 2026-06-18 10:43Z UTC (Iter ~2200, Tier 1, consecutive_clean=1→2, NOMINAL)
 
 **Iter ~2200 summary:** ✅ Nominal. 0 new alerts (watermark=914=file_length). All 5 daemons alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4159159 (Ssl), outbox_notifier 4159430 (Ss). Repo HEAD=9674323d=origin/main (clean). Last sync 09:50:40Z (~53 min). 0 open PRs. 0 stalls. pending=1 (fix-retention-watermark-inline-reset-001 awaiting Larry's `approve`; DM delivered 10:30:33Z). Credential rotation: OK. Heartbeat 10:32:09Z (~11 min, fresh). Check I skipped (Thursday). §5.0 all no-ops. Stale bash orphan PID 1834248: still alive (20d 15h 21m). PR #561 (defensive watermark auto-repair) confirmed merged 2026-06-17T11:22Z — proactive fix still pending. PRIME ratio=19.71 (1025 interventions, 52 systemic_fixes, trend=improving). **Tier 1, consecutive_clean=1→2 — 1 more clean iter needed to de-escalate to Tier 2.**

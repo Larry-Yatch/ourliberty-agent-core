@@ -4,6 +4,91 @@
 
 ---
 
+## Iteration ~2201 — 2026-06-18 10:50Z UTC (interactive, /cycle, Tier 1→2 de-escalate, consecutive_clean=2→3→0, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. All checks clean. Tier 1, consecutive_clean=2→3 → **de-escalated to Tier 2** (15-min cadence). Reset consecutive_clean=0.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Stale bash orphan PID 1834248:** CONFIRMED alive (Ss, 20d 15h 28m). Naming-mismatch loop; will never self-exit. Low CPU. [blue carry]
+- **All 5 daemon PIDs:** beacon 3734671 (Ss) ✅, chain-event 3734305 (SNs) ✅, inbox-watcher 3434697 (Ssl) ✅, dashboard_api 4159159 (Ssl) ✅, outbox_notifier 4159430 (Ss) ✅.
+- **Repo HEAD:** cddd6cee=origin/main (Pulse cycle 20260618T104543Z). Clean tree. ✅
+- **Git worktrees:** Only main worktree. No stale. Larry's "Can you clear the stale worktree?" directive from 23:22Z yesterday resolved: `heal-wedged-review-sessions` reaped `wt-forge-p3f-reversibility-and-orphan` at ~01:00Z today. ✅
+- **pending=1 (fix-retention-watermark-inline-reset-001):** CONFIRMED still in beacon-pending-approvals.json. DM delivered 10:30Z today. Awaiting Larry's `approve`. [yellow carry]
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 914, "file_length": 915}`. **1 new alert (L915).**
+- L915 (`dispatch-branch-cleanup`, subject=summary, ts=10:45:22Z): Helper → **Tier 3** (known-pattern). Pruned 6 local + 3 remote stale branches. Silenced. No DM. ✅
+- Watermark advanced 914→915. ✅ No tier-reset.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → No entries. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot PID 3734671 alive (Ss). Last Larry directive "Can you clear the stale worktree?" at 23:22Z yesterday — bot replied `[claude exit 1]` (API 429). Underlying issue resolved by healer (worktree reaped ~01:00Z today); no stale worktrees remain; not an orphan. Transient network errors at ~00:24Z–00:43Z today have resolved. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → 0 stalls. 9 FORGE_NO_PR_SKIP (all reason=pr_exists). ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` pending=1 (`fix-retention-watermark-inline-reset-001`). DM delivered 10:30Z today. [yellow — awaiting Larry]. Carry.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=`2026-06-18T10:32:09Z` (~18 min). FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=cddd6cee=origin/main. Clean tree. On main. Up to date. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-18T09:50:40Z (~60 min), status=no-change. Within 2h. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon 3734671 (Ss) ✅, chain-event 3734305 (SNs) ✅, inbox-watcher 3434697 (Ssl) ✅, dashboard_api 4159159 (Ssl) ✅, outbox_notifier 4159430 (Ss) ✅. All 5/5 alive. ✅ Nominal.
+
+**Check D — Inboxes:** beacon=0, forge=0, mirror=0. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open. ✅ Nominal.
+
+**Check H — Forge digest:** 0 open PRs. Last merges: PR #575/#574/#573 (projects-v3-p3-followup, merged ~01:25Z today). Pipeline steady. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:**
+- `audit_due_nudge.py`: no-op (no committed audit baseline). ✅
+- `distill_detector.py`: no-op. ✅
+- `audit_cadence_signal.py` (at `review/distill/`): no-op. ✅
+
+**Conditional checks:** Thursday 2026-06-18 UTC, weekday=3 ∉ {0,2,4,6}. Check I: skip. Check III: skip. Check VIII/IX/X: skip (non-Monday). ✅
+
+**Actions taken:**
+1. Check 0: L915 triaged Tier 3 (dispatch-branch-cleanup/summary, known-pattern). Silenced.
+2. Check 0: Watermark advanced 914→915.
+3. PRIME ledger: `iter_clean` appended (Tier 1).
+4. Tier state: `record --checks-clean true` → consecutive_clean=2→3 → **de-escalated Tier 1→2**, reset consecutive_clean=0.
+
+**Dispatches:** None.
+
+**Standing findings (carried):**
+- [yellow] **pending=1 fix-retention-watermark-inline-reset-001** — proactive watermark-retention fix; approval_request DM delivered 10:30Z today. Awaiting Larry's `approve`. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [blue] **unreviewed-merge:571** — bot DM'd. Larry judgment. [carry]
+- [blue] **Stale bash orphan** — PID 1834248 (20d 15h+ sleep-loop, naming-mismatch exit condition). [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule catalog-accuracy-drift-tier4** — 1/3. Watch.
+- [blue] **G-rule ledger/check-i Tier-4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule mirror-marker-parse-error** — 1/3. Watch.
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+
+**Next:** Tier 2 (15-min cadence; 3 clean iters needed to de-escalate to Tier 3).
+
+**PRIME DIRECTIVE:** 0 interventions this iter (iter_clean). Trailing-30d: interventions=1025, systemic_fixes=52, ratio=19.71, trend=improving.
+**Tier end-of-iter:** Tier 1→2 de-escalation, consecutive_clean reset to 0. Last signal 10:23:58Z.
+
+---
+
 ## Iteration ~2200 — 2026-06-18 10:43Z UTC (interactive, /cycle, Tier 1, consecutive_clean=1→2, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).
