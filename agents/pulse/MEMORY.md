@@ -132,6 +132,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-18 11:47Z UTC (Iter ~2204, Tier 2→3 de-escalate, consecutive_clean=2→3→0, NOMINAL)
+
+**Iter ~2204 summary:** ✅ Nominal. 0 new alerts (watermark=915=file_length). All 5 daemons alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4159159 (Ssl), outbox_notifier 4159430 (Ss). Repo HEAD=4023ae9d=origin/main (clean). Last sync 10:50:41Z (~57 min). 0 open PRs. 0 stalls. pending=1 (fix-retention-watermark-inline-reset-001 awaiting Larry's `approve`). Credential rotation: OK. Heartbeat 11:32:17Z (~15 min, fresh). Check I skipped (Thursday). §5.0 all no-ops. Stale bash orphan PID 1834248: still alive (20d 16h 28m). PRIME ratio=19.71 (1025 interventions, 52 systemic_fixes, trend=improving). **Tier 2→3 de-escalation, consecutive_clean reset to 0. 3 more clean iters needed for Tier 3 steady-state.**
+
 ## Status snapshot — updated 2026-06-18 11:07Z UTC (Iter ~2202, Tier 2, consecutive_clean=0→1, NOMINAL)
 
 **Iter ~2202 summary:** ✅ Nominal. 0 new alerts (watermark=915=file_length). All 5 daemons alive — beacon 3734671 (Ss), chain-event 3734305 (SNs), inbox-watcher 3434697 (Ssl), dashboard_api 4159159 (Ssl), outbox_notifier 4159430 (Ss). Repo HEAD=6049dfcc=origin/main (clean). Last sync 10:50:41Z (~17 min). 0 open PRs. 0 stalls. pending=1 (fix-retention-watermark-inline-reset-001 awaiting Larry's `approve`). Credential rotation: OK. Heartbeat 11:02:15Z (~4.3 min, fresh). Check I skipped (Thursday). §5.0 all no-ops. Stale bash orphan PID 1834248: still alive (20d 15h 48m). PRIME ratio=19.71 (1025 interventions, 52 systemic_fixes, trend=improving). **Tier 2, consecutive_clean=0→1. 2 more clean iters needed for Tier 3.**
