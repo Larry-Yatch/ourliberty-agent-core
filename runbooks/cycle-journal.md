@@ -154621,3 +154621,88 @@ Watermark: 1049 → 1050. No tier-reset (Tier-3 silence).
 
 **PRIME DIRECTIVE:** 1 intervention + 1 verification_pending this iter. Trailing-30d: interventions=1025, systemic_fixes=52, ratio=19.71, trend=improving.
 **Tier end-of-iter:** Tier 3→1, consecutive_clean=0. Last signal: 2026-06-18T10:23:58Z.
+
+
+## Iteration ~2199 — 2026-06-18 10:33Z UTC (interactive, /cycle via /loop, Tier 1, consecutive_clean=0→1, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle` via /loop self-paced dynamic mode).
+
+**Health:** ✅ Nominal. All checks clean. Tier 1 (5-min cadence, recovering from iter ~2198 signal), consecutive_clean=0→1.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Stale bash orphan PID 1834248:** Still alive (Ss, 20d 15h 11m). Waiting for naming-mismatch file; loop never self-exits. Low CPU. [blue carry]
+- **All 5 daemon PIDs:** beacon 3734671 (Ss, 1d 8h+) ✅, chain-event 3734305 (SNs, 1d 8h+) ✅, inbox-watcher 3434697 (Ssl, 2d 5h+) ✅, dashboard_api 4159159 (Ssl, 8h+) ✅, outbox_notifier 4159430 (Ss, 8h+) ✅.
+- **Repo HEAD:** 937c2f0b=origin/main (Pulse cycle 20260618T102901Z). Clean tree. ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 913, "file_length": 914}`. **1 new alert (L914).**
+- L914 (`approval_request`, approval_id=fix-retention-watermark-inline-reset-001, source=outbox-notifier, ts=10:26:05Z): Helper → **Tier 3** (known-pattern: outbox-notifier approval_request = delivery confirmation). Silenced. No DM. ✅
+- Watermark advanced 913→914. ✅
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → No entries. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon PID 3734671 alive (Ss). Last log entry 2026-06-18T03:50:12-0600 (09:50Z, ~43 min ago). Idle silence, not a hang. No new Larry directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → 0 stalls. 15 FORGE_NO_PR_SKIP (all reason=pr_exists — tasks already have merged PRs). ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` pending=1.
+- `fix-retention-watermark-inline-reset-001` (created 10:26:04Z, 7 min after iter ~2198 dispatch): Beacon processed the direction-ask and queued plan for Larry approval. Outbox-notifier DM'd Larry via Telegram (L914). [yellow carry — awaiting Larry's `approve` reply]
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=`2026-06-18T10:02:00Z` (~31 min). FRESH (<60 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=937c2f0b=origin/main. Clean tree. On main. Up to date. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-18T09:50:40Z (~43 min), status=no-change. Within 2h. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon 3734671 (Ss) ✅, chain-event 3734305 (SNs) ✅, inbox-watcher 3434697 (Ssl) ✅, dashboard_api 4159159 (Ssl) ✅, outbox_notifier 4159430 (Ss) ✅. All 5/5 alive. ✅ Nominal.
+
+**Check D — Inboxes:** Beacon: 0. Forge: 0. Mirror: 0. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open. Most recent merges: PR #575 (01:25Z), PR #574 (00:28Z), PR #573 (00:18Z). ✅ Nominal.
+
+**Check H — Forge digest:** 0 open PRs. 15 merged in last ~24h (PR #561–#575, P3 pipeline buildout complete). Pipeline quiet post-P3-followup. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:**
+- `audit_due_nudge.py`: no-op (no committed audit baseline). ✅
+- `distill_detector.py`: no-op. ✅
+- `audit_cadence_signal.py` (at `review/distill/`): no-op. ✅
+
+**Conditional checks:** Thursday 2026-06-18 UTC, weekday=3 ∉ {0,2,4,6}. Check I: skip. Check III: skip. Check VIII/IX/X: skip (non-Monday). ✅
+
+**Actions taken:**
+1. Check 0: L914 triaged Tier-3 (approval_request/outbox-notifier, known-pattern). Silenced.
+2. Check 0: Watermark advanced 913→914.
+3. PRIME ledger: `iter_clean` appended (Tier 1).
+4. Tier state: `record --checks-clean true` → consecutive_clean=0→1 (Tier 1, recovering).
+
+**Dispatches:** None.
+
+**Standing findings (carried):**
+- [yellow] **fix-retention-watermark-inline-reset-001** — plan queued in beacon-pending-approvals.json (10:26Z); Larry's `approve` DM will release it to Forge. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [blue] **G-rule watermark-rotation-gap** — **3/3 DISPATCHED** ✅ (pulse-grule-watermark-rotation-gap-001). Pending Larry approval → Forge build → merge.
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch; dispatch at 3/3.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule catalog-accuracy-drift-tier4** — 1/3. Watch.
+- [blue] **G-rule ledger/check-i Tier-4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule mirror-marker-parse-error** — 1/3. Watch.
+- [blue] **Stale bash orphan** — PID 1834248 (20d 15h+, naming-mismatch exit, low CPU). [carry]
+- [blue] **unreviewed-merge:571** — bot DM'd. Larry judgment. [carry]
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+- [blue] **projects-v3-p3 COMPLETE ✅ and projects-v3-p3-followup COMPLETE ✅** — all PRs (#573/#574/#575) merged 2026-06-18.
+
+**Next:** Tier 1 (5-min cadence). consecutive_clean=1, need 2 more clean iters to de-escalate to Tier 2.
+
+**PRIME DIRECTIVE:** 0 interventions this iter (iter_clean). Trailing-30d: interventions=1025, systemic_fixes=52, ratio=19.71, trend=improving.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0→1. Last signal: 2026-06-18T10:23:58Z.
