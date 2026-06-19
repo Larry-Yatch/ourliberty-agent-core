@@ -114,9 +114,9 @@
 
 ---
 
-## heal-droplet-git-drift Tier-4 → DISPATCHED (iter ~2273 dispatch, verification pending)
+## heal-droplet-git-drift Tier-4 → PR #586 MERGED ✅ (iter ~2273 dispatch, iter ~2278 PR merged, verification pending next fire)
 
-**Rule:** G-rule heal-droplet-git-drift-tier4 reached 3/3 (L876 at 12:41Z 2026-06-19). Direction-ask dispatched to Beacon inbox (`pulse-direction-ask-heal-droplet-git-drift-tier3-001.json`) requesting Tier-3 silence translation for `source=heal-droplet-git-drift, subject=droplet-uncommitted:main` in `config/alert-translations.json`. Bot already DMs Larry for these (route=escalate); Pulse Tier-4 triage adds noise. VERIFICATION PENDING: confirm translation merged and triage helper classifies Tier-3 on next occurrence.
+**Rule:** G-rule heal-droplet-git-drift-tier4: direction-ask dispatched iter ~2273, Larry approved 13:14Z, PR #586 (`chore(config): silence Pulse re-triage of droplet-uncommitted:main drift alert`) merged 2026-06-19T13:26:32Z. Tier-3 translation active in `config/alert-translations.json` for `source=heal-droplet-git-drift, subject=droplet-uncommitted:main`. Bot still DMs Larry (route=escalate preserved). PRIME verification_pending. VERIFICATION PENDING: confirm triage helper classifies Tier-3 on next heal-droplet-git-drift fire (expected ~18:41Z).
 
 ---
 
@@ -137,6 +137,10 @@
 **Rule:** `audit_due_nudge.py` and `distill_detector.py` live in `scripts/`, NOT `review/distill/`. Only `audit_cadence_signal.py` is in `review/distill/`. Always invoke: `python3 scripts/audit_due_nudge.py`, `python3 scripts/distill_detector.py`, `python3 review/distill/audit_cadence_signal.py`.
 
 ---
+
+## Status snapshot — updated 2026-06-19 13:37Z UTC (Iter ~2278, Tier 2, consecutive_clean=1→2, NOMINAL ✅)
+
+**Iter ~2278 summary:** ✅ Nominal. 1 new alert (L879: outbox-notifier review-pass, Tier-3 silence). All 5 daemons alive — beacon 3734671 (2d 11h 11m+), chain-event 3734305 (2d 11h 11m+), inbox-watcher 3434697 (3d 8h 21m+), outbox_notifier 305068 (~9h 59m), dashboard_api 304948 (~9h 59m). Repo HEAD=50b8cf9a=origin/main (clean; untracked trim_memory.py). Last sync 12:38:19Z (~59 min). 0 open PRs both repos. 0 stalls. pending=0. Credential rotation OK. Heartbeat 13:08:29Z (~29 min, fresh). Check I deduped (Fri artifact). §5.0 all no-ops. **PR #576 verification window CLOSED ✅** — 0 rotation-gap alerts, fix verified. **PR #586 MERGED 13:26Z ✅** — G-rule heal-droplet-git-drift-tier4 fix live, PRIME verification_pending (next fire ~18:41Z). Stale bash orphan PID 1834248 (21d 18h 18m+, condition file absent). G-rule ledger/check-i at 2/3. PRIME ratio≈19.8 (interventions≈1048, systemic_fixes=53, trend=improving). **Tier 2, consecutive_clean=1→2. Need 1 more clean iter for Tier 3. Next cadence: 15-min.**
 
 ## Status snapshot — updated 2026-06-19 13:18Z UTC (Iter ~2277, Tier 2, consecutive_clean=0→1, NOMINAL ✅)
 
