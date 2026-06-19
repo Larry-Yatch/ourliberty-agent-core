@@ -149,6 +149,14 @@
       "recommended_action": "Add an entry to config/token-rotation-schedule.json for the named credential per the existing entries' shape (4-artifact discipline: registry + runbook + calendar event + drift-healer awareness). Runbook: runbooks/heal-credential-registry-drift.md."
     }
   },
+  "heal-droplet-git-drift": {
+    "droplet-uncommitted:main": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "The droplet git-drift healer found uncommitted file(s) on `main` whose newest edit is older than 6h (healer-managed runtime paths are excluded first). The healer is observation-only by design — it never auto-commits or discards — and it already DM'd you directly at emit time via route=escalate. This entry silences Pulse's Check-0 redundant re-triage of the same record (which was re-escalating it as a novel Tier-4 alert each cycle); it does NOT silence the primary healer DM, which still fires every 6h until the tree is clean. The raw subject carries the branch after the colon (droplet-uncommitted:<branch>); this key matches via the prefix-strip lookup rule. By-design dedup, not a failure.",
+      "recommended_action": "Review the named files (the alert body lists them) and either commit or restore them: `cd /home/larry/agent-core && git status && git diff`. Once the working tree is clean the healer stops firing. This entry only mutes Pulse's duplicate re-escalation — the primary 6h healer DM still reaches you, so genuinely-new uncommitted drift on main is never hidden. Producer: scripts/heal_droplet_git_drift.py (observation-only)."
+    }
+  },
   "heal-chain-event-shipper-heartbeat": {
     "chain-event-shipper-stale": {
       "severity": "URGENT",
