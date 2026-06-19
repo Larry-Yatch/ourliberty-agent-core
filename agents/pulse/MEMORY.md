@@ -138,9 +138,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-19 20:32Z UTC (Iter ~2297, Tier 2→3, consecutive_clean=2→3→de-escalate, NOMINAL ✅)
+## Status snapshot — updated 2026-06-19 21:07Z UTC (Iter ~2298, Tier 3, consecutive_clean=0→1, NOMINAL ✅)
 
-**Iter ~2297 summary:** ✅ Nominal. 0 new alerts. All 5 daemons alive — beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 497831, dashboard_api 497752. 0 open PRs. Repo on main, up-to-date (HEAD=43d77835, PR #596 `docs(north-star): P1 ✅ — board is Funnel + Pipeline only (kanban retired)` merged since last iter). Sync 20:21Z (~11 min). Watermark=895=file_length. pending=0. Creds OK. Heartbeat 20:10:19Z (~22 min). Check I deduped (Fri). §5.0 no-ops. Stale bash orphan PID 1834248 (~22d+). G-rule ledger/check-i 2/3. PRIME ratio≈19.8 (interventions=1049, systemic_fixes=53, trend=improving). **Tier 3 (de-escalated from Tier 2). consecutive_clean=0. Next cadence: 30-min.**
+**Iter ~2298 summary:** ✅ Nominal. 1 new alert (L896 dispatch-branch-cleanup Tier-3 silenced). All 5 daemons alive — beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 497831, dashboard_api 497752. 0 open PRs. Repo on main, up-to-date (HEAD=a3be4e51, Pulse cycle 20260619T203358Z). Sync 20:21Z (~46 min). Watermark=896=file_length. pending=0. Creds OK. Heartbeat 20:40:19Z (~27 min). Check I deduped (Fri). §5.0 no-ops. Stale bash orphan PID 1834248 (~22d+). G-rule ledger/check-i 2/3. PRIME ratio≈19.8 (interventions=1049, systemic_fixes=53, trend=improving). **Tier 3. consecutive_clean=0→1. Next cadence: 30-min.**
 
 
 
