@@ -4,6 +4,87 @@
 
 ---
 
+## Iteration ~2271 — 2026-06-19T11:44Z UTC (interactive, /cycle, Tier 3, consecutive_clean=7, NOMINAL ✅)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 0 new alerts. All checks clean. Tier 3, consecutive_clean=7. Next cadence: 30-min.
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #576 verification window (closes 2026-06-19T13:35Z):** PR #576 MERGED 2026-06-18T13:35:28Z (confirmed). Watermark=873=file_length (0 new rotation-gap alerts). Fix holding. ~1.88h remaining. ✅
+- **All 5 daemons:** beacon 3734671 (Ss, 2d 9h 17m+) ✅, chain-event 3734305 (SNs, 2d 9h 17m+) ✅, inbox-watcher 3434697 (Ssl, 3d 6h 27m+) ✅, outbox_notifier 305068 (Ss, ~8h 5m) ✅, dashboard_api 304948 (Ssl, ~8h 5m) ✅.
+- **Stale bash orphan PID 1834248:** ALIVE — bash, Ss, elapsed=21d 16h 25m+. Condition file absent; loop will never self-exit. [blue carry]
+- **heal-droplet-git-drift G-rule 2/3:** 0 new drift alerts. G-rule stays at 2/3. [watch]
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 873, "file_length": 873}`. 0 new alerts. Watermark=873=file_length. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → No entries. outbox-notifier.log + inbox-watcher.log: 0 WARN/ERROR. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot PID 3734671 alive (Ss, 2d 9h 17m+). Recent Larry messages (10:51–11:12Z): 'Can you clean this up?' → 'Yes clear out those marker-builder files from your memory.' → 'How do I approve the prompt?' — Beacon responded at 11:12Z. All three are Beacon conversational exchanges in active handling; no orphaned directives. ✅ Nominal (journal note: Beacon is engaged with Larry re: marker-builder cleanup + approval flow explanation).
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → 0 stalls. 8 FORGE_NO_PR_SKIP (pr_exists or preflight_exit — all confirmed merged/archived). ✅ Nominal.
+
+**Check 4 — Pending directives:** watermark=873=file_length. beacon-pending-approvals.json: pending=0, history=238. Inboxes forge=0, beacon=0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-19T11:38:19Z (~5.7 min ago). FRESH (< 60 min). ✅ Nominal.
+
+**Check A — Source repo:** On main, HEAD=307f1676=origin/main. **DIRTY TREE: agents/beacon/captures.json modified** — capture cap-orphan-lane-show-state-collapse-terminal-orphans-aa37 reverted from state=promoted to state=parked (spawned block stamped 11:30:05Z removed). Projects-store healer wrote this; sync at 11:38Z ran fine (no-change, nothing to pull). Wrapper will commit on next systemd-timer cycle. Untracked trim_memory.py — carry. [blue] Healer-driven churn; not escalating unless it persists past next system cycle.
+
+**Check B — Sync health:** last_sync=2026-06-19T11:38:15Z (~5.7 min ago). Status=no-change. Within 2h threshold. ✅
+
+**Check C — Agent liveness:** beacon 3734671 (Ss, 2d 9h 17m+) ✅, chain-event 3734305 (SNs, 2d 9h 17m+) ✅, inbox-watcher 3434697 (Ssl, 3d 6h 27m+) ✅, outbox_notifier 305068 (Ss, ~8h 5m) ✅, dashboard_api 304948 (Ssl, ~8h 5m) ✅. 5/5. ✅
+
+**Check D — Inboxes:** forge=0, beacon=0. ✅
+
+**Check E — PRs:** ourliberty-agent-core: 0 open PRs. ourliberty-dashboard: 0 open PRs. ✅ All clear.
+
+**Check H — Forge activity digest:** Recent merges: #585 (spec(projects-v3): empty-state hint, 2026-06-19T03:37Z), #584 (P4 closeout DM handoff, 03:14Z), #583 (author phase closeout, 2026-06-18T23:08Z), #582 (p3f2 Drop/Archive honest, 16:08Z), #581 (fix(sync): one-tick grace, 15:39Z). 0 open PRs. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Check I (Fri UTC, weekday=4 ∈ {0,2,4,6}):** check-i-2026-06-19.json already present. Dedup — skip. ✅
+**Check III:** Not Sunday — skip. ✅
+**Check VIII/IX/X:** Not Monday — skip. ✅
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op (873=file_length). Set-watermark to 873 (confirm persistence).
+2. PRIME ledger: `iter_clean` appended (Tier 3, template=iter-clean, ts=11:44:39Z).
+3. Tier state: `record --checks-clean true` → Tier 3, consecutive_clean=7.
+
+**Dispatches:** None. System nominal.
+
+**Standing findings (carried forward — verified above where noted):**
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [blue] **PR #576 verification window** — closes 2026-06-19T13:35Z; ~1.88h remaining; fix holding. [watch]
+- [blue] **Dirty tree: agents/beacon/captures.json** — modified by projects-store healer at 11:30Z (cap reverted promoted→parked). Sync not blocked (HEAD=origin). Wrapper commits on next timer cycle. [watch 1 cycle]
+- [blue] **L929/L939 heal-droplet-git-drift** — trim_memory.py untracked. Bot DM'd Larry twice (idx=928, idx=938). PR #581 merged may reduce future occurrences. Larry: commit or delete trim_memory.py. [carry]
+- [blue] **unreviewed-merge:571** — bot DM'd. Larry judgment. [carry]
+- [blue] **Stale bash orphan** — PID 1834248 (21d 16h 25m+, bash, Ss). Condition file absent; loop will never self-exit. Re-verified alive this iter. [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule catalog-accuracy-drift-tier4** — 1/3. Watch.
+- [blue] **G-rule ledger/check-i Tier-4** — 2/3. Watch. Dispatch to Beacon at 3/3.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule mirror-marker-parse-error** — 1/3. Watch.
+- [blue] **G-rule heal-droplet-git-drift-tier4** — **2/3**. 0 new occurrence this iter. Watch. Dispatch to Beacon at 3/3.
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+
+**PRIME DIRECTIVE:** 0 interventions this iter. iter_clean recorded. Trailing-30d: interventions=1047, systemic_fixes=52, ratio≈20.1, trend=improving.
+**Tier end-of-iter:** Tier 3, consecutive_clean=7. Next cadence: 30-min.
+
+---
+
 ## Iteration ~2270 — 2026-06-19T11:07Z UTC (interactive, /cycle, Tier 3, consecutive_clean=6, NOMINAL ✅)
 
 **Trigger:** Larry direct invocation (`/cycle`).
