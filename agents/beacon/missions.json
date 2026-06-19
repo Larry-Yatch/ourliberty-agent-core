@@ -4162,7 +4162,21 @@
       "created": "2026-06-19",
       "deferred_reason": null,
       "proposed_by": "closeout",
-      "proposed_at": "2026-06-19T19:46:22.105099+00:00"
+      "proposed_at": "2026-06-19T19:46:22.105099+00:00",
+      "briefing": {
+        "what": "A recent change is ready, but the usual automatic safety checks couldn't finish running, so we don't yet have proof it works correctly.",
+        "why": "Shipping something unverified risks introducing a bug that reaches customers and costs time and trust to fix later.",
+        "suggest": "Hold off on releasing until the checks are re-run and come back clean \u2014 a short wait now avoids a bigger cleanup later."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-19T20:00:47.362051+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "the-empty-state-hint-and-unchanged-populated-view-still-need-to-be-confirmed-live-on-the-board-since-the-done-gate-is-browser-checkable-only",
@@ -4175,7 +4189,21 @@
       "created": "2026-06-19",
       "deferred_reason": null,
       "proposed_by": "closeout",
-      "proposed_at": "2026-06-19T19:46:22.109992+00:00"
+      "proposed_at": "2026-06-19T19:46:22.109992+00:00",
+      "briefing": {
+        "what": "A small board update that shows a friendly hint when there's nothing to display, with everything else left untouched.",
+        "why": "First impressions matter \u2014 a blank screen looks broken, while a clear hint keeps the board feeling polished and trustworthy.",
+        "suggest": "Have someone open the board and eyeball both the empty and normal views before signing off, just to be sure it looks right."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-19T20:00:47.362051+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "this-phase-was-the-first-live-trial-of-the-build-completion-closeout-so-confirm-live-that-the-building-to-done-flip-the-card-closeout-the-completion-message-and-any-suggested-follow-ups-all-actually-fired",
@@ -4188,7 +4216,21 @@
       "created": "2026-06-19",
       "deferred_reason": null,
       "proposed_by": "closeout",
-      "proposed_at": "2026-06-19T19:46:22.110884+00:00"
+      "proposed_at": "2026-06-19T19:46:22.110884+00:00",
+      "briefing": {
+        "what": "This is the first real run of the system that automatically wraps up a finished project \u2014 moving it to Done, closing out its card, sending the completion note, and offering next steps.",
+        "why": "If any of those steps quietly failed, finished work could look unfinished or customers could miss the wrap-up message, so we need to know it works before relying on it.",
+        "suggest": "Do a quick hands-on check that all four wrap-up steps actually happened this time before trusting it to run on its own."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-19T20:00:47.362051+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
