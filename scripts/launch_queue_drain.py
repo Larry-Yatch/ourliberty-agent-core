@@ -89,6 +89,25 @@ def _agents_root() -> Path:
     return Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
 
 
+def _valid_repos() -> frozenset[str]:
+    """Buildable repo names from ``config/agent-models.json`` ``repo_paths`` (the
+    canonical repo block; config lives at ``<scripts>/../config/agent-models.json``).
+
+    Best-effort: any read/parse error returns an EMPTY set, which the caller
+    treats as "can't validate" and SKIPS the repo check (fail OPEN — never
+    dead-letter otherwise-fine work over a transient config read miss). A
+    populated set enables the belt-and-suspenders check in `_drain_one`."""
+    cfg_path = Path(__file__).resolve().parent.parent / 'config' / 'agent-models.json'
+    try:
+        data = json.loads(cfg_path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return frozenset()
+    block = data.get('repo_paths') if isinstance(data, dict) else None
+    if not isinstance(block, dict):
+        return frozenset()
+    return frozenset(k for k in block if isinstance(k, str) and k)
+
+
 def _launch_queue_dir() -> Path:
     """Where `POST /api/projects/launch` drops queued launch requests."""
     return _agents_root() / 'blackboard' / 'build-launch-queue'
@@ -342,6 +361,24 @@ def _drain_one(path: Path, sequences_dir: Path, now: datetime, result: DrainResu
         # re-author and do NOT dispatch a second build; just clear the queue.
         _remove_queue_file(path)
         result.already_launched.append(phase_id)
+        return
+
+    # --- repo sanity: never author a sequence Forge can't build ---
+    # The dashboard launch endpoint already validates/repairs target_repo, so
+    # this is belt-and-suspenders for a legacy / hand-written queue file. An
+    # invalid repo (e.g. a working-dir name like `ol-work` that rode in from a
+    # capture origin) is dead-lettered rather than authored into an unbuildable
+    # sequence that would sit `dispatched` forever (the 2026-06-19 wedge).
+    # valid_repos empty (config unreadable) → skip the check (fail open).
+    repo = str(entry.get('repo') or _DEFAULT_BUILD_REPO)
+    valid_repos = _valid_repos()
+    if valid_repos and repo not in valid_repos:
+        _dead_letter(
+            path,
+            f'target_repo {repo!r} is not a buildable repo '
+            f'(config/agent-models.json repo_paths: {sorted(valid_repos)})',
+        )
+        result.dead_lettered.append(path.name)
         return
 
     # --- new launch: author → validate → write → dispatch Mirror ---

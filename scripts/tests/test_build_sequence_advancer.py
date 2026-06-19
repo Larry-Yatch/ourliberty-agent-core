@@ -50,6 +50,16 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 
+def _recent_iso(minutes_ago=5):
+    """A `dispatched_at` well inside the stranded-dispatch stall window
+    (DISPATCH_STALL_TIMEOUT_SEC, default 4h). Reconcile tests that keep a step
+    `dispatched` with no PR use this so the realistic 'just dispatched, no PR
+    yet' scenario isn't also tripped by the stall backstop (the backstop only
+    targets genuinely-old dispatches; the fixed 3-weeks-ago fixture timestamps
+    were incidental, not the test's intent)."""
+    return (datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)).isoformat()
+
+
 def _make_step(step_id, deps=None, status='pending', pr_url=None,
                dispatched_at=None):
     return {
@@ -877,7 +887,7 @@ class TestActiveReconciliation(_AdvancerHarness):
                 _make_step(
                     'api', status='dispatched',
                     pr_url=None,
-                    dispatched_at='2026-05-30T00:00:00+00:00',
+                    dispatched_at=_recent_iso(),
                 ),
             ],
             current_steps=['api'],
@@ -989,7 +999,7 @@ class TestActiveReconciliation(_AdvancerHarness):
                 _make_step(
                     'step-baz', status='dispatched',
                     pr_url=None,
-                    dispatched_at='2026-05-30T00:00:00+00:00',
+                    dispatched_at=_recent_iso(),
                 ),
             ],
             current_steps=['step-baz'],
@@ -1303,6 +1313,135 @@ class TestReconciliationConservativeGuard(_AdvancerHarness):
         seq = self._read_sequence('seq-001')
         step = next(s for s in seq['steps'] if s['step_id'] == 'step-foo')
         self.assertEqual(step['status'], 'dispatched')
+
+
+class TestStrandedDispatchEscalation(_AdvancerHarness):
+    """Bug 2 backstop: a `dispatched` step that can NEVER reach a terminal gate
+    (invalid target_repo, or stalled with no PR) is escalated — step `failed` +
+    sequence `paused` + Larry DM — instead of silently hanging for hours (the
+    2026-06-19 `ol-work` launch sat ~6h with no failure + no alert)."""
+
+    def setUp(self):
+        super().setUp()
+        # Deterministic gates + a stand-in buildable-repo set (don't depend on
+        # the live config). Reconcile finds no merged PR (the stranded steps
+        # never produced one) — escalation is what must catch them; the lambda
+        # also avoids a real `gh` subprocess for the invalid repo.
+        self._patch_gates(chain_merged=False, gh_merged=None)
+        self.bsa._gh_list_merged_prs = lambda repo, logger=None: []
+        self.bsa._valid_target_repos = lambda: frozenset(
+            {'ourliberty-agent-core', 'ourliberty-dashboard'})
+
+    def _dispatched(self, *, repo, dispatched_at, pr_url=None, status='active'):
+        seq = _make_sequence(
+            status=status,
+            steps=[_make_step('only-step', status='dispatched',
+                              pr_url=pr_url, dispatched_at=dispatched_at)],
+            current_steps=['only-step'],
+        )
+        seq['steps'][0]['target_repo'] = repo
+        return seq
+
+    def _stale_iso(self):
+        return (datetime.now(timezone.utc) - timedelta(
+            seconds=self.bsa.DISPATCH_STALL_TIMEOUT_SEC + 3600)).isoformat()
+
+    def test_invalid_target_repo_escalates_within_one_tick(self):
+        self._write_sequence(self._dispatched(
+            repo='ol-work', dispatched_at=_recent_iso()))
+        self.bsa.tick()
+        seq = self._read_sequence('seq-001')
+        step = seq['steps'][0]
+        self.assertEqual(step['status'], 'failed')
+        self.assertIn('ol-work', step['failure_reason'])
+        self.assertIn('repo_paths', step['failure_reason'])
+        self.assertEqual(seq['status'], 'paused')
+        self.assertIsNone(step['current_actor'])
+        subjects = [d['subject'] for d in self.dms]
+        self.assertIn('sequence-stranded:seq-001:only-step', subjects)
+        self.assertTrue(any(d['severity'] == 'critical' for d in self.dms))
+        events = [e['event'] for e in seq['audit_log']]
+        self.assertIn('step-stranded', events)
+        self.assertIn('sequence-paused', events)
+
+    def test_invalid_target_repo_escalates_even_with_flag_off(self):
+        # A bad repo is a config error → escalation is FLAG-INDEPENDENT.
+        os.environ['OURLIBERTY_BUILD_SEQUENCE_ADVANCER_ENABLED'] = 'false'
+        self._write_sequence(self._dispatched(
+            repo='ol-work', dispatched_at=_recent_iso()))
+        self.bsa.tick()
+        seq = self._read_sequence('seq-001')
+        self.assertEqual(seq['steps'][0]['status'], 'failed')
+        self.assertEqual(seq['status'], 'paused')
+
+    def test_stalled_valid_repo_escalates(self):
+        self._write_sequence(self._dispatched(
+            repo='ourliberty-agent-core', dispatched_at=self._stale_iso()))
+        self.bsa.tick()
+        seq = self._read_sequence('seq-001')
+        step = seq['steps'][0]
+        self.assertEqual(step['status'], 'failed')
+        self.assertIn('stall', step['failure_reason'].lower())
+        self.assertEqual(seq['status'], 'paused')
+        self.assertTrue(any(d['severity'] == 'warning' for d in self.dms))
+
+    def test_stall_suppressed_when_flag_off(self):
+        # Valid repo + forward-dispatch OFF → a waiting step is expected, not
+        # stalled; the timing backstop does not fire.
+        os.environ['OURLIBERTY_BUILD_SEQUENCE_ADVANCER_ENABLED'] = 'false'
+        self._write_sequence(self._dispatched(
+            repo='ourliberty-agent-core', dispatched_at=self._stale_iso()))
+        self.bsa.tick()
+        seq = self._read_sequence('seq-001')
+        self.assertEqual(seq['steps'][0]['status'], 'dispatched')
+        self.assertEqual(seq['status'], 'active')
+
+    def test_recent_valid_dispatch_not_escalated(self):
+        self._write_sequence(self._dispatched(
+            repo='ourliberty-agent-core', dispatched_at=_recent_iso()))
+        self.bsa.tick()
+        seq = self._read_sequence('seq-001')
+        self.assertEqual(seq['steps'][0]['status'], 'dispatched')
+        self.assertEqual(seq['status'], 'active')
+
+    def test_unreadable_config_fails_open_on_invalid_repo(self):
+        # Empty valid set (config unreadable) → invalid-repo check skipped so a
+        # transient config miss never pauses a sequence. Recent dispatch → no
+        # stall either, so the step is left untouched.
+        self.bsa._valid_target_repos = lambda: frozenset()
+        self._write_sequence(self._dispatched(
+            repo='ol-work', dispatched_at=_recent_iso()))
+        self.bsa.tick()
+        seq = self._read_sequence('seq-001')
+        self.assertEqual(seq['steps'][0]['status'], 'dispatched')
+        self.assertEqual(seq['status'], 'active')
+
+    def test_write_failure_does_not_resurrect_active_for_forward_dispatch(self):
+        # If escalation's atomic write FAILS, the on-disk file stays `active`;
+        # tick must NOT re-read it and run the forward-dispatch leg on the step
+        # the pass just (in-memory) paused. Assert _process_active_sequence is
+        # never invoked despite the write failure.
+        def _boom(path, seq):
+            raise OSError('disk full')
+        self.bsa._atomic_write_sequence = _boom
+        processed = []
+        self.bsa._process_active_sequence = (
+            lambda path, seq, *a, **k: processed.append(seq.get('seq_id')))
+        self._write_sequence(self._dispatched(
+            repo='ol-work', dispatched_at=_recent_iso()))
+        self.bsa.tick()
+        # The escalation DM still fired (wedge is visible)...
+        self.assertTrue(any(
+            d['subject'].startswith('sequence-stranded:') for d in self.dms))
+        # ...and the forward-dispatch leg did NOT act on the paused-in-memory seq.
+        self.assertEqual(processed, [])
+
+    def test_dispatched_age_handles_z_suffix(self):
+        # A 'Z'-suffixed timestamp must parse (not silently disable the stall
+        # backstop on Python <3.11).
+        now = datetime(2026, 6, 19, 12, 0, 0, tzinfo=timezone.utc)
+        age = self.bsa._dispatched_age_sec('2026-06-19T08:00:00Z', now)
+        self.assertEqual(age, 4 * 3600)
 
 
 class _RecordingLogger:
