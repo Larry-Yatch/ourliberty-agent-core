@@ -4,6 +4,85 @@
 
 ---
 
+## Iteration ~2247 — 2026-06-19T03:05Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0, NON-NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ PR #584 (p4-closeout-outputs) fix in Forge inbox, not yet processed. Mirror-review FAILURE ongoing. All other checks nominal.
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #584 (p4-closeout-outputs):** CONFIRMED OPEN, mergeable=UNKNOWN (oscillation resumed), statusCheckRollup=FAILURE (mirror-review since 2026-06-18T23:45:21Z — unchanged). `build-fix-p4-closeout-outputs-revisions-001.json` confirmed STILL in `/home/larry/agents/inboxes/forge/` — not yet processed by Forge. No Forge build session started yet. ⚠️ (ongoing — awaiting Forge pickup)
+- **PR #576 verification window (closes 2026-06-19T13:35Z):** PR not in open list (merged); FORGE_NO_PR_SKIP for task fix-retention-watermark-inline-reset-001 confirms branch/PR exists. ~10.5h remaining. Fix holding. ✅
+- **Wedged-review-reaped (wt-forge-p4-closeout-outputs, L933):** Mirror review session for PR #584 reaped — terminal marker present, idle 11837s (≈3.28h), worktree removed: False. Consistent with Mirror's FAILURE review completing at 23:45:21Z and session sitting idle. Normal cleanup. Tier-3 silence per helper. ✅
+- **All 5 daemon PIDs:** beacon 3734671 (Ss, 175090s≈48.6h) ✅, chain-event 3734305 (SNs, 175099s≈48.6h) ✅, inbox-watcher 3434697 (Ssl, 251303s≈69.8h) ✅, outbox_notifier 217608 (Ss, 12430s≈3.45h) ✅, dashboard_api 218007 (Ssl, 12417s≈3.45h) ✅.
+- **Stale bash orphan PID 1834248:** Carry from prior iters. [blue carry — not re-verified this iter]
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 932, "file_length": 933}`. 1 new alert: L933 = `heal-wedged-review-sessions` (wedged-review-reaped:wt-forge-p4-closeout-outputs, 02:56Z, route=closure). Triage helper: Tier-3 silence (known-pattern match). Watermark advanced 932→933. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → No entries. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot PID 3734671 alive (Ss, ~48.6h). Last bot log entry: `alert idx=932 delivered (wedged-review-reaped, 21:00 MDT June 18)`. No new Larry directives. Last directive was "go" at 20:50 MDT (02:50Z UTC) from iter ~2246. No orphaned directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → 0 stalls. 7 FORGE_NO_PR_SKIP (all reason=pr_exists). ✅ Nominal.
+
+**Check 4 — Pending directives:** watermark=932→933. 1 new alert triaged (L933, Tier-3, no action). beacon-pending-approvals.json: pending=0, history=238. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-19T02:36:18Z (~26 min at check time). FRESH (within threshold). ✅ Nominal.
+
+**Check A — Source repo:** On main, HEAD=7133c64d=origin/main (up to date). Untracked: agents/pulse/trim_memory.py (L929 carry). ✅
+
+**Check B — Sync health:** last_sync=2026-06-19T02:33:15Z (~29 min ago at check time, within 2h threshold). Status=no-change. ✅
+
+**Check C — Agent liveness:** beacon 3734671 (Ss, 48.6h) ✅, chain-event 3734305 (SNs, 48.6h) ✅, inbox-watcher 3434697 (Ssl, 69.8h) ✅, outbox_notifier 217608 (Ss, 3.45h) ✅, dashboard_api 218007 (Ssl, 3.45h) ✅. 5/5. ✅
+
+**Check D — Inboxes:** Forge inbox: `build-fix-p4-closeout-outputs-revisions-001.json` (present, awaiting Forge build — expected). Beacon=0. ✅ (expected state)
+
+**Check E — PRs:** ourliberty-agent-core: PR #584 OPEN (forge/p4-closeout-outputs, mergeable=UNKNOWN oscillation, statusCheckRollup=FAILURE). Fix build in Forge inbox, awaiting Forge pickup. ⚠️ (ongoing) ourliberty-dashboard: 0 open. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Check I (Fri UTC gate, weekday=4 ∈ {0,2,4,6}):** check-i-2026-06-19.json already present (created iter ~2230). Dedup — skip. ✅
+**Check III:** Not Sunday — skip. ✅
+**Check VIII/IX/X:** Not Monday — skip. ✅
+
+**Actions taken:**
+1. Check 0: L933 triaged Tier-3 (wedged-review-reaped:wt-forge-p4-closeout-outputs). Watermark advanced 932→933.
+2. PRIME ledger: `intervention` appended (Tier 1, template=pr584-build-pending-forge-inbox, ts=03:04:40Z).
+3. Tier state: `record --checks-clean false` → Tier 1, consecutive_clean=0. Last signal: 2026-06-19T03:04:44Z.
+
+**Dispatches:** None. PR #584 fix is in Forge inbox — pipeline is moving. No escalation needed this iter.
+
+**Standing findings (updated):**
+- [yellow→watch] **PR #584 fix in Forge inbox** — `build-fix-p4-closeout-outputs-revisions-001.json` in Forge inbox. Forge has not yet started the build session. Mirror-review FAILURE expected until fix lands. PR mergeable=UNKNOWN (oscillation). [awaiting Forge pickup]
+- [blue] **PR #576 verification window** — closes 2026-06-19T13:35Z; ~10.5h remaining; fix holding. [watch]
+- [blue] **L929 heal-droplet-git-drift** — trim_memory.py untracked. Larry: commit or delete. [carry]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [blue] **unreviewed-merge:571** — bot DM'd. Larry judgment. [carry]
+- [blue] **Stale bash orphan** — PID 1834248 (~21.3d+). [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule catalog-accuracy-drift-tier4** — 1/3. Watch.
+- [blue] **G-rule ledger/check-i Tier-4** — 2/3. Watch. Dispatch to Beacon at 3/3.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule mirror-marker-parse-error** — 1/3. Watch.
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention (pr584-build-pending-forge-inbox). Trailing-30d: interventions=1045, systemic_fixes=52, ratio≈20.09, trend=improving.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0. Last signal: 2026-06-19T03:04:44Z.
+
+---
+
 ## Iteration ~2246 — 2026-06-19T02:58Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0, NON-NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).
