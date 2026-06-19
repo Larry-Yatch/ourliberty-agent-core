@@ -138,9 +138,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-19 19:58Z UTC (Iter ~2295, Tier 2, consecutive_clean=0→1, NOMINAL ✅)
+## Status snapshot — updated 2026-06-19 20:18Z UTC (Iter ~2296, Tier 2, consecutive_clean=1→2, NOMINAL ✅)
 
-**Iter ~2295 summary:** ✅ Nominal. 2 new alerts (L892-L893, both Tier-3 silenced). outbox_notifier self-healed: PID 442600→491617 (SIGTERM at 19:40:22Z, clean restart). All 5 daemons alive — beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 491617, dashboard_api 475318. 0 open PRs. Repo on main, up-to-date (HEAD=52f0a773, PR #594 merged). Sync 19:55:53Z (~2 min). Watermark=893=file_length. pending=0. Creds OK. Heartbeat 19:40:18Z (~17 min). Check I deduped (Fri). §5.0 no-ops. Stale bash orphan PID 1834248 (~22d+). G-rule ledger/check-i 2/3. install-drift:ourliberty-build-sequence-advancer.service (L892, Tier-3 silenced, bot may have DM'd). PRIME ratio≈19.8 (interventions=1049, systemic_fixes=53, trend=improving). **Tier 2. consecutive_clean=1. Next cadence: 15-min.**
+**Iter ~2296 summary:** ✅ Nominal. 2 new alerts (L894-L895, both Tier-3 silenced: heal-stale-daemon-code auto-restart confirmations for PR #595 `feat(projects): mirror active missions into Pipeline`). All 5 daemons alive — beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier **497831** (new PID, restarted 14:10 MDT), dashboard_api **497752** (new PID, restarted 14:10 MDT). 0 open PRs. Repo on main, up-to-date (HEAD=6119ccfb, PR #595 merged 20:07Z). Sync 20:08Z (~10 min). Watermark=895=file_length. pending=0. Creds OK. Heartbeat 20:10:19Z (~8 min). Check I deduped (Fri). §5.0 no-ops. Stale bash orphan PID 1834248 (~22d+). G-rule ledger/check-i 2/3. PRIME ratio≈19.8 (interventions=1049, systemic_fixes=53, trend=improving). **Tier 2. consecutive_clean=2. Next cadence: 15-min. One more clean → Tier 3.**
 
 
 
