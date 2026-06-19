@@ -231,12 +231,29 @@
           "id": "p5-dag-status-on-cards",
           "title": "P5 \u2014 DAG status on cards",
           "desired_end_state": "Glanceable live build status on pipeline phase cards (step N/M \u00b7 actor \u00b7 last event), early \u26a0 stuck badge, project N-of-M rollup, click-through to Build Sequences. Dashboard-only. Spec: agents/beacon/specs/projects-v3-p5-dag-status.md (repo ourliberty-dashboard). Launch through the board to also confirm the P4 enriched completion DM.",
-          "lifecycle_state": "building",
+          "lifecycle_state": "done",
           "order": 0,
           "spec_ref": "agents/beacon/specs/projects-v3-p5-dag-status.md",
           "sequence_ref": "launch-p5-dag-status-on-cards",
           "created_at": "2026-06-19T22:57:02.509616+00:00",
-          "updated_at": "2026-06-19T23:05:14.414312+00:00"
+          "updated_at": "2026-06-19T23:24:30.494326+00:00",
+          "closeout": {
+            "summary": "The Projects tab now shows live build status right on each phase card, so you can see what's running, stuck, or done without leaving the page. The next phase can build on this glanceable pipeline view; it also served as the first real-world test of the enriched 'phase done' notification.",
+            "shipped": "Phase cards that are building now show a compact live line (which step it's on, who's working it, and the latest activity), an early warning badge when a build looks stuck, a 'how many phases done out of total' rollup at the project level, and a click-through to the full build detail. Delivered in PR #71.",
+            "changed_vs_spec": "It landed as planned with no new backend work, no new alerts, and no extra polling \u2014 it reuses the same live feed the Operations tab already shows. The stuck badge is purely a visual heads-up on the card and does not send any messages; the real stuck-alert notifications stay where they already were.",
+            "learnings": "The existing live build feed was reusable as-is, so this was assembly rather than new plumbing. One open item: the browser walk-through (live status, rollup, stuck badge, click-through, and confirming the 'phase done' notification) had to be verified on the live board, not in the build sandbox.",
+            "cost": "One PR of build work.",
+            "done_gate_met": true
+          },
+          "closeout_provenance": {
+            "by": "beacon",
+            "model": "claude-opus-4-8",
+            "at": "2026-06-19T23:24:16.699312+00:00",
+            "from_state": "done",
+            "pr_numbers": [
+              "71"
+            ]
+          }
         }
       ],
       "one_off": true,
