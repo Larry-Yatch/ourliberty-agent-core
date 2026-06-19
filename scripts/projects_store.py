@@ -318,6 +318,27 @@ def find_phase(
     return None, None
 
 
+def launch_ids_from_sequence(
+    seq: Any,
+) -> tuple[Optional[str], Optional[str]]:
+    """Return ``(project_id, phase_id)`` from a launch sequence's
+    ``authored-by-launch-drain`` audit entry — the robust, ``sequence_ref``-
+    INDEPENDENT linkage the done-stamp + closeout use to find the phase a
+    ``launch-<phase_id>`` sequence belongs to. The launch drain writes this entry
+    with both ids when it authors the sequence (launch_queue_drain.py); the
+    building-stamp reads the same source. ``(None, None)`` for an ordinary
+    (non-launch) sequence, a missing entry, or junk — callers then fall back to a
+    ``sequence_ref`` lookup or no-op. Pure; safe on any input."""
+    if not isinstance(seq, dict):
+        return None, None
+    for entry in seq.get('audit_log') or []:
+        if isinstance(entry, dict) and entry.get('event') == 'authored-by-launch-drain':
+            pid = _coerce_str(entry.get('project_id'))
+            phid = _coerce_str(entry.get('phase_id'))
+            return pid, phid
+    return None, None
+
+
 def find_phase_by_sequence_ref(
     registry: dict[str, Any], sequence_ref: str,
 ) -> tuple[Optional[dict[str, Any]], Optional[dict[str, Any]]]:
@@ -334,6 +355,34 @@ def find_phase_by_sequence_ref(
         for phase in proj.get('phases', []) or []:
             if isinstance(phase, dict) and phase.get('sequence_ref') == sequence_ref:
                 return proj, phase
+    return None, None
+
+
+def resolve_phase_for_sequence(
+    registry: dict[str, Any], seq: Any,
+) -> tuple[Optional[dict[str, Any]], Optional[dict[str, Any]]]:
+    """Return ``(project, phase)`` for the phase a completed/launching sequence
+    belongs to — THE single resolution policy shared by the done-stamp
+    (``projects_status_writeback.stamp_done``) and the P4 closeout
+    (``projects_closeout_author.narrator_find_phase``) so both always pick the
+    SAME phase for a given sequence.
+
+    Order: ``sequence_ref == seq['seq_id']`` first (the building-stamp's pin, also
+    re-pinned by the done-stamp — reliable once either has run), then the
+    ``(project_id, phase_id)`` in the sequence's ``authored-by-launch-drain``
+    audit entry (the robust fallback when the building-stamp never persisted the
+    ref — e.g. an EROFS write failure). ``(None, None)`` for an ordinary
+    non-launch sequence. Pure; safe on junk."""
+    if not isinstance(seq, dict):
+        return None, None
+    seq_id = _coerce_str(seq.get('seq_id'))
+    if seq_id:
+        proj, phase = find_phase_by_sequence_ref(registry, seq_id)
+        if phase is not None:
+            return proj, phase
+    project_id, phase_id = launch_ids_from_sequence(seq)
+    if project_id and phase_id:
+        return find_phase(registry, project_id, phase_id)
     return None, None
 
 
@@ -357,6 +406,28 @@ def stamp_phase_building(
     if state == 'building' and phase.get('sequence_ref') == sequence_ref:
         return False
     phase['lifecycle_state'] = 'building'
+    phase['sequence_ref'] = sequence_ref
+    phase['updated_at'] = _iso_now(now)
+    return True
+
+
+def pin_phase_sequence_ref(
+    phase: dict[str, Any], sequence_ref: str, *, now: Optional[datetime] = None,
+) -> bool:
+    """Pin ``phase['sequence_ref'] = sequence_ref`` when the phase is MISSING a
+    ref, bumping ``updated_at``. Returns True iff the phase dict was mutated.
+
+    The repair the done-stamp applies when it had to resolve the phase by its
+    launch-drain audit ids because the building-stamp never persisted the ref —
+    so the downstream closeout's ``sequence_ref`` lookup (and the card's ref
+    field) become correct. Never OVERWRITES an existing (truthy) ref — a phase
+    already carrying a different ref is left untouched (no silent relink). Pure;
+    keeps all phase mutation + its updated_at bump in this layer (alongside
+    ``stamp_phase_building`` / ``stamp_phase_done``)."""
+    if not isinstance(phase, dict) or not sequence_ref:
+        return False
+    if phase.get('sequence_ref'):
+        return False
     phase['sequence_ref'] = sequence_ref
     phase['updated_at'] = _iso_now(now)
     return True

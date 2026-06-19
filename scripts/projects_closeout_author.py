@@ -803,7 +803,7 @@ def run_closeout_for_sequence(
     registry = healer.read_registry(path)
     if not isinstance(registry, dict):
         return None
-    project, phase = narrator_find_phase(registry, seq_id)
+    project, phase = narrator_find_phase(registry, seq)
     if phase is None or project is None:
         return None  # non-launch sequence — no phase to close out
 
@@ -841,8 +841,12 @@ def run_closeout_for_sequence(
     }
 
 
-def narrator_find_phase(registry: dict[str, Any], seq_id: str):
-    """Thin re-export of ``projects_store.find_phase_by_sequence_ref`` so this
-    module owns its phase lookup without the notifier importing projects_store."""
+def narrator_find_phase(registry: dict[str, Any], seq: dict[str, Any]):
+    """Resolve ``(project, phase)`` for a completed sequence via the SINGLE shared
+    policy ``projects_store.resolve_phase_for_sequence`` (``sequence_ref`` then the
+    ``authored-by-launch-drain`` audit ids) — the SAME policy the done-stamp uses,
+    so the closeout always picks the phase the done-stamp just stamped, even when
+    the building-stamp never persisted the ``sequence_ref`` (an EROFS failure).
+    ``(None, None)`` for an ordinary non-launch sequence."""
     import projects_store  # local import: optional dep
-    return projects_store.find_phase_by_sequence_ref(registry, seq_id)
+    return projects_store.resolve_phase_for_sequence(registry, seq)

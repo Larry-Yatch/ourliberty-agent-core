@@ -70,6 +70,19 @@ def _project(pid, phases):
     }
 
 
+def _seq(seq_id='launch-ph1', *, project_id=None, phase_id=None):
+    """A build-sequence dict as stamp_done receives it. With project_id+phase_id
+    it carries the `authored-by-launch-drain` audit entry the resolver falls back
+    to when the building-stamp never persisted the sequence_ref."""
+    seq = {'seq_id': seq_id, 'audit_log': []}
+    if project_id and phase_id:
+        seq['audit_log'] = [{
+            'event': 'authored-by-launch-drain',
+            'project_id': project_id, 'phase_id': phase_id,
+        }]
+    return seq
+
+
 # --------------------------------------------------------------------------- #
 # PURE helpers (projects_store)
 # --------------------------------------------------------------------------- #
@@ -100,6 +113,55 @@ class PureLookupTests(unittest.TestCase):
         self.assertEqual((None, None), ps.find_phase(junk, 'p', 'q'))
         self.assertEqual((None, None),
                          ps.find_phase_by_sequence_ref(junk, 'launch-q'))
+
+    def test_launch_ids_from_sequence(self):
+        seq = {'seq_id': 'launch-ph1', 'audit_log': [
+            {'event': 'authored-by-launch-drain',
+             'project_id': 'p1', 'phase_id': 'ph1'}]}
+        self.assertEqual(ps.launch_ids_from_sequence(seq), ('p1', 'ph1'))
+        # ordinary (non-launch) sequence — no authoring entry
+        self.assertEqual(
+            ps.launch_ids_from_sequence(
+                {'seq_id': 'feat-1', 'audit_log': [{'event': 'step-dispatched'}]}),
+            (None, None))
+        # authoring entry present but missing/blank ids → (None, None)
+        self.assertEqual(
+            ps.launch_ids_from_sequence(
+                {'audit_log': [{'event': 'authored-by-launch-drain',
+                                'project_id': '', 'phase_id': None}]}),
+            (None, None))
+        # junk — never raises
+        self.assertEqual(ps.launch_ids_from_sequence(None), (None, None))
+        self.assertEqual(
+            ps.launch_ids_from_sequence({'audit_log': ['x', None]}), (None, None))
+
+    def test_resolve_phase_for_sequence_prefers_ref_then_audit(self):
+        # sequence_ref wins when present.
+        reg = _registry(_project('p1', [
+            _phase('ph1', state='building', sequence_ref='launch-ph1')]))
+        _, phase = ps.resolve_phase_for_sequence(
+            reg, _seq('launch-ph1', project_id='p1', phase_id='ph1'))
+        self.assertEqual(phase['id'], 'ph1')
+        # ref absent → audit-id fallback resolves the same phase.
+        reg2 = _registry(_project('p1', [_phase('ph1', state='spec')]))
+        _, phase2 = ps.resolve_phase_for_sequence(
+            reg2, _seq('launch-ph1', project_id='p1', phase_id='ph1'))
+        self.assertEqual(phase2['id'], 'ph1')
+        # non-launch sequence (no ref match, no audit ids) → (None, None).
+        self.assertEqual(
+            (None, None), ps.resolve_phase_for_sequence(reg2, _seq('ordinary')))
+
+    def test_pin_phase_sequence_ref(self):
+        ph = _phase('ph1', state='done', sequence_ref=None)
+        self.assertTrue(ps.pin_phase_sequence_ref(ph, 'launch-ph1'))
+        self.assertEqual(ph['sequence_ref'], 'launch-ph1')
+        self.assertNotEqual(ph['updated_at'], '2026-06-17T00:00:00+00:00')  # bumped
+        # idempotent: already pinned → no mutation.
+        self.assertFalse(ps.pin_phase_sequence_ref(ph, 'launch-ph1'))
+        # never OVERWRITES a different existing ref.
+        ph2 = _phase('ph2', state='done', sequence_ref='launch-other')
+        self.assertFalse(ps.pin_phase_sequence_ref(ph2, 'launch-ph1'))
+        self.assertEqual(ph2['sequence_ref'], 'launch-other')
 
 
 class PureStampTests(unittest.TestCase):
@@ -162,7 +224,7 @@ class WriterTests(unittest.TestCase):
             psw.stamp_building(seq_id='launch-ph1', project_id='p1', phase_id='ph1'))
         self.assertEqual(self._phase_state('p1', 'ph1'), ('building', 'launch-ph1'))
 
-        self.assertTrue(psw.stamp_done(seq_id='launch-ph1'))
+        self.assertTrue(psw.stamp_done(seq=_seq('launch-ph1')))
         self.assertEqual(self._phase_state('p1', 'ph1')[0], 'done')
 
     def test_building_idempotent_no_rewrite(self):
@@ -178,9 +240,9 @@ class WriterTests(unittest.TestCase):
     def test_done_idempotent_no_rewrite(self):
         self._write(_registry(_project('p1', [
             _phase('ph1', state='building', sequence_ref='launch-ph1')])))
-        self.assertTrue(psw.stamp_done(seq_id='launch-ph1'))
+        self.assertTrue(psw.stamp_done(seq=_seq('launch-ph1')))
         before = self.path.read_bytes()
-        self.assertFalse(psw.stamp_done(seq_id='launch-ph1'))
+        self.assertFalse(psw.stamp_done(seq=_seq('launch-ph1')))
         self.assertEqual(self.path.read_bytes(), before)
 
     def test_done_never_regresses_a_later_relaunch(self):
@@ -202,7 +264,33 @@ class WriterTests(unittest.TestCase):
         # An ordinary build sequence has no phase pointing at its seq_id.
         self._write(_registry(_project('p1', [_phase('ph1', state='spec')])))
         before = self.path.read_bytes()
-        self.assertFalse(psw.stamp_done(seq_id='some-other-seq-001'))
+        self.assertFalse(psw.stamp_done(seq=_seq('some-other-seq-001')))
+        self.assertEqual(self.path.read_bytes(), before)
+
+    def test_done_by_id_when_sequence_ref_never_persisted(self):
+        # The building-stamp failed to persist (e.g. EROFS): the phase is still
+        # `spec` with sequence_ref=None. The done-stamp must STILL flip it to
+        # done — resolved by (project_id, phase_id) from the launch-drain audit —
+        # and PIN the sequence_ref so the downstream closeout can resolve it.
+        self._write(_registry(_project('p1', [_phase('ph1', state='spec')])))
+        self.assertTrue(psw.stamp_done(seq=_seq('launch-ph1', project_id='p1', phase_id='ph1')))
+        self.assertEqual(
+            self._phase_state('p1', 'ph1'), ('done', 'launch-ph1'))
+
+    def test_done_by_id_is_idempotent_after_pin(self):
+        # Re-running the done-stamp (done + ref already pinned) is a no-op → no
+        # write → byte-identical file (the double-SEQUENCE_COMPLETE guard).
+        self._write(_registry(_project('p1', [_phase('ph1', state='spec')])))
+        self.assertTrue(psw.stamp_done(seq=_seq('launch-ph1', project_id='p1', phase_id='ph1')))
+        before = self.path.read_bytes()
+        self.assertFalse(psw.stamp_done(seq=_seq('launch-ph1', project_id='p1', phase_id='ph1')))
+        self.assertEqual(self.path.read_bytes(), before)
+
+    def test_done_by_id_missing_phase_falls_back_then_noop(self):
+        # Bogus ids AND no sequence_ref match → no-op (the non-launch posture).
+        self._write(_registry(_project('p1', [_phase('ph1', state='spec')])))
+        before = self.path.read_bytes()
+        self.assertFalse(psw.stamp_done(seq=_seq('launch-zz', project_id='nope', phase_id='nope')))
         self.assertEqual(self.path.read_bytes(), before)
 
     def test_malformed_store_is_failsafe_noop(self):
@@ -210,7 +298,7 @@ class WriterTests(unittest.TestCase):
         # Must NOT raise; returns False (no write).
         self.assertFalse(
             psw.stamp_building(seq_id='launch-ph1', project_id='p1', phase_id='ph1'))
-        self.assertFalse(psw.stamp_done(seq_id='launch-ph1'))
+        self.assertFalse(psw.stamp_done(seq=_seq('launch-ph1')))
 
     def test_does_not_git_commit(self):
         # Non-committer invariant: the writer only touches the JSON file. The
