@@ -55,6 +55,10 @@ import projects_store  # noqa: E402 — shared schema/normalization (single sour
 
 _MODELS_CONFIG_PATH = _SCRIPTS_DIR.parent / 'config' / 'agent-models.json'
 PROJECTS_REL = 'agents/beacon/projects.json'
+# READ-ONLY here: the kanban→pipeline migration mirrors ACTIVE missions as
+# pipeline projects but NEVER writes missions.json (that store has its own
+# committer). projects-v3 retire-missions-kanban.
+MISSIONS_REL = 'agents/beacon/missions.json'
 
 GIT_TIMEOUT_SEC = 60
 PUSH_TIMEOUT_SEC = 180
@@ -114,6 +118,33 @@ def projects_path(repo_paths: dict[str, Path]) -> Optional[Path]:
         return Path(override)
     core = repo_paths.get('ourliberty-agent-core')
     return (core / PROJECTS_REL) if core else None
+
+
+def missions_path(repo_paths: dict[str, Path]) -> Optional[Path]:
+    """Path to agent-core's missions.json — READ-ONLY (the migration mirrors
+    active missions as projects, never writes missions.json). Honors
+    OURLIBERTY_MISSIONS_JSON (test redirection)."""
+    override = os.environ.get('OURLIBERTY_MISSIONS_JSON')
+    if override:
+        return Path(override)
+    core = repo_paths.get('ourliberty-agent-core')
+    return (core / MISSIONS_REL) if core else None
+
+
+def read_missions(path: Optional[Path]) -> list[Any]:
+    """The ``missions[]`` list from missions.json, or ``[]`` on any fault (path
+    unresolved / missing / malformed / wrong shape). FAIL-SAFE + READ-ONLY: a bad
+    missions file mirrors NOTHING this tick — it never blocks the projects
+    normalize+commit, and this healer never writes missions.json."""
+    if path is None or not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as e:
+        log(f'missions.json unreadable ({path}): {e} — mirroring no missions this tick')
+        return []
+    missions = data.get('missions') if isinstance(data, dict) else None
+    return missions if isinstance(missions, list) else []
 
 
 # ---------- read / write — fail-safe ----------
@@ -287,6 +318,21 @@ def run_once(*, dry_run: bool, now: Optional[datetime] = None) -> int:
         # malformed-on-disk: read_registry already logged; skip this tick.
         return 1
 
+    # Mirror ACTIVE (non-shipped) missions into the pipeline as single-phase
+    # projects so the legacy Missions kanban can be retired (projects-v3
+    # retire-missions-kanban). Mutates `raw` in place (adds projects only);
+    # idempotent + reversible; READS missions.json, never writes it. Fail-safe: a
+    # migration fault mirrors nothing and never blocks the normalize+commit below.
+    minted: list[str] = []
+    try:
+        minted = projects_store.mirror_missions_as_projects(
+            raw, read_missions(missions_path(repo_paths)), now=now)
+        if minted:
+            verb = 'would mirror' if dry_run else 'mirrored'
+            log(f'{verb} {len(minted)} active mission(s) into the pipeline: {minted}')
+    except Exception as e:  # noqa: BLE001 — fail-safe: never block the committer
+        log(f'mirror-missions raised: {type(e).__name__}: {e} — mirroring nothing this tick')
+
     try:
         normalized, dropped = projects_store.normalize_registry(raw, now=now)
     except Exception as e:  # noqa: BLE001 — fail-safe: report, never corrupt
@@ -296,7 +342,11 @@ def run_once(*, dry_run: bool, now: Optional[datetime] = None) -> int:
     if dropped:
         log(f'dropped {len(dropped)} malformed project/phase entr(y/ies): {dropped}')
 
-    changed = (normalized != raw) or not path.exists()
+    # `bool(minted)` forces the write+commit: the freshly-minted projects come out
+    # of new_single_phase_project already normalized, so `normalized != raw` is
+    # False (raw was mutated in place) even though disk lacks them — without this
+    # the mirror delta would never reach disk.
+    changed = (normalized != raw) or bool(minted) or not path.exists()
     n_projects = len(normalized.get('projects', []))
     core = repo_paths.get('ourliberty-agent-core')
     # North Star docs the closeout may have ticked (non-committer wrote them to

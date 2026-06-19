@@ -243,14 +243,23 @@ def new_single_phase_project(
     promoted_from: Optional[dict[str, Any]] = None,
     project_id: Optional[str] = None,
     phase_id: Optional[str] = None,
+    lifecycle_state: Optional[str] = None,
+    spec_ref: Optional[str] = None,
+    sequence_ref: Optional[str] = None,
     now: Optional[datetime] = None,
 ) -> dict[str, Any]:
-    """Build a normalized single-phase project at Brainstorm — the shape Promote
-    lands a funnel item into (spec § 0 "Promote is a move, not a record", § 4
-    decision 2). One model for everything: a one-off is a 1-phase project
-    (``one_off=True``), state ``active`` so it shows in the "Actively working"
-    pipeline immediately; a mis-promote is reversible by archiving it (it never
-    duplicates the source — the caller removes the item from its funnel lane).
+    """Build a normalized single-phase project — the shape Promote lands a funnel
+    item into (spec § 0 "Promote is a move, not a record", § 4 decision 2). One
+    model for everything: a one-off is a 1-phase project (``one_off=True``), state
+    ``active`` so it shows in the "Actively working" pipeline immediately; a
+    mis-promote is reversible by archiving it (it never duplicates the source —
+    the caller removes the item from its funnel lane).
+
+    Defaults to **Brainstorm** with no refs (the Promote path). The kanban→pipeline
+    migration (`mirror_missions_as_projects`) passes a mapped ``lifecycle_state``
+    (an in-flight mission lands at ``building``) plus the mission's ``spec_ref`` /
+    ``sequence_ref`` so the coarse status reflects reality on day one. An invalid
+    ``lifecycle_state`` degrades to the default (never a corrupt phase).
 
     ``promoted_from`` is the provenance back-reference (e.g.
     ``{'kind': 'capture', 'capture_id': ...}`` or
@@ -269,10 +278,13 @@ def new_single_phase_project(
         'id': phid,
         'title': title,
         'desired_end_state': desired_end_state if isinstance(desired_end_state, str) else '',
-        'lifecycle_state': DEFAULT_LIFECYCLE_STATE,
+        'lifecycle_state': (
+            lifecycle_state if is_valid_lifecycle_state(lifecycle_state)
+            else DEFAULT_LIFECYCLE_STATE
+        ),
         'order': 0,
-        'spec_ref': None,
-        'sequence_ref': None,
+        'spec_ref': _coerce_str(spec_ref),
+        'sequence_ref': _coerce_str(sequence_ref),
         'created_at': now_iso,
         'updated_at': now_iso,
     }
@@ -290,6 +302,113 @@ def new_single_phase_project(
     if isinstance(promoted_from, dict):
         project['promoted_from'] = dict(promoted_from)
     return project
+
+
+# --------------------------------------------------------------------------- #
+# kanban → pipeline migration (projects-v3 retire-missions-kanban). Mirror each
+# ACTIVE (non-shipped) mission as a single-phase project so the legacy Missions
+# kanban can be retired and the work lives in "Actively working". Idempotent +
+# reversible: a mission already represented (by project id OR a `mission`
+# promoted_from back-ref, active OR archived) is skipped — so a re-run is a no-op
+# and a dropped project never resurrects. missions.json is NEVER written here;
+# the migration only mints projects, exactly like Promote.
+# --------------------------------------------------------------------------- #
+
+# Mission phases that belong on the active board → their pipeline lifecycle.
+# `shipped`/`deferred`/`proposed` are intentionally absent: shipped is done work
+# (retired, not mirrored — spec § 4.2); deferred/proposed are not active.
+_MISSION_PHASE_TO_LIFECYCLE: dict[str, str] = {
+    'drafting': 'brainstorm',
+    'ready': 'spec',
+    'in_flight': 'building',
+}
+
+_SEQ_STEP_RE = re.compile(r'^seq-(?P<seq>.+?)-step-')  # non-greedy: split at the FIRST -step-
+
+
+def _sequence_ref_from_task_ids(task_ids: Any) -> Optional[str]:
+    """The build-sequence id a mission's `seq-<id>-step-*` task_ids belong to, or
+    None. Pins the migrated phase's `sequence_ref` so the coarse Building/Done
+    status reflects the real sequence. Best-effort: first match wins; a mission
+    with no sequence-step task gets a null ref (coarse `building`, no sequence —
+    acceptable per spec § 5)."""
+    if not isinstance(task_ids, list):
+        return None
+    for tid in task_ids:
+        if isinstance(tid, str):
+            m = _SEQ_STEP_RE.match(tid)
+            if m:
+                return m.group('seq')
+    return None
+
+
+def _mission_already_mirrored(projects: list[dict[str, Any]], mission_id: str) -> bool:
+    """True iff some project (ACTIVE or ARCHIVED) already represents this mission —
+    by sharing its id (the migration uses ``project_id = mission_id``) OR carrying
+    a ``{'kind': 'mission', 'mission_id': <id>}`` promoted_from. Checking archived
+    too is what makes a dropped project permanent (a re-run never resurrects it)
+    and skips a mission already promoted into the pipeline by hand (e.g. a
+    capture-promoted project that shares the slug)."""
+    for p in projects:
+        if not isinstance(p, dict):
+            continue
+        if p.get('id') == mission_id:
+            return True
+        pf = p.get('promoted_from')
+        if (isinstance(pf, dict) and pf.get('kind') == 'mission'
+                and pf.get('mission_id') == mission_id):
+            return True
+    return False
+
+
+def mirror_missions_as_projects(
+    registry: dict[str, Any],
+    missions: Any,
+    now: Optional[datetime] = None,
+) -> list[str]:
+    """Mint a single-phase project for each ACTIVE (non-shipped) mission not yet
+    represented in the pipeline. Mutates ``registry['projects']`` in place; returns
+    the ids minted (empty on a no-op tick). Pure over its inputs (no IO): the
+    caller supplies the parsed missions list and commits the delta.
+
+    Maps the mission phase to the pipeline lifecycle (drafting→brainstorm,
+    ready→spec, in_flight→building), takes the mission's first spec doc as
+    ``spec_ref``, and derives ``sequence_ref`` from its sequence-step task_ids so
+    the coarse status reflects reality. Idempotent + reversible via
+    ``_mission_already_mirrored``; ``missions.json`` is never written."""
+    if not isinstance(registry, dict) or not isinstance(missions, list):
+        return []
+    projects = registry.setdefault('projects', [])
+    if not isinstance(projects, list):
+        return []
+    minted: list[str] = []
+    for m in missions:
+        if not isinstance(m, dict):
+            continue
+        lifecycle = _MISSION_PHASE_TO_LIFECYCLE.get(m.get('phase'))
+        if lifecycle is None:
+            continue  # shipped/deferred/proposed/unknown — not an active board card
+        if m.get('archived') is True or m.get('acknowledged') is True:
+            continue
+        mid = _coerce_str(m.get('id'))
+        if mid is None or _mission_already_mirrored(projects, mid):
+            continue
+        spec_docs = m.get('spec_docs')
+        spec_ref = (spec_docs[0] if isinstance(spec_docs, list) and spec_docs
+                    and isinstance(spec_docs[0], str) else None)
+        projects.append(new_single_phase_project(
+            title=m.get('name') or mid,
+            desired_end_state=m.get('brief') or '',
+            repo=m.get('repo'),
+            promoted_from={'kind': 'mission', 'mission_id': mid},
+            project_id=mid,
+            lifecycle_state=lifecycle,
+            spec_ref=spec_ref,
+            sequence_ref=_sequence_ref_from_task_ids(m.get('task_ids')),
+            now=now,
+        ))
+        minted.append(mid)
+    return minted
 
 
 # --------------------------------------------------------------------------- #

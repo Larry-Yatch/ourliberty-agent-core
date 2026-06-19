@@ -295,6 +295,118 @@ class NewSinglePhaseProjectTest(unittest.TestCase):
         self.assertEqual(proj['id'], 'untitled')
         self.assertEqual(proj['title'], 'untitled')
 
+    def test_mapped_lifecycle_and_refs(self):
+        # The migration passes a mapped lifecycle + the mission's spec/sequence
+        # refs so the migrated phase reflects reality, not a fresh Brainstorm.
+        proj = ps.new_single_phase_project(
+            title='In-flight work', lifecycle_state='building',
+            spec_ref='agents/beacon/specs/x.md', sequence_ref='pulse-upgrade-001',
+            now=NOW)
+        ph = proj['phases'][0]
+        self.assertEqual(ph['lifecycle_state'], 'building')
+        self.assertEqual(ph['spec_ref'], 'agents/beacon/specs/x.md')
+        self.assertEqual(ph['sequence_ref'], 'pulse-upgrade-001')
+
+    def test_invalid_lifecycle_state_degrades_to_default(self):
+        proj = ps.new_single_phase_project(title='X', lifecycle_state='bogus', now=NOW)
+        self.assertEqual(proj['phases'][0]['lifecycle_state'], 'brainstorm')
+
+
+class MirrorMissionsAsProjectsTest(unittest.TestCase):
+    """retire-missions-kanban: mirror each ACTIVE (non-shipped) mission as a
+    single-phase pipeline project. Idempotent + reversible; never writes missions."""
+
+    def _mission(self, mid, phase='in_flight', **extra):
+        m = {'id': mid, 'name': mid.replace('-', ' ').title(), 'phase': phase,
+             'brief': f'brief for {mid}', 'task_ids': [], 'repo': 'ourliberty-agent-core'}
+        m.update(extra)
+        return m
+
+    def test_mirrors_active_non_shipped_with_mapped_lifecycle(self):
+        reg = {'projects': []}
+        minted = ps.mirror_missions_as_projects(reg, [
+            self._mission('draft-x', phase='drafting'),
+            self._mission('ready-x', phase='ready'),
+            self._mission('flight-x', phase='in_flight'),
+        ], now=NOW)
+        self.assertEqual(sorted(minted), ['draft-x', 'flight-x', 'ready-x'])
+        by_id = {p['id']: p for p in reg['projects']}
+        self.assertEqual(by_id['draft-x']['phases'][0]['lifecycle_state'], 'brainstorm')
+        self.assertEqual(by_id['ready-x']['phases'][0]['lifecycle_state'], 'spec')
+        self.assertEqual(by_id['flight-x']['phases'][0]['lifecycle_state'], 'building')
+        self.assertEqual(by_id['flight-x']['promoted_from'],
+                         {'kind': 'mission', 'mission_id': 'flight-x'})
+        self.assertEqual(by_id['flight-x']['phases'][0]['desired_end_state'],
+                         'brief for flight-x')
+
+    def test_skips_shipped_deferred_proposed_archived_acknowledged(self):
+        reg = {'projects': []}
+        minted = ps.mirror_missions_as_projects(reg, [
+            self._mission('shipped-x', phase='shipped'),
+            self._mission('deferred-x', phase='deferred'),
+            self._mission('proposed-x', phase='proposed'),
+            self._mission('archived-x', phase='drafting', archived=True),
+            self._mission('ackd-x', phase='in_flight', acknowledged=True),
+        ], now=NOW)
+        self.assertEqual(minted, [])
+        self.assertEqual(reg['projects'], [])
+
+    def test_idempotent_skips_already_mirrored_by_id(self):
+        reg = {'projects': []}
+        m = [self._mission('flight-x', phase='in_flight')]
+        ps.mirror_missions_as_projects(reg, m, now=NOW)
+        self.assertEqual(ps.mirror_missions_as_projects(reg, m, now=NOW), [])
+        self.assertEqual(len(reg['projects']), 1)
+
+    def test_skips_mission_already_promoted_by_back_ref(self):
+        reg = {'projects': [{'id': 'other-id', 'state': 'active',
+                             'promoted_from': {'kind': 'mission', 'mission_id': 'flight-x'},
+                             'phases': [{'id': 'p'}]}]}
+        self.assertEqual(ps.mirror_missions_as_projects(
+            reg, [self._mission('flight-x', phase='in_flight')], now=NOW), [])
+
+    def test_dropped_project_never_resurrects(self):
+        # An ARCHIVED project for the mission (a drop-back) keeps it dropped.
+        reg = {'projects': [{'id': 'flight-x', 'state': 'archived',
+                             'phases': [{'id': 'flight-x'}]}]}
+        self.assertEqual(ps.mirror_missions_as_projects(
+            reg, [self._mission('flight-x', phase='in_flight')], now=NOW), [])
+
+    def test_derives_sequence_ref_and_spec_ref(self):
+        reg = {'projects': []}
+        ps.mirror_missions_as_projects(reg, [self._mission(
+            'pulse-cycle-upgrade', phase='in_flight',
+            spec_docs=['agents/beacon/specs/pulse.md'],
+            task_ids=['alpha-1', 'seq-pulse-upgrade-001-step-alpha-1'])], now=NOW)
+        ph = reg['projects'][0]['phases'][0]
+        self.assertEqual(ph['sequence_ref'], 'pulse-upgrade-001')
+        self.assertEqual(ph['spec_ref'], 'agents/beacon/specs/pulse.md')
+
+    def test_no_sequence_step_leaves_null_ref(self):
+        reg = {'projects': []}
+        ps.mirror_missions_as_projects(reg, [self._mission(
+            'flight-x', phase='in_flight', task_ids=['a', 'b'])], now=NOW)
+        self.assertIsNone(reg['projects'][0]['phases'][0]['sequence_ref'])
+
+    def test_safe_on_junk_inputs(self):
+        self.assertEqual(ps.mirror_missions_as_projects({}, 'not-a-list'), [])
+        self.assertEqual(ps.mirror_missions_as_projects('not-a-dict', []), [])
+        reg = {'projects': []}
+        ps.mirror_missions_as_projects(
+            reg, [None, 42, {'id': 'flight-x', 'phase': 'in_flight'}], now=NOW)
+        self.assertEqual([p['id'] for p in reg['projects']], ['flight-x'])
+
+    def test_normalize_is_a_noop_on_mirrored(self):
+        # A mirrored project is already normalized → the committer sees no spurious
+        # delta beyond the mint itself.
+        reg = {'projects': []}
+        ps.mirror_missions_as_projects(reg, [self._mission(
+            'flight-x', phase='in_flight', task_ids=['seq-s-step-a'],
+            spec_docs=['s.md'])], now=NOW)
+        norm, dropped = ps.normalize_registry(reg, now=NOW)
+        self.assertEqual(dropped, [])
+        self.assertEqual(norm['projects'][0], reg['projects'][0])
+
 
 if __name__ == '__main__':
     unittest.main()
