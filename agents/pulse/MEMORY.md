@@ -132,6 +132,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-19 06:38Z UTC (Iter ~2258, Tier 3→1, consecutive_clean=0, ALERT ⚠️ — L939 heal-droplet-git-drift Tier-4, tier-reset)
+
+**Iter ~2258 summary:** ⚠️ Alert. L939 `source=heal-droplet-git-drift, subject=droplet-uncommitted:main` → Tier-4 (no template). Bot already DM'd Larry (idx=938 delivered). No second DM from Pulse. Tier-reset 3→1. All 5 daemons alive — beacon 3734671 (2d 4h+), chain-event 3734305 (2d 4h+), inbox-watcher 3434697 (3d 1h+), outbox_notifier 305068 (~3h), dashboard_api 304948 (~3h). Repo HEAD=4fab3b75=origin/main (clean, untracked trim_memory.py). Last sync 05:37Z (~61 min). 0 open PRs both repos. 0 stalls. pending=0. Credential rotation OK. Heartbeat 06:37Z (~1 min, fresh). Check I deduped (Fri artifact present). §5.0 all no-ops. PR #576 verification window closes 2026-06-19T13:35Z (~6.9h remaining, fix holding). Stale bash orphan PID 1834248 (21d 11h 19m+). G-rule heal-droplet-git-drift-tier4 **2/3** (new). G-rule ledger/check-i at 2/3. PRIME ratio≈20.1 (systemic_fixes=52, trend=improving). **Tier 3→1, consecutive_clean=0 — tier-reset on Tier-4 alert.**
+
 ## Status snapshot — updated 2026-06-19 06:02Z UTC (Iter ~2257, Tier 3, consecutive_clean=3, NOMINAL ✅ — Tier 3 steady-state confirmed)
 
 **Iter ~2257 summary:** ✅ Nominal. 1 new alert (L938: dispatch-branch-cleanup/summary — Tier-3 silenced). All 5 daemons alive — beacon 3734671 (2d 3h 37m+), chain-event 3734305 (2d 3h 37m+), inbox-watcher 3434697 (3d+), outbox_notifier 305068 (~2h 25m), dashboard_api 304948 (~2h 25m). Repo HEAD=ccc4a1ae=origin/main (clean, untracked trim_memory.py). Last sync 05:37Z (~24 min). 0 open PRs both repos. 0 stalls. pending=0. Credential rotation OK. Heartbeat 05:36:52Z (~25 min, fresh). Check I deduped (Fri artifact present). §5.0 all no-ops. PR #576 verification window closes 2026-06-19T13:35Z (~7.5h remaining, fix holding). Stale bash orphan PID 1834248 (21d 10h 43m+, condition file absent). G-rule ledger/check-i at 2/3. PRIME ratio≈20.1 (systemic_fixes=52, trend=improving). **Tier 3, consecutive_clean=3 — Tier 3 steady-state confirmed.**
