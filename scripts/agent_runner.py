@@ -867,6 +867,68 @@ def identity_pin_args(expected_agent):
     return ['--append-system-prompt', build_identity_pin_system_prompt(expected_agent)]
 
 
+# === Deterministic preflight marker reminder (hard, dispatcher-set) ========
+# A phase=preflight Forge dispatch must end its turn with EXACTLY ONE marker
+# block, but the task `prompt` is authored by whoever generated the dispatch
+# (e.g. the build-sequence / projects-v3 path) and often (a) omits the
+# "decide + emit one marker" reminder and (b) uses build-phase imperative
+# verbs ("Implement per the spec and open one PR") that prime Forge to ACT
+# instead of DECIDE. The result is the recurring outbox-notifier WARN
+# `phase=preflight requires ONE marker block ... none found` — a response
+# that ended on prose with no marker at all. agents/forge/CLAUDE.md already
+# carries the rule three times; more prose there isn't the fix. The fix is a
+# per-dispatch, last-in-context system-prompt injection that does not depend
+# on the task author remembering the reminder — exactly paralleling the
+# identity pin above. Gated to phase=='preflight' + Forge (the marker
+# agent for preflight); build/revision and other agents are unaffected.
+
+PREFLIGHT_MARKER_REMINDER_MARKER = (
+    "PREFLIGHT MARKER REQUIREMENT (authoritative — dispatcher-set)"
+)
+
+
+def build_preflight_marker_reminder_system_prompt():
+    """Authoritative reminder APPENDED to the worker's system prompt on every
+    phase=preflight Forge dispatch.
+
+    Derived from no input — the gating (phase + agent) happens in the args
+    wrapper — so the text is a fixed, last-in-context instruction that the
+    task prompt's phrasing cannot override.
+    """
+    return (
+        "=" * 70 + "\n"
+        + PREFLIGHT_MARKER_REMINDER_MARKER + "\n"
+        + "=" * 70 + "\n\n"
+        "This is a `phase=preflight` dispatch. Preflight DECIDES; it does NOT\n"
+        "write code, run builds, or open PRs. REGARDLESS of any imperative\n"
+        "'implement / build / open a PR' phrasing in the task prompt, your\n"
+        "response MUST end with EXACTLY ONE marker block as its FINAL content:\n"
+        "`=== PROCEED ===` / `=== CLARIFY_REQUEST ===` / `=== REJECT ===` with\n"
+        "a single JSON payload between the delimiters. A response that ends on\n"
+        "prose, analysis, or command output has NOT decided and will\n"
+        "dead-letter for a retry. Emit the marker via\n"
+        "`python3 ~/agent-core/scripts/marker.py render forge <type>` and paste\n"
+        "its output verbatim. The build phase is a SEPARATE dispatch that\n"
+        "arrives automatically after a PROCEED marker.\n"
+        + "=" * 70
+    )
+
+
+def preflight_marker_reminder_args(phase, expected_agent):
+    """Return the CLI args that inject the preflight marker reminder.
+
+    ``['--append-system-prompt', <reminder>]`` only when this is a Forge
+    preflight dispatch (``phase == 'preflight'`` AND the dispatched agent is
+    ``forge``), else ``[]``. Pure and centralized so the spawn path and the
+    tests share one source of truth.
+    """
+    if str(phase).strip().lower() != 'preflight':
+        return []
+    if str(expected_agent).strip().lower() != 'forge':
+        return []
+    return ['--append-system-prompt', build_preflight_marker_reminder_system_prompt()]
+
+
 CANCEL_DIR = AGENTS_ROOT / 'blackboard'
 CANCEL_POLL_INTERVAL = 5  # seconds between cancel checks during worker execution
 
@@ -961,7 +1023,7 @@ def _clear_cancel(task_stem):
 def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                system_prompt_file=None, timeout=14400, context='default',
                model_override=None, session_id=None, effort='high',
-               task_stem=None, out_meta=None, expected_agent=None):
+               task_stem=None, out_meta=None, expected_agent=None, phase=None):
     """
     Run a claude CLI command with concurrency guard + token management.
     Max 6 concurrent across entire system to prevent OOM.
@@ -986,6 +1048,12 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
         or when the marker is already present in `prompt` (idempotent). E1.2
         moved this gating from the caller into run_claude so every caller
         gets the right behavior by passing the parameter.
+      phase: The dispatch phase from the task envelope (preflight/build/
+        revision). When phase == 'preflight' AND expected_agent == 'forge',
+        an authoritative marker-discipline reminder is appended to the system
+        prompt so the preflight turn ends with one marker block regardless of
+        the task prompt's phrasing — see preflight_marker_reminder_args. No-op
+        for other phases/agents.
 
     Returns: (success: bool, output_text: str, new_session_id: str | None)
     """
@@ -1065,6 +1133,13 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
             # invocation (including --resume) so build/revision phases are
             # covered too — see identity_pin_args + build_identity_pin_system_prompt.
             cmd.extend(identity_pin_args(expected_agent))
+            # Deterministic preflight marker reminder: on every phase=preflight
+            # Forge dispatch, append a last-in-context instruction that the turn
+            # must end with one marker block — neutralizing build-phase
+            # imperative phrasing in the task prompt that primes Forge to act
+            # instead of decide. No-op for non-preflight phases / non-forge
+            # agents — see preflight_marker_reminder_args.
+            cmd.extend(preflight_marker_reminder_args(phase, expected_agent))
             if fallback and fallback != model:
                 cmd.extend(['--fallback-model', fallback])
             if session_id:
