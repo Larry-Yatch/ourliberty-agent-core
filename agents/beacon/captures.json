@@ -637,6 +637,41 @@
         "from_state": "parked"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-pipeline-empty-state-hint-a62a",
+      "title": "Pipeline empty-state hint",
+      "note": "When 'Actively working' is empty, show a quiet one-line hint instead of self-hiding. GUINEA-PIG for the first live P4 closeout dogfood \u2014 promote this through the board to Launch. Spec: agents/beacon/specs/projects-v3-pipeline-empty-state.md (repo ourliberty-dashboard).",
+      "state": "promoted",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ol-work",
+        "branch": "pr476-review",
+        "captured_at": "2026-06-19T11:45:20.575712+00:00"
+      },
+      "last_touched": "2026-06-19T11:45:20.575712+00:00",
+      "promoted_to": "pipeline-empty-state-hint",
+      "spawned": {
+        "kind": "project",
+        "project_id": "pipeline-empty-state-hint",
+        "stamped_at": "2026-06-19T11:45:50.126613+00:00"
+      },
+      "briefing": {
+        "what": "When the work-in-progress area of the projects screen has nothing in it, show a short, friendly one-line hint instead of leaving a blank space.",
+        "why": "Today a new or empty screen shows nothing there, so people never realize that part of the product exists and quietly miss using it.",
+        "suggest": "It's a small, low-stakes polish worth a green light, but treat it as a careful trial run to confirm the approach holds up before leaning on it more widely."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-19T11:54:59.438487+00:00",
+        "from_state": "promoted"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
