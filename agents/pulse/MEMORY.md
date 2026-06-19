@@ -138,9 +138,21 @@
 
 ---
 
-## Status snapshot — updated 2026-06-19 22:47Z UTC (Iter ~2301, Tier 3, consecutive_clean=3→4, NOMINAL ✅)
+## G-rule forge-preflight-no-marker DISPATCHED (iter ~2302, 2026-06-19)
 
-**Iter ~2301 summary:** ✅ Nominal. 0 new alerts. All 5 daemons alive — beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 497831, dashboard_api 497752. 0 open PRs. Repo on main, up-to-date (HEAD=fac5db12, Pulse cycle 20260619T221320Z). Sync 22:22Z (~25 min). Watermark=896=file_length. pending=0. Creds OK. Heartbeat 22:41:00Z (~6 min). Check I deduped (Fri). §5.0 no-ops. Stale bash orphan PID 1834248 (~22d+). G-rule ledger/check-i 2/3. PRIME ratio≈19.8 (interventions=1049, systemic_fixes=53, trend=improving). **Tier 3. consecutive_clean=3→4 (max). Next cadence: 30-min.**
+**Rule:** G-rule forge-preflight-no-marker crossed 3/3 threshold. Beacon dispatch `forge-preflight-no-marker-systemic-fix-001` written 2026-06-19T23:27Z. Pattern: `MalformedForgeMarker: phase=preflight requires ONE marker block — none found` in outbox-notifier.log. 4 incidents across 3 cycles: p4-closeout-outputs (2026-06-18), pipeline-empty-state-hint (2026-06-19 morning), mission-action-pr-label-capitalize + p5-dag-status-on-cards (2026-06-19 evening). All self-recovered. Waiting for Beacon spec + Forge PR. **G-rule DISPATCHED — watch for PR.**
+
+---
+
+## G-rule projects-json-healer-path-unregistered (new, iter ~2302, 2026-06-19)
+
+**Rule:** `agents/beacon/projects.json` is written and committed by a projects-store healer (frequent "chore(projects): projects-store healer" commits in git log) but is NOT listed in `config/healer-managed-runtime-paths.json`. This produces a Check A dirty-tree finding (never-auto + tier-reset) on every cycle where the check runs between healer writes. Config allowlist only contains captures.json and missions.json. Fix: add `agents/beacon/projects.json` to `config/healer-managed-runtime-paths.json`. **G-rule count: 1/1 — dispatch at 3/3.**
+
+---
+
+## Status snapshot — updated 2026-06-19 23:28Z UTC (Iter ~2302, Tier 3→1 reset, SIGNAL ⚠️)
+
+**Iter ~2302 summary:** ⚠️ Signal. Check A: `agents/beacon/projects.json` dirty (not in healer-managed-runtime-paths.json) → never-auto + tier-reset 3→1. G-rule forge-preflight-no-marker 3/3 → Beacon dispatch written. 3 new alerts all Tier-3 silenced (L897-899: mirror-dag-pass and sequence-complete). Both build sequences complete (mission-action-pr-label-capitalize: #597/#70; p5-dag-status-on-cards: #598/#71). All 5 daemons alive (same PIDs). Watermark=899=file_length. Sync 22:55Z. Heartbeat 23:11Z. PRIME: systemic_fixes=54, ratio≈19.44, trend=improving. **Tier 1. consecutive_clean=0. Next cadence: 5-min.**
 
 
 

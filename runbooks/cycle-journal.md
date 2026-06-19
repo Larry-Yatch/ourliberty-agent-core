@@ -4,6 +4,102 @@
 
 ---
 
+## Iteration ~2302 — 2026-06-19T23:28Z UTC (interactive, /cycle, Tier 3→1 reset, SIGNAL ⚠️)
+
+**Trigger:** Larry `/cycle` invocation.
+
+**Health:** ⚠️ Signal — Check A: `agents/beacon/projects.json` dirty (not in healer-managed-runtime-paths.json). G-rule forge-preflight-no-marker crossed 3/3 → dispatched to Beacon. Tier 3→1 reset.
+
+**VERIFY-BEFORE-REASSERT:**
+- **All 5 daemons alive:** beacon 3734671 (Ss, 2d 21h+) ✅, chain-event 3734305 (SNs, 2d 21h+) ✅, inbox-watcher 3434697 (Ssl, 3d 18h+) ✅, outbox_notifier 497831 (Ss, ~3h10m) ✅, dashboard_api 497752 (Ssl, ~3h10m) ✅.
+- **Stale bash orphan PID 1834248:** Confirmed alive (Ss, 22d+). [carry]
+- **G-rule Forge-preflight-CLARIFY_REQUEST 2/3:** separate pattern from today's MalformedForgeMarker "none found" — not incremented here; still 2/3.
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 896, "file_length": 899}`. 3 new alerts (L897-L899). Triage: all Tier-3 silenced (known-pattern match):
+- L897: `source=outbox-notifier, subject=mirror-dag-pass:launch-mission-action-pr-label-capitalize` → Tier-3 silence.
+- L898: `source=outbox-notifier, subject=mirror-dag-pass:launch-p5-dag-status-on-cards` → Tier-3 silence.
+- L899: `source=outbox-notifier, subject=sequence-complete:launch-mission-action-pr-label-capitalize` → Tier-3 silence.
+Watermark advanced to 899=file_length. ✅ Nominal (Tier-3 silences do not trigger tier-reset).
+
+**Check 1 — Log noise:** outbox-notifier.log: 2 new WARNs today (afternoon burst):
+- `17:05:05 MDT` — `MalformedForgeMarker: phase=preflight ... none found` (task: mission-action-pr-label-capitalize)
+- `17:16:48 MDT` — `MalformedForgeMarker: phase=preflight ... none found` (task: p5-dag-status-on-cards)
+- Collapsed signature: 1 distinct pattern, 2 occurrences in last hour (peak). Below 5/hour threshold.
+- Both sequences self-recovered: mission-action-pr-label-capitalize → PR #70 merged 23:20Z; p5-dag-status-on-cards → PR #71 merged 23:24Z. ✅ Sub-threshold. G-rule tracking: see Dispatches below.
+- inbox-watcher.log: 0 WARN/ERROR. journalctl inaccessible (user not in adm group). ✅ Partial — nominal on checked logs.
+
+**Check 2 — Telegram sweep:** Beacon bot PID 3734671 alive (Ss, 2d 21h+). Last log entry: `[2026-06-19T17:21:25-0600] alert idx=898 delivered (sequence-complete)`. Last Larry message: `17:17:43-0600 'status'` → handled (catch_me_up delivered). No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → "no stalls detected". ≥7 FORGE_NO_PR_SKIP (all known preflight_exit or pr_exists). ✅ Nominal.
+
+**Check 4 — Pending directives:** watermark=899=file_length (0 outstanding after triage). beacon-pending-approvals.json: pending=0, history=243. Forge inbox=0, Beacon inbox=0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-19T23:11:16Z (~17 min ago). FRESH (< 60 min). ✅ Nominal.
+
+**Check A — Source repo:** ⚠️ On main, up-to-date with origin/main (HEAD=5215e510). Working tree dirty: `M agents/beacon/projects.json`. This file is NOT listed in `config/healer-managed-runtime-paths.json` (which contains only captures.json and missions.json). Per Check A doctrine: non-managed dirt → `never-auto` + tier-reset. Context: projects.json is clearly committed on a timer by a projects-store healer (git log shows "chore(projects): projects-store healer" as 3 of the 5 most recent commits); sync still succeeds. The issue is a config omission, not a real discipline violation. Severity: [yellow] — sync working, transient dirty window. **G-rule projects-json-healer-path-unregistered: 1/1. Watch; dispatch to Beacon at 3/3.**
+
+**Check B — Sync health:** last_sync=2026-06-19T22:55:59Z (~33 min ago). Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon 3734671 (Ss, 2d 21h+) ✅, chain-event 3734305 (SNs, 2d 21h+) ✅, inbox-watcher 3434697 (Ssl, 3d 18h+) ✅, outbox_notifier 497831 (Ss, ~3h10m) ✅, dashboard_api 497752 (Ssl, ~3h10m) ✅. 5/5. ✅
+
+**Check E — PRs:** ourliberty-agent-core: 0 open PRs ✅. ourliberty-dashboard: PR #71 showed open at check time (created 23:16:32Z, ~12 min old) → merged at 23:24:14Z while iterating. Both repos clean at end of iter. ✅ Nominal.
+
+**Check H — Forge activity digest:**
+- **Since last iter (22:47Z) — agent-core:** PR #598 merged 22:55:54Z (`spec(projects-v3): P5 — DAG status on cards`); PR #597 merged 22:51:31Z (`spec(dashboard): capitalize the mission-action PR-open label (dogfood)`).
+- **Since last iter — dashboard:** PR #71 merged 23:24:14Z (`feat(projects): live DAG status on pipeline phase cards`); PR #70 merged 23:20:19Z (`fix(missions): capitalize the mission-action PR-open label`).
+- Both active build sequences complete: `launch-mission-action-pr-label-capitalize` (PRs #597, #70) and `launch-p5-dag-status-on-cards` (PRs #598, #71). ✅
+- 0 open Forge PRs in either repo. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Check I (Fri UTC, weekday=4 ∈ {0,2,4,6}):** check-i-2026-06-19.json EXISTS — dedup, skip. ✅
+**Check III:** Not Sunday — skip. ✅
+**Check VIII/IX/X:** Not Monday — skip. ✅
+
+**Actions taken:**
+1. Alert watermark: advanced 896→899.
+2. Beacon dispatch: `forge-preflight-no-marker-systemic-fix-001.json` written to Beacon inbox (G-rule forge-preflight-no-marker 3/3 → systemic-fix dispatch; spec Forge preflight marker discipline reinforcement).
+3. PRIME ledger: `intervention` appended (check-a-dirty-tree, tier=1) + `systemic_fix` appended (forge-preflight-no-marker-beacon-dispatch, tier=1).
+4. Tier state: `record --checks-clean false` → Tier 3→1 reset (consecutive_clean reset to 0, last_signal_at=2026-06-19T23:27Z).
+
+**Dispatches:**
+- [Beacon] `forge-preflight-no-marker-systemic-fix-001` — direction-ask to spec Forge preflight marker discipline fix. G-rule forge-preflight-no-marker crossed 3/3 (incidents: 2026-06-18T23:23Z p4-closeout-outputs, 2026-06-19T18:28Z pipeline-empty-state-hint, 2026-06-19T23:05Z mission-action-pr-label-capitalize, 2026-06-19T23:17Z p5-dag-status-on-cards; all self-recovered). G-rule now **DISPATCHED**.
+
+**Standing findings (carried forward):**
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **Check A: agents/beacon/projects.json not in healer-managed-runtime-paths.json** — config gap; healer commits frequently but path not registered. Sync still succeeds. G-rule projects-json-healer-path-unregistered **1/1**. Watch; dispatch at 3/3. [NEW]
+- [blue] **trim_memory.py untracked** — persistent. [carry]
+- [blue] **install-drift:ourliberty-build-sequence-advancer.service** — L892 Tier-3 silenced. [carry]
+- [blue] **unreviewed-merge:571** — bot DM'd. Larry judgment. [carry]
+- [blue] **Stale bash orphan** — PID 1834248 (Ss, ~22d+). [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch. (DISTINCT from forge-preflight-no-marker which was dispatched this iter.)
+- [blue] **G-rule forge-preflight-no-marker** — **DISPATCHED** (3/3 → Beacon envelope forge-preflight-no-marker-systemic-fix-001 written 2026-06-19T23:27Z). Watch for Beacon spec + Forge PR.
+- [blue] **G-rule ledger/check-i Tier-4** — 2/3. Watch. Dispatch to Beacon at 3/3.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule catalog-accuracy-drift-tier4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule mirror-marker-parse-error** — 1/3. Watch.
+- [blue] **G-rule watchdog-watcher-log-stale** — 1/3. Watch.
+- [blue] **G-rule projects-json-healer-path-unregistered** — 1/1. Watch. [NEW]
+- [blue] **G-rule health-notify-script-missing** — Beacon dispatch sent 2026-06-09, fix status unverified. [carry]
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention (Check A dirty tree), 1 systemic_fix (forge-preflight-no-marker Beacon dispatch). Trailing-30d: systemic_fixes=54, ratio≈19.44, trend=improving.
+**Tier end-of-iter:** Tier 3→1 reset (Check A non-clean finding; consecutive_clean reset to 0). Next cadence: 5-min.
+
+---
+
 ## Iteration ~2301 — 2026-06-19T22:47Z UTC (interactive, /cycle, Tier 3, consecutive_clean=3→4, NOMINAL ✅)
 
 **Trigger:** Larry `/cycle` invocation.
