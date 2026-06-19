@@ -91,6 +91,16 @@ ACTIVATION_ENV = 'OURLIBERTY_BUILD_SEQUENCE_ADVANCER_ENABLED'
 # 30-minute one-signal-only mismatch tolerance per spec § 5.3.
 GATE_MISMATCH_TIMEOUT_SEC = 30 * 60
 
+# Wall-clock backstop for a step that's `dispatched` but never makes progress
+# (no PR, no gate signal) — the silent-wedge class the reconcile pass can't see
+# (it only RETIRES merged work). Set generously beyond any real build so a
+# legitimately-slow build is never paused; a step still pr_url-less past this is
+# almost certainly stranded (the 2026-06-19 `ol-work` launch sat ~6h with no
+# failure + no alert). The invalid-target_repo escalation below fires
+# IMMEDIATELY — this timeout is only the catch-all for OTHER stall causes.
+# Tunable; see spec launch-repo-validation-and-silent-wedge.md § 3 Layer C.
+DISPATCH_STALL_TIMEOUT_SEC = 4 * 60 * 60
+
 # Bounded subprocess timeout for `gh pr view`. The CLI usually responds in
 # under a second; 30s gives the network layer wide headroom without
 # letting a wedged subprocess block the entire tick.
@@ -1070,6 +1080,153 @@ def _match_pr_for_step(
     return None
 
 
+# -------------------- stranded-dispatch escalation (silent-wedge backstop) --------------------
+
+
+def _valid_target_repos() -> frozenset[str]:
+    """Buildable repo names from ``config/agent-models.json`` ``repo_paths`` —
+    the same canonical block routing/dispatch validate against (config lives at
+    ``<scripts>/../config/agent-models.json``).
+
+    Best-effort: any read/parse error returns an EMPTY set, which the escalation
+    pass treats as "can't validate repos this tick" and SKIPS the invalid-repo
+    check (fail OPEN — never pause a sequence just because the config was briefly
+    unreadable). A populated set enables the check."""
+    cfg_path = _SCRIPTS_DIR.parent / 'config' / 'agent-models.json'
+    try:
+        data = json.loads(cfg_path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return frozenset()
+    block = data.get('repo_paths') if isinstance(data, dict) else None
+    if not isinstance(block, dict):
+        return frozenset()
+    return frozenset(k for k in block if isinstance(k, str) and k)
+
+
+def _dispatched_age_sec(dispatched_at: Any, now: datetime) -> Optional[float]:
+    """Seconds since ``dispatched_at`` (ISO-8601), or None if it's absent /
+    unparseable (caller then can't apply the stall timeout — fail safe)."""
+    if not isinstance(dispatched_at, str) or not dispatched_at:
+        return None
+    # Normalize a trailing 'Z' to '+00:00' before fromisoformat: our own
+    # producers stamp '+00:00', but 'Z'-suffixed timestamps circulate
+    # elsewhere in the codebase and fromisoformat rejects 'Z' on Python <3.11
+    # — without this a 'Z' step would silently skip the stall backstop.
+    try:
+        ts = datetime.fromisoformat(dispatched_at.replace('Z', '+00:00'))
+    except ValueError:
+        return None
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    return (now - ts).total_seconds()
+
+
+def _escalate_stranded_dispatched_steps(
+    sequence: dict[str, Any], path: Path, now: datetime,
+    logger: logging.Logger, valid_repos: frozenset[str],
+    stall_enabled: bool = True,
+) -> bool:
+    """Backstop for a `dispatched` step that can NEVER reach a terminal gate —
+    the silent-wedge class the V6 reconcile pass cannot catch (it only RETIRES
+    merged work via `gh pr list --state merged`; a step that produces no PR is
+    invisible to it, and the gh call for an invalid repo just fails → None →
+    no-op every tick). Two triggers, checked per still-`dispatched` step:
+
+      1. INVALID TARGET_REPO — `target_repo` is not a buildable repo in
+         `config/agent-models.json` `repo_paths`. Forge can't act on it, so the
+         step would sit `dispatched` forever (the 2026-06-19 `ol-work` launch
+         hung ~6h with no failure + no alert). Caught IMMEDIATELY — a bad repo
+         never gets better — and FLAG-INDEPENDENT (a config error is wrong
+         regardless of whether forward-dispatch is enabled).
+      2. STALL — a valid-repo step `dispatched` longer than
+         DISPATCH_STALL_TIMEOUT_SEC with no `pr_url` recorded. A generous
+         wall-clock backstop for any OTHER cause that strands a dispatch (Forge
+         never picked it up, a lost inbox envelope, ...). Gated on
+         `stall_enabled` (the advancer's forward-dispatch flag): while
+         forward-dispatch is intentionally OFF a step waiting is expected, not
+         stalled, so the timing backstop only applies when dispatch is live.
+
+    On the FIRST stranded step found: mark it `failed` (+ `failure_reason`),
+    pause the SEQUENCE, append audit, atomic-write, and DM Larry (subject-keyed
+    cooldown). Returns True iff it escalated (caller re-reads + skips
+    forward-dispatch). Runs flag-INDEPENDENT (like the reconcile pass) so a
+    wedge escalates even when forward-dispatch is gated off. Only the caller's
+    `active`-status gate prevents re-firing on an already-paused sequence."""
+    steps = sequence.get('steps') or []
+    seq_id = sequence.get('seq_id', path.stem)
+    for step in steps:
+        if step.get('status') != 'dispatched':
+            continue
+        step_id = step.get('step_id')
+        if not isinstance(step_id, str):
+            continue
+        target_repo = step.get('target_repo')
+        reason: Optional[str] = None
+        severity = 'warning'
+        if valid_repos and (
+            not isinstance(target_repo, str) or target_repo not in valid_repos
+        ):
+            reason = (
+                f'target_repo {target_repo!r} is not a buildable repo '
+                f'(config/agent-models.json repo_paths: {sorted(valid_repos)}). '
+                f'Forge can never act on it, so the step would sit `dispatched` '
+                f'indefinitely. Fix the phase/project repo and re-launch.'
+            )
+            severity = 'critical'
+        elif stall_enabled:
+            age = _dispatched_age_sec(step.get('dispatched_at'), now)
+            if (
+                age is not None
+                and age >= DISPATCH_STALL_TIMEOUT_SEC
+                and not step.get('pr_url')
+            ):
+                reason = (
+                    f'dispatched ~{int(age // 3600)}h ago with no PR and no gate '
+                    f'progress (exceeds the {DISPATCH_STALL_TIMEOUT_SEC // 3600}h '
+                    f'stall backstop). Forge may never have picked it up. If this '
+                    f'is a legitimately long build, `resume sequence {seq_id}`; '
+                    f'otherwise investigate the dispatch.'
+                )
+        if reason is None:
+            continue
+        # Escalate this step + pause the sequence (mirrors the failed/pause
+        # handling in _process_active_sequence, but runs flag-independent).
+        step['status'] = 'failed'
+        step['failure_reason'] = reason
+        step['current_actor'] = None
+        audit = list(sequence.get('audit_log') or [])
+        audit.append(_audit_entry('step-stranded', step_id=step_id, reason=reason))
+        audit.append(_audit_entry(
+            'sequence-paused', reason=f'Step `{step_id}` stranded: {reason}',
+        ))
+        sequence['audit_log'] = audit
+        sequence['status'] = 'paused'
+        try:
+            _atomic_write_sequence(path, sequence)
+        except OSError as e:
+            # Still DM below so the wedge is visible even if the write failed;
+            # the next tick re-processes from the on-disk (still active) state.
+            logger.error(f'escalate: atomic write failed for {seq_id}: {e}')
+        logger.warning(
+            f'escalate: sequence={seq_id} step={step_id} stranded; paused. {reason}'
+        )
+        _dm_larry(
+            message=(
+                f'Sequence `{seq_id}` paused — step `{step_id}` is stranded and '
+                f'can never complete on its own.\n\n{reason}'
+            ),
+            subject=f'sequence-stranded:{seq_id}:{step_id}',
+            severity=severity,
+            suggested_action=(
+                f'Inspect ~/agents/blackboard/build-sequences/{path.name}; fix '
+                f'the step `target_repo` (or the phase/project repo), then '
+                f'`resume sequence {seq_id}` / re-launch.'
+            ),
+        )
+        return True
+    return False
+
+
 def _reconcile_dispatched_steps(
     sequence: dict[str, Any], logger: logging.Logger,
     _repo_cache: Optional[dict[str, Optional[list[dict[str, Any]]]]] = None,
@@ -1232,6 +1389,11 @@ def tick(now: Optional[datetime] = None) -> int:
     seen_files = 0
     processed = 0
     reconciled_total = 0
+    escalated_total = 0
+    # Buildable repos, read once per tick (cheap) and shared across sequences;
+    # empty if the config was unreadable (escalation skips the invalid-repo
+    # check — fail open).
+    valid_repos = _valid_target_repos()
     # Shared per-tick gh cache across all sequences (multiple sequences may
     # target the same repo); survives the whole loop, not just one sequence.
     repo_cache: dict[str, Optional[list[dict[str, Any]]]] = {}
@@ -1264,13 +1426,40 @@ def tick(now: Optional[datetime] = None) -> int:
                     refreshed, _ = _read_sequence(path)
                     if refreshed is not None:
                         seq = refreshed
+                        status = seq.get('status')
             except Exception as e:
                 logger.error(
                     f'reconcile: unexpected error for {path.name}: '
                     f'{type(e).__name__}: {e}'
                 )
+        # Stranded-dispatch escalation — flag-INDEPENDENT (§3.4a-style backstop)
+        # but `active`-only so it never re-fires on an already-paused sequence.
+        # A `dispatched` step on an invalid target_repo (or stalled with no PR)
+        # can't be reconciled and would otherwise hang forever; escalate it
+        # (fail step + pause + DM) so a Launch can't silently wedge for hours.
+        # Runs AFTER reconcile so a step whose PR did merge is retired first.
+        if status == 'active':
+            try:
+                if _escalate_stranded_dispatched_steps(
+                    seq, path, now, logger, valid_repos,
+                    stall_enabled=advancer_on,
+                ):
+                    escalated_total += 1
+                    # The pass mutates `seq` in place (status → paused) AND
+                    # atomic-writes it. Trust the in-memory copy — do NOT
+                    # re-read from disk: if the write FAILED, the on-disk file
+                    # is still `active`, and re-reading it would resurrect the
+                    # stale status, letting the forward-dispatch leg act on the
+                    # very step the pass just tried to pause. The write retries
+                    # next tick from the still-active on-disk state.
+                    status = seq.get('status')
+            except Exception as e:
+                logger.error(
+                    f'escalate: unexpected error for {path.name}: '
+                    f'{type(e).__name__}: {e}'
+                )
         # Forward-dispatch leg — flag-GATED and active-only. Paused sequences
-        # are reconciled above but never advanced here.
+        # (incl. any just paused by escalation above) are never advanced here.
         if not advancer_on or status != 'active':
             continue
         try:
@@ -1300,7 +1489,7 @@ def tick(now: Optional[datetime] = None) -> int:
             )
     logger.info(
         f'tick: files={seen_files} processed={processed} '
-        f'reconciled_steps={reconciled_total}'
+        f'reconciled_steps={reconciled_total} escalated_seqs={escalated_total}'
     )
     return 0
 

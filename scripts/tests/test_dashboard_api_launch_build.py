@@ -260,5 +260,79 @@ class LaunchTest(_LaunchBuildTestBase):
         self.assertEqual(self.gh.calls, [])
 
 
+# ==================== repo resolution (Bug 1) ====================
+
+
+class RepoResolutionTest(_LaunchBuildTestBase):
+    """A bad/missing build repo (e.g. `ol-work` inherited from a capture origin,
+    dropped to None at promote) must never ride to an unbuildable dispatch: a
+    valid repo passes through, anything else is rejected LOUDLY (422). We never
+    derive the repo from the spec — every spec lives in agent-core regardless of
+    the build target, so spec location carries no target-repo signal."""
+
+    def setUp(self):
+        super().setUp()
+        # Stand-in config so validation is deterministic, not dependent on the
+        # live droplet config.
+        self.models_path = self.tmp / 'config' / 'agent-models.json'
+        self.models_path.parent.mkdir(parents=True, exist_ok=True)
+        self.models_path.write_text(json.dumps({'repo_paths': {
+            'ourliberty-agent-core': '/home/larry/agent-core',
+            'ourliberty-dashboard': '/home/larry/ourliberty-dashboard',
+        }}))
+        self._orig_models = da._agent_models_json_path
+        da._agent_models_json_path = lambda: self.models_path
+
+    def tearDown(self):
+        da._agent_models_json_path = self._orig_models
+        super().tearDown()
+
+    def test_bogus_repo_rejected_422_no_queue(self):
+        # Project repo is a working-dir name (`ol-work`) → loud rejection, no
+        # queue file, no silent bad dispatch.
+        self._seed_projects(_project(repo='ol-work'))
+        r = self.client.post(ENDPOINT, headers=AUTH,
+                             json={'project_id': 'aging-idea',
+                                   'phase_id': 'aging-idea'})
+        self.assertEqual(r.status_code, 422)
+        detail = r.json()['detail']
+        self.assertEqual(detail['error'], 'unbuildable target repo')
+        self.assertEqual(detail['target_repo'], 'ol-work')
+        self.assertIn('ourliberty-agent-core', detail['valid_repos'])
+        self.assertEqual(self._queue_files(), [])
+        self.assertEqual(self.gh.calls, [])
+
+    def test_missing_repo_rejected_422(self):
+        # Promote drops a bogus repo to None; with no buildable repo the launch
+        # rejects (the user must set the real target repo) — never guesses.
+        self._seed_projects(_project(repo=None, phases=[_phase()]))
+        r = self.client.post(ENDPOINT, headers=AUTH,
+                             json={'project_id': 'aging-idea',
+                                   'phase_id': 'aging-idea'})
+        self.assertEqual(r.status_code, 422)
+        self.assertEqual(r.json()['detail']['error'], 'unbuildable target repo')
+        self.assertEqual(self._queue_files(), [])
+
+    def test_valid_repo_passes_through(self):
+        self._seed_projects(_project(repo='ourliberty-dashboard'))
+        r = self.client.post(ENDPOINT, headers=AUTH,
+                             json={'project_id': 'aging-idea',
+                                   'phase_id': 'aging-idea'})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(self._read_queue('aging-idea')['repo'],
+                         'ourliberty-dashboard')
+
+    def test_unreadable_config_fails_open(self):
+        # Config missing → can't validate → fail open: the candidate is used
+        # as-is (never block a launch over a transient config read miss).
+        da._agent_models_json_path = lambda: self.tmp / 'config' / 'does-not-exist.json'
+        self._seed_projects(_project(repo='ol-work'))
+        r = self.client.post(ENDPOINT, headers=AUTH,
+                             json={'project_id': 'aging-idea',
+                                   'phase_id': 'aging-idea'})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(self._read_queue('aging-idea')['repo'], 'ol-work')
+
+
 if __name__ == '__main__':
     unittest.main()

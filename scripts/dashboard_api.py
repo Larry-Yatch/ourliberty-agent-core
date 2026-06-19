@@ -124,6 +124,30 @@ def _agent_models_json_path() -> Path:
     return _repo_root() / 'config' / 'agent-models.json'
 
 
+def _valid_repo_names(models_path: Path) -> frozenset[str]:
+    """Buildable repo NAMES from ``config/agent-models.json`` ``repo_paths`` keys
+    — the canonical block that gates which repos Forge can build.
+
+    Best-effort: any read/parse error returns an EMPTY set, which every caller
+    treats as "can't validate" and FAILS OPEN (never block a launch / drop a
+    repo over a transient config read miss). A populated set enables the check.
+
+    Note we validate the build repo by NAME only and never try to derive it from
+    the spec's location: every spec lives in agent-core's ``agents/beacon/specs``
+    regardless of which repo the build targets (e.g. a ``ourliberty-dashboard``
+    build's spec_doc is an agent-core path), so spec location carries no signal
+    about the target repo. The phase/project ``repo`` is the only reliable
+    source; when it's missing or bogus the launch must reject loudly, not guess."""
+    try:
+        data = json.loads(models_path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return frozenset()
+    block = data.get('repo_paths') if isinstance(data, dict) else None
+    if not isinstance(block, dict):
+        return frozenset()
+    return frozenset(k for k in block if isinstance(k, str) and k)
+
+
 def _captures_json_path() -> Path:
     """Path to the durable-capture sibling registry (Missions v2 Phase 1).
     Env-overridable so tests redirect reads/writes to a tmpdir without
@@ -2917,6 +2941,22 @@ def _create_project_from_funnel(
     _PROJECTS_INGEST_LOCK here (CAPTURE→PROJECTS); the funnel/mission paths take
     only _PROJECTS_INGEST_LOCK — no path takes them in the reverse order, so
     there is no lock inversion."""
+    # Drop a non-buildable repo before it lands in projects.json. A capture
+    # emitted from a local working dir inherits that dir's name as origin.repo
+    # (e.g. `ol-work`), which is not a real repo; storing it would ride all the
+    # way to an unbuildable dispatch (the 2026-06-19 wedge). Store None instead
+    # — the Launch endpoint re-derives the real repo from the spec at build
+    # time. Fail open: an unreadable config (empty valid set) keeps the
+    # candidate untouched.
+    if repo is not None:
+        valid_repos = _valid_repo_names(_agent_models_json_path())
+        if valid_repos and repo not in valid_repos:
+            logger.info(
+                'promote: dropping non-buildable repo %r (not in repo_paths) '
+                'for project %r; launch will derive from the spec',
+                repo, title,
+            )
+            repo = None
     with _PROJECTS_INGEST_LOCK:
         registry = _read_projects_registry(projects_path)
         projects = registry['projects']
@@ -6513,6 +6553,7 @@ def _handle_launch_build(
     actor: str,
     projects_path: Path,
     queue_dir: Path,
+    models_path: Optional[Path] = None,
     now: Optional[datetime] = None,
 ) -> dict[str, Any]:
     """Pure handler for POST /api/projects/launch (projects-v3 P3,
@@ -6540,6 +6581,7 @@ def _handle_launch_build(
     `heal_projects_store.py`) and the non-committer dispatch discipline (the
     `+New mission` precedent)."""
     now = now or datetime.now(timezone.utc)
+    models_path = models_path or _agent_models_json_path()
     seq_id = f'launch-{phase_id}'
 
     projects = _reader_projects(projects_path)
@@ -6584,6 +6626,36 @@ def _handle_launch_build(
             },
         )
 
+    # Gate the build repo: the phase/project repo must be a buildable repo, else
+    # reject LOUDLY. This is the gate that stops a bad repo (e.g. `ol-work`
+    # inherited from a capture origin, dropped to None at promote) from riding to
+    # an unbuildable dispatch that silently hangs for hours. We do NOT derive the
+    # repo from the spec — every spec lives in agent-core regardless of the build
+    # target, so spec location would mis-route every dashboard/graph build to
+    # agent-core. The phase/project repo is the only reliable signal; when it's
+    # missing/bogus the right answer is to ask, not guess.
+    candidate_repo = phase.get('repo') or _project_repo(projects, project_id)
+    valid_repos = _valid_repo_names(models_path)
+    # Fail OPEN on an empty set (config unreadable) — never block a launch over a
+    # transient config read miss.
+    if valid_repos and (
+        not isinstance(candidate_repo, str) or candidate_repo not in valid_repos
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                'error': 'unbuildable target repo',
+                'phase_id': phase_id,
+                'target_repo': candidate_repo,
+                'valid_repos': sorted(valid_repos),
+                'hint': (
+                    "this phase has no buildable target repo (not in "
+                    "config/agent-models.json repo_paths). Set the project's "
+                    "repo to the repo the build should target, then re-launch."
+                ),
+            },
+        )
+
     request_entry: dict[str, Any] = {
         'phase_id': phase_id,
         'project_id': project_id,
@@ -6591,7 +6663,7 @@ def _handle_launch_build(
         'spec_ref': spec_ref.strip(),
         'phase_title': phase.get('title') or phase_id,
         'desired_end_state': phase.get('desired_end_state', '') or '',
-        'repo': phase.get('repo') or _project_repo(projects, project_id),
+        'repo': candidate_repo,
         'requested_at': now.isoformat(),
         'requested_by': actor,
     }
@@ -8402,6 +8474,7 @@ def post_launch_build(
         actor=actor,
         projects_path=_projects_json_path(),
         queue_dir=_build_launch_queue_dir(),
+        models_path=_agent_models_json_path(),
     )
 
 

@@ -276,6 +276,36 @@ class DeadLetterTest(_DrainTestBase):
         self.assertEqual(result.dead_lettered, ['noid.json'])
         self.assertTrue((self.queue_dir / '.failed' / 'noid.json').exists())
 
+    def test_invalid_target_repo_is_dead_lettered(self):
+        # Belt-and-suspenders for Bug 1: a queue entry whose repo is not a
+        # buildable repo (e.g. `ol-work` inherited from a capture origin) is
+        # dead-lettered, never authored into an unbuildable sequence that would
+        # sit `dispatched` forever (the 2026-06-19 wedge).
+        with mock.patch.object(
+            lqd, '_valid_repos',
+            return_value=frozenset({'ourliberty-agent-core', 'ourliberty-dashboard'}),
+        ):
+            self._queue(_entry('bad-repo-phase', repo='ol-work'))
+            result = self._drain()
+        self.assertEqual(result.dead_lettered, ['bad-repo-phase.json'])
+        self.assertEqual(result.launched, [])
+        # No sequence authored, no Mirror dispatch, queue file moved to .failed.
+        self.assertFalse(self._seq_path('bad-repo-phase').exists())
+        self.assertEqual(self.recorder.calls, [])
+        self.assertTrue(
+            (self.queue_dir / '.failed' / 'bad-repo-phase.json').exists())
+
+    def test_unreadable_config_fails_open_and_authors(self):
+        # Fail open: if repo_paths can't be read (empty valid set), the drain
+        # does NOT dead-letter — it authors as before, so a transient config
+        # read miss never blocks otherwise-fine work.
+        with mock.patch.object(lqd, '_valid_repos', return_value=frozenset()):
+            self._queue(_entry('aging-idea', repo='ol-work'))
+            result = self._drain()
+        self.assertEqual(result.launched, ['aging-idea'])
+        self.assertEqual(result.dead_lettered, [])
+        self.assertTrue(self._seq_path('aging-idea').exists())
+
     def test_dispatch_failure_leaves_queue_file_for_retry(self):
         self._queue(_entry('aging-idea'))
         with mock.patch.object(lqd.safe_write_inbox, 'safe_write_inbox',

@@ -346,6 +346,17 @@ class PromoteTest(_ActionsTestBase):
         self.client.post(_endpoint('cap-1'), headers=AUTH, json={'action': 'promote'})
         self.assertEqual(self._read_projects()[0]['repo'], 'ourliberty-agent-core')
 
+    def test_bogus_origin_repo_dropped_to_none(self):
+        # Bug 1: a capture emitted from a local working dir inherits the dir name
+        # as origin.repo (e.g. `ol-work`), which is not a buildable repo. Promote
+        # must NOT carry it into projects.json — store None so the Launch
+        # endpoint re-derives the real repo from the spec at build time.
+        self._seed(_cap('cap-1', title='Aging idea', repo='ol-work'))
+        r = self.client.post(_endpoint('cap-1'), headers=AUTH,
+                             json={'action': 'promote'})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertIsNone(self._read_projects()[0]['repo'])
+
     def test_missing_capture_returns_404_no_write(self):
         self._seed(_cap('cap-1'))
         r = self.client.post(_endpoint('nope'), headers=AUTH, json={'action': 'promote'})
