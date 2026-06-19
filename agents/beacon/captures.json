@@ -64,7 +64,7 @@
       "id": "cap-orphan-lane-show-state-collapse-terminal-orphans-aa37",
       "title": "Orphan lane: show STATE + collapse terminal orphans (97 noisy, can't tell what's done)",
       "note": "Lane shows ALL unregistered tasks (terminal + active) with no phase, so 97 items look actionable when most are done. Fix: derive each orphan's phase, badge it (building/in-review/shipped/abandoned), and collapse/hide terminal ones so only actionable orphans show. Pairs with the Phase 2 derive-relocation. Auto-registration + register/dismiss buttons = Phase 3.",
-      "state": "promoted",
+      "state": "parked",
       "origin": {
         "source": "desktop-chat",
         "session_id": null,
@@ -73,27 +73,22 @@
         "captured_at": "2026-06-10T06:35:24.295967+00:00"
       },
       "last_touched": "2026-06-10T06:35:24.295967+00:00",
-      "promoted_to": "orphan-lane-show-state-collapse-terminal-orphans",
       "briefing": {
-        "what": "A cleanup of the task list that today shows 97 items as if they all need attention, when most are already finished.",
-        "why": "The clutter makes it impossible to tell at a glance what's actually still open, so real work gets buried and time gets wasted scanning noise.",
-        "suggest": "Worth doing, but scope it carefully and start with simply hiding the finished items to prove it out before building the fancier sorting and buttons."
+        "what": "A cleanup of one of our work-tracking views that currently lumps 97 finished and unfinished items together, so it looks like there's a huge pile of open work when most of it is already done.",
+        "why": "Right now the view is misleading \u2014 it's hard to tell what actually needs attention, which wastes time and erodes trust in the dashboard as a decision-making tool.",
+        "suggest": "Worth doing, but start small: label each item by status and hide the finished ones first, confirm that view is accurate, then layer on the fancier automation later."
       },
       "risk": "medium",
       "recommended_action": "drop",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-06-19T11:34:48.060071+00:00",
-        "from_state": "promoted"
+        "at": "2026-06-19T11:44:53.914622+00:00",
+        "from_state": "parked"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "aging": true,
-      "spawned": {
-        "kind": "project",
-        "project_id": "orphan-lane-show-state-collapse-terminal-orphans",
-        "stamped_at": "2026-06-19T11:30:05.815616+00:00"
-      }
+      "updated_at": "2026-06-19T11:36:11.534880+00:00"
     },
     {
       "id": "cap-projects-pm-layer-data-is-stale-separate-system-84ec",
