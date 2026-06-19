@@ -138,9 +138,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-19 19:04Z UTC (Iter ~2289, Tier 1, consecutive_clean=0→1, NOMINAL ✅)
+## Status snapshot — updated 2026-06-19 19:12Z UTC (Iter ~2290, Tier 1, consecutive_clean=1→2, NOMINAL ✅)
 
-**Iter ~2289 summary:** ✅ Nominal. 1 new alert (L888: sequence-complete:launch-pipeline-empty-state-hint, PR #66 ourliberty-dashboard merged) — Tier-3 silenced by helper, bot already DM'd. fix-launch-drain-target-repo-resolution-001 approved by Larry at 18:53Z → Forge inbox active (build-fix-launch-drain-target-repo-resolution-001.json). All 5 daemons alive — beacon 3734671 (~2d 16h 37m), chain-event 3734305 (~2d 16h 37m), inbox-watcher 3434697 (~3d 13h 47m), outbox_notifier 442600 (~21m), dashboard_api 442264 (~21m). Watermark 887→888. 0 open PRs both repos. 0 stalls. pending=0 (fix-launch-drain dispatched). Credential rotation OK. Heartbeat 18:40:16Z (fresh). Check I deduped (Fri artifact). §5.0 all no-ops. heal-droplet-git-drift PRIME verification still pending (tracked tree clean, healer didn't fire). Stale bash orphan PID 1834248 (~22d 0h). G-rule ledger/check-i at 2/3. PRIME ratio≈19.8 (interventions=1049, systemic_fixes=53, trend=improving). **Tier 1. consecutive_clean=0→1. Next cadence: 5-min.**
+**Iter ~2290 summary:** ✅ Nominal. 0 new alerts. PR #589 `fix(launch): validate build repo + escalate stranded dispatches` MERGED 19:08:07Z — fix-launch-drain-target-repo-resolution-001 COMPLETE. Repo synced b5412c9f→06816d21. All 5 daemons alive — beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 442600, dashboard_api 442264. Watermark=888=file_length. 0 open PRs both repos. 0 stalls. pending=0. Credential rotation OK. Heartbeat 18:40:16Z (fresh). Check I deduped (Fri artifact). §5.0 all no-ops. heal-droplet-git-drift PRIME verification still pending. Stale bash orphan PID 1834248 (~22d). G-rule watchdog-watcher-log-stale 1/3. G-rule health-notify-script-missing: Beacon dispatch 2026-06-09, fix unverified. G-rule ledger/check-i at 2/3. PRIME ratio≈19.8 (interventions=1049, systemic_fixes=53, trend=improving). **Tier 1. consecutive_clean=1→2. Next cadence: 5-min.**
 
 
 
