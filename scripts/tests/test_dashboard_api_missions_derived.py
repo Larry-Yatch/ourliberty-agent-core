@@ -832,6 +832,37 @@ class IsProposableInitiativeTest(unittest.TestCase):
         for tid in ('20', 'summary', '', '   '):
             self.assertFalse(da.is_proposable_initiative(tid), tid)
 
+    def test_preflight_approval_redispatch_ledger_artifacts_swept(self) -> None:
+        # The noise classes that still leaked onto the proposed lane and never
+        # drained (P1 follow-up): DAG-preflight runs, approval-thread hashes,
+        # redispatch artifacts, and ops-cleanup ledger snapshots.
+        for tid in (
+            'dag-preflight-park-the-nudge',
+            'dag-preflight-missions-v2-phase2',
+            'dag-preflight-projects-v3-p3-followup2-v2',
+            'larry-approval-8aa50bfa8aec52113f9405772937021ca0fa7689',
+            'larry-approval-45a1464c4cea2a71e1291bd5b6e96830c5175f12',
+            'p3-dashboard-proposed-lane-redispatch-20260612T132800Z',
+            'ops-cleanup2-s1-dedup-ledger-20260611',
+            'ops-cleanup-ccds1-ledger-20260610',
+        ):
+            self.assertFalse(da.is_proposable_initiative(tid), tid)
+
+    def test_new_rules_do_not_sweep_genuine_buildables(self) -> None:
+        # The anchored rules must NOT collide with buildables that merely look
+        # similar — a partial approval hash, a non-dated ledger initiative, a
+        # 'preflight' mid-id, or the pinned rebase/pulse ids.
+        for tid in (
+            'larry-approval-flow-redesign',              # not a 40-hex hash
+            'redispatch-guard-hardening-001',            # 'redispatch' but no -<ts> tail
+            'add-preflight-clean-exit-detection',        # 'preflight' mid-id, not prefix
+            'ops-cleanup-healer-design',                 # 'ops-cleanup' but no -ledger-<date>
+            'rebase-pr252-digest-generator-001',
+            'pulse-check-iii-tune-forge-stuck-threshold',
+            'capture-label-contract',
+        ):
+            self.assertTrue(da.is_proposable_initiative(tid), tid)
+
     def test_delegates_to_infrastructure_classification(self) -> None:
         # An id/agent that is_infrastructure_task already rejects is never proposable.
         self.assertFalse(da.is_proposable_initiative('notify-routing-xyz'))
