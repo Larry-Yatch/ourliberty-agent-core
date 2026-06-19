@@ -150,9 +150,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-19 23:41Z UTC (Iter ~2304, Tier 1, NOMINAL ✅)
+## Status snapshot — updated 2026-06-19 23:47Z UTC (Iter ~2305, Tier 1, NOMINAL ✅)
 
-**Iter ~2304 summary:** ✅ Nominal. 1 new alert L901 (approval_request forge-preflight-marker-gate-001) Tier-3 silenced. All 5 daemons alive (same PIDs). Repo clean at start; healer pushed `9370f06d chore(missions): autoregister healer` during check window — in sync after fetch. Check A: no dirty-tree at iter start (G-rule projects-json-healer-path-unregistered stays at **2/3**). forge-preflight-marker-gate-001 APPROVAL_REQUEST delivered to Larry at 17:37 MDT — pending his `approve`/`go`. Watermark=901=file_length. Sync 22:55Z. Heartbeat 23:11Z. PRIME: systemic_fixes=54, ratio≈19.46, trend=improving. **Tier 1. consecutive_clean=1. Next cadence: 5-min.**
+**Iter ~2305 summary:** ✅ Nominal. 0 new alerts. All 5 daemons alive (same PIDs). Repo clean. Key update: Larry replied 'go' at 17:39 MDT — forge-preflight-marker-gate-001 APPROVED → build-phase dispatched to Forge inbox at 23:42 UTC (5 min old). Forge preflight ran; MalformedForgeMarker on first attempt (occurrence #4), retry 1/3 succeeded. G-rule forge-preflight-no-marker now **BUILD IN PROGRESS**. G-rule projects-json-healer-path-unregistered stays at **2/3** (Check A clean). Watermark=901=file_length. Heartbeat 23:41Z. PRIME: systemic_fixes=54, ratio≈19.46, trend=improving. **Tier 1. consecutive_clean=2. Next cadence: 5-min (1 more clean iter → Tier 2).**
 
 
 
