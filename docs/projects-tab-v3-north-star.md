@@ -115,7 +115,7 @@ This entire process — **funnel → pipeline → brainstorm → spec → build 
 | Phase | What | Status |
 |---|---|---|
 | (foundation) | Phase 4 meaning layer · 4.1 Narrator schedule · Phase S sync · delegate fix | ✅ shipped |
-| P1 | Funnel + Missions retirement | 🚧 mostly shipped 2026-06-19 (was over-marked ✅) — see note ¹ |
+| P1 | Funnel + Missions retirement | ✅ shipped 2026-06-19 — board is **Funnel + Pipeline only** (see note ¹) |
 | P2 | Universal action card on funnel | ✅ shipped (+ follow-up: meaning layer on Proposed lane + reliable refresh) |
 | P3 | Pipeline (Projects → Phases) | 🚧 built + verified (advance/attach/launch-gate/drop); edges in `projects-v3-p3-followup2` |
 | P4 | Closeout pass | 🚧 specced — `projects-v3-p4-closeout` (holds for p3-followup2 verify) |
@@ -130,8 +130,7 @@ _Legend: ✅ done · 🚧 in flight · ▫️ planned_
 > - **Legacy UI retired** (dashboard [#67](https://github.com/Larry-Yatch/ourliberty-dashboard/pull/67)): the standalone Proposed accept/dismiss lane + the Deferred + Shipped-today collapsibles are gone; the Orphaned lane now **drops** verifiably-terminal orphans (not collapses them). Board renders **Pipeline + Funnel(Parked · Suggested · Orphaned)**.
 > - **Archived legacy drafts hidden** (dashboard [#68](https://github.com/Larry-Yatch/ourliberty-dashboard/pull/68)): the 9 `heal_missions_board_drain`-archived drafts no longer render in the kanban.
 > - **`backfill_target_repo`** was already migrated to a `chain_events`-derived source (no `missions.json` dependency); the 9 legacy drafts were already archived. Verified + regression-locked.
+> - **Orphan-lane noise filtered** (agent-core [#594](https://github.com/Larry-Yatch/ourliberty-agent-core/pull/594)): the derive narrows the surfaced `orphans[]` (and `funnel.secondary`) by `is_proposable_initiative` — the Orphaned lane shows only verifiably-live buildable work (live: 89→41 orphan rows; the board shows ~14 live).
+> - **Active-missions kanban retired** (agent-core [#595](https://github.com/Larry-Yatch/ourliberty-agent-core/pull/595) + dashboard [#69](https://github.com/Larry-Yatch/ourliberty-dashboard/pull/69)): `heal_projects_store.mirror_missions_as_projects` mirrors each active (non-shipped) mission into the P3 Pipeline as a single-phase project (reuses `new_single_phase_project` + `promoted_from`; lifecycle/spec/sequence mapped; idempotent + reversible; `missions.json` untouched). Verified live — Pulse Cycle Upgrade + Rate-limit resilience show as **Building** projects in "Actively working". The dashboard then dropped the kanban + its cascade → **board = Pipeline + Funnel only** (§0 reached). Shipped missions go invisible-once-done (§4.2, Larry's call). Spec: `agents/beacon/specs/projects-v3-retire-missions-kanban.md` (#593).
 >
-> **Remains for the full §0 "Funnel + Pipeline ONLY":**
-> - The **active-missions kanban** (Pulse Cycle Upgrade, Rate-limit resilience, …) is the "original Missions kanban"; retiring it = migrating those missions into the **Pipeline** (Projects) — P3-sized, not in P1's a–e work items.
-> - **Orphan-lane noise**: the Orphaned lane shows ~64 live (non-terminal) including non-buildable noise; a derive-side `is_proposable_initiative` filter on `orphans[]` would narrow it to verifiably-live buildable work.
-> - The proposed-ledger drains to a **residual** (genuinely-live + old PRs beyond the gate's ~200-PR window / shipped via non-PR paths), not literally 0 — these are now invisible (no Proposed lane) but still in `missions.json` as the §3 orphan decision-queue.
+> **Residual (intentional, invisible):** the proposed-ledger drains to a remainder (genuinely-live + old PRs beyond the gate's ~200-PR window / shipped via non-PR paths), not literally 0 — these no longer render (no Proposed lane) but persist in `missions.json` as the §3 orphan decision-queue.
