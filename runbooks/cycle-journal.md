@@ -4,6 +4,100 @@
 
 ---
 
+## Iteration ~2227 — 2026-06-19T00:09Z UTC (interactive, /cycle, Tier 3, consecutive_clean=22→23, NOMINAL)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. All checks clean. Tier 3 steady-state continues (consecutive_clean=22→23). heal_stale_daemon_code auto-restarted outbox_notifier + dashboard_api (Tier-3 known-pattern — healer working correctly). Check I fired (Fri UTC gate).
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #576 verification window (closes 2026-06-19T13:35Z):** PR #576 CONFIRMED MERGED at 13:35:28Z. repair-watermark → `{"repaired": false, "old_watermark": 923, "file_length": 926}` — no rotation gap. Fix holding. ✅
+- **PR #584 (p4-closeout-outputs):** CONFIRMED open, MERGEABLE, no review decision, updated 23:28:11Z. Build tasks (p4-closeout-outputs, p4-closeout-ui) archived in forge outbox (~23:38-23:39Z). Normal sequence progression. ✅
+- **All 5 daemon PIDs:** beacon 3734671 (Ss, ~45.7h) ✅, chain-event 3734305 (SNs, ~45.7h) ✅, inbox-watcher 3434697 (Ssl, ~66.9h) ✅, outbox_notifier 217608 (Ss, new PID post-heal-restart 23:35Z) ✅, dashboard_api 218007 (Ssl, new PID post-heal-restart 23:35Z) ✅.
+- **Stale bash orphan PID 1834248:** CONFIRMED alive (Ss, etimes=1831755s ≈ 21.19d). [blue carry]
+
+**Check 0 — Alert triage:** repair-watermark no-op (watermark=923 < file_length=926 — 3 new alerts, no rotation gap). Triaged:
+- L924: `source=dispatch-branch-cleanup, subject=summary, route=digest` → **Tier-3** (known-pattern). ✅
+- L925: `source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-outbox-notifier.service, route=digest` → **Tier-3** (known-pattern). Healer auto-restarted outbox_notifier at 23:35:32Z (script mtime 23:27:29Z > active-since 16:34:23Z by ~413 min; triggered by commit 3bb474c9). New PID 217608. ✅
+- L926: `source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-dashboard-api.service, route=digest` → **Tier-3** (known-pattern). Auto-restarted dashboard_api at 23:35:46Z. New PID 218007. ✅
+- Watermark advanced 923→926. No tier-reset (all Tier-3).
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 min ago"` → No entries. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot PID 3734671 alive (Ss). No orphaned Larry directives. p4-closeout sequence: PR #584 open, build tasks archived. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → 0 stalls. 7 FORGE_NO_PR_SKIP (all reason=pr_exists, all PRs merged). ✅ Nominal.
+
+**Check 4 — Pending directives:** watermark=926. beacon-pending-approvals.json: pending=0, history=237. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-19T00:05:31Z (~3.5 min ago). FRESH. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=218a31ec=origin/main. Clean tree (untracked agents/pulse/trim_memory.py). New commit since iter ~2226: `218a31ec chore(missions): GC healer — commit captures.json delta`. On main. ✅
+
+**Check B — Sync health:** last_sync=2026-06-18T23:32:39Z (~37 min ago). Within 2h threshold. ✅
+
+**Check C — Agent liveness:** beacon 3734671 (Ss) ✅, chain-event 3734305 (SNs) ✅, inbox-watcher 3434697 (Ssl) ✅, outbox_notifier 217608 (Ss, new PID) ✅, dashboard_api 218007 (Ssl, new PID) ✅. 5/5. ✅
+
+**Check D — Inboxes:** beacon=0, forge=0, mirror=0. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: PR #584 open (forge/p4-closeout-outputs, "feat(projects): P4 closeout DM handoff + loose-ends to funnel", MERGEABLE, no review decision, created 23:23Z, updated 23:28Z, build tasks archived 23:38-23:39Z). heal_pipeline_stall=0 stalls. ourliberty-dashboard: 0 open. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Check I (Fri gate, UTC weekday=4 ∈ {0,2,4,6}):**
+```
+[pulse-check-i] journal: skipped — block for 2026-06-15 already present
+[pulse-check-i] sidecar refresh: invoked run_ledger.sh, exit=0, took 2.4s
+[pulse-check-i] auto-dispatch dedup skip: key=04807c018d prior_task=pulse-auto-04807c018d-20260615 dispatched_at=2026-06-15T07:02:11.804157+00:00
+[pulse-check-i] mode=digest
+[pulse-check-i] parked: 0
+[pulse-check-i] wrote /home/larry/agents/blackboard/pulse-check-i/check-i-2026-06-19.json
+[pulse-check-i] DM: queued
+[pulse-check-i] auto-dispatched: 0
+```
+Week ending 2026-06-15: total=$1,135.74 (+$94.09/+9.03% vs prior week). retry_overhead=$12.09 (1.06%). 360 σ-anomalies (pulse cycle tasks at $2.40-$2.80 vs $0.81 baseline). 1 proposal: effort=small "Review high-σ anomaly task cycle-202606111240000000" — auto-dispatch dedup skip (dispatched 2026-06-15). DM queued by script. ✅
+
+**Check III:** Not Sunday — skip. ✅
+**Check VIII/IX/X:** Not Monday — skip. ✅
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op. Triaged 3 new alerts (all Tier-3). Watermark advanced 923→926.
+2. Check I: Ran. DM queued by script (bot delivers). 0 auto-dispatches (dedup). Artifact: check-i-2026-06-19.json.
+3. PRIME ledger: `iter_clean` appended (Tier 3).
+4. Tier state: `record --checks-clean true` → consecutive_clean=22→23, Tier 3 steady-state continues.
+
+**Dispatches:** None.
+
+**Standing findings (carried):**
+- [blue] **PR #576 verification window** — watermark-rotation-gap systemic fix; MERGED 2026-06-18T13:35:28Z; closes 2026-06-19T13:35Z; fix holding. [watch — closes today]
+- [blue] **PR #584 in-flight** — p4-closeout sequence (DM handoff + loose-ends); created 23:23Z; build tasks archived 23:38-23:39Z; awaiting Mirror review. [watch]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [blue] **unreviewed-merge:571** — bot DM'd. Larry judgment. [carry]
+- [blue] **Stale bash orphan** — PID 1834248 (~21.19d+, sleep-loop). [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule catalog-accuracy-drift-tier4** — 1/3. Watch.
+- [blue] **G-rule ledger/check-i Tier-4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule mirror-marker-parse-error** — 1/3. Watch.
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+
+**PRIME DIRECTIVE:** 0 interventions this iter (iter_clean). Trailing-30d: interventions=1025, systemic_fixes=52, ratio=19.71, trend=improving.
+**Tier end-of-iter:** Tier 3, consecutive_clean=23. Last signal: 2026-06-18T10:23:58Z.
+
+---
+
 ## Iteration ~2226 — 2026-06-18T23:34Z UTC (interactive, /cycle, Tier 3, consecutive_clean=21→22, NOMINAL)
 
 **Trigger:** Larry direct invocation (`/cycle`).
