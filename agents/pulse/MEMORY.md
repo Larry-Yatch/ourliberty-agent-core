@@ -114,9 +114,9 @@
 
 ---
 
-## heal-droplet-git-drift Tier-4 → PR #586 MERGED ✅ (iter ~2273 dispatch, iter ~2278 PR merged, verification pending next fire)
+## heal-droplet-git-drift Tier-4 → COMPLETE ✅ (iter ~2273 dispatch, iter ~2278 PR merged, iter ~2293 PRIME verified)
 
-**Rule:** G-rule heal-droplet-git-drift-tier4: direction-ask dispatched iter ~2273, Larry approved 13:14Z, PR #586 (`chore(config): silence Pulse re-triage of droplet-uncommitted:main drift alert`) merged 2026-06-19T13:26:32Z. Tier-3 translation active in `config/alert-translations.json` for `source=heal-droplet-git-drift, subject=droplet-uncommitted:main`. Bot still DMs Larry (route=escalate preserved). PRIME verification_pending. VERIFICATION PENDING: confirm triage helper classifies Tier-3 on next heal-droplet-git-drift fire (expected ~18:41Z).
+**Rule:** G-rule heal-droplet-git-drift-tier4 COMPLETE. PR #586 (`chore(config): silence Pulse re-triage of droplet-uncommitted:main drift alert`) merged 2026-06-19T13:26:32Z. Tier-3 translation confirmed working in production: L891 (`source=heal-droplet-git-drift, subject=droplet-uncommitted:main`) classified Tier-3 by triage helper at iter ~2293 (2026-06-19T19:30Z). Bot still DMs Larry (route=escalate preserved per PR #586 design). PRIME verified. **G-rule COMPLETE.**
 
 ---
 
@@ -138,9 +138,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-19 19:26Z UTC (Iter ~2292, Tier 1, consecutive_clean=0→1, NOMINAL ✅)
+## Status snapshot — updated 2026-06-19 19:30Z UTC (Iter ~2293, Tier 1, consecutive_clean=1→2, NOMINAL ✅)
 
-**Iter ~2292 summary:** ✅ Nominal. 0 new alerts. PR #590 (fix(launch-drain)) auto-merged 19:22:40Z (Mirror PASS notification at 19:24Z). L889 still-stale-after-restart:dashboard-api SELF-RESOLVED (PID 475318 stable, heartbeat fresh 19:10Z no re-alert). All 5 daemons alive — beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 442600, dashboard_api 475318. 5 PRs shipped today (587/588/589/590/591). 0 open PRs. Repo on main, HEAD=6a82568d=origin/main. Sync 19:15Z. Watermark=889=file_length. pending=0. Creds OK. Heartbeat 19:10:17Z. Check I deduped (Fri). §5.0 no-ops. heal-droplet-git-drift PRIME verification pending (need dirty-tracked-tree trigger). Stale bash orphan PID 1834248 (~22d). G-rule ledger/check-i 2/3. PRIME ratio≈19.8 (interventions=1049, systemic_fixes=53, trend=improving). **Tier 1. consecutive_clean=0→1. Next cadence: 5-min.**
+**Iter ~2293 summary:** ✅ Nominal. 2 new alerts (L890-L891), both Tier-3 silenced. **G-rule heal-droplet-git-drift-tier4 PRIME VERIFIED ✅** (L891 Tier-3 confirms PR #586 translation working). All 5 daemons alive — beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 442600, dashboard_api 475318. 0 open PRs. Repo on main, up-to-date. Sync 19:15Z. Watermark=891=file_length. pending=0. Creds OK. Heartbeat 19:10:17Z. Check I deduped (Fri). §5.0 no-ops. Stale bash orphan PID 1834248 (~22d). G-rule ledger/check-i 2/3. PRIME ratio≈19.8 (interventions=1049, systemic_fixes=53, trend=improving). **Tier 1. consecutive_clean=1→2. Next cadence: 5-min.**
 
 
 
