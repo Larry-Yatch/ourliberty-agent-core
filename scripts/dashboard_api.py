@@ -3292,6 +3292,8 @@ _NON_PROPOSABLE_TASK_ID_PREFIXES: tuple[str, ...] = (
                             # variant is caught by the bare-colon rule)
     'ceo-digest-',          # generated digest artifact
     'weekly-', 'check-i-',  # dated temporal digest artifacts
+    'dag-preflight-',       # DAG-preflight session-start artifact (a validation
+                            # run, never a buildable initiative)
 )
 
 # Substrings that mark translation / generated-rule artifacts regardless of
@@ -3305,6 +3307,17 @@ _NON_PROPOSABLE_TASK_ID_SUBSTRINGS: tuple[str, ...] = (
 
 _DESKTOP_CAPTURE_HASH_RE = re.compile(r'^desktop-[0-9a-f]{6,}$')
 _SEQUENCE_STEP_RE = re.compile(r'^seq-.*-step-')
+
+# Whole-id noise SHAPES (anchored / delimited regexes): orphans that are never
+# buildable initiatives — an approval-thread hash, a redispatch artifact (a re-kick
+# of work already tracked elsewhere), an ops-cleanup ledger snapshot. Anchored so
+# they can't sweep a genuine buildable (e.g. `rebase-pr252-…` and `pulse-check-iii-…`
+# match NONE of these and stay proposable — they drain via the terminal gate).
+_NON_PROPOSABLE_TASK_ID_RES: tuple[re.Pattern[str], ...] = (
+    re.compile(r'^larry-approval-[0-9a-f]{40}$'),   # approval-thread hash artifact
+    re.compile(r'-redispatch-\d{8}T\d{6}Z$'),       # trailing redispatch timestamp
+    re.compile(r'^ops-cleanup.*-ledger-\d{8}$'),    # ops-cleanup*-ledger-<YYYYMMDD>
+)
 
 
 def is_proposable_initiative(task_id: str, agent: Optional[str] = None) -> bool:
@@ -3336,6 +3349,8 @@ def is_proposable_initiative(task_id: str, agent: Optional[str] = None) -> bool:
     if task_id.startswith(_NON_PROPOSABLE_TASK_ID_PREFIXES):
         return False
     if any(s in task_id for s in _NON_PROPOSABLE_TASK_ID_SUBSTRINGS):
+        return False
+    if any(rx.search(task_id) for rx in _NON_PROPOSABLE_TASK_ID_RES):
         return False
     return True
 

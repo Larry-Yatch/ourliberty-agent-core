@@ -94,6 +94,16 @@ GIT_TIMEOUT_SEC = 60
 PUSH_TIMEOUT_SEC = 180
 GH_TIMEOUT_SEC = 30
 
+# How many recent merged/closed PRs per repo the terminal gate scans to resolve a
+# proposed orphan's terminal state. Fetched ONCE per tick per (repo, state) and
+# matched in-memory, so gh cost is O(repos) — NOT O(candidates) — regardless of the
+# backlog size. The window must reach back past the oldest un-drained proposal:
+# task_resolution.shipped_pr's `--limit 40` aged a week-old backlog out (the root
+# cause the lane never drained); 200 spans multiple weeks at this repo's merge rate.
+# PRs older than this window aren't seen — they degrade to the event-only path / KEEP
+# (fail-safe), never a false drop.
+_TERMINAL_PR_FETCH_LIMIT = 200
+
 # Dashboard "+New mission" registration is drained HERE, inside the missions
 # writer, so the dashboard never has to be a git committer (it just drops a queue
 # file) and no unroutable PR is ever created. Two sources, both append-only +
@@ -489,6 +499,99 @@ def _retire_reason(
     return None
 
 
+def _fetch_terminal_prs(repos: tuple[str, ...]) -> Optional[list[tuple[dict[str, Any], str]]]:
+    """The recent merged + closed PRs across `repos`, fetched ONCE (reach-back-
+    independent of any single task). Returns a flat [(pr_dict, state), ...] index,
+    or None if EVERY (repo, state) fetch failed — the gate then degrades to the
+    event-only path (fail-safe; a total gh outage never drops a card).
+
+    gh's `--state merged` and `--state closed` are disjoint (closed EXCLUDES merged),
+    so the union is exactly the verifiably-TERMINAL set — open/in-flight PRs are
+    never fetched and so can never be mistaken for terminal. A single (repo, state)
+    failure is skipped (a partial index can only MISS a terminal PR → KEEP, never a
+    false drop)."""
+    import json as _json  # noqa: PLC0415
+    import subprocess  # noqa: PLC0415
+    import task_resolution as tr  # noqa: PLC0415
+    index: list[tuple[dict[str, Any], str]] = []
+    any_ok = False
+    for repo in repos:
+        for state in ('merged', 'closed'):
+            try:
+                res = subprocess.run(
+                    ['gh', 'pr', 'list', '--repo', repo, '--state', state,
+                     '--limit', str(_TERMINAL_PR_FETCH_LIMIT), '--json',
+                     'number,title,headRefName,state'],
+                    capture_output=True, text=True, timeout=tr.GH_TIMEOUT_S,
+                    env=tr._gh_env(),
+                )
+                if res.returncode != 0:
+                    log(f'terminal-PR fetch {repo}/{state} rc={res.returncode}: '
+                        f'{(res.stderr or "")[:160]}')
+                    continue
+                prs = _json.loads(res.stdout or '[]')
+            except (subprocess.TimeoutExpired, _json.JSONDecodeError,
+                    FileNotFoundError, OSError) as e:
+                log(f'terminal-PR fetch {repo}/{state} failed: {type(e).__name__}: {e}')
+                continue
+            any_ok = True
+            if isinstance(prs, list):
+                for pr in prs:
+                    if isinstance(pr, dict):
+                        index.append((pr, state))
+    return index if any_ok else None
+
+
+def _terminal_gate_from_index(
+    index: list[tuple[dict[str, Any], str]],
+) -> Callable[[list[str]], tuple[bool, Optional[str]]]:
+    """Pure (no I/O) gate over a pre-fetched terminal-PR index. Returns
+    callable(task_ids) -> (terminal_all, signal): True iff EVERY task_id matches a
+    merged/closed PR (positive evidence only, § 5). Reuses the SAME matcher the
+    pipeline-stall + drain healers use (task_resolution.pr_matches_task) so the
+    branch/title rule never drifts."""
+    import task_resolution as tr  # noqa: PLC0415
+
+    def gate(task_ids: list[str]) -> tuple[bool, Optional[str]]:
+        signal: Optional[str] = None
+        for tid in task_ids:
+            hit: Optional[tuple[dict[str, Any], str]] = None
+            for pr, state in index:
+                if tr.pr_matches_task(pr, tid):
+                    hit = (pr, state)
+                    break
+            if hit is None:
+                return (False, signal)  # tid not verifiably terminal → KEEP
+            if signal is None:
+                pr, _state = hit
+                kind = 'pr_merged' if (pr.get('state') or '').upper() == 'MERGED' else 'pr_closed'
+                signal = f'{kind}:#{pr.get("number")}'
+        return (bool(task_ids), signal)
+
+    return gate
+
+
+def _load_terminal_gate() -> Optional[Callable[[list[str]], tuple[bool, Optional[str]]]]:
+    """Build the RELIABLE PR-state terminal gate, or None if unavailable.
+
+    The per-tick event-only terminal signal (an `auto_merge` chain event or a
+    resolvable pr_url) is BLIND to old shipped work whose events carry neither —
+    those read `stalled` forever and never retire. This gate closes that gap with a
+    POSITIVE-EVIDENCE PR-state check, never a clock (§ 5 guardrail): it scans a deep
+    recent window of merged/closed PRs (fetched once per tick, not per candidate) and
+    matches each proposed orphan's task_id by branch/title. None when gh is wholly
+    unavailable (the tick then leans on the event-only path alone — fail-safe)."""
+    import task_resolution as tr  # noqa: PLC0415
+    try:
+        index = _fetch_terminal_prs(tr.DEFAULT_REPOS)
+    except Exception as e:  # noqa: BLE001 — any fetch fault degrades to event-only, never crashes
+        log(f'terminal-gate fetch raised: {type(e).__name__}: {e} — event-only path this tick')
+        return None
+    if index is None:
+        return None
+    return _terminal_gate_from_index(index)
+
+
 def retire_stale_proposals(
     registry: dict[str, Any],
     rows: list[dict[str, Any]],
@@ -496,6 +599,7 @@ def retire_stale_proposals(
     now: datetime,
     *,
     pr_state_resolver: Optional[Callable[[list[str]], dict[str, str]]] = None,
+    terminal_gate: Optional[Callable[[list[str]], tuple[bool, Optional[str]]]] = None,
 ) -> list[tuple[str, str]]:
     """Retire-with-audit any auto-proposed entry that should no longer be live.
 
@@ -541,15 +645,41 @@ def retire_stale_proposals(
             log(f'retire PR-state resolve raised: {type(e).__name__}: {e} — treating as indeterminate')
             pr_state_by_url = {}
 
+    # The reliable gh-PR-state terminal gate (fail-safe: None when unavailable).
+    if terminal_gate is None:
+        terminal_gate = _load_terminal_gate()
+
     retired: list[tuple[str, str]] = []
     for entry in candidates:
         reason = _retire_reason(entry, events_by_task, derive, now, pr_state_by_url)
+        signal: Optional[str] = None
+        # Event-only path indeterminate (reason is None) → fall back to the RELIABLE
+        # terminal gate (in-memory match over the once-fetched PR index — cheap, so
+        # EVERY candidate is checked, no per-tick budget / starvation). A still-live
+        # (open / unmatched) entry is correctly KEPT; only positive merged/closed
+        # evidence retires it (§ 5).
+        if reason is None and terminal_gate is not None:
+            tids = [t for t in (entry.get('task_ids') or []) if isinstance(t, str) and t]
+            if tids:
+                try:
+                    is_terminal, sig = terminal_gate(tids)
+                except Exception as e:  # noqa: BLE001 — fail-safe: any gate error → keep
+                    log(f'terminal gate raised for {entry.get("id")}: '
+                        f'{type(e).__name__}: {e} — keeping')
+                    is_terminal, sig = False, None
+                if is_terminal:
+                    reason, signal = 'orphan-terminal', sig
         if reason is None:
             continue
         entry['acknowledged'] = True
         entry['retired_by'] = PROPOSED_BY
         entry['retired_at'] = now.isoformat()
         entry['retired_reason'] = reason
+        # Provenance parity with heal_missions_board_drain's drop: record the
+        # positive terminal signal (pr_merged:#N / pr_closed:#N) when the gh gate
+        # fired. Absent for the filter/event triggers (no PR# to cite).
+        if signal:
+            entry['retired_signal'] = signal
         retired.append((entry.get('id', ''), reason))
     return retired
 

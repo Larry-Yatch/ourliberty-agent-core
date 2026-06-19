@@ -275,6 +275,14 @@ class ScanAndProposeTest(unittest.TestCase):
 class RetireStaleProposalsTest(unittest.TestCase):
     def setUp(self):
         self.now = datetime(2026, 6, 14, 12, 0, tzinfo=timezone.utc)
+        # The reliable gh terminal gate shells `gh` — an effectful edge. Seam it OFF
+        # by default (loader returns a no-op gate) so the event-only / filter
+        # assertions never touch gh. The gh-gate tests below inject `terminal_gate=`
+        # explicitly, which takes precedence over this loader.
+        _gate = mock.patch.object(h, '_load_terminal_gate',
+                                  return_value=lambda tids: (False, None))
+        _gate.start()
+        self.addCleanup(_gate.stop)
 
     def _proposed(self, entry_id, task_id, **extra):
         e = {'id': entry_id, 'phase': 'proposed', 'task_ids': [task_id],
@@ -376,6 +384,141 @@ class RetireStaleProposalsTest(unittest.TestCase):
             {'id': 'm-drafting', 'phase': 'drafting', 'task_ids': ['x']},
         ]}
         self.assertEqual(h.surviving_proposed_ids(reg), ['proposed-live'])
+
+    # -- the RELIABLE gh terminal gate: drains shipped work the event-only path is
+    #    blind to (no auto_merge event + no resolvable pr_url). Positive evidence
+    #    only, bounded per tick, fail-safe.
+
+    def test_gh_gate_retires_indeterminate_terminal(self):
+        # Buildable, passes the filter, NO events (event-only path indeterminate) —
+        # but the gh gate finds the work shipped -> retire 'orphan-terminal' + signal.
+        reg = {'schema_version': 1, 'missions': [
+            self._proposed('proposed-p2-digest-generator', 'p2-digest-generator'),
+        ]}
+        retired = h.retire_stale_proposals(
+            reg, [], derive, self.now,
+            pr_state_resolver=lambda urls: {},
+            terminal_gate=lambda tids: (True, 'pr_merged:#252'))
+        self.assertEqual(retired, [('proposed-p2-digest-generator', 'orphan-terminal')])
+        entry = reg['missions'][0]
+        self.assertTrue(entry['acknowledged'])
+        self.assertEqual(entry['phase'], 'proposed')          # relabel, never delete
+        self.assertEqual(entry['retired_reason'], 'orphan-terminal')
+        self.assertEqual(entry['retired_signal'], 'pr_merged:#252')
+
+    def test_gh_gate_keeps_when_not_terminal(self):
+        # gh gate returns not-terminal (open / unresolvable) -> KEEP (fail-safe).
+        reg = {'schema_version': 1, 'missions': [
+            self._proposed('proposed-auth-setup-token-wiring', 'auth-setup-token-wiring'),
+        ]}
+        retired = h.retire_stale_proposals(
+            reg, [], derive, self.now,
+            pr_state_resolver=lambda urls: {},
+            terminal_gate=lambda tids: (False, None))
+        self.assertEqual(retired, [])
+        self.assertNotIn('acknowledged', reg['missions'][0])
+
+    def test_gh_gate_error_keeps_failsafe(self):
+        # A gate that RAISES must never manufacture a drop.
+        reg = {'schema_version': 1, 'missions': [
+            self._proposed('proposed-auth-setup-token-wiring', 'auth-setup-token-wiring'),
+        ]}
+        def _boom(tids):
+            raise RuntimeError('gh exploded')
+        retired = h.retire_stale_proposals(
+            reg, [], derive, self.now,
+            pr_state_resolver=lambda urls: {}, terminal_gate=_boom)
+        self.assertEqual(retired, [])
+        self.assertNotIn('acknowledged', reg['missions'][0])
+
+    def test_gh_gate_checks_every_candidate_no_budget(self):
+        # The gate matches in-memory over a once-fetched PR index (cheap), so EVERY
+        # candidate is checked each tick — no per-candidate budget, no starvation of
+        # terminal entries behind still-live ones.
+        calls = []
+        def _gate(tids):
+            calls.append(tids[0])
+            return (True, 'pr_merged:#1')
+        reg = {'schema_version': 1, 'missions': [
+            self._proposed(f'proposed-buildable-task-{i}', f'buildable-task-{i}')
+            for i in range(5)
+        ]}
+        retired = h.retire_stale_proposals(
+            reg, [], derive, self.now,
+            pr_state_resolver=lambda urls: {}, terminal_gate=_gate)
+        self.assertEqual(len(calls), 5)          # every candidate gated, none skipped
+        self.assertEqual(len(retired), 5)
+        self.assertEqual(sum(1 for m in reg['missions'] if m.get('acknowledged')), 5)
+
+    def test_gh_gate_not_consulted_when_event_path_resolves(self):
+        # When the event-only path already decides terminal, the gh gate is NOT
+        # consulted (no wasted gh round-trip).
+        url = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/53'
+        called = []
+        reg = {'schema_version': 1, 'missions': [
+            self._proposed('proposed-p3-dashboard-proposed-lane',
+                           'p3-dashboard-proposed-lane'),
+        ]}
+        rows = [_ev('p3-dashboard-proposed-lane', self.now - timedelta(days=2),
+                    event_type='pr_opened', pr_url=url)]
+        retired = h.retire_stale_proposals(
+            reg, rows, derive, self.now,
+            pr_state_resolver=lambda urls: {url: 'MERGED'},
+            terminal_gate=lambda tids: called.append(tids) or (True, 'x'))
+        self.assertEqual([r for _, r in retired], ['orphan-terminal'])
+        self.assertEqual(called, [])           # event path resolved -> gate untouched
+
+
+class TerminalGateTest(unittest.TestCase):
+    """The reach-back-independent PR-state terminal gate: a batched fetch (once per
+    tick, deep window) + in-memory branch/title match reusing the SHARED matcher
+    task_resolution.pr_matches_task — so old shipped work whose PR aged out of the
+    event-only path is still retired, with NO per-task gh fan-out."""
+
+    @staticmethod
+    def _idx(number, branch, state, title='x'):
+        return ({'number': number, 'headRefName': branch, 'state': state,
+                 'title': title}, state.lower())
+
+    def test_index_gate_matches_merged_by_branch(self):
+        gate = h._terminal_gate_from_index(
+            [self._idx(252, 'forge/p2-digest-generator', 'MERGED')])
+        self.assertEqual(gate(['p2-digest-generator']), (True, 'pr_merged:#252'))
+
+    def test_index_gate_matches_closed_unmerged(self):
+        gate = h._terminal_gate_from_index(
+            [self._idx(99, 'forge/abandoned-task', 'CLOSED')])
+        self.assertEqual(gate(['abandoned-task']), (True, 'pr_closed:#99'))
+
+    def test_index_gate_no_match_keeps(self):
+        gate = h._terminal_gate_from_index(
+            [self._idx(1, 'forge/other', 'MERGED', title='unrelated')])
+        self.assertEqual(gate(['not-in-index']), (False, None))
+
+    def test_index_gate_all_task_ids_must_match(self):
+        # EVERY task_id must be terminal; one unmatched -> not terminal -> KEEP.
+        gate = h._terminal_gate_from_index(
+            [self._idx(5, 'forge/task-a', 'MERGED')])
+        self.assertFalse(gate(['task-a', 'task-b'])[0])
+
+    def test_fetch_returns_none_when_all_gh_fail(self):
+        # A total gh outage -> None -> the tick degrades to the event-only path
+        # (fail-safe: never a false drop).
+        with mock.patch('subprocess.run',
+                        side_effect=FileNotFoundError('gh missing')):
+            self.assertIsNone(h._fetch_terminal_prs(('o/repo-a', 'o/repo-b')))
+
+    def test_fetch_builds_index_on_success(self):
+        def _fake_run(cmd, **kw):
+            state = cmd[cmd.index('--state') + 1]
+            out = json.dumps(
+                [{'number': 7, 'headRefName': 'forge/t', 'state': 'MERGED',
+                  'title': 'x'}]) if state == 'merged' else '[]'
+            return subprocess.CompletedProcess(cmd, 0, stdout=out, stderr='')
+        with mock.patch('subprocess.run', side_effect=_fake_run):
+            index = h._fetch_terminal_prs(('o/repo-a',))
+        self.assertIsNotNone(index)
+        self.assertTrue(any(pr['number'] == 7 for pr, _ in index))
 
 
 # --------------------------------------- commit + push (real temp git repo)
