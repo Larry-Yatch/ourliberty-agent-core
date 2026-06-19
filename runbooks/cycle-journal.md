@@ -4,6 +4,89 @@
 
 ---
 
+## Iteration ~2288 — 2026-06-19T18:56Z UTC (interactive, /cycle, Tier 3→1, consecutive_clean=8→0, SIGNAL ⚠️)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Signal — repo behind origin/main at time of Check A (PR #588 + autoregister healer commit a11b54a8). Auto-resolved by sync running concurrently. Tier-reset to Tier 1.
+
+**VERIFY-BEFORE-REASSERT:**
+- **G-rule heal-droplet-git-drift-tier4 (PR #586 MERGED 13:26Z):** No heal-droplet-git-drift alert in L884-L887. Expected fire ~18:41Z passed without healer firing — tracked tree is clean (only `?? agents/pulse/trim_memory.py` untracked), so healer correctly didn't fire. PRIME verification still pending — need a dirty-tracked-tree cycle to confirm Tier-3 silence. [watch]
+- **All 5 daemons alive:** beacon 3734671 (Ss, 2d 16h 29m+) ✅, chain-event 3734305 (SNs, 2d 16h 29m+) ✅, inbox-watcher 3434697 (Ssl, 3d 13h 39m+) ✅, outbox_notifier 442600 (Ss, ~16m — restarted by heal-stale at 18:40Z) ✅, dashboard_api 442264 (Ssl, ~16m — restarted by heal-stale at 18:40Z) ✅.
+- **Stale bash orphan PID 1834248:** ALIVE — bash, Ss, elapsed=21d 23h 37m+. Condition file absent. [blue carry]
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 883, "file_length": 887}`. 4 new alerts (L884-L887), all Tier-3 silenced:
+- L884: `source=heal-stale-daemon-code`, `subject=auto-restarted:ourliberty-dashboard-api.service` — PR #587 code live, dashboard_api restarted. Tier-3 silence ✅
+- L885: `source=heal-stale-daemon-code`, `subject=auto-restarted:ourliberty-outbox-notifier.service` — PR #587 code live, outbox_notifier restarted. Tier-3 silence ✅
+- L886: `source=outbox-notifier`, `intent=review-pass`, task=`reconcile-missions-board-harden-ship-reconciler-001` — Mirror approved PR #588 (fix missions reconcile + harden sec3.3 against review-task-id blocking). Auto-merged. history=242. Tier-3 silence ✅
+- L887: `source=dispatch-branch-cleanup`, `subject=summary` — pruned 2 local + 1 remote stale branches. Tier-3 silence ✅
+Watermark advanced 883→887.
+
+**Check 1 — Log noise:** journalctl: heal-orphan-autoregister at 18:51Z normal (proposed 0, retired 22 stale, surviving 31). No WARN/ERROR. outbox_notifier.log: 0 WARN/ERROR. inbox_watcher.log: 0 WARN/ERROR. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot PID 3734671 alive (Ss, 2d 16h 29m+). Last Larry activity: 12:26:59 MDT (18:26Z) — approved reconcile-missions-board-harden-ship-reconciler-001. fix-launch-drain-target-repo-resolution-001 DM sent to Larry at 12:46:24 MDT (18:46Z), pending response. No orphaned directives >24h. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → 0 stalls. 8 FORGE_NO_PR_SKIP (pr_exists or preflight_exit). ✅ Nominal.
+
+**Check 4 — Pending directives:** watermark=887=file_length (0 new after triage). beacon-pending-approvals.json: pending=1 (fix-launch-drain-target-repo-resolution-001, DM sent 18:46Z, awaiting Larry reply). history=242. Forge inbox=0, beacon inbox=1 (notify-fix-launch-drain-target-repo-resolution-001.json — active notify, not stale). ✅
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-19T18:40:16Z (~16 min ago). FRESH (< 60 min). ✅ Nominal.
+
+**Check A — Source repo:** ⚠️ At time of check: HEAD=ed99ec75, origin/main=23e788ba (repo behind by 1+ commit). Sync script ran concurrently and fast-forwarded to a11b54a8. `git pull --ff-only` confirmed "Already up to date" (sync got there first). New commits on origin: `23e788ba` PR #588 (fix missions reconcile + harden sec3.3), `a11b54a8` (chore missions autoregister healer). Current HEAD=a11b54a8=origin/main. Untracked trim_memory.py — persistent carry. **always-fix executed by sync; tier-reset.** Logged to cycle-actions.jsonl.
+
+**Check B — Sync health:** last_sync=2026-06-19T18:39:29Z (sync that brought us to ed99ec75). Subsequent sync resolved the ed99ec75→a11b54a8 gap. Within 2h threshold. ✅
+
+**Check C — Agent liveness:** beacon 3734671 (Ss, 2d 16h 29m+) ✅, chain-event 3734305 (SNs, 2d 16h 29m+) ✅, inbox-watcher 3434697 (Ssl, 3d 13h 39m+) ✅, outbox_notifier 442600 (Ss, ~16m) ✅, dashboard_api 442264 (Ssl, ~16m) ✅. 5/5. ✅
+
+**Check D — Inboxes:** forge=0, beacon=1 (notify-fix-launch-drain-target-repo-resolution-001.json — active, not stale). ✅
+
+**Check E — PRs:** ourliberty-agent-core: 0 open PRs. ourliberty-dashboard: 0 open PRs. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Check I (Fri UTC, weekday=4 ∈ {0,2,4,6}):** check-i-2026-06-19.json already present. Dedup — skip. ✅
+**Check III:** Not Sunday — skip. ✅
+**Check VIII/IX/X:** Not Monday — skip. ✅
+
+**Actions taken:**
+1. cycle-actions.jsonl: logged ff-main-when-behind auto-fix (sync concurrent).
+2. Alert watermark: advanced 883→887 (L884-L887 triaged Tier-3).
+3. PRIME ledger: `intervention` appended (tier=1, template=ff-main-when-behind).
+4. Tier state: `record --checks-clean false` → Tier 3→1, consecutive_clean=8→0 (Check A finding).
+
+**Dispatches:** None.
+
+**Standing findings (carried forward — verified above where noted):**
+- [yellow] **fix-launch-drain-target-repo-resolution-001 pending approval** — DM sent to Larry at 18:46Z. Awaiting Larry "approve" reply. [watch]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [blue] **G-rule heal-droplet-git-drift-tier4** — **3/3 DISPATCHED ✅, PR #586 MERGED**. PRIME verification_pending. Healer didn't fire at ~18:41Z (tracked tree clean). Verify on next dirty-tracked-tree cycle. [watch]
+- [blue] **trim_memory.py untracked** — persistent; PR #586 silences Pulse triage. Larry: commit or delete to stop healer recurrence at the source. [carry]
+- [blue] **unreviewed-merge:571** — bot DM'd. Larry judgment. [carry]
+- [blue] **Stale bash orphan** — PID 1834248 (21d 23h 37m+, bash, Ss). Condition file absent. [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule catalog-accuracy-drift-tier4** — 1/3. Watch.
+- [blue] **G-rule ledger/check-i Tier-4** — 2/3. Watch. Dispatch to Beacon at 3/3.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule mirror-marker-parse-error** — 1/3. Watch.
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention this iter (ff-main-when-behind via sync). Trailing-30d: interventions=1049, systemic_fixes=53, ratio≈19.8, trend=improving.
+**Tier end-of-iter:** Tier 3→1 (Check A signal). consecutive_clean=8→0. Next cadence: 5-min.
+
+---
+
 ## Iteration ~2287 — 2026-06-19T18:18Z UTC (interactive, /cycle, Tier 3, consecutive_clean=7→8, PLATEAU ✅)
 
 **Trigger:** Larry direct invocation (`/cycle`).
