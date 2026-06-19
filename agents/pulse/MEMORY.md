@@ -114,6 +114,12 @@
 
 ---
 
+## heal-droplet-git-drift Tier-4 → DISPATCHED (iter ~2273 dispatch, verification pending)
+
+**Rule:** G-rule heal-droplet-git-drift-tier4 reached 3/3 (L876 at 12:41Z 2026-06-19). Direction-ask dispatched to Beacon inbox (`pulse-direction-ask-heal-droplet-git-drift-tier3-001.json`) requesting Tier-3 silence translation for `source=heal-droplet-git-drift, subject=droplet-uncommitted:main` in `config/alert-translations.json`. Bot already DMs Larry for these (route=escalate); Pulse Tier-4 triage adds noise. VERIFICATION PENDING: confirm translation merged and triage helper classifies Tier-3 on next occurrence.
+
+---
+
 ## heal-pipeline-stall:unrouted-pr Tier-4 → COMPLETE ✅ (iter ~1930 dispatch, iter ~1969 verified)
 
 **Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#N` alerts now classify Tier-3 (silenced per longest-prefix match) via translation in `config/alert-translations.json`. PR #516 (`forge/alert-translation-unrouted-pr-001`) merged 2026-06-15T17:27:36Z. First live verification: L1031+L1032 (PRs #513/#512) triaged Tier-3 by helper in iter ~1969. **G-rule COMPLETE.** Bot still DMs Larry for unrouted PRs — Pulse no longer double-DMs.
@@ -132,9 +138,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-19 12:14Z UTC (Iter ~2272, Tier 3, consecutive_clean=8, NOMINAL ✅)
+## Status snapshot — updated 2026-06-19 12:44Z UTC (Iter ~2273, Tier 3→1, SIGNAL ⚠️)
 
-**Iter ~2272 summary:** ✅ Nominal. 2 new alerts (both Tier-3 silence). All 5 daemons alive — beacon 3734671 (2d 9h 46m+), chain-event 3734305 (2d 9h 46m+), inbox-watcher 3434697 (3d 6h 56m+), outbox_notifier 305068 (~8h 34m), dashboard_api 304948 (~8h 34m). Repo HEAD=e0a8fc04=origin/main (clean; dirty-tree from ~2271 resolved by wrapper). Untracked trim_memory.py — carry. Last sync 11:38:15Z (~36 min). 0 open PRs both repos. 0 stalls. pending=0. Credential rotation OK. Heartbeat 12:08:21Z (~3.8 min, fresh). Check I deduped (Fri artifact present). §5.0 all no-ops. PR #576 window closes 2026-06-19T13:35Z (~1h21m remaining, fix holding). L875: mirror-dag-pass:launch-pipeline-empty-state-hint — bot DM'd Larry, Beacon ran 11:55Z (seq-advancer), pipeline proceeding. Stale bash orphan PID 1834248 (21d 16h 52m+, condition file absent). G-rule heal-droplet-git-drift-tier4 **2/3** (no new occurrence). G-rule ledger/check-i at 2/3. PRIME ratio≈20.1 (interventions=1047, systemic_fixes=52, trend=improving). **Tier 3, consecutive_clean=8. Next cadence: 30-min.**
+**Iter ~2273 summary:** ⚠️ Signal. 1 new alert (L876: heal-droplet-git-drift, droplet-uncommitted:main, Tier-4). G-rule heal-droplet-git-drift-tier4 **3/3 DISPATCHED** → direction-ask to Beacon inbox (`pulse-direction-ask-heal-droplet-git-drift-tier3-001.json`) for Tier-3 silence translation in alert-translations.json. All 5 daemons alive — beacon 3734671 (2d 10h 17m+), chain-event 3734305 (2d 10h 17m+), inbox-watcher 3434697 (3d 7h 27m+), outbox_notifier 305068 (~9h 5m), dashboard_api 304948 (~9h 5m). Repo HEAD=048d9d2c=origin/main (clean; untracked trim_memory.py). Last sync 12:38:19Z (~5 min). 0 open PRs both repos. 0 stalls. pending=0. Credential rotation OK. Heartbeat 12:38:21Z (~5 min, fresh). Check I deduped (Fri artifact). §5.0 all no-ops. PR #576 window closes 13:35Z (~51 min, fix holding). Stale bash orphan PID 1834248 (21d 17h 25m+, condition file absent). G-rule ledger/check-i at 2/3. PRIME ratio≈19.8 (interventions=1048, systemic_fixes=53, trend=improving). **Tier 1, consecutive_clean=0 (reset from Tier 3).**
 
 ## Status snapshot — updated 2026-06-19 11:07Z UTC (Iter ~2270, Tier 3, consecutive_clean=6, NOMINAL ✅)
 
