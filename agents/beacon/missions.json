@@ -4032,6 +4032,19 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "pipeline-empty-state-hint",
+      "name": "Pipeline empty-state hint",
+      "phase": "drafting",
+      "brief": "When 'Actively working' is empty, show a quiet one-line hint instead of self-hiding. Guinea-pig: first live dogfood of the P4 closeout (launched through the board to exercise Building\u2192Done + closeout). Spec: agents/beacon/specs/projects-v3-pipeline-empty-state.md",
+      "spec_docs": [
+        "agents/beacon/specs/projects-v3-pipeline-empty-state.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-dashboard",
+      "created": "2026-06-19",
+      "deferred_reason": null
     }
   ]
 }
