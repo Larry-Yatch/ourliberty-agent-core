@@ -115,7 +115,7 @@ This entire process — **funnel → pipeline → brainstorm → spec → build 
 | Phase | What | Status |
 |---|---|---|
 | (foundation) | Phase 4 meaning layer · 4.1 Narrator schedule · Phase S sync · delegate fix | ✅ shipped |
-| P1 | Funnel + Missions retirement | ✅ shipped |
+| P1 | Funnel + Missions retirement | 🚧 mostly shipped 2026-06-19 (was over-marked ✅) — see note ¹ |
 | P2 | Universal action card on funnel | ✅ shipped (+ follow-up: meaning layer on Proposed lane + reliable refresh) |
 | P3 | Pipeline (Projects → Phases) | 🚧 built + verified (advance/attach/launch-gate/drop); edges in `projects-v3-p3-followup2` |
 | P4 | Closeout pass | 🚧 specced — `projects-v3-p4-closeout` (holds for p3-followup2 verify) |
@@ -124,3 +124,14 @@ This entire process — **funnel → pipeline → brainstorm → spec → build 
 | P7 | Generalize + shelf + dashboard-wide | ▫️ planned |
 
 _Legend: ✅ done · 🚧 in flight · ▫️ planned_
+
+> **¹ P1 honest status (2026-06-19).** A live board inspection showed P1 was marked ✅ while the board still rendered legacy Missions sections + kept minting proposed records. **Shipped this pass:**
+> - **Proposed-backlog drain** (agent-core [#587](https://github.com/Larry-Yatch/ourliberty-agent-core/pull/587)): `heal_orphan_autoregister.retire_stale_proposals` now retires on a RELIABLE, reach-back-independent PR-state terminal gate (merged/closed evidence only, never a clock — §5) + a tightened `is_proposable_initiative` noise filter. Drained the live proposed backlog 53→31 on the first tick (9 verifiably-terminal old PRs + 13 filter-noise) and keeps it drained going forward.
+> - **Legacy UI retired** (dashboard [#67](https://github.com/Larry-Yatch/ourliberty-dashboard/pull/67)): the standalone Proposed accept/dismiss lane + the Deferred + Shipped-today collapsibles are gone; the Orphaned lane now **drops** verifiably-terminal orphans (not collapses them). Board renders **Pipeline + Funnel(Parked · Suggested · Orphaned)**.
+> - **Archived legacy drafts hidden** (dashboard [#68](https://github.com/Larry-Yatch/ourliberty-dashboard/pull/68)): the 9 `heal_missions_board_drain`-archived drafts no longer render in the kanban.
+> - **`backfill_target_repo`** was already migrated to a `chain_events`-derived source (no `missions.json` dependency); the 9 legacy drafts were already archived. Verified + regression-locked.
+>
+> **Remains for the full §0 "Funnel + Pipeline ONLY":**
+> - The **active-missions kanban** (Pulse Cycle Upgrade, Rate-limit resilience, …) is the "original Missions kanban"; retiring it = migrating those missions into the **Pipeline** (Projects) — P3-sized, not in P1's a–e work items.
+> - **Orphan-lane noise**: the Orphaned lane shows ~64 live (non-terminal) including non-buildable noise; a derive-side `is_proposable_initiative` filter on `orphans[]` would narrow it to verifiably-live buildable work.
+> - The proposed-ledger drains to a **residual** (genuinely-live + old PRs beyond the gate's ~200-PR window / shipped via non-PR paths), not literally 0 — these are now invisible (no Proposed lane) but still in `missions.json` as the §3 orphan decision-queue.
