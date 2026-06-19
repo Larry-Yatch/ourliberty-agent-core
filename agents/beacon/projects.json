@@ -214,12 +214,12 @@
           "id": "p5-dag-status-on-cards",
           "title": "P5 \u2014 DAG status on cards",
           "desired_end_state": "Glanceable live build status on pipeline phase cards (step N/M \u00b7 actor \u00b7 last event), early \u26a0 stuck badge, project N-of-M rollup, click-through to Build Sequences. Dashboard-only. Spec: agents/beacon/specs/projects-v3-p5-dag-status.md (repo ourliberty-dashboard). Launch through the board to also confirm the P4 enriched completion DM.",
-          "lifecycle_state": "spec",
+          "lifecycle_state": "building",
           "order": 0,
           "spec_ref": "agents/beacon/specs/projects-v3-p5-dag-status.md",
-          "sequence_ref": null,
+          "sequence_ref": "launch-p5-dag-status-on-cards",
           "created_at": "2026-06-19T22:57:02.509616+00:00",
-          "updated_at": "2026-06-19T22:57:22.828340+00:00"
+          "updated_at": "2026-06-19T23:05:14.414312+00:00"
         }
       ],
       "one_off": true,
