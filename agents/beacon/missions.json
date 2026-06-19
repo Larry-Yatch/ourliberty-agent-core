@@ -4150,6 +4150,45 @@
       "repo": "ourliberty-dashboard",
       "created": "2026-06-19",
       "deferred_reason": null
+    },
+    {
+      "id": "automated-tests-and-type-checks-could-not-run-in-the-build-sandbox-so-the-change-still-needs-npm-test-or-ci-to-confirm-it-is-green",
+      "name": "Automated tests and type-checks could not run in the build sandbox, so the change still needs npm test or CI to confirm it is green.",
+      "phase": "proposed",
+      "brief": "Loose end from the \"Pipeline empty-state hint\" closeout: Automated tests and type-checks could not run in the build sandbox, so the change still needs npm test or CI to confirm it is green.",
+      "spec_docs": [],
+      "task_ids": [],
+      "repo": "ol-work",
+      "created": "2026-06-19",
+      "deferred_reason": null,
+      "proposed_by": "closeout",
+      "proposed_at": "2026-06-19T19:46:22.105099+00:00"
+    },
+    {
+      "id": "the-empty-state-hint-and-unchanged-populated-view-still-need-to-be-confirmed-live-on-the-board-since-the-done-gate-is-browser-checkable-only",
+      "name": "The empty-state hint and unchanged populated view still need to be confirmed live on the board, since the done-gate is browser-checkable only.",
+      "phase": "proposed",
+      "brief": "Loose end from the \"Pipeline empty-state hint\" closeout: The empty-state hint and unchanged populated view still need to be confirmed live on the board, since the done-gate is browser-checkable only.",
+      "spec_docs": [],
+      "task_ids": [],
+      "repo": "ol-work",
+      "created": "2026-06-19",
+      "deferred_reason": null,
+      "proposed_by": "closeout",
+      "proposed_at": "2026-06-19T19:46:22.109992+00:00"
+    },
+    {
+      "id": "this-phase-was-the-first-live-trial-of-the-build-completion-closeout-so-confirm-live-that-the-building-to-done-flip-the-card-closeout-the-completion-message-and-any-suggested-follow-ups-all-actually-fired",
+      "name": "This phase was the first live trial of the build-completion closeout, so confirm live that the Building-to-Done flip, the card closeout, the completion message, and any suggested follow-ups all actually fired.",
+      "phase": "proposed",
+      "brief": "Loose end from the \"Pipeline empty-state hint\" closeout: This phase was the first live trial of the build-completion closeout, so confirm live that the Building-to-Done flip, the card closeout, the completion message, and any suggested follow-ups all actually fired.",
+      "spec_docs": [],
+      "task_ids": [],
+      "repo": "ol-work",
+      "created": "2026-06-19",
+      "deferred_reason": null,
+      "proposed_by": "closeout",
+      "proposed_at": "2026-06-19T19:46:22.110884+00:00"
     }
   ]
 }
