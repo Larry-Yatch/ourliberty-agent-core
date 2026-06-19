@@ -4231,6 +4231,19 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "the-full-browser-done-gate-live-status-rollup-stuck-badge-click-through-graceful-degrade-no-new-ping-and-the-p4-enriched-completion-dm-still-needs-to-be-confirmed-live-on-the-board-since-it-couldn-t-run-from-the-build-sandbox",
+      "name": "The full browser done-gate \u2014 live status, rollup, stuck badge, click-through, graceful degrade, no-new-ping, and the P4 enriched completion DM \u2014 still needs to be confirmed live on the board, since it couldn't run from the build sandbox.",
+      "phase": "proposed",
+      "brief": "Loose end from the \"P5 \u2014 DAG status on cards\" closeout: The full browser done-gate \u2014 live status, rollup, stuck badge, click-through, graceful degrade, no-new-ping, and the P4 enriched completion DM \u2014 still needs to be confirmed live on the board, since it couldn't run from the build sandbox.",
+      "spec_docs": [],
+      "task_ids": [],
+      "repo": "ourliberty-dashboard",
+      "created": "2026-06-19",
+      "deferred_reason": null,
+      "proposed_by": "closeout",
+      "proposed_at": "2026-06-19T23:24:43.868826+00:00"
     }
   ]
 }
