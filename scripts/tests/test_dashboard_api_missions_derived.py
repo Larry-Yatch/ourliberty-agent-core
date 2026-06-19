@@ -266,6 +266,32 @@ class OrphanFilteringTest(_DerivedTestBase):
         ts = [o['last_event_ts'] for o in self._derive()['orphans']]
         self.assertEqual(ts, sorted(ts, reverse=True))
 
+    def test_non_buildable_orphan_excluded_from_surfaced_orphans(self) -> None:
+        # § 4.8: the surfaced orphans[] is narrowed to buildable initiatives by
+        # is_proposable_initiative. desktop-ab12cd34 survives detect_orphans (it is
+        # not infrastructure) but is a pure desktop-capture hash → not a buildable
+        # mission → it must NOT appear in orphans[], while genuine buildable orphans
+        # stay. This view-level gate does not change detect_orphans (autoregister).
+        ids = {o['task_id'] for o in self._derive()['orphans']}
+        self.assertNotIn('desktop-ab12cd34', ids)
+        self.assertTrue(
+            da.is_proposable_initiative('orphan-stalled-old', 'forge'))
+        self.assertFalse(
+            da.is_proposable_initiative('desktop-ab12cd34', 'desktop-claude'))
+        for buildable in (
+            'orphan-stalled-old', 'orphan-building-now', 'orphan-inreview-now',
+        ):
+            self.assertIn(buildable, ids)
+
+    def test_non_buildable_orphan_excluded_from_funnel_secondary(self) -> None:
+        # The same § 4.8 gate flows through to funnel.secondary (built off the
+        # filtered orphans[]): the noise id is gone, a buildable one stays.
+        secondary_refs = {
+            i['ref'] for i in self._derive()['funnel']['secondary']
+        }
+        self.assertNotIn('desktop-ab12cd34', secondary_refs)
+        self.assertIn('orphan-stalled-old', secondary_refs)
+
 
 # ---------- ?repo= / ?task_id= filters (§ 3.2) ----------
 
@@ -1138,8 +1164,10 @@ class FunnelDeriveTest(_DerivedTestBase):
     def test_live_orphans_are_secondary(self) -> None:
         secondary = self._derive()['funnel']['secondary']
         refs = {i['ref'] for i in secondary}
+        # § 4.8: desktop-ab12cd34 (a pure desktop-capture hash) is non-buildable
+        # noise → filtered from orphans[] upstream, so it never reaches secondary.
         self.assertEqual(refs, {
-            'orphan-inreview-now', 'desktop-ab12cd34', 'desktop-blobrepo01',
+            'orphan-inreview-now', 'desktop-blobrepo01',
             'desktop-blobonly01', 'orphan-building-now', 'orphan-stalled-old',
         })
         self.assertTrue(all(i['kind'] == 'orphan' for i in secondary))
