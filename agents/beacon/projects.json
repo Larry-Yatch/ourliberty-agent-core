@@ -93,12 +93,29 @@
           "id": "pipeline-empty-state-hint",
           "title": "Pipeline empty-state hint",
           "desired_end_state": "When 'Actively working' is empty, show a quiet one-line hint instead of self-hiding. GUINEA-PIG for the first live P4 closeout dogfood \u2014 promote this through the board to Launch. Spec: agents/beacon/specs/projects-v3-pipeline-empty-state.md (repo ourliberty-dashboard).",
-          "lifecycle_state": "spec",
+          "lifecycle_state": "done",
           "order": 0,
           "spec_ref": "agents/beacon/specs/projects-v3-pipeline-empty-state.md",
-          "sequence_ref": null,
+          "sequence_ref": "launch-pipeline-empty-state-hint",
           "created_at": "2026-06-19T11:45:50.126613+00:00",
-          "updated_at": "2026-06-19T11:47:11.130945+00:00"
+          "updated_at": "2026-06-19T19:46:06.012965+00:00",
+          "closeout": {
+            "summary": "The projects board now greets an empty 'Actively working' area with a quiet one-line nudge telling people how to start, instead of showing nothing. This was also our first real test of the automatic phase-closeout, so the next phase can lean on that closeout flow with more confidence.",
+            "shipped": "When no projects are active, the board shows the 'Actively working' heading plus a single faint line: 'Nothing here yet \u2014 Promote an item from the funnel to start a project.' When projects are active, the board looks exactly as it did before. Delivered in PR #66.",
+            "changed_vs_spec": "It matched the plan \u2014 a subtle, single muted line with no new buttons, cards, or colors, and the populated view left untouched. One caveat: the automated tests couldn't be run in the build environment, so the test pass was left to be confirmed in CI.",
+            "learnings": "This phase was deliberately small and easily reversible so it could prove out the build-to-done closeout process before a bigger feature relies on it. The live board checks \u2014 empty-state hint, unchanged populated view, and the completion handoff \u2014 still need a real eyes-on confirmation since they can't be verified automatically.",
+            "cost": "One PR of build work.",
+            "done_gate_met": true
+          },
+          "closeout_provenance": {
+            "by": "beacon",
+            "model": "claude-opus-4-8",
+            "at": "2026-06-19T19:45:50.472623+00:00",
+            "from_state": "done",
+            "pr_numbers": [
+              "66"
+            ]
+          }
         }
       ],
       "one_off": true,
