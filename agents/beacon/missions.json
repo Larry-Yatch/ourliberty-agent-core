@@ -390,7 +390,12 @@
         "at": "2026-06-17T06:00:01.633456+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-19T18:51:41.723924+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#447"
     },
     {
       "id": "proposed-desktop-7807b99c",
@@ -505,7 +510,11 @@
         "at": "2026-06-17T06:00:01.633456+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-19T18:51:41.723924+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-rotation-mode",
@@ -567,7 +576,12 @@
         "at": "2026-06-17T06:00:01.633456+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-19T18:51:41.723924+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#450"
     },
     {
       "id": "proposed-transcript-not-persisted:tier1",
@@ -703,7 +717,11 @@
         "at": "2026-06-17T06:00:01.633456+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-19T18:51:41.723924+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-dag-preflight-park-the-nudge",
@@ -734,7 +752,11 @@
         "at": "2026-06-17T06:00:01.633456+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-19T18:51:41.723924+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-rekick-reaper-fix-20260610",
@@ -860,7 +882,12 @@
         "at": "2026-06-17T06:10:10.187179+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-19T18:51:41.723924+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#420"
     },
     {
       "id": "proposed-p2-derive-endpoint",
@@ -891,7 +918,12 @@
         "at": "2026-06-17T06:10:10.187179+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-19T18:51:41.723924+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#418"
     },
     {
       "id": "proposed-dag-preflight-revision-autonomy-001",
@@ -922,7 +954,11 @@
         "at": "2026-06-17T06:10:10.187179+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-19T18:51:41.723924+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-seq-missions-v2-phase2-step-p2-digest-generator",
@@ -995,7 +1031,11 @@
         "at": "2026-06-17T06:10:10.187179+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-19T18:51:41.723924+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-unreg-approval-8ba8e3b472a8",
@@ -1362,7 +1402,12 @@
         "at": "2026-06-17T06:10:10.187179+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-19T18:51:41.723924+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#412"
     },
     {
       "id": "proposed-desktop-bc57cca6",
@@ -1603,7 +1648,11 @@
         "at": "2026-06-17T06:10:10.187179+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-19T18:51:41.723924+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-desktop-64c6ad47",
@@ -2387,7 +2436,11 @@
         "at": "2026-06-17T06:20:16.057578+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-19T18:51:41.723924+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-test-isolation-v3",
@@ -2584,7 +2637,12 @@
         "at": "2026-06-17T06:30:16.494096+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-19T18:51:41.723924+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#13"
     },
     {
       "id": "proposed-build-sequence-orchestrator-pr-s3a-droplet-api-endpoint",
@@ -2948,7 +3006,11 @@
         "at": "2026-06-17T06:40:20.347632+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-19T18:51:41.723924+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-failure:commit-failed",
@@ -3229,7 +3291,12 @@
         "at": "2026-06-17T06:50:47.007169+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-19T18:51:41.723924+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#444"
     },
     {
       "id": "proposed-wire-pulse-check-iv-cadence-001",
@@ -3459,7 +3526,11 @@
         "at": "2026-06-17T06:50:47.007169+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-19T18:51:41.723924+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-larry-approval-45a1464c4cea2a71e1291bd5b6e96830c5175f12",
@@ -3490,7 +3561,11 @@
         "at": "2026-06-17T06:50:47.007169+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-19T18:51:41.723924+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-autoregister-warn-demote-optA-001",
@@ -3702,7 +3777,11 @@
         "at": "2026-06-17T06:50:47.007169+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-19T18:51:41.723924+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-p2-actions",
@@ -3775,7 +3854,12 @@
         "at": "2026-06-17T07:01:05.782109+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-19T18:51:41.723924+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#59"
     },
     {
       "id": "proposed-fix-retention-watermark-inline-reset-001",
@@ -3872,7 +3956,11 @@
         "at": "2026-06-18T14:39:10.374825+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-19T18:51:41.723924+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-p3f2-promote-lands-proposed",
@@ -3938,7 +4026,11 @@
         "at": "2026-06-18T15:29:39.795842+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-19T18:51:41.723924+00:00",
+      "retired_reason": "filter-non-buildable"
     },
     {
       "id": "proposed-p3f2-archive-honest",
@@ -4039,7 +4131,12 @@
         "at": "2026-06-18T16:40:19.904560+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-19T18:51:41.723924+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#442"
     },
     {
       "id": "pipeline-empty-state-hint",
