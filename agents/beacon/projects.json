@@ -81,6 +81,33 @@
         "kind": "capture",
         "capture_id": "cap-orphan-lane-show-state-collapse-terminal-orphans-aa37"
       }
+    },
+    {
+      "id": "pipeline-empty-state-hint",
+      "title": "Pipeline empty-state hint",
+      "north_star_ref": null,
+      "repo": "ol-work",
+      "state": "active",
+      "phases": [
+        {
+          "id": "pipeline-empty-state-hint",
+          "title": "Pipeline empty-state hint",
+          "desired_end_state": "When 'Actively working' is empty, show a quiet one-line hint instead of self-hiding. GUINEA-PIG for the first live P4 closeout dogfood \u2014 promote this through the board to Launch. Spec: agents/beacon/specs/projects-v3-pipeline-empty-state.md (repo ourliberty-dashboard).",
+          "lifecycle_state": "spec",
+          "order": 0,
+          "spec_ref": "agents/beacon/specs/projects-v3-pipeline-empty-state.md",
+          "sequence_ref": null,
+          "created_at": "2026-06-19T11:45:50.126613+00:00",
+          "updated_at": "2026-06-19T11:47:11.130945+00:00"
+        }
+      ],
+      "one_off": true,
+      "created_at": "2026-06-19T11:45:50.126613+00:00",
+      "updated_at": "2026-06-19T11:45:50.126613+00:00",
+      "promoted_from": {
+        "kind": "capture",
+        "capture_id": "cap-pipeline-empty-state-hint-a62a"
+      }
     }
   ]
 }
