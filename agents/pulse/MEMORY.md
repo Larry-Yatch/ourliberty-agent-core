@@ -132,6 +132,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-19 03:25Z UTC (Iter ~2250, Tier 1, consecutive_clean=2, NOMINAL ✅ — 2nd consecutive clean, 0 open PRs, all daemons alive)
+
+**Iter ~2250 summary:** ✅ Nominal. All checks clean. PRs #579, #582, #583 (p3f2-promote, p3f2-archive, p4-closeout-author) and dashboard #64, #65 all MERGED (confirmed this iter). 0 open PRs on both repos. All 5 daemons alive — beacon 3734671 (2d+), chain-event 3734305 (2d+), inbox-watcher 3434697 (~70h+), outbox_notifier 217608 (~3.8h), dashboard_api 218007 (~3.8h). Repo HEAD=f799d3ef=origin/main (clean, untracked trim_memory.py). Last sync 02:33:15Z (~52 min). 0 alerts. 0 stalls. pending=0. Credential rotation OK. Heartbeat 03:06:19Z (~19 min, fresh). Check I deduped (Fri gate). §5.0 all no-ops. PR #576 verification window closes 2026-06-19T13:35Z (~10.2h remaining, fix holding). G-rule ledger/check-i at 2/3. PRIME ratio≈20.1 (1046/52, trend=improving). **Tier 1, consecutive_clean=2 — de-escalation ladder at 2/3.**
+
 ## Status snapshot — updated 2026-06-19 03:18Z UTC (Iter ~2249, Tier 1, consecutive_clean=1, NOMINAL ✅ — PR #584 merged, all clear)
 
 **Iter ~2249 summary:** ✅ Nominal. PR #584 (`fix-p4-closeout-outputs-revisions-001`) auto-merged at 03:14Z (Mirror REVIEW_PASS, branch deleted). All 5 daemons alive — beacon 3734671 (2d+), chain-event 3734305 (2d+), inbox-watcher 3434697 (~70h), outbox_notifier 217608 (~3.7h), dashboard_api 218007 (~3.7h). Repo HEAD=a530790f=origin/main (clean, untracked trim_memory.py). Last sync 02:33:15Z (~45 min). 0 open PRs agent-core and dashboard. 0 stalls. pending=0. Credential rotation OK. Heartbeat 03:06:19Z (~12 min, fresh). Check I deduped (Fri gate). §5.0 all no-ops. L934 triaged Tier-3 (review-pass/auto-merge). PR #576 verification window closes 2026-06-19T13:35Z (~10.3h remaining, fix holding). G-rule ledger/check-i at 2/3. PRIME ratio≈20.1 (1046/52, trend=improving). **Tier 1, consecutive_clean=1 — system nominal, de-escalation ladder started.**
