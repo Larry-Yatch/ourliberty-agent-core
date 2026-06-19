@@ -179,6 +179,29 @@
         "kind": "mission",
         "mission_id": "rate-limit-resilience"
       }
+    },
+    {
+      "id": "mission-action-pr-label-capitalize",
+      "title": "Capitalize the mission-action PR-open label",
+      "north_star_ref": null,
+      "repo": "ourliberty-dashboard",
+      "state": "active",
+      "phases": [
+        {
+          "id": "mission-action-pr-label-capitalize",
+          "title": "Capitalize the mission-action PR-open label",
+          "desired_end_state": "On the Missions board, when an action (Defer/Resume/Reprioritize) has an open PR, the status line shows the action capitalized ('Defer PR open') instead of lowercase. One-line dashboard papercut \u2014 the vehicle for the live P3/P4 board-Launch dogfood.",
+          "lifecycle_state": "spec",
+          "order": 0,
+          "spec_ref": "agents/beacon/specs/dashboard-mission-action-pr-label-capitalize.md",
+          "sequence_ref": null,
+          "created_at": "2026-06-19T22:52:26.004507+00:00",
+          "updated_at": "2026-06-19T22:52:26.004507+00:00"
+        }
+      ],
+      "one_off": true,
+      "created_at": "2026-06-19T22:52:26.004507+00:00",
+      "updated_at": "2026-06-19T22:52:26.004507+00:00"
     }
   ]
 }
