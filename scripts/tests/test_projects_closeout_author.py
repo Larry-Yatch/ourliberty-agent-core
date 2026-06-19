@@ -381,5 +381,41 @@ class WriteNorthStarTickTests(unittest.TestCase):
         self.assertFalse(author.write_north_star_tick(None, project, phase))
 
 
+# --------------------------------------------------------------------------- #
+# phase resolution — sequence_ref primary, launch-drain audit fallback. The
+# closeout must resolve its phase even when the building-stamp never persisted
+# the sequence_ref (the 2026-06-19 EROFS failure).
+# --------------------------------------------------------------------------- #
+class NarratorFindPhaseTests(unittest.TestCase):
+    def _seq(self, *, seq_id='launch-ph1', project_id='p1', phase_id='ph1',
+             with_audit=True):
+        audit = ([{'event': 'authored-by-launch-drain',
+                   'project_id': project_id, 'phase_id': phase_id}]
+                 if with_audit else [{'event': 'step-dispatched'}])
+        return {'seq_id': seq_id, 'audit_log': audit}
+
+    def test_resolves_by_sequence_ref(self):
+        reg = _registry(_project('p1', [
+            _phase('ph1', state='building', sequence_ref='launch-ph1')]))
+        # No audit entry needed — the pinned ref wins.
+        project, phase = author.narrator_find_phase(
+            reg, self._seq(with_audit=False))
+        self.assertEqual((project['id'], phase['id']), ('p1', 'ph1'))
+
+    def test_audit_fallback_when_sequence_ref_absent(self):
+        # sequence_ref never persisted (EROFS) → resolve by the launch-drain ids.
+        reg = _registry(_project('p1', [
+            _phase('ph1', state='done', sequence_ref=None)]))
+        project, phase = author.narrator_find_phase(reg, self._seq())
+        self.assertEqual((project['id'], phase['id']), ('p1', 'ph1'))
+
+    def test_non_launch_sequence_returns_none(self):
+        reg = _registry(_project('p1', [_phase('ph1', state='spec')]))
+        self.assertEqual(
+            (None, None),
+            author.narrator_find_phase(
+                reg, {'seq_id': 'feat-1', 'audit_log': [{'event': 'x'}]}))
+
+
 if __name__ == '__main__':
     unittest.main()

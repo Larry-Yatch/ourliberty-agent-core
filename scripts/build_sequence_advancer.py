@@ -140,6 +140,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 import build_sequence_validator as bsv  # noqa: E402
 import projects_status_writeback as psw  # noqa: E402 — phase status writeback (p3f)
+import projects_store  # noqa: E402 — shared launch-sequence id resolution (p3f)
 import task_terminal_state as tts  # noqa: E402 — shared terminal-state probe kernel
 from id_match import id_matches  # noqa: E402
 
@@ -533,12 +534,10 @@ def _launch_sequence_project_id(seq: dict[str, Any]) -> Optional[str]:
     """The project id a ``launch-<phase_id>`` sequence was authored for, read
     from the ``authored-by-launch-drain`` audit entry the drain wrote (it
     carries ``phase_id`` + ``project_id``). None if absent (e.g. an ordinary
-    sequence, or one not authored by the launch drain)."""
-    for entry in seq.get('audit_log') or []:
-        if isinstance(entry, dict) and entry.get('event') == 'authored-by-launch-drain':
-            pid = entry.get('project_id')
-            return pid if isinstance(pid, str) and pid else None
-    return None
+    sequence, or one not authored by the launch drain). Delegates to the shared
+    ``projects_store.launch_ids_from_sequence`` so the audit-entry parsing lives
+    in exactly one place (the same source the done-stamp + closeout use)."""
+    return projects_store.launch_ids_from_sequence(seq)[0]
 
 
 def _maybe_stamp_phase_building(seq: dict[str, Any], step_id: str) -> None:

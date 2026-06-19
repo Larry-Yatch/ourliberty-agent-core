@@ -5770,21 +5770,26 @@ def _emit_sequence_complete_chain_event(seq: dict[str, Any]) -> None:
         )
 
 
-def _stamp_phase_done_for_sequence(seq_id: str) -> None:
-    """p3f-status-writeback: stamp the phase whose ``sequence_ref == seq_id`` to
-    ``done`` (the board reflects reality once the build sequence completes). The
-    writer is a NON-committer (heal_projects_store commits) and is itself
-    idempotent + fail-safe; this wrapper adds a daemon-never-wedge guard and a
-    one-line log on a real transition. A non-launch sequence (no matching phase)
-    is a silent no-op."""
+def _stamp_phase_done_for_sequence(seq: dict) -> None:
+    """p3f-status-writeback: stamp the just-completed build sequence's phase to
+    ``done`` (the board reflects reality once the build sequence completes).
+
+    Passes the whole sequence dict to ``stamp_done``, which resolves the phase via
+    the shared ``sequence_ref``-then-``authored-by-launch-drain``-audit-ids policy
+    — so the done-stamp lands even if the building-stamp never persisted the
+    ``sequence_ref`` (e.g. an EROFS write failure in the advancer) — and pins the
+    ref when missing so the downstream closeout resolves too. The writer is a
+    NON-committer (heal_projects_store commits), idempotent + fail-safe; this
+    wrapper adds a daemon-never-wedge guard. A non-launch sequence (no matching
+    phase) is a silent no-op."""
     try:
         import projects_status_writeback as psw  # local import: optional dep
-        if psw.stamp_done(seq_id=seq_id):
-            log(f'phase status: stamped done for sequence_ref={seq_id}')
+        if psw.stamp_done(seq=seq):
+            log(f'phase status: stamped done for seq={seq.get("seq_id")}')
     except Exception as e:  # noqa: BLE001 — daemon-never-wedge
         log(
-            f'phase done-stamp for seq={seq_id} raised '
-            f'{type(e).__name__}: {e}; swallowing',
+            f'phase done-stamp for seq={seq.get("seq_id") if isinstance(seq, dict) else seq} '
+            f'raised {type(e).__name__}: {e}; swallowing',
             'WARN',
         )
 
@@ -5878,11 +5883,12 @@ def _maybe_signal_sequence_complete(seq_id: str) -> None:
             seq, propose_gated=_propose_gated_finish_step,
         )
         # p3f-status-writeback: SEQUENCE_COMPLETE is the phase's done event.
-        # Stamp the phase whose sequence_ref == seq_id to `done` on disk
-        # (non-committer; heal_projects_store commits). Idempotent (done->done
-        # no-op), event-driven, fail-safe — a non-launch sequence has no
-        # matching phase and this is a logged no-op.
-        _stamp_phase_done_for_sequence(seq_id)
+        # Stamp the phase to `done` on disk (non-committer; heal_projects_store
+        # commits), resolving it by the launch-drain audit ids on `seq` (robust
+        # to a never-persisted sequence_ref). Idempotent (done->done no-op),
+        # event-driven, fail-safe — a non-launch sequence has no matching phase
+        # and this is a logged no-op.
+        _stamp_phase_done_for_sequence(seq)
         # p4-closeout-author + p4-closeout-outputs: the just-done phase authors
         # its own closeout onto the card + ticks the North Star tracker, and
         # returns the OUTPUTS the completion DM renders (summary + next-phase

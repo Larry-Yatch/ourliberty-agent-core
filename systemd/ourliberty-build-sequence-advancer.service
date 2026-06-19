@@ -26,7 +26,14 @@ TimeoutStartSec=120
 Nice=10
 # Hardening (matches existing ourliberty-chain-event-shipper.service pattern).
 ProtectHome=read-only
-ReadWritePaths=/home/larry/agents/blackboard /home/larry/agents/logs /home/larry/agents/state /home/larry/agents/inboxes /home/larry/credentials
+# /home/larry/agent-core is REQUIRED: the advancer is a projects.json non-committer
+# — on a launch dispatch it calls projects_status_writeback.stamp_building to flip
+# the phase to `building` (p3f-status-writeback), an atomic write into
+# agent-core/agents/beacon/projects.json. Without this carve-out that write hit
+# `OSError [Errno 30] Read-only file system` and the building-stamp silently never
+# persisted (the 2026-06-19 dogfood failure). The committer (heal-projects-store)
+# and outbox-notifier units already carry the same carve-out.
+ReadWritePaths=/home/larry/agents/blackboard /home/larry/agents/logs /home/larry/agents/state /home/larry/agents/inboxes /home/larry/credentials /home/larry/agent-core
 NoNewPrivileges=true
 ProtectSystem=strict
 PrivateTmp=true

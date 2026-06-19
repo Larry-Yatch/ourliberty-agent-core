@@ -11,7 +11,10 @@ Wiring (event-driven, NEVER clock-based):
   * ``build_sequence_advancer`` calls ``stamp_building`` the moment it dispatches
     the first step of a ``launch-<phase_id>`` sequence.
   * ``outbox_notifier`` calls ``stamp_done`` inside the one-time
-    SEQUENCE_COMPLETE signal, matching the phase by ``sequence_ref``.
+    SEQUENCE_COMPLETE signal, passing the sequence dict; resolution is the shared
+    ``projects_store.resolve_phase_for_sequence`` (``sequence_ref`` then the
+    ``authored-by-launch-drain`` audit ids) — so a done-stamp lands even when the
+    building-stamp never persisted the ``sequence_ref``.
 
 Single-committer invariant (spec § 4): this writer mutates
 ``agents/beacon/projects.json`` ON DISK only — atomic (tmp + ``os.replace``)
@@ -30,6 +33,7 @@ stdlib only.
 """
 from __future__ import annotations
 
+import errno
 import json
 import os
 import sys
@@ -136,6 +140,19 @@ def _apply(
                 return False
             _atomic_write(path, registry)
             return True
+    except OSError as e:
+        # A read-only / full FS is the failure that silently broke p3f live: the
+        # advancer's systemd sandbox omitted agent-core from ReadWritePaths, so
+        # this write raised EROFS (errno 30) and the phase never flipped to
+        # `building`. Log it LOUDLY and distinctly (not a generic "raised") so a
+        # recurrence is unmistakable in projects-store.log — but still swallow: a
+        # stamp must never wedge the advancer / notifier. EROFS specifically
+        # points at the caller unit's ReadWritePaths.
+        hint = (" — likely the caller unit's ReadWritePaths is missing the "
+                "projects.json dir") if e.errno == errno.EROFS else ''
+        _log(f'WRITE FAILED ({type(e).__name__}: {e}) — phase status NOT '
+             f'persisted{hint}; swallowing')
+        return False
     except Exception as e:  # noqa: BLE001 — a stamp must never wedge its caller
         _log(f'status writeback raised {type(e).__name__}: {e}; swallowing')
         return False
@@ -149,7 +166,12 @@ def stamp_building(
     ``sequence_ref`` to ``seq_id``, on disk (non-committer). Returns True iff a
     write happened. Idempotent (a re-dispatch of the same launch is a no-op) and
     fail-safe (a missing phase is a logged no-op). Event-driven: invoked on the
-    launch dispatch event."""
+    launch dispatch event.
+
+    The success log fires ONLY after the write actually persists (it is gated on
+    ``_apply``'s return, NOT emitted inside the mutator) — the old code logged
+    "stamped building" from inside the mutator, BEFORE the atomic write, so an
+    EROFS write failure printed a false success (the 2026-06-19 dogfood trap)."""
     def _mut(registry: dict[str, Any]) -> bool:
         _, phase = projects_store.find_phase(registry, project_id, phase_id)
         if phase is None:
@@ -158,12 +180,12 @@ def stamp_building(
                 f'(seq={seq_id!r}) — no-op'
             )
             return False
-        changed = projects_store.stamp_phase_building(phase, seq_id, now=now)
-        if changed:
-            _log(f'stamped building: {project_id}/{phase_id} sequence_ref={seq_id}')
-        return changed
+        return projects_store.stamp_phase_building(phase, seq_id, now=now)
 
-    return _apply(_mut, now=now)
+    wrote = _apply(_mut, now=now)
+    if wrote:
+        _log(f'stamped building: {project_id}/{phase_id} sequence_ref={seq_id}')
+    return wrote
 
 
 def attach_closeout(
@@ -179,35 +201,59 @@ def attach_closeout(
     logged no-op). Event-driven: invoked on the SEQUENCE_COMPLETE event, right
     after the done-stamp. The decision logic (idempotency, shape) lives in the
     pure ``projects_store.attach_phase_closeout``; this only adds the IO."""
+    attached_id: dict[str, Any] = {}
+
     def _mut(registry: dict[str, Any]) -> bool:
         _, phase = projects_store.find_phase_by_sequence_ref(registry, seq_id)
         if phase is None:
             _log(f'closeout attach: no phase with sequence_ref={seq_id!r} — no-op')
             return False
-        changed = projects_store.attach_phase_closeout(
-            phase, closeout_fields, now=now)
-        if changed:
-            _log(f'attached closeout: sequence_ref={seq_id} phase={phase.get("id")}')
-        return changed
+        attached_id['id'] = phase.get('id')
+        return projects_store.attach_phase_closeout(phase, closeout_fields, now=now)
 
-    return _apply(_mut, now=now)
+    wrote = _apply(_mut, now=now)
+    if wrote:
+        _log(f'attached closeout: sequence_ref={seq_id} phase={attached_id.get("id")}')
+    return wrote
 
 
-def stamp_done(*, seq_id: str, now: Optional[datetime] = None) -> bool:
-    """Stamp the phase whose ``sequence_ref == seq_id`` to ``done``, on disk
-    (non-committer). Returns True iff a write happened. Idempotent
-    (``done``→``done`` no-op — the double-SEQUENCE_COMPLETE guard) and fail-safe
-    (a sequence with no matching phase — e.g. a non-launch build sequence — is a
-    logged no-op). Event-driven: invoked on the SEQUENCE_COMPLETE event."""
+def stamp_done(*, seq: dict[str, Any], now: Optional[datetime] = None) -> bool:
+    """Stamp the completing sequence's phase to ``done``, on disk (non-committer).
+    Returns True iff a write happened. Takes the whole sequence dict so its phase
+    resolution does NOT depend on the building-stamp having persisted
+    ``sequence_ref`` (that write can fail — e.g. EROFS — and leave the phase at
+    ``spec``/``sequence_ref=None``, the 2026-06-19 dogfood failure).
+
+    Resolution is the SINGLE shared policy ``projects_store.resolve_phase_for_
+    sequence`` (``sequence_ref`` first, then the launch-drain audit ids) — the
+    SAME policy the P4 closeout uses, so the done-stamp and the closeout always
+    pick the same phase. On a hit it also PINS ``sequence_ref`` when the phase is
+    missing it (``pin_phase_sequence_ref``), so the closeout's ``sequence_ref``
+    lookup and the card's ref field are correct.
+
+    Idempotent (``done``→``done`` with the ref already pinned is a no-op — the
+    double-SEQUENCE_COMPLETE guard) and fail-safe (a non-launch sequence with no
+    matching phase is a logged no-op). Event-driven: invoked on SEQUENCE_COMPLETE."""
+    seq_id = seq.get('seq_id') if isinstance(seq, dict) else None
+    done_id: dict[str, Any] = {}
+
     def _mut(registry: dict[str, Any]) -> bool:
-        _, phase = projects_store.find_phase_by_sequence_ref(registry, seq_id)
+        _, phase = projects_store.resolve_phase_for_sequence(registry, seq)
         if phase is None:
             # Common + expected for ordinary (non-launch) build sequences.
-            _log(f'done stamp: no phase with sequence_ref={seq_id!r} — no-op')
+            _log(f'done stamp: no phase for seq={seq_id!r} — no-op')
             return False
+        done_id['id'] = phase.get('id')
+        # Stamp done, then repair the closeout linkage by pinning the ref when
+        # missing (a phase resolved by audit id may lack it). Two independent
+        # mutations → OR their changed flags.
         changed = projects_store.stamp_phase_done(phase, now=now)
-        if changed:
-            _log(f'stamped done: sequence_ref={seq_id} phase={phase.get("id")}')
+        if seq_id:
+            changed = projects_store.pin_phase_sequence_ref(
+                phase, seq_id, now=now) or changed
         return changed
 
-    return _apply(_mut, now=now)
+    wrote = _apply(_mut, now=now)
+    if wrote:
+        _log(f'stamped done: seq={seq_id} phase={done_id.get("id")}')
+    return wrote
