@@ -434,31 +434,12 @@ def generate_closeout_analysis_voice(prompt: str) -> Optional[dict[str, Any]]:
     """One claude round-trip for the follow-ups + divergence analysis. Returns the
     parsed JSON object, or None on ANY failure (timeout, non-zero exit, no JSON)
     so the caller falls through to the deterministic empty analysis. Never raises.
-    Mirrors `narrator.generate_briefing_voice` but tolerates non-string values
-    (the analysis carries a list + booleans, not a flat prose dict)."""
-    refuse_under_test('claude-spawn')
-    try:
-        proc = subprocess.run(
-            ['claude', '--print', '--model', CLOSEOUT_MODEL,
-             '--output-format', 'json', prompt],
-            capture_output=True, text=True,
-            timeout=narrator.CLAUDE_TIMEOUT_SEC, check=False,
-        )
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
-        _log(f'analysis claude invocation failed: {type(e).__name__}: {e}')
-        return None
-    if proc.returncode != 0:
-        _log(f'analysis claude exited {proc.returncode}; using empty analysis')
-        return None
-    try:
-        envelope = json.loads(proc.stdout or '{}')
-    except json.JSONDecodeError:
-        return None
-    text = (envelope.get('result') or '').strip() if isinstance(
-        envelope, dict) else ''
-    if not text:
-        return None
-    parsed = narrator.parse_briefing_json(text)
+    Reuses the Narrator's guarded claude round-trip (the single allowlisted
+    ``claude`` sink) rather than spawning the CLI here; the analysis tolerates
+    non-string values (it carries a follow-ups list + booleans, not a flat prose
+    dict), which is why it takes the raw parsed dict instead of
+    ``generate_briefing_voice``'s flat-string-key result."""
+    parsed = narrator.claude_json_roundtrip(prompt, model=CLOSEOUT_MODEL)
     return parsed if isinstance(parsed, dict) else None
 
 
