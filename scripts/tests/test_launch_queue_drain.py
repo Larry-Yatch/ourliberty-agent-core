@@ -305,6 +305,72 @@ class DeadLetterTest(_DrainTestBase):
         self.assertEqual(len(remaining), 3)
 
 
+# ==================== author-time target_repo guard ====================
+
+
+class TargetRepoGuardTest(_DrainTestBase):
+    """The launch-drain validates the entry's `repo` against Forge's
+    allowed_repos at AUTHOR time (config/agent-models.json via
+    routing_validator), so a non-allowed value fails here — not at dispatch as
+    an opaque RoutingDenied that strands the build (the 'ol-work' incident,
+    2026-06-19)."""
+
+    def test_canonical_repo_authors_fine(self):
+        self._queue(_entry('canon', project_id='canon',
+                           repo='ourliberty-dashboard'))
+        result = self._drain()
+        self.assertEqual(result.launched, ['canon'])
+        self.assertEqual(result.dead_lettered, [])
+        seq = self._read_seq('canon')
+        self.assertEqual(seq['steps'][0]['target_repo'], 'ourliberty-dashboard')
+
+    def test_short_form_alias_maps_to_canonical(self):
+        # `dashboard` is the bare short form of the canonical `ourliberty-
+        # dashboard` — it normalizes to the canonical name (the alias can only
+        # ever resolve onto an already-allowed repo).
+        self._queue(_entry('aliased', project_id='aliased', repo='dashboard'))
+        result = self._drain()
+        self.assertEqual(result.launched, ['aliased'])
+        self.assertEqual(result.dead_lettered, [])
+        seq = self._read_seq('aliased')
+        self.assertEqual(seq['steps'][0]['target_repo'], 'ourliberty-dashboard')
+
+    def test_unknown_repo_rejected_at_author_time_with_alert(self):
+        # 'ol-work' is a one-off bad value with no alias scheme — it must be
+        # rejected at author time: dead-lettered (no sequence authored, no
+        # Mirror dispatch) AND surfaced to Larry naming the phase + bad repo.
+        with mock.patch.object(lqd.larry_alerts, 'append_alert') as alert:
+            qpath = self._queue(
+                _entry('badrepo', project_id='badrepo', repo='ol-work'))
+            result = self._drain()
+
+        self.assertEqual(result.dead_lettered, ['badrepo.json'])
+        self.assertEqual(result.launched, [])
+        # No doomed sequence authored; no Mirror dispatch (no dispatch-time
+        # RoutingDenied possible).
+        self.assertFalse(self._seq_path('badrepo').exists())
+        self.assertEqual(self.recorder.calls, [])
+        # Queue file moved to .failed (dead-letter), not silently left.
+        self.assertFalse(qpath.exists())
+        self.assertTrue((self.queue_dir / '.failed' / 'badrepo.json').exists())
+        # Larry-actionable alert names the phase + the bad repo.
+        self.assertEqual(alert.call_count, 1)
+        kwargs = alert.call_args.kwargs
+        self.assertEqual(kwargs['source'], 'launch-queue-drain')
+        self.assertEqual(kwargs['subject'], 'badrepo')
+        self.assertIn('ol-work', kwargs['message'])
+        self.assertIn('badrepo', kwargs['message'])
+
+    def test_missing_repo_falls_back_to_default_build_repo(self):
+        entry = _entry('norepo', project_id='norepo')
+        del entry['repo']
+        self._queue(entry)
+        result = self._drain()
+        self.assertEqual(result.launched, ['norepo'])
+        seq = self._read_seq('norepo')
+        self.assertEqual(seq['steps'][0]['target_repo'], lqd._DEFAULT_BUILD_REPO)
+
+
 # ==================== non-committer ====================
 
 

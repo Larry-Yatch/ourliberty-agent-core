@@ -62,6 +62,8 @@ from typing import Any, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import build_sequence_validator  # noqa: E402
+import larry_alerts  # noqa: E402
+import routing_validator  # noqa: E402
 import safe_write_inbox  # noqa: E402
 
 logger = logging.getLogger('launch_queue_drain')
@@ -80,8 +82,87 @@ _MIRROR_REVIEW_REPO = 'ourliberty-agent-core'
 _STEP_TASK_TYPE = 'feature-development'
 _DEFAULT_BUILD_REPO = 'ourliberty-agent-core'
 
+# The build step is dispatched Beacon → Forge, so the step's target_repo must
+# fall within Forge's allowed_repos (config/agent-models.json, via
+# routing_validator.allowed_repos_for). We resolve + validate the launch
+# entry's `repo` against this set at AUTHOR time so a non-allowed value fails
+# here (a dead-letter + a Larry-actionable alert) rather than at DISPATCH time
+# as an opaque RoutingDenied that strands the build (the pipeline-empty-state-
+# hint 'ol-work' incident, 2026-06-19).
+_BUILD_AGENT = 'forge'
+_ALERT_SOURCE = 'launch-queue-drain'
+
 # Bound the work per tick so a flood of queue files can't monopolize a tick.
 MAX_PER_TICK = 25
+
+
+class UnknownRepoError(Exception):
+    """The launch entry's resolved `repo` is not an allowed build repo and is
+    not a short-form alias of one. Carries the offending value + the allowed
+    set so the caller can dead-letter with an actionable message."""
+
+    def __init__(self, repo: str, allowed: list[str]):
+        self.repo = repo
+        self.allowed = allowed
+        super().__init__(
+            f'target_repo {repo!r} is not an allowed build repo '
+            f'(allowed: {allowed})'
+        )
+
+
+def _resolve_target_repo(raw_repo: Any) -> str:
+    """Resolve a launch entry's `repo` to a canonical allowed build repo.
+
+    Resolution order:
+
+      1. Empty/None → the default build repo (`ourliberty-agent-core`).
+      2. Already a canonical allowed repo → unchanged.
+      3. A short-form alias (the bare name without the `ourliberty-` prefix,
+         e.g. `dashboard` → `ourliberty-dashboard`) that resolves to an allowed
+         repo → the canonical form. The alias is *derived* from the canonical
+         naming, so it can only ever map onto a repo already in the allow-list —
+         it cannot invent an out-of-list target, and a new `ourliberty-X` repo
+         added to the allow-list gets its `X` short form for free.
+
+    Anything else (e.g. `ol-work`, a bad value with no alias scheme) raises
+    `UnknownRepoError`. Fails OPEN only when Forge has no `allowed_repos`
+    configured — mirroring `routing_validator.check_target_repo`'s back-compat
+    posture so a missing/unreadable config degrades to the pre-guard behavior
+    rather than rejecting every launch."""
+    repo = (str(raw_repo).strip() if raw_repo else '') or _DEFAULT_BUILD_REPO
+    allowed = routing_validator.allowed_repos_for(_BUILD_AGENT)
+    if not allowed:
+        return repo
+    if repo in allowed:
+        return repo
+    candidate = f'ourliberty-{repo}'
+    if candidate in allowed:
+        return candidate
+    raise UnknownRepoError(repo, sorted(allowed))
+
+
+def _alert_unknown_repo(phase_id: str, repo: str, allowed: list[str]) -> None:
+    """Surface an author-time repo rejection to Larry (best-effort). Naming the
+    phase + the bad repo so the fix (correct the phase/project `repo` field in
+    projects.json to a canonical repo) is obvious. Never raises — an alert-queue
+    failure (or the test jail) must not crash the drain."""
+    try:
+        larry_alerts.append_alert(
+            source=_ALERT_SOURCE,
+            severity='warning',
+            message=(
+                f'Launch of phase {phase_id!r} was rejected at author time: its '
+                f'target_repo {repo!r} is not an allowed build repo '
+                f'(allowed: {allowed}). No build was dispatched. Fix the phase/'
+                f'project `repo` field in projects.json to a canonical repo and '
+                f're-launch.'
+            ),
+            subject=phase_id,
+            route='escalate',
+        )
+    except Exception as e:  # noqa: BLE001 — alerting is best-effort
+        logger.warning(
+            'could not emit unknown-repo alert for phase %s: %s', phase_id, e)
 
 
 def _agents_root() -> Path:
@@ -144,7 +225,11 @@ def build_sequence(entry: dict[str, Any], now: Optional[datetime] = None) -> dic
     seq_id = entry.get('seq_id') or f'launch-{phase_id}'
     spec_ref = str(entry.get('spec_ref') or '')
     title = str(entry.get('phase_title') or phase_id)
-    repo = str(entry.get('repo') or _DEFAULT_BUILD_REPO)
+    # Author-time guard: resolve + validate the target_repo against Forge's
+    # allowed_repos. Raises UnknownRepoError for a non-allowed, non-alias value
+    # (caught in _drain_one → dead-letter + alert) so we never author a sequence
+    # that would RoutingDeny at dispatch.
+    repo = _resolve_target_repo(entry.get('repo'))
 
     step = {
         'step_id': phase_id,
@@ -345,7 +430,17 @@ def _drain_one(path: Path, sequences_dir: Path, now: datetime, result: DrainResu
         return
 
     # --- new launch: author → validate → write → dispatch Mirror ---
-    seq = build_sequence(entry, now=now)
+    try:
+        seq = build_sequence(entry, now=now)
+    except UnknownRepoError as e:
+        # Author-time repo rejection: the entry names a non-allowed build repo
+        # (no alias resolves it). Dead-letter the request + alert Larry naming
+        # the phase + bad repo, rather than authoring a doomed sequence that
+        # RoutingDenies at dispatch and strands the build.
+        _dead_letter(path, f'non-allowed target_repo {e.repo!r}: {e}')
+        _alert_unknown_repo(phase_id, e.repo, e.allowed)
+        result.dead_lettered.append(path.name)
+        return
     validation = build_sequence_validator.validate_dag(seq)
     if not validation.valid:
         _dead_letter(path, f'authored sequence failed validate_dag: {validation.errors}')
