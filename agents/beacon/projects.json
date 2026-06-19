@@ -125,6 +125,60 @@
         "kind": "capture",
         "capture_id": "cap-pipeline-empty-state-hint-a62a"
       }
+    },
+    {
+      "id": "pulse-cycle-upgrade",
+      "title": "Pulse Cycle Upgrade (alpha / beta / gamma sequence)",
+      "north_star_ref": null,
+      "repo": "ourliberty-agent-core",
+      "state": "active",
+      "phases": [
+        {
+          "id": "pulse-cycle-upgrade",
+          "title": "Pulse Cycle Upgrade (alpha / beta / gamma sequence)",
+          "desired_end_state": "Four-PR sequence implementing the self-optimizing operational config via Pulse Check pattern (design pass 2026-05-26). alpha-1 + alpha-2 + beta + gamma. Critical-path destination for the chain.",
+          "lifecycle_state": "building",
+          "order": 0,
+          "spec_ref": "agents/beacon/specs/pulse-cycle-upgrade.md",
+          "sequence_ref": "pulse-upgrade-001",
+          "created_at": "2026-06-19T20:17:09.750195+00:00",
+          "updated_at": "2026-06-19T20:17:09.750195+00:00"
+        }
+      ],
+      "one_off": true,
+      "created_at": "2026-06-19T20:17:09.750195+00:00",
+      "updated_at": "2026-06-19T20:17:09.750195+00:00",
+      "promoted_from": {
+        "kind": "mission",
+        "mission_id": "pulse-cycle-upgrade"
+      }
+    },
+    {
+      "id": "rate-limit-resilience",
+      "title": "Rate-limit resilience sequence (001)",
+      "north_star_ref": null,
+      "repo": "ourliberty-agent-core",
+      "state": "active",
+      "phases": [
+        {
+          "id": "rate-limit-resilience",
+          "title": "Rate-limit resilience sequence (001)",
+          "desired_end_state": "Sequence hardening the chain against Anthropic rate-limit windows (the 5h burn-rate gate plus Tier 1/Tier 2 OAuth fallback boundaries).",
+          "lifecycle_state": "building",
+          "order": 0,
+          "spec_ref": null,
+          "sequence_ref": "rate-limit-resilience-001",
+          "created_at": "2026-06-19T20:17:09.750195+00:00",
+          "updated_at": "2026-06-19T20:17:09.750195+00:00"
+        }
+      ],
+      "one_off": true,
+      "created_at": "2026-06-19T20:17:09.750195+00:00",
+      "updated_at": "2026-06-19T20:17:09.750195+00:00",
+      "promoted_from": {
+        "kind": "mission",
+        "mission_id": "rate-limit-resilience"
+      }
     }
   ]
 }
