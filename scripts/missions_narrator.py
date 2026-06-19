@@ -346,20 +346,22 @@ def parse_briefing_json(text: str) -> Optional[dict[str, Any]]:
     return None
 
 
-def generate_briefing_voice(
-    prompt: str, *, keys: tuple[str, ...] = ('what', 'why', 'suggest'),
-) -> Optional[dict[str, str]]:
-    """Invoke the claude CLI to author a JSON object with exactly ``keys``.
-    Returns the parsed dict (all keys present, non-empty strings), or None on any
-    failure (timeout, non-zero exit, parse failure, missing key) so the caller
-    falls through to the deterministic raw rendering. Never raises. Mirrors
-    ceo_digest_generator.generate_ceo_voice. ``keys`` is parameterized so both the
-    parked-card briefing ({what,why,suggest}) and the S3 closeout
-    ({what,outcome,note}) share one CLI round-trip path."""
+def claude_json_roundtrip(
+    prompt: str, *, model: str = NARRATOR_MODEL,
+) -> Optional[dict[str, Any]]:
+    """One guarded ``claude`` CLI round-trip → the JSON object the model returned
+    (ANY shape: prose dict, or a dict carrying lists/booleans), or None on any
+    failure (timeout, non-zero exit, non-JSON envelope, no extractable JSON).
+    Never raises. This is the SINGLE allowlisted ``claude`` spawn for the
+    narrator family; callers that need a typed/validated shape layer their own
+    checks on top of it (e.g. ``generate_briefing_voice`` enforces flat string
+    keys; the closeout author normalizes a follow-ups list). ``model`` lets a
+    caller pick its own model (e.g. the closeout author's ``CLOSEOUT_MODEL``)
+    while reusing this one chokepoint sink."""
     refuse_under_test('claude-spawn')
     try:
         proc = subprocess.run(
-            ['claude', '--print', '--model', NARRATOR_MODEL,
+            ['claude', '--print', '--model', model,
              '--output-format', 'json', prompt],
             capture_output=True, text=True,
             timeout=CLAUDE_TIMEOUT_SEC, check=False,
@@ -378,7 +380,20 @@ def generate_briefing_voice(
     text = (envelope.get('result') or '').strip() if isinstance(envelope, dict) else ''
     if not text:
         return None
-    briefing = parse_briefing_json(text)
+    return parse_briefing_json(text)
+
+
+def generate_briefing_voice(
+    prompt: str, *, keys: tuple[str, ...] = ('what', 'why', 'suggest'),
+) -> Optional[dict[str, str]]:
+    """Invoke the claude CLI to author a JSON object with exactly ``keys``.
+    Returns the parsed dict (all keys present, non-empty strings), or None on any
+    failure (timeout, non-zero exit, parse failure, missing key) so the caller
+    falls through to the deterministic raw rendering. Never raises. Mirrors
+    ceo_digest_generator.generate_ceo_voice. ``keys`` is parameterized so both the
+    parked-card briefing ({what,why,suggest}) and the S3 closeout
+    ({what,outcome,note}) share one CLI round-trip path."""
+    briefing = claude_json_roundtrip(prompt)
     if not isinstance(briefing, dict):
         log('narrator: claude result had no extractable JSON briefing; using raw briefing')
         return None
@@ -654,13 +669,13 @@ def author_captures_in_registry(
 
 _MISSION_FUNNEL_PHASE = 'proposed'
 
-# Canonical suggesting agents — mirrors dashboard_api._SUGGESTED_AGENTS. A
+# Canonical suggesting sources — mirrors dashboard_api._SUGGESTED_AGENTS. A
 # proposed mission whose `proposed_by` maps to one of these is a team
 # *suggestion*; anything else (the orphan-autoregister healer, or an
 # unidentifiable proposer) is *orphan-derived*. We replicate the small
 # normalizer here rather than import dashboard_api (a heavy FastAPI module the
-# headless narrator must not pull in).
-_SUGGESTED_AGENTS = ('beacon', 'medic', 'pulse')
+# headless narrator must not pull in). `closeout` is the non-agent P4 source.
+_SUGGESTED_AGENTS = ('beacon', 'medic', 'pulse', 'closeout')
 
 
 def mission_suggested_source(mission: dict[str, Any]) -> Optional[str]:

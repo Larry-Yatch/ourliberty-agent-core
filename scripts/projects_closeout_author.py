@@ -68,6 +68,15 @@ CLOSEOUT_MODEL = narrator.NARRATOR_MODEL
 # card never shows a hallucinated number (no-raw-metadata + accuracy guard).
 CLOSEOUT_LLM_KEYS = ('summary', 'shipped', 'changed_vs_spec', 'learnings')
 
+# p4-closeout-outputs: the funnel source tag for loose ends a closeout finds (spec
+# § 2/§ 4 decision 3). Must be in `suggest_funnel_card.SUGGESTING_AGENTS` and the
+# funnel derive's `_SUGGESTED_AGENTS` so the card lands in the suggested lane.
+FOLLOWUP_SOURCE = 'closeout'
+
+# Cap the loose ends one closeout drops so a runaway LLM reply can't flood the
+# funnel with suggestions.
+_MAX_FOLLOW_UPS = 10
+
 # Bounds so a single closeout's context gather can't run unbounded or blow the
 # LLM prompt: cap the doc/diff excerpts and the number of PRs scanned.
 _EXCERPT_CHARS = 4000
@@ -375,6 +384,261 @@ def author_phase_closeout(
 
 
 # --------------------------------------------------------------------------- #
+# follow-ups + divergence analysis (the closeout's "loose ends" + needs-you)
+# --------------------------------------------------------------------------- #
+def build_follow_ups_prompt(
+    phase: dict[str, Any],
+    project: dict[str, Any],
+    context: dict[str, Any],
+) -> str:
+    """Authoring prompt for the closeout's loose ends + spec divergence. Reads
+    the SAME source stream as the closeout prose (PRs/commits/diff/spec) and asks
+    only for REAL follow-ups grounded in the facts — an empty list is the right
+    answer for a clean build (no invented work, spec § 5 follow-up-spam guard)."""
+    facts = {
+        'phase_title': phase.get('title'),
+        'phase_desired_end_state': phase.get('desired_end_state'),
+        'project_title': project.get('title'),
+        'pr_numbers': context.get('pr_numbers') or [],
+        'pr_titles': context.get('pr_titles') or [],
+        'pr_bodies': context.get('pr_bodies') or [],
+        'commit_subjects': (context.get('commit_subjects') or [])[:30],
+        'changed_files': (context.get('changed_files') or [])[:50],
+        'spec_excerpt': context.get('spec_excerpt'),
+    }
+    return (
+        "You are Beacon, the operator's manager. A phase of a project just "
+        "shipped (its build merged). Two questions:\n"
+        "  1. What LOOSE ENDS did it leave — follow-up work the build deferred, "
+        "TODOs, known gaps, or risky areas that need a careful follow-up?\n"
+        "  2. Did the build DIVERGE materially from its spec?\n\n"
+        "Return ONLY a JSON object with exactly these keys:\n"
+        '  "follow_ups":    a list (possibly empty) of objects, each '
+        '{"text": "<one plain-English sentence naming the loose end>", '
+        '"risky": <true if it is a careful/risky follow-up — touches '
+        'security, credentials, data, or anything irreversible — else false>}.\n'
+        '  "diverged":      true if the build diverged materially from the '
+        "spec, else false.\n"
+        '  "diverged_note": one short sentence describing the divergence, or '
+        "null when it did not diverge.\n\n"
+        "List ONLY real loose ends grounded in the facts below; an EMPTY list is "
+        "the correct answer for a clean build. Never invent work. Use plain "
+        "operator language — never task ids, branches, commits, or risk codes.\n\n"
+        "Here are the facts (JSON):\n"
+        f"{json.dumps(facts, indent=2, default=str)}\n\n"
+        "Output ONLY the JSON object."
+    )
+
+
+def generate_closeout_analysis_voice(prompt: str) -> Optional[dict[str, Any]]:
+    """One claude round-trip for the follow-ups + divergence analysis. Returns the
+    parsed JSON object, or None on ANY failure (timeout, non-zero exit, no JSON)
+    so the caller falls through to the deterministic empty analysis. Never raises.
+    Reuses the Narrator's guarded claude round-trip (the single allowlisted
+    ``claude`` sink) rather than spawning the CLI here; the analysis tolerates
+    non-string values (it carries a follow-ups list + booleans, not a flat prose
+    dict), which is why it takes the raw parsed dict instead of
+    ``generate_briefing_voice``'s flat-string-key result."""
+    parsed = narrator.claude_json_roundtrip(prompt, model=CLOSEOUT_MODEL)
+    return parsed if isinstance(parsed, dict) else None
+
+
+def _normalize_analysis(raw: Optional[dict[str, Any]]) -> dict[str, Any]:
+    """Coerce a raw (LLM or absent) analysis into the canonical shape:
+    ``{'follow_ups': [{'text': str, 'risky': bool}], 'diverged': bool,
+    'diverged_note': Optional[str]}``. A None/garbage reply yields the clean
+    default (no follow-ups, no divergence) — the deterministic fallback so the
+    pass is head-less and never raises. Follow-up items may arrive as bare
+    strings or objects; both normalize. Empty-text items are dropped; the list
+    is capped at ``_MAX_FOLLOW_UPS``."""
+    follow_ups: list[dict[str, Any]] = []
+    diverged = False
+    diverged_note: Optional[str] = None
+    if isinstance(raw, dict):
+        diverged = bool(raw.get('diverged'))
+        note = raw.get('diverged_note')
+        if isinstance(note, str) and note.strip():
+            diverged_note = note.strip()
+        for item in (raw.get('follow_ups') or []):
+            if isinstance(item, str):
+                text, risky = item.strip(), False
+            elif isinstance(item, dict):
+                t = item.get('text') or item.get('summary')
+                text = t.strip() if isinstance(t, str) else ''
+                risky = bool(item.get('risky'))
+            else:
+                continue
+            if not text:
+                continue
+            follow_ups.append({'text': text, 'risky': risky})
+            if len(follow_ups) >= _MAX_FOLLOW_UPS:
+                break
+    if not diverged:
+        diverged_note = None  # a note only makes sense alongside a divergence
+    return {
+        'follow_ups': follow_ups,
+        'diverged': diverged,
+        'diverged_note': diverged_note,
+    }
+
+
+def author_closeout_analysis(
+    phase: dict[str, Any],
+    project: dict[str, Any],
+    context: dict[str, Any],
+    *,
+    use_llm: bool = True,
+) -> dict[str, Any]:
+    """Author the closeout's loose ends + divergence verdict, normalized. PURE
+    (no disk/git). ``use_llm=True`` (production) tries the claude voice and falls
+    back to the deterministic empty analysis on ANY failure; ``use_llm=False``
+    (test / head-less) is the empty analysis directly. The empty default means a
+    closeout never INVENTS follow-ups when the model is unavailable."""
+    raw = None
+    if use_llm:
+        raw = generate_closeout_analysis_voice(
+            build_follow_ups_prompt(phase, project, context))
+    return _normalize_analysis(raw)
+
+
+def compute_needs_decision_flags(
+    done_gate_met: bool, analysis: dict[str, Any],
+) -> list[str]:
+    """The DM's "needs you" flags (spec § 2 / § 4 decision 2): the closeout DM
+    flags when Larry must decide — the done-gate wasn't met, the build diverged
+    from spec, or a risky follow-up exists. Plain operator language, computed
+    DETERMINISTICALLY from the closeout schema + the (already-authored) analysis
+    so the same inputs always produce the same flags. Returns [] for a clean
+    completion (the common, no-interruption case)."""
+    flags: list[str] = []
+    if not done_gate_met:
+        flags.append(
+            "the done-gate wasn't met — not every build step merged cleanly")
+    if analysis.get('diverged'):
+        note = analysis.get('diverged_note')
+        flags.append(
+            f'the build diverged from the plan: {note}' if note
+            else 'the build diverged from the plan')
+    risky = [f for f in (analysis.get('follow_ups') or [])
+             if isinstance(f, dict) and f.get('risky') and f.get('text')]
+    if risky:
+        flags.append(f'a risky follow-up needs your eyes — {risky[0]["text"]}')
+    return flags
+
+
+# --------------------------------------------------------------------------- #
+# next-phase handoff (the "Next up: Phase Y" the DM names)
+# --------------------------------------------------------------------------- #
+def next_phase_after(
+    project: dict[str, Any], phase: dict[str, Any],
+) -> Optional[dict[str, Any]]:
+    """The next not-yet-done phase after ``phase`` in the project, by ``order``
+    (ties broken by list position) — the phase the closeout DM names as "ready
+    for you to brainstorm." Returns None when ``phase`` is the last/only phase (a
+    one-off or the final phase of a multi-phase project — nothing to feed)."""
+    if not isinstance(project, dict) or not isinstance(phase, dict):
+        return None
+    phases = [p for p in (project.get('phases') or []) if isinstance(p, dict)]
+    cur_order = phase.get('order', 0)
+    cur_id = phase.get('id')
+    candidates = []
+    for idx, p in enumerate(phases):
+        if p.get('id') == cur_id:
+            continue
+        if p.get('lifecycle_state') == 'done':
+            continue
+        order = p.get('order', 0)
+        if order > cur_order or (order == cur_order and idx > _phase_index(
+                phases, cur_id)):
+            candidates.append((order, idx, p))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda t: (t[0], t[1]))
+    return candidates[0][2]
+
+
+def _phase_index(phases: list[dict[str, Any]], phase_id: Any) -> int:
+    for idx, p in enumerate(phases):
+        if p.get('id') == phase_id:
+            return idx
+    return -1
+
+
+# --------------------------------------------------------------------------- #
+# drop the loose ends into the funnel's Suggested lane (source='closeout')
+# --------------------------------------------------------------------------- #
+def drop_follow_ups_to_funnel(
+    follow_ups: list[dict[str, Any]],
+    *,
+    phase: dict[str, Any],
+    repo: Optional[str] = None,
+    existing_ids: Optional[set[str]] = None,
+    queue_dir: Optional[Any] = None,
+    now: Optional[datetime] = None,
+) -> list[str]:
+    """Drop each loose end into the funnel's Suggested lane as a
+    ``proposed_by='closeout'`` card, via the shared `suggest_funnel_card`
+    interface (the SAME non-committer queue → healer-drain path Beacon/Medic/Pulse
+    use). Returns the list of queued mission ids.
+
+    DEDUPED + IDEMPOTENT (spec § 5 follow-up-spam guard, Mirror focus): a loose
+    end is skipped when its kebab id (a) repeats within this batch, (b) is already
+    registered in missions.json (``existing_ids``), or (c) already has an
+    in-flight queue file (`SuggestionError` from a prior, not-yet-drained run). So
+    a re-run on the same closeout drops NO duplicate cards. Fail-safe: a single
+    bad suggestion is logged and skipped — it never aborts the batch or the
+    closeout flow."""
+    import suggest_funnel_card as suggest  # local import: optional dep
+
+    existing = set(existing_ids or set())
+    queued: list[str] = []
+    seen: set[str] = set()
+    phase_title = (phase.get('title') or phase.get('id') or 'a phase').strip() \
+        if isinstance(phase, dict) else 'a phase'
+    for fu in follow_ups:
+        text = fu.get('text') if isinstance(fu, dict) else None
+        if not (isinstance(text, str) and text.strip()):
+            continue
+        text = text.strip()
+        mid = suggest._kebab_case(text)
+        if not mid or mid in seen or mid in existing:
+            continue
+        seen.add(mid)
+        brief = f'Loose end from the "{phase_title}" closeout: {text}'
+        try:
+            result = suggest.suggest_funnel_card(
+                source=FOLLOWUP_SOURCE, name=text, brief=brief, repo=repo,
+                queue_dir=queue_dir, now=now)
+            queued.append(result['mission_id'])
+        except suggest.SuggestionError as e:
+            # Already queued in-flight (not yet drained) — the dedup no-op.
+            _log(f'follow-up {mid!r} already queued; skipping ({e})')
+        except Exception as e:  # noqa: BLE001 — one bad card never aborts the batch
+            _log(f'follow-up {mid!r} drop raised {type(e).__name__}: {e}; skipping')
+    return queued
+
+
+def _existing_mission_ids(repo_paths: dict[str, Any]) -> set[str]:
+    """Best-effort set of ids already in missions.json — the cross-run dedup key
+    so a re-run does not re-suggest a loose end the healer has already drained
+    into the registry. Any failure (no path, unreadable, bad shape) yields an
+    empty set — dedup degrades to the in-flight-queue guard, never raises."""
+    try:
+        import heal_orphan_autoregister as orphan  # local import: optional dep
+        mpath = orphan.missions_path(repo_paths)
+        if mpath is None:
+            return set()
+        reg = orphan.read_missions_registry(mpath)
+        if not isinstance(reg, dict):
+            return set()
+        return {m.get('id') for m in (reg.get('missions') or [])
+                if isinstance(m, dict) and m.get('id')}
+    except Exception as e:  # noqa: BLE001 — dedup is best-effort
+        _log(f'existing-mission-ids read raised {type(e).__name__}: {e}')
+        return set()
+
+
+# --------------------------------------------------------------------------- #
 # North Star status-tracker tick (deterministic markdown-table edit)
 # --------------------------------------------------------------------------- #
 _DONE_STATUS_CELL = '✅ done'
@@ -509,34 +773,39 @@ def write_north_star_tick(
 
 def run_closeout_for_sequence(
     seq: dict[str, Any], *, use_llm: bool = True, now: Optional[datetime] = None,
-) -> bool:
+) -> Optional[dict[str, Any]]:
     """Orchestrate the full closeout for a completed sequence (the entry point the
     notifier's SEQUENCE_COMPLETE hook calls). Resolves the phase by
     ``sequence_ref == seq['seq_id']``, gathers context, authors the closeout,
-    attaches it to the phase card (non-committer), and ticks the North Star
-    tracker (non-committer). Returns True iff a closeout was attached.
+    attaches it to the phase card (non-committer), ticks the North Star tracker
+    (non-committer), authors the loose-ends/divergence analysis, and drops the
+    loose ends into the funnel's Suggested lane (source='closeout', deduped).
 
-    Fail-safe: a non-launch sequence (no matching phase) is a no-op; the
-    single-committer invariant holds (this only does non-committer writes — the
-    healer commits both artifacts). NEVER raises into the caller — the notifier
-    hook also wraps this in a daemon-never-wedge guard."""
+    Returns the closeout OUTPUTS the completion DM renders — a dict
+    ``{attached, summary, phase_title, next_phase_title, done_gate_met, flags,
+    follow_ups_queued}`` — or ``None`` for a non-launch sequence (no matching
+    phase, the common case for an ordinary build sequence).
+
+    Fail-safe: the single-committer invariant holds (this only does non-committer
+    writes — the healer commits both artifacts). NEVER raises into the caller —
+    the notifier hook also wraps this in a daemon-never-wedge guard."""
     import heal_projects_store as healer  # local import: optional dep chain
     import projects_status_writeback as psw
 
     seq = seq or {}
     seq_id = seq.get('seq_id')
     if not seq_id:
-        return False
+        return None
     repo_paths = healer.load_repo_paths()
     path = healer.projects_path(repo_paths)
     if path is None:
-        return False
+        return None
     registry = healer.read_registry(path)
     if not isinstance(registry, dict):
-        return False
+        return None
     project, phase = narrator_find_phase(registry, seq_id)
     if phase is None or project is None:
-        return False  # non-launch sequence — no phase to close out
+        return None  # non-launch sequence — no phase to close out
 
     repo = repo_paths.get('ourliberty-agent-core')
     context = gather_closeout_context(phase, project, seq, repo=repo)
@@ -546,7 +815,30 @@ def run_closeout_for_sequence(
     if wrote:
         _log(f'authored closeout for sequence_ref={seq_id} phase={phase.get("id")}')
     write_north_star_tick(repo, project, phase)
-    return wrote
+
+    # p4-closeout-outputs: loose ends → funnel Suggested lane (deduped), and the
+    # closeout DM payload (summary + next-phase handoff + needs-you flags).
+    analysis = author_closeout_analysis(phase, project, context, use_llm=use_llm)
+    queued = drop_follow_ups_to_funnel(
+        analysis['follow_ups'], phase=phase, repo=project.get('repo'),
+        existing_ids=_existing_mission_ids(repo_paths), now=now)
+    if queued:
+        _log(f'dropped {len(queued)} follow-up(s) to funnel for seq={seq_id}: '
+             f'{", ".join(queued)}')
+
+    closeout = fields['closeout']
+    done_gate_met = bool(closeout.get('done_gate_met', True))
+    nxt = next_phase_after(project, phase)
+    return {
+        'attached': wrote,
+        'summary': closeout.get('summary'),
+        'phase_title': (phase.get('title') or phase.get('id') or '').strip(),
+        'next_phase_title': (
+            (nxt.get('title') or nxt.get('id') or '').strip() if nxt else None),
+        'done_gate_met': done_gate_met,
+        'flags': compute_needs_decision_flags(done_gate_met, analysis),
+        'follow_ups_queued': queued,
+    }
 
 
 def narrator_find_phase(registry: dict[str, Any], seq_id: str):
