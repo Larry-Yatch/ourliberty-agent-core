@@ -138,21 +138,21 @@
 
 ---
 
-## G-rule forge-preflight-no-marker DISPATCHED (iter ~2302, 2026-06-19)
+## G-rule forge-preflight-no-marker DISPATCHED → APPROVAL_REQUEST SENT (iter ~2302→2303, 2026-06-19)
 
-**Rule:** G-rule forge-preflight-no-marker crossed 3/3 threshold. Beacon dispatch `forge-preflight-no-marker-systemic-fix-001` written 2026-06-19T23:27Z. Pattern: `MalformedForgeMarker: phase=preflight requires ONE marker block — none found` in outbox-notifier.log. 4 incidents across 3 cycles: p4-closeout-outputs (2026-06-18), pipeline-empty-state-hint (2026-06-19 morning), mission-action-pr-label-capitalize + p5-dag-status-on-cards (2026-06-19 evening). All self-recovered. Waiting for Beacon spec + Forge PR. **G-rule DISPATCHED — watch for PR.**
+**Rule:** G-rule forge-preflight-no-marker crossed 3/3 threshold. Beacon dispatch `forge-preflight-no-marker-systemic-fix-001` written 2026-06-19T23:27Z. Beacon processed it (file moved to .archive by iter ~2303). outbox-notifier queued APPROVAL_REQUEST force_ask to Larry at `17:32:09-0600` (23:32 UTC). Pattern: `MalformedForgeMarker: phase=preflight requires ONE marker block — none found`. All 4 incidents self-recovered. **G-rule DISPATCHED — waiting for Larry to approve → Beacon spec → Forge PR.**
 
 ---
 
 ## G-rule projects-json-healer-path-unregistered (new, iter ~2302, 2026-06-19)
 
-**Rule:** `agents/beacon/projects.json` is written and committed by a projects-store healer (frequent "chore(projects): projects-store healer" commits in git log) but is NOT listed in `config/healer-managed-runtime-paths.json`. This produces a Check A dirty-tree finding (never-auto + tier-reset) on every cycle where the check runs between healer writes. Config allowlist only contains captures.json and missions.json. Fix: add `agents/beacon/projects.json` to `config/healer-managed-runtime-paths.json`. **G-rule count: 1/1 — dispatch at 3/3.**
+**Rule:** `agents/beacon/projects.json` is written and committed by a projects-store healer (frequent "chore(projects): projects-store healer" commits in git log) but is NOT listed in `config/healer-managed-runtime-paths.json`. This produces a Check A dirty-tree finding (never-auto + tier-reset) on every cycle where the check runs between healer writes. Config allowlist only contains captures.json and missions.json. Fix: add `agents/beacon/projects.json` to `config/healer-managed-runtime-paths.json`. **G-rule count: 2/3 — dispatch at 3/3.**
 
 ---
 
-## Status snapshot — updated 2026-06-19 23:28Z UTC (Iter ~2302, Tier 3→1 reset, SIGNAL ⚠️)
+## Status snapshot — updated 2026-06-19 23:35Z UTC (Iter ~2303, Tier 1, SIGNAL ⚠️)
 
-**Iter ~2302 summary:** ⚠️ Signal. Check A: `agents/beacon/projects.json` dirty (not in healer-managed-runtime-paths.json) → never-auto + tier-reset 3→1. G-rule forge-preflight-no-marker 3/3 → Beacon dispatch written. 3 new alerts all Tier-3 silenced (L897-899: mirror-dag-pass and sequence-complete). Both build sequences complete (mission-action-pr-label-capitalize: #597/#70; p5-dag-status-on-cards: #598/#71). All 5 daemons alive (same PIDs). Watermark=899=file_length. Sync 22:55Z. Heartbeat 23:11Z. PRIME: systemic_fixes=54, ratio≈19.44, trend=improving. **Tier 1. consecutive_clean=0. Next cadence: 5-min.**
+**Iter ~2303 summary:** ⚠️ Signal. Check A: `agents/beacon/projects.json` dirty at iter start (healer-managed but not in config) → never-auto + tier-reset. Healer auto-committed mid-cycle (b8076693). Tree clean at end. G-rule projects-json-healer-path-unregistered **2/3** (dispatch at 3/3). 1 new alert L900 Tier-3 silenced (sequence-complete p5-dag-status). Beacon processed forge-preflight-no-marker dispatch → APPROVAL_REQUEST queued for Larry at 17:32 MDT. trim_memory.py no longer untracked (dropped from findings). All 5 daemons alive (same PIDs). Watermark=900=file_length. Sync 22:55Z. Heartbeat 23:11Z. PRIME: systemic_fixes=54, ratio≈19.44, trend=improving. **Tier 1. consecutive_clean=0. Next cadence: 5-min.**
 
 
 
