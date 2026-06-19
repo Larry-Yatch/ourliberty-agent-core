@@ -138,9 +138,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-19 19:37Z UTC (Iter ~2294, Tier 1→2 de-escalated, consecutive_clean=2→3→reset, NOMINAL ✅)
+## Status snapshot — updated 2026-06-19 19:58Z UTC (Iter ~2295, Tier 2, consecutive_clean=0→1, NOMINAL ✅)
 
-**Iter ~2294 summary:** ✅ Nominal. 0 new alerts. All checks clean. **Tier 1→2 de-escalation** triggered (consecutive_clean=2→3). All 5 daemons alive — beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 442600, dashboard_api 475318. 0 open PRs. Repo on main, up-to-date (HEAD=8bbdf257). Sync 19:15Z (~22 min). Watermark=891=file_length. pending=0. Creds OK. Heartbeat 19:10:17Z (~27 min). Check I deduped (Fri). §5.0 no-ops. Stale bash orphan PID 1834248 (~22d+). G-rule ledger/check-i 2/3. PRIME ratio≈19.8 (interventions=1049, systemic_fixes=53, trend=improving). **Tier 2. consecutive_clean=0 (reset at promotion). Next cadence: 15-min.**
+**Iter ~2295 summary:** ✅ Nominal. 2 new alerts (L892-L893, both Tier-3 silenced). outbox_notifier self-healed: PID 442600→491617 (SIGTERM at 19:40:22Z, clean restart). All 5 daemons alive — beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 491617, dashboard_api 475318. 0 open PRs. Repo on main, up-to-date (HEAD=52f0a773, PR #594 merged). Sync 19:55:53Z (~2 min). Watermark=893=file_length. pending=0. Creds OK. Heartbeat 19:40:18Z (~17 min). Check I deduped (Fri). §5.0 no-ops. Stale bash orphan PID 1834248 (~22d+). G-rule ledger/check-i 2/3. install-drift:ourliberty-build-sequence-advancer.service (L892, Tier-3 silenced, bot may have DM'd). PRIME ratio≈19.8 (interventions=1049, systemic_fixes=53, trend=improving). **Tier 2. consecutive_clean=1. Next cadence: 15-min.**
 
 
 
