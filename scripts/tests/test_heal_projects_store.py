@@ -182,6 +182,58 @@ class RunOnceTest(unittest.TestCase):
         rc = h.run_once(dry_run=False, now=NOW)
         self.assertEqual(rc, 1)
 
+    def _write_missions(self, missions):
+        mp = self.repo / h.MISSIONS_REL
+        mp.parent.mkdir(parents=True, exist_ok=True)
+        mp.write_text(json.dumps({'schema_version': 1, 'missions': missions}) + '\n')
+
+    def test_mirrors_active_missions_into_pipeline(self):
+        # retire-missions-kanban: an ACTIVE in_flight mission with no project yet
+        # is mirrored into projects.json as a single-phase building project; a
+        # shipped mission is NOT mirrored (spec § 4.2). missions.json is untouched.
+        self.proj.write_text(json.dumps({'schema_version': 1, 'projects': []}, indent=2) + '\n')
+        self._git('add', '.'); self._git('commit', '-q', '-m', 'seed empty projects')
+        self._write_missions([
+            {'id': 'flight-x', 'name': 'Flight X', 'phase': 'in_flight',
+             'brief': 'ship it', 'task_ids': ['seq-flight-x-001-step-a'],
+             'repo': 'ourliberty-agent-core', 'spec_docs': ['s.md']},
+            {'id': 'shipped-x', 'name': 'Shipped X', 'phase': 'shipped'},
+        ])
+        missions_before = (self.repo / h.MISSIONS_REL).read_text()
+        rc = h.run_once(dry_run=False, now=NOW)
+        self.assertIn(rc, (0, 2))
+        data = json.loads(self.proj.read_text())
+        self.assertEqual([p['id'] for p in data['projects']], ['flight-x'])  # shipped skipped
+        ph = data['projects'][0]['phases'][0]
+        self.assertEqual(ph['lifecycle_state'], 'building')      # in_flight → building
+        self.assertEqual(ph['sequence_ref'], 'flight-x-001')      # from seq-step task
+        self.assertEqual(data['projects'][0]['promoted_from'],
+                         {'kind': 'mission', 'mission_id': 'flight-x'})
+        # missions.json is READ-ONLY here — never written by this healer.
+        self.assertEqual((self.repo / h.MISSIONS_REL).read_text(), missions_before)
+
+    def test_mirror_is_idempotent_second_tick_noop(self):
+        self.proj.write_text(json.dumps({'schema_version': 1, 'projects': []}, indent=2) + '\n')
+        self._git('add', '.'); self._git('commit', '-q', '-m', 'seed')
+        self._write_missions([{'id': 'flight-x', 'name': 'Flight X',
+                               'phase': 'in_flight', 'brief': 'x', 'task_ids': [],
+                               'repo': 'ourliberty-agent-core'}])
+        h.run_once(dry_run=False, now=NOW)            # first tick mirrors + commits
+        before = self.proj.read_text()
+        rc = h.run_once(dry_run=False, now=NOW)       # second tick: project exists → no-op
+        self.assertEqual(rc, 0)
+        self.assertEqual(self.proj.read_text(), before)
+
+    def test_no_missions_file_mirrors_nothing(self):
+        # The common path before deploy: no missions.json under the repo → fail-safe
+        # read returns [] → nothing mirrored, the normalize+commit proceeds.
+        self.proj.write_text(json.dumps({'schema_version': 1, 'projects': []}, indent=2) + '\n')
+        self._git('add', '.'); self._git('commit', '-q', '-m', 'seed')
+        before = self.proj.read_text()
+        rc = h.run_once(dry_run=False, now=NOW)
+        self.assertEqual(rc, 0)
+        self.assertEqual(self.proj.read_text(), before)
+
     def test_uncommitted_already_normalized_store_is_committed(self):
         # Regression for the commit being gated on the *normalization* delta
         # instead of the *git* delta. The dashboard (a non-committer) writes a
