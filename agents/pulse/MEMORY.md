@@ -132,6 +132,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-19 03:48Z UTC (Iter ~2252, Tier 2, consecutive_clean=1, NOMINAL ✅)
+
+**Iter ~2252 summary:** ✅ Nominal. 2 new alerts (L935/L936: heal-stale-daemon-code auto-restarted ourliberty-dashboard-api.service and ourliberty-outbox-notifier.service at 03:36Z post-PR-#584-deploy) — both Tier-3 silenced. New PIDs: dashboard_api=304948, outbox_notifier=305068. All 5 daemons alive — beacon 3734671 (2d+), chain-event 3734305 (2d+), inbox-watcher 3434697 (2d 22h+). Repo HEAD=8f2c189e=origin/main (clean, untracked trim_memory.py). Last sync 03:37Z (~11 min). 0 open PRs both repos. 0 stalls. pending=0. Credential rotation OK. Heartbeat 03:36:19Z (~12 min, fresh). Check I deduped (Fri artifact present). §5.0 all no-ops. PR #576 verification window closes 2026-06-19T13:35Z (~9.8h remaining, fix holding). Stale bash orphan PID 1834248 (21d+). G-rule ledger/check-i at 2/3. PRIME ratio≈20.1 (1046/52, trend=improving). **Tier 2, consecutive_clean=1 — de-escalation ladder: 2 more clean iters needed to reach Tier 3.**
+
 ## Status snapshot — updated 2026-06-19 03:33Z UTC (Iter ~2251, Tier 2 DE-ESCALATED, consecutive_clean=0, NOMINAL ✅ — 3rd consecutive clean triggered Tier 1→2 promotion)
 
 **Iter ~2251 summary:** ✅ Nominal. 3rd consecutive clean iter → de-escalated from Tier 1 to Tier 2 (15-min cadence). 0 open PRs on both repos. All 5 daemons alive — beacon 3734671 (49h+), chain-event 3734305 (49h+), inbox-watcher 3434697 (70h+), outbox_notifier 217608 (~3.9h), dashboard_api 218007 (~3.9h). Repo HEAD=3dfa0355=origin/main (clean, untracked trim_memory.py). Last sync 02:33Z (~57 min). 0 alerts. 0 stalls. pending=0. Credential rotation OK. Heartbeat 03:06Z (~24.5 min, fresh). Check I deduped (Fri, artifact already present). §5.0 all no-ops. PR #576 verification window closes 2026-06-19T13:35Z (~10h remaining, fix holding). Stale bash orphan PID 1834248 re-verified alive (21d 8h+). G-rule ledger/check-i at 2/3. PRIME ratio≈20.1 (1046/52, trend=improving). **Tier 2, consecutive_clean=0 — de-escalation ladder: 3 more clean iters needed to reach Tier 3.**
