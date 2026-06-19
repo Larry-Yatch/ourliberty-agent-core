@@ -4243,7 +4243,21 @@
       "created": "2026-06-19",
       "deferred_reason": null,
       "proposed_by": "closeout",
-      "proposed_at": "2026-06-19T23:24:43.868826+00:00"
+      "proposed_at": "2026-06-19T23:24:43.868826+00:00",
+      "briefing": {
+        "what": "A new at-a-glance view on your dashboard that shows what's finished, what's stuck, and lets you click straight into anything \u2014 plus an automatic heads-up message when a job wraps up.",
+        "why": "It saves you from guessing whether work is actually done and surfaces problems before they cost you time, but the feature was built in a test setup and hasn't been proven on the real board yet.",
+        "suggest": "Approve a quick live check on the actual dashboard before relying on it \u2014 don't trust the status view for real decisions until someone confirms it works end to end."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-19T23:43:20.212106+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
