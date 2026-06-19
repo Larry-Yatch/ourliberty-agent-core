@@ -150,9 +150,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-19 23:35Z UTC (Iter ~2303, Tier 1, SIGNAL ⚠️)
+## Status snapshot — updated 2026-06-19 23:41Z UTC (Iter ~2304, Tier 1, NOMINAL ✅)
 
-**Iter ~2303 summary:** ⚠️ Signal. Check A: `agents/beacon/projects.json` dirty at iter start (healer-managed but not in config) → never-auto + tier-reset. Healer auto-committed mid-cycle (b8076693). Tree clean at end. G-rule projects-json-healer-path-unregistered **2/3** (dispatch at 3/3). 1 new alert L900 Tier-3 silenced (sequence-complete p5-dag-status). Beacon processed forge-preflight-no-marker dispatch → APPROVAL_REQUEST queued for Larry at 17:32 MDT. trim_memory.py no longer untracked (dropped from findings). All 5 daemons alive (same PIDs). Watermark=900=file_length. Sync 22:55Z. Heartbeat 23:11Z. PRIME: systemic_fixes=54, ratio≈19.44, trend=improving. **Tier 1. consecutive_clean=0. Next cadence: 5-min.**
+**Iter ~2304 summary:** ✅ Nominal. 1 new alert L901 (approval_request forge-preflight-marker-gate-001) Tier-3 silenced. All 5 daemons alive (same PIDs). Repo clean at start; healer pushed `9370f06d chore(missions): autoregister healer` during check window — in sync after fetch. Check A: no dirty-tree at iter start (G-rule projects-json-healer-path-unregistered stays at **2/3**). forge-preflight-marker-gate-001 APPROVAL_REQUEST delivered to Larry at 17:37 MDT — pending his `approve`/`go`. Watermark=901=file_length. Sync 22:55Z. Heartbeat 23:11Z. PRIME: systemic_fixes=54, ratio≈19.46, trend=improving. **Tier 1. consecutive_clean=1. Next cadence: 5-min.**
 
 
 
