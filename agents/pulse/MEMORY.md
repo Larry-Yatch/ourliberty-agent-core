@@ -138,9 +138,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-19 19:12Z UTC (Iter ~2290, Tier 1, consecutive_clean=1→2, NOMINAL ✅)
+## Status snapshot — updated 2026-06-19 19:18Z UTC (Iter ~2291, Tier 1, consecutive_clean=2→0, SIGNAL ⚠️)
 
-**Iter ~2290 summary:** ✅ Nominal. 0 new alerts. PR #589 `fix(launch): validate build repo + escalate stranded dispatches` MERGED 19:08:07Z — fix-launch-drain-target-repo-resolution-001 COMPLETE. Repo synced b5412c9f→06816d21. All 5 daemons alive — beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 442600, dashboard_api 442264. Watermark=888=file_length. 0 open PRs both repos. 0 stalls. pending=0. Credential rotation OK. Heartbeat 18:40:16Z (fresh). Check I deduped (Fri artifact). §5.0 all no-ops. heal-droplet-git-drift PRIME verification still pending. Stale bash orphan PID 1834248 (~22d). G-rule watchdog-watcher-log-stale 1/3. G-rule health-notify-script-missing: Beacon dispatch 2026-06-09, fix unverified. G-rule ledger/check-i at 2/3. PRIME ratio≈19.8 (interventions=1049, systemic_fixes=53, trend=improving). **Tier 1. consecutive_clean=1→2. Next cadence: 5-min.**
+**Iter ~2291 summary:** ⚠️ Signal. L889 Tier-4 `still-stale-after-restart:ourliberty-dashboard-api.service` — bot DM'd Larry 19:13Z; service self-recovered PID 442264→475318 (~19:12Z), code pickup unconfirmed. PR #591 (docs(north-star) correct §9) merged. PR #590 opened by Forge (fix-launch-drain, MERGEABLE, no Mirror review yet, ~9 min old). Repo HEAD=6d4be2df, up to date. Sync 19:15Z. All 5 daemons alive — beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 442600, dashboard_api 475318 (new PID). Watermark=889=file_length. pending=0. Creds OK. Heartbeat 19:10:17Z (fresh). Check I deduped (Fri). §5.0 no-ops. heal-droplet-git-drift PRIME verification pending. Stale bash orphan PID 1834248 (~22d). G-rule ledger/check-i 2/3. PRIME ratio≈19.8 (interventions=1049, systemic_fixes=53, trend=improving). **Tier 1. consecutive_clean=2→0. Next cadence: 5-min.**
 
 
 
