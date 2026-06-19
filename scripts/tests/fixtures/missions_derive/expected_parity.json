@@ -131,12 +131,6 @@
       "pr_url": null
     },
     {
-      "task_id": "desktop-ab12cd34",
-      "last_event_ts": "2026-06-09T15:00:00+00:00",
-      "agent": "desktop-claude",
-      "pr_url": null
-    },
-    {
       "task_id": "orphan-building-now",
       "last_event_ts": "2026-06-09T14:00:00+00:00",
       "agent": "forge",

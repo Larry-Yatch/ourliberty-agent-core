@@ -388,9 +388,10 @@ def scan_and_propose(
 
     detected = derive.detect_orphans(rows, registered)
     res.scanned_orphans = len(detected)
-    # Higher signal bar than the Orphans lane: only genuine buildable initiatives
-    # become a `proposed` decision-queue entry. detect_orphans already drops
-    # is_infrastructure_task; is_proposable_initiative additionally sweeps
+    # Same buildable-initiative gate the dashboard's Orphaned lane now applies
+    # (§ 4.8): only genuine buildable initiatives become a `proposed` decision-queue
+    # entry. detect_orphans already drops is_infrastructure_task;
+    # is_proposable_initiative additionally sweeps
     # chain-incident/alert artifacts, desktop captures, sequence-step proposals,
     # translation/rule/dated-digest artifacts, and stale test-fixture ids.
     orphans = [

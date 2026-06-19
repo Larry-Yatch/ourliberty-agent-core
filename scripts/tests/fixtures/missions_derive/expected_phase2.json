@@ -9,15 +9,6 @@
       "repo": null,
       "branch": null
     },
-    "desktop-ab12cd34": {
-      "derived_phase": "ready",
-      "state_badge": "building",
-      "terminal": false,
-      "stalled": false,
-      "label": "Scene graph interface",
-      "repo": "ourliberty-graph",
-      "branch": "main"
-    },
     "desktop-blobrepo01": {
       "derived_phase": "ready",
       "state_badge": "building",

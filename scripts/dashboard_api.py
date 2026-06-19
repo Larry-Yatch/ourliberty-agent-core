@@ -4198,6 +4198,19 @@ def _build_derived_response(
             events_by_orphan.setdefault(tid, []).append(ev)
 
     orphans = detect_orphans(recent_events, registered_task_ids)
+    # § 4.8: the Orphaned secondary lane surfaces only buildable initiatives.
+    # Narrow the orphans SURFACED to the dashboard (orphans[] + funnel.secondary,
+    # built below) by the same is_proposable_initiative gate heal_orphan_autoregister
+    # uses to pick what's a buildable mission — sweeping the non-buildable noise an
+    # orphan can be (chain-incident/alert artifacts, desktop-capture hashes,
+    # sequence-step proposals, dag-preflight runs, dated-digest / translation /
+    # stale-fixture ids). detect_orphans' broader everything-in-flight semantics are
+    # UNCHANGED: heal_orphan_autoregister calls it directly and applies this same
+    # gate separately, so its decision queue is unaffected by this view-level filter.
+    orphans = [
+        o for o in orphans
+        if is_proposable_initiative(o.get('task_id', ''), o.get('agent'))
+    ]
     # Resolve live PR states for orphans carrying a pr_url so a merged/closed
     # orphan is detected as terminal even with no auto_merge event under its
     # task_id (§ 3.4). Fail-safe: a {} result → event-only derive (pre-fix).
