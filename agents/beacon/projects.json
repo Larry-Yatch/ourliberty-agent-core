@@ -131,7 +131,7 @@
       "title": "Pulse Cycle Upgrade (alpha / beta / gamma sequence)",
       "north_star_ref": null,
       "repo": "ourliberty-agent-core",
-      "state": "active",
+      "state": "archived",
       "phases": [
         {
           "id": "pulse-cycle-upgrade",
@@ -147,7 +147,7 @@
       ],
       "one_off": true,
       "created_at": "2026-06-19T20:17:09.750195+00:00",
-      "updated_at": "2026-06-19T20:17:09.750195+00:00",
+      "updated_at": "2026-06-19T23:42:34.438419+00:00",
       "promoted_from": {
         "kind": "mission",
         "mission_id": "pulse-cycle-upgrade"
@@ -158,7 +158,7 @@
       "title": "Rate-limit resilience sequence (001)",
       "north_star_ref": null,
       "repo": "ourliberty-agent-core",
-      "state": "active",
+      "state": "archived",
       "phases": [
         {
           "id": "rate-limit-resilience",
@@ -174,7 +174,7 @@
       ],
       "one_off": true,
       "created_at": "2026-06-19T20:17:09.750195+00:00",
-      "updated_at": "2026-06-19T20:17:09.750195+00:00",
+      "updated_at": "2026-06-19T23:42:37.818364+00:00",
       "promoted_from": {
         "kind": "mission",
         "mission_id": "rate-limit-resilience"
