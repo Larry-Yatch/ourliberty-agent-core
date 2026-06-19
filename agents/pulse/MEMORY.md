@@ -138,9 +138,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-19 19:30Z UTC (Iter ~2293, Tier 1, consecutive_clean=1→2, NOMINAL ✅)
+## Status snapshot — updated 2026-06-19 19:37Z UTC (Iter ~2294, Tier 1→2 de-escalated, consecutive_clean=2→3→reset, NOMINAL ✅)
 
-**Iter ~2293 summary:** ✅ Nominal. 2 new alerts (L890-L891), both Tier-3 silenced. **G-rule heal-droplet-git-drift-tier4 PRIME VERIFIED ✅** (L891 Tier-3 confirms PR #586 translation working). All 5 daemons alive — beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 442600, dashboard_api 475318. 0 open PRs. Repo on main, up-to-date. Sync 19:15Z. Watermark=891=file_length. pending=0. Creds OK. Heartbeat 19:10:17Z. Check I deduped (Fri). §5.0 no-ops. Stale bash orphan PID 1834248 (~22d). G-rule ledger/check-i 2/3. PRIME ratio≈19.8 (interventions=1049, systemic_fixes=53, trend=improving). **Tier 1. consecutive_clean=1→2. Next cadence: 5-min.**
+**Iter ~2294 summary:** ✅ Nominal. 0 new alerts. All checks clean. **Tier 1→2 de-escalation** triggered (consecutive_clean=2→3). All 5 daemons alive — beacon 3734671, chain-event 3734305, inbox-watcher 3434697, outbox_notifier 442600, dashboard_api 475318. 0 open PRs. Repo on main, up-to-date (HEAD=8bbdf257). Sync 19:15Z (~22 min). Watermark=891=file_length. pending=0. Creds OK. Heartbeat 19:10:17Z (~27 min). Check I deduped (Fri). §5.0 no-ops. Stale bash orphan PID 1834248 (~22d+). G-rule ledger/check-i 2/3. PRIME ratio≈19.8 (interventions=1049, systemic_fixes=53, trend=improving). **Tier 2. consecutive_clean=0 (reset at promotion). Next cadence: 15-min.**
 
 
 
