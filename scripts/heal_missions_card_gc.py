@@ -113,6 +113,21 @@ MISSIONS_REL = 'agents/beacon/missions.json'
 RECONCILABLE_MISSION_PHASES = frozenset({'drafting', 'in_flight', 'ready'})
 SHIPPED_PHASE = 'shipped'
 
+# task_ids the orchestrator never opens a PR for — DAG-preflight routing signals,
+# inter-agent notifies, and code-review handoffs. They can never resolve to a
+# MERGED/CLOSED PR, so requiring them to be terminal makes a mission's
+# shipped-detection permanently unsatisfiable (the clarify-round-visibility
+# class: a `dag-preflight-*` id sat in task_ids and blocked the all-terminal gate
+# forever). They are excluded from the ship gate — only PR-backed ids count.
+REVIEW_SHAPED_TASK_ID_PREFIXES = ('dag-preflight-', 'notify-', 'review-')
+
+# A reconcilable-phase mission with NO probeable (PR-backed) task_id can't be
+# auto-shipped — there's nothing to verify terminal, so it stays manual reconcile
+# (fundamentally unprobeable). Once it has lingered past this grace since
+# `created`, it's flagged on the audit line so it surfaces for manual reconcile
+# instead of sitting on the board silently forever.
+EMPTY_PROBEABLE_MISSION_GRACE_DAYS = 14
+
 # Phase S (S3) completion states. A parked card whose spawned work reaches
 # verified-merged (belt-and-suspenders) is routed by its risk: a `safe` card
 # auto-closes to `done` (with a shipped note), a `medium`/`careful` (or
@@ -675,38 +690,88 @@ class MissionDecision:
     reason: str
 
 
+def is_review_shaped_task_id(task_id: Any) -> bool:
+    """True if `task_id` is a non-PR / review-shaped id the orchestrator never
+    opens a PR for (DAG-preflight routing signals, inter-agent notifies, code
+    reviews). Such ids never resolve to a merged PR, so they must NOT count
+    toward the all-PR-backed-task-terminal ship gate — otherwise one review id
+    would permanently block a mission's shipped-detection."""
+    return (isinstance(task_id, str)
+            and task_id.startswith(REVIEW_SHAPED_TASK_ID_PREFIXES))
+
+
+def probeable_task_ids(task_ids: Any) -> list[str]:
+    """The PR-backed task_ids worth probing for a terminal state: non-empty
+    string ids that are NOT review-shaped. A mission ships when all of THESE are
+    terminal; review-shaped ids are ignored entirely (they can never be
+    terminal)."""
+    if not isinstance(task_ids, list):
+        return []
+    return [t for t in task_ids
+            if isinstance(t, str) and t and not is_review_shaped_task_id(t)]
+
+
 def classify_mission(
     phase: Any, task_ids: Any, terminal_states: dict[str, str],
 ) -> MissionDecision:
     """Decide whether a mission flips to `shipped`. Pure.
 
     Ships ONLY when ALL of: the phase is reconcilable (drafting/in_flight/ready
-    — `proposed`/`deferred`/`shipped` are left alone), `task_ids` is a non-empty
-    list, and EVERY task_id resolves to a terminal state (MERGED/CLOSED) in
-    ``terminal_states``. A task_id missing from the map counts as non-terminal.
-    Any OPEN/UNKNOWN/missing task, an empty task list, or a non-reconcilable
-    phase ⇒ KEEP — the conservative posture (spec § 1): never falsely retire
-    live work."""
+    — `proposed`/`deferred`/`shipped` are left alone), the mission has at least
+    one PR-backed (non-review-shaped) task_id, and EVERY PR-backed task_id
+    resolves to a terminal state (MERGED/CLOSED) in ``terminal_states``. A
+    PR-backed task_id missing from the map counts as non-terminal. Review-shaped
+    ids (`dag-preflight-*`/`notify-*`/`review-*`) are ignored — they never back a
+    PR, so requiring them terminal would block shipping permanently. Any
+    OPEN/UNKNOWN/missing PR-backed task, no probeable task at all (empty list or
+    only review-shaped ids), or a non-reconcilable phase ⇒ KEEP — the
+    conservative posture (spec § 1): never falsely retire live work."""
     if phase not in RECONCILABLE_MISSION_PHASES:
         return MissionDecision('keep', f'phase={phase} not reconcilable')
-    if not isinstance(task_ids, list) or not task_ids:
-        # Empty task list: "every entry is terminal" is vacuously true, so guard
-        # explicitly — a mission with no tasks can't be terminal-state shipped.
-        return MissionDecision('keep', 'no task_ids')
+    probeable = probeable_task_ids(task_ids)
+    if not probeable:
+        # Nothing PR-backed to verify: "every entry is terminal" would be
+        # vacuously true, so guard explicitly — a mission with no probeable task
+        # (empty, or only review-shaped ids) can't be terminal-state shipped; it
+        # surfaces via the reconcile flag for manual review instead.
+        return MissionDecision('keep', 'no probeable task_ids')
     non_terminal = [
-        t for t in task_ids
+        t for t in probeable
         if terminal_states.get(t) not in tts.TERMINAL_STATES
     ]
     if non_terminal:
         return MissionDecision('keep', f'{len(non_terminal)} task(s) not terminal')
-    return MissionDecision('ship', 'all-tasks-terminal')
+    return MissionDecision('ship', 'all-pr-backed-tasks-terminal')
 
 
 @dataclass
 class MissionReconcileResult:
     shipped: list[tuple[str, str]] = field(default_factory=list)  # (id, prior_phase)
+    flagged: list[tuple[str, str]] = field(default_factory=list)  # (id, reason)
     kept: int = 0
     probed: int = 0
+
+
+def _maybe_flag_unprobeable_mission(
+    res: MissionReconcileResult, mid: str, mission: dict[str, Any],
+    task_ids: Any, now: datetime,
+) -> None:
+    """Flag a reconcilable mission that has no PR-backed task_id to probe once it
+    has lingered past EMPTY_PROBEABLE_MISSION_GRACE_DAYS since `created`. Surfaces
+    it on the audit line for manual reconcile; it never auto-ships (unprobeable).
+    A missing/unparseable `created` stamp can't be aged, so it stays silent."""
+    created = parse_iso_utc(mission.get('created'))
+    if created is None:
+        return
+    if now - created < timedelta(days=EMPTY_PROBEABLE_MISSION_GRACE_DAYS):
+        return
+    n = len(task_ids) if isinstance(task_ids, list) else 0
+    reason = (f'{(now - created).days}d in reconcilable phase with no probeable '
+              f'task_id ({n} review-shaped/empty)')
+    res.flagged.append((mid, reason))
+    log(f'mission {mid}: no probeable task_id past '
+        f'{EMPTY_PROBEABLE_MISSION_GRACE_DAYS}d grace — flag for manual reconcile '
+        f'({reason})')
 
 
 def reconcile_mission_phases(
@@ -731,13 +796,17 @@ def reconcile_mission_phases(
         if phase not in RECONCILABLE_MISSION_PHASES:
             continue
         task_ids = mission.get('task_ids')
-        if not isinstance(task_ids, list) or not task_ids:
+        mid = mission.get('id') if isinstance(mission.get('id'), str) else '<unknown>'
+        probeable = probeable_task_ids(task_ids)
+        if not probeable:
+            # No PR-backed task to verify terminal (empty, or only review-shaped
+            # ids) — can't auto-ship (stays manual reconcile). Flag it if it has
+            # lingered past the grace so it surfaces instead of sitting silently.
             res.kept += 1
+            _maybe_flag_unprobeable_mission(res, mid, mission, task_ids, now)
             continue
         states: dict[str, str] = {}
-        for tid in task_ids:
-            if not (isinstance(tid, str) and tid):
-                continue
+        for tid in probeable:
             states[tid] = probe_fn(tid)
             res.probed += 1
             if states[tid] not in tts.TERMINAL_STATES:
@@ -746,7 +815,6 @@ def reconcile_mission_phases(
         if decision.action != 'ship':
             res.kept += 1
             continue
-        mid = mission.get('id') if isinstance(mission.get('id'), str) else '<unknown>'
         if dry_run:
             res.shipped.append((mid, f'{phase} (dry-run)'))
             continue
@@ -757,8 +825,8 @@ def reconcile_mission_phases(
         mission['shipped_by'] = 'heal_missions_card_gc'
         mission['prior_phase'] = phase
         res.shipped.append((mid, str(phase)))
-        log(f'mission {mid}: {phase} -> shipped (all {len(task_ids)} task_id(s) '
-            f'terminal: {states})')
+        log(f'mission {mid}: {phase} -> shipped (all {len(probeable)} PR-backed '
+            f'task_id(s) terminal: {states})')
     return res
 
 
@@ -1359,6 +1427,10 @@ def _emit_summary(retire: RetireResult, aged: list[str], commit_status: str,
                     f'{m_brief_verb} {mission_briefed} funnel mission(s), '
                     f'deferred {mission_deferred}; '
                     f'missions-commit={missions_commit_status}')
+        if missions.flagged:
+            flagged_ids = [mid for mid, _ in missions.flagged]
+            summary += (f'; flagged {len(missions.flagged)} unprobeable mission(s) '
+                        f'{flagged_ids} for manual reconcile')
     if retire.emit_failures:
         summary += f'; {len(retire.emit_failures)} emit-failure(s) {retire.emit_failures}'
     if retire.skipped_no_client:

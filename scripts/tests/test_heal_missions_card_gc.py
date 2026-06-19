@@ -413,6 +413,47 @@ class ClassifyMissionTest(unittest.TestCase):
         # Vacuous-truth guard: no tasks ⇒ not "all terminal".
         self.assertEqual(h.classify_mission('ready', [], {}).action, 'keep')
 
+    def test_review_shaped_ids_ignored_in_terminal_gate(self):
+        # A non-terminal review-shaped id (dag-preflight-/notify-/review-) must
+        # NOT block shipping when the PR-backed ids are all terminal.
+        states = {'real-pr-task': h.tts.MERGED}
+        for review_id in ('dag-preflight-clarify-x', 'notify-foo', 'review-bar'):
+            self.assertEqual(
+                h.classify_mission(
+                    'ready', ['real-pr-task', review_id], states).action,
+                'ship',
+                f'review id {review_id} must not block ship')
+
+    def test_unmerged_pr_backed_task_keeps_despite_review_id(self):
+        # No false-ship: a genuinely-unmerged PR-backed id keeps the mission
+        # even when every other id is an (ignored) review id.
+        states = {'real-pr-task': h.tts.OPEN}
+        self.assertEqual(
+            h.classify_mission(
+                'ready', ['real-pr-task', 'dag-preflight-z'], states).action,
+            'keep')
+
+    def test_only_review_shaped_ids_keeps(self):
+        # All ids review-shaped ⇒ no probeable task ⇒ keep (flagged downstream).
+        decision = h.classify_mission(
+            'ready', ['dag-preflight-z', 'review-y'], {})
+        self.assertEqual(decision.action, 'keep')
+        self.assertEqual(decision.reason, 'no probeable task_ids')
+
+
+class ReviewShapedTaskIdTest(unittest.TestCase):
+    def test_predicate_matches_known_prefixes(self):
+        for tid in ('dag-preflight-x', 'notify-y', 'review-z'):
+            self.assertTrue(h.is_review_shaped_task_id(tid))
+
+    def test_predicate_rejects_pr_backed_and_nonstrings(self):
+        for tid in ('clarify-shipper-extend', 'pulse-cycle-alpha-1', '', None, 7):
+            self.assertFalse(h.is_review_shaped_task_id(tid))
+
+    def test_probeable_filters_review_and_blanks(self):
+        ids = ['real-a', 'dag-preflight-x', 'notify-y', '', 'real-b', 5]
+        self.assertEqual(h.probeable_task_ids(ids), ['real-a', 'real-b'])
+
 
 class ReconcileMissionPhasesTest(unittest.TestCase):
     """terminal⇒ship AND live/indeterminate⇒keep (spec §6 conservative guard)."""
@@ -461,6 +502,70 @@ class ReconcileMissionPhasesTest(unittest.TestCase):
         by_id = {m['id']: m for m in reg['missions']}
         self.assertEqual(by_id['m-shipped']['phase'], 'in_flight')
         self.assertNotIn('shipped_at', by_id['m-shipped'])
+
+    def test_review_id_does_not_block_ship_and_is_not_probed(self):
+        # A reconcilable mission whose only non-terminal id is review-shaped
+        # ships once its PR-backed id is terminal — and the review id is never
+        # probed (a permanently-unsatisfiable id can't block shipped-detection).
+        reg = {'schema_version': 1, 'missions': [
+            {'id': 'm-rev', 'phase': 'ready',
+             'task_ids': ['real-pr', 'dag-preflight-real']},
+        ]}
+        probed: list[str] = []
+
+        def probe(tid):
+            probed.append(tid)
+            return h.tts.MERGED if tid == 'real-pr' else h.tts.OPEN
+        res = h.reconcile_mission_phases(
+            reg, self._now(), probe_fn=probe, dry_run=False)
+        self.assertEqual([s[0] for s in res.shipped], ['m-rev'])
+        self.assertEqual(reg['missions'][0]['phase'], 'shipped')
+        self.assertEqual(reg['missions'][0]['prior_phase'], 'ready')
+        self.assertEqual(probed, ['real-pr'])  # review id never probed
+
+    def test_real_unmerged_pr_backed_task_does_not_ship(self):
+        # No false-ship regression: a genuine OPEN PR-backed id keeps the
+        # mission even though the other id is an (ignored) review id.
+        reg = {'schema_version': 1, 'missions': [
+            {'id': 'm-live', 'phase': 'ready',
+             'task_ids': ['real-pr', 'review-x']},
+        ]}
+        res = h.reconcile_mission_phases(
+            reg, self._now(), probe_fn=lambda tid: h.tts.OPEN, dry_run=False)
+        self.assertEqual(res.shipped, [])
+        self.assertEqual(reg['missions'][0]['phase'], 'ready')
+
+    def test_empty_probeable_flagged_past_grace_not_shipped(self):
+        # A reconcilable mission with no probeable task_id (empty, or only
+        # review-shaped ids) that has lingered past the grace is flagged for
+        # manual reconcile — never auto-shipped.
+        old = (self._now()
+               - timedelta(days=h.EMPTY_PROBEABLE_MISSION_GRACE_DAYS + 1))
+        reg = {'schema_version': 1, 'missions': [
+            {'id': 'm-empty', 'phase': 'drafting', 'task_ids': [],
+             'created': old.isoformat()},
+            {'id': 'm-review-only', 'phase': 'ready',
+             'task_ids': ['dag-preflight-y'], 'created': old.isoformat()},
+        ]}
+        res = h.reconcile_mission_phases(
+            reg, self._now(), probe_fn=lambda tid: h.tts.MERGED, dry_run=False)
+        self.assertEqual(res.shipped, [])
+        flagged_ids = sorted(mid for mid, _ in res.flagged)
+        self.assertEqual(flagged_ids, ['m-empty', 'm-review-only'])
+        self.assertTrue(all(m['phase'] != 'shipped' for m in reg['missions']))
+
+    def test_empty_probeable_within_grace_not_flagged(self):
+        # Same shape but freshly created (within grace) ⇒ kept silently, not
+        # flagged: a young mission with no probeable task isn't stale yet.
+        recent = self._now() - timedelta(days=1)
+        reg = {'schema_version': 1, 'missions': [
+            {'id': 'm-fresh', 'phase': 'drafting', 'task_ids': [],
+             'created': recent.isoformat()},
+        ]}
+        res = h.reconcile_mission_phases(
+            reg, self._now(), probe_fn=lambda tid: h.tts.MERGED, dry_run=False)
+        self.assertEqual(res.flagged, [])
+        self.assertEqual(res.shipped, [])
 
 
 # ----------------------------------- Phase S (S3) completion reconcile

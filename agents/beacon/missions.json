@@ -89,7 +89,11 @@
     {
       "id": "operator-ux-catch-me-up-shortcut",
       "name": "Beacon catch-me-up Telegram shortcut",
-      "phase": "drafting",
+      "phase": "shipped",
+      "prior_phase": "drafting",
+      "shipped_at": "2026-06-19T00:00:00+00:00",
+      "shipped_by": "forge-manual-reconcile",
+      "shipped_note": "Already shipped via PR #182 (merged 2026-05-29); board phase was stale because task_ids is empty so the GC healer had nothing to probe. Manually reconciled by Forge per task reconcile-missions-board-harden-ship-reconciler-001 (Beacon-verified 2026-06-19).",
       "brief": "Single Telegram command (e.g. 'catch me up' / 'status') that returns structured since-last-checkpoint summary: merged PRs + open PRs + pending approvals + active alerts + sequence state. Eliminates 5+ refetch round-trips per check-in.",
       "spec_docs": [
         "agents/beacon/specs/operator-ux-catch-me-up-shortcut.md"
@@ -136,7 +140,11 @@
     {
       "id": "clarify-round-visibility",
       "name": "CLARIFY round visibility \u2014 full Q+A on Missions cards",
-      "phase": "ready",
+      "phase": "shipped",
+      "prior_phase": "ready",
+      "shipped_at": "2026-06-19T00:00:00+00:00",
+      "shipped_by": "forge-manual-reconcile",
+      "shipped_note": "Already shipped via PR #22, refined by PR #55 and PR #61; board phase was stale because the task_ids don't match the real merge PRs and carried a non-PR review id (dag-preflight-clarify-round-visibility) that can never be terminal, leaving the all-terminal gate unsatisfiable. Manually reconciled by Forge per task reconcile-missions-board-harden-ship-reconciler-001 (Beacon-verified 2026-06-19).",
       "brief": "Render the full Forge\u2194Beacon CLARIFY round-trip (questions AND answers) on Missions tab side-panel. Supersedes stub operator-ux-clarify-visibility (answer side gap surfaced 2026-05-29). 2-step sequence: agent-core chain_event_shipper extension + dashboard ClarifyRoundDrawer component.",
       "spec_docs": [
         "agents/beacon/specs/clarify-round-visibility.md"
