@@ -672,6 +672,41 @@
         "from_state": "promoted"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "cap-p5-dag-status-on-cards-a822",
+      "title": "P5 \u2014 DAG status on cards",
+      "note": "Glanceable live build status on pipeline phase cards (step N/M \u00b7 actor \u00b7 last event), early \u26a0 stuck badge, project N-of-M rollup, click-through to Build Sequences. Dashboard-only. Spec: agents/beacon/specs/projects-v3-p5-dag-status.md (repo ourliberty-dashboard). Launch through the board to also confirm the P4 enriched completion DM.",
+      "state": "promoted",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ol-work",
+        "branch": "dogfood/mission-action-label-spec",
+        "captured_at": "2026-06-19T22:56:18.785301+00:00"
+      },
+      "last_touched": "2026-06-19T22:56:18.785301+00:00",
+      "promoted_to": "p5-dag-status-on-cards",
+      "spawned": {
+        "kind": "project",
+        "project_id": "p5-dag-status-on-cards",
+        "stamped_at": "2026-06-19T22:57:02.509616+00:00"
+      },
+      "briefing": {
+        "what": "A live status view on each project's cards so you can see at a glance how far along a piece of work is, who's on it, and whether anything's stuck.",
+        "why": "It turns the dashboard into a real-time pulse on everything in motion, so problems surface early instead of after they've cost you time.",
+        "suggest": "Worth doing, but start it as a small contained pilot and confirm it works cleanly before rolling it out widely."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-19T23:02:30.009202+00:00",
+        "from_state": "promoted"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
