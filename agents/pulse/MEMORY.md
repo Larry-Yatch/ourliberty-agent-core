@@ -156,9 +156,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-20 02:27Z UTC (Iter ~2320, Tier 2 consecutive_clean=1, NOMINAL ✅)
+## Status snapshot — updated 2026-06-20 02:41Z UTC (Iter ~2321, Tier 2 consecutive_clean=2, NOMINAL ✅)
 
-**Iter ~2320 summary:** ✅ Nominal. 0 new alerts. wm=921=file_length. 5/5 daemons alive (beacon=599691, dashboard=599692, outbox=598943, inbox-watcher=559441, chain-event=3734305). No stalls. beacon-pending-approvals: pending=1 (silence-routine-weekly-alerts-tier3-001, ~27 min, awaiting Larry "go" approval — Forge build spec for ledger/check-i Tier-3 silence). Heartbeat 02:12:15Z (14 min, fresh). PRIME: systemic_fixes=55, ratio≈19.16. **Tier 2, consecutive_clean=0→1. Need 2 more clean iters to reach Tier 3. Next cadence: 15-min.**
+**Iter ~2321 summary:** ✅ Nominal. 0 new alerts. wm=921=file_length. 5/5 daemons alive (beacon=599691, dashboard=599692, outbox=598943, inbox-watcher=559441, chain-event=3734305). No stalls. beacon-pending-approvals: pending=1 (silence-routine-weekly-alerts-tier3-001, ~42 min, awaiting Larry "go" approval — Forge build spec for ledger/check-i Tier-3 silence). Heartbeat 02:12:15Z (29 min, fresh). PRIME: systemic_fixes=55, ratio≈19.16. **Tier 2, consecutive_clean=1→2. Need 1 more clean iter to reach Tier 3. Next cadence: 15-min.**
 
 
 
