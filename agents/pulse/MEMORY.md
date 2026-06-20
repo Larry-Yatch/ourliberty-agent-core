@@ -156,9 +156,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-20 01:53Z UTC (Iter ~2316, Tier 1, SIGNAL ⚠️)
+## Status snapshot — updated 2026-06-20 01:58Z UTC (Iter ~2317, Tier 1, NOMINAL ✅)
 
-**Iter ~2316 summary:** ⚠️ Signal. 2 new alerts (L919-920): ledger weekly-2026-06-15 + pulse check-i-2026-06-15, both Tier-4 (novel). Bot already DM'd Larry (route=escalate). G-rule ledger/check-i Tier-4 hit 3/3 → dispatched `ledger-check-i-tier3-silence-001` to Beacon for config/alert-translations.json Tier-3 silence fix. All other checks clean. Watermark=920. Daemons: beacon=599691, dashboard=599692, outbox=598943, inbox-watcher=559441, chain-event=3734305 (all alive). beacon-pending-approvals: pending=0. Heartbeat 01:42:15Z (fresh). PRIME: systemic_fixes=55, ratio≈19.15. **Tier 1, consecutive_clean=2→0. Next cadence: 5-min.**
+**Iter ~2317 summary:** ✅ Nominal. 0 new alerts (wm=920=file_length). 5/5 daemons alive (beacon=599691, dashboard=599692, outbox=598943, inbox-watcher=559441, chain-event=3734305). No stalls. beacon-pending-approvals: pending=0. `ledger-check-i-tier3-silence-001` in Beacon inbox (dispatched iter ~2316, ~6 min, awaiting pickup). Heartbeat 01:42:15Z (16 min, fresh). PRIME: systemic_fixes=55, ratio≈19.16. **Tier 1, consecutive_clean=0→1. Next cadence: 5-min.**
 
 
 
