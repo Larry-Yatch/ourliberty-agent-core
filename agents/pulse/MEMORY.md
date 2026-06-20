@@ -156,9 +156,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-20 02:08Z UTC (Iter ~2318, Tier 1, NOMINAL ✅)
+## Status snapshot — updated 2026-06-20 02:12Z UTC (Iter ~2319, Tier 2, NOMINAL ✅)
 
-**Iter ~2318 summary:** ✅ Nominal. 1 new alert (L921 Tier-3 silenced, approval_request). wm=921=file_length. 5/5 daemons alive (beacon=599691, dashboard=599692, outbox=598943, inbox-watcher=559441, chain-event=3734305). No stalls. beacon-pending-approvals: pending=1 (silence-routine-weekly-alerts-tier3-001, ~8 min, expected). Heartbeat 01:42:15Z (26 min, fresh). GC healer committed captures.json (91eba788) between iters — expected. PRIME: systemic_fixes=55, ratio≈19.16. **Tier 1, consecutive_clean=1→2. 1 more clean iter → Tier 2. Next cadence: 5-min.**
+**Iter ~2319 summary:** ✅ Nominal. 0 new alerts. wm=921=file_length. 5/5 daemons alive (beacon=599691, dashboard=599692, outbox=598943, inbox-watcher=559441, chain-event=3734305). No stalls. beacon-pending-approvals: pending=1 (silence-routine-weekly-alerts-tier3-001, ~13 min, awaiting Larry "go" approval — Beacon's Forge build spec for ledger/check-i Tier-3 silence). Heartbeat 01:42:15Z (30 min, fresh). PRIME: systemic_fixes=55, ratio≈19.16. **Tier 1→2 de-escalation (3rd consecutive clean iter). Next cadence: 15-min.**
 
 
 
