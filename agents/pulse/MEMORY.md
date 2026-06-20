@@ -144,9 +144,9 @@
 
 ---
 
-## G-rule projects-json-healer-path-unregistered → DISPATCHED (iter ~2309, 2026-06-20)
+## G-rule projects-json-healer-path-unregistered → COMPLETE ✅ (iter ~2309 dispatch, iter ~2313 verified)
 
-**Rule:** `agents/beacon/projects.json` is written and committed by a projects-store healer but was NOT listed in `config/healer-managed-runtime-paths.json`. Produced Check A dirty-tree finding (never-auto + tier-reset) on 3 occasions. G-rule 3/3 threshold hit at iter ~2309 → dispatch sent to Beacon (`projects-json-healer-path-register-001.json`). Fix: add `agents/beacon/projects.json` to allowlist. Watching for Beacon spec → Forge PR → Mirror PASS → merge → PRIME verify.
+**Rule:** `agents/beacon/projects.json` is written and committed by a projects-store healer but was NOT listed in `config/healer-managed-runtime-paths.json`. Produced Check A dirty-tree finding (never-auto + tier-reset) on 3 occasions. G-rule 3/3 threshold hit at iter ~2309 → dispatch sent to Beacon (`projects-json-healer-path-register-001.json`). PR #603 `fix(config): register projects.json as healer-managed runtime path` merged 2026-06-20T01:21:55Z. Fix adds projects.json to `config/healer-managed-runtime-paths.json`, `scripts/_lib_pulse_runtime.sh`, and `scripts/heal_droplet_git_drift.py`. PRIME verified iter ~2313. **G-rule COMPLETE.**
 
 ---
 
@@ -156,9 +156,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-20 01:04Z UTC (Iter ~2312, Tier 2, NOMINAL ✅)
+## Status snapshot — updated 2026-06-20 01:26Z UTC (Iter ~2313, Tier 2→1, SIGNAL ⚠️ auto-fixed)
 
-**Iter ~2312 summary:** ✅ Nominal. 0 new alerts (watermark=912=file_length). Forge system-self-awareness-the-standing-brain build completed: PR #602 `feat(system-awareness): work-in-flight State Log (Slice 1)` created at 01:00:22Z, MERGEABLE, pending Mirror review. All 5 daemons alive (dashboard_api 497752, outbox_notifier 497831, inbox-watcher 559441, beacon 559555, chain-event 3734305). Pending approval: healer-runtime-path-projects-json-001 (Larry hasn't responded to 18:48 MDT DM). Watermark=912. Heartbeat 00:41Z (fresh ~23 min). PRIME: trailing-30d interventions=1052, systemic_fixes=54, ratio=19.48. **Tier 1→2 (de-escalated; 3 consecutive clean). consecutive_clean=0. Next cadence: 15-min.**
+**Iter ~2313 summary:** ⚠️ Signal (auto-fixed). Check A: behind origin/main by PR #603 merge — git pull --ff-only executed. G-rule projects-json-healer-path-unregistered **COMPLETE ✅** (PR #603 merged 01:21:55Z). 2 new alerts (L913 sequence-complete, L914 mirror-dag-pass) both Tier-3 silenced. Watermark=914. All 5 daemons alive. beacon-pending-approvals: pending=0. Heartbeat 01:11Z (fresh ~14 min). New sequence `launch-system-self-awareness-slice-1-state-log` activated 01:20Z — watch for Forge build. PRIME: trailing-30d interventions=1052, systemic_fixes=54, ratio=19.48. **Tier 2→1 (signal; Check A). consecutive_clean=0. Next cadence: 5-min.**
 
 
 

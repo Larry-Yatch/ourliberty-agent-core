@@ -4,6 +4,95 @@
 
 ---
 
+## Iteration ~2313 — 2026-06-20T01:26Z UTC (interactive, /cycle, Tier 2→1, consecutive_clean=0, SIGNAL ⚠️)
+
+**Trigger:** Larry `/cycle` invocation.
+
+**Health:** ⚠️ Signal — Check A: local HEAD 3c7b2dcf behind origin/main f9f62c89 (PR #603 `fix(config): register projects.json as healer-managed runtime path`, merged 01:21:55Z). Auto-fixed (git pull --ff-only). G-rule projects-json-healer-path-unregistered: **COMPLETE ✅** (dispatched iter ~2309 → PR #603 merged). All other checks nominal.
+
+**VERIFY-BEFORE-REASSERT:**
+- **All 5 daemons alive:** dashboard_api 497752 (Ssl, 5h10m) ✅, outbox_notifier 497831 (Ss, 5h10m) ✅, inbox-watcher 559441 (Ssl, 1h09m) ✅, beacon 559555 (Ss, 1h09m) ✅, chain-event 3734305 (SNs, 2d 22h56m) ✅.
+- **Stale bash orphan PID 1834248:** Not re-checked this iter; no change signal. [carry]
+- **G-rule projects-json-healer-path-unregistered:** PR #603 merged at 01:21:55Z. Fast-forward confirmed (config/healer-managed-runtime-paths.json +1, scripts/_lib_pulse_runtime.sh +1, scripts/heal_droplet_git_drift.py +1). **COMPLETE ✅** [CLOSED]
+- **healer-runtime-path-projects-json-001:** Larry approved at 19:07 MDT → Forge built PR #603 → Mirror revision cycle → PR #603 merged 01:21:55Z. beacon-pending-approvals.json: pending=0. **COMPLETE** [CLOSED]
+- **G-rule forge-preflight-task-id-mismatch 1/3:** No new occurrence this iter. [carry at 1/3]
+- **launch-system-self-awareness-slice-1-state-log:** NEW sequence activated at 01:20:14Z (L914, Tier-3 silenced). Build sequence advancer will dispatch first Forge step within 5 min. Watch for build in next iter. [NEW]
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 912, "file_length": 914}`. 2 new alerts:
+- L913: `source=outbox-notifier, subject=sequence-complete:launch-system-self-awareness-the-standing-brain` → Tier-3 silence (known-pattern). Bot delivered at 19:14 MDT (idx=912). ✅
+- L914: `source=outbox-notifier, subject=mirror-dag-pass:launch-system-self-awareness-slice-1-state-log` → Tier-3 silence (known-pattern). ✅
+Watermark advanced 912→914. No tier-reset from Check 0.
+
+**Check 1 — Log noise:** outbox-notifier.log: 0 new WARN/ERROR (all activity since iter ~2312 is INFO: healer-runtime-path-projects-json-001 revision + re-review + merge). inbox_watcher.log: 0 WARN/ERROR (all INFO task completions). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot PID 559555 alive. Last log: 19:18:25 MDT (Larry 'status' → catch_me_up). No new directives since iter ~2312. No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → "no stalls detected." 10 FORGE_NO_PR_SKIP (same known set: preflight_exit or pr_exists). ✅ Nominal.
+
+**Check 4 — Pending directives:** watermark=914=file_length (0 outstanding). beacon-pending-approvals.json: pending=0 (healer-runtime-path-projects-json-001 resolved). Forge inbox: empty ✅. Beacon inbox: empty ✅. Larry directives in 24h: 'go' at 19:07 MDT (healer approval → DONE), 'status' at 19:18 MDT (catch_me_up → DONE). ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-20T01:11:50Z (~14 min ago). FRESH (< 60 min). ✅ Nominal.
+
+**Check A — Source repo:** ⚠️ On main, tree clean, but behind origin/main — 3c7b2dcf vs f9f62c89 (PR #603 merged 01:21:55Z during this iter). **always-fix:** `git pull --ff-only` executed. Fast-forward: 3 files changed (healer-managed-runtime-paths.json, _lib_pulse_runtime.sh, heal_droplet_git_drift.py). Now at f9f62c89=origin/main. tier-reset.
+
+**Check B — Sync health:** last_sync=2026-06-20T00:56:15Z (~30 min ago), status=no-change. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** dashboard_api 497752 (Ssl, 5h10m) ✅, outbox_notifier 497831 (Ss, 5h10m) ✅, inbox-watcher 559441 (Ssl, 1h09m) ✅, beacon 559555 (Ss, 1h09m) ✅, chain-event 3734305 (SNs, 2d 22h56m) ✅. 5/5. ✅
+
+**Check E — PRs:** ourliberty-agent-core: 0 open PRs ✅ (PR #603 merged this iter). ourliberty-dashboard: 0 open PRs ✅. Note: sequence `launch-system-self-awareness-slice-1-state-log` activated 01:20:14Z — Forge build step expected to appear shortly. Nominal (pipeline flowing).
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Check I (Sat UTC, weekday=5 ∉ {0,2,4,6}):** Not a Check I day — skip. ✅
+**Check III:** Not Sunday — skip. ✅
+**Check VIII/IX/X:** Not Monday — skip. ✅
+
+**Actions taken:**
+1. Alert watermark: advanced 912→914.
+2. Check A: `git pull --ff-only` executed (3c7b2dcf→f9f62c89). Logged to cycle-actions.jsonl.
+3. PRIME ledger: `intervention` appended (tier=2, ff-main-when-behind).
+4. PRIME ledger: `systemic_fix` appended (tier=2, projects-json-healer-path-unregistered COMPLETE, PR #603).
+5. Tier state: reset 2→1 (signal; Check A behind-origin). consecutive_clean=0.
+
+**Dispatches:** None.
+
+**Standing findings (carried forward):**
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [blue] **install-drift:ourliberty-build-sequence-advancer.service** — Tier-3 silenced. [carry]
+- [blue] **unreviewed-merge:571** — bot DM'd. Larry judgment. [carry]
+- [blue] **Stale bash orphan** — PID 1834248 (Ss, ~22d 7h). [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule ledger/check-i Tier-4** — 2/3. Watch. Dispatch to Beacon at 3/3.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule catalog-accuracy-drift-tier4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule mirror-marker-parse-error** — 1/3. Watch.
+- [blue] **G-rule watchdog-watcher-log-stale** — 1/3. Watch.
+- [blue] **G-rule health-notify-script-missing** — Beacon dispatch sent 2026-06-09, fix status unverified. [carry]
+- [blue] **G-rule forge-preflight-no-marker** — **COMPLETE ✅** (PR #600 auto-merged). [CLOSED]
+- [blue] **G-rule outbox-notifier-review-pass-tier4** — 1/3. Watch; dispatch to Beacon at 3/3.
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule heal-droplet-git-drift Tier-4** — **COMPLETE ✅** (PR #586 merged). [CLOSED]
+- [blue] **G-rule projects-json-healer-path-unregistered** — **COMPLETE ✅** (PR #603 merged 01:21:55Z). [CLOSED]
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+- [blue] **launch-system-self-awareness-slice-1-state-log** — sequence activated 01:20:14Z, Forge build dispatch pending (≤5 min from activation). Watch. [NEW]
+
+**PRIME DIRECTIVE:** 1 intervention (ff-pull), 1 systemic_fix (G-rule projects-json-healer-path-unregistered COMPLETE). Trailing-30d: interventions=1052, systemic_fixes=54, ratio=19.48, trend=improving.
+**Tier end-of-iter:** Tier 2→1 (signal; Check A behind-origin). consecutive_clean=0. Next cadence: 5-min.
+
+---
+
 ## Iteration ~2312 — 2026-06-20T01:04Z UTC (interactive, /cycle, Tier 1→2, consecutive_clean=2→3, NOMINAL ✅)
 
 **Trigger:** Larry `/cycle` invocation.
