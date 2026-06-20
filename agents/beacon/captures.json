@@ -797,6 +797,36 @@
         "from_state": "parked"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "cap-board-add-abort-for-a-dispatched-build-no-way-to-c22d",
+      "title": "Board: add ABORT for a dispatched build (no way to stop auto-merge) \u2014 NEXT PRIORITY",
+      "note": "Dogfood 2026-06-20 proved the board's most dangerous gap: once a build is dispatched there is NO way to abort it before it auto-merges. PR #602 auto-merged a build we'd tried to stop; the duplicate dispatched before we could cancel. FIX = a 'Cancel/Abort build' action on an active project/sequence that (1) marks the build-sequence cancelled, (2) stops the advancer, (3) GUARANTEES nothing from that build auto-merges (mark the dispatch cancelled so Mirror/auto-merge skip it, and/or auto-close its PR), (4) cleans up the Forge worktree/inbox. Invariant: after abort, no PR from that build can land on main. SECONDARY (same area, lower urgency): launch should show + require confirming repo+spec_docs before dispatch, and mission spec_docs should be editable post-create. Build this the CONTROLLED way (not through the board). Owner = Projects-tab-v3 board stream / next build.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ol-work",
+        "branch": "dogfood/mission-action-label-spec",
+        "captured_at": "2026-06-20T02:00:29.992529+00:00"
+      },
+      "last_touched": "2026-06-20T02:00:29.992529+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "Right now, once we kick off an automated build there's no stop button \u2014 and last night one we tried to halt went live on its own anyway.",
+        "why": "Without a way to abort, a bad or duplicate build can ship to our live product before anyone can intervene, which is exactly how mistakes reach customers.",
+        "suggest": "Approve building a reliable 'Cancel build' button as the next priority, and have the team walk you through the safeguards before it goes in given the stakes."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-20T02:04:48.404818+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
