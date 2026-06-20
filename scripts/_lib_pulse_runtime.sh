@@ -82,6 +82,7 @@ PULSE_RUNTIME_PATHS=(
 SYNC_EXTRA_RUNTIME_PATHS=(
     "agents/beacon/captures.json"
     "agents/beacon/missions.json"
+    "agents/beacon/projects.json"
 )
 
 # The full machine-owned set: Pulse runtime (sync auto-commits) + healer-owned

@@ -73,6 +73,7 @@ HEALER_MANAGED_RUNTIME_PATHS_FILE = (
 _HEALER_MANAGED_PATHS_FALLBACK = (
     'agents/beacon/captures.json',
     'agents/beacon/missions.json',
+    'agents/beacon/projects.json',
 )
 
 GIT_TIMEOUT_S = 30
