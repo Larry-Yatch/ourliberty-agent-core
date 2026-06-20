@@ -55,6 +55,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import tempfile
 from datetime import datetime, timezone
@@ -76,6 +77,13 @@ LOG_REL = 'logs/alert-triage-state.log'
 # lifecycle write. Its own store means the lifecycle writes can never touch it.
 WATERMARK_REL = 'state/alert-triage-watermark.json'
 WATERMARK_KEY = 'last_claimed_line'
+
+# Trailing rotating ISO-date suffix on a subject (e.g. weekly-2026-06-15,
+# check-i-2026-06-15). Stripped in _translation_match so a stable prefix key
+# (weekly / check-i) can match a date-rotating subject. Anchored to a leading
+# '-' and the end of string so it only fires on a genuine -YYYY-MM-DD suffix,
+# never on a ':'-delimited subject or an interior date.
+_ISO_DATE_SUFFIX_RE = re.compile(r'-\d{4}-\d{2}-\d{2}.*$')
 
 # Phase C — the per-template execution track-record store. Distinct from the
 # per-alert lifecycle state above: keyed by action-template, it accrues one
@@ -548,8 +556,14 @@ def _translation_match(translations: dict[str, Any], source: str,
 
     Mirrors the table's own lookup_rule: source must match a top-level key
     exactly; then exact subject, else strip trailing ``:``-segments one at a
-    time and retry (longest-prefix, first match wins). ``_schema`` is metadata,
-    never a source.
+    time and retry (longest-prefix, first match wins). If that loop also
+    misses, strip a trailing ``-YYYY-MM-DD`` ISO-date suffix from the derived
+    key and retry once — this lets a stable prefix key (e.g. ``weekly`` /
+    ``check-i``) match a date-rotating subject (``weekly-2026-06-15``) without
+    enumerating every date. The step is inert unless a ``-YYYY-MM-DD`` suffix
+    is present AND the stripped key (which must DIFFER from the original) exists
+    in the source's ``by_subject`` map, so no existing match is altered.
+    ``_schema`` is metadata, never a source.
 
     Some producers (e.g. outbox-notifier success alerts) carry the pattern in
     ``intent`` and leave ``subject`` None. When ``subject is None`` we fall back
@@ -589,6 +603,16 @@ def _translation_match(translations: dict[str, Any], source: str,
         if ':' not in key:
             break
         key = key.rsplit(':', 1)[0]
+    # Trailing rotating ISO-date strip: a stable prefix key matches a
+    # date-rotating subject (weekly-<date>, check-i-<date>). Re-derive from the
+    # original key (subject -> intent -> kind), not the ':'-stripped remainder.
+    base = subject if subject is not None \
+        else (intent if intent is not None else kind)
+    if base:
+        stripped = _ISO_DATE_SUFFIX_RE.sub('', base)
+        if stripped != base and stripped in by_subject:
+            entry = by_subject[stripped]
+            return entry if isinstance(entry, dict) else {}
     wildcard = by_subject.get('*')
     if wildcard is not None:
         return wildcard if isinstance(wildcard, dict) else {}
