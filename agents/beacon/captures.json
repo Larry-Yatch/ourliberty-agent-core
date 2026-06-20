@@ -707,6 +707,36 @@
         "from_state": "promoted"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "cap-board-new-mission-has-no-confirmation-drain-lag-5dbc",
+      "title": "Board: +New mission has no confirmation + drain lag (dogfood)",
+      "note": "Dogfood 2026-06-19 (system-awareness mission): after Create the modal shows 'Queued' then closes, but the mission does NOT appear on the board until heal_orphan_autoregister drains the new-mission-queue (>2min, 2 refreshes, still 16 parked, no confirmation card). UX trust gap on a board meant to be trusted at a glance. Suggested fix: optimistic 'pending/queued' card on Create that reconciles when drained, or at minimum a confirmation toast. Owner = Projects-tab-v3 board stream (system-awareness mission is layered above the board).",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ol-work",
+        "branch": "dogfood/mission-action-label-spec",
+        "captured_at": "2026-06-20T00:16:19.352907+00:00"
+      },
+      "last_touched": "2026-06-20T00:16:19.352907+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "When someone adds a new item to the board, it silently disappears for a couple of minutes before showing up, with no confirmation it worked.",
+        "why": "The board is meant to be trusted at a glance, and this gap makes people doubt whether their action took \u2014 eroding confidence in the one tool they rely on.",
+        "suggest": "Worth fixing soon with a simple 'we got it' confirmation and a placeholder card, but scope it carefully and test before rollout since it touches the core board everyone watches."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-20T00:24:05.389795+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
