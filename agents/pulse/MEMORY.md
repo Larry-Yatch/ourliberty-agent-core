@@ -156,9 +156,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-20 00:52Z UTC (Iter ~2310, Tier 1, NOMINAL ✅)
+## Status snapshot — updated 2026-06-20 00:58Z UTC (Iter ~2311, Tier 1, NOMINAL ✅)
 
-**Iter ~2310 summary:** ✅ Nominal. 1 new alert (L911 Tier-3: approval_request delivery confirmation for healer-runtime-path-projects-json-001). Check A clean (projects.json now committed). New G-rule: forge-preflight-task-id-mismatch 1/3 (system-self-awareness-the-standing-brain preflight wrote wrong task_id; retry-1/3 self-healed). All 5 daemons alive (dashboard_api 497752, outbox_notifier 497831, inbox-watcher 559441, beacon 559555, chain-event 3734305). 0 open PRs. Forge building system-self-awareness-the-standing-brain (started 00:43Z, ~9 min in). Pending approval: healer-runtime-path-projects-json-001 (bot DM'd Larry 18:48 MDT). Watermark=911. Heartbeat 00:41Z (fresh ~10 min). PRIME: interventions=1052, systemic_fixes=54, ratio≈19.48, trend=improving. **Tier 1, consecutive_clean=0→1. Next cadence: 5-min.**
+**Iter ~2311 summary:** ✅ Nominal. 1 new alert (L912 Tier-3: dispatch-branch-cleanup summary). Check A clean (new healer commit 9e767680 `chore(missions): autoregister healer — reconcile proposed lane`). No new G-rules. All 5 daemons alive (dashboard_api 497752, outbox_notifier 497831, inbox-watcher 559441, beacon 559555, chain-event 3734305). 0 open PRs. Forge building system-self-awareness-the-standing-brain (~15m in at 00:58Z, no PR yet, within stall window). Pending approval: healer-runtime-path-projects-json-001 (awaiting Larry's Telegram response). Watermark=912. Heartbeat 00:41Z (fresh ~17 min). PRIME: trailing-30d interventions=27, systemic_fixes=2, ratio=13.50. **Tier 1, consecutive_clean=1→2. Need 1 more clean iter for Tier 2. Next cadence: 5-min.**
 
 
 
