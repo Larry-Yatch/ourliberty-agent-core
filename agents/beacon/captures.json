@@ -767,6 +767,36 @@
         "from_state": "parked"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "cap-board-card-doesn-t-reflect-a-successful-launch-d-4c0e",
+      "title": "Board: card doesn't reflect a successful Launch -> duplicate launches 409 (dogfood)",
+      "note": "Dogfood 2026-06-19. After a SUCCESSFUL 'Launch build', the project card stays on 'Brainstorm' with the 'Launch build' button still active (no Building/dispatched state shown). Clicking again POSTs /api/projects/launch -> 409 Conflict (sequence already exists), silently reverting to 'Launch build'. Verified via /api/system/build-sequences: sequence 'launch-system-self-awareness-slice-1-state-log' exists, status 'pending'. So the launch worked the first time but the UI gives zero feedback, causing confusing repeated clicks. Suggest: on a successful launch advance the card to Building/dispatched (or disable the button + show queued), and surface the 409 instead of silently reverting. Owner = Projects-tab-v3 board stream.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ol-work",
+        "branch": "dogfood/mission-action-label-spec",
+        "captured_at": "2026-06-20T01:14:16.782341+00:00"
+      },
+      "last_touched": "2026-06-20T01:14:16.782341+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "After you successfully kick off a project build, the board card doesn't change and still shows the 'Launch' button, so it looks like nothing happened.",
+        "why": "People click 'Launch' again thinking it failed, which throws a confusing error and makes a working feature feel broken \u2014 eroding trust in the tool.",
+        "suggest": "Worth fixing soon: have the card clearly move to a 'Building' state once a launch succeeds, but validate the change carefully before shipping so we don't introduce new confusion."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-20T01:14:19.913222+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
