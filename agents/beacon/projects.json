@@ -319,12 +319,12 @@
           "id": "system-self-awareness-slice-1-state-log",
           "title": "System self-awareness - Slice 1 (State Log)",
           "desired_end_state": "Slice 1: whole-system work-in-flight State Log (generalize the missions Narrator). Build STRICTLY from the spec doc.",
-          "lifecycle_state": "brainstorm",
+          "lifecycle_state": "building",
           "order": 0,
           "spec_ref": "agents/beacon/specs/system-awareness-slice-1-state-log.md",
-          "sequence_ref": null,
+          "sequence_ref": "launch-system-self-awareness-slice-1-state-log",
           "created_at": "2026-06-20T01:04:15.976634+00:00",
-          "updated_at": "2026-06-20T01:04:15.976634+00:00"
+          "updated_at": "2026-06-20T01:25:17.432586+00:00"
         }
       ],
       "one_off": true,
