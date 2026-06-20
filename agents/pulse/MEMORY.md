@@ -156,9 +156,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-20 00:46Z UTC (Iter ~2309, Tier 1, SIGNAL ⚠️)
+## Status snapshot — updated 2026-06-20 00:52Z UTC (Iter ~2310, Tier 1, NOMINAL ✅)
 
-**Iter ~2309 summary:** ⚠️ Signal. Check A: agents/beacon/projects.json dirty (healer-managed, NOT in allowlist) → G-rule projects-json-healer-path-unregistered 3/3 → **DISPATCHED to Beacon** (`projects-json-healer-path-register-001.json`). 1 new alert (L910 Tier-3: mirror-dag-pass:launch-system-self-awareness-the-standing-brain). All 5 daemons alive (PIDs unchanged: dashboard_api 497752, outbox_notifier 497831, inbox-watcher 559441, beacon 559555, chain-event 3734305). 0 open PRs. Forge actively running system-self-awareness-the-standing-brain (started 00:43Z). PR #601 merged (system-awareness Slice 1 spec). Watermark=910. Heartbeat 00:41Z (fresh). PRIME: interventions=1052, systemic_fixes=54, ratio≈19.46, trend=improving. **Tier 2→1 (signal), consecutive_clean=0. Next cadence: 5-min.**
+**Iter ~2310 summary:** ✅ Nominal. 1 new alert (L911 Tier-3: approval_request delivery confirmation for healer-runtime-path-projects-json-001). Check A clean (projects.json now committed). New G-rule: forge-preflight-task-id-mismatch 1/3 (system-self-awareness-the-standing-brain preflight wrote wrong task_id; retry-1/3 self-healed). All 5 daemons alive (dashboard_api 497752, outbox_notifier 497831, inbox-watcher 559441, beacon 559555, chain-event 3734305). 0 open PRs. Forge building system-self-awareness-the-standing-brain (started 00:43Z, ~9 min in). Pending approval: healer-runtime-path-projects-json-001 (bot DM'd Larry 18:48 MDT). Watermark=911. Heartbeat 00:41Z (fresh ~10 min). PRIME: interventions=1052, systemic_fixes=54, ratio≈19.48, trend=improving. **Tier 1, consecutive_clean=0→1. Next cadence: 5-min.**
 
 
 
