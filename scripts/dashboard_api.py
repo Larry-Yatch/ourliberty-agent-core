@@ -169,6 +169,20 @@ def _projects_json_path() -> Path:
     return _repo_root() / 'agents' / 'beacon' / 'projects.json'
 
 
+def _state_log_json_path() -> Path:
+    """Path to the work-in-flight State Log (system self-awareness Slice 1).
+    The SOLE writer is `system_state_log.py` (riding the GC tick); this read
+    surface only reads it. It is UNCOMMITTED droplet runtime state, so it lives
+    under the agents blackboard — NOT `_repo_root()`. Env-overridable
+    (`OURLIBERTY_SYSTEM_STATE_LOG`) so tests redirect reads to a tmpdir, and so
+    the path stays in lockstep with the narrator's own resolver of the same
+    name."""
+    override = os.environ.get('OURLIBERTY_SYSTEM_STATE_LOG')
+    if override:
+        return Path(override)
+    return _agents_root() / 'blackboard' / 'system-state-log.json'
+
+
 def _new_mission_queue_dir() -> Path:
     """Directory the +New mission flow drops queued mission entries into for
     the missions writer (heal_orphan_autoregister) to drain into missions.json
@@ -617,6 +631,26 @@ class CapturesResponse(BaseModel):
     captures: list[dict[str, Any]]
     last_synced_at: Optional[str]
     schema_version: Optional[int] = None
+
+
+class SystemStateLogResponse(BaseModel):
+    # The work-in-flight State Log read surface (system self-awareness Slice 1
+    # § D3). Serves the narrator's doc verbatim plus two derived freshness
+    # signals the consumer needs to degrade honestly:
+    #   * `present`  — False when the log has never been written (first tick
+    #                  hasn't run, or the file was removed); all doc fields null.
+    #   * `stale`    — True when the file is older than STATE_LOG_STALE_AFTER_SEC,
+    #                  so Beacon can caveat "this picture is N minutes old".
+    # Additive read surface: it NEVER raises on a missing/malformed file — a
+    # broken log degrades to present=False rather than 500ing the dashboard.
+    present: bool = True
+    stale: bool = False
+    last_synced_at: Optional[str] = None
+    schema_version: Optional[int] = None
+    as_of: Optional[str] = None
+    narrative_prose: Optional[str] = None
+    structured_snapshot: Optional[dict[str, Any]] = None
+    provenance: Optional[dict[str, Any]] = None
 
 
 class MissionsDerivedResponse(BaseModel):
@@ -2791,6 +2825,68 @@ def _reader_captures(captures_path: Path) -> dict[str, Any]:
         'captures': captures,
         'last_synced_at': _iso(_safe_mtime(captures_path)),
         'schema_version': schema_version,
+    }
+
+
+# A State Log older than this is reported `stale` so Beacon can caveat the
+# answer ("this picture is N minutes old"). Sized to the narrator's cadence
+# (it rides the GC tick, ~15 min) plus headroom for a skipped/slow tick.
+STATE_LOG_STALE_AFTER_SEC = 25 * 60
+
+
+def _reader_system_state_log(state_log_path: Path) -> dict[str, Any]:
+    """Return the work-in-flight State Log doc + freshness signals (Slice 1
+    § D3). Fail-safe like `_reader_projects`, NOT `_reader_missions`: a missing
+    OR malformed log degrades to `present=False` (never a 500) — the State Log
+    is an additive read surface and a broken file must never break the
+    dashboard. Missing/unreadable → present=False, stale=True, doc fields null.
+    A present, well-formed log carries an mtime-derived `last_synced_at` and a
+    `stale` flag computed against STATE_LOG_STALE_AFTER_SEC."""
+    empty = {
+        'present': False,
+        'stale': True,
+        'last_synced_at': None,
+        'schema_version': None,
+        'as_of': None,
+        'narrative_prose': None,
+        'structured_snapshot': None,
+        'provenance': None,
+    }
+    if not state_log_path.exists():
+        return empty
+    try:
+        raw = state_log_path.read_text()
+        data = json.loads(raw) if raw.strip() else {}
+    except (OSError, json.JSONDecodeError):
+        return dict(empty)
+    if not isinstance(data, dict):
+        return dict(empty)
+    mtime = _safe_mtime(state_log_path)
+    stale = mtime is None or (time.time() - mtime) > STATE_LOG_STALE_AFTER_SEC
+    schema_version = data.get('schema_version')
+    if not isinstance(schema_version, int):
+        schema_version = None
+    snapshot = data.get('structured_snapshot')
+    if not isinstance(snapshot, dict):
+        snapshot = None
+    provenance = data.get('provenance')
+    if not isinstance(provenance, dict):
+        provenance = None
+    narrative = data.get('narrative_prose')
+    if not isinstance(narrative, str):
+        narrative = None
+    as_of = data.get('as_of')
+    if not isinstance(as_of, str):
+        as_of = None
+    return {
+        'present': True,
+        'stale': stale,
+        'last_synced_at': _iso(mtime),
+        'schema_version': schema_version,
+        'as_of': as_of,
+        'narrative_prose': narrative,
+        'structured_snapshot': snapshot,
+        'provenance': provenance,
     }
 
 
@@ -8197,6 +8293,19 @@ def get_system_build_sequences() -> dict[str, Any]:
 )
 def get_system_missions() -> dict[str, Any]:
     return _reader_missions(_missions_json_path())
+
+
+# GET /api/system/state-log — the work-in-flight State Log (system
+# self-awareness Slice 1 § D3). Serves the narrator's doc verbatim plus
+# present/stale freshness signals; same auth gate as the sibling /api/system
+# reads. Fail-safe: a missing/malformed log returns present=False, never a 500.
+@app.get(
+    '/api/system/state-log',
+    response_model=SystemStateLogResponse,
+    dependencies=[Depends(_require_token)],
+)
+def get_system_state_log() -> dict[str, Any]:
+    return _reader_system_state_log(_state_log_json_path())
 
 
 # GET /api/missions/captures — the Parked-lane data source (Missions v2
