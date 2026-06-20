@@ -650,6 +650,7 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
             task_stem=task_id,
             out_meta=meta,
             expected_agent=agent,
+            phase=task.get("phase"),
         )
     except Exception as e:
         log(f"[{agent}] agent_runner.run_claude raised on {task_file.name}: {e!r}")
