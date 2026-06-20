@@ -156,9 +156,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-20 01:26Z UTC (Iter ~2313, Tier 2→1, SIGNAL ⚠️ auto-fixed)
+## Status snapshot — updated 2026-06-20 01:39Z UTC (Iter ~2314, Tier 1, NOMINAL ✅)
 
-**Iter ~2313 summary:** ⚠️ Signal (auto-fixed). Check A: behind origin/main by PR #603 merge — git pull --ff-only executed. G-rule projects-json-healer-path-unregistered **COMPLETE ✅** (PR #603 merged 01:21:55Z). 2 new alerts (L913 sequence-complete, L914 mirror-dag-pass) both Tier-3 silenced. Watermark=914. All 5 daemons alive. beacon-pending-approvals: pending=0. Heartbeat 01:11Z (fresh ~14 min). New sequence `launch-system-self-awareness-slice-1-state-log` activated 01:20Z — watch for Forge build. PRIME: trailing-30d interventions=1052, systemic_fixes=54, ratio=19.48. **Tier 2→1 (signal; Check A). consecutive_clean=0. Next cadence: 5-min.**
+**Iter ~2314 summary:** ✅ Nominal. All checks clean. 1 new alert (L915 Tier-3 silenced, review-pass). Check A: projects.json auto-committed by healer mid-cycle — PR #603 fix confirmed working (SYNC_EXTRA_RUNTIME_PATHS exemption active). `system-self-awareness-slice-1-state-log` Forge build no-op: Forge correctly declined to duplicate PR #602 (Slice 1 already merged). Outbox-notifier misclassified build result as "ack-proceed" (scanner detected old PROCEED text in resumed session); Beacon notified 01:30:42Z; no stall. Watermark=915. All 5 daemons alive. beacon-pending-approvals: pending=0. Heartbeat 01:11Z (watch for staleness next iter). PRIME: systemic_fixes=55, ratio≈19.1. **Tier 1, consecutive_clean=0→1. Need 2 more clean iters for Tier 2. Next cadence: 5-min.**
 
 
 
