@@ -102,9 +102,9 @@
 
 ---
 
-## Ledger/Check-I Tier-4 → DISPATCHED ✅ (iter ~2316)
+## Ledger/Check-I Tier-4 → COMPLETE ✅ (iter ~2316 dispatch, iter ~2347 PRIME verified)
 
-**Rule:** `source=ledger` weekly reports (subject=weekly-YYYY-MM-DD) and `source=pulse` Check I digests (subject=check-i-YYYY-MM-DD) consistently classify as Tier-4 (novel, no template) in the triage helper. G-rule hit 3/3 at iter ~2316 (iters ~1900, ~2315, ~2316). Beacon envelope `ledger-check-i-tier3-silence-001` dispatched 2026-06-20T01:52Z requesting Tier-3 silence translations for both patterns in `config/alert-translations.json`. Bot DM via route=escalate preserved. **verification_pending — waiting for Forge PR + merge.**
+**Rule:** `source=ledger` weekly reports (subject=weekly-YYYY-MM-DD) and `source=pulse` Check I digests (subject=check-i-YYYY-MM-DD) now classify Tier-3 (digest route) via trailing-ISO-date-strip step in `config/alert-translations.json`. PR #604 (`silence-routine-weekly-alerts-tier3-001`) merged 2026-06-20T14:21Z after Larry approved ('Go' at 08:04 MDT). G-rule COMPLETE. PRIME verified iter ~2347.
 
 ---
 
@@ -150,9 +150,9 @@
 
 ---
 
-## G-rule outbox-notifier-review-pass-tier4 (new, iter ~2307, 2026-06-20)
+## G-rule outbox-notifier-review-pass-tier4 → COMPLETE ✅ (iter ~2347)
 
-**Rule:** `source=outbox-notifier, kind=notification, intent=review-pass` alerts classify as Tier-4 (novel, no registry template) in triage helper. Alert carries `route=escalate` — bot DMs Larry directly. Do NOT send second DM from Pulse. Journal-note only. G-rule count: **1/3** — dispatch to Beacon at 3/3 for Tier-3 translation in `config/alert-translations.json`.
+**Rule:** `source=outbox-notifier, kind=notification, intent=review-pass` alerts now correctly classify Tier-3 (digest route) via the `review-pass` key in `config/alert-translations.json`. Confirmed working in production at iter ~2347 — triage helper returned tier=3, route=digest. G-rule count stopped at 1/3 because the translation was already present (confirmed in PR #604's scope or earlier). COMPLETE.
 
 ---
 
@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-20 14:00Z UTC (Iter ~2346, Tier 3, consecutive_clean=12→13, NOMINAL ✅)
+## Status snapshot — updated 2026-06-20 14:33Z UTC (Iter ~2347, Tier 3, consecutive_clean=13→14, NOMINAL ✅)
 
-**Iter ~2346 summary:** ✅ Nominal. 1 new alert (dispatch-branch-cleanup, Tier-3 silenced, watermark=836→837). 5/5 daemons alive. No stalls. 0 open PRs. beacon-pending-approvals: pending=1 (silence-routine-weekly-alerts-tier3-001, awaiting Larry "go"). PRIME: systemic_fixes=55, interventions=1055, ratio≈19.18. **G-rule catalog-accuracy-drift: 2/3.** Tier 3, consecutive_clean=12→13. Tier 3 stabilized (max steady-state). Next cadence: 30-min.
+**Iter ~2347 summary:** ✅ Nominal. 1 new alert (outbox-notifier review-pass for PR #604, Tier-3 silenced, watermark=837→838). PR #604 (`silence-routine-weekly-alerts-tier3-001`) merged — Larry approved 'Go' at 08:04 MDT. G-rule `ledger/check-i Tier-4` COMPLETE ✅. G-rule `outbox-notifier-review-pass-tier4` COMPLETE ✅. 5/5 daemons alive. No stalls. 0 open PRs. beacon-pending-approvals: pending=0. PRIME: systemic_fixes=55, interventions=1055, ratio≈19.18. **G-rule catalog-accuracy-drift: 2/3.** Tier 3, consecutive_clean=13→14. Next cadence: 30-min.
 
 
 
