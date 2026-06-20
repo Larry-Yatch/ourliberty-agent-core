@@ -128,7 +128,7 @@
 
 ## catalog-accuracy-drift Tier-4 pattern (observed iter ~1926)
 
-**Rule:** `source=pulse-check, subject=catalog-accuracy-drift` alerts classify as Tier-4 (novel, no registry template) in triage helper. Alert carries `route=digest` — bot delivers as digest, no DM. Do NOT send second DM from Pulse. Journal-note only. Current count: 9/34 ourliberty-graph shelf cards drifted. **G-rule count: 1/3** — dispatch to Beacon at 3/3 for alert-translations.json Tier-3 template.
+**Rule:** `source=pulse-check, subject=catalog-accuracy-drift` alerts classify as **Tier-3** (known-pattern match in alert-translations.json) in triage helper. Alert carries `route=digest` — bot delivers as digest, no DM. Do NOT send second DM from Pulse. Journal-note only. Current count: 7/60 shelf cards drifted (iter ~2340). **G-rule count: 2/3** — dispatch to Beacon at 3/3 for alert-translations.json Tier-3 template.
 
 ---
 
@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-20 10:04Z UTC (Iter ~2339, Tier 3, consecutive_clean=5→6, NOMINAL ✅)
+## Status snapshot — updated 2026-06-20 10:32Z UTC (Iter ~2340, Tier 3, consecutive_clean=6→7, NOMINAL ✅)
 
-**Iter ~2339 summary:** ✅ Nominal. 0 new alerts (watermark=835=file_length; larry-alerts.jsonl compacted 922→835 lines, pre-repaired). 5/5 daemons alive. No stalls. 0 open PRs. beacon-pending-approvals: pending=1 (silence-routine-weekly-alerts-tier3-001, awaiting Larry "go"). PRIME: systemic_fixes=55, interventions=1055, ratio≈19.18. **Tier 3, consecutive_clean=5→6. Tier 3 stabilized (max steady-state). Next cadence: 30-min.**
+**Iter ~2340 summary:** ✅ Nominal. 1 new alert (catalog-accuracy-drift, Tier-3 silenced; watermark 835→836). 5/5 daemons alive. No stalls. 0 open PRs. beacon-pending-approvals: pending=1 (silence-routine-weekly-alerts-tier3-001, awaiting Larry "go"). PRIME: systemic_fixes=55, interventions=1055, ratio≈19.18. **G-rule catalog-accuracy-drift: 2/3.** Tier 3, consecutive_clean=6→7. Tier 3 stabilized (max steady-state). Next cadence: 30-min.
 
 
 
