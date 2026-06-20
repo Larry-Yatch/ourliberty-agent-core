@@ -2,7 +2,7 @@
   "_schema": {
     "version": 1,
     "purpose": "Plain-language translation layer for healer alerts. Render-time lookup keyed by (source, subject); on match, surface severity + summary + recommended_action above a collapsed technical-detail footer. See docs/runbooks/add-new-healer-alert.md.",
-    "lookup_rule": "Exact match on subject first; if miss, strip trailing ':'-segments from subject one at a time and retry. First match wins (longest-prefix). If exact + ':'-prefix-strip both miss, a source-level '*' catch-all entry (when present) matches any subject under that source. Source must match exactly.",
+    "lookup_rule": "Exact match on subject first; if miss, strip trailing ':'-segments from subject one at a time and retry. First match wins (longest-prefix). If the ':'-prefix-strip also misses, strip a trailing '-YYYY-MM-DD' ISO-date suffix from the subject and retry once, so a stable prefix key (e.g. 'weekly', 'check-i') matches a date-rotating subject like 'weekly-2026-06-15' (the stripped key must differ from the original AND exist under the source). If exact + ':'-prefix-strip + ISO-date-strip all miss, a source-level '*' catch-all entry (when present) matches any subject under that source. Source must match exactly.",
     "severity_vocab": [
       "URGENT",
       "WARNING",
@@ -534,6 +534,20 @@
       "tier": "NOW",
       "plain_language_summary": "Pulse detected the Beacon (or another claude-subprocess) bot returning [claude exit 1] because the claude CLI hit EROFS when writing /home/larry/.claude.json. Root cause: ProtectHome=read-only in the systemd unit whitelists the .claude/ directory but not the home-root .claude.json file. The CLI rewrites this file on some turns (startup-count bump, cache-TTL refresh, new project entry) — only those turns fail, making it intermittent. PR #470 (2026-06-11) added the file to ReadWritePaths on all 18 claude-invoking units; live drop-ins bridge the gap until those inline units are reinstalled.",
       "recommended_action": "1) Verify drop-ins are in place: `ls /etc/systemd/system/ourliberty-{beacon,forge,mirror,pulse,cycle,ledger,*}-bot.service.d/claude-json-writable.conf` — if any are missing, re-apply via `sudo mkdir -p /etc/systemd/system/<unit>.service.d && printf '[Service]\\nReadWritePaths=/home/larry/.claude.json\\n' | sudo tee /etc/systemd/system/<unit>.service.d/claude-json-writable.conf && sudo systemctl daemon-reload && sudo systemctl restart <unit>`. 2) Verify PR #470 is in the installed units: `grep .claude.json /etc/systemd/system/ourliberty-cycle.service` — if absent the install-drift healer hasn't converged yet, keep the drop-ins. 3) Once inline units are installed (grep returns the path), clean up all drop-ins: `sudo rm /etc/systemd/system/ourliberty-*.service.d/claude-json-writable.conf && sudo systemctl daemon-reload && sudo systemctl restart ourliberty-beacon-bot ourliberty-forge-bot ourliberty-mirror-bot ourliberty-pulse-bot`. Runbook: see PR #470 and the claude-json-erofs-readwrite memory entry."
+    },
+    "check-i": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "Pulse's Check I weekly cost digest — the rolling-window spend/usage report it emits once a week. Pulse already delivers this to Larry directly via route=escalate (he gets the beacon-bot DM at emit time), so Pulse's Check 0 re-read of the same record on the next cycle would only duplicate it. The raw subject carries the rotating report date after a hyphen (check-i-<YYYY-MM-DD>); this stable key matches via the trailing-ISO-date-strip lookup rule. By-design FYI, not a failure.",
+      "recommended_action": "None — by-design weekly cost report. The Check I digest already reached you via route=escalate at emit time; this entry only silences Pulse's redundant Check-0 re-triage of the same record. The narrow 'check-i' key plus the date-strip means only this weekly digest is muted — every other source=pulse escalation (e.g. beacon-erofs, unreviewed-merge) still surfaces."
+    }
+  },
+  "ledger": {
+    "weekly": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "The weekly cost-ledger report — the five-section spend/usage rollup the ledger emits once a week. The producer already delivers this to Larry directly via route=escalate (he gets the beacon-bot DM at emit time), so Pulse's Check 0 re-read of the same record on the next cycle would only duplicate it. The raw subject carries the rotating report date after a hyphen (weekly-<YYYY-MM-DD>); this stable key matches via the trailing-ISO-date-strip lookup rule. By-design FYI, not a failure.",
+      "recommended_action": "None — by-design; the weekly ledger DM already reached you via route=escalate; this only mutes Pulse's duplicate re-read. The ledger is single-purpose (it only ever emits weekly-<date>), so this entry silences Pulse's redundant Check-0 re-triage without hiding any other signal. Report detail: weekly-YYYY-MM-DD.md from scripts/ledger_weekly.py."
     }
   },
   "heal-unreviewed-merge-detector": {

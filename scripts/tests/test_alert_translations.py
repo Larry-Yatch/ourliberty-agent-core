@@ -767,5 +767,46 @@ class OutcomeLanguageTest(unittest.TestCase):
         self.assertNotIn('sudo', text.lower())
 
 
+class RoutineWeeklyReportSilenceTest(unittest.TestCase):
+    """The routine weekly cost reports (ledger weekly-<date>, pulse
+    check-i-<date>) are Tier-3-silenced at the Pulse Check-0 layer to stop the
+    duplicate re-escalation. The producer already DMs Larry via route=escalate,
+    so these entries MUST stay silenceable: an INFO/FYI shape with NO
+    never_silence flag (a never_silence here would re-surface the duplicate the
+    fix exists to mute). The date-rotating subject matches the stable key via
+    the trailing-ISO-date-strip lookup rule (exercised against classify in
+    test_alert_triage_state.py)."""
+
+    _SILENCED_WEEKLY = [
+        ('ledger', 'weekly'),
+        ('pulse', 'check-i'),
+    ]
+
+    @classmethod
+    def setUpClass(cls):
+        cls.data = json.loads(TRANSLATIONS_FILE.read_text(encoding='utf-8'))
+
+    def test_entries_exist_with_silenceable_shape(self):
+        for source, subject in self._SILENCED_WEEKLY:
+            self.assertIn(source, self.data, f'missing source {source!r}')
+            entry = self.data[source].get(subject)
+            self.assertIsInstance(
+                entry, dict, f'missing entry {source}:{subject}')
+            self.assertEqual(entry['severity'], 'INFO', f'{source}:{subject}')
+            self.assertEqual(entry['tier'], 'FYI', f'{source}:{subject}')
+            self.assertFalse(
+                entry.get('never_silence'),
+                f'{source}:{subject} must stay silenceable — a never_silence '
+                'flag would re-surface the duplicate this entry exists to mute',
+            )
+
+    def test_pulse_beacon_erofs_entry_untouched(self):
+        # The existing pulse/beacon-erofs escalation stays intact alongside the
+        # new check-i entry (no collateral change to other pulse subjects).
+        erofs = self.data.get('pulse', {}).get('beacon-erofs', {})
+        self.assertEqual(erofs.get('severity'), 'URGENT')
+        self.assertEqual(erofs.get('tier'), 'NOW')
+
+
 if __name__ == '__main__':
     unittest.main()

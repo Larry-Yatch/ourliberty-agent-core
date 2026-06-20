@@ -234,6 +234,16 @@ _FIXTURE_TRANSLATIONS = {
     'wildcard-surfaced': {
         '*': {'severity': 'WARNING', 'tier': 'SOON', 'never_silence': True},
     },
+    # Date-rotating subjects: a stable prefix key matches weekly-<date> /
+    # check-i-<date> via the trailing-ISO-date-strip step. ledger is
+    # single-purpose (only weekly-<date>); pulse keys 'check-i' NARROWLY so a
+    # novel dated pulse subject still falls through to Tier 4.
+    'ledger': {
+        'weekly': {'severity': 'INFO', 'tier': 'FYI'},
+    },
+    'pulse': {
+        'check-i': {'severity': 'INFO', 'tier': 'FYI'},
+    },
 }
 
 
@@ -329,6 +339,53 @@ class TestTranslationMatch(unittest.TestCase):
         self.assertIsNone(ats._translation_match(
             _FIXTURE_TRANSLATIONS, 'heal-known', 'no-such-subject'))
 
+    def test_iso_date_suffix_strips_to_stable_key(self):
+        # weekly-<date> strips its trailing -YYYY-MM-DD back to the 'weekly'
+        # entry; the rotating date no longer defeats the match.
+        entry = ats._translation_match(
+            _FIXTURE_TRANSLATIONS, 'ledger', 'weekly-2026-06-15')
+        self.assertIsInstance(entry, dict)
+        self.assertEqual(entry.get('tier'), 'FYI')
+        # And a different future date hits the same stable key.
+        self.assertIsInstance(ats._translation_match(
+            _FIXTURE_TRANSLATIONS, 'ledger', 'weekly-2027-01-04'), dict)
+
+    def test_iso_date_suffix_strips_for_pulse_check_i(self):
+        entry = ats._translation_match(
+            _FIXTURE_TRANSLATIONS, 'pulse', 'check-i-2026-06-15')
+        self.assertIsInstance(entry, dict)
+        self.assertEqual(entry.get('tier'), 'FYI')
+
+    def test_iso_date_strip_does_not_over_silence_novel_pulse(self):
+        # A novel dated pulse subject strips to a key NOT in the map → None.
+        # The narrow 'check-i' key must not catch arbitrary pulse escalations.
+        self.assertIsNone(ats._translation_match(
+            _FIXTURE_TRANSLATIONS, 'pulse', 'mirror-escalate-2026-06-15'))
+        # Non-dated pulse subjects are equally unaffected (no suffix to strip).
+        self.assertIsNone(ats._translation_match(
+            _FIXTURE_TRANSLATIONS, 'pulse', 'unreviewed-merge:494'))
+
+    def test_iso_date_strip_inert_without_date_suffix(self):
+        # A bare 'weekly' (no date) is an exact match already; a 'weekly'-less
+        # subject with no suffix and no entry still misses. The strip only fires
+        # on a genuine -YYYY-MM-DD tail.
+        self.assertIsInstance(ats._translation_match(
+            _FIXTURE_TRANSLATIONS, 'ledger', 'weekly'), dict)
+        self.assertIsNone(ats._translation_match(
+            _FIXTURE_TRANSLATIONS, 'ledger', 'something-else'))
+
+    def test_iso_date_strip_leaves_colon_strip_matches_intact(self):
+        # A ':'-suffixed subject still resolves via the existing prefix-strip
+        # loop and never reaches the date-strip step (no -YYYY-MM-DD tail).
+        entry = ats._translation_match(
+            _FIXTURE_TRANSLATIONS, 'heal-known', 'known-subject:extra:detail')
+        self.assertIsInstance(entry, dict)
+        # And the pulse-cycle '*' echo path is untouched by the date-strip.
+        self.assertEqual(
+            ats._translation_match(
+                _FIXTURE_TRANSLATIONS, 'pulse-cycle', 'novel-echo-subject'
+            ).get('tier'), 'FYI')
+
 
 class TestClassify(unittest.TestCase):
 
@@ -399,6 +456,34 @@ class TestClassify(unittest.TestCase):
         self.assertEqual(r['tier'], 3)
         self.assertEqual(r['route'], 'digest')
         self.assertEqual(r['decision'], 'silence')
+
+    def test_tier3_ledger_weekly_dated_subject_silences(self):
+        # The bug fix: a routine weekly ledger report (weekly-<date>) silences
+        # to digest instead of re-escalating as a fresh Tier-4 alert every cycle.
+        r = self._classify({'source': 'ledger', 'subject': 'weekly-2026-06-15'})
+        self.assertEqual(r['tier'], 3)
+        self.assertEqual(r['route'], 'digest')
+        self.assertEqual(r['decision'], 'silence')
+        # A future date hits the same stable key — the fix is not date-bound.
+        self.assertEqual(
+            self._classify({'source': 'ledger',
+                            'subject': 'weekly-2027-03-01'})['tier'], 3)
+
+    def test_tier3_pulse_check_i_dated_subject_silences(self):
+        r = self._classify({'source': 'pulse',
+                            'subject': 'check-i-2026-06-15'})
+        self.assertEqual(r['tier'], 3)
+        self.assertEqual(r['route'], 'digest')
+        self.assertEqual(r['decision'], 'silence')
+
+    def test_novel_dated_pulse_subject_still_tier4(self):
+        # Regression guard against over-silencing: a novel dated pulse subject
+        # (NOT check-i) must still classify Tier 4 — the narrow key + date-strip
+        # must not swallow genuine one-off pulse escalations.
+        r = self._classify({'source': 'pulse',
+                            'subject': 'unreviewed-merge-2026-06-15'})
+        self.assertEqual(r['tier'], 4)
+        self.assertEqual(r['route'], 'escalate')
 
     def test_tier2_probation_template_asks(self):
         r = self._classify({'source': 's', 'subject': 'sub',
