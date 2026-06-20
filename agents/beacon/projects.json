@@ -263,6 +263,33 @@
         "kind": "capture",
         "capture_id": "cap-p5-dag-status-on-cards-a822"
       }
+    },
+    {
+      "id": "system-self-awareness-the-standing-brain",
+      "title": "System self-awareness - the standing brain",
+      "north_star_ref": null,
+      "repo": "ourliberty-agent-core",
+      "state": "active",
+      "phases": [
+        {
+          "id": "system-self-awareness-the-standing-brain",
+          "title": "System self-awareness - the standing brain",
+          "desired_end_state": "Move insight, status, and direction off Larry's laptop so the droplet team self-directs. Multi-phase; first slice = work-in-flight Narrator -> State Log.",
+          "lifecycle_state": "brainstorm",
+          "order": 0,
+          "spec_ref": "docs/system-awareness-north-star.md",
+          "sequence_ref": null,
+          "created_at": "2026-06-20T00:13:50.124026+00:00",
+          "updated_at": "2026-06-20T00:13:50.124026+00:00"
+        }
+      ],
+      "one_off": true,
+      "created_at": "2026-06-20T00:13:50.124026+00:00",
+      "updated_at": "2026-06-20T00:13:50.124026+00:00",
+      "promoted_from": {
+        "kind": "mission",
+        "mission_id": "system-self-awareness-the-standing-brain"
+      }
     }
   ]
 }
