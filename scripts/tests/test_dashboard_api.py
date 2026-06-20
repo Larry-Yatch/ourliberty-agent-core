@@ -699,5 +699,50 @@ class ReaderUnitTest(unittest.TestCase):
         )
 
 
+class SystemStateLogReaderTest(unittest.TestCase):
+    """GET /api/system/state-log reader (system self-awareness Slice 1 § D3).
+    Fail-safe like the projects reader: missing/malformed → present=False, never
+    a 500; a fresh, well-formed log carries present=True + a staleness flag."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix='dash-sl-'))
+
+    def test_missing_file_present_false_not_500(self):
+        out = da._reader_system_state_log(self.tmp / 'absent.json')
+        self.assertFalse(out['present'])
+        self.assertTrue(out['stale'])
+        self.assertIsNone(out['narrative_prose'])
+
+    def test_malformed_file_present_false(self):
+        p = self.tmp / 'state.json'
+        p.write_text('{ broken')
+        out = da._reader_system_state_log(p)
+        self.assertFalse(out['present'])
+
+    def test_fresh_log_present_and_not_stale(self):
+        p = self.tmp / 'state.json'
+        p.write_text(json.dumps({
+            'schema_version': 1,
+            'as_of': '2026-06-19T12:00:00+00:00',
+            'narrative_prose': 'Two missions progressing; nothing stuck.',
+            'structured_snapshot': {'missions_active': []},
+            'provenance': {'by': 'system-state-narrator', 'fallback': False},
+        }))
+        out = da._reader_system_state_log(p)
+        self.assertTrue(out['present'])
+        self.assertFalse(out['stale'])  # just written
+        self.assertEqual(out['schema_version'], 1)
+        self.assertEqual(
+            out['narrative_prose'], 'Two missions progressing; nothing stuck.')
+        self.assertIsNotNone(out['last_synced_at'])
+
+    def test_path_resolver_honors_env_override(self):
+        target = self.tmp / 'custom-state.json'
+        with mock.patch.dict(
+            os.environ, {'OURLIBERTY_SYSTEM_STATE_LOG': str(target)}
+        ):
+            self.assertEqual(da._state_log_json_path(), target)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -60,6 +60,7 @@ import catch_me_up  # noqa: E402  # operator-UX shortcut synthesizer
 import chain_event_emit  # noqa: E402  # E4.4e PR-A: approval_request push writer
 import larry_alerts  # noqa: E402
 import safe_write_inbox  # noqa: E402
+import state_log_query  # noqa: E402  # work-in-flight State Log reader (Slice 1 D4)
 from telegram_text_utils import strip_leading_slash  # noqa: E402
 from test_isolation_guard import refuse_under_test  # noqa: E402
 
@@ -1065,6 +1066,28 @@ def _process_update(update: dict) -> None:
     if action.get('action') != 'none':
         if handle_user_command(chat_id, action):
             return
+
+    # Work-in-flight State Log shortcut — intercept "work in flight" / "state
+    # of work" / "/state" variants before any Beacon round-trip. Reads the
+    # standing State Log the narrator keeps fresh (system self-awareness Slice
+    # 1); no chain mutations, no Claude spawn. Distinct from catch_me_up: this
+    # is the always-current standing picture, that is a delta synthesis. Spec:
+    # agents/beacon/specs/system-awareness-slice-1-state-log.md § D4.
+    if state_log_query.is_state_log_query(text):
+        try:
+            doc = state_log_query.read_state_log()
+            reply = state_log_query.format_reply(doc)
+        except Exception as e:
+            log(f"state_log_query error: {type(e).__name__}: {e}")
+            telegram_send(
+                chat_id,
+                f"⚠ work-in-flight lookup failed ({type(e).__name__}). "
+                f"Falling back to normal chat — say it again to retry.",
+            )
+        else:
+            telegram_send(chat_id, reply)
+            log(f"state_log answer delivered to {chat_id}")
+        return
 
     # Operator-UX shortcut — intercept "catch me up" / "status" / variants
     # before any Beacon round-trip. Cheap local synthesis from refetched

@@ -1472,14 +1472,16 @@ def run_once(*, dry_run: bool,
              failure_fn: Optional[Callable[[str], Optional[str]]] = None,
              ring_fn: Optional[Callable[..., dict[str, Any]]] = None,
              in_flight_fn: Optional[Callable[[str], bool]] = None,
+             state_log_fn: Optional[Callable[..., Any]] = None,
              now: Optional[datetime] = None) -> int:
     """One healer tick. The injectable seams (emit_fn / events_fetcher /
     mission_probe_fn / author_fn / completion_verify_fn / completion_closeout_fn /
-    failure_fn / ring_fn / in_flight_fn / now) keep the effectful edges
+    failure_fn / ring_fn / in_flight_fn / state_log_fn / now) keep the effectful edges
     test-controllable; production resolves them from chain_event_emit + the live
     Supabase client + the shared terminal-state probe + the Narrator sweep + the
     belt-and-suspenders verified-merge gate + the chain_events failure signal +
-    the doorbell rails + the shared phase-derive in-flight gate."""
+    the doorbell rails + the shared phase-derive in-flight gate + the
+    work-in-flight State Log writer."""
     now = now or datetime.now(timezone.utc)
     repo_paths = load_repo_paths()
     if mission_probe_fn is None:
@@ -1754,6 +1756,22 @@ def run_once(*, dry_run: bool,
                     except Exception as e:  # noqa: BLE001 — fail-safe
                         log(f'missions commit+push raised: {type(e).__name__}: {e}')
                         missions_commit_status = 'push-failed'
+
+    # --- phase 5: refresh the work-in-flight State Log (system self-awareness
+    # Slice 1). Rides this tick so there is no new systemd unit; runs AFTER the
+    # Narrator sweeps above so it sees fresh briefings. The State Log is droplet
+    # runtime state under the agents blackboard — its OWN sole writer, never
+    # git-committed and never a writer of missions/captures — so it is outside
+    # the single-committer machinery above. Fully fail-isolated: a State-Log
+    # error here must never break the GC tick (spec § 2 / D2). ---
+    if state_log_fn is None:
+        from system_state_log import write_state_log as state_log_fn  # noqa: PLC0415
+    try:
+        # use_llm + write only in LIVE mode; a dry-run authors the deterministic
+        # narrative (no claude spawn, no cost) and writes nothing.
+        state_log_fn(now=now, use_llm=not dry_run, write=not dry_run)
+    except Exception as e:  # noqa: BLE001 — fail-safe: never abort the tick
+        log(f'state-log refresh raised: {type(e).__name__}: {e}')
 
     _emit_summary(retire, aged, commit_status, dry_run,
                   missions=missions, missions_commit_status=missions_commit_status,
