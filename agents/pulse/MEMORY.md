@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-20 05:56Z UTC (Iter ~2329, Tier 1, consecutive_clean=1→2, NOMINAL ✅)
+## Status snapshot — updated 2026-06-20 06:03Z UTC (Iter ~2330, Tier 1→2 DE-ESCALATED, NOMINAL ✅)
 
-**Iter ~2329 summary:** ✅ Nominal. 0 new alerts. 5/5 daemons alive. No stalls. 0 open PRs. beacon-pending-approvals: pending=1 (silence-routine-weekly-alerts-tier3-001, awaiting Larry "go"). PRIME: systemic_fixes=55, interventions=1055, ratio≈19.18. **Tier 1, consecutive_clean=1→2. One more clean iter needed to de-escalate to Tier 2.**
+**Iter ~2330 summary:** ✅ Nominal. 0 new alerts (watermark repair: 923→922 off-by-one corrected). 5/5 daemons alive. No stalls. 0 open PRs. beacon-pending-approvals: pending=1 (silence-routine-weekly-alerts-tier3-001, awaiting Larry "go"). PRIME: systemic_fixes=55, interventions=1055, ratio≈19.18. **Tier 1→2 DE-ESCALATED after 3 consecutive clean iters. Next cadence: 15-min.**
 
 
 
