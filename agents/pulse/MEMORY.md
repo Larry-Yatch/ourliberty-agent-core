@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-20 14:33Z UTC (Iter ~2347, Tier 3, consecutive_clean=13→14, NOMINAL ✅)
+## Status snapshot — updated 2026-06-20 15:05Z UTC (Iter ~2348, Tier 3, consecutive_clean=14→15, NOMINAL ✅)
 
-**Iter ~2347 summary:** ✅ Nominal. 1 new alert (outbox-notifier review-pass for PR #604, Tier-3 silenced, watermark=837→838). PR #604 (`silence-routine-weekly-alerts-tier3-001`) merged — Larry approved 'Go' at 08:04 MDT. G-rule `ledger/check-i Tier-4` COMPLETE ✅. G-rule `outbox-notifier-review-pass-tier4` COMPLETE ✅. 5/5 daemons alive. No stalls. 0 open PRs. beacon-pending-approvals: pending=0. PRIME: systemic_fixes=55, interventions=1055, ratio≈19.18. **G-rule catalog-accuracy-drift: 2/3.** Tier 3, consecutive_clean=13→14. Next cadence: 30-min.
+**Iter ~2348 summary:** ✅ Nominal. 3 new alerts (heal-stale-daemon-code ×2 auto-restarted dashboard-api + outbox-notifier after PR #604 deploy; dispatch-branch-cleanup ×1 — all Tier-3 silenced, watermark=838→841). New PIDs: outbox_notifier=687691, dashboard_api=687617. 5/5 daemons alive. No stalls. 0 open PRs. beacon-pending-approvals: pending=0. PRIME: systemic_fixes=55, interventions=1055, ratio≈19.18. **G-rule catalog-accuracy-drift: 2/3.** Tier 3, consecutive_clean=14→15. Next cadence: 30-min.
 
 
 
