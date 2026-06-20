@@ -4258,6 +4258,20 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "system-self-awareness-the-standing-brain",
+      "name": "System self-awareness - the standing brain",
+      "phase": "drafting",
+      "brief": "Move insight, status, and direction off Larry's laptop so the droplet team self-directs. Multi-phase; first slice = work-in-flight Narrator -> State Log.",
+      "spec_docs": [
+        "docs/system-awareness-north-star.md",
+        "docs/desired-end-state.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-20",
+      "deferred_reason": null
     }
   ]
 }
