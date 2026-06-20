@@ -144,9 +144,9 @@
 
 ---
 
-## G-rule projects-json-healer-path-unregistered (new, iter ~2302, 2026-06-19)
+## G-rule projects-json-healer-path-unregistered → DISPATCHED (iter ~2309, 2026-06-20)
 
-**Rule:** `agents/beacon/projects.json` is written and committed by a projects-store healer (frequent "chore(projects): projects-store healer" commits in git log) but is NOT listed in `config/healer-managed-runtime-paths.json`. This produces a Check A dirty-tree finding (never-auto + tier-reset) on every cycle where the check runs between healer writes. Config allowlist only contains captures.json and missions.json. Fix: add `agents/beacon/projects.json` to `config/healer-managed-runtime-paths.json`. **G-rule count: 2/3 — dispatch at 3/3.**
+**Rule:** `agents/beacon/projects.json` is written and committed by a projects-store healer but was NOT listed in `config/healer-managed-runtime-paths.json`. Produced Check A dirty-tree finding (never-auto + tier-reset) on 3 occasions. G-rule 3/3 threshold hit at iter ~2309 → dispatch sent to Beacon (`projects-json-healer-path-register-001.json`). Fix: add `agents/beacon/projects.json` to allowlist. Watching for Beacon spec → Forge PR → Mirror PASS → merge → PRIME verify.
 
 ---
 
@@ -156,9 +156,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-20 00:25Z UTC (Iter ~2308, Tier 2, NOMINAL ✅)
+## Status snapshot — updated 2026-06-20 00:46Z UTC (Iter ~2309, Tier 1, SIGNAL ⚠️)
 
-**Iter ~2308 summary:** ✅ Nominal. 5 new alerts (L905-L909), all Tier-3 (heal-stale-daemon-code auto-restarts — inbox-watcher, beacon-bot, forge-bot, mirror-bot, pulse-bot restarted after PR #600 code landed). All 5 daemons alive (beacon now PID 559555, inbox-watcher now PID 559441; outbox_notifier 497831, dashboard_api 497752, chain-event 3734305 unchanged). 0 open PRs. No stalls. G-rule projects-json-healer-path-unregistered stays at **2/3**. G-rule outbox-notifier-review-pass-tier4 stays at **1/3**. Watermark=909=file_length. Heartbeat 00:11Z (~11 min, fresh). PRIME: systemic_fixes=54, ratio≈19.46, trend=improving. **Tier 2, consecutive_clean=1→2. Need 1 more clean iter to Tier 3. Next cadence: 15-min.**
+**Iter ~2309 summary:** ⚠️ Signal. Check A: agents/beacon/projects.json dirty (healer-managed, NOT in allowlist) → G-rule projects-json-healer-path-unregistered 3/3 → **DISPATCHED to Beacon** (`projects-json-healer-path-register-001.json`). 1 new alert (L910 Tier-3: mirror-dag-pass:launch-system-self-awareness-the-standing-brain). All 5 daemons alive (PIDs unchanged: dashboard_api 497752, outbox_notifier 497831, inbox-watcher 559441, beacon 559555, chain-event 3734305). 0 open PRs. Forge actively running system-self-awareness-the-standing-brain (started 00:43Z). PR #601 merged (system-awareness Slice 1 spec). Watermark=910. Heartbeat 00:41Z (fresh). PRIME: interventions=1052, systemic_fixes=54, ratio≈19.46, trend=improving. **Tier 2→1 (signal), consecutive_clean=0. Next cadence: 5-min.**
 
 
 
