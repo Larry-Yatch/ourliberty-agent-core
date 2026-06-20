@@ -156,9 +156,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-20 01:39Z UTC (Iter ~2314, Tier 1, NOMINAL ✅)
+## Status snapshot — updated 2026-06-20 01:46Z UTC (Iter ~2315, Tier 1, NOMINAL ✅)
 
-**Iter ~2314 summary:** ✅ Nominal. All checks clean. 1 new alert (L915 Tier-3 silenced, review-pass). Check A: projects.json auto-committed by healer mid-cycle — PR #603 fix confirmed working (SYNC_EXTRA_RUNTIME_PATHS exemption active). `system-self-awareness-slice-1-state-log` Forge build no-op: Forge correctly declined to duplicate PR #602 (Slice 1 already merged). Outbox-notifier misclassified build result as "ack-proceed" (scanner detected old PROCEED text in resumed session); Beacon notified 01:30:42Z; no stall. Watermark=915. All 5 daemons alive. beacon-pending-approvals: pending=0. Heartbeat 01:11Z (watch for staleness next iter). PRIME: systemic_fixes=55, ratio≈19.1. **Tier 1, consecutive_clean=0→1. Need 2 more clean iters for Tier 2. Next cadence: 5-min.**
+**Iter ~2315 summary:** ✅ Nominal. All checks clean. 3 new alerts (L916-918) Tier-3 silenced (heal-stale-daemon-code auto-restarted beacon-bot, dashboard-api, outbox-notifier at 01:42Z post-PR#602 rollout — expected behavior). Check I ran (Friday). `launch-system-self-awareness-slice-1-state-log` CLOSED: build completed 01:29:42Z as no-op (Forge correctly declined PR#602 duplicate), inboxes empty. Watermark=918. All 5 daemons alive (new PIDs: beacon=598547, dashboard=598696, outbox=598943). beacon-pending-approvals: pending=0. Heartbeat 01:42:15Z (fresh). PRIME: systemic_fixes=55, ratio≈19.15. **Tier 1, consecutive_clean=1→2. Need 1 more clean iter for Tier 2. Next cadence: 5-min.**
 
 
 
