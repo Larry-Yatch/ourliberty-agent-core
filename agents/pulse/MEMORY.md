@@ -156,9 +156,15 @@
 
 ---
 
-## Status snapshot — updated 2026-06-20 05:41Z UTC (Iter ~2327, Tier 3→1 reset, SIGNAL ⚠️)
+## seq-advancer-sequence-stranded false-positive mechanism (confirmed iter ~2328)
 
-**Iter ~2327 summary:** ⚠️ Signal. 1 new alert (wm=922→923): build-sequence-advancer sequence-stranded (launch-system-self-awareness-slice-1-state-log). Forge preflight PROCEED'd at 01:27Z but build phase never dispatched; no PR created; sequence paused. Bot DM'd Larry at idx=922 (23:32 MDT). 5/5 daemons alive. No pipeline stalls. 0 open PRs. 0 log WARN/ERROR. beacon-pending-approvals: pending=1 (silence-routine-weekly-alerts-tier3-001, awaiting Larry "go"). PRIME: systemic_fixes=55, interventions=1055, ratio≈19.18. **Tier 3→1 reset. consecutive_clean=0. Next cadence: 5-min.**
+**Rule:** When the build-sequence-advancer fires a `sequence-stranded` alert (4h backstop), verify the build phase archive BEFORE treating it as a live issue. Check `outboxes/forge/.archive/<task-id>.1.json` for `exit_code` and `result` text. If exit_code=0 and result says "already built/merged via prior PR," the alert is a false positive — the prior completed sequence step satisfied the spec, and the advancer's backstop fired before it detected the completion. Correct action: remove from standing findings; note G-rule 1/3. Do NOT escalate to Larry when build archive shows self-resolved outcome.
+
+---
+
+## Status snapshot — updated 2026-06-20 05:52Z UTC (Iter ~2328, Tier 1, consecutive_clean=0→1, NOMINAL ✅)
+
+**Iter ~2328 summary:** ✅ Nominal. 0 new alerts. 5/5 daemons alive. No stalls. 0 open PRs. Key resolution: iter ~2327 "sequence-stranded" finding was a false positive — build phase archive (system-self-awareness-slice-1-state-log.1.json, exit_code=0) confirms PR #602 already satisfied the spec; advancer's 4h backstop fired before completion was detected. Finding removed. beacon-pending-approvals: pending=1 (silence-routine-weekly-alerts-tier3-001, awaiting Larry "go"). PRIME: systemic_fixes=55, interventions=1055, ratio≈19.18. **Tier 1, consecutive_clean=0→1. Next cadence: 5-min.**
 
 
 
