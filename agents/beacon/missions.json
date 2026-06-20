@@ -4272,6 +4272,19 @@
       "repo": "ourliberty-agent-core",
       "created": "2026-06-20",
       "deferred_reason": null
+    },
+    {
+      "id": "system-self-awareness-slice-1-state-log",
+      "name": "System self-awareness - Slice 1 (State Log)",
+      "phase": "drafting",
+      "brief": "Slice 1: whole-system work-in-flight State Log (generalize the missions Narrator). Build STRICTLY from the spec doc.",
+      "spec_docs": [
+        "agents/beacon/specs/system-awareness-slice-1-state-log.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-20",
+      "deferred_reason": null
     }
   ]
 }
