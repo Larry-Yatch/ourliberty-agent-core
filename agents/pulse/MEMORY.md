@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-20 05:52Z UTC (Iter ~2328, Tier 1, consecutive_clean=0→1, NOMINAL ✅)
+## Status snapshot — updated 2026-06-20 05:56Z UTC (Iter ~2329, Tier 1, consecutive_clean=1→2, NOMINAL ✅)
 
-**Iter ~2328 summary:** ✅ Nominal. 0 new alerts. 5/5 daemons alive. No stalls. 0 open PRs. Key resolution: iter ~2327 "sequence-stranded" finding was a false positive — build phase archive (system-self-awareness-slice-1-state-log.1.json, exit_code=0) confirms PR #602 already satisfied the spec; advancer's 4h backstop fired before completion was detected. Finding removed. beacon-pending-approvals: pending=1 (silence-routine-weekly-alerts-tier3-001, awaiting Larry "go"). PRIME: systemic_fixes=55, interventions=1055, ratio≈19.18. **Tier 1, consecutive_clean=0→1. Next cadence: 5-min.**
+**Iter ~2329 summary:** ✅ Nominal. 0 new alerts. 5/5 daemons alive. No stalls. 0 open PRs. beacon-pending-approvals: pending=1 (silence-routine-weekly-alerts-tier3-001, awaiting Larry "go"). PRIME: systemic_fixes=55, interventions=1055, ratio≈19.18. **Tier 1, consecutive_clean=1→2. One more clean iter needed to de-escalate to Tier 2.**
 
 
 
