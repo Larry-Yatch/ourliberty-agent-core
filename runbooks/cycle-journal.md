@@ -4,6 +4,172 @@
 
 ---
 
+## Iteration ~2307 — 2026-06-20T00:08Z UTC (interactive, /cycle, Tier 2, consecutive_clean=0→1, NOMINAL ✅)
+
+**Trigger:** Larry `/cycle` invocation.
+
+**Health:** ✅ Nominal — 2 new alerts (L903 Tier-3, L904 Tier-4 delivery-confirmation). All 5 daemons alive. Repo on main, HEAD=708af79e=origin/main. Major milestone: **G-rule forge-preflight-no-marker COMPLETE** — Mirror approved PR #600 at 18:03 MDT, auto-merged + branch deleted.
+
+**VERIFY-BEFORE-REASSERT:**
+- **All 5 daemons alive:** beacon 3734671 (Ss, 2d 21h+) ✅, chain-event 3734305 (SNs, 2d 21h+) ✅, inbox-watcher 3434697 (Ssl, 3d 18h+) ✅, outbox_notifier 497831 (Ss, ~3h56m) ✅, dashboard_api 497752 (Ssl, ~3h56m) ✅.
+- **Stale bash orphan PID 1834248:** Confirmed alive (Ss, 22d 4h 50m+). [carry]
+- **G-rule forge-preflight-no-marker MIRROR REVIEW IN PROGRESS → COMPLETE:** L904 confirms Mirror approved PR #600 (`feat(agent_runner): deterministic preflight marker reminder for Forge dispatches`) at 18:03:38 MDT; `Auto-merged + branch deleted`. git log HEAD=708af79e matches. **G-rule forge-preflight-no-marker: COMPLETE ✅.** [updated/closed]
+- **G-rule projects-json-healer-path-unregistered 2/3:** Check A clean at iter start (no dirty projects.json this iter) → no new occurrence. Remains at 2/3. [carry]
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 902, "file_length": 904}`. 2 new alerts (L903-L904):
+- L903: `source=sync.service, severity=warning, subject=sync-blocked:auto-commit-push-failed` → triage helper returned Tier-3 silence (known-pattern match). ✅ (bot log L902 confirms route=digest, no DM. Message: "auto-committed Pulse runtime files but push to origin/main failed; rolled back Pulse paths to 4135be74. Self-heals on next sync tick; no action needed.")
+- L904: `source=outbox-notifier, kind=notification, intent=review-pass, task_id=forge-preflight-marker-gate-001` → triage helper returned Tier-4 (novel, no registry template). Bot already DM'd Larry at `18:03:38 MDT` (route=escalate). No second DM from Pulse. Journal-note + G-rule increment: **outbox-notifier review-pass Tier-4 → 1/3** (dispatch to Beacon at 3/3 for Tier-3 translation). ✅
+Watermark advanced 902→904. ✅ Nominal (no tier-reset; bot handled escalation path, Pulse nominal).
+
+**Check 1 — Log noise:** outbox_notifier.log last 80 lines: 0 WARN/ERROR. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot PID 3734671 alive. Last log entry: `[2026-06-19T18:03:38-0600] notification idx=903 delivered (intent=review-pass)`. Larry's last message: `17:39:41 'go'` — handled (iter ~2305). No new directives. No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → "no stalls detected." 8 FORGE_NO_PR_SKIP (all known: preflight_exit or pr_exists). ✅ Nominal.
+
+**Check 4 — Pending directives:** watermark=904=file_length (0 outstanding). beacon-pending-approvals.json: pending=0, history=244. Forge inbox=0. Beacon inbox=0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-19T23:41:19Z (~27 min ago). FRESH (< 60 min). ✅ Nominal.
+
+**Check A — Source repo:** On main, HEAD=708af79e=origin/main (PR #600 merged since iter ~2306). Modified files: MEMORY.md + cycle-journal.md (Pulse runtime files, expected — wrapper commits). No unexpected dirt. G-rule projects-json-healer-path-unregistered: no dirty-tree at iter start → no new occurrence. Still **2/3**. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-19T23:56:01Z (~12 min ago). Status=error (auto-commit push failed; self-heals next tick). Within 2h threshold. L903 triage → Tier-3, no action. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon 3734671 (Ss, 2d 21h+) ✅, chain-event 3734305 (SNs, 2d 21h+) ✅, inbox-watcher 3434697 (Ssl, 3d 18h+) ✅, outbox_notifier 497831 (Ss, ~3h56m) ✅, dashboard_api 497752 (Ssl, ~3h56m) ✅. 5/5. ✅
+
+**Check E — PRs:** ourliberty-agent-core: 0 open PRs ✅. ourliberty-dashboard: 0 open PRs ✅. Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Check I (Fri UTC, weekday=4 ∈ {0,2,4,6}):** check-i-2026-06-19.json EXISTS — dedup, skip. ✅
+**Check III:** Not Sunday — skip. ✅
+**Check VIII/IX/X:** Not Monday — skip. ✅
+
+**Actions taken:**
+1. Alert watermark: advanced 902→904.
+2. PRIME ledger: `iter_clean` appended (tier=2).
+3. Tier state: `record --checks-clean true` → Tier 2, consecutive_clean=0→1.
+
+**Dispatches:** None.
+
+**Standing findings (carried forward):**
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [blue] **install-drift:ourliberty-build-sequence-advancer.service** — L892 Tier-3 silenced. [carry]
+- [blue] **unreviewed-merge:571** — bot DM'd. Larry judgment. [carry]
+- [blue] **Stale bash orphan** — PID 1834248 (Ss, ~22d 4h 50m+). [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule ledger/check-i Tier-4** — 2/3. Watch. Dispatch to Beacon at 3/3.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule catalog-accuracy-drift-tier4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule mirror-marker-parse-error** — 1/3. Watch.
+- [blue] **G-rule watchdog-watcher-log-stale** — 1/3. Watch.
+- [blue] **G-rule projects-json-healer-path-unregistered** — **2/3**. Watch; dispatch to Beacon at 3/3.
+- [blue] **G-rule health-notify-script-missing** — Beacon dispatch sent 2026-06-09, fix status unverified. [carry]
+- [blue] **G-rule forge-preflight-no-marker** — **COMPLETE ✅** (PR #600 auto-merged 2026-06-20T00:03Z. Mirror approved; branch deleted.) [CLOSED]
+- [blue] **G-rule outbox-notifier-review-pass-tier4** — **1/3**. New this iter. Watch; dispatch to Beacon at 3/3 for Tier-3 translation.
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+
+**PRIME DIRECTIVE:** 0 interventions, 0 systemic_fixes this iter. Trailing-30d: systemic_fixes=54, ratio≈19.46, trend=improving.
+**Tier end-of-iter:** Tier 2, consecutive_clean=0→1. Need 2 more clean iters to reach Tier 3. Next cadence: 15-min.
+
+---
+
+## Iteration ~2306 — 2026-06-19T23:54Z UTC (interactive, /cycle, Tier 1→2, consecutive_clean=2→3→de-escalate, NOMINAL ✅)
+
+**Trigger:** Larry `/cycle` invocation.
+
+**Health:** ✅ Nominal — 1 new alert (Tier-3 silence). All 5 daemons alive. Repo always-fix fast-forward applied (PR #599 docs). Major update: **G-rule forge-preflight-no-marker BUILD COMPLETE** — PR #600 `feat(agent_runner): deterministic preflight marker reminder for Forge dispatches` opened; Mirror review dispatched 17:52 MDT. Tier 1→2 de-escalated.
+
+**VERIFY-BEFORE-REASSERT:**
+- **All 5 daemons alive:** beacon 3734671 (Ss, 2d 21h+) ✅, chain-event 3734305 (SNs, 2d 21h+) ✅, inbox-watcher 3434697 (Ssl, 3d 18h+) ✅, outbox_notifier 497831 (Ss, ~3h54m) ✅, dashboard_api 497752 (Ssl, ~3h54m) ✅.
+- **Stale bash orphan PID 1834248:** Confirmed alive (Ss, 22d 4h+). [carry]
+- **G-rule forge-preflight-no-marker BUILD COMPLETE:** Forge picked up `build-forge-preflight-marker-gate-001.json` from inbox, ran build, opened PR #600 at ~17:52 MDT (23:52 UTC). outbox-notifier: `review-request dispatched mirror <- beacon (task=forge-preflight-marker-gate-001, pr=.../pull/600)` at 17:52:03. PR #600 state=OPEN, MERGEABLE, reviewDecision="". Mirror review in progress (~2 min old). **G-rule forge-preflight-no-marker: BUILD COMPLETE → MIRROR REVIEW IN PROGRESS.** [updated]
+- **G-rule projects-json-healer-path-unregistered 2/3:** No dirty tree at iter start → no new occurrence. Remains at 2/3. [carry]
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 901, "file_length": 902}`. 1 new alert (L902):
+- L902: `source=dispatch-branch-cleanup, severity=warning, subject=summary` → triage helper returned Tier-3 silence (known-pattern match). ✅
+Watermark advanced to 902=file_length. ✅ Nominal (Tier-3 silence; no tier-reset).
+
+**Check 1 — Log noise:** outbox-notifier.log last 80 lines: 0 new WARN/ERROR since iter ~2305 (last WARN at 17:40:51 MDT was forge-preflight-marker-gate-001 preflight retry — already counted; followed by successful build-phase dispatch at 17:42 and mirror-review dispatch at 17:52). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot PID 3734671 alive. Last log entry: `[2026-06-19T17:52:03-0600] build-phase already dispatched for task forge-preflight-marker-gate-001 (archive or .invalid present); skipping duplicate write`. Larry's last message: `17:39:41 'go'` — handled (iter ~2305). No new directives. No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → "no stalls detected." 8 FORGE_NO_PR_SKIP (all known: preflight_exit or pr_exists). ✅ Nominal.
+
+**Check 4 — Pending directives:** watermark=902=file_length (0 outstanding after triage). beacon-pending-approvals.json: pending=0, history=244. Forge inbox: empty (build-forge-preflight-marker-gate-001.json was picked up by Forge — build complete, PR #600 opened). Beacon inbox: 0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-19T23:41:19Z (~13 min ago). FRESH (< 60 min). ✅ Nominal.
+
+**Check A — Source repo:** At iter start: on main, clean tree, HEAD=ecb5c484=origin/main (locally cached). After git fetch: origin/main advanced to 4135be74 (2 commits: PR #599 `docs: system-awareness North Star + desired-end-state (teal-doc #1)` + merge commit). Fast-forward applied: `git pull --ff-only` → now HEAD=4135be74=origin/main. Context: origin advanced mid-check window (PR #599 merged since iter ~2305); no local dirt. Same pattern as iter ~2304 (healer-mid-check-push = nominal). G-rule projects-json-healer-path-unregistered: no dirty tree at iter start → no new occurrence. Still **2/3**. ✅ Nominal (always-fix applied).
+
+**Check B — Sync health:** last_sync=2026-06-19T22:55:59Z (~58 min ago). Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon 3734671 (Ss, 2d 21h+) ✅, chain-event 3734305 (SNs, 2d 21h+) ✅, inbox-watcher 3434697 (Ssl, 3d 18h+) ✅, outbox_notifier 497831 (Ss, ~3h54m) ✅, dashboard_api 497752 (Ssl, ~3h54m) ✅. 5/5. ✅
+
+**Check E — PRs:** ourliberty-agent-core: PR #600 opened by Forge during iter (`feat(agent_runner): deterministic preflight marker reminder for Forge dispatches`), Mirror review dispatched 17:52 MDT — ~2 min old, within 30-min auto-merge window. ✅ Nominal. ourliberty-dashboard: 0 open PRs. ✅ Nominal.
+
+**Check H — Forge activity:** forge-preflight-marker-gate-001 BUILD COMPLETE. PR #600 opened ~17:52 MDT (23:52 UTC). Mirror review request dispatched. Cost so far: $1.16 (within $50 cap). Outbox-notifier: `build-phase already dispatched for task forge-preflight-marker-gate-001 (archive or .invalid present); skipping duplicate write` — correct dedup behavior. ✅ Nominal (build complete, in review chain).
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Check I (Fri UTC, weekday=4 ∈ {0,2,4,6}):** check-i-2026-06-19.json EXISTS — dedup, skip. ✅
+**Check III:** Not Sunday — skip. ✅
+**Check VIII/IX/X:** Not Monday — skip. ✅
+
+**Actions taken:**
+1. Alert watermark: advanced 901→902.
+2. Check A always-fix: `git -C ~/agent-core/ pull --ff-only` (2 commits, PR #599 docs: system-awareness North Star).
+3. PRIME ledger: `iter_clean` appended (tier=1).
+4. Tier state: `record --checks-clean true` → Tier 1→2 de-escalated (consecutive_clean=3; tier promoted).
+
+**Dispatches:** None.
+
+**Standing findings (carried forward):**
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [blue] **forge-preflight-marker-gate-001 IN MIRROR REVIEW** — PR #600 opened 23:52 UTC. Mirror review dispatched. Auto-merge pending Mirror PASS. G-rule forge-preflight-no-marker fix advancing. [UPDATED: was "build in-flight"]
+- [blue] **install-drift:ourliberty-build-sequence-advancer.service** — L892 Tier-3 silenced. [carry]
+- [blue] **unreviewed-merge:571** — bot DM'd. Larry judgment. [carry]
+- [blue] **Stale bash orphan** — PID 1834248 (Ss, ~22d 4h+). [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch. (Distinct from forge-preflight-no-marker now in review.)
+- [blue] **G-rule ledger/check-i Tier-4** — 2/3. Watch. Dispatch to Beacon at 3/3.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule catalog-accuracy-drift-tier4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule mirror-marker-parse-error** — 1/3. Watch.
+- [blue] **G-rule watchdog-watcher-log-stale** — 1/3. Watch.
+- [blue] **G-rule projects-json-healer-path-unregistered** — **2/3**. Watch; dispatch to Beacon at 3/3.
+- [blue] **G-rule health-notify-script-missing** — Beacon dispatch sent 2026-06-09, fix status unverified. [carry]
+- [blue] **G-rule forge-preflight-no-marker** — **MIRROR REVIEW IN PROGRESS** (PR #600, Mirror dispatched 23:52 UTC). Watching for Mirror PASS → auto-merge. [UPDATED]
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+
+**PRIME DIRECTIVE:** 0 interventions, 0 systemic_fixes this iter. Trailing-30d: systemic_fixes=54, ratio≈19.46, trend=improving.
+**Tier end-of-iter:** Tier 1→2 (consecutive_clean=3 at Tier 1 → de-escalated). Next cadence: 15-min.
+
+---
+
 ## Iteration ~2305 — 2026-06-19T23:47Z UTC (interactive, /cycle, Tier 1, consecutive_clean=1→2, NOMINAL ✅)
 
 **Trigger:** Larry `/cycle` invocation.

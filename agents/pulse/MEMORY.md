@@ -138,9 +138,9 @@
 
 ---
 
-## G-rule forge-preflight-no-marker DISPATCHED → APPROVAL_REQUEST SENT (iter ~2302→2303, 2026-06-19)
+## G-rule forge-preflight-no-marker → COMPLETE ✅ (iter ~2306 dispatch, iter ~2307 verified)
 
-**Rule:** G-rule forge-preflight-no-marker crossed 3/3 threshold. Beacon dispatch `forge-preflight-no-marker-systemic-fix-001` written 2026-06-19T23:27Z. Beacon processed it (file moved to .archive by iter ~2303). outbox-notifier queued APPROVAL_REQUEST force_ask to Larry at `17:32:09-0600` (23:32 UTC). Pattern: `MalformedForgeMarker: phase=preflight requires ONE marker block — none found`. All 4 incidents self-recovered. **G-rule DISPATCHED — waiting for Larry to approve → Beacon spec → Forge PR.**
+**Rule:** G-rule forge-preflight-no-marker COMPLETE. Mirror approved PR #600 `feat(agent_runner): deterministic preflight marker reminder for Forge dispatches` at 18:03:38 MDT 2026-06-19; auto-merged + branch deleted. Pattern was `MalformedForgeMarker: phase=preflight requires ONE marker block — none found` (4 incidents, all self-recovered). Fix: deterministic preflight marker reminder injected via --append-system-prompt on every phase=preflight Forge dispatch. PRIME verified iter ~2307. **G-rule COMPLETE.**
 
 ---
 
@@ -150,9 +150,15 @@
 
 ---
 
-## Status snapshot — updated 2026-06-19 23:47Z UTC (Iter ~2305, Tier 1, NOMINAL ✅)
+## G-rule outbox-notifier-review-pass-tier4 (new, iter ~2307, 2026-06-20)
 
-**Iter ~2305 summary:** ✅ Nominal. 0 new alerts. All 5 daemons alive (same PIDs). Repo clean. Key update: Larry replied 'go' at 17:39 MDT — forge-preflight-marker-gate-001 APPROVED → build-phase dispatched to Forge inbox at 23:42 UTC (5 min old). Forge preflight ran; MalformedForgeMarker on first attempt (occurrence #4), retry 1/3 succeeded. G-rule forge-preflight-no-marker now **BUILD IN PROGRESS**. G-rule projects-json-healer-path-unregistered stays at **2/3** (Check A clean). Watermark=901=file_length. Heartbeat 23:41Z. PRIME: systemic_fixes=54, ratio≈19.46, trend=improving. **Tier 1. consecutive_clean=2. Next cadence: 5-min (1 more clean iter → Tier 2).**
+**Rule:** `source=outbox-notifier, kind=notification, intent=review-pass` alerts classify as Tier-4 (novel, no registry template) in triage helper. Alert carries `route=escalate` — bot DMs Larry directly. Do NOT send second DM from Pulse. Journal-note only. G-rule count: **1/3** — dispatch to Beacon at 3/3 for Tier-3 translation in `config/alert-translations.json`.
+
+---
+
+## Status snapshot — updated 2026-06-20 00:08Z UTC (Iter ~2307, Tier 2, NOMINAL ✅)
+
+**Iter ~2307 summary:** ✅ Nominal. 2 new alerts (L903 sync-blocked Tier-3 silence; L904 review-pass Tier-4 delivery-confirmation, bot already DM'd). All 5 daemons alive (same PIDs). **MILESTONE: G-rule forge-preflight-no-marker COMPLETE** — Mirror approved PR #600 at 18:03 MDT, auto-merged + branch deleted. G-rule projects-json-healer-path-unregistered stays at **2/3**. New G-rule: outbox-notifier-review-pass-tier4 at **1/3**. Watermark=904=file_length. Heartbeat 23:41Z (~27 min, fresh). PRIME: systemic_fixes=54, ratio≈19.46, trend=improving. **Tier 2, consecutive_clean=0→1. Next cadence: 15-min.**
 
 
 
