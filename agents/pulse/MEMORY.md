@@ -156,9 +156,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-20 00:08Z UTC (Iter ~2307, Tier 2, NOMINAL ✅)
+## Status snapshot — updated 2026-06-20 00:25Z UTC (Iter ~2308, Tier 2, NOMINAL ✅)
 
-**Iter ~2307 summary:** ✅ Nominal. 2 new alerts (L903 sync-blocked Tier-3 silence; L904 review-pass Tier-4 delivery-confirmation, bot already DM'd). All 5 daemons alive (same PIDs). **MILESTONE: G-rule forge-preflight-no-marker COMPLETE** — Mirror approved PR #600 at 18:03 MDT, auto-merged + branch deleted. G-rule projects-json-healer-path-unregistered stays at **2/3**. New G-rule: outbox-notifier-review-pass-tier4 at **1/3**. Watermark=904=file_length. Heartbeat 23:41Z (~27 min, fresh). PRIME: systemic_fixes=54, ratio≈19.46, trend=improving. **Tier 2, consecutive_clean=0→1. Next cadence: 15-min.**
+**Iter ~2308 summary:** ✅ Nominal. 5 new alerts (L905-L909), all Tier-3 (heal-stale-daemon-code auto-restarts — inbox-watcher, beacon-bot, forge-bot, mirror-bot, pulse-bot restarted after PR #600 code landed). All 5 daemons alive (beacon now PID 559555, inbox-watcher now PID 559441; outbox_notifier 497831, dashboard_api 497752, chain-event 3734305 unchanged). 0 open PRs. No stalls. G-rule projects-json-healer-path-unregistered stays at **2/3**. G-rule outbox-notifier-review-pass-tier4 stays at **1/3**. Watermark=909=file_length. Heartbeat 00:11Z (~11 min, fresh). PRIME: systemic_fixes=54, ratio≈19.46, trend=improving. **Tier 2, consecutive_clean=1→2. Need 1 more clean iter to Tier 3. Next cadence: 15-min.**
 
 
 
