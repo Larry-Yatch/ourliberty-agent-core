@@ -102,9 +102,9 @@
 
 ---
 
-## Ledger/Check-I Tier-4 pattern (observed 2026-06-15 iter ~1900)
+## Ledger/Check-I Tier-4 → DISPATCHED ✅ (iter ~2316)
 
-**Rule:** `source=ledger` weekly reports (subject=weekly-YYYY-MM-DD) and `source=pulse` Check I digests (subject=check-i-YYYY-MM-DD) consistently classify as Tier-4 (novel, no template) in the triage helper. These are routine Monday outputs already delivered by the bot via route=escalate. G-rule candidate: add Tier-3 translations for both. **Count: 1/3** — dispatch to Beacon at 3/3.
+**Rule:** `source=ledger` weekly reports (subject=weekly-YYYY-MM-DD) and `source=pulse` Check I digests (subject=check-i-YYYY-MM-DD) consistently classify as Tier-4 (novel, no template) in the triage helper. G-rule hit 3/3 at iter ~2316 (iters ~1900, ~2315, ~2316). Beacon envelope `ledger-check-i-tier3-silence-001` dispatched 2026-06-20T01:52Z requesting Tier-3 silence translations for both patterns in `config/alert-translations.json`. Bot DM via route=escalate preserved. **verification_pending — waiting for Forge PR + merge.**
 
 ---
 
@@ -156,9 +156,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-20 01:46Z UTC (Iter ~2315, Tier 1, NOMINAL ✅)
+## Status snapshot — updated 2026-06-20 01:53Z UTC (Iter ~2316, Tier 1, SIGNAL ⚠️)
 
-**Iter ~2315 summary:** ✅ Nominal. All checks clean. 3 new alerts (L916-918) Tier-3 silenced (heal-stale-daemon-code auto-restarted beacon-bot, dashboard-api, outbox-notifier at 01:42Z post-PR#602 rollout — expected behavior). Check I ran (Friday). `launch-system-self-awareness-slice-1-state-log` CLOSED: build completed 01:29:42Z as no-op (Forge correctly declined PR#602 duplicate), inboxes empty. Watermark=918. All 5 daemons alive (new PIDs: beacon=598547, dashboard=598696, outbox=598943). beacon-pending-approvals: pending=0. Heartbeat 01:42:15Z (fresh). PRIME: systemic_fixes=55, ratio≈19.15. **Tier 1, consecutive_clean=1→2. Need 1 more clean iter for Tier 2. Next cadence: 5-min.**
+**Iter ~2316 summary:** ⚠️ Signal. 2 new alerts (L919-920): ledger weekly-2026-06-15 + pulse check-i-2026-06-15, both Tier-4 (novel). Bot already DM'd Larry (route=escalate). G-rule ledger/check-i Tier-4 hit 3/3 → dispatched `ledger-check-i-tier3-silence-001` to Beacon for config/alert-translations.json Tier-3 silence fix. All other checks clean. Watermark=920. Daemons: beacon=599691, dashboard=599692, outbox=598943, inbox-watcher=559441, chain-event=3734305 (all alive). beacon-pending-approvals: pending=0. Heartbeat 01:42:15Z (fresh). PRIME: systemic_fixes=55, ratio≈19.15. **Tier 1, consecutive_clean=2→0. Next cadence: 5-min.**
 
 
 
