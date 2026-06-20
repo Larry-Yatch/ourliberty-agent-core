@@ -737,6 +737,36 @@
         "from_state": "parked"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "cap-board-launch-build-has-no-spec-select-spec-docs-fc93",
+      "title": "Board: Launch build has no spec-select + spec_docs not editable (dogfood)",
+      "note": "Dogfood 2026-06-19 (system-awareness mission). 'Launch build' dispatches IMMEDIATELY against the mission's stored spec_docs with no step to select/confirm the build spec, and there's no way to edit a mission's spec_docs after creation. Our mission's spec_docs were the planning docs (North Star + DES); the detailed build spec (agents/beacon/specs/system-awareness-slice-1-state-log.md, merged #601) wasn't referenced, so Forge was dispatched against planning docs. Suggest: a launch confirm step showing repo + spec_docs (editable) before dispatch; make mission spec_docs editable on the card. Owner = Projects-tab-v3 board stream.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ol-work",
+        "branch": "dogfood/mission-action-label-spec",
+        "captured_at": "2026-06-20T00:34:10.075072+00:00"
+      },
+      "last_touched": "2026-06-20T00:34:10.075072+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "When you hit \"Launch\" on a project, it immediately starts work using whatever documents were attached when the project was first created \u2014 and there's no chance to review or swap them first.",
+        "why": "We just got burned by this on our own project: it launched against the early brainstorming notes instead of the finished plan, so the team built from the wrong instructions and the work had to be redone.",
+        "suggest": "Worth fixing, but carefully \u2014 add a quick \"here's what we're about to build, confirm or change it\" screen before launch, and let people update a project's documents after it's created."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-20T00:34:09.968534+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
