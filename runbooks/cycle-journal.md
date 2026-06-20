@@ -4,6 +4,90 @@
 
 ---
 
+## Iteration ~2327 — 2026-06-20T05:41Z UTC (interactive, /cycle, Tier 3→1, tier-reset, SIGNAL ⚠️)
+
+**Trigger:** Larry `/cycle` invocation via `/loop /cycle`.
+
+**Health:** ⚠️ Signal — 1 new alert (line 923). All daemons alive. No pipeline stalls. 0 open PRs. Saturday UTC — no conditional checks.
+
+**VERIFY-BEFORE-REASSERT:**
+- **All 5 daemons alive:** beacon=599691 (Ss, ~3h57m) ✅, dashboard_api=599692 (Ssl, ~3h57m) ✅, outbox_notifier=598943 (Ss, ~3h59m) ✅, inbox_watcher=559441 (Ssl, ~5h29m) ✅, chain-event=3734305 (SNs, 3d+) ✅.
+- **G-rule ledger/check-i Tier-4 → verification_pending:** `silence-routine-weekly-alerts-tier3-001` still in beacon-pending-approvals (pending=1, created 01:59:30Z, ~3h42m). Awaiting Larry "go" approval. [carry verification_pending]
+- **Stale bash orphan PID 1834248:** Alive (Ss, ~22d10h25m). [carry]
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 922, "file_length": 923}`. **1 new alert at line 923.**
+- `source=build-sequence-advancer, subject=sequence-stranded:launch-system-self-awareness-slice-1-state-log:system-self-awareness-slice-1-state-log, ts=2026-06-20T05:30:18Z, route=escalate`
+- Helper triage: **Tier-4** (novel: no registry template, no translation match). Bot already DM'd Larry at idx=922 (23:32 MDT June 19 = 05:32Z). No separate Pulse DM.
+- Context: Forge dispatched at 01:25Z (via Beacon), ran preflight in 80s (01:27Z), preflight decision=PROCEED, but build phase never dispatched → no PR. Sequence advancer 4h stall backstop fired at 05:30Z. Archive: `outboxes/forge/.archive/system-self-awareness-slice-1-state-log.json`. Action needed: Larry inspects, then `resume sequence launch-system-self-awareness-slice-1-state-log` or re-launch.
+- Watermark advanced: 922→923. Tier-reset: Tier 3→1.
+
+**Check 1 — Log noise:** outbox-notifier.log: 0 new WARN/ERROR. inbox-watcher.log: 0 WARN/ERROR. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot PID 599691 alive (Ss, ~3h57m). Last bot log entry: idx=922 (build-sequence-advancer sequence-stranded delivered 23:32 MDT June 19). Larry's last message: 19:18 MDT June 19 'status'. No new directives since. No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → "no stalls detected." 13 FORGE_NO_PR_SKIP (same known set; `system-self-awareness-slice-1-state-log` now classified `preflight_exit`). ✅ Nominal.
+
+**Check 4 — Pending directives:** watermark=922→923 (1 new alert triaged). beacon-pending-approvals.json: pending=1 (silence-routine-weekly-alerts-tier3-001, created 01:59:30Z — expected, awaiting Larry approval). Forge inbox: empty ✅. Beacon inbox: empty ✅. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-20T05:12:35Z (~29 min ago). FRESH (< 60 min). ✅ Nominal.
+
+**Check A — Source repo:** On main, clean. HEAD=fd4b7a64=origin/main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-20T04:57:01Z (~44 min ago), status=no-change. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon=599691 ✅, dashboard_api=599692 ✅, outbox_notifier=598943 ✅, inbox_watcher=559441 ✅, chain-event=3734305 ✅. 5/5. ✅
+
+**Check E — PRs:** ourliberty-agent-core: 0 open PRs ✅. ourliberty-dashboard: 0 open PRs ✅. Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — UTC weekday=Saturday (5 ∉ {0,2,4,6}):** Check I/III/VIII/IX/X all skip. ✅
+
+**Actions taken:**
+1. Alert watermark: 922→923 (1 new alert triaged).
+2. PRIME ledger: `intervention` appended (tier=3, template=build-sequence-advancer-sequence-stranded).
+3. Tier state: `record --checks-clean false` → Tier 3→1 reset, consecutive_clean=0.
+
+**Dispatches:** None (Tier-4 alert already DM'd Larry via bot at idx=922; no separate Pulse DM).
+
+**Standing findings (carried forward):**
+- [yellow] **Sequence stranded: launch-system-self-awareness-slice-1-state-log** — Forge preflight PROCEED'd at 01:27Z but build phase never dispatched; no PR. Sequence paused/failed. Bot DM'd Larry (idx=922). Larry to decide: resume or re-launch. [NEW]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [blue] **install-drift:ourliberty-build-sequence-advancer.service** — Tier-3 silenced. [carry]
+- [blue] **unreviewed-merge:571** — bot DM'd. Larry judgment. [carry]
+- [blue] **Stale bash orphan** — PID 1834248 (Ss, ~22d10h25m). [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule ledger/check-i Tier-4** — **DISPATCHED ✅** (3/3 → `ledger-check-i-tier3-silence-001` → Beacon, iter ~2316; Beacon converted to Forge task `silence-routine-weekly-alerts-tier3-001`). verification_pending — awaiting Larry approval.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule seq-advancer-sequence-stranded** — 1/3. Watch. (New this iter: build-sequence-advancer Tier-4 alert for stranded step after Forge preflight-exit-no-build.)
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule catalog-accuracy-drift-tier4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule mirror-marker-parse-error** — 1/3. Watch.
+- [blue] **G-rule watchdog-watcher-log-stale** — 1/3. Watch.
+- [blue] **G-rule health-notify-script-missing** — Beacon dispatch sent 2026-06-09, fix status unverified. [carry]
+- [blue] **G-rule forge-preflight-no-marker** — **COMPLETE ✅** (PR #600). [CLOSED]
+- [blue] **G-rule outbox-notifier-review-pass-tier4** — 1/3. Watch; dispatch to Beacon at 3/3.
+- [blue] **G-rule forge-preflight-task-id-mismatch** — **2/3**. Watch; dispatch to Beacon at 3/3.
+- [blue] **G-rule heal-droplet-git-drift Tier-4** — **COMPLETE ✅** (PR #586). [CLOSED]
+- [blue] **G-rule projects-json-healer-path-unregistered** — **COMPLETE ✅** (PR #603). [CLOSED]
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention this iter. Trailing-30d: interventions=1055, systemic_fixes=55, ratio≈19.18, trend=improving.
+**Tier end-of-iter:** Tier 3→1 reset (Tier-4 alert). consecutive_clean=0. Next cadence: 5-min.
+
+---
+
 ## Iteration ~2326 — 2026-06-20T05:12Z UTC (interactive, /cycle, Tier 3, consecutive_clean=3→4, NOMINAL ✅)
 
 **Trigger:** Larry `/cycle` invocation via `/loop /cycle`.

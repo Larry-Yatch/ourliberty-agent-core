@@ -156,9 +156,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-20 05:12Z UTC (Iter ~2326, Tier 3, consecutive_clean=3→4, NOMINAL ✅)
+## Status snapshot — updated 2026-06-20 05:41Z UTC (Iter ~2327, Tier 3→1 reset, SIGNAL ⚠️)
 
-**Iter ~2326 summary:** ✅ Nominal. 0 new alerts (wm=922=file_length). 5/5 daemons alive (beacon=599691, dashboard=599692, outbox=598943, inbox-watcher=559441, chain-event=3734305). No stalls. 13 FORGE_NO_PR_SKIP (same known set). 0 new WARN/ERROR in logs. beacon-pending-approvals: pending=1 (silence-routine-weekly-alerts-tier3-001, awaiting Larry "go" approval). Heartbeat 04:42:27Z (~30 min, fresh). PRIME: systemic_fixes=55, ratio≈19.16. **Tier 3, consecutive_clean=3→4 (max tier). Next cadence: 30-min.**
+**Iter ~2327 summary:** ⚠️ Signal. 1 new alert (wm=922→923): build-sequence-advancer sequence-stranded (launch-system-self-awareness-slice-1-state-log). Forge preflight PROCEED'd at 01:27Z but build phase never dispatched; no PR created; sequence paused. Bot DM'd Larry at idx=922 (23:32 MDT). 5/5 daemons alive. No pipeline stalls. 0 open PRs. 0 log WARN/ERROR. beacon-pending-approvals: pending=1 (silence-routine-weekly-alerts-tier3-001, awaiting Larry "go"). PRIME: systemic_fixes=55, interventions=1055, ratio≈19.18. **Tier 3→1 reset. consecutive_clean=0. Next cadence: 5-min.**
 
 
 
