@@ -275,12 +275,29 @@
           "id": "system-self-awareness-the-standing-brain",
           "title": "System self-awareness - the standing brain",
           "desired_end_state": "Move insight, status, and direction off Larry's laptop so the droplet team self-directs. Multi-phase; first slice = work-in-flight Narrator -> State Log.",
-          "lifecycle_state": "building",
+          "lifecycle_state": "done",
           "order": 0,
           "spec_ref": "docs/system-awareness-north-star.md",
           "sequence_ref": "launch-system-self-awareness-the-standing-brain",
           "created_at": "2026-06-20T00:13:50.124026+00:00",
-          "updated_at": "2026-06-20T00:40:11.118810+00:00"
+          "updated_at": "2026-06-20T01:10:54.966478+00:00",
+          "closeout": {
+            "summary": "The system now keeps a living, plain-English picture of all work currently in progress, updated automatically and readable on demand \u2014 so you can ask \"where are we on work in flight?\" and get an answer without firing up a Claude session on your laptop. This is the first slice of a larger effort to move status, insight, and direction off your laptop and onto the always-on droplet team; the next phase can build the diagnosing and planning organs on top of this standing picture.",
+            "shipped": "A continuously-updated work-in-flight log that tracks active projects, their progress, what's stuck, and what's in review, written automatically on a schedule in your terms. You can read it three ways \u2014 on the dashboard, by asking Beacon for \"work in flight\" or \"state of work,\" or via a /state shortcut \u2014 and it honestly tells you when it's stale rather than guessing (PR #602).",
+            "changed_vs_spec": "The build matched the plan's first slice. The one notable judgment call: an existing \"catch me up\" shortcut already owned phrases like \"where are we\" and \"status,\" so this new standing log was deliberately given distinct phrases to avoid stepping on it \u2014 the two now coexist, one giving the always-current picture and the other giving what's changed since you last checked.",
+            "learnings": "The team built this almost entirely by reusing machinery that already existed rather than reinventing it, which kept it cheap to run and fast to ship. It was also built to never break the system or itself \u2014 every part fails quietly and degrades gracefully instead of taking anything down, a pattern worth carrying into the next phases.",
+            "cost": "One PR of build work.",
+            "done_gate_met": true
+          },
+          "closeout_provenance": {
+            "by": "beacon",
+            "model": "claude-opus-4-8",
+            "at": "2026-06-20T01:10:39.772776+00:00",
+            "from_state": "done",
+            "pr_numbers": [
+              "602"
+            ]
+          }
         }
       ],
       "one_off": true,
