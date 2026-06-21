@@ -2317,6 +2317,36 @@ class BuildPhaseDispatchTest(unittest.TestCase):
         build_data = json.loads(forge_builds[0].read_text())
         self.assertEqual(build_data['branch'], 'forge/watchdog-fix-001')
 
+    def test_resumed_build_with_stale_proceed_does_not_redispatch(self):
+        # resumed-build-stale-marker guard (fix 1a). A `phase=build` outbox
+        # RESUMES the preflight session, so a stale `=== PROCEED ===` is still
+        # in its transcript. The classifier must NOT re-discover it and re-
+        # dispatch the build (the 2026-06-20 strand). Embedding the marker in
+        # `result` exercises the same classification path the session-log scan
+        # hits. Before the guard this wrote a build-phase task + returned
+        # 'notified-marker'; after it, neither happens.
+        stale = (
+            '=== PROCEED ===\n'
+            '{"task_id": "slice-x", "preflight_summary": "stale"}\n'
+            '=== END_PROCEED ==='
+        )
+        outbox = _good_outbox(
+            agent='forge', source='beacon', task_id='slice-x',
+            phase='build', target_repo='ourliberty-agent-core',
+            claude_session_id='sess-build-xyz',
+            result=f'Build phase narrative; work shipped.\n\n{stale}',
+        )
+        f = self._write_outbox('forge', 'slice-x.json', outbox)
+
+        result = on.process_outbox(f)
+
+        forge_builds = list((on.INBOXES_ROOT / 'forge').glob('build-*.json'))
+        self.assertEqual(
+            forge_builds, [],
+            msg='a resumed build must not re-dispatch itself off a stale PROCEED',
+        )
+        self.assertNotEqual(result, 'notified-marker')
+
     def test_proceed_with_max_clarifications_propagates(self):
         outbox = self._forge_proceed_outbox(
             target_repo='ourliberty-agent-core',

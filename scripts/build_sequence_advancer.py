@@ -72,6 +72,7 @@ import argparse
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -1226,6 +1227,148 @@ def _escalate_stranded_dispatched_steps(
     return False
 
 
+# -------------------- already-merged build bridge (no-PR strand backstop) --------------------
+
+
+# The escalate pass writes this signature into a stranded step's failure_reason
+# (see `_escalate_stranded_dispatched_steps`). A `failed` step carrying it (and
+# no pr_url) is the 4h-stall backstop's own work, NOT a genuine build failure or
+# a human cancel — so reconcile may safely re-examine it (option c). Matched as a
+# stable substring of the stall reason.
+_STALL_FAILURE_SIGNATURE = 'stall backstop'
+
+
+def _paused_by_stall_strand(sequence: dict[str, Any]) -> bool:
+    """True iff the sequence's MOST RECENT `sequence-paused` audit entry was the
+    stall backstop's own (its reason names a stranded/stall-backstop strand).
+
+    Gates the reconcile auto-resume so it only un-pauses a sequence the escalate
+    pass paused for THIS strand class — never an operator's intentional `pause`
+    (or a pause for any other reason), even if a stranded-then-failed step
+    happens to coexist."""
+    for entry in reversed(sequence.get('audit_log') or []):
+        if not isinstance(entry, dict) or entry.get('event') != 'sequence-paused':
+            continue
+        reason = entry.get('reason')
+        return isinstance(reason, str) and (
+            _STALL_FAILURE_SIGNATURE in reason or 'stranded' in reason
+        )
+    return False
+
+
+def _is_advancer_stranded_failure(step: dict[str, Any]) -> bool:
+    """True iff `step` is a `failed` step the advancer's stall backstop stranded
+    (it has the stall signature in `failure_reason` and never recorded a PR).
+
+    Distinguishes the auto-escalated-strand case — whose work may have shipped
+    via another path — from a genuinely-failed build (Mirror reject, build error)
+    or a human cancel, neither of which reconcile should resurrect."""
+    if step.get('status') != 'failed':
+        return False
+    if step.get('pr_url'):
+        return False
+    reason = step.get('failure_reason')
+    return isinstance(reason, str) and _STALL_FAILURE_SIGNATURE in reason
+
+
+def _latest_forge_build_result(step_id: str) -> Optional[str]:
+    """Return the result text of the most-recent Forge BUILD outbox for
+    `step_id` (task_id == step_id), or None.
+
+    Reads `~/agents/outboxes/forge/.archive/<step_id>(.N).json`. The filename is
+    anchored so a step_id that is a prefix of another (`foo` vs `foo-v2`) can't
+    cross-match. Only a CLEAN-EXIT `phase == 'build'` envelope counts
+    (exit_code == 0 — an honest no-delta refusal is a successful turn, while a
+    crash exits non-zero); the newest by completed_at (else mtime) wins.
+    Fail-safe — any read/parse error → None."""
+    try:
+        archive_dir = AGENTS_ROOT / 'outboxes' / 'forge' / '.archive'
+        if not archive_dir.is_dir():
+            return None
+        name_re = re.compile(rf'^{re.escape(step_id)}(\.\d+)?\.json$')
+        best: Optional[tuple[float, str]] = None
+        for f in archive_dir.glob('*.json'):
+            if f.name.startswith('.') or not name_re.match(f.name):
+                continue
+            try:
+                env = json.loads(f.read_text())
+            except (OSError, json.JSONDecodeError):
+                continue
+            if not isinstance(env, dict) or env.get('phase') != 'build':
+                continue
+            if env.get('exit_code') != 0:
+                continue
+            ts = env.get('completed_at')
+            epoch: float
+            if isinstance(ts, str) and ts:
+                try:
+                    epoch = datetime.fromisoformat(
+                        ts.replace('Z', '+00:00')
+                    ).timestamp()
+                except ValueError:
+                    epoch = f.stat().st_mtime
+            else:
+                try:
+                    epoch = f.stat().st_mtime
+                except OSError:
+                    epoch = 0.0
+            result = env.get('result')
+            if not isinstance(result, str):
+                result = ''
+            if best is None or epoch > best[0]:
+                best = (epoch, result)
+        return best[1] if best is not None else None
+    except Exception:
+        return None
+
+
+def _bridge_already_merged_pr(
+    ssh, step_id: str, target_repo: str,
+    merged_prs: Optional[list[dict[str, Any]]],
+    logger: logging.Logger,
+) -> Optional[dict[str, Any]]:
+    """Bridge a step to the PR its work already merged under, when the PR's
+    branch/title carry no step_id token so `_match_pr_for_step` can't.
+
+    Reads the step's Forge build outbox; if it narrates an already-merged /
+    no-delta outcome naming a single gh-MERGED PR, returns a merged-PR dict
+    `{'url', 'mergedAt'}` (the shape `apply_step_merged` consumes). Resolves the
+    PR via the per-tick `merged_prs` list first (already fetched, no extra gh
+    call); falls back to a direct `gh pr view` verify when the PR is older than
+    the recent-merged window. Fail-safe — any miss/error → None.
+
+    `ssh` is the lazily-imported `sequence_shortcut_helpers` module passed from
+    the reconcile loop (the advancer imports it under an importability guard, so
+    it is not a module-level name here)."""
+    result_text = _latest_forge_build_result(step_id)
+    if not result_text:
+        return None
+    pr_number = ssh.parse_already_merged_pr_ref(result_text)
+    if pr_number is None:
+        return None
+    # Prefer the already-fetched recent-merged list (confirmed MERGED, carries
+    # url + mergedAt) — no second gh call in the common case.
+    if merged_prs:
+        for pr in merged_prs:
+            if pr.get('number') == pr_number:
+                logger.info(
+                    f'reconcile: step_id={step_id!r} bridged to already-merged '
+                    f'PR #{pr_number} via build-outbox no-delta refusal '
+                    f'(recent-merged list)'
+                )
+                return pr
+    # Older than the lookback window — verify the named PR directly.
+    info = ssh.gh_pr_merge_info(ssh.qualify_repo(target_repo), pr_number)
+    if info is None:
+        return None
+    url, merged_at = info
+    logger.info(
+        f'reconcile: step_id={step_id!r} bridged to already-merged PR '
+        f'#{pr_number} via build-outbox no-delta refusal (direct gh verify)'
+    )
+    return {'url': url, 'mergedAt': merged_at, 'number': pr_number}
+
+
 def _reconcile_dispatched_steps(
     sequence: dict[str, Any], logger: logging.Logger,
     _repo_cache: Optional[dict[str, Optional[list[dict[str, Any]]]]] = None,
@@ -1248,6 +1391,20 @@ def _reconcile_dispatched_steps(
     matches via pr_url → branch → title-substring. On a confident match,
     it fires apply_step_merged (which is idempotent) and counts the
     reconciliation. Returns the count for this sequence.
+
+    no-PR already-merged backstop (2026-06-20): two extensions close the
+    strand class where a build opens NO PR because its work already merged
+    via another path (`git diff main..HEAD` empty; Forge refuses to fabricate
+    a PR) AND the merged PR's branch/title carry no step_id token, so the
+    identity match above can't bridge it (real incident: step
+    `system-self-awareness-slice-1-state-log` → PR #602):
+      • when the identity match misses for a step with NO recorded pr_url,
+        fall back to `_bridge_already_merged_pr` — it reads the PR Forge named
+        in her honest "already merged" build-outbox refusal and gh-verifies it;
+      • reconcile ALSO considers steps the 4h stall backstop already escalated
+        to `failed` (no pr_url + stall signature). Healing such a step on the
+        paused sequence resumes it first (when the strand is the sole blocker)
+        so the now-all-merged sequence finalizes — no manual operator unstick.
 
     Failure mode: gh missing / timeout / network → log + return 0. The
     rest of the tick continues normally (stale-but-running > stopped).
@@ -1282,7 +1439,14 @@ def _reconcile_dispatched_steps(
         return 0
 
     for step in steps:
-        if step.get('status') != 'dispatched':
+        status = step.get('status')
+        # Reconcile steps still `dispatched`, PLUS steps the 4h stall backstop
+        # already escalated to `failed` whose work may have shipped via another
+        # path (option c — without this a stranded-then-failed step could never
+        # auto-heal, the exact dead end the 2026-06-20 incident hit). Every other
+        # status (genuine failure, merged, pending, ...) is left alone.
+        is_stranded_failed = _is_advancer_stranded_failure(step)
+        if status != 'dispatched' and not is_stranded_failed:
             continue
         step_id = step.get('step_id')
         if not isinstance(step_id, str):
@@ -1301,6 +1465,18 @@ def _reconcile_dispatched_steps(
         match = _match_pr_for_step(
             step_id, step.get('pr_url'), merged_prs, logger,
         )
+        # No identity match by pr_url / branch / title. When the step recorded no
+        # PR at all, the work may have shipped under a branch/title that carries
+        # none of the step_id token (the #602 incident: branch
+        # `forge/system-self-awareness-the-standing-brain`, title with no
+        # step_id). Fall back to the build-outbox no-delta bridge — it reads the
+        # PR Forge named in her honest "already merged" refusal and gh-verifies
+        # it. Only for steps with no recorded pr_url (a recorded one already
+        # matched tier-1 above, or is a genuine non-strand).
+        if match is None and not step.get('pr_url'):
+            match = _bridge_already_merged_pr(
+                ssh, step_id, target_repo, merged_prs, logger,
+            )
         if match is None:
             continue
         pr_url = match.get('url') or ''
@@ -1316,6 +1492,36 @@ def _reconcile_dispatched_steps(
             )
             continue
         matched_prs_in_pass[pr_url] = step_id
+        # Healing a stranded-`failed` step: the escalate pass also PAUSED the
+        # sequence, and apply_step_merged's completion rollup no-ops while paused
+        # (terminal statuses are operator-overriding). Resume FIRST so a now-all-
+        # merged sequence finalizes — but ONLY when (a) this strand is the sole
+        # blocker (no OTHER failed step), and (b) the pause was the stall
+        # backstop's OWN (never auto-resume an operator's intentional pause). A
+        # genuinely-failed sibling or a non-strand pause leaves the pause for
+        # Larry; we still record this step's merge.
+        if (
+            is_stranded_failed
+            and sequence.get('status') == 'paused'
+            and _paused_by_stall_strand(sequence)
+        ):
+            other_failed = any(
+                s is not step and s.get('status') == 'failed' for s in steps
+            )
+            if not other_failed:
+                resume = ssh.apply_resume(seq_id, actor='advancer-reconcile')
+                if getattr(resume, 'error', False):
+                    logger.warning(
+                        f'reconcile: could not resume paused sequence {seq_id} '
+                        f'to heal stranded step {step_id}: {resume.reason}'
+                    )
+                else:
+                    sequence['status'] = 'active'  # keep in-memory consistent
+                    logger.info(
+                        f'reconcile: resumed paused sequence {seq_id} to heal '
+                        f'stranded-then-failed step {step_id} (work shipped via '
+                        f'{pr_url})'
+                    )
         try:
             result = ssh.apply_step_merged(
                 seq_id=seq_id,
@@ -1333,6 +1539,11 @@ def _reconcile_dispatched_steps(
         if getattr(result, 'applied', False):
             reconciled += 1
             matched_step_ids.append(step_id)
+            # Keep the in-memory copy consistent so a later iteration's
+            # `other_failed` / status checks in this same pass don't read stale
+            # state (the on-disk file already reflects the merge).
+            step['status'] = 'merged'
+            step['pr_url'] = pr_url
 
     if reconciled > 0:
         logger.info(
