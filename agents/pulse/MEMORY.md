@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-21 21:04Z UTC (Iter ~2406, Tier 2, consecutive_clean=0→1, NOMINAL ✅)
+## Status snapshot — updated 2026-06-21 21:24Z UTC (Iter ~2407, Tier 2, consecutive_clean=1→2, NOMINAL ✅)
 
-**Iter ~2406 summary:** ✅ Nominal. 2 new alerts (L856–L857: heal-stale-daemon-code auto-restarted outbox_notifier + dashboard_api, both Tier-3 silenced, watermark 855→857). 5/5 daemons alive (new PIDs: outbox_notifier=851803, dashboard_api=852044). PR #611 (p6-brainstorm-autofill-author) auto-merged at 20:59Z. Next sequence step p6-brainstorm-card-ui in Forge inbox (fresh, 1 min). 0 open PRs. beacon-pending-approvals: 0. unreviewed-merge:607 still Larry's judgment ([yellow] carry). Check I: sentinel exists → skip. Check III: 10d < 14d → skip. PRIME: systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3.** **Tier 2, consecutive_clean=0→1**, need 2 more clean iters to reach Tier 3.
+**Iter ~2407 summary:** ✅ Nominal. 1 new alert (L858: sequence-complete:projects-v3-p6-brainstorm-autofill, Tier-3 silenced, watermark 857→858). 5/5 daemons alive (outbox_notifier now PID 866327 after another restart). **Sequence projects-v3-p6-brainstorm-autofill COMPLETE** — PR #611 (agent-core) + PR #72 (dashboard) both merged at 15:22 MDT. Mirror had a malformed REVIEW_PASS (bare keyword) → notifier retry → Mirror self-corrected in 1 min. 0 open PRs. beacon-pending-approvals: 0. unreviewed-merge:607 still Larry's judgment ([yellow] carry). Check I: sentinel exists → skip. Check III: 10d < 14d → skip. PRIME: systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3 (↑).** **Tier 2, consecutive_clean=1→2**, need 1 more clean iter to reach Tier 3.
 
 
 
