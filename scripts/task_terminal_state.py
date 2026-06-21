@@ -108,10 +108,20 @@ def default_repos() -> list[str]:
 def _qualify_repo(repo: str) -> str:
     """Return `repo` in the OWNER/REPO form `gh --repo` requires. A bare name
     (`ourliberty-agent-core`) is prefixed with the gh owner; an already-qualified
-    value passes through untouched."""
-    if not repo:
-        return repo
-    return repo if '/' in repo else f'{_gh_owner()}/{repo}'
+    or falsy value passes through untouched.
+
+    Delegates to the SINGLE shared resolver `sequence_shortcut_helpers.qualify_repo`
+    so the owner default lives in one place. The import is lazy (call-time, not
+    module-level) so this low-level probe kernel keeps importing even where the
+    heavier ssh dependency chain isn't available; the local fallback preserves the
+    exact prior behavior in that case."""
+    try:
+        from sequence_shortcut_helpers import qualify_repo
+        return qualify_repo(repo)
+    except Exception:
+        if not repo:
+            return repo
+        return repo if '/' in repo else f'{_gh_owner()}/{repo}'
 
 
 # -------------------- shared kernel (the de-duplicated probe core) --------------------

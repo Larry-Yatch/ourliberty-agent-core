@@ -928,7 +928,9 @@ _REAL_NO_DELTA_RESULT = (
 
 
 class ParseAlreadyMergedPrRefTests(unittest.TestCase):
-    """Pure parser — needs a no-delta CUE AND exactly one distinct PR number."""
+    """Pure parser — two-tier: PREFER the canonical structured contract line
+    `NO PR — already merged: #<N>` (authoritative); else fall back to a no-delta
+    CUE plus exactly one distinct PR number."""
 
     def test_real_incident_extracts_602(self):
         self.assertEqual(
@@ -986,6 +988,70 @@ class ParseAlreadyMergedPrRefTests(unittest.TestCase):
         self.assertEqual(
             ssh.parse_already_merged_pr_ref('NO PR — already merged: #777'), 777,
         )
+
+    def test_canonical_line_is_authoritative_over_other_prs(self):
+        # The structured contract line names THE merged PR explicitly, so other
+        # PR numbers in the surrounding prose (a superseded attempt) must NOT make
+        # it ambiguous the way the prose tier would — this is the durability win.
+        self.assertEqual(
+            ssh.parse_already_merged_pr_ref(
+                'NO PR — already merged: #602\n\n'
+                'This superseded my earlier #595 attempt; `git diff main..HEAD` '
+                'is empty.'
+            ),
+            602,
+        )
+
+    def test_canonical_line_lenient_separators(self):
+        # Colon / hyphen stand in for the em-dash, optional `PR` token before the
+        # number — a minor transcription drift still parses as tier 1.
+        for text in (
+            'NO PR: already merged #602',
+            'NO PR - already merged: #602',
+            'NO PR — already merged PR #602',
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(ssh.parse_already_merged_pr_ref(text), 602)
+
+    def test_canonical_line_full_url_form(self):
+        self.assertEqual(
+            ssh.parse_already_merged_pr_ref(
+                'NO PR — already merged: '
+                'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/602'
+            ),
+            602,
+        )
+
+    def test_canonical_url_form_authoritative_over_other_prs(self):
+        # The URL form of the canonical line must be tier-1 authoritative too:
+        # a superseded PR mentioned in the explanation paragraph below must NOT
+        # drag it into tier-2 ambiguity → None (the `#<N>` and URL forms of the
+        # same contract must reach the SAME answer).
+        self.assertEqual(
+            ssh.parse_already_merged_pr_ref(
+                'NO PR — already merged: '
+                'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/602\n\n'
+                'This work was already landed by #551 in an earlier attempt.'
+            ),
+            602,
+        )
+
+    def test_url_fragment_does_not_phantom_a_second_pr(self):
+        # A deep PR link's OWN #fragment (named or numeric) must not be read as a
+        # second distinct PR — that would make a single-PR result spuriously
+        # ambiguous (a safe-but-suboptimal false negative). Prose tier → 602.
+        for url in (
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/602'
+            '#issuecomment-123',
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/602#603',
+        ):
+            with self.subTest(url=url):
+                self.assertEqual(
+                    ssh.parse_already_merged_pr_ref(
+                        f'Already merged via {url}. No delta to commit.'
+                    ),
+                    602,
+                )
 
     def test_empty_or_non_str(self):
         self.assertIsNone(ssh.parse_already_merged_pr_ref(''))

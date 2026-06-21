@@ -919,36 +919,98 @@ def apply_step_merged(
 #   3. the caller then gh-VERIFIES that PR is genuinely MERGED before flipping
 #      the step. Prose alone never mutates sequence state.
 
+# STRUCTURED-FIELD TIER — the canonical no-delta CONTRACT line. When a build
+# RESUMES onto a slice whose work already merged via another path, Forge leads
+# her result with this exact form (agents/forge/CLAUDE.md Build phase protocol),
+# mirroring the `PR opened: <url>` contract for the normal case:
+#
+#     NO PR — already merged: #<N>
+#
+# This is the DURABLE entry signal the prose cue below can't be: a tight,
+# line-anchored field that names THE already-merged PR explicitly, so detection
+# does NOT silently degrade when Forge's surrounding narration is reworded. The
+# regex matches the contract PHRASE + the rest of its line (em-dash / colon /
+# hyphen as the lead separator are all tolerated, a minor transcription drift);
+# the PR number is then pulled from that line by `_iter_pr_numbers`, so BOTH
+# documented forms — `#<N>` and a full `https://.../pull/<N>` URL — are honored
+# identically. MULTILINE `^` so the line is recognized wherever Forge places it
+# (she typically follows it with a one-paragraph explanation). Only PR refs ON
+# the canonical line are authoritative — a stray PR number in the explanation
+# paragraph below can't override it.
+_CANONICAL_ALREADY_MERGED_RE = re.compile(
+    r'^\s*NO\s+PR\s*[—:-]\s*already\s+merged\b[^\n]*',
+    re.IGNORECASE | re.MULTILINE,
+)
+
 _ALREADY_MERGED_CUE_RE = re.compile(
     r'already\s+(?:built\s+and\s+)?merged'
     r'|no\s+delta'
     r'|diff\s+[^\n]*\bis\s+empty'
     r'|byte-identical\s+to\s+`?main`?'
-    # Forward-compat: a canonical `NO PR — already merged: #N` lead line, should
-    # Forge's CLAUDE.md ever standardize one. Accepting it now costs nothing.
+    # The canonical `NO PR — already merged: #N` lead line also trips the cue, so
+    # a result carrying it still satisfies the prose tier even if the structured
+    # parse above is ever tightened. Belt-and-suspenders, costs nothing.
     r'|\bNO\s+PR\s*[—:-]',
     re.IGNORECASE,
 )
 
 # A PR reference as `#<N>`, `PR #<N>`, or the trailing `/pull/<N>` of a full URL.
-# Bare integers (line counts, test counts, deliverable ids like `D1`) never have
-# a leading `#` or `/pull/`, so they don't match.
-_PR_NUMBER_RE = re.compile(r'(?:/pull/|#)(\d+)\b')
+# Two alternates (not one `(?:/pull/|#)`) so a full PR URL's OWN trailing
+# `#fragment` can never contribute a phantom SECOND number: the standalone `#<N>`
+# form requires a boundary before the `#` that excludes word / `/` / `#` / `-`
+# characters, so a numeric fragment hung off a URL (`/pull/602#603`,
+# `/pull/602#issuecomment-123`) is read as part of that URL, not as an
+# independent PR. Bare integers (line counts, deliverable ids like `D1`) carry no
+# leading `#` or `/pull/`, so they don't match either.
+_PR_NUMBER_RE = re.compile(r'/pull/(\d+)|(?<![\w/#-])#(\d+)')
+
+
+def _iter_pr_numbers(text: str):
+    """Yield each PR number `text` names via `/pull/<N>` or a standalone `#<N>`.
+
+    Exactly one of the two capture groups matches per hit (the other is None);
+    `\\d+` guarantees the matched group is a non-empty digit string."""
+    for m in _PR_NUMBER_RE.finditer(text):
+        yield int(m.group(1) or m.group(2))
 
 
 def parse_already_merged_pr_ref(result_text: Optional[str]) -> Optional[int]:
     """Return the single PR number a no-delta/already-merged build result names.
 
-    Returns None when the text: is empty/non-str; carries no already-merged CUE;
-    names NO PR number; or names MORE THAN ONE distinct PR number (ambiguous —
-    refuse to guess, the safe direction). The caller MUST gh-verify the returned
-    PR is genuinely MERGED (via `gh_pr_merge_info`) before treating the step as
-    terminal — this parser only proposes a candidate from prose."""
+    Two-tier, STRUCTURED-FIELD-FIRST:
+
+      1. The canonical CONTRACT line `NO PR — already merged: #<N>`
+         (`_CANONICAL_ALREADY_MERGED_RE`; the PR may be a `#<N>` or a full
+         `/pull/<N>` URL) — authoritative. It names THE merged PR explicitly, so
+         it is honored even when the surrounding prose mentions OTHER PR numbers
+         (a superseded attempt, a sibling slice). This is the durable signal Forge
+         is asked to emit; rewording the narration around it never degrades
+         detection.
+
+      2. Backward-compat PROSE fallback for results that pre-date the contract
+         (or an un-updated session): an already-merged CUE
+         (`_ALREADY_MERGED_CUE_RE`) PLUS exactly ONE distinct PR number. More than
+         one distinct number is ambiguous — refuse to guess (the safe direction),
+         since prose alone gives no way to tell which is the merge.
+
+    Returns None on empty/non-str input or when neither tier resolves a number.
+    The caller MUST gh-verify the returned PR is genuinely MERGED (via
+    `gh_pr_merge_info`) before treating the step as terminal — this parser only
+    proposes a candidate."""
     if not isinstance(result_text, str) or not result_text:
         return None
+    # Tier 1 — structured canonical contract line (authoritative). Pull the PR
+    # the line names (either `#<N>` or a full `/pull/<N>` URL) via the shared
+    # extractor; the first ref ON the canonical line wins. If the phrase matched
+    # but carries no PR ref on its line, fall through to the prose tier.
+    canonical = _CANONICAL_ALREADY_MERGED_RE.search(result_text)
+    if canonical is not None:
+        for pr in _iter_pr_numbers(canonical.group(0)):
+            return pr
+    # Tier 2 — prose-cue fallback (single distinct PR only).
     if not _ALREADY_MERGED_CUE_RE.search(result_text):
         return None
-    nums = {int(m.group(1)) for m in _PR_NUMBER_RE.finditer(result_text)}
+    nums = set(_iter_pr_numbers(result_text))
     if len(nums) != 1:
         return None
     return next(iter(nums))
@@ -958,10 +1020,15 @@ def qualify_repo(repo: str) -> str:
     """Return `repo` in the OWNER/REPO form `gh --repo` requires.
 
     A bare name (`ourliberty-agent-core`) is prefixed with `OURLIBERTY_GH_OWNER`
-    (default `Larry-Yatch`, same default + env var as build_sequence_advancer's
-    GITHUB_OWNER); an already-qualified value (a '/' is present) passes through.
-    Shared so the notifier and advancer resolve coords identically."""
-    if '/' in repo:
+    (default `Larry-Yatch`); an already-qualified value (a '/' is present) or a
+    falsy value passes through untouched. The empty passthrough mirrors
+    task_terminal_state's guard so the older `_qualify_repo` copies can delegate
+    here without a behavior change.
+
+    This is the SINGLE shared resolver — outbox_notifier, build_sequence_advancer
+    (`_qualify_repo`), and task_terminal_state (`_qualify_repo`) all route here so
+    the owner default lives in exactly one place."""
+    if not repo or '/' in repo:
         return repo
     owner = os.environ.get('OURLIBERTY_GH_OWNER', 'Larry-Yatch')
     return f'{owner}/{repo}'
