@@ -44,7 +44,40 @@
           "spec_ref": null,
           "sequence_ref": null,
           "created_at": "2026-06-18T22:02:06.789554+00:00",
-          "updated_at": "2026-06-18T22:02:06.789554+00:00"
+          "updated_at": "2026-06-21T21:08:15.814563+00:00",
+          "brainstorm": {
+            "is_ai_draft": true,
+            "draft": {
+              "end_state": "When this phase is done, one of two things is true: either this work item has been confirmed as real, given a concrete and agreed destination, and that destination has been delivered; or it has been judged not worth doing and retired so it stops resurfacing. As written, the facts do not yet define a concrete deliverable \u2014 the title points at something about pending approvals and unregistered approval requests, but what 'done' actually looks like is still an open question this brainstorm must pin down before anything else.",
+              "why_now": "This phase exists because a stale, unclaimed work item keeps being re-proposed and someone has to decide its fate. It traces back to activity that stopped around mid-June with nothing closed out, so it sits in limbo: not actively worked, not retired. The forcing function is the re-proposal itself \u2014 until it is either claimed and scoped or explicitly dismissed, it will keep demanding attention. Whether the underlying approvals/unregistered-request concern is still live is itself unverified and is part of what must be checked now.",
+              "scope": "IN: deciding whether this item is real and current; if real, nailing down a concrete destination and delivering it; if not, retiring it cleanly so it stops re-proposing. OUT: committing to any specific feature, fix, or behavior change before the underlying need is confirmed \u2014 the title alone is not enough to scope build work. Also OUT (pending confirmation) is broad rework of the approvals flow; this should stay narrowly aimed at whatever this single item actually represents, not become a general approvals overhaul.",
+              "constraints_reuse": "This should be assembly, not greenfield: if the item turns out to be real, prefer reusing the existing approvals and request-handling machinery already in place rather than building parallel paths. The hard constraint is that the live approvals flow must not break or regress while this is investigated or changed \u2014 anything touching it needs to leave the working path intact. Because the concrete subject is not yet confirmed, the specific components to reuse are an open question to resolve once scope is pinned.",
+              "options_decision": "The first real fork is dismiss versus claim. Dismissing costs nothing to build and stops the noise, but risks discarding a genuine gap if the concern is still live \u2014 cheap, but potentially a silent miss. Claiming lets the need be properly scoped and addressed, but spends effort on something whose value is unproven and may turn out stale. If claimed, a second fork follows: do a tightly-scoped investigation first to confirm the need before any build, versus going straight to a fix. Investigate-first is slower but avoids building against a phantom requirement. Recommendation: claim, but gate it on a short investigation that confirms the need is real and current before committing to any build; if the investigation finds nothing live, dismiss and retire it.",
+              "risks_guardrails": "Risk: building against an imagined requirement because the title was over-interpreted \u2014 guardrail: confirm the actual need from real signals before writing code, and keep a written 'what is this' answer before scoping. Risk: regressing the working approvals path while poking at it \u2014 guardrail: treat the live flow as not-to-break and verify it still works before and after any change. Risk: the item is simply stale and effort is wasted \u2014 guardrail: time-box the investigation and dismiss fast if nothing current surfaces. Risk: it gets dismissed but quietly resurfaces \u2014 guardrail: make dismissal explicit and durable so it actually stops re-proposing.",
+              "done_gate": "Done is checkable as: a recorded decision of either 'real, scoped, delivered' or 'retired, will not re-propose,' with no ambiguous middle. If retired: confirm it no longer re-proposes. If delivered: the agreed destination is met, the existing approvals path is verified still working (no regression), and whatever change was made is covered by a test that would catch the specific behavior it introduced or fixed. Because the deliverable is not yet defined, the precise pass/fail tests are an open item to fill in once scope is set in the steps below.",
+              "breakdown": "Step 1: triage \u2014 read the original signal behind this item and write a plain-language answer to 'what is this and is it still live,' deciding real vs. stale. Step 2: if stale, retire it durably and confirm it stops re-proposing \u2014 phase ends here. Step 3: if real, define the concrete destination and the specific in/out scope, replacing the placeholders above. Step 4: identify which existing approvals/request components to reuse and the exact path that must not break. Step 5: make the narrowest change that meets the destination. Step 6: add the test that proves the new behavior and re-verify the live flow is intact. Step 7: record the closeout so this does not resurface."
+            },
+            "decisions": [
+              "Claim this work item and investigate it, or dismiss it now and stop the re-proposals?",
+              "If claimed, do we require a short confirm-the-need investigation before any build, or accept going straight to a fix?",
+              "How much effort are you willing to spend confirming this is real before we cut our losses and retire it?",
+              "If it turns out real, should this stay a narrow point fix, or are you open to it touching the broader approvals flow?"
+            ],
+            "decisions_overflow": false,
+            "handoff": {
+              "spec_target_path": "agents/beacon/specs/pending-approvals-3-plus-unregistered-ar-iter-15.md",
+              "target_repo": "ourliberty-agent-core",
+              "north_star_ref": null,
+              "prior_closeout_summary": null,
+              "directive": "Work with Larry to finalize this brainstorm and author the spec at agents/beacon/specs/pending-approvals-3-plus-unregistered-ar-iter-15.md in ourliberty-agent-core; he will mark it Ready to spec."
+            }
+          },
+          "brainstorm_provenance": {
+            "by": "beacon",
+            "model": "claude-opus-4-8",
+            "at": "2026-06-21T21:08:15.814563+00:00",
+            "from_state": "brainstorm"
+          }
         }
       ],
       "one_off": true,
@@ -71,7 +104,39 @@
           "spec_ref": null,
           "sequence_ref": null,
           "created_at": "2026-06-19T11:30:05.815616+00:00",
-          "updated_at": "2026-06-19T11:30:05.815616+00:00"
+          "updated_at": "2026-06-21T21:08:15.814563+00:00",
+          "brainstorm": {
+            "is_ai_draft": true,
+            "draft": {
+              "end_state": "When this phase is done, the orphan lane no longer shows 97 undifferentiated items that all look actionable. Every unregistered task with no phase carries a derived phase and a status badge \u2014 building, in-review, shipped, or abandoned \u2014 and the ones that are already finished (shipped or abandoned) are collapsed or hidden by default. The operator opens the lane and sees only the orphans that still need attention, with the done ones tucked away but reachable.",
+              "why_now": "The lane currently surfaces all unregistered, phase-less tasks together, so 97 items appear to demand action when most are already terminal. There is no way to tell what is done from what is live, which makes the lane untrustworthy and hides the small number of orphans that actually need a decision. This phase exists to restore signal by separating finished work from actionable work.",
+              "scope": "IN: deriving a phase for each orphan; assigning a status badge (building, in-review, shipped, abandoned); collapsing or hiding terminal orphans so only actionable ones show by default. OUT: automatic registration of orphans, and the register/dismiss buttons \u2014 both are explicitly deferred to a later phase (Phase 3). This phase changes how orphans are displayed and classified, not how they are acted upon or onboarded.",
+              "constraints_reuse": "Reuse the existing phase-derivation work rather than building classification from scratch \u2014 this phase pairs with the Phase 2 derive-relocation effort and should lean on the same derivation logic so the two stay consistent. The orphan lane itself and its current task listing must keep working; the change is additive (state + collapse), so tasks that are genuinely active must still appear and not be accidentally swept into the terminal/hidden bucket. Treat this as assembly on top of existing derivation, not a greenfield classifier.",
+              "options_decision": "The main fork is how terminal orphans are handled in the UI: (a) fully hide shipped/abandoned orphans by default with a way to reveal them, which gives the cleanest lane but risks the operator forgetting work exists; or (b) collapse them into a counted, expandable group that stays visible but out of the way, which keeps everything discoverable at the cost of a little more visual weight. A second, smaller fork is whether terminal means only shipped + abandoned, or whether in-review also counts as 'not actionable right now.' Recommendation: collapse terminal orphans into an expandable group (b) and treat only shipped + abandoned as terminal, keeping building and in-review visible \u2014 this reduces noise without making finished work invisible, and it is reversible if the operator wants stricter hiding later.",
+              "risks_guardrails": "Risk: an active orphan is misderived as terminal and disappears from view. Guardrail: default to showing, not hiding \u2014 only collapse on a confident shipped/abandoned signal, and make the collapsed group easy to expand. Risk: the derived phase or badge is wrong and the operator mistrusts the lane again. Guardrail: keep the badge visible and the underlying task reachable so a wrong call is obvious and correctable. Risk: scope creep into registration/dismiss, which belongs to Phase 3. Guardrail: this phase only displays and classifies \u2014 it adds no action buttons and no auto-registration. Risk: divergence from the Phase 2 derivation. Guardrail: share the same derivation source so badges and relocation agree.",
+              "done_gate": "Done means: every orphan in the lane shows a derived phase and one of the four status badges; shipped and abandoned orphans are collapsed/hidden by default while building and in-review orphans remain visible; and the operator can expand to see the terminal ones. Checkable: the default lane view shows far fewer than 97 items (only the actionable ones), the collapsed group reports an accurate terminal count, and no genuinely active task is hidden. Tests should confirm badge assignment matches the derived phase, terminal orphans collapse, active orphans stay visible, and expanding reveals the hidden set.",
+              "breakdown": "1) Derive a phase for each orphan, reusing the Phase 2 derivation logic. 2) Map each derived phase to a status badge (building, in-review, shipped, abandoned) and render it on every orphan. 3) Classify which badges count as terminal (proposed: shipped + abandoned). 4) Collapse or hide terminal orphans by default into an expandable, counted group, leaving actionable orphans in the main view. 5) Verify the default view shows only actionable orphans and that active tasks are never swept into the terminal bucket. 6) Add tests covering badge assignment, collapse behavior, and the visible/hidden split."
+            },
+            "decisions": [
+              "Collapse terminal orphans into a visible, expandable group, or hide them fully by default?",
+              "Does 'terminal' mean only shipped + abandoned, or should in-review also be treated as not-actionable?",
+              "How confident must the derived signal be before an orphan is auto-collapsed as done?"
+            ],
+            "decisions_overflow": false,
+            "handoff": {
+              "spec_target_path": "agents/beacon/specs/orphan-lane-show-state-collapse-terminal-orphans.md",
+              "target_repo": "ourliberty-agent-core",
+              "north_star_ref": null,
+              "prior_closeout_summary": null,
+              "directive": "Work with Larry to finalize this brainstorm and author the spec at agents/beacon/specs/orphan-lane-show-state-collapse-terminal-orphans.md in ourliberty-agent-core; he will mark it Ready to spec."
+            }
+          },
+          "brainstorm_provenance": {
+            "by": "beacon",
+            "model": "claude-opus-4-8",
+            "at": "2026-06-21T21:08:15.814563+00:00",
+            "from_state": "brainstorm"
+          }
         }
       ],
       "one_off": true,
@@ -368,7 +433,40 @@
           "spec_ref": "agents/beacon/specs/system-awareness-slice-1b-dashboard-where-are-we.md",
           "sequence_ref": null,
           "created_at": "2026-06-21T20:38:01.814186+00:00",
-          "updated_at": "2026-06-21T20:38:01.814186+00:00"
+          "updated_at": "2026-06-21T21:08:15.814563+00:00",
+          "brainstorm": {
+            "is_ai_draft": true,
+            "draft": {
+              "end_state": "When this phase is done, there is a new read-only dashboard page called \"Where are we\" that renders the live State Log at a glance. Larry can open the dashboard and immediately see the whole-system status \u2014 a plain-language headline of where things stand, plus panels for work in flight, active missions, and what's waiting on him \u2014 without having to ask the assistant or read the raw endpoint. The page only displays; it never takes actions or writes anything. It pulls its data through the same-origin proxy, handles loading, stale, error, and empty states gracefully, and visually matches the existing system pages.",
+              "why_now": "The previous slice already made the system narrate its own work-in-flight and shipped the live data endpoint, but right now Larry can only consume that narration by asking the assistant or hitting the raw endpoint. His preferred way to consume status is the dashboard \u2014 glance first, then skim, then drill in. This phase delivers that human surface so the work already done becomes something he can actually see at a glance.",
+              "scope": "IN: a single new read-only page that renders the live State Log \u2014 a top-of-page narrative headline with a freshness indicator, and skim-level panels for work in flight (building, in review, recently merged, and anything stuck called out prominently), active missions, and a 'waiting on you' teaser. Also in: a navigation entry that routes to the page, the types describing the endpoint's response, graceful loading/stale/error/empty handling, and a test suite. OUT: any write or action controls (this is read-only only); click-through 'full story' drill-down into a mission or PR; and the system-health synthesis, which is a later slice and stays held. This page is also explicitly separate from the existing missions/projects board \u2014 it does not touch that board's pipeline.",
+              "constraints_reuse": "This is assembly, not greenfield. Reuse the existing read-only system page as the template for layout, fetching, loading, error/stale handling, and the panel structure \u2014 mirror its patterns rather than inventing new ones. Fetch through the canonical same-origin proxy hook with a periodic refresh, and reuse the shared building-block components for error boundaries, the stale-data banner, the last-refresh and relative-time displays, and the loading state. Match the existing styling conventions and the navigation pattern. Authentication is inherited automatically from existing middleware, so no per-page gate code. Two things must not break: the page must never call the backend host directly \u2014 always through the same-origin proxy \u2014 and it must not touch the existing missions/projects board, which is a deliberately distinct surface.",
+              "options_decision": "The spec is prescriptive, so most choices are already settled, but a couple of real forks remain. First, how defensively to type the endpoint's response: the snapshot may carry minor additions and one field is currently reserved/empty, so the fork is type-it-loosely-now (optional fields, fewer breakages as the backend evolves, but weaker compile-time guarantees) versus type-it-strictly against today's exact shape (stronger guarantees, but more churn when the backend adds fields). Recommendation: type defensively with optional fields where the shape is uncertain, and verify field shapes against the live endpoint while building. Second, where to place the new entry in the navigation: among the diagnostic/system entries near the existing live-system view. Recommendation: place it in that diagnostic cluster so it sits alongside related system views.",
+              "risks_guardrails": "Risk: the page accidentally calls the backend host directly instead of the same-origin proxy \u2014 guardrail: route every fetch through the canonical proxy hook and add a test that asserts the proxy path is used and the direct host is not. Risk: the live response shape drifts from what the page expects and a panel crashes \u2014 guardrail: type defensively with optional fields, verify against the live endpoint while building, and wrap each panel in an error boundary so one panel failing can't take down the page. Risk: the data is stale or the fetch fails and Larry trusts an out-of-date view \u2014 guardrail: show a stale banner on the stale flag or on fetch error, and surface a freshness timestamp. Risk: an empty or not-yet-written state renders as a confusing blank or crash \u2014 guardrail: explicit loading and friendly empty states. Risk: scope creep into drill-downs, health synthesis, or any action controls \u2014 guardrail: hold the line on read-only and the named out-of-scope items.",
+              "done_gate": "It's done when: the new page renders the live narrative plus the structured-snapshot panels, read-only; loading, error/stale, and empty states are all handled without crashing and panel render errors are contained by the per-panel error boundaries; the page fetches only via the same-origin proxy and never the backend host directly; the navigation entry is present and routes correctly with inherited auth; and the new test suite passes. Tests should mirror the existing comparable page's test approach: assert the header and narrative render on success, assert the fetch goes to the proxy path and not the direct host, assert the stale banner shows on a fetch error, and assert the snapshot panels (work-in-flight, missions, waiting-on-you) render. The finished page should also visually match the existing system page it mirrors.",
+              "breakdown": "Proposed steps: (1) Add the response types for the endpoint, including the nested snapshot and provenance shapes, typed defensively and verified against the live endpoint while building. (2) Build the page itself in the glance-then-skim layout: the narrative headline with freshness line and stale banner at top, then the skim panels \u2014 work in flight (with stuck items called out prominently), active missions, waiting-on-you highlighted, and a placeholder for the reserved health field \u2014 plus loading and empty states. (3) Add the navigation entry routing to the new page in the diagnostic cluster. (4) Write the test suite mirroring the existing comparable page's tests, covering success rendering, proxy-only fetching, stale-on-error, and panel rendering. These steps are mostly sequential (types underpin the page; the page underpins its tests), with the navigation entry independent and parallelizable."
+            },
+            "decisions": [
+              "Confirm read-only-only is the right call for this phase \u2014 no action or write controls of any kind, even small ones.",
+              "Confirm the reserved health field stays out of scope this slice (shown as a 'coming soon' placeholder) rather than being pulled forward.",
+              "Confirm where the navigation entry should sit \u2014 in the diagnostic cluster near the existing live-system view, or somewhere more prominent.",
+              "Confirm the data freshness expectation is acceptable \u2014 the underlying log refreshes roughly every ten minutes and the page polls every thirty seconds on top of that."
+            ],
+            "decisions_overflow": false,
+            "handoff": {
+              "spec_target_path": "agents/beacon/specs/system-self-awareness-slice-1b-where-are-we.md",
+              "target_repo": "ourliberty-dashboard",
+              "north_star_ref": null,
+              "prior_closeout_summary": null,
+              "directive": "Work with Larry to finalize this brainstorm and author the spec at agents/beacon/specs/system-self-awareness-slice-1b-where-are-we.md in ourliberty-dashboard; he will mark it Ready to spec."
+            }
+          },
+          "brainstorm_provenance": {
+            "by": "beacon",
+            "model": "claude-opus-4-8",
+            "at": "2026-06-21T21:08:15.814563+00:00",
+            "from_state": "brainstorm"
+          }
         }
       ],
       "one_off": true,
