@@ -1,0 +1,39 @@
+[Unit]
+Description=Launch-dedup GC — re-surface/archive stale .deduped/ holds + rotate deliverable-claims.jsonl (PR #609 follow-up; operational hygiene for the board-Launch duplicate-work guard)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/launch_dedup_gc.py
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/launch_dedup_guard.py
+After=network.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+WorkingDirectory=/home/larry/agent-core
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/launch_dedup_gc.py
+TimeoutStartSec=120
+Nice=10
+# Hardening (matches ourliberty-launch-queue-drain.service). Pure-filesystem
+# non-committer: it re-surfaces/archives held launch requests under
+# blackboard/build-launch-queue/.deduped, rotates blackboard/deliverable-claims.jsonl
+# into blackboard/archive, may append a roll-up to blackboard/larry-alerts.jsonl,
+# and writes its log + heartbeat under logs/blackboard. NO git, NO network, NO
+# credentials — it never commits the repo or the projects store.
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents/blackboard /home/larry/agents/logs
+NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+# Bounded memory — a runaway tick must not starve the droplet's bot processes.
+MemoryMax=256M
+MemoryHigh=128M
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-launch-dedup-gc
+
+[Install]
+WantedBy=multi-user.target
