@@ -428,12 +428,12 @@
           "id": "system-self-awareness-slice-1b-where-are-we",
           "title": "System self-awareness - Slice 1b (Where are we)",
           "desired_end_state": "Read-only dashboard view of the live State Log (GET /api/system/state-log) \u2014 the glance surface for Slice 1. Build STRICTLY from the spec doc.",
-          "lifecycle_state": "brainstorm",
+          "lifecycle_state": "building",
           "order": 0,
           "spec_ref": "agents/beacon/specs/system-awareness-slice-1b-dashboard-where-are-we.md",
-          "sequence_ref": null,
+          "sequence_ref": "launch-system-self-awareness-slice-1b-where-are-we",
           "created_at": "2026-06-21T20:38:01.814186+00:00",
-          "updated_at": "2026-06-21T21:08:15.814563+00:00",
+          "updated_at": "2026-06-21T21:30:03.004905+00:00",
           "brainstorm": {
             "is_ai_draft": true,
             "draft": {
