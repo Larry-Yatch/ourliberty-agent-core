@@ -4337,7 +4337,21 @@
       "created": "2026-06-21",
       "deferred_reason": null,
       "proposed_by": "closeout",
-      "proposed_at": "2026-06-21T21:45:07.803299+00:00"
+      "proposed_at": "2026-06-21T21:45:07.803299+00:00",
+      "briefing": {
+        "what": "A new \"Where are we\" status page was built but nobody has confirmed it actually displays correctly on the live site yet.",
+        "why": "If it's broken when visitors land on it, it reflects poorly on us and undermines trust in what we're showing the public.",
+        "suggest": "Have someone open the live page and eyeball it before we count it as done \u2014 quick to check, worth doing first."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-21T21:49:00.461836+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
