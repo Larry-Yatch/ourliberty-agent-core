@@ -1,0 +1,12 @@
+[Unit]
+Description=Run board-drain every 20 minutes (auto-feed the build line from the Parked board)
+
+[Timer]
+OnBootSec=20min
+OnUnitActiveSec=20min
+RandomizedDelaySec=180
+Unit=ourliberty-board-drain.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target
