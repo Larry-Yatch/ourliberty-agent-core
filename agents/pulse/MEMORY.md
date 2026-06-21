@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-21 19:46Z UTC (Iter ~2401, Tier 3, consecutive_clean=67→68, NOMINAL ✅)
+## Status snapshot — updated 2026-06-21 20:25Z UTC (Iter ~2402, Tier 3→1, consecutive_clean=68→0, SIGNAL ⚠️)
 
-**Iter ~2401 summary:** ✅ Nominal. 0 new alerts (watermark 850=file_length). 5/5 daemons alive (inbox_watcher=559441, outbox_notifier=687691, beacon=599691, dashboard_api=687617, chain-event=3734305). No stalls. 0 open PRs. beacon-pending-approvals: pending=0. Check I: sentinel check-i-2026-06-21.json exists → skip. Check III: last 2026-06-11 (10d < 14d gate) → skip. PRIME: systemic_fixes=55, ratio≈19.18. **G-rule catalog-accuracy-drift: 2/3.** Tier 3, consecutive_clean=67→68. Next cadence: 30-min.
+**Iter ~2402 summary:** ⚠️ Signal. L853 unreviewed-merge:607 (PR docs commit, actor=Larry-Yatch) → Tier-4, escalation written, bot DMs via route=escalate. 5/5 daemons alive — outbox_notifier PID changed (687691→841123, clean restart 13:59 MDT). 0 open PRs. beacon-pending-approvals: pending=1 (dag-preflight-projects-v3-p6-brainstorm-autofill, ~30m pending). Check I: sentinel exists → skip. Check III: 10d < 14d gate → skip. PRIME: systemic_fixes=55, ratio≈19.18. **G-rule catalog-accuracy-drift: 2/3.** Tier reset 3→1, consecutive_clean=0.
 
 
 

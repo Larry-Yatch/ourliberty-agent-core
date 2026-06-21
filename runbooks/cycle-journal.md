@@ -4,6 +4,68 @@
 
 ---
 
+## Iteration ~2402 — 2026-06-21T20:25Z UTC (interactive, /cycle, Tier 3→1, consecutive_clean=68→0, SIGNAL ⚠️)
+
+**Trigger:** Larry `/cycle` invocation (interactive).
+
+**Health:** ⚠️ Signal — Check 0 Tier-4 alert (unreviewed-merge:607). Tier reset 3→1.
+
+**VERIFY-BEFORE-REASSERT:**
+- **All 5 daemons alive (re-verified):** inbox_watcher=559441 (Ssl) ✅, outbox_notifier=841123 (Ss, new PID — clean restart at 13:59 MDT, was 687691) ✅, beacon=599691 (Ss) ✅, dashboard_api=687617 (Ssl) ✅, chain-event=3734305 (SNs) ✅.
+- **G-rule catalog-accuracy-drift:** 2/3 — no new alerts this iter (L851–852 both Tier-3 silenced). [carry]
+- **Repo HEAD:** 5b37d498=origin/main. Clean tree. On main. ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 850, "file_length": 853}`. 3 new alerts (L851–853):
+- **L851** `source=outbox-notifier, subject=sequence-complete:launch-system-self-awareness-slice-1-state-log` → Tier-3 silence (known-pattern). ✅
+- **L852** `source=dispatch-branch-cleanup, subject=summary` → Tier-3 silence (known-pattern). ✅
+- **L853** `source=heal-unreviewed-merge-detector, severity=critical, subject=unreviewed-merge:607` — PR #607 (`docs(system-awareness): mark Slice 1 DONE, Slice 2 next`) merged by Larry directly without Mirror REVIEW_PASS. Helper returned **Tier-4** (never-silence, route=escalate). Bot will DM Larry. Pulse: escalation written to pulse-escalations.json. Tier-reset → Tier 1. ⚠️
+
+Watermark advanced 850→853. ✅
+
+**Check 1 — Log noise:** outbox-notifier.log last 20 lines INFO-only (sequence-complete closeout, clean restart at 13:59, resume). No WARN/ERROR patterns. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot PID 599691 alive (Ss). Last bot log entry: 13:59 MDT (alert idx=851, dispatch-branch-cleanup, digest). Larry directive at 13:52 MDT ("kick off build sequence projects-v3-p6-brainstorm-autofill") tracked by pending approval in beacon-pending-approvals.json (30 min pending, DM'd). No orphans. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → "no stalls detected." ✅ Nominal.
+
+**Check 4 — Pending directives:** Forge: 0. Beacon: 0. Mirror: 0. beacon-pending-approvals: pending=1 (`dag-preflight-projects-v3-p6-brainstorm-autofill`, created 19:54Z, DM'd, ~30 min pending). Not orphaned — Larry's call pending. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-21T19:54:15Z (~28 min ago at check time). Within 60 min freshness window. ✅ Nominal.
+
+**Check A — Source repo:** On main, clean. HEAD=5b37d498=origin/main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-21T20:17:18Z (~8 min ago), status=success, commit=5b37d498. ✅ Nominal.
+
+**Check C — Agent liveness:** inbox_watcher=559441 (Ssl) ✅, outbox_notifier=841123 (Ss, new PID post-restart) ✅, beacon=599691 (Ss) ✅, dashboard_api=687617 (Ssl) ✅, chain-event=3734305 (SNs) ✅. 5/5. ✅
+
+**Check D — Inboxes:** Beacon: 0. Forge: 0. Mirror: 0. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Sunday 2026-06-21 UTC (weekday=6 ∈ {0,2,4,6}):** Check I: sentinel check-i-2026-06-21.json exists → skip re-run (ran in iter ~2401). Check III: last 2026-06-11 (10d < 14d gate) → skip. Check VIII/IX/X: Monday-only → skip. ✅
+
+**Actions taken:**
+1. Check 0: watermark repair no-op (file_length=853, old_watermark=850). 3 alerts triaged: L851 Tier-3 silence, L852 Tier-3 silence, L853 Tier-4 escalate. Watermark advanced to 853.
+2. Pulse-escalations.json: entry written for unreviewed-merge:607 (Tier-4, yellow).
+3. PRIME ledger: `intervention` appended (tier=3, template=unreviewed-merge-detector).
+4. Tier state: `record --checks-clean false` → Tier 3→1, consecutive_clean=68→0.
+
+**Escalations:**
+- 💓 [yellow] iter 2402 — PR #607 merged without Mirror review (actor=Larry-Yatch; docs-only commit). `heal-unreviewed-merge-detector` severity=critical. Triage: Tier-4. Bot will DM via route=escalate. If this was intentional (docs-only direct merge), consider adding a docs-or-release-commit bypass rule to the unreviewed-merge detector so future docs merges aren't flagged as critical. Journal: runbooks/cycle-journal.md#iter-2402.
+
+**G-rule tracking:**
+- catalog-accuracy-drift: 2/3 (no new alerts this iter, carry from iter ~2401)
+
+**PRIME ratio:** systemic_fixes=55, ratio≈19.18, trend=improving.
+
+**Tier:** Reset 3→1. consecutive_clean=0.
+
+---
+
 ## Iteration ~2401 — 2026-06-21T19:46Z UTC (interactive, /loop /cycle, Tier 3, consecutive_clean=67→68, NOMINAL ✅)
 
 **Trigger:** Larry `/loop /cycle` invocation (interactive).
