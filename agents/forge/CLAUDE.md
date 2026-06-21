@@ -200,6 +200,16 @@ PR updated: https://github.com/Larry-Yatch/ourliberty-agent-core/pull/<N>
 
 **Exact form of that line (don't paraphrase):** write it literally as `PR opened: <url>` or `PR updated: <url>` — the line stands alone with no preamble (no `Done. ` clause sharing the line), and nothing sits between `PR` and the verb. In particular, do NOT insert a `#<number>` token there: write `PR opened: https://github.com/Larry-Yatch/ourliberty-agent-core/pull/303`, not `PR #303 opened: ...` — the number is already in the URL. Pick the verb that matches reality (opened vs updated). The notifier parses this exact line to auto-dispatch Mirror's review; non-canonical phrasing (the `Done. PR #303 opened:` form that stalled PR #303 unreviewed) risks the PR sitting in limbo.
 
+**When the slice already merged via another path** (a concurrent Forge session, a manual desktop merge) — your worktree has NO delta: `git diff main..HEAD` is empty, so `gh pr create` has nothing to open. **Do NOT fabricate a `PR opened:` URL.** You're right to refuse — but don't refuse with free prose alone. Lead your response with this canonical line so the notifier can reconcile the build's sequence step to merged (it gh-verifies the PR is genuinely MERGED first) instead of stranding it until the 4h stall backstop pauses the sequence and pages Larry to reconcile by hand:
+
+```
+NO PR — already merged: #<N>
+
+<brief paragraph: which PR already shipped this work, how you confirmed it (diff empty / commit in history), anything Beacon should know>
+```
+
+**Exact form of that line:** `NO PR — already merged: #<N>` as the **FIRST LINE**, where `#<N>` names the PR your work already shipped under (a full `https://.../pull/<N>` URL is also accepted). Unlike the `PR opened:` line, the `#<N>` token IS correct here — there is no PR URL of your own to carry the number; you are naming the *already-merged* PR by reference. The em-dash separator is parsed leniently (a colon or hyphen also works), but lead with this line, not narrative — same `\A`-anchored discipline as `PR opened:`. This is the structured signal that makes the no-delta outcome auto-reconcilable; rewording the explanation paragraph below it is fine, but keep the lead line. (Real incident: `system-self-awareness-slice-1-state-log` already merged via #602, whose branch/title carried none of the step's tokens — only this line bridges the step to the PR.)
+
 If you hit a real blocker mid-build — compile error you can't fix, test failure that reveals the spec was wrong, security issue surfaced during self-review — **don't emit a CLARIFY_REQUEST marker** (those are preflight-only and the notifier won't route them in build phase). Instead, end your response with a plain paragraph explaining the blocker and what you'd need to proceed. The notifier's default routing returns this to Beacon, who decides whether to dispatch a fresh preflight or escalate to Larry.
 
 ### Build-phase constraints

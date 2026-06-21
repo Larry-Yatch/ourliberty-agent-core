@@ -5585,10 +5585,13 @@ def _maybe_reconcile_already_merged_build(data: dict[str, Any]) -> Optional[str]
     Three gates + gh-truth (so prose alone never flips a step against the wrong
     PR): (1) the build EXITED CLEANLY (exit_code == 0) — an honest no-delta
     refusal is a successful turn, while a crash / genuine failure exits non-zero;
-    (2) a no-delta CUE plus a single named PR (see
-    `ssh.parse_already_merged_pr_ref`); (3) `gh` confirms that PR is MERGED. A
-    build that misses any gate returns None and the caller falls through to the
-    default Beacon notify, leaving the stall backstop to escalate a real failure.
+    (2) a named PR from `ssh.parse_already_merged_pr_ref` — which PREFERS Forge's
+    canonical structured contract line `NO PR — already merged: #<N>` (durable
+    against narration rewording) and falls back to the prose cue + single-PR
+    heuristic for results that pre-date the contract; (3) `gh` confirms that PR is
+    MERGED. A build that misses any gate returns None and the caller falls through
+    to the default Beacon notify, leaving the stall backstop to escalate a real
+    failure.
     Erring toward None is the safe direction — it falls back to today's behavior.
 
     Best-effort: any missing field / gh failure / sequence accident returns None

@@ -937,13 +937,23 @@ def _process_active_sequence(
 def _qualify_repo(repo: str) -> str:
     """Return `repo` in the OWNER/REPO form `gh --repo` requires.
 
-    Sequence steps store a bare repo name (`ourliberty-agent-core`); gh
-    rejects that with rc=1 before any network call. Prepend GITHUB_OWNER
-    unless the value is already qualified (an owner-or-host '/' is
-    present)."""
-    if '/' in repo:
-        return repo
-    return f'{GITHUB_OWNER}/{repo}'
+    Sequence steps store a bare repo name (`ourliberty-agent-core`); gh rejects
+    that with rc=1 before any network call. Delegates to the SINGLE shared
+    resolver `sequence_shortcut_helpers.qualify_repo` so the owner default lives
+    in one place (it reads the same `OURLIBERTY_GH_OWNER` / `Larry-Yatch` default
+    as GITHUB_OWNER here). Imported lazily — same resilience posture as the
+    reconcile pass's `ssh` import — but the only caller (`_gh_list_merged_prs`)
+    runs INSIDE `_reconcile_dispatched_steps`, which already imported `ssh`
+    successfully, so the import is warm and cannot fail at this point. The local
+    fallback keeps a direct unit call (`bsa._qualify_repo(...)`) correct even if
+    ssh were somehow unimportable."""
+    try:
+        from sequence_shortcut_helpers import qualify_repo
+        return qualify_repo(repo)
+    except Exception:
+        if not repo or '/' in repo:
+            return repo
+        return f'{GITHUB_OWNER}/{repo}'
 
 
 def _gh_list_merged_prs(
@@ -1330,12 +1340,16 @@ def _bridge_already_merged_pr(
     """Bridge a step to the PR its work already merged under, when the PR's
     branch/title carry no step_id token so `_match_pr_for_step` can't.
 
-    Reads the step's Forge build outbox; if it narrates an already-merged /
+    Reads the step's Forge build outbox; if it carries an already-merged /
     no-delta outcome naming a single gh-MERGED PR, returns a merged-PR dict
-    `{'url', 'mergedAt'}` (the shape `apply_step_merged` consumes). Resolves the
-    PR via the per-tick `merged_prs` list first (already fetched, no extra gh
-    call); falls back to a direct `gh pr view` verify when the PR is older than
-    the recent-merged window. Fail-safe — any miss/error → None.
+    `{'url', 'mergedAt'}` (the shape `apply_step_merged` consumes). The PR ref is
+    resolved by `ssh.parse_already_merged_pr_ref`, which PREFERS Forge's canonical
+    structured contract line `NO PR — already merged: #<N>` (durable against
+    narration rewording) and falls back to the prose cue + single-PR heuristic for
+    older results. Resolves the PR via the per-tick `merged_prs` list first
+    (already fetched, no extra gh call); falls back to a direct `gh pr view`
+    verify when the PR is older than the recent-merged window. Fail-safe — any
+    miss/error → None.
 
     `ssh` is the lazily-imported `sequence_shortcut_helpers` module passed from
     the reconcile loop (the advancer imports it under an importability guard, so
