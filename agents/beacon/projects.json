@@ -552,6 +552,66 @@
         "kind": "capture",
         "capture_id": "cap-p6-verify-brainstorm-card-render-check-c7cc"
       }
+    },
+    {
+      "id": "system-self-awareness-slice-2a-waiting-on-larry",
+      "title": "System self-awareness - Slice 2a (Waiting on Larry)",
+      "north_star_ref": null,
+      "repo": "ourliberty-agent-core",
+      "state": "active",
+      "phases": [
+        {
+          "id": "system-self-awareness-slice-2a-waiting-on-larry",
+          "title": "System self-awareness - Slice 2a (Waiting on Larry)",
+          "desired_end_state": "Extend the State Log's waiting_on_larry into an itemized cross-source list (parked + pending approvals + for-Larry escalations), read-only, reusing existing sources. Build STRICTLY from the spec doc.",
+          "lifecycle_state": "brainstorm",
+          "order": 0,
+          "spec_ref": "agents/beacon/specs/system-awareness-slice-2a-waiting-on-larry-substrate.md",
+          "sequence_ref": null,
+          "created_at": "2026-06-21T22:26:15.787568+00:00",
+          "updated_at": "2026-06-21T22:26:15.787568+00:00",
+          "brainstorm": {
+            "is_ai_draft": true,
+            "draft": {
+              "end_state": "When this phase is done, the State Log no longer shows a single vague 'waiting on Larry' signal. Instead it shows an itemized, read-only list that pulls together everything currently blocked on the operator from across the existing sources: items that have been parked, approvals that are pending, and escalations explicitly raised for the operator. Each entry names what it is and where it came from, so the operator can see his full queue of blocking decisions in one place at a glance.",
+              "why_now": "Slice 1 established the State Log and its high-level 'waiting on Larry' indicator. That indicator tells the operator that something is waiting but not what or how much, which means he still has to go hunting across separate places to act on it. This slice is the natural next step: turn that single flag into an itemized list so the signal becomes actionable. The exact trigger and any deadline are not stated in the facts and should be confirmed.",
+              "scope": "IN: extending the existing State Log 'waiting on Larry' element into an itemized list; aggregating three existing sources of blocked items \u2014 parked items, pending approvals, and for-Larry escalations \u2014 into one read-only view; building strictly to what the spec document specifies. OUT: writing back to or mutating any of the underlying sources (this is read-only); adding new sources of blocking items beyond the three named; changing how items get parked, approved, or escalated in the first place. Anything not covered by the spec doc is out of scope until the spec says otherwise.",
+              "constraints_reuse": "This is assembly, not greenfield. Reuse the existing State Log surface from Slice 1 and the existing data sources for parked items, pending approvals, and for-Larry escalations rather than creating new stores or new ways of tracking blocked work. The read-only contract must not break: producing this list must not alter, resolve, re-order, or otherwise side-effect the underlying items. The existing Slice 1 'waiting on Larry' behavior and the rest of the State Log must continue to work unchanged. The exact source locations and their read interfaces are defined in the spec doc and should be taken from there.",
+              "options_decision": "The main fork is how the three sources are combined. Option A: aggregate them live at read time each time the State Log is viewed \u2014 always current, no staleness, but cost and latency depend on how expensive the three reads are. Option B: aggregate into a cached/materialized list refreshed on a cycle \u2014 cheaper and faster to render, but can show a slightly stale picture of what is waiting. A second fork is presentation: one flat merged list versus grouping by source (parked / pending approvals / escalations). The spec doc may already settle these; where it does, follow it. Recommendation pending the spec \u2014 provisionally, live aggregation with source-grouped display, since a decisions queue is most useful when it is accurate and its origins are visible. Confirm against the spec before locking.",
+              "risks_guardrails": "Risk: the read-only intent is violated and aggregating accidentally mutates or resolves an underlying item \u2014 guardrail: treat all three sources as strictly read-only and verify no write paths are touched. Risk: duplicate or double-counted entries when the same blocking item appears in more than one source \u2014 guardrail: define a de-duplication / identity rule in the spec so each real item shows once. Risk: drift from Slice 1 so the itemized count disagrees with the existing top-level 'waiting on Larry' flag \u2014 guardrail: make the flag and the list derive from the same aggregation. Risk: a slow or unavailable source degrades the whole State Log \u2014 guardrail: isolate per-source failures so one bad source does not blank the view. Risk: scope creep beyond the spec \u2014 guardrail: build strictly from the spec doc and defer anything not in it.",
+              "done_gate": "Done when: the State Log renders an itemized list of everything waiting on the operator, drawn from all three existing sources; each entry is identifiable and attributed to its source; the view is verifiably read-only (the underlying parked items, pending approvals, and escalations are unchanged after viewing); the itemized total is consistent with the existing Slice 1 'waiting on Larry' indicator; and the build matches the spec doc. Tests: parked items, pending approvals, and escalations each appear in the list; an empty source and an all-empty state render cleanly; duplicates across sources collapse per the spec's identity rule; a viewing pass leaves every source byte-for-byte unchanged; one unavailable source does not break the other two or the rest of the State Log.",
+              "breakdown": "Step 1: read the spec doc and pin down the exact three source interfaces, the entry shape, the de-duplication rule, and the display format it prescribes. Step 2: build a read-only aggregator that reads parked items, pending approvals, and for-Larry escalations and normalizes them into a common entry shape. Step 3: apply the de-duplication / identity rule so each real blocking item appears once. Step 4: wire the aggregated list into the existing State Log surface and reconcile it with the Slice 1 'waiting on Larry' indicator so they agree. Step 5: handle per-source failure isolation so one bad source degrades gracefully. Step 6: tests covering presence of each source, empty/all-empty states, de-duplication, the read-only guarantee, and source-failure isolation. Sequence may shift once the spec is read."
+            },
+            "decisions": [
+              "Live aggregation at view time vs. a cached list refreshed on a cycle \u2014 accuracy vs. cost/latency.",
+              "Display as one flat merged list or grouped by source (parked / approvals / escalations).",
+              "When the same item shows up in two sources, how to decide it is 'the same' and which source wins.",
+              "How a slow or unavailable source should behave \u2014 hide that section, show a placeholder, or surface an error."
+            ],
+            "decisions_overflow": false,
+            "handoff": {
+              "spec_target_path": "agents/beacon/specs/system-self-awareness-slice-2a-waiting-on-larry.md",
+              "target_repo": "ourliberty-agent-core",
+              "north_star_ref": null,
+              "prior_closeout_summary": null,
+              "directive": "Work with Larry to finalize this brainstorm and author the spec at agents/beacon/specs/system-self-awareness-slice-2a-waiting-on-larry.md in ourliberty-agent-core; he will mark it Ready to spec."
+            }
+          },
+          "brainstorm_provenance": {
+            "by": "beacon",
+            "model": "claude-opus-4-8",
+            "at": "2026-06-21T22:26:15.787568+00:00",
+            "from_state": "brainstorm"
+          }
+        }
+      ],
+      "one_off": true,
+      "created_at": "2026-06-21T22:26:15.787568+00:00",
+      "updated_at": "2026-06-21T22:26:15.787568+00:00",
+      "promoted_from": {
+        "kind": "mission",
+        "mission_id": "system-self-awareness-slice-2a-waiting-on-larry"
+      }
     }
   ]
 }
