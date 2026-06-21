@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-21 21:24Z UTC (Iter ~2407, Tier 2, consecutive_clean=1→2, NOMINAL ✅)
+## Status snapshot — updated 2026-06-21 21:38Z UTC (Iter ~2408, Tier 2→3 DE-ESCALATED, NOMINAL ✅)
 
-**Iter ~2407 summary:** ✅ Nominal. 1 new alert (L858: sequence-complete:projects-v3-p6-brainstorm-autofill, Tier-3 silenced, watermark 857→858). 5/5 daemons alive (outbox_notifier now PID 866327 after another restart). **Sequence projects-v3-p6-brainstorm-autofill COMPLETE** — PR #611 (agent-core) + PR #72 (dashboard) both merged at 15:22 MDT. Mirror had a malformed REVIEW_PASS (bare keyword) → notifier retry → Mirror self-corrected in 1 min. 0 open PRs. beacon-pending-approvals: 0. unreviewed-merge:607 still Larry's judgment ([yellow] carry). Check I: sentinel exists → skip. Check III: 10d < 14d → skip. PRIME: systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3 (↑).** **Tier 2, consecutive_clean=1→2**, need 1 more clean iter to reach Tier 3.
+**Iter ~2408 summary:** ✅ Nominal. 1 new alert (L859: mirror-dag-pass:launch-system-self-awareness-slice-1b-where-are-we, Tier-3 silenced, watermark 858→859). 5/5 daemons alive (same PIDs as ~2407). New sequence `launch-system-self-awareness-slice-1b-where-are-we` active — Mirror DAG-preflight PASS at 15:29 MDT, Forge build-phase dispatched at 15:32 MDT. 0 open PRs. beacon-pending-approvals: 0. unreviewed-merge:607 still Larry's judgment ([yellow] carry). Check I: sentinel exists → skip. Check III: 10d < 14d → skip. PRIME: systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** **DE-ESCALATED Tier 2→3** (consecutive_clean=2→3). Next cadence: 30-min (Tier 3).
 
 
 
