@@ -351,6 +351,33 @@
         "kind": "mission",
         "mission_id": "system-self-awareness-slice-1-state-log"
       }
+    },
+    {
+      "id": "system-self-awareness-slice-1b-where-are-we",
+      "title": "System self-awareness - Slice 1b (Where are we)",
+      "north_star_ref": null,
+      "repo": "ourliberty-dashboard",
+      "state": "active",
+      "phases": [
+        {
+          "id": "system-self-awareness-slice-1b-where-are-we",
+          "title": "System self-awareness - Slice 1b (Where are we)",
+          "desired_end_state": "Read-only dashboard view of the live State Log (GET /api/system/state-log) \u2014 the glance surface for Slice 1. Build STRICTLY from the spec doc.",
+          "lifecycle_state": "brainstorm",
+          "order": 0,
+          "spec_ref": "agents/beacon/specs/system-awareness-slice-1b-dashboard-where-are-we.md",
+          "sequence_ref": null,
+          "created_at": "2026-06-21T20:38:01.814186+00:00",
+          "updated_at": "2026-06-21T20:38:01.814186+00:00"
+        }
+      ],
+      "one_off": true,
+      "created_at": "2026-06-21T20:38:01.814186+00:00",
+      "updated_at": "2026-06-21T20:38:01.814186+00:00",
+      "promoted_from": {
+        "kind": "mission",
+        "mission_id": "system-self-awareness-slice-1b-where-are-we"
+      }
     }
   ]
 }
