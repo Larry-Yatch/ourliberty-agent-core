@@ -114,8 +114,8 @@ Prove the **Narrator** on one narrow surface, run it days, widen, then add the *
 | # | Item | Status |
 |---|------|--------|
 | 0 | This North Star drafted + boundary-with-board decided (own doc, above the board) | DONE 2026-06-19 |
-| 1 | Slice 1 — work-in-flight State Log (generalize Narrator; A+D) → feed board | TODO (next) |
-| 2 | Slice 2 — "what needs Larry" decision queue | TODO |
+| 1 | Slice 1 — work-in-flight State Log (generalize Narrator; A+D) → feed board | ✅ DONE 2026-06-20 (PR #602, live + closed-out) |
+| 2 | Slice 2 — "what needs Larry" decision queue | TODO (next) |
 | 3 | Synthesized system health | HOLD (earn trust first) |
 | 4 | Orchestrator (the directing brain) | TODO (after substrate is trusted) |
 | 5 | Desired-end-state doc + Plan self-maintenance loop | DES v1 DRAFTED 2026-06-19 (`docs/desired-end-state.md`, why-now=self-direction-foundation, horizon=weeks); Plan self-maintenance TODO |
