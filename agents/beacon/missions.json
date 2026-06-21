@@ -4352,6 +4352,19 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "system-self-awareness-slice-2a-waiting-on-larry",
+      "name": "System self-awareness - Slice 2a (Waiting on Larry)",
+      "phase": "drafting",
+      "brief": "Extend the State Log's waiting_on_larry into an itemized cross-source list (parked + pending approvals + for-Larry escalations), read-only, reusing existing sources. Build STRICTLY from the spec doc.",
+      "spec_docs": [
+        "agents/beacon/specs/system-awareness-slice-2a-waiting-on-larry-substrate.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-21",
+      "deferred_reason": null
     }
   ]
 }
