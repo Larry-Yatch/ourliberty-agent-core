@@ -166,7 +166,7 @@ Three failure modes are recognized:
 **Larry's recovery options (via Beacon shortcuts):**
 
 - `resume sequence <seq-id>` — unpause; advancer re-evaluates current step state. Used when the failure was transient (e.g., a retry succeeded out-of-band).
-- `cancel sequence <seq-id>` — set sequence status to `failed`, log reason, stop advancing. Any in-flight PRs continue but new steps will not dispatch.
+- `cancel sequence <seq-id>` — set sequence status to `failed`, log reason, stop advancing. New steps will not dispatch, and **any in-flight PR from this sequence will NOT auto-merge via the team's primary auto-merge path** — the gate in `outbox_notifier` checks the sequence's cancelled state before merging (board-abort-dispatched-build); the in-flight step PR stays open for manual close, and the Forge run already underway is not killed. (The default-OFF detective healer `heal_pr_auto_merge.py` is a separate merge path not yet covered by this gate — fast-follow.)
 - `retry sequence <seq-id> step <step-id>` — re-dispatch a specific failed step (creates a new PR). Used when the failure was a fixable spec issue that Larry has already addressed.
 - `skip sequence <seq-id> step <step-id>` — mark a step as `merged` without an actual PR (use sparingly; used when the step's work was done out-of-band). Logs a `step-skipped` event in audit_log.
 
