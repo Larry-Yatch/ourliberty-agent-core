@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-21 00:13Z UTC (Iter ~2365, Tier 3, consecutive_clean=31→32, NOMINAL ✅)
+## Status snapshot — updated 2026-06-21 00:46Z UTC (Iter ~2366, Tier 3, consecutive_clean=32→33, NOMINAL ✅)
 
-**Iter ~2365 summary:** ✅ Nominal. 1 new alert (dispatch-branch-cleanup/summary, Tier-3 silenced). 5/5 daemons alive (inbox_watcher=559441, outbox_notifier=687691, beacon=599691, dashboard_api=687617, chain-event=3734305). No stalls. 0 open PRs. beacon-pending-approvals: pending=0. Check I fired (Sunday UTC): week-ending=2026-06-15, $1135.74, 1 proposal (high-σ Pulse cycle review, dedup skip already dispatched). PRIME: systemic_fixes=55, interventions=1055, ratio≈19.18. **G-rule catalog-accuracy-drift: 2/3.** Tier 3, consecutive_clean=31→32. Next cadence: 30-min.
+**Iter ~2366 summary:** ✅ Nominal. 1 new alert (pulse/check-i-2026-06-15, Tier-3 silenced — watermark catch-up from iter ~2365 delivery). 5/5 daemons alive (inbox_watcher=559441, outbox_notifier=687691, beacon=599691, dashboard_api=687617, chain-event=3734305). No stalls. 0 open PRs. beacon-pending-approvals: pending=0. Check I: sentinel check-i-2026-06-21.json already exists from iter ~2365 (same Sunday) — skipped re-run. Check III skipped (10d < 14d gate). PRIME: systemic_fixes=55, interventions=1055, ratio≈19.18. **G-rule catalog-accuracy-drift: 2/3.** Tier 3, consecutive_clean=32→33. Next cadence: 30-min.
 
 
 
