@@ -5528,6 +5528,64 @@ def _signal_sequence_step_merged(
     return None
 
 
+def _maybe_reconcile_already_merged_build(data: dict[str, Any]) -> Optional[str]:
+    """Terminal-reconcile a build outbox that opened no PR because its work
+    already merged.
+
+    Fires from the `phase=build` branch of `process_outbox` when
+    `_extract_pr_url_from_build_result` finds no `PR opened:` line. If the build
+    result narrates an already-merged / no-delta outcome and names a single PR
+    that `gh` confirms is MERGED, signal the sequence step merged — reusing
+    `_signal_sequence_step_merged` (matched by step_id == task_id), which flips
+    the step `dispatched → merged`, records the PR + merge time, removes it from
+    `current_steps`, and fires the sequence-complete signal if it was the last
+    step. The step never strands; the 4h stall backstop never fires.
+
+    Three gates + gh-truth (so prose alone never flips a step against the wrong
+    PR): (1) the build EXITED CLEANLY (exit_code == 0) — an honest no-delta
+    refusal is a successful turn, while a crash / genuine failure exits non-zero;
+    (2) a no-delta CUE plus a single named PR (see
+    `ssh.parse_already_merged_pr_ref`); (3) `gh` confirms that PR is MERGED. A
+    build that misses any gate returns None and the caller falls through to the
+    default Beacon notify, leaving the stall backstop to escalate a real failure.
+    Erring toward None is the safe direction — it falls back to today's behavior.
+
+    Best-effort: any missing field / gh failure / sequence accident returns None
+    and the build outbox routes exactly as before. Returns the reconciled seq_id
+    or None."""
+    task_id = data.get('task_id')
+    target_repo = data.get('target_repo')
+    if not isinstance(task_id, str) or not task_id:
+        return None
+    if not isinstance(target_repo, str) or not target_repo:
+        return None
+    # A genuine build crash/failure exits non-zero; only a clean turn (Forge
+    # deciding NOT to fabricate a PR) is an already-merged refusal. Gating here
+    # keeps a failing build that merely mentions a merged PR from being flipped.
+    if data.get('exit_code') != 0:
+        return None
+    pr_number = ssh.parse_already_merged_pr_ref(data.get('result', ''))
+    if pr_number is None:
+        return None
+    repo_coords = ssh.qualify_repo(target_repo)
+    info = ssh.gh_pr_merge_info(repo_coords, pr_number)
+    if info is None:
+        log(
+            f'BUILD_ALREADY_MERGED task={task_id} pr=#{pr_number} '
+            f'({repo_coords}) — build opened no PR and named an already-merged '
+            f'PR, but gh did not confirm it MERGED; leaving to default routing.',
+            'WARN',
+        )
+        return None
+    pr_url, merged_at = info
+    log(
+        f'BUILD_ALREADY_MERGED task={task_id} pr=#{pr_number} ({repo_coords}) — '
+        f'build opened no PR; work already shipped via {pr_url}. Reconciling the '
+        f'sequence step to merged instead of stranding it.'
+    )
+    return _signal_sequence_step_merged(task_id, pr_url, merged_at)
+
+
 def _sequence_cancelled(task_id: Optional[str]) -> bool:
     """True iff `task_id` belongs to a build sequence that has been ABORTED
     (board-abort-dispatched-build): `apply_cancel` sets the sequence
@@ -9352,9 +9410,20 @@ def process_outbox(outbox_file: Path) -> str:
         pr_url = _extract_pr_url_from_build_result(data.get('result', ''))
         if pr_url:
             _dispatch_mirror_review(data, pr_url)
-        # No marker, so marker classification below returns None and the
-        # default routing path takes over (Beacon notify with the full
-        # build result narrative).
+        else:
+            # No `PR opened:` line. Forge may have HONESTLY refused to open one
+            # because this slice already merged via another path (a concurrent
+            # session, a manual merge): `git diff main..HEAD` is empty, no delta
+            # to commit. Recognize that outcome, gh-verify the PR she names is
+            # genuinely MERGED, and flip the sequence step terminal NOW — instead
+            # of letting it strand `dispatched` until the 4h stall backstop pages
+            # Larry to reconcile by hand (the 2026-06-20 incident). A genuine
+            # build failure (no merged PR named) falls through unchanged and the
+            # stall backstop still escalates it as a real failure.
+            _maybe_reconcile_already_merged_build(data)
+        # Build phase emits no marker (preflight-only); the guarded classifier
+        # below leaves marker_decision None and the default routing path takes
+        # over (Beacon notify with the full build result narrative).
 
     # D3.5 commit 5b — Forge revision-phase outbox. Strict gate per Larry's
     # signoff (Option 3 — strict on revision, lenient on build):
@@ -9533,8 +9602,23 @@ def process_outbox(outbox_file: Path) -> str:
     # Forge preflight marker check. Markers override default routing rules
     # because the preflight protocol is intentionally multi-hop and the
     # clarification budget on the envelope guards termination.
+    #
+    # resumed-session-stale-marker guard: markers are PREFLIGHT-only (per
+    # agents/forge/CLAUDE.md — build opens a PR or narrates a blocker; revision
+    # leads with "Revision N applied:"; neither emits a PROCEED/CLARIFY/REJECT
+    # block). Both the build AND revision phases RESUME the preflight `claude`
+    # session (revision --resumes forge_build_session_id, which itself resumed
+    # preflight), so the session-log scan inside `_classify_forge_marker` would
+    # re-discover the STALE preflight `=== PROCEED ===` still sitting earlier in
+    # that resumed transcript and mis-route the outbox as a fresh PROCEED —
+    # re-dispatching the build (idempotency-skipped) and emitting NO terminal
+    # signal, the exact strand the 2026-06-20 incident hit. Skip classification
+    # for the resumed phases: a build outbox is handled above (PR opened ->
+    # Mirror review; no PR -> already-merged reconcile) and a revision outbox is
+    # handled above (re-review dispatch); both must fall through to the default
+    # Beacon notify.
     marker_decision: Optional[dict[str, Any]] = None
-    if agent == 'forge':
+    if agent == 'forge' and data.get('phase') not in ('build', 'revision'):
         try:
             marker_decision = _classify_forge_marker(data)
         except (fph.MalformedForgeMarker, fph.MultipleForgeMarkers) as e:

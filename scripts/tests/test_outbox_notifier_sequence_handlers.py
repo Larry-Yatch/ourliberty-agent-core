@@ -1215,6 +1215,109 @@ class AutoMergeChokepointFiresV6Hook(SignalSequenceStepMergedHarness):
         self.assertEqual(len(step_merged_events), 1)
 
 
+class QualifyRepoTests(unittest.TestCase):
+    """Bare repo name → OWNER/REPO coords for gh; qualified names pass through.
+    Shared helper lives in sequence_shortcut_helpers (used by both seams)."""
+
+    def test_bare_name_prefixes_owner(self):
+        self.assertEqual(
+            ssh.qualify_repo('ourliberty-agent-core'),
+            'Larry-Yatch/ourliberty-agent-core',
+        )
+
+    def test_already_qualified_passes_through(self):
+        self.assertEqual(
+            ssh.qualify_repo('someone/other-repo'), 'someone/other-repo',
+        )
+
+
+class MaybeReconcileAlreadyMergedBuildTests(SignalSequenceStepMergedHarness):
+    """fix 1b — a no-PR build whose work already merged flips its step terminal
+    instead of stranding. `_make_active_sequence` gives step-a (dispatched) +
+    step-b (pending), so reconciling step-a is NOT a last-step merge — no
+    completion-signal machinery runs."""
+
+    NO_DELTA_RESULT = (
+        '**Already built and merged.** PR #602 merged to `main`; '
+        '`git diff main..HEAD` is empty — no delta. Already merged via #602.'
+    )
+    PR_URL = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/602'
+
+    def _build_data(self, **overrides):
+        data = {
+            'agent': 'forge', 'phase': 'build', 'task_id': 'step-a',
+            'target_repo': 'ourliberty-agent-core', 'exit_code': 0,
+            'result': self.NO_DELTA_RESULT,
+        }
+        data.update(overrides)
+        return data
+
+    def test_already_merged_flips_step_to_merged(self):
+        self._write_sequence(self._make_active_sequence())
+        with mock.patch.object(
+            ssh, 'gh_pr_merge_info',
+            return_value=(self.PR_URL, '2026-06-20T01:10:37Z'),
+        ):
+            result = on._maybe_reconcile_already_merged_build(self._build_data())
+        self.assertEqual(result, 'live-seq-001')
+        on_disk = self._read_sequence('live-seq-001')
+        step_a = next(s for s in on_disk['steps'] if s['step_id'] == 'step-a')
+        self.assertEqual(step_a['status'], 'merged')
+        self.assertEqual(step_a['pr_url'], self.PR_URL)
+        self.assertNotIn('step-a', on_disk['current_steps'])
+
+    def test_no_cue_does_not_reconcile(self):
+        self._write_sequence(self._make_active_sequence())
+        with mock.patch.object(ssh, 'gh_pr_merge_info') as gh:
+            result = on._maybe_reconcile_already_merged_build(
+                self._build_data(result='Opened nothing yet; still working on #602.'),
+            )
+        self.assertIsNone(result)
+        gh.assert_not_called()  # no cue → never even shells out
+        on_disk = self._read_sequence('live-seq-001')
+        step_a = next(s for s in on_disk['steps'] if s['step_id'] == 'step-a')
+        self.assertEqual(step_a['status'], 'dispatched')
+
+    def test_gh_not_merged_does_not_reconcile(self):
+        self._write_sequence(self._make_active_sequence())
+        with mock.patch.object(ssh, 'gh_pr_merge_info', return_value=None):
+            result = on._maybe_reconcile_already_merged_build(self._build_data())
+        self.assertIsNone(result)
+        on_disk = self._read_sequence('live-seq-001')
+        step_a = next(s for s in on_disk['steps'] if s['step_id'] == 'step-a')
+        self.assertEqual(step_a['status'], 'dispatched')
+
+    def test_ambiguous_pr_refs_do_not_reconcile(self):
+        self._write_sequence(self._make_active_sequence())
+        with mock.patch.object(ssh, 'gh_pr_merge_info') as gh:
+            result = on._maybe_reconcile_already_merged_build(self._build_data(
+                result='Already merged via #602, superseding #595. No delta.',
+            ))
+        self.assertIsNone(result)
+        gh.assert_not_called()
+
+    def test_missing_target_repo_returns_none(self):
+        self._write_sequence(self._make_active_sequence())
+        result = on._maybe_reconcile_already_merged_build(
+            self._build_data(target_repo=None),
+        )
+        self.assertIsNone(result)
+
+    def test_non_clean_exit_does_not_reconcile(self):
+        # A build that exited non-zero is a genuine failure, not an honest
+        # no-delta refusal — never gh-verify or flip the step.
+        self._write_sequence(self._make_active_sequence())
+        with mock.patch.object(ssh, 'gh_pr_merge_info') as gh:
+            result = on._maybe_reconcile_already_merged_build(
+                self._build_data(exit_code=1),
+            )
+        self.assertIsNone(result)
+        gh.assert_not_called()
+        on_disk = self._read_sequence('live-seq-001')
+        step_a = next(s for s in on_disk['steps'] if s['step_id'] == 'step-a')
+        self.assertEqual(step_a['status'], 'dispatched')
+
+
 try:
     from . import _chokepoint_optout
 except ImportError:

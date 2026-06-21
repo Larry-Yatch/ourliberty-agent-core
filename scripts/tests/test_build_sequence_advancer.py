@@ -1444,6 +1444,243 @@ class TestStrandedDispatchEscalation(_AdvancerHarness):
         self.assertEqual(age, 4 * 3600)
 
 
+class TestAlreadyMergedBridge(_AdvancerHarness):
+    """no-PR already-merged backstop (2026-06-20 incident).
+
+    A build that opens NO PR because its work already merged via another path
+    strands until the 4h backstop. The merged PR's branch/title carry no
+    step_id token, so the identity match can't bridge it — only the Forge
+    build-outbox no-delta refusal (which names the PR) can. These tests cover
+    that bridge plus the stranded-`failed` heal/resume (option c)."""
+
+    STEP_ID = 'system-self-awareness-slice-1-state-log'
+    PR_URL = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/602'
+    # Branch + title carry NONE of the step_id token — so _match_pr_for_step
+    # cannot match; only the outbox bridge can. (Verbatim from the incident.)
+    PR = {
+        'number': 602,
+        'url': PR_URL,
+        'title': 'feat(system-awareness): work-in-flight State Log (Slice 1)',
+        'headRefName': 'forge/system-self-awareness-the-standing-brain',
+        'mergedAt': '2026-06-20T01:10:37Z',
+    }
+    RESULT = (
+        '**This slice is already built and merged.** PR #602 merged to `main`; '
+        '`git diff main..HEAD` is empty — no delta to commit. Already merged '
+        'via #602.'
+    )
+    STALL_REASON = (
+        'dispatched ~4h ago with no PR and no gate progress (exceeds the 4h '
+        'stall backstop). Forge may never have picked it up.'
+    )
+
+    def _write_forge_build_outbox(self, step_id, result, phase='build'):
+        d = self.agents_root / 'outboxes' / 'forge' / '.archive'
+        d.mkdir(parents=True, exist_ok=True)
+        (d / f'{step_id}.json').write_text(json.dumps({
+            'agent': 'forge', 'phase': phase, 'task_id': step_id,
+            'target_repo': 'ourliberty-agent-core', 'exit_code': 0,
+            'duration_sec': 150.0, 'pr_url': None, 'result': result,
+            'completed_at': '2026-06-20T01:27:00+00:00',
+        }))
+
+    def _patch_gh_pr_list(self, prs_by_repo):
+        self.bsa._gh_list_merged_prs = (
+            lambda repo, logger=None: prs_by_repo.get(repo)
+        )
+
+    def _failed_step(self, step_id, reason):
+        step = _make_step(step_id, status='failed', pr_url=None)
+        step['failure_reason'] = reason
+        return step
+
+    def _stall_pause_audit(self, step_id):
+        # The audit trail the escalate pass writes when it strands + pauses.
+        return [
+            {'event': 'step-stranded', 'step_id': step_id,
+             'reason': self.STALL_REASON},
+            {'event': 'sequence-paused',
+             'reason': f'Step `{step_id}` stranded: {self.STALL_REASON}'},
+        ]
+
+    def test_identity_match_cannot_bridge_this_pr(self):
+        # The pre-existing matcher must MISS (branch/title lack the step_id
+        # token) — the precondition that makes the bridge necessary.
+        self.assertIsNone(
+            self.bsa._match_pr_for_step(self.STEP_ID, None, [self.PR]),
+        )
+
+    def test_bridge_heals_stranded_dispatched_step(self):
+        seq = _make_sequence(
+            steps=[_make_step(self.STEP_ID, status='dispatched', pr_url=None,
+                              dispatched_at=_recent_iso())],
+            current_steps=[self.STEP_ID],
+        )
+        self._write_sequence(seq)
+        self._write_forge_build_outbox(self.STEP_ID, self.RESULT)
+        self._patch_gates()
+        self._patch_gh_pr_list({'ourliberty-agent-core': [self.PR]})
+        self.bsa.tick()
+        seq2 = self._read_sequence('seq-001')
+        step = next(s for s in seq2['steps'] if s['step_id'] == self.STEP_ID)
+        self.assertEqual(step['status'], 'merged')
+        self.assertEqual(step['pr_url'], self.PR_URL)
+        events = [(e['event'], e.get('actor')) for e in seq2['audit_log']]
+        self.assertIn(('step-merged', 'advancer-reconcile'), events)
+
+    def test_bridge_heals_stranded_failed_step_and_resumes_to_complete(self):
+        seq = _make_sequence(
+            status='paused',
+            steps=[self._failed_step(self.STEP_ID, self.STALL_REASON)],
+            current_steps=[self.STEP_ID],
+            audit_log=self._stall_pause_audit(self.STEP_ID),
+        )
+        self._write_sequence(seq)
+        self._write_forge_build_outbox(self.STEP_ID, self.RESULT)
+        self._patch_gates()
+        self._patch_gh_pr_list({'ourliberty-agent-core': [self.PR]})
+        self.bsa.tick()
+        seq2 = self._read_sequence('seq-001')
+        step = next(s for s in seq2['steps'] if s['step_id'] == self.STEP_ID)
+        self.assertEqual(step['status'], 'merged')
+        self.assertEqual(seq2['status'], 'complete')
+        events = [(e['event'], e.get('actor')) for e in seq2['audit_log']]
+        self.assertIn(('resumed', 'advancer-reconcile'), events)
+        self.assertIn(('step-merged', 'advancer-reconcile'), events)
+        self.assertTrue(any(e[0] == 'sequence-complete' for e in events))
+
+    def test_does_not_resume_when_another_step_genuinely_failed(self):
+        seq = _make_sequence(
+            status='paused',
+            steps=[
+                self._failed_step(self.STEP_ID, self.STALL_REASON),
+                self._failed_step('other-step',
+                                  'Mirror REVIEW_ESCALATE: not buildable'),
+            ],
+            current_steps=[self.STEP_ID, 'other-step'],
+            audit_log=self._stall_pause_audit(self.STEP_ID),
+        )
+        self._write_sequence(seq)
+        self._write_forge_build_outbox(self.STEP_ID, self.RESULT)
+        self._patch_gates()
+        self._patch_gh_pr_list({'ourliberty-agent-core': [self.PR]})
+        self.bsa.tick()
+        seq2 = self._read_sequence('seq-001')
+        stranded = next(s for s in seq2['steps'] if s['step_id'] == self.STEP_ID)
+        genuine = next(s for s in seq2['steps'] if s['step_id'] == 'other-step')
+        # The stranded step's merge is recorded, but a real failure remains so
+        # the sequence stays paused for Larry and is NOT auto-resumed.
+        self.assertEqual(stranded['status'], 'merged')
+        self.assertEqual(genuine['status'], 'failed')
+        self.assertEqual(seq2['status'], 'paused')
+        self.assertNotIn('resumed', [e['event'] for e in seq2['audit_log']])
+
+    def test_genuine_failure_without_stall_signature_is_left_untouched(self):
+        # A `failed` step with no stall signature is a real failure — reconcile
+        # must not resurrect it even when a merged PR is nameable.
+        seq = _make_sequence(
+            status='paused',
+            steps=[self._failed_step(self.STEP_ID,
+                                     'Mirror REVIEW_ESCALATE: design rejected')],
+            current_steps=[self.STEP_ID],
+        )
+        self._write_sequence(seq)
+        self._write_forge_build_outbox(self.STEP_ID, self.RESULT)
+        self._patch_gates()
+        self._patch_gh_pr_list({'ourliberty-agent-core': [self.PR]})
+        self.bsa.tick()
+        seq2 = self._read_sequence('seq-001')
+        step = next(s for s in seq2['steps'] if s['step_id'] == self.STEP_ID)
+        self.assertEqual(step['status'], 'failed')
+        self.assertEqual(seq2['status'], 'paused')
+
+    def test_does_not_auto_resume_an_operator_pause(self):
+        # A stranded-failed step whose work merged is recorded, but if the most
+        # recent pause was an OPERATOR pause (event 'paused', not the stall
+        # backstop's 'sequence-paused'), the sequence is NOT auto-resumed.
+        seq = _make_sequence(
+            status='paused',
+            steps=[self._failed_step(self.STEP_ID, self.STALL_REASON)],
+            current_steps=[self.STEP_ID],
+            audit_log=[{'event': 'paused', 'actor': 'larry',
+                        'reason': 'investigating something unrelated'}],
+        )
+        self._write_sequence(seq)
+        self._write_forge_build_outbox(self.STEP_ID, self.RESULT)
+        self._patch_gates()
+        self._patch_gh_pr_list({'ourliberty-agent-core': [self.PR]})
+        self.bsa.tick()
+        seq2 = self._read_sequence('seq-001')
+        step = next(s for s in seq2['steps'] if s['step_id'] == self.STEP_ID)
+        self.assertEqual(step['status'], 'merged')   # merge still recorded
+        self.assertEqual(seq2['status'], 'paused')   # but NOT auto-resumed
+        self.assertNotIn('resumed', [e['event'] for e in seq2['audit_log']])
+
+    def test_non_clean_exit_build_outbox_is_not_bridged(self):
+        # A build that exited non-zero is a genuine failure, not an honest
+        # no-delta refusal — even if its result text names a merged PR, the
+        # bridge must not flip the step.
+        seq = _make_sequence(
+            steps=[_make_step(self.STEP_ID, status='dispatched', pr_url=None,
+                              dispatched_at=_recent_iso())],
+            current_steps=[self.STEP_ID],
+        )
+        self._write_sequence(seq)
+        d = self.agents_root / 'outboxes' / 'forge' / '.archive'
+        d.mkdir(parents=True, exist_ok=True)
+        (d / f'{self.STEP_ID}.json').write_text(json.dumps({
+            'agent': 'forge', 'phase': 'build', 'task_id': self.STEP_ID,
+            'target_repo': 'ourliberty-agent-core', 'exit_code': 1,
+            'duration_sec': 150.0, 'pr_url': None, 'result': self.RESULT,
+            'completed_at': '2026-06-20T01:27:00+00:00',
+        }))
+        self._patch_gates()
+        self._patch_gh_pr_list({'ourliberty-agent-core': [self.PR]})
+        self.bsa.tick()
+        seq2 = self._read_sequence('seq-001')
+        step = next(s for s in seq2['steps'] if s['step_id'] == self.STEP_ID)
+        self.assertEqual(step['status'], 'dispatched')
+
+    def test_bridge_direct_verify_fallback_when_pr_not_in_recent_list(self):
+        # PR older than the recent-merged lookback window — the bridge falls
+        # back to a direct gh verify (ssh.gh_pr_merge_info).
+        import sequence_shortcut_helpers as ssh_mod
+        seq = _make_sequence(
+            steps=[_make_step(self.STEP_ID, status='dispatched', pr_url=None,
+                              dispatched_at=_recent_iso())],
+            current_steps=[self.STEP_ID],
+        )
+        self._write_sequence(seq)
+        self._write_forge_build_outbox(self.STEP_ID, self.RESULT)
+        self._patch_gates()
+        self._patch_gh_pr_list({'ourliberty-agent-core': []})  # #602 not listed
+        with patch.object(
+            ssh_mod, 'gh_pr_merge_info',
+            lambda coords, num, timeout=10: (self.PR_URL, self.PR['mergedAt']),
+        ):
+            self.bsa.tick()
+        seq2 = self._read_sequence('seq-001')
+        step = next(s for s in seq2['steps'] if s['step_id'] == self.STEP_ID)
+        self.assertEqual(step['status'], 'merged')
+        self.assertEqual(step['pr_url'], self.PR_URL)
+
+    def test_no_outbox_no_bridge(self):
+        # No Forge build outbox on disk → bridge finds nothing → step stays
+        # dispatched (the bridge never invents a PR).
+        seq = _make_sequence(
+            steps=[_make_step(self.STEP_ID, status='dispatched', pr_url=None,
+                              dispatched_at=_recent_iso())],
+            current_steps=[self.STEP_ID],
+        )
+        self._write_sequence(seq)
+        self._patch_gates()
+        self._patch_gh_pr_list({'ourliberty-agent-core': [self.PR]})
+        self.bsa.tick()
+        seq2 = self._read_sequence('seq-001')
+        step = next(s for s in seq2['steps'] if s['step_id'] == self.STEP_ID)
+        self.assertEqual(step['status'], 'dispatched')
+
+
 class _RecordingLogger:
     """Minimal logger stand-in capturing warning() message strings."""
 

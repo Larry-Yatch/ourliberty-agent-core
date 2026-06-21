@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -890,6 +891,121 @@ def apply_step_merged(
     )
 
 
+# -------------------- no-delta / already-merged build outcome --------------------
+#
+# Forge's build phase opens ONE PR for the work it builds. When a build session
+# RESUMES onto a slice whose work has ALREADY merged via another path — a
+# concurrent Forge session, a manual desktop merge — `git diff main..HEAD` is
+# empty: there is no delta to commit, so `gh pr create` has nothing to open.
+# Forge correctly REFUSES to fabricate a `PR opened:` line and instead narrates
+# the PR that already shipped. That outbox carries no PR URL and (by protocol)
+# no marker, so the sequence step it belongs to would strand in `dispatched`
+# until the 4h stall backstop fails + pauses it + pages Larry to reconcile by
+# hand. The real incident: seq `launch-system-self-awareness-slice-1-state-log`,
+# step `system-self-awareness-slice-1-state-log`, work already merged via
+# https://github.com/Larry-Yatch/ourliberty-agent-core/pull/602 — whose branch
+# (`forge/system-self-awareness-the-standing-brain`) and title carry none of the
+# step_id token, so neither the notifier nor the advancer's branch/title match
+# could bridge the step to the PR. The one DURABLE bridge is the build outbox's
+# own result text, which names the already-merged PR.
+#
+# These two helpers let BOTH seams (the notifier live, the advancer as backstop)
+# turn that honest no-delta outcome into a terminal, auto-reconcilable state.
+# Detection is deliberately conservative — two text gates PLUS a gh-truth gate:
+#   1. an already-merged / no-delta CUE must be present (Forge's vocabulary for
+#      this outcome — she leads with it), AND
+#   2. the result must name EXACTLY ONE distinct PR number (ambiguous multiples
+#      refuse to guess — mirrors outbox_notifier._extract_pr_url_from_build_result),
+#   3. the caller then gh-VERIFIES that PR is genuinely MERGED before flipping
+#      the step. Prose alone never mutates sequence state.
+
+_ALREADY_MERGED_CUE_RE = re.compile(
+    r'already\s+(?:built\s+and\s+)?merged'
+    r'|no\s+delta'
+    r'|diff\s+[^\n]*\bis\s+empty'
+    r'|byte-identical\s+to\s+`?main`?'
+    # Forward-compat: a canonical `NO PR — already merged: #N` lead line, should
+    # Forge's CLAUDE.md ever standardize one. Accepting it now costs nothing.
+    r'|\bNO\s+PR\s*[—:-]',
+    re.IGNORECASE,
+)
+
+# A PR reference as `#<N>`, `PR #<N>`, or the trailing `/pull/<N>` of a full URL.
+# Bare integers (line counts, test counts, deliverable ids like `D1`) never have
+# a leading `#` or `/pull/`, so they don't match.
+_PR_NUMBER_RE = re.compile(r'(?:/pull/|#)(\d+)\b')
+
+
+def parse_already_merged_pr_ref(result_text: Optional[str]) -> Optional[int]:
+    """Return the single PR number a no-delta/already-merged build result names.
+
+    Returns None when the text: is empty/non-str; carries no already-merged CUE;
+    names NO PR number; or names MORE THAN ONE distinct PR number (ambiguous —
+    refuse to guess, the safe direction). The caller MUST gh-verify the returned
+    PR is genuinely MERGED (via `gh_pr_merge_info`) before treating the step as
+    terminal — this parser only proposes a candidate from prose."""
+    if not isinstance(result_text, str) or not result_text:
+        return None
+    if not _ALREADY_MERGED_CUE_RE.search(result_text):
+        return None
+    nums = {int(m.group(1)) for m in _PR_NUMBER_RE.finditer(result_text)}
+    if len(nums) != 1:
+        return None
+    return next(iter(nums))
+
+
+def qualify_repo(repo: str) -> str:
+    """Return `repo` in the OWNER/REPO form `gh --repo` requires.
+
+    A bare name (`ourliberty-agent-core`) is prefixed with `OURLIBERTY_GH_OWNER`
+    (default `Larry-Yatch`, same default + env var as build_sequence_advancer's
+    GITHUB_OWNER); an already-qualified value (a '/' is present) passes through.
+    Shared so the notifier and advancer resolve coords identically."""
+    if '/' in repo:
+        return repo
+    owner = os.environ.get('OURLIBERTY_GH_OWNER', 'Larry-Yatch')
+    return f'{owner}/{repo}'
+
+
+def gh_pr_merge_info(
+    repo_coords: str, pr_number: int, timeout: int = 10,
+) -> Optional[tuple[str, str]]:
+    """Return `(pr_url, merged_at_iso)` iff PR `pr_number` in `repo_coords` is
+    MERGED, else None.
+
+    `repo_coords` is the OWNER/REPO gh form (e.g. `Larry-Yatch/ourliberty-agent-
+    core`). Shells `gh pr view <N> --repo <coords> --json state,url,mergedAt`.
+    Returns None on any non-MERGED state, transport error, non-zero exit, or
+    parse failure — the gh-truth gate for the already-merged reconcile, so a
+    candidate PR from `parse_already_merged_pr_ref` only flips a step when GitHub
+    itself confirms the merge. Never raises."""
+    if not repo_coords or not isinstance(pr_number, int) or pr_number < 1:
+        return None
+    try:
+        proc = subprocess.run(
+            ['gh', 'pr', 'view', str(pr_number), '--repo', repo_coords,
+             '--json', 'state,url,mergedAt'],
+            capture_output=True, text=True, timeout=timeout, check=False,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return None
+    if proc.returncode != 0:
+        return None
+    try:
+        data = json.loads(proc.stdout or '{}')
+    except (ValueError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict) or data.get('state') != 'MERGED':
+        return None
+    url = data.get('url')
+    merged_at = data.get('mergedAt')
+    if not isinstance(url, str) or not url:
+        return None
+    if not isinstance(merged_at, str) or not merged_at:
+        return None
+    return url, merged_at
+
+
 __all__ = [
     'Result',
     'apply_pause',
@@ -898,6 +1014,9 @@ __all__ = [
     'apply_retry',
     'apply_skip',
     'apply_step_merged',
+    'parse_already_merged_pr_ref',
+    'qualify_repo',
+    'gh_pr_merge_info',
     'is_completion_signaled',
     'claim_completion_signal',
     'SEQUENCE_COMPLETE_SIGNALED_EVENT',

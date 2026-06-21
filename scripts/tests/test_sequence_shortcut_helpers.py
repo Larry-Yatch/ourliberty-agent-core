@@ -30,6 +30,8 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
 
 _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_REPO_SCRIPTS) not in sys.path:
@@ -905,6 +907,146 @@ class SequenceCompletionFinalizationTests(_HelpersHarness):
         completion = on_disk['audit_log'][-1]
         self.assertEqual(completion['event'], 'sequence-complete')
         self.assertEqual(completion['actor'], 'beacon')
+
+
+# The verbatim build-outbox result text Forge emitted in the 2026-06-20 incident
+# (seq launch-system-self-awareness-slice-1-state-log) — a no-PR, already-merged
+# refusal naming PR #602. Used as the canonical fixture so the parser is pinned
+# to a real outcome, not a synthetic one.
+_REAL_NO_DELTA_RESULT = (
+    "I cannot open a PR here, and I'm stopping rather than fabricating one.\n\n"
+    "**This slice is already built and merged.** PR #602 "
+    '"feat(system-awareness): work-in-flight State Log (Slice 1)" merged to '
+    "`main` at 2026-06-20T01:10:37Z, and that commit (`790a8ca0`) is already in "
+    "this branch's history. `git diff main..HEAD` is empty — my worktree is "
+    "byte-identical to `main`. There is no delta to commit.\n\n"
+    "- **D1** — `scripts/system_state_log.py` (577 lines)\n"
+    "- **Tests** — 22 passed, exit 0.\n\n"
+    "This is a stale/duplicate build dispatch — the slice was built and merged "
+    "via #602 (almost certainly a concurrent Forge session)."
+)
+
+
+class ParseAlreadyMergedPrRefTests(unittest.TestCase):
+    """Pure parser — needs a no-delta CUE AND exactly one distinct PR number."""
+
+    def test_real_incident_extracts_602(self):
+        self.assertEqual(
+            ssh.parse_already_merged_pr_ref(_REAL_NO_DELTA_RESULT), 602,
+        )
+
+    def test_no_cue_returns_none(self):
+        # Names a PR but no already-merged / no-delta cue → not this outcome.
+        self.assertIsNone(
+            ssh.parse_already_merged_pr_ref('Opened PR #602, build in progress.')
+        )
+
+    def test_cue_but_no_pr_number_returns_none(self):
+        self.assertIsNone(
+            ssh.parse_already_merged_pr_ref(
+                'This slice is already merged; no delta to commit.'
+            )
+        )
+
+    def test_ambiguous_multiple_distinct_prs_returns_none(self):
+        # Refuse to guess which PR is the step's work.
+        self.assertIsNone(
+            ssh.parse_already_merged_pr_ref(
+                'Already merged via #602, which supersedes #595. No delta.'
+            )
+        )
+
+    def test_repeated_same_pr_is_not_ambiguous(self):
+        self.assertEqual(
+            ssh.parse_already_merged_pr_ref(
+                'Already merged via #602. PR #602 satisfies the spec. No delta.'
+            ),
+            602,
+        )
+
+    def test_full_pull_url_form(self):
+        self.assertEqual(
+            ssh.parse_already_merged_pr_ref(
+                'No delta — already merged: '
+                'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/602'
+            ),
+            602,
+        )
+
+    def test_bare_integers_do_not_match_only_the_hash_pr(self):
+        # 'D1', '577 lines', '22 tests' carry no leading # or /pull/.
+        self.assertEqual(
+            ssh.parse_already_merged_pr_ref(
+                'Already merged. D1 is 577 lines, 22 tests pass. PR #602 covers it.'
+            ),
+            602,
+        )
+
+    def test_canonical_no_pr_lead_line(self):
+        self.assertEqual(
+            ssh.parse_already_merged_pr_ref('NO PR — already merged: #777'), 777,
+        )
+
+    def test_empty_or_non_str(self):
+        self.assertIsNone(ssh.parse_already_merged_pr_ref(''))
+        self.assertIsNone(ssh.parse_already_merged_pr_ref(None))
+
+
+class GhPrMergeInfoTests(unittest.TestCase):
+    """gh-truth gate — returns (url, merged_at) ONLY when state == MERGED."""
+
+    @staticmethod
+    def _run_returning(rc=0, stdout='', raise_exc=None):
+        def _run(argv, **kwargs):  # noqa: ANN001 — test stub
+            if raise_exc is not None:
+                raise raise_exc
+            return SimpleNamespace(returncode=rc, stdout=stdout, stderr='')
+        return _run
+
+    def test_merged_returns_url_and_time(self):
+        out = json.dumps({
+            'state': 'MERGED',
+            'url': 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/602',
+            'mergedAt': '2026-06-20T01:10:37Z',
+        })
+        with mock.patch.object(ssh.subprocess, 'run', self._run_returning(stdout=out)):
+            info = ssh.gh_pr_merge_info('Larry-Yatch/ourliberty-agent-core', 602)
+        self.assertEqual(info, (
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/602',
+            '2026-06-20T01:10:37Z',
+        ))
+
+    def test_open_pr_returns_none(self):
+        out = json.dumps({'state': 'OPEN', 'url': 'x', 'mergedAt': None})
+        with mock.patch.object(ssh.subprocess, 'run', self._run_returning(stdout=out)):
+            self.assertIsNone(ssh.gh_pr_merge_info('o/r', 5))
+
+    def test_merged_but_missing_url_returns_none(self):
+        out = json.dumps({'state': 'MERGED', 'url': '', 'mergedAt': '2026-06-20T01:10:37Z'})
+        with mock.patch.object(ssh.subprocess, 'run', self._run_returning(stdout=out)):
+            self.assertIsNone(ssh.gh_pr_merge_info('o/r', 5))
+
+    def test_nonzero_exit_returns_none(self):
+        with mock.patch.object(ssh.subprocess, 'run', self._run_returning(rc=1)):
+            self.assertIsNone(ssh.gh_pr_merge_info('o/r', 5))
+
+    def test_transport_error_returns_none(self):
+        with mock.patch.object(
+            ssh.subprocess, 'run',
+            self._run_returning(raise_exc=FileNotFoundError('gh not found')),
+        ):
+            self.assertIsNone(ssh.gh_pr_merge_info('o/r', 5))
+
+    def test_bad_pr_number_does_not_shell_out(self):
+        called = {'n': 0}
+
+        def _run(argv, **kwargs):  # noqa: ANN001 — test stub
+            called['n'] += 1
+            return SimpleNamespace(returncode=0, stdout='{}', stderr='')
+
+        with mock.patch.object(ssh.subprocess, 'run', _run):
+            self.assertIsNone(ssh.gh_pr_merge_info('o/r', 0))
+        self.assertEqual(called['n'], 0)
 
 
 if __name__ == '__main__':
