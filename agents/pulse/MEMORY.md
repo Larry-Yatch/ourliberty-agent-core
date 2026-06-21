@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-21 22:16Z UTC (Iter ~2409, Tier 3, consecutive_clean=0→1, NOMINAL ✅)
+## Status snapshot — updated 2026-06-21 22:49Z UTC (Iter ~2410, Tier 3, consecutive_clean=1→2, NOMINAL ✅)
 
-**Iter ~2409 summary:** ✅ Nominal. 5 new alerts (L860–L864), all Tier-3 silenced. 5/5 daemons alive (outbox_notifier=880012, dashboard_api=880179 — new PIDs, restarted 21:54Z by heal-stale-daemon-code after PR #617). 0 open PRs. **New [yellow] standing finding:** install-drift:ourliberty-launch-dedup-gc.service + .timer — bot DM'd Larry at 16:06 MDT; operator must SSH and install units or GC timer won't fire. Sequence launch-system-self-awareness-slice-1b-where-are-we COMPLETE — PR #73 (ourliberty-dashboard "Where are we" page) merged. beacon-pending-approvals: 0. Check I: sentinel exists → skip. Check III: 10d < 14d → skip. PRIME: systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** Tier 3, consecutive_clean=0→1. Next cadence: 30-min (Tier 3).
+**Iter ~2410 summary:** ✅ Nominal. 0 new alerts (watermark=864=file_length). 5/5 daemons alive (outbox_notifier=885031, dashboard_api=882541 — new PIDs, 2nd heal-stale-daemon-code restart at 22:24Z). 0 open PRs. 0 inbox tasks. **Standing [yellow]:** install-drift:ourliberty-launch-dedup-gc.service + .timer (operator SSH action still needed). beacon-pending-approvals: 0. Check I: sentinel exists → skip. Check III: 10d < 14d → skip. PRIME: systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** Tier 3, consecutive_clean=1→2. Next cadence: 30-min (Tier 3).
 
 
 
