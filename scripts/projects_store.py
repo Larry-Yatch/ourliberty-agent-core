@@ -632,11 +632,79 @@ def attach_phase_brainstorm(
 # --------------------------------------------------------------------------- #
 # the "Actively working" derive (the read surface)
 # --------------------------------------------------------------------------- #
+# The 8 brainstorm-draft sections (projects_brainstorm_author.BRAINSTORM_SECTION_
+# KEYS) paired with the plain-English headers the card renders them under. The
+# author STORES the draft as a section→prose dict; the Brainstorm card (dashboard
+# p6-brainstorm-card-ui) renders a single pre-wrapped STRING, so the card view
+# flattens the dict into one headed string here at the read boundary. Kept in
+# this module (not imported from the author) so the read surface never depends on
+# the author's optional `claude`/narrator import chain.
+_BRAINSTORM_DRAFT_SECTIONS: tuple[tuple[str, str], ...] = (
+    ('end_state', 'Desired end state'),
+    ('why_now', 'Why now'),
+    ('scope', 'Scope & non-goals'),
+    ('constraints_reuse', 'Constraints & reuse'),
+    ('options_decision', 'Options & the decision'),
+    ('risks_guardrails', 'Risks & guardrails'),
+    ('done_gate', 'Done-gate'),
+    ('breakdown', 'Breakdown'),
+)
+
+
+def _flatten_brainstorm_draft(draft: Any) -> Optional[str]:
+    """Flatten the stored 8-section draft dict into the single headed string the
+    Brainstorm card renders (whitespace-pre-wrap). A draft that is already a
+    plain string is returned trimmed; a dict is rendered section-by-section in
+    canonical order, skipping empty sections; anything else (or an all-empty
+    draft) yields None so the card omits the draft block (graceful no-prefill)."""
+    if isinstance(draft, str):
+        return draft.strip() or None
+    if not isinstance(draft, dict):
+        return None
+    blocks: list[str] = []
+    for key, header in _BRAINSTORM_DRAFT_SECTIONS:
+        value = draft.get(key)
+        if isinstance(value, str) and value.strip():
+            blocks.append(f'{header}\n{value.strip()}')
+    return '\n\n'.join(blocks) or None
+
+
+def _brainstorm_decision_cards(brainstorm: dict[str, Any]) -> list[dict[str, Any]]:
+    """Map the stored "Your decisions" forks (a capped list of plain-English
+    strings — the genuine choices that are Larry's to call) into the decision
+    objects the card renders (``{id, title, decision}``: the card shows the fork
+    as ``title`` and an em-dash for the as-yet-unmade ``decision``). When the
+    author flagged ``decisions_overflow`` (more genuine forks existed than the
+    ≤5 cap — spec § 4 guardrail), a trailing note item says so, so the card and
+    the handoff make clear more will surface in the Claude session."""
+    raw = brainstorm.get('decisions')
+    cards: list[dict[str, Any]] = []
+    if isinstance(raw, list):
+        for i, fork in enumerate(raw):
+            if isinstance(fork, str) and fork.strip():
+                cards.append({'id': f'dec-{i}', 'title': fork.strip(), 'decision': ''})
+    if cards and brainstorm.get('decisions_overflow'):
+        cards.append({
+            'id': 'dec-more',
+            'title': 'More decisions will surface as you work this through with Claude.',
+            'decision': '',
+        })
+    return cards
+
+
 def _phase_card(phase: dict[str, Any]) -> dict[str, Any]:
     """The lightweight phase card the pipeline UI renders: lifecycle state +
     the plain-language Desired End State + the optional spec/sequence refs, plus
     the authored ``closeout`` once the phase is done (the live surface the UI
-    renders — spec § 0.24)."""
+    renders — spec § 0.24).
+
+    Brainstorm pre-fill (projects-v3 P6): the author STORES a nested
+    ``phase['brainstorm']`` ({is_ai_draft, draft (8-section dict), decisions
+    (forks), decisions_overflow, handoff}); the Brainstorm card consumes a FLAT
+    shape (``draft`` string, ``decisions`` objects, ``spec_target_path``). This
+    read boundary projects the stored fields into that flat card shape so the
+    two steps (author #611 / card #72) meet — additive + graceful: a phase with
+    no brainstorm carries none of these keys and the card no-prefills."""
     card = {
         'id': phase.get('id'),
         'title': phase.get('title'),
@@ -651,7 +719,17 @@ def _phase_card(phase: dict[str, Any]) -> dict[str, Any]:
         card['closeout'] = closeout
     brainstorm = phase.get('brainstorm')
     if isinstance(brainstorm, dict):
-        card['brainstorm'] = brainstorm
+        draft = _flatten_brainstorm_draft(brainstorm.get('draft'))
+        if draft:
+            card['draft'] = draft
+        decisions = _brainstorm_decision_cards(brainstorm)
+        if decisions:
+            card['decisions'] = decisions
+        handoff = brainstorm.get('handoff')
+        if isinstance(handoff, dict):
+            spec_target = handoff.get('spec_target_path')
+            if isinstance(spec_target, str) and spec_target.strip():
+                card['spec_target_path'] = spec_target.strip()
     return card
 
 

@@ -361,12 +361,25 @@ class StoreAttachTests(unittest.TestCase):
         self.assertFalse(ps.attach_phase_brainstorm({}, {'brainstorm': 'not-a-dict'}))
         self.assertFalse(ps.attach_phase_brainstorm({}, {}))
 
-    def test_phase_card_passes_brainstorm_through(self):
-        bs = {'is_ai_draft': True, 'draft': {'end_state': 'x'}}
+    def test_phase_card_projects_brainstorm_to_flat_card_shape(self):
+        # The card consumes a FLAT shape (draft string + decisions objects +
+        # spec_target_path), not the stored nested brainstorm dict — _phase_card
+        # projects the stored fields into it (the #611↔#72 contract seam).
+        bs = {
+            'is_ai_draft': True,
+            'draft': {'end_state': 'x', 'why_now': 'now'},
+            'decisions': ['Pick a scope.'],
+            'handoff': {'spec_target_path': 'agents/beacon/specs/p6.md'},
+        }
         carded = ps._phase_card(_phase('p6', brainstorm=bs))
-        self.assertEqual(carded['brainstorm'], bs)
+        self.assertEqual(carded['draft'], 'Desired end state\nx\n\nWhy now\nnow')
+        self.assertEqual(carded['decisions'],
+                         [{'id': 'dec-0', 'title': 'Pick a scope.', 'decision': ''}])
+        self.assertEqual(carded['spec_target_path'], 'agents/beacon/specs/p6.md')
+        self.assertNotIn('brainstorm', carded)  # flat is the card contract
         # Absent when the phase has no brainstorm draft.
-        self.assertNotIn('brainstorm', ps._phase_card(_phase('p6')))
+        self.assertNotIn('draft', ps._phase_card(_phase('p6')))
+        self.assertNotIn('decisions', ps._phase_card(_phase('p6')))
 
 
 # --------------------------------------------------------------------------- #
