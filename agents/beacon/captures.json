@@ -887,6 +887,41 @@
         "from_state": "parked"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "cap-p6-verify-brainstorm-card-render-check-c7cc",
+      "title": "P6 verify: brainstorm card render check",
+      "note": "throwaway phase to confirm the flat brainstorm prefill renders on the board",
+      "state": "promoted",
+      "label": null,
+      "origin": {
+        "source": "agent",
+        "session_id": null,
+        "repo": null,
+        "branch": null,
+        "captured_at": "2026-06-21T22:15:30.525154+00:00"
+      },
+      "last_touched": "2026-06-21T22:15:30.525154+00:00",
+      "promoted_to": "p6-verify-brainstorm-render",
+      "spawned": {
+        "kind": "project",
+        "project_id": "p6-verify-brainstorm-render",
+        "stamped_at": "2026-06-21T22:15:30.603759+00:00"
+      },
+      "briefing": {
+        "what": "A quick test to make sure new brainstorm ideas show up correctly on your board.",
+        "why": "If ideas don't display properly, you could lose track of them or act on a wrong picture of what's in the pipeline.",
+        "suggest": "Worth a fast check before relying on it, but keep it small and low-stakes until we've confirmed it works as expected."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-21T22:19:20.247356+00:00",
+        "from_state": "promoted"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
