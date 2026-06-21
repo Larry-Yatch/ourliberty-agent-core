@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-21 20:38Z UTC (Iter ~2404, Tier 1, consecutive_clean=1→2, NOMINAL ✅)
+## Status snapshot — updated 2026-06-21 20:49Z UTC (Iter ~2405, Tier 1→2 DE-ESCALATED, consecutive_clean=2→3→0, NOMINAL ✅)
 
-**Iter ~2404 summary:** ✅ Nominal. 1 new alert (mirror-dag-pass:projects-v3-p6-brainstorm-autofill, Tier-3 silenced, watermark 853→854). 5/5 daemons alive (outbox_notifier=841123 Ss, beacon=599691). 0 open PRs. Forge: 1 fresh inbox task (p6-brainstorm-autofill-author, dispatched 14:35:40 MDT — sequence active). beacon-pending-approvals: pending=0 (Larry approved dag-preflight at 14:32:34 MDT — sequence active, Forge dispatched). unreviewed-merge:607 still Larry's judgment ([yellow] carry). Check I: sentinel exists → skip. Check III: 10d < 14d → skip. PRIME: systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3.** Tier 1, consecutive_clean=1→2 (1 more clean iter → Tier 2).
+**Iter ~2405 summary:** ✅ Nominal. 1 new alert (sync-blocked:auto-commit-push-failed, Tier-3 silenced, watermark 854→855). 5/5 daemons alive. PR #610 opened (Forge, `work/forge-nopr-terminal-reconcile`, `fix(orchestrator): no-PR terminal reconcile`, 7min old). Forge: build-p6-brainstorm-autofill-author.json in inbox (active sequence, 9min). beacon-pending-approvals: pending=0. unreviewed-merge:607 still Larry's judgment ([yellow] carry). Check I: sentinel exists → skip. Check III: 10d < 14d → skip. PRIME: systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3.** **Tier 1→2 DE-ESCALATED (consecutive_clean=3)**, next cadence 15-min.
 
 
 
