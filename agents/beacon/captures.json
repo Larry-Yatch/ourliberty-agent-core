@@ -857,6 +857,36 @@
         "from_state": "parked"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-state-log-active-missions-panel-shows-stale-phas-3740",
+      "title": "State Log: 'Active missions' panel shows STALE phases (done work as DRAFTING) \u2014 trust risk",
+      "note": "Found dogfooding the new /where-we-are page (Slice 1b) 2026-06-21. The page renders correctly; the issue is upstream in the State Log snapshot. The 'Active missions' panel (from system_state_log missions_active) shows raw mission phases that LAG reality: 'System self-awareness - Slice 1 (State Log)' = DRAFTING though it's DONE+LIVE+closed-out; 'the standing brain' (dropped) + 'Slice 1b' also DRAFTING; and 2 old efforts (pulse-cycle-upgrade, rate-limit-resilience-001) = IN_FLIGHT with no real progress. The NARRATIVE prose IS accurate ('technically open but no progress', 'drafting') \u2014 only the structured panel is stale. Root = system_state_log.load_active_missions reads missions.json phase without reconciling to the project/sequence terminal state (the missions-vs-projects lag; overlaps the known board-staleness / Phase-S theme). FIX = reconcile mission phase with project/sequence completion in the snapshot (or surface projects, not raw missions). Trust risk per the DES ('trust is the whole game'): a status page that calls done work 'drafting' erodes trust. Owner = Slice-1 State Log narrator (scripts/system_state_log.py). NOT a Slice-1b view bug.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": null,
+        "branch": null,
+        "captured_at": "2026-06-21T21:48:09.834014+00:00"
+      },
+      "last_touched": "2026-06-21T21:48:09.834014+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "Our internal status page is showing some finished work as still 'in progress,' so the at-a-glance summary doesn't match what's actually done.",
+        "why": "When a status page calls completed work unfinished, people stop trusting it \u2014 and trust in our own numbers is what the whole operation runs on.",
+        "suggest": "Worth fixing soon so the summary reflects reality, but it's not on fire \u2014 slot it into the next round of cleanup rather than dropping everything today."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-21T21:49:00.461836+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
