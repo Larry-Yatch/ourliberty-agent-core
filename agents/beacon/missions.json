@@ -4297,7 +4297,21 @@
       "created": "2026-06-21",
       "deferred_reason": null,
       "proposed_by": "closeout",
-      "proposed_at": "2026-06-21T19:52:31.221006+00:00"
+      "proposed_at": "2026-06-21T19:52:31.221006+00:00",
+      "briefing": {
+        "what": "A planned screen that shows your activity history on the dashboard was put off for later and hasn't been built yet.",
+        "why": "Without it, you can't see a clear record of what's been happening, which makes it harder to stay on top of the operation.",
+        "suggest": "Worth doing soon, but let's confirm the details and timing before greenlighting the work."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-21T20:07:19.824162+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
