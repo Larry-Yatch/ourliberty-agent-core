@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-21 20:29Z UTC (Iter ~2403, Tier 1, consecutive_clean=0→1, NOMINAL ✅)
+## Status snapshot — updated 2026-06-21 20:38Z UTC (Iter ~2404, Tier 1, consecutive_clean=1→2, NOMINAL ✅)
 
-**Iter ~2403 summary:** ✅ Nominal. 0 new alerts. 5/5 daemons alive (outbox_notifier=841123 Ss, beacon=599691). 0 open PRs. beacon-pending-approvals: pending=1 (dag-preflight-projects-v3-p6-brainstorm-autofill, ~35m pending, Larry's call). unreviewed-merge:607 bot DM delivered (iter ~2402 escalation confirmed). Check I: sentinel exists → skip. Check III: 10d < 14d → skip. PRIME: systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3.** Tier 1, consecutive_clean=0→1. Prior iter ~2402 was Tier reset 3→1 (unreviewed-merge:607 Tier-4 signal).
+**Iter ~2404 summary:** ✅ Nominal. 1 new alert (mirror-dag-pass:projects-v3-p6-brainstorm-autofill, Tier-3 silenced, watermark 853→854). 5/5 daemons alive (outbox_notifier=841123 Ss, beacon=599691). 0 open PRs. Forge: 1 fresh inbox task (p6-brainstorm-autofill-author, dispatched 14:35:40 MDT — sequence active). beacon-pending-approvals: pending=0 (Larry approved dag-preflight at 14:32:34 MDT — sequence active, Forge dispatched). unreviewed-merge:607 still Larry's judgment ([yellow] carry). Check I: sentinel exists → skip. Check III: 10d < 14d → skip. PRIME: systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3.** Tier 1, consecutive_clean=1→2 (1 more clean iter → Tier 2).
 
 
 
