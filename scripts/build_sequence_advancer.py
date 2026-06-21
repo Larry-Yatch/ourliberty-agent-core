@@ -125,6 +125,15 @@ GH_PR_LIST_TIMEOUT_SEC = 10
 # task_terminal_state.DEFAULT_PR_LOOKBACK so both probes see the same horizon.
 RECONCILE_PR_LOOKBACK = 50
 
+# Recency bound for the #609-follow-up pre-dispatch already-merged match
+# (_already_merged_launch_match). A launch step sits `pending` only minutes
+# before dispatch, and a genuine duplicate's PR merges around that window, so a
+# PR merged longer ago than this is NOT evidence that a freshly-authored launch
+# is redundant. Generous (7d) so a real recent duplicate is never rejected while
+# a stale, unrelated forge/<phase_id> branch can never falsely mark a re-launch
+# done.
+PREDISPATCH_MERGE_LOOKBACK_SEC = 7 * 24 * 60 * 60
+
 # GitHub owner for the sandbox repos. Sequence steps store a bare repo
 # name (e.g. 'ourliberty-agent-core'), but `gh --repo` requires the
 # OWNER/REPO form — passing the bare name fails with rc=1 ("expected the
@@ -1567,6 +1576,296 @@ def _reconcile_dispatched_steps(
     return reconciled
 
 
+# -------------------- pre-dispatch already-merged backstop (#609 follow-up) --------------------
+#
+# WHY (the 2026-06-20 incident, deeper fix). The board Launch of
+# `system-self-awareness-slice-1-state-log` authored a build whose deliverables a
+# SIBLING project's Forge build had ALREADY shipped (PR #602). The build still
+# dispatched, found nothing to do (byte-identical to main), and stranded 4h /
+# ~$1.5 before #610's post-build no-delta bridge reconciled it. PR #609 added a
+# CHEAP author-time guard in the launch drain, but the drain is a pure-filesystem
+# non-committer — it can only ADVISE/reversibly-hold. The REAL fix — "a recently-
+# merged PR already delivered this phase → skip the build AND reconcile the phase
+# straight to done" — belongs HERE in the advancer, which already shells to gh and
+# writes the projects store. This pass catches the redundant build BEFORE it
+# dispatches (the drain's hold may miss the window between author and dispatch),
+# saving the whole Forge run rather than reconciling it after the fact.
+
+
+def _pr_merged_recently(
+    pr: dict[str, Any], now: datetime, max_age_sec: int,
+) -> bool:
+    """True iff ``pr['mergedAt']`` (ISO-8601, possibly 'Z'-suffixed) is within
+    ``max_age_sec`` of ``now``. A missing / unparseable ``mergedAt`` returns
+    False — we cannot confirm recency, so the conservative outcome is NOT a match
+    (fail toward dispatching the build, never toward a false done-stamp)."""
+    raw = pr.get('mergedAt')
+    if not isinstance(raw, str) or not raw:
+        return False
+    try:
+        ts = datetime.fromisoformat(raw.replace('Z', '+00:00'))
+    except ValueError:
+        return False
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    return 0 <= (now - ts).total_seconds() <= max_age_sec
+
+
+def _already_merged_launch_match(
+    step_id: str,
+    seq_id: str,
+    merged_prs: list[dict[str, Any]],
+    claims: list[dict[str, Any]],
+    now: datetime,
+    max_age_sec: int,
+) -> Optional[dict[str, Any]]:
+    """Find the gh-MERGED PR that already delivered this launch phase's work, or
+    None. CONSERVATIVE by construction — only two confident, exact signals, never
+    a title-substring guess, and only against a RECENTLY-merged PR (so a phase is
+    never marked done wrongly):
+
+      1. OWN CONVENTION BRANCH — a merged PR whose ``headRefName`` is exactly
+         ``forge/<step_id>`` or ``forge/<seq_id>`` (the phase's own build branch;
+         a re-run / parallel dispatch of THIS phase that merged already).
+
+      2. CLAIM + SIBLING-BRANCH CORROBORATION — a #609 deliverable claim names
+         this phase (``claimed_task_id`` ∈ this phase's id forms) AND a merged PR
+         corroborates it via the SIBLING's convention branch
+         ``forge/<envelope_task_id>`` (the cross-identity case: the sibling built
+         under its OWN envelope task_id but its marker claimed THIS phase's id —
+         the exact 2026-06-20 shape, where #602 merged under
+         ``forge/system-self-awareness-the-standing-brain``).
+
+    RECENCY GATE (``_pr_merged_recently``): a launch step sits ``pending`` only
+    minutes before dispatch (the advancer ticks every 5 min) and a genuine
+    duplicate's PR merges around that same window, so a PR merged LONG ago is not
+    evidence that a freshly-authored launch is redundant. Without it a stale,
+    unrelated ``forge/<step_id>`` branch still inside the count-bounded (not
+    date-bounded) lookback list would falsely mark a legitimate RE-launch done.
+    ``max_age_sec`` is generous (7d) so a real recent duplicate is never rejected.
+
+    The caller supplies ``claims`` already filtered to this phase
+    (``launch_dedup_guard.find_matching_claims``), so tier 2 only needs the
+    branch corroboration. Returns the first matching PR dict (carries ``url`` +
+    ``mergedAt``)."""
+    own_branches = {f'forge/{step_id}', f'forge/{seq_id}'}
+    for pr in merged_prs:
+        if (pr.get('headRefName') in own_branches
+                and _pr_merged_recently(pr, now, max_age_sec)):
+            return pr
+    if claims:
+        sibling_branches = {
+            f'forge/{env}'
+            for env in (
+                c.get('envelope_task_id') for c in claims
+            )
+            if isinstance(env, str) and env
+        }
+        if sibling_branches:
+            for pr in merged_prs:
+                if (pr.get('headRefName') in sibling_branches
+                        and _pr_merged_recently(pr, now, max_age_sec)):
+                    return pr
+    return None
+
+
+def _reconcile_already_merged_launch_phase(
+    sequence: dict[str, Any],
+    logger: logging.Logger,
+    now: datetime,
+    _repo_cache: Optional[dict[str, Optional[list[dict[str, Any]]]]] = None,
+) -> int:
+    """Pre-dispatch already-merged backstop for a board-Launch sequence (#609
+    follow-up). For a ``launch-<phase_id>`` sequence whose step is still
+    ``pending`` (never dispatched) but whose deliverables ALREADY merged
+    elsewhere, mark the step ``merged`` from the gh-confirmed PR INSTEAD of
+    dispatching a redundant Forge build. Reuses the idempotent
+    ``apply_step_merged`` rollup, so the single-step launch sequence finalizes to
+    ``complete`` and the forward-dispatch leg (which runs AFTER reconcile in the
+    same tick) then has a non-``active`` sequence and dispatches nothing.
+
+    Scoped tight + flag-independent (like the rest of reconcile): only
+    ``launch-`` sequences, only still-``pending`` steps (a ``dispatched`` /
+    terminal step is handled by ``_reconcile_dispatched_steps`` / already done),
+    and only an EXACT convention-branch match against a recently-merged PR
+    (``_already_merged_launch_match``). Fail-safe: any gh / ssh / guard error
+    returns 0 and leaves the step ``pending`` for the normal dispatch path (plus
+    the post-build #610 no-delta bridge). Returns the count reconciled (0 or 1
+    for a single-step launch).
+
+    The per-tick ``_repo_cache`` is shared with ``_reconcile_dispatched_steps``
+    so a launch sequence whose repo was already queried this tick issues no extra
+    gh call."""
+    seq_id = sequence.get('seq_id')
+    if not isinstance(seq_id, str) or not seq_id.startswith('launch-'):
+        return 0
+    if _repo_cache is None:
+        _repo_cache = {}
+    pending = [
+        s for s in (sequence.get('steps') or [])
+        if isinstance(s, dict) and s.get('status') == 'pending'
+    ]
+    if not pending:
+        return 0
+    try:
+        import sequence_shortcut_helpers as ssh  # noqa: E402
+        import launch_dedup_guard as guard  # noqa: E402
+    except Exception as e:  # noqa: BLE001
+        logger.info(
+            f'pre-dispatch reconcile: helpers unavailable '
+            f'({type(e).__name__}: {e}); skipping for {seq_id}'
+        )
+        return 0
+    reconciled = 0
+    for step in pending:
+        step_id = step.get('step_id')
+        if not isinstance(step_id, str) or not step_id:
+            continue
+        target_repo = step.get('target_repo')
+        if not isinstance(target_repo, str) or not target_repo:
+            continue
+        if target_repo not in _repo_cache:
+            _repo_cache[target_repo] = _gh_list_merged_prs(target_repo, logger)
+        merged_prs = _repo_cache[target_repo]
+        # None (gh failure, already logged) or [] (queried OK, nothing merged) —
+        # either way we cannot confidently confirm an already-merged delivery, so
+        # leave the step pending for the normal dispatch path.
+        if not merged_prs:
+            continue
+        # #609 deliverable claims naming this phase (the cross-identity case).
+        # Derive the ledger from the advancer's own blackboard so a test pointing
+        # AGENTS_ROOT at a tmpdir resolves the tmp ledger. Fail-safe → no claims.
+        try:
+            claims = guard.find_matching_claims(
+                {'phase_id': step_id, 'seq_id': seq_id},
+                sequences_dir=BLACKBOARD_DIR, now=now,
+            )
+        except Exception:  # noqa: BLE001 — claims are advisory corroboration
+            claims = []
+        match = _already_merged_launch_match(
+            step_id, seq_id, merged_prs, claims, now,
+            PREDISPATCH_MERGE_LOOKBACK_SEC,
+        )
+        if match is None:
+            continue
+        pr_url = match.get('url') or ''
+        merged_at = match.get('mergedAt') or now.isoformat()
+        try:
+            result = ssh.apply_step_merged(
+                seq_id=seq_id,
+                step_id=step_id,
+                pr_url=pr_url,
+                merged_at=merged_at,
+                actor='advancer-already-merged-predispatch',
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.error(
+                f'pre-dispatch reconcile: apply_step_merged raised for '
+                f'{seq_id}/{step_id}: {type(e).__name__}: {e}'
+            )
+            continue
+        if getattr(result, 'applied', False):
+            reconciled += 1
+            step['status'] = 'merged'
+            step['pr_url'] = pr_url
+            logger.info(
+                f'pre-dispatch reconcile: launch phase {step_id!r} already '
+                f'delivered by merged PR {pr_url} (branch '
+                f'{match.get("headRefName")!r}); marked merged + skipped a '
+                f'redundant Forge build (seq={seq_id})'
+            )
+    return reconciled
+
+
+def _signal_launch_phase_done(seq_id: Any, logger: logging.Logger) -> None:
+    """Emit the one-time completion signal for a LAUNCH sequence the advancer's
+    OWN reconcile pass drove to ``complete``. The outbox notifier owns the
+    happy-path completion signal (SEQUENCE_COMPLETE → done-stamp + closeout + DM),
+    but it only fires when it processes a merge outbox whose task_id matches a
+    step — exactly the match that MISSES for the already-merged / cross-identity
+    class the advancer reconcile exists to bridge. Without this, an advancer-
+    reconciled launch phase stays ``building`` on the board with no closeout.
+
+    Single-winner + idempotent: claims via the SAME
+    ``ssh.claim_completion_signal`` gate the notifier uses (writes the
+    ``sequence-complete-signaled`` marker before returning ``applied=True``), so a
+    race with the notifier — or a re-tick — can never double-stamp or double-DM.
+    On the (rare) happy path where the notifier already signaled, the claim
+    returns ``applied=False`` and this is a clean no-op. Fail-safe: any error is
+    logged and swallowed; the merge itself already landed on disk.
+
+    Scoped to launch sequences (a non-launch sequence has no phase/closeout, and
+    its completion DM stays the notifier's job). Mirrors the notifier's
+    ``_maybe_signal_sequence_complete`` minus the post_merge executor + chain
+    event (a launch sequence carries no ``post_merge`` block; the board-truth
+    done-stamp + closeout + the doorbell DM are the load-bearing surface)."""
+    if not isinstance(seq_id, str) or not seq_id.startswith('launch-'):
+        return
+    try:
+        import sequence_shortcut_helpers as ssh  # noqa: E402
+        seq, err = ssh._read_sequence(seq_id)
+        if err is not None or not isinstance(seq, dict):
+            return
+        if seq.get('status') != 'complete' or ssh.is_completion_signaled(seq):
+            return
+        result = ssh.claim_completion_signal(
+            seq_id, actor='advancer-already-merged-reconcile')
+        if not getattr(result, 'applied', False):
+            # Lost the race to the notifier, or already signaled — exactly-once
+            # guard held; nothing more to do.
+            return
+        # We won the claim. Stamp the phase done (board truth) + author its
+        # closeout, both NON-committer writes (heal_projects_store commits), then
+        # ring Larry's doorbell. Each leg is independently guarded so a failure in
+        # one never blocks the others or wedges the tick.
+        try:
+            if psw.stamp_done(seq=seq):
+                logger.info(
+                    f'pre-dispatch reconcile: stamped phase done for {seq_id}')
+        except Exception as e:  # noqa: BLE001 — psw is already fail-safe
+            logger.warning(
+                f'pre-dispatch reconcile: done-stamp for {seq_id} raised '
+                f'{type(e).__name__}: {e}; swallowing')
+        closeout_outputs: Optional[dict[str, Any]] = None
+        try:
+            import projects_closeout_author as closeout  # noqa: E402
+            closeout_outputs = closeout.run_closeout_for_sequence(seq)
+        except Exception as e:  # noqa: BLE001 — closeout is non-load-bearing
+            logger.warning(
+                f'pre-dispatch reconcile: closeout for {seq_id} raised '
+                f'{type(e).__name__}: {e}; swallowing')
+        phase_title = (
+            (closeout_outputs or {}).get('phase_title')
+            or seq.get('label') or seq_id
+        )
+        summary = (closeout_outputs or {}).get('summary') or ''
+        pr_urls = sorted({
+            s.get('pr_url') for s in (seq.get('steps') or [])
+            if isinstance(s, dict) and s.get('pr_url')
+        })
+        pr_line = f'\n\nDelivered by: {", ".join(pr_urls)}' if pr_urls else ''
+        summary_line = f'\n\n{summary}' if summary else ''
+        _dm_larry(
+            message=(
+                f'Phase **{phase_title}** (`{seq_id}`) reconciled to *done* — its '
+                f'deliverables had ALREADY merged elsewhere, so the advancer '
+                f'skipped a redundant Forge build and stamped the phase done + '
+                f'authored its closeout.{pr_line}{summary_line}'
+            ),
+            subject=f'sequence-complete:{seq_id}',
+            severity='warning',
+        )
+        logger.info(
+            f'pre-dispatch reconcile: completion signaled for {seq_id} '
+            f'(done + closeout + DM; advancer won the claim)'
+        )
+    except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+        logger.error(
+            f'pre-dispatch reconcile: completion signal for {seq_id} raised '
+            f'{type(e).__name__}: {e}; swallowing'
+        )
+
+
 # -------------------- tick --------------------
 
 
@@ -1643,6 +1942,16 @@ def tick(now: Optional[datetime] = None) -> int:
                 reconciled_here = _reconcile_dispatched_steps(
                     seq, logger, repo_cache,
                 )
+                # #609 follow-up: also catch a still-PENDING launch phase whose
+                # deliverables already merged elsewhere, BEFORE the forward-
+                # dispatch leg below fires a redundant Forge build. Reuses the
+                # same idempotent apply_step_merged rollup; shares the per-tick
+                # gh cache so it issues no extra `gh pr list` for a repo already
+                # queried above.
+                reconciled_predispatch = _reconcile_already_merged_launch_phase(
+                    seq, logger, now, repo_cache,
+                )
+                reconciled_here += reconciled_predispatch
                 reconciled_total += reconciled_here
                 # apply_step_merged wrote to disk; re-read so the in-memory
                 # copy matches before we hand it to _process_active_sequence.
@@ -1651,6 +1960,17 @@ def tick(now: Optional[datetime] = None) -> int:
                     if refreshed is not None:
                         seq = refreshed
                         status = seq.get('status')
+                    # ONLY the pre-dispatch already-merged path owns the launch
+                    # phase's done + closeout signal. A launch sequence is
+                    # single-step, so it finalizes to `complete` on the same tick
+                    # its step is reconciled. Completion of a launch sequence by
+                    # the DISPATCHED-step reconcile (a build that actually RAN,
+                    # then bridged via #610) stays the notifier's job, as before —
+                    # claiming its signal here would wrongly DM Larry that a
+                    # "redundant build was skipped" and steal the notifier's richer
+                    # completion DM.
+                    if reconciled_predispatch > 0 and status == 'complete':
+                        _signal_launch_phase_done(seq.get('seq_id'), logger)
             except Exception as e:
                 logger.error(
                     f'reconcile: unexpected error for {path.name}: '

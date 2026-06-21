@@ -1697,6 +1697,248 @@ class _RecordingLogger:
         pass
 
 
+def _make_launch_sequence(phase_id, project_id='proj-x', status='active'):
+    """A board-Launch build sequence: seq_id `launch-<phase_id>`, a single step
+    whose step_id IS the phase_id, plus the `authored-by-launch-drain` audit entry
+    the drain writes (carries phase_id + project_id, so the done-stamp/closeout can
+    resolve the phase)."""
+    seq_id = f'launch-{phase_id}'
+    seq = _make_sequence(
+        seq_id=seq_id,
+        status=status,
+        steps=[_make_step(phase_id, status='pending')],
+        current_steps=[],
+        audit_log=[{
+            'ts': '2026-06-20T00:00:00+00:00',
+            'event': 'authored-by-launch-drain',
+            'actor': 'launch_queue_drain',
+            'phase_id': phase_id,
+            'project_id': project_id,
+        }],
+    )
+    seq['created_by'] = 'launch_queue_drain'
+    return seq
+
+
+class TestPreDispatchAlreadyMergedLaunch(_AdvancerHarness):
+    """#609 follow-up: the advancer catches a still-PENDING launch phase whose
+    deliverables ALREADY merged elsewhere and reconciles it to done INSTEAD of
+    dispatching a redundant Forge build (the 2026-06-20 cross-identity incident
+    that stranded 4h / ~$1.5). Conservative — only an exact convention-branch
+    match (own `forge/<phase|seq>` or a #609-claimed sibling's branch) against a
+    gh-MERGED PR advances a phase; everything else dispatches normally."""
+
+    def _patch_gh_pr_list(self, prs_by_repo):
+        def _fake_list(repo, logger=None):
+            return prs_by_repo.get(repo)
+        self.bsa._gh_list_merged_prs = _fake_list
+
+    def _write_claim(self, claimed_task_id, envelope_task_id):
+        """Append one #609 deliverable claim (recent ts) to the tmp blackboard
+        ledger the advancer derives from BLACKBOARD_DIR."""
+        ledger = self.agents_root / 'blackboard' / 'deliverable-claims.jsonl'
+        rec = {
+            'ts': datetime.now(timezone.utc).isoformat(),
+            'claimed_task_id': claimed_task_id,
+            'envelope_task_id': envelope_task_id,
+            'agent': 'forge',
+        }
+        with ledger.open('a', encoding='utf-8') as fh:
+            fh.write(json.dumps(rec) + '\n')
+
+    def _completion_dms(self, seq_id):
+        return [d for d in self.dms
+                if d['subject'] == f'sequence-complete:{seq_id}']
+
+    @staticmethod
+    def _recent_merged_at():
+        # tick() runs at real wall-clock now; the pre-dispatch match only counts
+        # a PR merged within PREDISPATCH_MERGE_LOOKBACK_SEC (7d), so the matching
+        # PRs must be recent RELATIVE TO NOW (a fixed past date would make these
+        # tests rot once it falls outside the window).
+        return (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+
+    def test_own_branch_match_skips_build_and_completes(self):
+        seq = _make_launch_sequence('slice-1-state-log')
+        self._write_sequence(seq)
+        self._patch_gates(chain_merged=False, gh_merged=False)
+        self._patch_gh_pr_list({'ourliberty-agent-core': [{
+            'number': 602,
+            'url': 'https://github.com/x/y/pull/602',
+            'title': 'unrelated framing',
+            'headRefName': 'forge/slice-1-state-log',
+            'mergedAt': self._recent_merged_at(),
+        }]})
+        self.bsa.tick()
+        seq2 = self._read_sequence('launch-slice-1-state-log')
+        step = seq2['steps'][0]
+        self.assertEqual(step['status'], 'merged')
+        self.assertEqual(step['pr_url'], 'https://github.com/x/y/pull/602')
+        self.assertEqual(seq2['status'], 'complete')
+        # No redundant build dispatched.
+        self.assertEqual(self.dispatched_envelopes, [])
+        # Completion signaled exactly once (done + closeout + DM), and the
+        # single-winner marker is on the sequence so a re-tick can't double-fire.
+        self.assertEqual(len(self._completion_dms('launch-slice-1-state-log')), 1)
+        events = [e.get('event') for e in seq2['audit_log']]
+        self.assertIn('sequence-complete-signaled', events)
+        self.assertIn(('step-merged', 'advancer-already-merged-predispatch'),
+                      [(e.get('event'), e.get('actor')) for e in seq2['audit_log']])
+
+    def test_seq_branch_match(self):
+        seq = _make_launch_sequence('phase-a')
+        self._write_sequence(seq)
+        self._patch_gates(chain_merged=False, gh_merged=False)
+        # PR merged under the SEQUENCE branch convention (forge/<seq_id>).
+        self._patch_gh_pr_list({'ourliberty-agent-core': [{
+            'number': 7,
+            'url': 'https://github.com/x/y/pull/7',
+            'title': 'x',
+            'headRefName': 'forge/launch-phase-a',
+            'mergedAt': self._recent_merged_at(),
+        }]})
+        self.bsa.tick()
+        seq2 = self._read_sequence('launch-phase-a')
+        self.assertEqual(seq2['steps'][0]['status'], 'merged')
+        self.assertEqual(seq2['status'], 'complete')
+        self.assertEqual(self.dispatched_envelopes, [])
+
+    def test_claim_corroboration_cross_identity(self):
+        # The 2026-06-20 shape: a sibling built under its OWN envelope task_id
+        # (`...the-standing-brain`) but its marker CLAIMED this phase's id; the
+        # sibling's PR merged under `forge/<sibling-envelope>`. Branch-tier misses
+        # (no forge/<phase|seq>), but claim + sibling-branch corroboration hits.
+        seq = _make_launch_sequence('slice-1-state-log')
+        self._write_sequence(seq)
+        self._write_claim(
+            claimed_task_id='slice-1-state-log',
+            envelope_task_id='the-standing-brain',
+        )
+        self._patch_gates(chain_merged=False, gh_merged=False)
+        self._patch_gh_pr_list({'ourliberty-agent-core': [{
+            'number': 602,
+            'url': 'https://github.com/x/y/pull/602',
+            'title': 'feat(self-awareness): the standing brain',
+            'headRefName': 'forge/the-standing-brain',
+            'mergedAt': self._recent_merged_at(),
+        }]})
+        self.bsa.tick()
+        seq2 = self._read_sequence('launch-slice-1-state-log')
+        self.assertEqual(seq2['steps'][0]['status'], 'merged')
+        self.assertEqual(seq2['steps'][0]['pr_url'],
+                         'https://github.com/x/y/pull/602')
+        self.assertEqual(seq2['status'], 'complete')
+        self.assertEqual(self.dispatched_envelopes, [])
+
+    def test_no_match_dispatches_normally(self):
+        # No convention-branch match and no claim → the launch must build as
+        # usual (the guard never blocks a legitimate launch).
+        seq = _make_launch_sequence('phase-b')
+        self._write_sequence(seq)
+        self._patch_gates(chain_merged=False, gh_merged=False)
+        self._patch_gh_pr_list({'ourliberty-agent-core': [{
+            'number': 9,
+            'url': 'https://github.com/x/y/pull/9',
+            'title': 'totally unrelated work',
+            'headRefName': 'forge/something-else',
+            'mergedAt': '2026-06-20T01:00:00Z',
+        }]})
+        self.bsa.tick()
+        seq2 = self._read_sequence('launch-phase-b')
+        self.assertEqual(seq2['steps'][0]['status'], 'dispatched')
+        self.assertEqual(len(self.dispatched_envelopes), 1)
+        self.assertEqual(self._completion_dms('launch-phase-b'), [])
+
+    def test_title_only_does_not_match(self):
+        # A merged PR whose TITLE contains the phase id but whose BRANCH does not
+        # carry the convention must NOT mark the phase done (no title-substring
+        # guesses — the conservative contract). It dispatches normally.
+        seq = _make_launch_sequence('api')
+        self._write_sequence(seq)
+        self._patch_gates(chain_merged=False, gh_merged=False)
+        self._patch_gh_pr_list({'ourliberty-agent-core': [{
+            'number': 11,
+            'url': 'https://github.com/x/y/pull/11',
+            'title': 'feat(api): unrelated change mentioning api',
+            'headRefName': 'forge/unrelated',
+            'mergedAt': '2026-06-20T01:00:00Z',
+        }]})
+        self.bsa.tick()
+        seq2 = self._read_sequence('launch-api')
+        self.assertEqual(seq2['steps'][0]['status'], 'dispatched')
+        self.assertEqual(len(self.dispatched_envelopes), 1)
+
+    def test_gh_failure_dispatches(self):
+        # gh unavailable (None) → cannot confirm an already-merged delivery, so
+        # fail-open: dispatch normally rather than block.
+        seq = _make_launch_sequence('phase-c')
+        self._write_sequence(seq)
+        self._patch_gates(chain_merged=False, gh_merged=False)
+        self._patch_gh_pr_list({})  # repo missing → None
+        self.bsa.tick()
+        seq2 = self._read_sequence('launch-phase-c')
+        self.assertEqual(seq2['steps'][0]['status'], 'dispatched')
+        self.assertEqual(len(self.dispatched_envelopes), 1)
+
+    def test_stale_branch_match_is_not_recent_so_dispatches(self):
+        # A merged PR on the phase's own convention branch but merged LONG ago
+        # (outside PREDISPATCH_MERGE_LOOKBACK_SEC) is NOT evidence the fresh
+        # re-launch is redundant — it must build, not be falsely marked done.
+        seq = _make_launch_sequence('state-log')
+        self._write_sequence(seq)
+        self._patch_gates(chain_merged=False, gh_merged=False)
+        stale = (datetime.now(timezone.utc) - timedelta(days=60)).isoformat()
+        self._patch_gh_pr_list({'ourliberty-agent-core': [{
+            'number': 1,
+            'url': 'https://github.com/x/y/pull/1',
+            'title': 'old build of an earlier run',
+            'headRefName': 'forge/state-log',
+            'mergedAt': stale,
+        }]})
+        self.bsa.tick()
+        seq2 = self._read_sequence('launch-state-log')
+        self.assertEqual(seq2['steps'][0]['status'], 'dispatched')
+        self.assertEqual(len(self.dispatched_envelopes), 1)
+        self.assertEqual(self._completion_dms('launch-state-log'), [])
+
+    def test_non_launch_sequence_untouched(self):
+        # An ordinary (non-launch) sequence with a pending step is NEVER touched
+        # by the pre-dispatch launch reconcile, even if a branch happens to match.
+        seq = _make_sequence(
+            seq_id='seq-ordinary',
+            steps=[_make_step('phase-a', status='pending')],
+        )
+        self._write_sequence(seq)
+        self._patch_gates(chain_merged=False, gh_merged=False)
+        self._patch_gh_pr_list({'ourliberty-agent-core': [{
+            'number': 5,
+            'url': 'https://github.com/x/y/pull/5',
+            'title': 'x',
+            'headRefName': 'forge/phase-a',
+            'mergedAt': '2026-06-20T01:00:00Z',
+        }]})
+        self.bsa.tick()
+        seq2 = self._read_sequence('seq-ordinary')
+        # Dispatched normally; not marked merged by the launch-only pass.
+        self.assertEqual(seq2['steps'][0]['status'], 'dispatched')
+        self.assertEqual(len(self.dispatched_envelopes), 1)
+
+    def test_idempotent_no_double_signal(self):
+        seq = _make_launch_sequence('phase-d')
+        self._write_sequence(seq)
+        self._patch_gates(chain_merged=False, gh_merged=False)
+        self._patch_gh_pr_list({'ourliberty-agent-core': [{
+            'number': 12,
+            'url': 'https://github.com/x/y/pull/12',
+            'title': 'x',
+            'headRefName': 'forge/phase-d',
+            'mergedAt': self._recent_merged_at(),
+        }]})
+        self.bsa.tick()
+        self.bsa.tick()  # re-tick: completed sequence is skipped; no double DM
+        self.assertEqual(len(self._completion_dms('launch-phase-d')), 1)
+
+
 try:
     from . import _chokepoint_optout
 except ImportError:
