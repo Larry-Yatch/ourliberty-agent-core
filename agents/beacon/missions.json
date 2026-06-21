@@ -4312,6 +4312,19 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "system-self-awareness-slice-1b-where-are-we",
+      "name": "System self-awareness - Slice 1b (Where are we)",
+      "phase": "drafting",
+      "brief": "Read-only dashboard view of the live State Log (GET /api/system/state-log) \u2014 the glance surface for Slice 1. Build STRICTLY from the spec doc.",
+      "spec_docs": [
+        "agents/beacon/specs/system-awareness-slice-1b-dashboard-where-are-we.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-dashboard",
+      "created": "2026-06-21",
+      "deferred_reason": null
     }
   ]
 }
