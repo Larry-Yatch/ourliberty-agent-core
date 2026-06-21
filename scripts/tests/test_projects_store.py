@@ -191,6 +191,93 @@ class BuildPipelineTest(unittest.TestCase):
         self.assertEqual(card['spec_ref'], 'specs/p3.md')
         self.assertEqual(card['sequence_ref'], 'seq-42')
 
+    def test_brainstorm_prefill_projects_to_flat_card_shape(self):
+        # The author STORES a nested brainstorm dict (8-section draft dict +
+        # fork strings + handoff); the card consumes a FLAT shape. build_pipeline
+        # must project the stored fields into draft (headed string) + decisions
+        # (objects) + spec_target_path so step1 (#611) and step2 (#72) meet.
+        projects = self._norm([{
+            'id': 'proj-bs', 'state': 'active',
+            'phases': [{
+                'id': 'ph-bs', 'title': 'Where are we', 'lifecycle_state': 'brainstorm',
+                'brainstorm': {
+                    'is_ai_draft': True,
+                    'draft': {
+                        'end_state': 'When done, the board shows where we are.',
+                        'why_now': 'The blank page is the last friction.',
+                        'scope': '',  # empty section is skipped
+                        'breakdown': 'One step: wire the card.',
+                    },
+                    'decisions': ['Scope: cut anything?', 'Risk: how much polish?'],
+                    'decisions_overflow': True,
+                    'handoff': {
+                        'spec_target_path': 'agents/beacon/specs/ph-bs.md',
+                        'target_repo': 'ourliberty-agent-core',
+                        'directive': 'Author the spec.',
+                    },
+                },
+            }],
+        }])
+        card = ps.build_pipeline(projects, NOW)[0]['phases'][0]
+        # draft: flattened to one headed string, in canonical order, empties skipped
+        self.assertIsInstance(card['draft'], str)
+        self.assertIn('Desired end state\nWhen done, the board shows where we are.',
+                      card['draft'])
+        self.assertIn('Breakdown\nOne step: wire the card.', card['draft'])
+        self.assertNotIn('Scope & non-goals', card['draft'])  # empty section dropped
+        self.assertLess(card['draft'].index('Desired end state'),
+                        card['draft'].index('Why now'))  # canonical order
+        # decisions: fork strings → {id,title,decision} objects + overflow note
+        titles = [d['title'] for d in card['decisions']]
+        self.assertIn('Scope: cut anything?', titles)
+        self.assertTrue(all(d['decision'] == '' and d['id'] for d in card['decisions']))
+        self.assertTrue(any('surface' in d['title'] for d in card['decisions']),
+                        'decisions_overflow must add a trailing note item')
+        # spec_target_path lifted to the top level the card reads
+        self.assertEqual(card['spec_target_path'], 'agents/beacon/specs/ph-bs.md')
+        # the nested brainstorm dict is NOT what the card reads — flat is the contract
+        self.assertNotIn('brainstorm', card)
+
+    def test_brainstorm_absent_or_thin_no_prefill_keys(self):
+        # Graceful no-prefill: a phase with no brainstorm (or an all-empty draft)
+        # carries none of the prefill keys, so the card simply no-prefills.
+        projects = self._norm([{
+            'id': 'proj-none', 'state': 'active',
+            'phases': [
+                {'id': 'ph-plain', 'lifecycle_state': 'brainstorm'},
+                {'id': 'ph-thin', 'lifecycle_state': 'brainstorm',
+                 'brainstorm': {'draft': {'end_state': '   '}, 'decisions': []}},
+            ],
+        }])
+        cards = {c['id']: c for c in ps.build_pipeline(projects, NOW)[0]['phases']}
+        for cid in ('ph-plain', 'ph-thin'):
+            self.assertNotIn('draft', cards[cid])
+            self.assertNotIn('decisions', cards[cid])
+            self.assertNotIn('spec_target_path', cards[cid])
+
+    def test_brainstorm_draft_sections_match_author_key_set(self):
+        # Drift guard: the card-view section list is duplicated from the author's
+        # BRAINSTORM_SECTION_KEYS (kept local so the read surface doesn't import
+        # the author's heavy narrator chain). If the author adds/renames a
+        # section and this list isn't updated, that section's prose would silently
+        # never reach the card. Pin the two key SETS in lockstep here.
+        import projects_brainstorm_author as author
+        self.assertEqual(
+            tuple(k for k, _ in ps._BRAINSTORM_DRAFT_SECTIONS),
+            author.BRAINSTORM_SECTION_KEYS,
+        )
+
+    def test_brainstorm_draft_already_string_passes_through(self):
+        # Defensive: a draft stored as a plain string (not the 8-section dict) is
+        # surfaced trimmed rather than dropped.
+        projects = self._norm([{
+            'id': 'proj-s', 'state': 'active',
+            'phases': [{'id': 'ph-s', 'lifecycle_state': 'brainstorm',
+                        'brainstorm': {'draft': '  a plain draft  '}}],
+        }])
+        card = ps.build_pipeline(projects, NOW)[0]['phases'][0]
+        self.assertEqual(card['draft'], 'a plain draft')
+
     def test_coarse_status_rollup(self):
         # all done → done
         done = self._norm([{'id': 'p', 'phases': [
