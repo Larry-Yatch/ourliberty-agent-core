@@ -598,6 +598,37 @@ def attach_phase_closeout(
     return True
 
 
+def attach_phase_brainstorm(
+    phase: dict[str, Any], brainstorm_fields: dict[str, Any],
+    *, now: Optional[datetime] = None,
+) -> bool:
+    """Merge an authored brainstorm (the ``brainstorm`` schema dict + its
+    ``brainstorm_provenance``) onto ``phase``. Returns True iff the phase dict was
+    mutated. Pure — the decision (what an attach means, idempotency) lives here;
+    the IO/commit is the healer's job (single-committer invariant), exactly as
+    ``attach_phase_closeout`` for the P4 closeout.
+
+    Idempotent: re-attaching an identical brainstorm is a no-op (returns False, NO
+    mutation) so the periodic author sweep never produces a spurious store delta
+    for the healer to commit. Fail-safe on junk: a non-dict phase or a payload
+    without a ``brainstorm`` body is a no-op."""
+    if not isinstance(phase, dict) or not isinstance(brainstorm_fields, dict):
+        return False
+    brainstorm = brainstorm_fields.get('brainstorm')
+    if not isinstance(brainstorm, dict):
+        return False
+    provenance = brainstorm_fields.get('brainstorm_provenance')
+    if phase.get('brainstorm') == brainstorm and (
+        provenance is None or phase.get('brainstorm_provenance') == provenance
+    ):
+        return False
+    phase['brainstorm'] = brainstorm
+    if provenance is not None:
+        phase['brainstorm_provenance'] = provenance
+    phase['updated_at'] = _iso_now(now)
+    return True
+
+
 # --------------------------------------------------------------------------- #
 # the "Actively working" derive (the read surface)
 # --------------------------------------------------------------------------- #
@@ -618,6 +649,9 @@ def _phase_card(phase: dict[str, Any]) -> dict[str, Any]:
     closeout = phase.get('closeout')
     if isinstance(closeout, dict):
         card['closeout'] = closeout
+    brainstorm = phase.get('brainstorm')
+    if isinstance(brainstorm, dict):
+        card['brainstorm'] = brainstorm
     return card
 
 

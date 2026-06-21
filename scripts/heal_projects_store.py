@@ -52,6 +52,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 import projects_store  # noqa: E402 — shared schema/normalization (single source)
+import projects_brainstorm_author  # noqa: E402 — P6 brainstorm-autofill in-registry sweep
 
 _MODELS_CONFIG_PATH = _SCRIPTS_DIR.parent / 'config' / 'agent-models.json'
 PROJECTS_REL = 'agents/beacon/projects.json'
@@ -333,6 +334,25 @@ def run_once(*, dry_run: bool, now: Optional[datetime] = None) -> int:
     except Exception as e:  # noqa: BLE001 — fail-safe: never block the committer
         log(f'mirror-missions raised: {type(e).__name__}: {e} — mirroring nothing this tick')
 
+    # Author the P6 brainstorm autofill onto every phase that just entered the
+    # Brainstorm lifecycle state (projects-v3 P6: pre-filled 8-section draft +
+    # capped "Your decisions" + handoff payload). Mutates `raw` in place — the
+    # SAME in-registry mutation pattern missions_narrator.author_captures_in_
+    # registry uses, so this healer stays the SOLE committer of projects.json (no
+    # second writer). Fail-safe: an authoring fault drafts nothing and never blocks
+    # the normalize+commit below. Gated on `not dry_run`: a dry tick is read-only
+    # (it must not spawn claude OR mutate `raw`, so its git/normalization-delta
+    # report stays faithful) — the next live tick authors the pending phases.
+    authored = 0
+    if not dry_run:
+        try:
+            authored, _deferred = projects_brainstorm_author.author_brainstorms_in_registry(
+                raw, now=now, use_llm=True)
+            if authored:
+                log(f'authored {authored} brainstorm draft(s) for newly-Brainstorm phase(s)')
+        except Exception as e:  # noqa: BLE001 — fail-safe: never block the committer
+            log(f'brainstorm-autofill raised: {type(e).__name__}: {e} — drafting nothing this tick')
+
     try:
         normalized, dropped = projects_store.normalize_registry(raw, now=now)
     except Exception as e:  # noqa: BLE001 — fail-safe: report, never corrupt
@@ -345,8 +365,10 @@ def run_once(*, dry_run: bool, now: Optional[datetime] = None) -> int:
     # `bool(minted)` forces the write+commit: the freshly-minted projects come out
     # of new_single_phase_project already normalized, so `normalized != raw` is
     # False (raw was mutated in place) even though disk lacks them — without this
-    # the mirror delta would never reach disk.
-    changed = (normalized != raw) or bool(minted) or not path.exists()
+    # the mirror delta would never reach disk. `bool(authored)` does the same for
+    # the brainstorm sweep: it mutates `raw` before normalize, so the draft is in
+    # both `raw` and `normalized` and the `!=` check alone would miss the delta.
+    changed = (normalized != raw) or bool(minted) or bool(authored) or not path.exists()
     n_projects = len(normalized.get('projects', []))
     core = repo_paths.get('ourliberty-agent-core')
     # North Star docs the closeout may have ticked (non-committer wrote them to
