@@ -1,0 +1,42 @@
+[Unit]
+Description=Drain the Parked board into Beacon — auto-delegate the top-N Narrator-recommended low-risk agent-core cards so the build line stays fed (ships DISABLED; gated on OURLIBERTY_BOARD_DRAIN_ENABLED)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/drain_board_to_beacon.py
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/drain_board_to_beacon.py --once
+
+TimeoutStartSec=120
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-board-drain
+
+# Memory cap: reads captures.json + writes one inbox envelope; small.
+MemoryMax=256M
+MemoryHigh=128M
+
+# Hardening — matches readiness-trip-wire / heal-claude-max-burn-rate pattern.
+# Writes: its state file + Beacon's inbox (under ~/agents) AND the spawned-ref
+# stamp on captures.json (under ~/agent-core). Read-only everywhere else.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /home/larry/agent-core /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

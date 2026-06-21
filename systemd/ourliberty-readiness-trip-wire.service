@@ -1,0 +1,41 @@
+[Unit]
+Description=Second-build-team readiness trip-wire — DM Larry only when forge backlog, concurrency saturation, and rate-limit pressure are jointly sustained for hours
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/readiness_trip_wire.py
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/readiness_trip_wire.py
+
+TimeoutStartSec=60
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-readiness-trip-wire
+
+# Memory cap: pure read of three small signal files + arithmetic; never needs more than 128M.
+MemoryMax=128M
+MemoryHigh=64M
+
+# Hardening — matches heal-claude-max-burn-rate / heal-pipeline-stall pattern.
+# Read-only everywhere except the watcher's own state file under ~/agents.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

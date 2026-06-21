@@ -1,0 +1,12 @@
+[Unit]
+Description=Run readiness_trip_wire every 15 minutes (second-build-team readiness signal)
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=15min
+RandomizedDelaySec=120
+Unit=ourliberty-readiness-trip-wire.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target
