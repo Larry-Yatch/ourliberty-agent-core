@@ -4325,6 +4325,19 @@
       "repo": "ourliberty-dashboard",
       "created": "2026-06-21",
       "deferred_reason": null
+    },
+    {
+      "id": "confirm-the-new-where-are-we-page-actually-renders-correctly-against-the-live-deployed-endpoint-which-the-build-left-unverified",
+      "name": "Confirm the new \"Where are we\" page actually renders correctly against the live deployed endpoint, which the build left unverified.",
+      "phase": "proposed",
+      "brief": "Loose end from the \"System self-awareness - Slice 1b (Where are we)\" closeout: Confirm the new \"Where are we\" page actually renders correctly against the live deployed endpoint, which the build left unverified.",
+      "spec_docs": [],
+      "task_ids": [],
+      "repo": "ourliberty-dashboard",
+      "created": "2026-06-21",
+      "deferred_reason": null,
+      "proposed_by": "closeout",
+      "proposed_at": "2026-06-21T21:45:07.803299+00:00"
     }
   ]
 }
