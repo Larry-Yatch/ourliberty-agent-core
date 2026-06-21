@@ -1689,6 +1689,26 @@ class ClassifyForgeMarkerTest(unittest.TestCase):
         self.assertIn('drifted-id', str(cm.exception))
         self.assertIn('real-mismatch', str(cm.exception))
 
+    def test_marker_task_id_mismatch_records_deliverable_claim(self):
+        # The cross-identity bridge (2026-06-20 redundant-build incident): on a
+        # marker-task_id mismatch, record the CLAIMED id so a later board Launch
+        # of that id can de-duplicate against this in-flight work.
+        import launch_dedup_guard
+        result = (
+            '=== PROCEED ===\n'
+            '{"task_id": "drifted-id", "preflight_summary": "ok"}\n'
+            '=== END_PROCEED ==='
+        )
+        with mock.patch.object(launch_dedup_guard, 'record_claim') as rec:
+            with self.assertRaises(on.fph.MalformedForgeMarker):
+                on._classify_forge_marker({
+                    'agent': 'forge', 'result': result,
+                    'task_id': 'real-mismatch', 'target_repo': 'ourliberty-agent-core',
+                })
+        rec.assert_called_once()
+        self.assertEqual(rec.call_args.kwargs['claimed_task_id'], 'drifted-id')
+        self.assertEqual(rec.call_args.kwargs['envelope_task_id'], 'real-mismatch')
+
     def test_marker_task_id_match_succeeds(self):
         result = (
             '=== PROCEED ===\n'

@@ -63,6 +63,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import build_sequence_validator  # noqa: E402
 import larry_alerts  # noqa: E402
+import launch_dedup_guard  # noqa: E402 — pure-filesystem duplicate-work guard
 import routing_validator  # noqa: E402
 import safe_write_inbox  # noqa: E402
 
@@ -345,6 +346,7 @@ class DrainResult:
     already_launched: list[str] = field(default_factory=list)  # non-pending seq, queue cleared
     dead_lettered: list[str] = field(default_factory=list)   # malformed / invalid
     dispatch_failed: list[str] = field(default_factory=list)  # left for retry next tick
+    deduped: list[str] = field(default_factory=list)         # skipped — work already in flight
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -353,6 +355,7 @@ class DrainResult:
             'already_launched': list(self.already_launched),
             'dead_lettered': list(self.dead_lettered),
             'dispatch_failed': list(self.dispatch_failed),
+            'deduped': list(self.deduped),
         }
 
 
@@ -401,6 +404,88 @@ def _read_existing_status(seq_path: Path) -> Optional[str]:
     except (OSError, json.JSONDecodeError):
         return None
     return data.get('status') if isinstance(data, dict) else None
+
+
+# --------------------------------------------------------------------------- #
+# duplicate-work guard (launch_dedup_guard — pure-filesystem, fail-open)
+# --------------------------------------------------------------------------- #
+# Where a launch held for duplicate-work review is parked. NOT `.failed/` — this
+# is a reversible hold, not a malformed request: a wrong de-dup is recovered by
+# moving the file back to the queue dir (the alert spells out the one command).
+_DEDUPED_DIRNAME = '.deduped'
+
+
+def _evaluate_dedup(
+    entry: dict[str, Any], sequences_dir: Path, now: datetime,
+) -> Optional[launch_dedup_guard.DedupVerdict]:
+    """Run the duplicate-work guard, FAIL-OPEN. Returns the verdict, or None on
+    any error — a guard failure must never block an otherwise-fine launch (the
+    drain then authors normally)."""
+    try:
+        return launch_dedup_guard.evaluate(
+            entry, sequences_dir=sequences_dir, now=now)
+    except Exception as e:  # noqa: BLE001 — fail open; the guard is advisory
+        logger.warning('dedup guard raised for %s (%s); proceeding with launch',
+                       entry.get('phase_id'), e)
+        return None
+
+
+def _alert_duplicate_launch(
+    phase_id: str, verdict: launch_dedup_guard.DedupVerdict, held_path: Optional[Path],
+) -> None:
+    """Surface a duplicate-work detection to Larry (best-effort). The message is
+    keyed on the VERDICT (not on whether the hold happened), so a held launch
+    names the one-command undo, a hold-that-could-not-be-parked says so honestly
+    (rather than the advisory's misleading "proceeding"), and an advisory says
+    the build is proceeding. Never raises — alerting is best-effort."""
+    if verdict.action == 'skip_duplicate':
+        if held_path is not None:
+            action_line = (
+                f'No build was authored; the launch is parked. If this is a '
+                f'legitimately distinct build, re-queue it: `mv {held_path} '
+                f'{held_path.parent.parent / held_path.name}`.'
+            )
+        else:
+            action_line = (
+                'No build was authored, but the launch request could NOT be '
+                'parked (filesystem error) — it will be re-evaluated next tick.'
+            )
+    else:
+        action_line = (
+            'Proceeding with the build anyway (advisory only). Cancel the '
+            'sequence if it turns out to be redundant.'
+        )
+    severity = 'warning'
+    try:
+        larry_alerts.append_alert(
+            source=_ALERT_SOURCE,
+            severity=severity,
+            message=(
+                f'Launch of phase {phase_id!r}: {verdict.reason} {action_line}'
+            ),
+            subject=phase_id,
+            route='escalate',
+        )
+    except Exception as e:  # noqa: BLE001 — alerting is best-effort
+        logger.warning('could not emit duplicate-launch alert for %s: %s',
+                       phase_id, e)
+
+
+def _dedup_hold(path: Path, reason: str) -> Optional[Path]:
+    """Park a de-duplicated launch request in `<queue_dir>/.deduped/` so it stops
+    re-firing every tick but stays recoverable (vs `.failed/` which connotes a
+    malformed request). Returns the new path, or None if the move failed (the
+    caller then leaves the file in place — better a re-alert than a lost launch)."""
+    logger.info('launch-queue %s held for duplicate work: %s', path.name, reason)
+    held_dir = path.parent / _DEDUPED_DIRNAME
+    try:
+        held_dir.mkdir(parents=True, exist_ok=True)
+        dest = held_dir / path.name
+        os.replace(path, dest)
+        return dest
+    except OSError as e:
+        logger.warning('could not hold de-duplicated launch %s: %s', path.name, e)
+        return None
 
 
 def _drain_one(path: Path, sequences_dir: Path, now: datetime, result: DrainResult) -> None:
@@ -465,6 +550,26 @@ def _drain_one(path: Path, sequences_dir: Path, now: datetime, result: DrainResu
         )
         result.dead_lettered.append(path.name)
         return
+
+    # --- duplicate-work guard: do not author a launch whose deliverables are
+    # already in flight elsewhere (the 2026-06-20 cross-identity redundant-build
+    # incident). A matching deliverable claim → reversibly hold + alert; an
+    # in-flight spec overlap → advisory alert + proceed. Fail-open: a guard
+    # error or a clean verdict authors normally.
+    verdict = _evaluate_dedup(entry, sequences_dir, now)
+    if verdict is not None and verdict.has_signal:
+        if verdict.action == 'skip_duplicate':
+            held = _dedup_hold(path, verdict.reason)
+            _alert_duplicate_launch(phase_id, verdict, held)
+            # Only count it deduped when the file was actually parked. If the
+            # hold MOVE failed, the queue file is still in place: leave it for
+            # next-tick re-evaluation (don't author a duplicate, don't over-
+            # count) — the alert above said so honestly.
+            if held is not None:
+                result.deduped.append(phase_id)
+            return
+        # 'proceed' with a signal (in-flight spec overlap) → advisory only.
+        _alert_duplicate_launch(phase_id, verdict, None)
 
     # --- new launch: author → validate → write → dispatch Mirror ---
     try:
@@ -533,15 +638,15 @@ def drain_once(
 def _emit_summary(result: DrainResult) -> None:
     total = (len(result.launched) + len(result.redispatched)
              + len(result.already_launched) + len(result.dead_lettered)
-             + len(result.dispatch_failed))
+             + len(result.dispatch_failed) + len(result.deduped))
     if total == 0:
         logger.info('launch-queue-drain: nothing queued')
         return
     logger.info(
         'launch-queue-drain: launched %s; re-dispatched %s; already-launched '
-        '%s; dead-lettered %s; dispatch-failed %s',
+        '%s; dead-lettered %s; dispatch-failed %s; de-duped %s',
         result.launched, result.redispatched, result.already_launched,
-        result.dead_lettered, result.dispatch_failed,
+        result.dead_lettered, result.dispatch_failed, result.deduped,
     )
 
 
