@@ -268,40 +268,59 @@ class LoadPolicyTest(unittest.TestCase):
 
 class ShippedDefaultPolicyTest(unittest.TestCase):
     """The default config/trust-policy.json that ships in the repo must parse
-    cleanly and produce force_ask for every shape we care about."""
+    cleanly and encode the intended autonomy gate (2026-06-21 ladder rung 1):
+    Beacon->Forge agent-core auto_approve, with sensitive paths + every other
+    shape held at force_ask."""
 
-    def test_repo_default_policy_loads_and_is_strict(self):
+    def test_repo_default_policy_loads_and_encodes_gate(self):
         # Path: <repo>/config/trust-policy.json
         repo_default = _REPO_SCRIPTS.parent / 'config' / 'trust-policy.json'
         self.assertTrue(repo_default.exists(), f'missing default policy at {repo_default}')
         policy = tp.load_policy(repo_default)
         self.assertEqual(policy['default_action'], 'force_ask')
-        # Shipped policy carries exactly one documentary rule: the
-        # closed-loop step-4 pulse-auto-dispatch force_ask carve-out.
-        # It is intentionally redundant with default_action so the
-        # operator sees the source has been considered.
-        self.assertEqual(len(policy['rules']), 1)
+
+        # Three rules, first-match-wins order:
+        #   0: pulse-auto-dispatch                       -> force_ask
+        #   1: beacon->forge agent-core sensitive paths  -> force_ask (carve-out)
+        #   2: beacon->forge agent-core                  -> auto_approve (gate)
+        # The carve-out MUST stay ordered before the broad auto_approve.
+        self.assertEqual(len(policy['rules']), 3)
         self.assertEqual(policy['rules'][0]['source'], 'pulse-auto-dispatch')
         self.assertEqual(policy['rules'][0]['action'], 'force_ask')
+        self.assertEqual(policy['rules'][1]['action'], 'force_ask')
+        self.assertEqual(policy['rules'][2]['source'], 'beacon')
+        self.assertEqual(policy['rules'][2]['action'], 'auto_approve')
 
-        # The documentary rule resolves to force_ask via the evaluator.
-        action, _ = tp.evaluate(
-            {'source': 'pulse-auto-dispatch', 'target_agent': 'beacon',
-             'task_type': 'doc-only', 'target_repo': 'ourliberty-agent-core'},
-            policy,
-        )
-        self.assertEqual(action, 'force_ask')
+        def ev(**task):
+            action, _ = tp.evaluate(task, policy)
+            return action
 
-        # Even for the dispatch shape we most want to auto-approve later, default policy says force_ask.
-        for source, target in [
-            ('pulse', 'beacon'), ('beacon', 'forge'), ('mirror', 'beacon'),
-        ]:
-            action, _ = tp.evaluate(
-                {'source': source, 'target_agent': target,
-                 'task_type': 'doc-only', 'target_repo': 'ourliberty-agent-core'},
-                policy,
-            )
-            self.assertEqual(action, 'force_ask')
+        # pulse-auto-dispatch still asks.
+        self.assertEqual(ev(source='pulse-auto-dispatch', target_agent='beacon',
+                            target_repo='ourliberty-agent-core'), 'force_ask')
+
+        # THE GATE: a fresh Beacon->Forge agent-core build auto-fires, including
+        # a code revision (changed_files that aren't sensitive).
+        self.assertEqual(ev(source='beacon', target_agent='forge',
+                            target_repo='ourliberty-agent-core'), 'auto_approve')
+        self.assertEqual(ev(source='beacon', target_agent='forge',
+                            target_repo='ourliberty-agent-core',
+                            changed_files=['scripts/inbox_watcher.py']), 'auto_approve')
+
+        # Sensitive-path revisions still ask (carve-out bites when files known).
+        for f in ('config/agent-models.json', 'systemd/x.service',
+                  'supabase/migrations/001.sql', 'deploy/x.sh', '.env.larry',
+                  'migrations/001.sql'):
+            self.assertEqual(ev(source='beacon', target_agent='forge',
+                                target_repo='ourliberty-agent-core',
+                                changed_files=[f]), 'force_ask', f)
+
+        # Other repos and non-(beacon->forge) shapes still ask.
+        self.assertEqual(ev(source='beacon', target_agent='forge',
+                            target_repo='ourliberty-dashboard'), 'force_ask')
+        for source, target in [('pulse', 'beacon'), ('mirror', 'beacon')]:
+            self.assertEqual(ev(source=source, target_agent=target,
+                                target_repo='ourliberty-agent-core'), 'force_ask')
 
 
 if __name__ == '__main__':

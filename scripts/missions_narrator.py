@@ -156,15 +156,25 @@ def classify_careful(capture: dict[str, Any]) -> bool:
 def map_risk(action: str, careful: bool) -> str:
     """Map a trust_policy action + careful-class flag to a risk level (§ 5).
 
-      auto_approve                         ⇒ safe
+      careful-class (irreversible/outward/spendy) ⇒ careful  (ALWAYS — even when
+          the repo's rule auto_approves: an auto-firing deploy/migrate/credential
+          card must still READ as careful so the board never under-warns)
+      auto_approve (reversible)            ⇒ safe
       force_ask (reversible)               ⇒ medium
-      force_ask (irreversible/outward/...) ⇒ careful
       reject (or anything unknown)         ⇒ careful  (fail toward caution)
     """
+    # The careful escalator wins over the trust action. Once an auto_approve rule
+    # exists (e.g. agent-core code), a careful card would otherwise mislabel as
+    # `safe` — map_risk used to read `auto_approve ⇒ safe` unconditionally, which
+    # was written when no auto_approve rules existed. Surfacing careful work as
+    # `careful` keeps the board honest, and is the same signal the board-drain
+    # uses (classify_careful) to keep such work OUT of the autonomous path.
+    if careful:
+        return 'careful'
     if action == 'auto_approve':
         return 'safe'
     if action == 'force_ask':
-        return 'careful' if careful else 'medium'
+        return 'medium'
     # reject — or any unexpected action — is the most-cautious bucket.
     return 'careful'
 

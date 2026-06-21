@@ -7,8 +7,9 @@ The § 11 1a proof obligations covered here:
   - the Narrator authors a deterministic briefing + risk for a seeded capture
     (use_llm=False → the raw briefing, no claude spawn);
   - risk maps correctly through trust_policy.evaluate (injected policies pin
-    auto_approve ⇒ safe, force_ask ⇒ medium, force_ask+careful / reject ⇒
-    careful);
+    auto_approve ⇒ safe, force_ask ⇒ medium, force_ask+careful / reject /
+    auto_approve+careful ⇒ careful — the careful escalator wins over the trust
+    action so an auto-firing deploy/credential card still reads as careful);
   - absence: a capture the Narrator hasn't touched carries no meaning-layer
     fields, and needs_briefing is idempotent so a re-sweep doesn't re-author;
   - the single-committer invariant: run() writes captures.json ATOMICALLY to a
@@ -68,7 +69,9 @@ def _capture(**over):
 class RiskMappingTest(unittest.TestCase):
     def test_map_risk_table(self):
         self.assertEqual(mn.map_risk('auto_approve', False), 'safe')
-        self.assertEqual(mn.map_risk('auto_approve', True), 'safe')
+        # careful escalator wins even under auto_approve — an auto-firing
+        # deploy/migrate/credential card must still read as careful (board honesty).
+        self.assertEqual(mn.map_risk('auto_approve', True), 'careful')
         self.assertEqual(mn.map_risk('force_ask', False), 'medium')
         self.assertEqual(mn.map_risk('force_ask', True), 'careful')
         self.assertEqual(mn.map_risk('reject', False), 'careful')
