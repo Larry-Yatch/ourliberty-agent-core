@@ -5528,6 +5528,60 @@ def _signal_sequence_step_merged(
     return None
 
 
+def _sequence_cancelled(task_id: Optional[str]) -> bool:
+    """True iff `task_id` belongs to a build sequence that has been ABORTED
+    (board-abort-dispatched-build): `apply_cancel` sets the sequence
+    `status: 'failed'` and appends an `audit_log` entry `event == 'cancelled'`.
+    Used to block auto-merge of any PR from an aborted build — the guarantee
+    that "once aborted, nothing from that build lands on main".
+
+    **FAIL-OPEN.** Any uncertainty — no task_id, no sequences dir, an
+    unreadable/malformed file, or no sequence claiming this step — returns
+    False, so this check NEVER blocks a legitimate merge; it only ever ADDS a
+    skip for a CONFIRMED cancellation. Mirrors `_signal_sequence_step_merged`'s
+    scan convention (match a step by `step_id == task_id`) rather than parsing
+    the task_id string, so it stays correct if the id format changes.
+    """
+    if not isinstance(task_id, str) or not task_id:
+        return False
+    try:
+        seq_dir = AGENTS_ROOT / 'blackboard' / 'build-sequences'
+        if not seq_dir.is_dir():
+            return False
+        for seq_path in sorted(seq_dir.glob('*.json')):
+            if seq_path.suffix != '.json':
+                continue
+            try:
+                seq = json.loads(seq_path.read_text())
+            except (OSError, json.JSONDecodeError):
+                continue  # unreadable sibling — fail-open, keep scanning
+            if not isinstance(seq, dict):
+                continue
+            steps = seq.get('steps') or []
+            if not any(
+                isinstance(s, dict) and s.get('step_id') == task_id
+                for s in steps
+            ):
+                continue
+            # Found the sequence that owns this step. It is "cancelled" only
+            # under apply_cancel's exact contract: status failed + the audit
+            # event (a `failed` from a build error is NOT a cancel).
+            if seq.get('status') != 'failed':
+                return False
+            audit = seq.get('audit_log') or []
+            return any(
+                isinstance(e, dict) and e.get('event') == 'cancelled'
+                for e in audit
+            )
+    except Exception as e:  # noqa: BLE001 — daemon-never-wedge: fail-open
+        log(
+            f'sequence-cancelled-check raised {type(e).__name__}: {e}; '
+            f'fail-open (allowing merge)',
+            'WARN',
+        )
+    return False
+
+
 # ============================================================================
 # projects-v3 P4 Contract A (p4-complete-signal) — one-time completion signal
 # ============================================================================
@@ -7062,6 +7116,29 @@ def _attempt_auto_merge_with_gates(
     WITHOUT resetting the stale-queue watchdog clock). The 2026-06-11 PR
     #455 incident is the motivating case.
     """
+    # board-abort-dispatched-build: HIGHEST-PRIORITY gate. If this build's
+    # sequence was aborted (apply_cancel set status:failed + audit cancelled),
+    # NEVER merge its PR — the guarantee that an aborted build lands nothing on
+    # main. Runs before the test-bypass and the fail-closed gate. Fail-open
+    # (see _sequence_cancelled): only a CONFIRMED cancellation skips here, so a
+    # transient read error can never block a legitimate merge. Backstops the
+    # _queue_release + sweep-retry callers that don't pass through
+    # _run_review_pass_auto_merge's own check.
+    if _sequence_cancelled(task_id):
+        log(
+            f'AUTO_MERGE task={task_id} pr={pr_url} outcome=skipped '
+            f'reason=sequence-cancelled (build aborted) agent=forge',
+            'WARN',
+        )
+        return {
+            'merge_outcome': 'skipped_sequence_cancelled',
+            'merge_reason': (
+                'build sequence was cancelled (aborted); auto-merge blocked'
+            ),
+            'pr_number': pr_number,
+            'repo_coords': repo_coords,
+        }
+
     # Test-bypass: existing D3.5 5d tests assert merge-outcome rendering
     # via _AUTO_MERGE_FN_OVERRIDE without mocking the gate's gh calls.
     # When the bypass is set, fire the merge directly (preserve old
@@ -9007,6 +9084,26 @@ def _run_review_pass_auto_merge(
             'merge_status_line': status_line,
         }
         return 'auto-merge-skipped'
+
+    # board-abort-dispatched-build: if this build was aborted, do not merge its
+    # PR. Checked here on the primary review-pass path for a clean notify (DM
+    # suppressed via _skip); the shared gate in _attempt_auto_merge_with_gates
+    # backstops the queue-release + sweep-retry paths. FAIL-OPEN
+    # (see _sequence_cancelled): only a confirmed cancellation skips.
+    if _sequence_cancelled(data.get('task_id')):
+        log(
+            f'AUTO_MERGE task={data.get("task_id", "?")} pr={pr_url!r} '
+            f'outcome=skipped reason=sequence-cancelled (build aborted) '
+            f'agent=forge',
+            'WARN',
+        )
+        return _skip(
+            'skipped_sequence_cancelled',
+            'build sequence was cancelled (aborted); auto-merge blocked',
+            'Auto-merge was SKIPPED — the build was cancelled; the PR is '
+            'NOT merged.',
+        )
+
     # nervous-system-audit #15 (2026-06-05): the marker's `pr_url` is
     # agent-authored and must agree with the PR the chain actually
     # dispatched Mirror to review — `data['pr_url']`, set on the
