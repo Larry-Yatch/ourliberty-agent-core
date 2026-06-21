@@ -1,0 +1,11 @@
+{
+  "_meta": {
+    "owner": "launch-dedup-gc (PR #609 follow-up — operational hygiene for the board-Launch duplicate-work guard)",
+    "tweak_via": "edit this file + commit; the GC job reads it on the next tick (no service reload needed)",
+    "rationale": "Retention/GC policy for launch_dedup_guard's byproducts. claim_window_hours mirrors the guard's own 24h read window — a .deduped/ hold is only re-surfaced once its justifying deliverable claim has aged out of what the drain would still act on. claims_retention_days (7d) sits well beyond that read window so rotation never drops a claim the guard would still read. claims_min_retained_lines is the floor kept regardless of age. All three are config-tunable (intended to become Pulse-Check self-optimizing); a missing/invalid field falls back to the conservative default for that field.",
+    "last_update": null
+  },
+  "claim_window_hours": 24,
+  "claims_retention_days": 7,
+  "claims_min_retained_lines": 500
+}

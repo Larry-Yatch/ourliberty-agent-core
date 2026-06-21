@@ -1,0 +1,18 @@
+[Unit]
+Description=Run launch_dedup_gc daily (PR #609 follow-up — reap .deduped/ holds + rotate the deliverable-claims ledger)
+
+[Timer]
+# Once a day — this is housekeeping, not a hot loop. 03:42 keeps it off the busy
+# top-of-hour, Pulse-cycle boundaries, and the other daily retention jobs
+# (chain-events 03:17, larry-alerts). Re-surfacing/rotation are idempotent, so an
+# empty tick is a cheap no-op.
+OnCalendar=*-*-* 03:42:00
+# Up to 5 min of jitter so it never lock-steps with other daily jobs.
+RandomizedDelaySec=5min
+AccuracySec=1min
+Persistent=true
+
+Unit=ourliberty-launch-dedup-gc.service
+
+[Install]
+WantedBy=timers.target
