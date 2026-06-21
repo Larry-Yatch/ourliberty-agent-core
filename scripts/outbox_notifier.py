@@ -1935,6 +1935,30 @@ def _build_preflight_marker_grammar(task_id: str) -> str:
     )
 
 
+def _record_deliverable_claim(
+    *, claimed_task_id: Any, envelope_task_id: Any,
+    agent: Optional[str] = None, target_repo: Any = None,
+) -> None:
+    """Best-effort bridge to the launch dedup guard: when a build session emits a
+    marker whose task_id differs from its envelope (the marker-task_id-mismatch
+    class), record the CLAIMED task_id so a later board Launch of that same id can
+    recognise the work is already in flight elsewhere — the 2026-06-20
+    cross-identity redundant-build incident. NEVER raises (a claim-record failure
+    must not perturb the marker-error cascade)."""
+    try:
+        import launch_dedup_guard  # local import: optional, pure-stdlib dep
+        launch_dedup_guard.record_claim(
+            claimed_task_id=claimed_task_id,
+            envelope_task_id=envelope_task_id,
+            agent=agent,
+            target_repo=target_repo if isinstance(target_repo, str) else None,
+            source='marker-task_id-mismatch',
+        )
+    except Exception as e:  # noqa: BLE001 — best-effort; never break the notifier
+        log(f'deliverable-claim record failed (non-fatal): '
+            f'{type(e).__name__}: {e}', 'WARN')
+
+
 def _classify_forge_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
     """Inspect a Forge outbox for a preflight marker. Returns routing decision or None.
 
@@ -2011,6 +2035,14 @@ def _classify_forge_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
         and marker_task_id is not None
         and marker_task_id != envelope_task_id
     ):
+        # Record the cross-identity claim BEFORE raising so a later board Launch
+        # of `marker_task_id` can de-duplicate against this in-flight work.
+        _record_deliverable_claim(
+            claimed_task_id=marker_task_id,
+            envelope_task_id=envelope_task_id,
+            agent=data.get('agent', 'forge'),
+            target_repo=data.get('target_repo'),
+        )
         raise fph.MalformedForgeMarker(
             f'marker task_id ({marker_task_id!r}) does not match envelope '
             f'task_id ({envelope_task_id!r})'
@@ -3137,6 +3169,15 @@ def _classify_mirror_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
         and marker_task_id is not None
         and marker_task_id != envelope_task_id
     ):
+        # Record the cross-identity claim BEFORE raising (same bridge as Forge):
+        # Mirror reviewed/approved a PR whose marker task_id drifted from the
+        # envelope, so a later Launch of that task_id can de-duplicate.
+        _record_deliverable_claim(
+            claimed_task_id=marker_task_id,
+            envelope_task_id=envelope_task_id,
+            agent=data.get('agent', 'mirror'),
+            target_repo=data.get('target_repo'),
+        )
         raise mrh.MalformedMirrorMarker(
             f'marker task_id ({marker_task_id!r}) does not match envelope '
             f'task_id ({envelope_task_id!r})'

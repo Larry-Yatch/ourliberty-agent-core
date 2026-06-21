@@ -43,6 +43,7 @@ if str(_REPO_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_REPO_SCRIPTS))
 
 import build_sequence_validator  # noqa: E402
+import launch_dedup_guard as ldg  # noqa: E402
 import launch_queue_drain as lqd  # noqa: E402
 
 
@@ -142,7 +143,7 @@ class HappyPathTest(_DrainTestBase):
         result = self._drain()
         self.assertEqual(result.to_dict(), {
             'launched': [], 'redispatched': [], 'already_launched': [],
-            'dead_lettered': [], 'dispatch_failed': [],
+            'dead_lettered': [], 'dispatch_failed': [], 'deduped': [],
         })
         self.assertEqual(self.recorder.calls, [])
 
@@ -419,6 +420,92 @@ class NonCommitterTest(_DrainTestBase):
         src = (Path(lqd.__file__)).read_text()
         self.assertNotIn('import subprocess', src)
         self.assertNotIn('subprocess.', src)
+
+
+class DuplicateWorkGuardTest(_DrainTestBase):
+    """The launch_dedup_guard wiring (2026-06-20 cross-identity redundant-build
+    incident): a matching deliverable claim reversibly HOLDS the launch (no
+    sequence, no Mirror dispatch); an in-flight spec overlap is advisory-only;
+    and any guard failure FAILS OPEN (authors normally)."""
+
+    def _claim(self, claimed_task_id, envelope_task_id='the-standing-brain'):
+        ldg.record_claim(
+            claimed_task_id=claimed_task_id, envelope_task_id=envelope_task_id,
+            path=ldg.claims_path_for_sequences_dir(self.sequences_dir))
+
+    def test_matching_claim_holds_launch_and_skips_build(self):
+        self._claim('aging-idea')
+        self._queue(_entry('aging-idea'))
+        with mock.patch.object(lqd.larry_alerts, 'append_alert') as alert:
+            result = self._drain()
+        # No sequence authored, no Mirror dispatched, queue file held in .deduped/.
+        self.assertEqual(result.deduped, ['aging-idea'])
+        self.assertEqual(result.launched, [])
+        self.assertFalse(self._seq_path('aging-idea').exists())
+        self.assertEqual(self.recorder.calls, [])
+        held = self.queue_dir / '.deduped' / 'aging-idea.json'
+        self.assertTrue(held.exists())
+        self.assertFalse((self.queue_dir / 'aging-idea.json').exists())
+        alert.assert_called_once()
+        # The alert spells out the reversible re-queue command.
+        msg = alert.call_args.kwargs.get('message', '')
+        self.assertIn('mv', msg)
+        self.assertIn('the-standing-brain', msg)
+
+    def test_inflight_spec_overlap_proceeds_with_advisory(self):
+        # A LIVE sibling sequence sharing this launch's spec_doc → advisory only.
+        sibling = {
+            'seq_id': 'launch-sibling', 'status': 'active',
+            'spec_doc': 'agents/beacon/specs/aging-idea.md', 'steps': [],
+        }
+        (self.sequences_dir).mkdir(parents=True, exist_ok=True)
+        (self.sequences_dir / 'launch-sibling.json').write_text(
+            json.dumps(sibling, indent=2) + '\n')
+        self._queue(_entry('aging-idea'))  # default spec_ref == sibling spec_doc
+        with mock.patch.object(lqd.larry_alerts, 'append_alert') as alert:
+            result = self._drain()
+        # Proceeds: sequence authored + Mirror dispatched, but an advisory fired.
+        self.assertEqual(result.launched, ['aging-idea'])
+        self.assertEqual(result.deduped, [])
+        self.assertTrue(self._seq_path('aging-idea').exists())
+        self.assertEqual(len(self.recorder.calls), 1)
+        alert.assert_called_once()
+
+    def test_hold_move_failure_leaves_file_and_does_not_count_deduped(self):
+        # If the .deduped/ move fails (e.g. EROFS), the launch is NOT counted
+        # deduped, no build is authored, and the queue file stays for next-tick
+        # re-evaluation — with an honest "could NOT be parked" alert.
+        self._claim('aging-idea')
+        qpath = self._queue(_entry('aging-idea'))
+        with mock.patch.object(lqd.os, 'replace', side_effect=OSError('EROFS')):
+            with mock.patch.object(lqd.larry_alerts, 'append_alert') as alert:
+                result = self._drain()
+        self.assertEqual(result.deduped, [])
+        self.assertEqual(result.launched, [])
+        self.assertFalse(self._seq_path('aging-idea').exists())
+        self.assertEqual(self.recorder.calls, [])
+        self.assertTrue(qpath.exists())  # left in place for retry
+        self.assertFalse((self.queue_dir / '.deduped' / 'aging-idea.json').exists())
+        self.assertIn('could NOT be parked', alert.call_args.kwargs.get('message', ''))
+
+    def test_guard_failure_fails_open_and_authors(self):
+        self._queue(_entry('aging-idea'))
+        with mock.patch.object(lqd.launch_dedup_guard, 'evaluate',
+                               side_effect=RuntimeError('boom')):
+            result = self._drain()
+        # A guard crash must never block an otherwise-fine launch.
+        self.assertEqual(result.launched, ['aging-idea'])
+        self.assertEqual(result.deduped, [])
+        self.assertTrue(self._seq_path('aging-idea').exists())
+        self.assertEqual(len(self.recorder.calls), 1)
+
+    def test_nonmatching_claim_proceeds_normally(self):
+        self._claim('some-unrelated-phase')
+        self._queue(_entry('aging-idea'))
+        result = self._drain()
+        self.assertEqual(result.launched, ['aging-idea'])
+        self.assertEqual(result.deduped, [])
+        self.assertTrue(self._seq_path('aging-idea').exists())
 
 
 if __name__ == '__main__':
