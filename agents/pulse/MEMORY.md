@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-21 22:49Z UTC (Iter ~2410, Tier 3, consecutive_clean=1→2, NOMINAL ✅)
+## Status snapshot — updated 2026-06-21 23:22Z UTC (Iter ~2411, Tier 3, consecutive_clean=2→3, NOMINAL ✅)
 
-**Iter ~2410 summary:** ✅ Nominal. 0 new alerts (watermark=864=file_length). 5/5 daemons alive (outbox_notifier=885031, dashboard_api=882541 — new PIDs, 2nd heal-stale-daemon-code restart at 22:24Z). 0 open PRs. 0 inbox tasks. **Standing [yellow]:** install-drift:ourliberty-launch-dedup-gc.service + .timer (operator SSH action still needed). beacon-pending-approvals: 0. Check I: sentinel exists → skip. Check III: 10d < 14d → skip. PRIME: systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** Tier 3, consecutive_clean=1→2. Next cadence: 30-min (Tier 3).
+**Iter ~2411 summary:** ✅ Nominal. 0 new alerts (watermark=864=file_length). 5/5 daemons alive (PIDs unchanged: outbox_notifier=885031, dashboard_api=882541, inbox_watcher=559441, beacon=599691, chain-event=3734305). 0 open PRs. 0 inbox tasks. PRs #611 (agent-core) + #72 (dashboard) both MERGED — FORGE_NO_PR_SKIP in stall log is nominal. **Standing [yellow]:** install-drift:ourliberty-launch-dedup-gc.service + .timer (operator SSH action still needed). beacon-pending-approvals: 0. Check I: sentinel exists → skip. Check III: 10d < 14d → skip. PRIME: systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** Tier 3, consecutive_clean=2→3 (at max, stays Tier 3). Next cadence: 30-min (Tier 3).
 
 
 
