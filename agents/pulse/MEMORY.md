@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-21 21:38Z UTC (Iter ~2408, Tier 2→3 DE-ESCALATED, NOMINAL ✅)
+## Status snapshot — updated 2026-06-21 22:16Z UTC (Iter ~2409, Tier 3, consecutive_clean=0→1, NOMINAL ✅)
 
-**Iter ~2408 summary:** ✅ Nominal. 1 new alert (L859: mirror-dag-pass:launch-system-self-awareness-slice-1b-where-are-we, Tier-3 silenced, watermark 858→859). 5/5 daemons alive (same PIDs as ~2407). New sequence `launch-system-self-awareness-slice-1b-where-are-we` active — Mirror DAG-preflight PASS at 15:29 MDT, Forge build-phase dispatched at 15:32 MDT. 0 open PRs. beacon-pending-approvals: 0. unreviewed-merge:607 still Larry's judgment ([yellow] carry). Check I: sentinel exists → skip. Check III: 10d < 14d → skip. PRIME: systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** **DE-ESCALATED Tier 2→3** (consecutive_clean=2→3). Next cadence: 30-min (Tier 3).
+**Iter ~2409 summary:** ✅ Nominal. 5 new alerts (L860–L864), all Tier-3 silenced. 5/5 daemons alive (outbox_notifier=880012, dashboard_api=880179 — new PIDs, restarted 21:54Z by heal-stale-daemon-code after PR #617). 0 open PRs. **New [yellow] standing finding:** install-drift:ourliberty-launch-dedup-gc.service + .timer — bot DM'd Larry at 16:06 MDT; operator must SSH and install units or GC timer won't fire. Sequence launch-system-self-awareness-slice-1b-where-are-we COMPLETE — PR #73 (ourliberty-dashboard "Where are we" page) merged. beacon-pending-approvals: 0. Check I: sentinel exists → skip. Check III: 10d < 14d → skip. PRIME: systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** Tier 3, consecutive_clean=0→1. Next cadence: 30-min (Tier 3).
 
 
 

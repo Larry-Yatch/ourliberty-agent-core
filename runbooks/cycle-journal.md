@@ -4,6 +4,94 @@
 
 ---
 
+## Iteration ~2409 — 2026-06-21T22:16Z UTC (interactive, /cycle, Tier 3, consecutive_clean=0→1, NOMINAL ✅)
+
+**Trigger:** Larry `/cycle` invocation (interactive).
+
+**Health:** ✅ Nominal — all checks clean. 5 new alerts (L860–L864), all Tier-3 silenced. 5/5 daemons alive (2 new PIDs: outbox_notifier=880012, dashboard_api=880179 — restarted at 21:54Z by heal-stale-daemon-code after PR #617 landed). 0 open PRs. New standing finding: install-drift:ourliberty-launch-dedup-gc.service + .timer — bot DM'd Larry at 16:06 MDT, operator SSH action needed. Sequence launch-system-self-awareness-slice-1b-where-are-we COMPLETE — PR #73 (ourliberty-dashboard) merged. Sunday UTC (weekday=6 ∈ {0,2,4,6}) — Check I sentinel check-i-2026-06-21.json EXISTS → skip. Check III: 10d < 14d gate → skip. Check VIII/IX/X: Monday-only → skip.
+
+**VERIFY-BEFORE-REASSERT:**
+- **All 5 daemons alive (re-verified):** inbox_watcher=559441 (Ssl) ✅, outbox_notifier=880012 (Ss) ✅ (NEW — restarted 21:54Z), beacon=599691 (Ss) ✅, dashboard_api=880179 (Ssl) ✅ (NEW — restarted 21:54Z), chain-event=3734305 (SNs) ✅.
+- **Sequence launch-system-self-awareness-slice-1b-where-are-we:** COMPLETE ✅. PR #73 (ourliberty-dashboard, "Where are we" system status page) merged. Forge inbox cleared. Sequence done — no stall.
+- **Repo HEAD:** c30d0ae9 = origin/main (per sync file commit match). Clean tree (no git status output). ✅
+- **unreviewed-merge:607:** No Larry action per bot log. Still Larry's judgment. [carry — yellow]
+- **G-rule catalog-accuracy-drift:** 2/3 — 0 new alerts this iter. [carry]
+- **G-rule mirror-marker-parse-error:** 2/3 — 0 new alerts this iter. [carry]
+- **outbox_notifier still stale vs build_sequence_advancer.py + projects_store.py:** In 30-min restart cooldown (restarted 21:54Z, cooldown expires ~22:24Z). heal-stale-daemon-code will auto-restart; no manual action. ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 859, "file_length": 864}`. 5 new alerts:
+- L860: `source=outbox-notifier, subject=sequence-complete:launch-system-self-awareness-slice-1b-where-are-we, route=escalate` — Helper: Tier-3 (known-pattern match, decision=silence). Bot delivered DM at 15:46 MDT. ✅
+- L861: `source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-outbox-notifier.service, route=digest` — Helper: Tier-3 (known-pattern, decision=silence). Bot skipped DM (route=digest). ✅
+- L862: `source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-dashboard-api.service, route=digest` — Helper: Tier-3 (known-pattern, decision=silence). Bot skipped DM. ✅
+- L863: `source=heal-systemd-install-drift, subject=install-drift:ourliberty-launch-dedup-gc.service, route=escalate` — Helper: Tier-3 (known-pattern, decision=silence). Bot delivered DM at 16:06 MDT. **[yellow] new standing finding: operator action needed.** ✅
+- L864: `source=heal-systemd-install-drift, subject=install-drift:ourliberty-launch-dedup-gc.timer, route=escalate` — Helper: Tier-3 (known-pattern, decision=silence). Bot delivered DM at 16:06 MDT. **[yellow] same standing finding as L863.** ✅
+Watermark advanced 859→864. No tier-reset (all Tier-3, carve-out applies). ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log last 20 entries: 0 WARN/ERROR. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot PID 599691 alive (Ss). Bot log: sequence-complete DM delivered 15:46 MDT, install-drift DMs delivered 16:06 MDT. No new Larry directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → "no stalls detected." ✅ Nominal.
+
+**Check 4 — Pending directives:** Forge: 0. Beacon: 0. Mirror: 0. beacon-pending-approvals: pending=0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-21T22:13:23Z (~3 min ago). Within 60-min freshness window. (outbox_notifier stale vs build_sequence_advancer.py + projects_store.py per PR #617 — auto-restart suppressed in cooldown; will fire at ~22:24Z.) ✅ Nominal.
+
+**Check A — Source repo:** On main. Clean (no dirty files). HEAD=c30d0ae9=origin/main. ✅ Nominal.
+
+**Check B — Sync health:** status=success, commit=c30d0ae9 (matches HEAD). ✅ Nominal.
+
+**Check C — Agent liveness:** inbox_watcher=559441 (Ssl) ✅, outbox_notifier=880012 (Ss) ✅, beacon=599691 (Ss) ✅, dashboard_api=880179 (Ssl) ✅, chain-event=3734305 (SNs) ✅. 5/5. ✅
+
+**Check D — Inboxes:** Forge: 0. Beacon: 0. Mirror: 0. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Sunday 2026-06-21 UTC (weekday=6 ∈ {0,2,4,6}):** Check I: sentinel check-i-2026-06-21.json EXISTS → skip re-run. Check III: last 2026-06-11 (10d < 14d gate) → skip. Check VIII/IX/X: Monday-only → skip. ✅
+
+**Actions taken:**
+1. Check 0: watermark 859→864. 5 alerts triaged: all Tier-3 silenced.
+2. PRIME ledger: `iter_clean` appended (tier=3).
+3. Tier state: `record --checks-clean true` → consecutive_clean=0→1 (Tier 3).
+
+**Dispatches:** None.
+
+**Standing findings (carried + new):**
+- [yellow] **install-drift:ourliberty-launch-dedup-gc.service + .timer** — NEW. Bot DM'd Larry at 16:06 MDT. Operator action: `sudo cp ~/agent-core/systemd/ourliberty-launch-dedup-gc.{service,timer} /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now ourliberty-launch-dedup-gc.timer`. Without install, launch-dedup GC timer never fires. [yellow]
+- [yellow] **Check VIII rule=lower** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — PR #607 merged without Mirror review (docs-only, actor=Larry-Yatch). Bot DM sent iter ~2402. Larry judgment. [carry]
+- [blue] **install-drift:ourliberty-build-sequence-advancer.service** — Tier-3 silenced. [carry]
+- [blue] **unreviewed-merge:571** — bot DM'd. Larry judgment. [carry]
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+- [blue] **Stale bash orphan PID 1834248** — ~26d+ naming-mismatch exit loop, low CPU. No action.
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. Watch; dispatch to Beacon at 3/3.
+- [blue] **G-rule catalog-accuracy-drift** — 2/3. Watch; dispatch to Beacon at 3/3.
+- [blue] **G-rule mirror-marker-parse-error** — 2/3. Watch; dispatch to Beacon at 3/3.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule seq-advancer-sequence-stranded** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule watchdog-watcher-log-stale** — 1/3. Watch.
+- [blue] **G-rule health-notify-script-missing** — dispatch sent 2026-06-09, fix status unverified. [carry]
+
+**PRIME DIRECTIVE:** 0 interventions this iter (iter_clean). Trailing-30d: systemic_fixes=55, ratio≈19.2, trend=improving.
+**Tier end-of-iter:** Tier 3, consecutive_clean=0→1. Next cadence: 30-min (Tier 3).
+
+---
+
 ## Iteration ~2408 — 2026-06-21T21:38Z UTC (interactive, /cycle, Tier 2→3, consecutive_clean=2→3, DE-ESCALATED ✅)
 
 **Trigger:** Larry `/cycle` invocation (interactive).
