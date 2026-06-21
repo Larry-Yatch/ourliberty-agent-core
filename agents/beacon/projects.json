@@ -428,12 +428,12 @@
           "id": "system-self-awareness-slice-1b-where-are-we",
           "title": "System self-awareness - Slice 1b (Where are we)",
           "desired_end_state": "Read-only dashboard view of the live State Log (GET /api/system/state-log) \u2014 the glance surface for Slice 1. Build STRICTLY from the spec doc.",
-          "lifecycle_state": "building",
+          "lifecycle_state": "done",
           "order": 0,
           "spec_ref": "agents/beacon/specs/system-awareness-slice-1b-dashboard-where-are-we.md",
           "sequence_ref": "launch-system-self-awareness-slice-1b-where-are-we",
           "created_at": "2026-06-21T20:38:01.814186+00:00",
-          "updated_at": "2026-06-21T21:30:03.004905+00:00",
+          "updated_at": "2026-06-21T21:44:56.112694+00:00",
           "brainstorm": {
             "is_ai_draft": true,
             "draft": {
@@ -466,6 +466,23 @@
             "model": "claude-opus-4-8",
             "at": "2026-06-21T21:08:15.814563+00:00",
             "from_state": "brainstorm"
+          },
+          "closeout": {
+            "summary": "The new \"Where are we\" dashboard page shipped (PR #73): Larry can now open the dashboard and see whole-system status at a glance instead of having to ask Beacon. The next phase can build on this glance surface \u2014 adding the deeper \"what needs Larry\" view and health status, both deliberately left out here.",
+            "shipped": "A read-only \"Where are we\" page that shows the live system status in plain language \u2014 a headline summary plus skim panels for work in flight (including a prominent callout when something is stuck), active missions, and what's waiting on you. It's reachable from the dashboard's navigation and shows nothing but status \u2014 no buttons or actions.",
+            "changed_vs_spec": "It didn't meaningfully diverge \u2014 the build followed the spec, mirroring an existing system page and reusing the same data-fetching and display pieces. Health status was intentionally left as a \"coming soon\" placeholder, as the spec directed.",
+            "learnings": "The field shapes were verified against the live system data while building rather than assumed, and the data is pulled only through the safe same-origin path (never the server directly) \u2014 both confirmed by tests. One open item: a reviewer still needs to confirm the page renders correctly against the live deployed system.",
+            "cost": "One PR of build work.",
+            "done_gate_met": true
+          },
+          "closeout_provenance": {
+            "by": "beacon",
+            "model": "claude-opus-4-8",
+            "at": "2026-06-21T21:44:43.306226+00:00",
+            "from_state": "done",
+            "pr_numbers": [
+              "73"
+            ]
           }
         }
       ],
