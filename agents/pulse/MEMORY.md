@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 06:13Z UTC (Iter ~2429, Tier 2→1, FINDING ⚠️)
+## Status snapshot — updated 2026-06-22 06:18Z UTC (Iter ~2430, Tier 1, NOMINAL ✅)
 
-**Iter ~2429 summary:** ⚠️ Finding. PR #628 "feat(heal-undispatched-pr-review)" MERGED 06:08:57Z by Larry without Mirror review (unreviewed-merge:628 — Larry-deliberate bypass). Check 0 watermark rotation gap auto-repaired (888→885, compaction). Check C: outbox_notifier PID 963464, dashboard_api PID 981918 (new PIDs, both alive; daemon-pids.json missing). Check A: repo was behind, self-corrected by wrapper before pull ran. 0 open PRs. beacon-pending-approvals: pending=0, history=250. **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. [blue]: unreviewed-merge:628 (new), unreviewed-merge:625/627, daemon-pids.json missing.** PRIME: iter_clean, systemic_fixes=55, ratio≈19.3. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** Tier 2→1 (tier-reset: unreviewed-merge finding). Next cadence: 5-min.
+**Iter ~2430 summary:** ✅ Nominal. 0 new alerts (watermark=885=file_length). 5/5 daemons alive (same PIDs as ~2429). 0 open PRs. All inboxes empty. Check I sentinel exists → skipped. consecutive_clean=0→1 (stays Tier 1). **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. [blue]: unreviewed-merge:628/625/627, daemon-pids.json missing.** PRIME: ratio≈19.3, trend=improving. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** Next cadence: 5-min.
 
 
 
