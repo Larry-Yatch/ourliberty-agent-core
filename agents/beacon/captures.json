@@ -649,7 +649,7 @@
       "id": "cap-pipeline-empty-state-hint-a62a",
       "title": "Pipeline empty-state hint",
       "note": "When 'Actively working' is empty, show a quiet one-line hint instead of self-hiding. GUINEA-PIG for the first live P4 closeout dogfood \u2014 promote this through the board to Launch. Spec: agents/beacon/specs/projects-v3-pipeline-empty-state.md (repo ourliberty-dashboard).",
-      "state": "promoted",
+      "state": "parked",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -659,26 +659,21 @@
         "captured_at": "2026-06-19T11:45:20.575712+00:00"
       },
       "last_touched": "2026-06-19T11:45:20.575712+00:00",
-      "promoted_to": "pipeline-empty-state-hint",
-      "spawned": {
-        "kind": "project",
-        "project_id": "pipeline-empty-state-hint",
-        "stamped_at": "2026-06-19T11:45:50.126613+00:00"
-      },
       "briefing": {
-        "what": "When the work-in-progress area of the projects screen has nothing in it, show a short, friendly one-line hint instead of leaving a blank space.",
-        "why": "Today a new or empty screen shows nothing there, so people never realize that part of the product exists and quietly miss using it.",
-        "suggest": "It's a small, low-stakes polish worth a green light, but treat it as a careful trial run to confirm the approach holds up before leaning on it more widely."
+        "what": "When the work queue has nothing in it, the screen shows a calm one-line note instead of going blank.",
+        "why": "A blank screen leaves people wondering if something broke; a short note reassures them everything's fine and working.",
+        "suggest": "Worth doing as a small, low-stakes polish \u2014 let's try it on a limited basis first and confirm it feels right before rolling it out fully."
       },
       "risk": "medium",
       "recommended_action": "delegate",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-06-19T11:54:59.438487+00:00",
-        "from_state": "promoted"
+        "at": "2026-06-22T05:04:15.877204+00:00",
+        "from_state": "parked"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "updated_at": "2026-06-22T05:00:35.632545+00:00"
     },
     {
       "id": "cap-p5-dag-status-on-cards-a822",
