@@ -4519,6 +4519,74 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-fix-phantom-build-phase-terminal-guard-001",
+      "name": "Fix Phantom Build Phase Terminal Guard 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `fix-phantom-build-phase-terminal-guard-001`. Last activity 2026-06-22T05:36:06.317429+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "fix-phantom-build-phase-terminal-guard-001"
+      ],
+      "repo": null,
+      "created": "2026-06-22",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-22T05:36:18.575909+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-22T05:36:06.317429+00:00"
+    },
+    {
+      "id": "proposed-delegate-cap-projects-pm-layer-data-is-stale-separate-system-84ec",
+      "name": "Delegate Cap Projects PM Layer Data Is Stale Separate System 84ec",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `delegate-cap-projects-pm-layer-data-is-stale-separate-system-84ec`. Last activity 2026-06-22T05:35:39.298967+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "delegate-cap-projects-pm-layer-data-is-stale-separate-system-84ec"
+      ],
+      "repo": null,
+      "created": "2026-06-22",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-22T05:36:18.575909+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-22T05:35:39.298967+00:00"
+    },
+    {
+      "id": "proposed-delegate-cap-orphan-lane-show-desktop-chat-title-fallback-rep-dd23",
+      "name": "Delegate Cap Orphan Lane Show Desktop Chat Title Fallback Rep Dd23",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `delegate-cap-orphan-lane-show-desktop-chat-title-fallback-rep-dd23`. Last activity 2026-06-22T05:35:34.289482+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "delegate-cap-orphan-lane-show-desktop-chat-title-fallback-rep-dd23"
+      ],
+      "repo": null,
+      "created": "2026-06-22",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-22T05:36:18.575909+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-22T05:35:34.289482+00:00"
+    },
+    {
+      "id": "proposed-delegate-cap-phantom-build-phase-after-marker-error-retry-pr-4d78",
+      "name": "Delegate Cap Phantom Build Phase After Marker Error Retry PR 4d78",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `delegate-cap-phantom-build-phase-after-marker-error-retry-pr-4d78`. Last activity 2026-06-22T05:34:24.271008+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "delegate-cap-phantom-build-phase-after-marker-error-retry-pr-4d78"
+      ],
+      "repo": null,
+      "created": "2026-06-22",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-22T05:36:18.575909+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-22T05:34:24.271008+00:00"
     }
   ]
 }
