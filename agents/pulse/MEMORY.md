@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 03:50Z UTC (Iter ~2416, Tier 3→1, consecutive_clean=7→0, DRIFT ⚠️)
+## Status snapshot — updated 2026-06-22 03:54Z UTC (Iter ~2417, Tier 1, consecutive_clean=0→1, NOMINAL ✅)
 
-**Iter ~2416 summary:** ⚠️ Drift. Check A: local main was 1 commit behind origin/main (4a67bd2d "feat(autonomy): autonomy_decision chain event — slice 1 (#623)"). Always-fix fast-forward executed. All mandatory checks (0–5) nominal. 0 new alerts. 5/5 daemons alive (PIDs unchanged: inbox_watcher=559441, outbox_notifier=913753, beacon=599691, dashboard_api=920762, chain-event=3734305). 0 open PRs. 0 inbox tasks. Monday conditional checks ran in iter ~2413 → skipped. **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15 proposal, Tier-2 probe auth_401, Check III proposals.** PRIME: 1 intervention (ff-main-when-behind), systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** Tier 3→1 (tier-reset). consecutive_clean=7→0. Next cadence: 5-min (Tier 1).
+**Iter ~2417 summary:** ✅ Nominal. All mandatory checks (0–5) and additive (A–E) clean. 0 new alerts (watermark=873, file_length=873). 5/5 daemons alive (PIDs unchanged: inbox_watcher=559441, outbox_notifier=913753, beacon=599691, dashboard_api=920762, chain-event=3734305). 0 open PRs. 0 inbox tasks. Monday conditional checks (Check I sentinel EXISTS, Check VIII/IX/X already ran in ~2413, Check III 11d<14d gate) → all skipped. **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15 proposal, Tier-2 probe auth_401, Check III proposals.** PRIME: 0 interventions (iter_clean), systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** consecutive_clean=0→1. Next cadence: 5-min (Tier 1).
 
 
 
