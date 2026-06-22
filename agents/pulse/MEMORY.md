@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 05:55Z UTC (Iter ~2428, Tier 1→2, consecutive_clean=2→3→de-escalate, NOMINAL ✅)
+## Status snapshot — updated 2026-06-22 06:13Z UTC (Iter ~2429, Tier 2→1, FINDING ⚠️)
 
-**Iter ~2428 summary:** ✅ Nominal. 2 new alerts (L887-L888) both Tier-3 (L888 confirmed beacon-bot restart cause=heal-stale-daemon-code post-PR #629 deploy — prior "unknown cause" resolved). PR #630 MERGED 05:52:41Z. PR #631 open (Mirror reviewing projects-stale-gc). PR #628 (feat/heal-undispatched-pr-review) approaching 30-min stale threshold at ~06:07Z — no Mirror review task yet, watch next iter. beacon-pending-approvals: pending=0, history=250. **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. [blue]: PR #628 approaching stale.** PRIME: iter_clean, systemic_fixes=55, ratio≈19.3, trend=improving. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** Tier 1→2 (de-escalated). Next cadence: 15-min (Tier 2).
+**Iter ~2429 summary:** ⚠️ Finding. PR #628 "feat(heal-undispatched-pr-review)" MERGED 06:08:57Z by Larry without Mirror review (unreviewed-merge:628 — Larry-deliberate bypass). Check 0 watermark rotation gap auto-repaired (888→885, compaction). Check C: outbox_notifier PID 963464, dashboard_api PID 981918 (new PIDs, both alive; daemon-pids.json missing). Check A: repo was behind, self-corrected by wrapper before pull ran. 0 open PRs. beacon-pending-approvals: pending=0, history=250. **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. [blue]: unreviewed-merge:628 (new), unreviewed-merge:625/627, daemon-pids.json missing.** PRIME: iter_clean, systemic_fixes=55, ratio≈19.3. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** Tier 2→1 (tier-reset: unreviewed-merge finding). Next cadence: 5-min.
 
 
 
