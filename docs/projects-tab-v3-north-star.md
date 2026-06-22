@@ -117,11 +117,11 @@ This entire process — **funnel → pipeline → brainstorm → spec → build 
 | (foundation) | Phase 4 meaning layer · 4.1 Narrator schedule · Phase S sync · delegate fix | ✅ shipped |
 | P1 | Funnel + Missions retirement | ✅ shipped 2026-06-19 — board is **Funnel + Pipeline only** (see note ¹) |
 | P2 | Universal action card on funnel | ✅ shipped (+ follow-up: meaning layer on Proposed lane + reliable refresh) |
-| P3 | Pipeline (Projects → Phases) | 🚧 built + verified (advance/attach/launch-gate/drop); edges in `projects-v3-p3-followup2` |
-| P4 | Closeout pass | 🚧 specced — `projects-v3-p4-closeout` (holds for p3-followup2 verify) |
-| P5 | DAG status on cards | ▫️ planned |
-| P6 | Brainstorm template + auto-fill | ▫️ planned |
-| P7 | Generalize + shelf + dashboard-wide | ▫️ planned |
+| P3 | Pipeline (Projects → Phases) | ✅ shipped 2026-06-19 — pipeline live (advance / attach-spec / launch / drop + `p3-followup2` edges); status-writeback persisted via [#592](https://github.com/Larry-Yatch/ourliberty-agent-core/pull/592) |
+| P4 | Closeout pass | ✅ shipped 2026-06-19 — closeout fires on Done + feeds-forward; **verified end-to-end (4/4 done-gate)**, incl. the enriched completion DM on P5's clean board-launched run. Live writeback no-op root-caused to EROFS/missing-RWP, fixed [#592](https://github.com/Larry-Yatch/ourliberty-agent-core/pull/592) |
+| P5 | DAG status on cards | ✅ shipped 2026-06-21 — live `step N/M · status` on building cards (dashboard [#71](https://github.com/Larry-Yatch/ourliberty-dashboard/pull/71)) |
+| P6 | Brainstorm template + auto-fill | ✅ shipped 2026-06-21 — Narrator pre-fills draft + capped "Your decisions" + a "Copy handoff for Claude" button ([#611](https://github.com/Larry-Yatch/ourliberty-agent-core/pull/611) author · dashboard [#72](https://github.com/Larry-Yatch/ourliberty-dashboard/pull/72) card · [#617](https://github.com/Larry-Yatch/ourliberty-agent-core/pull/617) store-nested→serve-flat bridge) |
+| P7 | Generalize + shelf + dashboard-wide | ▫️ planned — **next up** (handoff prepared) |
 
 _Legend: ✅ done · 🚧 in flight · ▫️ planned_
 
