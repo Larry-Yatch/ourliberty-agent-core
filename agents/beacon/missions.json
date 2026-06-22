@@ -4444,6 +4444,19 @@
         "from_state": "proposed"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "system-self-awareness-slice-2b-waiting-on-larry-render",
+      "name": "System self-awareness - Slice 2b (Waiting-on-Larry render)",
+      "phase": "drafting",
+      "brief": "Render the itemized waiting_on_larry.items[] on the /where-we-are 'Waiting on you' panel: source badge + title + plain-English why + relative age, in the substrate's order. Link approvals/escalations to /approvals, parked to /missions; reuse the Slice-1b page + Approvals tab, do not rebuild. Normalize the parked why dict-repr via cleanWhy. Update lib/types + extend vitest. Full spec: agents/beacon/specs/system-awareness-slice-2b-waiting-on-larry-render.md",
+      "spec_docs": [
+        "agents/beacon/specs/system-awareness-slice-2b-waiting-on-larry-render.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-dashboard",
+      "created": "2026-06-22",
+      "deferred_reason": null
     }
   ]
 }
