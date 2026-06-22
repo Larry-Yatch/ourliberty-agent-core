@@ -32,6 +32,7 @@ except ImportError:  # discover loads this module top-level (no package parent)
     import _bootstrap  # noqa: F401
 
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -132,7 +133,14 @@ class BuildSnapshotTest(unittest.TestCase):
         )
         self.assertEqual(snap['in_flight_now'], 2)
         self.assertEqual(snap['sequences_active'], seqs)
-        self.assertEqual(snap['waiting_on_larry'], {'parked': 4})
+        # parked retained for back-compat; new cross-source fields default empty.
+        waiting = snap['waiting_on_larry']
+        self.assertEqual(waiting['parked'], 4)
+        self.assertEqual(waiting['pending_approvals'], 0)
+        self.assertEqual(waiting['escalations'], 0)
+        self.assertEqual(waiting['total'], 4)
+        self.assertEqual(waiting['items'], [])
+        self.assertFalse(waiting['truncated'])
         self.assertIsNone(snap['health'])
         self.assertEqual(snap['as_of'], _NOW.isoformat())
 
@@ -318,6 +326,190 @@ class StateLogQueryFormatTest(unittest.TestCase):
         })
         self.assertIn('Alpha shipped; Beta in review.', reply)
         self.assertIn('as of', reply)
+
+
+def _wi(source, ident, ts, severity=None):
+    """A raw waiting-item as a source reader would emit it (carries `_ts`, which
+    build_snapshot turns into `age_seconds`)."""
+    return {
+        'source': source, 'id': ident, 'title': f'{source}-{ident}',
+        'why': 'because', 'severity': severity, 'action_hint': 'do', '_ts': ts,
+    }
+
+
+class WaitingOnLarryAggregationTest(unittest.TestCase):
+    """Slice 2a — the itemized cross-source waiting_on_larry block."""
+
+    def test_aggregates_three_sources_with_counts_and_order(self):
+        snap = ssl.build_snapshot(
+            missions=[], in_flight=[], sequences=[], parked=2,
+            now=_NOW, pipeline_probe=lambda ids: {},
+            parked_items=[
+                _wi('parked', 'p-old', '2026-06-18T12:00:00+00:00'),   # 24h
+                _wi('parked', 'p-new', '2026-06-19T11:30:00+00:00'),   # 30m
+            ],
+            pending_approvals=[
+                _wi('approval', 'a1', '2026-06-19T10:00:00+00:00', 'warning'),
+            ],
+            escalations=[
+                _wi('escalation', 'e1', '2026-06-19T11:00:00+00:00', 'critical'),
+            ],
+        )
+        w = snap['waiting_on_larry']
+        self.assertEqual(w['parked'], 2)            # back-compat field retained
+        self.assertEqual(w['pending_approvals'], 1)
+        self.assertEqual(w['escalations'], 1)
+        self.assertEqual(w['total'], 4)
+        self.assertFalse(w['truncated'])
+        # Ordered escalations -> approvals -> aged parked (oldest parked first).
+        self.assertEqual([i['source'] for i in w['items']],
+                         ['escalation', 'approval', 'parked', 'parked'])
+        self.assertEqual([i['id'] for i in w['items']],
+                         ['e1', 'a1', 'p-old', 'p-new'])
+        # age_seconds is computed from _ts against `now`, and _ts is stripped.
+        self.assertEqual(w['items'][0]['age_seconds'], 3600)
+        self.assertEqual(w['items'][2]['age_seconds'], 86400)
+        self.assertNotIn('_ts', w['items'][0])
+
+    def test_escalations_ordered_by_severity_then_age(self):
+        snap = ssl.build_snapshot(
+            missions=[], in_flight=[], sequences=[], parked=0,
+            now=_NOW, pipeline_probe=lambda ids: {},
+            escalations=[
+                _wi('escalation', 'warn-new', '2026-06-19T11:30:00+00:00', 'warning'),
+                _wi('escalation', 'crit', '2026-06-19T11:00:00+00:00', 'critical'),
+                _wi('escalation', 'warn-old', '2026-06-19T09:00:00+00:00', 'warning'),
+            ],
+        )
+        ids = [i['id'] for i in snap['waiting_on_larry']['items']]
+        self.assertEqual(ids, ['crit', 'warn-old', 'warn-new'])
+
+    def test_truncation_caps_items_but_not_counts(self):
+        parked = [
+            _wi('parked', f'p{i:02d}', '2026-06-18T12:00:00+00:00')
+            for i in range(30)
+        ]
+        snap = ssl.build_snapshot(
+            missions=[], in_flight=[], sequences=[], parked=30,
+            now=_NOW, pipeline_probe=lambda ids: {},
+            parked_items=parked,
+        )
+        w = snap['waiting_on_larry']
+        self.assertEqual(len(w['items']), ssl.WAITING_ITEMS_CAP)
+        self.assertTrue(w['truncated'])
+        self.assertEqual(w['total'], 30)      # totals reflect all, not just shown
+
+    def test_empty_sources_yield_empty_items_not_truncated(self):
+        snap = ssl.build_snapshot(
+            missions=[], in_flight=[], sequences=[], parked=0,
+            now=_NOW, pipeline_probe=lambda ids: {},
+        )
+        w = snap['waiting_on_larry']
+        self.assertEqual(w['items'], [])
+        self.assertEqual(w['total'], 0)
+        self.assertFalse(w['truncated'])
+
+    def test_narrative_reflects_cross_source_total(self):
+        snap = ssl.build_snapshot(
+            missions=[], in_flight=[], sequences=[], parked=1,
+            now=_NOW, pipeline_probe=lambda ids: {},
+            parked_items=[_wi('parked', 'p1', '2026-06-18T12:00:00+00:00')],
+            pending_approvals=[
+                _wi('approval', 'a1', '2026-06-19T11:00:00+00:00', 'warning')],
+            escalations=[
+                _wi('escalation', 'e1', '2026-06-19T11:00:00+00:00', 'critical')],
+        )
+        prose = ssl.render_fallback_narrative(snap)
+        self.assertIn('Waiting on you: 3 item(s)', prose)
+        self.assertIn('1 approval(s)', prose)
+        self.assertIn('1 escalation(s)', prose)
+        self.assertIn('1 parked', prose)
+
+    def test_narrative_idle_says_nothing_parked(self):
+        snap = ssl.build_snapshot(
+            missions=[], in_flight=[], sequences=[], parked=0,
+            now=_NOW, pipeline_probe=lambda ids: {},
+        )
+        self.assertIn('nothing parked', ssl.render_fallback_narrative(snap))
+
+
+class WaitingSourceReadersTest(unittest.TestCase):
+    """Each source reader is independently fail-open (spec § 3 D4)."""
+
+    def test_pending_approvals_maps_entries(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / 'pending.json'
+            p.write_text(json.dumps({'pending': [
+                {'id': 'task-1', 'plan_summary': 'Ship the thing',
+                 'target_agent': 'forge', 'status': 'pending',
+                 'created_at': '2026-06-19T11:00:00+00:00'},
+            ]}))
+            with mock.patch.dict(os.environ,
+                                 {'OURLIBERTY_PENDING_APPROVALS': str(p)}):
+                items = ssl.load_pending_approvals()
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]['source'], 'approval')
+        self.assertEqual(items[0]['id'], 'task-1')
+        self.assertEqual(items[0]['title'], 'Ship the thing')
+        self.assertEqual(items[0]['severity'], 'warning')
+        self.assertEqual(items[0]['action_hint'], 'approve/reject in Approvals')
+
+    def test_pending_approvals_missing_file_fails_open(self):
+        with mock.patch.dict(
+                os.environ,
+                {'OURLIBERTY_PENDING_APPROVALS': '/no/such/pending.json'}):
+            self.assertEqual(ssl.load_pending_approvals(), [])
+
+    def test_pending_approvals_malformed_fails_open(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / 'bad.json'
+            p.write_text('{not json')
+            with mock.patch.dict(os.environ,
+                                 {'OURLIBERTY_PENDING_APPROVALS': str(p)}):
+                self.assertEqual(ssl.load_pending_approvals(), [])
+
+    def test_escalations_conservative_requires_for_larry_flag(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / 'esc.json'
+            p.write_text(json.dumps([
+                {'headline': 'ops-internal noise', 'severity': 'high'},
+                {'headline': 'needs you', 'severity': 'critical',
+                 'for_larry': True, 'ts': '2026-06-19T10:00:00+00:00'},
+                {'headline': 'already handled', 'for_larry': True,
+                 'resolved': True, 'ts': '2026-06-19T09:00:00+00:00'},
+            ]))
+            with mock.patch.dict(os.environ,
+                                 {'OURLIBERTY_ESCALATIONS_FILE': str(p)}):
+                items = ssl.load_for_larry_escalations()
+        # Only the unresolved, explicitly-flagged entry folds in.
+        self.assertEqual([i['id'] for i in items], ['needs you'])
+        self.assertEqual(items[0]['source'], 'escalation')
+        self.assertEqual(items[0]['severity'], 'critical')
+
+    def test_escalations_missing_file_fails_open(self):
+        with mock.patch.dict(
+                os.environ,
+                {'OURLIBERTY_ESCALATIONS_FILE': '/no/such/esc.json'}):
+            self.assertEqual(ssl.load_for_larry_escalations(), [])
+
+    def test_one_bad_source_does_not_break_the_others(self):
+        # A missing pending file degrades to [] while a good escalations file
+        # still aggregates — sources fail open independently.
+        with tempfile.TemporaryDirectory() as d:
+            good_esc = Path(d) / 'esc.json'
+            good_esc.write_text(json.dumps([
+                {'headline': 'needs you', 'severity': 'critical',
+                 'for_larry': True, 'ts': '2026-06-19T10:00:00+00:00'},
+            ]))
+            env = {
+                'OURLIBERTY_PENDING_APPROVALS': '/no/such/pending.json',
+                'OURLIBERTY_ESCALATIONS_FILE': str(good_esc),
+            }
+            with mock.patch.dict(os.environ, env):
+                pending = ssl.load_pending_approvals()
+                escalations = ssl.load_for_larry_escalations()
+        self.assertEqual(pending, [])
+        self.assertEqual(len(escalations), 1)
 
 
 if __name__ == '__main__':

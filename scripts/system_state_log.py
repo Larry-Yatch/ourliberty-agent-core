@@ -29,8 +29,9 @@ INVARIANTS (spec § 3):
   * The output `~/agents/blackboard/system-state-log.json` is **droplet runtime
     state, NOT git-committed** (it lives under the agents blackboard, like the
     other blackboard files). This narrator is its SOLE writer.
-  * It is **read-only** on missions.json / captures.json / the in-flight + build
-    sequence state — it NEVER mutates them (preserves the single-committer rule).
+  * It is **read-only** on missions.json / captures.json / beacon-pending-
+    approvals.json / for-Larry escalations / the in-flight + build sequence state
+    — it NEVER mutates them (preserves the single-committer rule).
   * **Bounded + fail-safe:** at most one LLM call per tick; the gh probe lists
     each repo once; any single read failure degrades that section to empty,
     never aborts the whole log; the prose always falls back to deterministic
@@ -78,6 +79,14 @@ ACTIVE_MISSION_PHASES = frozenset({'drafting', 'in_flight', 'ready'})
 # render as 'unknown' (KEEP-shaped — never a false terminal).
 MAX_TASK_PROBES = 60
 
+# Cap on the itemized waiting-on-Larry list (Slice 2a, spec § 2 D2). Items past
+# the cap are dropped from `items` but still counted in the totals; `truncated`
+# flags it so the surface can say "+N more".
+WAITING_ITEMS_CAP = 25
+
+# Severity ordering for the waiting list — most urgent first. None sorts last.
+_SEVERITY_RANK = {'critical': 0, 'warning': 1, 'info': 2, None: 3}
+
 # Pipeline status labels (spec § 3 structured_snapshot).
 ST_BUILDING = 'building'
 ST_IN_REVIEW = 'in_review'
@@ -121,7 +130,54 @@ def build_sequences_dir() -> Path:
     return _agents_root() / 'blackboard' / 'build-sequences'
 
 
+def pending_approvals_path() -> Path:
+    """Beacon's pending-approvals state file (read-only here). The SAME file
+    `scripts/beacon_approval_handler.py` owns. `OURLIBERTY_PENDING_APPROVALS`
+    overrides for tests; otherwise the agents state dir."""
+    override = os.environ.get('OURLIBERTY_PENDING_APPROVALS')
+    if override:
+        return Path(override)
+    return _agents_root() / 'state' / 'beacon-pending-approvals.json'
+
+
+def escalations_path() -> Path:
+    """For-Larry escalations source (read-only). `OURLIBERTY_ESCALATIONS_FILE`
+    overrides for tests; otherwise the pulse-escalations blackboard file."""
+    override = os.environ.get('OURLIBERTY_ESCALATIONS_FILE')
+    if override:
+        return Path(override)
+    return _agents_root() / 'blackboard' / 'pulse-escalations.json'
+
+
 # ---------------- read helpers (each fail-safe to empty) ----------------
+
+
+def _normalize_severity(raw: Any) -> Optional[str]:
+    """Map a source's free-form severity onto the waiting-item enum
+    (critical / warning / info / None)."""
+    s = str(raw).strip().lower() if raw is not None else ''
+    if s in ('critical', 'crit', 'fatal'):
+        return 'critical'
+    if s in ('warning', 'warn', 'high', 'medium'):
+        return 'warning'
+    if s in ('info', 'low', 'notice'):
+        return 'info'
+    return None
+
+
+def _age_seconds(ts: Any, now: datetime) -> int:
+    """Whole seconds between an ISO-8601 timestamp and `now`, fail-safe to 0.
+    Tolerates a trailing 'Z' and naive timestamps (assumed UTC)."""
+    if not isinstance(ts, str) or not ts:
+        return 0
+    try:
+        dt = datetime.fromisoformat(ts.replace('Z', '+00:00'))
+    except ValueError:
+        return 0
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    delta = (now - dt).total_seconds()
+    return int(delta) if delta > 0 else 0
 
 
 def _mission_is_active(mission: dict[str, Any]) -> bool:
@@ -221,24 +277,161 @@ def load_active_sequences() -> list[dict[str, Any]]:
     return out
 
 
-def load_parked_count() -> int:
-    """Count of parked captures awaiting Larry (the "what's waiting on you" line).
-    Read-only on captures.json; fail-safe to 0."""
+def load_parked_items() -> list[dict[str, Any]]:
+    """Parked captures awaiting Larry, as waiting-items (the itemized form of
+    load_parked_count — same read). Read-only on captures.json; fail-safe to [].
+    Each item carries a private `_ts` (raw timestamp) that build_snapshot turns
+    into `age_seconds` against the injected `now`."""
     try:
         path = captures_path(load_repo_paths())
         if path is None:
-            return 0
+            return []
         registry = read_captures_registry(path)
     except Exception as e:  # noqa: BLE001 — degrade, never abort
         log(f'state-log: captures read failed: {type(e).__name__}: {e}')
-        return 0
+        return []
     if not isinstance(registry, dict):
-        return 0
+        return []
     captures = registry.get('captures')
     if not isinstance(captures, list):
-        return 0
-    return sum(1 for c in captures
-               if isinstance(c, dict) and c.get('state') == 'parked')
+        return []
+    items: list[dict[str, Any]] = []
+    for c in captures:
+        if not isinstance(c, dict) or c.get('state') != 'parked':
+            continue
+        origin = c.get('origin') if isinstance(c.get('origin'), dict) else {}
+        items.append({
+            'source': 'parked',
+            'id': str(c.get('id') or ''),
+            'title': str(c.get('title') or c.get('id') or 'parked item'),
+            'why': str(c.get('briefing') or c.get('note') or ''),
+            'severity': None,
+            'action_hint': 'promote/drop in Missions',
+            '_ts': c.get('last_touched') or origin.get('captured_at'),
+        })
+    return items
+
+
+def load_parked_count() -> int:
+    """Count of parked captures awaiting Larry (the "what's waiting on you" line).
+    Read-only on captures.json; fail-safe to 0. Itemized companion:
+    load_parked_items()."""
+    return len(load_parked_items())
+
+
+def load_pending_approvals() -> list[dict[str, Any]]:
+    """Pending approvals awaiting Larry, as waiting-items. Read-only on Beacon's
+    beacon-pending-approvals.json `pending[]` (the file owned by
+    scripts/beacon_approval_handler.py). Fail-open to []."""
+    import json  # local import keeps the module top stdlib-light
+    path = pending_approvals_path()
+    try:
+        if not path.is_file():
+            return []
+        data = json.loads(path.read_text())
+    except (OSError, ValueError) as e:
+        log(f'state-log: pending-approvals read failed: {type(e).__name__}: {e}')
+        return []
+    if not isinstance(data, dict):
+        return []
+    pending = data.get('pending')
+    if not isinstance(pending, list):
+        return []
+    items: list[dict[str, Any]] = []
+    for e in pending:
+        if not isinstance(e, dict):
+            continue
+        if e.get('status') not in (None, 'pending'):
+            continue
+        summary = (e.get('plan_summary') or '').strip()
+        target = e.get('target_agent') or 'forge'
+        items.append({
+            'source': 'approval',
+            'id': str(e.get('id') or ''),
+            'title': summary or str(e.get('id') or 'pending approval'),
+            'why': f'Dispatch to {target} awaiting your approval.',
+            'severity': 'warning',
+            'action_hint': 'approve/reject in Approvals',
+            '_ts': e.get('created_at'),
+        })
+    return items
+
+
+def load_for_larry_escalations() -> list[dict[str, Any]]:
+    """For-Larry escalations awaiting Larry, as waiting-items — CONSERVATIVE:
+    only entries EXPLICITLY flagged for Larry (`for_larry: true`) and not yet
+    resolved. Read-only; fail-open to [].
+
+    Note (spec § 2): the ops-internal pulse-escalations.json carries no
+    for-Larry flag today, so this contributes NONE in production right now — by
+    design, we include none rather than guess "needs you" from ops noise. The
+    reader is wired so the day a canonical for-Larry signal exists (an entry
+    flagged `for_larry`, or the chain_events escalation form folded into this
+    file), it appears in the list with no schema change."""
+    import json  # local import; escalations read is a cold path
+    path = escalations_path()
+    try:
+        if not path.is_file():
+            return []
+        data = json.loads(path.read_text())
+    except (OSError, ValueError) as e:
+        log(f'state-log: escalations read failed: {type(e).__name__}: {e}')
+        return []
+    if isinstance(data, list):
+        entries = data
+    elif isinstance(data, dict) and isinstance(data.get('escalations'), list):
+        entries = data['escalations']
+    else:
+        return []
+    items: list[dict[str, Any]] = []
+    for e in entries:
+        if not isinstance(e, dict):
+            continue
+        if e.get('for_larry') is not True:   # conservative: explicit flag only
+            continue
+        if e.get('resolved') is True:
+            continue
+        items.append({
+            'source': 'escalation',
+            'id': str(e.get('id') or e.get('headline') or ''),
+            'title': str(e.get('headline') or e.get('id') or 'escalation'),
+            'why': str(e.get('context') or e.get('suggested_action') or ''),
+            'severity': _normalize_severity(e.get('severity')),
+            'action_hint': 'review escalation',
+            '_ts': e.get('ts') or e.get('created_at'),
+        })
+    return items
+
+
+def _finalize_waiting_items(
+    escalations: list[dict[str, Any]],
+    pending: list[dict[str, Any]],
+    parked: list[dict[str, Any]],
+    now: datetime,
+) -> tuple[list[dict[str, Any]], bool]:
+    """Turn each source's raw waiting-items into the bounded, ordered cross-source
+    list (spec § 2 D2): compute `age_seconds` from the private `_ts`, order
+    most-urgent first (escalations → pending approvals → aged parked), and cap at
+    WAITING_ITEMS_CAP. Returns (items, truncated)."""
+    def aged(raw: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        for it in raw:
+            item = dict(it)
+            item['age_seconds'] = _age_seconds(item.pop('_ts', None), now)
+            out.append(item)
+        return out
+
+    esc = aged(escalations)
+    pend = aged(pending)
+    park = aged(parked)
+    # Within escalations: severity first, then oldest. Pending + parked: oldest.
+    esc.sort(key=lambda i: (_SEVERITY_RANK.get(i.get('severity'), 3),
+                            -i.get('age_seconds', 0)))
+    pend.sort(key=lambda i: -i.get('age_seconds', 0))
+    park.sort(key=lambda i: -i.get('age_seconds', 0))
+    ordered = esc + pend + park
+    truncated = len(ordered) > WAITING_ITEMS_CAP
+    return ordered[:WAITING_ITEMS_CAP], truncated
 
 
 # ---------------- pipeline probe (bounded, reuses the tts kernel) ----------------
@@ -323,11 +516,17 @@ def build_snapshot(
     parked: int,
     now: datetime,
     pipeline_probe: Callable[[list[str]], dict[str, str]],
+    parked_items: Optional[list[dict[str, Any]]] = None,
+    pending_approvals: Optional[list[dict[str, Any]]] = None,
+    escalations: Optional[list[dict[str, Any]]] = None,
 ) -> dict[str, Any]:
     """Build the structured_snapshot (spec § 3) from already-loaded inputs. Pure:
     no IO beyond the injected `pipeline_probe` (which the live path backs with the
     bounded gh reduce; tests inject a fake). This is the mechanical, ground-truth
     layer the prose rides on — it must be accurate, so it is fully unit-tested."""
+    parked_items = parked_items or []
+    pending_approvals = pending_approvals or []
+    escalations = escalations or []
     in_flight_set = set(in_flight)
 
     # Gather every task id across all active missions, probe once in bulk.
@@ -382,8 +581,38 @@ def build_snapshot(
         },
         'in_flight_now': len(in_flight),
         'sequences_active': sequences,
-        'waiting_on_larry': {'parked': parked},
+        'waiting_on_larry': _build_waiting_on_larry(
+            parked=parked,
+            parked_items=parked_items,
+            pending_approvals=pending_approvals,
+            escalations=escalations,
+            now=now,
+        ),
         'health': None,  # reserved — NOT this slice (Slice C).
+    }
+
+
+def _build_waiting_on_larry(
+    *,
+    parked: int,
+    parked_items: list[dict[str, Any]],
+    pending_approvals: list[dict[str, Any]],
+    escalations: list[dict[str, Any]],
+    now: datetime,
+) -> dict[str, Any]:
+    """Assemble the itemized cross-source `waiting_on_larry` block (Slice 2a, spec
+    § 2 D2): per-source counts + a grand total + a bounded, ordered `items` list.
+    `parked` is KEPT as a top-level count for back-compat with the current
+    /where-we-are panel (which reads `waiting_on_larry.parked`)."""
+    items, truncated = _finalize_waiting_items(
+        escalations, pending_approvals, parked_items, now)
+    return {
+        'parked': parked,                          # KEEP — /where-we-are reads this
+        'pending_approvals': len(pending_approvals),
+        'escalations': len(escalations),
+        'total': parked + len(pending_approvals) + len(escalations),
+        'items': items,
+        'truncated': truncated,
     }
 
 
@@ -401,6 +630,9 @@ def render_fallback_narrative(snapshot: dict[str, Any]) -> str:
     sequences = snapshot.get('sequences_active') or []
     waiting = snapshot.get('waiting_on_larry') or {}
     parked = waiting.get('parked') or 0
+    pending_approvals = waiting.get('pending_approvals') or 0
+    escalations = waiting.get('escalations') or 0
+    waiting_total = waiting.get('total') or 0
 
     if missions:
         lines.append(f'Active missions ({len(missions)}):')
@@ -431,9 +663,13 @@ def render_fallback_narrative(snapshot: dict[str, Any]) -> str:
             lines.append(
                 f'  - {s.get("seq_id")} [{s.get("status")}] step {s.get("step")}')
 
-    lines.append(
-        f'Waiting on you: {parked} parked item(s).'
-        if parked else 'Waiting on you: nothing parked.')
+    if waiting_total:
+        lines.append(
+            f'Waiting on you: {waiting_total} item(s) — '
+            f'{pending_approvals} approval(s), {escalations} escalation(s), '
+            f'{parked} parked.')
+    else:
+        lines.append('Waiting on you: nothing parked.')
 
     return '\n'.join(lines)
 
@@ -495,11 +731,15 @@ def author_narrative(
 def load_inputs() -> dict[str, Any]:
     """Load every snapshot input from the droplet filesystem, each section
     fail-safe to empty. Read-only on every source."""
+    parked_items = load_parked_items()
     return {
         'missions': load_active_missions(),
         'in_flight': load_in_flight(),
         'sequences': load_active_sequences(),
-        'parked': load_parked_count(),
+        'parked': len(parked_items),
+        'parked_items': parked_items,
+        'pending_approvals': load_pending_approvals(),
+        'escalations': load_for_larry_escalations(),
     }
 
 
@@ -530,6 +770,9 @@ def write_state_log(
         parked=inputs['parked'],
         now=now,
         pipeline_probe=probe,
+        parked_items=inputs.get('parked_items'),
+        pending_approvals=inputs.get('pending_approvals'),
+        escalations=inputs.get('escalations'),
     )
     prose, fallback = author_narrative(snapshot, use_llm=use_llm, voice_fn=voice_fn)
 
