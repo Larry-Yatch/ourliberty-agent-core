@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 03:54Z UTC (Iter ~2417, Tier 1, consecutive_clean=0→1, NOMINAL ✅)
+## Status snapshot — updated 2026-06-22 04:03Z UTC (Iter ~2418, Tier 1, consecutive_clean=1→2, NOMINAL ✅)
 
-**Iter ~2417 summary:** ✅ Nominal. All mandatory checks (0–5) and additive (A–E) clean. 0 new alerts (watermark=873, file_length=873). 5/5 daemons alive (PIDs unchanged: inbox_watcher=559441, outbox_notifier=913753, beacon=599691, dashboard_api=920762, chain-event=3734305). 0 open PRs. 0 inbox tasks. Monday conditional checks (Check I sentinel EXISTS, Check VIII/IX/X already ran in ~2413, Check III 11d<14d gate) → all skipped. **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15 proposal, Tier-2 probe auth_401, Check III proposals.** PRIME: 0 interventions (iter_clean), systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** consecutive_clean=0→1. Next cadence: 5-min (Tier 1).
+**Iter ~2418 summary:** ✅ Nominal. All mandatory checks (0–5) and additive (A–E) clean. 4 new Tier-3 alerts (watermark 873→877): heal-stale-daemon-code auto-restarted beacon/chain-event/outbox_notifier/dashboard_api after PR #623 (`feat(autonomy): autonomy_decision chain event`) — all silenced route=digest. 5/5 daemons alive with updated PIDs: inbox_watcher=559441, beacon=930450, chain_event=930563, outbox_notifier=930686, dashboard_api=930797. 0 open PRs. 0 inbox tasks. Monday conditional checks (Check I sentinel EXISTS, Check VIII/IX/X already ran in ~2413, Check III 11d<14d gate) → all skipped. **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15 proposal, Tier-2 probe auth_401, Check III proposals.** PRIME: 0 interventions (iter_clean), systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** consecutive_clean=1→2. Next cadence: 5-min (Tier 1).
 
 
 
