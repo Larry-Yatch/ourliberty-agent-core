@@ -168,9 +168,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 16:05Z UTC (Iter ~2457, Tier 3→3, consecutive_clean=4→5, NOMINAL ✅)
+## Status snapshot — updated 2026-06-22 16:37Z UTC (Iter ~2458, Tier 3→3, consecutive_clean=5→6, NOMINAL ✅)
 
-**Iter ~2457 summary:** ✅ Nominal. 0 new alerts (watermark=919=file_length). 5/5 daemons alive (same PIDs). HEAD=36335119. **NOTABLE: PR #634 MERGED** (spec(projects-v3) P7 — Generalize + shelf + dashboard-wide). deploy-notifier:ERROR main-branch [yellow] CLEARED (no new error 45+ min post-PR#81 merge). Both repos at 0 open PRs. **Standing [yellow]: install-drift:doorbell, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals, unreviewed-merge:607.** PRIME: systemic_fixes=56, ratio=18.95, trend=improving. **G-rule sync.service-deploy-restart-storm-tier4: 1/3. G-rule mirror-marker-parse-error: 2/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Next cadence: 30-min (Tier 3, consecutive_clean=5).
+**Iter ~2458 summary:** ✅ Nominal. 0 new alerts (watermark=919=file_length). 5/5 daemons alive (same PIDs). HEAD=95206c05 (wraps PR#634 merge 36335119). Both repos at 0 open PRs. deploy-notifier:ERROR CLEARED confirmed. **Standing [yellow]: install-drift:doorbell, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals, unreviewed-merge:607.** PRIME: systemic_fixes=56, ratio=18.95, trend=improving. **G-rule sync.service-deploy-restart-storm-tier4: 1/3. G-rule mirror-marker-parse-error: 2/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Next cadence: 30-min (Tier 3, consecutive_clean=6).
 
 
 
