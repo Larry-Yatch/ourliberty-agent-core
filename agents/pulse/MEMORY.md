@@ -168,9 +168,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 22:58Z UTC (Iter ~2475, Tier 3, consecutive_clean=6, NOMINAL ✅)
+## Status snapshot — updated 2026-06-22 23:28Z UTC (Iter ~2476, Tier 3, consecutive_clean=7, NOMINAL ✅)
 
-**Iter ~2475 summary:** ✅ Nominal. 1 new alert L930 (outbox-notifier mirror-dag-pass:slice-2b, Tier-3 silence). Watermark=930. Dashboard PR #84 merged 22:32Z. Slice-2b dispatched to Forge inbox by sequence advancer (not stale). 5/5 daemons alive (same PIDs: chain_event=930563, beacon=1149166, dashboard_api=1149238, inbox_watcher=1026206, outbox_notifier=1149312). Both repos 0 open PRs. Tier 3, consecutive_clean=5→6. **Standing [yellow]: unreviewed-merge:637, unreviewed-merge:607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals.** PRIME: systemic_fixes=56, ratio=19.0, trend=improving. **G-rule mirror-marker-parse-error: 2/3. G-rule sync.service-deploy-restart-storm-tier4: 1/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Tier 3, consecutive_clean=6, next cadence: 30-min.
+**Iter ~2476 summary:** ✅ Nominal. 0 new alerts (watermark=930=file_length). Forge processed slice-2b dispatch → dashboard PR #85 ("autonomy posture panel") opened 23:16Z, MERGEABLE, no Mirror review yet (12 min old, watch next iter). 5/5 daemons alive (same PIDs: chain_event=930563, beacon=1149166, dashboard_api=1149238, inbox_watcher=1026206, outbox_notifier=1149312). agent-core: 0 open PRs. Tier 3, consecutive_clean=6→7. **Standing [yellow]: unreviewed-merge:637, unreviewed-merge:607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals.** PRIME: systemic_fixes=56, ratio=19.0, trend=improving. **G-rule mirror-marker-parse-error: 2/3. G-rule revision-phase-preamble-missing: 2/3. G-rule mirror-no-session-revision-loop: 2/3. G-rule telegram-409-burst: 2/3. G-rule Forge-preflight-CLARIFY_REQUEST: 2/3.** Tier 3, consecutive_clean=7, next cadence: 30-min.
 
 
 
