@@ -4457,6 +4457,23 @@
       "repo": "ourliberty-dashboard",
       "created": "2026-06-22",
       "deferred_reason": null
+    },
+    {
+      "id": "proposed-pr-625-mirror-review-dispatch-001",
+      "name": "PR 625 Mirror Review Dispatch 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-625-mirror-review-dispatch-001`. Last activity 2026-06-22T05:05:24.078035+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-625-mirror-review-dispatch-001"
+      ],
+      "repo": null,
+      "created": "2026-06-22",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-22T05:05:59.325782+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-22T05:05:24.078035+00:00"
     }
   ]
 }
