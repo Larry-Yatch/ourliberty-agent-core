@@ -168,9 +168,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 18:15Z UTC (Iter ~2461, Tier 3→1, consecutive_clean=8→0, AUTO-FIX ✅)
+## Status snapshot — updated 2026-06-22 18:21Z UTC (Iter ~2462, Tier 1→1, consecutive_clean=0→1, NOMINAL ✅)
 
-**Iter ~2461 summary:** ⚠️ Auto-fix (2 actions). Check A: repo behind 1 commit (PR #638 shelf-descriptor schema merged) → fast-forwarded e943929c→4c65ddef. Check E: PR #637 (spec/p7.2-re-scope) clean+green >30 min → auto-merge enabled. **install-drift:ourliberty-doorbell.service+timer CLEARED** — heal-systemd-install-drift closure alerts verified; service+timer installed at /etc/systemd/system/. 1 new alert L920 (install-resolved:timer) Tier-3 silenced. Watermark 919→920. p7 sequence active: PR #82 (feat/approvals adopt UniversalCard) opened by Forge, Mirror review task fresh. **Standing [yellow]: credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals, unreviewed-merge:607.** PRIME: systemic_fixes=56, ratio=18.96, trend=improving. **G-rule mirror-marker-parse-error: 2/3. G-rule sync.service-deploy-restart-storm-tier4: 1/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Tier-reset to 1, next cadence: 5-min.
+**Iter ~2462 summary:** ✅ Nominal. 1 new alert L921 (sequence-complete:projects-v3-p7, Tier-3 silence). **P7 sequence COMPLETE** — PR #638 (shelf-descriptor schema, agent-core) + PR #82 (approvals adopt UniversalCard, dashboard) both merged. 0 open PRs both repos. Watermark 920→921. **Standing [yellow]: credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals, unreviewed-merge:607.** PRIME: systemic_fixes=56, ratio=18.98, trend=improving. **G-rule mirror-marker-parse-error: 2/3. G-rule sync.service-deploy-restart-storm-tier4: 1/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Tier 1, consecutive_clean=1, next cadence: 5-min.
 
 
 
