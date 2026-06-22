@@ -4549,7 +4549,11 @@
         "at": "2026-06-22T05:44:49.823638+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-22T06:06:19.791433+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-delegate-cap-projects-pm-layer-data-is-stale-separate-system-84ec",
@@ -4673,7 +4677,11 @@
         "at": "2026-06-22T05:55:11.914408+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-22T06:06:19.791433+00:00",
+      "retired_reason": "orphan-terminal"
     }
   ]
 }
