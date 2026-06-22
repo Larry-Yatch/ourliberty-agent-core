@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 05:37Z UTC (Iter ~2426, Tier 1, consecutive_clean=0→1, NOMINAL ✅)
+## Status snapshot — updated 2026-06-22 05:46Z UTC (Iter ~2427, Tier 1, consecutive_clean=1→2, NOMINAL ✅)
 
-**Iter ~2426 summary:** ✅ Nominal. 0 new alerts (watermark stays 884). 5/5 daemons alive: inbox_watcher=559441, beacon=930450, chain_event=930563, outbox_notifier=944877 (second restart since ~2425 at 05:23Z post-PR #627 deploy, alive), dashboard_api=930797. No open PRs. Board-drain pipeline active: 3 tasks (source=dashboard) arrived in Beacon inbox during cycle window; phantom-build-phase task auto-dispatched to Forge (fix-phantom-build-phase-terminal-guard-001 build-phase at 05:36Z). beacon-pending-approvals: pending=0, history=249. **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. [blue]: unreviewed-merge:625+627.** PRIME: iter_clean, systemic_fixes=55, ratio≈19.3. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** Tier 1, consecutive_clean=0→1. Next cadence: 5-min (Tier 1).
+**Iter ~2427 summary:** ✅ Nominal. 2 new alerts (L885-L886) both Tier-3. 5/5 daemons alive (new PIDs: beacon=951720 restarted 05:40:16Z unknown cause, dashboard_api=951414 auto-restarted by heal-stale-daemon-code per L886). PR #628 open (Mirror actively reviewing fix-phantom-build-phase-terminal-guard-001). Forge running projects-stale-gc-archive-completed-001. beacon-pending-approvals: pending=0, history=250. **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. [blue]: unreviewed-merge:625+627, beacon-bot-restart:951720.** PRIME: iter_clean, systemic_fixes=55, ratio≈19.3. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** Tier 1, consecutive_clean=1→2. Next cadence: 5-min (Tier 1).
 
 
 
