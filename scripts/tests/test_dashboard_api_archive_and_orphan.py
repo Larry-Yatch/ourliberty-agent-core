@@ -42,6 +42,7 @@ TOKEN = 'test-token-value'
 os.environ.setdefault('DASHBOARD_API_TOKEN', TOKEN)
 
 import dashboard_api as da  # noqa: E402
+import projects_store  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 ARCHIVE = '/api/projects/archive'
@@ -276,7 +277,7 @@ class ArchiveHonestMessageTest(_Base):
         self.assertEqual(r.status_code, 200)
         body = r.json()
         self.assertEqual(body['status'], 'archived')
-        self.assertEqual(body['message'], 'Archived')
+        self.assertEqual(body['message'], 'Archived.')
         self.assertTrue(body['applied'])
         self.assertEqual(self.gh.calls, [])
 
@@ -289,7 +290,7 @@ class ArchiveHonestMessageTest(_Base):
         self.assertEqual(r.status_code, 200)
         body = r.json()
         self.assertEqual(body['status'], 'returned-to-funnel')
-        self.assertEqual(body['message'], 'returned to the funnel')
+        self.assertEqual(body['message'], 'Dropped — returned to the funnel.')
         # mission/orphan return structurally — captures.json is untouched.
         self.assertEqual(self.captures_path.read_text(), before_caps)
         self.assertEqual(self.gh.calls, [])
@@ -300,7 +301,7 @@ class ArchiveHonestMessageTest(_Base):
             promoted_from={'kind': 'orphan', 'task_id': 'orphan-task-1'}))
         r = self.client.post(ARCHIVE, headers=AUTH, json={'project_id': 'aging-idea'})
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['message'], 'returned to the funnel')
+        self.assertEqual(r.json()['message'], 'Dropped — returned to the funnel.')
 
     # ---- capture provenance → re-park the capture so the return is REAL ----
     def test_archive_capture_re_parks_and_says_returned(self):
@@ -313,7 +314,7 @@ class ArchiveHonestMessageTest(_Base):
         self.assertEqual(r.status_code, 200)
         body = r.json()
         self.assertEqual(body['status'], 'returned-to-funnel')
-        self.assertEqual(body['message'], 'returned to the funnel')
+        self.assertEqual(body['message'], 'Dropped — returned to the funnel.')
         self.assertEqual(self.gh.calls, [])
 
         # The capture is actually back in the parked lane — state flipped, the
@@ -345,7 +346,7 @@ class ArchiveHonestMessageTest(_Base):
         self.assertEqual(r.status_code, 200)
         body = r.json()
         # Nothing was re-parked → the toast must NOT claim a return.
-        self.assertEqual(body['message'], 'Archived')
+        self.assertEqual(body['message'], 'Archived.')
         self.assertEqual(body['status'], 'archived')
         self.assertEqual(self._project_on_disk('cap-1-proj')['state'], 'archived')
 
@@ -356,7 +357,7 @@ class ArchiveHonestMessageTest(_Base):
         self.assertEqual(again.status_code, 200)
         again_body = again.json()
         self.assertFalse(again_body['applied'])
-        self.assertEqual(again_body['message'], 'Archived')
+        self.assertEqual(again_body['message'], 'Archived.')
         self.assertEqual(again_body['status'], 'archived')
 
     # ---- idempotent re-archive still reports the honest outcome, no 2nd write ----
@@ -376,10 +377,159 @@ class ArchiveHonestMessageTest(_Base):
         self.assertEqual(second.status_code, 200)
         body = second.json()
         self.assertFalse(body['applied'])
-        self.assertEqual(body['message'], 'returned to the funnel')
+        self.assertEqual(body['message'], 'Dropped — returned to the funnel.')
         # No second write to either store (no spurious heal-commit churn).
         self.assertEqual(self.captures_path.read_text(), caps_after_first)
         self.assertEqual(self.projects_path.read_text(), projs_after_first)
+
+
+# ============ Complete & retire: a Done project leaves the board, source kept ===
+
+
+def _done_project(pid='done-idea', *, promoted_from=None, **extra):
+    """A project whose every phase is done → coarse rollup 'done' → the terminal
+    Drop RETIRES it (state 'retired', source NOT returned) rather than dropping it
+    back to the funnel."""
+    proj = _project(pid, phases=[_phase(pid, lifecycle_state='done')], **extra)
+    if promoted_from is not None:
+        proj['promoted_from'] = promoted_from
+    return proj
+
+
+class RetireDoneProjectTest(_Base):
+    """p3f3-complete-and-retire: a DONE project's Drop is the terminal "Complete &
+    retire" gesture — state→'retired', it leaves the board, and its funnel source
+    is NOT returned (done is done, not a mis-promote). A not-done project keeps the
+    reversible return-to-funnel behavior unchanged."""
+
+    def _capture_on_disk(self, cid) -> dict:
+        for cap in json.loads(self.captures_path.read_text())['captures']:
+            if cap['id'] == cid:
+                return cap
+        raise AssertionError(f'capture {cid} not on disk')
+
+    def test_done_project_retires_with_completed_message(self):
+        self._seed_projects(_done_project(
+            promoted_from={'kind': 'mission', 'mission_id': 'm-1'}))
+        r = self.client.post(ARCHIVE, headers=AUTH, json={'project_id': 'done-idea'})
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(body['status'], 'retired')
+        self.assertEqual(body['message'], 'Completed — cleared from the board.')
+        self.assertEqual(body['state'], 'retired')
+        self.assertTrue(body['applied'])
+        self.assertEqual(self._project_on_disk('done-idea')['state'], 'retired')
+        self.assertEqual(self.gh.calls, [])
+        # A retired project leaves the pipeline like any non-active project.
+        from projects_store import build_pipeline
+        self.assertEqual(build_pipeline(self._read_projects()), [])
+
+    def test_retire_done_mission_stays_suppressed(self):
+        # The whole point: a retired Done mission must NOT bounce back into the
+        # funnel. The suppression set still counts it (active OR retired).
+        self._seed_projects(_done_project(
+            promoted_from={'kind': 'mission', 'mission_id': 'm-1'}))
+        self.client.post(ARCHIVE, headers=AUTH, json={'project_id': 'done-idea'})
+        self.assertIn('m-1', da._promoted_mission_ids(self._read_projects()))
+
+    def test_retire_done_orphan_stays_suppressed(self):
+        self._seed_projects(_done_project(
+            promoted_from={'kind': 'orphan', 'task_id': 'orphan-task-1'}))
+        self.client.post(ARCHIVE, headers=AUTH, json={'project_id': 'done-idea'})
+        self.assertIn(
+            'orphan-task-1', da._promoted_orphan_task_ids(self._read_projects()))
+
+    def test_retire_done_capture_not_re_parked(self):
+        # A capture-sourced Done project: retire leaves the capture CONSUMED
+        # ('promoted'), NOT re-parked — the work shipped, it's not parked intake.
+        self._seed_captures(_capture('cap-1', promoted_to='cap-1-proj'))
+        self._seed_projects(_done_project(
+            'cap-1-proj', promoted_from={'kind': 'capture', 'capture_id': 'cap-1'}))
+        r = self.client.post(ARCHIVE, headers=AUTH, json={'project_id': 'cap-1-proj'})
+        self.assertEqual(r.json()['status'], 'retired')
+        self.assertEqual(self._capture_on_disk('cap-1')['state'], 'promoted')
+
+    def test_re_retire_is_idempotent_no_second_write(self):
+        self._seed_projects(_done_project(
+            promoted_from={'kind': 'mission', 'mission_id': 'm-1'}))
+        first = self.client.post(ARCHIVE, headers=AUTH, json={'project_id': 'done-idea'})
+        self.assertTrue(first.json()['applied'])
+        projs_after = self.projects_path.read_text()
+        second = self.client.post(ARCHIVE, headers=AUTH, json={'project_id': 'done-idea'})
+        self.assertEqual(second.status_code, 200)
+        body = second.json()
+        self.assertFalse(body['applied'])
+        self.assertEqual(body['status'], 'retired')
+        self.assertEqual(body['message'], 'Completed — cleared from the board.')
+        self.assertEqual(self.projects_path.read_text(), projs_after)
+
+    def test_idempotent_outcome_tracks_recorded_state_not_phases(self):
+        # Guard the honesty contract on the already-terminal path: a project
+        # DROPPED while not-done (→ 'archived', returned to funnel) whose phases
+        # later complete OFFLINE must, on a re-archive, report its RECORDED state
+        # ('archived' / returned-to-funnel) — NOT a phase-recomputed 'retired'.
+        # state and status can never disagree.
+        self._seed_projects(_project(
+            'drift-idea', promoted_from={'kind': 'mission', 'mission_id': 'm-3'}))
+        first = self.client.post(ARCHIVE, headers=AUTH, json={'project_id': 'drift-idea'})
+        self.assertEqual(first.json()['state'], 'archived')
+        # Simulate the project's phases completing after it was dropped.
+        self._seed_projects(_project(
+            'drift-idea', state='archived',
+            phases=[_phase('drift-idea', lifecycle_state='done')],
+            promoted_from={'kind': 'mission', 'mission_id': 'm-3'}))
+        again = self.client.post(ARCHIVE, headers=AUTH, json={'project_id': 'drift-idea'})
+        body = again.json()
+        self.assertFalse(body['applied'])
+        self.assertEqual(body['state'], 'archived')
+        self.assertEqual(body['status'], 'returned-to-funnel')
+        self.assertNotEqual(body['status'], 'retired')
+
+    def test_partially_done_project_still_returns_to_funnel(self):
+        # Not every phase done → NOT a retire → the reversible drop still returns
+        # the mission to the funnel (the in-flight escape hatch is unchanged).
+        self._seed_projects(_project(
+            'half-idea',
+            phases=[_phase('p1', lifecycle_state='done', order=0),
+                    _phase('p2', lifecycle_state='building', order=1)],
+            promoted_from={'kind': 'mission', 'mission_id': 'm-2'}))
+        r = self.client.post(ARCHIVE, headers=AUTH, json={'project_id': 'half-idea'})
+        self.assertEqual(r.json()['status'], 'returned-to-funnel')
+        self.assertEqual(self._project_on_disk('half-idea')['state'], 'archived')
+        self.assertNotIn('m-2', da._promoted_mission_ids(self._read_projects()))
+
+
+class RetireHelperUnitTest(unittest.TestCase):
+    """The pure projects_store helpers the retire branch hinges on."""
+
+    def test_suppresses_funnel_source(self):
+        self.assertTrue(projects_store.suppresses_funnel_source('active'))
+        self.assertTrue(projects_store.suppresses_funnel_source('retired'))
+        self.assertFalse(projects_store.suppresses_funnel_source('archived'))
+        self.assertFalse(projects_store.suppresses_funnel_source('nonsense'))
+
+    def test_project_is_done(self):
+        self.assertTrue(projects_store.project_is_done(
+            {'phases': [{'lifecycle_state': 'done'},
+                        {'lifecycle_state': 'done'}]}))
+        self.assertFalse(projects_store.project_is_done(
+            {'phases': [{'lifecycle_state': 'done'},
+                        {'lifecycle_state': 'building'}]}))
+        # No phases / junk → not done (fail-safe).
+        self.assertFalse(projects_store.project_is_done({'phases': []}))
+        self.assertFalse(projects_store.project_is_done({}))
+        self.assertFalse(projects_store.project_is_done(None))
+
+    def test_promoted_mission_ids_counts_active_and_retired_not_archived(self):
+        projects = [
+            {'state': 'active',
+             'promoted_from': {'kind': 'mission', 'mission_id': 'a'}},
+            {'state': 'retired',
+             'promoted_from': {'kind': 'mission', 'mission_id': 'r'}},
+            {'state': 'archived',
+             'promoted_from': {'kind': 'mission', 'mission_id': 'x'}},
+        ]
+        self.assertEqual(da._promoted_mission_ids(projects), {'a', 'r'})
 
 
 # ==================== orphan promote ====================
