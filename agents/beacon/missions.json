@@ -4504,7 +4504,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-22T05:21:15.748634+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-04T05:42:36.395963+00:00"
+      "orphan_last_activity_ts": "2026-06-04T05:42:36.395963+00:00",
+      "briefing": {
+        "what": "A cleanup effort to fix tests that were failing or going stale because of timezone differences.",
+        "why": "Flaky timezone-related tests slow the team down and can hide real problems, eroding trust in our quality checks.",
+        "suggest": "Let it move forward, but ask for a quick confirmation that the fix holds up before it's fully wrapped."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-22T05:24:17.317855+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
