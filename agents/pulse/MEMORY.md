@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 04:15Z UTC (Iter ~2419, Tier 1→2, consecutive_clean=2→3, NOMINAL ✅)
+## Status snapshot — updated 2026-06-22 04:27Z UTC (Iter ~2420, Tier 2, consecutive_clean=0→1, NOMINAL ✅)
 
-**Iter ~2419 summary:** ✅ Nominal. All mandatory checks (0–5) and additive (A–E) clean. 0 new alerts (watermark 877, file_length 877). 5/5 daemons alive (PIDs unchanged): inbox_watcher=559441, beacon=930450, chain_event=930563, outbox_notifier=930686, dashboard_api=930797. 0 open PRs. 0 inbox tasks. Monday conditional checks (Check I sentinel EXISTS, Check VIII/IX/X already ran in ~2413, Check III 11d<14d gate) → all skipped. **Tier de-escalation: 1→2 (3rd consecutive clean iter).** **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15 proposal, Tier-2 probe auth_401, Check III proposals.** PRIME: 0 interventions (iter_clean), systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** consecutive_clean=0 (reset after de-escalation). Next cadence: 15-min (Tier 2).
+**Iter ~2420 summary:** ✅ Nominal. All mandatory checks (0–5) and additive (A–E) clean. 0 new alerts (watermark 877, file_length 877). 5/5 daemons alive (PIDs unchanged): inbox_watcher=559441, beacon=930450, chain_event=930563, outbox_notifier=930686, dashboard_api=930797. 0 open PRs. 0 inbox tasks. Monday conditional checks (Check I sentinel EXISTS, Check VIII/IX/X already ran in ~2413, Check III 11d<14d gate) → all skipped. **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15 proposal, Tier-2 probe auth_401, Check III proposals.** PRIME: 0 interventions (iter_clean), systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** consecutive_clean=1 (Tier 2). Next cadence: 15-min (Tier 2).
 
 
 
