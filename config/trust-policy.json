@@ -30,8 +30,8 @@
         {
             "source": "pulse-auto-dispatch",
             "target": "*",
-            "action": "force_ask",
-            "_note": "Closed-loop step 4 (2026-05-24). Pulse-auto-dispatch envelopes route through trust_policy via outbox_notifier._route_beacon_pulse_auto_dispatch_approval. v1 ships force_ask only \u2014 Skipping Larry's approval for Pulse-judged dispatches is out of scope per closed-loop spec \u00a7 5. Redundant with default_action today but kept explicit so the operator sees this source has been considered. Edit `action` to auto_approve to wire in carve-outs as Larry builds confidence."
+            "action": "auto_approve",
+            "_note": "AUTONOMY (2026-06-22, Larry-approved). Pulse-auto-dispatch envelopes auto-fire without Larry's pre-build click. SAFE because the envelope only asks Beacon to DRAFT A SPEC (target_agent=beacon, no build), and Pulse only auto-dispatches candidates that are effort=small AND $-quantified, always targeting ourliberty-agent-core (pulse_check_i._is_auto_dispatch_eligible / _build_dispatch_envelope). The downstream build (Beacon->Forge->agent-core) is still governed by the rules below + Mirror REVIEW_PASS before any merge + classify_careful exclusion + EMERGENCY_HALT/pause. This removes ONLY the 'draft a spec?' click. REVERT = set action back to force_ask (re-read on every evaluate(), no restart). Was force_ask (closed-loop v1 conservatism, 2026-05-24)."
         },
         {
             "source": "beacon",
