@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 04:47Z UTC (Iter ~2421, Tier 2, consecutive_clean=1→2, NOMINAL ✅)
+## Status snapshot — updated 2026-06-22 05:05Z UTC (Iter ~2422, Tier 2→1, consecutive_clean=2→0, STALL ⚠️)
 
-**Iter ~2421 summary:** ✅ Nominal. All mandatory checks (0–5) and additive (A–E) clean. 0 new alerts (watermark 877, file_length 877). 5/5 daemons alive (PIDs unchanged): inbox_watcher=559441, beacon=930450, chain_event=930563, outbox_notifier=930686, dashboard_api=930797. 0 open PRs. 0 inbox tasks. Monday conditional checks (Check I sentinel EXISTS, Check VIII/IX/X already ran in ~2413, Check III 11d<14d gate) → all skipped. **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15 proposal, Tier-2 probe auth_401, Check III proposals.** PRIME: 0 interventions (iter_clean), systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** consecutive_clean=2 (Tier 2). Next cadence: 15-min (Tier 2).
+**Iter ~2422 summary:** ⚠️ Check E stall — PR #625 (`fix(heal-install-drift): drop duplicate daemon-reload`) open in T0, author=Larry-Yatch (direct, bypassed pipeline), created 04:51Z, no Mirror review dispatched. Direction-ask sent to Beacon (`pr-625-mirror-review-dispatch-001.json`). All other checks nominal. 0 new alerts (watermark 877, file_length 877). 5/5 daemons alive (PIDs unchanged): inbox_watcher=559441, beacon=930450, chain_event=930563, outbox_notifier=930686, dashboard_api=930797. Monday conditional checks (Check I sentinel EXISTS, Check VIII/IX/X already ran in ~2413, Check III 11d<14d gate) → all skipped. **Standing [yellow]: PR #625 untracked Mirror review (dispatched), unreviewed-merge:607, Check VIII 2026-06-15 proposal, Tier-2 probe auth_401, Check III proposals.** PRIME: 1 intervention (check-e-stall-untracked-pr), systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** Tier 2→1 (signal). Next cadence: 5-min (Tier 1).
 
 
 
