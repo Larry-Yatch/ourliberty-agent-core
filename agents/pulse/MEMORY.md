@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 02:11Z UTC (Iter ~2413, Tier 3, consecutive_clean=4→5, NOMINAL ✅)
+## Status snapshot — updated 2026-06-22 02:51Z UTC (Iter ~2414, Tier 3, consecutive_clean=5→6, NOMINAL ✅)
 
-**Iter ~2413 summary:** ✅ Nominal. 6 new alerts (L866-L871: all Tier-3 silenced — dispatch-branch-cleanup x2, outbox-notifier mirror-dag-pass + sequence-complete slice-2a, heal-stale-daemon-code x2). 5/5 daemons alive (NEW PIDs: outbox_notifier=913753, dashboard_api=913511 — heal-stale-daemon-code restart at 01:25Z for P6.1 commit 8822216a; inbox_watcher=559441, beacon=599691, chain-event=3734305 unchanged). 0 open PRs. 0 inbox tasks (1 Check I dispatch envelope in Beacon inbox). **Monday checks: Check I mode=digest, 1 proposal auto-dispatched (cycle-202606190057210000, 17.2σ). Check VIII insufficient_signal (prior 2026-06-15 lower proposal still on table). Check IX 2/2 deduped. Check X outcome=none.** **Standing [yellow]:** install-drift:ourliberty-launch-dedup-gc.service + .timer (operator SSH action still needed). PRIME: systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** Tier 3, consecutive_clean=4→5 (stays Tier 3). Next cadence: 30-min (Tier 3).
+**Iter ~2414 summary:** ✅ Nominal. 2 new alerts (L872-L873: ledger weekly + Check I digest, both Tier-3 silenced). 5/5 daemons alive (dashboard_api NEW PID 920762 — restarted since iter ~2413, likely for "Pulse cycle" commit; inbox_watcher=559441, outbox_notifier=913753, beacon=599691, chain-event=3734305 unchanged). 0 open PRs. 0 inbox tasks. **Monday conditional checks all already ran in iter ~2413 → skipped.** **RESOLVED [yellow]: install-drift:ourliberty-launch-dedup-gc — timer now active in /etc/systemd/system/ since 20:34 MDT 2026-06-21 (Larry took operator action between iters). Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15 proposal, Tier-2 probe auth_401, Check III proposals.** PRIME: systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** Tier 3, consecutive_clean=5→6 (stays Tier 3). Next cadence: 30-min (Tier 3).
 
 
 
