@@ -26,8 +26,30 @@ anywhere (inbox / archive / .invalid), dispatches one. Because it reads GitHub �
 not a local outbox that a reap can prevent from ever existing — it recovers the
 exact failure shape that defeated the outbox-based reconcile.
 
+EXTENSION — opt-in label for human PRs (2026-06-22):
+
+The same structural blindness also stranded PRs Larry opens by hand (#509, #510,
+#625): they live on non-`forge/*` branches, so the inline Forge→Mirror dispatch
+(keyed off Forge's build outbox, which only Forge writes) never fired, AND this
+backstop's forge-only filter skipped them — they sat unreviewed until a human
+noticed. This healer now also routes any *non-draft* PR carrying the
+`auto-review` label to a Mirror review, exactly like a Forge PR (a Mirror PASS
+auto-merges).
+
+Why a LABEL and not a branch rule: neither branch prefix nor PR author can
+separate Larry's hand-opened PRs from the agent team's. The team commits as
+Larry's own GitHub identity and uses the very same prefixes (`fix/`, `feat/`,
+`chore/`, …). So "any non-forge branch == human" is false — it would auto-merge
+agent PRs, including the `feat/new-mission-*` PRs that heal_orphan_autoregister
+must CLOSE rather than merge. The label is the one reliable signal: it is applied
+only on the desktop side (whatever opens a PR for Larry tags it — the droplet
+agents never add it), so a labeled PR is unambiguously cleared for the team.
+Draft is the safety valve: a draft labeled PR is "still iterating" and is left
+alone until marked ready, so an unfinished PR is never auto-merged.
+
 Key design points (follows the heal_* conventions):
-  - GitHub-truth: `gh pr list --state open` → filter to `forge/*` head branches.
+  - GitHub-truth: `gh pr list --state open` → keep Forge build PRs (`forge/*`
+    head) and non-draft PRs labeled `auto-review`; everything else is skipped.
   - "Already reviewed" is decided by `outbox_notifier._review_request_already_dispatched`
     (the SAME predicate the inline dispatch + outbox reconcile use), NOT GitHub's
     `reviewDecision` — Mirror emits marker blocks, never a GitHub review, so
@@ -88,11 +110,23 @@ HEARTBEAT_FILE = AGENTS_ROOT / 'blackboard' / 'heal-undispatched-pr-review.heart
 STATE_FILE = AGENTS_ROOT / 'state' / 'heal-undispatched-pr-review.json'
 
 REPO = 'Larry-Yatch/ourliberty-agent-core'
-# Only Forge-produced build PRs are dispatched a Mirror review by the pipeline.
-# The reliable signal of a Forge PR is its head branch prefix (the worktree/branch
-# convention `forge/<task-id>`); PR author is the human identity the bot commits
-# as, so it cannot distinguish bot PRs from Larry's own and is NOT used to gate.
+# Two classes of open PR get auto-routed to a Mirror review:
+#   1. Forge build PRs — head branch `forge/<task-id>` (the original #412 gap).
+#      Reviewed unconditionally; the proven path.
+#   2. Opt-in PRs — any PR carrying the AUTO_REVIEW_LABEL, reviewed when NOT a
+#      draft (the #509/#510/#625 gap — PRs Larry opens by hand sat unreviewed).
 FORGE_BRANCH_PREFIX = 'forge/'
+# The explicit opt-in marker for class 2. Neither branch prefix nor PR author can
+# distinguish Larry's hand-opened PRs from the agent team's: the team commits as
+# Larry's own GitHub identity AND uses the same branch prefixes (`fix/`, `feat/`,
+# `chore/`, … — see post_merge_verifier.list_recent_merged_agent_prs). So "any
+# non-forge branch == human" is FALSE and would auto-merge agent PRs (incl.
+# `feat/new-mission-*`, which heal_orphan_autoregister must CLOSE, not merge).
+# The label is the only reliable signal: it is applied only on the desktop side
+# (whatever opens a PR for Larry tags it; the droplet agents never add it), so a
+# labeled PR is unambiguously "cleared for the team." Draft still gates it — a
+# draft labeled PR is "still iterating" and is left alone until marked ready.
+AUTO_REVIEW_LABEL = 'auto-review'
 
 GH_TIMEOUT_S = 30
 # Per-call row cap. Open Forge PRs at any instant are few (bounded by the fleet's
@@ -208,13 +242,13 @@ def _parse_iso(ts: str) -> Optional[datetime]:
 def fetch_open_prs() -> Optional[list[dict[str, Any]]]:
     """List open PRs via gh. Returns parsed rows, or None on ANY gh failure
     (already logged) — a healer must never crash the timer. Each row carries
-    number, url, headRefName, createdAt, title, headRefOid."""
+    number, url, headRefName, createdAt, title, headRefOid, isDraft, labels."""
     cmd = [
         'gh', 'pr', 'list',
         '--repo', REPO,
         '--state', 'open',
         '--limit', str(_OPEN_PR_FETCH_LIMIT),
-        '--json', 'number,url,headRefName,createdAt,title,headRefOid',
+        '--json', 'number,url,headRefName,createdAt,title,headRefOid,isDraft,labels',
     ]
     try:
         proc = subprocess.run(
@@ -259,21 +293,61 @@ def parse_open_prs(raw_json: str) -> list[dict[str, Any]]:
             # head was reviewed" from "an EARLIER head was reviewed". Tolerated
             # absent (older gh, mocks) → dedup falls back to existence-only.
             'headRefOid': r.get('headRefOid'),
+            # Draft state gates the opt-in path (a draft is "still iterating",
+            # never auto-routed). Forge PRs ignore it. Absent (older gh / mocks)
+            # coerces to False — gh always returns a requested field in practice.
+            'isDraft': bool(r.get('isDraft')),
+            # Label NAMES (gh returns `labels` as [{name,color,...}]). The
+            # `auto-review` label is the opt-in marker for the non-Forge path.
+            # Malformed/absent → empty list (no opt-in).
+            'labels': [
+                lbl.get('name') for lbl in (r.get('labels') or [])
+                if isinstance(lbl, dict) and lbl.get('name')
+            ],
         })
     return out
 
 
 # -------------------- core detection (pure) --------------------
 
-def task_id_for_branch(head_ref: str) -> str:
-    """Map a Forge head branch to its task_id: strip the `forge/` prefix. This is
-    the inverse of the worktree/branch convention `forge/<task-id>` and matches
-    the task_id the build outbox would have carried — so the derived review
-    filename `review-<task-id>.json` lines up with the inline path's idempotency
-    key."""
+def task_id_for_branch(head_ref: str, pr_number: Optional[int] = None) -> str:
+    """Map an open PR's head branch to the task_id used for its Mirror review
+    request filename (`review-<task_id>.json`).
+
+    - Forge build branch `forge/<task-id>`: strip the prefix. This is the inverse
+      of the worktree/branch convention and matches the task_id the build outbox
+      would have carried — so the derived filename lines up with the inline path's
+      idempotency key (else the backstop would duplicate the inline review).
+    - Any other (opt-in / human-authored) branch: there is no upstream task_id and
+      no inline dispatch to collide with, so key by PR number — `pr-<number>`. It
+      is stable across ticks (dedup works) and unique per PR, so two branches that
+      sanitize to the same on-disk name can't collide into one review. Falls back
+      to the raw branch only when no pr_number is supplied (defensive)."""
     if head_ref.startswith(FORGE_BRANCH_PREFIX):
         return head_ref[len(FORGE_BRANCH_PREFIX):]
+    if pr_number is not None:
+        return f'pr-{pr_number}'
     return head_ref
+
+
+def _is_reviewable_pr(head_ref: str, is_draft: bool, labels: Any) -> bool:
+    """Whether an open PR should be auto-routed to a Mirror review.
+
+    - `forge/*` — Forge build PR: always (the proven path; draft state ignored,
+      Forge does not draft its build PRs).
+    - anything else — routed only when it carries the `auto-review` label AND is
+      NOT a draft. The label is the explicit opt-in (the only signal that
+      distinguishes a PR cleared for the team from an agent-authored PR — see
+      AUTO_REVIEW_LABEL); draft is the "still iterating" safety valve, since a
+      Mirror PASS auto-merges and a draft must never be merged out from under its
+      author. `labels` is the row's list of label names (empty/None → no opt-in)."""
+    if not head_ref:
+        return False
+    if head_ref.startswith(FORGE_BRANCH_PREFIX):
+        return True
+    if is_draft:
+        return False
+    return AUTO_REVIEW_LABEL in (labels or [])
 
 
 def select_orphaned_prs(
@@ -282,8 +356,10 @@ def select_orphaned_prs(
     already_dispatched: Any,
     grace_minutes: int = DISPATCH_GRACE_MINUTES,
 ) -> list[dict[str, Any]]:
-    """Pure selection step. From the open-PR rows, return those that are Forge
-    build PRs, older than the grace window, and have NO Mirror review task yet.
+    """Pure selection step. From the open-PR rows, return those that are
+    reviewable (Forge build PRs + non-draft `auto-review`-labeled PRs — see
+    `_is_reviewable_pr`), older than the grace window, and have NO Mirror review
+    task yet.
 
     `already_dispatched(task_id, head_sha) -> bool` is injected (the production
     caller passes a thin wrapper over
@@ -297,14 +373,14 @@ def select_orphaned_prs(
     out: list[dict[str, Any]] = []
     for pr in open_prs:
         head = str(pr.get('headRefName') or '')
-        if not head.startswith(FORGE_BRANCH_PREFIX):
-            continue  # not a Forge build PR
+        if not _is_reviewable_pr(head, bool(pr.get('isDraft')), pr.get('labels')):
+            continue  # not Forge, and not a non-draft auto-review-labeled PR
         created = _parse_iso(pr.get('createdAt'))
         if created is None or created > cutoff:
             continue  # too fresh — let the normal inline dispatch fire first
-        task_id = task_id_for_branch(head)
+        task_id = task_id_for_branch(head, pr.get('number'))
         if not task_id:
-            continue  # degenerate 'forge/' branch → no dispatchable task_id
+            continue  # degenerate branch → no dispatchable task_id
         try:
             if already_dispatched(task_id, pr.get('headRefOid')):
                 continue  # CURRENT head already in inbox / archive / .invalid
@@ -319,11 +395,12 @@ def select_orphaned_prs(
 
 def _synthesize_build_data(pr: dict[str, Any]) -> dict[str, Any]:
     """Build the minimal `data` envelope `_dispatch_mirror_review` consumes from a
-    GitHub PR row. There is no Forge build outbox to read (the reap prevented it),
-    so we reconstruct from GitHub truth: task_id (from branch), branch, target_repo
-    (this repo), pr_title. No `claude_session_id` is available — Forge's build
-    session is gone — so a downstream REVIEW_REVISION will start Forge fresh rather
-    than --resume; that is the correct, available behavior for a recovered PR."""
+    GitHub PR row. There is no build outbox to read here — for a Forge PR the reap
+    prevented it; for a human PR one never existed — so we reconstruct from GitHub
+    truth: task_id (from branch / PR number), branch, target_repo (this repo),
+    pr_title. No `claude_session_id` is available (no live build session), so a
+    downstream REVIEW_REVISION starts Forge fresh rather than --resume; that is the
+    correct, available behavior for a recovered or human-authored PR."""
     return {
         'task_id': pr['task_id'],
         'target_repo': 'ourliberty-agent-core',
@@ -410,8 +487,8 @@ def main() -> int:
     failed = state['failed_prs']
 
     orphaned = select_orphaned_prs(open_prs, now, _already_dispatched)
-    log(f'scanned {len(open_prs)} open PR(s); {len(orphaned)} Forge PR(s) '
-        f'past grace with no Mirror review')
+    log(f'scanned {len(open_prs)} open PR(s); {len(orphaned)} reviewable PR(s) '
+        f'(Forge + non-draft auto-review) past grace with no Mirror review')
 
     dry_run = not healer_enabled()
     dispatched = 0
