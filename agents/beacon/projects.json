@@ -618,6 +618,65 @@
         "kind": "mission",
         "mission_id": "system-self-awareness-slice-2a-waiting-on-larry"
       }
+    },
+    {
+      "id": "system-self-awareness-slice-2b-waiting-on-larry-render",
+      "title": "System self-awareness - Slice 2b (Waiting-on-Larry render)",
+      "north_star_ref": null,
+      "repo": "ourliberty-dashboard",
+      "state": "active",
+      "phases": [
+        {
+          "id": "system-self-awareness-slice-2b-waiting-on-larry-render",
+          "title": "System self-awareness - Slice 2b (Waiting-on-Larry render)",
+          "desired_end_state": "Render the itemized waiting_on_larry.items[] on the /where-we-are 'Waiting on you' panel: source badge + title + plain-English why + relative age, in the substrate's order. Link approvals/escalations to /approvals, parked to /missions; reuse the Slice-1b page + Approvals tab, do not rebuild. Normalize the parked why dict-repr via cleanWhy. Update lib/types + extend vitest. Full spec: agents/beacon/specs/system-awareness-slice-2b-waiting-on-larry-render.md",
+          "lifecycle_state": "brainstorm",
+          "order": 0,
+          "spec_ref": "agents/beacon/specs/system-awareness-slice-2b-waiting-on-larry-render.md",
+          "sequence_ref": null,
+          "created_at": "2026-06-22T03:09:56.780596+00:00",
+          "updated_at": "2026-06-22T03:09:56.780596+00:00",
+          "brainstorm": {
+            "is_ai_draft": true,
+            "draft": {
+              "end_state": "When this phase is done, the 'Waiting on you' panel on the where-we-are page no longer shows just a bare count of parked items. It shows the actual list: every thing waiting on Larry rendered as its own row with a small source label (escalation, approval, or parked), a plain-English title, a one-line reason, and how long it's been waiting \u2014 kept in the order the system already decided is most urgent. Each row links straight to where Larry acts on it: approvals and escalations go to the Approvals view, parked items go to the Missions funnel. The page opens and answers, in plain language, both 'where does everything stand' and 'what needs me,' one click from acting.",
+              "why_now": "The earlier slices built up to exactly this. One slice gave Larry the whole-system glance; the most recent one taught the underlying system to produce the itemized 'what needs you' data \u2014 a per-source, ordered, bounded list. But the page still only renders a number, so Larry can see that, say, twenty-two things are waiting on him but not what they are or where to go. This panel is the payoff of the entire 'what needs Larry' arc; rendering the list is the last piece that makes the whole effort usable.",
+              "scope": "IN: rendering the itemized waiting list on the existing 'Waiting on you' panel \u2014 source label, title, plain-English reason, relative age, in the order the system already provides; linking approval/escalation rows to the Approvals view and parked rows to the Missions funnel; normalizing the messy machine-formatted reason text on parked items into plain English; a kept summary count, a calm empty state, and a 'more waiting' note when the list is capped; updating the data type definition to match the real shape and extending the existing tests. OUT: rebuilding or changing the Approvals view or the Missions funnel (link out only, no actions or writes in this panel); per-item detail or drill-down panes; any health summary; and the separate upstream cleanup that would make the reason text clean at the source.",
+              "constraints_reuse": "This is assembly, not greenfield. Extend the existing where-we-are page and the single panel function inside it \u2014 keep the page structure, the shared panel wrapper, the loading and stale and empty handling, and every other panel untouched. The data is already fetched by the page's existing poll, so no new data fetching is added; this is rendering plus types only. Reuse the existing shared components and styling tokens already used across these pages, and the existing automatic auth. The hard boundary: the Approvals view and the Missions funnel are the homes for those items \u2014 this panel links to them and must not re-implement their lists, queries, or actions. Existing tests must stay green, and the panel must keep behaving like the rest of the page on loading, stale, empty, and error states without crashing.",
+              "options_decision": "Fork one \u2014 what to do about the parked items' reason text, which today arrives as a messy machine-formatted blob rather than a sentence. Option A: render a small, tested cleanup helper in this panel that pulls out the human summary, falling back to showing nothing rather than the raw blob. Option B: wait for the separate upstream fix that would make the system emit clean text at the source. Trade-off: A ships now and is defensive even after the upstream fix lands (it just becomes a pass-through), but is belt-and-suspenders work; B is cleaner long-term but blocks this visible payoff on unrelated work. Recommendation: A \u2014 defend in the panel now, let the upstream cleanup proceed as its own follow-up. Fork two \u2014 how loud to make a critical escalation. Option A: every source gets the same calm treatment, distinguished only by a neutral label color. Option B: a critical-severity escalation gets a stronger visual cue. Trade-off: louder is more useful in a real incident but risks the panel feeling alarmist when, today, the list is entirely low-urgency parked items. Recommendation: keep it calm by default with at most a subtle bump for critical, since today nothing critical is even flowing.",
+              "risks_guardrails": "Risk: the panel shows the raw machine-formatted reason blob to Larry, violating plain-language-first. Guardrail: a pure, tested cleanup helper that extracts the human summary and renders nothing rather than the blob if it can't, with the test cases as the contract. Risk: accidentally re-sorting the list and undoing the urgency ordering the system already applied. Guardrail: render strictly in the order received, asserted in tests. Risk: drifting into rebuilding the Approvals view or adding actions here. Guardrail: this panel is read-only and links out only \u2014 no write or action controls, enforced by the scope boundary and review. Risk: an older or partial data snapshot crashes the panel or shows a broken empty list. Guardrail: keep the prior count-only behavior as a fallback when the itemized list is absent, with a back-compat test. Risk: today only one of the three source types actually has data, so the other two paths go untested in production. Guardrail: tests cover all three source types with representative items even though two are empty live today.",
+              "done_gate": "It's done when the panel renders the itemized list \u2014 source label, title, plain-English reason, relative age \u2014 in the system's order; when no parked item ever shows the raw machine-formatted reason blob; when approval and escalation rows link to the Approvals view and parked rows link to the Missions funnel, with the Approvals view left unrebuilt; when a summary count is kept and the empty, loading, and stale states behave like the rest of the page without crashing; and when the data type matches the real shape. Tests prove it: the list renders each item's title and source label, the messy parked reason is shown normalized with no raw blob, the links resolve to the right destinations, the summary count reflects the true total, the capped-list note appears when the list is truncated, the empty state shows when nothing is waiting, and the legacy count-only shape still renders. The existing test suite stays green.",
+              "breakdown": "Step one: tighten the data type definition for the waiting-on-you shape to match what the system actually emits \u2014 the item fields, the source and severity values, the counts, and the truncation flag \u2014 so typos are caught and older snapshots still type-check. Step two: extend the single panel to render the summary count, then the itemized rows (label, title, cleaned reason, relative age, action link) in the given order, plus the capped-list note, the calm empty state, and the back-compat fallback to the old count box. Step three: add the small pure helpers the panel needs \u2014 relative-age formatting, the reason-text cleanup, and the source-to-destination link mapping \u2014 kept module-scoped and individually tested. Step four: extend the existing test suite with representative items across all three sources (including a parked item whose reason is the messy blob) and assertions for titles, labels, normalized reason, resolved links, summary count, the capped note, the empty state, and back-compat, plus focused unit tests on the helpers. These map cleanly onto the four deliverables already laid out in the full spec."
+            },
+            "decisions": [
+              "Ship the in-panel reason cleanup now and treat the upstream source fix as a separate follow-up, rather than waiting for the source to emit clean text \u2014 confirm that's the call.",
+              "How loud should a critical escalation look: same calm styling as everything else, or a stronger visual cue when severity is critical?",
+              "Is capping the visible list with a 'more waiting' note (rather than showing all of them) the right behavior, or do you want a way to expand the full list?"
+            ],
+            "decisions_overflow": false,
+            "handoff": {
+              "spec_target_path": "agents/beacon/specs/system-self-awareness-slice-2b-waiting-on-larry-render.md",
+              "target_repo": "ourliberty-dashboard",
+              "north_star_ref": null,
+              "prior_closeout_summary": null,
+              "directive": "Work with Larry to finalize this brainstorm and author the spec at agents/beacon/specs/system-self-awareness-slice-2b-waiting-on-larry-render.md in ourliberty-dashboard; he will mark it Ready to spec."
+            }
+          },
+          "brainstorm_provenance": {
+            "by": "beacon",
+            "model": "claude-opus-4-8",
+            "at": "2026-06-22T03:09:56.780596+00:00",
+            "from_state": "brainstorm"
+          }
+        }
+      ],
+      "one_off": true,
+      "created_at": "2026-06-22T03:09:56.780596+00:00",
+      "updated_at": "2026-06-22T03:09:56.780596+00:00",
+      "promoted_from": {
+        "kind": "mission",
+        "mission_id": "system-self-awareness-slice-2b-waiting-on-larry-render"
+      }
     }
   ]
 }
