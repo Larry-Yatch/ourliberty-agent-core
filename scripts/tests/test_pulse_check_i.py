@@ -1089,24 +1089,42 @@ class AutoDispatchTests(unittest.TestCase):
         self.assertNotEqual(state[key]["task_id"], "pulse-auto-stale-20260514")
         self.assertEqual(state[key]["dispatched_at"], self.fired_at.isoformat())
 
-    def test_medium_effort_not_dispatched(self):
+    def test_medium_effort_now_dispatched(self):
+        # Widened 2026-06-22: medium-effort proposals auto-dispatch.
         records = pci.auto_dispatch_proposals(
             check_i=self._check_i([self._medium_proposal()]),
             fired_at=self.fired_at,
             state_path=self.state_path,
         )
-        self.assertEqual(self.calls, [])
-        self.assertEqual(records, [])
-        self.assertFalse(self.state_path.exists())
+        self.assertEqual(len(self.calls), 1)
+        self.assertEqual(len(records), 1)
+        self.assertTrue(self.state_path.exists())
 
-    def test_small_without_dollar_not_dispatched(self):
+    def test_small_without_dollar_now_dispatched(self):
+        # Widened 2026-06-22: a non-cost-framed small win auto-dispatches.
         records = pci.auto_dispatch_proposals(
             check_i=self._check_i([self._small_no_dollar()]),
             fired_at=self.fired_at,
             state_path=self.state_path,
         )
-        self.assertEqual(self.calls, [])
-        self.assertEqual(records, [])
+        self.assertEqual(len(self.calls), 1)
+        self.assertEqual(len(records), 1)
+
+    def test_large_or_impactless_not_dispatched(self):
+        # Still excluded: large effort (Larry's call) + impact-less proposals.
+        for p in (
+            {"title": "Big refactor", "effort": "large",
+             "impact": "$50/wk reclaimable", "rationale": "x"},
+            {"title": "Vague idea", "effort": "small", "impact": "",
+             "rationale": "x"},
+        ):
+            self.calls.clear()
+            records = pci.auto_dispatch_proposals(
+                check_i=self._check_i([p]), fired_at=self.fired_at,
+                state_path=self.state_path,
+            )
+            self.assertEqual(self.calls, [], p["effort"])
+            self.assertEqual(records, [], p["effort"])
 
     def test_dispatch_rejected_does_not_crash(self):
         # Stop the setUp-installed patcher and replace with one whose
@@ -1150,9 +1168,16 @@ class AutoDispatchTests(unittest.TestCase):
         self.assertEqual(records, [])
 
     def test_eligibility_helper_direct(self):
+        # Widened 2026-06-22: small + medium with any non-empty impact are eligible.
         self.assertTrue(pci._is_auto_dispatch_eligible(self._eligible_proposal()))
-        self.assertFalse(pci._is_auto_dispatch_eligible(self._medium_proposal()))
-        self.assertFalse(pci._is_auto_dispatch_eligible(self._small_no_dollar()))
+        self.assertTrue(pci._is_auto_dispatch_eligible(self._medium_proposal()))
+        self.assertTrue(pci._is_auto_dispatch_eligible(self._small_no_dollar()))
+        # Still ineligible: large effort, and any effort with no/blank impact.
+        self.assertFalse(pci._is_auto_dispatch_eligible(
+            {"effort": "large", "impact": "$5/wk reclaimable"}))
+        self.assertFalse(pci._is_auto_dispatch_eligible(
+            {"effort": "small", "impact": "   "}))
+        self.assertFalse(pci._is_auto_dispatch_eligible({"effort": "medium"}))
 
     def test_corrupt_state_file_treated_as_empty(self):
         self.state_path.write_text("{not valid json")
@@ -1710,16 +1735,17 @@ class MarkerDisciplineProposalTests(unittest.TestCase):
             [],
         )
 
-    def test_proposal_not_auto_dispatch_eligible(self):
-        # The proposal is small-effort but its impact line carries no `$<digit>`
-        # token, so it surfaces in the digest without auto-opening a Beacon spec.
+    def test_proposal_is_now_auto_dispatch_eligible(self):
+        # Widened 2026-06-22: a small-effort marker-discipline proposal with a
+        # clear impact now auto-dispatches even with no `$<digit>` token (the
+        # dollar-quantified requirement was dropped).
         proposals = pci.synthesize_proposals(
             _sidecar(), repeats=[], marker_discipline=self._alert_md(),
         )
         p = proposals[0]
         self.assertEqual(p["effort"], "small")
-        self.assertFalse(pci._is_auto_dispatch_eligible(p))
         self.assertNotRegex(p["impact"], r"\$\d")
+        self.assertTrue(pci._is_auto_dispatch_eligible(p))
 
     def test_none_marker_discipline_is_safe(self):
         self.assertEqual(
@@ -1876,14 +1902,21 @@ class ParkAndSuppressTests(unittest.TestCase):
             "rationale": "Ledger flagged this task at 3.7σ above baseline.",
         }
 
-    def _medium_proposal(self) -> dict:
-        # effort=medium → not eligible → parkable.
+    def _parkable_proposal(self) -> dict:
+        # An INELIGIBLE proposal, so it parks rather than auto-dispatches.
+        # effort=large keeps it out of the widened (small+medium) auto-dispatch
+        # lane (2026-06-22). (Was effort=medium, which now auto-dispatches.)
         return {
             "title": "Investigate retry / clarification cost sources",
-            "effort": "medium",
+            "effort": "large",
             "impact": "~$2.50/wk reclaimable (20.0% of total spend)",
             "rationale": "Retry overhead is above the 15% threshold.",
         }
+
+    # The park tests below were written against a medium-effort fixture; medium
+    # now auto-dispatches, so they use the large-effort parkable one via this
+    # alias (keeps the call sites unchanged).
+    _medium_proposal = _parkable_proposal
 
     def _check_i(self, proposals: list[dict], signals: dict | None = None) -> dict:
         return {
@@ -2008,11 +2041,12 @@ class ParkAndSuppressTests(unittest.TestCase):
         self.assertNotIn("parked", c["proposals"][0])
         self.assertEqual(c["mode"], "digest")
 
-    def test_mixed_eligible_and_parked_only_medium_parked(self):
-        # A digest with one eligible + one medium proposal: only the medium one
-        # parks; the eligible one is left for the auto-dispatch path.
+    def test_mixed_eligible_and_parked_only_ineligible_parked(self):
+        # A digest with one eligible + one ineligible (large-effort) proposal:
+        # only the ineligible one parks; the eligible one is left for the
+        # auto-dispatch path.
         eligible = self._eligible_proposal()
-        medium = self._medium_proposal()
+        medium = self._parkable_proposal()
         with mock.patch.object(pci, "emit_capture",
                                return_value="cap-m") as emit:
             parked_now = pci.park_proposals(

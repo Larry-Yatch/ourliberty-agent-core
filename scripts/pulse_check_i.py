@@ -103,10 +103,10 @@ DEFAULT_JOURNAL = (
 )
 
 # Closed-loop step 5 (2026-05-24) — auto-dispatch tunables.
-# Eligible-proposal heuristic: effort='small' AND impact contains a dollar
-# amount. Deliberately narrow per closed-loop spec § 5 — judgment-shaped
-# proposals still surface in the digest DM for Larry to triage.
-AUTO_DISPATCH_DOLLAR_RE = re.compile(r"\$\d")
+# Eligible-proposal heuristic (widened 2026-06-22): effort in {small, medium}
+# AND a non-empty impact. Large-effort + impact-less proposals still surface in
+# the digest / park to the funnel for Larry to triage. See
+# _is_auto_dispatch_eligible.
 # Same proposal recurring across Check I runs should only dispatch once
 # per window. 7 days lines up with the weekly Ledger cadence — a recurring
 # σ-anomaly that survives a week is genuinely new evidence.
@@ -685,18 +685,22 @@ def synthesize_proposals(
 
 
 def _is_auto_dispatch_eligible(proposal: dict[str, Any]) -> bool:
-    """A proposal auto-dispatches iff effort=='small' and impact mentions $N.
+    """A proposal auto-dispatches iff effort is 'small' or 'medium' AND it states
+    a clear (non-empty) impact.
 
-    The dollar-amount check is the proxy for "quantified" — without it the
-    candidate is judgment-shaped and should stay in the digest DM. v1 is
-    deliberately narrow per closed-loop spec § 5; tune after observation.
+    Widened 2026-06-22 (Larry-approved "open the Pulse dial — more confidence in
+    the system + Mirror"). The v1 filter (effort=small AND $-quantified impact)
+    deliberately held back medium-effort and non-cost-framed wins; both now flow.
+    Still excluded: large-effort changes (Larry's call) and impact-less proposals
+    (nothing concrete to act on) — these continue to surface in the digest / park
+    to the funnel for triage. The downstream build is unchanged: Beacon drafts a
+    spec, and the trust-policy carve-outs + Mirror REVIEW_PASS + classify_careful
+    still gate it.
     """
-    if proposal.get("effort") != "small":
+    if proposal.get("effort") not in ("small", "medium"):
         return False
-    impact = proposal.get("impact") or ""
-    if not isinstance(impact, str):
-        return False
-    return bool(AUTO_DISPATCH_DOLLAR_RE.search(impact))
+    impact = proposal.get("impact")
+    return isinstance(impact, str) and bool(impact.strip())
 
 
 def _proposal_dedup_key(proposal: dict[str, Any]) -> str:
@@ -764,7 +768,8 @@ def _build_dispatch_envelope(
         f"This is an auto-dispatched optimization candidate from Pulse "
         f"Check I (closed-loop step 5). Read the relevant sidecar / outbox "
         f"archives, then draft a spec following the standard template and "
-        f"emit an APPROVAL_REQUEST marker. Larry approves before any build."
+        f"emit an APPROVAL_REQUEST marker — the trust policy gates whether the "
+        f"build auto-starts or asks Larry, and Mirror reviews before any merge."
     )
     return {
         "task_id": task_id,
