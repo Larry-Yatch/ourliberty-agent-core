@@ -894,7 +894,7 @@
       "id": "cap-p6-verify-brainstorm-card-render-check-c7cc",
       "title": "P6 verify: brainstorm card render check",
       "note": "throwaway phase to confirm the flat brainstorm prefill renders on the board",
-      "state": "promoted",
+      "state": "parked",
       "label": null,
       "origin": {
         "source": "agent",
@@ -904,26 +904,21 @@
         "captured_at": "2026-06-21T22:15:30.525154+00:00"
       },
       "last_touched": "2026-06-21T22:15:30.525154+00:00",
-      "promoted_to": "p6-verify-brainstorm-render",
-      "spawned": {
-        "kind": "project",
-        "project_id": "p6-verify-brainstorm-render",
-        "stamped_at": "2026-06-21T22:15:30.603759+00:00"
-      },
       "briefing": {
-        "what": "A quick test to make sure new brainstorm ideas show up correctly on your board.",
-        "why": "If ideas don't display properly, you could lose track of them or act on a wrong picture of what's in the pipeline.",
-        "suggest": "Worth a fast check before relying on it, but keep it small and low-stakes until we've confirmed it works as expected."
+        "what": "A quick test to make sure new idea cards show up correctly on your planning board.",
+        "why": "If cards don't display properly, you and the team could miss ideas you've parked for later.",
+        "suggest": "Run the quick check, but keep it small and time-boxed since it's a throwaway test, not a finished feature."
       },
       "risk": "medium",
       "recommended_action": "delegate",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-06-21T22:19:20.247356+00:00",
-        "from_state": "promoted"
+        "at": "2026-06-22T05:24:17.317855+00:00",
+        "from_state": "parked"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "updated_at": "2026-06-22T05:14:33.765405+00:00"
     }
   ]
 }
