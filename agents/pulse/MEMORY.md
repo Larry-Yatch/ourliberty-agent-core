@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 07:22Z UTC (Iter ~2436, Tier 2→2, consecutive_clean=1→2, NOMINAL ✅)
+## Status snapshot — updated 2026-06-22 07:43Z UTC (Iter ~2437, Tier 2→3, consecutive_clean=2→3→de-escalate, NOMINAL ✅)
 
-**Iter ~2436 summary:** ✅ Nominal. 1 new alert (line 889, ledger weekly-2026-06-22, Tier-3 silenced, bot DM'd Larry directly). 5/5 daemons alive (same PIDs as ~2435). 0 open PRs. All inboxes empty. Tier 2, consecutive_clean=1→2. **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. [blue]: unreviewed-merge:628/625/627, daemon-pids.json missing.** PRIME: interventions=1060, systemic_fixes=55, ratio≈19.27, trend=improving. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Next cadence: 15-min (Tier 2). One more clean iter → Tier 3.
+**Iter ~2437 summary:** ✅ Nominal. 0 new alerts (watermark=889=file_length). 5/5 daemons alive (same PIDs as ~2436). 0 open PRs. All inboxes empty. PR #630 (fix-phantom-build-phase-terminal-guard-001) merged at 05:52Z — new in FORGE_NO_PR_SKIP list. **Tier 2→3 de-escalation** (consecutive_clean=2→3). **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. [blue]: unreviewed-merge:628/625/627, daemon-pids.json missing.** PRIME: interventions=1060, systemic_fixes=55, ratio≈19.27, trend=improving. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Next cadence: 30-min (Tier 3).
 
 
 
