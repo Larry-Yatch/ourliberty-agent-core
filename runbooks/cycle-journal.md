@@ -4,6 +4,93 @@
 
 ---
 
+## Iteration ~2442 — 2026-06-22T10:27Z UTC (interactive, /cycle, Tier 3→3, consecutive_clean=4→5, G-RULE DISPATCH ✅)
+
+**Trigger:** Larry `/cycle` invocation (interactive).
+
+**Health:** ✅ Nominal — all checks clean. 1 new alert (line 885): catalog-accuracy-drift → Tier-3 silence (known pattern); G-rule 2/3→3/3 threshold crossed, direction-ask dispatched to Beacon. 5/5 daemons alive (same PIDs). 0 open PRs. All inboxes empty. Tier 3, consecutive_clean=4→5.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Daemons (re-verified):** inbox_watcher=559441 (Ssl) ✅, beacon=985300 (Ss) ✅, chain_event=930563 (SNs) ✅, outbox_notifier=985380 (Ss) ✅, dashboard_api=981918 (Ssl) ✅. All same PIDs as iter ~2441.
+- **Repo HEAD:** f2d82381=origin/main (Pulse cycle 20260622T095446Z). Clean. Fetch dry-run: no new commits from origin. ✅
+- **deploy-notifier:ERROR main-branch (dpl_8QqRKy3hBSeQ913R2PQjKVSHw1ZJ):** No new deploy-notifier alerts since bot log last entry. Still only the 06:24Z failure. Carry [yellow] until confirmed resolved.
+- **G-rule catalog-accuracy-drift:** 2/3→3/3 — new alert line 885 (10:17Z). Threshold crossed; dispatched to Beacon. See Actions below.
+- **G-rule mirror-marker-parse-error:** 2/3 — 0 new alerts this iter. [carry]
+- **G-rule heal-stale-daemon-code-script-service-mismatch:** 1/3 — 0 new alerts. [carry]
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 884, "file_length": 885}`. 1 new alert (line 885): `source=pulse-check, subject=catalog-accuracy-drift` (15/63 shelf cards drifted, attention rate 24%). Triage helper → Tier-3, decision=silence, route=digest (known-pattern match). Bot log confirms idx=884 delivered as digest at 04:22 MDT (10:22Z). Watermark advanced 884→885. ✅ Nominal (Tier-3 → no tier-reset).
+
+**Check 1 — Log noise:** outbox-notifier.log + inbox-watcher.log: 0 WARN/ERROR (last 50 lines each). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot PID 985300 (Ss). Last bot entry: `alert idx=884 route=digest; skipping DM (catalog-accuracy-drift)` at 04:22 MDT (10:22Z). No new Larry directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → "no stalls detected." FORGE_NO_PR_SKIP: p6-brainstorm-autofill-author (#611), p6-brainstorm-card-ui (#72), system-self-awareness-slice-1b-where-are-we (#73), system-self-awareness-slice-2a-waiting-on-larry (#620), fix-phantom-build-phase-terminal-guard-001 (#630, merged 05:52Z), projects-stale-gc-archive-completed-001 (#631, merged 06:02Z). ✅ Nominal.
+
+**Check 4 — Pending directives:** All inboxes empty before dispatch (forge: 0, mirror: 0, beacon: 0). beacon-pending-approvals: pending=0, history=250. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-22T10:22:17Z (~5 min before iter). Within 60-min window. ✅ Nominal.
+
+**Check A — Source repo:** On main. HEAD=f2d82381=origin/main. Clean. Fetch dry-run: no new commits. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-22T10:09:16Z (~18 min ago), status=no-change. Within 2h window. ✅ Nominal.
+
+**Check C — Agent liveness:** inbox_watcher=559441 (Ssl) ✅, beacon=985300 (Ss) ✅, chain_event=930563 (SNs) ✅, outbox_notifier=985380 (Ss) ✅, dashboard_api=981918 (Ssl) ✅. 5/5 alive. ✅
+
+**Check D — Inboxes:** All empty (before dispatch). ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Monday 2026-06-22 UTC (weekday=0 ∈ {0,2,4,6}):** Check I sentinel check-i-2026-06-22.json EXISTS → skip. Check VIII/IX/X: already ran in iter ~2413 → skip. Check III: last 2026-06-11 (11d < 14d gate, Monday not Sunday) → skip. ✅
+
+**Actions taken:**
+1. Watermark advanced 884→885 (catalog-accuracy-drift Tier-3 claimed).
+2. PRIME ledger: `iter_clean` appended (tier=3).
+3. PRIME ledger: `systemic_fix` appended (catalog-accuracy-drift-grule-dispatch, tier=3).
+4. Tier state: `record --checks-clean true` → consecutive_clean=4→5 (Tier 3, no ceiling change). Next cadence: 30-min.
+
+**Dispatches:**
+- **catalog-accuracy-drift-grule-001** → Beacon inbox (`/home/larry/agents/inboxes/beacon/catalog-accuracy-drift-grule-001.json`). G-rule 3/3: recurring catalog accuracy drift. Direction-ask to Beacon to spec a permanent fix (automated catalog refresh trigger) for Forge.
+
+**Standing findings (carried + verified):**
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — PR #607 merged without Mirror review. Larry judgment. [carry]
+- [yellow] **deploy-notifier:ERROR main-branch (dpl_8QqRKy3hBSeQ913R2PQjKVSHw1ZJ)** — Vercel build FAILED for ourliberty-dashboard main at 06:24Z. No subsequent failure alerts. Likely transient; carry until confirmed resolved. [carry]
+- [blue] **unreviewed-merge:628** — Larry-deliberate bypass at 06:08:57Z. [carry]
+- [blue] **unreviewed-merge:625+627** — Larry-deliberate bypass 05:17Z/05:18Z. [carry]
+- [blue] **install-drift:ourliberty-build-sequence-advancer.service** — Tier-3 silenced. [carry]
+- [blue] **unreviewed-merge:571** — bot DM'd. Larry judgment. [carry]
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+- [blue] **Stale bash orphan PID 1834248** — ~30d+ sleep-loop. Low CPU. Benign. [carry]
+- [blue] **daemon-pids.json missing** — PIDs looked up by name via ps. Daemons all alive. Informational.
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. Watch; dispatch to Beacon at 3/3.
+- [blue] **G-rule catalog-accuracy-drift** — 3/3 → DISPATCHED to Beacon (catalog-accuracy-drift-grule-001). Carry until PR merges.
+- [blue] **G-rule mirror-marker-parse-error** — 2/3. Watch; dispatch to Beacon at 3/3.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule seq-advancer-sequence-stranded** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule watchdog-watcher-log-stale** — 1/3. Watch.
+- [blue] **G-rule heal-stale-daemon-code-script-service-mismatch** — 1/3. Watch.
+- [blue] **G-rule health-notify-script-missing** — dispatch sent 2026-06-09, fix status unverified. [carry]
+
+**PRIME DIRECTIVE:** 0 manual interventions (iter_clean), 1 systemic_fix dispatch (catalog-accuracy-drift G-rule). Trailing-30d: interventions=1060, systemic_fixes=56, ratio≈18.93, trend=improving.
+**Tier end-of-iter:** Tier 3→3, consecutive_clean=4→5. Next cadence: 30-min.
+
+---
+
 ## Iteration ~2441 — 2026-06-22T09:53Z UTC (interactive, /cycle, Tier 3→3, consecutive_clean=3→4, NOMINAL ✅)
 
 **Trigger:** Larry `/cycle` invocation (interactive).

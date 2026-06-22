@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 09:53Z UTC (Iter ~2441, Tier 3→3, consecutive_clean=3→4, NOMINAL ✅)
+## Status snapshot — updated 2026-06-22 10:27Z UTC (Iter ~2442, Tier 3→3, consecutive_clean=4→5, G-RULE DISPATCH ✅)
 
-**Iter ~2441 summary:** ✅ Nominal. 0 new alerts (watermark=884=file_length; larry-alerts.jsonl compacted since prior iter). 5/5 daemons alive (same PIDs). 0 open PRs. All inboxes empty. **Tier 3→3, consecutive_clean=3→4.** **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals, deploy-notifier:ERROR main-branch dpl_8QqRKy3hBSeQ913R2PQjKVSHw1ZJ (no new failure alerts since 06:25Z, likely transient). [blue]: unreviewed-merge:628/625/627, daemon-pids.json missing.** PRIME: interventions=1060, systemic_fixes=55, ratio≈19.27, trend=improving. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Next cadence: 30-min (Tier 3).
+**Iter ~2442 summary:** ✅ Nominal + G-rule dispatch. 1 new alert (line 885): catalog-accuracy-drift Tier-3 silenced; G-rule 2/3→3/3 crossed → dispatched direction-ask to Beacon (catalog-accuracy-drift-grule-001). 5/5 daemons alive (same PIDs). 0 open PRs. All inboxes empty (pre-dispatch). **Tier 3→3, consecutive_clean=4→5.** **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals, deploy-notifier:ERROR main-branch dpl_8QqRKy3hBSeQ913R2PQjKVSHw1ZJ (likely transient, no new failures). [blue]: unreviewed-merge:628/625/627, daemon-pids.json missing.** PRIME: interventions=1060, systemic_fixes=56, ratio≈18.93, trend=improving. **G-rule catalog-accuracy-drift: 3/3 DISPATCHED (catalog-accuracy-drift-grule-001 → Beacon). G-rule mirror-marker-parse-error: 2/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Next cadence: 30-min (Tier 3).
 
 
 
