@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 05:27Z UTC (Iter ~2425, Tier 1, consecutive_clean=2→0, FINDING ⚠️)
+## Status snapshot — updated 2026-06-22 05:37Z UTC (Iter ~2426, Tier 1, consecutive_clean=0→1, NOMINAL ✅)
 
-**Iter ~2425 summary:** ⚠️ Finding. 6 new alerts (watermark 878→884), all Tier-3 silence (install-drift×5 + outbox-notifier restart). 5/5 daemons alive: inbox_watcher=559441, beacon=930450, chain_event=930563, outbox_notifier=943798 (new PID — healer restart at 05:20Z), dashboard_api=930797. PR #625 MERGED 05:17Z by Larry (unreviewed, Larry rejected Mirror dispatch 'by hand'). PR #627 MERGED 05:18Z by Larry (unreviewed). Both unreviewed-merge noted [blue]. beacon-pending-approvals: pending=0 (review-pr-625 rejected by Larry). **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. [blue]: unreviewed-merge:625+627 (new).** PRIME: 1 intervention (unreviewed-merges 625/627), systemic_fixes=55, ratio≈19.3. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** Tier 1, consecutive_clean=2→0. Next cadence: 5-min (Tier 1).
+**Iter ~2426 summary:** ✅ Nominal. 0 new alerts (watermark stays 884). 5/5 daemons alive: inbox_watcher=559441, beacon=930450, chain_event=930563, outbox_notifier=944877 (second restart since ~2425 at 05:23Z post-PR #627 deploy, alive), dashboard_api=930797. No open PRs. Board-drain pipeline active: 3 tasks (source=dashboard) arrived in Beacon inbox during cycle window; phantom-build-phase task auto-dispatched to Forge (fix-phantom-build-phase-terminal-guard-001 build-phase at 05:36Z). beacon-pending-approvals: pending=0, history=249. **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. [blue]: unreviewed-merge:625+627.** PRIME: iter_clean, systemic_fixes=55, ratio≈19.3. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** Tier 1, consecutive_clean=0→1. Next cadence: 5-min (Tier 1).
 
 
 
