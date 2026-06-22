@@ -58,7 +58,12 @@
         "at": "2026-06-14T17:52:43.946307+00:00",
         "from_state": "parked"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-orphan-lane-show-desktop-chat-title-fallback-rep-dd23",
+        "stamped_at": "2026-06-22T05:28:33.730575+00:00"
+      }
     },
     {
       "id": "cap-orphan-lane-show-state-collapse-terminal-orphans-aa37",
@@ -336,7 +341,12 @@
         "from_state": "parked"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
-      "aging": true
+      "aging": true,
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-phantom-build-phase-after-marker-error-retry-pr-4d78",
+        "stamped_at": "2026-06-22T05:28:33.725368+00:00"
+      }
     },
     {
       "id": "cap-direct-discover-test-leak-still-open-pr-7-514a",
