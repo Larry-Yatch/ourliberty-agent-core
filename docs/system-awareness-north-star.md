@@ -9,6 +9,8 @@
 
 > Living doc — keep current; tick the tracker (§9) as work lands. Start here when we pick this up.
 
+> **Update 2026-06-21 — autonomy went live, and its mirror surfaced.** The earned-autonomy ladder (§6 item 4) reached **rung 1 in production**: Beacon→Forge `ourliberty-agent-core` code now auto-fires without Larry's pre-build click (trust-policy gate live; config/deploy/migrations/secrets still ask; Mirror still reviews everything). That makes Slice 2 ("what needs Larry") urgent **and** adds its mirror — **"Automated Work"**: what the team did *without* a click, so Larry can audit it and dial autonomy. Both are now powered by one new durable record, the **`autonomy_decision`** chain event (capture DONE — agent-core #623). See §5–§6, §9. Context: memory `two-team-feasibility-2026-06`, `autonomy-visibility-project`.
+
 ---
 
 ## 0. Desired end state  *(the destination — everything builds from here)*
@@ -81,13 +83,18 @@ The board already targets *"Larry opens one tab and sees every piece of work in 
 - The **missions Narrator (4.1)** + **two-way sync (Phase S)** — the seed machinery for our Narrator.
 - `chain_events` spine + `missions.json` / `captures.json` + droplet endpoints (`/api/system/missions`, `/api/missions/captures`) — the work-state telemetry the State Log reads.
 - Beacon (the voice), the dispatch path (Beacon-mediated), Forge/Mirror (the hands).
+- **`autonomy_decision` chain event (agent-core #623, 2026-06-21)** — one durable record per trust-policy decision (`auto_approve` / `force_ask` / `reject` + the matched rule + task/repo). The audit substrate for **both** "Automated Work" (it auto-fired) and an enriched "what needs Larry" (it asks). The pre-existing `approval_request` event records only that an ask was *made*, never the resolution or the *why*.
+- **The trust-policy gate** (`config/trust-policy.json`, live 2026-06-21) — the autonomy dial itself; surfacing its matched rule per action is the "dial-in" instrument Larry asked for.
 
 ## 6. Build sequence (prove-first)
 
 Prove the **Narrator** on one narrow surface, run it days, widen, then add the **Orchestrator**. Don't build the brain until the memory it reads is trusted.
 
 1. **Slice 1 — "work in flight," narrated end-to-end** *(A + D as one coherent surface).* Generalize the existing Narrator from per-project cards to whole-system work-in-flight: missions (the container) + build/PR pipeline (the execution detail), persisted as the **State Log** substrate and fed to the existing board. Narrator-only, read-only over existing telemetry. **Success bar:** for a week, Larry opens the dashboard (or asks Beacon) and knows where every active piece of work stands — mission *and* its PRs — without pinging Claude once.
-2. **Slice 2 — "what needs Larry."** A synthesized decision queue across sources (PRs at the merge-gate, missions awaiting promote/drop, policy escalations, pending chips). This is the slice that actually dissolves the couriering.
+2. **Slice 2 — "what needs Larry" + its mirror "Automated Work"** *(co-built — two views of one `autonomy_decision` record).*
+   - **What needs Larry:** a synthesized decision queue across sources (PRs at the merge-gate, missions awaiting promote/drop, **`force_ask` autonomy decisions**, policy escalations, pending chips) — substrate = `agents/beacon/specs/system-awareness-slice-2a-waiting-on-larry-substrate.md` (in build), render = `…-slice-2b`. Plus a **doorbell** (Larry's ask 2026-06-21): Beacon does the work it can and **DMs Larry a short "N items need your call — check the board"** (a doorbell, never a wall) when `force_ask` items accrue.
+   - **Automated Work** (the mirror): a plain-language, cross-system feed of what the team did *on its own* (`autonomy_decision` that auto-fired), each row drilling to its `chain_events` trail + the matched trust rule. The **dial-in instrument** for autonomy. Natural home = the (specced, unbuilt) `/where-we-are` page. **Needs its own build spec.**
+   - **Keystone enabler:** the **board-delegate dispatch route** — completes `agents/beacon/specs/missions-v2-delegate-fix.md` (which built the dashboard endpoint but missed that a `source='dashboard'` Beacon proposal never reaches Forge — `outbox_notifier._BEACON_TRUSTED_DISPATCH_SOURCES` trusts only `larry`/`orchestrator`). Until it lands, the board-drain only scopes proposals that never build (found live 2026-06-21). Reuse `_route_beacon_pulse_auto_dispatch_approval`.
 3. **HOLD — synthesized system health (C).** Highest eventual value, **highest risk** (false reassurance destroys trust). Earn it only after the pattern is proven.
 4. **The Orchestrator.** The periodic reasoning brain on top of the trusted substrate: diagnose → propose Plan → escalate policy → dispatch. Climb the earned-autonomy ladder (advisory → proposes-with-gate → bounded auto).
 5. **The why/what/how docs + their maintenance loop.** Stand up the Desired-End-State doc (structured Larry check-ins + team-proposed drift corrections) and make the Plan self-maintaining (Orchestrator-drafted, Larry-gated).
@@ -115,7 +122,11 @@ Prove the **Narrator** on one narrow surface, run it days, widen, then add the *
 |---|------|--------|
 | 0 | This North Star drafted + boundary-with-board decided (own doc, above the board) | DONE 2026-06-19 |
 | 1 | Slice 1 — work-in-flight State Log (generalize Narrator; A+D) → feed board | ✅ DONE 2026-06-20 (PR #602, live + closed-out) |
-| 2 | Slice 2 — "what needs Larry" decision queue | TODO (next) |
+| 1.5 | **Autonomy gate LIVE** — earned-autonomy ladder rung 1 (Beacon→Forge agent-core auto-fires) + readiness trip-wire + board-drain | ✅ LIVE 2026-06-21 (agent-core #614/#615; activated on droplet, revert-ready) |
+| 1.6 | `autonomy_decision` capture — the audit substrate for Slice 2 + Automated Work | ✅ DONE 2026-06-21 (agent-core #623) |
+| 2 | Slice 2 — "what needs Larry" decision queue (+ doorbell DM) | substrate 2a IN BUILD; render 2b + doorbell DM TODO |
+| 2′ | **Automated Work feed** — the mirror of Slice 2; the autonomy dial-in surface | TODO — needs a build spec |
+| 2″ | Board-delegate dispatch route (keystone: completes delegate-fix, un-blocks the board-drain) + re-enable drain | TODO (agent-core) |
 | 3 | Synthesized system health | HOLD (earn trust first) |
 | 4 | Orchestrator (the directing brain) | TODO (after substrate is trusted) |
 | 5 | Desired-end-state doc + Plan self-maintenance loop | DES v1 DRAFTED 2026-06-19 (`docs/desired-end-state.md`, why-now=self-direction-foundation, horizon=weeks); Plan self-maintenance TODO |
