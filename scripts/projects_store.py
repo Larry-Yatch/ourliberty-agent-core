@@ -629,6 +629,61 @@ def attach_phase_brainstorm(
     return True
 
 
+def edit_phase_brainstorm(
+    phase: dict[str, Any],
+    *,
+    draft: Optional[str] = None,
+    decisions: Optional[list[Any]] = None,
+    now: Optional[datetime] = None,
+) -> bool:
+    """Apply a Larry EDIT to a phase's brainstorm (projects-v3 P6.1): set the
+    ``draft`` (a plain string — the card flattens an authored 8-section dict but
+    serves a string verbatim, so an edit round-trips with no schema fork) and/or
+    the ``decisions`` (the fork-string list the card renders). Returns True iff
+    the phase was mutated. PURE — the caller owns the atomic write + the healer
+    owns the commit (single-committer invariant), exactly like ``attach_phase_
+    brainstorm``.
+
+    An edit makes the draft Larry's, so it stamps ``is_ai_draft=False`` and a
+    ``brainstorm_provenance`` of ``by='larry'`` + ``edited_at`` keyed to the
+    current ``lifecycle_state`` — which keeps ``needs_brainstorm`` False so the
+    Narrator sweep NEVER re-authors over an edit (the no-clobber guardrail, spec
+    § 4). Editing the decisions clears ``decisions_overflow`` (Larry has set the
+    list explicitly). A phase with no prior brainstorm gets a minimal one created
+    so the edit still lands. Idempotent: an edit equal to the current values is a
+    no-op (returns False, no spurious store delta). Fail-safe on junk: a non-dict
+    phase, or neither field provided, is a no-op."""
+    if not isinstance(phase, dict):
+        return False
+    if draft is None and decisions is None:
+        return False
+    current = phase.get('brainstorm')
+    brainstorm: dict[str, Any] = dict(current) if isinstance(current, dict) else {}
+    before = dict(brainstorm)
+
+    if draft is not None and isinstance(draft, str):
+        brainstorm['draft'] = draft
+    if decisions is not None and isinstance(decisions, list):
+        cleaned = [d.strip() for d in decisions if isinstance(d, str) and d.strip()]
+        brainstorm['decisions'] = cleaned
+        brainstorm['decisions_overflow'] = False
+    brainstorm['is_ai_draft'] = False
+
+    new_prov = {
+        'by': 'larry',
+        'edited_at': _iso_now(now),
+        'from_state': phase.get('lifecycle_state'),
+    }
+    # Idempotent: nothing actually changed in the body → no write, no provenance
+    # churn (the edited_at timestamp must not by itself manufacture a delta).
+    if brainstorm == before and isinstance(current, dict):
+        return False
+    phase['brainstorm'] = brainstorm
+    phase['brainstorm_provenance'] = new_prov
+    phase['updated_at'] = _iso_now(now)
+    return True
+
+
 # --------------------------------------------------------------------------- #
 # the "Actively working" derive (the read surface)
 # --------------------------------------------------------------------------- #
