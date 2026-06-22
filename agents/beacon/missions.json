@@ -4377,7 +4377,20 @@
       "created": "2026-06-22",
       "deferred_reason": null,
       "proposed_by": "closeout",
-      "proposed_at": "2026-06-22T01:24:05.125123+00:00"
+      "proposed_at": "2026-06-22T01:24:05.125123+00:00",
+      "briefing": {
+        "what": "Your team flagged that work which is finished and waiting to go live isn't yet showing up on your list of things parked and awaiting a green light.",
+        "why": "Without it, completed work can sit idle and unseen, slowing down how fast things actually get into customers' hands.",
+        "suggest": "A sensible, low-stakes improvement worth picking up soon \u2014 give it the go-ahead when you have a moment."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-22T01:41:11.385855+00:00",
+        "from_state": "proposed"
+      }
     },
     {
       "id": "the-dashboard-view-of-the-itemized-waiting-list-and-the-approve-reject-promote-actions-were-deferred-to-the-next-slice",
@@ -4390,7 +4403,20 @@
       "created": "2026-06-22",
       "deferred_reason": null,
       "proposed_by": "closeout",
-      "proposed_at": "2026-06-22T01:24:05.124711+00:00"
+      "proposed_at": "2026-06-22T01:24:05.124711+00:00",
+      "briefing": {
+        "what": "The screen that shows your waiting list with one-tap approve, reject, and promote buttons hasn't been built yet \u2014 it was pushed to the next round of work.",
+        "why": "Without it, you can't act on pending items at a glance, which slows down every decision that's waiting on you.",
+        "suggest": "Greenlight building it in the next round of work, and confirm the timing fits your priorities before the team starts."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-22T01:41:11.385855+00:00",
+        "from_state": "proposed"
+      }
     },
     {
       "id": "the-for-larry-escalations-source-contributes-nothing-in-production-today-because-no-canonical-for-larry-signal-exists-yet-it-needs-to-be-wired-up-once-such-a-signal-lands",
@@ -4403,7 +4429,21 @@
       "created": "2026-06-22",
       "deferred_reason": null,
       "proposed_by": "closeout",
-      "proposed_at": "2026-06-22T01:24:05.124040+00:00"
+      "proposed_at": "2026-06-22T01:24:05.124040+00:00",
+      "briefing": {
+        "what": "A planned channel for routing escalations directly to you isn't doing anything yet because the signal it depends on doesn't exist.",
+        "why": "Until it's connected to a real source, you're not getting escalations through it \u2014 but hooking it up to nothing could also flood you with noise.",
+        "suggest": "Hold off for now and revisit only once there's a real escalation signal to connect it to, then wire it up carefully."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-22T01:41:11.385855+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
