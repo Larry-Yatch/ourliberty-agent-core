@@ -961,6 +961,62 @@ class RenderMarkerTest(unittest.TestCase):
 # -------------------- chain_event payload builder (E4.4e PR-A) --------------------
 
 
+class BuildAutonomyDecisionChainEventTest(unittest.TestCase):
+    """autonomy_decision: one record powering the Automated Work feed
+    (decision=auto_approve) and the needs-Larry view (decision=force_ask)."""
+
+    def _payload(self, **o):
+        p = {
+            'task_id': 'task-auto-001',
+            'summary': 'Reconcile the projects store',
+            'target_agent': 'forge',
+            'target_repo': 'ourliberty-agent-core',
+            'task_type': 'feature-development',
+            'pr_title': 'feat(projects): completion-reconcile',
+        }
+        p.update(o)
+        return p
+
+    def test_kwargs_and_known_type(self):
+        import chain_event_shipper as ces
+        row = ah.build_autonomy_decision_chain_event(
+            self._payload(), decision='auto_approve', rule={'action': 'auto_approve'})
+        self.assertEqual(row['event_type'], 'autonomy_decision')
+        self.assertIn(row['event_type'], ces.KNOWN_EVENT_TYPES)  # emit_event won't drop it
+        self.assertEqual(row['agent'], 'beacon')
+        self.assertEqual(row['task_id'], 'task-auto-001')
+        self.assertEqual(row['id_extra'], 'auto_approve')
+        self.assertIn('ts', row)
+
+    def test_auto_approve_is_dispatched(self):
+        rule = {'action': 'auto_approve', 'repos': ['ourliberty-agent-core']}
+        row = ah.build_autonomy_decision_chain_event(
+            self._payload(), decision='auto_approve', rule=rule, source='beacon')
+        p = row['payload']
+        self.assertEqual(p['decision'], 'auto_approve')
+        self.assertTrue(p['dispatched'])  # fired without Larry → Automated Work
+        self.assertEqual(p['source'], 'beacon')
+        self.assertEqual(p['target_repo'], 'ourliberty-agent-core')
+        self.assertEqual(p['matched_rule'], rule)
+        self.assertEqual(p['summary'], 'Reconcile the projects store')
+
+    def test_force_ask_and_reject_not_dispatched(self):
+        for dec in ('force_ask', 'reject'):
+            row = ah.build_autonomy_decision_chain_event(
+                self._payload(), decision=dec, rule=None,
+                source='pulse-auto-dispatch')
+            p = row['payload']
+            self.assertEqual(p['decision'], dec)
+            self.assertFalse(p['dispatched'], dec)  # waiting on Larry → needs-Larry
+            self.assertEqual(p['source'], 'pulse-auto-dispatch')
+            self.assertIsNone(p['matched_rule'])
+
+    def test_missing_task_id_defaults_to_unknown(self):
+        row = ah.build_autonomy_decision_chain_event(
+            {'summary': 'x'}, decision='force_ask')
+        self.assertEqual(row['task_id'], 'unknown')
+
+
 class BuildApprovalRequestChainEventTest(unittest.TestCase):
     """Spec § 4 contract: 6-field payload + dual concrete envelopes."""
 
