@@ -31,6 +31,7 @@ import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_REPO_SCRIPTS) not in sys.path:
@@ -752,6 +753,246 @@ class AuthorMissionsInRegistryTest(unittest.TestCase):
         m = reg['missions'][0]
         self.assertEqual(m['risk'], 'safe')
         self.assertNotIn('risk_note', m)
+
+
+# ---------------- approval-card meaning layer (projects-v3 P7.2a) -------------
+
+
+def _approval(**over):
+    """A pending approval chain_events row (approval_request by default)."""
+    ev = {
+        'event_id': 'ev-1',
+        'event_type': 'approval_request',
+        'agent': 'beacon',
+        'ts': '2026-06-14T00:00:00+00:00',
+        'read_at': None,
+        'payload': {'prompt': 'Please approve the spec for the new feature.'},
+    }
+    ev.update(over)
+    return ev
+
+
+class _FakeResp:
+    def __init__(self, data):
+        self.data = data
+
+
+class _FakeQuery:
+    """Mimics the supabase-py chained query used by the approval sweep:
+    .select().in_().order().limit().execute() (read) and
+    .update().eq().execute() (write — recorded on the client)."""
+
+    def __init__(self, client):
+        self._client = client
+        self._payload = None
+        self._eq = None
+
+    def select(self, *a, **k):
+        return self
+
+    def in_(self, *a, **k):
+        return self
+
+    def order(self, *a, **k):
+        return self
+
+    def limit(self, *a, **k):
+        return self
+
+    def update(self, payload):
+        self._payload = payload
+        return self
+
+    def eq(self, col, val):
+        self._eq = (col, val)
+        return self
+
+    def execute(self):
+        if self._payload is not None:
+            self._client.updates.append((self._eq[1], self._payload))
+            return _FakeResp(None)
+        return _FakeResp([dict(r) for r in self._client.rows])
+
+
+class _FakeClient:
+    def __init__(self, rows):
+        self.rows = rows
+        self.updates = []  # list of (event_id, {'payload': ...})
+
+    def table(self, name):
+        assert name == 'chain_events'
+        return _FakeQuery(self)
+
+
+class ApprovalRiskTest(unittest.TestCase):
+    def test_policy_match_maps_through_trust_policy(self):
+        # A matching rule (auto_approve) → safe, regardless of severity.
+        risk, careful = mn.derive_approval_risk(
+            _approval(payload={'prompt': 'tidy a tooltip', 'severity': 'critical'}),
+            _POLICY_SAFE)
+        self.assertEqual(risk, 'safe')
+        self.assertFalse(careful)
+
+    def test_no_rule_floors_at_default_and_severity_escalates(self):
+        # _POLICY_ASK has no rules → the force_ask DEFAULT applies (floor = medium);
+        # the event's severity may ESCALATE it (critical → careful) but never drop
+        # it below the floor — an unclassified approval is still a real decision.
+        crit = mn.derive_approval_risk(
+            _approval(payload={'prompt': 'x', 'severity': 'critical'}), _POLICY_ASK)
+        self.assertEqual(crit[0], 'careful')
+        warn = mn.derive_approval_risk(
+            _approval(payload={'prompt': 'x', 'severity': 'warning'}), _POLICY_ASK)
+        self.assertEqual(warn[0], 'medium')
+        # info / no severity must NOT drop the force_ask default below medium
+        # (no under-warning on the queue's most decision-dense surface).
+        info = mn.derive_approval_risk(
+            _approval(payload={'prompt': 'x', 'severity': 'info'}), _POLICY_ASK)
+        self.assertEqual(info[0], 'medium')
+        none = mn.derive_approval_risk(
+            _approval(payload={'prompt': 'x'}), _POLICY_ASK)
+        self.assertEqual(none[0], 'medium')
+
+    def test_careful_keyword_wins(self):
+        # An irreversible/outward request reads careful even with no rule + low sev.
+        risk, careful = mn.derive_approval_risk(
+            _approval(payload={'prompt': 'Deploy to production and delete the table',
+                               'severity': 'info'}),
+            _POLICY_ASK)
+        self.assertEqual(risk, 'careful')
+        self.assertTrue(careful)
+
+    def test_careful_escalator_wins_over_matched_auto_approve(self):
+        # The careful escalator wins even inside the policy-match branch: an
+        # auto_approve rule still reads careful for an irreversible request.
+        risk, careful = mn.derive_approval_risk(
+            _approval(payload={'prompt': 'delete the production database'}),
+            _POLICY_SAFE)
+        self.assertEqual(risk, 'careful')
+        self.assertTrue(careful)
+
+    def test_reject_rule_is_careful(self):
+        risk, _ = mn.derive_approval_risk(_approval(), _POLICY_REJECT)
+        self.assertEqual(risk, 'careful')
+
+
+class ApprovalMeaningLayerTest(unittest.TestCase):
+    def test_authors_deterministic_fields(self):
+        fields = mn.author_approval_meaning_layer(
+            _approval(payload={'prompt': 'x', 'severity': 'warning'}),
+            now=NOW, policy=_POLICY_ASK, use_llm=False)
+        self.assertEqual(set(fields['briefing']), {'what', 'why', 'suggest'})
+        self.assertTrue(all(isinstance(v, str) and v
+                            for v in fields['briefing'].values()))
+        self.assertEqual(fields['risk'], 'medium')
+        self.assertIn('risk_note', fields)  # medium → a note
+        prov = fields['briefing_provenance']
+        self.assertEqual(prov['by'], 'beacon')
+        self.assertEqual(prov['model'], 'raw')  # no LLM under use_llm=False
+        self.assertEqual(prov['source'], 'approval')
+        # The Approvals queue uses Approve/Reject, not delegate/drop — so the
+        # approval meaning layer carries NO recommended_action.
+        self.assertNotIn('recommended_action', fields)
+
+    def test_safe_has_no_risk_note(self):
+        fields = mn.author_approval_meaning_layer(
+            _approval(payload={'prompt': 'x'}), now=NOW, policy=_POLICY_SAFE,
+            use_llm=False)
+        self.assertEqual(fields['risk'], 'safe')
+        self.assertNotIn('risk_note', fields)
+
+    def test_raw_briefing_does_not_echo_the_prompt_blob(self):
+        # The fallback is a plain summary, not the raw request (the card already
+        # shows the full prompt on expand).
+        long_prompt = 'SECRET-MARKER ' * 50
+        fields = mn.author_approval_meaning_layer(
+            _approval(payload={'prompt': long_prompt}), now=NOW,
+            policy=_POLICY_ASK, use_llm=False)
+        self.assertNotIn('SECRET-MARKER', json.dumps(fields['briefing']))
+
+
+class ApprovalNeedsBriefingTest(unittest.TestCase):
+    def test_unbriefed_pending_needs_briefing(self):
+        self.assertTrue(mn.approval_needs_briefing(_approval()))
+        self.assertTrue(mn.approval_needs_briefing(
+            _approval(event_type='clarify_request',
+                      payload={'question': 'which repo?'})))
+
+    def test_already_briefed_is_idempotent(self):
+        ev = _approval(payload={'prompt': 'x', 'briefing': {'what': 'a'}})
+        self.assertFalse(mn.approval_needs_briefing(ev))
+
+    def test_resolved_row_is_skipped(self):
+        self.assertFalse(mn.approval_needs_briefing(
+            _approval(read_at='2026-06-14T00:00:00+00:00')))
+
+    def test_non_briefable_types_skipped(self):
+        for t in ('larry_alert', 'sentinel_alert', 'card_message'):
+            self.assertFalse(mn.approval_needs_briefing(
+                _approval(event_type=t, payload={'message': 'fyi'})))
+
+    def test_escalation_with_summary_skipped_without_briefed(self):
+        self.assertFalse(mn.approval_needs_briefing(
+            _approval(event_type='escalation',
+                      payload={'summary': 'already explained'})))
+        self.assertTrue(mn.approval_needs_briefing(
+            _approval(event_type='escalation', payload={'headline': 'h'})))
+
+
+class ApprovalSweepTest(unittest.TestCase):
+    def _rows(self):
+        return [
+            _approval(event_id='a1',
+                      payload={'prompt': 'Deploy to production'}),       # careful
+            _approval(event_id='a2', event_type='clarify_request',
+                      payload={'question': 'Which repo should this land in?'}),
+            _approval(event_id='a3',
+                      payload={'prompt': 'x', 'briefing': {'what': 'done'}}),  # skip
+            _approval(event_id='a4', event_type='larry_alert',
+                      payload={'message': 'fyi'}),                        # skip
+            _approval(event_id='a5',
+                      read_at='2026-06-14T00:00:00+00:00',
+                      payload={'prompt': 'y'}),                          # skip
+        ]
+
+    def test_briefs_pending_writes_payload_back(self):
+        client = _FakeClient(self._rows())
+        briefed, deferred = mn.author_pending_approvals(
+            client=client, now=NOW, use_llm=False, policy=_POLICY_ASK)
+        self.assertEqual(briefed, 2)      # a1 + a2 only
+        self.assertEqual(deferred, 0)
+        wrote = {eid: payload['payload'] for eid, payload in client.updates}
+        self.assertEqual(set(wrote), {'a1', 'a2'})
+        # a1: a production/deploy request reads careful + keeps its prompt.
+        self.assertEqual(wrote['a1']['risk'], 'careful')
+        self.assertEqual(wrote['a1']['prompt'], 'Deploy to production')
+        self.assertEqual(set(wrote['a1']['briefing']), {'what', 'why', 'suggest'})
+        self.assertEqual(wrote['a1']['briefing_provenance']['source'], 'approval')
+        # a2: a plain question with no rule → the force_ask default floors at
+        # medium (no under-warning), so it carries a risk_note.
+        self.assertEqual(wrote['a2']['risk'], 'medium')
+        self.assertIn('risk_note', wrote['a2'])
+
+    def test_per_tick_bound(self):
+        client = _FakeClient(self._rows())
+        briefed, deferred = mn.author_pending_approvals(
+            client=client, now=NOW, use_llm=False, policy=_POLICY_ASK,
+            max_per_tick=1)
+        self.assertEqual(briefed, 1)
+        self.assertEqual(deferred, 1)
+        self.assertEqual(len(client.updates), 1)
+
+    def test_empty_pending_is_noop(self):
+        client = _FakeClient([])
+        self.assertEqual(
+            mn.author_pending_approvals(client=client, now=NOW, use_llm=False),
+            (0, 0))
+
+    def test_no_supabase_client_is_noop(self):
+        # No injected client and no configured supabase → the sweep no-ops with no
+        # fetch/update (the real cli-is-None branch).
+        with patch.object(mn, '_approval_client', return_value=None):
+            self.assertEqual(
+                mn.author_pending_approvals(now=NOW, use_llm=False), (0, 0))
 
 
 if __name__ == '__main__':

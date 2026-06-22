@@ -1757,6 +1757,25 @@ def run_once(*, dry_run: bool,
                         log(f'missions commit+push raised: {type(e).__name__}: {e}')
                         missions_commit_status = 'push-failed'
 
+    # --- phase 4b: author the Approvals-queue meaning layer (projects-v3 P7.2a).
+    # Rides this tick so there is no new systemd unit; mirrors the State Log phase
+    # below. Unlike captures/missions (JSON registries committed above), the
+    # Approvals queue is read by the dashboard DIRECTLY from Supabase chain_events,
+    # so the Narrator writes the briefing into each pending row's payload JSONB
+    # itself — its OWN sole writer of those keys, never git-committed, outside the
+    # single-committer machinery. Skipped under --dry-run (the sweep writes to
+    # Supabase when it briefs; a dry tick must touch nothing). Fully fail-isolated:
+    # an approval-sweep error must never break the GC tick. ---
+    if not dry_run:
+        try:
+            from missions_narrator import author_pending_approvals  # noqa: PLC0415
+            a_briefed, a_deferred = author_pending_approvals(now=now, use_llm=True)
+            if a_briefed or a_deferred:
+                log(f'approval meaning-layer: briefed {a_briefed}, '
+                    f'deferred {a_deferred}')
+        except Exception as e:  # noqa: BLE001 — fail-safe: never abort the tick
+            log(f'narrator approval sweep raised: {type(e).__name__}: {e}')
+
     # --- phase 5: refresh the work-in-flight State Log (system self-awareness
     # Slice 1). Rides this tick so there is no new systemd unit; runs AFTER the
     # Narrator sweeps above so it sees fresh briefings. The State Log is droplet
