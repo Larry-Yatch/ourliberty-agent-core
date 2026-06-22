@@ -4,6 +4,109 @@
 
 ---
 
+## Iteration ~2445 — 2026-06-22T12:00Z UTC (interactive, /cycle, Tier 3→1, consecutive_clean=7→0, SIGNAL ⚠️)
+
+**Trigger:** Larry `/cycle` invocation (interactive).
+
+**Health:** ⚠️ Signal — Tier-4 escalations: deploy-restart-storm (novel, bot routed digest/no-DM); deploy-notifier PR #80 Vercel failure (novel, bot delivered to Larry at 05:48 MDT). New install-drift for ourliberty-doorbell.service+timer (Tier-3 silence from Pulse; bot delivered to Larry at 05:38 MDT; needs operator sudo install to activate doorbell feature). All 5 daemons restarted at 11:43Z after d648280a (feat(doorbell)) changed larry_alerts.py — all alive with new PIDs. New open PRs: #81 (fix es2018 dotAll regex, Vercel preview SUCCESS), #80 (p7-universal-card, Vercel preview FAILED), #634 (spec P7, <30 min old), #635 (heal-systemd-install-drift grace window, Mirror inbox in-flight). Tier 3→1, consecutive_clean=7→0.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Daemons (re-verified, new PIDs after 11:43Z restart):** chain_event=930563 (SNs, unchanged since Jun21) ✅, beacon=1025989 (Ss, started 05:43 MDT) ✅, dashboard_api=1026057 (Ssl, started 05:43 MDT) ✅, inbox_watcher=1026206 (Ssl, started 05:43 MDT) ✅, outbox_notifier=1026349 (Ss, started 05:43 MDT) ✅. 5/5 alive. PIDs updated from prior iters.
+- **Repo HEAD:** 313bca22=origin/main (docs(system-awareness): tick the tracker, PR #636). Clean, up to date. ✅
+- **deploy-notifier:ERROR main-branch (dpl_8QqRKy3hBSeQ913R2PQjKVSHw1ZJ):** Re-verified: no new success notification for ourliberty-dashboard main in bot log since 06:24Z failure. Still outstanding. PR #81 (es2018 dotAll fix, Vercel preview SUCCESS at 11:53Z) is the likely fix-in-progress. Carry [yellow].
+- **catalog-accuracy-drift-grule-001 (Beacon in-flight):** Dispatched iter ~2442; Beacon picked up 10:57Z. Still in-flight. [carry blue]
+- **G-rule mirror-marker-parse-error:** 2/3 — 0 new alerts this iter. [carry]
+- **G-rule heal-stale-daemon-code-script-service-mismatch:** 1/3 — 0 new mismatch alerts this iter (11:43Z restarts all had correct script→service mapping). Still-stale-after-restart alerts (idx=882,883 at 00:00 MDT) visible in bot log are from pre-watermark period, already delivered to Larry. [carry 1/3]
+
+**Check 0 — Alert triage (11 new alerts, watermark 887→898):**
+- repair-watermark → `{"repaired": false, "old_watermark": 887, "file_length": 898}`. 11 new alerts (lines 888-898).
+- Line 888: `source=sync.service, subject=deploy-restart-storm, route=digest` (7 daemons restarted after d648280a). Triage helper → Tier-4 (novel; no registry/translation match). Bot route=digest, DM skipped. All daemons self-healed. G-rule **sync.service-deploy-restart-storm-tier4 1/3**. → tier-reset (Tier-4 classification). No Pulse DM (bot digest already correct).
+- Line 889: `source=heal-systemd-install-drift, subject=install-drift:ourliberty-doorbell.service, route=escalate`. Triage helper → Tier-3 (silence, known-pattern match). Bot delivered to Larry at 05:38 MDT. Functional gap: doorbell feature won't fire without sudo install. → [yellow] standing finding.
+- Line 890: `source=heal-systemd-install-drift, subject=install-drift:ourliberty-doorbell.timer, route=escalate`. Triage helper → Tier-3 (silence). Bot delivered to Larry at 05:38 MDT. → [yellow] standing finding.
+- Lines 891-897: `source=heal-stale-daemon-code, subject=auto-restarted:<service>` ×7 (beacon, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot). Triage helper → Tier-3 (silence, known pattern; beacon representative call confirmed). All route=digest, DMs skipped. Expected post-deploy restarts (d648280a changed larry_alerts.py). ✅ Nominal.
+- Line 898: `source=deploy-notifier, subject=deploy-notifier:ERROR:dpl_HXKoGGik21q9cGQcatG7n8ESbyLV, route=escalate`. (PR #80 work/p7-universal-card Vercel preview failed.) Triage helper → Tier-4 (novel). Bot delivered to Larry at 05:48 MDT. → [yellow] standing finding. → tier-reset (Tier-4).
+- Watermark advanced 887→898. ✅
+
+**Check 1 — Log noise:** outbox_notifier.log: 0 WARN/ERROR (last 50 lines). inbox_watcher.log: 0 WARN/ERROR (last 50 lines). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot PID 1025989 (Ss, restarted 05:43 MDT). Bot log: doorbell install-drift alerts delivered at 05:38 MDT; PR #80 Vercel failure delivered at 05:48 MDT; still-stale-after-restart alerts (idx=882,883) delivered at 00:00 MDT (pre-watermark, already actioned). No new Larry directives since 04:52 MDT ("Go" approved catalog-drift-sync-cadence-001). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → "no stalls detected." FORGE_NO_PR_SKIP: p6-brainstorm-autofill-author (#611), p6-brainstorm-card-ui (#72), system-self-awareness-slice-1b-where-are-we (#73), system-self-awareness-slice-2a-waiting-on-larry (#620), fix-phantom-build-phase-terminal-guard-001 (#630), projects-stale-gc-archive-completed-001 (#631). ✅ Nominal.
+
+**Check 4 — Pending directives:** Forge inbox: empty. Beacon inbox: empty. Mirror inbox: review-pr-635.json (PR #635 work/install-drift-self-clear; just arrived, not stale — inbox_watcher will dispatch). beacon-pending-approvals: pending=0, history=251. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-22T11:53:19Z (~7 min before iter). Within 60-min window. ✅ Nominal.
+
+**Check A — Source repo:** On main. HEAD=313bca22=origin/main. Clean, up to date. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-22T11:46:35Z (~14 min ago), status=success (synced d648280a→313bca22, PR #633→#636). Within 2h window. ✅ Nominal.
+
+**Check C — Agent liveness:** chain_event=930563 (SNs) ✅, beacon=1025989 (Ss) ✅, dashboard_api=1026057 (Ssl) ✅, inbox_watcher=1026206 (Ssl) ✅, outbox_notifier=1026349 (Ss) ✅. 5/5 alive (4/5 restarted at 11:43Z via heal-stale-daemon-code after d648280a). ✅
+
+**Check D — Inboxes:** Forge: empty. Beacon: empty. Mirror: review-pr-635.json (in-flight, not stale). ✅ Nominal.
+
+**Check E — PRs:**
+- ourliberty-agent-core: PR #635 (heal-systemd-install-drift grace window; MERGEABLE; Mirror review in-flight), PR #634 (spec(projects-v3) P7; UNKNOWN mergeable; created 11:35Z, no review yet — <30 min old, not stale).
+- ourliberty-dashboard: PR #81 (fix es2018 dotAll regex breaks prod build; created 11:53Z, MERGEABLE, Vercel preview SUCCESS — <30 min old, not stale, needs Mirror review); PR #80 (feat UniversalCard; MERGEABLE per GitHub, Vercel preview FAILED dpl_HXKoGGik21q9cGQcatG7n8ESbyLV — already in standing findings [yellow]).
+- No auto-merge eligible PRs (all either <30 min old or awaiting Mirror review). ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Monday 2026-06-22 UTC (weekday=0 ∈ {0,2,4,6}):** Check I sentinel check-i-2026-06-22.json EXISTS → skip. Check VIII/IX/X: already ran iter ~2413 → skip. Check III: last 2026-06-11 (11d < 14d gate, Monday not Sunday) → skip. ✅
+
+**Actions taken:**
+1. Watermark advanced 887→898 (11 alerts triaged; Tier-3×9, Tier-4×2).
+2. PRIME ledger: `intervention` appended (tier=1, template=tier4-alert-triage; Tier-4 deploy-restart-storm + PR #80 Vercel failure).
+3. Tier state: `record --checks-clean false` → consecutive_clean=7→0, Tier 3→1 (tier-reset from Tier-4 alerts). Next cadence: 5-min.
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [yellow] **install-drift:ourliberty-doorbell.service + ourliberty-doorbell.timer** — Bot delivered to Larry 05:38 MDT. Doorbell feature (PR #633) won't fire without operator install: `sudo cp ~/agent-core/systemd/ourliberty-doorbell.{service,timer} /etc/systemd/system/` then `sudo systemctl daemon-reload && sudo systemctl enable --now ourliberty-doorbell.timer`. [new this iter]
+- [yellow] **deploy-notifier:ERROR PR #80 (dpl_HXKoGGik21q9cGQcatG7n8ESbyLV)** — work/p7-universal-card Vercel preview failed 11:48Z. Bot delivered to Larry. PR MERGEABLE per GitHub. [new this iter]
+- [yellow] **deploy-notifier:ERROR PR #79 (dpl_8rPcUdLrCaRWmGisk3QudJZDyTvg)** — work/slice-2b Vercel build failed 06:24Z. Bot delivered to Larry 00:25 MDT. [adding now — was below watermark in prior iters; PR #81 may fix underlying issue]
+- [yellow] **deploy-notifier:ERROR main-branch (dpl_8QqRKy3hBSeQ913R2PQjKVSHw1ZJ)** — ourliberty-dashboard main branch Vercel build FAILED 06:24Z. No subsequent success confirmed. PR #81 (es2018 dotAll fix, Vercel preview SUCCESS) is in-flight fix. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — PR #607 merged without Mirror review. Larry judgment. [carry]
+- [blue] **review-pr-635 in-flight (Mirror)** — PR #635 (heal-systemd-install-drift grace window + stand-down). Mirror inbox; inbox_watcher dispatching. [new this iter]
+- [blue] **PR #634 open** — spec(projects-v3) P7, created 11:35Z, no review task yet. Needs Mirror review dispatch from outbox-notifier. [new this iter]
+- [blue] **PR #81 open** — fix(where-we-are): es2018 dotAll regex, created 11:53Z, Vercel preview SUCCESS. Needs Mirror review. Pending fix for main-branch Vercel failure. [new this iter]
+- [blue] **catalog-accuracy-drift-grule-001 in-flight** — Dispatched iter ~2442; Beacon picked up 10:57Z. Carry until Beacon spec + Forge PR.
+- [blue] **unreviewed-merge:628** — Larry-deliberate bypass 06:08:57Z. [carry]
+- [blue] **unreviewed-merge:625+627** — Larry-deliberate bypass 05:17Z/05:18Z. [carry]
+- [blue] **install-drift:ourliberty-build-sequence-advancer.service** — Tier-3 silenced. [carry]
+- [blue] **unreviewed-merge:571** — bot DM'd. Larry judgment. [carry]
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+- [blue] **Stale bash orphan PID 1834248** — ~30d+ sleep-loop. Low CPU. Benign. [carry]
+- [blue] **daemon-pids.json missing** — PIDs looked up by name via ps. Daemons all alive. [carry]
+- [blue] **G-rule sync.service-deploy-restart-storm-tier4** — 1/3. Bot already routes deploy-restart-storm as digest; Tier-3 translation candidate at 3/3. Watch.
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. Watch; dispatch to Beacon at 3/3.
+- [blue] **G-rule catalog-accuracy-drift** — 3/3 → DISPATCHED (catalog-accuracy-drift-grule-001). Carry until PR merges.
+- [blue] **G-rule mirror-marker-parse-error** — 2/3. Watch; dispatch to Beacon at 3/3.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule seq-advancer-sequence-stranded** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule watchdog-watcher-log-stale** — 1/3. Watch.
+- [blue] **G-rule heal-stale-daemon-code-script-service-mismatch** — 1/3. Watch.
+- [blue] **G-rule health-notify-script-missing** — dispatch sent 2026-06-09, fix status unverified. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention (Tier-4 triage, tier=1). Trailing-30d: systemic_fixes=56, ratio≈18.93, trend=improving.
+**Tier end-of-iter:** Tier 3→1 (tier-reset), consecutive_clean=7→0. Next cadence: 5-min.
+
+---
+
 ## Iteration ~2444 — 2026-06-22T11:28Z UTC (interactive, /cycle, Tier 3→3, consecutive_clean=6→7, NOMINAL ✅)
 
 **Trigger:** Larry `/cycle` invocation (interactive).
