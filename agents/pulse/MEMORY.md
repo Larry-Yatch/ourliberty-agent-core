@@ -168,9 +168,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 18:21Z UTC (Iter ~2462, Tier 1→1, consecutive_clean=0→1, NOMINAL ✅)
+## Status snapshot — updated 2026-06-22 18:27Z UTC (Iter ~2463, Tier 1→1, consecutive_clean=1→0, ALERT ⚠️)
 
-**Iter ~2462 summary:** ✅ Nominal. 1 new alert L921 (sequence-complete:projects-v3-p7, Tier-3 silence). **P7 sequence COMPLETE** — PR #638 (shelf-descriptor schema, agent-core) + PR #82 (approvals adopt UniversalCard, dashboard) both merged. 0 open PRs both repos. Watermark 920→921. **Standing [yellow]: credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals, unreviewed-merge:607.** PRIME: systemic_fixes=56, ratio=18.98, trend=improving. **G-rule mirror-marker-parse-error: 2/3. G-rule sync.service-deploy-restart-storm-tier4: 1/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Tier 1, consecutive_clean=1, next cadence: 5-min.
+**Iter ~2463 summary:** ⚠️ Alert. 1 new alert L922 (unreviewed-merge:637, Tier-4). PR #637 (spec P7.2 re-scope, spec-only) merged by actor=Larry-Yatch without Mirror review; bot DM delivered at 12:22 MDT. 0 open PRs both repos. Watermark 921→922. **Standing [yellow]: unreviewed-merge:637 (new), unreviewed-merge:607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals.** PRIME: systemic_fixes=56, ratio=18.98, trend=improving. **G-rule mirror-marker-parse-error: 2/3. G-rule sync.service-deploy-restart-storm-tier4: 1/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Tier 1, consecutive_clean=0, next cadence: 5-min.
 
 
 
