@@ -485,7 +485,8 @@
         "at": "2026-06-14T17:52:43.946307+00:00",
         "from_state": "parked"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "aging": true
     },
     {
       "id": "cap-schedule-the-missions-narrator-no-timer-new-park-9943",
@@ -515,7 +516,8 @@
         "at": "2026-06-15T20:16:15.974732+00:00",
         "from_state": "parked"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "aging": true
     },
     {
       "id": "cap-test-jail-pr-4-ready-for-go-after-pr-3-lands-447f",
