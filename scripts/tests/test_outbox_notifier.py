@@ -7423,7 +7423,7 @@ class BeaconReplanPauseTest(unittest.TestCase):
         lines = self._la.ALERTS_FILE.read_text().splitlines()
         return [json.loads(line) for line in lines if line.strip()]
 
-    def _beacon_replan_outbox(self):
+    def _beacon_replan_outbox(self, target_repo='ourliberty-agent-core'):
         marker_payload = json.dumps({
             'task_id': 'real-001',
             'summary': (
@@ -7431,7 +7431,7 @@ class BeaconReplanPauseTest(unittest.TestCase):
             ),
             'target_agent': 'forge',
             'prompt': 'x' * 200,
-            'target_repo': 'ourliberty-agent-core',
+            'target_repo': target_repo,
             'task_type': 'feature-development',
         })
         marker = (
@@ -7491,8 +7491,10 @@ class BeaconReplanPauseTest(unittest.TestCase):
         self.assertEqual(backlog[0].get('_replan_count'), 1)
 
     def test_no_pause_proceeds_normally(self):
-        """Sanity: no pause → alert queued as before."""
-        body = self._beacon_replan_outbox()
+        """Sanity: no pause → force_ask alert queued as before. Post-autonomy
+        (#615) an agent-core replan auto-approves, so this force_ask-path test
+        targets a still-ask repo (ourliberty-dashboard)."""
+        body = self._beacon_replan_outbox(target_repo='ourliberty-dashboard')
         f = self._write_outbox('beacon', 'beacon-normal.json', body)
         on.process_outbox(f)
         alerts = self._read_alerts()

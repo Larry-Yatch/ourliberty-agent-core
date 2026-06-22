@@ -847,6 +847,12 @@ def _send_beacon_response(
         log(f"trust_decision raised; defaulting to force_ask: {type(e).__name__}: {e}")
         action_str, rule = 'force_ask', None
 
+    # Record the autonomy decision (powers the Automated Work + needs-Larry views).
+    chain_event_emit.emit_event(
+        **approval.build_autonomy_decision_chain_event(
+            payload, decision=action_str, rule=rule, source='beacon'),
+    )
+
     if narrative:
         telegram_send(chat_id, narrative)
 

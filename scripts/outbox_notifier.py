@@ -7902,6 +7902,12 @@ def _route_beacon_replan_approval(data: dict[str, Any]) -> bool:
         )
         return False
 
+    # Record the autonomy decision (powers the Automated Work + needs-Larry views).
+    chain_event_emit.emit_event(
+        **approval.build_autonomy_decision_chain_event(
+            payload, decision=action_str, rule=rule, source='beacon'),
+    )
+
     if action_str == 'reject':
         log(
             f'trust_policy rejected beacon replan for task {task_id} '
@@ -8191,6 +8197,12 @@ def _route_beacon_pulse_auto_dispatch_approval(
             'WARN',
         )
         return False
+
+    # Record the autonomy decision (powers the Automated Work + needs-Larry views).
+    chain_event_emit.emit_event(
+        **approval.build_autonomy_decision_chain_event(
+            payload, decision=action_str, rule=rule, source=policy_source),
+    )
 
     if action_str == 'reject':
         log(

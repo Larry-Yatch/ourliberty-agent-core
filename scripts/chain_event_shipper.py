@@ -174,6 +174,18 @@ KNOWN_EVENT_TYPES: frozenset[str] = frozenset({
     # re-tick / notifier crash-resume never double-emits. The shipper never
     # produces these rows; listing the type here admits it to the weekly audit.
     'sequence_complete',
+    # autonomy-visibility (2026-06-21): the durable record of ONE trust-policy
+    # decision, push-emitted at each decision site (beacon chat path, pulse-
+    # auto-dispatch route, replan route — board-delegate route lands in slice 2)
+    # via
+    # beacon_approval_handler.build_autonomy_decision_chain_event. payload carries
+    # decision (auto_approve|force_ask|reject), dispatched (fired without Larry?),
+    # source, target_agent/repo, task_type, matched_rule, summary. This is the
+    # audit primitive behind BOTH the Automated Work feed (decision=auto_approve)
+    # and the needs-Larry view (decision=force_ask). The shipper never produces
+    # these rows; listing the type here admits it to the weekly chain-event-type
+    # audit (heal_chain_event_type_audit.py).
+    'autonomy_decision',
 })
 
 # PII / credential redaction. Any payload field key matching one of these

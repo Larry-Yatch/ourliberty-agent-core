@@ -855,6 +855,11 @@ class TestKnownEventTypesContract(unittest.TestCase):
         # (p4-complete-signal) — push-emitted by outbox_notifier when a
         # build-sequence's final step reaches verified-merged (exactly-once,
         # guarded by a sequence-complete-signaled audit marker).
+        # The autonomy_decision type was added by the autonomy-visibility work
+        # (2026-06-21) — push-emitted at each trust-decision site
+        # (beacon_approval_handler.build_autonomy_decision_chain_event) recording
+        # the auto_approve/force_ask/reject outcome + matched rule; the audit
+        # primitive behind the Automated Work feed and the needs-Larry view.
         spec_listed = {
             'session_start', 'session_done', 'marker_emit', 'auto_merge',
             'marker_error', 'cost_budget', 'review_request',
@@ -870,6 +875,7 @@ class TestKnownEventTypesContract(unittest.TestCase):
             'desktop_session_done',
             'card_message',
             'sequence_complete',
+            'autonomy_decision',
         }
         self.assertEqual(ces.KNOWN_EVENT_TYPES, frozenset(spec_listed))
 

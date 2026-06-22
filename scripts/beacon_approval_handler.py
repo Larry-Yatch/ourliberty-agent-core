@@ -993,6 +993,66 @@ def build_approval_request_chain_event(
     }
 
 
+def build_autonomy_decision_chain_event(
+    payload: dict[str, Any],
+    *,
+    decision: str,
+    rule: Optional[dict[str, Any]] = None,
+    source: str = 'beacon',
+    ts: Optional[str] = None,
+) -> dict[str, Any]:
+    """Build kwargs for `chain_event_emit.emit_event` recording ONE trust-policy
+    autonomy decision — the durable audit primitive behind two derived views:
+
+      - `decision == 'auto_approve'` (dispatched=True)        → Automated Work
+        feed: "what the team did on its own."
+      - `decision in ('force_ask', 'reject')` (dispatched=False) → needs-Larry
+        view: "what the team found it could work on but needs his call."
+
+    One record, both halves. Emitted at every trust-decision site (the bot's
+    chat path, the pulse-auto-dispatch route, the replan route — and the board-
+    delegate route once slice 2 wires it) right after `trust_policy.evaluate` /
+    `trust_decision` returns, so the matched rule + the auto-vs-ask outcome are
+    captured at the decision moment (the pre-existing `approval_request` event
+    records only that an ask was *made*, never the resolution). Downstream
+    `build_dispatched` / `auto_merge` / `review_pass` events join by `task_id`
+    for the outcome.
+
+    Best-effort + emitted UPSTREAM of each route's replay-dedup (unlike the
+    sibling `approval_request` emit, which sits below it), so a notifier
+    crash-resume that re-processes the same outbox can land a duplicate row (the
+    deterministic event_id uses a fresh ts per call, so the PK can't absorb it).
+    That's an accepted trade for an audit primitive — the Automated Work /
+    needs-Larry consumers dedup by `task_id` on read.
+
+    Pure: returns kwargs; the caller does the Supabase write (so tests can assert
+    payload shape without mocking supabase-py). `source` is the trust-policy
+    source the decision was evaluated under ('beacon', 'pulse-auto-dispatch',
+    'pulse'), NOT necessarily 'beacon' — kept distinct so the feed can attribute
+    who proposed the work."""
+    use_ts = ts or _now_utc()
+    task_id = payload.get('task_id') or 'unknown'
+    chain_payload = {
+        'decision': decision,
+        'dispatched': decision == 'auto_approve',
+        'source': source,
+        'target_agent': payload.get('target_agent', 'forge'),
+        'target_repo': payload.get('target_repo'),
+        'task_type': payload.get('task_type'),
+        'matched_rule': rule,
+        'summary': payload.get('summary'),
+        'pr_title': payload.get('pr_title'),
+    }
+    return {
+        'event_type': 'autonomy_decision',
+        'agent': 'beacon',
+        'task_id': task_id,
+        'ts': use_ts,
+        'payload': chain_payload,
+        'id_extra': decision,
+    }
+
+
 # -------------------- dispatch step --------------------
 
 def dispatch_approved(entry: dict[str, Any]) -> Path:
