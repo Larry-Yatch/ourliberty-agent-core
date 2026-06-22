@@ -564,12 +564,12 @@
           "id": "system-self-awareness-slice-2a-waiting-on-larry",
           "title": "System self-awareness - Slice 2a (Waiting on Larry)",
           "desired_end_state": "Extend the State Log's waiting_on_larry into an itemized cross-source list (parked + pending approvals + for-Larry escalations), read-only, reusing existing sources. Build STRICTLY from the spec doc.",
-          "lifecycle_state": "building",
+          "lifecycle_state": "done",
           "order": 0,
           "spec_ref": "agents/beacon/specs/system-awareness-slice-2a-waiting-on-larry-substrate.md",
           "sequence_ref": "launch-system-self-awareness-slice-2a-waiting-on-larry",
           "created_at": "2026-06-21T22:26:15.787568+00:00",
-          "updated_at": "2026-06-22T01:05:02.728244+00:00",
+          "updated_at": "2026-06-22T01:23:50.955712+00:00",
           "brainstorm": {
             "is_ai_draft": true,
             "draft": {
@@ -602,6 +602,23 @@
             "model": "claude-opus-4-8",
             "at": "2026-06-21T22:26:15.787568+00:00",
             "from_state": "brainstorm"
+          },
+          "closeout": {
+            "summary": "We turned the single \"things waiting on you\" number into an actual itemized list, so you can now see each specific thing blocked on your decision in one place instead of just a tally. The next phase can take that list and put it on screen (PR #620).",
+            "shipped": "A behind-the-scenes list that gathers everything waiting on you \u2014 parked ideas, pending approvals, and any items flagged for you \u2014 into one running view, sorted most-urgent first and capped at 25 entries. It only reads from the existing systems and never changes them.",
+            "changed_vs_spec": "It was built as planned, with one honest note: the \"flagged for you\" escalations source has no clean way today to mark something as needing you specifically, so right now it contributes nothing rather than guessing. In a live check it pulled together 22 parked items and 0 of the other two types.",
+            "learnings": "The escalations feed is currently internal operations noise with no \"this needs Larry\" marker, so it's deliberately left empty for now but already wired up to light up the moment such a marker exists. Putting the list on a page and adding approve/reject buttons was intentionally left for the next phase.",
+            "cost": "One PR of build work.",
+            "done_gate_met": true
+          },
+          "closeout_provenance": {
+            "by": "beacon",
+            "model": "claude-opus-4-8",
+            "at": "2026-06-22T01:23:26.168630+00:00",
+            "from_state": "done",
+            "pr_numbers": [
+              "620"
+            ]
           }
         }
       ],
