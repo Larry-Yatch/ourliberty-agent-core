@@ -48,6 +48,24 @@ ENV_HEALER_ENABLED = 'OURLIBERTY_INSTALL_DRIFT_HEALER_ENABLED'
 
 RE_DM_WINDOW = timedelta(hours=12)
 
+# A failed/disabled auto-install is escalated to a 🔴 URGENT manual-dance DM only
+# after the drift has PERSISTED this long since its first sighting. The
+# post-merge sync trigger (scripts/sync_agent_core.sh) runs this healer on every
+# deploy; when it catches a freshly-merged unit mid-deploy — the new file is in
+# the repo but the droplet checkout / install hasn't landed yet, so the
+# `sudo cp ~/agent-core/systemd/<unit> …` auto-install fails — the old code paged
+# instantly, then the drift cleared on its own within minutes (the deploy
+# finished installing the unit). That transient deploy-sync race is exactly the
+# false page this window suppresses: a drift that resolves inside the window
+# never DMs, while a genuinely-stuck drift (repo has it, install keeps failing,
+# or auto-remediation is off) still escalates on the first tick past the window.
+# Distinct from JUST_FIRED_GRACE_S on the stuck-timer path: that one is a "did
+# this timer literally just fire" health check (LastTriggerUSec < 120s), whereas
+# this is a first-sighting persistence debounce on the install/content-drift
+# escalation. Backstopped by the 12h scheduled tick, so even with no intervening
+# sync a real miss pages within one cadence.
+ESCALATE_GRACE = timedelta(minutes=30)
+
 SYSTEMCTL_TIMEOUT_S = 10
 RESTART_TIMEOUT_S = 30
 
@@ -138,6 +156,45 @@ def _record_dm(
     entry['last_dm_at'] = now.isoformat()
 
 
+def _within_escalate_grace(
+    state: dict[str, Any], unit: str, now: Optional[datetime] = None,
+    grace: timedelta = ESCALATE_GRACE, bucket: str = 'units',
+) -> bool:
+    """Record this drift's first sighting and report whether it is still inside
+    the escalation grace window (see ESCALATE_GRACE).
+
+    On first sight: stamp `first_seen_at` and return True (defer the page so a
+    transient deploy-sync race can clear itself). On a later sight once the
+    window has elapsed: return False (the drift persisted — page now). The entry
+    is created WITHOUT a `last_dm_at`, so `_should_re_dm` still returns True the
+    instant grace lapses. A reconciled unit is dropped from state by the GC, so
+    its `first_seen_at` is cleared and a fresh drift restarts the clock."""
+    now = now or datetime.now(timezone.utc)
+    entry = state.setdefault(bucket, {}).setdefault(unit, {'dm_count': 0})
+    # A unit we have already paged (has last_dm_at) is never re-deferred: the
+    # window's job — suppress a transient deploy-race before the first page — is
+    # moot once a real 🔴 went out. This also covers state written by the
+    # pre-grace code, where an in-flight page carries last_dm_at but no
+    # first_seen_at; without this it would be silenced for a fresh grace window
+    # on upgrade. (Normal re-DM after RE_DM_WINDOW is unaffected — that path
+    # already has first_seen_at and would escalate anyway.)
+    if entry.get('last_dm_at'):
+        return False
+    first_iso = entry.get('first_seen_at')
+    if not first_iso:
+        entry['first_seen_at'] = now.isoformat()
+        return True
+    try:
+        first = datetime.fromisoformat(first_iso)
+        if first.tzinfo is None:
+            first = first.replace(tzinfo=timezone.utc)
+    except ValueError:
+        # Corrupt stamp — restart the clock rather than escalate off bad data.
+        entry['first_seen_at'] = now.isoformat()
+        return True
+    return (now - first) < grace
+
+
 # -------------------- DM --------------------
 
 def dm_larry(
@@ -160,9 +217,10 @@ def dm_larry(
         return False
 
 
-def _resolve_install_alert(unit: str) -> None:
+def _resolve_install_alert(unit: str) -> int:
     """Retract any stale `install-drift:<unit>` escalate alert for a unit that
-    has been reconciled (it left `live_set`).
+    has been reconciled (it left `live_set`). Returns the number of queue lines
+    removed (0 = nothing to retract, or a swallowed error).
 
     The larry-alerts queue is append-only: a 🔴 URGENT manual-dance alert
     emitted by `_render_missing_install` / `_render_content_drift_dry_run`
@@ -170,8 +228,10 @@ def _resolve_install_alert(unit: str) -> None:
     drift resolves out-of-band — the GC below only prunes this healer's internal
     re-DM dedup state, never the emitted alert. `larry_alerts.resolve_alert`
     removes the stale escalate line(s) under the queue flock and keeps the
-    beacon/medic line cursors consistent. Best-effort: any failure is logged and
-    swallowed so it can never break the reconciliation GC."""
+    beacon/medic line cursors consistent. A non-zero return is the caller's
+    proof that a real 🔴 had been delivered, so it can fire a stand-down DM.
+    Best-effort: any failure is logged and swallowed so it can never break the
+    reconciliation GC."""
     try:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         import larry_alerts as la  # noqa: E402
@@ -181,9 +241,11 @@ def _resolve_install_alert(unit: str) -> None:
         if removed:
             log(f'retracted {removed} stale install-drift alert line(s) for '
                 f'{unit} (reconciled out-of-band)')
+        return removed or 0
     except Exception as e:  # noqa: BLE001
         log(f'_resolve_install_alert failed for {unit}: '
             f'{type(e).__name__}: {e}', 'WARN')
+        return 0
 
 
 def _classify_route(subject: str, healed: bool) -> str:
@@ -1032,6 +1094,26 @@ def _render_content_drift_dry_run(unit: str) -> tuple[str, str, str]:
     return message, subject, suggested
 
 
+def _render_install_resolved(unit: str) -> tuple[str, str, str]:
+    """Stand-down copy for a previously-PAGED install-drift that has since been
+    reconciled. The queue retraction (`_resolve_install_alert`) removes the stale
+    line, but it cannot un-send the 🔴 DM already on Larry's phone — this one-line
+    closure does that. Emitted only when a real escalate line was actually
+    removed (proof the 🔴 went out), so it never fires for a drift that was
+    deferred-and-resolved inside the grace window (which never paged)."""
+    message = (
+        f'Stand down — `{unit}` is now installed under /etc/systemd/system/ and '
+        f'the earlier 🔴 install-drift alert has been retracted. The drift '
+        f'reconciled (post-merge install completed / out-of-band fix); no action '
+        f'needed.'
+    )
+    # Distinct healed-style subject so it routes to its own no-imperative
+    # translation entry, like install-healed:/content-healed:.
+    subject = f'install-resolved:{unit}'
+    suggested = f'Verify on the droplet: `systemctl status {unit}`.'
+    return message, subject, suggested
+
+
 def _activation_message() -> tuple[str, str, str]:
     message = (
         f'Heal-systemd-install-drift is in dry-run mode '
@@ -1062,7 +1144,8 @@ def run_once(
     """Single-tick orchestration."""
     counts = {
         'missing_install': 0, 'dm_sent': 0,
-        'dm_suppressed_dedup': 0, 'reconciled_gc': 0,
+        'dm_suppressed_dedup': 0, 'dm_deferred_grace': 0,
+        'reconciled_gc': 0, 'stand_down': 0,
         'stuck_timer': 0, 'timer_healed': 0,
         'install_healed': 0,
         'content_drift': 0, 'content_healed': 0,
@@ -1128,6 +1211,18 @@ def run_once(
                 'WARN',
             )
 
+        # Escalation grace: an auto-install that was disabled or just failed is
+        # not paged on first sight — a freshly-merged unit the post-merge trigger
+        # caught mid-deploy clears within minutes (deploy finishes installing it)
+        # and is GC'd below, never DMing. Only a drift still present past the
+        # window pages.
+        if _within_escalate_grace(state, unit, now=now):
+            counts['dm_deferred_grace'] += 1
+            log(f'missing install {unit}: within escalation grace '
+                f'({ESCALATE_GRACE}); deferring manual-dance DM '
+                f'(transient deploy-sync race clears itself)')
+            continue
+
         msg, subj, sug = _render_missing_install(unit)
         ok = dm_larry(message=msg, subject=subj, suggested_action=sug)
         if ok:
@@ -1189,6 +1284,17 @@ def run_once(
                 'WARN',
             )
 
+        # Same escalation grace as missing-install: a content "differ" the
+        # post-merge trigger sees mid-deploy (old file on disk, new copy not yet
+        # synced) reconciles within minutes, so defer the page until the drift
+        # persists past the window.
+        if _within_escalate_grace(state, unit, now=now):
+            counts['dm_deferred_grace'] += 1
+            log(f'content drift {unit}: within escalation grace '
+                f'({ESCALATE_GRACE}); deferring manual-dance DM '
+                f'(transient deploy-sync race clears itself)')
+            continue
+
         msg, subj, sug = _render_content_drift_dry_run(unit)
         ok = dm_larry(message=msg, subject=subj, suggested_action=sug)
         if ok:
@@ -1203,12 +1309,30 @@ def run_once(
     # escalate line in the append-only queue; retract it so the operator's queue
     # clears with the drift (defense-in-depth alongside the just-fired-grace fix
     # that stops the false alert being emitted in the first place).
+    inst_dir = installed_dir or INSTALLED_SYSTEMD_DIR
     for gone in list(state['units'].keys()):
         if gone not in live_set:
             state['units'].pop(gone, None)
             counts['reconciled_gc'] += 1
             if not dry_run:
-                _resolve_install_alert(gone)
+                removed = _resolve_install_alert(gone)
+                # A non-zero removal means a real 🔴 install-drift line was in
+                # the queue (so it had been paged), and it is now reconciled.
+                # The retraction clears the queue but cannot un-send the DM on
+                # Larry's phone — fire a one-line stand-down so the alert he saw
+                # visibly closes. Never fires for a grace-deferred drift (which
+                # never paged → nothing to remove → removed == 0).
+                #
+                # Gate on the unit being genuinely installed now: a unit can also
+                # leave live_set because it was DELETED from the repo, not
+                # installed. The stale 🔴 is still retracted above (correct), but
+                # a "now installed, stand down" DM would be a false all-clear, so
+                # skip it when the unit is absent from /etc/systemd/system/.
+                if removed and (inst_dir / gone).exists():
+                    counts['stand_down'] += 1
+                    s_msg, s_subj, s_sug = _render_install_resolved(gone)
+                    dm_larry(message=s_msg, subject=s_subj,
+                             suggested_action=s_sug, route='closure')
 
     # Stuck-timer pass — independent of the missing-install loop. The
     # _should_re_dm cooldown (separate `stuck_timers` state bucket) throttles

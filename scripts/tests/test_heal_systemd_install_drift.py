@@ -186,12 +186,24 @@ class OrchestrationTest(_IsolatedAgentsRoot):
             )
 
     def test_live_mode_dm_per_unit(self):
+        # Not-allowlisted path → manual-dance escalate, but only AFTER the
+        # escalation grace elapses. The first tick defers (a deploy-race-safe
+        # window); the second, past grace, pages each unit once.
         with tempfile.TemporaryDirectory() as td:
             r = _make_repo_systemd(Path(td), ['a.service', 'b.timer'])
             i = _make_installed(Path(td), [])
+            state = {'units': {}}
+            t0 = datetime(2026, 5, 19, 12, 0, tzinfo=timezone.utc)
+            first = h.run_once(
+                repo_dir=r, installed_dir=i, state=state,
+                dry_run_override=False, now=t0,
+            )
+            self.assertEqual(first['dm_sent'], 0)
+            self.assertEqual(first['dm_deferred_grace'], 2)
             counts = h.run_once(
-                repo_dir=r, installed_dir=i,
-                state={'units': {}}, dry_run_override=False,
+                repo_dir=r, installed_dir=i, state=state,
+                dry_run_override=False,
+                now=t0 + h.ESCALATE_GRACE + timedelta(seconds=1),
             )
             self.assertEqual(counts['dm_sent'], 2)
             subjects = {c['subject'] for c in self._dm_calls}
@@ -202,10 +214,14 @@ class OrchestrationTest(_IsolatedAgentsRoot):
         with tempfile.TemporaryDirectory() as td:
             r = _make_repo_systemd(Path(td), ['b.timer'])
             i = _make_installed(Path(td), [])
-            h.run_once(
-                repo_dir=r, installed_dir=i,
-                state={'units': {}}, dry_run_override=False,
-            )
+            state = {'units': {}}
+            t0 = datetime(2026, 5, 19, 12, 0, tzinfo=timezone.utc)
+            # First tick defers; the page (with the install-dance) fires past grace.
+            h.run_once(repo_dir=r, installed_dir=i, state=state,
+                       dry_run_override=False, now=t0)
+            h.run_once(repo_dir=r, installed_dir=i, state=state,
+                       dry_run_override=False,
+                       now=t0 + h.ESCALATE_GRACE + timedelta(seconds=1))
             sug = self._dm_calls[0]['suggested_action']
             self.assertIn('cp', sug)
             self.assertIn('daemon-reload', sug)
@@ -226,15 +242,24 @@ class OrchestrationTest(_IsolatedAgentsRoot):
             r = _make_repo_systemd(Path(td), ['a.timer'])
             i = _make_installed(Path(td), [])
             state = {'units': {}}
-            now = datetime(2026, 5, 19, 12, 0, tzinfo=timezone.utc)
+            t0 = datetime(2026, 5, 19, 12, 0, tzinfo=timezone.utc)
+            # Tick 1: within grace → deferred, no page yet.
             h.run_once(
                 repo_dir=r, installed_dir=i, state=state,
-                dry_run_override=False, now=now,
+                dry_run_override=False, now=t0,
             )
+            # Tick 2: past grace → the manual-dance page fires exactly once.
+            paged = t0 + h.ESCALATE_GRACE + timedelta(seconds=1)
+            c2 = h.run_once(
+                repo_dir=r, installed_dir=i, state=state,
+                dry_run_override=False, now=paged,
+            )
+            self.assertEqual(c2['dm_sent'], 1)
             self._dm_calls.clear()
+            # Tick 3: within RE_DM_WINDOW of the page → dedup-suppressed.
             counts = h.run_once(
                 repo_dir=r, installed_dir=i, state=state,
-                dry_run_override=False, now=now + timedelta(hours=1),
+                dry_run_override=False, now=paged + timedelta(hours=1),
             )
             self.assertEqual(counts['dm_sent'], 0)
             self.assertEqual(counts['dm_suppressed_dedup'], 1)
@@ -244,15 +269,19 @@ class OrchestrationTest(_IsolatedAgentsRoot):
             r = _make_repo_systemd(Path(td), ['a.timer'])
             i = _make_installed(Path(td), [])
             state = {'units': {}}
-            now = datetime(2026, 5, 19, 12, 0, tzinfo=timezone.utc)
-            h.run_once(
-                repo_dir=r, installed_dir=i, state=state,
-                dry_run_override=False, now=now,
-            )
+            t0 = datetime(2026, 5, 19, 12, 0, tzinfo=timezone.utc)
+            # Tick 1: deferred (within grace). Tick 2: first page (past grace).
+            h.run_once(repo_dir=r, installed_dir=i, state=state,
+                       dry_run_override=False, now=t0)
+            paged = t0 + h.ESCALATE_GRACE + timedelta(seconds=1)
+            c2 = h.run_once(repo_dir=r, installed_dir=i, state=state,
+                            dry_run_override=False, now=paged)
+            self.assertEqual(c2['dm_sent'], 1)
             self._dm_calls.clear()
+            # Tick 3: a full RE_DM_WINDOW after the page → the drift re-DMs.
             counts = h.run_once(
                 repo_dir=r, installed_dir=i, state=state,
-                dry_run_override=False, now=now + timedelta(hours=13),
+                dry_run_override=False, now=paged + timedelta(hours=13),
             )
             self.assertEqual(counts['dm_sent'], 1)
 
@@ -295,6 +324,167 @@ class OrchestrationTest(_IsolatedAgentsRoot):
                         state={'units': {}},
                     )
                     self.assertEqual(counts['dm_sent'], 0)
+
+
+class EscalationGraceTest(_IsolatedAgentsRoot):
+    """The escalation grace window (ESCALATE_GRACE) and the stand-down DM.
+
+    A failed/disabled auto-install is NOT paged on first sight — a freshly-merged
+    unit the post-merge trigger catches mid-deploy clears within minutes and is
+    GC'd, never DMing. A drift still present past the window pages; when a unit
+    that WAS paged later reconciles, a one-line stand-down DM closes the loop.
+    Allowlist points at a nonexistent file so the not-allowlisted escalate path
+    runs directly, without remediation mocks.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self._dm_calls: list[dict] = []
+
+        def fake_dm(message, subject, suggested_action, severity='warning',
+                    route='escalate'):
+            self._dm_calls.append({
+                'message': message, 'subject': subject,
+                'suggested_action': suggested_action, 'severity': severity,
+                'route': route,
+            })
+            return True
+
+        self._dm_patch = mock.patch.object(h, 'dm_larry', fake_dm)
+        self._dm_patch.start()
+        self.addCleanup(self._dm_patch.stop)
+
+        self._allowlist_patch = mock.patch.object(
+            h, 'ALLOWLIST_FILE',
+            Path(self._isolated_tmp) / 'no-such-allowlist.json',
+        )
+        self._allowlist_patch.start()
+        self.addCleanup(self._allowlist_patch.stop)
+
+    def test_within_escalate_grace_first_sight_then_expiry(self):
+        state = {'units': {}}
+        t0 = datetime(2026, 5, 19, 12, 0, tzinfo=timezone.utc)
+        # First sight: stamps first_seen_at and defers; leaves dedup window open.
+        self.assertTrue(h._within_escalate_grace(state, 'a.timer', now=t0))
+        self.assertIn('first_seen_at', state['units']['a.timer'])
+        self.assertNotIn('last_dm_at', state['units']['a.timer'])
+        # Inside the window → still defers.
+        self.assertTrue(h._within_escalate_grace(
+            state, 'a.timer', now=t0 + h.ESCALATE_GRACE - timedelta(seconds=1)))
+        # Past the window → escalate.
+        self.assertFalse(h._within_escalate_grace(
+            state, 'a.timer', now=t0 + h.ESCALATE_GRACE + timedelta(seconds=1)))
+
+    def test_grace_helper_corrupt_stamp_restarts_clock(self):
+        state = {'units': {'a.timer': {
+            'dm_count': 0, 'first_seen_at': 'not-a-date'}}}
+        t0 = datetime(2026, 5, 19, 12, 0, tzinfo=timezone.utc)
+        # Corrupt stamp → restart the clock (defer) rather than escalate on garbage.
+        self.assertTrue(h._within_escalate_grace(state, 'a.timer', now=t0))
+        self.assertEqual(
+            state['units']['a.timer']['first_seen_at'], t0.isoformat())
+
+    def test_deploy_race_resolves_within_grace_never_pages(self):
+        # The headline fix: a drift the post-merge trigger catches, then resolves
+        # within the grace window, pages ZERO times and stands down ZERO times.
+        with mock.patch.object(
+            h, '_resolve_install_alert', return_value=0,
+        ) as res, tempfile.TemporaryDirectory() as td:
+            r = _make_repo_systemd(Path(td), ['a.timer'])
+            i = _make_installed(Path(td), [])
+            state = {'units': {}}
+            t0 = datetime(2026, 5, 19, 12, 0, tzinfo=timezone.utc)
+            # Tick 1: drift detected mid-deploy → deferred, no page.
+            c1 = h.run_once(repo_dir=r, installed_dir=i, state=state,
+                            dry_run_override=False, now=t0)
+            self.assertEqual(c1['dm_sent'], 0)
+            self.assertEqual(c1['dm_deferred_grace'], 1)
+            self.assertIn('a.timer', state['units'])
+            # Deploy finishes installing the unit, still inside the grace window.
+            (Path(i) / 'a.timer').write_text('# a.timer\n')
+            c2 = h.run_once(repo_dir=r, installed_dir=i, state=state,
+                            dry_run_override=False, now=t0 + timedelta(minutes=5))
+        self.assertNotIn('a.timer', state['units'])
+        self.assertEqual(c2['reconciled_gc'], 1)
+        self.assertEqual(c2['stand_down'], 0)
+        self.assertEqual(self._dm_calls, [])  # never paged, never stood down
+        res.assert_called_once_with('a.timer')
+
+    def test_stand_down_dm_after_paged_drift_resolves(self):
+        # A drift that persisted past grace pages; when it later reconciles a
+        # stand-down closure DM fires (gated on a real queue line being removed).
+        with mock.patch.object(
+            h, '_resolve_install_alert', return_value=1,
+        ) as res, tempfile.TemporaryDirectory() as td:
+            r = _make_repo_systemd(Path(td), ['a.timer'])
+            i = _make_installed(Path(td), [])
+            state = {'units': {}}
+            t0 = datetime(2026, 5, 19, 12, 0, tzinfo=timezone.utc)
+            h.run_once(repo_dir=r, installed_dir=i, state=state,
+                       dry_run_override=False, now=t0)  # defer
+            paged = t0 + h.ESCALATE_GRACE + timedelta(seconds=1)
+            c2 = h.run_once(repo_dir=r, installed_dir=i, state=state,
+                            dry_run_override=False, now=paged)  # page
+            self.assertEqual(c2['dm_sent'], 1)
+            self.assertEqual(
+                self._dm_calls[-1]['subject'], 'install-drift:a.timer')
+            self._dm_calls.clear()
+            # Operator installs it; next tick reconciles and stands down.
+            (Path(i) / 'a.timer').write_text('# a.timer\n')
+            c3 = h.run_once(repo_dir=r, installed_dir=i, state=state,
+                            dry_run_override=False, now=paged + timedelta(hours=1))
+        self.assertEqual(c3['reconciled_gc'], 1)
+        self.assertEqual(c3['stand_down'], 1)
+        self.assertEqual(len(self._dm_calls), 1)
+        sd = self._dm_calls[0]
+        self.assertEqual(sd['subject'], 'install-resolved:a.timer')
+        self.assertEqual(sd['route'], 'closure')
+        self.assertIn('Stand down', sd['message'])
+        res.assert_called_once_with('a.timer')
+
+    def test_no_stand_down_when_unit_deleted_from_repo(self):
+        # A paged unit later REMOVED from the repo (a revert) also leaves
+        # live_set: the stale 🔴 is still retracted, but no false "now installed"
+        # stand-down fires (the unit was never installed on the droplet).
+        with mock.patch.object(
+            h, '_resolve_install_alert', return_value=1,
+        ) as res, tempfile.TemporaryDirectory() as td:
+            r = _make_repo_systemd(Path(td), ['a.timer'])
+            i = _make_installed(Path(td), [])
+            state = {'units': {}}
+            t0 = datetime(2026, 5, 19, 12, 0, tzinfo=timezone.utc)
+            h.run_once(repo_dir=r, installed_dir=i, state=state,
+                       dry_run_override=False, now=t0)  # defer
+            paged = t0 + h.ESCALATE_GRACE + timedelta(seconds=1)
+            c2 = h.run_once(repo_dir=r, installed_dir=i, state=state,
+                            dry_run_override=False, now=paged)  # page
+            self.assertEqual(c2['dm_sent'], 1)
+            self._dm_calls.clear()
+            # Unit reverted out of the repo (never installed on the droplet).
+            (Path(r) / 'a.timer').unlink()
+            c3 = h.run_once(repo_dir=r, installed_dir=i, state=state,
+                            dry_run_override=False, now=paged + timedelta(hours=1))
+        self.assertEqual(c3['reconciled_gc'], 1)
+        self.assertEqual(c3['stand_down'], 0)  # no false "installed" all-clear
+        self.assertEqual(self._dm_calls, [])
+        res.assert_called_once_with('a.timer')  # stale 🔴 still retracted
+
+    def test_pre_grace_state_pages_immediately_not_re_deferred(self):
+        # State written by the pre-grace code (already paged, no first_seen_at)
+        # must re-page once past RE_DM_WINDOW, not start a fresh grace window.
+        with tempfile.TemporaryDirectory() as td:
+            r = _make_repo_systemd(Path(td), ['a.timer'])
+            i = _make_installed(Path(td), [])
+            t0 = datetime(2026, 5, 20, 0, 0, tzinfo=timezone.utc)
+            state = {'units': {'a.timer': {
+                'dm_count': 1,
+                'last_dm_at': (t0 - timedelta(hours=13)).isoformat(),
+            }}}
+            counts = h.run_once(repo_dir=r, installed_dir=i, state=state,
+                                dry_run_override=False, now=t0)
+        self.assertEqual(counts['dm_sent'], 1)  # re-paged, not deferred
+        self.assertEqual(counts['dm_deferred_grace'], 0)
+        self.assertEqual(self._dm_calls[0]['subject'], 'install-drift:a.timer')
 
 
 class DetectStuckTimersTest(_IsolatedAgentsRoot):
@@ -1119,11 +1309,23 @@ class InstallRemediationOrchestrationTest(_IsolatedAgentsRoot):
                     )
                 return mock.MagicMock(returncode=0, stdout='', stderr='')
 
+            state = {'units': {}, 'stuck_timers': {}}
+            t0 = datetime(2026, 5, 31, 12, 0, tzinfo=timezone.utc)
             with mock.patch.object(h.subprocess, 'run', side_effect=fake_run):
+                # Tick 1: auto-install fails but the drift is fresh → deferred,
+                # no page (covers the deploy-sync race that resolves on its own).
+                first = h.run_once(
+                    repo_dir=r, installed_dir=i, state=state,
+                    dry_run_override=False, now=t0,
+                )
+                self.assertEqual(first['dm_sent'], 0)
+                self.assertEqual(first['dm_deferred_grace'], 1)
+                # Tick 2: install still failing past the grace window → the
+                # manual-dance page fires.
                 counts = h.run_once(
-                    repo_dir=r, installed_dir=i,
-                    state={'units': {}, 'stuck_timers': {}},
+                    repo_dir=r, installed_dir=i, state=state,
                     dry_run_override=False,
+                    now=t0 + h.ESCALATE_GRACE + timedelta(seconds=1),
                 )
 
         self.assertEqual(counts['install_healed'], 0)
@@ -1521,12 +1723,22 @@ class ContentDriftOrchestrationTest(_IsolatedAgentsRoot):
                 'NextElapseUSecMonotonic': '1h',
                 'LastTriggerUSec': '',
             }
+            state = {'units': {}, 'stuck_timers': {}}
+            t0 = datetime(2026, 6, 3, 12, 0, tzinfo=timezone.utc)
             with mock.patch.object(h.subprocess, 'run', side_effect=fake_run), \
                     mock.patch.object(h, '_systemctl_show', return_value=healthy):
+                # Tick 1: reconcile fails but the drift is fresh → deferred.
+                first = h.run_once(
+                    repo_dir=r, installed_dir=i, state=state,
+                    dry_run_override=False, now=t0,
+                )
+                self.assertEqual(first['dm_sent'], 0)
+                self.assertEqual(first['dm_deferred_grace'], 1)
+                # Tick 2: still drifted past the grace window → manual-dance page.
                 counts = h.run_once(
-                    repo_dir=r, installed_dir=i,
-                    state={'units': {}, 'stuck_timers': {}},
+                    repo_dir=r, installed_dir=i, state=state,
                     dry_run_override=False,
+                    now=t0 + h.ESCALATE_GRACE + timedelta(seconds=1),
                 )
         self.assertEqual(counts['content_drift'], 1)
         self.assertEqual(counts['content_healed'], 0)
@@ -1735,6 +1947,19 @@ class HealedSubjectTranslationTest(_IsolatedAgentsRoot):
         self.assertIsNotNone(entry)
         self.assertEqual(entry['severity'], 'URGENT')
         self.assertEqual(entry['tier'], 'NOW')
+
+    def test_install_resolved_subject_resolves_to_no_action_entry(self):
+        # The stand-down subject must resolve to a non-imperative FYI entry, not
+        # the URGENT install-dance copy.
+        _msg, subj, _sug = h._render_install_resolved('ourliberty-x.timer')
+        entry = la.translate_alert('heal-systemd-install-drift', subj)
+        self.assertIsNotNone(
+            entry, f'stand-down subject {subj!r} has no translation entry')
+        self.assertEqual(entry['severity'], 'INFO')
+        self.assertEqual(entry['tier'], 'FYI')
+        action = entry['recommended_action'].lower()
+        self.assertIn('none', action)
+        self.assertNotIn('could not auto-install', action)
 
 
 class RemediateMissingInstallClassAwareTest(_IsolatedAgentsRoot):

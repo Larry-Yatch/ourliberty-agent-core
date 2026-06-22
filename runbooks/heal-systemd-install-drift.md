@@ -6,8 +6,9 @@ file changed), so a daemon/timer/healer is silently absent or running stale
 config. Motivated by the E1.5 discovery that `heal-pr-auto-merge.{service,timer}`
 shipped via PR #43 but were never installed.
 
-**Cadence.** Every 12h via `ourliberty-heal-systemd-install-drift.timer`. Silent
-unless drift is detected. Per-unit DMs deduplicated 12h.
+**Cadence.** Every 12h via `ourliberty-heal-systemd-install-drift.timer`, plus a
+post-merge trigger on every deploy (`scripts/sync_agent_core.sh` runs it
+`--triggered`). Silent unless drift is detected. Per-unit DMs deduplicated 12h.
 
 **Script.** `scripts/heal_systemd_install_drift.py`.
 
@@ -48,6 +49,31 @@ healed notification, nothing is required beyond an optional
 whose next-fire anchor has gone to `infinity`. That is almost always a transient
 false alarm at the top of a firing period; see the `stuck-timer` translation
 entry.)
+
+---
+
+## Escalation grace + stand-down (why a 🔴 can self-clear)
+
+A 🔴 URGENT manual-dance alert (`install-drift:<unit>`) is only sent once a drift
+has **persisted past `ESCALATE_GRACE` (30 min)** since its first sighting. The
+reason: the post-merge trigger runs this healer on every deploy, and it can catch
+a freshly-merged unit *mid-deploy* — the new file is in the repo but the droplet
+checkout / install hasn't landed yet, so the auto-install `cp` fails. Without the
+grace window that transient deploy-sync race paged immediately, then resolved on
+its own within minutes. With it:
+
+- **Drift that clears inside 30 min** (the deploy finishes installing the unit)
+  is GC'd and **never pages** (`dm_deferred_grace` in the tick log).
+- **Drift still present past 30 min** (genuinely missing, install keeps failing,
+  or auto-remediation is off) pages on the first tick past the window — fail-loud
+  preserved, just debounced. The 12h scheduled tick is the backstop.
+
+When a unit that **was** paged later reconciles, the healer retracts the stale
+queue line **and** sends a one-line stand-down DM (`install-resolved:<unit>`,
+route `closure`) — the queue retraction alone can't un-send the 🔴 already on
+your phone. If you see an `install-resolved:` line, the earlier 🔴 for that unit
+is handled; stand down. A drift that was only ever *deferred* (never paged)
+produces no stand-down — there was nothing to retract.
 
 ---
 
