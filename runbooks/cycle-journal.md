@@ -4,6 +4,93 @@
 
 ---
 
+## Iteration ~2431 — 2026-06-22T06:31Z UTC (interactive, /cycle, Tier 1→1, consecutive_clean=1→0→tier-reset, FINDING ⚠️)
+
+**Trigger:** Larry `/cycle` invocation (interactive).
+
+**Health:** ⚠️ Finding — Vercel build FAILED on ourliberty-dashboard (main branch + PR #79 work/slice-2b). Both alerts Tier-4, bot already delivered to Larry at 06:25:20Z. Beacon and outbox-notifier PIDs rotated (~06:20Z, heal-stale-daemon-code). All other checks nominal.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Daemons (re-verified):** inbox_watcher=559441 (Ssl) ✅, beacon=985300 (Ss) ✅ [PID changed 951720→985300, restarted 06:20:17Z], chain_event=930563 (SNs) ✅ [same], outbox_notifier=985380 (Ss) ✅ [PID changed 963464→985380, restarted ~06:20Z per L886], dashboard_api=981918 (Ssl) ✅ [same].
+- **Repo HEAD:** 28082442=origin/main (Pulse cycle 20260622T062009Z). Clean. ✅
+- **G-rule catalog-accuracy-drift:** 2/3 — 0 new alerts this iter. [carry]
+- **G-rule mirror-marker-parse-error:** 2/3 — 0 new alerts this iter. [carry]
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 885, "file_length": 888}`. 3 new alerts:
+- **L886** (`source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-outbox-notifier.service`, ts=06:20:23Z) — Triage helper → Tier-3 silence (known-pattern). ✅ Note: alert message shows `script_path=/home/larry/agent-core/scripts/dashboard_api.py` with commit feat(dashboard-api) #632 — service name and monitored script are mismatched. G-rule candidate 1/3 (`heal-stale-daemon-code-script-service-mismatch`).
+- **L887** (`source=deploy-notifier, severity=critical, subject=deploy-notifier:ERROR:dpl_8QqRKy3hBSeQ913R2PQjKVSHw1ZJ`, ts=06:24:17Z) — Vercel build FAILED, Project: ourliberty-dashboard, Branch: main, PR #(unknown). Triage helper → Tier-4 (novel, no template). Bot delivered at 06:25:20Z. ⚠️ **[yellow]**
+- **L888** (`source=deploy-notifier, severity=critical, subject=deploy-notifier:ERROR:dpl_8rPcUdLrCaRWmGisk3QudJZDyTvg`, ts=06:24:17Z) — Vercel build FAILED, Project: ourliberty-dashboard, PR #79 (feat(where-we-are): itemize the "Waiting on you" panel (Slice 2b)), Branch: work/slice-2b. Triage helper → Tier-4. Bot delivered at 06:25:20Z. ⚠️ **[yellow]**
+Watermark advanced to 888. Bot already DM'd Larry for L887+L888 — no second Pulse DM.
+
+**Check 1 — Log noise:** outbox-notifier.log + inbox-watcher.log: 0 WARN/ERROR (last 30 lines each). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot PID 985300 (Ss), restarted 06:20:17Z. Bot log shows L887+L888 delivered at 06:25:20Z. No new Larry directives since 'reject: we are going to do it by hand' at 23:16:42 MDT 2026-06-21. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → "no stalls detected." FORGE_NO_PR_SKIP for p6-brainstorm-autofill-author (#611), p6-brainstorm-card-ui (#72), system-self-awareness-slice-1b-where-are-we (#73), system-self-awareness-slice-2a-waiting-on-larry (#620). ✅ Nominal.
+
+**Check 4 — Pending directives:** All inboxes empty (forge: 0, mirror: 0, beacon: 0). beacon-pending-approvals: pending=0, history=250. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-22T06:20:12Z (~11 min before iter). Within 60-min window. ✅ Nominal.
+
+**Check A — Source repo:** On main. HEAD=28082442=origin/main. Clean. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-22T06:09:32Z (~22 min ago), status=success. Within 2h window. ✅ Nominal.
+
+**Check C — Agent liveness:** inbox_watcher=559441 (Ssl) ✅, beacon=985300 (Ss) ✅ [PID rotated], chain_event=930563 (SNs) ✅, outbox_notifier=985380 (Ss) ✅ [PID rotated], dashboard_api=981918 (Ssl) ✅. 5/5 alive. PID rotations for beacon and outbox-notifier at ~06:20Z align with heal-stale-daemon-code heartbeat (06:20:12Z). Beacon restart had no corresponding healer alert — likely systemd auto-restart or healer without alert (1st observation; not yet G-rule). ✅ Nominal.
+
+**Check D — Inboxes:** All empty. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open. ✅ Nominal. (PR #79 work/slice-2b is the PR with the failed Vercel build — no active PR listed, build failure pre-merge.)
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Monday 2026-06-22 UTC (weekday=0 ∈ {0,2,4,6}):** Check I sentinel check-i-2026-06-22.json EXISTS → skip. Check VIII/IX/X: already ran in iter ~2413 → skip. Check III: last 2026-06-11 (11d < 14d gate) → skip. ✅
+
+**Actions taken:**
+1. Alert watermark advanced 885→888 (3 new alerts, L886 Tier-3, L887+L888 Tier-4).
+2. PRIME ledger: `intervention` appended (tier=1, template=deploy-notifier-vercel-build-failed).
+3. Tier state: `record --checks-clean false` → consecutive_clean=1→0, tier stays 1 (tier-reset: Vercel build failures Tier-4). Next cadence: 5-min.
+
+**Dispatches:** None. Bot already delivered L887+L888 to Larry. No second Pulse DM.
+
+**Standing findings (carried + verified):**
+- [yellow] **Vercel build FAILED** — ourliberty-dashboard main branch (dpl_8QqRKy3hBSeQ913R2PQjKVSHw1ZJ) + PR #79 work/slice-2b (dpl_8rPcUdLrCaRWmGisk3QudJZDyTvg). Bot DM'd Larry. Larry investigating Vercel logs. [new]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — PR #607 merged without Mirror review. Larry judgment. [carry]
+- [blue] **unreviewed-merge:628** — PR #628 merged by Larry at 06:08:57Z without Mirror review. Larry-deliberate bypass. [carry]
+- [blue] **unreviewed-merge:625+627** — Larry-deliberate bypass 05:17Z/05:18Z. [carry]
+- [blue] **install-drift:ourliberty-build-sequence-advancer.service** — Tier-3 silenced. [carry]
+- [blue] **unreviewed-merge:571** — bot DM'd. Larry judgment. [carry]
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+- [blue] **Stale bash orphan PID 1834248** — ~30d+ sleep-loop. Ss state, low CPU. No action.
+- [blue] **daemon-pids.json missing** — state file absent. PIDs looked up by name via ps. Informational; daemons all alive.
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. Watch; dispatch to Beacon at 3/3.
+- [blue] **G-rule catalog-accuracy-drift** — 2/3. Watch; dispatch to Beacon at 3/3.
+- [blue] **G-rule mirror-marker-parse-error** — 2/3. Watch; dispatch to Beacon at 3/3.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule seq-advancer-sequence-stranded** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule watchdog-watcher-log-stale** — 1/3. Watch.
+- [blue] **G-rule heal-stale-daemon-code-script-service-mismatch** — 1/3. Watch. (L886: `subject=auto-restarted:ourliberty-outbox-notifier.service` but `script_path=dashboard_api.py`.)
+- [blue] **G-rule health-notify-script-missing** — dispatch sent 2026-06-09, fix status unverified. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention this iter (deploy-notifier-vercel-build-failed). Trailing-30d: interventions=1059+, systemic_fixes=55, ratio≈19.3+, trend=improving.
+**Tier end-of-iter:** Tier 1→1 (tier-reset: Vercel build failures). consecutive_clean=1→0. Next cadence: 5-min.
+
+---
+
 ## Iteration ~2430 — 2026-06-22T06:18Z UTC (interactive, /cycle, Tier 1, consecutive_clean=0→1, NOMINAL ✅)
 
 **Trigger:** Larry `/cycle` invocation (interactive).

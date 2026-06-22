@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 06:18Z UTC (Iter ~2430, Tier 1, NOMINAL ✅)
+## Status snapshot — updated 2026-06-22 06:31Z UTC (Iter ~2431, Tier 1, FINDING ⚠️)
 
-**Iter ~2430 summary:** ✅ Nominal. 0 new alerts (watermark=885=file_length). 5/5 daemons alive (same PIDs as ~2429). 0 open PRs. All inboxes empty. Check I sentinel exists → skipped. consecutive_clean=0→1 (stays Tier 1). **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. [blue]: unreviewed-merge:628/625/627, daemon-pids.json missing.** PRIME: ratio≈19.3, trend=improving. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** Next cadence: 5-min.
+**Iter ~2431 summary:** ⚠️ Finding. 3 new alerts (watermark 885→888): L886 Tier-3 (auto-restarted outbox-notifier, script/service name mismatch in alert), L887+L888 Tier-4 (Vercel build FAILED ourliberty-dashboard: main branch + PR #79 work/slice-2b). Bot DM'd Larry for both. Beacon PID 951720→985300, outbox-notifier PID 963464→985380 (both restarted ~06:20Z). 5/5 daemons alive. 0 open PRs. All inboxes empty. Tier-reset; consecutive_clean=0. **Standing [yellow]: Vercel build FAILED (main+PR#79), unreviewed-merge:607, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. [blue]: unreviewed-merge:628/625/627, daemon-pids.json missing.** PRIME: ratio≈19.3+, trend=improving. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Next cadence: 5-min.
 
 
 
