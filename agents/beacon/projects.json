@@ -290,7 +290,7 @@
       "title": "P5 \u2014 DAG status on cards",
       "north_star_ref": null,
       "repo": "ourliberty-dashboard",
-      "state": "active",
+      "state": "retired",
       "phases": [
         {
           "id": "p5-dag-status-on-cards",
@@ -323,10 +323,15 @@
       ],
       "one_off": true,
       "created_at": "2026-06-19T22:57:02.509616+00:00",
-      "updated_at": "2026-06-19T22:57:02.509616+00:00",
+      "updated_at": "2026-06-22T06:12:54.948958+00:00",
       "promoted_from": {
         "kind": "capture",
         "capture_id": "cap-p5-dag-status-on-cards-a822"
+      },
+      "gc": {
+        "prior_state": "active",
+        "retired_at": "2026-06-22T06:12:54.948958+00:00",
+        "retired_by": "projects-store-gc"
       }
     },
     {
@@ -378,7 +383,7 @@
       "title": "System self-awareness - Slice 1 (State Log)",
       "north_star_ref": null,
       "repo": "ourliberty-agent-core",
-      "state": "active",
+      "state": "retired",
       "phases": [
         {
           "id": "system-self-awareness-slice-1-state-log",
@@ -411,10 +416,15 @@
       ],
       "one_off": true,
       "created_at": "2026-06-20T01:04:15.976634+00:00",
-      "updated_at": "2026-06-20T01:04:15.976634+00:00",
+      "updated_at": "2026-06-22T06:12:54.948958+00:00",
       "promoted_from": {
         "kind": "mission",
         "mission_id": "system-self-awareness-slice-1-state-log"
+      },
+      "gc": {
+        "prior_state": "active",
+        "retired_at": "2026-06-22T06:12:54.948958+00:00",
+        "retired_by": "projects-store-gc"
       }
     },
     {
@@ -422,7 +432,7 @@
       "title": "System self-awareness - Slice 1b (Where are we)",
       "north_star_ref": null,
       "repo": "ourliberty-dashboard",
-      "state": "active",
+      "state": "retired",
       "phases": [
         {
           "id": "system-self-awareness-slice-1b-where-are-we",
@@ -488,10 +498,15 @@
       ],
       "one_off": true,
       "created_at": "2026-06-21T20:38:01.814186+00:00",
-      "updated_at": "2026-06-21T20:38:01.814186+00:00",
+      "updated_at": "2026-06-22T06:12:54.948958+00:00",
       "promoted_from": {
         "kind": "mission",
         "mission_id": "system-self-awareness-slice-1b-where-are-we"
+      },
+      "gc": {
+        "prior_state": "active",
+        "retired_at": "2026-06-22T06:12:54.948958+00:00",
+        "retired_by": "projects-store-gc"
       }
     },
     {
@@ -547,7 +562,7 @@
       "title": "System self-awareness - Slice 2a (Waiting on Larry)",
       "north_star_ref": null,
       "repo": "ourliberty-agent-core",
-      "state": "active",
+      "state": "retired",
       "phases": [
         {
           "id": "system-self-awareness-slice-2a-waiting-on-larry",
@@ -613,10 +628,15 @@
       ],
       "one_off": true,
       "created_at": "2026-06-21T22:26:15.787568+00:00",
-      "updated_at": "2026-06-21T22:26:15.787568+00:00",
+      "updated_at": "2026-06-22T06:12:54.948958+00:00",
       "promoted_from": {
         "kind": "mission",
         "mission_id": "system-self-awareness-slice-2a-waiting-on-larry"
+      },
+      "gc": {
+        "prior_state": "active",
+        "retired_at": "2026-06-22T06:12:54.948958+00:00",
+        "retired_by": "projects-store-gc"
       }
     },
     {
