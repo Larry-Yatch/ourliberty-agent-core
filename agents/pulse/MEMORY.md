@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 05:15Z UTC (Iter ~2424, Tier 1, consecutive_clean=1→2, NOMINAL ✅)
+## Status snapshot — updated 2026-06-22 05:27Z UTC (Iter ~2425, Tier 1, consecutive_clean=2→0, FINDING ⚠️)
 
-**Iter ~2424 summary:** ✅ Nominal. 0 new alerts (watermark 878, file_length 878). 5/5 daemons alive (PIDs unchanged): inbox_watcher=559441, beacon=930450, chain_event=930563, outbox_notifier=930686, dashboard_api=930797. PR #625: still open (reviewDecision=""), beacon-pending-approvals pending=1 (`review-pr-625-install-drift-dedup-001`) — awaiting Larry's "approve" Telegram reply. All checks nominal. Monday conditional checks → all skipped (sentinel+VIII/IX/X+Check III 11d<14d). **Standing [yellow]: PR #625 awaiting Larry approval, unreviewed-merge:607, Check VIII 2026-06-15 proposal, Tier-2 probe auth_401, Check III proposals.** PRIME: 0 interventions (iter_clean), systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** Tier 1, consecutive_clean=1→2. Next cadence: 5-min (Tier 1).
+**Iter ~2425 summary:** ⚠️ Finding. 6 new alerts (watermark 878→884), all Tier-3 silence (install-drift×5 + outbox-notifier restart). 5/5 daemons alive: inbox_watcher=559441, beacon=930450, chain_event=930563, outbox_notifier=943798 (new PID — healer restart at 05:20Z), dashboard_api=930797. PR #625 MERGED 05:17Z by Larry (unreviewed, Larry rejected Mirror dispatch 'by hand'). PR #627 MERGED 05:18Z by Larry (unreviewed). Both unreviewed-merge noted [blue]. beacon-pending-approvals: pending=0 (review-pr-625 rejected by Larry). **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. [blue]: unreviewed-merge:625+627 (new).** PRIME: 1 intervention (unreviewed-merges 625/627), systemic_fixes=55, ratio≈19.3. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** Tier 1, consecutive_clean=2→0. Next cadence: 5-min (Tier 1).
 
 
 

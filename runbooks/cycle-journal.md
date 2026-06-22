@@ -4,6 +4,99 @@
 
 ---
 
+## Iteration ~2425 — 2026-06-22T05:27Z UTC (interactive, /cycle, Tier 1, consecutive_clean=2→0, FINDING ⚠️)
+
+**Trigger:** Larry `/cycle` invocation (interactive, /loop).
+
+**Health:** ⚠️ Finding — Check E: PRs #625 and #627 merged by Larry directly without Mirror review. All other checks nominal. 6 new alerts (L879–L884), all Tier-3 silence. Outbox-notifier PID updated (930686→943798, healer auto-restart).
+
+**VERIFY-BEFORE-REASSERT:**
+- **All 5 daemons alive (re-verified):** inbox_watcher=559441 (Ssl) ✅, beacon=930450 (Ss) ✅, chain_event=930563 (SNs) ✅, outbox_notifier=943798 (Ss) ✅ [new PID — heal-stale-daemon-code auto-restarted 05:20:03Z, L884], dashboard_api=930797 (Ssl) ✅.
+- **PR #625 MERGED:** 05:17:49Z by Larry-Yatch, reviews=[] (unreviewed). Larry rejected Mirror dispatch at 23:16:42 MDT ('reject: we are going to do it by hand'). Prior standing [yellow] PR #625 pending → RESOLVED.
+- **PR #627 MERGED:** 05:18:51Z by Larry-Yatch, reviews=[] (unreviewed). 'feat(deploy): self-healing daemon-restart manifest — shrink the stale-dashboard window'.
+- **G-rule catalog-accuracy-drift:** 2/3 — 0 new alerts this iter. [carry]
+- **G-rule mirror-marker-parse-error:** 2/3 — 0 new alerts this iter. [carry]
+- **Repo HEAD:** 6557d8b0=origin/main. Dirty: agents/beacon/captures.json + agents/beacon/projects.json — both healer-managed. ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 878, "file_length": 884}`. 6 new alerts (L879–L884), all Tier-3 (known-pattern match, route=digest):
+- L879/L880: install-drift:ourliberty-heal-daemon-restart-manifest-drift.{service,timer} → Tier-3. Bot-delivered (idx=878/879).
+- L881/L882: install-drift:ourliberty-readiness-trip-wire.{service,timer} → Tier-3. Bot-delivered (idx=880/881).
+- L883: install-drift:ourliberty-heal-stale-daemon-code.timer (content drift — timer installed but contents differ from repo) → Tier-3. Bot-delivered (idx=882).
+- L884: auto-restarted:ourliberty-outbox-notifier.service → Tier-3. Digest route, no DM.
+- Safety-triaged board-drain.{service,timer} (pre-watermark zone): also Tier-3. Bot-delivered (idx=876/877).
+Watermark advanced to 884. No Pulse DM warranted. ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log + inbox-watcher.log: 0 WARN/ERROR (last 30 lines each). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot PID 930450 alive (Ss). Last bot delivery: idx=883 (route=digest) 23:22:26 MDT 2026-06-21. Last Larry message: 'reject: we are going to do it by hand' at 23:16:42 MDT (rejecting Mirror dispatch for PR #625 review). No new directives since. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → "no stalls detected." FORGE_NO_PR_SKIP for tasks p6-brainstorm-autofill-author (PR #611), p6-brainstorm-card-ui (PR #72), system-self-awareness-slice-1b-where-are-we (PR #73), system-self-awareness-slice-2a-waiting-on-larry (PR #620). ✅ Nominal.
+
+**Check 4 — Pending directives:** Forge: 0. Beacon: 0. Mirror: 0. beacon-pending-approvals: pending=0, history=248 (was 1 — review-pr-625-install-drift-dedup-001 resolved by Larry's 'reject' at 23:16 MDT). ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-22T05:19:58Z (~7 min before iter). Within 60-min window. ✅ Nominal.
+
+**Check A — Source repo:** On main. HEAD=6557d8b0=origin/main. Dirty: agents/beacon/captures.json + agents/beacon/projects.json — both in config/healer-managed-runtime-paths.json. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-22T05:18:56Z (~8 min ago), status=success (synced 6cb438e4→6557d8b0). Within 2h window. ✅ Nominal.
+
+**Check C — Agent liveness:** inbox_watcher=559441 (Ssl) ✅, beacon=930450 (Ss) ✅, chain_event=930563 (SNs) ✅, outbox_notifier=943798 (Ss) ✅, dashboard_api=930797 (Ssl) ✅. 5/5. Outbox-notifier PID changed 930686→943798: heal-stale-daemon-code auto-restarted it at 05:20:03Z (script mtime for outbox_notifier.py newer by 80 min post PR #626 merge). New code live. ✅
+
+**Check D — Inboxes:** Forge: 0. Beacon: 0. Mirror: 0. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: **FINDING.**
+- **PR #625** (fix/install-drift-dedup-daemon-reload): MERGED 05:17:49Z by Larry-Yatch, reviews=[]. Larry rejected Mirror dispatch at 23:16:42 MDT; merged manually. → unreviewed-merge:625 [blue — Larry-deliberate].
+- **PR #627** (feat(deploy): self-healing daemon-restart manifest): MERGED 05:18:51Z by Larry-Yatch, reviews=[]. → unreviewed-merge:627 [blue — Larry-deliberate].
+- Prior [yellow] PR #625 Mirror-review-pending → **RESOLVED** (merged; unreviewed but deliberate).
+ourliberty-dashboard: 0 open.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Monday 2026-06-22 UTC (weekday=0 ∈ {0,2,4,6}):** Check I sentinel check-i-2026-06-22.json EXISTS → skip. Check VIII/IX/X: already ran in iter ~2413 → skip. Check III: last 2026-06-11 (11d < 14d gate) → skip. ✅
+
+**Actions taken:**
+1. Alert watermark advanced to 884 (6 new alerts, all Tier-3 silence).
+2. PRIME ledger: `intervention` appended (tier=1, template=check-e-unreviewed-merge, detail: PRs #625/#627 merged without Mirror review, Larry-deliberate).
+3. Tier state: `record --checks-clean false` → consecutive_clean=2→0, last_signal_at=05:27Z. Tier stays 1.
+
+**Dispatches:** None.
+
+**Standing findings (updated):**
+- RESOLVED: [yellow] PR #625 Mirror review pending — merged 05:17:49Z by Larry. [cleared]
+- [blue] **unreviewed-merge:625** — Larry explicitly bypassed Mirror ('by hand' 23:16 MDT); merged fix/install-drift-dedup-daemon-reload 05:17Z. Larry judgment. [new]
+- [blue] **unreviewed-merge:627** — feat(deploy): self-healing daemon-restart manifest; merged 05:18Z without Mirror review. Larry judgment. [new]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Prior proposal (10M→7.6M tokens). Larry judgment. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — PR #607 merged without Mirror review. Larry judgment. [carry]
+- [blue] **install-drift:ourliberty-build-sequence-advancer.service** — Tier-3 silenced. [carry]
+- [blue] **unreviewed-merge:571** — bot DM'd. Larry judgment. [carry]
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+- [blue] **Stale bash orphan PID 1834248** — ~30d+ sleep-loop. Ss state, low CPU. No action.
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. Watch; dispatch to Beacon at 3/3.
+- [blue] **G-rule catalog-accuracy-drift** — 2/3. Watch; dispatch to Beacon at 3/3.
+- [blue] **G-rule mirror-marker-parse-error** — 2/3. Watch; dispatch to Beacon at 3/3.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule seq-advancer-sequence-stranded** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule watchdog-watcher-log-stale** — 1/3. Watch.
+- [blue] **G-rule health-notify-script-missing** — dispatch sent 2026-06-09, fix status unverified. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention this iter (check-e-unreviewed-merge: PRs #625/#627 Larry-deliberate bypass). Trailing-30d: interventions=1059, systemic_fixes=55, ratio≈19.3.
+**Tier end-of-iter:** Tier 1, consecutive_clean=2→0 (new finding: unreviewed-merge #625/#627). Next cadence: 5-min (Tier 1).
+
+---
+
 ## Iteration ~2424 — 2026-06-22T05:15Z UTC (interactive, /cycle, Tier 1, consecutive_clean=1→2, NOMINAL ✅)
 
 **Trigger:** Larry `/cycle` invocation (interactive).
