@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 12:30Z UTC (Iter ~2448, Tier 1→2, consecutive_clean=2→3→0, NOMINAL ✅)
+## Status snapshot — updated 2026-06-22 12:43Z UTC (Iter ~2449, Tier 2→2, consecutive_clean=0→1, NOMINAL ✅)
 
-**Iter ~2448 summary:** ✅ Nominal. 0 new alerts (watermark=898, file_length=898). 5/5 daemons alive (same PIDs: chain_event=930563, beacon=1025989, dashboard_api=1026057, inbox_watcher=1026206, outbox_notifier=1026349). HEAD=e3238b6d (Pulse cycle 20260622T122216Z). consecutive_clean=2→3 → de-escalation Tier 1→2. **Standing [yellow]: install-drift:doorbell (needs sudo install), deploy ERROR PR #80, deploy ERROR main-branch (PR #81 fix in-flight), unreviewed-merge:607, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. IN-FLIGHT [blue]: PR #634/#81/#80 needs Mirror review, catalog-accuracy-drift-gruel-001 Beacon outcome pending.** PRIME: systemic_fixes=56, ratio≈18.95, trend=improving. **G-rule sync.service-deploy-restart-storm-tier4: 1/3. G-rule catalog-accuracy-drift: 3/3 DISPATCHED (Beacon investigating). G-rule mirror-marker-parse-error: 2/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Next cadence: 15-min (Tier 2).
+**Iter ~2449 summary:** ✅ Nominal. 1 new alert (line 899: heal-pipeline-stall:unrouted-pr:PR#634, Tier-3 silenced). Watermark advanced 898→899. 5/5 daemons alive (same PIDs: chain_event=930563, beacon=1025989, dashboard_api=1026057, inbox_watcher=1026206, outbox_notifier=1026349). HEAD=410e3c4e (Pulse cycle 20260622T123428Z). consecutive_clean=0→1 (Tier 2). **Standing [yellow]: install-drift:doorbell (needs sudo install), deploy ERROR PR #80, deploy ERROR main-branch (PR #81 fix in-flight), unreviewed-merge:607, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. IN-FLIGHT [blue]: PR #634/#81/#80 needs Mirror review, catalog-accuracy-drift-gruel-001 Beacon outcome pending.** PRIME: systemic_fixes=56, ratio≈18.95, trend=improving. **G-rule sync.service-deploy-restart-storm-tier4: 1/3. G-rule catalog-accuracy-drift: 3/3 DISPATCHED (Beacon investigating). G-rule mirror-marker-parse-error: 2/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Next cadence: 15-min (Tier 2).
 
 
 
