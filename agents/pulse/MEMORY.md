@@ -168,9 +168,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 15:35Z UTC (Iter ~2456, Tier 3→3, consecutive_clean=3→4, NOMINAL ✅)
+## Status snapshot — updated 2026-06-22 16:05Z UTC (Iter ~2457, Tier 3→3, consecutive_clean=4→5, NOMINAL ✅)
 
-**Iter ~2456 summary:** ✅ Nominal. 5 new alerts (L915-919: pipeline-stall PR#634/#80 cooldowns, dispatch-branch-cleanup, medic PR#634/#80 attempt 3), all Tier-3 silenced. Watermark advanced 914→919. 5/5 daemons alive (same PIDs). HEAD=de28e6f9. **NOTABLE: PR #81 (fix dotAll regex) MERGED 15:16:44Z → should resolve main-branch Vercel failure (confirmation pending). PR #80 (UniversalCard) MERGED 15:19:17Z. PR #634 queued in Mirror inbox (review-p7-spec.json).** **Standing [yellow]: install-drift:doorbell, deploy-ERROR main-branch (pending Vercel confirmation), Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. [blue]: PR #634 awaiting Mirror review.** PRIME: systemic_fixes=56, ratio=18.95, trend=improving. **G-rule sync.service-deploy-restart-storm-tier4: 1/3. G-rule mirror-marker-parse-error: 2/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Next cadence: 30-min (Tier 3, consecutive_clean=4).
+**Iter ~2457 summary:** ✅ Nominal. 0 new alerts (watermark=919=file_length). 5/5 daemons alive (same PIDs). HEAD=36335119. **NOTABLE: PR #634 MERGED** (spec(projects-v3) P7 — Generalize + shelf + dashboard-wide). deploy-notifier:ERROR main-branch [yellow] CLEARED (no new error 45+ min post-PR#81 merge). Both repos at 0 open PRs. **Standing [yellow]: install-drift:doorbell, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals, unreviewed-merge:607.** PRIME: systemic_fixes=56, ratio=18.95, trend=improving. **G-rule sync.service-deploy-restart-storm-tier4: 1/3. G-rule mirror-marker-parse-error: 2/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Next cadence: 30-min (Tier 3, consecutive_clean=5).
 
 
 
