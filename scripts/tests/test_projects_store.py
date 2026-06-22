@@ -495,5 +495,65 @@ class MirrorMissionsAsProjectsTest(unittest.TestCase):
         self.assertEqual(norm['projects'][0], reg['projects'][0])
 
 
+class EditPhaseBrainstormTest(unittest.TestCase):
+    """projects-v3 P6.1 — the pure Larry-edit helper edit_phase_brainstorm."""
+
+    def _phase(self, **over):
+        ph = {
+            'id': 'ph', 'lifecycle_state': 'brainstorm',
+            'brainstorm': {
+                'is_ai_draft': True,
+                'draft': {'end_state': 'authored'},
+                'decisions': ['a fork'],
+                'decisions_overflow': True,
+                'handoff': {'spec_target_path': 'agents/beacon/specs/ph.md'},
+            },
+            'brainstorm_provenance': {'by': 'beacon', 'model': 'claude',
+                                      'from_state': 'brainstorm'},
+        }
+        ph.update(over)
+        return ph
+
+    def test_edit_draft_persists_string_and_marks_larry(self):
+        ph = self._phase()
+        self.assertTrue(ps.edit_phase_brainstorm(ph, draft='my own words', now=NOW))
+        self.assertEqual(ph['brainstorm']['draft'], 'my own words')
+        self.assertIs(ph['brainstorm']['is_ai_draft'], False)
+        self.assertEqual(ph['brainstorm_provenance']['by'], 'larry')
+        self.assertEqual(ph['brainstorm_provenance']['from_state'], 'brainstorm')
+        self.assertIn('edited_at', ph['brainstorm_provenance'])
+
+    def test_edited_string_draft_round_trips_to_the_card(self):
+        ph = self._phase()
+        ps.edit_phase_brainstorm(ph, draft='my own words', now=NOW)
+        card = ps._phase_card(ph)
+        self.assertEqual(card['draft'], 'my own words')
+
+    def test_edit_decisions_clears_overflow_and_cleans(self):
+        ph = self._phase()
+        self.assertTrue(ps.edit_phase_brainstorm(
+            ph, decisions=['  keep this ', '', 42, 'and this'], now=NOW))
+        self.assertEqual(ph['brainstorm']['decisions'], ['keep this', 'and this'])
+        self.assertIs(ph['brainstorm']['decisions_overflow'], False)
+
+    def test_no_fields_is_noop(self):
+        ph = self._phase()
+        self.assertFalse(ps.edit_phase_brainstorm(ph, now=NOW))
+
+    def test_idempotent_resave(self):
+        ph = self._phase()
+        self.assertTrue(ps.edit_phase_brainstorm(ph, draft='same', now=NOW))
+        self.assertFalse(ps.edit_phase_brainstorm(ph, draft='same', now=NOW))
+
+    def test_safe_on_junk(self):
+        self.assertFalse(ps.edit_phase_brainstorm('nope', draft='x'))
+
+    def test_no_prior_brainstorm_creates_minimal(self):
+        ph = {'id': 'ph', 'lifecycle_state': 'brainstorm'}
+        self.assertTrue(ps.edit_phase_brainstorm(ph, draft='seed', now=NOW))
+        self.assertEqual(ph['brainstorm']['draft'], 'seed')
+        self.assertIs(ph['brainstorm']['is_ai_draft'], False)
+
+
 if __name__ == '__main__':
     unittest.main()

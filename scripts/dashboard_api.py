@@ -896,6 +896,47 @@ class PhaseAdvanceResponse(BaseModel):
     status: str = 'advanced'
 
 
+class EditBrainstormRequest(BaseModel):
+    # projects-v3 P6.1 — POST /api/projects/brainstorm body. Larry edits the
+    # pre-filled Brainstorm card: `draft` (the AI draft, now his prose) and/or
+    # `decisions` (the "Your decisions" fork list). At least one must be present.
+    # `project_id` + `phase_id` locate the phase; the dashboard writes the edit to
+    # projects.json on disk and the projects-store healer commits (non-committer).
+    project_id: str = Field(..., min_length=1)
+    phase_id: str = Field(..., min_length=1)
+    draft: Optional[str] = None
+    decisions: Optional[list[str]] = None
+
+
+class BrainstormDecisionCard(BaseModel):
+    # One "Your decisions" item as the card renders it ({id,title,decision}).
+    id: str
+    title: str
+    decision: str = ''
+
+
+class EditBrainstormResponse(BaseModel):
+    # The edit landed (or was a no-op). `applied` is False on an idempotent
+    # re-save. The flat fields mirror the card projection so the dashboard can
+    # re-render from the response without a refetch.
+    project_id: str
+    phase_id: str
+    applied: bool
+    status: str = 'edited'
+    draft: Optional[str] = None
+    decisions: Optional[list[BrainstormDecisionCard]] = None
+    spec_target_path: Optional[str] = None
+
+
+class PhaseThreadResponse(BaseModel):
+    # GET /api/projects/phases/{ref}/thread — the Brainstorm phase card's
+    # conversation, oldest-first (mirrors CaptureThreadResponse). `phase_ref` is
+    # the composite project_id::phase_id the conversation keys on.
+    phase_ref: str
+    messages: list[CaptureThreadMessage] = Field(default_factory=list)
+    last_synced_at: str
+
+
 class SpecAttachRequest(BaseModel):
     # p3f-phase-transitions — POST /api/projects/attach-spec body. Points a Spec-
     # stage phase at its (already-authored) spec doc, making it spec-ready so the
@@ -5549,6 +5590,7 @@ def _handle_capture_thread(
 # conversation mechanism, differing only in the id key + where the thread lives.
 _CARD_KIND_CAPTURE = 'capture'
 _CARD_KIND_MISSION = 'mission'
+_CARD_KIND_PHASE = 'phase'
 _CARD_KIND_META: dict[str, dict[str, str]] = {
     _CARD_KIND_CAPTURE: {
         'id_key': 'capture_id',
@@ -5559,6 +5601,17 @@ _CARD_KIND_META: dict[str, dict[str, str]] = {
         'id_key': 'mission_id',
         'noun': 'mission card',
         'thread_url': '/api/system/missions/{id}/thread',
+    },
+    # projects-v3 P6.1 — a Brainstorm phase card gets the SAME team-chat thread as
+    # a parked/mission card. The join key is a COMPOSITE `project_id::phase_id`
+    # ref (phase ids are title slugs, NOT globally unique, so phase-id alone would
+    # cross-thread two projects' conversations and mis-route resolution). Beacon
+    # answers via the generic envelope, no phase-specific responder. The thread_url
+    # carries the composite ref in the single-placeholder template.
+    _CARD_KIND_PHASE: {
+        'id_key': 'phase_ref',
+        'noun': 'brainstorm phase',
+        'thread_url': '/api/projects/phases/{id}/thread',
     },
 }
 
@@ -6655,6 +6708,45 @@ def _find_active_phase(
     return None
 
 
+_PHASE_REF_SEP = '::'
+
+
+def _split_phase_ref(phase_ref: str) -> tuple[Optional[str], str]:
+    """Parse a P6.1 card-chat ref into ``(project_id, phase_id)``. The canonical
+    form is the composite ``project_id::phase_id`` (phase ids are title slugs, not
+    globally unique, so the project scopes resolution AND the conversation join
+    key). A ref without the separator degrades to ``(None, phase_ref)`` — a
+    best-effort scan fallback — so a hand-crafted phase-only ref still resolves."""
+    if _PHASE_REF_SEP in phase_ref:
+        project_id, phase_id = phase_ref.split(_PHASE_REF_SEP, 1)
+        return (project_id or None, phase_id)
+    return (None, phase_ref)
+
+
+def _resolve_phase_for_ref(
+    projects: list[Any], phase_ref: str,
+) -> Optional[dict[str, Any]]:
+    """Resolve the phase a P6.1 card-chat ``phase_ref`` names, or None. A
+    composite ``project_id::phase_id`` resolves PRECISELY (`_find_active_phase`);
+    a bare phase id falls back to the first active match by id. Only active
+    projects count (an archived project has left the pipeline)."""
+    project_id, phase_id = _split_phase_ref(phase_ref)
+    if project_id is not None:
+        return _find_active_phase(projects, project_id, phase_id)
+    for proj in projects:
+        if not isinstance(proj, dict):
+            continue
+        if proj.get('state', projects_store.DEFAULT_PROJECT_STATE) != 'active':
+            continue
+        phases = proj.get('phases')
+        if not isinstance(phases, list):
+            continue
+        for phase in phases:
+            if isinstance(phase, dict) and phase.get('id') == phase_id:
+                return phase
+    return None
+
+
 def _handle_launch_build(
     *,
     project_id: str,
@@ -6844,6 +6936,147 @@ def _resolve_spec_ref(spec_ref: str) -> Optional[Path]:
     except ValueError:
         return None
     return candidate
+
+
+def _handle_edit_brainstorm(
+    *,
+    project_id: str,
+    phase_id: str,
+    draft: Optional[str],
+    decisions: Optional[list[str]],
+    projects_path: Path,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Pure handler for POST /api/projects/brainstorm (projects-v3 P6.1). Larry
+    edits the pre-filled Brainstorm card: persist the edited `draft` and/or
+    `decisions` onto the phase, then return the flat card projection.
+
+      1. 400 if neither `draft` nor `decisions` is provided.
+      2. 404 if the active project / phase doesn't exist.
+      3. 409 if the phase isn't at Brainstorm (the card — and so editing — only
+         exists at the Brainstorm stage).
+      4. `projects_store.edit_phase_brainstorm` applies the edit (stamps it
+         Larry-authored so the Narrator never re-authors over it), atomic-write.
+
+    Non-committer: the edit lands on disk under `_PROJECTS_INGEST_LOCK`;
+    `heal_projects_store.py` commits the delta (the promote/advance precedent).
+    Idempotent: a re-save of identical content writes nothing (`applied=False`)."""
+    if draft is None and decisions is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='provide at least one of draft, decisions',
+        )
+    now = now or datetime.now(timezone.utc)
+    with _PROJECTS_INGEST_LOCK:
+        registry = _read_projects_registry(projects_path)
+        phase = _find_active_phase(registry['projects'], project_id, phase_id)
+        if phase is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    'error': 'phase not found',
+                    'project_id': project_id,
+                    'phase_id': phase_id,
+                    'hint': (
+                        'phase_id must name a phase inside an ACTIVE project_id '
+                        'in the projects store'
+                    ),
+                },
+            )
+        state = phase.get('lifecycle_state', projects_store.DEFAULT_LIFECYCLE_STATE)
+        if state != 'brainstorm':
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    'error': 'phase not at brainstorm',
+                    'phase_id': phase_id,
+                    'lifecycle_state': state,
+                    'hint': 'the brainstorm draft is editable only at the Brainstorm stage',
+                },
+            )
+        applied = projects_store.edit_phase_brainstorm(
+            phase, draft=draft, decisions=decisions, now=now)
+        if applied:
+            try:
+                _atomic_write_json(projects_path, registry)
+            except OSError as e:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=f'could not persist edit: {e}',
+                )
+        card = projects_store._phase_card(phase)
+    return {
+        'project_id': project_id,
+        'phase_id': phase_id,
+        'applied': applied,
+        'status': 'edited',
+        'draft': card.get('draft'),
+        'decisions': card.get('decisions'),
+        'spec_target_path': card.get('spec_target_path'),
+    }
+
+
+def _handle_phase_thread(
+    *,
+    phase_ref: str,
+    projects_path: Path,
+    supabase_client: Any,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """GET /api/projects/phases/{phase_ref}/thread (projects-v3 P6.1) — the
+    Brainstorm phase card's conversation, oldest-first. ``phase_ref`` is the
+    composite ``project_id::phase_id``. 404 if it names no active phase. Degrades
+    to an empty thread when Supabase is unavailable (the derive read-resilience
+    contract). Mirrors `_handle_capture_thread`. The conversation keys on the
+    composite ref so two projects' threads never merge."""
+    now = now or datetime.now(timezone.utc)
+    registry = _read_projects_registry(projects_path)
+    phase = _resolve_phase_for_ref(registry['projects'], phase_ref)
+    if phase is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={'error': 'phase not found', 'phase_ref': phase_ref},
+        )
+    return {
+        'phase_ref': phase_ref,
+        'messages': _card_thread_messages(phase_ref, supabase_client),
+        'last_synced_at': now.isoformat(),
+    }
+
+
+def _handle_phase_message(
+    *,
+    phase_ref: str,
+    text: str,
+    actor: str,
+    projects_path: Path,
+    agents_root: Path,
+    supabase_client: Any,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """POST /api/projects/phases/{phase_ref}/message (projects-v3 P6.1) — Larry
+    posts on a Brainstorm phase card. ``phase_ref`` is the composite
+    ``project_id::phase_id``. Finds the active phase (404 if absent) then defers
+    to the store-agnostic `_post_card_message` core with the `phase` kind, so
+    Beacon answers next cycle exactly as she does for a parked card. 503 if
+    Supabase is unavailable (the message must be durable)."""
+    registry = _read_projects_registry(projects_path)
+    phase = _resolve_phase_for_ref(registry['projects'], phase_ref)
+    if phase is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={'error': 'phase not found', 'phase_ref': phase_ref},
+        )
+    return _post_card_message(
+        item_id=phase_ref,
+        item_title=phase.get('title'),
+        item_kind=_CARD_KIND_PHASE,
+        text=text,
+        actor=actor,
+        agents_root=agents_root,
+        supabase_client=supabase_client,
+        now=now,
+    )
 
 
 def _handle_phase_advance(
@@ -8620,6 +8853,71 @@ def post_phase_advance(
         project_id=body.project_id,
         phase_id=body.phase_id,
         projects_path=_projects_json_path(),
+    )
+
+
+# POST /api/projects/brainstorm — edit the pre-filled Brainstorm card (projects-v3
+# P6.1). Persists the edited draft + decisions onto the phase. Non-committer: the
+# edit is written to projects.json on disk and `heal_projects_store.py` commits.
+# Same auth: X-Dashboard-Token + an allowlisted X-Actor.
+@app.post(
+    '/api/projects/brainstorm',
+    response_model=EditBrainstormResponse,
+    response_model_exclude_none=True,
+    dependencies=[Depends(_require_token)],
+)
+def post_edit_brainstorm(
+    body: EditBrainstormRequest,
+    actor: str = Depends(_require_actor),
+) -> dict[str, Any]:
+    return _handle_edit_brainstorm(
+        project_id=body.project_id,
+        phase_id=body.phase_id,
+        draft=body.draft,
+        decisions=body.decisions,
+        projects_path=_projects_json_path(),
+    )
+
+
+# GET /api/projects/phases/{phase_ref}/thread — the Brainstorm phase card's async
+# conversation (projects-v3 P6.1). `phase_ref` is the composite project_id::phase_id.
+# Read-only → X-Dashboard-Token suffices.
+@app.get(
+    '/api/projects/phases/{phase_ref}/thread',
+    response_model=PhaseThreadResponse,
+    dependencies=[Depends(_require_token)],
+)
+def get_phase_thread(phase_ref: str) -> dict[str, Any]:
+    return _handle_phase_thread(
+        phase_ref=phase_ref,
+        projects_path=_projects_json_path(),
+        supabase_client=_get_larry_action_supabase_client(),
+    )
+
+
+# POST /api/projects/phases/{phase_ref}/message — Larry posts on a Brainstorm phase
+# card (projects-v3 P6.1). `phase_ref` is the composite project_id::phase_id. Emits
+# a card_message event + drops a resume envelope in Beacon's inbox (she answers next
+# cycle), reusing the kind-generic card-chat core. Same auth as the other write
+# routes: X-Dashboard-Token + an allowlisted X-Actor.
+@app.post(
+    '/api/projects/phases/{phase_ref}/message',
+    response_model=CaptureMessageResponse,
+    response_model_exclude_none=True,
+    dependencies=[Depends(_require_token)],
+)
+def post_phase_message(
+    phase_ref: str,
+    body: CaptureMessageRequest,
+    actor: str = Depends(_require_actor),
+) -> dict[str, Any]:
+    return _handle_phase_message(
+        phase_ref=phase_ref,
+        text=body.text,
+        actor=actor,
+        projects_path=_projects_json_path(),
+        agents_root=_agents_root(),
+        supabase_client=_get_larry_action_supabase_client(),
     )
 
 

@@ -381,6 +381,15 @@ class StoreAttachTests(unittest.TestCase):
         self.assertNotIn('draft', ps._phase_card(_phase('p6')))
         self.assertNotIn('decisions', ps._phase_card(_phase('p6')))
 
+    def test_larry_edit_blocks_reauthor(self):
+        # P6.1 no-clobber guardrail: after a Larry edit, needs_brainstorm must be
+        # False so the periodic Narrator sweep never overwrites his edited draft.
+        ph = _phase('p6', state='brainstorm', brainstorm={
+            'is_ai_draft': True, 'draft': {'end_state': 'authored'}})
+        self.assertTrue(ps.edit_phase_brainstorm(ph, draft='Larry rewrote this'))
+        self.assertFalse(author.needs_brainstorm(ph))
+        self.assertEqual(ph['brainstorm_provenance']['by'], 'larry')
+
 
 # --------------------------------------------------------------------------- #
 # the in-registry sweep — mutates in place, bounded, idempotent
