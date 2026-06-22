@@ -974,6 +974,326 @@ def fetch_capture_events(
     return list(getattr(resp, 'data', None) or [])
 
 
+# ---------------- approval-card meaning layer (projects-v3 P7.2a) -------------
+#
+# Contract A extended to the Approvals queue. Unlike captures/missions (JSON
+# registries), the dashboard reads pending decisions DIRECTLY from Supabase
+# `chain_events` (select * over the approvable event types), so the meaning layer
+# can't ride a registry — it must live ON the chain_events row. The Narrator
+# authors the SAME field contract (briefing/risk/risk_note/briefing_provenance,
+# minus recommended_action — the queue uses Approve/Reject, not delegate/drop)
+# and writes it into the row's `payload` JSONB (payload.briefing, …) so the
+# dashboard's `select *` surfaces it with no schema migration.
+#
+# This is the Narrator's ONLY write to chain_events. It writes ONLY the briefing
+# keys; the emitter owns the rest of payload and row resolution only ever flips
+# the top-level `read_at` column (never payload — verified in dashboard_api), so
+# there is no lost-update race. Author-once: an approval is point-in-time (no
+# lifecycle state to re-key on), so we brief a row once (briefing absent) and
+# never re-author. Same fail-safe per row + per-tick bound + deterministic
+# fallback as the sibling sweeps.
+
+# The approvable types we brief. approval_request + clarify_request are the
+# decisions Larry must act on; an escalation is briefed only when it carries no
+# summary of its own. larry_alert/sentinel_alert already carry a message and are
+# read-not-decided, so they are NOT briefed.
+_APPROVAL_BRIEF_TYPES = ('approval_request', 'clarify_request', 'escalation')
+
+# Severity → risk when trust_policy has no rule to classify the approval (its
+# payload carries no repo/file dispatch context). Mirrors the dashboard's
+# normalizeSeverity buckets.
+_SEVERITY_RISK = {'critical': 'careful', 'warning': 'medium', 'info': 'safe'}
+
+# Risk ordering for the "severity may escalate but never downgrade the policy
+# default" rule in derive_approval_risk.
+_RISK_ORDER = {'safe': 0, 'medium': 1, 'careful': 2}
+
+
+def _approval_payload(event: dict[str, Any]) -> dict[str, Any]:
+    p = event.get('payload')
+    return p if isinstance(p, dict) else {}
+
+
+def _normalize_severity(raw: Any) -> str:
+    """Coarse severity → {critical, warning, info}; unknown/absent → info."""
+    s = str(raw or '').strip().lower()
+    if s in ('critical', 'crit', 'high', 'error', 'fatal', 'red'):
+        return 'critical'
+    if s in ('warning', 'warn', 'medium', 'med', 'yellow'):
+        return 'warning'
+    return 'info'
+
+
+def approval_text(event: dict[str, Any]) -> str:
+    """The human request prose the emitter wrote on an approval event — the
+    prompt/question/message/summary. Drives the careful-keyword scan + the
+    briefing fallback. Empty string when none present."""
+    p = _approval_payload(event)
+    for k in ('prompt', 'question', 'message', 'summary', 'headline'):
+        v = p.get(k)
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+    return ''
+
+
+def approval_to_task(event: dict[str, Any]) -> dict[str, Any]:
+    """Build the trust_policy task from an approval event. An approval_request
+    carries proposing/target agent but NOT the dispatch repo/file context, so the
+    task is coarse — trust_policy usually falls through to its default, handled by
+    derive_approval_risk's severity fallback."""
+    p = _approval_payload(event)
+    return {
+        'source': p.get('proposing_agent') or event.get('agent') or 'beacon',
+        'target_agent': p.get('target_agent') or 'forge',
+        'task_type': p.get('task_type') or 'feature-development',
+        'target_repo': p.get('target_repo') or p.get('repo'),
+        'changed_files': p.get('changed_files') or [],
+    }
+
+
+def classify_approval_careful(event: dict[str, Any]) -> bool:
+    """True if the approval's request prose looks irreversible/outward/spendy —
+    the § 5 escalator to careful. Scans the request text."""
+    return _CAREFUL_PATTERN.search(approval_text(event)) is not None
+
+
+def derive_approval_risk(
+    event: dict[str, Any], policy: Optional[dict[str, Any]] = None,
+) -> tuple[str, bool]:
+    """Return (risk, careful) for an approval. When a real trust_policy rule
+    matches, trust it (map_risk). When no rule matches, the policy DEFAULT applies
+    (e.g. force_ask → medium) as the FLOOR, and the event's severity may only
+    ESCALATE it (critical → careful), never drop it below that default — an
+    unclassified approval is still a decision the policy wants a human to weigh,
+    so it never reads `safe` just because its severity is low (an approval payload
+    carries no repo/file context for finer matching; § P7.2a). The careful-keyword
+    escalator always wins (it's folded into map_risk)."""
+    careful = classify_approval_careful(event)
+    action, rule = trust_policy.evaluate(approval_to_task(event), policy)
+    policy_risk = map_risk(action, careful)
+    if rule is not None:
+        return policy_risk, careful  # an explicit rule classified it — trust it
+    # No rule matched: policy_risk is the default-action floor; severity escalates
+    # it but never downgrades below the floor.
+    sev_risk = _SEVERITY_RISK[_normalize_severity(
+        _approval_payload(event).get('severity'))]
+    risk = (policy_risk if _RISK_ORDER[policy_risk] >= _RISK_ORDER[sev_risk]
+            else sev_risk)
+    return risk, careful
+
+
+def render_raw_approval_briefing(
+    event: dict[str, Any], risk: str, careful: bool,
+) -> dict[str, str]:
+    """Deterministic plain-English briefing — the fallback when the LLM voice is
+    unavailable (and the value tests assert against). Operator language; never
+    echoes the raw request blob (the card already shows the full prompt on
+    expand — this is the plain summary layered on top). The `suggest` verb tracks
+    the event type's ACTUAL action (approve/reject, answer, or acknowledge) so it
+    never tells Larry to "approve" a card that has no Approve button — a
+    clarify_request is answered, an escalation is looked-at/acknowledged."""
+    etype = event.get('event_type')
+    if etype == 'clarify_request':
+        what = 'A teammate needs your answer to keep moving.'
+        why = 'Work is paused until you reply.'
+        if risk == 'careful':
+            suggest = 'Answer carefully — your call here is hard to walk back.'
+        elif risk == 'medium':
+            suggest = 'Give it a quick look, then answer.'
+        else:
+            suggest = 'A quick answer unblocks the team.'
+    elif etype == 'escalation':
+        what = 'The team escalated something for your attention.'
+        why = 'It was flagged as needing a person, not the auto-path.'
+        if risk == 'careful':
+            suggest = 'Look carefully before you act — it could be hard to undo.'
+        elif risk == 'medium':
+            suggest = 'Give it a quick look and decide how to handle it.'
+        else:
+            suggest = 'A quick look and an acknowledgement clears it.'
+    else:  # approval_request
+        what = 'The team is asking for your go-ahead.'
+        why = "It's blocked on your approval before it can proceed."
+        if risk == 'careful':
+            suggest = 'Look carefully before approving — it could be hard to undo.'
+        elif risk == 'medium':
+            suggest = 'Give it a quick check, then approve or send it back.'
+        else:
+            suggest = 'Low-risk — approve if it looks right.'
+    return {'what': what, 'why': why, 'suggest': suggest}
+
+
+def build_approval_briefing_prompt(event: dict[str, Any], risk: str) -> str:
+    """CEO-voice authoring prompt for an approval briefing (mirrors
+    build_briefing_prompt). Beacon voice, plain outcomes, JSON-out for parse."""
+    p = _approval_payload(event)
+    facts = {
+        'kind': event.get('event_type'),
+        'from_agent': event.get('agent') or p.get('proposing_agent'),
+        'request': approval_text(event)[:2000],
+        'risk_level': risk,
+    }
+    return (
+        "You are Beacon, the operator's manager. A teammate has put a decision in "
+        "front of the operator — an approval to give, a question to answer, or an "
+        "escalation to weigh. Write a 3-part briefing so a busy CEO can decide in "
+        "seconds — in his terms, never engineering jargon.\n\n"
+        "Return ONLY a JSON object with exactly these keys (each one short, plain "
+        "English, no markdown):\n"
+        '  "what":    one sentence — what he is being asked to decide.\n'
+        '  "why":     one sentence — why it matters / what is blocked on it.\n'
+        '  "suggest": one sentence — what you recommend he do.\n\n'
+        "Never mention task ids, branches, PRs, commits, agents, or risk codes. "
+        f"The risk level is already computed as \"{risk}\"; reflect its caution in "
+        "the suggestion's tone but don't name it.\n\n"
+        "Here are the facts (JSON):\n"
+        f"{json.dumps(facts, indent=2)}\n\n"
+        "Write the briefing now. Output ONLY the JSON object."
+    )
+
+
+def author_approval_meaning_layer(
+    event: dict[str, Any],
+    *,
+    now: Optional[datetime] = None,
+    policy: Optional[dict[str, Any]] = None,
+    use_llm: bool = True,
+) -> dict[str, Any]:
+    """Author the meaning layer for one approval event and return the field dict
+    (briefing/risk/risk_note/briefing_provenance) to merge into the row's payload.
+    Pure — does not mutate the event or touch Supabase; the sweep owns the write.
+    Mirrors author_meaning_layer, minus recommended_action (the Approvals queue
+    uses Approve/Reject, not the delegate/drop vocabulary)."""
+    now = now or datetime.now(timezone.utc)
+    risk, careful = derive_approval_risk(event, policy)
+
+    briefing = None
+    if use_llm:
+        briefing = generate_briefing_voice(
+            build_approval_briefing_prompt(event, risk))
+    authored_by_llm = briefing is not None
+    if briefing is None:
+        briefing = render_raw_approval_briefing(event, risk, careful)
+
+    fields: dict[str, Any] = {
+        'briefing': briefing,
+        'risk': risk,
+        'briefing_provenance': {
+            'by': NARRATOR_BY,
+            'model': NARRATOR_MODEL if authored_by_llm else 'raw',
+            'at': now.isoformat(),
+            'source': 'approval',
+        },
+    }
+    risk_note = build_risk_note(event, risk, careful)
+    if risk_note is not None:
+        fields['risk_note'] = risk_note
+    return fields
+
+
+def approval_needs_briefing(event: dict[str, Any]) -> bool:
+    """True if a pending approval row needs briefing — a briefable, unresolved
+    event whose payload carries no briefing yet. Author-once (approvals are
+    point-in-time): a row already carrying a briefing returns False, so the sweep
+    is idempotent. Resolved rows (read_at set) and an escalation that already
+    carries its own summary are skipped."""
+    if not isinstance(event, dict):
+        return False
+    if event.get('event_type') not in _APPROVAL_BRIEF_TYPES:
+        return False
+    if event.get('read_at'):
+        return False
+    p = _approval_payload(event)
+    if (event.get('event_type') == 'escalation'
+            and isinstance(p.get('summary'), str) and p['summary'].strip()):
+        return False
+    return not isinstance(p.get('briefing'), dict)
+
+
+def _approval_client(client: Optional[Any] = None) -> Optional[Any]:
+    """The Supabase client for the approval sweep — injected (tests) or the
+    shared chain_event_emit client. None when supabase isn't configured."""
+    if client is not None:
+        return client
+    try:
+        import chain_event_emit as cee  # noqa: PLC0415
+    except ImportError:
+        return None
+    return cee._get_client()
+
+
+def _fetch_pending_approvals(client: Any) -> list[dict[str, Any]]:
+    """Best-effort fetch of recent approvable chain_events (read_at filtered in
+    Python by approval_needs_briefing). Any failure → [] (the sweep no-ops)."""
+    try:
+        resp = (
+            client.table('chain_events')
+            .select('event_id,event_type,agent,ts,read_at,payload')
+            .in_('event_type', list(_APPROVAL_BRIEF_TYPES))
+            .order('ts', desc=True)
+            .limit(200)
+            .execute()
+        )
+    except Exception as e:  # noqa: BLE001 — fetch is best-effort
+        log(f'narrator: pending-approvals fetch failed: '
+            f'{type(e).__name__}: {e}')
+        return []
+    return list(getattr(resp, 'data', None) or [])
+
+
+def author_pending_approvals(
+    *,
+    client: Optional[Any] = None,
+    now: Optional[datetime] = None,
+    use_llm: bool = True,
+    policy: Optional[dict[str, Any]] = None,
+    max_per_tick: int = NARRATOR_MAX_PER_TICK,
+) -> tuple[int, int]:
+    """Author the meaning layer onto pending approval chain_events that need it,
+    writing the briefing fields into each row's `payload` JSONB via a single
+    per-row update — the Narrator's only write to chain_events (briefing keys
+    only; read_at-based resolution never touches payload, so no lost-update
+    race). Bounded by ``max_per_tick``; fail-safe per row (an error on one row is
+    logged + skipped). Returns ``(briefed, deferred)``. No supabase client
+    (unconfigured) → ``(0, 0)``."""
+    now = now or datetime.now(timezone.utc)
+    cli = _approval_client(client)
+    if cli is None:
+        return (0, 0)
+    pending = [e for e in _fetch_pending_approvals(cli)
+               if approval_needs_briefing(e)]
+
+    attempted = 0
+    briefed = 0
+    for ev in pending:
+        if attempted >= max_per_tick:
+            break
+        eid = ev.get('event_id')
+        if not eid:
+            continue  # no stable key to update — skip.
+        attempted += 1
+        try:
+            fields = author_approval_meaning_layer(
+                ev, now=now, policy=policy, use_llm=use_llm)
+            new_payload = {**_approval_payload(ev), **fields}
+            (
+                cli.table('chain_events')
+                .update({'payload': new_payload})
+                .eq('event_id', eid)
+                .execute()
+            )
+        except Exception as e:  # noqa: BLE001 — per-row fail-safe
+            log(f'narrator: approval brief failed for {eid}: '
+                f'{type(e).__name__}: {e} — skipped (retries next tick)')
+            continue
+        briefed += 1
+
+    deferred = max(0, len(pending) - briefed)
+    log(f'narrator approval sweep: briefed {briefed} approval(s); '
+        f'deferred {deferred} (max {max_per_tick}/tick)')
+    return (briefed, deferred)
+
+
 def run(
     *,
     dry_run: bool = False,
@@ -1066,7 +1386,21 @@ def main(argv: Optional[list[str]] = None) -> int:
                         help='compute briefings but do not write captures.json')
     parser.add_argument('--no-llm', action='store_true',
                         help='use the deterministic raw briefing (no claude CLI)')
+    parser.add_argument('--approvals', action='store_true',
+                        help='brief the Approvals queue (pending chain_events) '
+                             'instead of parked captures (projects-v3 P7.2a)')
     args = parser.parse_args(argv)
+    if args.approvals:
+        # Approvals are Supabase chain_events the dashboard reads directly; the
+        # sweep writes the briefing into each row's payload (no captures.json).
+        # --dry-run skips the write (the sweep can't author without writing).
+        if args.dry_run:
+            log('narrator: --approvals --dry-run is a no-op '
+                '(the approval sweep writes Supabase when it briefs); skipping')
+            return 0
+        briefed, deferred = author_pending_approvals(use_llm=not args.no_llm)
+        log(f'narrator: done ({briefed} approval(s) briefed, {deferred} deferred)')
+        return 0
     n = run(dry_run=args.dry_run, use_llm=not args.no_llm)
     log(f'narrator: done ({n} briefed)')
     return 0
