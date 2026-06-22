@@ -168,9 +168,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 16:37Z UTC (Iter ~2458, Tier 3→3, consecutive_clean=5→6, NOMINAL ✅)
+## Status snapshot — updated 2026-06-22 17:12Z UTC (Iter ~2459, Tier 3→3, consecutive_clean=6→7, NOMINAL ✅)
 
-**Iter ~2458 summary:** ✅ Nominal. 0 new alerts (watermark=919=file_length). 5/5 daemons alive (same PIDs). HEAD=95206c05 (wraps PR#634 merge 36335119). Both repos at 0 open PRs. deploy-notifier:ERROR CLEARED confirmed. **Standing [yellow]: install-drift:doorbell, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals, unreviewed-merge:607.** PRIME: systemic_fixes=56, ratio=18.95, trend=improving. **G-rule sync.service-deploy-restart-storm-tier4: 1/3. G-rule mirror-marker-parse-error: 2/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Next cadence: 30-min (Tier 3, consecutive_clean=6).
+**Iter ~2459 summary:** ✅ Nominal. 0 new alerts (watermark=919=file_length). 5/5 daemons alive (same PIDs). HEAD=c84b88a2 (Pulse cycle 20260622T164146Z). Both repos at 0 open PRs. **Standing [yellow]: install-drift:doorbell, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals, unreviewed-merge:607.** PRIME: systemic_fixes=56, ratio=18.95, trend=improving. **G-rule sync.service-deploy-restart-storm-tier4: 1/3. G-rule mirror-marker-parse-error: 2/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Next cadence: 30-min (Tier 3, consecutive_clean=7).
 
 
 
