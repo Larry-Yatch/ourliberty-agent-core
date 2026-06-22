@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 06:47Z UTC (Iter ~2434, Tier 1→2 de-escalation, NOMINAL ✅)
+## Status snapshot — updated 2026-06-22 07:02Z UTC (Iter ~2435, Tier 2→2, consecutive_clean=0→1, NOMINAL ✅)
 
-**Iter ~2434 summary:** ✅ Nominal. 0 new alerts (watermark=888=file_length). 5/5 daemons alive (same PIDs as ~2433). 0 open PRs. All inboxes empty. consecutive_clean=2→3→de-escalate → Tier 2. **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. [blue]: unreviewed-merge:628/625/627, daemon-pids.json missing.** PRIME: ratio≈19.3, trend=improving. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Next cadence: 15-min (Tier 2).
+**Iter ~2435 summary:** ✅ Nominal. 0 new alerts (watermark=888=file_length). 5/5 daemons alive (same PIDs as ~2434). 0 open PRs. All inboxes empty. Tier 2, consecutive_clean=0→1. **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. [blue]: unreviewed-merge:628/625/627, daemon-pids.json missing.** PRIME: interventions=1060, ratio≈19.27, trend=improving. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Next cadence: 15-min (Tier 2).
 
 
 
