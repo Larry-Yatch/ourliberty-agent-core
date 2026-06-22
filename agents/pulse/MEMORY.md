@@ -162,9 +162,15 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 13:28Z UTC (Iter ~2452, Tier 2→3 de-escalated, NOMINAL ✅)
+## G-rule catalog-accuracy-drift → COMPLETE ✅ (iter ~2453 verified)
 
-**Iter ~2452 summary:** ✅ Nominal. 2 new alerts (L904: medic-diagnosis:PR#81, L905: pulse check-i digest), both Tier-3 silenced. Watermark advanced 903→905. 5/5 daemons alive (PIDs: chain_event=930563, beacon=1025989, dashboard_api=1026057, inbox_watcher=1026206, outbox_notifier=1026349). HEAD=b6596856. consecutive_clean=2→3 → **Tier 2→3 de-escalated.** PR #607 MERGED — cleared from standing findings. Check I (Monday): already fired earlier, journal block pre-existing; Beacon completed anomaly review (cycle-model downgrade proposal, APPROVAL_REQUEST status unclear). **Standing [yellow]: install-drift:doorbell (needs sudo install), deploy ERROR PR #80, PR #81 live site on PR #78, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. IN-FLIGHT [blue]: PR #634/#81/#80 needs Mirror review, catalog-accuracy-drift-gruel-001 in-flight (not in Beacon archive yet), Check I proposal cycle-model-downgrade (APPROVAL_REQUEST delivery unclear).** PRIME: systemic_fixes=56, ratio=18.95, trend=improving. **G-rule sync.service-deploy-restart-storm-tier4: 1/3. G-rule catalog-accuracy-drift: 3/3 DISPATCHED. G-rule mirror-marker-parse-error: 2/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Next cadence: 30-min (Tier 3).
+**Rule:** G-rule catalog-accuracy-drift COMPLETE. catalog-drift-sync-cadence-001 → ourliberty-graph PR #6 merged 2026-06-22T04:56:35Z (Mirror REVIEW_PASS, auto-merged). The fix syncs catalog drift on a cadence. Pattern was `source=pulse-check, subject=catalog-accuracy-drift` (7/60 shelf cards drifted). G-rule dispatch was iter ~2452 (3/3 threshold). **G-rule COMPLETE.**
+
+---
+
+## Status snapshot — updated 2026-06-22 13:59Z UTC (Iter ~2453, Tier 3→3, consecutive_clean=0→1, NOMINAL ✅)
+
+**Iter ~2453 summary:** ✅ Nominal. 3 new alerts (L906: credential-drift OURLIBERTY_BOARD_DRAIN_ENABLED, L907-L908: pipeline-stall PRs #634/#80), all Tier-3 silenced. Watermark advanced 905→908. 5/5 daemons alive (same PIDs). HEAD=3c1b2951. **Notable: catalog-drift-sync-cadence-001 (ourliberty-graph PR #6) MERGED at 04:56Z — G-rule catalog-accuracy-drift COMPLETE. PR #635 (heal-systemd-install-drift grace window) MERGED at 06:06Z.** install-drift doorbell re-verified: auto-install blocked by container sudo restriction, real gap persists. **Standing [yellow]: install-drift:doorbell (sudo blocked), deploy ERROR PR #80/#81 site (PR #81 fix waiting Mirror), Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. [blue]: PR #634/#81/#80 awaiting Mirror review.** PRIME: systemic_fixes=56, ratio=18.95, trend=improving. **G-rule sync.service-deploy-restart-storm-tier4: 1/3. G-rule mirror-marker-parse-error: 2/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Next cadence: 30-min (Tier 3).
 
 
 
