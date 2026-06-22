@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 05:05Z UTC (Iter ~2422, Tier 2→1, consecutive_clean=2→0, STALL ⚠️)
+## Status snapshot — updated 2026-06-22 05:10Z UTC (Iter ~2423, Tier 1, consecutive_clean=0→1, NOMINAL ✅)
 
-**Iter ~2422 summary:** ⚠️ Check E stall — PR #625 (`fix(heal-install-drift): drop duplicate daemon-reload`) open in T0, author=Larry-Yatch (direct, bypassed pipeline), created 04:51Z, no Mirror review dispatched. Direction-ask sent to Beacon (`pr-625-mirror-review-dispatch-001.json`). All other checks nominal. 0 new alerts (watermark 877, file_length 877). 5/5 daemons alive (PIDs unchanged): inbox_watcher=559441, beacon=930450, chain_event=930563, outbox_notifier=930686, dashboard_api=930797. Monday conditional checks (Check I sentinel EXISTS, Check VIII/IX/X already ran in ~2413, Check III 11d<14d gate) → all skipped. **Standing [yellow]: PR #625 untracked Mirror review (dispatched), unreviewed-merge:607, Check VIII 2026-06-15 proposal, Tier-2 probe auth_401, Check III proposals.** PRIME: 1 intervention (check-e-stall-untracked-pr), systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** Tier 2→1 (signal). Next cadence: 5-min (Tier 1).
+**Iter ~2423 summary:** ✅ Nominal. 1 new alert (L878, approval_request for review-pr-625-install-drift-dedup-001 → Tier-3 silence, watermark→878). 5/5 daemons alive (PIDs unchanged): inbox_watcher=559441, beacon=930450, chain_event=930563, outbox_notifier=930686, dashboard_api=930797. PR #625: Beacon picked up direction-ask (in archive), approval_request DM sent to Larry at 05:06Z, beacon-pending-approvals pending=1 — awaiting Larry's "approve" reply. All other checks nominal. Monday conditional checks → all still skipped (sentinel+VIII/IX/X+Check III 11d<14d). **Standing [yellow]: PR #625 awaiting Larry approval, unreviewed-merge:607, Check VIII 2026-06-15 proposal, Tier-2 probe auth_401, Check III proposals.** PRIME: 0 interventions (iter_clean), systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** Tier 1, consecutive_clean=0→1. Next cadence: 5-min (Tier 1).
 
 
 
