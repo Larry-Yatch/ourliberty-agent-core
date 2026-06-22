@@ -2564,6 +2564,75 @@ def _prior_dispatch_was_definitive_non_run(task_id: str) -> bool:
         return False
 
 
+def _notify_beacon_phantom_build_suppressed(
+    data: dict[str, Any], branch: str, pr_state: str,
+) -> None:
+    """Best-effort: journal a phantom-build suppression to Beacon's inbox.
+
+    Informational only — the terminal guard has already skipped the dispatch and
+    logged PHANTOM_BUILD_SUPPRESSED. This adds a Beacon journal entry so the
+    suppression is visible in the chain record, not just the daemon log. Any
+    write failure is swallowed (the log line is the durable signal); this MUST
+    NEVER wedge the dispatch path, so the whole body is wrapped.
+    """
+    task_id = data.get('task_id') or 'unknown'
+    try:
+        notify_prompt = build_notify_prompt(
+            intent='result-notification',
+            sender='outbox-notifier',
+            task_id=task_id,
+            success=True,
+            output=(
+                f'Phantom build-phase dispatch suppressed for task '
+                f'`{task_id}`: build branch `{branch}` already has a '
+                f'{pr_state} PR, so this PROCEED is a stale-marker '
+                f're-discovery (resumed-session transcript), not fresh work. '
+                f'No build task was written to Forge. Journal only — no '
+                f'action needed.'
+            ),
+        )
+        notify_base = {
+            'task_id': f'notify-phantom-build-suppressed-{task_id}',
+            'prompt': notify_prompt,
+            'source': 'outbox-notifier',
+            'intent': 'result-notification',
+            'original_task_id': task_id,
+            '_notify_depth': _current_notify_depth(data) + 1,
+        }
+        notify_task = build_chain_envelope(
+            notify_base,
+            data,
+            carry={
+                'target_repo': CARRY,
+                'pr_url': DROP,
+                'forge_build_session_id': DROP,
+                'reply_chat_id': CARRY,
+                'revision_count': DROP,
+                'replan_count': CARRY,
+                'max_replans': CARRY,
+            },
+        )
+        notify_filename = f'notify-phantom-build-suppressed-{task_id}.json'
+        dest = safe_write_inbox.safe_write_inbox(
+            target_agent='beacon',
+            task_dict=notify_task,
+            source_agent='outbox-notifier',
+            filename=notify_filename,
+        )
+        log(
+            f'PHANTOM_BUILD_SUPPRESSED task={task_id}; journaled suppression '
+            f'notify to beacon (file={dest.name})'
+        )
+    except Exception as e:
+        # Informational only — a notify failure must never wedge the dispatch.
+        log(
+            f'phantom-build suppression notify to beacon failed for task '
+            f'{task_id}: {type(e).__name__}: {e}; suppression still applied '
+            f'(the PHANTOM_BUILD_SUPPRESSED log line is the durable signal)',
+            'WARN',
+        )
+
+
 def _dispatch_build_phase(data: dict[str, Any]) -> None:
     """Write a build-phase task to Forge's inbox after a PROCEED marker.
 
@@ -2721,6 +2790,49 @@ def _dispatch_build_phase(data: dict[str, Any]) -> None:
                 f'build-phase already dispatched for task {task_id} '
                 f'(archive or .invalid present); skipping duplicate write'
             )
+            return
+
+    # phantom-build-phase terminal guard (cap-phantom-build-phase-after-marker-
+    # error-retry-pr-4d78). The filename-dedup above is a local-filesystem
+    # heuristic, not ground truth — and its _prior_build_was_spawn_failure
+    # override (BUILD_DEDUP_OVERRIDE) can additionally re-OPEN a phantom. A
+    # marker-error-retry envelope carries phase=preflight, so the resumed-
+    # session stale-`=== PROCEED ===` re-discovery inside _classify_forge_marker
+    # is NOT excluded by the build/revision guard at the classify call site —
+    # it re-classifies as a fresh proceed and re-dispatches a build for an
+    # ALREADY-TERMINAL task (2026-06-10: build-fix-classifier-session-lost-002
+    # re-fired for PR #435 *after* it had merged; a human cancelled it). Ground-
+    # truth check: if this build branch already has a PR in a TERMINAL state
+    # (MERGED, or CLOSED-without-merge) the dispatch is a phantom — skip the
+    # inbox write, log it, and journal an informational notify to Beacon.
+    #
+    # FAIL-OPEN on every uncertainty: no branch (the `if branch:` guards above
+    # show it's optional) / gh transport error / timeout / non-zero exit /
+    # unparseable output -> proceed with the dispatch. A phantom is the rare
+    # exception; a gh outage must NEVER wedge every legitimate build. An OPEN PR
+    # is likewise NOT a phantom — it's the legitimate replan/revision re-dispatch
+    # (replan_count > 0, build-<task_id>-replan<N>.json) — so only a
+    # DEFINITIVELY terminal state skips. Wrapped in try/except so the guard can
+    # never raise into the daemon (daemon-never-wedge).
+    if branch and target_repo:
+        try:
+            pr_state = _gh_terminal_pr_state_for_branch(target_repo, branch)
+        except Exception as e:
+            log(
+                f'phantom-build terminal guard raised for task {task_id} '
+                f'(branch={branch}, repo={target_repo}): '
+                f'{type(e).__name__}: {e}; failing open (proceeding)',
+                'WARN',
+            )
+            pr_state = None
+        if pr_state in ('MERGED', 'CLOSED'):
+            log(
+                f'PHANTOM_BUILD_SUPPRESSED task={task_id} — build branch '
+                f'{branch} already has a {pr_state} PR in {target_repo}; '
+                f'this PROCEED is a stale-marker re-discovery, not fresh work. '
+                f'Skipping build-phase dispatch (GitHub-truth terminal guard).'
+            )
+            _notify_beacon_phantom_build_suppressed(data, branch, pr_state)
             return
 
     # D3.5 5d cost-budget gate. AFTER the idempotency check (second-pass
@@ -5073,6 +5185,70 @@ def _gh_pr_state(repo_coords: str, pr_number: int) -> Optional[str]:
     state = data.get('state')
     if isinstance(state, str):
         return state
+    return None
+
+
+def _gh_terminal_pr_state_for_branch(
+    repo_coords: str, branch: str,
+) -> Optional[str]:
+    """Collapse every PR opened from `branch` to one terminal-aware signal.
+
+    phantom-build-phase terminal guard (cap-phantom-build-phase-after-marker-
+    error-retry-pr-4d78). Looks up all PRs whose head is `branch`
+    (`gh pr list --head <branch> --state all`) and reduces them to:
+
+      'OPEN'   — at least one PR is still open. OPEN wins over any terminal
+                 sibling so a reopened/replanned branch is NEVER mis-skipped;
+                 this is the legitimate replan/revision re-dispatch case.
+      'MERGED' — no open PR, but one already merged (the phantom signature).
+      'CLOSED' — no open/merged PR, but one closed-without-merge (terminal too).
+      None     — no PR for the branch OR any gh transport/exit/parse failure.
+                 The dispatch guard treats both identically: fail open + proceed.
+
+    Never raises — every failure path returns None so the caller fails open.
+    Reuses the `gh` subprocess + `_AUTO_MERGE_TIMEOUT_S` convention of the
+    sibling `_gh_pr_state` / `_gh_open_prs_for_repo` helpers. State enum per
+    GitHub: 'OPEN' | 'CLOSED' | 'MERGED'.
+    """
+    try:
+        proc = subprocess.run(
+            ['gh', 'pr', 'list', '--repo', repo_coords,
+             '--head', branch, '--state', 'all',
+             '--json', 'number,state'],
+            capture_output=True, text=True, timeout=_AUTO_MERGE_TIMEOUT_S,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        log(
+            f'gh pr list --head {branch} ({repo_coords}) FAILED during '
+            f'phantom-build terminal check: {type(e).__name__}: {e}',
+            'WARN',
+        )
+        return None
+    if proc.returncode != 0:
+        log(
+            f'gh pr list --head {branch} ({repo_coords}) returned '
+            f'{proc.returncode} during phantom-build terminal check: '
+            f'{(proc.stderr or "").strip()[:200]}',
+            'WARN',
+        )
+        return None
+    try:
+        payload = json.loads(proc.stdout or '[]')
+    except (ValueError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, list):
+        return None
+    states = {
+        item.get('state')
+        for item in payload
+        if isinstance(item, dict)
+    }
+    if 'OPEN' in states:
+        return 'OPEN'
+    if 'MERGED' in states:
+        return 'MERGED'
+    if 'CLOSED' in states:
+        return 'CLOSED'
     return None
 
 
