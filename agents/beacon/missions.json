@@ -4535,7 +4535,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-22T05:36:18.575909+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-22T05:36:06.317429+00:00"
+      "orphan_last_activity_ts": "2026-06-22T05:36:06.317429+00:00",
+      "briefing": {
+        "what": "A fix to stop a glitch that was incorrectly flagging certain jobs as finished before they actually were.",
+        "why": "When work looks done but isn't, things can slip through and create rework or quality issues that erode trust in the system.",
+        "suggest": "Worth doing, but have someone double-check it before it goes live since it touches how completion is judged."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-22T05:44:49.823638+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-delegate-cap-projects-pm-layer-data-is-stale-separate-system-84ec",
@@ -4552,7 +4566,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-22T05:36:18.575909+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-22T05:35:39.298967+00:00"
+      "orphan_last_activity_ts": "2026-06-22T05:35:39.298967+00:00",
+      "briefing": {
+        "what": "The team has started work on fixing the project-tracking view that's showing out-of-date information because it pulls from a separate, disconnected system.",
+        "why": "If the tracking view shows stale numbers, you and the team could be making decisions off the wrong picture of what's actually in progress.",
+        "suggest": "Let the team confirm the scope and the fix before greenlighting it, since this touches how project status gets reported across the board."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-22T05:44:49.823638+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-delegate-cap-orphan-lane-show-desktop-chat-title-fallback-rep-dd23",
@@ -4569,7 +4597,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-22T05:36:18.575909+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-22T05:35:34.289482+00:00"
+      "orphan_last_activity_ts": "2026-06-22T05:35:34.289482+00:00",
+      "briefing": {
+        "what": "Some unplanned work the team kicked off to fix how chat titles show up on the desktop app when a proper title is missing.",
+        "why": "Untracked, off-the-roadmap work can quietly eat time and slip through without anyone deciding it's worth doing right now.",
+        "suggest": "Hold before greenlighting \u2014 have the team tie this to a real project and confirm it's worth the effort before it goes further."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-22T05:44:49.823638+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-delegate-cap-phantom-build-phase-after-marker-error-retry-pr-4d78",
@@ -4586,7 +4628,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-22T05:36:18.575909+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-22T05:34:24.271008+00:00"
+      "orphan_last_activity_ts": "2026-06-22T05:34:24.271008+00:00",
+      "briefing": {
+        "what": "The team kicked off a piece of work to fix a glitch where the system kept doing extra, unnecessary work after a hiccup, even though nothing real was left to do.",
+        "why": "Unnecessary repeated work wastes time and money and can make the operation look unreliable, which erodes trust in the system running smoothly.",
+        "suggest": "Let the team confirm the fix actually stops the wasted effort before signing off, since this one needs a careful check rather than a quick wave-through."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-22T05:44:49.823638+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
