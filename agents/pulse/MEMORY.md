@@ -168,9 +168,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 22:24Z UTC (Iter ~2474, Tier 3, consecutive_clean=5, NOMINAL ✅)
+## Status snapshot — updated 2026-06-22 22:58Z UTC (Iter ~2475, Tier 3, consecutive_clean=6, NOMINAL ✅)
 
-**Iter ~2474 summary:** ✅ Nominal. 3 new alerts L927-929 (heal-stale-daemon-code auto-restarts beacon/dashboard_api/outbox_notifier post PR #640 trust_policy.py), all Tier-3 silence. Watermark=929. Daemons alive with NEW PIDs: chain_event=930563, beacon=1149166, dashboard_api=1149238, inbox_watcher=1026206, outbox_notifier=1149312. agent-core: 0 open PRs. dashboard: PR #84 open (docs typo, Vercel CI green, 9 min old, no Mirror review yet). Tier 3, consecutive_clean=4→5. **Standing [yellow]: unreviewed-merge:637, unreviewed-merge:607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals.** PRIME: systemic_fixes=56, ratio=19.0, trend=improving. **G-rule mirror-marker-parse-error: 2/3. G-rule sync.service-deploy-restart-storm-tier4: 1/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Tier 3, consecutive_clean=5, next cadence: 30-min.
+**Iter ~2475 summary:** ✅ Nominal. 1 new alert L930 (outbox-notifier mirror-dag-pass:slice-2b, Tier-3 silence). Watermark=930. Dashboard PR #84 merged 22:32Z. Slice-2b dispatched to Forge inbox by sequence advancer (not stale). 5/5 daemons alive (same PIDs: chain_event=930563, beacon=1149166, dashboard_api=1149238, inbox_watcher=1026206, outbox_notifier=1149312). Both repos 0 open PRs. Tier 3, consecutive_clean=5→6. **Standing [yellow]: unreviewed-merge:637, unreviewed-merge:607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals.** PRIME: systemic_fixes=56, ratio=19.0, trend=improving. **G-rule mirror-marker-parse-error: 2/3. G-rule sync.service-deploy-restart-storm-tier4: 1/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Tier 3, consecutive_clean=6, next cadence: 30-min.
 
 
 
