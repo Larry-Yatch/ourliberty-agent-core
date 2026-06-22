@@ -43,11 +43,22 @@ SCHEMA_VERSION = 1
 LIFECYCLE_STATES: tuple[str, ...] = ('brainstorm', 'spec', 'building', 'done')
 DEFAULT_LIFECYCLE_STATE = 'brainstorm'
 
-# A project is either actively-worked or archived. Promote (P3 step 2) lands a
-# new project at `active`; a mis-promote is reversible by archiving it (spec § 5
-# "Promote irreversibility" guardrail) — it is never a dead end.
-PROJECT_STATES: tuple[str, ...] = ('active', 'archived')
+# A project is `active` (in the pipeline), `archived` (the reversible Drop — a
+# mis-promote sent back to the funnel), or `retired` (a Done project cleared from
+# the board). Promote (P3 step 2) lands a new project at `active`. The two
+# terminal states differ in the ONE way that matters: an `archived` project
+# RELEASES its funnel source back to the funnel (reversibility — never a dead
+# end), while a `retired` project KEEPS it suppressed (the work is genuinely done;
+# don't resurrect the source as a zombie). Both leave the pipeline.
+PROJECT_STATES: tuple[str, ...] = ('active', 'archived', 'retired')
 DEFAULT_PROJECT_STATE = 'active'
+
+# The project states that have CONSUMED their funnel source and must keep it
+# suppressed from the funnel: `active` (being worked) and `retired` (done &
+# cleared). Only `archived` — the reversible Drop — returns the source. The funnel
+# derive's mission/orphan suppression sets ask `suppresses_funnel_source` so a
+# retired Done project doesn't bounce its source back into the funnel as a zombie.
+FUNNEL_SUPPRESSING_STATES: tuple[str, ...] = ('active', 'retired')
 
 
 # --------------------------------------------------------------------------- #
@@ -61,6 +72,13 @@ def is_valid_lifecycle_state(state: Any) -> bool:
 def is_valid_project_state(state: Any) -> bool:
     """True iff `state` is one of the canonical project states."""
     return state in PROJECT_STATES
+
+
+def suppresses_funnel_source(state: Any) -> bool:
+    """True iff a project in `state` keeps its funnel source suppressed (the
+    source was consumed, not dropped) — `active` or `retired`. Only `archived`
+    (the reversible Drop) releases the source back to the funnel."""
+    return state in FUNNEL_SUPPRESSING_STATES
 
 
 def next_lifecycle_state(state: str) -> Optional[str]:
@@ -804,6 +822,20 @@ def _project_status(phases: list[dict[str, Any]]) -> str:
     if any(s == 'brainstorm' for s in states):
         return 'brainstorm'
     return 'spec'
+
+
+def project_is_done(project: dict[str, Any]) -> bool:
+    """True iff every phase of `project` is done (coarse rollup == 'done'). The
+    terminal Drop gesture branches on this: a Done project RETIRES (leaves the
+    board, source NOT returned); a not-done project's Drop returns its source to
+    the funnel. Single source of truth shared by the archive handler and the
+    pipeline rollup. A project with no phases is not done (rollup defaults to
+    brainstorm). Fail-safe on junk: a non-dict project is not done."""
+    if not isinstance(project, dict):
+        return False
+    phases = project.get('phases')
+    phases = [p for p in phases if isinstance(p, dict)] if isinstance(phases, list) else []
+    return _project_status(phases) == 'done'
 
 
 def build_pipeline(

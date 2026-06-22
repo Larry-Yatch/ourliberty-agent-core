@@ -969,15 +969,17 @@ class ProjectArchiveRequest(BaseModel):
 
 
 class ProjectArchiveResponse(BaseModel):
-    # The project was archived (or already was — `applied` is False on an
-    # idempotent re-archive). `state` is always 'archived'. p3f2: `status` /
-    # `message` are HONEST — 'returned-to-funnel'/'returned to the funnel' when the
-    # project came from a funnel source (capture/mission/orphan) that returns,
-    # else 'archived'/'Archived'. The UI toast reads `message` verbatim.
+    # The project left the board (or already had — `applied` is False on an
+    # idempotent repeat). `state` is the terminal state: 'retired' for a Done
+    # project (p3f3 Complete & retire), else 'archived'. p3f2/p3f3: `status` /
+    # `message` are HONEST and phase-aware — 'retired'/"Completed — cleared from
+    # the board." for a Done project; 'returned-to-funnel'/"Dropped — returned to
+    # the funnel." when a not-done funnel-sourced project drops back; else
+    # 'archived'/"Archived." The UI toast reads `message` verbatim.
     project_id: str
     state: str = 'archived'
     status: str = 'archived'
-    message: str = 'Archived'
+    message: str = 'Archived.'
     applied: bool
 
 
@@ -4234,16 +4236,18 @@ def _build_funnel(
 
 
 def _promoted_mission_ids(projects: list[dict[str, Any]]) -> set[str]:
-    """The mission ids that ACTIVE projects were promoted from (projects-v3 P3).
-    Read from each active project's `promoted_from.mission_id`; the funnel derive
-    uses this to suppress a proposed mission already MOVED into the pipeline.
-    Archived projects are excluded so archiving one returns its mission to the
-    funnel (reversible)."""
+    """The mission ids that SUPPRESSING projects were promoted from (projects-v3
+    P3). Read from each suppressing project's `promoted_from.mission_id`; the
+    funnel derive uses this to suppress a proposed mission already MOVED into the
+    pipeline. `active` AND `retired` projects suppress (a retired Done project's
+    mission stays out of the funnel — it was completed, not dropped); only an
+    `archived` project releases its mission back to the funnel (reversible)."""
     out: set[str] = set()
     for proj in projects:
         if not isinstance(proj, dict):
             continue
-        if proj.get('state', projects_store.DEFAULT_PROJECT_STATE) != 'active':
+        if not projects_store.suppresses_funnel_source(
+                proj.get('state', projects_store.DEFAULT_PROJECT_STATE)):
             continue
         pf = proj.get('promoted_from')
         if isinstance(pf, dict) and pf.get('kind') == 'mission':
@@ -4254,16 +4258,19 @@ def _promoted_mission_ids(projects: list[dict[str, Any]]) -> set[str]:
 
 
 def _promoted_orphan_task_ids(projects: list[dict[str, Any]]) -> set[str]:
-    """The orphan task_ids that ACTIVE projects were promoted from (projects-v3
-    P3 follow-up, p3f-reversibility-and-orphan). Read from each active project's
-    `promoted_from.task_id` where kind=='orphan'; the funnel derive uses this to
-    suppress a raw orphan already MOVED into the pipeline. Archived projects are
-    excluded so archiving one returns its orphan to the funnel (reversible)."""
+    """The orphan task_ids that SUPPRESSING projects were promoted from (projects-
+    v3 P3 follow-up, p3f-reversibility-and-orphan). Read from each suppressing
+    project's `promoted_from.task_id` where kind=='orphan'; the funnel derive uses
+    this to suppress a raw orphan already MOVED into the pipeline. `active` AND
+    `retired` projects suppress (a retired Done orphan stays out of the funnel);
+    only an `archived` project releases its orphan back to the funnel
+    (reversible)."""
     out: set[str] = set()
     for proj in projects:
         if not isinstance(proj, dict):
             continue
-        if proj.get('state', projects_store.DEFAULT_PROJECT_STATE) != 'active':
+        if not projects_store.suppresses_funnel_source(
+                proj.get('state', projects_store.DEFAULT_PROJECT_STATE)):
             continue
         pf = proj.get('promoted_from')
         if isinstance(pf, dict) and pf.get('kind') == 'orphan':
@@ -7269,19 +7276,31 @@ def _handle_spec_attach(
 _FUNNEL_SOURCE_KINDS = frozenset({'capture', 'mission', 'orphan'})
 
 
-def _archive_outcome(promoted_from: Any) -> dict[str, str]:
-    """The honest Drop/Archive outcome for a project's `promoted_from` (p3f2,
-    spec § 6 step 2 — "Drop does what it says"). A project promoted from a funnel
-    source (capture / mission / orphan) RETURNS to the funnel when archived (the
-    capture is re-parked here; mission/orphan are structurally un-suppressed by
-    the funnel derive's active-only sets) → "returned to the funnel". A project
-    with no funnel provenance is archive-only → "Archived". The toast must match
-    behavior, so this is the single source of truth for the message both the flip
-    and the idempotent no-op return."""
+def _archive_outcome(promoted_from: Any, *, retire: bool = False) -> dict[str, str]:
+    """The honest Drop outcome for a project (p3f2/p3f3, spec § 6 — "Drop does
+    what it says"). The `message` is the FULL display-ready toast text the UI
+    renders verbatim — three mutually exclusive cases:
+
+      • `retire` (a DONE project) → 'retired' / "Completed — cleared from the
+        board." The work is finished; it leaves the board and its source is NOT
+        returned to the funnel (the terminal "complete" gesture, not a reversal).
+        Takes precedence over provenance — done is done regardless of source.
+      • not done + funnel provenance (capture / mission / orphan) → 'returned-to-
+        funnel' / "Dropped — returned to the funnel." A mis-promote is reversible:
+        the capture is re-parked here; mission/orphan are un-suppressed
+        structurally by the funnel derive's suppression sets.
+      • not done + no funnel provenance → 'archived' / "Archived."
+
+    Single source of truth for the toast across the flip and the idempotent no-op
+    return, so the message can never claim a behavior that didn't happen."""
+    if retire:
+        return {'status': 'retired',
+                'message': 'Completed — cleared from the board.'}
     kind = promoted_from.get('kind') if isinstance(promoted_from, dict) else None
     if kind in _FUNNEL_SOURCE_KINDS:
-        return {'status': 'returned-to-funnel', 'message': 'returned to the funnel'}
-    return {'status': 'archived', 'message': 'Archived'}
+        return {'status': 'returned-to-funnel',
+                'message': 'Dropped — returned to the funnel.'}
+    return {'status': 'archived', 'message': 'Archived.'}
 
 
 def _capture_is_parked(
@@ -7355,28 +7374,37 @@ def _handle_project_archive(
     now: Optional[datetime] = None,
 ) -> dict[str, Any]:
     """Handler for POST /api/projects/archive (p3f-reversibility-and-orphan +
-    p3f2-archive-honest, spec § 6 step 2/3). The Drop/Archive gesture: flip a
-    project's `state` to `archived` so it LEAVES "Actively working", AND make the
-    outcome match the toast — a mis-promote returns to the funnel, an archive-only
-    drop says so. Steps:
+    p3f2-archive-honest + p3f3-complete-and-retire, spec § 6 step 2/3). The Drop
+    gesture is PHASE-AWARE — the terminal state and whether the source returns
+    depend on whether the project is Done:
 
+      • A DONE project (every phase done) is RETIRED: `state='retired'`, it leaves
+        the board, and its funnel source is NOT returned — the work is finished,
+        not mis-promoted. This is the "Complete & retire" terminal gesture.
+      • A not-done project is DROPPED back: `state='archived'`, it leaves the
+        board, and its funnel source RETURNS to the funnel (the reversible
+        "Return to funnel" escape hatch — a mis-promote is never a dead end).
+
+    Steps:
       1. 404 if no project carries `project_id`.
-      2. Idempotent: a project already `archived` is a no-op (applied=False) — no
-         write, no spurious heal-commit delta — but still reports the honest
-         outcome from its provenance.
-      3. Set `state='archived'`, stamp `updated_at`, atomic-write the registry.
-      4. If the project came from the funnel, RETURN the source: a capture is
-         re-parked here (`_return_capture_to_funnel`); a mission/orphan is
-         un-suppressed STRUCTURALLY — the funnel derive's promoted-source sets
-         (`_promoted_mission_ids`, `_promoted_orphan_task_ids`) and the
-         idempotency guard (`_find_active_project_by_promoted_from`) count ONLY
-         active projects, so flipping `state` to `archived` returns it to its lane
-         and lets it be re-promoted.
+      2. Compute `retire` from the project's phases (rollup == 'done').
+      3. Idempotent: a project already in a terminal state (`archived`/`retired`)
+         is a no-op (applied=False) — no write, no spurious heal-commit delta —
+         but still reports the honest outcome.
+      4. Flip `state` to `retired` (done) or `archived` (not done), stamp
+         `updated_at`, atomic-write the registry.
+      5. Return the source ONLY when NOT retiring AND it came from the funnel: a
+         capture is re-parked here (`_return_capture_to_funnel`); a mission/orphan
+         is un-suppressed STRUCTURALLY — the funnel derive's suppression sets
+         (`_promoted_mission_ids`, `_promoted_orphan_task_ids`) count `active` AND
+         `retired` projects, so flipping to `archived` (and ONLY `archived`)
+         returns it to its lane. A retired project keeps suppressing its source.
 
-    Honesty contract (p3f2): the returned `status`/`message` is
-    "returned-to-funnel"/"returned to the funnel" iff the project carries a funnel
-    `promoted_from` (capture/mission/orphan); otherwise "archived"/"Archived". The
-    toast never claims a return that didn't happen.
+    Honesty contract (p3f2/p3f3): `status`/`message` is the full display-ready
+    toast and matches behavior exactly — 'retired'/"Completed — cleared from the
+    board." for a Done project; 'returned-to-funnel'/"Dropped — returned to the
+    funnel." for a reversible drop of a funnel-sourced project; otherwise
+    'archived'/"Archived." The toast never claims a return that didn't happen.
 
     Single-committer preserved: the project flip lands on projects.json ON DISK
     (`heal_projects_store.py` is the SOLE committer of THAT file); the capture
@@ -7384,7 +7412,7 @@ def _handle_project_archive(
     `heal_missions_card_gc`). The dashboard commits neither. Locks taken in the
     global CAPTURE→PROJECTS order (matching `_handle_capture_promote`) so an
     archive's capture un-flip can't deadlock a concurrent promote. Returns
-    {project_id, state: 'archived', status, message, applied}."""
+    {project_id, state, status, message, applied}."""
     now = now or datetime.now(timezone.utc)
     # CAPTURE→PROJECTS lock order (same as _handle_capture_promote). The capture
     # lock is taken unconditionally — archive is a rare human gesture and we don't
@@ -7410,31 +7438,44 @@ def _handle_project_archive(
                 )
 
             promoted_from = project.get('promoted_from')
-            outcome = _archive_outcome(promoted_from)
+            current_state = project.get('state', projects_store.DEFAULT_PROJECT_STATE)
 
-            if project.get(
-                    'state', projects_store.DEFAULT_PROJECT_STATE) == 'archived':
-                # Idempotent no-op, but the toast must stay honest. Mission/orphan
-                # return structurally (kind-based outcome is correct), but a
-                # capture's return is only real if its row is STILL parked —
-                # deriving from kind alone would re-claim a return for a capture
-                # since GC'd/dropped (the exact leak this PR fixes, on the
-                # already-archived path).
-                idempotent_outcome = outcome
-                if (isinstance(promoted_from, dict)
+            if current_state in ('archived', 'retired'):
+                # Idempotent no-op: the project already LEFT the board. Report the
+                # outcome that matches its ALREADY-RECORDED terminal state, NOT a
+                # fresh recompute from phases — a project dropped while not-done
+                # that later completed offline is still `archived`, and the toast
+                # must describe what happened, not relitigate it (so `state` and
+                # `status` can never disagree). A retired project → "Completed…".
+                # For an archived (dropped) one, a capture's return is only real if
+                # its row is STILL parked — kind alone would re-claim a return for a
+                # capture since GC'd/dropped (the leak p3f2 fixed).
+                was_retired = current_state == 'retired'
+                idempotent_outcome = _archive_outcome(promoted_from, retire=was_retired)
+                if (not was_retired
+                        and isinstance(promoted_from, dict)
                         and promoted_from.get('kind') == 'capture'
                         and not _capture_is_parked(
                             captures_path, promoted_from.get('capture_id'))):
                     idempotent_outcome = _archive_outcome(None)
                 return {
                     'project_id': project_id,
-                    'state': 'archived',
+                    'state': current_state,
                     'status': idempotent_outcome['status'],
                     'message': idempotent_outcome['message'],
                     'applied': False,
                 }
 
-            project['state'] = 'archived'
+            # Active project → apply the phase-aware terminal flip. A Done project
+            # RETIRES (terminal, source not returned); a not-done one DROPS back to
+            # the funnel. `retire` is computed from the stored phases — the SAME
+            # rollup the pipeline card shows, so the button label and the outcome
+            # can't disagree.
+            retire = projects_store.project_is_done(project)
+            terminal_state = 'retired' if retire else 'archived'
+            outcome = _archive_outcome(promoted_from, retire=retire)
+
+            project['state'] = terminal_state
             project['updated_at'] = now.isoformat()
             try:
                 _atomic_write_json(projects_path, registry)
@@ -7445,19 +7486,24 @@ def _handle_project_archive(
                     detail={'error': 'projects write failed', 'detail': first_line},
                 )
 
-        # Project flip is persisted. For a capture source, re-park it so the
-        # "returned to the funnel" message is actually true (mission/orphan need
-        # no write — they return structurally). Still under _CAPTURE_INGEST_LOCK.
-        # If the capture row is gone (can't be re-parked), downgrade to an honest
-        # "Archived" — the toast must not claim a return that didn't happen.
-        if isinstance(promoted_from, dict) and promoted_from.get('kind') == 'capture':
+        # Project flip is persisted. ONLY a reversible drop (not a retire) returns
+        # the source. For a capture source, re-park it so the "returned to the
+        # funnel" message is actually true (mission/orphan need no write — they
+        # return structurally now that `archived` is excluded from the suppression
+        # sets). Still under _CAPTURE_INGEST_LOCK. If the capture row is gone
+        # (can't be re-parked), downgrade to an honest "Archived." — the toast must
+        # not claim a return that didn't happen. A retire never re-parks: the work
+        # is done and the source stays consumed.
+        if (not retire
+                and isinstance(promoted_from, dict)
+                and promoted_from.get('kind') == 'capture'):
             if not _return_capture_to_funnel(
                     captures_path, promoted_from.get('capture_id'), now):
                 outcome = _archive_outcome(None)
 
     return {
         'project_id': project_id,
-        'state': 'archived',
+        'state': terminal_state,
         'status': outcome['status'],
         'message': outcome['message'],
         'applied': True,
