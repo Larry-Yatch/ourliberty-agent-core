@@ -4365,6 +4365,45 @@
       "repo": "ourliberty-agent-core",
       "created": "2026-06-21",
       "deferred_reason": null
+    },
+    {
+      "id": "adding-pending-merge-prs-as-a-waiting-source-was-deferred",
+      "name": "Adding pending-merge PRs as a waiting source was deferred.",
+      "phase": "proposed",
+      "brief": "Loose end from the \"System self-awareness - Slice 2a (Waiting on Larry)\" closeout: Adding pending-merge PRs as a waiting source was deferred.",
+      "spec_docs": [],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-22",
+      "deferred_reason": null,
+      "proposed_by": "closeout",
+      "proposed_at": "2026-06-22T01:24:05.125123+00:00"
+    },
+    {
+      "id": "the-dashboard-view-of-the-itemized-waiting-list-and-the-approve-reject-promote-actions-were-deferred-to-the-next-slice",
+      "name": "The dashboard view of the itemized waiting list and the approve/reject/promote actions were deferred to the next slice.",
+      "phase": "proposed",
+      "brief": "Loose end from the \"System self-awareness - Slice 2a (Waiting on Larry)\" closeout: The dashboard view of the itemized waiting list and the approve/reject/promote actions were deferred to the next slice.",
+      "spec_docs": [],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-22",
+      "deferred_reason": null,
+      "proposed_by": "closeout",
+      "proposed_at": "2026-06-22T01:24:05.124711+00:00"
+    },
+    {
+      "id": "the-for-larry-escalations-source-contributes-nothing-in-production-today-because-no-canonical-for-larry-signal-exists-yet-it-needs-to-be-wired-up-once-such-a-signal-lands",
+      "name": "The for-Larry escalations source contributes nothing in production today because no canonical for-Larry signal exists yet; it needs to be wired up once such a signal lands.",
+      "phase": "proposed",
+      "brief": "Loose end from the \"System self-awareness - Slice 2a (Waiting on Larry)\" closeout: The for-Larry escalations source contributes nothing in production today because no canonical for-Larry signal exists yet; it needs to be wired up once such a signal lands.",
+      "spec_docs": [],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-22",
+      "deferred_reason": null,
+      "proposed_by": "closeout",
+      "proposed_at": "2026-06-22T01:24:05.124040+00:00"
     }
   ]
 }
