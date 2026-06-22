@@ -268,9 +268,10 @@ class LoadPolicyTest(unittest.TestCase):
 
 class ShippedDefaultPolicyTest(unittest.TestCase):
     """The default config/trust-policy.json that ships in the repo must parse
-    cleanly and encode the intended autonomy gate (2026-06-21 ladder rung 1):
-    Beacon->Forge agent-core auto_approve, with sensitive paths + every other
-    shape held at force_ask."""
+    cleanly and encode the intended autonomy gate: Beacon->Forge agent-core
+    auto_approve (2026-06-21 rung 1) + pulse-auto-dispatch auto_approve
+    (2026-06-22 rung 2), with sensitive paths + every other shape held at
+    force_ask."""
 
     def test_repo_default_policy_loads_and_encodes_gate(self):
         # Path: <repo>/config/trust-policy.json
@@ -280,13 +281,13 @@ class ShippedDefaultPolicyTest(unittest.TestCase):
         self.assertEqual(policy['default_action'], 'force_ask')
 
         # Three rules, first-match-wins order:
-        #   0: pulse-auto-dispatch                       -> force_ask
+        #   0: pulse-auto-dispatch                       -> auto_approve (2026-06-22)
         #   1: beacon->forge agent-core sensitive paths  -> force_ask (carve-out)
         #   2: beacon->forge agent-core                  -> auto_approve (gate)
         # The carve-out MUST stay ordered before the broad auto_approve.
         self.assertEqual(len(policy['rules']), 3)
         self.assertEqual(policy['rules'][0]['source'], 'pulse-auto-dispatch')
-        self.assertEqual(policy['rules'][0]['action'], 'force_ask')
+        self.assertEqual(policy['rules'][0]['action'], 'auto_approve')
         self.assertEqual(policy['rules'][1]['action'], 'force_ask')
         self.assertEqual(policy['rules'][2]['source'], 'beacon')
         self.assertEqual(policy['rules'][2]['action'], 'auto_approve')
@@ -295,9 +296,11 @@ class ShippedDefaultPolicyTest(unittest.TestCase):
             action, _ = tp.evaluate(task, policy)
             return action
 
-        # pulse-auto-dispatch still asks.
+        # pulse-auto-dispatch now auto-fires (2026-06-22 carve-out): the envelope
+        # only asks Beacon to draft a spec, and Pulse only auto-dispatches small
+        # $-quantified agent-core optimizations. Mirror still gates the merge.
         self.assertEqual(ev(source='pulse-auto-dispatch', target_agent='beacon',
-                            target_repo='ourliberty-agent-core'), 'force_ask')
+                            target_repo='ourliberty-agent-core'), 'auto_approve')
 
         # THE GATE: a fresh Beacon->Forge agent-core build auto-fires, including
         # a code revision (changed_files that aren't sensitive).
@@ -321,6 +324,51 @@ class ShippedDefaultPolicyTest(unittest.TestCase):
         for source, target in [('pulse', 'beacon'), ('mirror', 'beacon')]:
             self.assertEqual(ev(source=source, target_agent=target,
                                 target_repo='ourliberty-agent-core'), 'force_ask')
+
+
+class SummarizePolicyTest(unittest.TestCase):
+    """summarize_policy — the plain-language posture read for the dashboard's
+    read-only autonomy panel (projects-v3 P7.3)."""
+
+    def test_empty_policy_reads_conservative(self):
+        s = tp.summarize_policy(
+            {'version': 1, 'default_action': 'force_ask', 'rules': []})
+        self.assertEqual(s['level'], 'conservative')
+        self.assertEqual(s['auto_starts'], [])
+        # The default-ask line is always present under force_ask.
+        self.assertTrue(any('default' in x for x in s['still_asks']))
+        self.assertEqual(len(s['gates']), 4)
+        self.assertFalse(s['degraded'])
+
+    def test_auto_rule_reads_balanced_and_describes_in_plain_language(self):
+        policy = {
+            'version': 1, 'default_action': 'force_ask',
+            'rules': [
+                {'source': 'pulse-auto-dispatch', 'target': '*',
+                 'action': 'auto_approve'},
+                {'source': 'beacon', 'target': 'forge',
+                 'repos': ['ourliberty-agent-core'],
+                 'file_patterns': ['config/**'], 'action': 'force_ask'},
+                {'source': 'beacon', 'target': 'forge',
+                 'repos': ['ourliberty-agent-core'], 'action': 'auto_approve'},
+            ],
+        }
+        s = tp.summarize_policy(policy)
+        self.assertEqual(s['level'], 'balanced')
+        self.assertIn('Pulse auto-dispatch', s['auto_starts'])
+        self.assertIn('Beacon→Forge builds for ourliberty-agent-core',
+                      s['auto_starts'])
+        # The sensitive-path carve-out reads as a still-asks line.
+        self.assertTrue(any('sensitive paths' in x for x in s['still_asks']))
+        # No raw machine fields / globs leak into the plain-language lines.
+        joined = ' '.join(s['auto_starts'] + s['still_asks'])
+        self.assertNotIn('config/**', joined)
+        self.assertNotIn('auto_approve', joined)
+
+    def test_degraded_policy_flag(self):
+        s = tp.summarize_policy(tp._fail_closed('boom'))
+        self.assertTrue(s['degraded'])
+        self.assertEqual(s['level'], 'conservative')
 
 
 if __name__ == '__main__':

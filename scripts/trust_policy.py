@@ -187,6 +187,103 @@ def evaluate(
     return p.get('default_action', 'force_ask'), None
 
 
+# ---------------- plain-language posture (autonomy visibility) ----------------
+#
+# A read-only summary of the current policy for the dashboard's autonomy panel
+# (projects-v3 P7.3 — "make today's autonomy visible", the seed of the dial).
+# Pure: takes a loaded policy dict, returns a structured plain-language posture.
+# The always-on GATES are CODE invariants (verified in outbox_notifier /
+# drain_board_to_beacon), NOT policy — true at every dial setting — so they're
+# stated as constants, never derived from the rules. The dial removes pre-build
+# clicks; it never removes these.
+
+POLICY_GATES = (
+    'A reviewer (Mirror) signs off before any merge — auto-started work never '
+    'auto-merges unreviewed code.',
+    'Risky work (deploy, data, money, credentials, deletes) is auto-excluded '
+    'from the autonomous lane before it can start.',
+    'The kill switch (EMERGENCY_HALT) and /pause stop everything instantly.',
+    'Any rule reverts in one line — the policy is re-read on every check, no '
+    'restart.',
+)
+
+_AGENT_NAMES = {
+    'beacon': 'Beacon', 'forge': 'Forge', 'mirror': 'Mirror',
+    'pulse': 'Pulse', 'medic': 'Medic', '*': 'any agent',
+    'pulse-auto-dispatch': 'Pulse auto-dispatch',
+}
+
+
+def _agent_name(raw: Any) -> str:
+    s = str(raw) if raw not in (None, '') else '*'
+    return _AGENT_NAMES.get(s.lower(), s)
+
+
+def _describe_rule(rule: dict[str, Any]) -> str:
+    """One terse, operator-facing line for a policy rule — what SHAPE of work it
+    covers (no globs, field names, or risk codes)."""
+    source = _agent_name(rule.get('source'))
+    target = _agent_name(rule.get('target'))
+    repos = rule.get('repos') or []
+    if isinstance(repos, str):
+        repos = [repos]
+    task_type = rule.get('task_type')
+    file_patterns = rule.get('file_patterns') or []
+    if isinstance(file_patterns, str):
+        file_patterns = [file_patterns]
+
+    if source == 'any agent' and target == 'any agent':
+        line = 'Any dispatch'
+        line += f' for {", ".join(repos)}' if repos else ''
+    elif target == 'any agent':
+        # Source-scoped rule (e.g. Pulse auto-dispatch) — the source IS the
+        # meaningful scope; don't tack on a confusing "(any repo)".
+        line = source
+        line += f' for {", ".join(repos)}' if repos else ''
+    else:
+        line = f'{source}→{target} builds'
+        line += f' for {", ".join(repos)}' if repos else ' (any repo)'
+    if task_type and task_type != '*':
+        line += f' ({task_type})'
+    if file_patterns:
+        line += (' that declare they touch sensitive paths (config, deploy, '
+                 'migrations, secrets, kill-switch, account tier)')
+    return line
+
+
+def summarize_policy(policy: dict[str, Any]) -> dict[str, Any]:
+    """Plain-language read of the current autonomy posture for the dashboard's
+    read-only panel. Pure; never raises. A fail-closed/_error policy reads as
+    'everything asks you' (the safe default)."""
+    rules = policy.get('rules') if isinstance(policy.get('rules'), list) else []
+    default_action = policy.get('default_action', 'force_ask')
+
+    auto_starts = [_describe_rule(r) for r in rules
+                   if isinstance(r, dict) and r.get('action') == 'auto_approve']
+    still_asks = [_describe_rule(r) for r in rules
+                  if isinstance(r, dict)
+                  and r.get('action') in ('force_ask', 'reject')]
+    if default_action == 'force_ask':
+        still_asks.append('Everything else — the default is to ask you.')
+
+    if not auto_starts:
+        level = 'conservative'
+        headline = 'Everything asks you. Nothing starts without your go-ahead.'
+    else:
+        level = 'balanced'
+        headline = ('Some low-risk work starts on its own; everything else '
+                    'still asks you.')
+
+    return {
+        'level': level,
+        'headline': headline,
+        'auto_starts': auto_starts,
+        'still_asks': still_asks,
+        'gates': list(POLICY_GATES),
+        'degraded': bool(policy.get('_error')),
+    }
+
+
 def _self_test() -> int:
     """Smoke test runnable as `python3 trust_policy.py`."""
     # Empty policy → force_ask
