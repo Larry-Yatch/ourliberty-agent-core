@@ -22,6 +22,7 @@ import importlib
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -2310,7 +2311,12 @@ class BuildPhaseDispatchTest(unittest.TestCase):
         )
         f = self._write_outbox('forge', 'real-pf-branch.json', outbox)
 
-        on.process_outbox(f)
+        # Fail-open the phantom-build terminal guard (no real `gh` shell-out);
+        # PhantomBuildTerminalGuardTest covers the terminal-state behavior.
+        with mock.patch.object(
+            on, '_gh_terminal_pr_state_for_branch', return_value=None,
+        ):
+            on.process_outbox(f)
 
         forge_builds = list((on.INBOXES_ROOT / 'forge').glob('build-*.json'))
         self.assertEqual(len(forge_builds), 1)
@@ -2609,7 +2615,12 @@ class BuildDedupSpawnFailureOverrideTest(unittest.TestCase):
         self._seed_inbox_archive(task_id)
         self._seed_outbox_result(task_id, self._spawn_failure_result(task_id))
 
-        on._dispatch_build_phase(self._build_data(task_id))
+        # The spawn-failure override falls through to the phantom-build terminal
+        # guard; fail it open (no real `gh`) so this test isolates the override.
+        with mock.patch.object(
+            on, '_gh_terminal_pr_state_for_branch', return_value=None,
+        ):
+            on._dispatch_build_phase(self._build_data(task_id))
 
         # The override fired: a fresh build task is written to the live inbox.
         live = list((on.INBOXES_ROOT / 'forge').glob('build-*.json'))
@@ -2683,6 +2694,225 @@ class BuildDedupSpawnFailureOverrideTest(unittest.TestCase):
             'good-fail', self._spawn_failure_result('good-fail')
         )
         self.assertTrue(on._prior_build_was_spawn_failure('good-fail'))
+
+
+class PhantomBuildTerminalGuardTest(unittest.TestCase):
+    """phantom-build-phase terminal guard (cap-phantom-build-phase-after-marker-
+    error-retry-pr-4d78). A marker-error retry can resume a Forge preflight
+    session and re-discover a STALE `=== PROCEED ===` in the resumed transcript,
+    re-classifying it as a fresh proceed and re-dispatching a build for an
+    ALREADY-TERMINAL task. The GitHub-truth guard in `_dispatch_build_phase`
+    skips the dispatch ONLY when the build branch's PR is in a terminal state
+    (MERGED / CLOSED-unmerged); every other case (OPEN PR / no PR / gh failure /
+    no branch) fails open and dispatches."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',
+            'BLACKBOARD', 'LOG_FILE', 'DEAD_LETTER_STATE',
+            'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+
+        self._rv_root = rv.REPO_ROOT
+        self._rv_models_path = rv.MODELS_CONFIG_PATH
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.MODELS_CONFIG_PATH = rv.REPO_ROOT / 'config' / 'agent-models.json'
+        rv.MODELS_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        rv.MODELS_CONFIG_PATH.write_text(json.dumps({
+            'agents': {
+                'forge': {
+                    'worktree_enabled': True,
+                    'allowed_repos': ['ourliberty-agent-core'],
+                },
+            },
+        }))
+        rv.invalidate_cache()
+        rv.invalidate_models_cache()
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        rv.REPO_ROOT = self._rv_root
+        rv.MODELS_CONFIG_PATH = self._rv_models_path
+        rv.invalidate_cache()
+        rv.invalidate_models_cache()
+        self._tmp.cleanup()
+
+    def _build_data(self, task_id, **overrides):
+        data = {
+            'task_id': task_id,
+            'claude_session_id': 'sess-resume-xyz',
+            'target_repo': 'ourliberty-agent-core',
+            'branch': f'forge/{task_id}',
+        }
+        data.update(overrides)
+        return data
+
+    def _forge_builds(self):
+        return list((on.INBOXES_ROOT / 'forge').glob('build-*.json'))
+
+    def _beacon_notifies(self):
+        return list(
+            (on.INBOXES_ROOT / 'beacon').glob(
+                'notify-phantom-build-suppressed-*.json'
+            )
+        )
+
+    # ---- criterion 1: phantom suppressed on terminal PR ------------------
+
+    def test_phantom_suppressed_when_branch_pr_merged(self):
+        task_id = 'fix-classifier-session-lost-002'
+        with mock.patch.object(
+            on, '_gh_terminal_pr_state_for_branch', return_value='MERGED',
+        ):
+            on._dispatch_build_phase(self._build_data(task_id))
+
+        self.assertEqual(
+            self._forge_builds(), [],
+            msg='a build whose branch already MERGED must not be dispatched',
+        )
+        self.assertIn('PHANTOM_BUILD_SUPPRESSED', on.LOG_FILE.read_text())
+        # Best-effort informational journal to Beacon was written.
+        self.assertEqual(len(self._beacon_notifies()), 1)
+
+    def test_phantom_suppressed_when_branch_pr_closed_unmerged(self):
+        # CLOSED-without-merge is terminal too — also a phantom.
+        task_id = 'closed-unmerged-task'
+        with mock.patch.object(
+            on, '_gh_terminal_pr_state_for_branch', return_value='CLOSED',
+        ):
+            on._dispatch_build_phase(self._build_data(task_id))
+
+        self.assertEqual(self._forge_builds(), [])
+        self.assertIn('PHANTOM_BUILD_SUPPRESSED', on.LOG_FILE.read_text())
+
+    # ---- criterion 2: legitimate paths still dispatch --------------------
+
+    def test_dispatched_when_no_pr_for_branch(self):
+        # No PR for the branch -> None -> fail-open -> dispatch.
+        task_id = 'first-build-task'
+        with mock.patch.object(
+            on, '_gh_terminal_pr_state_for_branch', return_value=None,
+        ):
+            on._dispatch_build_phase(self._build_data(task_id))
+
+        self.assertEqual(len(self._forge_builds()), 1)
+        self.assertNotIn('PHANTOM_BUILD_SUPPRESSED', on.LOG_FILE.read_text())
+
+    def test_dispatched_when_branch_pr_open_replan(self):
+        # An OPEN PR is the legitimate replan/revision re-dispatch — NEVER skip.
+        task_id = 'replan-task'
+        with mock.patch.object(
+            on, '_gh_terminal_pr_state_for_branch', return_value='OPEN',
+        ):
+            on._dispatch_build_phase(self._build_data(task_id))
+
+        self.assertEqual(len(self._forge_builds()), 1)
+        self.assertNotIn('PHANTOM_BUILD_SUPPRESSED', on.LOG_FILE.read_text())
+
+    def test_failopen_when_gh_lookup_raises(self):
+        # daemon-never-wedge: any exception from the lookup -> fail-open.
+        task_id = 'gh-outage-task'
+        with mock.patch.object(
+            on, '_gh_terminal_pr_state_for_branch',
+            side_effect=RuntimeError('gh boom'),
+        ):
+            on._dispatch_build_phase(self._build_data(task_id))
+
+        self.assertEqual(len(self._forge_builds()), 1)
+        self.assertIn('failing open', on.LOG_FILE.read_text())
+
+    def test_dispatched_when_branch_absent(self):
+        # `branch` is optional; absent -> the lookup can't run -> dispatch.
+        # The stub raises to prove the guard never invokes it without a branch.
+        task_id = 'no-branch-task'
+        data = self._build_data(task_id)
+        data.pop('branch')
+        with mock.patch.object(
+            on, '_gh_terminal_pr_state_for_branch',
+            side_effect=AssertionError('lookup must not run without a branch'),
+        ):
+            on._dispatch_build_phase(data)
+
+        self.assertEqual(len(self._forge_builds()), 1)
+        self.assertNotIn('PHANTOM_BUILD_SUPPRESSED', on.LOG_FILE.read_text())
+
+
+class GhTerminalPrStateForBranchTest(unittest.TestCase):
+    """Unit tests for `_gh_terminal_pr_state_for_branch`'s state collapse +
+    fail-open transport handling (mocking the `gh pr list` subprocess)."""
+
+    def _patch_run(self, **kwargs):
+        return mock.patch.object(
+            on.subprocess, 'run', return_value=mock.Mock(**kwargs),
+        )
+
+    def test_open_wins_over_terminal_siblings(self):
+        # A reopened/replanned branch with both a merged and an open PR is OPEN.
+        out = json.dumps([
+            {'number': 1, 'state': 'MERGED'},
+            {'number': 2, 'state': 'OPEN'},
+        ])
+        with self._patch_run(returncode=0, stdout=out, stderr=''):
+            self.assertEqual(
+                on._gh_terminal_pr_state_for_branch('o/r', 'b'), 'OPEN',
+            )
+
+    def test_merged_when_only_merged(self):
+        out = json.dumps([{'number': 1, 'state': 'MERGED'}])
+        with self._patch_run(returncode=0, stdout=out, stderr=''):
+            self.assertEqual(
+                on._gh_terminal_pr_state_for_branch('o/r', 'b'), 'MERGED',
+            )
+
+    def test_closed_when_only_closed_unmerged(self):
+        out = json.dumps([{'number': 1, 'state': 'CLOSED'}])
+        with self._patch_run(returncode=0, stdout=out, stderr=''):
+            self.assertEqual(
+                on._gh_terminal_pr_state_for_branch('o/r', 'b'), 'CLOSED',
+            )
+
+    def test_none_when_no_pr_for_branch(self):
+        with self._patch_run(returncode=0, stdout='[]', stderr=''):
+            self.assertIsNone(on._gh_terminal_pr_state_for_branch('o/r', 'b'))
+
+    def test_none_on_nonzero_exit(self):
+        with self._patch_run(returncode=1, stdout='', stderr='auth required'):
+            self.assertIsNone(on._gh_terminal_pr_state_for_branch('o/r', 'b'))
+
+    def test_none_on_unparseable_output(self):
+        with self._patch_run(returncode=0, stdout='not json', stderr=''):
+            self.assertIsNone(on._gh_terminal_pr_state_for_branch('o/r', 'b'))
+
+    def test_none_on_timeout(self):
+        with mock.patch.object(
+            on.subprocess, 'run',
+            side_effect=subprocess.TimeoutExpired(cmd='gh', timeout=1),
+        ):
+            self.assertIsNone(on._gh_terminal_pr_state_for_branch('o/r', 'b'))
 
 
 # ============================================================================
