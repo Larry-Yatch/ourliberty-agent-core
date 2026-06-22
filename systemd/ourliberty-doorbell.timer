@@ -1,0 +1,15 @@
+[Unit]
+Description=~30-min doorbell tick — nudge Larry when approvals/escalations accrue (a doorbell, not a wall; the script gates the cadence)
+
+[Timer]
+# Small boot offset so it doesn't contend with the round-boundary healers. The
+# 30-min cadence notices an INCREASE promptly; the script's own reminder window
+# (default 4h) gates the steady-state reminder so a constant backlog isn't
+# re-pinged every tick.
+OnBootSec=9min
+OnUnitActiveSec=30min
+Unit=ourliberty-doorbell.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

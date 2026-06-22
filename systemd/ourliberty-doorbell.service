@@ -1,0 +1,35 @@
+[Unit]
+Description=Doorbell notifier — a gentle "N items need your call — check the board" nudge when force_ask approvals + escalations accrue (system self-awareness)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/doorbell_notifier.py
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/docs/system-awareness-north-star.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+# Carries TELEGRAM_ALLOWED_CHAT_IDS — resolves Larry's primary chat for the DM.
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/doorbell_notifier.py
+TimeoutStartSec=60
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-doorbell
+
+# Hardening. READ-ONLY over the world except its own state + log + the
+# larry-alerts queue, all under ~/agents. No git, no Supabase, no agent-core
+# write (it only reads the State Log snapshot + appends a notification).
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+Nice=10
