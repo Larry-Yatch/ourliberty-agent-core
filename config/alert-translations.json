@@ -120,6 +120,12 @@
       "plain_language_summary": "A systemd unit's installed copy under /etc/systemd/system/ had drifted from the repo; the healer re-copied it, daemon-reloaded, and (for a long-running daemon) restarted it so the new content is live. No action needed — surfaced for the record.",
       "recommended_action": "None — already reconciled; verify with `systemctl status <unit>`. Self-healed; details appear in the daily digest. Runbook: runbooks/heal-systemd-install-drift.md."
     },
+    "install-resolved": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "An earlier 🔴 install-drift alert for this unit has CLEARED — the unit is now installed under /etc/systemd/system/ and the stale alert line was retracted from the queue. This is the stand-down for a 🔴 you may have already seen on your phone: the drift reconciled (the post-merge install completed, or it was fixed out-of-band). No action needed.",
+      "recommended_action": "None — stand down. The unit is installed and the prior alert is retracted; confirm with `systemctl status <unit>` if you want. Runbook: runbooks/heal-systemd-install-drift.md."
+    },
     "install-drift": {
       "severity": "URGENT",
       "tier": "NOW",
