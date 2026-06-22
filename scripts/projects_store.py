@@ -838,6 +838,69 @@ def project_is_done(project: dict[str, Any]) -> bool:
     return _project_status(phases) == 'done'
 
 
+# --------------------------------------------------------------------------- #
+# project-level GC reconciliation (projects-stale-gc-archive-completed). The
+# project analogue of the missions GC's terminal-state reconciliation
+# (heal_missions_card_gc reconciliation #5): timer-driven, conservative,
+# idempotent. Phase-level done-stamping is the event-driven writeback's job; THIS
+# is purely PROJECT-level — clear an all-phases-done project off the active board.
+# --------------------------------------------------------------------------- #
+# The audit marker stamped on a project the GC reconciliation retires (vs a human
+# Drop or a mis-promote), so the transition's author is legible in the store.
+GC_RETIRED_BY = 'projects-store-gc'
+
+
+def retire_completed_projects(
+    registry: dict[str, Any], *, now: Optional[datetime] = None,
+) -> tuple[dict[str, Any], list[str]]:
+    """Flip every ACTIVE project whose phases are ALL done to ``retired``, clearing
+    it off the "Actively working" board. Returns ``(registry, retired_ids)`` — the
+    SAME registry object, mutated in place, plus the ids retired this pass (empty
+    on a no-op).
+
+    Conservative + idempotent, mirroring the missions GC terminal reconciliation:
+    a project with ANY non-done phase, OR zero phases, is KEPT unchanged
+    (``project_is_done`` is False for both); an already-``retired``/``archived``
+    project is not ``active`` so it is skipped — a second pass retires nothing new.
+
+    ``retired``, NOT ``archived``, is the terminal state for a COMPLETED project.
+    ``archived`` is the reversible Drop that RELEASES the promoted funnel source
+    back into the funnel (``suppresses_funnel_source`` is False for ``archived``),
+    which would resurrect a finished project's mission/capture/orphan as a funnel
+    zombie. ``retired`` keeps the source suppressed — matching the human "Complete &
+    retire" terminal gesture (``dashboard_api._handle_project_archive``, which sends
+    a Done project to ``retired``).
+
+    Stamps an audit sub-field (``gc``: ``prior_state`` + ``retired_at`` +
+    ``retired_by``) on each retired project and bumps ``updated_at``. PURE over its
+    input (no IO): the SOLE committer (``heal_projects_store``) calls this each tick
+    BEFORE its atomic-write + commit, preserving the single-committer invariant.
+
+    Fail-safe: a malformed (non-dict) project is skipped, never raises — one bad
+    entry never corrupts the registry or wedges the healer."""
+    if not isinstance(registry, dict):
+        return registry, []
+    now_iso = _iso_now(now)
+    retired: list[str] = []
+    for proj in registry.get('projects', []) or []:
+        if not isinstance(proj, dict):
+            continue
+        if proj.get('state', DEFAULT_PROJECT_STATE) != 'active':
+            continue
+        if not project_is_done(proj):
+            continue
+        proj['gc'] = {
+            'prior_state': proj.get('state', DEFAULT_PROJECT_STATE),
+            'retired_at': now_iso,
+            'retired_by': GC_RETIRED_BY,
+        }
+        proj['state'] = 'retired'
+        proj['updated_at'] = now_iso
+        pid = proj.get('id')
+        retired.append(pid if isinstance(pid, str) else '<unidentifiable>')
+    return registry, retired
+
+
 def build_pipeline(
     projects: list[dict[str, Any]], now: Optional[datetime] = None,
 ) -> list[dict[str, Any]]:
