@@ -8260,7 +8260,7 @@ def _route_beacon_pulse_auto_dispatch_approval(
             approval.dispatch_approved(entry)
             approval.resolve(
                 entry['id'], 'approved',
-                note=f'auto_approved by rule (pulse-auto-dispatch): {rule}',
+                note=f'auto_approved by rule ({policy_source}): {rule}',
             )
             log(
                 f'beacon pulse-auto-dispatch auto-approved + dispatched: '
@@ -9616,6 +9616,45 @@ def process_outbox(outbox_file: Path) -> str:
         ):
             _archive_outbox(outbox_file)
             return 'notified-pulse-direction-ask'
+
+    # Board-delegate dispatch route (autonomy-visibility keystone, 2026-06-21)
+    # — Beacon outbox responding to a board "Delegate to team" envelope
+    # (source='dashboard'). The dashboard delegate endpoint
+    # (_handle_capture_delegate) and the board-drain (drain_board_to_beacon)
+    # both drop a proposal into Beacon's inbox with source='dashboard'; Beacon
+    # scopes it and emits an APPROVAL_REQUEST marker targeting Forge. Before
+    # this branch that marker matched NEITHER the auto-dispatch set (pulse)
+    # NOR the trusted set (larry/orchestrator, below), so it fell through to a
+    # dead-end notify and the proposal NEVER reached Forge — the gap that left
+    # the board-drain scoping work that never built (found live 2026-06-21)
+    # and the manual Delegate button incomplete (missions-v2-delegate-fix.md).
+    #
+    # Route it through the SAME trust-gated extraction pipeline as the pulse
+    # paths, with three dashboard accommodations:
+    #   - policy_source='beacon': evaluate trust as a Beacon→Forge dispatch so
+    #     the live agent-core auto_approve rule (source=beacon) applies — the
+    #     board's whole purpose is to feed the team's autonomous lane. This
+    #     mirrors approval.trust_decision, which hardcodes source='beacon' for
+    #     the chat path; the autonomy_decision chain_event is recorded with
+    #     source='beacon' too, consistent with the chat dispatch it matches.
+    #   - chat_id_fallback=_primary_chat_id(): board envelopes carry
+    #     reply_chat_id=null (no chat thread), so a force_ask DM / auto-approve
+    #     confirmation / rejection falls back to the default Larry chat rather
+    #     than dropping the approval.
+    #   - enforce_task_id_match=False: the marker proposes a NEW scoped task
+    #     whose task_id legitimately differs from the `delegate-{capture_id}`
+    #     envelope task_id (mirrors the direction-ask + headless paths).
+    # A markerless / non-Forge dashboard result returns False and falls through
+    # to default routing unchanged.
+    if agent == 'beacon' and source == 'dashboard':
+        if _route_beacon_pulse_auto_dispatch_approval(
+            data,
+            policy_source='beacon',
+            chat_id_fallback=_primary_chat_id(),
+            enforce_task_id_match=False,
+        ):
+            _archive_outbox(outbox_file)
+            return 'notified-board-delegate'
 
     # Task #17 (2026-05-19) — headless Beacon APPROVAL_REQUEST handler.
     # When Claude in a Larry-session drops a dispatch envelope into Beacon's

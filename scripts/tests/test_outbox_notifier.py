@@ -7002,6 +7002,331 @@ class BeaconPulseDirectionAskTest(unittest.TestCase):
         self.assertEqual(pending[0]['chat_id'], 12345)
 
 
+# -------------------- autonomy-visibility keystone: board-delegate route (2026-06-21) --------------------
+
+
+class BeaconBoardDelegateTest(unittest.TestCase):
+    """The board-delegate dispatch route. A Beacon outbox responding to a board
+    "Delegate to team" envelope (source='dashboard' — emitted by the dashboard
+    delegate endpoint or the board-drain) carrying an APPROVAL_REQUEST marker
+    must be extracted + trust-gated through the SAME pipeline as the pulse
+    paths, with the dashboard accommodations:
+
+      - trust is evaluated as a Beacon→Forge dispatch (policy_source='beacon'),
+        NOT source='dashboard', so the live agent-core auto_approve rule
+        applies — the keystone that un-blocks the board-drain + the manual
+        Delegate button (both previously dead-ended at a notify-back);
+      - reply_chat_id=null falls back to the default Larry chat;
+      - the marker proposes a NEW scoped task whose task_id differs from the
+        `delegate-{capture_id}` envelope task_id (no mismatch gate).
+
+    A markerless / non-Forge dashboard result still falls through to default
+    routing. Setup/teardown mirrors BeaconPulseDirectionAskTest (it shares the
+    chat-fallback + task_id-authoritative accommodations)."""
+
+    _DEFAULT_LARRY_CHAT = 7998341473
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',
+            'BLACKBOARD', 'LOG_FILE', 'DEAD_LETTER_STATE',
+            'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+        self._rv_root = rv.REPO_ROOT
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.invalidate_cache()
+        import larry_alerts as la
+        self._la_originals = {
+            'AGENTS_ROOT': la.AGENTS_ROOT,
+            'ALERTS_FILE': la.ALERTS_FILE,
+            'COOLDOWN_ROOT': la.COOLDOWN_ROOT,
+            'OFFSET_FILE': la.OFFSET_FILE,
+        }
+        la.AGENTS_ROOT = self._root
+        la.ALERTS_FILE = self._root / 'blackboard' / 'larry-alerts.jsonl'
+        la.COOLDOWN_ROOT = self._root / 'state' / 'alert-cooldown'
+        la.OFFSET_FILE = self._root / 'state' / 'beacon-alerts-offset.txt'
+        self._la = la
+        import beacon_approval_handler as ah
+        self._ah_original = ah.PENDING_APPROVALS_PATH
+        ah.PENDING_APPROVALS_PATH = self._root / 'state' / 'pending-approvals.json'
+        self._ah = ah
+        import trust_policy as tp
+        self._tp = tp
+        self._tp_original_runtime = tp.RUNTIME_POLICY_PATH
+        self._tp_original_repo = tp.REPO_POLICY_PATH
+        tp.RUNTIME_POLICY_PATH = self._root / 'trust-policy.json'
+        tp.REPO_POLICY_PATH = self._root / 'trust-policy-repo.json'
+        self._chat_env_backup = os.environ.get('TELEGRAM_ALLOWED_CHAT_IDS')
+        os.environ['TELEGRAM_ALLOWED_CHAT_IDS'] = str(self._DEFAULT_LARRY_CHAT)
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        for name, value in self._la_originals.items():
+            setattr(self._la, name, value)
+        self._ah.PENDING_APPROVALS_PATH = self._ah_original
+        self._tp.RUNTIME_POLICY_PATH = self._tp_original_runtime
+        self._tp.REPO_POLICY_PATH = self._tp_original_repo
+        rv.REPO_ROOT = self._rv_root
+        rv.invalidate_cache()
+        if self._chat_env_backup is None:
+            os.environ.pop('TELEGRAM_ALLOWED_CHAT_IDS', None)
+        else:
+            os.environ['TELEGRAM_ALLOWED_CHAT_IDS'] = self._chat_env_backup
+        self._tmp.cleanup()
+
+    def _set_policy(self, default_action='force_ask', rules=None):
+        policy = {
+            'version': 1,
+            'default_action': default_action,
+            'rules': rules or [],
+        }
+        self._tp.RUNTIME_POLICY_PATH.parent.mkdir(parents=True, exist_ok=True)
+        self._tp.RUNTIME_POLICY_PATH.write_text(json.dumps(policy))
+
+    def _write_outbox(self, agent, name, body):
+        outbox_dir = on.OUTBOXES_ROOT / agent
+        outbox_dir.mkdir(parents=True, exist_ok=True)
+        f = outbox_dir / name
+        f.write_text(json.dumps(body))
+        return f
+
+    def _read_alerts(self):
+        if not self._la.ALERTS_FILE.exists():
+            return []
+        lines = self._la.ALERTS_FILE.read_text().splitlines()
+        return [json.loads(line) for line in lines if line.strip()]
+
+    def _delegate_outbox(
+        self,
+        marker_text=None,
+        narrative_prefix='Scoped the board-delegated capture below.',
+        reply_chat_id=None,
+        envelope_task_id='delegate-cap-projects-pm-layer-data-is-stale',
+        marker_task_id='cap-projects-pm-layer-data-is-stale-001',
+        **overrides,
+    ):
+        """Synthetic Beacon outbox answering a board-delegate envelope.
+        source='dashboard'; reply_chat_id=null (board action, no chat thread);
+        the marker proposes a NEW scoped task whose task_id differs from the
+        `delegate-{capture_id}` envelope task_id."""
+        if marker_text is None:
+            marker_text = _beacon_approval_request_marker(task_id=marker_task_id)
+        result = (
+            f'{narrative_prefix}\n\n{marker_text}'
+            if marker_text else narrative_prefix
+        )
+        body = _good_outbox(
+            agent='beacon',
+            source='dashboard',
+            task_id=envelope_task_id,
+            result=result,
+        )
+        body['reply_chat_id'] = reply_chat_id
+        body.update(overrides)
+        return body
+
+    # ----- happy path: marker extracted, force_ask queued on fallback chat -----
+
+    def test_delegate_marker_extracted_and_force_ask_queued(self):
+        body = self._delegate_outbox()
+        f = self._write_outbox('beacon', 'beacon-bd.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-board-delegate')
+        state = self._ah.load_state()
+        pending = state.get('pending', [])
+        self.assertEqual(len(pending), 1)
+        entry = pending[0]
+        # Marker task_id is authoritative (NOT the delegate-... envelope id).
+        self.assertEqual(entry['id'], 'cap-projects-pm-layer-data-is-stale-001')
+        # reply_chat_id=null → fell back to the default Larry chat.
+        self.assertEqual(entry['chat_id'], self._DEFAULT_LARRY_CHAT)
+        alerts = self._read_alerts()
+        approval_records = [a for a in alerts if a.get('kind') == 'approval_request']
+        self.assertEqual(len(approval_records), 1)
+        self.assertEqual(approval_records[0]['chat_id'], self._DEFAULT_LARRY_CHAT)
+        self.assertEqual(
+            approval_records[0]['approval_id'],
+            'cap-projects-pm-layer-data-is-stale-001',
+        )
+
+    # ----- KEYSTONE: trust is evaluated as source='beacon', so the live -----
+    # ----- agent-core auto_approve rule fires for a dashboard-sourced result -----
+
+    def test_trust_evaluated_as_beacon_source_auto_approves(self):
+        # The ONLY auto_approve rule keys source='beacon'. A dashboard-sourced
+        # result reaching auto_approve PROVES the route evaluates trust with
+        # policy_source='beacon' (had it passed source='dashboard', no rule
+        # would match and it would fall to the force_ask default).
+        self._set_policy(
+            default_action='force_ask',
+            rules=[{
+                'source': 'beacon',
+                'target': 'forge',
+                'repos': ['ourliberty-agent-core'],
+                'action': 'auto_approve',
+            }],
+        )
+        body = self._delegate_outbox()
+        f = self._write_outbox('beacon', 'beacon-bd-aa.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-board-delegate')
+        state = self._ah.load_state()
+        # auto_approve resolved the entry (no longer pending) + dispatched.
+        self.assertEqual(len(state.get('pending', [])), 0)
+        self.assertEqual(len(state.get('history', [])), 1)
+        forge_tasks = list(
+            (on.INBOXES_ROOT / 'forge').glob(
+                'cap-projects-pm-layer-data-is-stale-001.json'))
+        self.assertEqual(len(forge_tasks), 1)
+        # Auto-approve confirmation DM queued on the fallback chat.
+        alerts = self._read_alerts()
+        notifs = [a for a in alerts if a.get('kind') == 'notification']
+        self.assertEqual(len(notifs), 1)
+        self.assertEqual(notifs[0]['intent'], 'review-pass')
+
+    # ----- a dashboard-keyed rule must NOT match (we evaluate as beacon) -----
+
+    def test_dashboard_keyed_rule_does_not_match(self):
+        # Inverse of the keystone test: a rule keyed source='dashboard' must
+        # NOT fire, because the route deliberately evaluates as 'beacon'. The
+        # result falls to the force_ask default → no Forge dispatch.
+        self._set_policy(
+            default_action='force_ask',
+            rules=[{'source': 'dashboard', 'action': 'auto_approve'}],
+        )
+        body = self._delegate_outbox()
+        f = self._write_outbox('beacon', 'beacon-bd-noaa.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-board-delegate')
+        state = self._ah.load_state()
+        self.assertEqual(len(state.get('pending', [])), 1)
+        forge_tasks = list((on.INBOXES_ROOT / 'forge').glob('*.json'))
+        self.assertEqual(len(forge_tasks), 0)
+
+    # ----- autonomy_decision chain_event records the dispatch (source=beacon) -----
+
+    def test_autonomy_decision_recorded_with_beacon_source(self):
+        self._set_policy(
+            default_action='force_ask',
+            rules=[{
+                'source': 'beacon',
+                'target': 'forge',
+                'repos': ['ourliberty-agent-core'],
+                'action': 'auto_approve',
+            }],
+        )
+        emitted = []
+
+        def _spy_emit(**kwargs):
+            emitted.append(kwargs)
+
+        body = self._delegate_outbox()
+        f = self._write_outbox('beacon', 'beacon-bd-ad.json', body)
+        with mock.patch.object(on.chain_event_emit, 'emit_event', _spy_emit):
+            result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-board-delegate')
+        autonomy = [e for e in emitted if e.get('event_type') == 'autonomy_decision']
+        self.assertEqual(len(autonomy), 1)
+        payload = autonomy[0]['payload']
+        self.assertEqual(payload['decision'], 'auto_approve')
+        self.assertTrue(payload['dispatched'])
+        # source attributes the trust evaluation: 'beacon', consistent with
+        # the chat dispatch this now matches (NOT 'dashboard').
+        self.assertEqual(payload['source'], 'beacon')
+        self.assertEqual(payload['target_repo'], 'ourliberty-agent-core')
+        self.assertIsNotNone(payload['matched_rule'])
+
+    # ----- trust_policy reject → DM Larry the rejection -----
+
+    def test_trust_policy_reject_queues_rejection_dm(self):
+        self._set_policy(default_action='reject')
+        body = self._delegate_outbox()
+        f = self._write_outbox('beacon', 'beacon-bd-rej.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-board-delegate')
+        state = self._ah.load_state()
+        self.assertEqual(len(state.get('pending', [])), 0)
+        alerts = self._read_alerts()
+        notifs = [a for a in alerts if a.get('kind') == 'notification']
+        self.assertEqual(len(notifs), 1)
+        self.assertEqual(notifs[0]['intent'], 'reject')
+
+    # ----- regression: markerless dashboard result falls through -----
+
+    def test_no_marker_falls_through_to_default_notify(self):
+        body = self._delegate_outbox(marker_text='')
+        f = self._write_outbox('beacon', 'beacon-bd-noop.json', body)
+        result = on.process_outbox(f)
+        self.assertNotEqual(result, 'notified-board-delegate')
+        state = self._ah.load_state()
+        self.assertEqual(len(state.get('pending', [])), 0)
+        alerts = self._read_alerts()
+        approval_records = [a for a in alerts if a.get('kind') == 'approval_request']
+        self.assertEqual(len(approval_records), 0)
+
+    # ----- regression: malformed marker falls through cleanly -----
+
+    def test_malformed_marker_falls_through(self):
+        bad_payload = json.dumps({'task_id': 'x'})  # missing required fields
+        bad_marker = (
+            f'=== APPROVAL_REQUEST ===\n{bad_payload}\n'
+            f'=== END_APPROVAL_REQUEST ==='
+        )
+        body = self._delegate_outbox(marker_text=bad_marker)
+        f = self._write_outbox('beacon', 'beacon-bd-bad.json', body)
+        result = on.process_outbox(f)
+        self.assertNotEqual(result, 'notified-board-delegate')
+        state = self._ah.load_state()
+        self.assertEqual(len(state.get('pending', [])), 0)
+
+    # ----- fallback unavailable: no chat env → fall through (don't drop) -----
+
+    def test_no_chat_fallback_available_falls_through(self):
+        os.environ.pop('TELEGRAM_ALLOWED_CHAT_IDS', None)
+        body = self._delegate_outbox()
+        f = self._write_outbox('beacon', 'beacon-bd-nochat.json', body)
+        result = on.process_outbox(f)
+        self.assertNotEqual(result, 'notified-board-delegate')
+        state = self._ah.load_state()
+        self.assertEqual(len(state.get('pending', [])), 0)
+
+    # ----- explicit reply_chat_id honored over the fallback -----
+
+    def test_explicit_reply_chat_id_used_when_present(self):
+        body = self._delegate_outbox(reply_chat_id=12345)
+        f = self._write_outbox('beacon', 'beacon-bd-explicit.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-board-delegate')
+        state = self._ah.load_state()
+        pending = state.get('pending', [])
+        self.assertEqual(len(pending), 1)
+        self.assertEqual(pending[0]['chat_id'], 12345)
+
+
 # -------------------- D3.5 5c-followup-2 (audit C-1 + C-2 + Miss #3) --------------------
 
 
