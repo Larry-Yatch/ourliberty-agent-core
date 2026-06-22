@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "identity": {
+    "id": "projects-v3-universal-card",
+    "capability_name": "Universal plain-language work card + project lifecycle (funnel -> pipeline -> brainstorm -> spec -> build -> closeout)",
+    "north_star_ref": "docs/projects-tab-v3-north-star.md §8 (reuse / shelf descriptor — the durability mandate)",
+    "source_repos": [
+      "ourliberty-agent-core (authoring: Narrator/closeout/brainstorm authors, projects_store model, trust_policy, dashboard_api card-chat backend)",
+      "ourliberty-dashboard (rendering: the funnel card + meaning layer + lane adapters)"
+    ],
+    "consumers": [
+      "Missions/Projects tab (first consumer — the surface the capability was authored on)",
+      "Approvals tab (first NEW adopter — projects-v3 P7, the proof that the capability generalizes)",
+      "Operations / Alerts tabs (intended later adopters once they have a first-class decision-item model)",
+      "Future products (e.g. RSDPM) that need a plain-language work pipeline"
+    ]
+  },
+  "capability_statement": "One reusable process that turns any unit of work into a plain-English card a non-engineer can act on, and (for committed work) into a project that flows through a visible lifecycle. The FUNNEL side renders everything not yet committed (parked items, team suggestions, leftover orphans) as a single card that says, in the operator's terms, what it is / why it matters / how careful to be / what we suggest, with a one-click action set whose clicks dispatch REAL work rather than minting inert records. The PIPELINE side renders committed work as Projects, each a North-Star reference plus an ordered list of Phases moving Brainstorm -> Spec -> Building -> Done (a one-off is a single-phase project, no ceremony). Entering BRAINSTORM, a phase arrives pre-filled with an AI draft + a capped list of the genuine operator decisions + a deterministic handoff payload. SPEC and BUILD ride the existing dispatch/approval/DAG machinery. On verified merge, a dedicated CLOSEOUT pass authors a plain-language summary back onto the card (what shipped, what changed vs spec, learnings, cost, done-gate met) and can spawn bounded follow-ups back into the funnel — so the next phase always opens with context and the board is never stale. The whole thing speaks one plain-language grammar (absence renders as neutral, never raw machine fields) and surfaces a read-only risk/autonomy disposition off the trust policy so the dial is visible before it ever acts.",
+  "contracts": [
+    {
+      "name": "normalized card view-model (FunnelItem)",
+      "kind": "data-shape",
+      "description": "Every lane/surface normalizes its own wire type into ONE FunnelItem view-model (id, source, title, last_touched, label, status_badge, aging, pr_url, briefing/risk/risk_note/recommended_action). The card never sees a raw lane/surface type. A new surface plugs in by writing one adapter to this shape; the card stays surface-agnostic.",
+      "generic_or_surface_specific": "generic"
+    },
+    {
+      "name": "source -> FunnelItem adapter",
+      "kind": "adapter",
+      "description": "Per-source pure function (parkedToFunnelItem / suggestedToFunnelItem / orphanToFunnelItem today; approvalToFunnelItem next) that maps a surface's wire object into the normalized card shape. This is the surface seam — the adapter + the action set carry the per-surface difference; the card learns nothing about the surface.",
+      "generic_or_surface_specific": "surface-specific"
+    },
+    {
+      "name": "pluggable action set",
+      "kind": "action-set",
+      "description": "The card takes an action-set descriptor as a slot/prop (funnel: Delegate/Snooze/Drop/Talk/Promote; approvals: Approve/Reject/Comment/Mark-done). Actions dispatch real work through the surface's own action endpoint. The card does NOT branch internally per surface; surface differences live in the action set, not in the card.",
+      "generic_or_surface_specific": "surface-specific"
+    },
+    {
+      "name": "meaning-layer briefing (what/why/suggest + risk dial)",
+      "kind": "ui-grammar",
+      "description": "Plain-language briefing + risk badge + risk note, namespace+id parameterized so testids stay surface-scoped. Absence renders as NEUTRAL (no Narrator briefing => show the request text + a neutral state, never garbage or raw metadata). Every surface keeps this same grammar (North Star §4.10): no raw machine fields, absence is legal, no bare accept/dismiss.",
+      "generic_or_surface_specific": "generic"
+    },
+    {
+      "name": "card-chat (Talk-to-team) backend",
+      "kind": "data-shape",
+      "description": "dashboard_api._CARD_KIND_META keys chat on a generic kind (id_key, noun, thread_url) over _post_card_message / _card_thread_messages. Adding a surface's chat is one meta entry + two thin find/404 routes (the P6.1 'phase' kind is the precedent). Optional per surface — only needed when two-way conversation on items is wanted.",
+      "generic_or_surface_specific": "generic"
+    },
+    {
+      "name": "project + phase lifecycle model",
+      "kind": "data-shape",
+      "description": "projects_store defines the registry: a Project = North-Star ref + ordered Phases; a Phase has a Desired End State, a lifecycle_state (brainstorm/spec/building/done), and optional spec_ref/sequence_ref. Legal transitions are forward-by-one, any-backward, or no-op — never a skip. Reusable as the file-backed pipeline model for any agent-OS surface or product.",
+      "generic_or_surface_specific": "generic"
+    },
+    {
+      "name": "closeout trigger + schema",
+      "kind": "event-trigger",
+      "description": "On SEQUENCE_COMPLETE (a phase reaching Done) the closeout author runs ONCE, gathers the merged diff + PR bodies/commits + spec + North Star, and writes the structured closeout (shipped / changed_vs_spec / learnings / cost / done_gate_met) onto the card; it can drop bounded, deduped follow-ups into the funnel. Event-driven, never a clock.",
+      "generic_or_surface_specific": "generic"
+    },
+    {
+      "name": "authoring-vs-render split",
+      "kind": "authoring-render-split",
+      "description": "All plain-language authoring (briefings, brainstorm drafts, closeouts) happens agent-side via the Narrator family with a deterministic fallback (the LLM is never load-bearing); the dashboard only RENDERS. A new surface reuses the authoring family and supplies what context the Narrator reads — it does not build a second authoring engine.",
+      "generic_or_surface_specific": "generic"
+    },
+    {
+      "name": "read-only autonomy disposition",
+      "kind": "data-shape",
+      "description": "Each card exposes a risk-derived disposition ('would auto-pass at the loose setting' / 'always needs you') read off trust_policy (config/trust-policy.json, re-read every call) and the Narrator's safe/medium/careful mapping. Read-only in this cut: it shows the dial before it ever acts; no write path, no policy mutation from the card.",
+      "generic_or_surface_specific": "generic"
+    }
+  ],
+  "reuse_mode": {
+    "mode": "assembly-of-shelf-components",
+    "rationale": "Most of the spine is already generic and catalogued: the meaning layer (BriefingBlock/RiskBadge/RiskNote) is namespace-parameterized, the clarify drawer/reply box are pure and label-overridable (and the reply box already lives under app/approvals/components/), the capture action bar is action-agnostic, the card-chat backend is already kind-generic, and trust_policy already evaluates the autonomy dial. A new surface is therefore ASSEMBLY: write one source->FunnelItem adapter + one action-set descriptor (+ optionally one _CARD_KIND_META entry for chat) and reuse everything else. The only greenfield in P7 was THIS descriptor; adopting the capability on a new surface is not a rebuild."
+  },
+  "reuse_boundary": {
+    "generic": [
+      "The universal card itself (layout + the meaning-layer briefing: what/why/suggest + risk dial) — same on every surface, namespace+id parameterized so testids stay scoped.",
+      "The Narrator authoring family (briefings, brainstorm pre-fill, closeout) with its deterministic fallback — one voice/model, reused, never re-implemented per surface.",
+      "The risk/autonomy disposition off trust_policy (read-only) — same evaluator and same safe/medium/careful mapping everywhere.",
+      "The card-chat / Talk-to-team backend (_CARD_KIND_META over _post_card_message / _card_thread_messages) — kind-generic, one meta entry per new surface.",
+      "The doorbell pattern (Telegram is just a notifier; the dashboard is the act-on surface and stays a non-committer).",
+      "The project/phase lifecycle model (projects_store) — Brainstorm->Spec->Building->Done, forward/backward/no-op transitions, single-phase one-offs.",
+      "The closeout pass (event-driven, structured schema, feeds-forward, bounded follow-ups).",
+      "The brainstorm template + auto-fill (the 8-section draft + capped 'Your decisions' + deterministic handoff payload)."
+    ],
+    "surface_specific": [
+      "WHICH REGISTRY the items live in (parked/suggested/orphan captures for the funnel; the approvals pending bucket for Approvals; each future tab's own item model).",
+      "THE AVAILABLE ACTIONS (the action-set descriptor: Delegate/Snooze/Drop/Talk/Promote for the funnel vs Approve/Reject/Comment/Mark-done for Approvals), including any event-type-gated affordances that should stay surface-local rather than bloat the generic card.",
+      "THE CONTEXT THE NARRATOR READS to author the briefing for that surface (a capture's fields vs an approval request's prompt/question/message); risk/recommended_action stay optional and absence renders neutral."
+    ]
+  },
+  "seams": [
+    "source -> FunnelItem adapter seam (dashboard lib/funnel.ts): each lane/surface goes through an adapter into the ONE FunnelItem shape; the card never touches a raw wire type — this is the seam a new surface plugs into (mirrors the funnel component card's adapter seam).",
+    "@/lib/types view-model seam: FunnelItem + the per-surface wire types; a field change ripples to the adapters and the card (mirrors funnel card seam).",
+    "_CARD_KIND_META chat seam (agent-core dashboard_api): adding a surface's two-way thread = one kind entry (id_key/noun/thread_url) + two thin find/404 routes over _post_card_message / _card_thread_messages (the P6.1 'phase' kind precedent).",
+    "projects.json registry-shape seam (agents/beacon/projects.json): the Project+Phase schema both heal_projects_store (sole writer) and dashboard_api (reader) bind to; a shape change is a coordinated edit (mirrors projects_store seam).",
+    "promoted_from provenance seam: the {kind, ...} back-reference that suppresses a promoted item from its source lane and makes Promote reversible (mirrors projects_store seam).",
+    "missions.json / source-store read-only seam: the pipeline mirror CONSUMES the source store but NEVER writes it — Promote and the mirror only mint projects (mirrors projects_store invariant).",
+    "build-sequence id seam (seq-<id>-step-* task_ids): pins a phase's sequence_ref so DAG status + closeout trigger are real (mirrors projects_store + closeout seams).",
+    "SEQUENCE_COMPLETE trigger seam (agent-core outbox_notifier -> projects_closeout_author.run_closeout_for_sequence): the once-claimed event that fires the closeout (mirrors closeout card seam).",
+    "Narrator authoring seam (agent-core missions_narrator): the closeout and brainstorm authors EXTEND the Narrator's LLM-voice-with-deterministic-fallback pattern; BY/MODEL inherited — one voice, not a second engine (mirrors closeout + brainstorm card seams).",
+    "gh/git context seam: the closeout reads merged diff + PR bodies/commits + spec + North Star via subprocess to ground its summary (mirrors closeout card seam).",
+    "North Star status-tracker seam: closeout ticks the phase row to done by phase tokens, not a blind replace (mirrors closeout card seam).",
+    "funnel intake seam (proposed-missions registry): closeout drops bounded, deduped follow-ups back into the funnel, closing the cycle (mirrors closeout card seam).",
+    "deterministic handoff-payload seam (agent-core brainstorm author -> dashboard brainstorm card): the spec_target_path/target_repo/north_star_ref/prior_closeout_summary/directive payload is assembled agent-side, never on the button, never by the LLM (mirrors brainstorm card seam).",
+    "trust_policy seam (config/trust-policy.json, re-read every call -> Narrator safe/medium/careful): the autonomy-dial disposition reads this; it does not invent a policy engine.",
+    "action-dispatch seam (the surface's own action endpoint, e.g. /api/approvals/action via the droplet): card clicks dispatch real work through the single-committer path; the dashboard stays a non-committer."
+  ],
+  "invariants": [
+    "Plain language always; absence renders neutral. No raw machine fields on a card; a missing briefing shows the request text + a neutral state, never garbage. No bare accept/dismiss (North Star §4.10). (Mirrors the meaning-layer + brainstorm no-raw-metadata-leak rule.)",
+    "Actions dispatch real work, never mint inert records. Promote/Delegate/Approve set real work in motion; the board does not create records nobody builds (North Star §0/§4).",
+    "Single-committer preserved. The pipeline registry has exactly ONE git committer (heal_projects_store); the on-disk phase-status writeback is a non-committer writer; the dashboard is read-only/non-committer. A new surface must not add a second committer. (Mirrors projects_store + closeout + brainstorm invariants.)",
+    "Doorbell, not control plane. Telegram only notifies; the act-on surface is the dashboard, and writes go through the surface's action endpoint -> the droplet single-committer. (Mirrors the non-committer + doorbell rule.)",
+    "Lifecycle transitions are forward-by-one / any-backward / no-op — never a skip. The inter-stage gates are the point of the lifecycle. (Mirrors projects_store invariant.)",
+    "Promote is a move, not a copy. new_single_phase_project never duplicates the source; the caller removes it from its lane and the promoted_from back-ref makes the move reversible. (Mirrors projects_store invariant.)",
+    "The pipeline mirror is idempotent + reversible and NEVER writes the source store. A dropped/archived project never resurrects; the source store stays the system of record. (Mirrors projects_store invariant.)",
+    "Closeout is a separate board-side pass, not the build team's duty, and fires on a real terminal signal (verified merge / SEQUENCE_COMPLETE), never a clock. (Mirrors closeout invariant + North Star §5.)",
+    "Don't auto-drop unmerged work. Orphan/auto-drop fires only on a real terminal signal (PR merged/closed); anything unresolved stays and gets briefed. (North Star §5.)",
+    "LLM is never load-bearing. Every authoring step (briefing/brainstorm/closeout) has a deterministic fallback and runs head-less + under test; bounded source streams + capped outputs keep prompt cost and funnel impact bounded. (Mirrors closeout + brainstorm invariants.)",
+    "Authoring outputs are bounded + deduped. Follow-ups capped (<=10) and deduped against existing ids; operator-decision forks capped (<=5); excerpts/diffs capped. (Mirrors closeout + brainstorm invariants.)",
+    "The autonomy dial is advisory-only here. The disposition reads 'would auto-pass IF the dial were loose' — it never implies anything auto-fired; no write path, no policy mutation from the card. (Spec §4.)",
+    "Don't over-abstract the card. It takes a normalized item + an action-set descriptor; it does NOT grow a config DSL. A bespoke affordance the generic card can't express stays surface-local rather than bloating the card. (Spec §4.)",
+    "Behavior-preserving generalization. Lifting the funnel card into a surface-agnostic component must not change the first consumer (same testids, same actions, same thread); its component test suite is the regression gate. (Spec §4.)"
+  ],
+  "components": [
+    {"component_id": "projects_store", "role": "Pure data-model: Project+Phase schema, lifecycle state machine, idempotent normalization, new_single_phase_project (the Promote/mirror shape), mirror_missions_as_projects, build_pipeline derive.", "layer": "generic"},
+    {"component_id": "projects_closeout_author", "role": "P4 closeout pass: Narrator-extended, SEQUENCE_COMPLETE-driven; authors the structured closeout from merged diff/PR/spec/North Star, ticks the tracker, drops bounded follow-ups to the funnel.", "layer": "generic"},
+    {"component_id": "projects_brainstorm_author", "role": "P6 brainstorm auto-fill: Narrator-extended; pre-fills the 8-section draft + capped operator decisions + the deterministic handoff payload when a phase enters Brainstorm.", "layer": "generic"},
+    {"component_id": "projects_status_writeback", "role": "Event-driven on-disk writer of phase status stamps (the non-committer writer half of the single-committer discipline).", "layer": "generic"},
+    {"component_id": "funnel", "role": "Dashboard view-model adapters: normalize each lane's wire type into the one FunnelItem the single card renders. The adapter pattern IS the surface seam.", "layer": "surface-specific"},
+    {"component_id": "dashboard_api", "role": "Read surface + kind-generic card-chat backend (_CARD_KIND_META / _post_card_message / _card_thread_messages); the pipeline derive read path.", "layer": "generic"},
+    {"component_id": "build_sequence_validator", "role": "The DAG build machinery the Build stage rides (sequence schema + validation); Spec->Build->merge flows through it.", "layer": "generic"}
+  ],
+  "runtime_coupling": {
+    "status": "none",
+    "note": "Documentation artifact. Nothing in the running system reads this descriptor at runtime in this cut (North Star §8; spec §5.4 — 'Descriptor is documentation, not a coupling'). It is kept honest by mirroring the REAL seams/invariants of the components it catalogs (the ourliberty-graph per-component cards + the projects-v3 specs), reviewed at authoring time — not by being load-bearing config. If a future cut wants the shelf to drive behavior, that is a deliberate separate step."
+  },
+  "provenance": {
+    "authored_at_commit": "ourliberty-agent-core forge/p7-shelf-descriptor (branch off origin/main @ 36335119 spec(projects-v3) P7 #634)",
+    "model": "claude-opus-4-8",
+    "confidence": "high — seams/invariants mirrored directly from the ourliberty-graph per-component descriptors read byte-level (projects_store, projects_closeout_author, projects_brainstorm_author, funnel) plus the spec and North Star; capability statement + reuse boundary taken verbatim from North Star §8 + spec §3. The generic-vs-surface-specific split is the spec's, grounded in the components' own layer placement.",
+    "sources": [
+      "docs/projects-tab-v3-north-star.md §0, §3, §4, §5, §8",
+      "agents/beacon/specs/projects-v3-p7-generalize-shelf-dashboard-wide.md §0-§6",
+      "ourliberty-graph/descriptors/projects_store.json",
+      "ourliberty-graph/descriptors/projects_closeout_author.json",
+      "ourliberty-graph/descriptors/projects_brainstorm_author.json",
+      "ourliberty-graph/descriptors/funnel.json"
+    ]
+  }
+}
