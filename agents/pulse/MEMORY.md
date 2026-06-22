@@ -168,9 +168,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 13:59Z UTC (Iter ~2453, Tier 3→3, consecutive_clean=0→1, NOMINAL ✅)
+## Status snapshot — updated 2026-06-22 14:27Z UTC (Iter ~2454, Tier 3→3, consecutive_clean=1→2, NOMINAL ✅)
 
-**Iter ~2453 summary:** ✅ Nominal. 3 new alerts (L906: credential-drift OURLIBERTY_BOARD_DRAIN_ENABLED, L907-L908: pipeline-stall PRs #634/#80), all Tier-3 silenced. Watermark advanced 905→908. 5/5 daemons alive (same PIDs). HEAD=3c1b2951. **Notable: catalog-drift-sync-cadence-001 (ourliberty-graph PR #6) MERGED at 04:56Z — G-rule catalog-accuracy-drift COMPLETE. PR #635 (heal-systemd-install-drift grace window) MERGED at 06:06Z.** install-drift doorbell re-verified: auto-install blocked by container sudo restriction, real gap persists. **Standing [yellow]: install-drift:doorbell (sudo blocked), deploy ERROR PR #80/#81 site (PR #81 fix waiting Mirror), Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. [blue]: PR #634/#81/#80 awaiting Mirror review.** PRIME: systemic_fixes=56, ratio=18.95, trend=improving. **G-rule sync.service-deploy-restart-storm-tier4: 1/3. G-rule mirror-marker-parse-error: 2/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Next cadence: 30-min (Tier 3).
+**Iter ~2454 summary:** ✅ Nominal. 4 new alerts (L909-L912: medic+pipeline-stall for PRs #634/#80/#81), all Tier-3 silenced. Watermark advanced 908→912. 5/5 daemons alive (same PIDs). HEAD=4d5aed84. **Standing [yellow]: install-drift:doorbell (sudo blocked), deploy ERROR PR #80/#81 site (PR #81 fix waiting Mirror), Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. [blue]: PR #634/#81/#80 awaiting Mirror review.** PRIME: systemic_fixes=56, ratio=18.95, trend=improving. **G-rule sync.service-deploy-restart-storm-tier4: 1/3. G-rule mirror-marker-parse-error: 2/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Next cadence: 30-min (Tier 3, consecutive_clean=2).
 
 
 
