@@ -168,9 +168,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 17:44Z UTC (Iter ~2460, Tier 3→3, consecutive_clean=7→8, NOMINAL ✅)
+## Status snapshot — updated 2026-06-22 18:15Z UTC (Iter ~2461, Tier 3→1, consecutive_clean=8→0, AUTO-FIX ✅)
 
-**Iter ~2460 summary:** ✅ Nominal. 0 new alerts (watermark=919=file_length). 5/5 daemons alive (same PIDs). HEAD=56a98807 (Pulse cycle 20260622T171429Z). Both repos at 0 open PRs. Larry "Yes" at 11:38 MDT → Beacon dispatched dag-preflight-projects-v3-p7 to Mirror (routing-signal). **New [yellow]: credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED (2× today, L884+L906). Standing [yellow]: install-drift:doorbell, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals, unreviewed-merge:607.** PRIME: systemic_fixes=56, ratio=18.95, trend=improving. **G-rule sync.service-deploy-restart-storm-tier4: 1/3. G-rule mirror-marker-parse-error: 2/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Next cadence: 30-min (Tier 3, consecutive_clean=8).
+**Iter ~2461 summary:** ⚠️ Auto-fix (2 actions). Check A: repo behind 1 commit (PR #638 shelf-descriptor schema merged) → fast-forwarded e943929c→4c65ddef. Check E: PR #637 (spec/p7.2-re-scope) clean+green >30 min → auto-merge enabled. **install-drift:ourliberty-doorbell.service+timer CLEARED** — heal-systemd-install-drift closure alerts verified; service+timer installed at /etc/systemd/system/. 1 new alert L920 (install-resolved:timer) Tier-3 silenced. Watermark 919→920. p7 sequence active: PR #82 (feat/approvals adopt UniversalCard) opened by Forge, Mirror review task fresh. **Standing [yellow]: credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals, unreviewed-merge:607.** PRIME: systemic_fixes=56, ratio=18.96, trend=improving. **G-rule mirror-marker-parse-error: 2/3. G-rule sync.service-deploy-restart-storm-tier4: 1/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Tier-reset to 1, next cadence: 5-min.
 
 
 

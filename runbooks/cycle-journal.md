@@ -4,6 +4,94 @@
 
 ---
 
+## Iteration ~2461 — 2026-06-22T18:15Z UTC (interactive, /cycle, Tier 3→1, consecutive_clean=8→0, AUTO-FIX ✅)
+
+**Trigger:** Larry `/cycle` invocation (interactive).
+
+**Health:** ⚠️ Auto-fix — 2 actions taken. Check A: repo behind 1 commit (PR #638 shelf-descriptor schema merged, fast-forwarded). Check E: PR #637 clean+green >30 min, auto-merge enabled. All other checks nominal. Notable: install-drift:ourliberty-doorbell.service+timer CLEARED (heal-systemd-install-drift closure alerts verified). p7 sequence active: PR #82 opened by Forge, Mirror review task fresh. Tier 3→1 (tier-reset), consecutive_clean=8→0.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Daemons (re-verified):** chain_event=930563 (SNs) ✅, beacon=1025989 (Ss) ✅, dashboard_api=1026057 (Ssl) ✅, inbox_watcher=1026206 (Ssl) ✅, outbox_notifier=1026349 (Ss) ✅. Same PIDs as iters ~2459-2460.
+- **Repo HEAD:** was e943929c at iter ~2460; fast-forwarded to 4c65ddef (PR #638). ✅
+- **install-drift:ourliberty-doorbell.service+timer:** CLEARED ✅ — heal-systemd-install-drift sent closure alerts L919 (service) + L920 (timer) at 18:00:16Z. Verified via systemctl: service loaded at `/etc/systemd/system/`, last run 12:08 MDT status=0/SUCCESS; timer active+waiting (next tick 12:38 MDT). [yellow] standing finding REMOVED.
+- **G-rule sync.service-deploy-restart-storm-tier4:** 0 new alerts → carry 1/3.
+- **G-rule mirror-marker-parse-error:** 0 new alerts → carry 2/3.
+- **G-rule heal-stale-daemon-code-script-service-mismatch:** 0 new alerts → carry 1/3.
+- **OURLIBERTY_BOARD_DRAIN_ENABLED credential-drift:** no new alerts since L906. Carry [yellow].
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 919, "file_length": 920}`. 1 new alert: L920 = `install-resolved:ourliberty-doorbell.timer` (heal-systemd-install-drift, route=closure). Triage helper: Tier-3 silence (known pattern). Journal note: install-drift CLEARED (verified above). Watermark advanced: 919→920. ✅
+
+**Check 1 — Log noise:** outbox-notifier.log: 0 WARN/ERROR (last 50 lines). inbox_watcher.log: 0 WARN/ERROR (last 50 lines). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot PID 1025989 (Ss). Last Larry message: 11:38 MDT "Yes" (dag-preflight-projects-v3-p7 approved → dispatched to Mirror 11:42 MDT, confirmed in bot log). No new messages since iter ~2460. No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → "no stalls detected". FORGE_NO_PR_SKIP: p6-brainstorm-autofill-author (#611), p6-brainstorm-card-ui (#72), system-self-awareness-slice-1b-where-are-we (#73), system-self-awareness-slice-2a-waiting-on-larry (#620), fix-phantom-build-phase-terminal-guard-001 (#630), projects-stale-gc-archive-completed-001 (#631), catalog-drift-sync-cadence-001 (preflight_exit). ✅ Nominal.
+
+**Check 4 — Pending directives:** forge=0, beacon=0, mirror=1 (`review-p7-approvals-adopt.json`, created 18:12Z, fresh). beacon-pending-approvals: pending=0, history=252 (+1 from iter ~2460). ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-22T18:07:20Z (~8 min before check). Within 60-min window. ✅ Nominal.
+
+**Check A — Source repo:** FINDING — behind 1 commit. Auto-fix: `git -C ~/agent-core pull --ff-only` → 4c65ddef (PR #638: `feat(projects-v3): P7 step — shelf-descriptor schema + first descriptor`). 2 new files: `docs/shelf/projects-v3-universal-card.json`, `docs/shelf/shelf-descriptor.schema.json`. Tier-reset to 1. Logged to cycle-actions.jsonl.
+
+**Check B — Sync health:** last_sync=2026-06-22T17:47:07Z (~28 min ago), status=no-change. Within 2h window. ✅ Nominal.
+
+**Check C — Agent liveness:** chain_event=930563 (SNs) ✅, beacon=1025989 (Ss) ✅, dashboard_api=1026057 (Ssl) ✅, inbox_watcher=1026206 (Ssl) ✅, outbox_notifier=1026349 (Ss) ✅. 5/5 alive. ✅
+
+**Check D — Inboxes:** forge=0, beacon=0, mirror=1 (review-p7-approvals-adopt.json, fresh at 18:12Z). ✅ Nominal.
+
+**Check E — PRs:** FINDING — PR #637 (ourliberty-agent-core, `spec(projects-v3): P7.2 re-scope — brief approvals (backend-first), additive surfacing`, branch `work/p7-spec-revise`) MERGEABLE for 31 min, autoMergeRequest=null. Auto-fix: `gh pr merge 637 --auto --squash` → auto-merge enabled. Logged to cycle-actions.jsonl. ourliberty-dashboard: PR #82 (`feat(approvals): adopt UniversalCard with adapter + Approve/Reject/Comment/Mark-done action set`, branch `forge/p7-approvals-adopt`) — MERGEABLE, created 18:12:16Z (3 min old, Mirror review task fresh). ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Monday 2026-06-22 UTC (weekday=0 ∈ {0,2,4,6}):** Check I sentinel check-i-2026-06-22.json EXISTS → skip. Check VIII/IX/X: already ran iter ~2413 → skip. Check III: last 2026-06-11 (11d < 14d gate, not Sunday) → skip. ✅
+
+**Actions taken:**
+1. Check A: fast-forward main e943929c→4c65ddef (PR #638 shelf-descriptor schema + first descriptor). Logged to cycle-actions.jsonl.
+2. Check E: `gh pr merge 637 --repo Larry-Yatch/ourliberty-agent-core --auto --squash` — auto-merge enabled on PR #637. Logged to cycle-actions.jsonl.
+3. Alert triage L920: Tier-3 silence (install-resolved:ourliberty-doorbell.timer, known pattern). Watermark 919→920.
+4. PRIME ledger: 2× `intervention` rows (ff-main-when-behind, enable-pr-auto-merge).
+5. Tier state: `record --checks-clean false` → Tier 3→1, consecutive_clean=8→0.
+
+**Dispatches:** None.
+
+**Standing findings (updated):**
+- [yellow] ~~**install-drift:ourliberty-doorbell.service+timer**~~ **CLEARED** — heal-systemd-install-drift closure confirmed; service+timer at /etc/systemd/system/, verified running. ✅
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — still standing. [carry]
+- [blue] **PR #637 auto-merge enabled** — spec(projects-v3) P7.2 re-scope awaiting merge. [new]
+- [blue] **PR #82 pending Mirror review** — feat(approvals) adopt UniversalCard; Mirror task fresh at 18:12Z. [new]
+- [blue] **G-rule sync.service-deploy-restart-storm-tier4** — 1/3. Watch.
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. Watch; dispatch at 3/3.
+- [blue] **G-rule mirror-marker-parse-error** — 2/3. Watch; dispatch at 3/3.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule seq-advancer-sequence-stranded** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule watchdog-watcher-log-stale** — 1/3. Watch.
+- [blue] **G-rule heal-stale-daemon-code-script-service-mismatch** — 1/3. Watch.
+- [blue] **G-rule health-notify-script-missing** — dispatch sent 2026-06-09. [carry]
+- [blue] **catalog-drift-sync-cadence-001 MERGED** — G-rule catalog-accuracy-drift COMPLETE.
+- [blue] **unreviewed-merge:628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **Stale bash orphan PID 1834248** — benign. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. Informational. [carry]
+
+**PRIME DIRECTIVE:** 2 interventions this iter (ff-main-when-behind + enable-pr-auto-merge). Trailing-30d: systemic_fixes=56, ratio=18.96, trend=improving.
+**Tier end-of-iter:** Tier 3→1 (tier-reset, Check A finding), consecutive_clean=8→0. Next cadence: 5-min.
+
+---
+
 ## Iteration ~2460 — 2026-06-22T17:44Z UTC (interactive, /cycle, Tier 3→3, consecutive_clean=7→8, NOMINAL ✅)
 
 **Trigger:** Larry `/cycle` invocation (interactive).
