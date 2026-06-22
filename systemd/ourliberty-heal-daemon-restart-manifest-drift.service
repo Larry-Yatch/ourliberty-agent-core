@@ -1,0 +1,37 @@
+[Unit]
+Description=Healer — keep config/daemon-restart-manifest.json fresh (regenerate + commit on drift) so the deploy-restart and stale-daemon backstop never go blind to a new import (manifest-self-heal-001)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/heal_daemon_restart_manifest_drift.py
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/agents/beacon/specs/daemon-restart-manifest-self-heal.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+# Carries gh auth token + git credentials (commit/push the regenerated manifest
+# to main) and SUPABASE_*/etc for larry_alerts.
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/heal_daemon_restart_manifest_drift.py
+# A tick is a transitive import scan + (only on drift) a git commit/push round-trip.
+TimeoutStartSec=300
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-heal-daemon-restart-manifest-drift
+
+# Hardening (matches ourliberty-heal-missions-card-gc.service — also a committer).
+# ReadWritePaths covers agent-core (manifest write + git commit/push), the agents
+# tree (kill switch, logs, heartbeat, alert queue), and credentials.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /home/larry/agent-core /home/larry/credentials /home/larry/.claude /home/larry/.claude.json /home/larry/.local /home/larry/.cache /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+Nice=10

@@ -249,8 +249,10 @@ def build_manifest() -> dict:
             'regenerate': 'python3 scripts/daemon_restart_manifest.py regenerate',
             'note': (
                 'watch_paths are repo-relative POSIX paths derived from a '
-                'transitive first-party import scan; commit + review changes '
-                'rather than auto-deriving at runtime.'
+                'transitive first-party import scan. Regenerate with the '
+                'command above; heal_daemon_restart_manifest_drift.py keeps '
+                'this file fresh (commits the regen) if a PR adds a new import '
+                'without regenerating, so it never silently drifts.'
             ),
         },
         'units': dict(sorted(units.items())),
