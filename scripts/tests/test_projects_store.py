@@ -555,5 +555,102 @@ class EditPhaseBrainstormTest(unittest.TestCase):
         self.assertIs(ph['brainstorm']['is_ai_draft'], False)
 
 
+class RetireCompletedProjectsTest(unittest.TestCase):
+    """Project-level GC reconciliation (projects-stale-gc-archive-completed):
+    an ACTIVE project with every phase done retires off the board; anything with
+    a non-done or zero phases, and anything already terminal, is left untouched."""
+
+    @staticmethod
+    def _project(pid, state, phase_states):
+        return {
+            'id': pid,
+            'state': state,
+            'phases': [{'id': f'{pid}-ph{i}', 'lifecycle_state': s}
+                       for i, s in enumerate(phase_states)],
+        }
+
+    def test_all_phases_done_active_project_retires(self):
+        reg = {'projects': [self._project('p', 'active', ['done', 'done'])]}
+        _, retired = ps.retire_completed_projects(reg, now=NOW)
+        self.assertEqual(retired, ['p'])
+        proj = reg['projects'][0]
+        self.assertEqual(proj['state'], 'retired')  # retired, NOT archived
+        # audit trail: prior_state + retired_at + retired_by marker.
+        self.assertEqual(proj['gc']['prior_state'], 'active')
+        self.assertEqual(proj['gc']['retired_by'], ps.GC_RETIRED_BY)
+        self.assertEqual(proj['gc']['retired_at'], NOW.isoformat())
+        self.assertEqual(proj['updated_at'], NOW.isoformat())
+
+    def test_brainstorm_phase_keeps_project_active(self):
+        # The slice-2b shape: a single brainstorm phase, no closeout → MUST stay.
+        reg = {'projects': [self._project('slice-2b', 'active', ['brainstorm'])]}
+        _, retired = ps.retire_completed_projects(reg, now=NOW)
+        self.assertEqual(retired, [])
+        self.assertEqual(reg['projects'][0]['state'], 'active')
+        self.assertNotIn('gc', reg['projects'][0])
+
+    def test_partial_done_keeps_project_active(self):
+        reg = {'projects': [self._project('p', 'active', ['done', 'building'])]}
+        _, retired = ps.retire_completed_projects(reg, now=NOW)
+        self.assertEqual(retired, [])
+        self.assertEqual(reg['projects'][0]['state'], 'active')
+
+    def test_zero_phase_project_untouched(self):
+        reg = {'projects': [self._project('empty', 'active', [])]}
+        _, retired = ps.retire_completed_projects(reg, now=NOW)
+        self.assertEqual(retired, [])
+        self.assertEqual(reg['projects'][0]['state'], 'active')
+        self.assertNotIn('gc', reg['projects'][0])
+
+    def test_already_archived_is_noop(self):
+        reg = {'projects': [self._project('p', 'archived', ['done'])]}
+        _, retired = ps.retire_completed_projects(reg, now=NOW)
+        self.assertEqual(retired, [])
+        self.assertEqual(reg['projects'][0]['state'], 'archived')
+
+    def test_already_retired_is_noop(self):
+        reg = {'projects': [self._project('p', 'retired', ['done'])]}
+        _, retired = ps.retire_completed_projects(reg, now=NOW)
+        self.assertEqual(retired, [])
+        self.assertEqual(reg['projects'][0]['state'], 'retired')
+
+    def test_idempotent_second_pass_retires_nothing(self):
+        reg = {'projects': [self._project('p', 'active', ['done'])]}
+        ps.retire_completed_projects(reg, now=NOW)
+        _, retired_again = ps.retire_completed_projects(reg, now=NOW)
+        self.assertEqual(retired_again, [])
+        self.assertEqual(reg['projects'][0]['state'], 'retired')
+
+    def test_mixed_registry_retires_only_completed_active(self):
+        reg = {'projects': [
+            self._project('done-active', 'active', ['done']),
+            self._project('brainstorm-active', 'active', ['brainstorm']),
+            self._project('done-archived', 'archived', ['done']),
+        ]}
+        _, retired = ps.retire_completed_projects(reg, now=NOW)
+        self.assertEqual(retired, ['done-active'])
+        states = {p['id']: p['state'] for p in reg['projects']}
+        self.assertEqual(states, {
+            'done-active': 'retired',
+            'brainstorm-active': 'active',
+            'done-archived': 'archived',
+        })
+
+    def test_fail_safe_on_malformed_project(self):
+        reg = {'projects': ['junk', None, self._project('p', 'active', ['done'])]}
+        _, retired = ps.retire_completed_projects(reg, now=NOW)
+        self.assertEqual(retired, ['p'])  # bad entries skipped, never raises
+
+    def test_non_dict_registry_safe(self):
+        reg, retired = ps.retire_completed_projects(None, now=NOW)
+        self.assertIsNone(reg)
+        self.assertEqual(retired, [])
+
+    def test_returns_same_registry_object(self):
+        reg = {'projects': [self._project('p', 'active', ['done'])]}
+        out, _ = ps.retire_completed_projects(reg, now=NOW)
+        self.assertIs(out, reg)  # mutated in place
+
+
 if __name__ == '__main__':
     unittest.main()

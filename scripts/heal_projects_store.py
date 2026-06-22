@@ -362,13 +362,34 @@ def run_once(*, dry_run: bool, now: Optional[datetime] = None) -> int:
     if dropped:
         log(f'dropped {len(dropped)} malformed project/phase entr(y/ies): {dropped}')
 
+    # Project-level GC reconciliation: retire any ACTIVE project whose phases are
+    # ALL done off the "Actively working" board (projects-stale-gc-archive-
+    # completed). The project analogue of the missions GC terminal reconciliation —
+    # it runs HERE, after normalize and BEFORE the atomic-write+commit, so the SOLE
+    # committer drains the retire delta in its own commit (single-committer
+    # invariant). Operates on `normalized` (valid states/ids). Fail-safe: a GC fault
+    # retires nothing and never blocks the write+commit below. `retired` (not
+    # `archived`) keeps the promoted funnel source suppressed — see
+    # projects_store.retire_completed_projects.
+    retired: list[str] = []
+    try:
+        _, retired = projects_store.retire_completed_projects(normalized, now=now)
+        if retired:
+            verb = 'would retire' if dry_run else 'retired'
+            log(f'{verb} {len(retired)} all-phases-done project(s) off the board: {retired}')
+    except Exception as e:  # noqa: BLE001 — fail-safe: never block the committer
+        log(f'project-GC raised: {type(e).__name__}: {e} — retiring nothing this tick')
+
     # `bool(minted)` forces the write+commit: the freshly-minted projects come out
     # of new_single_phase_project already normalized, so `normalized != raw` is
     # False (raw was mutated in place) even though disk lacks them — without this
     # the mirror delta would never reach disk. `bool(authored)` does the same for
     # the brainstorm sweep: it mutates `raw` before normalize, so the draft is in
     # both `raw` and `normalized` and the `!=` check alone would miss the delta.
-    changed = (normalized != raw) or bool(minted) or bool(authored) or not path.exists()
+    # `bool(retired)` forces the commit for the GC retire delta (it mutates
+    # `normalized` after the `!=` baseline was captured against `raw`).
+    changed = ((normalized != raw) or bool(minted) or bool(authored)
+               or bool(retired) or not path.exists())
     n_projects = len(normalized.get('projects', []))
     core = repo_paths.get('ourliberty-agent-core')
     # North Star docs the closeout may have ticked (non-committer wrote them to
