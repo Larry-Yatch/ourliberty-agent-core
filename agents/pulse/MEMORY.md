@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 05:46Z UTC (Iter ~2427, Tier 1, consecutive_clean=1→2, NOMINAL ✅)
+## Status snapshot — updated 2026-06-22 05:55Z UTC (Iter ~2428, Tier 1→2, consecutive_clean=2→3→de-escalate, NOMINAL ✅)
 
-**Iter ~2427 summary:** ✅ Nominal. 2 new alerts (L885-L886) both Tier-3. 5/5 daemons alive (new PIDs: beacon=951720 restarted 05:40:16Z unknown cause, dashboard_api=951414 auto-restarted by heal-stale-daemon-code per L886). PR #628 open (Mirror actively reviewing fix-phantom-build-phase-terminal-guard-001). Forge running projects-stale-gc-archive-completed-001. beacon-pending-approvals: pending=0, history=250. **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. [blue]: unreviewed-merge:625+627, beacon-bot-restart:951720.** PRIME: iter_clean, systemic_fixes=55, ratio≈19.3. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** Tier 1, consecutive_clean=1→2. Next cadence: 5-min (Tier 1).
+**Iter ~2428 summary:** ✅ Nominal. 2 new alerts (L887-L888) both Tier-3 (L888 confirmed beacon-bot restart cause=heal-stale-daemon-code post-PR #629 deploy — prior "unknown cause" resolved). PR #630 MERGED 05:52:41Z. PR #631 open (Mirror reviewing projects-stale-gc). PR #628 (feat/heal-undispatched-pr-review) approaching 30-min stale threshold at ~06:07Z — no Mirror review task yet, watch next iter. beacon-pending-approvals: pending=0, history=250. **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. [blue]: PR #628 approaching stale.** PRIME: iter_clean, systemic_fixes=55, ratio≈19.3, trend=improving. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** Tier 1→2 (de-escalated). Next cadence: 15-min (Tier 2).
 
 
 
