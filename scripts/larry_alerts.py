@@ -954,6 +954,10 @@ _NOTIFICATION_INTENT_EMOJI = {
     'review-emergency-halt': '🛑',
     'reject': '✗',
     'clarification-exhausted': '✗',
+    # System self-awareness: the doorbell nudge (scripts/doorbell_notifier.py) —
+    # a calm "N items need your call — check the board", deliberately NOT a ⚠
+    # alert (it's a reminder, not an infra failure).
+    'doorbell': '🔔',
 }
 
 
