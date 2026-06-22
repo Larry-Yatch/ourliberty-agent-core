@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 09:25Z UTC (Iter ~2440, Tier 3→3, consecutive_clean=2→3→ceiling-reset, NOMINAL ✅)
+## Status snapshot — updated 2026-06-22 09:53Z UTC (Iter ~2441, Tier 3→3, consecutive_clean=3→4, NOMINAL ✅)
 
-**Iter ~2440 summary:** ✅ Nominal. 0 new alerts (watermark=890=file_length). 5/5 daemons alive (same PIDs). 0 open PRs. All inboxes empty. **Tier 3→3, consecutive_clean=2→3→ceiling-reset (stays Tier 3, counter resets to 0 on next iter).** **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals, deploy-notifier:ERROR main-branch dpl_8QqRKy3hBSeQ913R2PQjKVSHw1ZJ (bot-delivered 06:25Z, likely transient — no new alerts since). [blue]: unreviewed-merge:628/625/627, daemon-pids.json missing.** PRIME: interventions=1060, systemic_fixes=55, ratio≈19.27, trend=improving. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Next cadence: 30-min (Tier 3).
+**Iter ~2441 summary:** ✅ Nominal. 0 new alerts (watermark=884=file_length; larry-alerts.jsonl compacted since prior iter). 5/5 daemons alive (same PIDs). 0 open PRs. All inboxes empty. **Tier 3→3, consecutive_clean=3→4.** **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals, deploy-notifier:ERROR main-branch dpl_8QqRKy3hBSeQ913R2PQjKVSHw1ZJ (no new failure alerts since 06:25Z, likely transient). [blue]: unreviewed-merge:628/625/627, daemon-pids.json missing.** PRIME: interventions=1060, systemic_fixes=55, ratio≈19.27, trend=improving. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Next cadence: 30-min (Tier 3).
 
 
 
