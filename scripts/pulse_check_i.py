@@ -768,7 +768,8 @@ def _build_dispatch_envelope(
         f"This is an auto-dispatched optimization candidate from Pulse "
         f"Check I (closed-loop step 5). Read the relevant sidecar / outbox "
         f"archives, then draft a spec following the standard template and "
-        f"emit an APPROVAL_REQUEST marker. Larry approves before any build."
+        f"emit an APPROVAL_REQUEST marker — the trust policy gates whether the "
+        f"build auto-starts or asks Larry, and Mirror reviews before any merge."
     )
     return {
         "task_id": task_id,
