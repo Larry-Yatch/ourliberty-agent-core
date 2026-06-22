@@ -68,11 +68,17 @@ Key design points (follows the heal_* conventions):
     fail-safe (gh/dispatch errors are logged, NEVER crash the timer).
   - Read-only on GitHub (lists PRs; never merges, closes, comments, or reviews).
 
-Known scope limits (deliberate for this revision):
-  - agent-core only. REPO is fixed to Larry-Yatch/ourliberty-agent-core (the
-    repo of the #412 incident). Forge can also open PRs against
-    ourliberty-dashboard; those are not covered here. A multi-repo sweep is a
-    straightforward follow-up (loop REPO + set target_repo per repo).
+Multi-repo (2026-06-22): sweeps both Larry-Yatch/ourliberty-agent-core AND
+Larry-Yatch/ourliberty-dashboard (REPOS). The whole pipeline is repo-agnostic —
+the routing allowlist + repo_paths in config/agent-models.json cover both, and the
+auto-merge path derives its repo from the PR URL — so a labeled PR opened against
+EITHER repo auto-flows (a real dashboard PR, #72, has gone through Mirror
+auto-merge). This closes the gap where a desktop-opened dashboard PR (#80/#81) was
+flagged unrouted but never auto-routed, because this backstop was agent-core-only.
+Per-PR task_id for the opt-in path is repo-qualified (`pr-<repo>-<number>`) so a
+PR #N present in both repos can't collide onto one review-request dedup key.
+
+Known scope limits (deliberate):
   - task_id is recovered from the head branch by stripping `forge/`, which is
     exact only when the branch round-trips the task_id. Forge build task_ids are
     kebab-case in practice (e.g. `harden-test-prod-write-isolation-001`), for
@@ -109,7 +115,17 @@ LOG_FILE = AGENTS_ROOT / 'logs' / 'heal-undispatched-pr-review.log'
 HEARTBEAT_FILE = AGENTS_ROOT / 'blackboard' / 'heal-undispatched-pr-review.heartbeat'
 STATE_FILE = AGENTS_ROOT / 'state' / 'heal-undispatched-pr-review.json'
 
-REPO = 'Larry-Yatch/ourliberty-agent-core'
+# Repos this backstop sweeps. The Forge→Mirror→auto-merge pipeline is repo-agnostic
+# (routing allowlist + repo_paths in config/agent-models.json cover both; the merge
+# path derives its repo from the PR URL), so a labeled PR opened against EITHER repo
+# auto-flows. Dashboard coverage closes the gap where a desktop-opened dashboard PR
+# (e.g. #80/#81) was flagged unrouted but never auto-routed (this healer was
+# agent-core-only). Kept as an explicit pair (mirrors heal_pipeline_stall.REPOS)
+# rather than config-derived to keep this backstop dependency-light.
+REPOS = (
+    'Larry-Yatch/ourliberty-agent-core',
+    'Larry-Yatch/ourliberty-dashboard',
+)
 # Two classes of open PR get auto-routed to a Mirror review:
 #   1. Forge build PRs — head branch `forge/<task-id>` (the original #412 gap).
 #      Reviewed unconditionally; the proven path.
@@ -239,13 +255,19 @@ def _parse_iso(ts: str) -> Optional[datetime]:
 
 # -------------------- gh I/O (mockable seam) --------------------
 
-def fetch_open_prs() -> Optional[list[dict[str, Any]]]:
-    """List open PRs via gh. Returns parsed rows, or None on ANY gh failure
-    (already logged) — a healer must never crash the timer. Each row carries
-    number, url, headRefName, createdAt, title, headRefOid, isDraft, labels."""
+def _repo_segment(repo_coords: str) -> str:
+    """`owner/name` → `name`. gh + PR URLs use `owner/name`, but the dispatch
+    envelope's `target_repo` and config/agent-models.json `repo_paths` keys use the
+    bare repo name."""
+    return repo_coords.rsplit('/', 1)[-1]
+
+
+def _fetch_repo_prs(repo: str) -> Optional[list[dict[str, Any]]]:
+    """List open PRs for ONE repo via gh. Returns parsed rows (each tagged with its
+    `_repo`), or None on a gh failure for that repo (already logged)."""
     cmd = [
         'gh', 'pr', 'list',
-        '--repo', REPO,
+        '--repo', repo,
         '--state', 'open',
         '--limit', str(_OPEN_PR_FETCH_LIMIT),
         '--json', 'number,url,headRefName,createdAt,title,headRefOid,isDraft,labels',
@@ -255,18 +277,37 @@ def fetch_open_prs() -> Optional[list[dict[str, Any]]]:
             cmd, capture_output=True, text=True, timeout=GH_TIMEOUT_S,
         )
     except (subprocess.TimeoutExpired, OSError) as e:
-        log(f'gh pr list failed: {type(e).__name__}: {e}', 'WARN')
+        log(f'gh pr list ({repo}) failed: {type(e).__name__}: {e}', 'WARN')
         return None
     if proc.returncode != 0:
-        log(f'gh pr list returned {proc.returncode}: '
+        log(f'gh pr list ({repo}) returned {proc.returncode}: '
             f'{proc.stderr.strip()[:300]}', 'WARN')
         return None
-    return parse_open_prs(proc.stdout)
+    return parse_open_prs(proc.stdout, repo)
 
 
-def parse_open_prs(raw_json: str) -> list[dict[str, Any]]:
-    """Normalize `gh pr list --json ...` stdout into flat rows. Skips malformed
-    entries rather than raising."""
+def fetch_open_prs() -> Optional[list[dict[str, Any]]]:
+    """List open PRs across all REPOS via gh. Returns the combined parsed rows
+    (each tagged with `_repo`), or None ONLY when every repo's gh call failed — a
+    single-repo gh hiccup must not blind the sweep to the other repo, and a healer
+    must never crash the timer. A repo with no open PRs contributes [] (still a
+    success). Each row carries number, url, headRefName, createdAt, title,
+    headRefOid, isDraft, labels, _repo."""
+    combined: list[dict[str, Any]] = []
+    any_ok = False
+    for repo in REPOS:
+        rows = _fetch_repo_prs(repo)
+        if rows is None:
+            continue  # this repo errored (already logged); still try the others
+        any_ok = True
+        combined.extend(rows)
+    return combined if any_ok else None
+
+
+def parse_open_prs(raw_json: str, repo: Optional[str] = None) -> list[dict[str, Any]]:
+    """Normalize `gh pr list --json ...` stdout into flat rows, tagging each with
+    `_repo` (the owning `owner/name`). Skips malformed entries rather than
+    raising."""
     try:
         rows = json.loads(raw_json or '[]')
     except (json.JSONDecodeError, TypeError):
@@ -304,28 +345,38 @@ def parse_open_prs(raw_json: str) -> list[dict[str, Any]]:
                 lbl.get('name') for lbl in (r.get('labels') or [])
                 if isinstance(lbl, dict) and lbl.get('name')
             ],
+            # Owning repo (`owner/name`). Drives the dispatch's target_repo and
+            # makes the per-PR task_id repo-unique, so PR #N existing in BOTH repos
+            # can't collide onto a single `review-…json` dedup key.
+            '_repo': repo,
         })
     return out
 
 
 # -------------------- core detection (pure) --------------------
 
-def task_id_for_branch(head_ref: str, pr_number: Optional[int] = None) -> str:
+def task_id_for_branch(head_ref: str, pr_number: Optional[int] = None,
+                       repo: Optional[str] = None) -> str:
     """Map an open PR's head branch to the task_id used for its Mirror review
     request filename (`review-<task_id>.json`).
 
     - Forge build branch `forge/<task-id>`: strip the prefix. This is the inverse
       of the worktree/branch convention and matches the task_id the build outbox
       would have carried — so the derived filename lines up with the inline path's
-      idempotency key (else the backstop would duplicate the inline review).
-    - Any other (opt-in / human-authored) branch: there is no upstream task_id and
-      no inline dispatch to collide with, so key by PR number — `pr-<number>`. It
-      is stable across ticks (dedup works) and unique per PR, so two branches that
-      sanitize to the same on-disk name can't collide into one review. Falls back
-      to the raw branch only when no pr_number is supplied (defensive)."""
+      idempotency key (else the backstop would duplicate the inline review). NOT
+      repo-qualified, precisely so it stays equal to the inline path's key.
+    - Any other (opt-in) branch: there is no upstream task_id and no inline dispatch
+      to collide with, so key by repo + PR number — `pr-<repo-name>-<number>`
+      (e.g. `pr-ourliberty-dashboard-80`). Repo-qualified because PR numbers are
+      per-repo: agent-core #80 and dashboard #80 must NOT collide onto one
+      `review-…json` dedup key (which would suppress one's review or point Mirror
+      at the wrong PR). Stable across ticks, unique per PR. Falls back to
+      `pr-<number>` (no repo) then the raw branch (no number), defensively."""
     if head_ref.startswith(FORGE_BRANCH_PREFIX):
         return head_ref[len(FORGE_BRANCH_PREFIX):]
     if pr_number is not None:
+        if repo:
+            return f'pr-{_repo_segment(repo)}-{pr_number}'
         return f'pr-{pr_number}'
     return head_ref
 
@@ -378,7 +429,7 @@ def select_orphaned_prs(
         created = _parse_iso(pr.get('createdAt'))
         if created is None or created > cutoff:
             continue  # too fresh — let the normal inline dispatch fire first
-        task_id = task_id_for_branch(head, pr.get('number'))
+        task_id = task_id_for_branch(head, pr.get('number'), pr.get('_repo'))
         if not task_id:
             continue  # degenerate branch → no dispatchable task_id
         try:
@@ -397,13 +448,17 @@ def _synthesize_build_data(pr: dict[str, Any]) -> dict[str, Any]:
     """Build the minimal `data` envelope `_dispatch_mirror_review` consumes from a
     GitHub PR row. There is no build outbox to read here — for a Forge PR the reap
     prevented it; for a human PR one never existed — so we reconstruct from GitHub
-    truth: task_id (from branch / PR number), branch, target_repo (this repo),
-    pr_title. No `claude_session_id` is available (no live build session), so a
-    downstream REVIEW_REVISION starts Forge fresh rather than --resume; that is the
-    correct, available behavior for a recovered or human-authored PR."""
+    truth: task_id (from branch / PR number), branch, target_repo (the PR's OWN
+    repo, so a dashboard PR routes a dashboard review — the pipeline is repo-agnostic
+    and Mirror's worktree gate has a path for both), pr_title. No `claude_session_id`
+    is available (no live build session), so a downstream REVIEW_REVISION starts
+    Forge fresh rather than --resume; the correct behavior for a recovered PR."""
     return {
         'task_id': pr['task_id'],
-        'target_repo': 'ourliberty-agent-core',
+        'target_repo': (
+            _repo_segment(pr['_repo']) if pr.get('_repo')
+            else 'ourliberty-agent-core'
+        ),
         'branch': pr['headRefName'],
         'pr_title': pr.get('title') or '',
         'dispatched_by': 'heal-undispatched-pr-review',
@@ -420,10 +475,15 @@ def emit_failed_alert(pr: dict[str, Any]) -> bool:
     cooldown. Never raises."""
     number = pr['number']
     url = pr['url']
-    subject = f'{SUBJECT_PREFIX}:{number}'
+    repo = pr.get('_repo') or 'Larry-Yatch/ourliberty-agent-core'
+    # Repo-qualify the subject so the (source,subject) cooldown can't make an
+    # agent-core PR #N suppress a dashboard PR #N alert (PR numbers are per-repo).
+    # SUBJECT_PREFIX is unchanged, so the alert-translation coverage gate still
+    # matches on it.
+    subject = f'{SUBJECT_PREFIX}:{_repo_segment(repo)}:{number}'
     message = (
-        f'PR #{number} is open with no Mirror review, and the backstop review '
-        f'dispatch did not take (review task still absent after dispatch). '
+        f'PR #{number} ({repo}) is open with no Mirror review, and the backstop '
+        f'review dispatch did not take (review task still absent after dispatch). '
         f'PR: {url} (branch {pr.get("headRefName")}).'
     )
     # Don't assert a single root cause: _dispatch_mirror_review writes nothing —
@@ -437,7 +497,7 @@ def emit_failed_alert(pr: dict[str, Any]) -> bool:
         f'(~/agents/logs/outbox-notifier.log) for a "review-request dispatch '
         f'FAILED" / RoutingDenied / cost-budget line referencing the task. '
         f'Re-dispatch manually by writing a review task to '
-        f'~/agents/inboxes/mirror/, or `gh pr view {number} --repo {REPO}`.'
+        f'~/agents/inboxes/mirror/, or `gh pr view {number} --repo {repo}`.'
     )
     try:
         import larry_alerts as la  # noqa: E402

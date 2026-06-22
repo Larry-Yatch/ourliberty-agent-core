@@ -3,9 +3,10 @@
 Uses unittest (repo convention; pytest isn't installed on the droplet).
 
 Covers the pure, dependency-free core:
-- parse_open_prs: normalize gh JSON (incl. isDraft + label names), skip malformed
-- task_id_for_branch: strip forge/ for Forge PRs, pr-<number> for opt-in PRs
+- parse_open_prs: normalize gh JSON (incl. isDraft + label names + _repo), skip bad
+- task_id_for_branch: strip forge/ for Forge PRs, repo-qualified pr-id for opt-in
 - _is_reviewable_pr: forge always; else only when auto-review-labeled AND non-draft
+- fetch_open_prs: multi-repo combine; None only when EVERY repo's gh call failed
 - select_orphaned_prs: reviewability filter, age grace, already-dispatched skip,
   unparseable createdAt skip, task_id augmentation
 - _synthesize_build_data: the envelope handed to _dispatch_mirror_review
@@ -34,16 +35,17 @@ NOW = datetime(2026, 6, 10, 12, 0, 0, tzinfo=timezone.utc)
 
 
 def _pr(number, branch, *, age_minutes=60, url=None, title='t', is_draft=False,
-        labels=()):
+        labels=(), repo='Larry-Yatch/ourliberty-agent-core'):
     created = (NOW - timedelta(minutes=age_minutes)).strftime('%Y-%m-%dT%H:%M:%SZ')
     return {
         'number': number,
-        'url': url or f'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/{number}',
+        'url': url or f'https://github.com/{repo}/pull/{number}',
         'headRefName': branch,
         'createdAt': created,
         'title': title,
         'isDraft': is_draft,
         'labels': list(labels),
+        '_repo': repo,
     }
 
 
@@ -92,6 +94,14 @@ class TestParseOpenPrs(unittest.TestCase):
                '"createdAt":"2026-06-10T00:00:00Z","title":"hi","labels":null}]')
         self.assertEqual(h.parse_open_prs(raw)[0]['labels'], [])
 
+    def test_tags_repo(self):
+        raw = ('[{"number":1,"url":"https://x/1","headRefName":"fix/a",'
+               '"createdAt":"2026-06-10T00:00:00Z","title":"hi"}]')
+        rows = h.parse_open_prs(raw, 'Larry-Yatch/ourliberty-dashboard')
+        self.assertEqual(rows[0]['_repo'], 'Larry-Yatch/ourliberty-dashboard')
+        # repo is optional (pure-parse callers) → _repo is None when omitted.
+        self.assertIsNone(h.parse_open_prs(raw)[0]['_repo'])
+
 
 class TestTaskIdForBranch(unittest.TestCase):
     def test_strips_forge_prefix(self):
@@ -100,14 +110,28 @@ class TestTaskIdForBranch(unittest.TestCase):
     def test_passthrough_non_forge(self):
         self.assertEqual(h.task_id_for_branch('main'), 'main')
 
-    def test_human_branch_keys_by_pr_number(self):
-        # No forge/ prefix → key by PR number (stable + unique), not the branch.
+    def test_human_branch_keys_by_pr_number_no_repo(self):
+        # No forge/ prefix, no repo → bare pr-<number> fallback.
         self.assertEqual(h.task_id_for_branch('fix/install-drift-dedup', 625), 'pr-625')
 
-    def test_forge_prefix_wins_over_pr_number(self):
-        # A forge build PR keeps its branch-derived id even with a number present,
-        # so the backstop's filename lines up with the inline dispatch's key.
-        self.assertEqual(h.task_id_for_branch('forge/harden-x-001', 412), 'harden-x-001')
+    def test_opt_in_branch_keys_by_repo_and_pr_number(self):
+        # With a repo, the opt-in id is repo-qualified so PR #N in two repos can't
+        # collide onto one review-request dedup key.
+        self.assertEqual(
+            h.task_id_for_branch('fix/x', 80, 'Larry-Yatch/ourliberty-dashboard'),
+            'pr-ourliberty-dashboard-80')
+        self.assertEqual(
+            h.task_id_for_branch('work/y', 80, 'Larry-Yatch/ourliberty-agent-core'),
+            'pr-ourliberty-agent-core-80')
+
+    def test_forge_prefix_wins_over_pr_number_and_repo(self):
+        # A forge build PR keeps its branch-derived id (NOT repo-qualified) even
+        # with number+repo present, so the backstop's filename lines up with the
+        # inline dispatch's key.
+        self.assertEqual(
+            h.task_id_for_branch('forge/harden-x-001', 412,
+                                 'Larry-Yatch/ourliberty-dashboard'),
+            'harden-x-001')
 
 
 class TestIsReviewablePr(unittest.TestCase):
@@ -149,12 +173,23 @@ class TestSelectOrphanedPrs(unittest.TestCase):
 
     def test_selects_labeled_non_draft_pr(self):
         # The #509/#510/#625 gap: a non-draft PR carrying auto-review is now
-        # routed, keyed by PR number.
+        # routed, keyed by repo-qualified PR number.
         prs = [_pr(625, 'fix/install-drift-dedup', age_minutes=60,
                    labels=[h.AUTO_REVIEW_LABEL])]
         sel = h.select_orphaned_prs(prs, NOW, self._none_dispatched)
         self.assertEqual([p['number'] for p in sel], [625])
-        self.assertEqual(sel[0]['task_id'], 'pr-625')
+        self.assertEqual(sel[0]['task_id'], 'pr-ourliberty-agent-core-625')
+
+    def test_selects_labeled_dashboard_pr(self):
+        # Multi-repo: a labeled non-draft DASHBOARD PR is routed too (the #80/#81
+        # gap), keyed by the dashboard-qualified id so it can't collide with an
+        # agent-core PR of the same number.
+        prs = [_pr(80, 'work/p7-universal-card', age_minutes=60,
+                   labels=[h.AUTO_REVIEW_LABEL],
+                   repo='Larry-Yatch/ourliberty-dashboard')]
+        sel = h.select_orphaned_prs(prs, NOW, self._none_dispatched)
+        self.assertEqual([p['number'] for p in sel], [80])
+        self.assertEqual(sel[0]['task_id'], 'pr-ourliberty-dashboard-80')
 
     def test_skips_unlabeled_non_forge_pr(self):
         # Safety: a non-draft non-forge PR with NO opt-in label is left alone —
@@ -263,6 +298,66 @@ class TestSynthesizeBuildData(unittest.TestCase):
         self.assertEqual(
             h._synthesize_build_data(pr)['head_sha'], 'cafe1234beef5678')
 
+    def test_target_repo_follows_pr_repo(self):
+        # A dashboard PR's envelope targets the dashboard repo (repo-agnostic
+        # pipeline), not a hardcoded agent-core.
+        pr = {**_pr(80, 'work/x', repo='Larry-Yatch/ourliberty-dashboard'),
+              'task_id': 'pr-ourliberty-dashboard-80'}
+        self.assertEqual(
+            h._synthesize_build_data(pr)['target_repo'], 'ourliberty-dashboard')
+
+    def test_target_repo_defaults_when_repo_absent(self):
+        # Defensive: a row with no _repo (e.g. older fixture) falls back to
+        # agent-core rather than emitting an envelope with no target_repo.
+        pr = {**_pr(1, 'forge/x'), 'task_id': 'x'}
+        pr.pop('_repo', None)
+        self.assertEqual(
+            h._synthesize_build_data(pr)['target_repo'], 'ourliberty-agent-core')
+
+
+class TestFetchOpenPrs(unittest.TestCase):
+    """Multi-repo combine semantics (the per-repo gh call is mocked)."""
+
+    def _run(self, per_repo):
+        # per_repo: dict repo -> list|None (None models a gh failure for that repo)
+        from unittest import mock
+        with mock.patch.object(h, 'REPOS',
+                               ('Larry-Yatch/ourliberty-agent-core',
+                                'Larry-Yatch/ourliberty-dashboard')), \
+                mock.patch.object(h, '_fetch_repo_prs',
+                                  side_effect=lambda repo: per_repo.get(repo)):
+            return h.fetch_open_prs()
+
+    def test_combines_rows_from_both_repos(self):
+        out = self._run({
+            'Larry-Yatch/ourliberty-agent-core': [{'number': 1}],
+            'Larry-Yatch/ourliberty-dashboard': [{'number': 2}],
+        })
+        self.assertEqual(sorted(r['number'] for r in out), [1, 2])
+
+    def test_one_repo_failing_still_returns_the_other(self):
+        # A single-repo gh hiccup must NOT blind the sweep to the other repo.
+        out = self._run({
+            'Larry-Yatch/ourliberty-agent-core': None,          # errored
+            'Larry-Yatch/ourliberty-dashboard': [{'number': 2}],
+        })
+        self.assertEqual([r['number'] for r in out], [2])
+
+    def test_all_repos_failing_returns_none(self):
+        # Only None when EVERY repo failed → main logs "gh unavailable".
+        self.assertIsNone(self._run({
+            'Larry-Yatch/ourliberty-agent-core': None,
+            'Larry-Yatch/ourliberty-dashboard': None,
+        }))
+
+    def test_empty_repos_is_success_not_failure(self):
+        # Repos with zero open PRs are a success ([]), distinct from a gh failure.
+        out = self._run({
+            'Larry-Yatch/ourliberty-agent-core': [],
+            'Larry-Yatch/ourliberty-dashboard': [],
+        })
+        self.assertEqual(out, [])
+
 
 class TestHealerEnabled(unittest.TestCase):
     def test_default_on(self):
@@ -323,19 +418,21 @@ class TestMainDispatchFlow(unittest.TestCase):
     notifier/safe_write_inbox deps injected via sys.modules."""
 
     @staticmethod
-    def _pr_realnow(number, branch, age_minutes=60, *, is_draft=False, labels=()):
+    def _pr_realnow(number, branch, age_minutes=60, *, is_draft=False, labels=(),
+                    repo='Larry-Yatch/ourliberty-agent-core'):
         # main() compares createdAt against the real wall clock, so these
         # fixtures must be dated relative to actual now (not the fixed NOW).
         created = (datetime.now(timezone.utc)
                    - timedelta(minutes=age_minutes)).strftime('%Y-%m-%dT%H:%M:%SZ')
         return {
             'number': number,
-            'url': f'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/{number}',
+            'url': f'https://github.com/{repo}/pull/{number}',
             'headRefName': branch,
             'createdAt': created,
             'title': 't',
             'isDraft': is_draft,
             'labels': list(labels),
+            '_repo': repo,
         }
 
     def _run_main(self, *, prs, dispatch_succeeds, enabled=True, failed=None,
@@ -415,14 +512,29 @@ class TestMainDispatchFlow(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertEqual(fn.dispatch_calls, [])
 
-    def test_labeled_pr_dispatched_with_pr_number_task_id(self):
-        # End-to-end: a non-draft auto-review-labeled PR routes a Mirror review
-        # keyed pr-<number>.
+    def test_labeled_pr_dispatched_with_repo_qualified_task_id(self):
+        # End-to-end: a non-draft auto-review-labeled agent-core PR routes a Mirror
+        # review keyed by the repo-qualified pr id, targeting its own repo.
         prs = [self._pr_realnow(625, 'fix/install-drift-dedup', age_minutes=60,
                                 labels=[h.AUTO_REVIEW_LABEL])]
         rc, fn, saved, alerts = self._run_main(prs=prs, dispatch_succeeds=True)
         self.assertEqual(len(fn.dispatch_calls), 1)
-        self.assertEqual(fn.dispatch_calls[0][0]['task_id'], 'pr-625')
+        data, _url = fn.dispatch_calls[0]
+        self.assertEqual(data['task_id'], 'pr-ourliberty-agent-core-625')
+        self.assertEqual(data['target_repo'], 'ourliberty-agent-core')
+        self.assertEqual(alerts, [])
+
+    def test_labeled_dashboard_pr_dispatched_to_dashboard(self):
+        # Multi-repo end-to-end: a labeled DASHBOARD PR routes a review targeting
+        # the dashboard repo, keyed by the dashboard-qualified id.
+        prs = [self._pr_realnow(80, 'work/p7-universal-card', age_minutes=60,
+                                labels=[h.AUTO_REVIEW_LABEL],
+                                repo='Larry-Yatch/ourliberty-dashboard')]
+        rc, fn, saved, alerts = self._run_main(prs=prs, dispatch_succeeds=True)
+        self.assertEqual(len(fn.dispatch_calls), 1)
+        data, _url = fn.dispatch_calls[0]
+        self.assertEqual(data['task_id'], 'pr-ourliberty-dashboard-80')
+        self.assertEqual(data['target_repo'], 'ourliberty-dashboard')
         self.assertEqual(alerts, [])
 
     def test_unlabeled_pr_dispatches_nothing(self):
