@@ -20,17 +20,36 @@
 #
 # Idempotently creates the `auto-review` label if the repo doesn't have it yet.
 #
+# Multi-repo: heal_undispatched_pr_review routes labeled PRs in BOTH
+# ourliberty-agent-core AND ourliberty-dashboard, so this opener takes an optional
+# `--repo <owner/name>` (default agent-core). It ensures the label on whichever
+# repo you target and opens the PR there.
+#
 # Usage:
 #   scripts/open_pr_for_team.sh --title "<t>" --body "<b>" [gh pr create args...]
-#   scripts/open_pr_for_team.sh --title "<t>" --body-file body.md --draft
-# All extra args pass through to `gh pr create` verbatim (e.g. --base, --head).
+#   scripts/open_pr_for_team.sh --repo Larry-Yatch/ourliberty-dashboard \
+#       --title "<t>" --body-file body.md --draft
+# All other args pass through to `gh pr create` verbatim (e.g. --base, --head).
 set -euo pipefail
 
-REPO="Larry-Yatch/ourliberty-agent-core"
+REPO="Larry-Yatch/ourliberty-agent-core"   # default; override with --repo
 AUTO_REVIEW_LABEL="auto-review"
 
-# Ensure the opt-in label exists (no-op if already present). Color/description are
-# only set on first creation; `|| true` keeps a benign "already exists" non-fatal.
+# Pull an optional `--repo <coords>` / `--repo=<coords>` out of the args so we
+# ensure the label on the RIGHT repo and pass --repo to gh exactly once (a bare
+# passthrough would collide with our own --repo). Everything else is preserved.
+ARGS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --repo) REPO="${2:?--repo requires a value (owner/name)}"; shift 2 ;;
+    --repo=*) REPO="${1#--repo=}"; shift ;;
+    *) ARGS+=("$1"); shift ;;
+  esac
+done
+
+# Ensure the opt-in label exists on the TARGET repo (no-op if already present).
+# Color/description are only set on first creation; `|| true` keeps a benign
+# "already exists" non-fatal.
 if ! gh label list --repo "$REPO" --limit 200 \
       --json name --jq '.[].name' 2>/dev/null | grep -qx "$AUTO_REVIEW_LABEL"; then
   echo "[open_pr_for_team] creating '${AUTO_REVIEW_LABEL}' label on ${REPO}..."
@@ -41,7 +60,6 @@ if ! gh label list --repo "$REPO" --limit 200 \
 fi
 
 # Default base to main unless the caller supplied a base (long or gh short form).
-ARGS=("$@")
 has_base=false
 for a in ${ARGS[@]+"${ARGS[@]}"}; do
   case "$a" in --base|--base=*|-B) has_base=true ;; esac
