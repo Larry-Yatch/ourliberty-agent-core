@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 10:27Z UTC (Iter ~2442, Tier 3→3, consecutive_clean=4→5, G-RULE DISPATCH ✅)
+## Status snapshot — updated 2026-06-22 10:59Z UTC (Iter ~2443, Tier 3→3, consecutive_clean=5→6, NOMINAL ✅)
 
-**Iter ~2442 summary:** ✅ Nominal + G-rule dispatch. 1 new alert (line 885): catalog-accuracy-drift Tier-3 silenced; G-rule 2/3→3/3 crossed → dispatched direction-ask to Beacon (catalog-accuracy-drift-grule-001). 5/5 daemons alive (same PIDs). 0 open PRs. All inboxes empty (pre-dispatch). **Tier 3→3, consecutive_clean=4→5.** **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals, deploy-notifier:ERROR main-branch dpl_8QqRKy3hBSeQ913R2PQjKVSHw1ZJ (likely transient, no new failures). [blue]: unreviewed-merge:628/625/627, daemon-pids.json missing.** PRIME: interventions=1060, systemic_fixes=56, ratio≈18.93, trend=improving. **G-rule catalog-accuracy-drift: 3/3 DISPATCHED (catalog-accuracy-drift-grule-001 → Beacon). G-rule mirror-marker-parse-error: 2/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Next cadence: 30-min (Tier 3).
+**Iter ~2443 summary:** ✅ Nominal. 1 new alert (line 886): outbox-notifier approval_request for catalog-drift-sync-cadence-001 → Tier-3 silence (delivery confirmation only). 5/5 daemons alive (same PIDs). 0 open PRs. All inboxes empty. **Tier 3→3, consecutive_clean=5→6.** **KEY EVENTS SINCE ~2442:** catalog-drift-sync-cadence-001 approved by Larry ("Go" 10:52Z), dispatched to Forge, picked up ~10:54Z (in-flight). catalog-accuracy-drift-grule-001 dispatched to Beacon in ~2442, picked up ~10:57Z (in-flight). **Standing [yellow]: unreviewed-merge:607, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals, deploy-notifier:ERROR main-branch dpl_8QqRKy3hBSeQ913R2PQjKVSHw1ZJ (no new failures). [blue]: catalog-drift-sync-cadence-001 in-flight, catalog-accuracy-drift-grule-001 in-flight, unreviewed-merge:628/625/627, daemon-pids.json missing.** PRIME: interventions=1060, systemic_fixes=56, ratio≈18.93, trend=improving. **G-rule catalog-accuracy-drift: 3/3 DISPATCHED. G-rule mirror-marker-parse-error: 2/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Next cadence: 30-min (Tier 3).
 
 
 
