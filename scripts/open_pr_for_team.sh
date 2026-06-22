@@ -41,7 +41,7 @@ AUTO_REVIEW_LABEL="auto-review"
 ARGS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --repo) REPO="$2"; shift 2 ;;
+    --repo) REPO="${2:?--repo requires a value (owner/name)}"; shift 2 ;;
     --repo=*) REPO="${1#--repo=}"; shift ;;
     *) ARGS+=("$1"); shift ;;
   esac
