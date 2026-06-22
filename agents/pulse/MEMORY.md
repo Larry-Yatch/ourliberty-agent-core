@@ -168,9 +168,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 18:32Z UTC (Iter ~2464, Tier 1→1, consecutive_clean=0→1, NOMINAL ✅)
+## Status snapshot — updated 2026-06-22 18:42Z UTC (Iter ~2465, Tier 1→1, consecutive_clean=1→2, NOMINAL ✅)
 
-**Iter ~2464 summary:** ✅ Nominal. 0 new alerts. 0 open PRs both repos. 5/5 daemons alive (same PIDs). Watermark=922=file_length. **Standing [yellow]: unreviewed-merge:637, unreviewed-merge:607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals.** PRIME: systemic_fixes=56, ratio=19.0, trend=improving. **G-rule mirror-marker-parse-error: 2/3. G-rule sync.service-deploy-restart-storm-tier4: 1/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Tier 1, consecutive_clean=1, next cadence: 5-min.
+**Iter ~2465 summary:** ✅ Nominal. 0 new alerts. 0 open PRs both repos. 5/5 daemons alive (same PIDs). Watermark=922=file_length. **Standing [yellow]: unreviewed-merge:637, unreviewed-merge:607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals.** PRIME: systemic_fixes=56, ratio=19.0, trend=improving. **G-rule mirror-marker-parse-error: 2/3. G-rule sync.service-deploy-restart-storm-tier4: 1/3. G-rule heal-stale-daemon-code-script-service-mismatch: 1/3.** Tier 1, consecutive_clean=2, next cadence: 5-min.
 
 
 
