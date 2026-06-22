@@ -4,6 +4,114 @@
 
 ---
 
+## Iteration ~2413 — 2026-06-22T02:11Z UTC (interactive, /cycle, Tier 3, consecutive_clean=4→5, NOMINAL ✅)
+
+**Trigger:** Larry `/cycle` invocation (interactive).
+
+**Health:** ✅ Nominal — all checks clean. 6 new alerts (all Tier-3 silenced). 5/5 daemons alive (outbox_notifier + dashboard_api new PIDs after heal-stale-daemon-code restart). 0 open PRs. 0 inbox tasks. Monday UTC (weekday=0 ∈ {0,2,4,6}) — Check I, VIII, IX, X all ran.
+
+**VERIFY-BEFORE-REASSERT:**
+- **All 5 daemons alive (re-verified):** inbox_watcher=559441 (Ssl) ✅, outbox_notifier=913753 (Ss) ✅ (NEW PID — heal-stale-daemon-code restart 01:25Z for P6.1 commit 8822216a), beacon=599691 (Ss) ✅, dashboard_api=913511 (Ssl) ✅ (NEW PID — same restart), chain-event=3734305 (SNs) ✅. Old PIDs 885031/882541 confirmed dead.
+- **install-drift:ourliberty-launch-dedup-gc:** Still active — systemd files exist in agent-core/systemd/ but timer is `inactive`. Operator action still needed. [carry — yellow]
+- **unreviewed-merge:607:** PR #607 MERGED 2026-06-21T20:15:33Z, 0 reviews. Already bot-DM'd Larry. [carry — yellow]
+- **G-rule catalog-accuracy-drift:** 2/3 — 0 new alerts this iter. [carry]
+- **G-rule mirror-marker-parse-error:** 2/3 — 0 new alerts this iter. [carry]
+- **Repo HEAD:** e0d00173=origin/main. Clean tree. ✅
+- **Check VIII prior proposal (check-viii-update-2026-06-15):** This week's Check VIII returned `insufficient_signal` (TP=2, FP=2, FN=3555) — not enough signal to confirm or update the 2026-06-15 lower-threshold proposal. Prior proposal still technically on the table; Larry judgment. [carry — yellow]
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 865, "file_length": 871}`. 6 new alerts L866-L871:
+- L866: `source=dispatch-branch-cleanup, subject=summary` — Helper: Tier-3 (known-pattern). Branch cleanup: 1 local + 1 remote pruned. ✅
+- L867: `source=outbox-notifier, subject=mirror-dag-pass:launch-system-self-awareness-slice-2a-waiting-on-larry` — Helper: Tier-3 (known-pattern). Mirror DAG-preflight PASS; sequence activated. Bot already DM'd Larry. ✅
+- L868: `source=outbox-notifier, subject=sequence-complete:launch-system-self-awareness-slice-2a-waiting-on-larry` — Helper: Tier-3 (known-pattern). Sequence complete: PR #620 merged (System self-awareness Slice 2a). Bot already DM'd Larry at 19:28 MDT. ✅
+- L869: `source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-dashboard-api.service` — Helper: Tier-3 (known-pattern). Auto-restart for commit 8822216a P6.1 backend. ✅
+- L870: `source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-outbox-notifier.service` — Helper: Tier-3 (known-pattern). Same restart event. ✅
+- L871: `source=dispatch-branch-cleanup, subject=summary` — Helper: Tier-3 (known-pattern). Branch cleanup: 5 local + 3 remote pruned. ✅
+Watermark advanced 865→871. No tier-reset (all Tier-3 carve-out). ✅ Nominal.
+
+**Check 1 — Log noise:** outbox-notifier.log + inbox-watcher.log: 0 WARN/ERROR (last 30 lines each). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot PID 599691 alive (Ss). Last Larry directive: 'go' at 15:18:24 MDT 2026-06-21 (approved dag-preflight-projects-v3-p6-brainstorm-autofill). All directives resolved — sequence completed (PR #620 merged). No orphaned directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → "no stalls detected." FORGE_NO_PR_SKIP for merged PRs #611/#72/#73 — nominal. ✅ Nominal.
+
+**Check 4 — Pending directives:** Forge: 0. Beacon: 0. Mirror: 0. beacon-pending-approvals: pending=0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-22T01:55:20Z (~16 min before iter). Within 60-min window. ✅ Nominal.
+
+**Check A — Source repo:** On main. Clean. HEAD=e0d00173=origin/main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-22T01:21:46Z (~49 min ago), status=success. Within 2h window. ✅ Nominal.
+
+**Check C — Agent liveness:** inbox_watcher=559441 (Ssl) ✅, outbox_notifier=913753 (Ss) ✅, beacon=599691 (Ss) ✅, dashboard_api=913511 (Ssl) ✅, chain-event=3734305 (SNs) ✅. 5/5. ✅
+
+**Check D — Inboxes:** Forge: 0. Beacon: 1 (pulse-auto-f8ac2e3afc-20260622, just dispatched by Check I — nominal). Mirror: 0. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Monday 2026-06-22 UTC (weekday=0 ∈ {0,2,4,6}):**
+
+**Check I (2026-06-22):**
+- Ledger total: $859.04; 129 anomaly(ies)
+- Retry overhead: $0.00 (0.0%)
+- Forge marker-discipline: 0 misses (retry-depth 0/0/0, 0% retry-2+), trend flat
+- Mode: digest — 1 proposal(s), 1 auto-dispatched to Beacon:
+  1. [small] Review high-σ anomaly task `cycle-202606190057210000` — $2.83 vs $0.84 baseline (17.2σ above). Envelope: `pulse-auto-f8ac2e3afc-20260622.json` in Beacon inbox.
+
+**Check VIII (2026-06-22):** `rule_fired=insufficient_signal` (TP=2, FP=2, FN=3555, DMs=4, events=3630). No DM, no approve shortcut. Prior 2026-06-15 proposal (lower threshold 10M→7.6M tokens) remains on table but unconfirmed by this week's data.
+
+**Check IX (2026-06-22):** fired=2 (catch-me-up-gap, alert-ignored), registered=0, skipped=2 (both have existing drafting missions). Quiet — existing missions are handling these signals. ✅
+
+**Check X (2026-06-22):** outcome=none. 193 baseline tasks, 364 trailing tasks, 0 threshold breaches. Chain quality nominal. ✅
+
+**Check III:** Last artifact 2026-06-11 (11d < 14d gate). → skip. ✅
+
+**Actions taken:**
+1. Check 0: watermark 865→871. 6 alerts triaged: all Tier-3 silenced.
+2. Check I: ran pulse_check_i.py — 1 proposal auto-dispatched to Beacon (pulse-auto-f8ac2e3afc-20260622).
+3. Check VIII: ran pulse_check_viii.py — insufficient_signal, no action.
+4. Check IX: ran pulse_check_ix.py — 2 signals, 2 deduped, 0 new missions.
+5. Check X: ran pulse_check_x.py — outcome=none.
+6. PRIME ledger: `iter_clean` appended (tier=3).
+7. Tier state: `record --checks-clean true` → consecutive_clean=4→5 (Tier 3, stays).
+
+**Dispatches:** 1 — pulse-auto-f8ac2e3afc-20260622 to Beacon (Check I high-σ anomaly proposal).
+
+**Standing findings (carried + verified):**
+- [yellow] **install-drift:ourliberty-launch-dedup-gc.service + .timer** — Still active (timer inactive). Operator action: `sudo cp ~/agent-core/systemd/ourliberty-launch-dedup-gc.{service,timer} /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now ourliberty-launch-dedup-gc.timer`. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. This week: insufficient_signal (no update). Prior proposal (10M→7.6M tokens) still on table. Larry judgment. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — PR #607 merged without Mirror review (docs-only, actor=Larry-Yatch). Bot DM'd. Larry judgment. [carry]
+- [blue] **install-drift:ourliberty-build-sequence-advancer.service** — Tier-3 silenced. [carry]
+- [blue] **unreviewed-merge:571** — bot DM'd. Larry judgment. [carry]
+- [blue] **unreviewed-merge:511/499/494/489/518/519/530** — bot-delivered, Larry judgment. [carry]
+- [blue] **Stale bash orphan PID 1834248** — ~27d+ sleep-loop waiting for build-check-viii-pr-2b-analyzer-001.json. Ss state, low CPU. No action.
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. Watch; dispatch to Beacon at 3/3.
+- [blue] **G-rule catalog-accuracy-drift** — 2/3. Watch; dispatch to Beacon at 3/3.
+- [blue] **G-rule mirror-marker-parse-error** — 2/3. Watch; dispatch to Beacon at 3/3.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule seq-advancer-sequence-stranded** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule watchdog-watcher-log-stale** — 1/3. Watch.
+- [blue] **G-rule health-notify-script-missing** — dispatch sent 2026-06-09, fix status unverified. [carry]
+
+**PRIME DIRECTIVE:** 0 interventions this iter (iter_clean). Trailing-30d: systemic_fixes=55, ratio≈19.2, trend=improving.
+**Tier end-of-iter:** Tier 3, consecutive_clean=4→5 (stays Tier 3). Next cadence: 30-min (Tier 3).
+
+---
+
 ## Iteration ~2412 — 2026-06-21T23:57Z UTC (interactive, /cycle, Tier 3, consecutive_clean=3→4, NOMINAL ✅)
 
 **Trigger:** Larry `/cycle` invocation (interactive).
@@ -171628,3 +171736,12 @@ Watermark: 1049 → 1050. No tier-reset (Tier-3 silence).
 **Tier end-of-iter:** Tier 3, consecutive_clean=16. Last signal: 2026-06-18T10:23:58Z.
 
 ---
+
+**Check I (2026-06-22):**
+
+- Ledger total: $859.04; 129 anomaly(ies)
+- Retry overhead: $0.00 (0.0%)
+- Forge marker-discipline: 0 misses (retry-depth 0/0/0, 0% retry-2+), trend flat (+0 vs prior wk)
+- Mode: digest — 1 proposal(s):
+  1. [small] Review high-σ anomaly task `cycle-202606190057210000` — $2.83 task vs $0.84 baseline (17.2σ above)
+     Rationale: Ledger flagged this task at 17.2σ above baseline. Read the chain archive and propose either: a fast-path for the shape, a prompt-discipline fix, or a model downgrade if the depth wasn't warranted.

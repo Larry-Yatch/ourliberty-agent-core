@@ -162,9 +162,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-21 23:57Z UTC (Iter ~2412, Tier 3, consecutive_clean=3→4, NOMINAL ✅)
+## Status snapshot — updated 2026-06-22 02:11Z UTC (Iter ~2413, Tier 3, consecutive_clean=4→5, NOMINAL ✅)
 
-**Iter ~2412 summary:** ✅ Nominal. 1 new alert (L865: dispatch-branch-cleanup/summary, Tier-3 silenced — pruned 8 local + 5 remote stale branches). 5/5 daemons alive (PIDs unchanged: outbox_notifier=885031, dashboard_api=882541, inbox_watcher=559441, beacon=599691, chain-event=3734305). 0 open PRs. 0 inbox tasks. **Standing [yellow]:** install-drift:ourliberty-launch-dedup-gc.service + .timer (operator SSH action still needed). beacon-pending-approvals: 0. Check I: sentinel check-i-2026-06-21.json exists → skip. Check III: 10d < 14d → skip. PRIME: systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** Tier 3, consecutive_clean=3→4 (stays Tier 3). Next cadence: 30-min (Tier 3).
+**Iter ~2413 summary:** ✅ Nominal. 6 new alerts (L866-L871: all Tier-3 silenced — dispatch-branch-cleanup x2, outbox-notifier mirror-dag-pass + sequence-complete slice-2a, heal-stale-daemon-code x2). 5/5 daemons alive (NEW PIDs: outbox_notifier=913753, dashboard_api=913511 — heal-stale-daemon-code restart at 01:25Z for P6.1 commit 8822216a; inbox_watcher=559441, beacon=599691, chain-event=3734305 unchanged). 0 open PRs. 0 inbox tasks (1 Check I dispatch envelope in Beacon inbox). **Monday checks: Check I mode=digest, 1 proposal auto-dispatched (cycle-202606190057210000, 17.2σ). Check VIII insufficient_signal (prior 2026-06-15 lower proposal still on table). Check IX 2/2 deduped. Check X outcome=none.** **Standing [yellow]:** install-drift:ourliberty-launch-dedup-gc.service + .timer (operator SSH action still needed). PRIME: systemic_fixes=55, ratio≈19.2. **G-rule catalog-accuracy-drift: 2/3. G-rule mirror-marker-parse-error: 2/3.** Tier 3, consecutive_clean=4→5 (stays Tier 3). Next cadence: 30-min (Tier 3).
 
 
 
