@@ -564,12 +564,12 @@
           "id": "system-self-awareness-slice-2a-waiting-on-larry",
           "title": "System self-awareness - Slice 2a (Waiting on Larry)",
           "desired_end_state": "Extend the State Log's waiting_on_larry into an itemized cross-source list (parked + pending approvals + for-Larry escalations), read-only, reusing existing sources. Build STRICTLY from the spec doc.",
-          "lifecycle_state": "brainstorm",
+          "lifecycle_state": "building",
           "order": 0,
           "spec_ref": "agents/beacon/specs/system-awareness-slice-2a-waiting-on-larry-substrate.md",
-          "sequence_ref": null,
+          "sequence_ref": "launch-system-self-awareness-slice-2a-waiting-on-larry",
           "created_at": "2026-06-21T22:26:15.787568+00:00",
-          "updated_at": "2026-06-21T22:26:15.787568+00:00",
+          "updated_at": "2026-06-22T01:05:02.728244+00:00",
           "brainstorm": {
             "is_ai_draft": true,
             "draft": {
