@@ -929,21 +929,35 @@ def _render_install_healed(unit: str, next_fire: str) -> tuple[str, str, str]:
 
 def _render_missing_install(unit: str) -> tuple[str, str, str]:
     repo_path = f'~/agent-core/systemd/{unit}'
+    # cp + daemon-reload is the common core. Only a .timer or a standalone
+    # [Install] daemon needs a third `enable --now` step; an oneshot or a
+    # timer-activated (no-[Install]) service is brought up by its sibling timer,
+    # so daemon-reload IS the whole dance — fold the explanation onto the reload
+    # line as a comment rather than emitting a second, redundant daemon-reload.
     if _activates_via_enable(unit):  # timer or standalone [Install] daemon
+        reload_line = 'sudo systemctl daemon-reload'
         enable_line = (
             f'sudo systemctl enable --now {unit}  '
             f'# enable --now: starts it now + at boot'
         )
     elif _classify_unit(unit) == 'oneshot':
-        enable_line = (
+        reload_line = (
             'sudo systemctl daemon-reload  '
-            '# oneshot service re-execs on its next timer fire'
+            '# oneshot: its sibling timer re-execs it on the next fire — no enable needed'
         )
+        enable_line = None
     else:  # long-running service activated by its sibling timer (no [Install])
-        enable_line = (
+        reload_line = (
             'sudo systemctl daemon-reload  '
-            '# its sibling timer starts it on the next fire'
+            '# its sibling timer starts it on the next fire — no enable needed'
         )
+        enable_line = None
+    dance = [
+        f'  sudo cp {repo_path} /etc/systemd/system/',
+        f'  {reload_line}',
+    ]
+    if enable_line:
+        dance.append(f'  {enable_line}')
     message = (
         f'Unit `{unit}` is shipped in the repo (`systemd/{unit}`) but is not '
         f'installed under `/etc/systemd/system/`. Likely cause: the PR that '
@@ -952,11 +966,9 @@ def _render_missing_install(unit: str) -> tuple[str, str, str]:
     )
     subject = f'install-drift:{unit}'
     suggested = (
-        f'On the droplet (ssh larry@134.209.44.80):\n'
-        f'  sudo cp {repo_path} /etc/systemd/system/\n'
-        f'  sudo systemctl daemon-reload\n'
-        f'  {enable_line}\n'
-        f'Then verify: `systemctl status {unit}`'
+        'On the droplet (ssh larry@134.209.44.80):\n'
+        + '\n'.join(dance)
+        + f'\nThen verify: `systemctl status {unit}`'
     )
     return message, subject, suggested
 

@@ -1670,6 +1670,24 @@ class RenderRemediationByClassTest(_IsolatedAgentsRoot):
         self.assertIn('daemon-reload', sug)
         self.assertNotIn('enable --now', sug)
 
+    def test_missing_install_oneshot_no_duplicate_daemon_reload(self):
+        # Regression: the oneshot branch used to emit `daemon-reload` twice — the
+        # template's fixed reload line plus an enable_line that was itself a
+        # second daemon-reload, mislabelled 'oneshot service re-execs on its next
+        # timer fire'. The dance must list daemon-reload exactly once.
+        with mock.patch.object(h, '_classify_unit', return_value='oneshot'):
+            _msg, _subj, sug = h._render_missing_install('probe.service')
+        self.assertEqual(sug.count('daemon-reload'), 1, sug)
+
+    def test_missing_install_timer_activated_no_duplicate_daemon_reload(self):
+        # Same duplicate-reload bug on the timer-activated (long-running,
+        # no-[Install]) branch.
+        with mock.patch.object(h, '_classify_unit', return_value='long-running'), \
+             mock.patch.object(h, '_activates_via_enable', return_value=False):
+            _msg, _subj, sug = h._render_missing_install('ourliberty-cycle.service')
+        self.assertEqual(sug.count('daemon-reload'), 1, sug)
+        self.assertNotIn('enable --now', sug)
+
     def test_content_healed_long_running_no_next_fire(self):
         unit = 'ourliberty-inbox-watcher.service'
         with mock.patch.object(h, '_classify_unit', return_value='long-running'):
