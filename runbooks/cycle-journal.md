@@ -174920,3 +174920,87 @@ Watermark: 1049 → 1050. No tier-reset (Tier-3 silence).
 - Mode: digest — 1 proposal(s):
   1. [small] Review high-σ anomaly task `cycle-202606190057210000` — $2.83 task vs $0.84 baseline (17.2σ above)
      Rationale: Ledger flagged this task at 17.2σ above baseline. Read the chain archive and propose either: a fast-path for the shape, a prompt-discipline fix, or a model downgrade if the depth wasn't warranted.
+
+---
+
+## Iteration ~2452 — 2026-06-22T13:28Z UTC (interactive, /cycle, Tier 2→3 de-escalated, NOMINAL)
+
+**Trigger:** Larry direct invocation.
+
+**Health:** Nominal. All checks clean. Tier 2 consecutive_clean=2→3 → **de-escalated to Tier 3** (30-min cadence).
+
+**VERIFY-BEFORE-REASSERT:**
+- unreviewed-merge:607: PR #607 MERGED 2026-06-21T20:15Z. CLEARED.
+- Check I dispatch pulse-auto-f8ac2e3afc-20260622: Beacon archive exit_code=0 (root cause identified: Sonnet 4.6 cycle + model mislabel; proposal: downgrade to Haiku 4.5 + telemetry fix). Archive written 2026-06-21T20:21Z. beacon-pending-approvals pending=0; APPROVAL_REQUEST delivery status unclear. [blue carry]
+- catalog-accuracy-drift-gruel-001: NOT in Beacon archive. Still in-flight. [blue carry]
+- All 5 daemon PIDs: chain_event=930563 (SNs) ✅, beacon=1025989 (Ss) ✅, dashboard_api=1026057 ✅, inbox_watcher=1026206 ✅, outbox_notifier=1026349 ✅. 5/5 alive.
+- Repo HEAD: b6596856=origin/main. Clean tree.
+- PR #81 (ES2018 fix, dashboard): Still open, no review. Medic silenced (L904). Live site on PR #78. [yellow carry]
+- PR #80 (P7.1 UniversalCard, dashboard): Still open, no review. [yellow carry]
+- PR #634 (P7 spec, agent-core): Still open, no review. Created 11:35Z. [blue carry]
+
+**Check 0 — Alert triage:** repair-watermark no-op (watermark=903, file_length=904). 2 new alerts (L904–L905).
+- L904 (medic/medic-diagnosis, 13:04Z): pipeline-stall:unrouted-pr:PR#81. Helper → Tier 3 (known-pattern). Silenced.
+- L905 (pulse/check-i-2026-06-22, 13:24Z): Check I digest. Helper → Tier 3 (known-pattern: source=pulse subject=check-i-YYYY-MM-DD). Silenced.
+- Watermark advanced 903→905.
+
+**Check 1 — Log noise:** journalctl ourliberty-*.service priority=warning since 60min ago → No entries. outbox-notifier.log: no recent WARNs. Nominal.
+
+**Check 2 — Telegram sweep:** Beacon PID 1025989 alive. Larry messages (last 4h): "Can you fix this?" (10:52Z) had Beacon reply at 10:56Z — tracked, not orphaned. No orphaned directives. Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → 0 stalls. 7 FORGE_NO_PR_SKIP (pr_exists/preflight_exit). PRs #634/#81/#80 suppressed on cooldown. Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals pending=0. Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-22T13:14:09Z (~14 min). FRESH. Nominal.
+
+**Check A — Source repo:** HEAD=b6596856=origin/main. Clean tree. On main.
+
+**Check B — Sync health:** last_sync=2026-06-22T12:46:55Z (~41 min), status=no-change. Within 2h.
+
+**Check C — Agent liveness:** 5/5 alive (PIDs above).
+
+**Check D — Inboxes:** Beacon: 0. Forge: 0. Mirror: 0.
+
+**Check E — PRs:** agent-core: #634 [no review, ~1.9h]. dashboard: #81 + #80 [no review, ~1.5h each]. All under 72h. No clean+green PRs missing auto-merge.
+
+**Check H — Forge digest:** 0 open Forge PRs (forge/ prefix). 0 Forge merges in last 4h.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op.
+
+**Check I — Monday gate:** pulse_check_i.py → journal block already present for 2026-06-22. Auto-dispatch deduped (prior task=pulse-auto-f8ac2e3afc-20260622). DM queued (L905, Tier-3 silenced). 0 new dispatches.
+
+**Check III:** Today is Monday. Skip.
+
+**Actions taken:**
+1. Check 0: L904 Tier-3 silenced (medic-diagnosis known-pattern).
+2. Check 0: L905 Tier-3 silenced (pulse check-i-YYYY-MM-DD known-pattern).
+3. Check 0: Watermark 903→905.
+4. PRIME ledger: iter_clean appended (Tier 2).
+5. Tier state: record --checks-clean true → consecutive_clean=2→3, Tier 2→3 promoted (de-escalated).
+
+**Dispatches:** None.
+
+**Standing findings (carried):**
+- [yellow] deploy ERROR PR #80 — P7.1, no Mirror review. [carry]
+- [yellow] deploy ERROR main-branch / PR #81 fix in-flight — ES2018, no Mirror review, live site on PR #78. [carry]
+- [yellow] install-drift:doorbell — needs sudo install. [carry, not verified this iter]
+- [yellow] Check VIII rule=lower — approve check-viii-update-2026-06-15. [carry]
+- [yellow] Tier-2 weekly probe auth_401 — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] Check III threshold proposals — approve threshold-update-2026-06-11. [carry]
+- [blue] PR #634 — P7 spec, no Mirror review. Under 72h. [carry]
+- [blue] Check I proposal — cycle-model downgrade (Haiku 4.5 + telemetry fix). Beacon completed. APPROVAL_REQUEST status unclear. [carry]
+- [blue] catalog-accuracy-drift-gruel-001 — Beacon in-flight. [carry]
+- [blue] G-rule sync.service-deploy-restart-storm-tier4 — 1/3. Watch.
+- [blue] G-rule catalog-accuracy-drift — 3/3 DISPATCHED (gruel-001 in-flight). [carry]
+- [blue] G-rule mirror-marker-parse-error — 2/3. Watch.
+- [blue] G-rule heal-stale-daemon-code-script-service-mismatch — 1/3. Watch.
+- [blue] G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch — 1/3. Watch.
+- [blue] unreviewed-merge:511/499/494/489/518/519/530/571 — bot-delivered, Larry judgment. [carry]
+
+**Cleared this iter:** unreviewed-merge:607 — PR #607 MERGED 2026-06-21T20:15Z.
+
+**PRIME DIRECTIVE:** 0 interventions this iter (iter_clean). Trailing-30d: systemic_fixes=56, ratio=18.95, trend=improving.
+**Tier end-of-iter:** Tier 3, consecutive_clean=0. Last signal: 2026-06-22T12:06:37Z.
