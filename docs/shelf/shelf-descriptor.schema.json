@@ -1,0 +1,192 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ourliberty.dev/schemas/shelf-descriptor.schema.json",
+  "title": "Shelf Descriptor (capability-level, v1)",
+  "description": "The durability artifact for ONE reusable CAPABILITY (a multi-component process), not a single component. Defined by Projects-tab-v3 North Star (docs/projects-tab-v3-north-star.md) §8 — the reuse/shelf durability mandate. A capability is a whole process (e.g. funnel -> pipeline -> brainstorm -> spec -> build -> closeout) authored once and adopted by future surfaces/products as assembly rather than rebuild. The §8 fields are named verbatim: capability statement, contracts, reuse_mode, seams, invariants. This schema adds (a) reuse_boundary — the generic-vs-surface-specific line the North Star §8 + spec §3 draw — and (b) component references, so the capability descriptor points at the per-COMPONENT cards on the ourliberty-graph shelf (descriptors/*.json, the v2 Component Descriptor schema) rather than restating them. GRANULARITY NOTE: ourliberty-graph/descriptors/descriptor.schema.json catalogs ONE component (a file/module); THIS schema catalogs ONE capability (a cluster of components forming a reusable process). They are complementary, not competing. RUNTIME COUPLING: this is a documentation artifact. Nothing in the running system reads a shelf descriptor at runtime in this cut (North Star §8; spec §5.4 guardrail — 'Descriptor is documentation, not a coupling'). It is kept honest by mirroring the real seams of the components it catalogs, not by being load-bearing config.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "identity",
+    "capability_statement",
+    "contracts",
+    "reuse_mode",
+    "reuse_boundary",
+    "seams",
+    "invariants",
+    "components",
+    "runtime_coupling",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "description": "Bumped only on a breaking shape change. Readers tolerate-and-ignore unknown additive keys."
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "capability_name", "source_repos", "consumers"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable kebab-case id for the capability (the librarian's lookup key). e.g. 'projects-v3-universal-card'."
+        },
+        "capability_name": {
+          "type": "string",
+          "description": "Human-readable name of the capability."
+        },
+        "north_star_ref": {
+          "type": "string",
+          "description": "Path + section anchor of the doc that mandates this capability's reuse (e.g. 'docs/projects-tab-v3-north-star.md §8')."
+        },
+        "source_repos": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "The repo(s) the capability's components live in (the capability commonly spans more than one — e.g. agent-core authoring + dashboard rendering)."
+        },
+        "consumers": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Who renders/adopts this capability today, and which surfaces/products are intended adopters. The first consumer is the surface it was authored on; later entries are the durability payoff (other tabs, other products)."
+        }
+      }
+    },
+    "capability_statement": {
+      "type": "string",
+      "description": "§8 field. Plain-language 'what the whole capability does' — the one paragraph a stranger reads to decide whether to adopt it instead of rebuilding. Describes the PROCESS end to end, not any one component."
+    },
+    "contracts": {
+      "type": "array",
+      "minItems": 1,
+      "description": "§8 field. The interface contracts the capability exposes to (or consumes from) the rest of the system — the stable shapes a new surface binds to. NOT a per-function signature dump (that lives on the component cards); these are the capability-level contracts: the data shapes, the action set, the event triggers, and the authoring/render split that a new adopter must honor.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "kind", "description"],
+        "properties": {
+          "name": {"type": "string"},
+          "kind": {
+            "enum": ["data-shape", "action-set", "event-trigger", "authoring-render-split", "adapter", "ui-grammar", "other"],
+            "description": "What sort of contract this is."
+          },
+          "description": {
+            "type": "string",
+            "description": "The contract in plain language: what it guarantees and what an adopter must satisfy."
+          },
+          "generic_or_surface_specific": {
+            "enum": ["generic", "surface-specific"],
+            "description": "Whether this contract is the same for every surface (generic) or supplied per surface (surface-specific). Cross-references reuse_boundary."
+          }
+        }
+      }
+    },
+    "reuse_mode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "rationale"],
+      "description": "§8 field. How this capability is reused. A capability is rarely a single liftable unit; it is usually assembled from already-generic components plus a small surface-specific layer.",
+      "properties": {
+        "mode": {
+          "enum": [
+            "assembly-of-shelf-components",
+            "liftable-cluster",
+            "pattern-to-reimplement"
+          ],
+          "description": "assembly-of-shelf-components = reuse the existing generic components and write only the surface-specific seam (the common case for a mature capability); liftable-cluster = lift the whole component set together; pattern-to-reimplement = the shape is the reusable thing, reimplement per host."
+        },
+        "rationale": {
+          "type": "string",
+          "description": "Why this mode — what is already generic vs what each new surface must author."
+        }
+      }
+    },
+    "reuse_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generic", "surface_specific"],
+      "description": "The generic-vs-surface-specific boundary the North Star §8 + spec §3 draw — the single most important field for an adopter, because it says exactly what they get for free and what they must supply. This is what makes a new surface 'assembly, not a rebuild'.",
+      "properties": {
+        "generic": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string"},
+          "description": "What is the SAME across every surface — the parts an adopter reuses verbatim."
+        },
+        "surface_specific": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string"},
+          "description": "What each surface must SUPPLY — the parts that carry the difference (typically: which registry the items live in, the available action set, and the context the authoring layer reads)."
+        }
+      }
+    },
+    "seams": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string"},
+      "description": "§8 field. The integration points where the capability meets the rest of the system AND where a new surface plugs in. Must MIRROR the real seams of the catalogued components (the spec §5.4 honesty mandate) — a seam here should be traceable to a seam on a component card, not invented."
+    },
+    "invariants": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string"},
+      "description": "§8 field. The discipline that must hold for the capability to stay correct as it is reused — the rules an adopter must not break (single-committer, doorbell, plain-language-always, event-not-poll, no-raw-metadata-leak, etc.). Mirror the real component invariants."
+    },
+    "components": {
+      "type": "array",
+      "minItems": 1,
+      "description": "The per-component shelf cards (ourliberty-graph descriptors/*.json) this capability composes. Pointers, not copies — the component cards own the per-file contract; this list says which ones assemble into the capability and what role each plays.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["component_id", "role", "layer"],
+        "properties": {
+          "component_id": {
+            "type": "string",
+            "description": "The id of the component's shelf card (e.g. 'projects_store') — resolves to ourliberty-graph/descriptors/<id>.json."
+          },
+          "role": {
+            "type": "string",
+            "description": "What this component does within the capability."
+          },
+          "layer": {
+            "enum": ["generic", "surface-specific"],
+            "description": "Which side of the reuse boundary this component sits on."
+          }
+        }
+      }
+    },
+    "runtime_coupling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "note"],
+      "description": "Encodes the spec §5.4 guardrail structurally: the descriptor is documentation, not a coupling. Nothing reads it at runtime in this cut.",
+      "properties": {
+        "status": {
+          "const": "none",
+          "description": "MUST be 'none' — a shelf descriptor that becomes load-bearing config has drifted from its purpose."
+        },
+        "note": {
+          "type": "string",
+          "description": "How the descriptor is kept honest despite nothing reading it (by mirroring the real component seams; reviewed at authoring time)."
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authored_at_commit", "model", "confidence", "sources"],
+      "properties": {
+        "authored_at_commit": {"type": "string"},
+        "model": {"type": "string"},
+        "confidence": {"type": "string"},
+        "sources": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Where the seams/invariants were mirrored from (the component cards + specs read to author this descriptor)."
+        }
+      }
+    }
+  }
+}
