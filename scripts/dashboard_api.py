@@ -695,6 +695,23 @@ class AutomatedWorkResponse(BaseModel):
     truncated: bool = False
 
 
+# ---- /api/system/autonomy-posture response model (system self-awareness:
+# the *prospective* autonomy surface — the companion to the Automated Work
+# feed above). A plain-language read of the LIVE trust policy's current STANCE
+# (trust_policy.summarize_policy): what auto-starts, what still asks Larry, and
+# the always-on gates. Pure file read; `degraded`=True means the policy file
+# couldn't be read and we fail-closed to "everything asks you" (the safe
+# default), NEVER a 500.
+
+class AutonomyPostureResponse(BaseModel):
+    level: str                       # 'conservative' | 'balanced'
+    headline: str
+    auto_starts: list[str] = []      # work that starts without Larry's click
+    still_asks: list[str] = []       # work that still comes to him first
+    gates: list[str] = []            # the always-on backstops
+    degraded: bool = False           # policy unreadable → fail-closed to "asks"
+
+
 class MissionsDerivedResponse(BaseModel):
     # Missions v2 Phase 2 § 3.3 — the relocated derive endpoint's canonical
     # shape. `missions` + `orphans` match the dashboard's pre-Phase-2
@@ -8761,6 +8778,23 @@ def get_system_automated_work(
     return _reader_automated_work(
         client, window_days=window_days, limit=limit,
     )
+
+
+# GET /api/system/autonomy-posture — the autonomy POSTURE (system
+# self-awareness: the *prospective* dial-in surface, the companion to
+# /api/system/automated-work). A plain-language read of the live trust policy's
+# current stance — what auto-starts, what still asks Larry, the always-on gates.
+# Pure read of config/trust-policy.json via trust_policy.summarize_policy();
+# load_policy() and summarize_policy() both fail-closed and NEVER raise, so the
+# lane never 500s (a bad policy reads as degraded="everything asks you").
+@app.get(
+    '/api/system/autonomy-posture',
+    response_model=AutonomyPostureResponse,
+    dependencies=[Depends(_require_token)],
+)
+def get_system_autonomy_posture() -> dict[str, Any]:
+    import trust_policy  # noqa: E402 — scripts/ is on sys.path at module load
+    return trust_policy.summarize_policy(trust_policy.load_policy())
 
 
 # GET /api/missions/captures — the Parked-lane data source (Missions v2
