@@ -653,6 +653,48 @@ class SystemStateLogResponse(BaseModel):
     provenance: Optional[dict[str, Any]] = None
 
 
+# ---- /api/system/automated-work response models (system self-awareness:
+# the "Automated Work" feed — north star §6 item 2, the autonomy dial-in
+# surface). A read of chain_events `autonomy_decision` rows: what the trust
+# policy auto-fired without Larry's click.
+
+class AutomatedWorkItem(BaseModel):
+    # One auto-fired trust-policy decision ("what the team did on its own").
+    # All fields optional so a sparse/older autonomy_decision payload still
+    # serializes (the panel degrades per-field rather than dropping the row).
+    task_id: Optional[str] = None
+    ts: Optional[str] = None
+    age_seconds: Optional[int] = None
+    pr_url: Optional[str] = None
+    decision: Optional[str] = None
+    dispatched: Optional[bool] = None
+    source: Optional[str] = None
+    target_agent: Optional[str] = None
+    target_repo: Optional[str] = None
+    task_type: Optional[str] = None
+    summary: Optional[str] = None
+    rule_label: Optional[str] = None
+    rule_action: Optional[str] = None
+
+
+class AutomatedWorkCounts(BaseModel):
+    auto_approved: int = 0
+    asked: int = 0       # decision=force_ask
+    rejected: int = 0    # decision=reject
+
+
+class AutomatedWorkResponse(BaseModel):
+    # `items` = the auto_approve decisions (most-recent first, bounded by
+    # `limit`); `counts` cover auto_approved/asked/rejected over the window.
+    # Fail-safe: present=False (Supabase unavailable) degrades the panel — the
+    # reader NEVER raises, so the dashboard lane never 500s.
+    present: bool = True
+    window_days: int
+    counts: AutomatedWorkCounts
+    items: list[AutomatedWorkItem]
+    truncated: bool = False
+
+
 class MissionsDerivedResponse(BaseModel):
     # Missions v2 Phase 2 § 3.3 — the relocated derive endpoint's canonical
     # shape. `missions` + `orphans` match the dashboard's pre-Phase-2
@@ -2228,6 +2270,122 @@ def _fetch_chain_events_for_agent(
     except Exception:  # noqa: BLE001 — never 500 on a read-only dashboard lane
         return None
     return list(getattr(resp, 'data', None) or [])
+
+
+# ---- /api/system/automated-work reader (the "Automated Work" feed) ----
+#
+# Reads chain_events `autonomy_decision` rows — the durable record of every
+# trust-policy decision (agent-core #623). The feed surfaces the auto-fired
+# ones ("what the team did on its own"); the asked/rejected counts give the
+# dial-in ratio. NO State Log involvement — system_state_log.py is
+# local-files-only by design; autonomy_decision lives only in Supabase.
+
+_AUTOMATED_WORK_WINDOW_DAYS = 14
+# Bounded fetch so the window counts stay cheap; far above a realistic
+# decision volume (a few dozen/week). When more than this many decisions
+# exist in the window, counts reflect the most-recent _AUTOMATED_WORK_QUERY_CAP.
+_AUTOMATED_WORK_QUERY_CAP = 500
+
+
+def _automated_work_rule_label(rule: Optional[dict[str, Any]]) -> str:
+    """Concise plain-language label for the matched trust rule — NEVER the
+    verbose `_note`. `None` (no rule matched → default action) → 'default
+    policy'."""
+    if not isinstance(rule, dict):
+        return 'default policy'
+    source = rule.get('source') or '*'
+    target = rule.get('target') or '*'
+    repos = rule.get('repos')
+    if isinstance(repos, str):
+        repos = [repos]
+    label = f'{source} → {target}'
+    if repos:
+        label += ' · ' + ', '.join(str(r) for r in repos)
+    return label
+
+
+def _reader_automated_work(
+    supabase_client: Any, *, window_days: int, limit: int,
+) -> dict[str, Any]:
+    """Read autonomy_decision chain_events into the Automated Work feed.
+
+    Fail-safe (never 500): a None client (test env / no creds) or any query
+    error degrades to present=False with empty items + zero counts — the
+    dashboard panel renders 'no data' rather than the lane erroring. Mirrors
+    `_fetch_chain_events_for_agent`'s None-on-error discipline.
+    """
+    degraded = {
+        'present': False,
+        'window_days': window_days,
+        'counts': {'auto_approved': 0, 'asked': 0, 'rejected': 0},
+        'items': [],
+        'truncated': False,
+    }
+    if supabase_client is None:
+        return degraded
+    cutoff = (
+        datetime.now(timezone.utc) - timedelta(days=window_days)
+    ).isoformat()
+    try:
+        resp = (
+            supabase_client.table('chain_events')
+            .select('task_id,ts,pr_url,payload')
+            .eq('event_type', 'autonomy_decision')
+            .gte('ts', cutoff)
+            .order('ts', desc=True)
+            .limit(_AUTOMATED_WORK_QUERY_CAP)
+            .execute()
+        )
+    except Exception:  # noqa: BLE001 — never 500 a read-only dashboard lane
+        return degraded
+    rows = list(getattr(resp, 'data', None) or [])
+
+    now = datetime.now(timezone.utc)
+    counts = {'auto_approved': 0, 'asked': 0, 'rejected': 0}
+    items: list[dict[str, Any]] = []
+    auto_total = 0  # all auto_approve in-window (vs items, which is capped)
+    for row in rows:
+        payload = row.get('payload')
+        if not isinstance(payload, dict):
+            continue
+        decision = payload.get('decision')
+        if decision == 'auto_approve':
+            counts['auto_approved'] += 1
+        elif decision == 'force_ask':
+            counts['asked'] += 1
+        elif decision == 'reject':
+            counts['rejected'] += 1
+        if decision != 'auto_approve':
+            continue
+        auto_total += 1
+        if len(items) >= limit:
+            continue  # keep counting auto_total for `truncated`, stop appending
+        dt = _ts_to_dt(row.get('ts'))
+        age = int((now - dt).total_seconds()) if dt is not None else None
+        matched_rule = payload.get('matched_rule')
+        items.append({
+            'task_id': row.get('task_id') or payload.get('task_id'),
+            'ts': row.get('ts'),
+            'age_seconds': age,
+            'pr_url': row.get('pr_url'),
+            'decision': decision,
+            'dispatched': payload.get('dispatched'),
+            'source': payload.get('source'),
+            'target_agent': payload.get('target_agent'),
+            'target_repo': payload.get('target_repo'),
+            'task_type': payload.get('task_type'),
+            'summary': payload.get('summary'),
+            'rule_label': _automated_work_rule_label(matched_rule),
+            'rule_action': matched_rule.get('action')
+            if isinstance(matched_rule, dict) else None,
+        })
+    return {
+        'present': True,
+        'window_days': window_days,
+        'counts': counts,
+        'items': items,
+        'truncated': auto_total > len(items),
+    }
 
 
 def _derive_in_review(
@@ -8585,6 +8743,24 @@ def get_system_missions() -> dict[str, Any]:
 )
 def get_system_state_log() -> dict[str, Any]:
     return _reader_system_state_log(_state_log_json_path())
+
+
+# GET /api/system/automated-work — the "Automated Work" feed (system
+# self-awareness: the autonomy dial-in surface). Reads chain_events
+# autonomy_decision rows; the State Log is untouched (it's local-files-only).
+@app.get(
+    '/api/system/automated-work',
+    response_model=AutomatedWorkResponse,
+    dependencies=[Depends(_require_token)],
+)
+def get_system_automated_work(
+    window_days: int = Query(_AUTOMATED_WORK_WINDOW_DAYS, ge=1, le=90),
+    limit: int = Query(50, ge=1, le=200),
+) -> dict[str, Any]:
+    client = _get_larry_action_supabase_client()
+    return _reader_automated_work(
+        client, window_days=window_days, limit=limit,
+    )
 
 
 # GET /api/missions/captures — the Parked-lane data source (Missions v2
