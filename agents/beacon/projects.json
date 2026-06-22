@@ -499,7 +499,7 @@
       "title": "P6 verify brainstorm render",
       "north_star_ref": null,
       "repo": "ourliberty-dashboard",
-      "state": "active",
+      "state": "archived",
       "phases": [
         {
           "id": "p6-verify-brainstorm-render",
@@ -536,7 +536,7 @@
       ],
       "one_off": true,
       "created_at": "2026-06-21T22:15:30.603759+00:00",
-      "updated_at": "2026-06-21T22:15:30.603759+00:00",
+      "updated_at": "2026-06-22T05:14:33.765405+00:00",
       "promoted_from": {
         "kind": "capture",
         "capture_id": "cap-p6-verify-brainstorm-card-render-check-c7cc"
