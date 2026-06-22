@@ -510,23 +510,13 @@
           "spec_ref": null,
           "sequence_ref": null,
           "created_at": "2026-06-21T22:15:30.603759+00:00",
-          "updated_at": "2026-06-21T22:16:09.888201+00:00",
+          "updated_at": "2026-06-22T02:34:35.763333+00:00",
           "brainstorm": {
-            "is_ai_draft": true,
-            "draft": {
-              "end_state": "When this phase is done, we have confirmed that a flat brainstorm prefill actually renders on the board as a readable draft. Opening the board shows the pre-filled brainstorm in its expected place, in the right shape, with no blank or broken sections. This is a verification phase: the deliverable is confidence that the render path works end to end, not a new feature.",
-              "why_now": "A flat brainstorm prefill shape was recently introduced, and we need a quick, disposable check that it lands correctly on the board before relying on it for real phases. This phase exists to catch a rendering regression early rather than discovering it during actual brainstorming work.",
-              "scope": "IN: confirming that a flat-shaped brainstorm prefill displays on the board correctly, including that each section appears and is legible. OUT: any production brainstorm content, changes to how prefills are generated, board redesign, or persisting anything from this phase \u2014 it is explicitly throwaway. Open question: whether 'renders' means only visual display, or also that the operator can edit and save it (see decisions).",
-              "constraints_reuse": "Reuse the existing board and its current brainstorm-rendering path rather than building anything new \u2014 this is an assembly/verification effort. What must not break: the board's normal rendering for real phases must be unaffected, and this throwaway phase must not leave residue that pollutes real data. Open question: exactly which prefill-producing component feeds the board is not stated in the facts and should be confirmed before testing.",
-              "options_decision": "Fork one \u2014 verify by eye only (open the board, confirm the prefilled brainstorm looks right) versus add a lightweight automated check that the flat shape renders; trade-off is speed now versus a reusable guard against future regressions. Fork two \u2014 keep the throwaway artifact for a moment to inspect versus tear it down immediately; trade-off is inspectability versus leaving no residue. Recommendation: do a quick by-eye verification first since this is throwaway, and only invest in an automated check if the render proves fragile.",
-              "risks_guardrails": "Risk: the prefill renders blank or with missing sections \u2014 guardrail is to check every section is present and non-empty before calling it done. Risk: the throwaway phase leaves test data behind on the board \u2014 guardrail is to clean up the artifact once verified. Risk: 'looks fine by eye' hides a shape mismatch that only bites real phases later \u2014 guardrail is to verify against the actual flat shape the board expects, not just visual impression.",
-              "done_gate": "Done when: the board displays the flat brainstorm prefill, every expected section is shown and readable, and nothing in the normal board rendering for real phases is broken. Test: open the board for this phase and confirm the prefilled brainstorm appears in the correct shape with all sections; confirm a real phase still renders normally; confirm no leftover throwaway data remains afterward.",
-              "breakdown": "First, confirm which prefill feeds the board and what flat shape the board expects. Second, generate or place a flat brainstorm prefill for this phase. Third, open the board and verify it renders with all sections present and legible. Fourth, confirm real phases still render unaffected. Fifth, clean up the throwaway artifact so nothing persists."
-            },
+            "is_ai_draft": false,
+            "draft": "EDITED LIVE: this draft was changed via the new edit endpoint.",
             "decisions": [
-              "Is success just 'it displays correctly,' or must the operator also be able to edit and save the rendered prefill?",
-              "Verify by eye only, or invest in a small automated render check for future regressions?",
-              "Tear down the throwaway artifact immediately, or keep it briefly for inspection?"
+              "Is the edit endpoint live?",
+              "Does the thread work?"
             ],
             "decisions_overflow": false,
             "handoff": {
@@ -538,9 +528,8 @@
             }
           },
           "brainstorm_provenance": {
-            "by": "beacon",
-            "model": "claude-opus-4-8",
-            "at": "2026-06-21T22:16:09.888201+00:00",
+            "by": "larry",
+            "edited_at": "2026-06-22T02:34:35.763333+00:00",
             "from_state": "brainstorm"
           }
         }
