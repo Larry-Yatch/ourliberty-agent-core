@@ -1,0 +1,15 @@
+[Unit]
+Description=Run heal_daemon_restart_manifest_drift every 10 minutes (keep the daemon-restart manifest fresh)
+
+[Timer]
+# 10-min cadence: fast enough that a PR which adds a new import without
+# regenerating the manifest is reconciled (and the affected daemon then
+# restarted by the stale-daemon backstop) within ~10-20 min, not hours.
+# Steady state (no drift) is a cheap import scan + no commit, so a tight
+# cadence is free.
+OnBootSec=8min
+OnUnitActiveSec=10min
+Unit=ourliberty-heal-daemon-restart-manifest-drift.service
+
+[Install]
+WantedBy=timers.target

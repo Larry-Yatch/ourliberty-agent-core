@@ -1,9 +1,13 @@
 [Unit]
-Description=Run heal_stale_daemon_code every 30 minutes
+Description=Run heal_stale_daemon_code every 10 minutes
 
 [Timer]
-OnBootSec=15min
-OnUnitActiveSec=30min
+# 10-min cadence (was 30) shrinks the stale-code window. The per-unit 30-min
+# RESTART_COOLDOWN still caps each unit to one restart per 30 min, so a faster
+# tick only speeds DETECTION (no restart storms); the scan is a cheap
+# `systemctl show` + `stat` sweep. See spec daemon-restart-manifest-self-heal.
+OnBootSec=10min
+OnUnitActiveSec=10min
 Unit=ourliberty-heal-stale-daemon-code.service
 
 [Install]
