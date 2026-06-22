@@ -118,7 +118,12 @@
         "from_state": "parked"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
-      "aging": true
+      "aging": true,
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-projects-pm-layer-data-is-stale-separate-system-84ec",
+        "stamped_at": "2026-06-22T00:52:57.778041+00:00"
+      }
     },
     {
       "id": "cap-operator-action-queue-is-full-of-benign-auto-han-3c39",
