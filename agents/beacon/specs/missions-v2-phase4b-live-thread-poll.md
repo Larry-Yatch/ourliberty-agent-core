@@ -15,7 +15,7 @@ The "Talk to the team" thread on a Missions card is **write-once-read-stale**. W
 
 Root cause (confirmed 2026-06-23): the kanban cards poll on the SWR cadence from `e4-4f` §5.7 (10/30/60s), but the **on-demand conversation drawer** (`ClarifyRoundDrawer` + `ClarifyReplyBox`, mounted per Phase 4 §8) fetches `GET /api/missions/captures/{id}/thread` **once on open** — no `refreshInterval`, no push. Beacon's reply lands in `chain_events` and sits there invisibly. Phase 4 explicitly deferred the "feels truly live" upgrade to Phase 4b (Phase 4 §12).
 
-Phase 4b delivers the **perceived-live** experience with the smallest, lowest-risk change: **poll the open thread** and **signal unread replies** on the card. The backend contract is already poll-ready — this is a dashboard-only change.
+Phase 4b delivers the **perceived-live** experience with the smallest, lowest-risk change: **poll the open thread** and **signal unread replies** on the card. The work is almost entirely dashboard-side; the only agent-core change is Contract C — a one-field projection surfacing the existing `chain_events.event_id` as a per-message `id` on the `/thread` response (no new endpoint, no DB migration), which the client needs to dedupe and mark-as-seen.
 
 **Done-gate:** Larry opens a card's thread, asks a question, and **Beacon's reply appears on its own within ~5 seconds — no browser refresh**. If he navigates away, the card shows an **unread badge** when a reply arrives, and clicking back in clears it.
 
@@ -126,11 +126,11 @@ Step 2 is the substance; step 1 is a thin agent-core guard so the dashboard can 
 
 ## 10. Beacon kickoff & sequencing (single source of truth)
 
-**Sequencing decision (Larry, 2026-06-23):** ship **Contract D first as a standalone fast PR**, then **A+B as the follow-on**. D is a tiny, low-risk UX fix (clear the box on confirmed send) that delivers value immediately; A/B (polling + unread) is the larger change and depends on nothing in D, so D need not block on it.
+**Sequencing decision (Larry, 2026-06-23):** ship **Contract D first as a standalone fast PR**, then **A+B as the follow-on**. D is a tiny, low-risk UX fix (clear the box on confirmed send) that delivers value immediately and depends on nothing else. A/B (polling + unread) is the larger change and **requires the agent-core Contract C `id` projection merged first** (surfaced by Mirror's review of this spec, 2026-06-23 — A/B dedupe and mark-as-seen by a per-message `id` the `/thread` shape didn't expose). Order: **Contract C (agent-core) → A/B (dashboard)**; Contract D can land any time in parallel.
 
 **Repo split (orchestrator V1 is single-repo, build-sequence spec § 4):**
 - **Dashboard sequence `phase4b-live-thread-001`** (`ourliberty-dashboard`): step `clear-input` (Contract D) → step `live-thread` (Contracts A+B, `depends_on: clear-input`). Sequential, not parallel — both touch the same thread surface (`ClarifyReplyBox`/`ClarifyRoundDrawer`), so serialize to avoid file-overlap conflicts.
-- **Agent-core guard (Contract C)** (`ourliberty-agent-core`): a single independent APPROVAL_REQUEST (test-only, no endpoint change). Has no dependency on the dashboard steps and can run in parallel / first; skip if coverage already exists.
+- **Agent-core projection + guard (Contract C)** (`ourliberty-agent-core`): a single APPROVAL_REQUEST that surfaces the existing `chain_events.event_id` as a per-message `id` on `/thread` (one-field projection, no new endpoint, no DB migration) + guard tests. **Prerequisite for the A+B step** (the client dedupes / marks-seen by that `id`), so it must merge **before** `live-thread`. Not skippable — the field isn't projected yet. Contract D does not depend on it. **Dispatch this first.**
 
 **Draft sequence file** — `~/agents/blackboard/build-sequences/phase4b-live-thread-001.json` (Beacon synthesizes/validates per build-sequence spec § 5.1; `dispatch_text` ≤500 chars, points at this spec, no inline design):
 
@@ -164,7 +164,7 @@ Step 2 is the substance; step 1 is a thin agent-core guard so the dashboard can 
 **What Larry pastes to Beacon** is the short intent below; Beacon synthesizes the file above, runs the Mirror DAG preflight (build-sequence spec discipline 3), and emits the kickoff — Larry's role is approving the plan, not authoring the file (build-sequence spec decision J).
 
 > **Kickoff intent (paste to Beacon):**
-> Beacon — build Missions Phase 4b from `agents/beacon/specs/missions-v2-phase4b-live-thread-poll.md`. Ship it in two PRs against `ourliberty-dashboard`, sequential: **first** Contract D (clear the thread reply box on confirmed send — the standalone quick win), **then** Contracts A+B (poll the open thread + unread badge/refresh), with A+B depending on D. Synthesize sequence `phase4b-live-thread-001` per § 10, run the Mirror DAG preflight, and bring me the kickoff to approve. Separately, dispatch the Contract C guard tests as a one-off against `ourliberty-agent-core` (skip if coverage already exists). Don't add SSE/Realtime — that's the deferred Phase 4c.
+> Beacon — build Missions Phase 4b from `agents/beacon/specs/missions-v2-phase4b-live-thread-poll.md`. **First** dispatch Contract C as a one-off against `ourliberty-agent-core` — it surfaces the existing `chain_events.event_id` as a per-message `id` on the `/thread` response (one-field projection, no new endpoint, no DB migration) plus guard tests; it's a prerequisite for A+B (not skippable — the field isn't projected yet). **Then** run the dashboard sequence `phase4b-live-thread-001` against `ourliberty-dashboard`: step `clear-input` (Contract D — clear the reply box on confirmed send, the standalone quick win, no deps) → step `live-thread` (Contracts A+B — poll the open thread + unread badge/refresh, `depends_on: clear-input`, and only after Contract C has merged). Synthesize the sequence per § 10, run the Mirror DAG preflight, and bring me the kickoff to approve. Contract D can ship in parallel with C if you want it out fast. Don't add SSE/Realtime — that's the deferred Phase 4c.
 
 ## 11. Out of scope (later / separate)
 
