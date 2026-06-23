@@ -1088,6 +1088,101 @@ class SharedLibWatchlistTests(_IsolatedAgentsRoot):
             self.assertEqual(m_r.call_count, 1)
             self.assertEqual(m_f.call_count, 0)
 
+    def test_watchlist_restart_passes_entrypoint_distinct_from_lib(self):
+        # Attribution regression: the watchlist restart must hand
+        # dm_larry_auto_restarted the CHANGED LIBRARY as script_path AND the
+        # service's OWN entrypoint (resolved from FragmentPath) as
+        # changed_lib_entrypoint — never the library masquerading as the
+        # service's own script. Mirrors the 2026-06-23 PR #646 incident
+        # (beacon-bot/outbox-notifier restarted for a dashboard_api.py change).
+        with tempfile.TemporaryDirectory() as td:
+            lib = Path(td) / 'dashboard_api.py'          # the changed shared lib
+            lib.write_text('# shared library')
+            entrypoint = Path(td) / 'outbox_notifier.py'  # the service's own script
+            entrypoint.write_text('# entrypoint')
+            service_file = Path(td) / 'ourliberty-outbox-notifier.service'
+            service_file.write_text(
+                '[Service]\n'
+                f'ExecStart=/usr/bin/python3 {entrypoint}\n'
+            )
+            now = time.time()
+            service_start = now - (60 * 60)
+            lib_mtime = now - (10 * 60)
+            os.utime(lib, (lib_mtime, lib_mtime))
+            dms = self._stub_dms()
+            watchlist = {lib: {'ourliberty-outbox-notifier.service'}}
+            ts_str = time.strftime(
+                '%Y-%m-%d %H:%M:%S', time.localtime(service_start),
+            )
+            with self._patch_watchlist(watchlist), \
+                    self._stub_systemctl({
+                        'ourliberty-outbox-notifier.service': {
+                            'ActiveEnterTimestamp': ts_str,
+                            'FragmentPath': str(service_file),
+                        },
+                    }), self._stub_restart(rc=0), \
+                    self._stub_prs(), \
+                    dms['restarted'] as m_r, dms['failed']:
+                h.check_shared_lib_watchlist({'services': {}}, now=now)
+            self.assertEqual(m_r.call_count, 1)
+            # script_path positional arg is the CHANGED LIBRARY, not the entrypoint.
+            self.assertEqual(m_r.call_args.args[1], lib)
+            # the entrypoint is resolved and passed distinctly.
+            self.assertEqual(
+                m_r.call_args.kwargs.get('changed_lib_entrypoint'), entrypoint,
+            )
+
+    def test_watchlist_alert_body_names_lib_and_entrypoint_separately(self):
+        # The rendered alert body must label the changed library and the
+        # service's own entrypoint on separate lines, and must NOT present the
+        # library as the service's sole "Script path:".
+        lib = Path('/home/larry/agent-core/scripts/dashboard_api.py')
+        entrypoint = Path('/home/larry/agent-core/scripts/outbox_notifier.py')
+        now = time.time()
+        fake_la = mock.MagicMock()
+        fake_la.classify_route.return_value = 'digest'
+        fake_la.append_alert.return_value = True
+        with mock.patch.object(h, '_import_larry_alerts', return_value=fake_la):
+            h.dm_larry_auto_restarted(
+                'ourliberty-outbox-notifier.service', lib,
+                now - (60 * 60), now - (10 * 60), [],
+                changed_lib_entrypoint=entrypoint,
+            )
+        body = fake_la.append_alert.call_args.kwargs['message']
+        self.assertIn(f'Changed shared library:      {lib}', body)
+        self.assertIn(f'Service entrypoint:          {entrypoint}', body)
+        # the library is NOT labeled as the service's own script path.
+        self.assertNotIn(f'Script path:                 {lib}', body)
+
+    def test_direct_script_alert_body_unchanged(self):
+        # The direct-entrypoint path (changed_lib_entrypoint=None) keeps the
+        # legacy "Script path:" body byte-for-byte.
+        script = Path('/home/larry/agent-core/scripts/beacon_telegram_bot.py')
+        now = time.time()
+        service_start = now - (60 * 60)
+        script_mtime = now - (10 * 60)
+        fake_la = mock.MagicMock()
+        fake_la.classify_route.return_value = 'digest'
+        fake_la.append_alert.return_value = True
+        with mock.patch.object(h, '_import_larry_alerts', return_value=fake_la):
+            h.dm_larry_auto_restarted(
+                'ourliberty-beacon-bot.service', script,
+                service_start, script_mtime, [],
+            )
+        body = fake_la.append_alert.call_args.kwargs['message']
+        from datetime import datetime, timezone
+        svc_iso = datetime.fromtimestamp(service_start, tz=timezone.utc).isoformat()
+        scr_iso = datetime.fromtimestamp(script_mtime, tz=timezone.utc).isoformat()
+        gap_min = (script_mtime - service_start) / 60.0
+        expected = (
+            f'Auto-restarted ourliberty-beacon-bot.service (script mtime newer '
+            f'than active-since by {gap_min:.1f} min; new code now live).\n\n'
+            f'Service start (pre-restart): {svc_iso}\n'
+            f'Script mtime:                {scr_iso}\n'
+            f'Script path:                 {script}'
+        )
+        self.assertEqual(body, expected)
+
     def test_lib_within_race_window_no_action(self):
         # mtime gap < RACE_AVOIDANCE_SEC → race-window suppression. The
         # legitimate "sync + restart cycle just completed" case.

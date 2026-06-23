@@ -803,21 +803,45 @@ def _import_larry_alerts():
 
 def dm_larry_auto_restarted(
     unit: str, script_path: Path, service_start: float, script_mtime: float,
-    pr_lines: list[str],
+    pr_lines: list[str], changed_lib_entrypoint: Optional[Path] = None,
 ) -> bool:
-    """Append a warning-level closure alert after a successful auto-restart."""
+    """Append a warning-level closure alert after a successful auto-restart.
+
+    Two attribution shapes, selected by `changed_lib_entrypoint`:
+
+    - `None` (direct-script path, `check_unit`): `script_path` IS the
+      service's own entrypoint and `script_mtime` is its mtime. The body
+      labels it `Script path:` — the plain "your own script changed" case.
+    - set (shared-lib watchlist path, `_check_watchlist_pair`):
+      `script_path`/`script_mtime` describe the CHANGED SHARED LIBRARY the
+      service imports, and `changed_lib_entrypoint` is the service's OWN
+      entrypoint. The body distinguishes the two on separate, clearly
+      labeled lines so the alert never reads as "this service's own script
+      is <a library it merely imports>."
+    """
     try:
         la = _import_larry_alerts()
         svc_iso = datetime.fromtimestamp(service_start, tz=timezone.utc).isoformat()
         scr_iso = datetime.fromtimestamp(script_mtime, tz=timezone.utc).isoformat()
         gap_min = (script_mtime - service_start) / 60.0
-        body = (
-            f'Auto-restarted {unit} (script mtime newer than active-since by '
-            f'{gap_min:.1f} min; new code now live).\n\n'
-            f'Service start (pre-restart): {svc_iso}\n'
-            f'Script mtime:                {scr_iso}\n'
-            f'Script path:                 {script_path}'
-        )
+        if changed_lib_entrypoint is not None:
+            body = (
+                f'Auto-restarted {unit} (imported shared library changed '
+                f'{gap_min:.1f} min after this service last started, so it '
+                f'was running stale module bytes; new code now live).\n\n'
+                f'Service start (pre-restart): {svc_iso}\n'
+                f'Library mtime:               {scr_iso}\n'
+                f'Changed shared library:      {script_path}\n'
+                f'Service entrypoint:          {changed_lib_entrypoint}'
+            )
+        else:
+            body = (
+                f'Auto-restarted {unit} (script mtime newer than active-since by '
+                f'{gap_min:.1f} min; new code now live).\n\n'
+                f'Service start (pre-restart): {svc_iso}\n'
+                f'Script mtime:                {scr_iso}\n'
+                f'Script path:                 {script_path}'
+            )
         if pr_lines:
             body += '\n\nCommits since pre-restart active-start:\n' + '\n'.join(
                 f'  {line}' for line in pr_lines
@@ -1134,8 +1158,18 @@ def _check_watchlist_pair(
             service_start, tz=timezone.utc,
         ).isoformat()
         pr_lines = infer_recent_prs(lib_path, pre_restart_iso)
+        # Resolve the unit's OWN entrypoint so the alert can distinguish the
+        # changed shared library (lib_path) from the service's own script.
+        # Falls back to the unit name when FragmentPath/ExecStart can't be
+        # parsed — the alert still names the changed library unambiguously.
+        fragment_path = systemctl_show(unit, 'FragmentPath')
+        entrypoint = (
+            parse_script_path_from_service_file(fragment_path)
+            if fragment_path else None
+        ) or Path(unit)
         dm_larry_auto_restarted(
             unit, lib_path, service_start, lib_mtime, pr_lines,
+            changed_lib_entrypoint=entrypoint,
         )
         log(
             f'watchlist: AUTO-RESTARTED {unit} (shared lib '
