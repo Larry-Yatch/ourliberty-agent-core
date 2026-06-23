@@ -334,6 +334,59 @@ def _read_process_rss(pid: int) -> int | None:
     return None
 
 
+def _pid_alive(pid: int) -> bool:
+    """True if a process with this PID currently exists."""
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True  # exists but owned by another user
+    except OSError:
+        return False
+    return True
+
+
+def _task_in_flight(task_id: str) -> bool:
+    """True if an in-flight marker exists for task_id AND its pid is alive.
+
+    Correlates an inbox task to ~/agents/state/in-flight/<task_id>.json. A
+    marker whose pid is dead does NOT count as in-flight, so a build whose
+    process died still reads as queued work (the stale-log WARN can fire).
+    """
+    if not task_id:
+        return False
+    marker = AGENTS_ROOT / 'state' / 'in-flight' / f'{task_id}.json'
+    try:
+        with open(marker) as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return False
+    pid = data.get('pid')
+    if not isinstance(pid, int):
+        return False
+    return _pid_alive(pid)
+
+
+def _inbox_has_queued_task(agent_dir: Path) -> bool:
+    """True if the inbox holds at least one *.json task that is NOT in-flight.
+
+    Reads each envelope's task_id field (not its filename) and treats a task
+    as live queued work unless its task is in-flight with a live pid. A file
+    we cannot parse is conservatively counted as queued.
+    """
+    for env in agent_dir.glob('*.json'):
+        try:
+            with open(env) as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            return True  # unparseable envelope counts as queued work
+        task_id = data.get('task_id')
+        if not _task_in_flight(task_id):
+            return True
+    return False
+
+
 def check_inbox_watcher_memory() -> dict:
     """V2 process-RSS check. Adapted verbatim from upstream's V2 logic;
     swaps the service name + cooldown marker. Restart above threshold."""
@@ -560,16 +613,22 @@ def check_log_growth() -> dict:
 
     watcher_alive = is_service_alive('ourliberty-inbox-watcher.service')
 
-    # Are any inboxes non-empty?
+    # Are any inboxes holding queued (not in-flight) work? An inbox task that
+    # is actively being built keeps its envelope here for the whole build, so
+    # an in-flight-with-live-pid task is excluded — otherwise a multi-minute
+    # build (log naturally quiet > 5 min) mis-reads as a stalled queue.
     live_files = 0
+    any_inflight = False
     inboxes_root = AGENTS_ROOT / 'inboxes'
     try:
         for agent_dir in inboxes_root.iterdir():
             if not agent_dir.is_dir() or agent_dir.name.startswith(('.', '_')):
                 continue
             try:
-                if any(agent_dir.glob('*.json')):
+                if _inbox_has_queued_task(agent_dir):
                     live_files += 1
+                elif any(agent_dir.glob('*.json')):
+                    any_inflight = True  # non-empty, but all tasks in-flight
             except OSError:
                 pass
     except OSError:
@@ -582,10 +641,15 @@ def check_log_growth() -> dict:
             'reason': 'inbox-watcher service not active',
         }
     if live_files == 0 and age <= 43200:
+        reason = (
+            'work in progress (active build, watcher healthy)'
+            if any_inflight
+            else 'idle (empty inboxes, watcher healthy)'
+        )
         return {
             'status': 'ok',
             'seconds_since_write': int(age),
-            'reason': 'idle (empty inboxes, watcher healthy)',
+            'reason': reason,
         }
     if age > 43200:
         return {
