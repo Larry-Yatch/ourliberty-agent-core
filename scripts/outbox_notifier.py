@@ -8364,6 +8364,11 @@ def _route_beacon_pulse_auto_dispatch_approval(
         'target_repo': payload.get('target_repo'),
         'changed_files': payload.get('changed_files', []),
     }
+    # #8: predict sensitive intent for a fresh pulse dispatch (no changed_files)
+    # so the pulse sensitive carve-out can force_ask it — same chokepoint logic
+    # as approval.trust_decision, shared via approval.predict_sensitive_intent.
+    if not policy_task['changed_files'] and approval.predict_sensitive_intent(payload):
+        policy_task['sensitive_intent'] = True
     try:
         action_str, rule = trust_policy.evaluate(policy_task)
     except Exception as e:  # noqa: BLE001 — daemon-never-wedge invariant

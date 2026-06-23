@@ -739,6 +739,23 @@ def set_paused(paused: bool) -> None:
 
 # -------------------- trust policy bridge --------------------
 
+# Free-text fields scanned to predict a FRESH build will touch sensitive paths
+# (#8). `summary` + `prompt` are always present on an APPROVAL_REQUEST; the
+# others ride along when set. A fresh dispatch has no changed_files, so the
+# carve-out's path globs can't catch it — this text scan can.
+_SENSITIVE_INTENT_TEXT_FIELDS = ('summary', 'prompt', 'task_type', 'pr_title')
+
+
+def predict_sensitive_intent(payload: dict[str, Any]) -> bool:
+    """True if a dispatch payload's text names sensitive-infra work (the tight
+    keyword set in trust_policy.SENSITIVE_INTENT_KEYWORDS). Used to force_ask a
+    fresh build whose declared changed_files are empty. Pure; never raises."""
+    blob = ' '.join(
+        str(payload.get(k) or '') for k in _SENSITIVE_INTENT_TEXT_FIELDS
+    )
+    return trust_policy.text_signals_sensitive(blob)
+
+
 def trust_decision(payload: dict[str, Any]) -> tuple[str, Optional[dict[str, Any]]]:
     """Consult trust_policy. Returns (action, matched_rule).
 
@@ -754,6 +771,11 @@ def trust_decision(payload: dict[str, Any]) -> tuple[str, Optional[dict[str, Any
         'target_repo': payload.get('target_repo'),
         'changed_files': payload.get('changed_files', []),
     }
+    # #8: a fresh build carries no changed_files, so the sensitive-path carve-out
+    # can't glob-match it — predict sensitive intent from the dispatch text so the
+    # carve-out (match_sensitive_intent) force_asks instead of auto-starting.
+    if not policy_task['changed_files'] and predict_sensitive_intent(payload):
+        policy_task['sensitive_intent'] = True
     return trust_policy.evaluate(policy_task)
 
 
