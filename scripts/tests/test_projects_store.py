@@ -317,6 +317,91 @@ class BuildPipelineTest(unittest.TestCase):
         self.assertEqual([p['id'] for p in out], ['ok'])
 
 
+class SequenceRollupTest(unittest.TestCase):
+    """projects-v3 sequence-rollup-done-flip: a phase whose work is a build
+    SEQUENCE has no PR of its own, so the board rolls the sequence's completion
+    up to the parent. `rollup_lifecycle_from_sequence` is the pure mapping;
+    `build_pipeline(..., sequence_status_by_id=...)` is the read-time derive."""
+
+    def _norm(self, projects):
+        reg, _ = ps.normalize_registry({'projects': projects}, now=NOW)
+        return reg['projects']
+
+    # ---- the pure mapping ----
+    def test_rollup_complete_flips_to_done(self):
+        self.assertEqual(
+            ps.rollup_lifecycle_from_sequence('spec', 'complete'), 'done')
+        self.assertEqual(
+            ps.rollup_lifecycle_from_sequence('building', 'complete'), 'done')
+
+    def test_rollup_active_or_paused_reads_building(self):
+        self.assertEqual(
+            ps.rollup_lifecycle_from_sequence('spec', 'active'), 'building')
+        self.assertEqual(
+            ps.rollup_lifecycle_from_sequence('brainstorm', 'paused'), 'building')
+
+    def test_rollup_pending_or_unknown_or_missing_degrades_to_stored(self):
+        for status in ('pending', 'failed', 'archived', 'bogus', None):
+            self.assertEqual(
+                ps.rollup_lifecycle_from_sequence('spec', status), 'spec',
+                f'{status!r} must degrade to the stored state')
+
+    def test_rollup_is_forward_only_never_regresses(self):
+        # a stored `done` (the P4 closeout writeback already flipped it) must
+        # NOT be dragged back to building by a stale/active linked sequence.
+        self.assertEqual(
+            ps.rollup_lifecycle_from_sequence('done', 'active'), 'done')
+        self.assertEqual(
+            ps.rollup_lifecycle_from_sequence('done', 'paused'), 'done')
+
+    # ---- the read-time pipeline derive ----
+    def _proj_with_seq(self, lifecycle, seq_ref='launch-ph'):
+        return self._norm([{
+            'id': 'proj', 'state': 'active',
+            'phases': [{'id': 'ph', 'lifecycle_state': lifecycle,
+                        'sequence_ref': seq_ref}],
+        }])
+
+    def test_pipeline_complete_sequence_reads_done(self):
+        projects = self._proj_with_seq('building')
+        out = ps.build_pipeline(projects, NOW, {'launch-ph': 'complete'})
+        proj = out[0]
+        self.assertEqual(proj['phases'][0]['lifecycle_state'], 'done')
+        # the coarse project header agrees with the flipped phase (P5 rollup)
+        self.assertEqual(proj['status'], 'done')
+
+    def test_pipeline_active_sequence_reads_building(self):
+        projects = self._proj_with_seq('spec')
+        out = ps.build_pipeline(projects, NOW, {'launch-ph': 'active'})
+        self.assertEqual(out[0]['phases'][0]['lifecycle_state'], 'building')
+        self.assertEqual(out[0]['status'], 'building')
+
+    def test_pipeline_missing_sequence_degrades_to_stored(self):
+        # phase carries a sequence_ref but no live sequence file → empty/absent
+        # status map: render the stored lane, no error, no false Done.
+        projects = self._proj_with_seq('spec')
+        out = ps.build_pipeline(projects, NOW, {})  # empty map (no live file)
+        self.assertEqual(out[0]['phases'][0]['lifecycle_state'], 'spec')
+        # and with no map at all (pre-rollup callers) behaviour is identical
+        out2 = ps.build_pipeline(projects, NOW)
+        self.assertEqual(out2[0]['phases'][0]['lifecycle_state'], 'spec')
+
+    def test_pipeline_phase_without_sequence_ref_untouched(self):
+        projects = self._norm([{
+            'id': 'proj', 'state': 'active',
+            'phases': [{'id': 'ph', 'lifecycle_state': 'building'}],
+        }])
+        out = ps.build_pipeline(projects, NOW, {'launch-ph': 'complete'})
+        self.assertEqual(out[0]['phases'][0]['lifecycle_state'], 'building')
+
+    def test_pipeline_no_map_is_byte_identical_to_pre_rollup(self):
+        projects = self._proj_with_seq('building')
+        self.assertEqual(
+            ps.build_pipeline(projects, NOW),
+            ps.build_pipeline(projects, NOW, None),
+        )
+
+
 class SlugifyTest(unittest.TestCase):
     def test_basic(self):
         self.assertEqual(ps.slugify('Hello World!'), 'hello-world')

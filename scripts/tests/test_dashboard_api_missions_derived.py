@@ -1381,6 +1381,83 @@ class FunnelPromoteReversibilityTest(_DerivedTestBase):
         self.assertIn('m-pulse', self._funnel_refs())
 
 
+class SequenceRollupDoneFlipTest(_DerivedTestBase):
+    """End-to-end through `_handle_missions_derived` (projects-v3
+    sequence-rollup-done-flip): a phase whose linked build sequence is COMPLETE
+    reads `done` in the pipeline AND its child step-cards collapse out of the
+    orphan surface — driven entirely by the on-disk build-sequences dir, with no
+    write to projects.json (read-time derive)."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        # isolate: no missions, no captures.
+        self._missions_path.write_text(json.dumps(
+            {'schema_version': 1, 'missions': [], 'last_synced_at': None}) + '\n')
+        self._captures_path.write_text(json.dumps(
+            {'schema_version': 1, 'captures': []}) + '\n')
+        self._projects_path = self._tmp / 'projects.json'
+        self._seq_root = self._tmp / 'build-sequences'
+        self._seq_root.mkdir()
+
+    def _write_projects(self, lifecycle: str, seq_ref: str) -> None:
+        self._projects_path.write_text(json.dumps({'projects': [{
+            'id': 'rollup-demo', 'title': 'Rollup Demo', 'state': 'active',
+            'phases': [{'id': 'phase-1', 'title': 'Phase 1',
+                        'lifecycle_state': lifecycle, 'sequence_ref': seq_ref}],
+        }]}))
+
+    def _write_sequence(self, seq_id: str, status: str, step_ids: list[str]) -> None:
+        (self._seq_root / f'{seq_id}.json').write_text(json.dumps({
+            'seq_id': seq_id, 'status': status,
+            'steps': [{'step_id': s, 'status': 'merged'} for s in step_ids],
+        }))
+
+    def _derive(self, rows: list[dict]) -> dict:
+        return da._handle_missions_derived(
+            missions_path=self._missions_path,
+            captures_path=self._captures_path,
+            supabase_client=_StubClient(rows),
+            repo=None, task_id=None, now=NOW,
+            projects_path=self._projects_path,
+            build_sequences_root=self._seq_root,
+        )
+
+    def _phase_card(self, out: dict) -> dict:
+        return out['pipeline'][0]['phases'][0]
+
+    def test_complete_sequence_flips_parent_to_done(self) -> None:
+        self._write_projects('building', 'launch-rollup-demo')
+        self._write_sequence(
+            'launch-rollup-demo', 'complete',
+            ['rollup-step-cleanup', 'rollup-step-postmerge'])
+        # a step's chain-event surfaces under its step_id; without collapse it
+        # would float as a loose Shipped orphan.
+        rows = [{'event_type': 'auto_merge', 'task_id': 'rollup-step-cleanup',
+                 'agent': 'forge',
+                 'pr_url': 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/901',
+                 'ts': '2026-06-09T10:00:00+00:00', 'payload': {}}]
+        out = self._derive(rows)
+        # 1. parent phase flipped to done + project header agrees
+        self.assertEqual(self._phase_card(out)['lifecycle_state'], 'done')
+        self.assertEqual(out['pipeline'][0]['status'], 'done')
+        # 2. the step did NOT float as a loose orphan card
+        self.assertNotIn('rollup-step-cleanup',
+                         {o['task_id'] for o in out['orphans']})
+
+    def test_active_sequence_reads_building(self) -> None:
+        self._write_projects('spec', 'launch-rollup-demo')
+        self._write_sequence('launch-rollup-demo', 'active', ['rollup-step-1'])
+        out = self._derive([])
+        self.assertEqual(self._phase_card(out)['lifecycle_state'], 'building')
+
+    def test_missing_sequence_file_degrades_to_stored(self) -> None:
+        # phase carries a sequence_ref but the file was archived/never written:
+        # render the stored lane, no error, no false Done.
+        self._write_projects('spec', 'launch-rollup-demo')  # no sequence file
+        out = self._derive([])
+        self.assertEqual(self._phase_card(out)['lifecycle_state'], 'spec')
+
+
 class NormalizeSuggestedSourceUnitTest(unittest.TestCase):
     def test_known_agents_normalize(self) -> None:
         self.assertEqual(da._normalize_suggested_source('beacon'), 'beacon')

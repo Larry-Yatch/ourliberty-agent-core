@@ -3135,6 +3135,80 @@ def _reader_projects(projects_path: Path) -> list[dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
+# projects-v3 sequence rollup (sequence-rollup-done-flip) — the read-time join
+# between a pipeline phase and the BUILD SEQUENCE it owns. A phase whose work is
+# a multi-step sequence has no PR of its own, so the board must roll the
+# sequence's completion up to the parent: the parent flips to Done and the
+# sequence's child step-cards collapse under it instead of floating loose. Both
+# helpers reuse the existing `_reader_build_sequences` response (its
+# `{active, archived}` buckets) — no new endpoint, no second source of sequence
+# truth — and the `sequence_ref` join key P3 already persists on each phase.
+# ---------------------------------------------------------------------------
+def _sequence_status_by_id(build_sequences: dict[str, Any]) -> dict[str, str]:
+    """``{seq_id: status}`` over every sequence in a ``_reader_build_sequences``
+    response (both the ``active`` and ``archived`` buckets — a ``complete``
+    sequence lands in ``archived``). Feeds the phase-card rollup
+    (``projects_store.build_pipeline``). Fail-safe: a non-dict bucket entry or a
+    sequence missing a string ``seq_id``/``status`` is skipped, never raises."""
+    out: dict[str, str] = {}
+    for bucket in ('active', 'archived'):
+        for seq in build_sequences.get(bucket) or []:
+            if not isinstance(seq, dict):
+                continue
+            seq_id = seq.get('seq_id')
+            status_val = seq.get('status')
+            if isinstance(seq_id, str) and seq_id and isinstance(status_val, str):
+                out[seq_id] = status_val
+    return out
+
+
+def _phase_linked_sequence_ids(projects: list[dict[str, Any]]) -> set[str]:
+    """The set of ``seq_id``s that are the ``sequence_ref`` of SOME phase, across
+    all projects regardless of project state — i.e. the sequences that have a
+    parent phase card to be attributed to. A sequence NOT in this set is "bare"
+    (e.g. an ordinary meta-dev sequence) and is left untouched (out of scope)."""
+    refs: set[str] = set()
+    for proj in projects:
+        if not isinstance(proj, dict):
+            continue
+        for phase in proj.get('phases') or []:
+            if isinstance(phase, dict):
+                ref = phase.get('sequence_ref')
+                if isinstance(ref, str) and ref:
+                    refs.add(ref)
+    return refs
+
+
+def _collapsed_step_task_ids(
+    projects: list[dict[str, Any]], build_sequences: dict[str, Any],
+) -> set[str]:
+    """task_ids of every STEP belonging to a PHASE-LINKED build sequence — the
+    ids the orphan derive must collapse (attribute to the parent phase) rather
+    than surface as standalone loose cards. A step's chain-event ``task_id`` is
+    its ``step_id`` (the dispatched task id); we also accept an explicit
+    ``task_id``/``id`` field for robustness. Only steps of sequences in
+    ``_phase_linked_sequence_ids`` are collected — bare (non-phase-linked)
+    sequences are out of scope. Fail-safe over junk: a non-dict project/
+    sequence/step is skipped, never raises."""
+    linked = _phase_linked_sequence_ids(projects)
+    if not linked:
+        return set()
+    out: set[str] = set()
+    for bucket in ('active', 'archived'):
+        for seq in build_sequences.get(bucket) or []:
+            if not isinstance(seq, dict) or seq.get('seq_id') not in linked:
+                continue
+            for step in seq.get('steps') or []:
+                if not isinstance(step, dict):
+                    continue
+                for key in ('task_id', 'step_id', 'id'):
+                    val = step.get(key)
+                    if isinstance(val, str) and val:
+                        out.add(val)
+    return out
+
+
+# ---------------------------------------------------------------------------
 # Projects-tab-v3 P3 — the on-disk write side of Promote (p3-promote-endpoint).
 #
 # Promote is a MOVE (spec § 0 / § 4 decision 2): it relocates a funnel item
@@ -3724,14 +3798,23 @@ def _ts_key(ts: Optional[str]) -> datetime:
 def detect_orphans(
     events: list[dict[str, Any]],
     registered_task_ids: set[str],
+    collapsed_task_ids: Optional[set[str]] = None,
 ) -> list[dict[str, Any]]:
     """Port of `detectOrphans`. task_ids in chain_events but not registered in
     any mission; infrastructure events filtered out. Output newest-first by
-    last event ts. The caller supplies the time window (no filtering here)."""
+    last event ts. The caller supplies the time window (no filtering here).
+
+    ``collapsed_task_ids`` (projects-v3 sequence-rollup-done-flip): task_ids
+    that are STEPS of a build sequence LINKED to a pipeline phase
+    (``_collapsed_step_task_ids``). They are excluded exactly like a registered
+    task_id — a phase-linked step is attributed to its parent phase card, never
+    surfaced as a standalone (loose) orphan/board card. None → no collapse, so
+    existing callers (heal_orphan_autoregister) are unaffected."""
+    collapsed = collapsed_task_ids or set()
     by_task: dict[str, dict[str, Any]] = {}
     for ev in events:
         tid = ev.get('task_id')
-        if not tid or tid in registered_task_ids:
+        if not tid or tid in registered_task_ids or tid in collapsed:
             continue
         # Phase 4 step 1b: card_message events are keyed by capture_id (a
         # capture, not a mission task) so a thread is one query. They'd
@@ -4475,6 +4558,7 @@ def _build_derived_response(
     ] = None,
     promoted_mission_ids: Optional[set[str]] = None,
     promoted_orphan_task_ids: Optional[set[str]] = None,
+    collapsed_task_ids: Optional[set[str]] = None,
 ) -> dict[str, Any]:
     """Pure derive: build the full /api/missions/derived response (pre-filter).
 
@@ -4485,6 +4569,11 @@ def _build_derived_response(
     terminal detection (§ 3.4). None → no PR-state read (event-only derive); the
     route injects the real, fail-safe resolver, tests inject a stub. Mission-task
     pr_state always stays None regardless (parity-pinned).
+
+    `collapsed_task_ids` (projects-v3 sequence-rollup-done-flip): step task_ids
+    of phase-linked build sequences (`_collapsed_step_task_ids`) excluded from
+    the orphan surface so a phase-linked step never floats as a standalone card.
+    None → no collapse (unchanged behaviour).
     """
     now = now or datetime.now(timezone.utc)
 
@@ -4523,7 +4612,8 @@ def _build_derived_response(
         if tid:
             events_by_orphan.setdefault(tid, []).append(ev)
 
-    orphans = detect_orphans(recent_events, registered_task_ids)
+    orphans = detect_orphans(
+        recent_events, registered_task_ids, collapsed_task_ids)
     # § 4.8: the Orphaned secondary lane surfaces only buildable initiatives.
     # Narrow the orphans SURFACED to the dashboard (orphans[] + funnel.secondary,
     # built below) by the same is_proposable_initiative gate heal_orphan_autoregister
@@ -4660,6 +4750,7 @@ def _handle_missions_derived(
         Callable[[list[str]], dict[str, str]]
     ] = None,
     projects_path: Optional[Path] = None,
+    build_sequences_root: Optional[Path] = None,
 ) -> dict[str, Any]:
     """Pure handler for GET /api/missions/derived. Reads the registry +
     captures, fetches chain_events, derives, applies filters.
@@ -4670,7 +4761,12 @@ def _handle_missions_derived(
 
     `projects_path` (projects-v3 P3) is read for the additive "Actively working"
     pipeline; None → the pipeline section is an empty list, so existing callers
-    and tests that don't pass it are unaffected."""
+    and tests that don't pass it are unaffected.
+
+    `build_sequences_root` (projects-v3 sequence-rollup-done-flip) is the
+    blackboard build-sequences dir; None → the live `_sequence_blackboard_root()`
+    (tests inject a tmp dir). It is read ONCE (reusing `_reader_build_sequences`)
+    to drive BOTH the phase-card Done-flip rollup and the orphan step-collapse."""
     missions_data = _reader_missions(missions_path)
     captures_data = _reader_captures(captures_path)
     entries = missions_data.get('missions') or []
@@ -4708,6 +4804,16 @@ def _handle_missions_derived(
     promoted_mission_ids = _promoted_mission_ids(projects)
     promoted_orphan_task_ids = _promoted_orphan_task_ids(projects)
 
+    # projects-v3 sequence-rollup-done-flip: read the build sequences ONCE and
+    # derive both the {seq_id: status} rollup map (Done-flip) and the
+    # phase-linked step task_ids to collapse out of the orphan surface. Fail-safe
+    # — `_reader_build_sequences` degrades to empty buckets on a missing dir, so
+    # both derived sets are empty and the board renders exactly as before.
+    build_sequences = _reader_build_sequences(
+        build_sequences_root or _sequence_blackboard_root(), now)
+    sequence_status_by_id = _sequence_status_by_id(build_sequences)
+    collapsed_task_ids = _collapsed_step_task_ids(projects, build_sequences)
+
     response = _build_derived_response(
         entries=entries,
         last_synced_at=missions_data.get('last_synced_at'),
@@ -4718,6 +4824,7 @@ def _handle_missions_derived(
         pr_state_resolver=pr_state_resolver,
         promoted_mission_ids=promoted_mission_ids,
         promoted_orphan_task_ids=promoted_orphan_task_ids,
+        collapsed_task_ids=collapsed_task_ids,
     )
     response = _apply_derived_filters(
         response, repo=repo, task_id=task_id, now=now,
@@ -4730,7 +4837,8 @@ def _handle_missions_derived(
     # missions/orphans/parked/funnel sections. Repo filter applies (a project
     # carries an optional repo); the task_id filter narrows the active task-set
     # view of missions/orphans and does not apply to the project-level pipeline.
-    pipeline = projects_store.build_pipeline(projects, now)
+    pipeline = projects_store.build_pipeline(
+        projects, now, sequence_status_by_id)
     if repo:
         pipeline = [p for p in pipeline if p.get('repo') == repo]
     response['pipeline'] = pipeline
