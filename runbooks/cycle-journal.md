@@ -4,6 +4,94 @@
 
 ---
 
+## Iteration ~2551 — 2026-06-23T21:24Z UTC (interactive /cycle, Tier 1→2 DE-ESCALATION, consecutive_clean 2→3)
+
+**Trigger:** Larry `/cycle` invocation (chat mode).
+
+**Health:** ✅ Nominal — 0 new alerts, all mandatory + additive checks clean. 8/8 daemons alive (same PIDs). HEAD=26c48398=origin/main. 0 pending approvals. 1 open PR (#653, carry yellow). New: PR #655 MERGED (unreviewed, carry blue). **Tier de-escalation: 1→2** (3 consecutive clean iters reached).
+
+**VERIFY-BEFORE-REASSERT:**
+- **Daemons (re-verified):** chain_event=930563 (SNs) ✅, dashboard_api=1502707 (Ssl) ✅, outbox_notifier=1502977 (Ss) ✅, beacon_telegram_bot=1502905 (Ss) ✅, forge_bot=1388801 (Ss) ✅, mirror_bot=1388982 (Ss) ✅, pulse_bot=1389067 (Ss) ✅, inbox_watcher=1389730 (Ssl) ✅. 8/8 alive, same PIDs as iter ~2550. ✅
+- **HEAD (re-verified):** 26c48398=origin/main. Wrapper auto-committed `Pulse cycle 20260623T211846Z` after iter ~2550. Working tree clean. ✅
+- **PR #653 routing (re-verified):** Still open, isDraft=false, mergeable=MERGEABLE, reviewDecision="" — no Mirror routing. Pipeline stall healer in cooldown. Larry DM'd (idx=994). [carry yellow] ✅
+- **push-soft-gate-block-upgrade-decision (re-verified):** Not in new alerts this iter (0 new alerts). Awaiting Larry decision. [carry yellow] ✅
+- **credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED (re-verified):** Not in new alerts this iter. Underlying still standing. [carry yellow] ✅
+- **fix-645-alert-translation-001 stall (re-verified):** WARN `larry_alerts append failed for forge_built_no_pr:fix-645-alert-translation-001` persists in Check 3 dry-run. [carry blue] ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 1007, "file_length": 1007}` — **0 new alerts**. ✅ Nominal.
+
+**Check 1 — Log noise (30-min window):** journalctl --user -p warning: `-- No entries --` (0 WARN/ERROR). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot PID 1502905 (Ss). Last delivery: idx=1006 medic-diagnosis notification at 15:08 MDT (unchanged from iter ~2550). No new Larry directives. 0 pending approvals. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → `0 new alert(s) fired, 0 recovered, 2 suppressed` (fix-645 cooldown + PR#653 cooldown). FORGE_NO_PR_SKIP: 9 tasks (system-self-awareness-slice-2b, fix-proposed-retirement, #647–#652, phase4b-contract-c-guard-tests-001 pr=#654 merged, projects-v3-sequence-rollup-done-flip-001 pr=#655 merged). Fix-645 WARN persists. ✅ Nominal.
+
+**Check 4 — Pending directives:** Forge=0, Beacon=0, Mirror=0. beacon-pending-approvals: pending=0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-23T21:18:15Z (~6 min before cycle). Within 60-min window. ✅ Nominal.
+
+**Check A — Source repo:** On main. HEAD=26c48398=origin/main. Working tree clean. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json last_sync=2026-06-23T21:00:20Z (~24 min ago). Within 2-hour window. ✅ Nominal.
+
+**Check C — Agent liveness:** 8/8 alive (same PIDs — see VERIFY-BEFORE-REASSERT). ✅ Nominal.
+
+**Check D — Inboxes:** Forge=0, Beacon=0, Mirror=0. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: PR #653 `Missions v2 Phase 4b spec: live-feel thread` — open since 18:54Z (~2.5h), isDraft=false, mergeable=MERGEABLE, reviewDecision="" — no Mirror routing. Pipeline stall healer in cooldown. Larry DM'd (idx=994). [carry yellow]. PR #655 `fix(projects-v3): roll up build-sequence completion to the parent phase` — **MERGED at 20:17Z by Larry** (manual merge; Mirror worktree `wt-mirror-projects-v3-sequence-rollup-done-flip-001` was wedged and reaped by healer at 14:05 MDT before review completed). **New finding: unreviewed-merge:655.** [blue] ourliberty-dashboard: 0 open PRs. ✅ Nominal (carry findings only).
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Tuesday 2026-06-23 UTC (weekday=1 ∉ {0,2,4,6}):** Check I/VIII/IX/X/XI weekday gate not met → skip. Check III: last 2026-06-11 (12d < 14d gate, not Sunday) → skip. ✅
+
+**G-rule assessment:** No new G-rule counts this iter. All counts unchanged. [all carry]
+
+**Actions taken:**
+1. PRIME ledger: `iter_clean` appended (tier=1).
+2. Tier state: `record --checks-clean true` → consecutive_clean 2→3 → **Tier 1→2 DE-ESCALATION**. consecutive_clean reset to 0.
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [yellow] **PR #653 unrouted to Mirror** — Larry DM'd (idx=994). Medic re-diagnosed (attempt 2, L1007 Tier-3 silenced). Pipeline stall healer in cooldown. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Known false positive (Mirror REVIEW_PASS confirmed, manual merge). Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [blue] **unreviewed-merge:655** — **NEW**. PR #655 `fix(projects-v3)` merged manually by Larry at 20:17Z. Mirror worktree for `projects-v3-sequence-rollup-done-flip-001` was wedged/reaped at 14:05 MDT. Larry judgment. [new]
+- [blue] **fix-645-alert-translation-001 worktree stall** — WARN persists in heal_pipeline_stall dry-run. [carry]
+- [blue] **G-rule medic-approval-request-novel-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-dry-run-writes-real-alerts** — 1/3. Watch.
+- [blue] **G-rule beacon-claude-timeout** — 1/3. Watch.
+- [blue] **G-rule api-500-burst** — 1/3. Watch.
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. Watch.
+- [blue] **G-rule seq-advancer-sequence-stranded** — 2/3. Watch.
+- [blue] **G-rule sync.service-deploy-restart-storm-tier4** — 1/3. Watch.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule health-notify-script-missing** — dispatch sent 2026-06-09. [carry]
+- [blue] **unreviewed-merge:628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **Stale bash orphan PID 1834248** — benign. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. Informational. [carry]
+
+**PRIME DIRECTIVE:** 0 interventions this iter (iter_clean). Trailing-30d: systemic_fixes=60, interventions≈1079, ratio≈17.98, trend=improving.
+**Tier end-of-iter:** Tier **2** (de-escalated from 1), consecutive_clean=0. (Need 3 clean Tier-2 iters to reach Tier 3.)
+
+---
+
 ## Iteration ~2550 — 2026-06-23T21:17Z UTC (interactive /cycle, Tier 1, consecutive_clean 1→2)
 
 **Trigger:** Larry `/cycle` invocation (chat mode).
