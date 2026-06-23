@@ -4,6 +4,102 @@
 
 ---
 
+## Iteration ~2527 — 2026-06-23T15:09Z UTC (interactive /cycle, Tier 1, unreviewed-merge:649 Tier-4 known-circumstance, mirror-marker-parse-error progressing to Forge)
+
+**Trigger:** Larry `/cycle` invocation.
+
+**Health:** ⚠️ Signal — 1 Tier-4 alert (L979 `unreviewed-merge:649`; bot already DM'd Larry at 14:58Z). Tier 1 maintained, consecutive_clean=0. All other checks nominal. 5/5 daemons alive same PIDs. 0 pending approvals. 0 open PRs. **Key positive: Larry approved `harden-mirror-review-marker-reminder-001` at 15:04Z → Forge has the mirror-marker-parse-error G-rule fix.**
+
+**VERIFY-BEFORE-REASSERT:**
+- **Daemons (re-verified):** dashboard_api=1309235 (Ssl) ✅, beacon_telegram_bot=1309976 (Ss) ✅, outbox_notifier=1310052 (Ss) ✅, chain_event=930563 (SNs) ✅, inbox_watcher=1026206 (Ssl) ✅. Same PIDs as iter ~2526. ✅
+- **HEAD (re-verified):** de5a9865=origin/main (`Pulse cycle 20260623T145923Z`). Clean, on-main, up to date. ✅
+- **unreviewed-merge:649 context (verified):** PR #649 (`fix-watchdog-stale-log-inflight-aware-001`) was manually merged in iter ~2526 because auto-merge failed URL-shape-invalid (marker pr_url=`ourliberty` vs `Larry-Yatch`). Mirror REVIEW_PASS was confirmed in outbox archive prior to merge. Detector fires because manual merge bypasses chain_events AUTO_MERGE flow — known false-positive circumstance. [yellow carry]
+- **watchdog-watcher-log-stale (re-verified):** No stale-log WARNs in journalctl last 30 min. Fix PR #649 merged; verification window open. [carry pending-verify] ✅
+- **mirror-marker-parse-error (re-verified):** Larry approved `harden-mirror-review-marker-reminder-001` at 15:04:21Z → dispatched to Forge inbox. Envelope live at `/home/larry/agents/inboxes/forge/harden-mirror-review-marker-reminder-001.json`. G-rule progressing through pipeline. [verification_pending active] ✅
+- **pending-approvals (re-verified):** pending=0. Both prior approvals (fix-watchdog + doorbell) cleared. ✅
+- **fix-645-alert-translation-001 stall (re-verified):** heal_pipeline_stall WARN `larry_alerts append failed for forge_built_no_pr:fix-645-alert-translation-001` (15:06Z). Persists. [carry blue] ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 978, "file_length": 981}`. get-watermark=978. 3 new alerts:
+- L979: `source=heal-unreviewed-merge-detector, subject=unreviewed-merge:649` (14:55Z) — route=escalate → triage-alert → **Tier-4** (known never-silence pattern; bot already DM'd Larry idx=978 at 14:58Z). Tier-reset. Known circumstance: Mirror DID review it (REVIEW_PASS in archive, iter ~2526); detector fires because manual merge bypasses AUTO_MERGE chain_events flow. [yellow carry]
+- L980: `source=sync.service, subject=sync-blocked:auto-commit-push-failed` (14:59Z) → triage-alert → **Tier-3** (known-pattern silence). ✅
+- L981: `source=outbox-notifier, kind=approval_request, approval_id=harden-mirror-review-marker-reminder-001` (15:00Z) → triage-alert → **Tier-3** (known-pattern silence). ✅
+Watermark advanced 978→981. Tier-reset from L979.
+
+**Check 1 — Log noise (30 min window):** journalctl `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot PID 1309976 (Ss). Last log entry: `[2026-06-23T09:04:22-0600]` approved harden-mirror-review-marker-reminder-001 → dispatched to Forge (~6 min ago). Larry last message: 'Go' at 09:04:21 MDT (15:04:21Z) — approved `harden-mirror-review-marker-reminder-001`. No new directives since. 0 pending approvals. No agent distress. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → `0 new alert(s) fired, 0 recovered, 1 suppressed` (fix-645 on cooldown). FORGE_NO_PR_SKIP: p7-shelf-descriptor (#638 merged), p7-approvals-adopt (#82 dashboard merged), system-self-awareness-slice-2b (preflight_exit), fix-proposed-retirement (preflight_exit). Fix-645 WARN persists. ✅ Nominal.
+
+**Check 4 — Pending directives:** Forge=1 (harden-mirror-review-marker-reminder-001, just dispatched 15:04Z — active processing expected), Beacon=1 (card-message from Larry dashboard: "Is it complete?" for cap-orphan-lane-show-desktop-chat-title-fallback-rep-dd23 — normal Beacon task, no Pulse action), Mirror=0. beacon-pending-approvals: pending=0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-23T15:03:59Z (~5 min ago). Within 60-min window. ✅ Nominal.
+
+**Check A — Source repo:** On main. HEAD=de5a9865=origin/main. Clean. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json last_sync=2026-06-23T14:59:21Z (status=error, standing push-race with cycle wrapper, Tier-3 silenced). Repo at origin/main — in sync. ✅ Nominal.
+
+**Check C — Agent liveness:** dashboard_api=1309235 (Ssl) ✅, beacon_telegram_bot=1309976 (Ss) ✅, outbox_notifier=1310052 (Ss) ✅, chain_event=930563 (SNs) ✅, inbox_watcher=1026206 (Ssl) ✅. 5/5 alive.
+
+**Check D — Inboxes:** Forge=1 (harden-mirror-review-marker-reminder-001 active), Beacon=1 (card-message from Larry, normal). Mirror=0.
+
+**Check E — PRs:**
+- ourliberty-agent-core: 0 open PRs. ✅
+- ourliberty-dashboard: 0 open PRs. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Tuesday 2026-06-23 UTC (weekday=1 ∉ {0,2,4,6}):** Check I/VIII/IX/X/XI weekday gate not met → skip. Check III: last 2026-06-11 (12d < 14d gate, not Sunday) → skip. ✅
+
+**G-rule assessment:**
+- **mirror-marker-parse-error: 3/3 DISPATCHED → IN-FLIGHT** — Larry approved `harden-mirror-review-marker-reminder-001` at 15:04Z. Forge has the envelope. Awaiting Forge build + PR. PRIME verification_pending active.
+- **watchdog-watcher-log-stale: pending-verify** — PR #649 merged iter ~2526 (14:54Z). No WARN in last 30 min → positive signal. Verification window open. [carry pending-verify]
+- **G-rule api-500-burst: 1/3** — no new occurrence this iter. [carry]
+- All other G-rule counts unchanged.
+
+**Actions taken:**
+1. Alert triage: 3 alerts (L979 Tier-4, L980 Tier-3, L981 Tier-3). Watermark advanced 978→981.
+2. PRIME ledger: 1 intervention (unreviewed-merge-tier4; bot already DM'd Larry).
+3. Tier state: `record --checks-clean false` → Tier 1 maintained, consecutive_clean=0.
+
+**Dispatches:** None (mirror-marker-parse-error dispatched in iter ~2526 and progressed through Larry approval at 15:04Z; no new dispatches this iter).
+
+**Standing findings (carried + verified):**
+- [yellow] **unreviewed-merge:649** — New this iter. Mirror DID review (REVIEW_PASS in archive); false positive from manual-merge path. Bot DM'd Larry. Larry judgment. [new yellow]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [blue] **fix-645-alert-translation-001 worktree stall** — WARN persists in heal_pipeline_stall dry-run. [carry]
+- [blue] **G-rule watchdog-watcher-log-stale** — PR #649 MERGED 14:54Z (iter ~2526). Pending PRIME verify — no WARN in last 30 min, positive signal. [pending-verify]
+- [blue] **G-rule mirror-marker-parse-error** — 3/3 DISPATCHED (iter ~2526). Larry approved 15:04Z → Forge has it. Awaiting Forge build + PR + Mirror review + merge. [in-flight]
+- [blue] **G-rule api-500-burst** — 1/3 (iter ~2526). Watch.
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. Watch.
+- [blue] **G-rule seq-advancer-sequence-stranded** — 2/3. Watch.
+- [blue] **G-rule sync.service-deploy-restart-storm-tier4** — 1/3. Watch.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule health-notify-script-missing** — dispatch sent 2026-06-09. [carry]
+- [blue] **unreviewed-merge:628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **Stale bash orphan PID 1834248** — benign. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. Informational. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention this iter (unreviewed-merge:649 Tier-4 triage). Trailing-30d: systemic_fixes=57, ratio=18.8, trend=improving.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0 (Tier-4 alert = tier-reset).
+
+---
+
 ## Iteration ~2526 — 2026-06-23T14:55Z UTC (interactive /cycle, Tier 2→1 reset, 2 actions, PR #649 merged, G-rule doorbell COMPLETE, mirror-marker-parse-error 3/3 DISPATCHED)
 
 **Trigger:** Larry `/cycle` invocation.
