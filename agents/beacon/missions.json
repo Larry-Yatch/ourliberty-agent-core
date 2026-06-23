@@ -4812,7 +4812,11 @@
         "at": "2026-06-23T19:13:49.761697+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-23T19:39:49.842149+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-card-message-cap-build-completion-auto-report-auto-verify-auto-ru-58c8",
