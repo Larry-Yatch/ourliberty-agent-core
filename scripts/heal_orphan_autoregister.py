@@ -69,7 +69,7 @@ import os
 import subprocess
 import sys
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Optional
 
@@ -98,11 +98,22 @@ GH_TIMEOUT_SEC = 30
 # proposed orphan's terminal state. Fetched ONCE per tick per (repo, state) and
 # matched in-memory, so gh cost is O(repos) — NOT O(candidates) — regardless of the
 # backlog size. The window must reach back past the oldest un-drained proposal:
-# task_resolution.shipped_pr's `--limit 40` aged a week-old backlog out (the root
-# cause the lane never drained); 200 spans multiple weeks at this repo's merge rate.
-# PRs older than this window aren't seen — they degrade to the event-only path / KEEP
-# (fail-safe), never a false drop.
-_TERMINAL_PR_FETCH_LIMIT = 200
+# `--limit 40` aged a week-old backlog out, then 200 still aged out a backlog whose
+# shipped PRs were 500+ merges deep (a high-churn fortnight left proposals pointing
+# at PRs far older than the 200 most-recent). 1000 spans the full live backlog with
+# headroom; the stuck-proposal flag pass (flag_stuck_proposals) bounds growth past
+# that so the window never has to chase an unbounded reach. PRs older than this
+# window aren't seen — they degrade to the event-only path / KEEP (fail-safe), then
+# get flagged for a manual keep/drop — never a false drop.
+_TERMINAL_PR_FETCH_LIMIT = 1000
+
+# A proposed card that has lingered this many days WITHOUT a terminal-PR match is
+# not auto-retirable by the gate: its task_id never corresponds to a merged/closed
+# PR (a closeout deferred-work note, or a synthesized-label orphan whose task_id
+# diverges from any branch). Rather than let it rot silently on the lane, it is
+# flagged `needs_decision` so Larry can keep-or-drop it. 14d mirrors
+# heal_missions_card_gc.EMPTY_PROBEABLE_MISSION_GRACE_DAYS (one grace clock).
+STUCK_PROPOSAL_TTL_DAYS = 14
 
 # Dashboard "+New mission" registration is drained HERE, inside the missions
 # writer, so the dashboard never has to be a git committer (it just drops a queue
@@ -358,6 +369,7 @@ class ProposeResult:
     proposed: list[tuple[str, str]] = field(default_factory=list)  # (task_id, entry_id)
     retired: list[tuple[str, str]] = field(default_factory=list)  # (entry_id, reason)
     surviving_proposed: list[str] = field(default_factory=list)  # live proposed entry ids
+    flagged_stuck: list[str] = field(default_factory=list)  # newly needs_decision-flagged ids
     ingested: list[tuple[int, str]] = field(default_factory=list)  # (pr_number, mission_id) — PR backstop
     closeable_prs: list[tuple[int, str]] = field(default_factory=list)  # new-mission PRs to close
     queue_drained: list[str] = field(default_factory=list)  # mission_ids drained from the queue this tick
@@ -696,6 +708,72 @@ def surviving_proposed_ids(registry: dict[str, Any]) -> list[str]:
             if isinstance(eid, str) and eid:
                 out.append(eid)
     return out
+
+
+# ---------- surface the stuck residue for a manual keep/drop (backlog) -------
+
+
+def _parse_date(value: Any) -> Optional[datetime]:
+    """Parse an ISO date/datetime string to an aware UTC datetime, or None. A
+    proposal's `created` is a date-only ISO string (YYYY-MM-DD)."""
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(value.replace('Z', '+00:00'))
+    except ValueError:
+        return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+def flag_stuck_proposals(
+    registry: dict[str, Any],
+    now: datetime,
+    *,
+    terminal_gate: Callable[[list[str]], tuple[bool, Optional[str]]],
+    ttl_days: int = STUCK_PROPOSAL_TTL_DAYS,
+) -> list[str]:
+    """Surface (never retire) the residue: proposed cards stuck with no terminal-PR
+    match. A proposed + not-acknowledged card older than ``ttl_days`` whose task_ids
+    the reliable terminal gate does NOT match cannot be auto-retired — its work
+    either never shipped (a closeout deferred note) or its task_id diverges from any
+    branch. Stamp an additive `needs_decision` marker (+ reason/since) so the board
+    can flag it for a human keep/drop, instead of leaving it to rot silently.
+
+    Covers EVERY owner (no `proposed_by` guard, unlike retire): the closeout-authored
+    notes need this surface as much as the orphan-derived ones. Mutates the registry
+    in place; returns the ids newly flagged this tick. Idempotent: an already-flagged
+    card, or one the gate matches (the retire pass sweeps it instead), is skipped.
+    Fail-safe: the caller invokes this ONLY when the gate is live, so a gh outage
+    (gate is None / a transient miss) never mass-flags a healthy lane."""
+    newly: list[str] = []
+    for entry in registry.get('missions', []):
+        if not isinstance(entry, dict):
+            continue
+        if entry.get('phase') != PROPOSED_PHASE or entry.get('acknowledged'):
+            continue
+        if entry.get('needs_decision'):
+            continue  # already surfaced — idempotent
+        created = _parse_date(entry.get('created'))
+        if created is None or (now - created) < timedelta(days=ttl_days):
+            continue  # too young (or undateable) — give the gate time to retire it
+        tids = [t for t in (entry.get('task_ids') or []) if isinstance(t, str) and t]
+        try:
+            is_terminal, _sig = terminal_gate(tids) if tids else (False, None)
+        except Exception as e:  # noqa: BLE001 — fail-safe: a gate error never flags
+            log(f'stuck-flag gate raised for {entry.get("id")}: '
+                f'{type(e).__name__}: {e} — skip')
+            continue
+        if is_terminal:
+            continue  # the retire pass sweeps it this tick — not stuck
+        age_days = (now - created).days
+        entry['needs_decision'] = True
+        entry['needs_decision_since'] = now.isoformat()
+        entry['needs_decision_reason'] = (
+            f'{age_days}d on the proposed lane with no terminal-PR match — keep or drop')
+        eid = entry.get('id')
+        if isinstance(eid, str) and eid:
+            newly.append(eid)
+    return newly
 
 
 # ---------- commit + push the missions.json delta to main (§ 6) ----------
@@ -1051,7 +1129,8 @@ def _emit_summary(res: ProposeResult, commit_status: str, dry_run: bool) -> None
     summary = (
         f'missions-autoregister: {verb} {len(res.proposed)} orphan thread(s) '
         f'{proposed_ids}; {retire_verb} {len(res.retired)} stale proposal(s) '
-        f'{retired_ids}; drained {len(res.queue_drained)} queued mission(s) '
+        f'{retired_ids}; flagged {len(res.flagged_stuck)} stuck-for-decision '
+        f'{res.flagged_stuck}; drained {len(res.queue_drained)} queued mission(s) '
         f'{res.queue_drained}; ingested {len(res.ingested)} new-mission PR(s) '
         f'{ingested_ids}; surviving proposed={len(res.surviving_proposed)} '
         f'{res.surviving_proposed}; scanned {res.scanned_orphans} orphan(s); '
@@ -1080,6 +1159,17 @@ def _emit_summary(res: ProposeResult, commit_status: str, dry_run: bool) -> None
         larry_alerts.append_alert(
             source='missions-autoregister', severity='warning',
             message=summary, subject=f'failure:{commit_status}', route='escalate')
+
+    # Low-noise digest (never an escalation DM) when cards newly need a decision —
+    # the residue that auto-retirement can't resolve, surfaced ONCE per newly-flagged
+    # set (idempotent flagging means a quiet lane re-alerts nothing next tick).
+    if res.flagged_stuck:
+        larry_alerts.append_alert(
+            source='missions-autoregister', severity='warning',
+            message=(f'{len(res.flagged_stuck)} proposed card(s) have sat past '
+                     f'{STUCK_PROPOSAL_TTL_DAYS}d with no shipped-PR match and need a '
+                     f'keep/drop decision: {res.flagged_stuck}'),
+            subject='proposed:needs-decision', route='digest')
 
 
 # ---------- main ----------
@@ -1168,13 +1258,30 @@ def run_once(*, dry_run: bool,
                 # failure persists nothing" guarantee.
                 registry = read_missions_registry(mpath) or registry
             else:
+                # Build the reliable terminal-PR gate ONCE per tick (a single deep
+                # gh fetch) and share it across BOTH the retire pass and the stuck-
+                # proposal flag pass below — never fetch the PR index twice. None
+                # when gh is unavailable (both passes then degrade fail-safe).
+                terminal_gate = _load_terminal_gate()
                 # Retire only after a successful propose (as before); isolated so a
                 # retirement fault never blocks a healthy propose pass.
                 try:
-                    res.retired = retire_stale_proposals(registry, rows, derive, now,
-                                                         pr_state_resolver=pr_state_resolver)
+                    res.retired = retire_stale_proposals(
+                        registry, rows, derive, now,
+                        pr_state_resolver=pr_state_resolver,
+                        terminal_gate=terminal_gate)
                 except Exception as e:  # noqa: BLE001 — fail-safe: report, never corrupt
                     log(f'retire-stale-proposals raised: {type(e).__name__}: {e} — retiring nothing')
+                # Surface the residue: proposed cards stuck past the TTL with no
+                # terminal-PR match get a `needs_decision` flag (a human keep/drop)
+                # so they leave the silent backlog. Only when the gate is live — a
+                # gh outage must never mass-flag a transient miss (fail-safe).
+                if terminal_gate is not None:
+                    try:
+                        res.flagged_stuck = flag_stuck_proposals(
+                            registry, now, terminal_gate=terminal_gate)
+                    except Exception as e:  # noqa: BLE001 — fail-safe: report, never corrupt
+                        log(f'flag-stuck-proposals raised: {type(e).__name__}: {e} — flagging nothing')
                 res.surviving_proposed = surviving_proposed_ids(registry)
 
     # New-mission registration: drain the queue (PRIMARY) + reconcile any open
@@ -1212,7 +1319,8 @@ def run_once(*, dry_run: bool,
             log(f'new-mission observe raised: {type(e).__name__}: {e}')
 
     commit_status = 'nothing'
-    if (res.proposed or res.retired or res.ingested or res.queue_drained) and not dry_run:
+    if (res.proposed or res.retired or res.ingested or res.queue_drained
+            or res.flagged_stuck) and not dry_run:
         try:
             atomic_write_missions(mpath, registry)
         except Exception as e:  # noqa: BLE001 — fail-safe
@@ -1261,6 +1369,7 @@ def run_once(*, dry_run: bool,
 def _commit_audit(res: ProposeResult) -> str:
     return (f'Auto-committed by {PROPOSED_BY}. '
             f'proposed={len(res.proposed)} retired={len(res.retired)} '
+            f'flagged-stuck={len(res.flagged_stuck)} '
             f'drained-new-mission-queue={len(res.queue_drained)} '
             f'ingested-new-mission-prs={len(res.ingested)} '
             f'scanned={res.scanned_orphans} surviving={len(res.surviving_proposed)}.')

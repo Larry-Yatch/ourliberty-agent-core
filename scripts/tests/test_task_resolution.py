@@ -83,6 +83,38 @@ class PrMatchesTaskTest(unittest.TestCase):
             tr.pr_matches_task({'headRefName': 'forge/zzz', 'title': 'no'},
                                'abc-123'))
 
+    def test_forge_iteration_suffix_matches(self):
+        # Forge's re-attempt branch `forge/<task_id>-<NN>` carries an extra numeric
+        # suffix the bare task_id lacks. It must match the task (the canonical case
+        # the lane never drained on): forge/p3-dashboard-proposed-lane-002 -> task
+        # p3-dashboard-proposed-lane.
+        self.assertEqual(
+            tr.pr_matches_task(
+                {'headRefName': 'forge/p3-dashboard-proposed-lane-002'},
+                'p3-dashboard-proposed-lane'),
+            'branch_iter')
+
+    def test_forge_iteration_suffix_wrong_core_no_match(self):
+        # The iteration strip must require EXACT core equality — a different core
+        # with an iteration suffix is not this task's branch.
+        self.assertIsNone(
+            tr.pr_matches_task(
+                {'headRefName': 'forge/some-other-long-feature-002'},
+                'p3-dashboard-proposed-lane'))
+
+    def test_iteration_core_below_floor_no_match(self):
+        # A short core (below the length floor) must NOT iter-match, so a tiny task
+        # id can't collide with an unrelated `<short>-NN` branch.
+        self.assertIsNone(
+            tr.pr_matches_task({'headRefName': 'forge/abc-2'}, 'abc'))
+
+    def test_exact_numeric_task_prefers_branch_over_iter(self):
+        # When the numeric tail is PART of the task id, the exact-branch rule fires
+        # first (not iter) — forge/abc-123 == task abc-123.
+        self.assertEqual(
+            tr.pr_matches_task({'headRefName': 'forge/abc-123'}, 'abc-123'),
+            'branch')
+
 
 class ResolvedOutOfBandTest(unittest.TestCase):
     def test_larry_action_wins(self):

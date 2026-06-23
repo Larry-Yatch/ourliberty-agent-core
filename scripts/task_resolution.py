@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -52,6 +53,16 @@ DEFAULT_REPOS = (
 # that is a strict prefix of the task_id and at least this long is treated as
 # a (truncated) match. 30 avoids matching short common prefixes like `build-`.
 _BRANCH_TRUNCATION_MIN_LEN = 30
+
+# Forge re-attempts a task on a fresh branch by appending a numeric iteration
+# suffix: `forge/<task_id>-002`, `-003`, … . The orphan's task_id is the bare
+# `<task_id>` (no suffix), so the branch carries an EXTRA `-<NN>` that neither the
+# exact nor the truncation rule strips — i.e. the canonical Forge re-attempt
+# branch never matched its own task, and shipped proposals never retired. We strip
+# ONE trailing `-<digits>` group and match on EXACT-core equality (not a
+# substring); a length floor mirrors id_match's anti-short-id discipline so a tiny
+# task id can't collide with an unrelated `<short>-NN` branch.
+_BRANCH_ITER_MIN_LEN = 12
 
 
 def _noop(*_a, **_k) -> None:
@@ -102,13 +113,22 @@ def _branch_task(branch: str) -> Optional[str]:
 
 
 def pr_matches_task(pr: dict, task_id: str) -> Optional[str]:
-    """Return a match reason ('branch'/'branch_truncated'/'title') if `pr`
-    corresponds to `task_id`, else None. Mirrors
+    """Return a match reason ('branch'/'branch_iter'/'branch_truncated'/'title')
+    if `pr` corresponds to `task_id`, else None. Mirrors
     heal_pipeline_stall._pr_matches_task."""
     branch_task = _branch_task(pr.get('headRefName') or '')
     if branch_task:
         if branch_task == task_id:
             return 'branch'
+        # Forge iteration branch: `forge/<task_id>-<NN>` carries an extra numeric
+        # suffix the bare task_id lacks. Strip one trailing `-<digits>` and match
+        # on length-floored exact-core equality, so the task's own re-attempt
+        # branch matches without ever matching an unrelated PR.
+        iter_core = re.sub(r'-\d+$', '', branch_task)
+        if (iter_core != branch_task
+                and iter_core == task_id
+                and len(iter_core) >= _BRANCH_ITER_MIN_LEN):
+            return 'branch_iter'
         if (len(branch_task) >= _BRANCH_TRUNCATION_MIN_LEN
                 and task_id.startswith(branch_task)):
             return 'branch_truncated'
