@@ -4,6 +4,103 @@
 
 ---
 
+## Iteration ~2526 — 2026-06-23T14:55Z UTC (interactive /cycle, Tier 2→1 reset, 2 actions, PR #649 merged, G-rule doorbell COMPLETE, mirror-marker-parse-error 3/3 DISPATCHED)
+
+**Trigger:** Larry `/cycle` invocation.
+
+**Health:** ⚠️ Signal — 2 interventions this iter: (1) Check A fast-forward (doorbell alert-translation config from PR #648), (2) PR #649 manual merge (fix-watchdog Mirror REVIEW_PASS confirmed, auto-merge failed URL mismatch). Tier 2→1 reset. 5/5 daemons alive. No Larry-directed escalations needed.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Daemons (re-verified):** dashboard_api=1309235 (Ssl) ✅, beacon_telegram_bot=1309976 (Ss) ✅, outbox_notifier=1310052 (Ss) ✅, chain_event=930563 (SNs) ✅, inbox_watcher=1026206 (Ssl) ✅. Same PIDs as iter ~2525. ✅
+- **HEAD (re-verified post-fast-forward + PR #649 merge):** 843d468c=origin/main (`fix(watchdog): in-flight-aware inbox counting in check_log_growth`). Clean, on-main, up to date. ✅
+- **PR #648 (doorbell-tier3-silence-001, re-verified):** MERGED 2026-06-23T14:34:49Z. G-rule doorbell-tier4-pattern → COMPLETE ✅.
+- **PR #649 (fix-watchdog-stale-log-inflight-aware-001, re-verified):** MERGED 2026-06-23T14:54:28Z (manual merge — Mirror REVIEW_PASS confirmed in outbox archive). G-rule watchdog-watcher-log-stale → pending PRIME verify. ✅
+- **pending-approvals (re-verified):** pending=0. Both prior approvals (fix-watchdog + doorbell) fully processed. ✅
+- **fix-645-alert-translation-001 stall (re-verified):** heal_pipeline_stall --dry-run WARN `larry_alerts append failed for forge_built_no_pr:fix-645-alert-translation-001` (14:52Z). Persists. [carry blue] ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 976, "file_length": 978}`. get-watermark=976. 2 new alerts:
+- L977: `source=outbox-notifier, kind=notification, intent=review-pass` (14:34Z) — Mirror approved PR #648 (`doorbell-tier3-silence-001`), auto-merged + branch deleted → triage-alert → **Tier-3** (known-pattern, review-pass). G-rule doorbell-tier4-pattern → **COMPLETE ✅**.
+- L978: `source=outbox-notifier, kind=notification, intent=review-pass` (14:50Z) — Mirror approved PR #649 (`fix-watchdog-stale-log-inflight-aware-001`), auto-merge FAILED (marker pr_url=`ourliberty` org vs envelope pr_url=`Larry-Yatch` org) → triage-alert → **Tier-3** (known-pattern, review-pass). Manual merge executed this iter.
+Watermark advanced 976→978. No tier-reset from alerts (both Tier-3).
+
+**Check 1 — Log noise (30 min window):** Standing patterns (known, suppressed): `larry_alerts append failed for forge_built_no_pr:fix-645-alert-translation-001` (14:22Z, 14:39Z), `notify script missing` (14:26Z), watchdog WARN `Watcher log stale 583s` (14:45Z — G-rule fix now merged). New: API 500 burst — inbox-watcher reported `Claude returned is_error: API Error: 500` for forge (14:26Z), beacon (14:28Z), mirror (14:34Z, 14:35Z, 14:35Z, 14:36Z) — 6 in ~10 min window, exceeds 5/hour threshold. All self-resolved (Mirror produced REVIEW_PASS on retry; subsequent review-pass notification confirms recovery). MalformedMirrorMarker at 14:49Z for fix-watchdog (outbox-notifier: `MalformedMirrorMarker: phase=review requires ONE canonical verdict marker at end of response — none found`; marker-error-notify retry 1/3 sent to Mirror; Mirror re-emitted REVIEW_PASS). **G-rule mirror-marker-parse-error: 2/3 → 3/3 DISPATCHED** (mirror-marker-parse-error-grule-fix-001.json written to Beacon inbox). API 500 burst: new G-rule `api-500-burst: 1/3` (likely correlated with Mirror's session during the burst; self-resolved). ✅ Otherwise nominal.
+
+**Check 2 — Telegram sweep:** Bot PID 1309976 (Ss). Last log entry: `[2026-06-23T08:53:48-0600] notification idx=977 delivered (intent=review-pass)` (~2 min ago). Larry last message: 'Go' at 08:20:59 MDT (14:20:59Z) → approved doorbell-tier3-silence-001 → dispatched to Forge at 08:21:00. No new Larry directives since. No agent distress. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → `0 new alert(s) fired, 0 recovered, 1 suppressed` (fix-645 on cooldown). FORGE_NO_PR_SKIP: p7-shelf-descriptor (#638 merged), p7-approvals-adopt (#82 dashboard merged), system-self-awareness-slice-2b (preflight_exit), fix-proposed-retirement (preflight_exit). Fix-645 WARN persists. ✅ Nominal.
+
+**Check 4 — Pending directives:** Forge=0, Beacon=1 (mirror-marker-parse-error-grule-fix-001 just written), Mirror=0. beacon-pending-approvals: pending=0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-23T14:43:47Z (~12 min ago). Within 60-min window. ✅ Nominal.
+
+**Check A — Source repo:** Repo was 1 commit behind origin (0f3a1ef7→7bdab1eb, doorbell alert-translation config from PR #648). Fast-forwarded. Post-PR-#649-merge: now at 843d468c=origin/main. Clean. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json last_sync=2026-06-23T13:59:01Z (status=error, standing push-race with cycle wrapper, Tier-3 silenced). Repo at origin/main — in sync. ✅ Nominal.
+
+**Check C — Agent liveness:** dashboard_api=1309235 (Ssl) ✅, beacon_telegram_bot=1309976 (Ss) ✅, outbox_notifier=1310052 (Ss) ✅, chain_event=930563 (SNs) ✅, inbox_watcher=1026206 (Ssl) ✅. 5/5 alive.
+
+**Check D — Inboxes:** Forge=0, Beacon=1 (mirror-marker-parse-error-grule-fix-001), Mirror=0.
+
+**Check E — PRs:**
+- ourliberty-agent-core: PR #649 (fix-watchdog) was OPEN → manually merged 14:54:28Z. Now 0 open PRs. ✅
+- ourliberty-dashboard: 0 open PRs. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Tuesday 2026-06-23 UTC (weekday=1 ∉ {0,2,4,6}):** Check I/VIII/IX/X/XI weekday gate not met → skip. Check III: last 2026-06-11 (12d < 14d gate, not Sunday) → skip. ✅
+
+**G-rule assessment:**
+- **doorbell-tier4-pattern: COMPLETE ✅** — PR #648 auto-merged 14:34:49Z. G-rule COMPLETE. Removing from active standing findings.
+- **watchdog-watcher-log-stale: DISPATCHED + PR #649 MERGED** — PR #649 merged 14:54:28Z. Pending PRIME verification (verification window starts now). [upgrade to pending-verify]
+- **mirror-marker-parse-error: 3/3 DISPATCHED** — direction-ask `mirror-marker-parse-error-grule-fix-001.json` written to Beacon inbox this iter. Awaiting Beacon spec + Forge PR.
+- **G-rule api-500-burst: 1/3** — new G-rule first observation. API 500 errors for forge/beacon/mirror in ~10 min window at 14:26-14:36Z. Self-resolved. Likely Anthropic API blip correlated with Mirror's review session. Watch.
+- All other G-rule counts unchanged.
+
+**Actions taken:**
+1. Alert triage: 2 alerts (L977 Tier-3, L978 Tier-3). Watermark advanced 976→978.
+2. Check A always-fix: fast-forward 0f3a1ef7→7bdab1eb.
+3. Check E always-fix (URL-mismatch recovery): merged PR #649 manually at 14:54:28Z (Mirror REVIEW_PASS confirmed in `/home/larry/agents/outboxes/mirror/.archive/fix-watchdog-stale-log-inflight-aware-001.json`).
+4. G-rule mirror-marker-parse-error 3/3: dispatched direction-ask `mirror-marker-parse-error-grule-fix-001.json` to Beacon inbox.
+5. PRIME ledger: 2 interventions (ff-main-when-behind, manual-pr-merge-url-mismatch) + 1 verification_pending (mirror-marker-parse-error-grule-fix-001).
+6. Tier state: `record --checks-clean false` → tier reset 2→1 (consecutive_clean reset to 0).
+
+**Dispatches:** `mirror-marker-parse-error-grule-fix-001.json` → Beacon inbox.
+
+**Standing findings (carried + verified):**
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [blue] **fix-645-alert-translation-001 worktree stall** — WARN persists in heal_pipeline_stall dry-run. [carry]
+- [blue] **G-rule watchdog-watcher-log-stale** — 3/3 DISPATCHED (iter ~2517). PR #649 MERGED 14:54:28Z → pending PRIME verify (G-rule watchdog-watcher-log-stale). [carry, upgrading to pending-verify]
+- [blue] **G-rule mirror-marker-parse-error** — 3/3 DISPATCHED this iter. `mirror-marker-parse-error-grule-fix-001` written to Beacon inbox. Awaiting Beacon spec + Forge PR.
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. Watch.
+- [blue] **G-rule seq-advancer-sequence-stranded** — 2/3. Watch.
+- [blue] **G-rule api-500-burst** — 1/3 (new this iter). Watch.
+- [blue] **G-rule sync.service-deploy-restart-storm-tier4** — 1/3. Watch.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule health-notify-script-missing** — dispatch sent 2026-06-09. [carry]
+- [blue] **unreviewed-merge:628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **Stale bash orphan PID 1834248** — benign. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. Informational. [carry]
+
+**PRIME DIRECTIVE:** 2 interventions this iter (ff-main-when-behind, manual-pr-merge-url-mismatch) + 1 verification_pending (mirror-marker-parse-error). Trailing-30d: systemic_fixes=57, ratio=18.8, trend=improving.
+**Tier end-of-iter:** Tier 2→**1** (reset — signal observed). consecutive_clean=0.
+
+---
+
 ## Iteration ~2525 — 2026-06-23T14:18Z UTC (interactive /cycle, Tier 1→2 de-escalate, consecutive_clean=2→3→0, NOMINAL ✅)
 
 **Trigger:** Larry `/cycle` invocation.
