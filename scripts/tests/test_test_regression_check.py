@@ -174,6 +174,59 @@ class ComputeVerdictTest(_IsolatedAgentsRoot):
         self.assertEqual(v['fixed'], [])
 
 
+class AbsoluteInvariantVerdictTest(_IsolatedAgentsRoot):
+    """The absolute-invariant set bypasses dial 3's pre-existing tolerance: an
+    invariant test failing at HEAD blocks even when it was ALSO failing at the
+    parent (the silent-accumulation hole that let two non-compliant test files
+    merge red — bootstrap-import-gate-enforce-001). NON-invariant pre-existing
+    failures keep the original tolerance and still PASS."""
+
+    def setUp(self):
+        super().setUp()
+        # Use the real invariant id from the module so this test tracks the set
+        # rather than hardcoding a copy that could silently drift out of parity.
+        self._invariant_id = next(iter(trc.ABSOLUTE_INVARIANT_TESTS))
+
+    def test_invariant_failing_at_both_shas_still_blocks(self):
+        parent = {self._invariant_id}
+        head = {self._invariant_id}
+        v = trc.compute_verdict(parent, head)
+        self.assertEqual(v['verdict'], 'BLOCK')
+        # It is NOT a regression (present at parent too) — it blocks via the
+        # invariant path, and is surfaced distinctly.
+        self.assertEqual(v['regressions'], [])
+        self.assertEqual(v['invariant_failures'], [self._invariant_id])
+        self.assertEqual(v['pre_existing_unaffected'], [self._invariant_id])
+
+    def test_non_invariant_pre_existing_still_passes(self):
+        """Tolerance preserved for everything outside the invariant set."""
+        parent = {'a.B.test_old'}
+        head = {'a.B.test_old'}
+        v = trc.compute_verdict(parent, head)
+        self.assertEqual(v['verdict'], 'PASS')
+        self.assertEqual(v['invariant_failures'], [])
+        self.assertEqual(v['pre_existing_unaffected'], ['a.B.test_old'])
+
+    def test_invariant_plus_non_invariant_pre_existing_blocks_on_invariant_only(self):
+        parent = {self._invariant_id, 'a.B.test_old'}
+        head = {self._invariant_id, 'a.B.test_old'}
+        v = trc.compute_verdict(parent, head)
+        self.assertEqual(v['verdict'], 'BLOCK')
+        self.assertEqual(v['regressions'], [])
+        self.assertEqual(v['invariant_failures'], [self._invariant_id])
+        self.assertIn('a.B.test_old', v['pre_existing_unaffected'])
+
+    def test_invariant_absent_at_head_does_not_block(self):
+        """A PR that FIXES the invariant (failing at parent, passing at head)
+        must not be blocked by the invariant path — only HEAD presence blocks."""
+        parent = {self._invariant_id}
+        head: set[str] = set()
+        v = trc.compute_verdict(parent, head)
+        self.assertEqual(v['verdict'], 'PASS')
+        self.assertEqual(v['invariant_failures'], [])
+        self.assertEqual(v['fixed'], [self._invariant_id])
+
+
 # -------------------- collect_failures_at_sha (test-runner branch) --------------------
 
 class RunTestsInDirTest(_IsolatedAgentsRoot):
@@ -323,6 +376,18 @@ class MainCliVerdictTest(_MainHarness):
         # text mode should NOT be valid JSON
         with self.assertRaises(json.JSONDecodeError):
             json.loads(out)
+
+    def test_invariant_pre_existing_exits_block_end_to_end(self):
+        """A PR whose HEAD still fails an absolute-invariant test exits BLOCK
+        even though that same id was already failing at parent — the JSON
+        surfaces it under invariant_failures, not regressions."""
+        invariant_id = next(iter(trc.ABSOLUTE_INVARIANT_TESTS))
+        code, out, _ = self._invoke_main({invariant_id}, {invariant_id})
+        self.assertEqual(code, trc.EXIT_BLOCK)
+        report = json.loads(out)
+        self.assertEqual(report['verdict'], 'BLOCK')
+        self.assertEqual(report['regressions'], [])
+        self.assertEqual(report['invariant_failures'], [invariant_id])
 
 
 class MainCliAnalysisFailTest(_IsolatedAgentsRoot):
