@@ -35,7 +35,7 @@
       "id": "cap-orphan-lane-show-desktop-chat-title-fallback-rep-dd23",
       "title": "Orphan lane: prefer repo/branch over a prompt-blob desktop title (real title when we have one)",
       "note": "Re-scoped 2026-06-16. The readability fallback already shipped (no raw desktop-<hash>). Remaining need: desktop_session payload.title is just the first ~80 chars of the prompt, so ~20 orphans render the same truncated blob -- less readable than repo/branch. Fix in dashboard_api._orphan_label_and_location: only let a title win when it's a MEANINGFUL title (not prompt-like: long or trailing-ellipsis); when the only title is a prompt blob, prefer repo/branch. Server-only; frontend renders label verbatim. Build dispatched: orphan-lane-prompt-blob-title-fallback-001.",
-      "state": "parked",
+      "state": "dropped",
       "origin": {
         "source": "desktop-chat",
         "session_id": null,
@@ -46,19 +46,18 @@
       "last_touched": "2026-06-16T05:48:00+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "A small fix so parked desktop chats show their real name instead of a meaningless code.",
-        "why": "Right now those entries are unreadable gibberish, which makes the list harder to scan and trust at a glance.",
-        "suggest": "Worth doing, but it needs a quick check that the chat's name is actually available before we build on it \u2014 so green-light it as a scoped, verify-first improvement rather than a rushed change."
+        "what": "A small fix to how unnamed items show up on the dashboard, so they display a clear name instead of a confusing chunk of cut-off text.",
+        "why": "Right now about 20 of these items all look like the same garbled label, making the list harder to scan and trust at a glance.",
+        "suggest": "Go ahead and ship it \u2014 it's a low-stakes readability tidy-up with no downside, but no need to rush it ahead of bigger priorities."
       },
-      "risk": "medium",
+      "risk": "safe",
       "recommended_action": "delegate",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-06-14T17:52:43.946307+00:00",
-        "from_state": "parked"
+        "at": "2026-06-23T15:20:19.965065+00:00",
+        "from_state": "dropped"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "spawned": {
         "kind": "delegate",
         "task_id": "delegate-cap-orphan-lane-show-desktop-chat-title-fallback-rep-dd23",
@@ -69,7 +68,7 @@
       "id": "cap-orphan-lane-show-state-collapse-terminal-orphans-aa37",
       "title": "Orphan lane: show STATE + collapse terminal orphans (97 noisy, can't tell what's done)",
       "note": "Lane shows ALL unregistered tasks (terminal + active) with no phase, so 97 items look actionable when most are done. Fix: derive each orphan's phase, badge it (building/in-review/shipped/abandoned), and collapse/hide terminal ones so only actionable orphans show. Pairs with the Phase 2 derive-relocation. Auto-registration + register/dismiss buttons = Phase 3.",
-      "state": "parked",
+      "state": "dropped",
       "origin": {
         "source": "desktop-chat",
         "session_id": null,
@@ -79,19 +78,18 @@
       },
       "last_touched": "2026-06-10T06:35:24.295967+00:00",
       "briefing": {
-        "what": "A cleanup of one of our work-tracking views that currently lumps 97 finished and unfinished items together, so it looks like there's a huge pile of open work when most of it is already done.",
-        "why": "Right now the view is misleading \u2014 it's hard to tell what actually needs attention, which wastes time and erodes trust in the dashboard as a decision-making tool.",
-        "suggest": "Worth doing, but start small: label each item by status and hide the finished ones first, confirm that view is accurate, then layer on the fancier automation later."
+        "what": "A cleanup of the work-tracking list that today shows 97 items as if they all need attention, when most are already finished.",
+        "why": "The clutter makes it impossible to see what actually still needs doing, so real work hides behind a wall of noise and gets missed.",
+        "suggest": "Worth doing, but it's a tidy-up rather than urgent \u2014 slot it in when there's a calm window rather than dropping anything for it."
       },
-      "risk": "medium",
+      "risk": "safe",
       "recommended_action": "drop",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-06-19T11:44:53.914622+00:00",
-        "from_state": "parked"
+        "at": "2026-06-23T15:20:19.965065+00:00",
+        "from_state": "dropped"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "aging": true,
       "updated_at": "2026-06-19T11:36:11.534880+00:00"
     },
@@ -128,7 +126,8 @@
         "kind": "delegate",
         "task_id": "delegate-cap-projects-pm-layer-data-is-stale-separate-system-84ec",
         "stamped_at": "2026-06-22T00:52:57.778041+00:00"
-      }
+      },
+      "snoozed_until": "2026-07-01T00:00:00+00:00"
     },
     {
       "id": "cap-operator-action-queue-is-full-of-benign-auto-han-3c39",
@@ -187,7 +186,12 @@
         "from_state": "parked"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
-      "aging": true
+      "aging": true,
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-register-desktop-ingest-token-in-the-credential-edbb",
+        "stamped_at": "2026-06-23T15:16:24.507383+00:00"
+      }
     },
     {
       "id": "cap-decide-full-codebase-audit-cadence-abac",
