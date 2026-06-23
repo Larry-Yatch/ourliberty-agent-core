@@ -4,6 +4,105 @@
 
 ---
 
+## Iteration ~2489 — 2026-06-23T04:25Z UTC (interactive /loop /cycle, Tier 3→1, consecutive_clean=5→0, G-RULE DISPATCH ⚠️)
+
+**Trigger:** Larry `/loop /cycle` invocation (interactive, via loop skill).
+
+**Health:** ⚠️ G-rule dispatch — mirror-no-session-revision-loop hit 3/3; all mandatory checks nominal. Tier 3→1.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Daemons (re-verified):** chain_event=930563 (SNs) ✅, inbox_watcher=1026206 (Ssl) ✅, beacon=1163107 (Ss) ✅, dashboard_api=1162819 (Ssl) ✅, outbox_notifier=1163186 (Ss) ✅. Same PIDs as iter ~2488. ✅
+- **Repo HEAD:** 4cd01fd4 (Pulse cycle 20260623T035006Z) = origin/main. On main, clean. ✅
+- **unreviewed-merge:637:** No new Larry response in bot log. CARRY [yellow].
+- **Check VIII rule=lower (2026-06-15):** Sentinel 2026-06-22 exists. Awaiting Larry action. CARRY [yellow].
+- **medic-diagnosis-translation-gap (1/1):** Triage helper returned Tier-3 for medic this iter AND alert-translations.json has `medic-diagnosis` key with severity=INFO. Translation IS working. No new instance this iter. G-rule count stays 1/1.
+- **OURLIBERTY_BOARD_DRAIN_ENABLED credential-drift:** 0 new alerts. CARRY [yellow].
+- **PR #645:** OPEN, MERGEABLE, 0 reviews. Beacon dispatched Mirror at 04:01Z (after Larry `can you unstall pr 645`); Mirror returned `notify-no-session-revision-proposed-retirement-forge-matcher` at 04:12Z — no GitHub review posted. This triggered the mirror-no-session G-rule to 3/3. CARRY as [yellow] (escalation dispatched).
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 936, "file_length": 938}`. 2 new alerts:
+- **L937** `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#645` → triage helper: **Tier-3** (known-pattern match). Silence. ✅
+- **L938** `source=medic, kind=notification, intent=medic-diagnosis` → triage helper: **Tier-3** (known-pattern match, `medic-diagnosis` key present in alert-translations.json). Silence. ✅
+- Watermark advanced 936 → 938. ✅
+
+**Check 1 — Log noise:** outbox-notifier.log: 0 WARN/ERROR (last 60 lines). inbox-watcher.log: 0 WARN/ERROR. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot PID 1163107 (Ss). Bot log shows:
+- **04:01:03Z:** Larry sent `can you unstall pr 645`. Beacon responded "Routed. PR #645 is now in Mirror's review queue."
+- Routing confirmed: routing-events.jsonl shows Beacon → Mirror dispatch at 04:01:39Z (`task_id=proposed-retirement-forge-matcher, phase=review`).
+- Mirror returned `notify-no-session-revision-proposed-retirement-forge-matcher` at 04:12:54Z (`intent=code-review-revision-no-session`). **No GitHub review was posted.**
+- Directive tracked (Beacon handled); end state: PR #645 still 0 reviews. G-rule mirror-no-session advanced to 3/3.
+- Last bot log entry: idx=937 (medic notification) at 22:00 MDT (04:00Z). No new Larry messages after 04:01Z.  ✅ (directive tracked)
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → `0 new alert(s) fired, 0 recovered, 1 suppressed (cooldown: unrouted_open_pr:PR#645)`. FORGE_NO_PR_SKIP unchanged. ✅ Nominal.
+
+**Check 4 — Pending directives:** forge=0, beacon=0, mirror=0. beacon-pending-approvals: pending=0, history=252. Larry directive `unstall pr 645` tracked via Beacon handling. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-23T04:16:32Z (~9 min before check). Within 60-min window. ✅ Nominal.
+
+**Check A — Source repo:** On main. HEAD=4cd01fd4=origin/main. Clean. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-23T03:30:15Z (~55 min ago), status=no-change. Within 2h window. ✅ Nominal.
+
+**Check C — Agent liveness:** chain_event=930563 (SNs) ✅, inbox_watcher=1026206 (Ssl) ✅, beacon=1163107 (Ss) ✅, dashboard_api=1162819 (Ssl) ✅, outbox_notifier=1163186 (Ss) ✅. 5/5 alive. ✅
+
+**Check D — Inboxes:** forge=0, beacon=0 (post-dispatch), mirror=0. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: PR #645 OPEN (`fix/proposed-retirement-forge-matcher`, Larry-authored, MERGEABLE, 0 reviews — Mirror returned no-session). **[yellow] escalation dispatched.** ourliberty-dashboard: PR #86 OPEN (`work/autonomy-dial`, Larry-authored, created 04:14Z, MERGEABLE, 0 reviews, 51/51 tests green). **[blue] new, watch.** ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Tuesday 2026-06-23 UTC (weekday=1 ∉ {0,2,4,6}):** Check I/VIII/IX/X/XI weekday gate not met → skip. Check III: last 2026-06-11 (12d < 14d gate, not Sunday) → skip. ✅
+
+**G-rule assessment:**
+- **mirror-no-session-revision-loop: 2/3 → 3/3.** New occurrence: Mirror returned `code-review-revision-no-session` for PR #645 at 04:12Z. **Dispatching to Beacon.** Pattern: Mirror bails on externally-authored PRs with no Forge session — no GitHub review is ever posted.
+- All other G-rule counts unchanged from iter ~2488.
+
+**Actions taken:**
+1. Alert triage: 2 new alerts (L937 Tier-3, L938 Tier-3). Watermark 936 → 938.
+2. G-rule mirror-no-session-revision-loop 3/3: Dispatched `mirror-no-session-revision-fresh-review-001` to Beacon inbox.
+3. PRIME ledger: `intervention` + `verification_pending` appended (tier=1, template=mirror-no-session-revision-loop).
+4. Tier state: `record --checks-clean false` → Tier 3→1, consecutive_clean=5→0.
+
+**Dispatches:** `mirror-no-session-revision-fresh-review-001` → Beacon inbox. Direction-ask: spec + dispatch Forge to fix Mirror's no-session bail-out on externally-authored PRs. Also requests interim workaround path for PR #645.
+
+**Standing findings (carried + verified):**
+- [yellow] **unreviewed-merge:637** — PR #637 merged without Mirror review. Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Sentinel 2026-06-22 exists. Awaiting Larry action. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [yellow] **PR #645 unreviewed** — Mirror returned no-session; 0 GitHub reviews. Beacon dispatch sent for permanent fix. Interim: PR #645 needs alternate review path.
+- [blue] **PR #86 new** — Larry-authored `feat(operations): autonomy dial`, created 04:14Z, MERGEABLE, 51/51 tests green. No Mirror review yet (externally-authored). Watch.
+- [blue] **medic-diagnosis-translation-gap** — 1/1. Translation working this iter (Tier-3). Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 3/3. Dispatched. Awaiting Beacon spec + Forge PR.
+- [blue] **G-rule heal-stale-daemon-code-script-service-mismatch** — 2/3. Watch.
+- [blue] **G-rule mirror-marker-parse-error** — 2/3. Watch.
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. Watch.
+- [blue] **G-rule seq-advancer-sequence-stranded** — 2/3. Watch.
+- [blue] **G-rule sync.service-deploy-restart-storm-tier4** — 1/3. Watch.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule watchdog-watcher-log-stale** — 1/3. Watch.
+- [blue] **G-rule health-notify-script-missing** — dispatch sent 2026-06-09. [carry]
+- [blue] **unreviewed-merge:628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **Stale bash orphan PID 1834248** — benign. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. Informational. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention this iter (mirror-no-session G-rule dispatch). Trailing-30d: systemic_fixes=56, interventions=1065+1=1066, ratio≈19.0, trend=improving.
+**Tier end-of-iter:** Tier 3→1, consecutive_clean=5→0. Next cadence: 5-min.
+
+---
+
 ## Iteration ~2488 — 2026-06-23T03:48Z UTC (interactive, /cycle, Tier 3, consecutive_clean=4→5, NOMINAL ✅)
 
 **Trigger:** Larry `/cycle` invocation (interactive).
