@@ -204,9 +204,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-23 20:37Z UTC (Iter ~2546, Tier 1, consecutive_clean 1→2)
+## Status snapshot — updated 2026-06-23 20:47Z UTC (Iter ~2547, Tier 1→2 DE-ESCALATION, consecutive_clean=0)
 
-**Iter ~2546 summary:** ✅ Nominal. Check 0: 0 new alerts (watermark 1002, file_length 1002). All 8 daemons alive, same PIDs (dashboard_api=1502707, beacon_telegram_bot=1502905, outbox_notifier=1502977, forge_bot=1388801, mirror_bot=1388982, pulse_bot=1389067, inbox_watcher=1389730, chain_event=930563). HEAD=4f54f253=origin/main. All mandatory + additive checks nominal. PRIME: systemic_fixes=60, interventions≈1078, ratio≈17.97, trend=improving. **Tier 1, consecutive_clean=1→2** (need 1 more clean for Tier 2). Standing [yellow]: PR#653-unrouted-to-mirror (Larry DM'd idx=994), push-soft-gate-block-upgrade-decision (awaiting Larry decision), unreviewed-merge:649+637+607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. G-rules at 2/3: revision-phase-preamble-missing, telegram-409-burst, Forge-preflight-CLARIFY_REQUEST, forge-preflight-task-id-mismatch, seq-advancer-sequence-stranded, F24-empty-prompt-envelope-rejected. api-500-burst: 1/3. beacon-claude-timeout: 1/3.
+**Iter ~2547 summary:** ✅ Nominal. Check 0: 0 new alerts (watermark 1002, file_length 1002). All 8 daemons alive, same PIDs (dashboard_api=1502707, beacon_telegram_bot=1502905, outbox_notifier=1502977, forge_bot=1388801, mirror_bot=1388982, pulse_bot=1389067, inbox_watcher=1389730, chain_event=930563). HEAD=5ae6f16a=origin/main. All mandatory + additive checks nominal. PRIME: systemic_fixes=60, interventions≈1078, ratio≈17.97, trend=improving. **Tier 2, consecutive_clean=0** (de-escalated from Tier 1 after 3 consecutive clean iters; 15-min cadence now). Standing [yellow]: PR#653-unrouted-to-mirror (Larry DM'd idx=994), push-soft-gate-block-upgrade-decision (awaiting Larry decision), unreviewed-merge:649+637+607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. G-rules at 2/3: revision-phase-preamble-missing, telegram-409-burst, Forge-preflight-CLARIFY_REQUEST, forge-preflight-task-id-mismatch, seq-advancer-sequence-stranded, F24-empty-prompt-envelope-rejected. api-500-burst: 1/3. beacon-claude-timeout: 1/3.
 
 
 
