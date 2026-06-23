@@ -4782,6 +4782,40 @@
       "retired_by": "heal_orphan_autoregister",
       "retired_at": "2026-06-22T06:06:19.791433+00:00",
       "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-phase4b-contract-c-guard-tests-001",
+      "name": "Phase4b Contract C Guard Tests 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `phase4b-contract-c-guard-tests-001`. Last activity 2026-06-23T19:07:15.558585+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "phase4b-contract-c-guard-tests-001"
+      ],
+      "repo": null,
+      "created": "2026-06-23",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-23T19:09:27.723893+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-23T19:07:15.558585+00:00"
+    },
+    {
+      "id": "proposed-card-message-cap-build-completion-auto-report-auto-verify-auto-ru-58c8",
+      "name": "Card Message Cap Build Completion Auto Report Auto Verify Auto Ru 58c8",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `card-message-cap-build-completion-auto-report-auto-verify-auto-ru-58c8`. Last activity 2026-06-23T18:55:13.699504+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "card-message-cap-build-completion-auto-report-auto-verify-auto-ru-58c8"
+      ],
+      "repo": null,
+      "created": "2026-06-23",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-23T19:09:27.723893+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-23T18:55:13.699504+00:00"
     }
   ]
 }
