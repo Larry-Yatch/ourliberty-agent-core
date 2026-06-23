@@ -467,6 +467,66 @@ class CheckLogGrowthTest(_IsolatedRootsTest):
             result = watchdog.check_log_growth()
         self.assertEqual(result['status'], 'critical')
 
+    # ---- in-flight-aware inbox counting ----
+
+    def _stale_log(self):
+        log_dir = self._tmp_path / 'logs'
+        log_dir.mkdir(parents=True, exist_ok=True)
+        f = log_dir / 'inbox_watcher.log'
+        f.write_text('old\n')
+        import os as _os
+        import time as _time
+        stale = _time.time() - 600  # age > 5 min, well under 12h
+        _os.utime(f, (stale, stale))
+
+    def _inbox_task(self, agent: str, task_id: str):
+        inbox = self._tmp_path / 'inboxes' / agent
+        inbox.mkdir(parents=True, exist_ok=True)
+        (inbox / f'build-{task_id}.json').write_text(
+            json.dumps({'task_id': task_id})
+        )
+
+    def _in_flight_marker(self, task_id: str, pid: int):
+        d = self._tmp_path / 'state' / 'in-flight'
+        d.mkdir(parents=True, exist_ok=True)
+        (d / f'{task_id}.json').write_text(
+            json.dumps({'task_stem': task_id, 'pid': pid})
+        )
+
+    def test_in_flight_alive_task_is_ok_no_warn(self):
+        # Inbox task that is actively building (marker + live pid) -> ok.
+        self._stale_log()
+        self._inbox_task('forge', 'task-build-001')
+        self._in_flight_marker('task-build-001', pid=4242)
+        with mock.patch.object(watchdog, 'is_service_alive', return_value=True), \
+                mock.patch.object(watchdog, '_pid_alive', return_value=True), \
+                mock.patch.object(watchdog, 'log') as logged:
+            result = watchdog.check_log_growth()
+        self.assertEqual(result['status'], 'ok')
+        self.assertIn('work in progress', result['reason'])
+        for call in logged.call_args_list:
+            self.assertNotIn('Watcher log stale', call.args[0])
+
+    def test_queued_task_no_marker_still_warns(self):
+        # Inbox task with NO in-flight marker -> genuinely queued -> warn.
+        self._stale_log()
+        self._inbox_task('forge', 'task-queued-002')
+        with mock.patch.object(watchdog, 'is_service_alive', return_value=True):
+            result = watchdog.check_log_growth()
+        self.assertEqual(result['status'], 'warning')
+        self.assertEqual(result['queued_inboxes'], 1)
+
+    def test_in_flight_dead_pid_counts_as_queued_and_warns(self):
+        # Marker present but pid dead -> not in-flight -> counts as queued.
+        self._stale_log()
+        self._inbox_task('forge', 'task-dead-003')
+        self._in_flight_marker('task-dead-003', pid=999999)
+        with mock.patch.object(watchdog, 'is_service_alive', return_value=True), \
+                mock.patch.object(watchdog, '_pid_alive', return_value=False):
+            result = watchdog.check_log_growth()
+        self.assertEqual(result['status'], 'warning')
+        self.assertEqual(result['queued_inboxes'], 1)
+
 
 # ---------- bot desired-state reconciler ----------
 
