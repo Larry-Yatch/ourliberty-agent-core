@@ -146,6 +146,22 @@ _TEST_RUN_SENTINEL_PREFIX = 'OL-TEST-RUN-SENTINEL-'
 SUITE_EXITED_NONZERO_ID = 'scripts.tests:session-guard:suite-exited-nonzero'
 
 
+# Absolute invariants (always-must-pass-at-head): test IDs that BLOCK the gate
+# whenever they fail at HEAD, even if they were ALSO failing at the parent SHA —
+# bypassing dial 3's pre-existing-failure tolerance for these IDs only. This
+# closes the silent-accumulation hole the regression-only contract warned about:
+# the bootstrap-first-import gate is a SINGLE test that fails if ANY test file
+# drops its _bootstrap import. Once the first drift slipped in, that one ID
+# entered the "pre-existing failures" set and every later drift was tolerated as
+# not-new. The invariant set forces a BLOCK so a red defense-in-depth gate can
+# never ride along at HEAD. IDs use the dotted module.Class.method form that
+# parse_unittest_failures() produces.
+ABSOLUTE_INVARIANT_TESTS = frozenset({
+    'scripts.tests.test_bootstrap_first_import.'
+    'BootstrapFirstImportTest.test_every_test_file_imports_bootstrap_first',
+})
+
+
 class AnalysisError(Exception):
     """Raised when the analysis itself can't complete (exit 2)."""
 
@@ -514,13 +530,22 @@ def compute_verdict(parent: set[str], head: set[str]) -> dict:
     regressions = sorted(head - parent)
     fixed = sorted(parent - head)
     pre_existing_unaffected = sorted(parent & head)
-    verdict = 'BLOCK' if regressions else 'PASS'
+    # Absolute invariants block on presence at HEAD regardless of parent state —
+    # they bypass the pre-existing tolerance so a defense-in-depth gate that was
+    # already red can't keep riding along while new drift accumulates behind it.
+    invariant_failures = sorted(head & ABSOLUTE_INVARIANT_TESTS)
+    verdict = 'BLOCK' if (regressions or invariant_failures) else 'PASS'
 
     parts: list[str] = []
     if regressions:
         parts.append(f'{len(regressions)} new failure(s) introduced by this PR')
     else:
         parts.append('no new failures introduced by this PR')
+    if invariant_failures:
+        parts.append(
+            f'{len(invariant_failures)} absolute-invariant test(s) failing at '
+            'head (always blocks, even if pre-existing)'
+        )
     if pre_existing_unaffected:
         parts.append(
             f'{len(pre_existing_unaffected)} pre-existing failure(s) untouched'
@@ -533,6 +558,7 @@ def compute_verdict(parent: set[str], head: set[str]) -> dict:
         'regressions': regressions,
         'fixed': fixed,
         'pre_existing_unaffected': pre_existing_unaffected,
+        'invariant_failures': invariant_failures,
         'verdict': verdict,
         'summary': summary,
     }
@@ -554,6 +580,7 @@ def render_text(report: dict) -> str:
             lines.append('  (none)')
         lines.append('')
     _block('regressions', report['regressions'])
+    _block('invariant_failures', report['invariant_failures'])
     _block('pre_existing_unaffected', report['pre_existing_unaffected'])
     _block('fixed', report['fixed'])
     return '\n'.join(lines).rstrip() + '\n'
