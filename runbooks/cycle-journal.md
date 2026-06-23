@@ -4,6 +4,103 @@
 
 ---
 
+## Iteration ~2548 — 2026-06-23T21:05Z UTC (interactive /cycle, Tier 2→1 ESCALATION, signal: Tier-4 novel alert)
+
+**Trigger:** Larry `/cycle` invocation (chat mode).
+
+**Health:** ⚠️ Tier-reset — 4 new alerts (L1003–L1006); 3×Tier-3 silence + 1×Tier-4 (medic approval_request, self-resolved). 8/8 daemons alive (same PIDs). HEAD=424a53b9=origin/main. 0 pending approvals. 1 open PR (#653, carry yellow). **Tier escalation: 2→1** (Tier-4 novel alert = non-clean iter).
+
+**VERIFY-BEFORE-REASSERT:**
+- **Daemons (re-verified):** chain_event=930563 (SNs) ✅, dashboard_api=1502707 (Ssl) ✅, outbox_notifier=1502977 (Ss) ✅, beacon_telegram_bot=1502905 (Ss) ✅, forge_bot=1388801 (Ss) ✅, mirror_bot=1388982 (Ss) ✅, pulse_bot=1389067 (Ss) ✅, inbox_watcher=1389730 (Ssl) ✅. 8/8 alive, same PIDs as iter ~2547. ✅
+- **HEAD (re-verified):** 424a53b9=origin/main. Wrapper auto-committed `Pulse cycle 20260623T204856Z` after iter ~2547. Working tree clean. ✅
+- **PR #653 routing (re-verified):** Still open, isDraft=false, mergeable=MERGEABLE, reviewDecision="" — no Mirror routing. Cooldown for PR#653 unrouted-pr alert expired this iter (L1006 fired + Tier-3 silenced). Larry DM'd (idx=994). [carry yellow] ✅
+- **push-soft-gate-block-upgrade-decision (re-verified):** Not in new alerts L1003–L1006. Awaiting Larry decision. [carry yellow] ✅
+- **credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED (re-verified):** Not in new alerts this iter. Underlying still standing. [carry yellow] ✅
+- **fix-645-alert-translation-001 stall (re-verified):** WARN `larry_alerts append failed for forge_built_no_pr:fix-645-alert-translation-001` persists in Check 3 dry-run. [carry blue] ✅
+- **Forge inbox stale files (new, verified):** Medic proposed archiving 3 stale forge inbox files for `projects-v3-sequence-rollup-done-flip-001` (L1003/L1004). **Re-verified:** Forge inbox directory is EMPTY — no .json files present. Files were already archived at 20:22Z as part of the retry-exhausted process (inbox-watcher archived after 4 failed attempts 20:20–20:22Z). **Medic proposal is moot / self-resolved.** Medic already DM'd Larry (bot idx=1003, 14:58 MDT). ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 1002, "file_length": 1005}` — then **4 new alerts** (L1003–L1006 after Check 3 dry-run wrote L1006):
+- L1003 `source=heal-pipeline-stall, subject=pipeline-stall:retry-exhausted:projects-v3-sequence-rollup-done-flip-001, route=escalate` — **Tier-3 silence** (known-pattern). Forge inbox already empty (self-resolved). Bot already DM'd Larry at 14:53 MDT (idx=1002). ✅
+- L1004 `source=medic, kind=approval_request, approval_id=medic-heal-pipeline-stall:...-20260623T205129Z` — **Tier-4 novel** (no registry template). Medic already DM'd Larry at 14:58 MDT (bot idx=1003). Forge inbox empty — cleanup moot. Per MEMORY.md: no second DM from Pulse. Journal-note only. **→ PRIME intervention logged. Tier-reset triggered.** G-rule: `medic-approval-request-novel-tier4` 1/3.
+- L1005 `source=dispatch-branch-cleanup, subject=summary, route=digest` — **Tier-3 silence** (3 local + 2 remote stale branches pruned). ✅
+- L1006 `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#653, route=escalate` — **Tier-3 silence** (known-pattern). Fired by Check 3 dry-run when PR#653 cooldown expired. Note: `--dry-run` writes real alerts once cooldown expires (prior iters were suppressed). G-rule: `heal-pipeline-stall-dry-run-writes-real-alerts` 1/3.
+Watermark advanced 1002→1006.
+
+**Check 1 — Log noise (30-min window):** journalctl --user -p warning: `-- No entries --` (0 WARN/ERROR). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot PID 1502905 (Ss). Last log before cycle: idx=1003 approval_request delivered 14:58 MDT. No new Larry directives. 0 pending approvals. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → `1 new alert(s) fired` (PR#653 unrouted, cooldown expired — L1006 written then immediately triaged Tier-3), `1 suppressed` (fix-645 cooldown). FORGE_NO_PR_SKIP: 8 tasks (system-self-awareness-slice-2b, fix-proposed-retirement, #647–#652). fix-645 WARN persists. ✅ Nominal (L1006 silenced).
+
+**Check 4 — Pending directives:** Forge=0, Beacon=0, Mirror=0. beacon-pending-approvals: pending=0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-23T20:58:00Z (~7 min before cycle). Within 60-min window. ✅ Nominal.
+
+**Check A — Source repo:** On main. HEAD=424a53b9=origin/main. Working tree clean. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json last_sync=2026-06-23T21:00:20Z (~5 min ago). Within 2-hour window. ✅ Nominal.
+
+**Check C — Agent liveness:** 8/8 alive (same PIDs — see VERIFY-BEFORE-REASSERT). ✅ Nominal.
+
+**Check D — Inboxes:** Forge=0 (directory empty), Beacon=0, Mirror=0. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: PR #653 `Missions v2 Phase 4b spec: live-feel thread` — open since 18:54Z (~131 min), isDraft=false, mergeable=MERGEABLE, reviewDecision="" — no Mirror routing. Cooldown expired (L1006 fired + silenced). Larry DM'd (idx=994). [carry yellow]. ourliberty-dashboard: 0 open PRs. ✅ Nominal (pending carry finding).
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Tuesday 2026-06-23 UTC (weekday=1 ∉ {0,2,4,6}):** Check I/VIII/IX/X/XI weekday gate not met → skip. Check III: last 2026-06-11 (12d < 14d gate, not Sunday) → skip. ✅
+
+**G-rule assessment:**
+- **NEW `medic-approval-request-novel-tier4`** — 1/3. `source=medic, kind=approval_request` alerts classified Tier-4 (novel; no registry template). Consider adding Tier-3 translation (medic already DMs Larry directly; Pulse silence is correct). Watch.
+- **NEW `heal-pipeline-stall-dry-run-writes-real-alerts`** — 1/3. `--dry-run` in heal_pipeline_stall.py writes real alerts to larry-alerts.jsonl when cooldown expires (prior iters showed 0 fired only because cooldowns suppressed). Watch.
+- All prior G-rule counts unchanged. [all carry]
+
+**Actions taken:**
+1. Alert watermark advanced: 1002→1006.
+2. PRIME ledger: `intervention` appended (tier=2, template=medic-approval-request-novel-tier4, Tier-4 medic approval_request, self-resolved, no DM).
+3. Tier state: `record --checks-clean false` → **Tier 2→1** (signal: Tier-4 novel alert). consecutive_clean reset to 0.
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [yellow] **PR #653 unrouted to Mirror** — Larry DM'd (idx=994). Cooldown expired, L1006 fired (Tier-3 silenced). [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Known false positive (Mirror REVIEW_PASS confirmed, manual merge). Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [blue] **fix-645-alert-translation-001 worktree stall** — WARN persists in heal_pipeline_stall dry-run. [carry]
+- [blue] **G-rule medic-approval-request-novel-tier4** — **1/3 NEW**. Watch.
+- [blue] **G-rule heal-pipeline-stall-dry-run-writes-real-alerts** — **1/3 NEW**. Watch.
+- [blue] **G-rule beacon-claude-timeout** — 1/3. Watch.
+- [blue] **G-rule api-500-burst** — 1/3. Watch.
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. Watch.
+- [blue] **G-rule seq-advancer-sequence-stranded** — 2/3. Watch.
+- [blue] **G-rule sync.service-deploy-restart-storm-tier4** — 1/3. Watch.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule health-notify-script-missing** — dispatch sent 2026-06-09. [carry]
+- [blue] **unreviewed-merge:628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **Stale bash orphan PID 1834248** — benign. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. Informational. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention this iter (Tier-4 medic approval_request, self-resolved). Trailing-30d: systemic_fixes=60, interventions≈1079, ratio≈17.97, trend=improving.
+**Tier end-of-iter:** Tier **1** (escalated from 2 due to Tier-4 alert), consecutive_clean=0.
+
+---
+
 ## Iteration ~2547 — 2026-06-23T20:47Z UTC (interactive /cycle, Tier 1→2 DE-ESCALATION, consecutive_clean 2→3→0)
 
 **Trigger:** Larry `/cycle` invocation (chat mode, /loop dynamic).
