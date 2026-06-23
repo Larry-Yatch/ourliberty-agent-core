@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import fnmatch
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any, Optional
@@ -168,6 +169,15 @@ def _rule_matches(rule: dict[str, Any], task: dict[str, Any]) -> bool:
         repos = [repos]
     if not _matches_glob_any(task.get('target_repo'), repos):
         return False
+    # Predicted sensitive intent (#8). A FRESH build carries no changed_files, so
+    # the glob match below can't catch it — but the dispatch text may name
+    # sensitive work (deploy/config/migrations/secrets/…), which the chokepoint
+    # stamps as task['sensitive_intent']. A carve-out rule opts in with
+    # `match_sensitive_intent: true`; checked only AFTER the source/target/repo/
+    # task_type gating above, so it stays scoped to this rule. Rules without the
+    # flag are unaffected; tasks without the flag fall through to file_patterns.
+    if rule.get('match_sensitive_intent') and task.get('sensitive_intent'):
+        return True
     file_patterns = rule.get('file_patterns') or []
     if isinstance(file_patterns, str):
         file_patterns = [file_patterns]
@@ -293,6 +303,37 @@ _SENSITIVE_FILE_PATTERNS = [
     'scripts/kill_switch.py', '.env*', '**/.env*', 'credentials/**',
 ]
 
+# Sensitive-intent keywords (#8). A FRESH build carries no changed_files, so the
+# globs above can't catch it; this TIGHT, sensitive-only set lets the chokepoint
+# predict from the dispatch text (summary/prompt) that a build will touch a
+# sensitive path, and stamp task['sensitive_intent'] so the carve-out force_asks
+# instead of auto-starting. Deliberately narrow (infra/secrets/tier only, NOT the
+# broad classify_careful set) to minimize false-asks on benign builds — a build
+# that touches sensitive paths WITHOUT naming them still rides the Mirror gate.
+# One named constant: widen/narrow here in a one-liner.
+SENSITIVE_INTENT_KEYWORDS = (
+    'deploy', 'deployment', 'release', 'production',
+    'config', 'configuration', 'systemd',
+    'migrate', 'migration',
+    'secret', 'secrets', 'credential', 'credentials',
+    'token', 'password', 'api key', 'apikey',
+    'kill switch', 'kill-switch', 'killswitch', 'emergency halt',
+    'account tier', 'tier rotation', 'rotate tier',
+    'environment variable', 'env var',
+)
+
+_SENSITIVE_INTENT_PATTERN = re.compile(
+    r'\b(' + '|'.join(re.escape(k) for k in SENSITIVE_INTENT_KEYWORDS) + r')\b',
+    re.IGNORECASE,
+)
+
+
+def text_signals_sensitive(text: str) -> bool:
+    """True if free dispatch text (a build's summary/prompt) names sensitive-infra
+    work — used to predict a FRESH build (no changed_files yet) will touch a
+    sensitive path, so the carve-out can force_ask it. Pure; never raises."""
+    return bool(text) and _SENSITIVE_INTENT_PATTERN.search(text) is not None
+
 # 'loose' widens the auto-approve lane to all OurLiberty repos (balanced is
 # agent-core only).
 _LOOSE_REPOS = [
@@ -303,9 +344,25 @@ _LOOSE_REPOS = [
 def _sensitive_carveout_rule(repos: list[str]) -> dict[str, Any]:
     # MUST be ordered BEFORE the broad auto_approve rule (first-match-wins) so a
     # sensitive-path dispatch still force_asks inside the auto-approve lane.
+    # `match_sensitive_intent` closes the fresh-build hole (#8): a build with no
+    # declared changed_files but sensitive-named text trips this rule too.
     return {
         'source': 'beacon', 'target': 'forge', 'repos': list(repos),
-        'file_patterns': list(_SENSITIVE_FILE_PATTERNS), 'action': 'force_ask',
+        'file_patterns': list(_SENSITIVE_FILE_PATTERNS),
+        'match_sensitive_intent': True, 'action': 'force_ask',
+    }
+
+
+def _pulse_sensitive_carveout() -> dict[str, Any]:
+    # The pulse-auto-dispatch lane (rule below) auto-approves on `target: *` with
+    # no path carve-out — so a sensitive pulse dispatch would slip through (#8).
+    # Ordered BEFORE the pulse auto_approve so sensitive pulse work (declared
+    # files OR predicted intent) force_asks. Repo-agnostic on purpose: the
+    # conservative side (force_ask) should bite regardless of repo.
+    return {
+        'source': 'pulse-auto-dispatch', 'target': '*',
+        'file_patterns': list(_SENSITIVE_FILE_PATTERNS),
+        'match_sensitive_intent': True, 'action': 'force_ask',
     }
 
 
@@ -325,6 +382,7 @@ def policy_for_level(level: str) -> dict[str, Any]:
     elif level == 'balanced':
         repos = ['ourliberty-agent-core']
         rules = [
+            _pulse_sensitive_carveout(),
             pulse,
             _sensitive_carveout_rule(repos),
             {'source': 'beacon', 'target': 'forge', 'repos': repos,
@@ -332,6 +390,7 @@ def policy_for_level(level: str) -> dict[str, Any]:
         ]
     else:  # loose
         rules = [
+            _pulse_sensitive_carveout(),
             pulse,
             _sensitive_carveout_rule(_LOOSE_REPOS),
             {'source': 'beacon', 'target': 'forge', 'repos': list(_LOOSE_REPOS),
