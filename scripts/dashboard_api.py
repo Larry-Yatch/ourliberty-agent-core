@@ -3208,6 +3208,35 @@ def _collapsed_step_task_ids(
     return out
 
 
+def _sequence_owned_task_ids(build_sequences: dict[str, Any]) -> set[str]:
+    """Every task_id OWNED by a registered build sequence — its ``seq_id`` PLUS
+    every step's ``task_id``/``step_id``/``id`` — over BOTH the ``active`` and
+    ``archived`` buckets of a ``_reader_build_sequences`` response, INDEPENDENT of
+    phase-linkage. Unlike ``_collapsed_step_task_ids`` (which only collects steps
+    of phase-LINKED sequences, to attribute them to a parent phase card), this
+    suppresses sequence-owned ids from the loose-orphan surface even for a "bare"
+    sequence (e.g. a completed meta-dev sequence with no projects.json phase):
+    such an id is sequence work, never a standalone initiative. The orphan
+    exclusion set is the UNION of the two. Fail-safe over junk: a non-dict
+    bucket entry / sequence / step is skipped, never raises."""
+    out: set[str] = set()
+    for bucket in ('active', 'archived'):
+        for seq in build_sequences.get(bucket) or []:
+            if not isinstance(seq, dict):
+                continue
+            seq_id = seq.get('seq_id')
+            if isinstance(seq_id, str) and seq_id:
+                out.add(seq_id)
+            for step in seq.get('steps') or []:
+                if not isinstance(step, dict):
+                    continue
+                for key in ('task_id', 'step_id', 'id'):
+                    val = step.get(key)
+                    if isinstance(val, str) and val:
+                        out.add(val)
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Projects-tab-v3 P3 — the on-disk write side of Promote (p3-promote-endpoint).
 #
@@ -4812,7 +4841,14 @@ def _handle_missions_derived(
     build_sequences = _reader_build_sequences(
         build_sequences_root or _sequence_blackboard_root(), now)
     sequence_status_by_id = _sequence_status_by_id(build_sequences)
-    collapsed_task_ids = _collapsed_step_task_ids(projects, build_sequences)
+    # Suppress sequence-owned ids from the loose-orphan surface: the UNION of the
+    # phase-linked step ids (attributed to a parent phase card) AND every id OWNED
+    # by ANY registered sequence (seq_id + step ids), so a bare/completed sequence
+    # with no parent phase (e.g. projects-v3-p4) no longer leaks as loose orphans.
+    collapsed_task_ids = (
+        _collapsed_step_task_ids(projects, build_sequences)
+        | _sequence_owned_task_ids(build_sequences)
+    )
 
     response = _build_derived_response(
         entries=entries,

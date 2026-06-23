@@ -771,5 +771,71 @@ class SequenceRollupOrphanCollapseTest(unittest.TestCase):
         self.assertIn('p4-cleanup-committer', tids)
 
 
+class SequenceOwnedOrphanCollapseTest(unittest.TestCase):
+    """Follow-up to #655: a bare (non-phase-linked) sequence's seq_id + step ids
+    must ALSO be suppressed from the loose-orphan surface, even though there is no
+    parent phase card to attribute them to. `_sequence_owned_task_ids` collects
+    over both buckets independent of phase-linkage; the orphan exclusion set is the
+    UNION of it and `_collapsed_step_task_ids`."""
+
+    def _build_sequences(self):
+        return {
+            'active': [
+                {'seq_id': 'active-seq', 'status': 'active',
+                 'steps': [{'step_id': 'active-step'}]},
+            ],
+            'archived': [
+                # The real bare/complete sequence from the live incident.
+                {'seq_id': 'projects-v3-p4', 'status': 'complete',
+                 'steps': [{'step_id': 'p4-complete-signal'},
+                           {'step_id': 'p4-cleanup-committer'},
+                           {'step_id': 'p4-postmerge-exec'}]},
+            ],
+        }
+
+    def test_owned_ids_span_seq_ids_and_steps_both_buckets(self):
+        owned = da._sequence_owned_task_ids(self._build_sequences())
+        self.assertEqual(owned, {
+            'active-seq', 'active-step',
+            'projects-v3-p4', 'p4-complete-signal',
+            'p4-cleanup-committer', 'p4-postmerge-exec',
+        })
+
+    def test_owned_ids_fail_safe_over_junk(self):
+        bs = {'active': ['not-a-dict', {'seq_id': 'ok',
+                                        'steps': ['junk', {'task_id': 'okstep'},
+                                                  {'no': 'id'}]}],
+              'archived': None}
+        self.assertEqual(da._sequence_owned_task_ids(bs), {'ok', 'okstep'})
+
+    def test_owned_ids_empty_on_empty_buckets(self):
+        self.assertEqual(
+            da._sequence_owned_task_ids({'active': [], 'archived': []}), set())
+
+    def test_bare_sequence_seq_id_and_steps_excluded_from_orphans(self):
+        # No projects.json phase links projects-v3-p4 → _collapsed_step_task_ids is
+        # empty for it, but the UNION with _sequence_owned_task_ids suppresses both
+        # its seq_id and its step ids from detect_orphans.
+        events = [
+            {'task_id': 'projects-v3-p4', 'event_type': 'task_done',
+             'agent': 'forge', 'ts': '2026-06-22T01:00:00+00:00'},
+            {'task_id': 'p4-cleanup-committer', 'event_type': 'task_done',
+             'agent': 'forge', 'ts': '2026-06-22T01:00:00+00:00'},
+            {'task_id': 'p4-postmerge-exec', 'event_type': 'task_done',
+             'agent': 'forge', 'ts': '2026-06-22T01:00:00+00:00'},
+            {'task_id': 'genuine-orphan', 'event_type': 'task_done',
+             'agent': 'forge', 'ts': '2026-06-22T01:00:00+00:00'},
+        ]
+        projects = []  # nothing phase-links projects-v3-p4
+        bs = self._build_sequences()
+        collapsed = (da._collapsed_step_task_ids(projects, bs)
+                     | da._sequence_owned_task_ids(bs))
+        tids = {o['task_id'] for o in da.detect_orphans(events, set(), collapsed)}
+        self.assertNotIn('projects-v3-p4', tids)
+        self.assertNotIn('p4-cleanup-committer', tids)
+        self.assertNotIn('p4-postmerge-exec', tids)
+        self.assertIn('genuine-orphan', tids)
+
+
 if __name__ == '__main__':
     unittest.main()

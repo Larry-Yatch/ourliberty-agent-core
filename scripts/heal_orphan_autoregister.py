@@ -222,6 +222,22 @@ def load_derive() -> Optional[Any]:
     return dashboard_api
 
 
+def sequence_owned_task_ids(derive: Any, now: datetime) -> set[str]:
+    """Every task_id OWNED by a registered build sequence (its ``seq_id`` + each
+    step's task_id), so the catcher excludes them from the orphan derive and never
+    auto-proposes sequence work as a standalone initiative — the SAME suppression
+    the board applies (zero drift; reuses the derive's own
+    ``_reader_build_sequences`` + ``_sequence_owned_task_ids``). Fail-safe: any
+    read/parse error returns an empty set so a sequence-store fault never crashes
+    the tick (the catcher then degrades to its prior, un-collapsed behavior)."""
+    try:
+        bs = derive._reader_build_sequences(derive._sequence_blackboard_root(), now)
+        return derive._sequence_owned_task_ids(bs)
+    except Exception as e:  # noqa: BLE001 — fail-safe: never crash the tick
+        log(f'sequence-owned read failed: {type(e).__name__}: {e} — collapsing nothing')
+        return set()
+
+
 # ---------- missions.json (read / write) — fail-safe ----------
 
 
@@ -389,16 +405,22 @@ def scan_and_propose(
     now: datetime,
     *,
     pr_state_resolver: Optional[Callable[[list[str]], dict[str, str]]] = None,
+    collapsed_task_ids: Optional[set[str]] = None,
 ) -> ProposeResult:
     """Reuse the derive to find orphans, then append a proposed entry for each
     proposable one. Mutates ``registry['missions']`` in place; returns what was
     proposed. Fail-safe: any unexpected error proposes nothing (the registry is
-    left untouched for this orphan set)."""
+    left untouched for this orphan set).
+
+    ``collapsed_task_ids`` (sequence-owned): ids OWNED by a registered build
+    sequence (seq_id + step ids). Passed straight to ``detect_orphans`` so the
+    catcher excludes them exactly like the board does — a bare/completed sequence's
+    ids are never auto-proposed. None → no collapse (prior behavior)."""
     res = ProposeResult()
     registered = registered_task_ids(registry)
     existing_ids = existing_entry_ids(registry)
 
-    detected = derive.detect_orphans(rows, registered)
+    detected = derive.detect_orphans(rows, registered, collapsed_task_ids)
     res.scanned_orphans = len(detected)
     # Same buildable-initiative gate the dashboard's Orphaned lane now applies
     # (§ 4.8): only genuine buildable initiatives become a `proposed` decision-queue
@@ -478,10 +500,15 @@ def _retire_reason(
     derive: Any,
     now: datetime,
     pr_state_by_url: dict[str, str],
+    sequence_owned: Optional[set[str]] = None,
 ) -> Optional[str]:
     """Why this proposed entry should retire, or None to KEEP it.
 
-    Two triggers, both fail-safe (an indeterminate signal → KEEP a live buildable):
+    Three triggers, all fail-safe (an indeterminate signal → KEEP a live buildable):
+      * SEQUENCE-OWNED — every task_id the entry carries is OWNED by a registered
+        build sequence (its seq_id or a step id): sequence work that should never
+        have been a standalone proposal → retire 'sequence-owned'. (Checked first so
+        the more specific reason wins over the generic filter trigger.)
       * FILTER — every task_id the entry carries is non-proposable noise (would not
         pass is_proposable_initiative today): a category that should never have been
         proposed → retire 'filter-non-buildable'.
@@ -492,6 +519,9 @@ def _retire_reason(
     tids = [t for t in (entry.get('task_ids') or []) if isinstance(t, str) and t]
     if not tids:
         return None
+    owned = sequence_owned or set()
+    if owned and all(t in owned for t in tids):
+        return 'sequence-owned'
     if all(not derive.is_proposable_initiative(t) for t in tids):
         return 'filter-non-buildable'
     for tid in tids:
@@ -613,6 +643,7 @@ def retire_stale_proposals(
     *,
     pr_state_resolver: Optional[Callable[[list[str]], dict[str, str]]] = None,
     terminal_gate: Optional[Callable[[list[str]], tuple[bool, Optional[str]]]] = None,
+    collapsed_task_ids: Optional[set[str]] = None,
 ) -> list[tuple[str, str]]:
     """Retire-with-audit any auto-proposed entry that should no longer be live.
 
@@ -664,7 +695,8 @@ def retire_stale_proposals(
 
     retired: list[tuple[str, str]] = []
     for entry in candidates:
-        reason = _retire_reason(entry, events_by_task, derive, now, pr_state_by_url)
+        reason = _retire_reason(entry, events_by_task, derive, now, pr_state_by_url,
+                                sequence_owned=collapsed_task_ids)
         signal: Optional[str] = None
         # Event-only path indeterminate (reason is None) → fall back to the RELIABLE
         # terminal gate (in-memory match over the once-fetched PR index — cheap, so
@@ -1246,9 +1278,16 @@ def run_once(*, dry_run: bool,
             res.events_unavailable = True
             log('chain_events unavailable — proposing/retiring nothing this tick')
         else:
+            # Read the build sequences ONCE per tick: ids OWNED by any registered
+            # sequence (seq_id + step ids) are collapsed out of the orphan derive
+            # (never auto-proposed) and trigger the 'sequence-owned' retire of any
+            # already-live proposal — the SAME suppression the board applies.
+            # Fail-safe: a sequence-store fault degrades to an empty set.
+            sequence_owned = sequence_owned_task_ids(derive, now)
             try:
                 res = scan_and_propose(registry, rows, derive, now,
-                                       pr_state_resolver=pr_state_resolver)
+                                       pr_state_resolver=pr_state_resolver,
+                                       collapsed_task_ids=sequence_owned)
             except Exception as e:  # noqa: BLE001 — fail-safe: report, never corrupt
                 log(f'scan-and-propose raised: {type(e).__name__}: {e} — proposing nothing')
                 # scan_and_propose appends to registry in place, so a mid-loop raise
@@ -1269,7 +1308,8 @@ def run_once(*, dry_run: bool,
                     res.retired = retire_stale_proposals(
                         registry, rows, derive, now,
                         pr_state_resolver=pr_state_resolver,
-                        terminal_gate=terminal_gate)
+                        terminal_gate=terminal_gate,
+                        collapsed_task_ids=sequence_owned)
                 except Exception as e:  # noqa: BLE001 — fail-safe: report, never corrupt
                     log(f'retire-stale-proposals raised: {type(e).__name__}: {e} — retiring nothing')
                 # Surface the residue: proposed cards stuck past the TTL with no
