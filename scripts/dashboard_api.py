@@ -1135,6 +1135,13 @@ class RotationModeRequest(BaseModel):
     pinned_tier: Optional[str] = None
 
 
+class AutonomyPostureRequest(BaseModel):
+    # The autonomy dial position to apply: conservative | balanced | loose.
+    # Validated against trust_policy.AUTONOMY_LEVELS in the handler (400 on an
+    # unknown value) before any policy write.
+    level: str
+
+
 class RotationModeUpdateResponse(BaseModel):
     mode: str
     pinned_tier: Optional[str]
@@ -8299,6 +8306,68 @@ def _handle_rotation_mode_post(
     return state
 
 
+def _handle_autonomy_posture_post(
+    *,
+    level: str,
+    actor: str,
+    supabase_client: Any,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Apply an autonomy-dial preset: write the preset policy to the override
+    file + write the larry_action audit row, then return the resulting posture.
+
+    Raises HTTPException(400) on an unknown level BEFORE any write. The override
+    file (trust_policy.OVERRIDE_POLICY_PATH) lives OUTSIDE the synced config/
+    tree, so ourliberty-sync never clobbers it; it wins over the git policy until
+    deleted. Atomic write (tmp + fsync + os.replace) so a concurrent evaluate()
+    never reads a half-written policy. The dial can only pick a known preset —
+    each keeps default_action='force_ask' and the standing gates — so it can
+    never author an arbitrary or gate-weakening policy.
+    """
+    import trust_policy  # noqa: PLC0415 — scripts/ on sys.path at module load
+    if level not in trust_policy.AUTONOMY_LEVELS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f'invalid level={level!r}',
+        )
+    now = now or datetime.now(timezone.utc)
+    ts_iso = now.isoformat()
+
+    policy = trust_policy.policy_for_level(level)
+    target = trust_policy.OVERRIDE_POLICY_PATH
+    target.parent.mkdir(parents=True, exist_ok=True)
+    _import_atomic_io().atomic_write_text(
+        target, json.dumps(policy, indent=2) + '\n',
+    )
+
+    # Audit row — same writer contract as _handle_rotation_mode_post (top-level
+    # `actor` column, dedup on event_id). No source-event lookup: this control
+    # has no originating chain-event.
+    compute_event_id, sanitize_payload = _import_chain_event_helpers()
+    action_payload = {
+        'control': 'autonomy_posture',
+        'level': level,
+        'override_file': str(target),
+    }
+    action_event_id = compute_event_id('autonomy-posture', 'larry_action', ts_iso)
+    row: dict[str, Any] = {
+        'event_id': action_event_id,
+        'ts': ts_iso,
+        'agent': 'dashboard',
+        'event_type': 'larry_action',
+        'actor': actor,
+        'task_id': 'autonomy-posture',
+        'payload': sanitize_payload(action_payload),
+    }
+    supabase_client.table('chain_events').upsert(
+        [row], on_conflict='event_id', ignore_duplicates=True,
+    ).execute()
+
+    # Re-read through the override → resolve → load → summarize round-trip so the
+    # response reflects the truly-persisted state (and proves the write landed).
+    return trust_policy.summarize_policy(trust_policy.load_policy())
+
+
 # ---- /api/larry/cleanup-review engine (approvals-queue-rework N1 / L8) ----
 #
 # The "clean up" button. Given the current pending decision set, run the
@@ -9414,6 +9483,33 @@ def post_system_rotation(
         actor=actor,
         agents_root=_agents_root(),
         models_path=_agent_models_json_path(),
+        supabase_client=client,
+    )
+
+
+# POST /api/system/autonomy-posture — the autonomy DIAL write (#7), companion to
+# the read-only GET above. Token + actor gated like /api/system/rotation; writes
+# the chosen preset to the override policy file atomically + audited and echoes
+# the resulting posture. The dial can only pick a known preset (each keeps the
+# default-deny + standing gates), so it can never author a gate-weakening policy.
+@app.post(
+    '/api/system/autonomy-posture',
+    response_model=AutonomyPostureResponse,
+    dependencies=[Depends(_require_token)],
+)
+def post_system_autonomy_posture(
+    body: AutonomyPostureRequest,
+    actor: str = Depends(_require_actor),
+) -> dict[str, Any]:
+    client = _get_larry_action_supabase_client()
+    if client is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail='supabase unavailable',
+        )
+    return _handle_autonomy_posture_post(
+        level=body.level,
+        actor=actor,
         supabase_client=client,
     )
 

@@ -55,6 +55,13 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # repo copy so first-run bootstraps cleanly without a manual copy step.
 RUNTIME_POLICY_PATH = AGENTS_ROOT / 'config' / 'trust-policy.json'
 REPO_POLICY_PATH = REPO_ROOT / 'config' / 'trust-policy.json'
+# The autonomy dial (#7) writes a runtime OVERRIDE here — deliberately OUTSIDE
+# the synced config/ tree (a sibling of ~/agents/rotation.disabled) so
+# ourliberty-sync, which rsyncs config/ from the repo on every sync, never
+# clobbers it. When present it wins over both the synced snapshot and the repo
+# copy; deleting it reverts to the git-tracked policy. The dial stamps it with
+# `_preset` so the chosen position round-trips back to the panel.
+OVERRIDE_POLICY_PATH = AGENTS_ROOT / 'trust-policy.override.json'
 
 VALID_ACTIONS = {'auto_approve', 'force_ask', 'reject'}
 
@@ -64,6 +71,11 @@ class TrustPolicyError(Exception):
 
 
 def _resolve_policy_path() -> Path:
+    # Override (dial) wins, then the synced runtime snapshot, then the repo copy
+    # (first-run bootstrap). All three flow through load_policy's fail-closed
+    # validation, so a malformed override degrades to force_ask, never crashes.
+    if OVERRIDE_POLICY_PATH.exists():
+        return OVERRIDE_POLICY_PATH
     if RUNTIME_POLICY_PATH.exists():
         return RUNTIME_POLICY_PATH
     return REPO_POLICY_PATH
@@ -251,6 +263,90 @@ def _describe_rule(rule: dict[str, Any]) -> str:
     return line
 
 
+# ---- Autonomy dial presets (#7) ----
+# The three positions of the dashboard autonomy dial, each a COMPLETE policy the
+# dial writes verbatim to OVERRIDE_POLICY_PATH (atomic + audited; see
+# dashboard_api). Deterministic and idempotent: a position always means the same
+# rule-set regardless of prior state, so flipping is predictable and one-click
+# reversible. Every preset keeps default_action='force_ask' and the standing
+# gates (Mirror review, risky-work exclusion, kill switch) — those live in code,
+# not the policy file, so the dial can't weaken them. `_preset` stamps the chosen
+# position so summarize_policy reports it back exactly ('loose', in particular,
+# can't be told apart from 'balanced' by the rule-shape heuristic alone).
+
+AUTONOMY_LEVELS = ('conservative', 'balanced', 'loose')
+
+_LEVEL_HEADLINES = {
+    'conservative': 'Everything asks you. Nothing starts without your go-ahead.',
+    'balanced': ('Some low-risk work starts on its own; everything else still '
+                 'asks you.'),
+    'loose': ('A wider lane — low-risk work across all OurLiberty repos starts '
+              'on its own; sensitive paths and everything else still ask you.'),
+}
+
+# Sensitive paths that force_ask even inside an auto-approve lane (the carve-out).
+# Kept in one place so 'loose' extends it to every widened repo.
+_SENSITIVE_FILE_PATTERNS = [
+    'config/**', 'systemd/**', 'deploy/**', '.github/**',
+    'migrations/**', '**/migrations/**', 'supabase/migrations/**',
+    'scripts/active_tier.py', 'scripts/rotate_active_tier.py',
+    'scripts/kill_switch.py', '.env*', '**/.env*', 'credentials/**',
+]
+
+# 'loose' widens the auto-approve lane to all OurLiberty repos (balanced is
+# agent-core only).
+_LOOSE_REPOS = [
+    'ourliberty-agent-core', 'ourliberty-dashboard', 'ourliberty-graph',
+]
+
+
+def _sensitive_carveout_rule(repos: list[str]) -> dict[str, Any]:
+    # MUST be ordered BEFORE the broad auto_approve rule (first-match-wins) so a
+    # sensitive-path dispatch still force_asks inside the auto-approve lane.
+    return {
+        'source': 'beacon', 'target': 'forge', 'repos': list(repos),
+        'file_patterns': list(_SENSITIVE_FILE_PATTERNS), 'action': 'force_ask',
+    }
+
+
+def policy_for_level(level: str) -> dict[str, Any]:
+    """Build the COMPLETE policy for an autonomy-dial position. Pure — the caller
+    writes the returned dict to OVERRIDE_POLICY_PATH. Raises ValueError on an
+    unknown level (the web layer validates first, so this is a belt-and-braces
+    guard). Every position keeps default_action='force_ask'; conservative drops
+    all auto_approve rules, balanced reproduces today's agent-core lane, loose
+    widens that lane to all OurLiberty repos with the carve-out extended to match."""
+    if level not in AUTONOMY_LEVELS:
+        raise ValueError(f'unknown autonomy level: {level!r}')
+    pulse = {'source': 'pulse-auto-dispatch', 'target': '*',
+             'action': 'auto_approve'}
+    if level == 'conservative':
+        rules: list[dict[str, Any]] = []
+    elif level == 'balanced':
+        repos = ['ourliberty-agent-core']
+        rules = [
+            pulse,
+            _sensitive_carveout_rule(repos),
+            {'source': 'beacon', 'target': 'forge', 'repos': repos,
+             'action': 'auto_approve'},
+        ]
+    else:  # loose
+        rules = [
+            pulse,
+            _sensitive_carveout_rule(_LOOSE_REPOS),
+            {'source': 'beacon', 'target': 'forge', 'repos': list(_LOOSE_REPOS),
+             'action': 'auto_approve'},
+        ]
+    return {
+        'version': 1,
+        'default_action': 'force_ask',
+        '_preset': level,
+        '_doc': ('Written by the dashboard autonomy dial (#7). Delete this file '
+                 'to revert to the git-tracked config/trust-policy.json.'),
+        'rules': rules,
+    }
+
+
 def summarize_policy(policy: dict[str, Any]) -> dict[str, Any]:
     """Plain-language read of the current autonomy posture for the dashboard's
     read-only panel. Pure; never raises. A fail-closed/_error policy reads as
@@ -266,13 +362,20 @@ def summarize_policy(policy: dict[str, Any]) -> dict[str, Any]:
     if default_action == 'force_ask':
         still_asks.append('Everything else — the default is to ask you.')
 
-    if not auto_starts:
+    # A dial-written policy stamps its exact position in `_preset` — honor it so
+    # 'loose' (which has auto_approve rules, so the heuristic below would call it
+    # 'balanced') round-trips. Hand-edited / bootstrap policies have no `_preset`,
+    # so fall back to inferring from whether anything auto-starts.
+    preset = policy.get('_preset')
+    if preset in AUTONOMY_LEVELS:
+        level = preset
+        headline = _LEVEL_HEADLINES[preset]
+    elif not auto_starts:
         level = 'conservative'
-        headline = 'Everything asks you. Nothing starts without your go-ahead.'
+        headline = _LEVEL_HEADLINES['conservative']
     else:
         level = 'balanced'
-        headline = ('Some low-risk work starts on its own; everything else '
-                    'still asks you.')
+        headline = _LEVEL_HEADLINES['balanced']
 
     return {
         'level': level,
