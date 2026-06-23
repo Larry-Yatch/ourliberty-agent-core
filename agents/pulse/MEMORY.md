@@ -180,9 +180,9 @@
 
 ---
 
-## heal-stale-daemon-code-script-service-mismatch → FORGE BUILDING (iter ~2518 dispatch, ~2520 approved)
+## heal-stale-daemon-code-script-service-mismatch → COMPLETE ✅ (iter ~2518 dispatch, ~2520 approved, ~2522 verified)
 
-**Rule:** `scripts/heal_stale_daemon_code.py` reports the wrong `Script path` in its larry-alerts messages when multiple services restart after a deploy. Observed 2026-06-23T13:02Z after PR #646 sync: alerts for ourliberty-beacon-bot.service and ourliberty-outbox-notifier.service both showed `Script path: dashboard_api.py` — wrong for both. Root cause: script compares newest-mtime script globally against each service's active-since, rather than matching each service to its own script. G-rule: **3/3 DISPATCHED** iter ~2518. Larry approved 'Go' at 13:25:48Z (iter ~2520). `build-heal-stale-daemon-alert-attribution-001.json` now in Forge inbox. PRIME: verification_pending logged iter ~2518. Awaiting Forge PR → Mirror → merge.
+**Rule:** `scripts/heal_stale_daemon_code.py` now correctly attributes per-service script paths in larry-alerts messages. PR #647 (`fix(heal-stale-daemon): attribute shared-lib-triggered restarts correctly in alerts`) merged 2026-06-23T13:41:25Z (commit b89f7615). Fix: `dm_larry_auto_restarted` gains optional `changed_lib_entrypoint` separating changed library from service's own entrypoint; `_check_watchlist_pair` resolves entrypoint via FragmentPath/parse_script_path helpers. 77 targeted tests pass. G-rule COMPLETE. PRIME systemic_fix logged iter ~2522.
 
 ---
 
@@ -192,9 +192,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-23 13:38Z UTC (Iter ~2521, Tier 1→2 de-escalated, NOMINAL)
+## Status snapshot — updated 2026-06-23 13:56Z UTC (Iter ~2522, Tier 2→1 reset, PR #647 MERGED)
 
-**Iter ~2521 summary:** ✅ Nominal. 0 new alerts. Key: Forge opened PR #647 (`fix(heal-stale-daemon): attribute shared-lib-triggered restarts correctly in alerts`) — Mirror has review task in inbox. G-rule heal-stale-daemon-code-script-service-mismatch: Forge build complete, Mirror reviewing. 2 pending approvals: fix-watchdog-stale-log-inflight-aware-001 (04:48Z, ~9h), doorbell-tier3-silence-001 (13:19Z). 5/5 daemons alive (same PIDs: dashboard_api=1309235, beacon=1309976, outbox_notifier=1310052, chain_event=930563, inbox_watcher=1026206). Repo HEAD=7bca0c81=origin/main. fix-645 stall persists. **Standing [yellow]: unreviewed-merge:637, unreviewed-merge:607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals.** PRIME: interventions=1071, systemic_fixes=56, ratio=19.1, trend=improving. Tier de-escalated 1→2 (consecutive_clean=3). **G-rule watchdog-watcher-log-stale: 3/3 DISPATCHED (pending Larry approval since 04:48Z). G-rule doorbell-tier4-pattern: 3/3 DISPATCHED — plan `doorbell-tier3-silence-001` awaiting Larry `approve` (13:19Z). G-rule heal-stale-daemon-code-script-service-mismatch: PR #647 open, Mirror reviewing (review-heal-stale-daemon-alert-attribution-001.json in Mirror inbox). G-rule mirror-marker-parse-error: 2/3. G-rule revision-phase-preamble-missing: 2/3. G-rule telegram-409-burst: 2/3. G-rule Forge-preflight-CLARIFY_REQUEST: 2/3. G-rule forge-preflight-task-id-mismatch: 2/3. G-rule seq-advancer-sequence-stranded: 2/3. G-rule F24-empty-prompt-envelope-rejected: 2/3.**
+**Iter ~2522 summary:** ⚠️ Signal (Tier-4 doorbell L974, tier-reset 2→1). Key: PR #647 MERGED 13:41Z — G-rule heal-stale-daemon-code-script-service-mismatch → COMPLETE ✅. Repo fast-forwarded to b89f7615 (always-fix). 2 new alerts: L973 Tier-3 review-pass, L974 Tier-4 doorbell (doorbell already DMs Larry, no Pulse DM). Watchdog WARN 13:38Z (watcher log stale 376s, G-rule fix in-flight). 5/5 daemons alive same PIDs. **Standing [yellow]: unreviewed-merge:637, unreviewed-merge:607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals.** PRIME: interventions=1072, systemic_fixes=57, ratio=18.8, trend=improving. 2 pending approvals: fix-watchdog-stale-log-inflight-aware-001 (04:48Z, ~9h), doorbell-tier3-silence-001 (13:19Z). **G-rule watchdog-watcher-log-stale: 3/3 DISPATCHED pending Larry approve. G-rule doorbell-tier4-pattern: 3/3 DISPATCHED — `doorbell-tier3-silence-001` awaiting Larry `approve`. G-rule heal-stale-daemon-code-script-service-mismatch: COMPLETE ✅. G-rule mirror-marker-parse-error: 2/3. G-rule revision-phase-preamble-missing: 2/3. G-rule telegram-409-burst: 2/3. G-rule Forge-preflight-CLARIFY_REQUEST: 2/3. G-rule forge-preflight-task-id-mismatch: 2/3. G-rule seq-advancer-sequence-stranded: 2/3. G-rule F24-empty-prompt-envelope-rejected: 2/3.**
 
 
 
