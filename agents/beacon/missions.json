@@ -4844,6 +4844,40 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-projects-v3-sequence-rollup-done-flip-001",
+      "name": "Projects V3 Sequence Rollup Done Flip 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `projects-v3-sequence-rollup-done-flip-001`. Last activity 2026-06-23T19:22:30.547163+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "projects-v3-sequence-rollup-done-flip-001"
+      ],
+      "repo": null,
+      "created": "2026-06-23",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-23T19:24:42.592041+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-23T19:22:30.547163+00:00"
+    },
+    {
+      "id": "proposed-missions-v2-phase4b-spec",
+      "name": "Missions V2 Phase4b Spec",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `missions-v2-phase4b-spec`. Last activity 2026-06-23T19:21:09.60957+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "missions-v2-phase4b-spec"
+      ],
+      "repo": null,
+      "created": "2026-06-23",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-23T19:24:42.592041+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-23T19:21:09.60957+00:00"
     }
   ]
 }
