@@ -765,11 +765,60 @@ def _brainstorm_decision_cards(brainstorm: dict[str, Any]) -> list[dict[str, Any
     return cards
 
 
-def _phase_card(phase: dict[str, Any]) -> dict[str, Any]:
+# Forward-only lifecycle ordering — the sequence-completion rollup may ADVANCE a
+# phase's displayed lane but must never regress one (a stored ``done`` from the
+# P4 closeout writeback stays ``done`` even if a stale/active linked-sequence
+# status would otherwise imply ``building``).
+_LIFECYCLE_RANK: dict[str, int] = {
+    state: rank for rank, state in enumerate(LIFECYCLE_STATES)
+}
+
+
+def rollup_lifecycle_from_sequence(stored: str, seq_status: Optional[str]) -> str:
+    """Derive a phase's DISPLAYED lifecycle from its linked build sequence's
+    ``status`` (projects-v3 sequence rollup). A multi-step BUILD SEQUENCE phase
+    has no PR of its own, so its stored ``lifecycle_state`` can lag the sequence
+    it owns; this read-time derive rolls the sequence's completion up to the
+    parent without persisting anything (the single-committer invariant stays
+    intact — see ``build_pipeline``).
+
+    Mapping (spec § desired-end-state 1): ``complete`` → ``done``;
+    ``active``/``paused`` → ``building``; anything else — ``pending``,
+    ``failed``, ``archived``, an unknown status, or ``None`` (no linked
+    sequence) — degrades to the stored state untouched. Forward-only: the
+    derived state never ranks BELOW the stored state, so the rollup only ever
+    advances a lagging phase, never regresses a completed one. Pure; safe on
+    junk (an unrecognized ``stored`` ranks as the floor and is returned as-is
+    when nothing advances it)."""
+    if seq_status == 'complete':
+        candidate = 'done'
+    elif seq_status in ('active', 'paused'):
+        candidate = 'building'
+    else:
+        return stored
+    if _LIFECYCLE_RANK.get(candidate, -1) > _LIFECYCLE_RANK.get(stored, -1):
+        return candidate
+    return stored
+
+
+def _phase_card(
+    phase: dict[str, Any],
+    sequence_status_by_id: Optional[dict[str, str]] = None,
+) -> dict[str, Any]:
     """The lightweight phase card the pipeline UI renders: lifecycle state +
     the plain-language Desired End State + the optional spec/sequence refs, plus
     the authored ``closeout`` once the phase is done (the live surface the UI
     renders — spec § 0.24).
+
+    Sequence rollup (projects-v3 sequence-rollup-done-flip): when
+    ``sequence_status_by_id`` is supplied AND the phase carries a
+    ``sequence_ref`` present in that map, the rendered ``lifecycle_state`` is
+    the read-time derive ``rollup_lifecycle_from_sequence`` (a complete linked
+    sequence reads ``done`` even though the parent never had a PR of its own).
+    Absent the map / ref / a matching entry, the stored state renders verbatim
+    (graceful degrade — never raises, never regresses). NON-persisting: callers
+    that pass the map (the pipeline derive) get the rollup; mutating handlers
+    that pass nothing (brainstorm edit, etc.) keep the stored value.
 
     Brainstorm pre-fill (projects-v3 P6): the author STORES a nested
     ``phase['brainstorm']`` ({is_ai_draft, draft (8-section dict), decisions
@@ -778,14 +827,21 @@ def _phase_card(phase: dict[str, Any]) -> dict[str, Any]:
     read boundary projects the stored fields into that flat card shape so the
     two steps (author #611 / card #72) meet — additive + graceful: a phase with
     no brainstorm carries none of these keys and the card no-prefills."""
+    stored_lifecycle = phase.get('lifecycle_state', DEFAULT_LIFECYCLE_STATE)
+    lifecycle = stored_lifecycle
+    seq_ref = phase.get('sequence_ref')
+    if sequence_status_by_id and isinstance(seq_ref, str) and seq_ref:
+        seq_status = sequence_status_by_id.get(seq_ref)
+        if isinstance(seq_status, str):
+            lifecycle = rollup_lifecycle_from_sequence(stored_lifecycle, seq_status)
     card = {
         'id': phase.get('id'),
         'title': phase.get('title'),
         'desired_end_state': phase.get('desired_end_state', ''),
-        'lifecycle_state': phase.get('lifecycle_state', DEFAULT_LIFECYCLE_STATE),
+        'lifecycle_state': lifecycle,
         'order': phase.get('order', 0),
         'spec_ref': phase.get('spec_ref'),
-        'sequence_ref': phase.get('sequence_ref'),
+        'sequence_ref': seq_ref,
     }
     closeout = phase.get('closeout')
     if isinstance(closeout, dict):
@@ -902,7 +958,9 @@ def retire_completed_projects(
 
 
 def build_pipeline(
-    projects: list[dict[str, Any]], now: Optional[datetime] = None,
+    projects: list[dict[str, Any]],
+    now: Optional[datetime] = None,
+    sequence_status_by_id: Optional[dict[str, str]] = None,
 ) -> list[dict[str, Any]]:
     """The "Actively working" pipeline view (spec § 0, § 7 step 1): the list of
     ACTIVE projects, each with its ordered phase cards, coarse rollup status,
@@ -910,6 +968,18 @@ def build_pipeline(
     archived project leaves the pipeline). Pure over its input; safe on junk
     (a non-dict project is skipped). Additive — this is exposed under a NEW
     `pipeline` key; it never touches the existing board sections.
+
+    ``sequence_status_by_id`` (projects-v3 sequence-rollup-done-flip): an
+    optional ``{seq_id: status}`` map from ``_reader_build_sequences``. When
+    supplied, each phase card's displayed ``lifecycle_state`` is rolled up from
+    its linked build sequence's status (``_phase_card`` →
+    ``rollup_lifecycle_from_sequence``) — a phase whose sequence is ``complete``
+    reads ``done`` even though it never had a PR of its own. The COARSE project
+    ``status`` is computed from those same (rolled-up) card states, so the P5
+    project-header rollup agrees with the parent's flipped lane. None / empty →
+    the stored states render verbatim (the pre-rollup behaviour), keeping every
+    existing caller and test unaffected. Read-time + NON-persisting: nothing is
+    written, so the single-committer invariant holds.
     """
     out: list[dict[str, Any]] = []
     for proj in projects:
@@ -919,14 +989,21 @@ def build_pipeline(
             continue
         phases = proj.get('phases')
         phases = phases if isinstance(phases, list) else []
-        cards = [_phase_card(p) for p in phases if isinstance(p, dict)]
+        cards = [
+            _phase_card(p, sequence_status_by_id)
+            for p in phases if isinstance(p, dict)
+        ]
         out.append({
             'id': proj.get('id'),
             'title': proj.get('title'),
             'north_star_ref': proj.get('north_star_ref'),
             'repo': proj.get('repo'),
             'one_off': bool(proj.get('one_off', len(cards) == 1)),
-            'status': _project_status([p for p in phases if isinstance(p, dict)]),
+            # Coarse rollup over the ROLLED-UP card states (cards carry the
+            # derived lifecycle_state), so the project header agrees with the
+            # phases' flipped lanes. Identical to the stored-state rollup when
+            # no sequence map is supplied.
+            'status': _project_status(cards),
             'phases': cards,
         })
     return out

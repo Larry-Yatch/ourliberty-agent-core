@@ -687,5 +687,89 @@ class OrphanSuppressionUnitTest(unittest.TestCase):
         self.assertIn('live-task', refs)
 
 
+class SequenceRollupOrphanCollapseTest(unittest.TestCase):
+    """projects-v3 sequence-rollup-done-flip: the orphan-collapse half. A step
+    of a build sequence LINKED to a pipeline phase must not float loose as a
+    standalone orphan card — it is attributed to its parent phase. Bare
+    (non-phase-linked) sequences are out of scope and untouched."""
+
+    def _build_sequences(self):
+        # mirrors the `_reader_build_sequences` {active, archived} response:
+        # a complete sequence lands in `archived`; an active one in `active`.
+        return {
+            'active': [
+                {'seq_id': 'launch-ph-building', 'status': 'active',
+                 'steps': [{'step_id': 'ph-building'}]},
+            ],
+            'archived': [
+                {'seq_id': 'launch-ph-done', 'status': 'complete',
+                 'steps': [{'step_id': 'p4-cleanup-committer'},
+                           {'step_id': 'p4-postmerge-exec'}]},
+                {'seq_id': 'bare-meta-seq', 'status': 'complete',
+                 'steps': [{'step_id': 'bare-step'}]},
+            ],
+        }
+
+    def _projects(self):
+        # two phases carry sequence_ref (phase-linked); `bare-meta-seq` has no
+        # phase pointing at it.
+        return [{
+            'id': 'proj', 'state': 'active', 'phases': [
+                {'id': 'ph-done', 'sequence_ref': 'launch-ph-done'},
+                {'id': 'ph-building', 'sequence_ref': 'launch-ph-building'},
+            ],
+        }]
+
+    def test_status_map_spans_active_and_archived(self):
+        self.assertEqual(
+            da._sequence_status_by_id(self._build_sequences()),
+            {'launch-ph-building': 'active',
+             'launch-ph-done': 'complete',
+             'bare-meta-seq': 'complete'},
+        )
+
+    def test_phase_linked_ids_only(self):
+        self.assertEqual(
+            da._phase_linked_sequence_ids(self._projects()),
+            {'launch-ph-done', 'launch-ph-building'},
+        )
+
+    def test_collapsed_step_ids_exclude_bare_sequence(self):
+        collapsed = da._collapsed_step_task_ids(
+            self._projects(), self._build_sequences())
+        self.assertEqual(
+            collapsed, {'p4-cleanup-committer', 'p4-postmerge-exec', 'ph-building'})
+        self.assertNotIn('bare-step', collapsed)  # not phase-linked → untouched
+
+    def test_collapsed_empty_when_no_phase_carries_a_ref(self):
+        projects = [{'id': 'p', 'state': 'active',
+                     'phases': [{'id': 'ph'}]}]  # no sequence_ref
+        self.assertEqual(
+            da._collapsed_step_task_ids(projects, self._build_sequences()), set())
+
+    def test_detect_orphans_collapses_phase_linked_steps(self):
+        events = [
+            {'task_id': 'p4-cleanup-committer', 'event_type': 'task_done',
+             'agent': 'forge', 'ts': '2026-06-22T01:00:00+00:00'},
+            {'task_id': 'free-orphan', 'event_type': 'task_done',
+             'agent': 'forge', 'ts': '2026-06-22T01:00:00+00:00'},
+            {'task_id': 'bare-step', 'event_type': 'task_done',
+             'agent': 'forge', 'ts': '2026-06-22T01:00:00+00:00'},
+        ]
+        collapsed = da._collapsed_step_task_ids(
+            self._projects(), self._build_sequences())
+        tids = {o['task_id']
+                for o in da.detect_orphans(events, set(), collapsed)}
+        self.assertNotIn('p4-cleanup-committer', tids)  # collapsed under parent
+        self.assertIn('free-orphan', tids)              # genuine orphan stays
+        self.assertIn('bare-step', tids)                # bare seq step untouched
+
+    def test_detect_orphans_without_collapse_arg_unchanged(self):
+        events = [{'task_id': 'p4-cleanup-committer', 'event_type': 'task_done',
+                   'agent': 'forge', 'ts': '2026-06-22T01:00:00+00:00'}]
+        tids = {o['task_id'] for o in da.detect_orphans(events, set())}
+        self.assertIn('p4-cleanup-committer', tids)
+
+
 if __name__ == '__main__':
     unittest.main()
