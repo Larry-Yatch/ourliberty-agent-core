@@ -4,6 +4,100 @@
 
 ---
 
+## Iteration ~2529 — 2026-06-23T15:21Z UTC (interactive /cycle, Tier 1, consecutive_clean=1→2, G-rule doorbell-tier4-pattern COMPLETE ✅)
+
+**Trigger:** Larry `/cycle` invocation.
+
+**Health:** ✅ Nominal — 0 new alerts, all checks clean. G-rule doorbell-tier4-pattern COMPLETE (PR #648 merged, triage helper confirmed Tier-3). 5/5 daemons alive same PIDs. HEAD=e1fba01b=origin/main. 0 pending approvals. 0 open PRs. Forge still processing `harden-mirror-review-marker-reminder-001` (in-flight, 17 min since dispatch).
+
+**VERIFY-BEFORE-REASSERT:**
+- **Daemons (re-verified):** dashboard_api=1309235 (Ssl) ✅, beacon_telegram_bot=1309976 (Ss) ✅, outbox_notifier=1310052 (Ss) ✅, chain_event=930563 (SNs) ✅, inbox_watcher=1026206 (Ssl) ✅. Same PIDs as iter ~2528. ✅
+- **HEAD (re-verified):** e1fba01b=origin/main (`Pulse cycle 20260623T151637Z`). captures.json modified — healer-managed per config. On main, up to date. ✅
+- **mirror-marker-parse-error (re-verified):** Forge inbox has `harden-mirror-review-marker-reminder-001.json` (mtime=15:04Z). No archive entry; no PR created yet. Only 17 min since dispatch — expected in-flight window. [carry in-flight] ✅
+- **watchdog-watcher-log-stale (re-verified):** Check 1 `-- No entries --` again (3rd clean check since PR #649 merged 14:54Z). Positive signal. PRIME verify window still open. [carry pending-verify] ✅
+- **doorbell-tier4-pattern (re-verified):** PR #648 `fix(alerts): Tier-3-silence doorbell notifications (config-only)` merged 2026-06-23T14:34:49Z. Live triage test confirms `tier=3, status=resolved` for `source=doorbell, intent=doorbell`. **G-rule COMPLETE.** PRIME verification_pending promoted to systemic_fix. ✅
+- **fix-645-alert-translation-001 stall (re-verified):** Check 3 WARN persists. [carry blue] ✅
+- **unreviewed-merge:649 (re-verified):** Still [yellow]. Larry judgment pending. ✅
+- **credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED (re-verified):** Still standing. Note: new Beacon task `delegate-cap-register-desktop-ingest-token-in-the-credential-edbb` arrived (Larry delegated DESKTOP_INGEST_TOKEN registry fix — distinct from OURLIBERTY_BOARD_DRAIN_ENABLED but related credential-drift area). Beacon will handle. ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 981, "file_length": 981}`. get-watermark=981. 0 new alerts. ✅ Nominal.
+
+**Check 1 — Log noise (30 min window):** journalctl `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot PID 1309976 (Ss). Last log entry: `[2026-06-23T09:04:22-0600]` approved harden-mirror-review-marker-reminder-001 → dispatched to Forge. Larry last message: 'Go' at 09:04:21 MDT (15:04:21Z). No new directives since. 0 pending approvals. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → `0 new alert(s) fired, 0 recovered, 1 suppressed` (fix-645 on cooldown). FORGE_NO_PR_SKIP: p7-shelf-descriptor (#638), p7-approvals-adopt (#82 dashboard), system-self-awareness-slice-2b (preflight_exit), fix-proposed-retirement (preflight_exit). Fix-645 WARN persists. ✅ Nominal.
+
+**Check 4 — Pending directives:** Forge=1 (harden-mirror-review-marker-reminder-001, in-flight), Beacon=2 (card-message-66cb18e8: Larry asked "Is this still an issue?" on EROFS tier2 home card — normal Beacon task; delegate-cap-register-desktop-ingest-token: Larry delegated DESKTOP_INGEST_TOKEN registry fix — normal Beacon task; both new since iter ~2528), Mirror=0. beacon-pending-approvals: pending=0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-23T15:14:11Z (~7 min ago). Within 60-min window. ✅ Nominal.
+
+**Check A — Source repo:** On main. HEAD=e1fba01b=origin/main. `agents/beacon/captures.json` modified — confirmed healer-managed. Clean per policy. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json last_sync=2026-06-23T14:59:21Z (status=error, standing push-race with cycle wrapper, Tier-3 silenced). Repo at origin/main — in sync. ✅ Nominal.
+
+**Check C — Agent liveness:** dashboard_api=1309235 (Ssl) ✅, beacon_telegram_bot=1309976 (Ss) ✅, outbox_notifier=1310052 (Ss) ✅, chain_event=930563 (SNs) ✅, inbox_watcher=1026206 (Ssl) ✅. 5/5 alive.
+
+**Check D — Inboxes:** Forge=1 (harden-mirror in-flight), Beacon=2 (card-message EROFS + delegate DESKTOP_INGEST_TOKEN, both normal Beacon tasks), Mirror=0. ✅ Nominal.
+
+**Check E — PRs:**
+- ourliberty-agent-core: 0 open PRs. ✅
+- ourliberty-dashboard: 0 open PRs. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Tuesday 2026-06-23 UTC (weekday=1 ∉ {0,2,4,6}):** Check I/VIII/IX/X/XI weekday gate not met → skip. Check III: last 2026-06-11 (12d < 14d gate, not Sunday) → skip. ✅
+
+**G-rule assessment:**
+- **doorbell-tier4-pattern: G-rule COMPLETE ✅** — PR #648 `fix(alerts): Tier-3-silence doorbell notifications (config-only)` merged 2026-06-23T14:34:49Z. Live triage test confirms tier=3 for doorbell alerts. PRIME verification_pending promoted to systemic_fix at 15:21Z.
+- **watchdog-watcher-log-stale: pending-verify** — 3 consecutive clean checks since PR #649 merged (14:54Z). No stale-log WARNs. Positive signal. Verification window still open. [carry pending-verify]
+- **mirror-marker-parse-error: IN-FLIGHT** — Forge has `harden-mirror-review-marker-reminder-001.json` (17 min since dispatch). No PR yet. Expected in Forge build window. [carry in-flight]
+- **G-rule api-500-burst: 1/3** — no new occurrence. [carry]
+- All other G-rule counts unchanged.
+
+**Actions taken:**
+1. Alert triage: 0 new alerts. Watermark remains 981.
+2. PRIME ledger: doorbell-tier3-silence `verification_pending` promoted to `systemic_fix` (PR #648 verified). `iter_clean` appended (tier=1).
+3. Tier state: `record --checks-clean true` → consecutive_clean 1→2 (Tier 1, one more clean iter → Tier 2).
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [yellow] **unreviewed-merge:649** — False positive (Mirror REVIEW_PASS confirmed). Bot DM'd Larry. Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [blue] **fix-645-alert-translation-001 worktree stall** — WARN persists in heal_pipeline_stall dry-run. [carry]
+- [blue] **G-rule watchdog-watcher-log-stale** — PR #649 MERGED 14:54Z. 3 clean checks, no WARNs. Pending PRIME verify. [carry pending-verify]
+- [blue] **G-rule mirror-marker-parse-error** — 3/3 DISPATCHED (iter ~2526). Forge has envelope. Awaiting build + PR. [in-flight]
+- [blue] **G-rule api-500-burst** — 1/3. Watch.
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. Watch.
+- [blue] **G-rule seq-advancer-sequence-stranded** — 2/3. Watch.
+- [blue] **G-rule sync.service-deploy-restart-storm-tier4** — 1/3. Watch.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule health-notify-script-missing** — dispatch sent 2026-06-09. [carry]
+- [blue] **unreviewed-merge:628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **Stale bash orphan PID 1834248** — benign. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. Informational. [carry]
+
+**PRIME DIRECTIVE:** 0 interventions this iter (iter_clean). doorbell-tier3-silence systemic_fix promoted. Trailing-30d: interventions=1075, systemic_fixes=58, ratio=18.5, trend=improving.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=1→2. One more clean iter → de-escalate to Tier 2.
+
+---
+
 ## Iteration ~2528 — 2026-06-23T15:14Z UTC (interactive /cycle, Tier 1, consecutive_clean=0→1, NOMINAL ✅)
 
 **Trigger:** Larry `/cycle` invocation.
