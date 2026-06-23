@@ -394,6 +394,12 @@
       "tier": "SOON",
       "plain_language_summary": "missions-autoregister proposed orphan-thread registrations (and/or ingested new-mission PRs) but couldn't commit and push the result to main — the subject suffix names the git problem (`wrong-branch`, `commit-failed`, or `push-failed`). The work was computed but didn't persist, so the Missions board won't reflect the new proposals until a later clean run lands them.",
       "recommended_action": "Check the droplet repo state (`cd ~/agent-core && git status`) — a non-main checkout or a dirty/diverged tree is the usual cause; the change is retained locally and the next run retries. Detail is in ~/agents/logs/missions-autoregister.log around the alert time."
+    },
+    "proposed:needs-decision": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "One or more Proposed cards have sat on the Missions board past the 14-day grace with no matching shipped/closed PR, so the autoregister healer can neither auto-retire them (no terminal-PR evidence) nor leave them silent. They are flagged `needs_decision` and surfaced here, low-noise via route=digest, for you to keep or drop. These are typically closeout deferred-work notes or orphan cards whose task_id never mapped to a branch — genuine backlog needing a human call, not a failure.",
+      "recommended_action": "Open the Missions tab's Proposed lane and, for each flagged card, dismiss it (drop) if the work is done/moot or accept it (keep) if it's still worth building. No urgency — they stay parked until you decide. The exact ids are in the digest line and ~/agents/logs/missions-autoregister.log."
     }
   },
   "missions-card-gc": {
