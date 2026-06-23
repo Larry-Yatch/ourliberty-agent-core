@@ -192,9 +192,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-23 15:21Z UTC (Iter ~2529, Tier 1, consecutive_clean=2, NOMINAL)
+## Status snapshot — updated 2026-06-23 15:27Z UTC (Iter ~2530, Tier 1→2 de-escalation, NOMINAL)
 
-**Iter ~2529 summary:** ✅ Nominal. 0 new alerts. All checks clean. 5/5 daemons alive same PIDs. HEAD=e1fba01b=origin/main. PRIME: systemic_fixes=58, interventions=1075, ratio=18.5, trend=improving. **G-rule doorbell-tier4-pattern: COMPLETE** (PR #648 merged 14:34Z, triage confirmed Tier-3, PRIME systemic_fix promoted). **G-rule mirror-marker-parse-error: IN-FLIGHT** — Forge has `harden-mirror-review-marker-reminder-001.json` (dispatched 15:04Z, ~17 min). **G-rule watchdog-watcher-log-stale: pending-verify** (PR #649 merged 14:54Z, 3 clean checks). Pending approvals: 0. consecutive_clean=2 (1 more clean iter → Tier 2). **Beacon inbox: 2 new tasks (EROFS card message + DESKTOP_INGEST_TOKEN delegate — normal Beacon work). Standing [yellow]: unreviewed-merge:649+637+607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. G-rules at 2/3: revision-phase-preamble-missing, telegram-409-burst, Forge-preflight-CLARIFY_REQUEST, forge-preflight-task-id-mismatch, seq-advancer-sequence-stranded, F24-empty-prompt-envelope-rejected. api-500-burst: 1/3.**
+**Iter ~2530 summary:** ✅ Nominal. 0 new alerts. All checks clean. **Tier 1→2 de-escalated** (consecutive_clean 2→3 threshold). 5/5 daemons alive same PIDs. HEAD=11cf8430=origin/main. 0 pending approvals. PRIME: systemic_fixes=58, interventions=1075, ratio=18.5, trend=improving. **G-rule mirror-marker-parse-error: PR #650 UNDER MIRROR REVIEW** (`feat(agent-runner): symmetric review-phase marker reminder for Mirror`, Forge completed 15:24Z, Mirror started 15:24:36Z). **G-rule watchdog-watcher-log-stale: pending-verify** (4 clean checks since PR #649). Standing [yellow]: unreviewed-merge:649+637+607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. G-rules at 2/3: revision-phase-preamble-missing, telegram-409-burst, Forge-preflight-CLARIFY_REQUEST, forge-preflight-task-id-mismatch, seq-advancer-sequence-stranded, F24-empty-prompt-envelope-rejected. api-500-burst: 1/3.
 
 
 
