@@ -204,9 +204,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-23 19:20Z UTC (Iter ~2542, Tier 3, consecutive_clean 2→3)
+## Status snapshot — updated 2026-06-23 19:49Z UTC (Iter ~2543, Tier 3, consecutive_clean 3→4)
 
-**Iter ~2542 summary:** ✅ Nominal (0 interventions, 2 Tier-3 alert silences). All mandatory + additive checks clean. 8/8 daemons alive (same PIDs). HEAD=de259176=origin/main. 0 pending approvals. PR #653 open (Phase 4b spec, awaiting Mirror). Forge inbox: projects-v3-sequence-rollup-done-flip-001 + resume-phase4b-contract-c-guard-tests-001-r1 (both fresh). PR #652 (DESKTOP_INGEST_TOKEN calendar URL) auto-merged. PRIME: systemic_fixes=60, interventions=1076, ratio=17.9, trend=improving. **Tier 3 (30-min cadence), consecutive_clean 2→3 (floor)**. Standing [yellow]: unreviewed-merge:649+637+607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. G-rules at 2/3: revision-phase-preamble-missing, telegram-409-burst, Forge-preflight-CLARIFY_REQUEST, forge-preflight-task-id-mismatch, seq-advancer-sequence-stranded, F24-empty-prompt-envelope-rejected. api-500-burst: 1/3.
+**Iter ~2543 summary:** ✅ Nominal (0 interventions, 1 Tier-3 alert silence). All mandatory + additive checks clean. 8/8 daemons alive (same PIDs). HEAD=48eb56fa=origin/main. 0 pending approvals. PR #653 (Phase 4b spec) + PR #655 (projects-v3 sequence rollup Done flip) both open awaiting Mirror. Forge inbox: build-projects-v3-sequence-rollup-done-flip-001 (fresh). PR #654 (Phase 4b Contract C tests) auto-merged. PRIME: systemic_fixes=60, interventions=1076, ratio=17.9, trend=improving. **Tier 3 (30-min cadence), consecutive_clean 3→4 (floor)**. Standing [yellow]: unreviewed-merge:649+637+607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. G-rules at 2/3: revision-phase-preamble-missing, telegram-409-burst, Forge-preflight-CLARIFY_REQUEST, forge-preflight-task-id-mismatch, seq-advancer-sequence-stranded, F24-empty-prompt-envelope-rejected. api-500-burst: 1/3. beacon-claude-timeout: 1/3 NEW.
 
 
 
