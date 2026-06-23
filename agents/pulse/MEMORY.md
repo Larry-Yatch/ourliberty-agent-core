@@ -174,9 +174,15 @@
 
 ---
 
-## Status snapshot — updated 2026-06-23 04:44Z UTC (Iter ~2491, Tier 1, consecutive_clean=1→0, G-RULE DISPATCH ⚠️)
+## doorbell-tier4-pattern (new G-rule, iter ~2492)
 
-**Iter ~2491 summary:** ⚠️ G-rule dispatch. G-rule watchdog-watcher-log-stale hit 3/3 — watchdog fired `[WARN] Watcher log stale 405s` at 22:39 MDT (Forge inbox non-empty, Forge bot not wired). Beacon direction-ask dispatched (`watchdog-watcher-log-stale-001`). 0 new alerts (watermark=939). **New PR #646** (Larry-authored, `feat(system-awareness): POST /api/system/autonomy-posture`, autonomy dial backend, MERGEABLE, no Mirror review yet). 5/5 daemons alive same PIDs. Tier 1, consecutive_clean=1→0. **Standing [yellow]: unreviewed-merge:637, unreviewed-merge:607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals.** PRIME: interventions=1067, systemic_fixes=56, ratio≈19.1, trend=improving. **G-rule watchdog-watcher-log-stale: 3/3 DISPATCHED. G-rule mirror-no-session-revision-loop: 3/3 DISPATCHED (Beacon archive confirmed). G-rule heal-stale-daemon-code-script-service-mismatch: 2/3. G-rule mirror-marker-parse-error: 2/3. G-rule revision-phase-preamble-missing: 2/3. G-rule telegram-409-burst: 2/3. G-rule Forge-preflight-CLARIFY_REQUEST: 2/3. G-rule forge-preflight-task-id-mismatch: 2/3. G-rule seq-advancer-sequence-stranded: 2/3. G-rule F24-empty-prompt-envelope-rejected: 2/3. G-rule medic-diagnosis-translation-gap: 1/1.** PR #645 in-flight (2 Forge tasks), PR #646 new (watch), PR #86 dashboard (watch). Tier 1, consecutive_clean=0, next cadence: 5-min.
+**Rule:** `source=doorbell, intent=doorbell` alerts classify Tier-4 (novel, no translation match) but the doorbell service ALREADY DMs Larry on emit via the bot (delivery confirmation in bot log as `notification idx=N delivered (intent=doorbell)`). Pulse Tier-4 classification produces no additional value — a duplicate DM would be redundant. At G-rule 3/3: dispatch to Beacon for a Tier-3 silence translation (`source=doorbell, intent=doorbell` → route=digest). G-rule count: **1/3**.
+
+---
+
+## Status snapshot — updated 2026-06-23 04:52Z UTC (Iter ~2492, Tier 1, consecutive_clean=0, TIER-4 ALERT ⚠️)
+
+**Iter ~2492 summary:** ⚠️ L940 doorbell Tier-4 (novel; bot already DM'd Larry; no Pulse dispatch). Forge completed both PR #645 tasks (exit_code=0, both no-op — fix was already on branch). Mirror review for PR #645 now in-flight. watermark=940. 5/5 daemons alive same PIDs. Tier 1, consecutive_clean=0. **Standing [yellow]: unreviewed-merge:637, unreviewed-merge:607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals.** PRIME: interventions≈1068, systemic_fixes=56, ratio≈19.1, trend=improving. **G-rule watchdog-watcher-log-stale: 3/3 DISPATCHED (Beacon inbox in-flight). G-rule mirror-no-session-revision-loop: 3/3 DISPATCHED (Beacon processed). G-rule doorbell-tier4-pattern: 1/3 (NEW). G-rule heal-stale-daemon-code-script-service-mismatch: 2/3. G-rule mirror-marker-parse-error: 2/3. G-rule revision-phase-preamble-missing: 2/3. G-rule telegram-409-burst: 2/3. G-rule Forge-preflight-CLARIFY_REQUEST: 2/3. G-rule forge-preflight-task-id-mismatch: 2/3. G-rule seq-advancer-sequence-stranded: 2/3. G-rule F24-empty-prompt-envelope-rejected: 2/3. G-rule medic-diagnosis-translation-gap: 1/1.** PR #645 Mirror review in-flight, PR #646 new (watch), PR #86 dashboard (watch). Tier 1, consecutive_clean=0, next cadence: 5-min.
 
 
 

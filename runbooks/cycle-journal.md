@@ -4,6 +4,107 @@
 
 ---
 
+## Iteration ~2492 — 2026-06-23T04:52Z UTC (interactive /cycle, Tier 1, consecutive_clean=0, TIER-4 ALERT ⚠️)
+
+**Trigger:** Larry `/cycle` invocation (interactive).
+
+**Health:** ⚠️ Tier-4 alert — L940 doorbell notification (bot already DM'd Larry; no Pulse dispatch). All mandatory checks nominal. Forge completed both PR #645 tasks (exit_code=0). Mirror review in-flight for #645. Tier 1, consecutive_clean=0.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Daemons (re-verified):** chain_event=930563 (SNs) ✅, inbox_watcher=1026206 (Ssl) ✅, beacon=1163107 (Ss) ✅, dashboard_api=1162819 (Ssl) ✅, outbox_notifier=1163186 (Ss) ✅. Same PIDs as iter ~2491. ✅
+- **Repo HEAD:** fc12f8f4 (Pulse cycle 20260623T044712Z) = origin/main. On main, clean. ✅
+- **PR #645:** OPEN, MERGEABLE, 0 GitHub reviews. Forge completed both tasks (fix-645-alert-translation-001 exit_code=0 "finding already resolved"; fix-proposed-retirement-forge-matcher-revisions-001 exit_code=0 "no-op, contracted change already landed"). Mirror review task in inbox (in-flight). Last commit: `0f78ac2b` (alert-translation fix). ✅
+- **G-rule watchdog-watcher-log-stale (3/3 DISPATCHED):** Beacon inbox still has envelope (~8 min old, within stale gate). In-flight. ✅
+- **G-rule mirror-no-session-revision-loop (3/3 DISPATCHED):** Beacon processed; in outbox archive. In-flight Beacon→Forge. ✅
+- **medic-diagnosis-translation-gap (1/1):** 0 new medic alerts. CARRY [blue]. ✅
+- **OURLIBERTY_BOARD_DRAIN_ENABLED credential-drift:** 0 new alerts. CARRY [yellow]. ✅
+- **Check VIII rule=lower (2026-06-15):** Sentinel `check-viii-2026-06-22.json` exists in blackboard. Awaiting Larry action. CARRY [yellow]. ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 939, "file_length": 940}`. 1 new alert:
+- **L940:** `source=doorbell, kind=notification, intent=doorbell, message="2 items need your call — check the board."` (ts=04:41:33Z). Triage helper → **Tier-4** (novel, no translation match). Route=escalate. Bot already delivered DM to Larry at 22:42 MDT (idx=939 in bot log). No Pulse duplicate DM — doorbell already reached Larry. Watermark advanced 939→940.
+- **New G-rule: doorbell-tier4-pattern 1/3.** Pattern: doorbell fires when board has items needing Larry's call; bot delivers the DM directly on emit. Pulse Tier-4 classification is informational redundancy. At 3/3 dispatch to Beacon for Tier-3 silence translation.
+- Tier-reset: YES. ⚠️
+
+**Check 1 — Log noise:** outbox-notifier.log: 0 WARN/ERROR (last 60 lines). inbox-watcher.log: 0 WARN/ERROR. journalctl (last 30 min): 0 new WARN entries (22:39 MDT watchdog WARN is 71 min old — not in current 30-min window). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot PID 1163107 (Ss). Last activity: 22:42 MDT (doorbell notification idx=939 delivered). No new Larry messages since 22:32 MDT. No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → `0 stalls detected`. FORGE_NO_PR_SKIP: fix-phantom-build-phase-terminal-guard-001 (#630), projects-stale-gc-archive-completed-001 (#631), catalog-drift-sync-cadence-001 (preflight_exit), p7-shelf-descriptor (#638), p7-approvals-adopt (#82 dashboard), system-self-awareness-slice-2b-waiting-on-larry-render (preflight_exit). ✅ Nominal.
+
+**Check 4 — Pending directives:** Forge inbox=0 (both tasks completed and archived). Beacon inbox=2: `notify-fix-proposed-retirement-forge-matcher-revisions-001.json` (fresh, from Forge completion) + `watchdog-watcher-log-stale-001.json` (from iter ~2491, ~8 min old). Mirror inbox=1: `review-fix-proposed-retirement-forge-matcher-revisions-001.json` (PR #645 review). All within 1h stale gate. beacon-pending-approvals: pending=0, history=254. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-23T04:46:57Z (~5 min before check). Within 60-min window. ✅ Nominal.
+
+**Check A — Source repo:** On main. HEAD=fc12f8f4=origin/main. Clean. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-23T04:30:16Z (~22 min ago), status=no-change. Within 2h window. ✅ Nominal.
+
+**Check C — Agent liveness:** chain_event=930563 (SNs) ✅, inbox_watcher=1026206 (Ssl) ✅, beacon=1163107 (Ss) ✅, dashboard_api=1162819 (Ssl) ✅, outbox_notifier=1163186 (Ss) ✅. 5/5 alive. ✅
+
+**Check D — Inboxes:** Forge=0 (tasks completed), Beacon=2 (fresh, within stale gate), Mirror=1 (fresh). ✅ Nominal.
+
+**Check E — PRs:**
+- ourliberty-agent-core: **PR #645** OPEN, MERGEABLE, 0 reviews. Forge completed fixes; Mirror review in-flight. [in-flight] ✅
+- ourliberty-agent-core: **PR #646** OPEN, UNKNOWN mergeable, 0 reviews (created 04:38:53Z, ~13 min old — not yet 30 min). [blue] watch.
+- ourliberty-dashboard: **PR #86** OPEN, MERGEABLE, 0 reviews. [blue] watch.
+✅ No PRs clean+green >30m without merge.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Tuesday 2026-06-23 UTC (weekday=1 ∉ {0,2,4,6}):** Check I/VIII/IX/X/XI weekday gate not met → skip. Check III: last 2026-06-11 (12d < 14d gate, not Sunday) → skip. ✅
+
+**G-rule assessment:**
+- **doorbell-tier4-pattern: 1/3 NEW.** L940 doorbell Tier-4 (novel). Bot already DMs Larry on doorbell emit. Pulse Tier-4 redundant. At 3/3: dispatch to Beacon for `source=doorbell, intent=doorbell` → Tier-3 silence translation.
+- **watchdog-watcher-log-stale: 3/3 DISPATCHED** (iter ~2491). Beacon inbox has envelope in-flight. [carry]
+- All other G-rule counts unchanged from iter ~2491.
+
+**Actions taken:**
+1. Alert triage: 1 new alert (L940, doorbell, Tier-4, bot already DM'd). Watermark 939→940. No Pulse dispatch.
+2. PRIME ledger: `intervention` appended (tier=1, template=doorbell-novel-tier4).
+3. Tier state: `record --checks-clean false` → Tier 1, consecutive_clean=0.
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [yellow] **unreviewed-merge:637** — PR #637 merged without Mirror review. Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Sentinel 2026-06-22 exists. Awaiting Larry action. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [blue] **PR #645 in-flight** — Forge tasks completed (both no-op, fix already on branch). Mirror review task in inbox. MERGEABLE. Watch for Mirror REVIEW_PASS + auto-merge.
+- [blue] **PR #646 new** — Larry-authored `feat(system-awareness): POST /api/system/autonomy-posture` (autonomy dial backend), UNKNOWN mergeable, 0 reviews. Watch; heal-pipeline-stall will fire if not routed within 30-60 min.
+- [blue] **PR #86 open (dashboard)** — Larry-authored `feat(operations): autonomy dial`, MERGEABLE, 0 reviews. Watch.
+- [blue] **G-rule mirror-no-session-revision-loop** — 3/3 DISPATCHED. Beacon outbox archive shows processed. In-flight Beacon→Forge. [carry]
+- [blue] **G-rule watchdog-watcher-log-stale** — 3/3 DISPATCHED (iter ~2491). Beacon inbox in-flight. [carry]
+- [blue] **G-rule doorbell-tier4-pattern** — 1/3. Watch.
+- [blue] **medic-diagnosis-translation-gap** — 1/1. Watch.
+- [blue] **G-rule heal-stale-daemon-code-script-service-mismatch** — 2/3. Watch.
+- [blue] **G-rule mirror-marker-parse-error** — 2/3. Watch.
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. Watch.
+- [blue] **G-rule seq-advancer-sequence-stranded** — 2/3. Watch.
+- [blue] **G-rule sync.service-deploy-restart-storm-tier4** — 1/3. Watch.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule health-notify-script-missing** — dispatch sent 2026-06-09. [carry]
+- [blue] **unreviewed-merge:628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **Stale bash orphan PID 1834248** — benign. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. Informational. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention this iter (doorbell Tier-4 triage). Trailing-30d: interventions≈1068, systemic_fixes=56, ratio≈19.1, trend=improving.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0. Next cadence: 5-min.
+
+---
+
 ## Iteration ~2491 — 2026-06-23T04:44Z UTC (interactive /cycle, Tier 1, consecutive_clean=1→0, G-RULE DISPATCH ⚠️)
 
 **Trigger:** Larry `/cycle` invocation (interactive).
