@@ -4,6 +4,104 @@
 
 ---
 
+## Iteration ~2513 — 2026-06-23T10:23Z UTC (interactive /cycle, Tier 2→3 DE-ESCALATE, consecutive_clean=2→3, NOMINAL ✅)
+
+**Trigger:** Larry `/cycle` invocation.
+
+**Health:** ✅ Nominal — 2 Tier-3 alerts silenced (medic-diagnosis + catalog-accuracy-drift), all mandatory and additive checks clean, 5/5 daemons alive same PIDs. Tier 2 → de-escalated to Tier 3 (30-min cadence).
+
+**VERIFY-BEFORE-REASSERT:**
+- **Daemons (re-verified):** chain_event=930563 (SNs) ✅, inbox_watcher=1026206 (Ssl) ✅, beacon=1244182 (Ss) ✅, dashboard_api=1244279 (Ssl) ✅, outbox_notifier=1244425 (Ss) ✅. Same PIDs as iter ~2512. ✅
+- **HEAD (re-verified):** 782da4a8=origin/main (Pulse cycle 20260623T100502Z). Clean, on-main. ✅
+- **fix-watchdog-stale-log-inflight-aware-001 (re-verified):** beacon-pending-approvals pending=1, id=fix-watchdog-stale-log-inflight-aware-001, created 04:48:36Z. Still awaiting Larry. ✅
+- **PR #646 (re-verified):** OPEN, UNKNOWN mergeable, 0 reviews, Larry-authored (autonomy dial backend). ✅
+- **PR #86 (re-verified):** OPEN, MERGEABLE, 0 reviews, Larry-authored (autonomy dial frontend). ✅
+- **fix-645-alert-translation-001 worktree stall (re-verified):** journalctl WARN at 10:07:05Z, 10:21:36Z (`larry_alerts append failed for forge_built_no_pr:fix-645-alert-translation-001`). Stall persists. [carry blue] ✅
+- **OURLIBERTY_BOARD_DRAIN_ENABLED credential-drift:** 0 new alerts this window. Standing [yellow]. ✅
+- **Check VIII rule=lower (2026-06-15):** Carried. [yellow]. ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 955, "file_length": 957}`. get-watermark=955. 2 new alerts:
+- L956: `source=medic, intent=medic-diagnosis` (10:04:35Z) → triage-alert → **Tier-3** (known-pattern match). Silence.
+- L957: `source=pulse-check, subject=catalog-accuracy-drift` (10:19:22Z, 7/64 shelf cards, 11% > 10% gate) → triage-alert → **Tier-3** (known-pattern match). Silence.
+Watermark advanced 955→957. ✅ Nominal (Tier-3 no tier-reset).
+
+**Check 1 — Log noise:** outbox-notifier.log: 0 WARN/ERROR. inbox-watcher.log: 0 WARN/ERROR. journalctl (ourliberty-*.service, last 30 min): 2 WARNs — `ourliberty-heal-pipeline-stall: larry_alerts append failed for forge_built_no_pr:fix-645-alert-translation-001` (10:07:05Z, 10:21:36Z). Same standing fix-645 worktree stall. [carry blue]. ✅ Otherwise nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot PID 1244182 (Ss). Bot log last entry: `idx=956 route=digest (catalog-accuracy-drift)` at 04:20 MDT. Last Larry message: `go` at 22:32 MDT 2026-06-22. No new messages. Pending: `fix-watchdog-stale-log-inflight-aware-001` (awaiting Larry). Not orphaned. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → `0 new alert(s) fired, 0 recovered, 3 suppressed` (fix-645, PR#646, PR#86 all on cooldown). FORGE_NO_PR_SKIP: catalog-drift-sync-cadence-001 (preflight_exit), p7-shelf-descriptor (pr_exists=#638), p7-approvals-adopt (pr_exists=#82 dashboard), system-self-awareness-slice-2b (preflight_exit), fix-proposed-retirement-forge-matcher-revisions-001 (preflight_exit). Fix-645 WARN. ✅ Nominal.
+
+**Check 4 — Pending directives:** Forge=0, Beacon=0, Mirror=0. beacon-pending-approvals: pending=1 (`fix-watchdog-stale-log-inflight-aware-001`, awaiting Larry go, created 04:48:36Z), history=254. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-23T10:11:02Z (~12 min ago). Within 60-min window. ✅ Nominal.
+
+**Check A — Source repo:** On main. HEAD=782da4a8=origin/main. Clean. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-23T09:30:17Z (~53 min ago), status=no-change. Within 2h window. ✅ Nominal.
+
+**Check C — Agent liveness:** chain_event=930563 (SNs) ✅, inbox_watcher=1026206 (Ssl) ✅, beacon=1244182 (Ss) ✅, dashboard_api=1244279 (Ssl) ✅, outbox_notifier=1244425 (Ss) ✅. 5/5 alive. Same PIDs as iter ~2512. ✅
+
+**Check D — Inboxes:** Forge=0, Beacon=0, Mirror=0. ✅ Nominal.
+
+**Check E — PRs:**
+- ourliberty-agent-core: **PR #646** OPEN, UNKNOWN mergeable, 0 reviews, Larry-authored (autonomy dial backend). Pipeline stall on cooldown. [blue] watch.
+- ourliberty-dashboard: **PR #86** OPEN, MERGEABLE, 0 reviews, Larry-authored (autonomy dial frontend). Pipeline stall on cooldown. [blue] watch.
+- No Forge PRs open. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Tuesday 2026-06-23 UTC (weekday=1 ∉ {0,2,4,6}):** Check I/VIII/IX/X/XI weekday gate not met → skip. Check III: last 2026-06-11 (12d < 14d gate, not Sunday) → skip. ✅
+
+**G-rule assessment:**
+- No new occurrences of any G-rule this window.
+- **doorbell-tier4-pattern: 2/3** — no new doorbell alert this window. Watch.
+- All other G-rule counts unchanged from iter ~2512.
+
+**Actions taken:**
+1. Alert triage: 2 Tier-3 alerts silenced (L956 medic-diagnosis, L957 catalog-accuracy-drift). Watermark advanced 955→957.
+2. PRIME ledger: `iter_clean` appended (tier=2).
+3. Tier state: `record --checks-clean true` → consecutive_clean 2→3 → **DE-ESCALATED Tier 2 → Tier 3** (consecutive_clean reset to 0).
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [blue] **fix-645-alert-translation-001 worktree stall** — WARN in journalctl at 10:07Z, 10:21Z. Stall persists. [carry]
+- [blue] **PR #646 watch** — Larry-authored autonomy dial backend, OPEN/UNKNOWN, 0 reviews. Awaiting Larry action.
+- [blue] **PR #86 watch (dashboard)** — Larry-authored autonomy dial frontend, OPEN/MERGEABLE, 0 reviews. Awaiting Larry action.
+- [blue] **G-rule watchdog-watcher-log-stale** — 3/3 DISPATCHED. Forge task `fix-watchdog-stale-log-inflight-aware-001` pending Larry's Telegram approval. [carry]
+- [blue] **G-rule doorbell-tier4-pattern** — 2/3. Watch.
+- [blue] **G-rule heal-stale-daemon-code-script-service-mismatch** — 2/3. Watch.
+- [blue] **G-rule mirror-marker-parse-error** — 2/3. Watch.
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. Watch.
+- [blue] **G-rule seq-advancer-sequence-stranded** — 2/3. Watch.
+- [blue] **G-rule sync.service-deploy-restart-storm-tier4** — 1/3. Watch.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule health-notify-script-missing** — dispatch sent 2026-06-09. [carry]
+- [blue] **unreviewed-merge:628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **Stale bash orphan PID 1834248** — benign. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. Informational. [carry]
+
+**PRIME DIRECTIVE:** 0 interventions this iter (iter_clean). Trailing-30d: interventions≈1070, systemic_fixes=56, ratio≈19.11, trend=improving.
+**Tier end-of-iter:** Tier 2 → **Tier 3** (consecutive_clean 2→3, de-escalated). Next cadence: 30-min.
+
+---
+
 ## Iteration ~2512 — 2026-06-23T10:03Z UTC (interactive /cycle, Tier 2, consecutive_clean=1→2, NOMINAL ✅)
 
 **Trigger:** Larry `/cycle` invocation.
