@@ -4860,7 +4860,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-23T19:24:42.592041+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-23T19:22:30.547163+00:00"
+      "orphan_last_activity_ts": "2026-06-23T19:22:30.547163+00:00",
+      "briefing": {
+        "what": "A new piece of work the team kicked off to let project sequences automatically mark themselves complete, though it isn't yet tied to a specific project goal.",
+        "why": "It could save the team manual cleanup time, but since it's floating without a clear owner or objective, it risks drifting or duplicating effort.",
+        "suggest": "Have the team confirm which project this belongs to and the outcome you want before they go further, rather than letting it run unanchored."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-23T19:33:51.600852+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-missions-v2-phase4b-spec",
@@ -4877,7 +4891,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-23T19:24:42.592041+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-23T19:21:09.60957+00:00"
+      "orphan_last_activity_ts": "2026-06-23T19:21:09.60957+00:00",
+      "briefing": {
+        "what": "A new plan for the next phase of how the team organizes and tracks its work.",
+        "why": "Getting this right keeps the team's efforts coordinated and tied to real goals instead of drifting into unowned work.",
+        "suggest": "Take a quick look and give it your read before it goes further, since it's still taking shape and not yet anchored to a clear goal."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-23T19:33:51.600852+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
