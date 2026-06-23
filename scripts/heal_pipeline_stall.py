@@ -220,18 +220,20 @@ _AUTO_MERGE_MERGED_RE = re.compile(
     r'\[(?P<ts>\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:?\d{2}|Z)?)\]'
     r'.*AUTO_MERGE task=(?P<task>\S+).*outcome=merged'
 )
-# Chain discipline v3 GAP 1 (Check 6). Matches the WARN line emitted by
-# outbox_notifier.py when REVIEW_REVISION fires on an envelope with no
-# `forge_build_session_id`. Production line shape:
-#   [<ts>] [notifier] [WARN] REVIEW_REVISION on task <task> has no
-#   forge_build_session_id (routing_source='beacon', chat_id=None);
-#   revision dispatch would have no session to --resume — skipping.
-# The task token is non-greedy up to the first space so the regex matches
-# both the pre-v3 ("propagation gap?") shape and the v3 ("routing_source=…")
-# shape — the direct fix changed the trailing diagnostic, not the prefix.
+# Chain discipline v3 GAP 1 (Check 6). Matches the line emitted by
+# outbox_notifier.py's no-session REVISION handler. The handler logs:
+#   [<ts>] [notifier] [INFO] NO_SESSION_REVISION task=<task>; routed
+#   code-review-revision-no-session notify to beacon (file=...) ...
+# (and a WARN `NO_SESSION_REVISION task=<task>; FAILED to route ...`).
+# REGRESSION (fixed here): the message text changed on 2026-06-16 from the
+# original "REVIEW_REVISION on task <task> has no forge_build_session_id"
+# shape to the "NO_SESSION_REVISION task=<task>; ..." shape, but this regex
+# was never updated — so it silently stopped matching and the backstop went
+# dead (the #645 / #653 stalls). The task token stops at the first ';' or
+# space. See agents/beacon/specs/forge-cold-start-revision.md (S0).
 _NO_FORGE_SESSION_RE = re.compile(
     r'\[(?P<ts>\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:?\d{2}|Z)?)\]'
-    r'.*REVIEW_REVISION on task (?P<task>\S+) has no forge_build_session_id'
+    r'.*NO_SESSION_REVISION task=(?P<task>[^;\s]+)'
 )
 
 # Chain discipline v3 GAP 3 (Check 7). routing-events.jsonl carries one

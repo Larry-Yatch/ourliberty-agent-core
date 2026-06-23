@@ -1441,12 +1441,12 @@ class TestCheckRevisionDispatchedWithNoSession(_TempAgentsRootMixin, unittest.Te
     re-flag any `no forge_build_session_id` WARN line not already
     suppressed by the direct-fix alert's cooldown."""
 
-    def test_fires_when_warn_line_present(self):
+    def test_fires_when_no_session_line_present(self):
         line = (
-            f'[{_ts(45)}] [notifier] [WARN] REVIEW_REVISION on task '
-            f'feedback-claude-as-forge-001 has no forge_build_session_id '
-            f"(routing_source='beacon', chat_id=None); revision dispatch "
-            f'would have no session to --resume — skipping.'
+            f'[{_ts(45)}] [notifier] [INFO] NO_SESSION_REVISION task='
+            f'feedback-claude-as-forge-001; routed code-review-revision-no-session '
+            f'notify to beacon (file=notify-x.json) for autonomous fresh-task_id '
+            f're-dispatch'
         )
         alerts = self.hps.check_revision_dispatched_with_no_session([line], {})
         self.assertEqual(len(alerts), 1)
@@ -1457,33 +1457,46 @@ class TestCheckRevisionDispatchedWithNoSession(_TempAgentsRootMixin, unittest.Te
         )
 
     def test_dedup_per_task(self):
-        # Two WARN lines for the same task → one alert.
+        # Two no-session lines for the same task → one alert.
         lines = [
-            f'[{_ts(45)}] [notifier] [WARN] REVIEW_REVISION on task '
-            f'dup-task has no forge_build_session_id',
-            f'[{_ts(40)}] [notifier] [WARN] REVIEW_REVISION on task '
-            f'dup-task has no forge_build_session_id',
+            f'[{_ts(45)}] [notifier] [INFO] NO_SESSION_REVISION task='
+            f'dup-task; routed notify to beacon',
+            f'[{_ts(40)}] [notifier] [INFO] NO_SESSION_REVISION task='
+            f'dup-task; routed notify to beacon',
         ]
         alerts = self.hps.check_revision_dispatched_with_no_session(lines, {})
         self.assertEqual(len(alerts), 1)
 
-    def test_silent_when_no_warn_lines(self):
+    def test_silent_when_no_no_session_lines(self):
         lines = [
             f'[{_ts(45)}] [notifier] [INFO] business as usual',
         ]
         alerts = self.hps.check_revision_dispatched_with_no_session(lines, {})
         self.assertEqual(alerts, [])
 
-    def test_silent_against_pre_v3_warn_shape_is_still_caught(self):
-        """The pre-v3 WARN line had a different trailing diagnostic
-        ('propagation gap?'); the prefix is identical so the regex
-        catches both shapes."""
-        line = (
-            f'[{_ts(45)}] [notifier] [WARN] REVIEW_REVISION on task '
-            f'legacy-task has no forge_build_session_id (propagation gap?)'
+    def test_fires_on_both_routed_and_failed_variants(self):
+        """The handler emits an INFO `...; routed ...` line on a successful
+        route and a WARN `...; FAILED to route ...` line on failure; the
+        backstop must catch either (the task token stops at the first ';').
+        This replaces the dead-regex regression that matched neither — the
+        message text drifted from the old `REVIEW_REVISION ... has no
+        forge_build_session_id` shape on 2026-06-16 (S0)."""
+        routed = (
+            f'[{_ts(45)}] [notifier] [INFO] NO_SESSION_REVISION task='
+            f'routed-task; routed code-review-revision-no-session notify to beacon'
         )
-        alerts = self.hps.check_revision_dispatched_with_no_session([line], {})
-        self.assertEqual(len(alerts), 1)
+        failed = (
+            f'[{_ts(44)}] [notifier] [WARN] NO_SESSION_REVISION task='
+            f'failed-task; FAILED to route notify to beacon: RoutingDenied'
+        )
+        routed_alerts = self.hps.check_revision_dispatched_with_no_session(
+            [routed], {})
+        failed_alerts = self.hps.check_revision_dispatched_with_no_session(
+            [failed], {})
+        self.assertEqual(len(routed_alerts), 1)
+        self.assertEqual(len(failed_alerts), 1)
+        self.assertIn('routed-task', routed_alerts[0]['message'])
+        self.assertIn('failed-task', failed_alerts[0]['message'])
 
 
 class TestCheckUnroutedOpenPrs(_TempAgentsRootMixin, unittest.TestCase):
@@ -1683,11 +1696,11 @@ class TestScanWindow(_TempAgentsRootMixin, unittest.TestCase):
         self.assertEqual(alerts, [])
 
     def test_check6_skips_no_session_warn_older_than_window(self) -> None:
-        """REVIEW_REVISION no-session WARN line >24h ago: the direct-fix
-        DM fired when the WARN was fresh. Re-alerting now is noise."""
+        """No-session line >24h ago: the direct-fix DM fired when the event
+        was fresh. Re-alerting now is noise."""
         lines = [
-            f'[{_ts(25 * 60)}] [notifier] [WARN] REVIEW_REVISION on task '
-            f'historical-rev-001 has no forge_build_session_id'
+            f'[{_ts(25 * 60)}] [notifier] [INFO] NO_SESSION_REVISION task='
+            f'historical-rev-001; routed notify to beacon'
         ]
         alerts = self.hps.check_revision_dispatched_with_no_session(lines, {})
         self.assertEqual(alerts, [])
@@ -1965,9 +1978,8 @@ class TestPerCheckSkipPaths(_TempAgentsRootMixin, unittest.TestCase):
 
     def test_check6_skips_on_larry_action(self) -> None:
         lines = [
-            f'[{_ts(45)}] [notifier] [WARN] REVIEW_REVISION on task '
-            f'check6-resolved-001 has no forge_build_session_id '
-            f"(routing_source='beacon', chat_id=None); skipping."
+            f'[{_ts(45)}] [notifier] [INFO] NO_SESSION_REVISION task='
+            f'check6-resolved-001; routed notify to beacon'
         ]
         cm, captured = self._capture_logs()
         with cm, self._patch_resolution('larry_action'):
@@ -2109,8 +2121,8 @@ class TestResolutionSignalRegressionGuards(_TempAgentsRootMixin,
 
     def test_check6_fires_when_no_resolution_signal(self) -> None:
         lines = [
-            f'[{_ts(45)}] [notifier] [WARN] REVIEW_REVISION on task '
-            f'legit-stall-6 has no forge_build_session_id'
+            f'[{_ts(45)}] [notifier] [INFO] NO_SESSION_REVISION task='
+            f'legit-stall-6; routed notify to beacon'
         ]
         alerts = self.hps.check_revision_dispatched_with_no_session(lines, {})
         self.assertEqual(len(alerts), 1)
