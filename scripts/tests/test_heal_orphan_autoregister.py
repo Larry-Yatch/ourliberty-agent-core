@@ -268,6 +268,31 @@ class ScanAndProposeTest(unittest.TestCase):
             self.assertEqual(reg['missions'], [], tid)
             self.assertEqual(res.skipped_non_proposable, 1, tid)
 
+    def test_sequence_owned_seq_id_and_steps_not_proposed(self):
+        # projects-v3-p4 (a bare/complete sequence seq_id) and its step ids each
+        # PASS is_proposable_initiative, so only the sequence-owned collapse keeps
+        # the catcher from auto-proposing them (the live #655 follow-up symptom).
+        owned = {'projects-v3-p4', 'p4-cleanup-committer', 'p4-postmerge-exec'}
+        for tid in owned:
+            reg = self._empty_reg()
+            rows = [_ev(tid, self.now - timedelta(hours=2),
+                        event_type='session_start', pr_url=None)]
+            res = h.scan_and_propose(reg, rows, derive, self.now,
+                                     pr_state_resolver=lambda urls: {},
+                                     collapsed_task_ids=owned)
+            self.assertEqual(res.proposed, [], tid)
+            self.assertEqual(reg['missions'], [], tid)
+
+    def test_without_collapse_the_seq_id_would_be_proposed(self):
+        # Proves the collapse is the mechanism: drop the collapse set and the very
+        # same seq_id surfaces as a proposed orphan (prior behavior, the bug).
+        reg = self._empty_reg()
+        rows = [_ev('projects-v3-p4', self.now - timedelta(hours=2),
+                    event_type='session_start', pr_url=None)]
+        res = h.scan_and_propose(reg, rows, derive, self.now,
+                                 pr_state_resolver=lambda urls: {})
+        self.assertEqual([tid for tid, _ in res.proposed], ['projects-v3-p4'])
+
 
 # --------------------------------------------- retirement (self-clean the lane)
 
@@ -305,6 +330,53 @@ class RetireStaleProposalsTest(unittest.TestCase):
         self.assertEqual(entry['retired_by'], 'heal_orphan_autoregister')
         self.assertEqual(entry['retired_reason'], 'filter-non-buildable')
         self.assertEqual(entry['retired_at'], self.now.isoformat())
+
+    def test_retires_sequence_owned_proposal(self):
+        # The live #655 follow-up: a proposal whose task_id is a sequence seq_id is
+        # retired with reason 'sequence-owned' (additive ack + provenance, phase
+        # stays proposed, never hard-deleted).
+        reg = {'schema_version': 1, 'missions': [
+            self._proposed('proposed-projects-v3-p4', 'projects-v3-p4'),
+        ]}
+        retired = h.retire_stale_proposals(
+            reg, [], derive, self.now,
+            pr_state_resolver=lambda urls: {},
+            collapsed_task_ids={'projects-v3-p4', 'p4-cleanup-committer'})
+        self.assertEqual(retired, [('proposed-projects-v3-p4', 'sequence-owned')])
+        entry = reg['missions'][0]
+        self.assertTrue(entry['acknowledged'])
+        self.assertEqual(entry['phase'], 'proposed')            # not hard-deleted
+        self.assertEqual(entry['retired_by'], 'heal_orphan_autoregister')
+        self.assertEqual(entry['retired_reason'], 'sequence-owned')
+
+    def test_sequence_owned_retire_is_idempotent(self):
+        reg = {'schema_version': 1, 'missions': [
+            self._proposed('proposed-projects-v3-p4', 'projects-v3-p4'),
+        ]}
+        owned = {'projects-v3-p4'}
+        first = h.retire_stale_proposals(reg, [], derive, self.now,
+                                         pr_state_resolver=lambda urls: {},
+                                         collapsed_task_ids=owned)
+        self.assertEqual([r for _, r in first], ['sequence-owned'])
+        stamp = reg['missions'][0]['retired_at']
+        second = h.retire_stale_proposals(reg, [], derive, self.now,
+                                          pr_state_resolver=lambda urls: {},
+                                          collapsed_task_ids=owned)
+        self.assertEqual(second, [])                            # no re-touch
+        self.assertEqual(reg['missions'][0]['retired_at'], stamp)
+
+    def test_sequence_owned_keeps_entry_with_a_non_owned_member(self):
+        # Retire only when EVERY task_id is sequence-owned; a mixed entry is kept.
+        reg = {'schema_version': 1, 'missions': [
+            {'id': 'proposed-mix', 'phase': 'proposed',
+             'task_ids': ['projects-v3-p4', 'auth-setup-token-wiring'],
+             'proposed_by': 'heal_orphan_autoregister'},
+        ]}
+        retired = h.retire_stale_proposals(reg, [], derive, self.now,
+                                           pr_state_resolver=lambda urls: {},
+                                           collapsed_task_ids={'projects-v3-p4'})
+        self.assertEqual(retired, [])
+        self.assertNotIn('acknowledged', reg['missions'][0])
 
     def test_retires_terminal_merged_orphan(self):
         # A buildable proposal whose orphan PR has merged is terminal -> retire.
