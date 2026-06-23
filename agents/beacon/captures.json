@@ -321,7 +321,7 @@
       "id": "cap-phantom-build-phase-after-marker-error-retry-pr-4d78",
       "title": "Phantom build-phase after marker-error retry (PR-6 candidate)",
       "note": "Observed 2026-06-10 ~23:00Z: forge terminal markers for PRs #436/#437 were malformed -> outbox-notifier marker-error retry; the retry session for fix-classifier-session-lost-002 re-emitted PROCEED and the notifier classified it as a preflight verdict, dispatching build-fix-classifier-session-lost-002 for a PR (#435) that had ALREADY MERGED. Chat agent cancelled it via blackboard/cancel-task-fix-classifier-session-lost-002.json. FIX SHAPE: notifier must not treat a PROCEED from a marker-error-retry session as a fresh preflight verdict when the task is already terminal (PR merged/opened) \u2014 guard with GitHub-truth (like #417) or task-state check before build-phase dispatch. Same risk exists for the #436/#437 retries; watch for phantom build-fix-test-gate-sandbox-env-injection-002 / build-fix-dashboard-routing-denied-002 dispatches and cancel the same way.",
-      "state": "parked",
+      "state": "dropped",
       "origin": {
         "source": "desktop-chat",
         "session_id": null,
@@ -332,19 +332,18 @@
       "last_touched": "2026-06-10T23:01:33.065559+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "Our automated system occasionally restarts work on a job that's already finished, kicking off duplicate effort that someone then has to catch and shut down by hand.",
-        "why": "It wastes time cleaning up after the machine and risks redoing or undoing completed work if a duplicate slips through unnoticed.",
-        "suggest": "Worth fixing soon but not an emergency \u2014 have the team add a simple check so the system confirms a job is still open before reopening it, and keep an eye out for repeat cases in the meantime."
+        "what": "A glitch where the system, after retrying a hiccup, occasionally kicks off work to fix a job that was already finished and closed.",
+        "why": "It wastes effort on already-done work and could cause confusing duplicate activity, though so far it's been caught and stopped before any harm.",
+        "suggest": "Worth fixing when convenient by having the system double-check whether a job is already complete before starting more work on it \u2014 no rush, since we're currently catching these manually."
       },
-      "risk": "medium",
-      "recommended_action": "delegate",
+      "risk": "safe",
+      "recommended_action": "drop",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-06-14T17:52:43.946307+00:00",
-        "from_state": "parked"
+        "at": "2026-06-23T18:53:20.388475+00:00",
+        "from_state": "dropped"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "aging": true,
       "spawned": {
         "kind": "delegate",
