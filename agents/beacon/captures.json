@@ -967,6 +967,36 @@
         "project_id": "auto-retire-done-pipeline-cards-follow-up-to-pha",
         "stamped_at": "2026-06-23T22:07:57.930635+00:00"
       }
+    },
+    {
+      "id": "cap-dashboard-authors-specs-kill-the-attach-spec-git-f0a3",
+      "title": "Dashboard authors specs \u2014 kill the attach-spec git detour",
+      "note": "Problem: Attach spec only POINTS a phase at a spec doc that already exists in agent-core on the droplet (existence-checked, else HTTP 400). So authoring a spec needs a git detour (write file, PR, merge, sync) before you can attach \u2014 breaks the low-friction dashboard loop. Hit 2026-06-23 while testing the auto-retire spec (PR 659). Direction to discuss: let the dashboard AUTHOR the spec \u2014 accept spec text, write the .md to the brainstorm-computed spec_target_path (agents/beacon/specs/<phase_id>.md), and let heal_projects_store (single committer) commit it, exactly like projects.json state already flows. Result: brainstorm, write spec in dashboard, attach, launch \u2014 no git detour. Talk through before specing (Larry + Claude).",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-dashboard",
+        "branch": "main",
+        "captured_at": "2026-06-23T22:51:03.217028+00:00"
+      },
+      "last_touched": "2026-06-23T22:51:03.217028+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A change that lets you write a plan straight from the dashboard, instead of having to prepare it elsewhere first.",
+        "why": "Right now an extra detour breaks the smooth flow, so good ideas stall before they ever launch \u2014 this keeps you moving from idea to action in one sitting.",
+        "suggest": "Worth doing, but let's talk it through together first before we commit to building it."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-23T22:55:56.578186+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
