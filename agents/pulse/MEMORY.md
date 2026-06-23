@@ -204,9 +204,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-23 16:20Z UTC (Iter ~2533, Tier 1 consecutive_clean=0, Check A fast-forward PR #651)
+## Status snapshot — updated 2026-06-23 16:25Z UTC (Iter ~2534, Tier 1 consecutive_clean=1)
 
-**Iter ~2533 summary:** ✅ Nominal (1 always-fix). 1 new alert (L989, Tier-3 silence: review-pass PR #651 bootstrap-import-gate-enforce-001). Check A always-fix: repo 1 commit behind origin/main (efa02d20..e0bbf4ab) → fast-forwarded to e0bbf4ab. PR #651 (bootstrap-import-gate-enforce-001) COMPLETE: 218 test files bootstrap-compliant, ABSOLUTE_INVARIANT_TESTS enforcement, 45/45 tests pass. 8 daemons alive (PIDs unchanged from ~2532). HEAD=e0bbf4ab=origin/main. 0 pending approvals. 0 open PRs. PRIME: systemic_fixes=60, interventions=1076, ratio=17.9, trend=improving. Tier reset 2→1 (non-clean iter due to fast-forward). Standing [yellow]: unreviewed-merge:649+637+607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. G-rules at 2/3: revision-phase-preamble-missing, telegram-409-burst, Forge-preflight-CLARIFY_REQUEST, forge-preflight-task-id-mismatch, seq-advancer-sequence-stranded, F24-empty-prompt-envelope-rejected. api-500-burst: 1/3.
+**Iter ~2534 summary:** ✅ Nominal (0 fixes, 0 alerts). All mandatory + additive checks clean. 8/8 daemons alive (same PIDs). HEAD=79b93d78=origin/main. 0 pending approvals. 0 open PRs. PRIME: systemic_fixes=60, interventions=1076, ratio=17.9, trend=improving. Tier 1, consecutive_clean=1 (2 more clean iters → Tier 2). Standing [yellow]: unreviewed-merge:649+637+607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. G-rules at 2/3: revision-phase-preamble-missing, telegram-409-burst, Forge-preflight-CLARIFY_REQUEST, forge-preflight-task-id-mismatch, seq-advancer-sequence-stranded, F24-empty-prompt-envelope-rejected. api-500-burst: 1/3.
 
 
 
