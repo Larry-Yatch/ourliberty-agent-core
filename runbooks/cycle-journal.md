@@ -4,6 +4,96 @@
 
 ---
 
+## Iteration ~2520 — 2026-06-23T13:32Z UTC (interactive /cycle, Tier 1, consecutive_clean=1→2, Larry approved heal-stale-daemon-alert-attribution-001, NOMINAL ✅)
+
+**Trigger:** Larry `/cycle` invocation.
+
+**Health:** ✅ Nominal — 0 new alerts, all checks clean. Key development: Larry said 'Go' at 13:25:48Z (just after iter ~2519 journal write) — bot auto-approved `heal-stale-daemon-alert-attribution-001`, and `build-heal-stale-daemon-alert-attribution-001.json` is now in Forge's inbox awaiting build. G-rule heal-stale-daemon-code-script-service-mismatch advancing to Forge build phase.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Daemons (re-verified):** dashboard_api=1309235 (Ssl) ✅, beacon_telegram_bot=1309976 (Ss) ✅, outbox_notifier=1310052 (Ss) ✅, chain_event=930563 (SNs) ✅, inbox_watcher=1026206 (Ssl) ✅. Same PIDs. ✅
+- **HEAD (re-verified):** 0855b263=origin/main (Pulse cycle 20260623T132656Z). Clean, on-main. ✅
+- **heal-stale-daemon-alert-attribution-001 (re-verified):** Larry approved 'Go' at 13:25:48Z. Bot processed: `approved heal-stale-daemon-alert-attribution-001 → dispatched to /home/larry/agents/inboxes/forge/heal-stale-daemon-alert-attribution-001.json`. Forge inbox now contains `heal-stale-daemon-alert-attribution-001.json` + `build-heal-stale-daemon-alert-attribution-001.json`. G-rule DISPATCHED → Forge building. ✅ Progress.
+- **doorbell-tier3-silence-001 (re-verified):** beacon-pending-approvals pending=2; doorbell entry created 13:19Z still present. Still awaiting Larry's explicit `approve`. ✅
+- **fix-watchdog-stale-log-inflight-aware-001 (re-verified):** pending since 04:48Z. Still awaiting Larry. ✅
+- **fix-645-alert-translation-001 stall (re-verified):** heal_pipeline_stall --dry-run WARN at 13:05Z and 13:20Z. Persists. [carry blue] ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 972, "file_length": 972}`. get-watermark=972. 0 new alerts. ✅ Nominal.
+
+**Check 1 — Log noise:** outbox_notifier.log: 0 WARN/ERROR. inbox_watcher.log: 0 WARN/ERROR. journalctl: 2× `WARN larry_alerts append failed for forge_built_no_pr:fix-645-alert-translation-001` (13:05Z, 13:20Z) — standing fix-645 stall on cooldown. [carry blue]. ✅ Otherwise nominal.
+
+**Check 2 — Telegram sweep:** Larry 'Go' at 07:25:48 MDT (13:25:48Z) approved `heal-stale-daemon-alert-attribution-001`. Bot auto-processed. No other Larry directives in last 4h. No agent distress. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → `0 new alert(s) fired, 0 recovered, 1 suppressed` (fix-645 on cooldown). FORGE_NO_PR_SKIP: p7-shelf-descriptor (PR #638 merged), p7-approvals-adopt (#82 merged), system-self-awareness-slice-2b (preflight_exit), fix-proposed-retirement (preflight_exit). Fix-645 WARN. ✅ Nominal.
+
+**Check 4 — Pending directives:** Forge inbox: 2 tasks (heal-stale-daemon-alert-attribution-001.json + build-heal-stale-daemon-alert-attribution-001.json — freshly dispatched this window, not stuck). Beacon=0, Mirror=0. beacon-pending-approvals: pending=2 (fix-watchdog-stale-log-inflight-aware-001 04:48Z, doorbell-tier3-silence-001 13:19Z), history=255. heal-stale-daemon-alert-attribution-001 REMOVED from pending (approved). ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-23T13:22:43Z (~9 min ago). Within 60-min window. ✅ Nominal.
+
+**Check A — Source repo:** On main. HEAD=0855b263=origin/main (Pulse cycle 20260623T132656Z). Clean. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-23T12:59:02Z (~33 min ago). HEAD=origin/main → in sync. ✅ Nominal.
+
+**Check C — Agent liveness:** dashboard_api=1309235 (Ssl) ✅, beacon_telegram_bot=1309976 (Ss) ✅, outbox_notifier=1310052 (Ss) ✅, chain_event=930563 (SNs) ✅, inbox_watcher=1026206 (Ssl) ✅. 5/5 alive.
+
+**Check D — Inboxes:** Forge=2 (heal-stale-daemon tasks just dispatched, not stale). Beacon=0, Mirror=0. ✅ Nominal.
+
+**Check E — PRs:**
+- ourliberty-agent-core: 0 open PRs. ✅
+- ourliberty-dashboard: 0 open PRs. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Tuesday 2026-06-23 UTC (weekday=1 ∉ {0,2,4,6}):** Check I/VIII/IX/X/XI weekday gate not met → skip. Check III: last 2026-06-11 (12d < 14d gate, not Sunday) → skip. ✅
+
+**G-rule assessment:**
+- **heal-stale-daemon-code-script-service-mismatch: DISPATCHED → Forge building** — Larry approved 'Go' at 13:25:48Z; build-heal-stale-daemon-alert-attribution-001.json in Forge inbox. PRIME verification_pending logged iter ~2518. [advance]
+- **doorbell-tier4-pattern: 3/3 DISPATCHED** — plan `doorbell-tier3-silence-001` in pending approvals (created 13:19Z). Awaiting Larry `approve`. [carry]
+- All other G-rule counts unchanged from iter ~2519.
+
+**Actions taken:**
+1. Alert triage: 0 new alerts. Watermark remains 972.
+2. PRIME ledger: `iter_clean` appended (tier=1).
+3. Tier state: `record --checks-clean true` → consecutive_clean 1→2 (Tier 1 steady-state).
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [blue] **fix-645-alert-translation-001 worktree stall** — WARN persists in heal_pipeline_stall dry-run. [carry]
+- [blue] **G-rule watchdog-watcher-log-stale** — 3/3 DISPATCHED (iter ~2517). Forge task `fix-watchdog-stale-log-inflight-aware-001` pending Larry's Telegram approval (04:48Z). [carry]
+- [blue] **G-rule doorbell-tier4-pattern** — 3/3 DISPATCHED. Plan `doorbell-tier3-silence-001` awaiting Larry `approve` (pending 13:19Z).
+- [blue] **G-rule heal-stale-daemon-code-script-service-mismatch** — 3/3 DISPATCHED, Larry approved 13:25:48Z. `build-heal-stale-daemon-alert-attribution-001.json` in Forge inbox. Verification pending.
+- [blue] **G-rule mirror-marker-parse-error** — 2/3. Watch.
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. Watch.
+- [blue] **G-rule seq-advancer-sequence-stranded** — 2/3. Watch.
+- [blue] **G-rule sync.service-deploy-restart-storm-tier4** — 1/3. Watch.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule health-notify-script-missing** — dispatch sent 2026-06-09. [carry]
+- [blue] **unreviewed-merge:628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **Stale bash orphan PID 1834248** — benign. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. Informational. [carry]
+
+**PRIME DIRECTIVE:** 0 interventions this iter (iter_clean). Trailing-30d: interventions≈1071, systemic_fixes=56, ratio≈19.1, trend=improving.
+**Tier end-of-iter:** Tier 1, consecutive_clean=1→2. One more clean iter → de-escalate to Tier 2.
+
+---
+
 ## Iteration ~2519 — 2026-06-23T13:25Z UTC (interactive /cycle, Tier 1, consecutive_clean=0→1, Beacon processed both dispatches, NOMINAL ✅)
 
 **Trigger:** Larry `/cycle` invocation.
