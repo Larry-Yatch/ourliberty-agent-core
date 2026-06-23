@@ -168,9 +168,9 @@
 
 ---
 
-## medic-diagnosis translation regression (detected iter ~2487)
+## medic-diagnosis-translation-gap → CLOSED ✅ (iter ~2496 verified)
 
-**Rule:** alert-translations.json returns 0 entries for `source=medic` as of iter ~2487. Despite G-rule `medic-diagnosis-tier4` being marked COMPLETE (PR #515 merged 2026-06-15), the triage helper returns Tier-4 for `source=medic, intent=medic-diagnosis` alerts. Medic bot DMs Larry directly (chat_id=7998341473) so no Pulse DM needed — but the translation is missing/broken. G-rule `medic-diagnosis-translation-gap`: 1/1. Dispatch to Beacon at 3/3 to verify and restore the Tier-3 translation in alert-translations.json.
+**Rule:** G-rule `medic-diagnosis-translation-gap` CLOSED. Triage helper returned Tier-3 for `source=medic, intent=medic-diagnosis` alert L947 at iter ~2496. alert-translations.json has working `medic-diagnosis` entry (tier=FYI, route=digest — medic already DMs Larry via chat_id, so Pulse silence is correct). Translation likely restored by PR #645 (changed alert-translations.json). G-rule condition (translation missing) no longer holds. **CLOSED.**
 
 ---
 
@@ -180,9 +180,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-23 05:13Z UTC (Iter ~2495, Tier 2, consecutive_clean=0, NOMINAL ✅)
+## Status snapshot — updated 2026-06-23 05:27Z UTC (Iter ~2496, Tier 2, consecutive_clean=1, NOMINAL ✅)
 
-**Iter ~2495 summary:** ✅ Nominal. 3 Tier-3 alerts (heal-stale-daemon-code auto-restarts post-PR-645: beacon/dashboard/outbox-notifier restarted at 05:07Z, new PIDs: beacon=1244182, dashboard_api=1244279, outbox_notifier=1244425). All checks clean. **Tier 1 → Tier 2 DE-ESCALATED** (consecutive_clean=3 threshold). watermark=945. 5/5 daemons alive. **Standing [yellow]: unreviewed-merge:637, unreviewed-merge:607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals.** PRIME: interventions≈1068, systemic_fixes=56, ratio≈19.07, trend=improving. **G-rule watchdog-watcher-log-stale: 3/3 DISPATCHED, Forge task `fix-watchdog-stale-log-inflight-aware-001` PENDING Larry approval. G-rule doorbell-tier4-pattern: 1/3. G-rule heal-stale-daemon-code-script-service-mismatch: 2/3. G-rule mirror-marker-parse-error: 2/3. G-rule revision-phase-preamble-missing: 2/3. G-rule telegram-409-burst: 2/3. G-rule Forge-preflight-CLARIFY_REQUEST: 2/3. G-rule forge-preflight-task-id-mismatch: 2/3. G-rule seq-advancer-sequence-stranded: 2/3. G-rule F24-empty-prompt-envelope-rejected: 2/3. G-rule medic-diagnosis-translation-gap: 1/1. G-rule mirror-no-session-revision-loop CLOSED.** PR #646 (autonomy dial backend, OPEN/UNKNOWN, ~34 min old, 0 reviews) and PR #86 dashboard (autonomy dial frontend, OPEN/MERGEABLE, 0 reviews) watching — Larry-authored, externally-authored path. Tier 2, consecutive_clean=0, next cadence: 15-min.
+**Iter ~2496 summary:** ✅ Nominal. 2 new alerts L946/L947 (heal-pipeline-stall PR#86 unrouted-pr + medic-diagnosis), both Tier-3 silence. Bot already DM'd Larry about PR#86 (route=escalate, 05:17Z). All checks clean. watermark=947. 5/5 daemons alive (PIDs unchanged from iter ~2495). **medic-diagnosis-translation-gap G-rule CLOSED** (translation working). **Tier 2, consecutive_clean=0→1**, next cadence: 15-min. **Standing [yellow]: unreviewed-merge:637, unreviewed-merge:607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals.** PRIME: interventions≈1068, systemic_fixes=56, ratio≈19.07, trend=improving. **G-rule watchdog-watcher-log-stale: 3/3 DISPATCHED (pending Larry approval). G-rule doorbell-tier4-pattern: 1/3. G-rule heal-stale-daemon-code-script-service-mismatch: 2/3. G-rule mirror-marker-parse-error: 2/3. G-rule revision-phase-preamble-missing: 2/3. G-rule telegram-409-burst: 2/3. G-rule Forge-preflight-CLARIFY_REQUEST: 2/3. G-rule forge-preflight-task-id-mismatch: 2/3. G-rule seq-advancer-sequence-stranded: 2/3. G-rule F24-empty-prompt-envelope-rejected: 2/3. G-rule mirror-no-session-revision-loop CLOSED. G-rule medic-diagnosis-translation-gap CLOSED.** PR #646 (autonomy dial backend, OPEN/MERGEABLE, 0 reviews) and PR #86 dashboard (autonomy dial frontend, OPEN/MERGEABLE, 0 reviews, bot DM'd Larry re: unrouted) watching.
 
 
 
