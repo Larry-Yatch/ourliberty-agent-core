@@ -211,11 +211,11 @@ class ThreadGetTest(_ThreadBase):
 
     def test_get_pins_per_message_contract_shape(self):
         # Contract C read-shape lock (Phase 4b polling). Per message the GET
-        # response must surface a stable per-turn key (ts), needs_reply, and
-        # direction — the exact fields the dashboard's unread detection rides on.
-        # The thread turn's stable identity IS ts (the contract mirrors
-        # clarify-rounds, which keys render on .ts, not a payload id); there is
-        # no separate per-message id by design.
+        # response must surface a stable per-turn `id` (the projected
+        # chain_events.event_id), plus ts, needs_reply, and direction — the
+        # exact fields the dashboard's dedupe / unread detection rides on. The
+        # live-thread poll replaces the rendered list by `id`, so the id IS the
+        # per-message stable identity (§ 7 option a).
         self._seed(_cap('cap-1'))
         self.client.rows = [
             self._msg_row('cap-1', 'e2', '2026-06-14T02:00:00+00:00',
@@ -232,7 +232,11 @@ class ThreadGetTest(_ThreadBase):
 
         # oldest-first: 'first' (01:00) precedes 'second' (02:00)
         first, second = msgs
-        # ts — the per-turn stable key, surfaced verbatim per message.
+        # id — the per-message stable key, projected verbatim from the row's
+        # chain_events.event_id (what dedupe / mark-as-seen rides on).
+        self.assertEqual(first['id'], 'e1')
+        self.assertEqual(second['id'], 'e2')
+        # ts — the per-turn timestamp, surfaced verbatim per message.
         self.assertEqual(first['ts'], '2026-06-14T01:00:00+00:00')
         self.assertEqual(second['ts'], '2026-06-14T02:00:00+00:00')
         # needs_reply — surfaced per message as a bool (not just on the POST
@@ -244,15 +248,13 @@ class ThreadGetTest(_ThreadBase):
         self.assertEqual(first['direction'], 'larry_to_team')
         self.assertEqual(second['direction'], 'team_to_larry')
 
-        # The per-message shape is exactly the five contract fields — no more,
-        # no less. A negative guard on id/event_id locks the contract: there is
-        # no per-message id today, so accidental schema drift (someone adding
-        # one later) trips this test and forces an intentional decision.
+        # The per-message shape is exactly the six contract fields — no more,
+        # no less. Pinning the field set locks the contract so accidental
+        # schema drift (a field added/dropped later) trips this test and forces
+        # an intentional decision.
         for m in msgs:
-            self.assertEqual(set(m), {'ts', 'direction', 'text', 'actor',
+            self.assertEqual(set(m), {'id', 'ts', 'direction', 'text', 'actor',
                                       'needs_reply'})
-            self.assertNotIn('id', m)
-            self.assertNotIn('event_id', m)
 
     def test_filters_non_card_message_rows(self):
         self._seed(_cap('cap-1'))

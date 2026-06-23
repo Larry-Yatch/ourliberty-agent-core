@@ -813,6 +813,9 @@ class CaptureActionResponse(BaseModel):
 class CaptureThreadMessage(BaseModel):
     # Missions v2 Phase 4 § 8 — one card_message turn. Every field is optional so
     # a malformed/legacy row degrades per-field rather than failing the read.
+    # Phase 4b Contract C (§ 7): `id` projects the existing chain_events.event_id
+    # so the live-thread poll can dedupe / mark-as-seen by a stable per-message id.
+    id: Optional[str] = None
     ts: Optional[str] = None
     direction: Optional[str] = None  # larry_to_team | team_to_larry
     text: Optional[str] = None
@@ -4311,7 +4314,9 @@ def _fetch_events_for_task_ids(
     try:
         resp = (
             supabase_client.table('chain_events')
-            .select('event_type,task_id,agent,pr_url,ts,payload')
+            # event_id is selected so _shape_thread_message can project it as the
+            # per-message `id` (Phase 4b Contract C); additive for other callers.
+            .select('event_id,event_type,task_id,agent,pr_url,ts,payload')
             .in_('task_id', task_ids)
             .order('ts', desc=True)
             .execute()
@@ -5869,6 +5874,7 @@ def _shape_thread_message(ev: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(needs_reply, bool):
         needs_reply = None
     return {
+        'id': ev.get('event_id'),
         'ts': ev.get('ts'),
         'direction': direction,
         'text': text,
