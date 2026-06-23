@@ -79,6 +79,7 @@ import fixture_patterns             # noqa: E402  # outbox-side fixture gate
 import forge_preflight_handler as fph  # noqa: E402
 import larry_alerts                # noqa: E402
 import mirror_review_handler as mrh  # noqa: E402
+import no_session_ledger            # noqa: E402  # S1: cold-start obligation ledger
 import routing_validator            # noqa: E402  # allowed_repos source of truth
 import safe_write_inbox             # noqa: E402
 import sequence_shortcut_helpers as ssh  # noqa: E402  # V6: step-merged signal
@@ -4462,141 +4463,100 @@ def _dm_larry_no_session_revision(
         )
 
 
-def _route_no_session_revision_to_beacon(
-    data: dict[str, Any], decision: dict[str, Any],
-    routing_source: Optional[str],
-) -> None:
-    """Route a no-session code-review REVISION to Beacon for autonomous
-    re-dispatch (S2 — chain-context-durability M2).
+def _fetch_pr_body(pr_url: Optional[str]) -> Optional[str]:
+    """Return the PR description body via `gh pr view --json body`, or None.
 
-    When Mirror's REVIEW_REVISION lands on an envelope with no
-    `forge_build_session_id` (the PR #412 class: a heal-rebuilt envelope
-    that necessarily dropped the build session, or any externally-authored
-    PR routed without a Forge session), there is no Forge conversation to
-    `--resume`. Rather than dead-ending in a broadcast "reconcile manually"
-    Larry alert, write an inter-agent `code-review-revision-no-session`
-    notify to Beacon's inbox so a Beacon session re-dispatches Forge with a
-    FRESH task_id that applies Mirror's findings to the existing PR branch —
-    symmetric with the dag-preflight-revision self-heal in
-    `_handle_mirror_dag_preflight_result`.
-
-    Mirrors that template: build the notify via `build_notify_prompt` +
-    `build_chain_envelope` (M1) + `safe_write_inbox(target_agent='beacon')`,
-    keyed on a deterministic filename so re-processing the same Mirror
-    outbox overwrites the pending notify (atomic same-path write) rather
-    than duplicating it. The raw verdict is an agent-to-agent routing
-    signal, NOT a Larry decision, so the happy path does NOT DM Larry; only
-    a notify-write FAILURE (the autonomous path broke) DMs him.
-    """
-    task_id = data.get('task_id') or 'unknown'
-    payload = decision.get('payload') or {}
-    pr_url_value = data.get('pr_url') or (
-        payload.get('pr_url') if isinstance(payload, dict) else None
-    )
-    pr_url = pr_url_value or '(no pr_url)'
-    branch = data.get('branch') or '(branch unknown)'
-    summary = payload.get('summary') or payload.get('reason') or ''
-    findings = payload.get('findings')
-
-    # Serialize Mirror's findings into the notify body so Beacon's
-    # re-dispatch prompt can carry them verbatim to the fresh Forge build.
-    body_lines = [
-        f'Mirror requested REVISION on {pr_url} (task `{task_id}`).',
-        f'No forge_build_session_id on envelope (routing_source='
-        f'{routing_source!r}) — heal-rebuilt / externally-authored PR with no '
-        f'Forge session to --resume. Re-dispatch Forge with a fresh task_id '
-        f'to apply these findings to branch `{branch}` (same PR).',
-    ]
-    if summary:
-        body_lines.append(f'Summary: {summary}')
-    if isinstance(findings, list) and findings:
-        body_lines.append('Findings:')
-        for i, f in enumerate(findings, 1):
-            if isinstance(f, dict):
-                sev = f.get('severity', '?')
-                file_ref = f.get('file', '?')
-                line_ref = f.get('line_range', '')
-                desc = f.get('description', '(no description)')
-                loc = f'{file_ref} {line_ref}'.strip()
-                body_lines.append(f'  {i}. [{sev}] {loc} — {desc}')
-            else:
-                body_lines.append(f'  {i}. {f}')
-    body_snippet = '\n'.join(body_lines)
-
-    notify_source = 'mirror-result'
-    notify_prompt = build_notify_prompt(
-        intent='code-review-revision-no-session',
-        sender='mirror',
-        task_id=task_id,
-        success=True,
-        output=body_snippet,
-        intent_kwargs={'pr_url': pr_url, 'branch': branch},
-    )
-    notify_base = {
-        'task_id': f'notify-no-session-revision-{task_id}',
-        'prompt': notify_prompt,
-        'source': notify_source,
-        'intent': 'code-review-revision-no-session',
-        'original_task_id': task_id,
-        'branch': branch,
-        '_notify_depth': _current_notify_depth(data) + 1,
-    }
-    # Carry the recoverable chain context so Beacon's re-dispatch has what it
-    # needs (M1). forge_build_session_id is the field that's missing by
-    # definition here → explicit DROP. pr_url is resolved explicitly because
-    # it may live on Mirror's marker payload, not just the envelope.
-    notify_task = build_chain_envelope(
-        notify_base,
-        data,
-        carry={
-            'target_repo': CARRY,
-            'pr_url': pr_url_value,
-            'forge_build_session_id': DROP,
-            'reply_chat_id': CARRY,
-            'revision_count': CARRY,
-            'replan_count': CARRY,
-            'max_replans': CARRY,
-        },
-    )
-    # Deterministic filename keyed on task_id: re-processing the same Mirror
-    # outbox overwrites the pending notify rather than duplicating it.
-    notify_filename = f'notify-no-session-revision-{task_id}.json'
+    The cold-start revision brief needs the PR's stated intent, which a
+    heal/auto-routed review envelope does not carry (only `pr_title` rides the
+    chain). Best-effort: any transport / non-zero exit / parse error, or an
+    empty body, returns None and the brief degrades to "read the diff to infer
+    intent." Read-only `gh` (mirrors `_gh_pr_head_sha`)."""
+    if not pr_url:
+        return None
+    parsed = _parse_pr_url(pr_url)
+    if parsed is None:
+        return None
+    repo_coords, pr_number = parsed
     try:
-        dest = safe_write_inbox.safe_write_inbox(
-            target_agent='beacon',
-            task_dict=notify_task,
-            source_agent=notify_source,
-            filename=notify_filename,
+        proc = subprocess.run(
+            ['gh', 'pr', 'view', str(pr_number),
+             '--repo', repo_coords, '--json', 'body'],
+            capture_output=True, text=True, timeout=_AUTO_MERGE_TIMEOUT_S,
         )
-        log(
-            f'NO_SESSION_REVISION task={task_id}; routed '
-            f'code-review-revision-no-session notify to beacon '
-            f'(file={dest.name}) for autonomous fresh-task_id re-dispatch'
-        )
-    except (
-        safe_write_inbox.DispatchRejected,
-        safe_write_inbox.RoutingDenied,
-    ) as e:
-        # The autonomous path broke — Beacon won't self-heal this round. That
-        # IS Larry-actionable (protocol failure), so DM him rather than drop
-        # the REVISION silently.
-        larry_alerts.append_alert(
-            source='outbox-notifier',
-            severity='warning',
-            message=(
-                f'Mirror REVISION on PR {pr_url} (task `{task_id}`) has no '
-                f'Forge build session and could not be routed to Beacon '
-                f'({type(e).__name__}: {e}). Re-dispatch Forge manually with '
-                f'a fresh task_id to apply Mirror\'s findings to branch '
-                f'`{branch}`.\n\n{body_snippet}'
-            ),
-            subject=f'no-session-revision-route-failed:{task_id}',
-        )
-        log(
-            f'NO_SESSION_REVISION task={task_id}; FAILED to route notify to '
-            f'beacon: {type(e).__name__}: {e}; DMed Larry',
-            'WARN',
-        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        log(f'gh pr view {pr_number} ({repo_coords}) body lookup FAILED: '
+            f'{type(e).__name__}: {e}', 'WARN')
+        return None
+    if proc.returncode != 0:
+        log(f'gh pr view {pr_number} ({repo_coords}) body returned '
+            f'{proc.returncode}: {(proc.stderr or "").strip()[:200]}', 'WARN')
+        return None
+    try:
+        payload = json.loads(proc.stdout or '{}')
+    except (ValueError, json.JSONDecodeError):
+        return None
+    body = payload.get('body')
+    return body if isinstance(body, str) and body.strip() else None
+
+
+def _build_cold_start_revision_prompt(
+    *, task_id: str, branch: Optional[str], pr_url: Optional[str],
+    next_count: int, max_revisions: int, findings_block: str,
+    pr_body: Optional[str],
+) -> str:
+    """Build the round-1 brief for a Forge that has NO build session for this PR.
+
+    A resumed Forge carries its whole build conversation implicitly; a blind
+    Forge carries nothing. So the brief hand-delivers everything that
+    conversation would have held — provenance (this is NOT your build, read
+    first), the PR's intent (its description), an instruction to read the diff
+    + git log, the findings, and the same-branch/no-scope-creep constraints —
+    or Forge will "fix" a nit in a way that defeats the PR's purpose. See
+    agents/beacon/specs/forge-cold-start-revision.md (S2 / M2)."""
+    intent = pr_body.strip() if isinstance(pr_body, str) and pr_body.strip() else (
+        '(PR description unavailable — read the diff and `git log` to infer the '
+        'PR\'s intent before editing.)'
+    )
+    lines = [
+        f'Revision phase — COLD START (revision {next_count} of {max_revisions}). '
+        f'Mirror reviewed this PR and requested changes.',
+        '',
+        'IMPORTANT: this PR was authored by Claude Code on the laptop — it is '
+        'NOT your build. You have no prior session or memory of it. Before '
+        'editing you MUST read:',
+        '  1. the PR intent below (what this PR is for),',
+        '  2. the diff — `gh pr diff <N>` (or your checked-out branch), and',
+        '  3. the commit log — `git log` on the branch.',
+        'Apply ONLY Mirror\'s findings. Preserve the PR\'s stated intent. Do '
+        'not expand scope.',
+        '',
+        f'Task: `{task_id}`',
+    ]
+    if branch:
+        lines.append(f'Branch: `{branch}`')
+    if pr_url:
+        lines.append(f'PR: {pr_url}')
+    lines.extend([
+        '',
+        'PR intent (from the PR description):',
+        '--- BEGIN PR DESCRIPTION ---',
+        intent,
+        '--- END PR DESCRIPTION ---',
+        '',
+        findings_block,
+        '',
+        'Apply each finding as a targeted edit, commit with a '
+        'conventional-commit revision message, push to the SAME branch (no new '
+        'PR — it auto-updates), and emit a one-line result starting with '
+        f'`Revision {next_count} applied: <summary>` (strict — a missing prefix '
+        'dead-letters back to you).',
+        '',
+        'If a finding is a judgment/values call you cannot resolve from the PR '
+        'intent (e.g. an ambiguous spec contradiction), do NOT guess: leave '
+        'that finding unapplied and say so explicitly in your result summary so '
+        'it routes to Beacon/Larry for a decision.',
+    ])
+    return '\n'.join(lines)
 
 
 def _dispatch_revision_to_forge(
@@ -4609,9 +4569,18 @@ def _dispatch_revision_to_forge(
     serialize into the prompt so Forge has structured input on what to fix.
 
     Pulls `forge_build_session_id` from Mirror's outbox envelope (threaded
-    through 5a's `_dispatch_mirror_review` → propagated via _build_outbox).
-    Without it, the revision task can't --resume the right conversation;
-    Forge starts fresh and loses her build context.
+    through 5a's `_dispatch_mirror_review` → propagated via _build_outbox) and
+    --resumes that conversation.
+
+    COLD START (forge-cold-start-revision.md, S2/M2): when there is NO
+    `forge_build_session_id` — a `claude/` PR auto-routed to Mirror, or a
+    heal-rebuilt envelope (the #645 / #653 / PR #412 class) — Forge never built
+    this PR, so there is nothing to --resume. Instead of dead-ending, dispatch a
+    FRESH Forge run (session_id omitted) carrying a full cold-start brief
+    (`_build_cold_start_revision_prompt`: provenance + PR intent + read-the-diff
+    + findings) and open a durable obligation in `no_session_ledger`. The one
+    exception is an interactive `source='larry'` PR with a live chat, which
+    keeps its direct DM (Larry owns and drives that fix).
 
     Caller responsibility: only invoke when `decision['marker_type'] ==
     'review_revision'`, `not decision['auto_promoted']`, `not
@@ -4624,41 +4593,44 @@ def _dispatch_revision_to_forge(
     """
     task_id = data.get('task_id') or 'unknown'
     forge_session = data.get('forge_build_session_id')
-    if not forge_session:
-        # Chain-gap #6 (observed 2026-05-20 on PR #59). When Larry opens a
-        # Claude-as-Forge PR (trivial config/docs edits — source='larry',
-        # no Forge build session), Mirror's REVIEW_REVISION has no Forge
-        # session to --resume against. The auto-resume chain doesn't apply;
-        # instead, surface the findings to Larry via Telegram DM so the
-        # rejection isn't silent. Without this branch, Larry only learns
-        # about the revision rejection if he's watching the chat live.
-        #
-        # Gated on source='larry' (the Claude-as-Forge marker) AND an
-        # int reply_chat_id (a DM target). For source!='beacon' but also
-        # not 'larry' (system sources without chats), keep the original
-        # WARN — there's no DM target to escalate to.
+    cold_start = not forge_session
+    if cold_start:
+        # No Forge build session to --resume. Two sub-cases:
         routing_source = data.get('original_source') or data.get('source')
         chat_id = data.get('reply_chat_id')
         if routing_source == 'larry' and isinstance(chat_id, int):
+            # Interactive Claude-as-Forge PR with a live Telegram thread
+            # (chain-gap #6, the PR #59 class): Larry is watching and owns this
+            # PR, so surface Mirror's findings to him directly — he drives the
+            # fix. Unchanged.
             _dm_larry_no_session_revision(data, decision, chat_id)
             return
-        # S2 (chain-context-durability M2): the chat-targeted DM path above
-        # can't fire when routing_source != 'larry' (e.g. Beacon dispatched
-        # the revision, or a heal-rebuilt envelope — the PR #412 class) or
-        # there's no reply_chat_id. Instead of dead-ending in a broadcast
-        # "reconcile manually" Larry alert, route the REVISION to Beacon's
-        # inbox so she re-dispatches Forge with a fresh task_id that applies
-        # Mirror's findings to the existing PR branch — symmetric with the
-        # dag-preflight-revision self-heal. The route helper logs its own
-        # success/failure and only DMs Larry if the route itself fails.
-        _route_no_session_revision_to_beacon(data, decision, routing_source)
-        return
+        # Otherwise — a `claude/` PR auto-routed to Mirror, or a heal-rebuilt
+        # envelope (the #645 / #653 / PR #412 class) with no chat target. Forge
+        # never built this, so there is no session to --resume. Rather than the
+        # old LLM-mediated Beacon route (which silently dead-ended when the
+        # Beacon turn no-op'd — see agents/beacon/specs/forge-cold-start-revision.md),
+        # fall through and dispatch a FRESH, fully-briefed Forge revision. Each
+        # cold-start round re-briefs from scratch (provenance + PR intent +
+        # read-the-diff + findings); a blind Forge needs context, not session
+        # continuity, so there is no session to thread forward.
 
     target_repo = data.get('target_repo')
     if not target_repo:
+        # M3: derive target_repo from chain_events before dead-ending —
+        # symmetric with _dispatch_mirror_review / _dispatch_mirror_review_rerun.
+        target_repo = backfill_target_repo(task_id)
+        if target_repo:
+            log(
+                f'target_repo backfilled to `{target_repo}` for task {task_id} '
+                f'from chain_events (M3); proceeding with revision dispatch',
+                'INFO',
+            )
+    if not target_repo:
         log(
-            f'REVIEW_REVISION on task {task_id} has no target_repo on envelope; '
-            f'Forge worktree gate would reject revision dispatch — skipping.',
+            f'REVIEW_REVISION on task {task_id} has no target_repo on envelope '
+            f'and none derivable from chain_events; Forge worktree gate would '
+            f'reject revision dispatch — skipping.',
             'WARN',
         )
         return
@@ -4696,36 +4668,48 @@ def _dispatch_revision_to_forge(
         findings_lines.append(f'  (raw findings: {findings})')
     findings_block = '\n'.join(findings_lines)
 
-    revision_prompt_lines = [
-        f'Revision phase. Mirror has reviewed your build on task `{task_id}` '
-        f'and requested changes (revision {next_count} of {max_revisions}).',
-        '',
-        f'Task: `{task_id}`',
-    ]
-    if branch:
-        revision_prompt_lines.append(f'Branch: `{branch}`')
     pr_url = data.get('pr_url') or payload.get('pr_url')
-    if pr_url:
-        revision_prompt_lines.append(f'PR: {pr_url}')
-    revision_prompt_lines.extend([
-        '',
-        findings_block,
-        '',
-        'Follow the Revision phase protocol in your CLAUDE.md: apply each '
-        'finding as a targeted edit (no scope creep), commit with a '
-        'conventional-commit revision message, push to the same branch '
-        '(PR auto-updates), and emit a one-line result starting with '
-        f'`Revision {next_count} applied: <summary>` (strict per 5b — '
-        'missing prefix dead-letters back to you).',
-    ])
-    revision_prompt = '\n'.join(revision_prompt_lines)
+    if cold_start and not pr_url:
+        # M3: the brief + the obligation ledger need the PR; derive it via gh
+        # when a heal-rebuilt envelope didn't carry one.
+        pr_url = backfill_pr_url(task_id, target_repo=target_repo, branch=branch)
+
+    if cold_start:
+        revision_prompt = _build_cold_start_revision_prompt(
+            task_id=task_id, branch=branch, pr_url=pr_url,
+            next_count=next_count, max_revisions=max_revisions,
+            findings_block=findings_block,
+            pr_body=data.get('pr_body') or _fetch_pr_body(pr_url),
+        )
+    else:
+        revision_prompt_lines = [
+            f'Revision phase. Mirror has reviewed your build on task `{task_id}` '
+            f'and requested changes (revision {next_count} of {max_revisions}).',
+            '',
+            f'Task: `{task_id}`',
+        ]
+        if branch:
+            revision_prompt_lines.append(f'Branch: `{branch}`')
+        if pr_url:
+            revision_prompt_lines.append(f'PR: {pr_url}')
+        revision_prompt_lines.extend([
+            '',
+            findings_block,
+            '',
+            'Follow the Revision phase protocol in your CLAUDE.md: apply each '
+            'finding as a targeted edit (no scope creep), commit with a '
+            'conventional-commit revision message, push to the same branch '
+            '(PR auto-updates), and emit a one-line result starting with '
+            f'`Revision {next_count} applied: <summary>` (strict per 5b — '
+            'missing prefix dead-letters back to you).',
+        ])
+        revision_prompt = '\n'.join(revision_prompt_lines)
 
     revision_base: dict[str, Any] = {
         'task_id': task_id,
         'prompt': revision_prompt,
         'source': 'beacon',          # logical dispatcher (Beacon's spec authorized this)
         'phase': 'revision',
-        'session_id': forge_session,  # --resume Forge's build session
         'max_revisions': max_revisions,
         'dispatched_by': 'outbox-notifier',
         # D3.5 5b M-8 (second-pass review fix): thread Mirror's findings
@@ -4740,6 +4724,11 @@ def _dispatch_revision_to_forge(
         # reads + injects into Mirror's re-review prompt.
         'previous_findings': findings if isinstance(findings, list) else [],
     }
+    if not cold_start:
+        # --resume Forge's build session. Omitted on a cold start so
+        # agent_runner runs Forge fresh (it only threads --resume when
+        # session_id is truthy).
+        revision_base['session_id'] = forge_session
     if branch:
         revision_base['branch'] = branch
     # Propagate the same envelope fields _dispatch_build_phase does so a
@@ -4811,19 +4800,36 @@ def _dispatch_revision_to_forge(
             source_agent='beacon',
             filename=revision_filename,
         )
+        resume_note = (
+            'fresh (cold start — no Forge session)'
+            if cold_start else f'resume={forge_session[:12]}...'
+        )
         log(
             f'revision-{next_count} dispatched forge <- beacon '
-            f'(task={task_id}, file={dest.name}, '
-            f'resume={forge_session[:12]}...)'
+            f'(task={task_id}, file={dest.name}, {resume_note})'
         )
+        if cold_start:
+            # Open the durable obligation so the backstop can verify this
+            # session-less revision actually closes (Mirror PASS / merge),
+            # instead of trusting that the dispatch fired (S1/M3).
+            no_session_ledger.open_obligation(
+                task_id,
+                pr_url=pr_url or '(no pr_url)',
+                branch=branch,
+                target_repo=target_repo,
+                head_sha=data.get('head_sha'),
+                round_num=next_count,
+            )
     except (
         safe_write_inbox.DispatchRejected,
         safe_write_inbox.RoutingDenied,
     ) as e:
         log(
             f'revision dispatch FAILED for task {task_id} round {next_count}: '
-            f'{type(e).__name__}: {e}. Beacon already notified of REVISION; '
-            f'Larry must manually re-dispatch.',
+            f'{type(e).__name__}: {e}. '
+            + ('Cold-start (no session). ' if cold_start
+               else 'Beacon already notified of REVISION. ')
+            + 'Larry must manually re-dispatch.',
             'WARN',
         )
 
@@ -10289,6 +10295,28 @@ def process_outbox(outbox_file: Path) -> str:
             and not marker_decision.get('budget_exhausted')
         ):
             _dispatch_revision_to_forge(data, marker_decision)
+
+        # forge-cold-start-revision (S2/S3): a terminal Mirror verdict closes
+        # any open no-session obligation for this task — PASS, ESCALATE,
+        # EMERGENCY_HALT, or a REVISION that downgraded to escalate
+        # (auto-promoted / budget-exhausted). Only an ACTIVE revision re-dispatch
+        # (the branch above) keeps it open. resolve_obligation no-ops when no
+        # obligation exists, so this is safe for every PR (forge PRs included).
+        if agent == 'mirror' and str(
+            marker_decision['marker_type']
+        ).startswith('review_'):
+            _active_revision = (
+                marker_decision['marker_type'] == 'review_revision'
+                and not marker_decision.get('auto_promoted')
+                and not marker_decision.get('budget_exhausted')
+            )
+            if not _active_revision:
+                no_session_ledger.resolve_obligation(
+                    data.get('task_id') or 'unknown',
+                    resolution=str(
+                        marker_decision['marker_type']
+                    ).replace('review_', ''),
+                )
 
         # false-success-notify-fix (2026-06-11): the Mirror REVIEW_PASS
         # auto-merge now runs EARLIER — before the back-leg notify — via
