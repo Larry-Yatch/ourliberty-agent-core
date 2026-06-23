@@ -168,9 +168,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-23 01:41Z UTC (Iter ~2484, Tier 3, consecutive_clean=1, NOMINAL ✅)
+## Status snapshot — updated 2026-06-23 02:17Z UTC (Iter ~2485, Tier 3, consecutive_clean=2, NOMINAL ✅)
 
-**Iter ~2484 summary:** ✅ Nominal. 0 new alerts (watermark=932=file_length). 5/5 daemons alive same PIDs: beacon=1163107, dashboard_api=1162819, outbox_notifier=1163186, chain_event=930563, inbox_watcher=1026206. agent-core: 0 open PRs. dashboard: 0 open PRs. Tier 3, consecutive_clean=0→1. **Standing [yellow]: unreviewed-merge:637, unreviewed-merge:607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals.** PRIME: systemic_fixes=56, ratio=19.0, trend=improving. **G-rule heal-stale-daemon-code-script-service-mismatch: 2/3. G-rule mirror-marker-parse-error: 2/3. G-rule revision-phase-preamble-missing: 2/3. G-rule mirror-no-session-revision-loop: 2/3. G-rule telegram-409-burst: 2/3. G-rule Forge-preflight-CLARIFY_REQUEST: 2/3.** Tier 3, consecutive_clean=1, next cadence: 30-min.
+**Iter ~2485 summary:** ✅ Nominal. 1 new alert (line 933, credential-drift, Tier-3 silenced by helper, watermark→933). PR #645 Larry-authored open (`fix/proposed-retirement-forge-matcher`, created 01:44Z), no Mirror review triggered — [blue] watch. 5/5 daemons alive same PIDs: beacon=1163107, dashboard_api=1162819, outbox_notifier=1163186, chain_event=930563, inbox_watcher=1026206. agent-core: 1 open PR (#645, Larry-authored). dashboard: 0 open PRs. Tier 3, consecutive_clean=1→2. **Standing [yellow]: unreviewed-merge:637, unreviewed-merge:607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals.** PRIME: systemic_fixes=56, ratio=19.0, trend=improving. **G-rule heal-stale-daemon-code-script-service-mismatch: 2/3. G-rule mirror-marker-parse-error: 2/3. G-rule revision-phase-preamble-missing: 2/3. G-rule mirror-no-session-revision-loop: 2/3. G-rule telegram-409-burst: 2/3. G-rule Forge-preflight-CLARIFY_REQUEST: 2/3.** Tier 3, consecutive_clean=2, next cadence: 30-min.
 
 
 
