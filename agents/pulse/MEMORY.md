@@ -174,9 +174,15 @@
 
 ---
 
-## doorbell-tier4-pattern (new G-rule, iter ~2492)
+## doorbell-tier4-pattern → DISPATCHED ✅ (iter ~2518)
 
-**Rule:** `source=doorbell, intent=doorbell` alerts classify Tier-4 (novel, no translation match) but the doorbell service ALREADY DMs Larry on emit via the bot (delivery confirmation in bot log as `notification idx=N delivered (intent=doorbell)`). Pulse Tier-4 classification produces no additional value — a duplicate DM would be redundant. At G-rule 3/3: dispatch to Beacon for a Tier-3 silence translation (`source=doorbell, intent=doorbell` → route=digest). G-rule count: **2/3**.
+**Rule:** `source=doorbell, intent=doorbell` alerts classify Tier-4 (novel, no translation match) but the doorbell service ALREADY DMs Larry on emit via the bot. Pulse Tier-4 classification is a redundant duplicate. G-rule count: **3/3 DISPATCHED** — `doorbell-tier3-silence-001.json` written to Beacon inbox at iter ~2518 (2026-06-23T13:17Z). Awaiting Beacon processing → Forge PR to add Tier-3 silence entry in config/alert-translations.json.
+
+---
+
+## heal-stale-daemon-code-script-service-mismatch → DISPATCHED (iter ~2518)
+
+**Rule:** `scripts/heal_stale_daemon_code.py` reports the wrong `Script path` in its larry-alerts messages when multiple services restart after a deploy. Observed 2026-06-23T13:02Z after PR #646 sync: alerts for ourliberty-beacon-bot.service and ourliberty-outbox-notifier.service both showed `Script path: dashboard_api.py` — wrong for both. Root cause: script compares newest-mtime script globally against each service's active-since, rather than matching each service to its own script. G-rule: **3/3 DISPATCHED** — `heal-stale-daemon-code-script-service-mismatch-001.json` in Beacon inbox (iter ~2518). Awaiting Beacon → Forge fix. PRIME: verification_pending logged.
 
 ---
 
@@ -186,9 +192,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-23 12:38Z UTC (Iter ~2517, Tier 3, consecutive_clean=3→4, NOMINAL ✅)
+## Status snapshot — updated 2026-06-23 13:17Z UTC (Iter ~2518, Tier 3→1 reset, 2 G-rule dispatches)
 
-**Iter ~2517 summary:** ✅ Nominal. 2 Tier-3 alerts silenced (pipeline-stall:unrouted-pr:PR#646, medic-diagnosis: L964, L965). 5/5 daemons alive same PIDs (chain_event=930563, inbox_watcher=1026206, beacon=1244182, dashboard_api=1244279, outbox_notifier=1244425). Tier 3, consecutive_clean=3→4, next cadence: 30-min. fix-645 worktree stall persists. fix-watchdog-stale-log-inflight-aware-001 pending Larry approval. **PR #646 MERGEABLE (recovered from UNKNOWN in iter ~2516), 0 reviews. PR #86 MERGEABLE, 0 reviews. Both need Mirror manual routing.** **Standing [yellow]: unreviewed-merge:637, unreviewed-merge:607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals.** PRIME: interventions≈1070, systemic_fixes=56, ratio≈19.11, trend=improving. **G-rule watchdog-watcher-log-stale: 3/3 DISPATCHED (pending Larry approval). G-rule doorbell-tier4-pattern: 2/3. G-rule heal-stale-daemon-code-script-service-mismatch: 2/3. G-rule mirror-marker-parse-error: 2/3. G-rule revision-phase-preamble-missing: 2/3. G-rule telegram-409-burst: 2/3. G-rule Forge-preflight-CLARIFY_REQUEST: 2/3. G-rule forge-preflight-task-id-mismatch: 2/3. G-rule seq-advancer-sequence-stranded: 2/3. G-rule F24-empty-prompt-envelope-rejected: 2/3.**
+**Iter ~2518 summary:** ⚠️ Signal. L966 doorbell Tier-4 → tier-reset to Tier 1. PRs #646 (autonomy dial backend) and #86 (autonomy dial frontend) both MERGED this window. Heal-stale-daemon-code auto-restarted 3 daemons (dashboard_api=1309235, beacon_telegram_bot=1309976, outbox_notifier=1310052) at 13:02Z post-PR-#646 deploy. 5/5 daemons alive. fix-645 worktree stall persists. fix-watchdog-stale-log-inflight-aware-001 pending Larry approval. **Standing [yellow]: unreviewed-merge:637, unreviewed-merge:607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals.** PRIME: interventions≈1071, systemic_fixes=56, ratio≈19.1, trend=improving. **G-rule watchdog-watcher-log-stale: 3/3 DISPATCHED (pending Larry approval). G-rule doorbell-tier4-pattern: 3/3 DISPATCHED (doorbell-tier3-silence-001 in Beacon inbox). G-rule heal-stale-daemon-code-script-service-mismatch: 3/3 DISPATCHED (heal-stale-daemon-code-script-service-mismatch-001 in Beacon inbox). G-rule mirror-marker-parse-error: 2/3. G-rule revision-phase-preamble-missing: 2/3. G-rule telegram-409-burst: 2/3. G-rule Forge-preflight-CLARIFY_REQUEST: 2/3. G-rule forge-preflight-task-id-mismatch: 2/3. G-rule seq-advancer-sequence-stranded: 2/3. G-rule F24-empty-prompt-envelope-rejected: 2/3.**
 
 
 
