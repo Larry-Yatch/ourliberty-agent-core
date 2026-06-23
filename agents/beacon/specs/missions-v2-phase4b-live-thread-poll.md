@@ -121,7 +121,49 @@ Step 2 is the substance; step 1 is a thin agent-core guard so the dashboard can 
 - **Contract C (agent-core):** the two guard tests above are green.
 - **End-to-end (the real gate):** Larry opens a real parked card, asks Beacon a question, and **watches the answer appear without touching refresh**; later he sees an unread badge on a card he wasn't looking at. That lived experience is the done-gate — not green unit tests.
 
-## 10. Out of scope (later / separate)
+## 10. Beacon kickoff & sequencing (single source of truth)
+
+**Sequencing decision (Larry, 2026-06-23):** ship **Contract D first as a standalone fast PR**, then **A+B as the follow-on**. D is a tiny, low-risk UX fix (clear the box on confirmed send) that delivers value immediately; A/B (polling + unread) is the larger change and depends on nothing in D, so D need not block on it.
+
+**Repo split (orchestrator V1 is single-repo, build-sequence spec § 4):**
+- **Dashboard sequence `phase4b-live-thread-001`** (`ourliberty-dashboard`): step `clear-input` (Contract D) → step `live-thread` (Contracts A+B, `depends_on: clear-input`). Sequential, not parallel — both touch the same thread surface (`ClarifyReplyBox`/`ClarifyRoundDrawer`), so serialize to avoid file-overlap conflicts.
+- **Agent-core guard (Contract C)** (`ourliberty-agent-core`): a single independent APPROVAL_REQUEST (test-only, no endpoint change). Has no dependency on the dashboard steps and can run in parallel / first; skip if coverage already exists.
+
+**Draft sequence file** — `~/agents/blackboard/build-sequences/phase4b-live-thread-001.json` (Beacon synthesizes/validates per build-sequence spec § 5.1; `dispatch_text` ≤500 chars, points at this spec, no inline design):
+
+```jsonc
+{
+  "seq_id": "phase4b-live-thread-001",
+  "label": "Missions Phase 4b — clear-input (D) then live thread (A+B)",
+  "spec_doc": "agents/beacon/specs/missions-v2-phase4b-live-thread-poll.md",
+  "target_repo": "ourliberty-dashboard",
+  "status": "pending",
+  "current_steps": ["clear-input"],
+  "steps": [
+    {
+      "step_id": "clear-input",
+      "label": "Contract D — clear reply box on confirmed send",
+      "depends_on": [],
+      "dispatch_text": "Implement Phase 4b Contract D in the missions card reply box (ClarifyReplyBox): clear the controlled input ONLY after POST /api/missions/captures/{id}/message succeeds; restore text + error toast on failure; disable-in-flight to block double-send; ignore whitespace-only; Enter follows same path. Spec § 6 (Contract D); acceptance therein. Mirror focus: no clear-before-success path, no lost text on failed send, no double-post."
+    },
+    {
+      "step_id": "live-thread",
+      "label": "Contracts A+B — poll open thread + unread/refresh",
+      "depends_on": ["clear-input"],
+      "dispatch_text": "Implement Phase 4b Contracts A+B on the missions card thread: SWR refreshInterval ~5s on GET .../thread while drawer open AND tab visible (pause when hidden/closed); dedupe by message id; reconcile optimistic send; no scroll-jump. Plus unread badge for unseen team_to_larry replies, 'N new down' pill, manual refresh, reflect blocked-on-you doorbell. Spec §§ 4-5. Mirror focus: poll-pause discipline, optimistic reconcile, no duplicate render."
+    }
+  ]
+}
+```
+
+**Agent-core guard one-off** — single APPROVAL_REQUEST, `target_repo: ourliberty-agent-core`, dispatch_text: *"Add Phase 4b Contract C guard tests: assert GET /api/missions/captures/{id}/thread returns messages oldest-first with stable id/direction/ts/needs_reply + fresh last_synced_at; assert POST .../message clears the blocked-on-you doorbell. Spec § 7. No endpoint change. Mirror focus: tests pin the contract the dashboard relies on."*
+
+**What Larry pastes to Beacon** is the short intent below; Beacon synthesizes the file above, runs the Mirror DAG preflight (build-sequence spec discipline 3), and emits the kickoff — Larry's role is approving the plan, not authoring the file (build-sequence spec decision J).
+
+> **Kickoff intent (paste to Beacon):**
+> Beacon — build Missions Phase 4b from `agents/beacon/specs/missions-v2-phase4b-live-thread-poll.md`. Ship it in two PRs against `ourliberty-dashboard`, sequential: **first** Contract D (clear the thread reply box on confirmed send — the standalone quick win), **then** Contracts A+B (poll the open thread + unread badge/refresh), with A+B depending on D. Synthesize sequence `phase4b-live-thread-001` per § 10, run the Mirror DAG preflight, and bring me the kickoff to approve. Separately, dispatch the Contract C guard tests as a one-off against `ourliberty-agent-core` (skip if coverage already exists). Don't add SSE/Realtime — that's the deferred Phase 4c.
+
+## 11. Out of scope (later / separate)
 
 - **True push** (SSE stream from `dashboard_api.py`, or a Supabase Realtime subscription on `chain_events`) — the original low-latency "Beacon front desk" → **Phase 4c**, pursued only if 5s polling latency proves annoying in practice.
 - **Dashboard-wide** conversation card (Approvals / Operations / Alerts) → its own design pass (Phase 4 §12).
