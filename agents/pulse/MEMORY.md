@@ -204,9 +204,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-23 15:43Z UTC (Iter ~2531, Tier 2 consecutive_clean=1, NOMINAL — 2 G-rules COMPLETE)
+## Status snapshot — updated 2026-06-23 16:00Z UTC (Iter ~2532, Tier 2 consecutive_clean=2, NOMINAL — batch daemon restarts after PR #650)
 
-**Iter ~2531 summary:** ✅ Nominal. 1 new alert (L982, Tier-3 silence). All checks clean. Tier 2, consecutive_clean 0→1. 5/5 daemons alive same PIDs. HEAD=6b104faa=origin/main. 0 pending approvals. 0 open PRs. PRIME: systemic_fixes=60, interventions=1075, ratio=17.9, trend=improving. **G-rule mirror-marker-parse-error: COMPLETE ✅** (PR #650 `feat(agent-runner): symmetric review-phase marker reminder for Mirror` auto-merged 15:35Z). **G-rule watchdog-watcher-log-stale: COMPLETE ✅** (5 clean Check 1 scans post PR #649 merge 14:54Z). Standing [yellow]: unreviewed-merge:649+637+607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. G-rules at 2/3: revision-phase-preamble-missing, telegram-409-burst, Forge-preflight-CLARIFY_REQUEST, forge-preflight-task-id-mismatch, seq-advancer-sequence-stranded, F24-empty-prompt-envelope-rejected. api-500-burst: 1/3.
+**Iter ~2532 summary:** ✅ Nominal. 6 new alerts (L983-L988), all Tier-3 silence: 5x heal-stale-daemon-code batch restarts (beacon/forge/inbox-watcher/mirror/pulse bots restarted after PR #650 changed agent_runner.py — expected), 1x outbox-notifier review-pass (bootstrap-import-gate-enforce-001 auto-approved + dispatched to Forge). 8 daemons alive (new PIDs for 5 bots: beacon=1388269, forge=1388801, inbox=1389730, mirror=1388982, pulse=1389067). HEAD=b0be216d=origin/main. 0 pending approvals. 0 open PRs. Forge building bootstrap-import-gate-enforce-001 (in-flight). PRIME: systemic_fixes=60, interventions=1075, ratio=17.9, trend=improving. Standing [yellow]: unreviewed-merge:649+637+607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. G-rules at 2/3: revision-phase-preamble-missing, telegram-409-burst, Forge-preflight-CLARIFY_REQUEST, forge-preflight-task-id-mismatch, seq-advancer-sequence-stranded, F24-empty-prompt-envelope-rejected. api-500-burst: 1/3.
 
 
 
