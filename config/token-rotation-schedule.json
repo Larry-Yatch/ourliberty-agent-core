@@ -352,7 +352,7 @@
       "created_at": "2026-06-09",
       "last_rotated_at": "2026-06-09",
       "next_rotation_due": "2027-06-09",
-      "calendar_event_url": null,
+      "calendar_event_url": "https://www.google.com/calendar/event?eid=dTJxcDJlMnBxbXBwaGM4OWs2cWpycWQwdjggYWdlbnQuYmVhY29uLm91cmxpYmVydHlAbQ",
       "runbook_path": "docs/runbooks/rotate-desktop-ingest-token.md",
       "severity_if_lapsed": "medium",
       "owner_role": "larry",
