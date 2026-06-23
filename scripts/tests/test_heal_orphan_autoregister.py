@@ -520,6 +520,107 @@ class TerminalGateTest(unittest.TestCase):
         self.assertIsNotNone(index)
         self.assertTrue(any(pr['number'] == 7 for pr, _ in index))
 
+    def test_index_gate_matches_forge_iteration_branch(self):
+        # The real backlog case: a merged Forge re-attempt branch carries an extra
+        # `-002` the proposal's task_id lacks. The gate (via the fixed matcher) now
+        # retires it instead of keeping it forever.
+        gate = h._terminal_gate_from_index(
+            [self._idx(53, 'forge/p3-dashboard-proposed-lane-002', 'MERGED')])
+        self.assertEqual(
+            gate(['p3-dashboard-proposed-lane']), (True, 'pr_merged:#53'))
+
+
+# ------------------------------- flag stuck proposals (the un-retirable residue)
+
+
+class FlagStuckProposalsTest(unittest.TestCase):
+    def setUp(self):
+        self.now = datetime(2026, 6, 22, 12, 0, tzinfo=timezone.utc)
+
+    @staticmethod
+    def _keep_gate(_tids):
+        return (False, None)            # nothing matches -> nothing auto-retires
+
+    @staticmethod
+    def _match_gate(_tids):
+        return (True, 'pr_merged:#1')   # the gate matches -> retire, not flag
+
+    def _proposed(self, entry_id, created, **extra):
+        e = {'id': entry_id, 'phase': 'proposed', 'task_ids': [entry_id],
+             'proposed_by': 'heal_orphan_autoregister', 'created': created}
+        e.update(extra)
+        return e
+
+    def test_flags_old_unmatched(self):
+        reg = {'schema_version': 1, 'missions': [
+            self._proposed('proposed-stuck', '2026-06-01'),   # 21d old
+        ]}
+        flagged = h.flag_stuck_proposals(reg, self.now, terminal_gate=self._keep_gate)
+        self.assertEqual(flagged, ['proposed-stuck'])
+        e = reg['missions'][0]
+        self.assertIs(e['needs_decision'], True)
+        self.assertIn('keep or drop', e['needs_decision_reason'])
+        self.assertEqual(e['needs_decision_since'], self.now.isoformat())
+        self.assertEqual(e['phase'], 'proposed')   # surfaced, NOT retired
+
+    def test_skips_young(self):
+        reg = {'schema_version': 1, 'missions': [
+            self._proposed('proposed-fresh', '2026-06-20'),   # 2d old
+        ]}
+        self.assertEqual(
+            h.flag_stuck_proposals(reg, self.now, terminal_gate=self._keep_gate), [])
+        self.assertNotIn('needs_decision', reg['missions'][0])
+
+    def test_skips_gate_matched(self):
+        # An old card the gate matches is about to be retired -> not "stuck".
+        reg = {'schema_version': 1, 'missions': [
+            self._proposed('proposed-shipped', '2026-06-01'),
+        ]}
+        self.assertEqual(
+            h.flag_stuck_proposals(reg, self.now, terminal_gate=self._match_gate), [])
+        self.assertNotIn('needs_decision', reg['missions'][0])
+
+    def test_covers_all_owners_including_closeout(self):
+        # No proposed_by guard: a closeout-authored deferred note (which retire's
+        # ownership guard skips) still gets surfaced for a decision.
+        reg = {'schema_version': 1, 'missions': [
+            self._proposed('closeout-note', '2026-06-01', proposed_by='closeout'),
+        ]}
+        self.assertEqual(
+            h.flag_stuck_proposals(reg, self.now, terminal_gate=self._keep_gate),
+            ['closeout-note'])
+
+    def test_idempotent_already_flagged(self):
+        reg = {'schema_version': 1, 'missions': [
+            self._proposed('proposed-stuck', '2026-06-01', needs_decision=True),
+        ]}
+        self.assertEqual(
+            h.flag_stuck_proposals(reg, self.now, terminal_gate=self._keep_gate), [])
+
+    def test_skips_acknowledged(self):
+        reg = {'schema_version': 1, 'missions': [
+            self._proposed('proposed-dismissed', '2026-06-01', acknowledged=True),
+        ]}
+        self.assertEqual(
+            h.flag_stuck_proposals(reg, self.now, terminal_gate=self._keep_gate), [])
+
+    def test_undateable_created_skipped(self):
+        reg = {'schema_version': 1, 'missions': [
+            self._proposed('proposed-nodate', 'not-a-date'),
+        ]}
+        self.assertEqual(
+            h.flag_stuck_proposals(reg, self.now, terminal_gate=self._keep_gate), [])
+
+    def test_gate_error_is_failsafe_skip(self):
+        def _boom(_tids):
+            raise RuntimeError('gate exploded')
+        reg = {'schema_version': 1, 'missions': [
+            self._proposed('proposed-stuck', '2026-06-01'),
+        ]}
+        self.assertEqual(
+            h.flag_stuck_proposals(reg, self.now, terminal_gate=_boom), [])
+        self.assertNotIn('needs_decision', reg['missions'][0])
+
 
 # --------------------------------------- commit + push (real temp git repo)
 
