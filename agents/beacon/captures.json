@@ -291,7 +291,7 @@
       "id": "cap-erofs-tier2-home-systemd-unit-fix-pr-5-b0ef",
       "title": "EROFS tier2 home: systemd unit fix (PR-5)",
       "note": "ROOT CAUSE of all 6/10 session-loss failures: inbox-watcher + 4 bot systemd units have ProtectHome=read-only and ReadWritePaths lists /home/larry/.claude (tier1) but NOT /home/larry/.claude-larry-personal (TIER2_HOME) \u2014 tier2 dispatch transcripts hit EROFS, silently never persist, every build-phase --resume fails 'No conversation found'. Exposed when rotate_active_tier went live flipping tiers hourly. PLAN: (1) pin tier1 via 'tier1' > ~/agents/rotation.disabled; (2) re-kick PR-1 fix-classifier-session-lost-001, PR-2 fix-test-gate-sandbox-env-injection-001, PR-4 fix-dashboard-routing-denied-001 fresh; (3) PR-5 add tier2 home to ReadWritePaths in ALL repo systemd/ agent units + make transcript-write failure loud; deploy needs daemon-reload + unit restarts (Larry approval); (4) verify tier2 transcript persists, then unpin to re-enable rotation; (5) also fix rotation forced_open_sequence flip (docstring says NEVER force, log shows forced flips). Memory: tier-alert-cycle-final-rootcause.md",
-      "state": "parked",
+      "state": "dropped",
       "origin": {
         "source": "desktop-chat",
         "session_id": null,
@@ -302,17 +302,17 @@
       "last_touched": "2026-06-10T22:12:33.270614+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "A behind-the-scenes plumbing problem is the reason work sessions have been silently failing and losing progress about half the time.",
-        "why": "It quietly breaks tasks and erases work without warning, so the team can't trust the system to finish what it starts until it's fixed.",
-        "suggest": "Approve the fix, but pause the automatic switching first and confirm the repair holds before turning everything back on."
+        "what": "A fix for the storage glitch that's been silently wiping out work sessions whenever the system switches between its two workspaces.",
+        "why": "It's the single root cause behind the recent run of failures where work vanished mid-task and couldn't be resumed, so fixing it stops the most disruptive reliability problem we've had.",
+        "suggest": "Worth doing, but let's lock things to the stable workspace first and get your sign-off before the final switch-over, since this touches core system settings and needs a careful, verified rollout."
       },
       "risk": "careful",
-      "recommended_action": "delegate",
+      "recommended_action": "drop",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-06-14T17:52:43.946307+00:00",
-        "from_state": "parked"
+        "at": "2026-06-23T15:40:32.863111+00:00",
+        "from_state": "dropped"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
       "aging": true
@@ -418,7 +418,7 @@
       "id": "cap-restart-shipper-notifier-on-droplet-to-activate-5b70",
       "title": "Restart shipper+notifier on droplet to activate PR #453",
       "note": "PR #453 (chain shipper outbox-log source revival + agent=forge producer lines) is MERGED but NOT live: both ourliberty-chain-event-shipper and ourliberty-outbox-notifier serve stale code until restarted. After droplet auto-pulls c13794b: sudo systemctl restart ourliberty-chain-event-shipper ourliberty-outbox-notifier \u2014 then verify auto_merge events ship on the next merge (grep outbox_log ~/agents/logs/chain-event-shipper.log).",
-      "state": "parked",
+      "state": "dropped",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -430,17 +430,17 @@
       "last_touched": "2026-06-11T07:17:28.294112+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "A finished upgrade to our event-tracking system is approved but hasn't been switched on yet, so it's still running the old version.",
-        "why": "Until we flip the switch, important activity is going unrecorded, which leaves a gap in the visibility we rely on.",
-        "suggest": "Turn it on during a quiet window and confirm the events start flowing before walking away \u2014 quick, but worth watching once to make sure it took."
+        "what": "A finished upgrade to our event-tracking system is built and approved, but it won't actually do anything until we flip it on.",
+        "why": "Until we turn it on, the system keeps running the old version, so the improvements we already paid for are sitting idle and delivering no value.",
+        "suggest": "Let's switch it on soon, but have someone confirm it's working correctly right after, since the activation step needs to be done carefully."
       },
       "risk": "careful",
-      "recommended_action": "delegate",
+      "recommended_action": "drop",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-06-14T17:52:43.946307+00:00",
-        "from_state": "parked"
+        "at": "2026-06-23T15:40:32.863111+00:00",
+        "from_state": "dropped"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
       "aging": true
@@ -480,7 +480,7 @@
       "id": "cap-make-team-two-way-chat-a-dashboard-wide-layer-no-adaf",
       "title": "Make team two-way chat a dashboard-wide layer (not just Missions)",
       "note": "Larry's insight during the missions-board comprehension redo: the per-card pattern (plain-English briefing + 3-level risk signal + one-click hand-to-team + live chat thread) likely belongs across the WHOLE dashboard \u2014 Approvals, Operations, alerts \u2014 making the dashboard the primary human<->team interaction surface instead of Telegram. Telegram demoted to a doorbell that pings + deep-links into the card. Revisit as its own design pass after the Parked-lane proof.",
-      "state": "parked",
+      "state": "dropped",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -492,17 +492,17 @@
       "last_touched": "2026-06-14T04:06:50.430525+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "A proposal to let your team talk back and forth with you right inside the dashboard everywhere \u2014 not just on the missions screen \u2014 so the dashboard becomes the main place you and the team work together, with text messaging reduced to a simple doorbell that pings you and links you to the right spot.",
-        "why": "It would give you one consistent, plain-English place to review, decide, and chat across everything your team does, instead of juggling separate tools and losing context.",
-        "suggest": "Worth pursuing, but hold it until the current smaller test proves out, then give it a proper design pass before committing."
+        "what": "Turn the dashboard into the single place your team talks with you \u2014 every item gets a plain-English summary, a clear go/caution signal, a hand-off button, and a live chat \u2014 with Telegram reduced to a doorbell that just pings you and links back.",
+        "why": "It makes the dashboard the one place you run the business from, instead of scattering decisions across chat apps where things get lost.",
+        "suggest": "Worth pursuing, but give it a focused design pass on its own after the current Missions trial proves out \u2014 don't fold it in yet."
       },
       "risk": "medium",
-      "recommended_action": "delegate",
+      "recommended_action": "drop",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-06-14T17:52:43.946307+00:00",
-        "from_state": "parked"
+        "at": "2026-06-23T15:40:32.863111+00:00",
+        "from_state": "dropped"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "aging": true
@@ -511,7 +511,7 @@
       "id": "cap-schedule-the-missions-narrator-no-timer-new-park-9943",
       "title": "Schedule the Missions Narrator (no timer; new parked cards do not auto-brief)",
       "note": "Phase 4 shipped missions_narrator.py but nothing schedules it; the first pass was run manually 2026-06-14. New or re-stated captures stay at the placeholder until a timer is added or it is wired into the GC healer timer. Small follow-up build.",
-      "state": "parked",
+      "state": "dropped",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -523,17 +523,17 @@
       "last_touched": "2026-06-14T18:01:31.728606+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "We built a tool that writes plain-English summaries of your parked ideas, but right now it only runs when someone kicks it off by hand.",
-        "why": "Until it runs on its own, every new idea you park sits blank with no summary, so you can't review them at a glance the way this was meant to work.",
-        "suggest": "Worth finishing with a small follow-up so summaries appear automatically, but let's confirm it runs cleanly on its own before relying on it."
+        "what": "We built a tool that writes plain-English summaries of parked ideas, but it only runs when someone kicks it off by hand.",
+        "why": "Until it runs on its own, every new idea you park sits as a blank placeholder instead of a ready-to-read briefing, so things quietly pile up unseen.",
+        "suggest": "Approve the small follow-up to make it run automatically \u2014 it's a modest, sensible fix, so let's do it carefully and confirm it's working before moving on."
       },
       "risk": "medium",
-      "recommended_action": "delegate",
+      "recommended_action": "drop",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-06-15T20:16:15.974732+00:00",
-        "from_state": "parked"
+        "at": "2026-06-23T15:40:32.863111+00:00",
+        "from_state": "dropped"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "aging": true
@@ -542,7 +542,7 @@
       "id": "cap-test-jail-pr-4-ready-for-go-after-pr-3-lands-447f",
       "title": "test-jail PR-4 ready for go (after PR-3 lands)",
       "note": "PR-3 (gate hardening) dispatched+building as test-jail-pr3-gate-hardening-001. PR-4 REMAINING awaits your go: (a) docs sweep \u2014 bare 'unittest discover' prescriptions to the blessed entrypoint, esp docs/test-suite-green-brief.md's source-.env.larry recipe; (b) H18 leak-residue reconciliation runbook; (c) end-to-end deliberate-leak validation (a leaking test must fail under ALL invocation shapes on droplet+Mac = the acceptance property). NEW ops: one-time 'sudo apt install bubblewrap' on the droplet to ARM the Layer-C hard wall (droplet has no bwrap + userns disabled, so the wall ships best-effort/auto-arming until then). Mac phantom purge already DONE. Recommend: let PR-3 land+soak, then ship PR-4 as one closing PR + install bubblewrap.",
-      "state": "parked",
+      "state": "dropped",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -554,17 +554,17 @@
       "last_touched": "2026-06-11T20:00:50.396933+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "A final round of cleanup that makes our automated quality checks airtight, so a bad change can never slip through no matter how it's run.",
-        "why": "It closes the last gaps that could let a faulty change reach customers undetected, protecting product reliability and our reputation.",
-        "suggest": "Let the current safety upgrade settle and prove itself first, then give the go to finish this closing piece as a single clean step."
+        "what": "A final round of cleanup that makes our automated testing reliably catch problems the same way every time, no matter how a test is run.",
+        "why": "Without it, a broken test could slip through unnoticed, letting bugs reach customers and eroding confidence in our quality checks.",
+        "suggest": "Let the current safety upgrade settle in and prove stable first, then green-light this finishing work as a single clean batch."
       },
       "risk": "careful",
-      "recommended_action": "delegate",
+      "recommended_action": "drop",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-06-14T17:52:43.946307+00:00",
-        "from_state": "parked"
+        "at": "2026-06-23T15:40:32.863111+00:00",
+        "from_state": "dropped"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
       "aging": true
