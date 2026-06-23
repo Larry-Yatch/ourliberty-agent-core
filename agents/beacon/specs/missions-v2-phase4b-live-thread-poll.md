@@ -27,6 +27,7 @@ Phase 4b delivers the **perceived-live** experience with the smallest, lowest-ri
 |---|---|
 | **A — poll the open thread** (SWR `refreshInterval` while the drawer is open and the tab is visible) | True low-latency **push** responder (SSE / Supabase Realtime) — the original "near-live Beacon front desk" (Phase 4 §12) → Phase 4c, only if polling latency proves annoying |
 | **B — unread + manual refresh affordance** (badge on the card when a `team_to_larry` reply arrives unseen; "N new ↓" pill; manual refresh button; drive loud/quiet from the existing doorbell) | Dashboard-wide rollout of the conversation card to Approvals / Operations / Alerts (Phase 4 §12) |
+| **D — clear the input on confirmed send** (empty the reply box after a successful POST; restore on failure) | Rich composer features (drafts, attachments, markdown preview) — out of arc |
 
 This is the lightweight realization of Phase 4b. It reuses the SWR polling pattern already proven on the kanban (`e4-4f` §5.7) and the doorbell signal already live from Phase 4 §9 — **assembly, not greenfield.**
 
@@ -76,7 +77,19 @@ So a reply isn't missed when the drawer is closed or scrolled away:
 
 Acceptance: a reply that arrives while the drawer is closed lights an unread badge on the card; opening the card clears it; the manual refresh button forces an immediate pull; a thread the team is blocked-on-you on reads visibly louder than an FYI one.
 
-## 6. Contract C — backend (agent-core): confirm-and-guard only
+## 6. Contract D — clear the input on confirmed send (dashboard)
+
+Today the reply box (`ClarifyReplyBox`) keeps the typed text after send, so Larry has to clear it by hand and risks re-sending. Fix the submit flow to be **clear-on-success**:
+
+- On submit, **disable** the input/send button and keep the in-flight text in component state.
+- **Clear the input only after the `POST /api/missions/captures/{id}/message` resolves successfully** — set the controlled value back to empty, re-enable, and (per Contract A) reconcile the optimistic line with the server echo so the sent message shows in the thread, not in the box.
+- **On failure, restore the text** to the input (or leave it untouched if you never optimistically cleared) and surface the existing error toast — Larry must never lose what he typed to a failed send.
+- Guard against **double-send**: the disabled-while-in-flight state plus clear-on-success prevents an Enter-mash from posting twice; ignore empty/whitespace-only submits.
+- Keyboard: Enter-to-send (Shift+Enter newline) should follow the same clear-on-success path as the button.
+
+Acceptance: typing a message and sending it leaves the input **empty** the moment the server confirms; the message appears once in the thread; a failed send leaves the text in the box with an error, no duplicate post.
+
+## 7. Contract C — backend (agent-core): confirm-and-guard only
 
 No new endpoint or schema. The work here is to **lock the contract Phase 4b depends on** so a future change can't silently regress it:
 
@@ -87,25 +100,28 @@ If both already exist, this step is a no-op beyond confirming coverage.
 
 ---
 
-## 7. Build plan — 2 steps (single-repo: dashboard, with an agent-core guard)
+## 8. Build plan — 2 steps (single-repo: dashboard, with an agent-core guard)
 
 | Step | Repo | Scope | depends_on |
 |---|---|---|---|
 | **1 — contract guard** | agent-core | Tests pinning the `/thread` read shape + the POST→doorbell-clear (Contract C) | — |
-| **2 — live-feel thread** | dashboard | Contract A (poll open thread) + Contract B (unread badge / pill / manual refresh / loud-vs-quiet reflect); reuse SWR `e4-4f` §5.7 pattern + `ClarifyRoundDrawer`/`ClarifyReplyBox`/`PanelErrorBoundary` | 1 |
+| **2 — live-feel thread** | dashboard | Contract A (poll open thread) + Contract B (unread badge / pill / manual refresh / loud-vs-quiet reflect) + Contract D (clear input on confirmed send); reuse SWR `e4-4f` §5.7 pattern + `ClarifyRoundDrawer`/`ClarifyReplyBox`/`PanelErrorBoundary` | 1 |
+
+> **Quick win:** Contract D is a standalone, low-risk change (clear the controlled input on POST success) and can ship first/independently of A and B if a faster fix is wanted before the full polling work lands.
 
 Step 2 is the substance; step 1 is a thin agent-core guard so the dashboard can rely on the contract. They can run in parallel after step 1's contract is confirmed.
 
 ---
 
-## 8. Test / proof plan
+## 9. Test / proof plan
 
 - **Contract A:** drawer-open poll picks up a seeded `team_to_larry` reply within one interval; optimistic `larry_to_team` message reconciles to its server copy with no duplicate; scrolled-up state does not auto-scroll.
 - **Contract B:** a reply arriving with the drawer closed sets the unread badge; opening + viewing clears it; manual refresh forces a revalidate; `needs_reply`/blocked renders louder than FYI.
+- **Contract D:** a successful send empties the input and shows the message once in the thread; a mocked failed send leaves the text in the box, shows an error, and posts nothing twice; whitespace-only submit is ignored; rapid double-Enter posts once.
 - **Contract C (agent-core):** the two guard tests above are green.
 - **End-to-end (the real gate):** Larry opens a real parked card, asks Beacon a question, and **watches the answer appear without touching refresh**; later he sees an unread badge on a card he wasn't looking at. That lived experience is the done-gate — not green unit tests.
 
-## 9. Out of scope (later / separate)
+## 10. Out of scope (later / separate)
 
 - **True push** (SSE stream from `dashboard_api.py`, or a Supabase Realtime subscription on `chain_events`) — the original low-latency "Beacon front desk" → **Phase 4c**, pursued only if 5s polling latency proves annoying in practice.
 - **Dashboard-wide** conversation card (Approvals / Operations / Alerts) → its own design pass (Phase 4 §12).
