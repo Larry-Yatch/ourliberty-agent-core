@@ -204,9 +204,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-23 16:42Z UTC (Iter ~2536, Tier 1→2 de-escalation)
+## Status snapshot — updated 2026-06-23 17:17Z UTC (Iter ~2538, Tier 2, consecutive_clean 1→2)
 
-**Iter ~2536 summary:** ✅ Nominal (0 fixes, 0 alerts). All mandatory + additive checks clean. 8/8 daemons alive (same PIDs). HEAD=5c09ead1=origin/main. 0 pending approvals. 0 open PRs. PRIME: systemic_fixes=60, interventions=1076, ratio=17.9, trend=improving. **Tier 1→2 de-escalated** (3 consecutive clean iters). consecutive_clean=0 at Tier 2. Standing [yellow]: unreviewed-merge:649+637+607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. G-rules at 2/3: revision-phase-preamble-missing, telegram-409-burst, Forge-preflight-CLARIFY_REQUEST, forge-preflight-task-id-mismatch, seq-advancer-sequence-stranded, F24-empty-prompt-envelope-rejected. api-500-burst: 1/3.
+**Iter ~2538 summary:** ✅ Nominal (0 fixes, 0 alerts). All mandatory + additive checks clean. 8/8 daemons alive (same PIDs). HEAD=36e6056b=origin/main. 0 pending approvals. 0 open PRs. PRIME: systemic_fixes=60, interventions=1076, ratio=17.9, trend=improving. Tier 2, consecutive_clean=2. One more clean iter → de-escalate to Tier 3. Standing [yellow]: unreviewed-merge:649+637+607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. G-rules at 2/3: revision-phase-preamble-missing, telegram-409-burst, Forge-preflight-CLARIFY_REQUEST, forge-preflight-task-id-mismatch, seq-advancer-sequence-stranded, F24-empty-prompt-envelope-rejected. api-500-burst: 1/3.
 
 
 
