@@ -644,7 +644,7 @@
       "title": "System self-awareness - Slice 2b (Waiting-on-Larry render)",
       "north_star_ref": null,
       "repo": "ourliberty-dashboard",
-      "state": "active",
+      "state": "archived",
       "phases": [
         {
           "id": "system-self-awareness-slice-2b-waiting-on-larry-render",
@@ -692,7 +692,7 @@
       ],
       "one_off": true,
       "created_at": "2026-06-22T03:09:56.780596+00:00",
-      "updated_at": "2026-06-22T03:09:56.780596+00:00",
+      "updated_at": "2026-06-23T15:20:03.800614+00:00",
       "promoted_from": {
         "kind": "mission",
         "mission_id": "system-self-awareness-slice-2b-waiting-on-larry-render"
