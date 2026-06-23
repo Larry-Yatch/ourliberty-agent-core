@@ -4,6 +4,91 @@
 
 ---
 
+## Iteration ~2546 — 2026-06-23T20:37Z UTC (interactive /cycle, Tier 1, consecutive_clean 1→2)
+
+**Trigger:** Larry `/cycle` invocation (chat mode).
+
+**Health:** ✅ Nominal — 0 new alerts, all mandatory + additive checks clean. 8/8 daemons alive (same PIDs). HEAD=4f54f253=origin/main (wrapper auto-committed iter ~2545 journal). 0 pending approvals. 1 open PR (#653, carry yellow).
+
+**VERIFY-BEFORE-REASSERT:**
+- **Daemons (re-verified):** chain_event=930563 (SNs) ✅, dashboard_api=1502707 (Ssl) ✅, outbox_notifier=1502977 (Ss) ✅, beacon_telegram_bot=1502905 (Ss) ✅, forge_bot=1388801 (Ss) ✅, mirror_bot=1388982 (Ss) ✅, pulse_bot=1389067 (Ss) ✅, inbox_watcher=1389730 (Ssl) ✅. 8/8 alive, same PIDs as iter ~2545. ✅
+- **HEAD (re-verified):** 4f54f253 = origin/main. Wrapper auto-committed `Pulse cycle 20260623T203552Z` after iter ~2545. Working tree clean. ✅
+- **PR #653 routing (re-verified):** Still open, reviewDecision="" — no Mirror routing yet. Pipeline stall healer in cooldown. Larry DM'd (idx=994). [carry yellow] ✅
+- **push-soft-gate-block-upgrade-decision (re-verified):** Not in new alerts this iter. Awaiting Larry's decision. [carry yellow] ✅
+- **credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED (re-verified):** Not in new alerts this iter. Underlying still standing. [carry yellow] ✅
+- **fix-645-alert-translation-001 stall (re-verified):** WARN `larry_alerts append failed for forge_built_no_pr:fix-645-alert-translation-001` persists in Check 3 dry-run. [carry blue] ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 1002, "file_length": 1002}` — **0 new alerts**. ✅ Nominal.
+
+**Check 1 — Log noise (30-min window):** journalctl --user -p warning: `-- No entries --` (0 WARN/ERROR). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot PID 1502905 (Ss). Last log: `[2026-06-23T14:33:03-0600]` idx=1001 route=digest skipped (~6h ago). No new Larry directives. 0 pending approvals. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → `0 new alert(s) fired, 0 recovered, 2 suppressed` (fix-645 cooldown + PR#653 cooldown). FORGE_NO_PR_SKIP: same 7 tasks as prior iter (preflight_exit + pr_exists). fix-645 WARN persists. ✅ Nominal.
+
+**Check 4 — Pending directives:** Forge=0, Beacon=0, Mirror=0. beacon-pending-approvals: pending=0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-23T20:27:53Z (~10 min ago). Within 60-min window. ✅ Nominal.
+
+**Check A — Source repo:** On main. HEAD=4f54f253=origin/main. Working tree clean. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json last_sync=2026-06-23T20:00:16Z (~37 min ago). Within 2-hour window. ✅ Nominal.
+
+**Check C — Agent liveness:** 8/8 alive (same PIDs — see VERIFY-BEFORE-REASSERT). ✅ Nominal.
+
+**Check D — Inboxes:** Forge=0, Beacon=0, Mirror=0. ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: PR #653 `Missions v2 Phase 4b spec: live-feel thread` — open since 18:54Z (~103 min), reviewDecision="" — no Mirror routing. Pipeline stall healer in cooldown. Larry already DM'd (idx=994). [carry yellow]. ourliberty-dashboard: 0 open PRs. ✅ Nominal (pending carry finding).
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Tuesday 2026-06-23 UTC (weekday=1 ∉ {0,2,4,6}):** Check I/VIII/IX/X/XI weekday gate not met → skip. Check III: last 2026-06-11 (12d < 14d gate, not Sunday) → skip. ✅
+
+**G-rule assessment:** No new G-rule counts this iter. All counts unchanged. [all carry]
+
+**Actions taken:**
+1. PRIME ledger: `iter_clean` appended (tier=1).
+2. Tier state: `record --checks-clean true` → consecutive_clean 1→2.
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [yellow] **PR #653 unrouted to Mirror** — Larry DM'd (idx=994). Pipeline stall healer in cooldown. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Tier-4 novel (iter ~2544). Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Known false positive (Mirror REVIEW_PASS confirmed, manual merge). Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [blue] **fix-645-alert-translation-001 worktree stall** — WARN persists in heal_pipeline_stall dry-run. [carry]
+- [blue] **G-rule beacon-claude-timeout** — 1/3. Watch.
+- [blue] **G-rule api-500-burst** — 1/3. Watch.
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. Watch.
+- [blue] **G-rule seq-advancer-sequence-stranded** — 2/3. Watch.
+- [blue] **G-rule sync.service-deploy-restart-storm-tier4** — 1/3. Watch.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule health-notify-script-missing** — dispatch sent 2026-06-09. [carry]
+- [blue] **unreviewed-merge:628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **Stale bash orphan PID 1834248** — benign. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. Informational. [carry]
+
+**PRIME DIRECTIVE:** 0 interventions this iter (iter_clean). Trailing-30d: systemic_fixes=60, interventions≈1078, ratio≈17.97, trend=improving.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=1→2. (Need 1 more clean iter to de-escalate to Tier 2.)
+
+---
+
 ## Iteration ~2545 — 2026-06-23T20:34Z UTC (interactive /cycle, Tier 1, consecutive_clean 0→1)
 
 **Trigger:** Larry `/cycle` invocation (chat mode).
