@@ -672,6 +672,14 @@ class CommitAndPushTest(unittest.TestCase):
 
 
 class RunOnceTest(unittest.TestCase):
+    def setUp(self):
+        # run_once builds the reliable terminal gate (a gh fetch) once per tick;
+        # seam it OFF so these integration tests stay hermetic (no network).
+        _gate = mock.patch.object(h, '_load_terminal_gate',
+                                  return_value=lambda tids: (False, None))
+        _gate.start()
+        self.addCleanup(_gate.stop)
+
     def test_unresolved_path_is_noop(self):
         now = datetime(2026, 6, 12, 12, 0, tzinfo=timezone.utc)
         with mock.patch.object(h, 'load_repo_paths', return_value={}):
@@ -872,6 +880,11 @@ class RunOnceIngestTest(unittest.TestCase):
         (self.core / h.MISSIONS_REL).write_text(
             json.dumps({'schema_version': 1, 'missions': []}) + '\n')
         self.now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+        # Seam off the terminal-gate gh fetch run_once builds each tick (hermetic).
+        _gate = mock.patch.object(h, '_load_terminal_gate',
+                                  return_value=lambda tids: (False, None))
+        _gate.start()
+        self.addCleanup(_gate.stop)
 
     def tearDown(self):
         import shutil
@@ -1164,6 +1177,11 @@ class RunOnceQueueDrainTest(unittest.TestCase):
             json.dumps({'schema_version': 1, 'missions': []}) + '\n')
         self.qd = Path(self.tmp) / 'new-mission-queue'
         self.now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+        # Seam off the terminal-gate gh fetch run_once builds each tick (hermetic).
+        _gate = mock.patch.object(h, '_load_terminal_gate',
+                                  return_value=lambda tids: (False, None))
+        _gate.start()
+        self.addCleanup(_gate.stop)
 
     def tearDown(self):
         import shutil
