@@ -168,9 +168,15 @@
 
 ---
 
-## Status snapshot — updated 2026-06-23 02:42Z UTC (Iter ~2486, Tier 3, consecutive_clean=3, NOMINAL ✅)
+## medic-diagnosis translation regression (detected iter ~2487)
 
-**Iter ~2486 summary:** ✅ Nominal. 0 new alerts (watermark=933=file_length). PR #645 Larry-authored still open (`fix/proposed-retirement-forge-matcher`), no Mirror review — [blue] watch. FORGE_NO_PR_SKIP shrank: PRs #620/#630/#631 all merged 2026-06-22 (system-self-awareness-2a, phantom-build-phase-guard, projects-GC). 5/5 daemons alive same PIDs: beacon=1163107, dashboard_api=1162819, outbox_notifier=1163186, chain_event=930563, inbox_watcher=1026206. agent-core: 1 open PR (#645, Larry-authored). dashboard: 0 open PRs. Tier 3, consecutive_clean=2→3. **Standing [yellow]: unreviewed-merge:637, unreviewed-merge:607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals.** PRIME: systemic_fixes=56, ratio=19.0, trend=improving. **G-rule heal-stale-daemon-code-script-service-mismatch: 2/3. G-rule mirror-marker-parse-error: 2/3. G-rule revision-phase-preamble-missing: 2/3. G-rule mirror-no-session-revision-loop: 2/3. G-rule telegram-409-burst: 2/3. G-rule Forge-preflight-CLARIFY_REQUEST: 2/3.** Tier 3, consecutive_clean=3, next cadence: 30-min.
+**Rule:** alert-translations.json returns 0 entries for `source=medic` as of iter ~2487. Despite G-rule `medic-diagnosis-tier4` being marked COMPLETE (PR #515 merged 2026-06-15), the triage helper returns Tier-4 for `source=medic, intent=medic-diagnosis` alerts. Medic bot DMs Larry directly (chat_id=7998341473) so no Pulse DM needed — but the translation is missing/broken. G-rule `medic-diagnosis-translation-gap`: 1/1. Dispatch to Beacon at 3/3 to verify and restore the Tier-3 translation in alert-translations.json.
+
+---
+
+## Status snapshot — updated 2026-06-23 03:17Z UTC (Iter ~2487, Tier 3, consecutive_clean=4, NOMINAL ✅)
+
+**Iter ~2487 summary:** ✅ Nominal. 3 new alerts (L934 Tier-3 silence, L935 medic-diagnosis translation-regression+already-delivered, L936 seq-stranded false-positive). Watermark 933→936. PR #645 Larry-authored MERGEABLE, no Mirror review — [blue] watch. 5/5 daemons alive same PIDs: beacon=1163107, dashboard_api=1162819, outbox_notifier=1163186, chain_event=930563, inbox_watcher=1026206. agent-core: 1 open PR (#645). dashboard: 0 open PRs. PRs #620/#630/#631 confirmed merged. Tier 3, consecutive_clean=3→4. **Standing [yellow]: unreviewed-merge:637, unreviewed-merge:607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals.** PRIME: systemic_fixes=56, ratio=19.0, trend=improving. **G-rule heal-stale-daemon-code-script-service-mismatch: 2/3. G-rule mirror-marker-parse-error: 2/3. G-rule revision-phase-preamble-missing: 2/3. G-rule mirror-no-session-revision-loop: 2/3. G-rule telegram-409-burst: 2/3. G-rule Forge-preflight-CLARIFY_REQUEST: 2/3. G-rule seq-advancer-sequence-stranded: 2/3. G-rule medic-diagnosis-translation-gap: 1/1.** Tier 3, consecutive_clean=4, next cadence: 30-min.
 
 
 
