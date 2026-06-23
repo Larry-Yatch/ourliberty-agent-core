@@ -186,15 +186,27 @@
 
 ---
 
+## G-rule mirror-marker-parse-error → COMPLETE ✅ (iter ~2526 dispatch, iter ~2531 verified)
+
+**Rule:** Mirror review dispatches now get a symmetric marker reminder matching the Forge preflight reminder. PR #650 `feat(agent-runner): symmetric review-phase marker reminder for Mirror` merged 2026-06-23T15:35:09Z. Fix adds `build_review_marker_reminder_system_prompt()` + `review_marker_reminder_args()` gated to `phase==review AND expected_agent==mirror`, naming all four REVIEW_* markers and the marker.py render mirror path. 19 tests pass. PRIME systemic_fix logged iter ~2531. **G-rule COMPLETE.**
+
+---
+
+## G-rule watchdog-watcher-log-stale → COMPLETE ✅ (iter ~2522 dispatch, iter ~2531 verified)
+
+**Rule:** PR #649 `fix-watchdog-stale-log-inflight-aware-001` merged 2026-06-23T14:54Z. Fix makes the watchdog in-flight-aware (active build state suppresses stale-log WARNs). Verified via 5 consecutive clean Check 1 scans post-merge — no stale-log WARNs detected. PRIME systemic_fix logged iter ~2531. **G-rule COMPLETE.**
+
+---
+
 ## triage-alert call discipline — pass ACTUAL alert JSON, never reconstruct (learned iter ~2503)
 
 **Rule:** When calling `alert_triage_state.py triage-alert --alert '<json>'`, always pass the VERBATIM JSON from larry-alerts.jsonl. Never reconstruct the JSON with inferred fields. The `_translation_match` lookup uses `subject → intent → kind` precedence — if you add a non-null `subject` field that wasn't in the original alert, the subject key overrides the `intent` fallback and fails the translation lookup (returns Tier-4 instead of Tier-3). In iter ~2503, L955/L956 (medic-diagnosis) were initially Tier-4 because of a fake `subject` field added during reconstruction; re-triaged correctly as Tier-3 after passing the actual alert JSON (which has `intent=medic-diagnosis` and NO subject field).
 
 ---
 
-## Status snapshot — updated 2026-06-23 15:27Z UTC (Iter ~2530, Tier 1→2 de-escalation, NOMINAL)
+## Status snapshot — updated 2026-06-23 15:43Z UTC (Iter ~2531, Tier 2 consecutive_clean=1, NOMINAL — 2 G-rules COMPLETE)
 
-**Iter ~2530 summary:** ✅ Nominal. 0 new alerts. All checks clean. **Tier 1→2 de-escalated** (consecutive_clean 2→3 threshold). 5/5 daemons alive same PIDs. HEAD=11cf8430=origin/main. 0 pending approvals. PRIME: systemic_fixes=58, interventions=1075, ratio=18.5, trend=improving. **G-rule mirror-marker-parse-error: PR #650 UNDER MIRROR REVIEW** (`feat(agent-runner): symmetric review-phase marker reminder for Mirror`, Forge completed 15:24Z, Mirror started 15:24:36Z). **G-rule watchdog-watcher-log-stale: pending-verify** (4 clean checks since PR #649). Standing [yellow]: unreviewed-merge:649+637+607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. G-rules at 2/3: revision-phase-preamble-missing, telegram-409-burst, Forge-preflight-CLARIFY_REQUEST, forge-preflight-task-id-mismatch, seq-advancer-sequence-stranded, F24-empty-prompt-envelope-rejected. api-500-burst: 1/3.
+**Iter ~2531 summary:** ✅ Nominal. 1 new alert (L982, Tier-3 silence). All checks clean. Tier 2, consecutive_clean 0→1. 5/5 daemons alive same PIDs. HEAD=6b104faa=origin/main. 0 pending approvals. 0 open PRs. PRIME: systemic_fixes=60, interventions=1075, ratio=17.9, trend=improving. **G-rule mirror-marker-parse-error: COMPLETE ✅** (PR #650 `feat(agent-runner): symmetric review-phase marker reminder for Mirror` auto-merged 15:35Z). **G-rule watchdog-watcher-log-stale: COMPLETE ✅** (5 clean Check 1 scans post PR #649 merge 14:54Z). Standing [yellow]: unreviewed-merge:649+637+607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. G-rules at 2/3: revision-phase-preamble-missing, telegram-409-burst, Forge-preflight-CLARIFY_REQUEST, forge-preflight-task-id-mismatch, seq-advancer-sequence-stranded, F24-empty-prompt-envelope-rejected. api-500-burst: 1/3.
 
 
 
