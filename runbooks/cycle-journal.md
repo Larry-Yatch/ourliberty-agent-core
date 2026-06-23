@@ -4,6 +4,100 @@
 
 ---
 
+## Iteration ~2560 — 2026-06-23T23:22Z UTC (interactive /cycle via chat, Tier 1→2 de-escalation, consecutive_clean 2→3)
+
+**Trigger:** Larry `/cycle` invocation (chat mode).
+
+**Health:** ✅ Nominal — 0 new alerts, all mandatory + additive checks clean. 8/8 daemons alive (same PIDs as iter ~2559). HEAD=b8c56a6d=origin/main. Working tree clean. PR#659 (spec/* branch, non-Forge, ~35 min) and dashboard PR#88 (MERGEABLE, ~38 min) both open but below threshold for auto-merge pipeline (neither yet reviewed/approved). 0 pending approvals. **Tier 1 consecutive_clean 2→3 → de-escalation to Tier 2 triggered.**
+
+**VERIFY-BEFORE-REASSERT:**
+- **Daemons (re-verified):** chain_event=930563 (SNs) ✅, inbox_watcher=1389730 (Ssl) ✅, forge_bot=1388801 (Ss) ✅, mirror_bot=1388982 (Ss) ✅, pulse_bot=1389067 (Ss) ✅, dashboard_api=1580445 (Ssl) ✅, beacon_telegram_bot=1580654 (Ss) ✅, outbox_notifier=1580739 (Ss) ✅. 8/8 alive, same PIDs as iter ~2559. ✅
+- **push-soft-gate-block-upgrade-decision (re-verified):** 0 new alerts this iter. Awaiting Larry decision. [carry yellow] ✅
+- **credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED (re-verified):** 0 new alerts this iter. Underlying still standing. [carry yellow] ✅
+- **fix-645-alert-translation-001 stall (re-verified):** WARN `larry_alerts append failed for forge_built_no_pr:fix-645-alert-translation-001` persists in Check 3 dry-run. [carry blue] ✅
+- **PR #659 (re-verified):** Still open (spec/auto-retire-done-window, ~35 min at check time, UNKNOWN mergeable — GH computing). Non-Forge branch, no Mirror routing expected. [carry blue] ✅
+- **dashboard PR #88 (re-verified):** Still open (22:43:31Z, MERGEABLE, reviewDecision="", ~38 min at check). No Mirror routing for dashboard. Larry-merged. [carry blue] ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 1015, "file_length": 1015}` — **0 new alerts**. ✅ Nominal.
+
+**Check 1 — Log noise (30-min window):** journalctl --user -p warning: `-- No entries --` (0 WARN/ERROR). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot PID 1580654 (Ss). Last delivery: idx=1014 (auto-restarted:ourliberty-outbox-notifier.service) at 17:15:26-0600 (23:15Z). Bot restarted at 17:10:23-0600 (23:10Z — PR#660 deploy restart, per iter ~2559). No new Larry directives. 0 pending approvals. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → `0 new alert(s) fired, 0 recovered, 1 suppressed` (fix-645 cooldown only). FORGE_NO_PR_SKIP: multiple tasks (all pr_exists or preflight_exit — INFO, nominal). Fix-645 WARN persists. ✅ Nominal.
+
+**Check 4 — Pending directives:** All agent inboxes empty (beacon/forge/mirror: 0 tasks). beacon-pending-approvals: pending=0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-23T23:10:15Z (~8.4 min before cycle check). Within 60-min window. ✅ Nominal.
+
+**Check A — Source repo:** On main. HEAD=b8c56a6d=origin/main (0 commits behind). Working tree clean. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json last_sync=2026-06-23T22:23:24Z (~55 min ago), status=success. Within 2-hour window. ✅ Nominal.
+
+**Check C — Agent liveness:** 8/8 alive (same PIDs — see VERIFY-BEFORE-REASSERT). ✅ Nominal.
+
+**Check D — Inboxes:** All agent inboxes empty (beacon/forge/mirror: 0 tasks). ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 1 open PR:
+- PR#659 `docs(spec): auto-retire Done pipeline cards after a visibility window` (22:46:56Z, spec/auto-retire-done-window, UNKNOWN, reviewDecision="", ~35 min at check) — non-Forge branch, no Mirror routing. Under 30-min clean+green threshold (not yet approved). ✅
+ourliberty-dashboard: PR#88 `feat(missions): live-feel thread — poll open thread + unread/refresh (Phase 4b)` (22:43:31Z, forge/live-thread, MERGEABLE, reviewDecision="", ~38 min at check) — no Mirror routing for dashboard repo, Larry-merged. Not yet approved, so not clean+green. ✅ Nominal.
+
+**Check H — Forge digest:** Most recent merges: PR#660 (22:59Z), PR#658 (22:22Z), PR#657 (22:31Z), PR#656 (22:22Z), PR#655 (20:17Z), PR#654 (19:34Z), PR#653 (21:34Z), PR#652 (18:50Z). Pipeline active. No new merges since iter ~2559. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Tuesday 2026-06-23 UTC (weekday=1 ∉ {0,2,4,6}):** Check I/VIII/IX/X/XI weekday gate not met → skip. Check III: last 2026-06-11 (12d < 14d gate, not Sunday) → skip. ✅
+
+**G-rule assessment:** No new G-rule counts from standard checks. New observation from session memory: `sequence-step-review-escalate-null-chat` — code-inspection finding (reply_chat_id=None may drop closing-DM + replan-marker on Mirror REVIEW_ESCALATE for autonomous build-sequence-step tasks). No REVIEW_ESCALATE events found in production logs (outbox-notifier shows only review-pass events and malformed-marker WARNs). Noting as new G-rule 1/3 — needs 2 more confirmed occurrences before dispatch. All other G-rule counts unchanged. [all carry]
+
+**Actions taken:**
+1. PRIME ledger: `iter_clean` appended (tier=1, template=iter-clean).
+2. Tier state: `record --checks-clean true` → consecutive_clean 2→3 → **Tier promoted 1→2** (consecutive_clean reset to 0).
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Known false positive (Mirror REVIEW_PASS confirmed, manual merge). Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [blue] **PR #659 open** — `docs(spec): auto-retire Done pipeline cards after a visibility window`. spec/* branch, no Mirror routing, ~35 min at check. [carry from ~2555]
+- [blue] **ourliberty-dashboard PR #88 open** — `feat(missions): live-feel thread`. forge/live-thread branch, no Mirror routing for dashboard. ~38 min at check, not yet approved. [carry from ~2556]
+- [blue] **unreviewed-merge:655** — PR #655 merged manually by Larry at 20:17Z. Mirror worktree wedged/reaped. Larry judgment. [carry]
+- [blue] **fix-645-alert-translation-001 worktree stall** — WARN persists in heal_pipeline_stall dry-run. [carry]
+- [blue] **G-rule sequence-step-review-escalate-null-chat** — 1/3. Code-inspection finding: reply_chat_id=None may drop closing-DM + replan-marker on Mirror REVIEW_ESCALATE for autonomous build-sequence-step tasks. Not confirmed in production logs. Watch.
+- [blue] **G-rule medic-approval-request-novel-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-dry-run-writes-real-alerts** — 1/3. Watch.
+- [blue] **G-rule beacon-claude-timeout** — 1/3. Watch.
+- [blue] **G-rule api-500-burst** — 1/3. Watch.
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. Watch.
+- [blue] **G-rule seq-advancer-sequence-stranded** — 2/3. Watch.
+- [blue] **G-rule sync.service-deploy-restart-storm-tier4** — 1/3. Watch.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule health-notify-script-missing** — dispatch sent 2026-06-09. [carry]
+- [blue] **unreviewed-merge:628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **Stale bash orphan PID 1834248** — benign. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. Informational. [carry]
+
+**PRIME DIRECTIVE:** 0 interventions this iter (iter_clean). Trailing-30d: systemic_fixes=60, verification_pending=19, ratio≈18.02, trend=improving.
+**Tier end-of-iter:** Tier **2**, consecutive_clean=0. (De-escalated from Tier 1 after 3 consecutive clean iters. Next de-escalation to Tier 3 requires 3 consecutive clean Tier-2 iters.)
+
+---
+
 ## Iteration ~2559 — 2026-06-23T23:14Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 1→2)
 
 **Trigger:** Larry `/cycle` invocation (chat mode).
