@@ -5,7 +5,7 @@
 **Approver:** Larry
 **Parent:** [docs/missions-redesign-design-pass-2026-06-09.md](../../../docs/missions-redesign-design-pass-2026-06-09.md)
 **Predecessor:** [Phase 4 — Operator Meaning Layer](missions-v2-phase4-meaning-layer.md) (shipped; async thread via CLARIFY rails) · [e4-4f Missions tab v1](e4-4f-missions-tab-v1.md) (SWR kanban polling, §5.7)
-**Build path:** build-sequence orchestrator, single-repo (dashboard); agent-core unchanged except tests
+**Build path:** build-sequence orchestrator, single-repo (dashboard); agent-core touched only by Contract C — a one-field `id` projection on the existing `/thread` response + guard tests (no new endpoint, no DB migration)
 
 ---
 
@@ -41,12 +41,13 @@ Verified against `scripts/dashboard_api.py` on 2026-06-23:
 |---|---|---|
 | Thread read, already poll-shaped | `GET /api/missions/captures/{id}/thread` → `CaptureThreadResponse { messages[], last_synced_at }` (read-only, token-gated) | direct |
 | Per-message direction + unread hint | `CaptureThreadMessage.direction` (`larry_to_team` \| `team_to_larry`) and `.needs_reply` | direct |
+| Per-message stable `id` | `chain_events.event_id` already exists per turn (`compute_event_id`); Contract C projects it as `CaptureThreadMessage.id` | extend (project) |
 | Poll cadence + pause-when-hidden | SWR config pattern from `e4-4f` §5.7 (kanban 10/30/60s) | pattern |
 | Loud-vs-quiet "blocked on you" | `larry_alerts` + `alert_triage_state` doorbell (Phase 4 §9); POST message already clears it | reuse |
 | Thread render + input | `ClarifyRoundDrawer`, `ClarifyReplyBox`, `PanelErrorBoundary` (Phase 4 §8) | extend |
 | Relative timestamps | `RelativeTime` | direct |
 
-**No new backend endpoint.** The contract already returns everything polling needs.
+**No new backend endpoint and no DB migration.** The contract already returns everything polling needs **except a per-message `id`**: today `CaptureThreadMessage` / `_shape_thread_message` project only `ts`/`direction`/`text`/`actor`/`needs_reply` (verified `scripts/dashboard_api.py`). The dedupe/unread logic (Contracts A/B) keys on a stable `id`, so Contract C adds it by **surfacing the existing `chain_events.event_id` as `id`** — a one-field response-model projection on the existing `/thread` endpoint, **not** a new endpoint and **not** a DB schema change (the `event_id` column already exists).
 
 ---
 
@@ -58,7 +59,7 @@ Wrap the thread drawer's fetch in SWR (or the existing data-fetch hook used for 
 - **`revalidateOnFocus: true`** so tabbing back to the window refetches immediately (cheap win, complements B).
 - **Key by `capture_id`** so each open card polls only its own thread.
 - **Dedupe + merge, don't clobber:**
-  - Identify messages by their stable `id`; the poll response replaces the rendered list by id.
+  - Identify messages by their stable `id` (the per-message `id` Contract C projects from the existing `chain_events.event_id`); the poll response replaces the rendered list by id.
   - **Reconcile the optimistic send:** when the server copy of Larry's just-sent message arrives (same text/direction `larry_to_team`), drop the optimistic placeholder — never render it twice.
 - **No scroll-jump:** only auto-scroll to the newest message **if the user is already pinned to the bottom**. If they've scrolled up to read history, hold their scroll position and surface the "N new ↓" pill from Contract B instead.
 - **Error/empty:** keep the existing `PanelErrorBoundary`; a failed poll must not blank the thread — show the last good messages and a subtle retry.
@@ -89,14 +90,16 @@ Today the reply box (`ClarifyReplyBox`) keeps the typed text after send, so Larr
 
 Acceptance: typing a message and sending it leaves the input **empty** the moment the server confirms; the message appears once in the thread; a failed send leaves the text in the box with an error, no duplicate post.
 
-## 7. Contract C — backend (agent-core): confirm-and-guard only
+## 7. Contract C — backend (agent-core): project the id, then guard
 
-No new endpoint or schema. The work here is to **lock the contract Phase 4b depends on** so a future change can't silently regress it:
+**No new endpoint and no DB migration.** Two pieces, both small and confined to the existing `/thread` read path:
 
-- Add/extend a test asserting `GET /api/missions/captures/{id}/thread` returns `messages` **oldest-first** with stable `id`, `direction`, `ts`, and `needs_reply`, plus a fresh `last_synced_at` — i.e. the fields polling and unread-detection rely on.
-- Add/extend a test asserting `POST /api/missions/captures/{id}/message` **clears the blocked-on-you doorbell** (already implemented; pin it so the loud→quiet transition the UI reflects stays true).
+1. **Project the per-message `id` (one-field response-model add).** Contracts A/B dedupe and track "last seen" by a stable per-message `id`, but the current contract does **not** return one — `CaptureThreadMessage` and `_shape_thread_message` (`scripts/dashboard_api.py`) project only `ts`/`direction`/`text`/`actor`/`needs_reply`. Surface the **existing** `chain_events.event_id` (already computed per turn via `compute_event_id`, already read on each `ev` in `_card_thread_messages`) as a new `id` field: add `id: Optional[str]` to `CaptureThreadMessage` and emit `'id': ev.get('event_id')` from `_shape_thread_message`. This is a **projection of a column that already exists** — explicitly **NOT** a new endpoint and **NOT** a DB schema/migration change.
+2. **Guard the contract so a future change can't silently regress it:**
+   - Add/extend a test asserting `GET /api/missions/captures/{id}/thread` returns `messages` **oldest-first** with the projected stable `id` (== the row's `event_id`), plus `ts`, `direction`, and `needs_reply`, plus a fresh `last_synced_at` — i.e. the fields polling and unread-detection rely on.
+   - Add/extend a test asserting `POST /api/missions/captures/{id}/message` **clears the blocked-on-you doorbell** (already implemented; pin it so the loud→quiet transition the UI reflects stays true).
 
-If both already exist, this step is a no-op beyond confirming coverage.
+The doorbell-clear guard may already exist as coverage; if so that sub-step is a no-op. The `id` projection (piece 1) is the only net-new behavior, and it adds no endpoint and no migration.
 
 ---
 
@@ -104,7 +107,7 @@ If both already exist, this step is a no-op beyond confirming coverage.
 
 | Step | Repo | Scope | depends_on |
 |---|---|---|---|
-| **1 — contract guard** | agent-core | Tests pinning the `/thread` read shape + the POST→doorbell-clear (Contract C) | — |
+| **1 — id projection + contract guard** | agent-core | Project the existing `event_id` as a per-message `id` on `/thread` (one-field, no endpoint/migration) + tests pinning the `/thread` read shape and the POST→doorbell-clear (Contract C) | — |
 | **2 — live-feel thread** | dashboard | Contract A (poll open thread) + Contract B (unread badge / pill / manual refresh / loud-vs-quiet reflect) + Contract D (clear input on confirmed send); reuse SWR `e4-4f` §5.7 pattern + `ClarifyRoundDrawer`/`ClarifyReplyBox`/`PanelErrorBoundary` | 1 |
 
 > **Quick win:** Contract D is a standalone, low-risk change (clear the controlled input on POST success) and can ship first/independently of A and B if a faster fix is wanted before the full polling work lands.
@@ -156,7 +159,7 @@ Step 2 is the substance; step 1 is a thin agent-core guard so the dashboard can 
 }
 ```
 
-**Agent-core guard one-off** — single APPROVAL_REQUEST, `target_repo: ourliberty-agent-core`, dispatch_text: *"Add Phase 4b Contract C guard tests: assert GET /api/missions/captures/{id}/thread returns messages oldest-first with stable id/direction/ts/needs_reply + fresh last_synced_at; assert POST .../message clears the blocked-on-you doorbell. Spec § 7. No endpoint change. Mirror focus: tests pin the contract the dashboard relies on."*
+**Agent-core guard one-off** — single APPROVAL_REQUEST, `target_repo: ourliberty-agent-core`, dispatch_text: *"Phase 4b Contract C: surface the existing chain_events.event_id as a per-message `id` on GET /api/missions/captures/{id}/thread — add id to CaptureThreadMessage and emit ev['event_id'] from _shape_thread_message (one-field projection, NO new endpoint, NO DB migration). Then guard tests: assert thread returns messages oldest-first with stable id(==event_id)/direction/ts/needs_reply + fresh last_synced_at; assert POST .../message clears the blocked-on-you doorbell. Spec § 7. Mirror focus: id is a projection of an existing column, no schema/endpoint change; tests pin the contract the dashboard relies on."*
 
 **What Larry pastes to Beacon** is the short intent below; Beacon synthesizes the file above, runs the Mirror DAG preflight (build-sequence spec discipline 3), and emits the kickoff — Larry's role is approving the plan, not authoring the file (build-sequence spec decision J).
 
