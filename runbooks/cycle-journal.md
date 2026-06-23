@@ -4,6 +4,102 @@
 
 ---
 
+## Iteration ~2544 — 2026-06-23T20:26Z UTC (interactive /cycle, Tier 3→1 tier-reset, consecutive_clean 4→0)
+
+**Trigger:** Larry `/cycle` invocation (chat mode).
+
+**Health:** ⚠️ Tier-reset — 1 always-fix (fast-forward), 1 Tier-4 novel alert (bot already DM'd Larry), 6 Tier-3 alerts silenced. All mandatory + additive checks clean. 8/8 daemons alive (same PIDs). HEAD=e76f7ef9=origin/main (updated). 0 pending approvals. 1 open PR (#653, still awaiting Mirror routing).
+
+**VERIFY-BEFORE-REASSERT:**
+- **Daemons (re-verified):** chain_event=930563 (SNs) ✅, dashboard_api=1309235 (Ssl) ✅, outbox_notifier=1310052 (Ss) ✅, beacon_telegram_bot=1388269 (Ss) ✅, forge_bot=1388801 (Ss) ✅, mirror_bot=1388982 (Ss) ✅, pulse_bot=1389067 (Ss) ✅, inbox_watcher=1389730 (Ssl) ✅. 8/8 alive, same PIDs. ✅
+- **HEAD (re-verified):** Was 26085ca4 at session start. Fetch dry-run showed 26085ca4→e76f7ef9 pending. Always-fix applied (fast-forward). HEAD now e76f7ef9 = origin/main. Working tree clean post-pull. ✅
+- **fix-645-alert-translation-001 stall (re-verified):** `WARN larry_alerts append failed for forge_built_no_pr:fix-645-alert-translation-001` persists in Check 3 dry-run. [carry blue] ✅
+- **unreviewed-merge:649 (re-verified):** ourliberty-dashboard=0 open PRs. Known false positive. [carry yellow] ✅
+- **credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED (re-verified):** L993 fired this iter (19:53Z) — Tier-3 silenced. Underlying still standing. [carry yellow] ✅
+- **PR #653 routing (re-verified):** `routing-events.jsonl` has NO entry for PR #653 or branch `missions-reply-refresh-bug-k404pz`. Beacon's "already in motion" at 13:35 MDT (iter ~2543) did NOT result in a routing-events log entry. PR #653 has been open since 18:54Z with NO Mirror review dispatched. Pipeline stall healer fired at 20:00Z (bot idx=994 delivered to Larry). [new yellow] ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 992, "file_length": 999}` — 7 new alerts (L993–L999). Triage results:
+- L993: `source=heal-credential-registry-drift, subject=credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED` → **Tier-3 silence** (known-pattern). ✅
+- L994: `source=push-soft-gate-checkin, subject=soft-gate-block-upgrade-decision` → **Tier-4 (novel)** — soft deploy-gate decision check-in. Bot delivered at 14:00:47 MDT (idx=993). [yellow escalation — see Actions] Tier-reset.
+- L995: `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#653` → **Tier-3 silence** (longest-prefix match). Bot delivered at 14:00:48 MDT (idx=994). [carry yellow PR#653] ✅
+- L996: `source=medic, intent=medic-diagnosis` (PR#653) → **Tier-3 silence** (medic-diagnosis known-pattern). ✅
+- L997: `source=medic, intent=medic-diagnosis` (PR#653) → **Tier-3 silence**. ✅
+- L998: `source=heal-wedged-review-sessions, subject=wedged-review-reaped:wt-mirror-projects-v3-sequence-rollup-done-flip-001` → **Tier-3 silence** (known-pattern, route=closure). Terminal marker was present — Mirror review completed before reap. ✅
+- L999: `source=heal-wedged-review-sessions, subject=wedged-review-reaped:wt-forge-projects-v3-sequence-rollup-done-flip-001` → **Tier-3 silence** (known-pattern, route=closure). Terminal marker present — Forge build completed before reap. ✅
+Watermark advanced 992→999. Tier-reset (1 Tier-4 novel alert).
+
+**Check 1 — Log noise (30-min window):** journalctl --user -p warning: `-- No entries --` (0 WARN/ERROR entries). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot PID 1388269 (Ss). Last log: `[2026-06-23T14:21:00-0600]` alert idx=998 delivered (wedged-forge, ~7 min ago at cycle start). No new Larry directives since 13:34 MDT. 0 pending approvals. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → `0 new alert(s) fired, 0 recovered, 2 suppressed` (fix-645 cooldown + unrouted-pr:653 cooldown). FORGE_NO_PR_SKIP: system-self-awareness-slice-2b (preflight_exit), fix-proposed-retirement (preflight_exit), heal-stale-daemon-alert-attribution-001 (pr_exists #647), doorbell-tier3-silence-001 (pr_exists #648), fix-watchdog-stale-log-inflight-aware-001 (pr_exists #649), harden-mirror-review-marker-reminder-001 (pr_exists #650), bootstrap-import-gate-enforce-001 (pr_exists #651). RETRY_EXHAUSTED_SKIP: projects-v3-sequence-rollup-done-flip-001 (superseded_session — build+review completed, PR #655 merged). Fix-645 WARN persists. ✅ Nominal.
+
+**Check 4 — Pending directives:** Forge=0, Beacon=0, Mirror=0. All inbox tasks processed (projects-v3-sequence-rollup-done-flip-001 Forge/Mirror tasks archived by inbox_watcher after wedged sessions were reaped). beacon-pending-approvals: pending=0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-23T20:17:26Z (~9 min ago at cycle start). Within 60-min window. ✅ Nominal.
+
+**Check A — Source repo:** **Always-fix triggered.** Fetch dry-run showed repo behind origin/main (26085ca4→e76f7ef9). On main, working tree clean → fast-forward allowed. `git -C ~/agent-core pull --ff-only` succeeded. 5 files changed: dashboard_api.py, projects_store.py, 3 new test files (test_dashboard_api_archive_and_orphan.py, test_dashboard_api_missions_derived.py, test_projects_store.py). PR #655 `fix(projects-v3): roll up build-sequence completion to the parent phase (Done flip + collapse orphan step-cards)` merged. Logged to cycle-actions.jsonl. Tier-reset.
+
+**Check B — Sync health:** agent-core-sync.json last_sync=2026-06-23T20:00:16Z (~26 min ago). Within 2-hour window. ✅ Nominal.
+
+**Check C — Agent liveness:** 8/8 alive (same PIDs per VERIFY-BEFORE-REASSERT). ✅ Nominal.
+
+**Check D — Inboxes:** Forge=0, Beacon=0, Mirror=0. All clear. The projects-v3-sequence-rollup-done-flip-001 tasks (Forge build + Mirror review) were processed by inbox_watcher after heal-wedged-review-sessions reaped the sessions (both had terminal markers — work completed). ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: **PR #653** `Missions v2 Phase 4b spec: live-feel thread (poll + unread doorbell)` — open since 18:54Z (now ~90 min), reviewDecision="" — NO Mirror routing in routing-events.jsonl (VERIFY-BEFORE-REASSERT confirmed). Pipeline stall healer already alerted Larry (bot idx=994 at 14:00 MDT). PR #655 confirmed merged via fast-forward (RETRY_EXHAUSTED_SKIP in pipeline stall scan). ourliberty-dashboard: 0 open PRs. **[yellow carry: PR #653 needs Mirror routing via Beacon — Larry aware via bot DM]**
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Tuesday 2026-06-23 UTC (weekday=1 ∉ {0,2,4,6}):** Check I/VIII/IX/X/XI weekday gate not met → skip. Check III: last 2026-06-11 (12d < 14d gate, not Sunday) → skip. ✅
+
+**G-rule assessment:** No new G-rule counts this iter. beacon-claude-timeout stays at 1/3 (no new timeout observed). All other counts unchanged. [all carry]
+
+**Actions taken:**
+1. `git -C ~/agent-core pull --ff-only` → fast-forwarded 26085ca4→e76f7ef9 (PR #655 merged). Logged to cycle-actions.jsonl.
+2. Alert watermark advanced 992→999 (6 Tier-3 silenced, 1 Tier-4 novel).
+3. PRIME ledger: 2 `intervention` rows appended (fast-forward-main, tier4-novel-alert), tier=1.
+4. pulse-escalations.json written for Tier-4 push-soft-gate-checkin escalation.
+5. Tier state: reset 3→1 (non-clean: fast-forward auto-fix + Tier-4 novel alert), consecutive_clean 4→0.
+
+**Dispatches:** None. Tier-4 notification was pre-delivered by bot (idx=993). No Beacon dispatch required by Pulse.
+
+**Standing findings (carried + verified):**
+- [yellow] **PR #653 unrouted to Mirror** — pipeline stall healer DM'd Larry (idx=994). Routing-events.jsonl has no entry. Larry needs to re-dispatch Mirror review via Beacon. [NEW this iter]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Tier-4 novel. Bot DM'd Larry (idx=993). Awaiting Larry decision: upgrade hard-block / keep soft / drop. [NEW this iter]
+- [yellow] **unreviewed-merge:649** — Known false positive (Mirror REVIEW_PASS confirmed, manual merge). Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [blue] **fix-645-alert-translation-001 worktree stall** — WARN persists in heal_pipeline_stall dry-run. [carry]
+- [blue] **G-rule beacon-claude-timeout** — 1/3. Watch.
+- [blue] **G-rule api-500-burst** — 1/3. Watch.
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. Watch.
+- [blue] **G-rule telegram-409-burst** — 2/3. Watch.
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. Watch.
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. Watch.
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. Watch.
+- [blue] **G-rule seq-advancer-sequence-stranded** — 2/3. Watch.
+- [blue] **G-rule sync.service-deploy-restart-storm-tier4** — 1/3. Watch.
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. Watch.
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. Watch.
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. Watch.
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. Watch.
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. Watch.
+- [blue] **G-rule health-notify-script-missing** — dispatch sent 2026-06-09. [carry]
+- [blue] **unreviewed-merge:628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **Stale bash orphan PID 1834248** — benign. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. Informational. [carry]
+
+**PRIME DIRECTIVE:** 2 interventions this iter (fast-forward-main, tier4-novel-alert). Trailing-30d: systemic_fixes=60, interventions=1076+2=1078, ratio≈17.9, trend=improving.
+**Tier end-of-iter:** Tier **1** (reset from 3), consecutive_clean=0. Tier-reset driven by: (1) Check A always-fix fast-forward, (2) Check 0 Tier-4 novel alert.
+
+---
+
 ## Iteration ~2543 — 2026-06-23T19:49Z UTC (interactive /cycle, Tier 3, consecutive_clean 3→4)
 
 **Trigger:** Larry `/cycle` invocation (chat mode, /loop dynamic).
