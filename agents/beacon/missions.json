@@ -4798,7 +4798,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-23T19:09:27.723893+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-23T19:07:15.558585+00:00"
+      "orphan_last_activity_ts": "2026-06-23T19:07:15.558585+00:00",
+      "briefing": {
+        "what": "A round of safety checks the team started to make sure the message dashboard keeps showing conversations correctly and clears notifications when you reply.",
+        "why": "Without these checks, a future change could quietly break how messages display or leave notification dots stuck on, and no one would catch it until customers did.",
+        "suggest": "Let them finish it, but first have them confirm the gap is real and not already covered, so we don't spend time duplicating protection we already have."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-23T19:13:49.761697+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-card-message-cap-build-completion-auto-report-auto-verify-auto-ru-58c8",
@@ -4815,7 +4829,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-23T19:09:27.723893+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-23T18:55:13.699504+00:00"
+      "orphan_last_activity_ts": "2026-06-23T18:55:13.699504+00:00",
+      "briefing": {
+        "what": "A new limit on how long card messages can be, with built-in checks to confirm it's working before it ships.",
+        "why": "Capping message length keeps the product clean and predictable for users, but it touches a customer-facing feature so a mistake would be visible.",
+        "suggest": "Let it finish and see the verification results, then give it a quick look before signing off rather than approving sight-unseen."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-23T19:13:49.761697+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
