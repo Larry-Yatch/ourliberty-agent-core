@@ -356,7 +356,7 @@
       "id": "cap-direct-discover-test-leak-still-open-pr-7-514a",
       "title": "Direct-discover test leak still open (PR-7)",
       "note": "RESIDUAL after the 2026-06-10 tier-alert close-out (#435-#443 all merged): #436 sandboxed the regression GATE invocation, but any DIRECT 'python3 -m unittest discover -s scripts/tests' (Mirror reviews follow the docs' canonical command; agent sessions type it by hand) still bypasses scripts/tests/__init__ and leaks fixture writes to real blackboard files. Evidence post-fix: 3 mock quota events 2026-06-11T02:40:00Z (during Mirror's capture-label-contract review) + 2 FALSE 'transcript-not-persisted:tier1' CRITICAL alerts 03:23/03:24Z from #438's own test mocks (paths /tmp/tmp*-work/sid-new.jsonl, task unknown-task \u2014 IGNORE these two alerts, they cite mock session ids; larry-alerts is append-only so they will not retract). FIX SHAPE (PR-7): per-module bootstrap \u2014 a scripts/tests/_bootstrap.py doing the env-sandbox at import, imported at the top of EVERY test file (works under any loader), plus an AST gate test enforcing the import (same pattern as test_no_production_log_writes.py); then purge the 3 new ledger lines (quarantine pattern, ~/agents/.fixture-cleanup-20260610/). Memory: tier-alert-cycle-final-rootcause.md",
-      "state": "parked",
+      "state": "dropped",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -368,17 +368,17 @@
       "last_touched": "2026-06-11T04:12:01.009961+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "Direct-discover test leak still open (PR-7) \u2014 RESIDUAL after the 2026-06-10 tier-alert close-out (#435-#443 all merged): #436 sandboxed the regression GATE invocation, but any DIRECT 'python3 -m unittest discover -s scripts/tests' (Mirror reviews follow the docs' canonical command; agent sessions type it by hand) still bypasses scripts/tests/__init__ and leaks fixture writes to real blackboard files. Evidence post-fix: 3 mock quota events 2026-06-11T02:40:00Z (during Mirror's capture-label-contract review) + 2 FALSE 'transcript-not-persisted:tier1' CRITICAL alerts 03:23/03:24Z from #438's own test mocks (paths /tmp/tmp*-work/sid-new.jsonl, task unknown-task \u2014 IGNORE these two alerts, they cite mock session ids; larry-alerts is append-only so they will not retract). FIX SHAPE (PR-7): per-module bootstrap \u2014 a scripts/tests/_bootstrap.py doing the env-sandbox at import, imported at the top of EVERY test file (works under any loader), plus an AST gate test enforcing the import (same pattern as test_no_production_log_writes.py); then purge the 3 new ledger lines (quarantine pattern, ~/agents/.fixture-cleanup-20260610/). Memory: tier-alert-cycle-final-rootcause.md",
-        "why": "A captured idea (in ourliberty-agent-core) waiting on a decision.",
-        "suggest": "Have the team look at this carefully before any change \u2014 it could be hard to undo."
+        "what": "Our internal testing can still accidentally write fake data into the real system, which has been triggering false alarms.",
+        "why": "False alarms waste attention and erode trust in our monitoring \u2014 when real problems hit, we need to believe the alerts.",
+        "suggest": "Worth fixing, but let's do it carefully and verify each step so the cleanup itself doesn't create new noise."
       },
       "risk": "careful",
-      "recommended_action": "delegate",
+      "recommended_action": "drop",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-06-14T17:52:43.946307+00:00",
-        "from_state": "parked"
+        "at": "2026-06-23T18:43:20.376093+00:00",
+        "from_state": "dropped"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
       "aging": true
