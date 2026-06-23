@@ -168,9 +168,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-22 23:59Z UTC (Iter ~2477, Tier 1, consecutive_clean=0, ACTION ⚠️)
+## Status snapshot — updated 2026-06-23 00:05Z UTC (Iter ~2478, Tier 1, consecutive_clean=1, NOMINAL ✅)
 
-**Iter ~2477 summary:** ⚠️ Action taken. PR #85 (dashboard: autonomy posture panel, 41 min old, MERGEABLE) → auto-merge enabled → merged immediately. 2 new alerts (L931-L932, heal-stale-daemon-code restart, Tier-3 silence). Daemons restarted again with new PIDs post PR #644 deploy: beacon=1163107, dashboard_api=1162819, outbox_notifier=1163186; chain_event=930563, inbox_watcher=1026206 unchanged. agent-core: 0 open PRs. dashboard: 0 open PRs. Tier 3→1, consecutive_clean=7→0. **Standing [yellow]: unreviewed-merge:637, unreviewed-merge:607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals.** PRIME: systemic_fixes=56, interventions=1065, ratio=19.0, trend=improving. **G-rule heal-stale-daemon-code-script-service-mismatch: 2/3. G-rule mirror-marker-parse-error: 2/3. G-rule revision-phase-preamble-missing: 2/3. G-rule mirror-no-session-revision-loop: 2/3. G-rule telegram-409-burst: 2/3. G-rule Forge-preflight-CLARIFY_REQUEST: 2/3.** Tier 1, consecutive_clean=0, next cadence: 5-min.
+**Iter ~2478 summary:** ✅ Nominal. 0 new alerts (watermark=932=file_length). 5/5 daemons alive same PIDs: beacon=1163107, dashboard_api=1162819, outbox_notifier=1163186, chain_event=930563, inbox_watcher=1026206. agent-core: 0 open PRs. dashboard: 0 open PRs. Tier 1→1, consecutive_clean=0→1. **Standing [yellow]: unreviewed-merge:637, unreviewed-merge:607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals.** PRIME: systemic_fixes=56, ratio=19.0, trend=improving. **G-rule heal-stale-daemon-code-script-service-mismatch: 2/3. G-rule mirror-marker-parse-error: 2/3. G-rule revision-phase-preamble-missing: 2/3. G-rule mirror-no-session-revision-loop: 2/3. G-rule telegram-409-burst: 2/3. G-rule Forge-preflight-CLARIFY_REQUEST: 2/3.** Tier 1, consecutive_clean=1, next cadence: 5-min.
 
 
 
