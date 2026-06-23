@@ -929,6 +929,71 @@ def preflight_marker_reminder_args(phase, expected_agent):
     return ['--append-system-prompt', build_preflight_marker_reminder_system_prompt()]
 
 
+# === Deterministic review marker reminder (hard, dispatcher-set) ===========
+# The Mirror analogue of the preflight reminder above. A phase=review Mirror
+# dispatch must end its turn with EXACTLY ONE canonical verdict marker, but
+# the review prompt is authored upstream (the outbox notifier's review-request
+# builder) and a model that narrates its verdict in prose — `**Verdict:
+# PASS.**` with no marker block — produces the recurring outbox-notifier
+# `MalformedMirrorMarker: phase=review requires ONE canonical verdict marker
+# ... none found`. The chain self-heals (a marker-error retry, and a PASS-only
+# prose synthesizer) but each miss burns a ~$1/~7min retry round. agents/
+# mirror/CLAUDE.md already carries the marker-discipline prose; more prose
+# there isn't the fix. The fix is the same last-in-context system-prompt
+# injection the preflight path uses: it does not depend on the task author
+# remembering it and the task prompt's phrasing cannot override it. Gated to
+# phase=='review' + Mirror. Because the review-request dispatch carries
+# phase='review' AND the marker-error retry envelope preserves phase, this
+# fires on BOTH the first review attempt and every marker-error retry. Other
+# phases/agents are unaffected.
+
+REVIEW_MARKER_REMINDER_MARKER = (
+    "REVIEW MARKER REQUIREMENT (authoritative — dispatcher-set)"
+)
+
+
+def build_review_marker_reminder_system_prompt():
+    """Authoritative reminder APPENDED to the worker's system prompt on every
+    phase=review Mirror dispatch.
+
+    Derived from no input — the gating (phase + agent) happens in the args
+    wrapper — so the text is a fixed, last-in-context instruction that the
+    task prompt's phrasing cannot override.
+    """
+    return (
+        "=" * 70 + "\n"
+        + REVIEW_MARKER_REMINDER_MARKER + "\n"
+        + "=" * 70 + "\n\n"
+        "This is a `phase=review` dispatch. REGARDLESS of any prose-priming in\n"
+        "the task prompt, your response MUST end with EXACTLY ONE canonical\n"
+        "verdict marker block as its FINAL content:\n"
+        "`=== REVIEW_PASS ===` / `=== REVIEW_REVISION ===` /\n"
+        "`=== REVIEW_ESCALATE ===` / `=== REVIEW_EMERGENCY_HALT ===` with a\n"
+        "single JSON payload between the delimiters. A response that ends on a\n"
+        "PROSE verdict (e.g. \"Verdict: PASS\"), analysis, or command output has\n"
+        "NOT decided — it is invisible to auto-merge and will dead-letter for a\n"
+        "retry. Emit the marker via\n"
+        "`python3 ~/agent-core/scripts/marker.py render mirror <type>` and paste\n"
+        "its output verbatim.\n"
+        + "=" * 70
+    )
+
+
+def review_marker_reminder_args(phase, expected_agent):
+    """Return the CLI args that inject the review marker reminder.
+
+    ``['--append-system-prompt', <reminder>]`` only when this is a Mirror
+    review dispatch (``phase == 'review'`` AND the dispatched agent is
+    ``mirror``), else ``[]``. Pure and centralized so the spawn path and the
+    tests share one source of truth.
+    """
+    if str(phase).strip().lower() != 'review':
+        return []
+    if str(expected_agent).strip().lower() != 'mirror':
+        return []
+    return ['--append-system-prompt', build_review_marker_reminder_system_prompt()]
+
+
 CANCEL_DIR = AGENTS_ROOT / 'blackboard'
 CANCEL_POLL_INTERVAL = 5  # seconds between cancel checks during worker execution
 
@@ -1052,8 +1117,11 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
         revision). When phase == 'preflight' AND expected_agent == 'forge',
         an authoritative marker-discipline reminder is appended to the system
         prompt so the preflight turn ends with one marker block regardless of
-        the task prompt's phrasing — see preflight_marker_reminder_args. No-op
-        for other phases/agents.
+        the task prompt's phrasing — see preflight_marker_reminder_args.
+        Symmetrically, when phase == 'review' AND expected_agent == 'mirror',
+        an authoritative verdict-marker reminder is appended so the review turn
+        ends with one canonical REVIEW_* marker — see
+        review_marker_reminder_args. No-op for other phases/agents.
 
     Returns: (success: bool, output_text: str, new_session_id: str | None)
     """
@@ -1140,6 +1208,13 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
             # instead of decide. No-op for non-preflight phases / non-forge
             # agents — see preflight_marker_reminder_args.
             cmd.extend(preflight_marker_reminder_args(phase, expected_agent))
+            # Symmetric deterministic review marker reminder: on every
+            # phase=review Mirror dispatch, append a last-in-context
+            # instruction that the turn must end with one canonical REVIEW_*
+            # verdict marker — neutralizing prose-verdict misses that
+            # dead-letter for a retry. No-op for non-review phases / non-mirror
+            # agents — see review_marker_reminder_args.
+            cmd.extend(review_marker_reminder_args(phase, expected_agent))
             if fallback and fallback != model:
                 cmd.extend(['--fallback-model', fallback])
             if session_id:
