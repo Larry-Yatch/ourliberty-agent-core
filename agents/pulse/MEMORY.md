@@ -192,9 +192,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-23 15:09Z UTC (Iter ~2527, Tier 1, 1 intervention, mirror-marker-parse-error in-flight)
+## Status snapshot — updated 2026-06-23 15:14Z UTC (Iter ~2528, Tier 1, consecutive_clean=1, NOMINAL)
 
-**Iter ~2527 summary:** ⚠️ Signal (Tier-4). 1 intervention: L979 `unreviewed-merge:649` Tier-4 (bot already DM'd Larry; known circumstance — Mirror DID review PR #649 per archive, manual merge bypassed AUTO_MERGE chain_events). Tier 1 maintained. **G-rule mirror-marker-parse-error: DISPATCHED → IN-FLIGHT** — Larry approved `harden-mirror-review-marker-reminder-001` at 15:04Z; Forge has envelope. **G-rule watchdog-watcher-log-stale: pending PRIME verify** (PR #649 merged iter ~2526; no WARN in 30 min). Pending approvals: 0. 5/5 daemons alive same PIDs. HEAD=de5a9865=origin/main. PRIME: systemic_fixes=57, ratio=18.8, trend=improving. **Standing [yellow]: unreviewed-merge:649+637+607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. G-rules at 2/3: revision-phase-preamble-missing, telegram-409-burst, Forge-preflight-CLARIFY_REQUEST, forge-preflight-task-id-mismatch, seq-advancer-sequence-stranded, F24-empty-prompt-envelope-rejected.**
+**Iter ~2528 summary:** ✅ Nominal. 0 new alerts. All checks clean. 5/5 daemons alive same PIDs. HEAD=0578c22c=origin/main. PRIME: systemic_fixes=57, interventions=1075, ratio=18.9, trend=improving. **G-rule mirror-marker-parse-error: IN-FLIGHT** — Forge has `harden-mirror-review-marker-reminder-001.json` in inbox (dispatched 15:04Z). **G-rule watchdog-watcher-log-stale: pending-verify** (PR #649 merged 14:54Z; Check 1 clean this iter). Pending approvals: 0. consecutive_clean=1 (2 more clean iters → Tier 2). **Standing [yellow]: unreviewed-merge:649+637+607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. G-rules at 2/3: revision-phase-preamble-missing, telegram-409-burst, Forge-preflight-CLARIFY_REQUEST, forge-preflight-task-id-mismatch, seq-advancer-sequence-stranded, F24-empty-prompt-envelope-rejected. api-500-burst: 1/3.**
 
 
 
