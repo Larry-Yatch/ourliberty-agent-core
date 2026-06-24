@@ -240,6 +240,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-24 23:52Z UTC (Iter ~2649, Tier 1, consecutive_clean=0)
+
+**Iter ~2649 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry); PR #687 CONFLICTING (Mirror session 3 active ~39 min). Larry approved BOTH pending direction-asks at 17:44 MDT: `health-notify-wire-vs-silence-001` (Beacon completed 23:45:34Z, $0.318; `wire-agent-core-health-notify-001` → Forge inbox) + `alert-translation-mirror-pass-unmerged-001` (→ Forge inbox). Forge inbox now 8 items (+2 new). 2 alerts triaged: L1052 Tier-4 (mirror-pass-unmerged:PR#687, bot DM'd, no Pulse DM), L1053 Tier-3 (medic-diagnosis). Watermark 1051→1053. beacon-pending-approvals: 0 pending. 8 daemons alive. Watchdog: 0 WARNs during Mirror session 3 (~39 min) — positive signal for fix. Check I: mode=digest, cooldown-suppressed. PRIME: interventions=1120, systemic_fixes=66, ratio≈16.97, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-24 23:44Z UTC (Iter ~2648, Tier 1, consecutive_clean=0)
 
 **Iter ~2648 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry+verified); PR #687 CONFLICTING (Mirror session 3 active ~31 min). G-rule ourliberty-health-notify-script-missing: Beacon root-cause DONE — notify_larry.py never built (6-wk TODO); "1 issue" was untracked spec (cleared via 59bb8fbc); health-notify-wire-vs-silence-001 direction-ask DM'd Larry. 1 new alert triaged (L1051 Tier-3, approval_request). Watermark 1050→1051. New HEAD=59bb8fbc (doorbell spec committed). G-rule watchdog-watcher-log-stale-post-fix: 0 WARNs during Mirror session 3 (31 min). PRIME: interventions=1120, systemic_fixes=66, ratio≈16.97, trend=improving. Tier 1, consecutive_clean=0.
