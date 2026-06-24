@@ -216,9 +216,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-24 19:28Z UTC (Iter ~2616, Tier 3→1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-24 19:40Z UTC (Iter ~2617, Tier 1, consecutive_clean=0)
 
-**Iter ~2616 summary:** ⚠️ Drift — Check A: local behind origin/main (PR #679 merged at 19:19Z, last sync 18:38Z). Fast-forward applied (a68795ba→8436c7a5). 7 Tier-3 silences. 8/8 daemons alive (3 new PIDs: beacon_telegram_bot=1921593, dashboard_api=1921360, outbox_notifier=1921692 — auto-restarted 13:06 MDT by heal-stale-daemon-code per PR #677 merge). PRs #676/#677/#679 merged. 1 open PR: #680 (findings-visible-on-pr Contract A, mirror-review-visibility-001 sequence step 1) in Mirror review. Forge inbox: `add-676-mirror-visibility-crossref-001` (pre-failure [watch] — wants commit onto merged #676 branch; CLARIFY_REQUEST expected) + `build-closed-card-badge` (ourliberty-dashboard build, active). Tier 3→1. PRIME: systemic_fixes=61, interventions=1091, ratio≈17.87, trend=improving. G-rules unchanged from ~2615.
+**Iter ~2617 summary:** ⚠️ Drift — Check A: local behind origin/main (PR #680 feat(mirror): post findings comment on PR for non-PASS verdicts Contract A merged at 19:31Z). Fast-forward applied (051d91ab→c869cfd1). 0 new alerts. 8/8 daemons alive (same PIDs as ~2616). mirror-review-visibility-001 sequence step 1 (findings-visible-on-pr) COMPLETE — PR #680 merged. PR #681 open (docs: add-676-mirror-visibility-crossref-001 cross-ref, forge/add-676-mirror-visibility-crossref-001, MERGEABLE, Mirror review queued). Beacon inbox: `build-operator-needs-you-feed.json` (Larry-approved build for operator-needs-you-feed spec — new sequence starting). Forge inbox: `build-closed-card-badge` (phase4b2, active). Tier 1, consecutive_clean=0. PRIME: systemic_fixes=61, interventions=1092, ratio≈17.87, trend=improving. G-rules: check-i-force-bypass-dm-route 1/3, all others unchanged.
 
 
 
