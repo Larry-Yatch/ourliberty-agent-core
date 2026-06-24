@@ -747,7 +747,7 @@
       "title": "Mirror review visibility for session-less PRs",
       "north_star_ref": null,
       "repo": null,
-      "state": "active",
+      "state": "archived",
       "phases": [
         {
           "id": "mirror-review-visibility",
@@ -796,7 +796,7 @@
       ],
       "one_off": true,
       "created_at": "2026-06-24T15:50:59.823686+00:00",
-      "updated_at": "2026-06-24T15:50:59.823686+00:00",
+      "updated_at": "2026-06-24T21:03:33.115851+00:00",
       "promoted_from": {
         "kind": "mission",
         "mission_id": "mirror-review-visibility"
