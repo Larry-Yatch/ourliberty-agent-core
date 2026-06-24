@@ -5,12 +5,14 @@
 **Approver:** Larry
 **Parent:** chain-context-durability.md (the context-drop / human-terminal dead-end class; M1–M4 shipped)
 **Predecessor / template:** forge-cold-start-revision (the mechanical no-session re-dispatch `_dispatch_revision_to_forge` + `no_session_ledger` obligation) + Chain Context Durability M4 (recover-then-alert). This spec extends that work; it does not re-do it.
-**Related surfaces:** e4-4g-operator-action-queue.md (the dashboard action panel — still Draft; a soft dependency, see §9), the Approvals tab (fed by approval_request events), the Telegram doorbell (larry_alerts).
+**Related surfaces:** operator-needs-you-feed.md (the `/where-we-are` "Waiting on You" panel + doorbell — supersedes the archived e4-4g Operator Action Queue; the action-needed home, see §9), the Approvals tab (fed by approval_request events), the Telegram doorbell.
 
 > **Beacon refinements (2026-06-24), folded in:**
 > 1. Re-anchored to current code: the no-session self-heal is now the MECHANICAL `_dispatch_revision_to_forge` + `no_session_ledger` (forge-cold-start-revision). The earlier `_route_no_session_revision_to_beacon` function is REMOVED from outbox_notifier.py — references updated throughout (§1, §3, §5).
 > 2. Locked the Contract B classifier signal: classify on `marker_type` + session/ledger state (signals the notifier already has), not on finding semantics (which it cannot read). See §5.
 > 3. Added §9 sequencing note: hold kickoff until orchestrator-terminal-signal-hardening-001 lands (shared edits to outbox_notifier.py + heal_pipeline_stall.py).
+
+> **Reconciliation note (2026-06-24, Larry-session):** the action-needed routing target is realigned from the **archived** e4-4g Operator Action Queue to the **`/where-we-are` "Waiting on You" panel + doorbell** (operator-needs-you-feed). Mechanism: the action-needed escalation is emitted **through the existing `promote_alerts` gate** (the same producer pattern as operator-needs-you-feed §5.2 CLARIFY-exhausted) — **not** a direct `larry_alert`, which that spec forbids as double-surfacing. Decision-needed → Approvals tab is unchanged. Reflected in §2 (decisions 2–3), §3, §6, §7, §9.
 
 ---
 
@@ -29,15 +31,15 @@ The forge-cold-start-revision work already self-heals the *reaped-session* case 
 
 This spec closes both: findings become visible for the machines + audit; and the subset that genuinely needs Larry is routed to the surfaces he already watches — never to a PR comment he'll never read.
 
-**Done-gate:** a session-less PR that Mirror wants revised (a) carries Mirror's findings on the PR itself, (b) self-heals silently when it mechanically can, and (c) when it genuinely needs Larry, appears on his Approvals tab and/or Operator Action Queue with a Telegram ping — with zero reliance on anyone watching the PR.
+**Done-gate:** a session-less PR that Mirror wants revised (a) carries Mirror's findings on the PR itself, (b) self-heals silently when it mechanically can, and (c) when it genuinely needs Larry, appears on his Approvals tab and/or the `/where-we-are` "Waiting on You" panel with a Telegram ping — with zero reliance on anyone watching the PR.
 
 ## 2. Decisions (locked with Larry, 2026-06-24 design pass)
 
 | # | Decision | Value |
 |---|---|---|
 | 1 | Routine revisions stay silent. A mechanical, auto-fixable revision must NOT notify Larry — it self-heals via Forge. Surfacing every revision would bury him. | locked |
-| 2 | Larry never has to look at a PR. Findings on the PR are for machines + audit; anything needing Larry routes to *his* surfaces (Telegram + Approvals tab + Operator Action Queue). | locked |
-| 3 | Route by shape. Decision-shaped → Approvals tab (approval_request). Action-shaped (stuck, no clean binary) → Operator Action Queue (larry_alert NOW). Both also push to Telegram. | locked |
+| 2 | Larry never has to look at a PR. Findings on the PR are for machines + audit; anything needing Larry routes to *his* surfaces (Telegram + Approvals tab + the `/where-we-are` "Waiting on You" panel). | locked |
+| 3 | Route by shape. Decision-shaped → Approvals tab (approval_request). Action-shaped (stuck, no clean binary) → the `/where-we-are` "Waiting on You" panel, via the `promote_alerts` gate. Both also ring the Telegram doorbell. | locked |
 | 4 | Decisions are binary. The Approvals tab handles approve/reject only; >2 options get narrowed to binary or taken to chat. | locked |
 | 5 | Actionable-only. Larry is pinged solely for (i) a scope/values decision or (ii) auto-recovery having failed — never for a revision that's still self-healing. | locked |
 
@@ -47,9 +49,8 @@ This spec closes both: findings become visible for the machines + audit; and the
 |---|---|---|
 | Self-heal a no-session REVISION (mechanical re-dispatch to Forge + durable obligation) | `_dispatch_revision_to_forge` + `no_session_ledger` (forge-cold-start-revision; SUPERSEDES the removed `_route_no_session_revision_to_beacon`) | reuse |
 | Recover-before-alert backstop | Chain Context Durability M4 (heal_pipeline_stall.py recover-then-alert) | extend |
-| Push signal to Larry (quiet/loud) | larry_alerts ledger + alert_triage_state + the 5-min Telegram doorbell sweep | reuse |
 | Decision surface | approval_request marker (marker.py render) → Approvals tab; heal_unregistered_approval.py net ensures approval-class escalations reach the tab | reuse |
-| Action surface | Operator Action Queue panel (e4-4g, sourced from larry_alerts NOW-tier) | extend (soft dep, §9) |
+| Action surface (needs-you, quiet/loud) | the `promote_alerts` gate → for-Larry escalation snapshot → `/where-we-are` "Waiting on You" + doorbell (operator-needs-you-feed; supersedes e4-4g). **NOT** a direct larry_alerts promotion (that double-surfaces) | extend (soft dep, §9) |
 | Mirror's review verdict + markers | agents/mirror/CLAUDE.md review flow; REVIEW_PASS/REVIEW_REVISION/REVIEW_ESCALATE/EMERGENCY_HALT | extend |
 
 ## 4. Contract A — Mirror findings are always visible on the PR
@@ -76,17 +77,17 @@ When a REVIEW_REVISION/REVIEW_ESCALATE has no `forge_build_session_id`, classify
 | Bucket (from §5) | Surface | Mechanism |
 |---|---|---|
 | Self-healing | none (silent) | mechanical re-dispatch only; Contract A still posts findings |
-| Action-needed | Operator Action Queue + Telegram | larry_alert NOW-tier (deep-links to the PR + carries the copy-paste next step) |
+| Action-needed | `/where-we-are` "Waiting on You" + doorbell | a for-Larry escalation through the `promote_alerts` gate (writes the durable escalation record the board + doorbell read; deep-links to the PR + carries the copy-paste next step) — same producer pattern as operator-needs-you-feed §5.2 |
 | Decision-needed | Approvals tab + Telegram | binary approval_request (approve = option A, reject = option B), summary states both options in plain language |
 
 - A decision MUST be emitted as an approval_request — never a plain larry_alert that only *says* "waiting on your direction" (that strands the decision off the Approvals tab; the 2026-06-03 deploy-notifier incident is the cautionary case).
-- Both human-needed buckets also append to larry_alerts so the Telegram doorbell fires (loud for blocked-on-you).
+- The doorbell ring is a consequence of each bucket's surface, not a separate write: a decision lands on the Approvals / Waiting-on-You board, and an action escalation crosses the `promote_alerts` gate that already feeds `/live`, `/where-we-are`, and the doorbell. **Do not append to `larry_alerts` directly** — operator-needs-you-feed forbids it (promoting an already-DMing ledger double-surfaces).
 
-**Enforcement:** routing code in outbox_notifier.py emits the bucket-appropriate artifact; tests assert (a) decision-bucket → an approval_request event reaches the Approvals-tab feed, (b) action-bucket → a NOW-tier larry_alert, (c) self-healing → no Larry-facing artifact. The existing heal_unregistered_approval.py net backstops a missed decision marker.
+**Enforcement:** routing code in outbox_notifier.py emits the bucket-appropriate artifact; tests assert (a) decision-bucket → an approval_request event reaches the Approvals-tab feed, (b) action-bucket → a for-Larry escalation record crosses the `promote_alerts` gate (no direct larry_alert), (c) self-healing → no Larry-facing artifact. The existing heal_unregistered_approval.py net backstops a missed decision marker.
 
 ## 7. Contract D — actionable-only / no double-notify
 
-Routine self-healing revisions never reach Larry (Decision 1/5). Compose with M4: attempt recovery first; escalate to a human surface (Contract C) only if recovery fails or the bucket is decision-needed. A single escalation produces exactly one decision-or-action artifact (no duplicate DMs, no Approvals + Action-Queue double-post for the same case).
+Routine self-healing revisions never reach Larry (Decision 1/5). Compose with M4: attempt recovery first; escalate to a human surface (Contract C) only if recovery fails or the bucket is decision-needed. A single escalation produces exactly one decision-or-action artifact (no duplicate DMs, no Approvals + Waiting-on-You double-post for the same case). This honors operator-needs-you-feed's one-gate rule — the action path routes through `promote_alerts` only, never a parallel larry_alert.
 
 **Enforcement:** idempotency keyed on the PR + head SHA in the routing site; a test asserts a re-reviewed-but-still-self-healing PR emits zero new Larry artifacts, and a recovered-then-failed case emits exactly one.
 
@@ -103,23 +104,23 @@ Single-repo (ourliberty-agent-core): Mirror behavior, the notifier routing, and 
 | Step | Repo | Scope | depends_on |
 |---|---|---|---|
 | 1 — findings visible | agent-core | Contract A (Mirror posts/updates a PR findings comment on every non-PASS) | — |
-| 2 — classify + route | agent-core | Contracts B + C + D (bucket the no-session outcome; route decision→Approvals, action→Action-Queue/larry_alert, self-healing→silent) | 1 |
+| 2 — classify + route | agent-core | Contracts B + C + D (bucket the no-session outcome; route decision→Approvals, action→promote_alerts/Waiting-on-You, self-healing→silent) | 1 |
 | 3 — backstop healer | agent-core | Contract E (heal_pipeline_stall.py check for silent red-status session-less PRs) | 2 |
 
 **Sequencing note (Beacon 2026-06-24):** HOLD kickoff until `orchestrator-terminal-signal-hardening-001` lands. Step 2 here edits `outbox_notifier.py` and Step 3 edits `heal_pipeline_stall.py` — both files are touched by that in-flight hardening sequence. Synthesize + DAG-preflight + kick off THIS sequence only on the post-hardening base, to avoid the file-overlap merge conflicts (the #668 lesson).
 
-**Soft dependency — Operator Action Queue (`e4-4g`).** The *action-needed* bucket's ideal dashboard home is the Operator Action Queue panel, still Draft. This spec does NOT block on it: the action bucket routes via larry_alert NOW-tier, which already surfaces in Telegram today and will appear in the Operator Action Queue automatically once e4-4g ships (same larry_alerts NOW feed). No rework when e4-4g lands.
+**Soft dependency — operator-needs-you-feed (the "Waiting on You" surface).** The *action-needed* bucket's home is the `/where-we-are` "Waiting on You" panel + doorbell, completed by operator-needs-you-feed (which supersedes the archived e4-4g). This spec does NOT hard-block on it: the action escalation crosses the `promote_alerts` gate, which already feeds `/live` and the doorbell today; once operator-needs-you-feed lands, the same gated escalation also itemizes on the `/where-we-are` board with no rework. The two specs share the `promote_alerts` producer — sequence this spec's Step 2 to **reuse** that path (same pattern as operator-needs-you-feed §5.2), not re-invent it.
 
 ## 10. Test / proof plan
 
 - **A:** a REVIEW_REVISION on a session-less PR posts a findings comment; a second review round updates that comment (no duplicate).
-- **B/C/D:** fixtures for each bucket — self-healing emits no Larry artifact; action-needed emits a NOW larry_alert (→ Telegram + Operator Action Queue); decision-needed emits a binary approval_request (→ Approvals tab + Telegram). Re-reviewed-still-self-healing emits nothing new.
+- **B/C/D:** fixtures for each bucket — self-healing emits no Larry artifact; action-needed emits a for-Larry escalation via promote_alerts (→ doorbell + `/where-we-are` Waiting-on-You); decision-needed emits a binary approval_request (→ Approvals tab + Telegram). Re-reviewed-still-self-healing emits nothing new.
 - **E:** a synthetic session-less PR left with a red mirror-review status and no self-heal triggers the healer's recover-then-route before any alert.
-- **End-to-end (the real gate):** replay the #653 shape — a doc PR authored off-chain that Mirror wants revised. Findings land on the PR; it self-heals if mechanical; if it needs Larry, it appears on his Approvals tab / Operator Action Queue with a Telegram ping — without anyone watching the PR.
+- **End-to-end (the real gate):** replay the #653 shape — a doc PR authored off-chain that Mirror wants revised. Findings land on the PR; it self-heals if mechanical; if it needs Larry, it appears on his Approvals tab / the `/where-we-are` "Waiting on You" panel with a Telegram ping — without anyone watching the PR.
 
 ## 11. Out of scope
 
 - The mechanical route-to-Forge self-heal itself — shipped (forge-cold-start-revision / Chain Context Durability M2/M4); this spec rides on it.
 - Changing Mirror's review judgment — what Mirror flags is unchanged; only how findings are surfaced + escalated.
-- Building the Operator Action Queue panel — that's e4-4g; this spec is forward-compatible with it but routes via larry_alerts in the interim.
+- Building the "Waiting on You" feed itself — that's operator-needs-you-feed (which supersedes e4-4g); this spec rides on its `promote_alerts` producer and adds the Mirror-review escalation as one more source.
 - Dashboard-wide notification rework — only the session-less Mirror-review path is in scope here.
