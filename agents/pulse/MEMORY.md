@@ -240,6 +240,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-24 22:20Z UTC (Iter ~2637, Tier 1, consecutive_clean=0)
+
+**Iter ~2637 summary:** ⚠️ Watch — PR #685 CONFLICTING (pipeline-stall cooldown active); PR #687 CONFLICTING (Mirror review active, no reviews yet). 1 new alert (L1040): Tier-3 (medic-diagnosis). Watermark 1039→1040. 8 daemons alive. Check I: mode=digest, cooldown-suppressed. HEAD=b8019068. PRIME: interventions≈1109, systemic_fixes=63, ratio≈17.6, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-24 22:14Z UTC (Iter ~2636, Tier 1, consecutive_clean=0)
 
 **Iter ~2636 summary:** ⚠️ Watch — PR #685 CONFLICTING (mirror-pass-unmerged L1039 DM'd Larry; pipeline-stall in cooldown); PR #687 CONFLICTING (Mirror review active, no reviews yet). 4 new alerts triaged (L1036-L1039): 3 Tier-3, 1 Tier-4 (L1039 mirror-pass-unmerged). Watermark 1035→1039. G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4 **2/3** NEW. 8 daemons alive. Check I: mode=digest. HEAD=879158fc. PRIME: interventions≈1108, systemic_fixes=63, ratio≈17.6, trend=improving. Tier 1, consecutive_clean=0.
