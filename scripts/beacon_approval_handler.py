@@ -1085,14 +1085,27 @@ def dispatch_approved(entry: dict[str, Any]) -> Path:
     """
     payload = entry['dispatch_payload']
     target = entry.get('target_agent') or payload.get('target_agent', 'forge')
-    # Ensure source is 'beacon' on the envelope. Propagate `chat_id` from the
-    # stored entry into the dispatched task as `reply_chat_id` so the entire
-    # downstream chain (preflight → build → review → review-pass notify) can
-    # route a completion DM back to the chat thread that initiated the work.
-    # Bug A fix (D3.5 5a-followup): without this, the original Forge inbox
-    # task lands without reply_chat_id and the propagation chain has nothing
-    # to carry, so Larry never gets a closing DM on his Telegram thread.
-    task_dict = {**payload, 'source': 'beacon'}
+    # Self-targeted approvals (target == 'beacon', e.g. a binary direction-ask
+    # APPROVAL_REQUEST) must NOT carry source='beacon': routing_validator's
+    # hard-topology check denies source==target *before* consulting the route
+    # table, so a beacon->beacon write raises RoutingDenied and strands the
+    # approval. Re-source to 'larry' — the approval genuinely originated from
+    # Larry (he typed 'go'), 'larry -> beacon' is a valid FRESH_DISPATCH_ROUTES
+    # entry, and a source=larry inbox envelope is processed by Beacon as a
+    # direction-task carrying implicit Larry approval (her Headless-dispatch
+    # path). 'larry' is not in USER_DM_SOURCES, so the reply_chat_id propagation
+    # below does not trip the accepts_from_user soft-reroute. Mirrors the
+    # dashboard path's source='dashboard' treatment for the same target. Every
+    # other target keeps source='beacon' exactly as before — no behavior change.
+    envelope_source = 'larry' if target == 'beacon' else 'beacon'
+    # Propagate `chat_id` from the stored entry into the dispatched task as
+    # `reply_chat_id` so the entire downstream chain (preflight → build →
+    # review → review-pass notify) can route a completion DM back to the chat
+    # thread that initiated the work. Bug A fix (D3.5 5a-followup): without
+    # this, the original Forge inbox task lands without reply_chat_id and the
+    # propagation chain has nothing to carry, so Larry never gets a closing DM
+    # on his Telegram thread.
+    task_dict = {**payload, 'source': envelope_source}
     if entry.get('chat_id') is not None:
         task_dict['reply_chat_id'] = entry['chat_id']
     # D3.5 5c — replan_count + max_replans propagation. When this entry was
@@ -1114,7 +1127,7 @@ def dispatch_approved(entry: dict[str, Any]) -> Path:
     return safe_write_inbox.safe_write_inbox(
         target_agent=target,
         task_dict=task_dict,
-        source_agent='beacon',
+        source_agent=envelope_source,
         filename=filename,
     )
 
