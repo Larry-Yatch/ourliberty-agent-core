@@ -64,6 +64,11 @@ if str(_scripts_dir) not in sys.path:
 # top-level import is safe (no supabase/heavy deps that force lazy import).
 import projects_store  # noqa: E402
 
+# inbox_dispatch_order is the single source of the queued-lane ordering rule,
+# shared with inbox_watcher.scan_inbox so the panel matches what builds next
+# (forge-queue-fast-track). stdlib-only.
+from inbox_dispatch_order import order_pending, read_fast_tracked_at  # noqa: E402
+
 
 # ---- AGENTS_ROOT + derived paths (env-overridable for test isolation) ----
 
@@ -531,6 +536,11 @@ class SystemWorktreesResponse(BaseModel):
 class QueuedItem(BaseModel):
     task_id: str
     waited_seconds: float
+    # Set when the operator has fast-tracked this task via "Build next"
+    # (forge-queue-fast-track): the ISO-8601 timestamp of the most recent
+    # click. None for a normal FIFO task. Drives the UI's "next" badge; the
+    # ordering itself is already applied (fast-tracked first) in the reader.
+    fast_tracked_at: Optional[str] = None
 
 
 class BuildingItem(BaseModel):
@@ -585,6 +595,22 @@ class AgentQueueResponse(BaseModel):
     active: list[ActiveItem]
     done_today: list[Union[DoneItem, WorkerDoneItem]]
     captured_at: str
+
+
+# ---- POST /api/system/agent-queue/{agent}/fast-track (forge-queue-fast-track) ----
+#
+# The "Build next" gesture: stamp a queued inbox task with `fast_tracked_at`
+# so both the dispatcher and the queued-lane reader float it to the head of
+# the queue (newest stamp first, LIFO). Writes ONLY the target task's JSON
+# (mtime preserved); never touches what's already building.
+
+class FastTrackRequest(BaseModel):
+    task_id: str
+
+
+class FastTrackResponse(BaseModel):
+    task_id: str
+    fast_tracked_at: str
 
 
 # ---- /api/system/build-sequences response model (PR-S3a) ----
@@ -2202,17 +2228,20 @@ def _reader_agent_queue_queued(
     """QUEUED lane: inbox dispatches not yet picked up.
 
     Mirrors `inbox_watcher.scan_inbox`'s matching rule — non-dotfile
-    `*.json` — but sorts mtime oldest-first and emits `waited_seconds`
-    per item, whereas `_agent_inbox_pending` returns lexically-sorted ids.
-    Parameterized on `agents_root` so it stays tmpdir-testable like the
-    other dashboard readers. `waited_seconds = now(UTC) - file mtime`.
+    `*.json` — AND its dispatch order, via the shared `inbox_dispatch_order`
+    helper: fast-tracked tasks first (newest "Build next" click wins, LIFO),
+    then oldest-mtime-first FIFO. Sharing the helper is what guarantees the
+    panel shows exactly what the forge will build next. `waited_seconds` is
+    still `now(UTC) - file mtime` (fast-track preserves mtime, so the wait
+    stays honest); `fast_tracked_at` echoes the per-item flag for the UI.
+    Parameterized on `agents_root` so it stays tmpdir-testable.
     """
     now = now or datetime.now(timezone.utc)
     inbox = agents_root / 'inboxes' / agent
     items: list[dict[str, Any]] = []
     if not inbox.is_dir():
         return items
-    entries: list[tuple[float, str]] = []
+    entries: list[tuple[float, Optional[str], str]] = []
     try:
         for e in os.scandir(inbox):
             if not e.is_file() or e.name.startswith('.') or not e.name.endswith('.json'):
@@ -2221,17 +2250,88 @@ def _reader_agent_queue_queued(
                 mt = e.stat().st_mtime
             except OSError:
                 continue
-            entries.append((mt, e.name))
+            entries.append((mt, read_fast_tracked_at(Path(e.path)), e.name))
     except OSError:
         return items
-    entries.sort(key=lambda x: x[0])
-    for mt, name in entries:
+    for mt, fast_tracked_at, name in order_pending(entries):
         waited = (now - datetime.fromtimestamp(mt, tz=timezone.utc)).total_seconds()
         items.append({
             'task_id': name[:-len('.json')],
             'waited_seconds': waited,
+            'fast_tracked_at': fast_tracked_at,
         })
     return items
+
+
+def _handle_fast_track(
+    agents_root: Path, agent: str, task_id: str,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Stamp a queued inbox task with `fast_tracked_at` so it dispatches next.
+
+    The write counterpart to `_reader_agent_queue_queued`. Validates that
+    `task_id` is a single safe filename stem inside the agent's inbox (no
+    traversal/escape), requires the task to still be QUEUED, then rewrites
+    ONLY that task's JSON — atomically (the dispatcher never sees a partial
+    file) and PRESERVING the file mtime so `waited_seconds` and the mtime-age
+    inbox healers/reapers stay honest. The ordering itself is then applied by
+    `inbox_dispatch_order` on the next scan (dispatcher) / read (panel):
+    newest `fast_tracked_at` floats to the head (LIFO). Never touches a task
+    that is already building. Returns {task_id, fast_tracked_at}.
+    """
+    task_id = (task_id or '').strip()
+    inbox = agents_root / 'inboxes' / agent
+    # The reader emits bare stems (no '.json', no path component), so a
+    # well-behaved client never sends these. Reject anything that could escape
+    # the inbox or address a dotfile/subdir.
+    if (not task_id or '/' in task_id or '\\' in task_id
+            or task_id.startswith('.') or '\x00' in task_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='invalid task_id',
+        )
+    target = inbox / f'{task_id}.json'
+    # Defense in depth: the resolved file must sit DIRECTLY inside the inbox.
+    try:
+        if target.resolve().parent != inbox.resolve():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail='invalid task_id',
+            )
+    except OSError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='invalid task_id',
+        ) from exc
+    if not target.is_file():
+        # Already picked up (building/done) or never existed — nothing to
+        # fast-track. 409 (not 404) so the UI can say "already building"
+        # rather than blame a broken route.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail='task is not queued',
+        )
+    try:
+        st = target.stat()
+        payload = json.loads(target.read_text(encoding='utf-8'))
+    except (OSError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail='task payload unreadable',
+        ) from exc
+    if not isinstance(payload, dict):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail='task payload is not an object',
+        )
+    stamp = _now_utc_iso(now)
+    payload['fast_tracked_at'] = stamp
+    _atomic_write_json(target, payload)
+    try:
+        os.utime(target, (st.st_atime, st.st_mtime))
+    except OSError:
+        pass  # best-effort; the fast-track ordering already took effect
+    return {'task_id': task_id, 'fast_tracked_at': stamp}
 
 
 def _reader_agent_queue_building(
@@ -8903,6 +9003,29 @@ def get_system_agent_queue(
     return _reader_agent_queue(
         _agents_root(), _worktrees_root(), agent, client,
     )
+
+
+# POST /api/system/agent-queue/{agent}/fast-track — the "Build next" gesture
+# (forge-queue-fast-track). Floats a queued inbox task to the head of the
+# dispatch order. Same two-layer auth as the other write routes:
+# X-Dashboard-Token + an allowlisted X-Actor. Changes only WHEN a task builds,
+# never what/whether — no preflight/review gate is bypassed.
+@app.post(
+    '/api/system/agent-queue/{agent}/fast-track',
+    response_model=FastTrackResponse,
+    dependencies=[Depends(_require_token)],
+)
+def post_agent_queue_fast_track(
+    agent: str,
+    body: FastTrackRequest,
+    actor: str = Depends(_require_actor),
+) -> dict[str, Any]:
+    if agent not in AGENT_NAMES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f'unknown agent: {agent!r}',
+        )
+    return _handle_fast_track(_agents_root(), agent, body.task_id)
 
 
 @app.get(

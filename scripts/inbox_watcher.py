@@ -42,6 +42,7 @@ import agent_runner  # noqa: E402
 import dispatch_lease  # noqa: E402
 import dispatch_validator  # noqa: E402
 import fixture_patterns  # noqa: E402
+from inbox_dispatch_order import order_pending, read_fast_tracked_at  # noqa: E402
 import larry_alerts  # noqa: E402
 import routing_validator  # noqa: E402
 import safe_write_inbox  # noqa: E402
@@ -175,6 +176,11 @@ def ensure_dirs() -> None:
 
 
 def scan_inbox(agent: str) -> list[Path]:
+    # Dispatch order: fast-tracked tasks first (newest "Build next" click wins,
+    # LIFO), then oldest-mtime-first FIFO. The dashboard's queued-lane reader
+    # applies the SAME rule via inbox_dispatch_order so the Forge Queue panel
+    # shows exactly what will build next. See inbox_dispatch_order for the
+    # contract and the bad-file fallback.
     inbox = INBOXES_ROOT / agent
     if not inbox.exists():
         return []
@@ -182,9 +188,9 @@ def scan_inbox(agent: str) -> list[Path]:
     for e in os.scandir(inbox):
         if not e.is_file() or e.name.startswith(".") or not e.name.endswith(".json"):
             continue
-        entries.append((e.stat().st_mtime, Path(e.path)))
-    entries.sort(key=lambda x: x[0])
-    return [p for _, p in entries]
+        p = Path(e.path)
+        entries.append((e.stat().st_mtime, read_fast_tracked_at(p), p))
+    return [payload for _, _, payload in order_pending(entries)]
 
 
 def _unique_dest(dest_dir: Path, name: str) -> Path:
