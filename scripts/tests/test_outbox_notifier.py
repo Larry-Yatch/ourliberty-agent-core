@@ -74,6 +74,21 @@ def _inert_mirror_review_status(data, marker_decision):
     return state
 
 
+def _inert_mirror_findings_comment(data, marker_decision):
+    """Stand-in for `_post_mirror_findings_comment` during process_outbox
+    integration tests — records the verdict, no `gh` shell-out. Mirrors the
+    inert status override so non-PASS verdicts routed through process_outbox
+    never try to post a real PR comment."""
+    mtype = marker_decision.get('marker_type')
+    if mtype not in ('review_revision', 'review_escalate'):
+        return None
+    payload = marker_decision.get('payload') or {}
+    _MIRROR_STATUS_CALL_LOG.append(
+        ('findings', mtype, payload.get('pr_url')),
+    )
+    return 'created'
+
+
 def setUpModule():  # noqa: N802 — unittest hook name
     global _AGENTS_ROOT_BACKUP, _AGENTS_ROOT_TMPDIR, _LIVE_EMIT_BACKUP
     global _CHOKEPOINT_SAVED_SENTINEL
@@ -101,6 +116,10 @@ def setUpModule():  # noqa: N802 — unittest hook name
     # through process_outbox never shells out to real `gh`. Tests that exercise
     # the real helper restore `on._POST_STATUS_FN_OVERRIDE = None` themselves.
     on._POST_STATUS_FN_OVERRIDE = _inert_mirror_review_status
+    # Same posture for the Contract A findings-comment upsert (§ 4): inert
+    # during process_outbox integration so non-PASS verdicts never shell out
+    # to `gh` for a PR comment. MirrorFindingsCommentTest restores it to None.
+    on._POST_FINDINGS_FN_OVERRIDE = _inert_mirror_findings_comment
 
 
 def tearDownModule():  # noqa: N802 — unittest hook name
@@ -8260,6 +8279,225 @@ class PostMirrorReviewCommitStatusTest(unittest.TestCase):
         state, api_cmds = self._run_helper(self._decision('review_unknown'))
         self.assertIsNone(state)
         self.assertEqual(api_cmds, [])
+
+
+class MirrorFindingsCommentTest(unittest.TestCase):
+    """build-mirror-findings-comment — Contract A (mirror-review-visibility § 4).
+
+    Every non-PASS verdict posts/updates EXACTLY ONE Mirror findings comment on
+    the PR; a re-review updates it in place (no duplicate). Drives the real
+    `_post_mirror_findings_comment` against an in-memory fake `gh` comment store
+    so the create-then-update idempotency is exercised end-to-end without a
+    network shell-out.
+    """
+
+    def setUp(self):
+        # Exercise the real helper (setUpModule installs an inert override).
+        self._orig_override = on._POST_FINDINGS_FN_OVERRIDE
+        on._POST_FINDINGS_FN_OVERRIDE = None
+
+    def tearDown(self):
+        on._POST_FINDINGS_FN_OVERRIDE = self._orig_override
+
+    def _cp(self, *, returncode=0, stdout='', stderr=''):
+        class _R:
+            pass
+        r = _R()
+        r.returncode = returncode
+        r.stdout = stdout
+        r.stderr = stderr
+        return r
+
+    @staticmethod
+    def _extract_body(cmd):
+        for i, a in enumerate(cmd):
+            if a == '-f' and i + 1 < len(cmd) and cmd[i + 1].startswith('body='):
+                return cmd[i + 1][len('body='):]
+        return None
+
+    @staticmethod
+    def _endpoint(cmd):
+        for a in cmd:
+            if isinstance(a, str) and a.startswith('repos/'):
+                return a
+        return ''
+
+    def _fake_gh(self, store, calls, *, list_rc=0, write_rc=0):
+        """Build a stateful fake subprocess.run simulating GitHub PR comments.
+
+        `store` is {comment_id: body}; `calls` records ('list'|'create'|'update').
+        """
+        next_id = [1000]
+
+        def _run(cmd, **kwargs):
+            calls_kind = None
+            if '--jq' in cmd and '--paginate' in cmd:
+                calls_kind = 'list'
+                calls.append(calls_kind)
+                if list_rc != 0:
+                    return self._cp(returncode=list_rc, stderr='boom')
+                out = '\n'.join(
+                    json.dumps({'id': cid, 'body': body})
+                    for cid, body in store.items()
+                )
+                return self._cp(returncode=0, stdout=out)
+            if '-X' in cmd and 'PATCH' in cmd:
+                calls_kind = 'update'
+                calls.append(calls_kind)
+                if write_rc != 0:
+                    return self._cp(returncode=write_rc, stderr='boom')
+                cid = int(self._endpoint(cmd).rsplit('/', 1)[1])
+                store[cid] = self._extract_body(cmd)
+                return self._cp(returncode=0, stdout='{}')
+            if self._endpoint(cmd).endswith('/comments'):
+                calls_kind = 'create'
+                calls.append(calls_kind)
+                if write_rc != 0:
+                    return self._cp(returncode=write_rc, stderr='boom')
+                cid = next_id[0]
+                next_id[0] += 1
+                store[cid] = self._extract_body(cmd)
+                return self._cp(returncode=0, stdout=json.dumps({'id': cid}))
+            return self._cp(returncode=1)
+
+        return _run
+
+    def _decision(self, marker_type, pr_url=PR_URL_FIXTURE, **extra):
+        payload = {'pr_url': pr_url}
+        payload.update(extra)
+        return {'marker_type': marker_type, 'payload': payload}
+
+    def _revision_decision(self, desc='add a test', pr_url=PR_URL_FIXTURE):
+        return self._decision(
+            'review_revision', pr_url=pr_url,
+            findings=[{'file': 'scripts/x.py', 'line_range': 'L1-L2',
+                       'severity': 'medium', 'description': desc}],
+            severity='medium', confidence='high',
+        )
+
+    # ---- the § 4 idempotency proof: create then update, exactly one comment ----
+
+    def test_revision_creates_then_updates_single_comment(self):
+        store: dict = {}
+        calls: list = []
+        with mock.patch.object(on.subprocess, 'run',
+                               side_effect=self._fake_gh(store, calls)):
+            # Round 1 — no existing comment -> create.
+            r1 = on._post_mirror_findings_comment(
+                {'task_id': 't'}, self._revision_decision('round one finding'),
+            )
+            # Round 2 (re-review) — anchor found -> update in place.
+            r2 = on._post_mirror_findings_comment(
+                {'task_id': 't'}, self._revision_decision('round two finding'),
+            )
+        self.assertEqual(r1, 'created')
+        self.assertEqual(r2, 'updated')
+        # Exactly one comment on the PR after two review rounds.
+        self.assertEqual(len(store), 1)
+        # The single comment reflects the LATEST round (updated, not stale).
+        body = next(iter(store.values()))
+        self.assertIn('round two finding', body)
+        self.assertNotIn('round one finding', body)
+        self.assertIn(on._MIRROR_FINDINGS_ANCHOR, body)
+        # Call shape: list+create on round 1, list+update on round 2.
+        self.assertEqual(calls, ['list', 'create', 'list', 'update'])
+
+    def test_escalate_creates_comment(self):
+        store: dict = {}
+        calls: list = []
+        decision = self._decision(
+            'review_escalate', reason='spec relies on infra that does not exist',
+            severity='high', confidence='high',
+        )
+        with mock.patch.object(on.subprocess, 'run',
+                               side_effect=self._fake_gh(store, calls)):
+            result = on._post_mirror_findings_comment({'task_id': 't'}, decision)
+        self.assertEqual(result, 'created')
+        self.assertEqual(len(store), 1)
+        body = next(iter(store.values()))
+        self.assertIn('REVIEW_ESCALATE', body)
+        self.assertIn('infra that does not exist', body)
+
+    def test_pass_posts_no_comment(self):
+        store: dict = {}
+        calls: list = []
+        with mock.patch.object(on.subprocess, 'run',
+                               side_effect=self._fake_gh(store, calls)):
+            result = on._post_mirror_findings_comment(
+                {'task_id': 't'}, self._decision('review_pass', summary='ok'),
+            )
+        self.assertIsNone(result)
+        self.assertEqual(store, {})
+        self.assertEqual(calls, [])
+
+    def test_emergency_halt_posts_no_comment(self):
+        store: dict = {}
+        calls: list = []
+        with mock.patch.object(on.subprocess, 'run',
+                               side_effect=self._fake_gh(store, calls)):
+            result = on._post_mirror_findings_comment(
+                {'task_id': 't'},
+                self._decision('review_emergency_halt', reason='creds',
+                               evidence='AKIA...'),
+            )
+        self.assertIsNone(result)
+        self.assertEqual(calls, [])
+
+    def test_invalid_pr_url_skipped_without_shellout(self):
+        store: dict = {}
+        calls: list = []
+        with mock.patch.object(on.subprocess, 'run',
+                               side_effect=self._fake_gh(store, calls)):
+            result = on._post_mirror_findings_comment(
+                {'task_id': 't'}, self._revision_decision(pr_url='not-a-url'),
+            )
+        self.assertIsNone(result)
+        self.assertEqual(calls, [])
+
+    def test_gh_write_failure_tolerated(self):
+        store: dict = {}
+        calls: list = []
+        with mock.patch.object(on.subprocess, 'run',
+                               side_effect=self._fake_gh(store, calls, write_rc=1)):
+            result = on._post_mirror_findings_comment(
+                {'task_id': 't'}, self._revision_decision(),
+            )
+        # POST failed -> None, never raises; nothing persisted.
+        self.assertIsNone(result)
+        self.assertEqual(store, {})
+
+    def test_gh_missing_binary_tolerated(self):
+        def _raise(cmd, **kwargs):
+            raise FileNotFoundError('gh not on PATH')
+        with mock.patch.object(on.subprocess, 'run', side_effect=_raise):
+            result = on._post_mirror_findings_comment(
+                {'task_id': 't'}, self._revision_decision(),
+            )
+        self.assertIsNone(result)
+
+    # ---- pure body-render unit checks ----
+
+    def test_render_revision_body_has_anchor_and_findings(self):
+        body = on._render_mirror_findings_comment_body(
+            'review_revision',
+            {'findings': [{'file': 'a.py', 'line_range': 'L5-L9',
+                           'severity': 'low', 'description': 'rename foo'}],
+             'severity': 'low', 'confidence': 'high'},
+        )
+        self.assertTrue(body.startswith(on._MIRROR_FINDINGS_ANCHOR))
+        self.assertIn('REVIEW_REVISION', body)
+        self.assertIn('a.py', body)
+        self.assertIn('rename foo', body)
+
+    def test_render_escalate_body_has_anchor_and_reason(self):
+        body = on._render_mirror_findings_comment_body(
+            'review_escalate',
+            {'reason': 'wrong feature built', 'severity': 'high',
+             'confidence': 'high'},
+        )
+        self.assertTrue(body.startswith(on._MIRROR_FINDINGS_ANCHOR))
+        self.assertIn('REVIEW_ESCALATE', body)
+        self.assertIn('wrong feature built', body)
 
 
 class AutoMergePRTest(unittest.TestCase):
