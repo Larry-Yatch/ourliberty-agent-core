@@ -122,15 +122,21 @@ def _prune(state: dict[str, dict[str, Any]], now: datetime) -> dict[str, dict[st
 
     if len(kept) <= _MAX_ROWS:
         return kept
-    # Over cap: drop oldest resolved rows first, then oldest open rows.
-    def _sort_key(item: tuple[str, dict[str, Any]]) -> tuple[int, str]:
-        _, row = item
-        is_open = 1 if row.get('status') == OPEN else 0
-        stamp = row.get('last_dispatch_at') or row.get('opened_at') or ''
-        return (is_open, stamp)  # open sorts last (preferentially kept)
-
-    ordered = sorted(kept.items(), key=_sort_key)
-    return dict(ordered[len(ordered) - _MAX_ROWS:])
+    # Over cap: NEVER evict an OPEN obligation — losing one would blind the
+    # backstop to a stuck PR (the exact silent-loss this ledger exists to
+    # prevent). Prune only RESOLVED rows, oldest first, down to the cap. If OPEN
+    # rows alone exceed the cap, keep them ALL (a real stuck-PR backlog the
+    # backstop must still surface); the cap only bounds RESOLVED-row growth.
+    open_rows = {k: v for k, v in kept.items() if v.get('status') == OPEN}
+    resolved = [(k, v) for k, v in kept.items() if v.get('status') != OPEN]
+    slots = _MAX_ROWS - len(open_rows)
+    if slots <= 0:
+        return open_rows
+    resolved.sort(
+        key=lambda kv: kv[1].get('resolved_at')
+        or kv[1].get('last_dispatch_at') or ''
+    )
+    return {**open_rows, **dict(resolved[len(resolved) - slots:])}
 
 
 def _save(state: dict[str, dict[str, Any]], now: datetime) -> None:

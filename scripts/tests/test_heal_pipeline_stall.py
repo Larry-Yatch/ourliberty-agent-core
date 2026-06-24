@@ -1499,8 +1499,7 @@ class TestCheckRevisionDispatchedWithNoSession(_TempAgentsRootMixin, unittest.Te
         # recover-then-alert: a stuck obligation whose PR merged out-of-band is
         # cleared and reported recovered (the framework suppresses the alert).
         self._open('merged-1', minutes_ago=60)
-        with patch.object(self.hps, '_check_pr_closed_via_gh',
-                          return_value='MERGED'):
+        with patch.object(self.hps, '_gh_pr_state', return_value='MERGED'):
             recovered = self.hps._recover_no_session_revision(
                 'merged-1', 'https://gh/o/r/pull/7')
         self.assertTrue(recovered)
@@ -1508,16 +1507,26 @@ class TestCheckRevisionDispatchedWithNoSession(_TempAgentsRootMixin, unittest.Te
         self.assertEqual(ob['status'], self._nsl.RESOLVED)
         self.assertEqual(ob['resolution'], 'merged')
 
-    def test_recovery_false_when_pr_still_open(self):
+    def test_recovery_false_when_pr_confirmed_open(self):
         self._open('open-1', minutes_ago=60)
-        with patch.object(self.hps, '_check_pr_closed_via_gh',
-                          return_value=None):
+        with patch.object(self.hps, '_gh_pr_state', return_value='OPEN'):
             recovered = self.hps._recover_no_session_revision(
                 'open-1', 'https://gh/o/r/pull/7')
-        self.assertFalse(recovered)
-        # Obligation stays OPEN so the loud alert fires.
+        self.assertFalse(recovered)  # confirmed OPEN → stuck → loud alert fires
         self.assertEqual(
             self._nsl.get_obligation('open-1')['status'], self._nsl.OPEN,
+        )
+
+    def test_recovery_defers_when_gh_unreachable(self):
+        # verify-before-alarm: gh unreachable (state None) must NOT fire a
+        # false alert — suppress this round, leave the obligation OPEN to retry.
+        self._open('unknown-1', minutes_ago=60)
+        with patch.object(self.hps, '_gh_pr_state', return_value=None):
+            recovered = self.hps._recover_no_session_revision(
+                'unknown-1', 'https://gh/o/r/pull/7')
+        self.assertTrue(recovered)  # suppress (defer), not alert
+        self.assertEqual(
+            self._nsl.get_obligation('unknown-1')['status'], self._nsl.OPEN,
         )
 
 

@@ -536,10 +536,11 @@ def _get_chain_events_for_task(task_id: str,
         return None
 
 
-def _check_pr_closed_via_gh(pr_url: str) -> Optional[str]:
-    """Return the PR state string if MERGED or CLOSED, else None. Returns
-    None on subprocess / JSON error too (treated as 'unknown' so the
-    legitimate alert behavior is preserved)."""
+def _gh_pr_state(pr_url: str) -> Optional[str]:
+    """Return the PR's GitHub state ('OPEN' / 'MERGED' / 'CLOSED'), or None on
+    ANY gh transport / non-zero exit / JSON error. The None-vs-state distinction
+    lets callers tell 'gh could not be reached' apart from 'confirmed OPEN' — so
+    an outage never masquerades as a positive signal (verify-before-alarm)."""
     try:
         result = subprocess.run(
             ['gh', 'pr', 'view', pr_url, '--json', 'state'],
@@ -551,11 +552,17 @@ def _check_pr_closed_via_gh(pr_url: str) -> Optional[str]:
             return None
         data = json.loads(result.stdout or '{}')
         state = data.get('state')
-        if state in ('MERGED', 'CLOSED'):
-            return state
+        return state if isinstance(state, str) and state else None
     except (subprocess.TimeoutExpired, json.JSONDecodeError, FileNotFoundError):
         return None
-    return None
+
+
+def _check_pr_closed_via_gh(pr_url: str) -> Optional[str]:
+    """Return the PR state string if MERGED or CLOSED, else None (OPEN, or any
+    gh/JSON error — both 'not terminal', preserving the legitimate alert
+    behavior). Thin wrapper over `_gh_pr_state`."""
+    state = _gh_pr_state(pr_url)
+    return state if state in ('MERGED', 'CLOSED') else None
 
 
 def _resolution_signal_present(
@@ -2079,15 +2086,20 @@ def _recover_no_session_revision(task: str, pr_url: str = '') -> bool:
 
     This is a VERIFY, not a re-dispatch: the mechanical cold-start revision
     already ran (outbox_notifier), so a blind re-dispatch here would risk a
-    loop. If the PR resolved out-of-band — MERGED or CLOSED — clear the ledger
-    obligation and report recovered, so the framework suppresses the alert.
-    Otherwise the loop is genuinely stuck → return False so exactly one loud,
-    non-suppressed alert fires. (Replaces the old silent Beacon re-deposit that
-    suppressed the alert without anything actually resolving.)"""
-    pr_state = (
-        _check_pr_closed_via_gh(pr_url)
-        if pr_url and pr_url != '(no pr_url)' else None
-    )
+    loop. Three outcomes:
+      - PR MERGED / CLOSED → clear the ledger obligation and report recovered
+        (the framework suppresses the alert).
+      - PR confirmed OPEN → return False so exactly one loud, non-suppressed
+        alert fires (the loop is genuinely stuck).
+      - state UNVERIFIABLE (no pr_url, or gh unreachable) → return True to
+        SUPPRESS this round rather than fire a possibly-false page on an
+        unknown state (verify-before-alarm). The obligation stays OPEN, so the
+        next tick re-checks once gh recovers.
+    (Replaces the old silent Beacon re-deposit that suppressed the alert
+    without anything actually resolving.)"""
+    if not pr_url or pr_url == '(no pr_url)':
+        return True  # nothing to verify against → defer rather than false-alert
+    pr_state = _gh_pr_state(pr_url)
     if pr_state in ('MERGED', 'CLOSED'):
         try:
             no_session_ledger.resolve_obligation(
@@ -2099,7 +2111,13 @@ def _recover_no_session_revision(task: str, pr_url: str = '') -> bool:
         log(f'NO_SESSION_REVISION_RESOLVED task={task} pr_state={pr_state}; '
             f'cleared ledger obligation', 'INFO')
         return True
-    return False
+    if pr_state is None:
+        # gh could not be reached — do NOT fire a loud alert on an unverifiable
+        # state. Suppress this round; the obligation stays open and re-checks.
+        log(f'NO_SESSION_REVISION task={task} pr_state unverifiable (gh '
+            f'unreachable); deferring alert to next tick', 'INFO')
+        return True
+    return False  # confirmed OPEN (or any live state) → genuinely stuck
 
 
 def _recover_stalled_sequence(seq_id: str, seq_path: str) -> bool:
