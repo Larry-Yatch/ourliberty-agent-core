@@ -187282,3 +187282,104 @@ Watermark: 1049 → 1050. No tier-reset (Tier-3 silence).
 
 **PRIME DIRECTIVE:** 0 new interventions this iter. Trailing-30d: interventions=1089, systemic_fixes=61, verification_pending=21, ratio≈17.85, trend=improving.
 **Tier end-of-iter:** Tier **1**, consecutive_clean=2. Last signal: 2026-06-24T04:58:34Z.
+
+---
+
+## Iteration ~2585 — 2026-06-24T05:23Z UTC (interactive /loop /cycle via chat, Tier 1→2, consecutive_clean 2→3→de-escalate)
+
+**Trigger:** Larry `/loop /cycle` invocation (chat mode, self-paced dynamic loop).
+
+**Health:** ✅ Clean — 1 new alert (L1051 Tier-3 silenced). 8/8 daemons alive (same PIDs as ~2584). No open PRs. No stalls. Tier de-escalated 1→2 (3rd consecutive clean iter).
+
+**VERIFY-BEFORE-REASSERT:**
+- **Daemons (re-verified):** forge_bot=1388801 (Ss) ✅, mirror_bot=1388982 (Ss) ✅, pulse_bot=1389067 (Ss) ✅, inbox_watcher=1732118 (Ssl) ✅, dashboard_api=1742129 (Ssl) ✅, chain_event_shipper=1742173 (SNs) ✅, beacon_telegram_bot=1761804 (Ss) ✅, outbox_notifier=1761924 (Ss) ✅. 8/8 alive, same PIDs as ~2584. ✅
+- **Hardening sequence `dag-preflight-orchestrator-terminal-signal-hardening-001` (re-verified):** beacon-pending-approvals.json status=pending, created 2026-06-24T04:52:14Z, reminders_sent=[]. Still awaiting Larry response. `approve dag-preflight-orchestrator-terminal-signal-hardening-001`. [yellow — carry] ✅
+- **Open PRs (re-verified):** `gh pr list` → empty. No open PRs. ✅
+- **push-soft-gate-block-upgrade-decision (re-verified):** 0 new alerts. [carry yellow] ✅
+- **credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED (re-verified):** 0 new alerts. [carry yellow] ✅
+- **fix-645-alert-translation-001 stall (re-verified):** Check 3 dry-run → `no stalls detected`. WARN for fix-645 absent (cooldown or resolved — monitoring). [blue — carry] ✅
+- **heal-daemon-restart-manifest-drift-tier4 G-rule (re-verified):** No new alerts from this source. Count stays at 2/3. [carry] ✅
+- **Untracked Beacon spec (re-verified):** `agents/beacon/specs/missions-v2-funnel-item-doorbell.md` still present. [carry informational] ✅
+
+**New since ~2584:**
+- L1051: `source=doorbell, kind=notification, intent=doorbell` (05:15:46Z) → **Tier-3 silence** ✅ (known-pattern, route=digest). Bot delivered directly. No second DM from Pulse.
+
+**Check 0 — Alert triage:** repair-watermark → no repair needed (old_watermark=1050, file_length=1051). L1051 (doorbell) Tier-3 silenced. Watermark advanced 1050→1051. ✅ Nominal.
+
+**Check 1 — Log noise (30-min window):** journalctl --user -p warning → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep (last 4h):** Beacon bot PID 1761804 (Ss) ✅. Last activity: 23:19 MDT (05:19Z) doorbell notification delivered. Larry's last message 22:57 MDT — Beacon spec review conversation (not a Pulse directive). DAG preflight approval still awaiting Larry. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → `no stalls detected`, 0 alerts fired. All FORGE_NO_PR_SKIP (existing PRs). ✅ Nominal.
+
+**Check 4 — Pending directives:** Beacon inbox: empty. Forge inbox: empty. Mirror inbox: empty. beacon-pending-approvals: pending=1 (`dag-preflight-orchestrator-terminal-signal-hardening-001`, 04:52Z — carry yellow). ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-24T05:14:17Z (~9 min before cycle). Within 60-min window. ✅ Nominal.
+
+**Check A — Source repo:** On main. HEAD=1faa614c=origin/main (clean, 0 behind, 0 ahead). Untracked: `agents/beacon/specs/missions-v2-funnel-item-doorbell.md`. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-24T04:36:31Z (~47 min ago). Within 2-hour window. ✅ Nominal.
+
+**Check C — Agent liveness:** 8/8 alive (same PIDs as ~2584). ✅ Nominal.
+
+**Check E — PRs:** No open PRs on ourliberty-agent-core. ✅ Nominal.
+
+**Check H — Forge digest:** Forge inbox empty. Mirror inbox empty. 6 residual worktrees (wt-forge-pr-664, wt-mirror-dag-preflight-hardening, wt-mirror-live-thread-descoped-rereview, wt-mirror-pr-664, wt-mirror-pr-668, wt-mirror-review-sequence-dag-launch-auto-retire). All from completed/closed sessions; heal-wedged-review-sessions will reap. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. ✅
+
+**Conditional checks — Wednesday 2026-06-24 UTC (weekday=2):**
+- **Check I:** `pulse_check_i.py --force` → `journal: skipped — block for 2026-06-22 already present`. Dedup skip. Mode=digest, 0 parked proposals. check-i-2026-06-24.json written. ✅ Nominal.
+- **Check III:** Not Sunday → skip. ✅
+
+**G-rule assessment:**
+- **heal-daemon-restart-manifest-drift-tier4** — 2/3 [unchanged]. No new occurrences. [carry — dispatch at 3/3]
+- **heal-pipeline-stall-dry-run-writes-real-alerts** — 2/3 [unchanged]. Dry-run wrote 0 real alerts. [carry]
+- All other G-rule counts unchanged from ~2584. [all carry]
+
+**Actions taken:**
+1. Check 0: L1051 Tier-3 silenced. Watermark advanced 1050→1051.
+2. PRIME ledger: `iter_clean` appended (tier=1, template=iter-clean-nominal).
+3. Tier state: `record --checks-clean true` → consecutive_clean 2→3 → **Tier 1→2 de-escalation** (consecutive_clean reset to 0).
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [yellow] **Hardening sequence `dag-preflight-orchestrator-terminal-signal-hardening-001`** — Approval DM sent 04:52Z. Reply `approve dag-preflight-orchestrator-terminal-signal-hardening-001` to unblock Mirror DAG review. [active]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Known false positive. Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [blue] **fix-645-alert-translation-001 stall** — WARN absent in dry-run (cooldown or resolved). [monitoring]
+- [blue] **G-rule heal-daemon-restart-manifest-drift-tier4** — 2/3. [carry — dispatch at 3/3]
+- [blue] **G-rule heal-pipeline-stall-dry-run-writes-real-alerts** — 2/3. [carry]
+- [blue] **G-rule sequence-step-review-escalate-null-chat** — 1/3. [carry]
+- [blue] **G-rule medic-approval-request-novel-tier4** — 1/3. [carry]
+- [blue] **G-rule beacon-claude-timeout** — 1/3. [carry]
+- [blue] **G-rule api-500-burst** — 1/3. [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. [carry]
+- [blue] **G-rule telegram-409-burst** — 2/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. [carry]
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. [carry]
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. [carry]
+- [blue] **G-rule sync.service-deploy-restart-storm-tier4** — 1/3. [carry]
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. [carry]
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 2/3. [carry]
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. [carry]
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. [carry]
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. [carry]
+- [blue] **G-rule health-notify-script-missing** — dispatch sent 2026-06-09. [carry]
+- [blue] **G-rule pulse-self-summary-tier4** — 1/3. [carry]
+- [blue] **unreviewed-merge:655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. [carry]
+- [blue] **Untracked Beacon spec** — `agents/beacon/specs/missions-v2-funnel-item-doorbell.md`. Larry authoring. [carry]
+- [blue] **6 residual worktrees** — heal-wedged-review-sessions will reap. [monitoring]
+
+**PRIME DIRECTIVE:** 0 new interventions this iter. Trailing-30d: systemic_fixes=61, ratio≈17.85, trend=improving.
+**Tier end-of-iter:** Tier **2** (de-escalated from 1), consecutive_clean=0. Last signal: 2026-06-24T04:58:34Z.
