@@ -5097,7 +5097,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-24T23:38:05.354770+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-24T23:35:13.999001+00:00"
+      "orphan_last_activity_ts": "2026-06-24T23:35:13.999001+00:00",
+      "briefing": {
+        "what": "A piece of work flagging that the tool meant to send you health alerts about the Ourliberty system isn't in place yet.",
+        "why": "Without it, problems with the system could go unnoticed until they become bigger, more expensive issues.",
+        "suggest": "Have someone confirm what's actually missing before greenlighting the work, since this started on its own without a clear owner or goal."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-24T23:48:10.481374+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
