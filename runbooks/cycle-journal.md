@@ -4,6 +4,111 @@
 
 ---
 
+## Iteration ~2567 — 2026-06-24T02:20Z UTC (interactive /cycle via chat, Tier 3→1 reset, consecutive_clean 3→0)
+
+**Trigger:** Larry `/cycle` invocation (chat mode).
+
+**Health:** ⚠️ Signal — 1 Tier-4 alert (verified false positive), G-rule seq-advancer-sequence-stranded hits 3/3, dispatch sent to Beacon. All mandatory + additive checks otherwise clean. 8/8 daemons alive (same PIDs as ~2566). HEAD=23cc1b64=origin/main, working tree dirty (agents/beacon/projects.json — healer-managed, nominal). 0 open PRs on agent-core.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Daemons (re-verified):** chain_event=930563 (SNs) ✅, inbox_watcher=1389730 (Ssl) ✅, forge_bot=1388801 (Ss) ✅, mirror_bot=1388982 (Ss) ✅, pulse_bot=1389067 (Ss) ✅, dashboard_api=1580445 (Ssl) ✅, beacon_telegram_bot=1580654 (Ss) ✅, outbox_notifier=1580739 (Ss) ✅. 8/8 alive, same PIDs as ~2566. ✅
+- **push-soft-gate-block-upgrade-decision (re-verified):** 0 new alerts this iter. Awaiting Larry decision. [carry yellow] ✅
+- **credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED (re-verified):** L1020 fired this iter, Tier-3 silenced (same pattern). [carry yellow] ✅
+- **fix-645-alert-translation-001 stall (re-verified):** WARN `larry_alerts append failed for forge_built_no_pr:fix-645-alert-translation-001` persists in Check 3 dry-run. [carry blue] ✅
+- **dashboard PR #88 (re-verified):** Still open (22:43:31Z, forge/live-thread, MERGEABLE, reviewDecision=""). Sequence advancer fired false-positive stranded alert for this PR (see Check 0 below). [carry blue] ✅
+
+**New since ~2566:** commit 23cc1b64 `Pulse cycle 20260624T014642Z` (run_cycle.sh auto-commit for ~2566 journal). HEAD=23cc1b64=origin/main. ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 1019, "file_length": 1022}` — **3 new alerts (L1020–L1022)**. Triaged:
+- L1020: `source=heal-credential-registry-drift, subject=credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED` → Tier-3 silence (known-pattern match). No tier-reset. ✅
+- L1021: `source=dispatch-branch-cleanup, subject=summary` → Tier-3 silence (known-pattern match). No tier-reset. ✅
+- L1022: `source=build-sequence-advancer, subject=sequence-stranded:phase4b-live-thread-001:live-thread` → Tier-4 (novel — no translation match). Helper: `decision=ask`. **Verified false positive per MEMORY.md protocol:** Forge archive `live-thread.1.json` shows `exit_code=0`, `completed_at=2026-06-23T22:43:41Z`, "PR opened: https://github.com/Larry-Yatch/ourliberty-dashboard/pull/88". The advancer's 4h backstop fired at 02:15Z without detecting the already-open PR #88. Sequence `phase4b-live-thread-001` is in state=paused/step-status=failed but the build succeeded and PR exists. **G-rule seq-advancer-sequence-stranded → 3/3 → dispatch sent to Beacon** (see Dispatches). No DM to Larry (false positive, PR #88 already tracked as blue standing finding). Tier-reset: YES (dispatch fired this iter).
+Watermark advanced 1019→1022. ✅
+
+**Check 1 — Log noise (30-min window):** journalctl --user -p warning: `-- No entries --` (0 WARN/ERROR). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot PID 1580654 (Ss) ✅. Last log: Larry 'Status' at 19:36:45-0600 (01:36:45Z) → Beacon catch_me_up delivered. No new directives since ~2566. 0 pending approvals. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → `0 new alert(s) fired, 0 recovered, 1 suppressed` (fix-645 cooldown only). All FORGE_NO_PR_SKIP entries are pr_exists/preflight_exit/superseded_session. Fix-645 WARN persists. ✅ Nominal.
+
+**Check 4 — Pending directives:** All agent inboxes empty (beacon/forge/mirror: 0 tasks pre-dispatch). beacon-pending-approvals: pending=0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-24T02:12:49Z (~7 min before cycle). Within 60-min window. ✅ Nominal.
+
+**Check A — Source repo:** On main. HEAD=23cc1b64=origin/main (0 commits behind). Working tree: `M agents/beacon/projects.json` — registered healer-managed path per `config/healer-managed-runtime-paths.json`, nominal-by-design. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json last_sync=2026-06-24T02:09:09Z (~11 min ago), status=no-change. Within 2-hour window. ✅ Nominal.
+
+**Check C — Agent liveness:** 8/8 alive (same PIDs as ~2566 — see VERIFY-BEFORE-REASSERT). ✅ Nominal.
+
+**Check D — Inboxes:** Agent inboxes empty (beacon/forge/mirror: 0 tasks pre-dispatch). ✅ Nominal.
+
+**Check E — PRs:** ourliberty-agent-core: 0 open PRs. ✅ Nominal.
+ourliberty-dashboard: PR#88 `feat(missions): live-feel thread — poll open thread + unread/refresh (Phase 4b)` (22:43:31Z, forge/live-thread, MERGEABLE, reviewDecision="") — no Mirror routing for dashboard, sequence advancer false-positive stranded alert addressed (see Check 0). [carry blue]
+
+**Check H — Forge digest:** New since ~2566: 23cc1b64 `Pulse cycle 20260624T014642Z` (run_cycle.sh auto-commit for ~2566). No new merges, no new PRs on agent-core. Pipeline quiet. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Wednesday 2026-06-24 UTC (weekday=2 ∈ {0,2,4,6}):**
+- **Check I:** `pulse_check_i.py --force` → `journal: skipped (block for 2026-06-22 already present)`. Auto-dispatch dedup skip (prior task `pulse-auto-f8ac2e3afc-20260622`). Mode=digest, 0 parked proposals. Artifact: `check-i-2026-06-24.json`. DM cooldown-suppressed. ✅ Nominal.
+- **Check III:** Last 2026-06-11 (13d < 14d gate, not Sunday) → skip. ✅
+
+**G-rule assessment:**
+- **seq-advancer-sequence-stranded: 2/3 → 3/3 → DISPATCHED** (seq-advancer-sequence-stranded-fix-001 → Beacon inbox). Permanent fix: advancer must check for existing open PR (`forge/<task_id>` head branch in `target_repo`) before marking a step `failed` at the 4h backstop.
+- All other G-rule counts unchanged from ~2566. [all carry]
+
+**Actions taken:**
+1. Check 0: watermark advanced 1019→1022 (3 alerts triaged: 2 Tier-3, 1 Tier-4 false-positive).
+2. G-rule seq-advancer-sequence-stranded 3/3: wrote dispatch envelope `seq-advancer-sequence-stranded-fix-001.json` to Beacon inbox.
+3. PRIME ledger: `intervention` appended (tier=3, L1022 Tier-4 triage, seq-advancer-stranded-false-positive).
+4. PRIME ledger: `verification_pending` appended (tier=3, seq-advancer-stranded-fix-001 dispatch).
+5. Tier state: `record --checks-clean false` → Tier 3→1 reset, consecutive_clean=0 (Tier-4 alert + dispatch fired this iter).
+
+**Dispatches:**
+- `seq-advancer-sequence-stranded-fix-001` → Beacon inbox. Direction-ask: spec a fix for build-sequence-advancer's 4h-backstop false-positive detection gap. Root cause: advancer marks step `failed` without checking if `gh pr list --repo <target_repo> --head forge/<task_id>` returns an open PR. Three occurrences: iters ~2328, ~2566-context, ~2567.
+
+**Standing findings (carried + verified):**
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Known false positive (Mirror REVIEW_PASS confirmed, manual merge). Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [blue] **ourliberty-dashboard PR #88 open** — `feat(missions): live-feel thread`. forge/live-thread, MERGEABLE, no Mirror routing for dashboard. Sequence paused/failed (false-positive advancer state). [carry]
+- [blue] **unreviewed-merge:655** — PR #655 merged manually by Larry. Mirror worktree wedged/reaped. Larry judgment. [carry]
+- [blue] **fix-645-alert-translation-001 worktree stall** — WARN persists in heal_pipeline_stall dry-run. [carry]
+- [blue] **G-rule seq-advancer-sequence-stranded** — 3/3 → DISPATCHED (seq-advancer-sequence-stranded-fix-001 → Beacon). [carry pending verification]
+- [blue] **G-rule sequence-step-review-escalate-null-chat** — 1/3. [carry]
+- [blue] **G-rule medic-approval-request-novel-tier4** — 1/3. [carry]
+- [blue] **G-rule heal-pipeline-stall-dry-run-writes-real-alerts** — 1/3. [carry]
+- [blue] **G-rule beacon-claude-timeout** — 1/3. [carry]
+- [blue] **G-rule api-500-burst** — 1/3. [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. [carry]
+- [blue] **G-rule telegram-409-burst** — 2/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. [carry]
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. [carry]
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. [carry]
+- [blue] **G-rule sync.service-deploy-restart-storm-tier4** — 1/3. [carry]
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. [carry]
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. [carry]
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. [carry]
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. [carry]
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. [carry]
+- [blue] **G-rule health-notify-script-missing** — dispatch sent 2026-06-09. [carry]
+- [blue] **unreviewed-merge:628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **Stale bash orphan PID 1834248** — benign. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. Informational. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention + 1 verification_pending this iter. Trailing-30d: systemic_fixes=60, verification_pending=20, ratio≈18.02, trend=improving.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0 (reset from Tier 3).
+
+---
+
 ## Iteration ~2566 — 2026-06-24T01:42Z UTC (interactive /cycle via chat, Tier 3, consecutive_clean 2→3)
 
 **Trigger:** Larry `/cycle` invocation (chat mode).

@@ -156,9 +156,9 @@
 
 ---
 
-## seq-advancer-sequence-stranded false-positive mechanism (confirmed iter ~2328)
+## seq-advancer-sequence-stranded false-positive mechanism → G-rule DISPATCHED (iter ~2567)
 
-**Rule:** When the build-sequence-advancer fires a `sequence-stranded` alert (4h backstop), verify the build phase archive BEFORE treating it as a live issue. Check `outboxes/forge/.archive/<task-id>.1.json` for `exit_code` and `result` text. If exit_code=0 and result says "already built/merged via prior PR," the alert is a false positive — the prior completed sequence step satisfied the spec, and the advancer's backstop fired before it detected the completion. Correct action: remove from standing findings; note G-rule 1/3. Do NOT escalate to Larry when build archive shows self-resolved outcome.
+**Rule:** When the build-sequence-advancer fires a `sequence-stranded` alert (4h backstop), verify the build phase archive BEFORE treating it as a live issue. Check `outboxes/forge/.archive/<task-id>.1.json` for `exit_code` and `result` text. If exit_code=0 and result says "PR opened: …," the alert is a false positive — Forge built and opened a PR but the advancer's 4h backstop fired before detecting it. Correct action: note as false positive, do NOT escalate to Larry, increment G-rule. **G-rule 3/3 dispatched at iter ~2567**: `seq-advancer-sequence-stranded-fix-001` → Beacon inbox. Fix: advancer must check for existing open PR (`forge/<task_id>` head in `target_repo`) before marking step failed at the 4h backstop. Verification pending (Beacon → Forge build → Mirror review → merge).
 
 ---
 
@@ -204,9 +204,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-24 01:42Z UTC (Iter ~2566, Tier 3, consecutive_clean=2→3)
+## Status snapshot — updated 2026-06-24 02:20Z UTC (Iter ~2567, Tier 3→1 reset, consecutive_clean=0)
 
-**Iter ~2566 summary:** ✅ Nominal — 0 new alerts, all checks clean. 8/8 daemons alive (same PIDs). HEAD=d3f24f01=origin/main. 0 open PRs on agent-core. Dashboard PR#88 still open (~177 min, no reviewDecision, forge/live-thread, no Mirror routing). Check I: dedup skip (block for 2026-06-22 present), artifact check-i-2026-06-24.json. Check III: 13d < 14d gate, not Sunday → skip. Tier 3 consecutive_clean 2→3. PRIME: systemic_fixes=60, verification_pending=19, ratio≈18.02, trend=improving. Standing [yellow]: push-soft-gate-block-upgrade-decision, unreviewed-merge:649+637+607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. [blue]: dashboard#88 watch, unreviewed-merge:655, fix-645 stall. G-rules at 2/3: revision-phase-preamble-missing, telegram-409-burst, Forge-preflight-CLARIFY_REQUEST, forge-preflight-task-id-mismatch, seq-advancer-sequence-stranded, F24-empty-prompt-envelope-rejected. 1/3: medic-approval-request-novel-tier4, heal-pipeline-stall-dry-run-writes-real-alerts, api-500-burst, beacon-claude-timeout, sequence-step-review-escalate-null-chat.
+**Iter ~2567 summary:** ⚠️ Signal — 3 alerts (L1020 Tier-3 credential-drift, L1021 Tier-3 dispatch-branch-cleanup, L1022 Tier-4 sequence-stranded:phase4b-live-thread-001 — verified false positive, PR#88 exists exit_code=0). G-rule seq-advancer-sequence-stranded 3/3 → dispatched seq-advancer-sequence-stranded-fix-001 to Beacon. Tier 3→1 reset. 8/8 daemons alive (same PIDs). HEAD=23cc1b64=origin/main. 0 open PRs on agent-core. Dashboard PR#88 MERGEABLE (forge/live-thread, no Mirror routing). Check I: dedup skip. Check III: 13d < 14d, not Sunday → skip. PRIME: systemic_fixes=60, verification_pending=20, ratio≈18.02, trend=improving. Standing [yellow]: push-soft-gate-block-upgrade-decision, unreviewed-merge:649+637+607, credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED, Check VIII 2026-06-15, Tier-2 probe auth_401, Check III proposals. [blue]: dashboard#88 watch, unreviewed-merge:655, fix-645 stall, seq-advancer-fix dispatched (verification pending). G-rules at 2/3: revision-phase-preamble-missing, telegram-409-burst, Forge-preflight-CLARIFY_REQUEST, forge-preflight-task-id-mismatch, F24-empty-prompt-envelope-rejected. G-rules dispatched: seq-advancer-sequence-stranded. 1/3: medic-approval-request-novel-tier4, heal-pipeline-stall-dry-run-writes-real-alerts, api-500-burst, beacon-claude-timeout, sequence-step-review-escalate-null-chat, sync.service-deploy-restart-storm-tier4, seq-advancer-approval-routing-gap, merge_conflict_manual_rebase-tier4, heal-pipeline-stall-mirror-pass-unmerged-tier4, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch, Forge-timeout-worktree-missing-retry-loop.
 
 
 
