@@ -192,9 +192,9 @@
 
 ---
 
-## G-rule watchdog-watcher-log-stale-post-fix — 1/3 (new, iter ~2634)
+## G-rule watchdog-watcher-log-stale-post-fix — 2/3 (iter ~2634 first, iter ~2638 second)
 
-**Rule:** PR #649 was marked COMPLETE after 5 consecutive clean Check 1 scans (iter ~2531). Pattern re-emerged at iter ~2634 under a specific context: inbox_watcher is idle (last log write 21:31Z) while Forge inbox has items in build/preflight phase running in separate agent sessions (not through inbox_watcher's active polling). The watchdog's "in-flight-aware" fix may not suppress WARNs when the build sessions are external to inbox_watcher's own active loop. Frequency: 12/hr (4 occurrences in 20 min), above the 5/hr threshold. Dispatch to Beacon at 3/3 for a regression fix or threshold adjustment.
+**Rule:** PR #649 was marked COMPLETE after 5 consecutive clean Check 1 scans (iter ~2531). Pattern re-emerged at iter ~2634 (inbox_watcher idle between sessions) and again at iter ~2638 (7 WARNs in 40-min window, ~10.5/hr): inbox_watcher started a Mirror session at 21:55Z for PR #687 and had no further log writes; the watchdog fired stale-log WARNs every ~5 min despite inbox_watcher being in-flight. Two failure modes confirmed: (1) idle gap between sessions, (2) long-running Mirror session with no inbox_watcher log writes. In-flight-aware fix (PR #649) fails in both cases. Dispatch to Beacon at 3/3 for a regression fix (suppress WARNs when inbox_watcher has a known long-running in-flight session, not just when it's actively polling).
 
 ---
 
@@ -239,6 +239,10 @@
 **Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:mirror-pass-unmerged:PR#N` alerts classify Tier-4 (novel — no translation match). Bot delivers as escalate (route=escalate) and DMs Larry. Pulse does NOT send a second DM. Dispatch to Beacon at 3/3 for Tier-3 translation in alert-translations.json (bot already DMs Larry directly; Pulse silence is correct). Instances: iter ~2629 (PR#685 rev1), iter ~2636 (PR#685 L1039 at 22:07Z).
 
 ---
+
+## Status snapshot — updated 2026-06-24 22:31Z UTC (Iter ~2638, Tier 1, consecutive_clean=0)
+
+**Iter ~2638 summary:** ⚠️ Watch — PR #685 CONFLICTING (pipeline-stall cooldown active); PR #687 CONFLICTING (Mirror review active since 21:55Z, 0 reviews yet); G-rule watchdog-watcher-log-stale-post-fix **2/3** NEW (7 WARNs in 40-min window, in-flight suppression failing for long Mirror sessions). 0 new alerts (watermark=1040). 8 daemons alive. Check I: mode=digest, cooldown-suppressed. HEAD=e57fc076. PRIME: interventions≈1110, systemic_fixes=63, ratio≈17.6, trend=improving. Tier 1, consecutive_clean=0.
 
 ## Status snapshot — updated 2026-06-24 22:20Z UTC (Iter ~2637, Tier 1, consecutive_clean=0)
 
