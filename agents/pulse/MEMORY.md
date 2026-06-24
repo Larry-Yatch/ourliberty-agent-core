@@ -192,15 +192,15 @@
 
 ---
 
-## G-rule watchdog-watcher-log-stale-post-fix — 2/3 (iter ~2634 first, iter ~2638 second)
+## G-rule watchdog-watcher-log-stale-post-fix → DISPATCHED (iter ~2640, 3/3)
 
-**Rule:** PR #649 was marked COMPLETE after 5 consecutive clean Check 1 scans (iter ~2531). Pattern re-emerged at iter ~2634 (inbox_watcher idle between sessions) and again at iter ~2638 (7 WARNs in 40-min window, ~10.5/hr): inbox_watcher started a Mirror session at 21:55Z for PR #687 and had no further log writes; the watchdog fired stale-log WARNs every ~5 min despite inbox_watcher being in-flight. Two failure modes confirmed: (1) idle gap between sessions, (2) long-running Mirror session with no inbox_watcher log writes. In-flight-aware fix (PR #649) fails in both cases. Dispatch to Beacon at 3/3 for a regression fix (suppress WARNs when inbox_watcher has a known long-running in-flight session, not just when it's actively polling).
+**Rule:** PR #649 was COMPLETE after 5 clean Check 1 scans (iter ~2531). Pattern re-emerged: iter ~2634 (idle gap), iter ~2638 (long Mirror session for PR #687, 7 WARNs/40 min), iter ~2640 (NEW session for PR #687 backstop review at 22:40Z). 3/3 threshold crossed iter ~2640. Dispatch: `watchdog-stale-post-pr649-regression-fix-001.json` to Beacon inbox. Fix needed: suppress watchdog stale-log WARNs when (a) inbox_watcher has live in-flight Mirror session PID + open worktree, OR (b) all inboxes empty. verification_pending.
 
 ---
 
-## G-rule ourliberty-health-notify-script-missing — 1/3 (new, iter ~2634)
+## G-rule ourliberty-health-notify-script-missing — 2/3 (iter ~2634 first, iter ~2640 second)
 
-**Rule:** `ourliberty-health[2120791]` emitted `WARN: notify script missing, alert dropped: 1 issue(s) need attention` once in the 30-min window. The service tries to notify via a script that doesn't exist; underlying "1 issue" is unknown. journalctl query by unit name requires elevated permissions (only visible via `ourliberty-*.service` wildcard). Frequency low (1 occurrence); track at 1/3. If it crosses 5/hr or the same alert-dropped pattern recurs, dispatch to Beacon to investigate the missing script and the suppressed health issue.
+**Rule:** `ourliberty-health` emits `WARN: notify script missing, alert dropped: 1 issue(s) need attention` intermittently. The service tries to notify via a script that doesn't exist; underlying "1 issue" is unknown. journalctl query by unit name requires elevated permissions (only visible via `ourliberty-*.service` wildcard). Instances: iter ~2634 (first), iter ~2640 (22:33Z second). Dispatch to Beacon at 3/3 to investigate missing script and the suppressed health issue.
 
 ---
 
@@ -240,6 +240,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-24 22:45Z UTC (Iter ~2640, Tier 1, consecutive_clean=0)
+
+**Iter ~2640 summary:** ⚠️ Watch — PR #685 CONFLICTING (pipeline-stall cooldown active); PR #687 CONFLICTING (MalformedMirrorMarker; heal-undispatched-pr-review backstop dispatched at 22:35Z; inbox_watcher processing backstop review; 2 Mirror inbox items). G-rule watchdog-watcher-log-stale-post-fix **3/3 DISPATCHED** (watchdog-stale-post-pr649-regression-fix-001 → Beacon inbox). ourliberty-health-notify-script-missing **2/3** (22:33Z second occurrence). 0 new alerts (watermark=1041). 8 daemons alive. Check I: mode=digest, cooldown-suppressed. HEAD=f9e31ea9. PRIME: interventions≈1112, systemic_fixes=64, ratio≈17.4, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-24 22:39Z UTC (Iter ~2639, Tier 1, consecutive_clean=0)
 
 **Iter ~2639 summary:** ⚠️ Watch — PR #685 CONFLICTING (pipeline-stall cooldown active); PR #687 CONFLICTING (Mirror session reaped at 22:30Z; MalformedMirrorMarker at 22:32Z; re-review pending via marker-error envelope in Mirror inbox). 1 new alert (L1041): Tier-3 (heal-wedged-review-sessions, wedged-review-reaped). Watermark 1040→1041. 8 daemons alive. G-rule watchdog-watcher-log-stale-post-fix: 2/3 carry (same session reaped, no new independent occurrence). Check I: mode=digest, cooldown-suppressed. HEAD=eb45518b. PRIME: interventions≈1111, systemic_fixes=63, ratio≈17.6, trend=improving. Tier 1, consecutive_clean=0.
@@ -263,13 +267,5 @@
 ## Status snapshot — updated 2026-06-24 21:57Z UTC (Iter ~2634, Tier 1, consecutive_clean=0)
 
 **Iter ~2634 summary:** ⚠️ Watch — PR #687 NEW CONFLICTING (21:44Z) — G-rule fix forge-post-open-mergeable-rebase-001 opened as PR but is itself CONFLICTING (meta-irony); PR #685 still CONFLICTING. Watchdog-watcher-log-stale WARNs above threshold (12/hr, post-PR #649 fix; G-rule watchdog-watcher-log-stale-post-fix 1/3 NEW). ourliberty-health notify-script-missing (G-rule 1/3 NEW). 0 new larry-alerts (watermark 1035). 8 daemons alive. Check I: mode=digest, cooldown-suppressed. PRIME: interventions≈1106, systemic_fixes=63, ratio≈17.5, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-24 21:42Z UTC (Iter ~2633, Tier 1, consecutive_clean=0)
-
-**Iter ~2633 summary:** ⚠️ Watch — PR #685 still CONFLICTING (forge-post-open-mergeable-rebase-001 in BUILD); reconcile-hardening-mission-shipped-002 in BUILD; forge-wip-only-auto-redispatch-001, heal-stall-dryrun-noop-001, one-time-stale-dispatch-branch-cleanup-001 in Forge preflight. 0 new alerts (watermark 1035). All 8 daemons alive. Check I: mode=digest, cooldown-suppressed. HEAD=99a76219. PRIME: interventions≈1105, systemic_fixes=63, ratio≈17.5, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-24 21:33Z UTC (Iter ~2631, Tier 1, consecutive_clean=0)
-
-**Iter ~2631 summary:** ⚠️ Watch — PR #685 still CONFLICTING (Mirror REVIEW_PASS rev1 confirmed); forge-post-open-mergeable-rebase-001 IN BUILD. forge-wip-only-auto-redispatch-001 in Forge preflight. reconcile-hardening-002 in BUILD. L1035 Tier-3 (heal-droplet-git-drift, Beacon spec untracked — expected). Watermark 1034→1035. PRIME: interventions≈1103, systemic_fixes=63, ratio≈17.5, trend=improving. Tier 1, consecutive_clean=0.
 
 
