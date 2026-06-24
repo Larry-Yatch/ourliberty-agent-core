@@ -4947,6 +4947,28 @@ class RevisionLoopTest(unittest.TestCase):
         )
         self.assertEqual(len(revisions), 1)
 
+    def test_no_session_cold_start_reopens_obligation_on_idempotent_reprocess(self):
+        # Regression (review HIGH): the idempotency early-return (revision file
+        # already exists) must STILL open the ledger obligation — a dispatch that
+        # crashed between the write and the ledger open would otherwise leave the
+        # backstop blind. Simulate by resolving the obligation, then reprocessing
+        # (the file exists → early-return) and asserting it re-opened.
+        nsl = on.no_session_ledger
+        body = self._mirror_revision_outbox()
+        body.pop('forge_build_session_id', None)
+        on.process_outbox(self._write_outbox('mirror', 'real-no-session.json', body))
+        self.assertEqual(nsl.get_obligation('prod-loop')['status'], nsl.OPEN)
+        nsl.resolve_obligation('prod-loop', resolution='review-pass')
+        # Reprocess: revision file already exists → idempotency early-return.
+        on.process_outbox(self._write_outbox('mirror', 'real-no-session.json', body))
+        self.assertEqual(
+            len(list((on.INBOXES_ROOT / 'forge').glob('revision-prod-loop-*.json'))),
+            1,  # still idempotent — no duplicate revision
+        )
+        self.assertEqual(  # but the obligation was re-opened by the early-return
+            nsl.get_obligation('prod-loop')['status'], nsl.OPEN,
+        )
+
     def test_no_session_revision_pass_branch_unchanged(self):
         # Regression guard: a normal REVISION WITH a forge_build_session_id
         # still dispatches to Forge and does NOT route to Beacon's no-session

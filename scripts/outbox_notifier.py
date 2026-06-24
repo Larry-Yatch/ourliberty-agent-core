@@ -4777,6 +4777,24 @@ def _dispatch_revision_to_forge(
         revision_filename = f'revision-{task_id}-{next_count}.json'
     revision_filename = safe_write_inbox.canonical_inbox_name(revision_filename)
     forge_inbox = safe_write_inbox.INBOXES_ROOT / 'forge'
+
+    def _open_cold_start_obligation() -> None:
+        # Record/refresh the durable obligation so the backstop (heal Check 6)
+        # can verify this session-less revision actually closes (Mirror PASS /
+        # merge) instead of trusting that the dispatch fired (S1/M3). Idempotent
+        # + fail-safe; called on BOTH a fresh write and the idempotency
+        # early-return below — the file already existing means a revision IS in
+        # flight, and a prior dispatch may have crashed before opening the
+        # obligation, which would otherwise leave the backstop blind to it.
+        no_session_ledger.open_obligation(
+            task_id,
+            pr_url=pr_url or '(no pr_url)',
+            branch=branch,
+            target_repo=target_repo,
+            head_sha=data.get('head_sha'),
+            round_num=next_count,
+        )
+
     if (
         (forge_inbox / revision_filename).exists()
         or (forge_inbox / '.archive' / revision_filename).exists()
@@ -4786,6 +4804,8 @@ def _dispatch_revision_to_forge(
             f'revision-{next_count} already dispatched for task {task_id} '
             f'(file or archive or .invalid present); skipping duplicate write'
         )
+        if cold_start:
+            _open_cold_start_obligation()
         return
 
     # D3.5 5d cost-budget gate. AFTER the idempotency check (second-pass
@@ -4809,17 +4829,7 @@ def _dispatch_revision_to_forge(
             f'(task={task_id}, file={dest.name}, {resume_note})'
         )
         if cold_start:
-            # Open the durable obligation so the backstop can verify this
-            # session-less revision actually closes (Mirror PASS / merge),
-            # instead of trusting that the dispatch fired (S1/M3).
-            no_session_ledger.open_obligation(
-                task_id,
-                pr_url=pr_url or '(no pr_url)',
-                branch=branch,
-                target_repo=target_repo,
-                head_sha=data.get('head_sha'),
-                round_num=next_count,
-            )
+            _open_cold_start_obligation()
     except (
         safe_write_inbox.DispatchRejected,
         safe_write_inbox.RoutingDenied,
@@ -10216,19 +10226,19 @@ def process_outbox(outbox_file: Path) -> str:
         # task-17's larry-direct preflight to silently skip build-phase
         # dispatch (Larry had to manually bridge the build envelope).
         #
-        # chain-context-durability S2 (M2): when a Mirror REVIEW_REVISION
-        # carries no forge_build_session_id, `_dispatch_revision_to_forge`
-        # (below) routes an actionable `code-review-revision-no-session`
-        # notify to Beacon for a fresh-task_id re-dispatch instead of
-        # resuming a (non-existent) build session. Suppress THIS generic
-        # back-leg notify in that case: its body says "revision
-        # auto-dispatched to Forge, just journal," which is factually false
-        # (no dispatch happened) and would double up with the no-session
-        # route notify. The route notify is the sole, accurate Beacon signal.
+        # forge-cold-start-revision S2: when a Mirror REVIEW_REVISION carries
+        # no forge_build_session_id, `_dispatch_revision_to_forge` (below)
+        # mechanically dispatches a FRESH Forge revision (no `--resume`) with a
+        # full cold-start brief — there is no session to resume, and Beacon is
+        # intentionally kept OUT of the cold-start loop (the old LLM-mediated
+        # Beacon route was removed). Suppress THIS generic back-leg notify in
+        # that case: its body says "revision auto-dispatched to Forge, just
+        # journal," which would now double-signal the mechanical dispatch the
+        # cold-start path already performs.
         # Only the genuine revision-dispatch path is suppressed — an
         # auto_promoted / budget_exhausted REVISION downgrades to
         # review-escalate (intent override above) and keeps its back-leg
-        # notify, since no no-session route fires for it.
+        # notify, since no cold-start dispatch fires for it.
         suppress_no_session_backleg = (
             marker_decision['marker_type'] == 'review_revision'
             and agent == 'mirror'
@@ -10297,25 +10307,26 @@ def process_outbox(outbox_file: Path) -> str:
             _dispatch_revision_to_forge(data, marker_decision)
 
         # forge-cold-start-revision (S2/S3): a terminal Mirror verdict closes
-        # any open no-session obligation for this task — PASS, ESCALATE,
-        # EMERGENCY_HALT, or a REVISION that downgraded to escalate
-        # (auto-promoted / budget-exhausted). Only an ACTIVE revision re-dispatch
-        # (the branch above) keeps it open. resolve_obligation no-ops when no
-        # obligation exists, so this is safe for every PR (forge PRs included).
-        if agent == 'mirror' and str(
-            marker_decision['marker_type']
-        ).startswith('review_'):
-            _active_revision = (
-                marker_decision['marker_type'] == 'review_revision'
-                and not marker_decision.get('auto_promoted')
-                and not marker_decision.get('budget_exhausted')
+        # any open no-session obligation for this task. Terminal = PASS /
+        # ESCALATE / EMERGENCY_HALT, plus a REVISION that downgraded to escalate
+        # (auto-promoted / budget-exhausted — the loop ended, Larry was pinged).
+        # An ACTIVE revision re-dispatch (the branch above) keeps it open. Match
+        # the EXPLICIT terminal set (not a `review_` prefix) so a future
+        # non-terminal `review_*` marker can't resolve an obligation mid-loop.
+        # resolve_obligation no-ops when no obligation exists → safe for every PR.
+        if agent == 'mirror':
+            _mtype = marker_decision['marker_type']
+            _downgraded_revision = (
+                _mtype == 'review_revision'
+                and (marker_decision.get('auto_promoted')
+                     or marker_decision.get('budget_exhausted'))
             )
-            if not _active_revision:
+            if _mtype in (
+                'review_pass', 'review_escalate', 'review_emergency_halt',
+            ) or _downgraded_revision:
                 no_session_ledger.resolve_obligation(
                     data.get('task_id') or 'unknown',
-                    resolution=str(
-                        marker_decision['marker_type']
-                    ).replace('review_', ''),
+                    resolution=str(_mtype).replace('review_', ''),
                 )
 
         # false-success-notify-fix (2026-06-11): the Mirror REVIEW_PASS
