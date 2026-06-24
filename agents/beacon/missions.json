@@ -5062,6 +5062,25 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "operator-needs-you-feed",
+      "name": "Operator Needs-You Feed",
+      "phase": "in_flight",
+      "brief": "Complete the /where-we-are Waiting-on-You board + doorbell: feed the two missing needs-you classes (critical alerts the healers couldn't auto-fix; CLARIFY-exhausted builds) through the existing promote_alerts gate as durable, self-clearing for-Larry records; itemize paused / stuck-dispatched build sequences; and add live Resume/Skip/Cancel steering buttons via a new audited POST endpoint. Supersedes the archived e4-4g operator-action-queue.",
+      "spec_docs": [
+        "agents/beacon/specs/operator-needs-you-feed.md"
+      ],
+      "task_ids": [
+        "seq-operator-needs-you-feed-step-escalation-feed",
+        "seq-operator-needs-you-feed-step-sequence-rows-endpoint",
+        "seq-operator-needs-you-feed-step-waiting-panel-render"
+      ],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-24",
+      "deferred_reason": null,
+      "proposed_by": "beacon",
+      "proposed_at": "2026-06-24T19:30:00+00:00"
     }
   ]
 }
