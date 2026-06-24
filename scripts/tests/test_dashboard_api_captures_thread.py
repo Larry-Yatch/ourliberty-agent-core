@@ -354,5 +354,107 @@ class DetectOrphansCardMessageTest(unittest.TestCase):
         self.assertIn('genuine-orphan-work', tids)
 
 
+# ============ captures-list doorbell projection (Phase 4b.2 Contract E) ======
+
+class CapturesDoorbellTest(_ThreadBase):
+    """Pin Contract E: GET /api/missions/captures projects a per-card `doorbell`
+    (newest team_to_larry id/ts + blocked), batched from ONE chain_events read,
+    fail-safe to null. The closed-card badge (Contract F) keys on this shape."""
+
+    def _captures_by_id(self):
+        r = self.c.get('/api/missions/captures', headers=AUTH)
+        self.assertEqual(r.status_code, 200, r.text)
+        body = r.json()
+        return body, {c['id']: c for c in body['captures']}
+
+    def test_projection_shape_newest_team_reply(self):
+        # cap-1: larry ask then a team reply with needs_reply → blocked badge.
+        # cap-2: only a larry_to_team message (no team reply) → doorbell null.
+        self._seed(_cap('cap-1'), _cap('cap-2'))
+        self.client.rows = [
+            self._msg_row('cap-1', 'e2', '2026-06-14T02:00:00+00:00',
+                          direction='team_to_larry', text='reply',
+                          needs_reply=True),
+            self._msg_row('cap-1', 'e1', '2026-06-14T01:00:00+00:00',
+                          direction='larry_to_team', text='ask'),
+            self._msg_row('cap-2', 'e3', '2026-06-14T01:30:00+00:00',
+                          direction='larry_to_team', text='ask2'),
+        ]
+        _, caps = self._captures_by_id()
+        db = caps['cap-1']['doorbell']
+        self.assertEqual(db['latest_team_id'], 'e2')
+        self.assertEqual(db['latest_team_ts'], '2026-06-14T02:00:00+00:00')
+        self.assertIs(db['blocked'], True)
+        self.assertEqual(set(db), {'latest_team_id', 'latest_team_ts', 'blocked'})
+        # no team reply → null (a card with no Beacon reply shows no badge)
+        self.assertIsNone(caps['cap-2']['doorbell'])
+
+    def test_newest_team_reply_wins_over_older(self):
+        # Two team replies; only the NEWEST one's id/ts/blocked is projected.
+        self._seed(_cap('cap-1'))
+        self.client.rows = [
+            self._msg_row('cap-1', 'new', '2026-06-14T03:00:00+00:00',
+                          direction='team_to_larry', needs_reply=False),
+            self._msg_row('cap-1', 'old', '2026-06-14T01:00:00+00:00',
+                          direction='team_to_larry', needs_reply=True),
+        ]
+        _, caps = self._captures_by_id()
+        db = caps['cap-1']['doorbell']
+        self.assertEqual(db['latest_team_id'], 'new')
+        self.assertIs(db['blocked'], False)
+
+    def test_blocked_false_when_needs_reply_falsey(self):
+        # Pins the loud→quiet distinction Contract F renders: an FYI team reply
+        # (needs_reply false) projects blocked=False, not a louder badge.
+        self._seed(_cap('cap-1'))
+        self.client.rows = [
+            self._msg_row('cap-1', 'e1', '2026-06-14T02:00:00+00:00',
+                          direction='team_to_larry', needs_reply=False),
+        ]
+        _, caps = self._captures_by_id()
+        db = caps['cap-1']['doorbell']
+        self.assertEqual(db['latest_team_id'], 'e1')
+        self.assertIs(db['blocked'], False)
+
+    def test_failsafe_chain_events_error_degrades_to_null(self):
+        # With the chain_events read stubbed to raise, the captures payload
+        # still serves its file-read contract with every card → doorbell null,
+        # no 500 (mirrors _reader_captures' missing-file degradation).
+        self._seed(_cap('cap-1'), _cap('cap-2'))
+        orig = da._fetch_events_for_task_ids
+
+        def _boom(*a, **k):
+            raise RuntimeError('chain_events down')
+
+        da._fetch_events_for_task_ids = _boom  # type: ignore[assignment]
+        try:
+            body, caps = self._captures_by_id()
+        finally:
+            da._fetch_events_for_task_ids = orig  # type: ignore[assignment]
+        self.assertIn('last_synced_at', body)
+        self.assertEqual(set(caps), {'cap-1', 'cap-2'})
+        for c in caps.values():
+            self.assertIsNone(c['doorbell'])
+
+    def test_single_batch_query_no_per_card_roundtrip(self):
+        # The projection consults chain_events exactly ONCE for the whole list,
+        # carrying every parked card id — no per-card round-trip.
+        self._seed(_cap('cap-1'), _cap('cap-2'), _cap('cap-3'))
+        orig = da._fetch_events_for_task_ids
+        calls: list[list[str]] = []
+
+        def _spy(client, task_ids):
+            calls.append(list(task_ids))
+            return orig(client, task_ids)
+
+        da._fetch_events_for_task_ids = _spy  # type: ignore[assignment]
+        try:
+            self._captures_by_id()
+        finally:
+            da._fetch_events_for_task_ids = orig  # type: ignore[assignment]
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(set(calls[0]), {'cap-1', 'cap-2', 'cap-3'})
+
+
 if __name__ == '__main__':
     unittest.main()
