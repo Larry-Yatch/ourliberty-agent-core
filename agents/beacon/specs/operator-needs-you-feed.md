@@ -72,6 +72,8 @@ The key discovery that shapes this spec: **the "needs-you" gate already exists.*
 - **Clearing:** the record clears when a fresh dispatch for that task_id is observed (Beacon re-dispatched, or Larry dropped it). Backstop: `heal_pipeline_stall` already tracks stuck tasks; reuse its observation rather than a timer.
 - **Enforcement:** the write rides the existing terminal-intent handler (no new poll). Test asserts: clarification-exhausted→record written with the task_id; re-dispatch→record cleared.
 
+> **Sibling producer (cross-ref).** A third escalation producer feeds this same `promote_alerts` "needs-you" gate → Waiting-on-You panel + doorbell: `mirror-review-visibility.md` Contract C routes the *action-needed* session-less-PR escalation (a red `mirror-review` PR gone quiet with no self-heal) as a durable, self-clearing for-Larry record through this gate — reusing the §5.1/§5.2 producer pattern and decisions c/d, so it lands on this surface with no rework here. See that spec's Contract C and its §9 soft-dependency on this feed.
+
 ### 5.3 Sequence — paused sequence (Part B)
 
 - **Source:** `system_state_log.load_active_sequences()` already returns `status=='paused'` sequences. Itemize them into `waiting_on_larry.items` as `source='sequence'`.
