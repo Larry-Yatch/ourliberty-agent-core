@@ -36,21 +36,37 @@ from typing import Optional, TypeVar
 T = TypeVar('T')
 
 
-def read_fast_tracked_at(path: Path) -> Optional[str]:
-    """Return the task's ``fast_tracked_at`` string, or None.
+def _str_or_none(value: object) -> Optional[str]:
+    return value if isinstance(value, str) and value else None
+
+
+def read_dispatch_meta(path: Path) -> tuple[Optional[str], Optional[str]]:
+    """Return ``(fast_tracked_at, task_id)`` for an inbox task file.
 
     Best-effort: any OS/JSON error, a non-object payload, or a missing/blank
-    field all yield None (treat as not fast-tracked).
+    field yields None for that slot. ``task_id`` lets the dashboard reader
+    reconstruct the dispatcher's in-flight key (``task.get('task_id')`` or the
+    filename stem — see ``inbox_watcher.process_task``) so a task that is
+    already building can be filtered out of the queued lane.
     """
     try:
         with open(path, 'r', encoding='utf-8') as fh:
             data = json.load(fh)
     except (OSError, ValueError):
-        return None
+        return None, None
     if not isinstance(data, dict):
-        return None
-    value = data.get('fast_tracked_at')
-    return value if isinstance(value, str) and value else None
+        return None, None
+    return _str_or_none(data.get('fast_tracked_at')), _str_or_none(data.get('task_id'))
+
+
+def read_fast_tracked_at(path: Path) -> Optional[str]:
+    """Return the task's ``fast_tracked_at`` string, or None.
+
+    Best-effort: any OS/JSON error, a non-object payload, or a missing/blank
+    field all yield None (treat as not fast-tracked). Thin wrapper over
+    ``read_dispatch_meta`` so the dispatcher's hot path stays single-purpose.
+    """
+    return read_dispatch_meta(path)[0]
 
 
 def order_pending(

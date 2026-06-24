@@ -274,6 +274,37 @@ class QueuedLaneTest(_Base):
         self.assertEqual(r.json()['queued'], [])
 
 
+class QueuedLaneInFlightFilterTest(_Base):
+    """A task already building (in the in-flight registry for this agent)
+    must NOT also appear in the queued lane — it belongs to the building lane."""
+
+    def test_building_task_excluded_from_queued(self):
+        _write_inbox_file(self.agents_root, 'forge', 'building-1.json')
+        _write_inbox_file(self.agents_root, 'forge', 'queued-1.json')
+        _write_in_flight(self.agents_root, task_stem='building-1', agent_id='forge')
+        c = _client(self.agents_root, self.worktrees_root)
+        r = c.get('/api/system/agent-queue', headers=AUTH)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual([q['task_id'] for q in r.json()['queued']], ['queued-1'])
+
+    def test_building_matched_by_explicit_task_id(self):
+        # inbox filename differs from the payload's task_id (the in-flight key)
+        import json
+        (self.agents_root / 'inboxes' / 'forge' / 'file-stem.json').write_text(
+            json.dumps({'task_id': 'real-id', 'prompt': 'x'}))
+        _write_in_flight(self.agents_root, task_stem='real-id', agent_id='forge')
+        c = _client(self.agents_root, self.worktrees_root)
+        r = c.get('/api/system/agent-queue', headers=AUTH)
+        self.assertEqual(r.json()['queued'], [])
+
+    def test_other_agent_in_flight_does_not_exclude(self):
+        _write_inbox_file(self.agents_root, 'forge', 'shared.json')
+        _write_in_flight(self.agents_root, task_stem='shared', agent_id='mirror')
+        c = _client(self.agents_root, self.worktrees_root)
+        r = c.get('/api/system/agent-queue', headers=AUTH)
+        self.assertEqual([q['task_id'] for q in r.json()['queued']], ['shared'])
+
+
 # ==================== building lane ====================
 
 class BuildingLaneTest(_Base):
