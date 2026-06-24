@@ -240,6 +240,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-24 22:52Z UTC (Iter ~2641, Tier 1, consecutive_clean=0)
+
+**Iter ~2641 summary:** ⚠️ Watch — PR #685 CONFLICTING (pipeline-stall cooldown active); PR #687 CONFLICTING (Mirror backstop review session active since 22:44Z — new worktree created, inbox_watcher processing). G-rule watchdog-watcher-log-stale-post-fix: 3/3 dispatched (verification_pending; new WARN at 22:50Z for active Mirror session, fix in Beacon inbox). ourliberty-health-notify-script-missing: 2/3 carry (0 new instances). 0 new alerts (watermark=1041). 8 daemons alive. Check I: mode=digest, cooldown-suppressed. HEAD=4bc66f02. PRIME: interventions≈1113, systemic_fixes=64, ratio≈17.4, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-24 22:45Z UTC (Iter ~2640, Tier 1, consecutive_clean=0)
 
 **Iter ~2640 summary:** ⚠️ Watch — PR #685 CONFLICTING (pipeline-stall cooldown active); PR #687 CONFLICTING (MalformedMirrorMarker; heal-undispatched-pr-review backstop dispatched at 22:35Z; inbox_watcher processing backstop review; 2 Mirror inbox items). G-rule watchdog-watcher-log-stale-post-fix **3/3 DISPATCHED** (watchdog-stale-post-pr649-regression-fix-001 → Beacon inbox). ourliberty-health-notify-script-missing **2/3** (22:33Z second occurrence). 0 new alerts (watermark=1041). 8 daemons alive. Check I: mode=digest, cooldown-suppressed. HEAD=f9e31ea9. PRIME: interventions≈1112, systemic_fixes=64, ratio≈17.4, trend=improving. Tier 1, consecutive_clean=0.
