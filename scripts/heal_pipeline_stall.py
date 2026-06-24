@@ -724,6 +724,22 @@ def _preflight_family_shipped(task_id: str, prs: list[dict]) -> Optional[dict]:
     return None
 
 
+def _load_forge_outbox(task_id: str) -> Optional[dict]:
+    """Load + parse the archived first-attempt Forge outbox `<task_id>.json`.
+    Returns the parsed dict, or None on a missing / unreadable / invalid-JSON
+    archive. Single source for the first-attempt read shared by the `_forge_*`
+    reconciliation helpers below (retry siblings glob `<task_id>.*.json`
+    separately in `_forge_retry_succeeded`, so they don't route through here)."""
+    archive = FORGE_OUTBOX_ARCHIVE / safe_write_inbox.sanitize_component(f'{task_id}.json')
+    if not archive.exists():
+        return None
+    try:
+        with open(archive, errors='replace') as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
 def _forge_preflight_non_proceed(task_id: str) -> Optional[str]:
     """Classify the archived Forge outbox as a clean preflight non-PROCEED.
     Returns a short label string if so, else None.
@@ -752,13 +768,8 @@ def _forge_preflight_non_proceed(task_id: str) -> Optional[str]:
         recognized clean preflight outcome. Caller treats this as
         'no preflight skip-signal' and proceeds with the normal
         PR-existence reconciliation + alert decision."""
-    archive = FORGE_OUTBOX_ARCHIVE / safe_write_inbox.sanitize_component(f'{task_id}.json')
-    if not archive.exists():
-        return None
-    try:
-        with open(archive, errors='replace') as f:
-            data = json.load(f)
-    except (OSError, json.JSONDecodeError):
+    data = _load_forge_outbox(task_id)
+    if data is None:
         return None
     result = data.get('result')
     if isinstance(result, str):
@@ -846,13 +857,8 @@ def _forge_pr_create_inferred_failure(task_id: str) -> Optional[str]:
     this function stays a pure read of the first attempt. Returns None on a
     missing/unreadable archive or a clean (exit_code==0, no error) outbox --
     the caller then proceeds with the normal build-gap alert decision."""
-    archive = FORGE_OUTBOX_ARCHIVE / safe_write_inbox.sanitize_component(f'{task_id}.json')
-    if not archive.exists():
-        return None
-    try:
-        with open(archive, errors='replace') as f:
-            data = json.load(f)
-    except (OSError, json.JSONDecodeError):
+    data = _load_forge_outbox(task_id)
+    if data is None:
         return None
     return _classify_outbox_error(data)
 
@@ -936,6 +942,77 @@ def _forge_retry_succeeded(task_id: str) -> Optional[str]:
     return None
 
 
+def _forge_already_merged_bridge(task_id: str, merged_prs: list[dict]) -> Optional[dict]:
+    """Bridge a `forge built / no PR` task to the PR its work already merged
+    under, when that PR's branch + title carry no task_id token so
+    `_pr_matches_task` (Reconciliation step 1) cannot correlate it.
+
+    This is the heal_pipeline_stall sibling of build_sequence_advancer's
+    `_bridge_already_merged_pr` (PR #610), which closed the same matcher-blind
+    class for build-SEQUENCE steps ONLY. A standalone (non-sequence) Forge
+    dispatch whose work was already merged under a differently-named PR — e.g.
+    a follow-up whose change shipped inside the parent PR before the dispatch
+    ran — still fell all the way through to the build-gap alarm. Production
+    driver (2026-06-23): task `fix-645-alert-translation-001` — its alert-
+    translation entry was already committed to `fix/proposed-retirement-forge-
+    matcher` before the dispatch ran, so Forge honestly opened NO PR; the work
+    shipped under PR #645, whose branch + title carry none of the task_id token.
+    Medic could only durably *silence* that false stall per-fingerprint; this
+    closes it at the source so the stall never emits.
+
+    Reads the archived first-attempt outbox `<task_id>.json`; if its `result`
+    carries Forge's canonical `NO PR — already merged: #<N>` contract line (or
+    the prose-cue fallback), resolves PR #<N> and returns the matching PR dict
+    IFF it is confirmed MERGED — first against the already-fetched recent-merged
+    list `merged_prs` (scoped to the outbox's `target_repo` when present; else a
+    UNIQUE cross-repo number match, so a #<N> that collides between repos can't
+    bridge to the wrong PR), then a direct `gh pr view` verify for a PR older
+    than the fetch window. Searches `merged_prs` ONLY — never the open-PR list —
+    so an OPEN #<N> (a coincidental cross-repo number collision) can't be
+    mistaken for the merge; a genuinely-open correlatable PR is already step 1's
+    job. Fail-safe: any miss, ambiguity, or error → None — the alert fires,
+    today's behavior, so this can only REMOVE false stalls, never mask a real
+    one.
+
+    Reuses `sequence_shortcut_helpers` (parse_already_merged_pr_ref /
+    qualify_repo / gh_pr_merge_info) under a lazy import guard so a partial
+    deploy that lacks the module degrades to None rather than raising — the
+    single shared already-merged matcher, not a second copy that could drift."""
+    data = _load_forge_outbox(task_id)
+    if data is None:
+        return None
+    result_text = data.get('result')
+    if not isinstance(result_text, str) or not result_text:
+        return None
+    try:
+        import sequence_shortcut_helpers as ssh  # lazy: see docstring
+    except Exception:
+        return None
+    pr_number = ssh.parse_already_merged_pr_ref(result_text)
+    if pr_number is None:
+        return None
+    target_repo = data.get('target_repo')
+    qualified = ssh.qualify_repo(target_repo) if target_repo else None
+    # Prefer the already-fetched recent-merged list (no extra gh call). Scope
+    # to the outbox's target_repo when known; else require a UNIQUE cross-repo
+    # number match (both tracked repos number independently).
+    candidates = [pr for pr in merged_prs if pr.get('number') == pr_number]
+    if qualified:
+        candidates = [pr for pr in candidates if pr.get('_repo') == qualified]
+    if len(candidates) == 1:
+        return candidates[0]
+    # Not in the fetched window (or ambiguous without a repo to scope by) —
+    # verify the named PR directly IFF we know which repo to ask. Refuse to
+    # guess otherwise (the safe direction: fall through to the alert).
+    if not qualified:
+        return None
+    info = ssh.gh_pr_merge_info(qualified, pr_number)
+    if info is None:
+        return None
+    url, merged_at = info
+    return {'number': pr_number, 'url': url, 'mergedAt': merged_at, '_repo': qualified}
+
+
 def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
                             merged_prs: list[dict], state: dict) -> list[dict]:
     """Find Forge build-done lines >FORGE_BUILT_NO_PR_MIN ago where no PR
@@ -957,6 +1034,13 @@ def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
          timestamp branch (`forge/build-<family>-<ts>`) that (a) can't
          correlate. Fixes the 2026-06-04 forge-queue-api 4-escalation
          false-fire (preflight task -> merged PR #294).
+      a3) `_forge_already_merged_bridge` for ANY task (not just preflight):
+         the archived outbox carries Forge's `NO PR — already merged: #<N>`
+         contract line naming the gh-MERGED PR the work shipped under, when
+         that PR's branch/title carry no task_id token. Sibling of build_
+         sequence_advancer's #610 bridge for standalone (non-sequence)
+         dispatches. Fixes the 2026-06-23 `fix-645-alert-translation-001`
+         false stall (work shipped inside PR #645).
       b) `_forge_preflight_non_proceed` against the archived outbox.
          Returns `'CLARIFY_REQUEST'` / `'REJECT_REQUEST'` when the
          `result` field carries the marker delimiter, OR
@@ -1033,6 +1117,23 @@ def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
                 f'FORGE_NO_PR_SKIP task={task} reason=preflight_family_shipped '
                 f'pr=#{family_pr.get("number")} repo={family_pr.get("_repo")} '
                 f'branch={family_pr.get("headRefName")!r}',
+                'INFO',
+            )
+            seen_tasks.add(task)
+            continue
+        # Reconciliation step 1c: the archived outbox carries Forge's canonical
+        # `NO PR — already merged: #<N>` contract line (or the prose-cue
+        # fallback) naming the PR the work already shipped under, when that PR's
+        # branch + title carry no task_id token so step 1's `_pr_matches_task`
+        # cannot correlate it. Sibling of build_sequence_advancer's #610 bridge,
+        # for standalone (non-sequence) dispatches — drove the 2026-06-23
+        # `fix-645-alert-translation-001` false stall that Medic could only
+        # per-fingerprint silence. gh-truth-gated, fail-safe to None.
+        bridged_pr = _forge_already_merged_bridge(task, merged_prs)
+        if bridged_pr is not None:
+            log(
+                f'FORGE_NO_PR_SKIP task={task} reason=already_merged_bridge '
+                f'pr=#{bridged_pr.get("number")} repo={bridged_pr.get("_repo")}',
                 'INFO',
             )
             seen_tasks.add(task)
