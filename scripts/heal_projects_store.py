@@ -74,6 +74,24 @@ def _kill_switch_path() -> Path:
     return _agents_root() / 'healers.disabled'
 
 
+def _retire_window_sec() -> int:
+    """The Done-card visibility window (seconds) the GC waits before auto-retiring
+    a finished project. Read at call time (so tests can override) from
+    OURLIBERTY_PROJECTS_RETIRE_WINDOW_SEC, defaulting to the store constant. A
+    non-int override falls back to the default rather than wedging the tick. The
+    env read lives HERE (the caller), not in projects_store.retire_completed_
+    projects, which stays pure (no IO) so both writers and readers can share it."""
+    raw = os.environ.get('OURLIBERTY_PROJECTS_RETIRE_WINDOW_SEC')
+    if raw is None:
+        return projects_store.DONE_RETIRE_VISIBILITY_SEC
+    try:
+        return int(raw)
+    except (ValueError, TypeError):
+        log(f'OURLIBERTY_PROJECTS_RETIRE_WINDOW_SEC not an int ({raw!r}) — '
+            f'using default {projects_store.DONE_RETIRE_VISIBILITY_SEC}s')
+        return projects_store.DONE_RETIRE_VISIBILITY_SEC
+
+
 def _log_path() -> Path:
     override = os.environ.get('OURLIBERTY_LOG_DIR')
     base = Path(override) if override else (_agents_root() / 'logs')
@@ -302,6 +320,33 @@ def commit_and_push_projects(
     return 'push-failed'
 
 
+def _retire_log_detail(
+    registry: dict[str, Any], retired_ids: list[str], now: Optional[datetime],
+) -> str:
+    """Render ``id(done_at=T, age=Nh)`` for each retired project so the log
+    explains WHEN it reached Done and HOW LONG it waited. Reads the ``gc.done_at``
+    stamp ``retire_completed_projects`` just wrote (present in both live and
+    dry-run, since the retire pass stamps ``normalized`` before either commits).
+    Fail-safe: a missing/unparseable stamp degrades to the bare id."""
+    now_dt = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    by_id = {p.get('id'): p for p in registry.get('projects', []) or []
+             if isinstance(p, dict)}
+    parts: list[str] = []
+    for pid in retired_ids:
+        proj = by_id.get(pid)
+        gc = proj.get('gc') if isinstance(proj, dict) else None
+        done_at_raw = gc.get('done_at') if isinstance(gc, dict) else None
+        try:
+            done_at = datetime.fromisoformat(done_at_raw)
+            if done_at.tzinfo is None:
+                done_at = done_at.replace(tzinfo=timezone.utc)
+            age_h = (now_dt - done_at).total_seconds() / 3600
+            parts.append(f'{pid}(done_at={done_at_raw}, age={age_h:.1f}h)')
+        except (ValueError, TypeError):
+            parts.append(str(pid))
+    return ', '.join(parts)
+
+
 # ---------- one tick ----------
 def run_once(*, dry_run: bool, now: Optional[datetime] = None) -> int:
     """One healer tick. Resolves the store path, normalizes, atomic-writes any
@@ -372,11 +417,15 @@ def run_once(*, dry_run: bool, now: Optional[datetime] = None) -> int:
     # `archived`) keeps the promoted funnel source suppressed — see
     # projects_store.retire_completed_projects.
     retired: list[str] = []
+    window_sec = _retire_window_sec()
     try:
-        _, retired = projects_store.retire_completed_projects(normalized, now=now)
+        _, retired = projects_store.retire_completed_projects(
+            normalized, now=now, min_done_age_sec=window_sec)
         if retired:
             verb = 'would retire' if dry_run else 'retired'
-            log(f'{verb} {len(retired)} all-phases-done project(s) off the board: {retired}')
+            detail = _retire_log_detail(normalized, retired, now)
+            log(f'{verb} {len(retired)} all-phases-done project(s) past the '
+                f'{window_sec}s visibility window off the board: {detail}')
     except Exception as e:  # noqa: BLE001 — fail-safe: never block the committer
         log(f'project-GC raised: {type(e).__name__}: {e} — retiring nothing this tick')
 

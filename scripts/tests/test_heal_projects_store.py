@@ -15,7 +15,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 _SCRIPTS = str(Path(__file__).resolve().parent.parent)
@@ -305,6 +305,86 @@ class RunOnceTest(unittest.TestCase):
             ['git', 'status', '--porcelain', h.PROJECTS_REL],
             cwd=str(self.repo), capture_output=True, text=True)
         self.assertTrue(dirty.stdout.strip())
+
+
+    # ---- auto-retire visibility window (projects-v3) -------------------------
+    def _seed_done_project(self, done_at):
+        """Commit an already-normalized all-phases-done project whose phase
+        finished at ``done_at`` (so the retire pass sees that as the Done moment)."""
+        import projects_store
+        normalized, _ = projects_store.normalize_registry(
+            {'projects': [{'id': 'proj-done',
+                           'phases': [{'id': 'ph-1', 'lifecycle_state': 'done'}]}]},
+            now=NOW)
+        normalized['projects'][0]['phases'][0]['updated_at'] = done_at.isoformat()
+        self.proj.write_text(json.dumps(normalized, indent=2) + '\n')
+        self._git('add', '.'); self._git('commit', '-q', '-m', 'seed done project')
+
+    def _capture_log(self, *, dry_run):
+        lines: list[str] = []
+        orig = h.log
+        h.log = lambda msg: lines.append(msg)
+        try:
+            rc = h.run_once(dry_run=dry_run, now=NOW)
+        finally:
+            h.log = orig
+        return rc, ' '.join(lines)
+
+    def test_done_project_past_window_auto_retires(self):
+        self._seed_done_project(NOW - timedelta(hours=49))  # past the default 48h
+        rc, report = self._capture_log(dry_run=False)
+        self.assertIn(rc, (0, 2))
+        data = json.loads(self.proj.read_text())
+        self.assertEqual(data['projects'][0]['state'], 'retired')
+        # the log explains why/when: window + the done_at/age detail.
+        self.assertIn('visibility window', report)
+        self.assertIn('done_at=', report)
+        self.assertIn('age=', report)
+
+    def test_env_override_widens_window_keeps_done_project(self):
+        # 49h-old project would retire under the default 48h window; a 100h env
+        # override must keep it active — proving the env is read AND threaded.
+        self._seed_done_project(NOW - timedelta(hours=49))
+        os.environ['OURLIBERTY_PROJECTS_RETIRE_WINDOW_SEC'] = str(100 * 3600)
+        try:
+            h.run_once(dry_run=False, now=NOW)
+        finally:
+            os.environ.pop('OURLIBERTY_PROJECTS_RETIRE_WINDOW_SEC', None)
+        data = json.loads(self.proj.read_text())
+        self.assertEqual(data['projects'][0]['state'], 'active')  # still lingering
+
+    def test_dry_run_logs_window_and_age(self):
+        self._seed_done_project(NOW - timedelta(hours=49))
+        rc, report = self._capture_log(dry_run=True)
+        self.assertEqual(rc, 0)
+        self.assertIn('would retire', report)
+        self.assertIn('visibility window', report)
+        self.assertIn('age=', report)
+        # dry-run mutates nothing on disk.
+        self.assertEqual(json.loads(self.proj.read_text())['projects'][0]['state'], 'active')
+
+
+class RetireWindowEnvTest(unittest.TestCase):
+    """The env read that keeps projects_store.retire_completed_projects pure."""
+
+    def tearDown(self):
+        os.environ.pop('OURLIBERTY_PROJECTS_RETIRE_WINDOW_SEC', None)
+
+    def test_default_is_store_constant(self):
+        import projects_store
+        os.environ.pop('OURLIBERTY_PROJECTS_RETIRE_WINDOW_SEC', None)
+        self.assertEqual(h._retire_window_sec(),
+                         projects_store.DONE_RETIRE_VISIBILITY_SEC)
+
+    def test_override_is_read(self):
+        os.environ['OURLIBERTY_PROJECTS_RETIRE_WINDOW_SEC'] = '0'
+        self.assertEqual(h._retire_window_sec(), 0)
+
+    def test_bad_int_falls_back_to_default(self):
+        import projects_store
+        os.environ['OURLIBERTY_PROJECTS_RETIRE_WINDOW_SEC'] = 'not-an-int'
+        self.assertEqual(h._retire_window_sec(),
+                         projects_store.DONE_RETIRE_VISIBILITY_SEC)
 
 
 if __name__ == '__main__':
