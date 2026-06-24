@@ -192,6 +192,18 @@
 
 ---
 
+## G-rule watchdog-watcher-log-stale-post-fix — 1/3 (new, iter ~2634)
+
+**Rule:** PR #649 was marked COMPLETE after 5 consecutive clean Check 1 scans (iter ~2531). Pattern re-emerged at iter ~2634 under a specific context: inbox_watcher is idle (last log write 21:31Z) while Forge inbox has items in build/preflight phase running in separate agent sessions (not through inbox_watcher's active polling). The watchdog's "in-flight-aware" fix may not suppress WARNs when the build sessions are external to inbox_watcher's own active loop. Frequency: 12/hr (4 occurrences in 20 min), above the 5/hr threshold. Dispatch to Beacon at 3/3 for a regression fix or threshold adjustment.
+
+---
+
+## G-rule ourliberty-health-notify-script-missing — 1/3 (new, iter ~2634)
+
+**Rule:** `ourliberty-health[2120791]` emitted `WARN: notify script missing, alert dropped: 1 issue(s) need attention` once in the 30-min window. The service tries to notify via a script that doesn't exist; underlying "1 issue" is unknown. journalctl query by unit name requires elevated permissions (only visible via `ourliberty-*.service` wildcard). Frequency low (1 occurrence); track at 1/3. If it crosses 5/hr or the same alert-dropped pattern recurs, dispatch to Beacon to investigate the missing script and the suppressed health issue.
+
+---
+
 ## G-rule watchdog-watcher-log-stale → COMPLETE ✅ (iter ~2522 dispatch, iter ~2531 verified)
 
 **Rule:** PR #649 `fix-watchdog-stale-log-inflight-aware-001` merged 2026-06-23T14:54Z. Fix makes the watchdog in-flight-aware (active build state suppresses stale-log WARNs). Verified via 5 consecutive clean Check 1 scans post-merge — no stale-log WARNs detected. PRIME systemic_fix logged iter ~2531. **G-rule COMPLETE.**
@@ -221,6 +233,10 @@
 **Rule:** `source=heal-daemon-restart-manifest-drift, subject=regenerated` alerts classify Tier-4 (novel) — no translation match. But these are routine healer auto-commit actions (route=digest in the alert itself; bot already silences as digest). Should add Tier-3 translation. Dispatch to Beacon at 3/3 to add `config/alert-translations.json` entry.
 
 ---
+
+## Status snapshot — updated 2026-06-24 21:57Z UTC (Iter ~2634, Tier 1, consecutive_clean=0)
+
+**Iter ~2634 summary:** ⚠️ Watch — PR #687 NEW CONFLICTING (21:44Z) — G-rule fix forge-post-open-mergeable-rebase-001 opened as PR but is itself CONFLICTING (meta-irony); PR #685 still CONFLICTING. Watchdog-watcher-log-stale WARNs above threshold (12/hr, post-PR #649 fix; G-rule watchdog-watcher-log-stale-post-fix 1/3 NEW). ourliberty-health notify-script-missing (G-rule 1/3 NEW). 0 new larry-alerts (watermark 1035). 8 daemons alive. Check I: mode=digest, cooldown-suppressed. PRIME: interventions≈1106, systemic_fixes=63, ratio≈17.5, trend=improving. Tier 1, consecutive_clean=0.
 
 ## Status snapshot — updated 2026-06-24 21:42Z UTC (Iter ~2633, Tier 1, consecutive_clean=0)
 
