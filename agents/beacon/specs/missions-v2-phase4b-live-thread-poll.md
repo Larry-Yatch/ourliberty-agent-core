@@ -1,6 +1,6 @@
 # Spec: Missions v2 — Phase 4b: Live-feel thread (poll + unread doorbell)
 
-**Status:** Draft — ready to sequence
+**Status:** Partially shipped — Contract D merged (dashboard PR #87); Contracts A + B(open-drawer) in dashboard PR #88 (open). The CLOSED-card unread badge is descoped to a deferred follow-on (Larry, 2026-06-23) — it needs a server-driven agent-core funnel-item doorbell projection that isn't built yet.
 **Author:** Claude Code (web session, 2026-06-23)
 **Approver:** Larry
 **Parent:** [docs/missions-redesign-design-pass-2026-06-09.md](../../../docs/missions-redesign-design-pass-2026-06-09.md)
@@ -17,7 +17,9 @@ Root cause (confirmed 2026-06-23): the kanban cards poll on the SWR cadence from
 
 Phase 4b delivers the **perceived-live** experience with the smallest, lowest-risk change: **poll the open thread** and **signal unread replies** on the card. The work is almost entirely dashboard-side; the only agent-core change is Contract C — a one-field projection surfacing the existing `chain_events.event_id` as a per-message `id` on the `/thread` response (no new endpoint, no DB migration), which the client needs to dedupe and mark-as-seen.
 
-**Done-gate:** Larry opens a card's thread, asks a question, and **Beacon's reply appears on its own within ~5 seconds — no browser refresh**. If he navigates away, the card shows an **unread badge** when a reply arrives, and clicking back in clears it.
+**Done-gate (this phase):** Larry opens a card's thread, asks a question, and **Beacon's reply appears on its own within ~5 seconds — no browser refresh**. Inside the open drawer, a reply that lands while he's scrolled up surfaces a **"N new ↓" pill**, and a manual refresh forces an immediate pull.
+
+> **Deferred follow-on — CLOSED-card unread badge.** Showing an unread dot/count on a card whose drawer is *closed* is moved out of this phase. Contract A only polls the **open** thread, so a closed card has no client-side signal that a reply arrived; detecting it needs a **server-driven agent-core funnel-item doorbell projection** that isn't built yet. Tracked as a follow-on — see § 2, § 5, and § 11.
 
 ---
 
@@ -26,8 +28,8 @@ Phase 4b delivers the **perceived-live** experience with the smallest, lowest-ri
 | In scope (this phase) | Deferred |
 |---|---|
 | **A — poll the open thread** (SWR `refreshInterval` while the drawer is open and the tab is visible) | True low-latency **push** responder (SSE / Supabase Realtime) — the original "near-live Beacon front desk" (Phase 4 §12) → Phase 4c, only if polling latency proves annoying |
-| **B — unread + manual refresh affordance** (badge on the card when a `team_to_larry` reply arrives unseen; "N new ↓" pill; manual refresh button; drive loud/quiet from the existing doorbell) | Dashboard-wide rollout of the conversation card to Approvals / Operations / Alerts (Phase 4 §12) |
-| **D — clear the input on confirmed send** (empty the reply box after a successful POST; restore on failure) | Rich composer features (drafts, attachments, markdown preview) — out of arc |
+| **B(open-drawer) — in-drawer unread + manual refresh** ("N new ↓" pill when an open-but-scrolled-up drawer receives a `team_to_larry` reply; manual refresh button; loud-vs-quiet reflected on the message inside the open thread; reconcile the optimistic send so it never double-renders) | **B(closed-card) — unread badge on a *closed* card** (dot/count when a reply lands while the drawer is shut) → deferred follow-on: needs a server-driven agent-core **funnel-item doorbell projection** (the client can't poll a thread it hasn't opened) |
+| **D — clear the input on confirmed send** (empty the reply box after a successful POST; restore on failure) | Dashboard-wide rollout of the conversation card to Approvals / Operations / Alerts (Phase 4 §12); rich composer features (drafts, attachments, markdown preview) — out of arc |
 
 This is the lightweight realization of Phase 4b. It reuses the SWR polling pattern already proven on the kanban (`e4-4f` §5.7) and the doorbell signal already live from Phase 4 §9 — **assembly, not greenfield.**
 
@@ -66,17 +68,18 @@ Wrap the thread drawer's fetch in SWR (or the existing data-fetch hook used for 
 
 Acceptance: with a card thread open, a `team_to_larry` reply written to `chain_events` appears in the drawer within ~5s with **zero manual refresh**, no duplicate of Larry's own message, and no scroll yank if he was reading history.
 
-## 5. Contract B — unread + manual refresh affordance (dashboard)
+## 5. Contract B(open-drawer) — in-drawer unread + manual refresh (dashboard)
 
-So a reply isn't missed when the drawer is closed or scrolled away:
+So a reply isn't missed when the **open** drawer is scrolled away from the newest message:
 
-- **Unread badge on the card:** when polling brings a **new `team_to_larry` message** that Larry hasn't seen (drawer closed, or open-but-scrolled-up), show a dot/count badge on the card's chat affordance. Track "last seen" per `capture_id` (client-side, e.g. last seen message `id`/timestamp); **clear on view** (drawer opened and scrolled to that message).
-- **"N new ↓" pill** inside an open-but-scrolled-up drawer; clicking it scrolls to newest and clears unread.
-- **Loud vs quiet stays server-driven:** the **blocked-on-you** doorbell already fires when the team is waiting on Larry, and posting a message already clears it (Phase 4 §9; `needs_reply` on the message). Phase 4b only needs to **reflect that state visually on the card** (e.g. a louder badge when `needs_reply`/blocked) — do **not** add a second notification system.
+- **"N new ↓" pill** inside an open-but-scrolled-up drawer: when Contract A's poll brings a **new `team_to_larry` message** below the fold, show the pill; clicking it scrolls to newest and clears the in-drawer unread state. Track "last seen" within the open drawer (client-side, e.g. last seen message `id`/timestamp).
+- **Loud vs quiet inside the open drawer stays server-driven:** the **blocked-on-you** signal (`needs_reply` on the message; Phase 4 §9) already distinguishes a reply that's waiting on Larry from an FYI; reflect it visually on the relevant message in the open thread — do **not** add a second notification system.
 - **Manual "Refresh" control** in the drawer header: triggers an immediate revalidate. Cheap insurance for the impatient case and for when polling is paused.
 - **Optimistic send unchanged:** Larry's line still appears instantly on submit; Contract A's reconcile keeps it from duplicating once the server echoes it back.
 
-Acceptance: a reply that arrives while the drawer is closed lights an unread badge on the card; opening the card clears it; the manual refresh button forces an immediate pull; a thread the team is blocked-on-you on reads visibly louder than an FYI one.
+Acceptance: with the drawer open and scrolled up, a `team_to_larry` reply lights the "N new ↓" pill; clicking it jumps to the message and clears the pill; the manual refresh button forces an immediate pull; a `needs_reply`/blocked message reads visibly louder than an FYI one.
+
+> **Deferred — B(closed-card) unread badge.** Lighting an unread dot/count on a card whose drawer is **closed** is moved to a follow-on (Larry, 2026-06-23). Rationale: Contract A only polls the **open** thread, so a closed card has no client-side signal that a reply arrived. Detecting it requires a **server-driven agent-core funnel-item doorbell projection** — a per-capture unread/blocked flag surfaced on the funnel/card-list response — which is not built yet. That projection (and the card-badge UI that consumes it) is the follow-on; this phase ships only the open-drawer affordances above. **Implementing the projection is out of scope here** (see § 11).
 
 ## 6. Contract D — clear the input on confirmed send (dashboard)
 
@@ -108,7 +111,7 @@ The doorbell-clear guard may already exist as coverage; if so that sub-step is a
 | Step | Repo | Scope | depends_on |
 |---|---|---|---|
 | **1 — id projection + contract guard** | agent-core | Project the existing `event_id` as a per-message `id` on `/thread` (one-field, no endpoint/migration) + tests pinning the `/thread` read shape and the POST→doorbell-clear (Contract C) | — |
-| **2 — live-feel thread** | dashboard | Contract A (poll open thread) + Contract B (unread badge / pill / manual refresh / loud-vs-quiet reflect) + Contract D (clear input on confirmed send); reuse SWR `e4-4f` §5.7 pattern + `ClarifyRoundDrawer`/`ClarifyReplyBox`/`PanelErrorBoundary` | 1 |
+| **2 — live-feel thread** | dashboard | Contract A (poll open thread) + Contract B(open-drawer) (in-drawer "N new ↓" pill / manual refresh / loud-vs-quiet reflected inside the open drawer) + Contract D (clear input on confirmed send); reuse SWR `e4-4f` §5.7 pattern + `ClarifyRoundDrawer`/`ClarifyReplyBox`/`PanelErrorBoundary`. **B(closed-card) unread badge is descoped to a follow-on** (needs the agent-core funnel-item doorbell projection). | 1 |
 
 > **Quick win:** Contract D is a standalone, low-risk change (clear the controlled input on POST success) and can ship first/independently of A and B if a faster fix is wanted before the full polling work lands.
 
@@ -119,12 +122,14 @@ Step 2 is the substance; step 1 is a thin agent-core guard so the dashboard can 
 ## 9. Test / proof plan
 
 - **Contract A:** drawer-open poll picks up a seeded `team_to_larry` reply within one interval; optimistic `larry_to_team` message reconciles to its server copy with no duplicate; scrolled-up state does not auto-scroll.
-- **Contract B:** a reply arriving with the drawer closed sets the unread badge; opening + viewing clears it; manual refresh forces a revalidate; `needs_reply`/blocked renders louder than FYI.
+- **Contract B(open-drawer):** a reply arriving while the drawer is open-but-scrolled-up lights the "N new ↓" pill; clicking it scrolls to the message and clears it; manual refresh forces a revalidate; `needs_reply`/blocked renders louder than FYI. *(The closed-card unread badge is a deferred follow-on and is not tested here.)*
 - **Contract D:** a successful send empties the input and shows the message once in the thread; a mocked failed send leaves the text in the box, shows an error, and posts nothing twice; whitespace-only submit is ignored; rapid double-Enter posts once.
 - **Contract C (agent-core):** the two guard tests above are green.
-- **End-to-end (the real gate):** Larry opens a real parked card, asks Beacon a question, and **watches the answer appear without touching refresh**; later he sees an unread badge on a card he wasn't looking at. That lived experience is the done-gate — not green unit tests.
+- **End-to-end (the real gate):** Larry opens a real parked card, asks Beacon a question, and **watches the answer appear without touching refresh**; if he scrolls up to read history, a "N new ↓" pill flags the newer reply. *(Spotting an unread badge on a card he wasn't looking at is the deferred closed-card follow-on.)* That lived experience is the done-gate — not green unit tests.
 
 ## 10. Beacon kickoff & sequencing (single source of truth)
+
+> **Status (2026-06-23):** Contract D shipped — **dashboard PR #87 (merged)**. Contracts A + B(open-drawer) are in **dashboard PR #88 (open)**. The **CLOSED-card unread badge** is descoped from this phase to a deferred follow-on (Larry, 2026-06-23) — it requires a server-driven agent-core funnel-item doorbell projection that isn't built yet (see § 2, § 5, § 11). The sequencing detail below is the original plan, retained for provenance.
 
 **Sequencing decision (Larry, 2026-06-23):** ship **Contract D first as a standalone fast PR**, then **A+B as the follow-on**. D is a tiny, low-risk UX fix (clear the box on confirmed send) that delivers value immediately and depends on nothing else. A/B (polling + unread) is the larger change and **requires the agent-core Contract C `id` projection merged first** (surfaced by Mirror's review of this spec, 2026-06-23 — A/B dedupe and mark-as-seen by a per-message `id` the `/thread` shape didn't expose). Order: **Contract C (agent-core) → A/B (dashboard)**; Contract D can land any time in parallel.
 
@@ -151,9 +156,9 @@ Step 2 is the substance; step 1 is a thin agent-core guard so the dashboard can 
     },
     {
       "step_id": "live-thread",
-      "label": "Contracts A+B — poll open thread + unread/refresh",
+      "label": "Contracts A+B(open-drawer) — poll open thread + in-drawer unread/refresh",
       "depends_on": ["clear-input"],
-      "dispatch_text": "Implement Phase 4b Contracts A+B on the missions card thread: SWR refreshInterval ~5s on GET .../thread while drawer open AND tab visible (pause when hidden/closed); dedupe by message id; reconcile optimistic send; no scroll-jump. Plus unread badge for unseen team_to_larry replies, 'N new down' pill, manual refresh, reflect blocked-on-you doorbell. Spec §§ 4-5. Mirror focus: poll-pause discipline, optimistic reconcile, no duplicate render."
+      "dispatch_text": "Implement Phase 4b Contracts A+B(open-drawer) on the missions card thread: SWR refreshInterval ~5s on GET .../thread while drawer open AND tab visible (pause when hidden/closed); dedupe by message id; reconcile optimistic send; no scroll-jump. Plus 'N new down' pill for unseen team_to_larry replies in an open-but-scrolled-up drawer, manual refresh, reflect blocked-on-you inside the open drawer. CLOSED-card unread badge is deferred (needs the funnel-item doorbell projection). Spec §§ 4-5. Mirror focus: poll-pause discipline, optimistic reconcile, no duplicate render."
     }
   ]
 }
@@ -164,10 +169,11 @@ Step 2 is the substance; step 1 is a thin agent-core guard so the dashboard can 
 **What Larry pastes to Beacon** is the short intent below; Beacon synthesizes the file above, runs the Mirror DAG preflight (build-sequence spec discipline 3), and emits the kickoff — Larry's role is approving the plan, not authoring the file (build-sequence spec decision J).
 
 > **Kickoff intent (paste to Beacon):**
-> Beacon — build Missions Phase 4b from `agents/beacon/specs/missions-v2-phase4b-live-thread-poll.md`. **First** dispatch Contract C as a one-off against `ourliberty-agent-core` — it surfaces the existing `chain_events.event_id` as a per-message `id` on the `/thread` response (one-field projection, no new endpoint, no DB migration) plus guard tests; it's a prerequisite for A+B (not skippable — the field isn't projected yet). **Then** run the dashboard sequence `phase4b-live-thread-001` against `ourliberty-dashboard`: step `clear-input` (Contract D — clear the reply box on confirmed send, the standalone quick win, no deps) → step `live-thread` (Contracts A+B — poll the open thread + unread badge/refresh, `depends_on: clear-input`, and only after Contract C has merged). Synthesize the sequence per § 10, run the Mirror DAG preflight, and bring me the kickoff to approve. Contract D can ship in parallel with C if you want it out fast. Don't add SSE/Realtime — that's the deferred Phase 4c.
+> Beacon — build Missions Phase 4b from `agents/beacon/specs/missions-v2-phase4b-live-thread-poll.md`. **First** dispatch Contract C as a one-off against `ourliberty-agent-core` — it surfaces the existing `chain_events.event_id` as a per-message `id` on the `/thread` response (one-field projection, no new endpoint, no DB migration) plus guard tests; it's a prerequisite for A+B (not skippable — the field isn't projected yet). **Then** run the dashboard sequence `phase4b-live-thread-001` against `ourliberty-dashboard`: step `clear-input` (Contract D — clear the reply box on confirmed send, the standalone quick win, no deps) → step `live-thread` (Contracts A+B(open-drawer) — poll the open thread + in-drawer "N new ↓" pill/manual refresh, `depends_on: clear-input`, and only after Contract C has merged; the CLOSED-card unread badge is deferred to a follow-on). Synthesize the sequence per § 10, run the Mirror DAG preflight, and bring me the kickoff to approve. Contract D can ship in parallel with C if you want it out fast. Don't add SSE/Realtime — that's the deferred Phase 4c.
 
 ## 11. Out of scope (later / separate)
 
+- **CLOSED-card unread badge + its server-driven agent-core funnel-item doorbell projection** — lighting a dot/count on a card whose thread drawer is *closed*. Deferred follow-on (Larry, 2026-06-23): Contract A only polls the *open* thread, so a closed card has no client signal that a reply arrived; detecting it needs a per-capture unread/blocked flag projected onto the funnel/card-list response (the "funnel-item doorbell projection"), which doesn't exist yet. The follow-on builds that projection in agent-core, then the card-badge UI that consumes it. **Implementing the projection is out of scope here.**
 - **True push** (SSE stream from `dashboard_api.py`, or a Supabase Realtime subscription on `chain_events`) — the original low-latency "Beacon front desk" → **Phase 4c**, pursued only if 5s polling latency proves annoying in practice.
 - **Dashboard-wide** conversation card (Approvals / Operations / Alerts) → its own design pass (Phase 4 §12).
 - **Multi-voice** (addressing a specific agent vs Beacon), drag-drop, Programs↔Missions unification → out of arc.
