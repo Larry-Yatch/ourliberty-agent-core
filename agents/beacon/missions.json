@@ -5081,6 +5081,23 @@
       "deferred_reason": null,
       "proposed_by": "beacon",
       "proposed_at": "2026-06-24T19:30:00+00:00"
+    },
+    {
+      "id": "proposed-ourliberty-health-notify-script-missing-001",
+      "name": "Ourliberty Health Notify Script Missing 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `ourliberty-health-notify-script-missing-001`. Last activity 2026-06-24T23:35:13.999001+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "ourliberty-health-notify-script-missing-001"
+      ],
+      "repo": null,
+      "created": "2026-06-24",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-24T23:38:05.354770+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-24T23:35:13.999001+00:00"
     }
   ]
 }
