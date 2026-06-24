@@ -605,6 +605,7 @@ class AgentQueueResponse(BaseModel):
 # (mtime preserved); never touches what's already building.
 
 class FastTrackRequest(BaseModel):
+    model_config = ConfigDict(extra='forbid')
     task_id: str
 
 
@@ -2323,6 +2324,27 @@ def _handle_fast_track(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail='task payload is not an object',
+        )
+    # CRITICAL: refuse if a build is already running for this task. The
+    # dispatcher keeps the inbox file in place for the ENTIRE build and only
+    # archives it (move_to) when the build finishes — see
+    # inbox_watcher.process_task. Without this guard, a fast-track that lands
+    # as the build completes would let the atomic os.replace RECREATE the
+    # just-archived file, and the next poll would re-dispatch it: a duplicate
+    # build, a duplicate PR, and double spend — violating the watcher's "never
+    # re-dispatch paid work" invariant. The in-flight registry (written by
+    # run_claude) keys on the same task_stem = task.get('task_id') or the
+    # filename stem; a queued (not-yet-claimed) task is absent from it and the
+    # file is never moved out from under us, so the write stays safe.
+    inflight_key = task_id
+    explicit_id = payload.get('task_id')
+    if isinstance(explicit_id, str) and explicit_id:
+        inflight_key = explicit_id
+    inflight = _load_in_flight_index(agents_root).get(inflight_key)
+    if inflight and inflight.get('agent_id') == agent:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail='task is already building',
         )
     stamp = _now_utc_iso(now)
     payload['fast_tracked_at'] = stamp

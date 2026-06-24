@@ -121,6 +121,49 @@ class ValidationTest(_Base):
         self.assertEqual(r.status_code, 409)
 
 
+# ==================== in-flight (building) guard ====================
+
+class InFlightGuardTest(_Base):
+    """A task whose build is already running must NOT be fast-tracked: the
+    dispatcher keeps its inbox file in place for the whole build, so writing
+    it could resurrect the file after the build archives it and re-dispatch
+    (double build / double spend). The in-flight registry is the guard."""
+
+    def _write_in_flight(self, task_stem: str, agent_id: str = 'forge') -> None:
+        p = self.agents_root / 'state' / 'in-flight' / f'{task_stem}.json'
+        p.write_text(json.dumps({
+            'task_stem': task_stem, 'agent_id': agent_id,
+            'pid': 4242, 'started_at': '2026-06-23T07:00:00+00:00',
+        }))
+
+    def test_refuses_when_building_by_filename_stem(self):
+        _write_inbox_file(self.agents_root, 'forge', 'buildme.json')
+        self._write_in_flight('buildme', 'forge')
+        r = self.client.post(_endpoint(), json={'task_id': 'buildme'}, headers=AUTH)
+        self.assertEqual(r.status_code, 409)
+        # and the file must NOT have been stamped
+        payload = json.loads(
+            (self.agents_root / 'inboxes' / 'forge' / 'buildme.json').read_text())
+        self.assertNotIn('fast_tracked_at', payload)
+
+    def test_refuses_when_building_by_explicit_task_id(self):
+        # inbox filename differs from the payload's task_id, which is the
+        # in-flight key (task.get('task_id') or stem).
+        _write_inbox_file(self.agents_root, 'forge', 'file-stem.json',
+                          body={'task_id': 'real-id', 'prompt': 'x'})
+        self._write_in_flight('real-id', 'forge')
+        r = self.client.post(_endpoint(), json={'task_id': 'file-stem'}, headers=AUTH)
+        self.assertEqual(r.status_code, 409)
+
+    def test_other_agents_inflight_does_not_block(self):
+        # an in-flight entry for a DIFFERENT agent with the same stem must not
+        # block fast-tracking forge's queued task.
+        _write_inbox_file(self.agents_root, 'forge', 'shared.json')
+        self._write_in_flight('shared', 'mirror')
+        r = self.client.post(_endpoint(), json={'task_id': 'shared'}, headers=AUTH)
+        self.assertEqual(r.status_code, 200)
+
+
 # ==================== happy path + side effects ====================
 
 class FastTrackEffectTest(_Base):
