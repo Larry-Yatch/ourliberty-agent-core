@@ -967,9 +967,15 @@ def _qualify_repo(repo: str) -> str:
 
 def _gh_list_merged_prs(
     repo: str, logger: Optional[logging.Logger] = None,
+    state: str = 'merged',
 ) -> Optional[list[dict[str, Any]]]:
-    """Return the list of recently-merged PRs for `repo`, or None on
-    failure (gh missing, auth missing, timeout, non-zero rc, bad JSON).
+    """Return the list of recent PRs for `repo` in `state` (default
+    'merged' — the reconcile pass's horizon), or None on failure (gh
+    missing, auth missing, timeout, non-zero rc, bad JSON).
+
+    `state` lets the stall-escalation pre-check ask for 'open' PRs with the
+    same timeout / None-vs-[] / WARN-on-cause contract; existing callers
+    omit it and keep the merged-PR reconcile behavior unchanged.
 
     On any failure, log a WARNING that includes the concrete reason
     (returncode + truncated stderr, or the exception) so a self-heal that
@@ -977,9 +983,9 @@ def _gh_list_merged_prs(
     skipping — three stranded incidents traced back to the bare
     'gh pr list failed' line that swallowed the underlying cause.
 
-    None vs []: None means "couldn't query" (caller should skip
-    reconciliation for this repo this tick); [] means "queried OK, no
-    merged PRs in the lookback window." The two cases differ in whether
+    None vs []: None means "couldn't query" (caller should skip its
+    self-heal for this repo this tick); [] means "queried OK, no PRs in
+    this state in the lookback window." The two cases differ in whether
     we'd consider this a soft failure or a confident no-match."""
     if not repo:
         return None
@@ -988,16 +994,16 @@ def _gh_list_merged_prs(
     def _warn(detail: str) -> None:
         if logger is not None:
             logger.warning(
-                f'reconcile: gh pr list failed for repo={qualified} '
-                f'({detail}); skipping reconciliation for steps in this '
-                f'repo this tick'
+                f'gh pr list --state {state} failed for repo={qualified} '
+                f'({detail}); skipping the dependent self-heal for steps in '
+                f'this repo this tick'
             )
 
     try:
         proc = subprocess.run(
             [
                 'gh', 'pr', 'list', '--repo', qualified,
-                '--state', 'merged', '--limit', str(RECONCILE_PR_LOOKBACK),
+                '--state', state, '--limit', str(RECONCILE_PR_LOOKBACK),
                 '--json', 'number,url,title,headRefName,mergedAt',
             ],
             capture_output=True, text=True, timeout=GH_PR_LIST_TIMEOUT_SEC,
@@ -1199,6 +1205,56 @@ def _escalate_stranded_dispatched_steps(
                 and age >= DISPATCH_STALL_TIMEOUT_SEC
                 and not step.get('pr_url')
             ):
+                # Before stranding: a build that finished and opened a PR may
+                # simply not have had its `pr_url` recorded yet (the merge-gate
+                # / notifier hasn't advanced the step). Such a step is in review,
+                # NOT stranded. The reconcile pass only ever queries `--state
+                # merged`, so an OPEN-not-yet-merged PR is invisible to every
+                # other recovery path — query for it here.
+                open_prs = _gh_list_merged_prs(target_repo, logger, state='open')
+                if open_prs is None:
+                    # FAIL-SAFE: a transient gh outage must not resurrect the
+                    # exact false-strand this guard removes. Defer escalation one
+                    # tick — a genuinely-stranded step (truly no PR) isn't going
+                    # anywhere and will alert next tick when gh is reachable.
+                    logger.warning(
+                        f'escalate: sequence={seq_id} step={step_id} past the '
+                        f'{DISPATCH_STALL_TIMEOUT_SEC // 3600}h stall backstop, '
+                        f'but the open-PR pre-check query failed this tick '
+                        f'(cause logged above); deferring escalation, will retry '
+                        f'next tick.'
+                    )
+                    continue
+                open_match = _match_pr_for_step(
+                    step_id, step.get('pr_url'), open_prs, logger,
+                )
+                if open_match is not None:
+                    # The build shipped — record the PR and let the existing
+                    # merge-gate / reconcile advance it on merge. Stays
+                    # `dispatched` in `current_steps`; do NOT fail/pause/DM. The
+                    # stall guard's `and not step.get('pr_url')` then suppresses
+                    # any re-escalation on future ticks.
+                    pr_url = open_match.get('url') or ''
+                    step['pr_url'] = pr_url
+                    audit = list(sequence.get('audit_log') or [])
+                    audit.append(_audit_entry(
+                        'step-pr-detected', step_id=step_id, actor='advancer',
+                        pr_url=pr_url,
+                    ))
+                    sequence['audit_log'] = audit
+                    try:
+                        _atomic_write_sequence(path, sequence)
+                    except OSError as e:
+                        logger.error(
+                            f'escalate: atomic write failed recording open PR '
+                            f'for {seq_id} step={step_id}: {e}'
+                        )
+                    logger.info(
+                        f'escalate: sequence={seq_id} step={step_id} past the '
+                        f'stall backstop but has OPEN PR {pr_url}; recorded '
+                        f'pr_url, NOT stranding (in review).'
+                    )
+                    continue
                 reason = (
                     f'dispatched ~{int(age // 3600)}h ago with no PR and no gate '
                     f'progress (exceeds the {DISPATCH_STALL_TIMEOUT_SEC // 3600}h '

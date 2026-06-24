@@ -1328,7 +1328,12 @@ class TestStrandedDispatchEscalation(_AdvancerHarness):
         # never produced one) — escalation is what must catch them; the lambda
         # also avoids a real `gh` subprocess for the invalid repo.
         self._patch_gates(chain_merged=False, gh_merged=None)
-        self.bsa._gh_list_merged_prs = lambda repo, logger=None: []
+        # Accept the `state` kwarg the stall pre-check passes (state='open');
+        # default mirrors the merged-PR reconcile behavior. Returns [] for
+        # every state unless a test overrides — so the stall pre-check sees no
+        # open PR and escalation proceeds as before.
+        self.bsa._gh_list_merged_prs = (
+            lambda repo, logger=None, state='merged': [])
         self.bsa._valid_target_repos = lambda: frozenset(
             {'ourliberty-agent-core', 'ourliberty-dashboard'})
 
@@ -1442,6 +1447,88 @@ class TestStrandedDispatchEscalation(_AdvancerHarness):
         now = datetime(2026, 6, 19, 12, 0, 0, tzinfo=timezone.utc)
         age = self.bsa._dispatched_age_sec('2026-06-19T08:00:00Z', now)
         self.assertEqual(age, 4 * 3600)
+
+    def _stub_open_prs(self, value):
+        """Stub _gh_list_merged_prs so a state='open' query returns `value`
+        (the open-PR pre-check's view) while the merged reconcile query keeps
+        returning [] (no merged PR for the stranded step)."""
+        def _fake(repo, logger=None, state='merged'):
+            return value if state == 'open' else []
+        self.bsa._gh_list_merged_prs = _fake
+
+    def test_stalled_step_with_open_pr_is_not_stranded(self):
+        # Criterion 1: a stalled `dispatched` step WITH a matching OPEN PR on
+        # branch forge/<step_id> is recorded (pr_url populated) and left in
+        # review — NOT failed, NOT paused, NOT DM'd.
+        pr_url = 'https://github.com/Larry-Yatch/ourliberty-dashboard/pull/88'
+        self._stub_open_prs([{
+            'number': 88, 'url': pr_url, 'title': 'feat: live thread',
+            'headRefName': 'forge/only-step', 'mergedAt': None,
+        }])
+        self._write_sequence(self._dispatched(
+            repo='ourliberty-dashboard', dispatched_at=self._stale_iso()))
+        self.bsa.tick()
+        seq = self._read_sequence('seq-001')
+        step = seq['steps'][0]
+        # Step stays dispatched + in current_steps so the merge-gate advances it.
+        self.assertEqual(step['status'], 'dispatched')
+        self.assertEqual(step['pr_url'], pr_url)
+        self.assertIn('only-step', seq['current_steps'])
+        self.assertEqual(seq['status'], 'active')
+        # No strand DM; no failure_reason set.
+        self.assertFalse(any(
+            d['subject'].startswith('sequence-stranded:') for d in self.dms))
+        self.assertIsNone(step['failure_reason'])
+        # Exactly the detection audit entry was appended (no strand/pause).
+        events = [e['event'] for e in seq['audit_log']]
+        self.assertIn('step-pr-detected', events)
+        self.assertNotIn('step-stranded', events)
+        self.assertNotIn('sequence-paused', events)
+        detected = next(
+            e for e in seq['audit_log'] if e['event'] == 'step-pr-detected')
+        self.assertEqual(detected['actor'], 'advancer')
+        self.assertEqual(detected['pr_url'], pr_url)
+
+    def test_stalled_step_with_nonmatching_open_pr_still_escalates(self):
+        # Criterion 2: a stalled step whose only open PR does NOT identify as it
+        # (wrong branch, no token corroboration) escalates exactly as today.
+        self._stub_open_prs([{
+            'number': 5, 'url': 'https://github.com/x/y/pull/5',
+            'title': 'unrelated change', 'headRefName': 'forge/something-else',
+            'mergedAt': None,
+        }])
+        self._write_sequence(self._dispatched(
+            repo='ourliberty-agent-core', dispatched_at=self._stale_iso()))
+        self.bsa.tick()
+        seq = self._read_sequence('seq-001')
+        step = seq['steps'][0]
+        self.assertEqual(step['status'], 'failed')
+        self.assertIn('stall', step['failure_reason'].lower())
+        self.assertEqual(seq['status'], 'paused')
+        subjects = [d['subject'] for d in self.dms]
+        self.assertIn('sequence-stranded:seq-001:only-step', subjects)
+
+    def test_stall_open_pr_query_failure_defers_escalation(self):
+        # Criterion 4: when the open-PR query can't be answered (None), the step
+        # is NOT escalated this tick; a diagnosable WARN is logged; it's left
+        # `dispatched` for retry next tick (a transient gh outage must not
+        # resurrect the false strand this guard removes).
+        self._stub_open_prs(None)
+        self._write_sequence(self._dispatched(
+            repo='ourliberty-agent-core', dispatched_at=self._stale_iso()))
+        with self.assertLogs('build_sequence_advancer', level='WARNING') as cm:
+            self.bsa.tick()
+        seq = self._read_sequence('seq-001')
+        step = seq['steps'][0]
+        self.assertEqual(step['status'], 'dispatched')
+        self.assertEqual(seq['status'], 'active')
+        self.assertIsNone(step['failure_reason'])
+        self.assertFalse(any(
+            d['subject'].startswith('sequence-stranded:') for d in self.dms))
+        events = [e['event'] for e in seq['audit_log']]
+        self.assertNotIn('step-stranded', events)
+        joined = '\n'.join(cm.output)
+        self.assertIn('deferring escalation', joined)
 
 
 class TestAlreadyMergedBridge(_AdvancerHarness):
