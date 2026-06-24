@@ -222,6 +222,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-24 21:07Z UTC (Iter ~2628, Tier 1, consecutive_clean=0)
+
+**Iter ~2628 summary:** ⚠️ Watch — PR #685 (forge/escalation-feed) still CONFLICTING; Forge revision 2 complete (`review-escalation-feed-rev1.json` in Mirror). forge-post-open-mergeable-rebase-001 IN BUILD phase. G-rule Forge-timeout-worktree-missing-retry-loop **3/3 → DISPATCHED** (reconcile-hardening-mission-shipped-001 Forge WIP crash; medic DM sent). heal-stall-dryrun-noop-001 + one-time-stale-dispatch-branch-cleanup-001 both in Forge preflight. All other checks nominal. PRIME: systemic_fixes=63, interventions=1100, ratio≈17.5, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-24 20:58Z UTC (Iter ~2627, Tier 1, consecutive_clean=0)
 
 **Iter ~2627 summary:** ⚠️ Watch — PR #685 CONFLICTING + Mirror revision in Forge inbox (test failures + manifest regression). PR #686 (backstop-healer) NEW MERGEABLE, Mirror review active. G-rule heal-pipeline-stall-dry-run-writes-real-alerts **3/3 → DISPATCHED** (pipeline-stall-dry-run-writes-alerts-001.json to Beacon). New Larry directive 20:52Z: dispatch stale-branch cleanup → Beacon processing. All other checks nominal. PRIME: systemic_fixes=62, interventions=1099, ratio≈17.7, trend=improving. Tier 1, consecutive_clean=0.
@@ -237,22 +241,6 @@
 ## Status snapshot — updated 2026-06-24 20:36Z UTC (Iter ~2624, Tier 1, consecutive_clean=0)
 
 **Iter ~2624 summary:** ⚠️ Watch — PR #685 (forge/escalation-feed, operator-needs-you-feed step 1) opened CONFLICTING; Mirror review dispatched but auto-merge will fail until conflict resolved. PR #684 MERGED (b41884d5). backstop-healer advanced to build phase (build-backstop-healer.json in Forge inbox). G-rule merge_conflict_manual_rebase-tier4 hit **3/3 → dispatched** to Beacon (merge-conflict-rebase-001.json). PRIME: systemic_fixes=61, interventions=1096, ratio≈17.93, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-24 20:26Z UTC (Iter ~2623, Tier 1, consecutive_clean=2)
-
-**Iter ~2623 summary:** ✅ Nominal — all checks clean, no actions. Active pipeline: PR #684 (cred-drift boolean-skip) in Mirror review; Forge inbox has build-escalation-feed (step 1) + backstop-healer (Contract E step 3 preflight). PRIME: systemic_fixes=61, interventions=1095, ratio≈17.95, trend=improving. Tier 1, consecutive_clean=2. G-rules unchanged.
-
-## Status snapshot — updated 2026-06-24 20:20Z UTC (Iter ~2622, Tier 1, consecutive_clean=1)
-
-**Iter ~2622 summary:** ✅ Nominal — all checks clean, no actions. New pipeline item: `backstop-healer.json` (Contract E, mirror-review-visibility step 3 preflight) in Forge inbox. PR #684 (Larry cred-drift boolean skip) in Mirror review. [blue] RETIRED: fix-645-alert-translation-001 worktree stall (PR #645 MERGED). G-rules: heal-daemon-restart-manifest-drift-regenerated-tier4 1/3, check-i-force-bypass-dm-route 1/3 (no new instances). PRIME: systemic_fixes=61, interventions=1095, ratio≈17.95, trend=improving. Tier 1, consecutive_clean=1.
-
-## Status snapshot — updated 2026-06-24 20:14Z UTC (Iter ~2621, Tier 1, consecutive_clean=0)
-
-**Iter ~2621 summary:** ✅ Auto-fix — fast-forward 92f60ca8→41e58f68 (PR #683 merged mid-cycle: feat(mirror) classify+route Contracts B+C+D). [blue] watches RETIRED: Forge contamination + for_larry_escalations.py not-in-main. outbox_notifier restarted (L1024 Tier-3, new PID 1979436). New [blue]: PR #684 (Larry-authored, cred-drift boolean skip fix, MERGEABLE). Pipeline active: build-escalation-feed.json in Forge inbox (operator-needs-you-feed step 1). PRIME: systemic_fixes=61, interventions=1095, ratio≈17.95, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-24 20:09Z UTC (Iter ~2620, Tier 1, consecutive_clean=0)
-
-**Iter ~2620 summary:** ⚠️ Check 0: 2 Tier-4 novel alerts (L1022: still-stale-after-restart:outbox-notifier — self-resolved, Forge contamination cleared; L1023: manifest-drift-regenerated — informational, bot digest). Forge contamination from ~2619 CLEARED: PR #683 opened (feat(mirror) classify+route Contracts B+C+D), main tree clean. New [blue] watch: manifest tracks for_larry_escalations.py but file not in main (only in PR #683 branch — clears on merge). Pipeline active: build-escalation-feed.json in Forge inbox (operator-needs-you-feed step 1), review-classify-and-route.json in Mirror inbox. New G-rule: heal-daemon-restart-manifest-drift-regenerated-tier4 1/3. PRIME: systemic_fixes=61, interventions=1094, ratio≈17.93, trend=improving. Tier 1, consecutive_clean=0.
 
 
 
