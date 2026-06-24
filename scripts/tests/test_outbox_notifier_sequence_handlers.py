@@ -1318,6 +1318,130 @@ class MaybeReconcileAlreadyMergedBuildTests(SignalSequenceStepMergedHarness):
         self.assertEqual(step_a['status'], 'dispatched')
 
 
+# ============================================================================
+# push-signal-and-substatus — _signal_sequence_step_failed
+# ============================================================================
+
+
+class SignalSequenceStepFailedTests(SignalSequenceStepMergedHarness):
+    """Push-signal a non-merge terminal: step → failed + sequence paused +
+    ONE Larry doorbell alert. Reuses the merged harness (ssh.AGENTS_ROOT +
+    larry_alerts rerouted to the tmpdir)."""
+
+    def test_active_step_fails_pauses_and_alerts(self):
+        self._write_sequence(self._make_active_sequence())
+        result = on._signal_sequence_step_failed(
+            'step-a', 'Forge preflight REJECT (marker_type=reject)',
+        )
+        self.assertEqual(result, 'live-seq-001')
+        on_disk = self._read_sequence('live-seq-001')
+        step_a = next(s for s in on_disk['steps'] if s['step_id'] == 'step-a')
+        self.assertEqual(step_a['status'], 'failed')
+        self.assertIn('REJECT', step_a['failure_reason'])
+        self.assertEqual(on_disk['status'], 'paused')
+        # Failed step stays visible in current_steps.
+        self.assertIn('step-a', on_disk['current_steps'])
+        # Exactly one Larry doorbell alert about the pause.
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]['subject'], 'sequence-paused:live-seq-001')
+
+    def test_no_matching_step_returns_none_and_no_alert(self):
+        self._write_sequence(self._make_active_sequence())
+        result = on._signal_sequence_step_failed('unrelated', 'reason')
+        self.assertIsNone(result)
+        on_disk = self._read_sequence('live-seq-001')
+        step_a = next(s for s in on_disk['steps'] if s['step_id'] == 'step-a')
+        self.assertEqual(step_a['status'], 'dispatched')
+        self.assertEqual(on_disk['status'], 'active')
+        self.assertEqual(self._read_alerts(), [])
+
+    def test_refire_on_paused_sequence_is_dropped_no_double_alert(self):
+        # After the first failure the sequence is `paused`, which the active-
+        # sequence scan skips (same convention as _signal_sequence_step_merged).
+        # A re-fire of the same terminal therefore returns None and raises NO
+        # second alert — the pause is the natural idempotency boundary.
+        seq = _make_sequence(
+            seq_id='already-failed', status='paused',
+            steps=[_make_step('step-a', status='failed')],
+            current_steps=['step-a'],
+        )
+        seq['steps'][0]['failure_reason'] = 'first reason'
+        self._write_sequence(seq)
+        result = on._signal_sequence_step_failed('step-a', 'second reason')
+        self.assertIsNone(result)
+        on_disk = self._read_sequence('already-failed')
+        self.assertEqual(on_disk['steps'][0]['failure_reason'], 'first reason')
+        self.assertEqual(self._read_alerts(), [])
+
+    def test_merged_step_not_clobbered_by_late_failure(self):
+        seq = _make_sequence(
+            seq_id='merged-seq', status='active',
+            steps=[_make_step('step-a', status='merged',
+                              merged_at='2026-06-24T00:00:00Z',
+                              pr_url='https://github.com/x/y/pull/1')],
+        )
+        self._write_sequence(seq)
+        result = on._signal_sequence_step_failed('step-a', 'late failure')
+        self.assertEqual(result, 'merged-seq')
+        on_disk = self._read_sequence('merged-seq')
+        self.assertEqual(on_disk['steps'][0]['status'], 'merged')
+        self.assertEqual(on_disk['status'], 'active')
+        self.assertEqual(self._read_alerts(), [])
+
+
+# ============================================================================
+# push-signal-and-substatus — _signal_sequence_step_pr_opened
+# ============================================================================
+
+
+class SignalSequenceStepPrOpenedTests(SignalSequenceStepMergedHarness):
+    """Record pr_url + flip the step to `reviewing` at PR-open. No Larry
+    alert — in-flight progress is not an operator event."""
+
+    def test_open_records_pr_url_and_flips_reviewing(self):
+        self._write_sequence(self._make_active_sequence())
+        result = on._signal_sequence_step_pr_opened(
+            'step-a', 'https://github.com/x/y/pull/42',
+        )
+        self.assertEqual(result, 'live-seq-001')
+        on_disk = self._read_sequence('live-seq-001')
+        step_a = next(s for s in on_disk['steps'] if s['step_id'] == 'step-a')
+        self.assertEqual(step_a['status'], 'reviewing')
+        self.assertEqual(step_a['pr_url'], 'https://github.com/x/y/pull/42')
+        self.assertEqual(step_a['current_actor'], 'mirror')
+        # Sequence stays active; no operator alert.
+        self.assertEqual(on_disk['status'], 'active')
+        self.assertEqual(self._read_alerts(), [])
+
+    def test_no_matching_step_returns_none(self):
+        self._write_sequence(self._make_active_sequence())
+        result = on._signal_sequence_step_pr_opened(
+            'unrelated', 'https://github.com/x/y/pull/1',
+        )
+        self.assertIsNone(result)
+        on_disk = self._read_sequence('live-seq-001')
+        step_a = next(s for s in on_disk['steps'] if s['step_id'] == 'step-a')
+        self.assertEqual(step_a['status'], 'dispatched')
+
+    def test_terminal_step_not_walked_backward(self):
+        seq = _make_sequence(
+            seq_id='term-seq', status='active',
+            steps=[_make_step('step-a', status='merged',
+                              merged_at='2026-06-24T00:00:00Z',
+                              pr_url='https://github.com/x/y/pull/1')],
+        )
+        self._write_sequence(seq)
+        result = on._signal_sequence_step_pr_opened(
+            'step-a', 'https://github.com/x/y/pull/99',
+        )
+        self.assertEqual(result, 'term-seq')
+        on_disk = self._read_sequence('term-seq')
+        self.assertEqual(on_disk['steps'][0]['status'], 'merged')
+        self.assertEqual(on_disk['steps'][0]['pr_url'],
+                         'https://github.com/x/y/pull/1')
+
+
 try:
     from . import _chokepoint_optout
 except ImportError:

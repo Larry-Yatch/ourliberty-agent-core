@@ -1115,5 +1115,170 @@ class GhPrMergeInfoTests(unittest.TestCase):
         self.assertEqual(called['n'], 0)
 
 
+# ============================================================================
+# step-failed (push-signal non-merge terminals)
+# ============================================================================
+
+
+class ApplyStepFailedTests(_HelpersHarness):
+
+    def _active_with_dispatched_step(self, seq_id='f-seq'):
+        return _make_sequence(
+            seq_id=seq_id,
+            status='active',
+            steps=[
+                _make_step('s1', deps=[], status='dispatched',
+                           dispatched_at='2026-06-24T00:00:00Z'),
+                _make_step('s2', deps=['s1'], status='pending'),
+            ],
+            current_steps=['s1'],
+        )
+
+    def test_happy_path_flips_step_failed_and_pauses_sequence(self):
+        self._write_sequence(self._active_with_dispatched_step())
+        result = ssh.apply_step_failed(
+            'f-seq', 's1', 'Forge preflight REJECT (spec unsafe)',
+        )
+        self.assertTrue(result.applied)
+        self.assertFalse(result.error)
+        on_disk = self._read_sequence('f-seq')
+        s1 = next(s for s in on_disk['steps'] if s['step_id'] == 's1')
+        self.assertEqual(s1['status'], 'failed')
+        self.assertEqual(s1['failure_reason'],
+                         'Forge preflight REJECT (spec unsafe)')
+        self.assertIsNone(s1['current_actor'])
+        # Sequence paused.
+        self.assertEqual(on_disk['status'], 'paused')
+        # Failed step STAYS in current_steps for operator visibility.
+        self.assertIn('s1', on_disk['current_steps'])
+        # Audit: step-failed THEN sequence-paused.
+        events = [e['event'] for e in on_disk['audit_log']]
+        self.assertEqual(events[-2:], ['step-failed', 'sequence-paused'])
+        # Validator still passes.
+        v = bsv.validate_dag(on_disk)
+        self.assertTrue(v.valid, v.errors)
+
+    def test_idempotent_when_already_failed(self):
+        seq = _make_sequence(
+            seq_id='f-idem', status='paused',
+            steps=[_make_step('s1', status='failed')],
+            current_steps=['s1'],
+        )
+        seq['steps'][0]['failure_reason'] = 'original reason'
+        self._write_sequence(seq)
+        before = self._read_sequence('f-idem')
+        result = ssh.apply_step_failed('f-idem', 's1', 'a different reason')
+        self.assertFalse(result.applied)
+        self.assertFalse(result.error)
+        self.assertIn('already', result.reason)
+        # On-disk unchanged — original reason preserved.
+        self.assertEqual(self._read_sequence('f-idem'), before)
+
+    def test_merged_step_is_never_clobbered(self):
+        # A late/duplicate failure signal must not overwrite a real merge
+        # (success/failure race resolves in favor of success).
+        seq = _make_sequence(
+            seq_id='f-merged', status='active',
+            steps=[_make_step('s1', status='merged',
+                              merged_at='2026-06-24T00:00:00Z',
+                              pr_url='https://github.com/x/y/pull/1')],
+        )
+        self._write_sequence(seq)
+        before = self._read_sequence('f-merged')
+        result = ssh.apply_step_failed('f-merged', 's1', 'late failure')
+        self.assertFalse(result.applied)
+        self.assertIn('merged', result.reason)
+        self.assertEqual(self._read_sequence('f-merged'), before)
+
+    def test_missing_step_returns_error(self):
+        self._write_sequence(self._active_with_dispatched_step())
+        result = ssh.apply_step_failed('f-seq', 'nope', 'reason')
+        self.assertFalse(result.applied)
+        self.assertTrue(result.error)
+        self.assertIn('not found', result.reason)
+
+
+# ============================================================================
+# step-pr-opened (pr_url + substatus at PR-open)
+# ============================================================================
+
+
+class ApplyStepPrOpenedTests(_HelpersHarness):
+
+    def _active_with_dispatched_step(self, seq_id='o-seq'):
+        return _make_sequence(
+            seq_id=seq_id,
+            status='active',
+            steps=[
+                _make_step('s1', deps=[], status='dispatched',
+                           dispatched_at='2026-06-24T00:00:00Z'),
+            ],
+            current_steps=['s1'],
+        )
+
+    def test_happy_path_records_pr_url_and_flips_reviewing(self):
+        self._write_sequence(self._active_with_dispatched_step())
+        result = ssh.apply_step_pr_opened(
+            'o-seq', 's1', 'https://github.com/x/y/pull/42',
+        )
+        self.assertTrue(result.applied)
+        self.assertFalse(result.error)
+        on_disk = self._read_sequence('o-seq')
+        s1 = on_disk['steps'][0]
+        self.assertEqual(s1['status'], 'reviewing')
+        self.assertEqual(s1['pr_url'], 'https://github.com/x/y/pull/42')
+        self.assertEqual(s1['current_actor'], 'mirror')
+        # Sequence status untouched — PR-open is not a sequence transition.
+        self.assertEqual(on_disk['status'], 'active')
+        last = on_disk['audit_log'][-1]
+        self.assertEqual(last['event'], 'step-pr-opened')
+        self.assertEqual(last['pr_url'], 'https://github.com/x/y/pull/42')
+        v = bsv.validate_dag(on_disk)
+        self.assertTrue(v.valid, v.errors)
+
+    def test_idempotent_same_pr_url_while_reviewing(self):
+        seq = _make_sequence(
+            seq_id='o-idem', status='active',
+            steps=[_make_step('s1', status='reviewing',
+                              pr_url='https://github.com/x/y/pull/7')],
+            current_steps=['s1'],
+        )
+        seq['steps'][0]['current_actor'] = 'mirror'
+        self._write_sequence(seq)
+        before = self._read_sequence('o-idem')
+        result = ssh.apply_step_pr_opened(
+            'o-idem', 's1', 'https://github.com/x/y/pull/7',
+        )
+        self.assertFalse(result.applied)
+        self.assertFalse(result.error)
+        self.assertEqual(self._read_sequence('o-idem'), before)
+
+    def test_terminal_step_is_not_walked_backward(self):
+        for term in ('merged', 'failed'):
+            with self.subTest(status=term):
+                seq = _make_sequence(
+                    seq_id=f'o-{term}', status='active',
+                    steps=[_make_step('s1', status=term,
+                                      pr_url='https://github.com/x/y/pull/1')],
+                )
+                self._write_sequence(seq)
+                before = self._read_sequence(f'o-{term}')
+                result = ssh.apply_step_pr_opened(
+                    f'o-{term}', 's1', 'https://github.com/x/y/pull/99',
+                )
+                self.assertFalse(result.applied)
+                self.assertIn('terminal', result.reason)
+                self.assertEqual(self._read_sequence(f'o-{term}'), before)
+
+    def test_missing_step_returns_error(self):
+        self._write_sequence(self._active_with_dispatched_step())
+        result = ssh.apply_step_pr_opened(
+            'o-seq', 'nope', 'https://github.com/x/y/pull/1',
+        )
+        self.assertFalse(result.applied)
+        self.assertTrue(result.error)
+        self.assertIn('not found', result.reason)
+
+
 if __name__ == '__main__':
     unittest.main()
