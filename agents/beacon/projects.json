@@ -709,12 +709,12 @@
           "id": "auto-retire-done-pipeline-cards-follow-up-to-pha",
           "title": "Auto-retire Done pipeline cards (follow-up to phase-aware Complete & retire, merged #629/#77). A Done project should auto-retire after a visibility window (default ~48h since it reached Done) so the board self-cleans and Larry never has to click Complete & retire. Design: a healer tick (heal_projects_store or a new heal_pipeline_retire) scans ACTIVE projects with rollup status 'done', computes done-at = max(phase.updated_at where lifecycle_state=='done'), and when now-done_at > window flips state active->retired (single-committer: healer owns projects.json). The 'retired' state + suppresses_funnel_source() already exist (active+retired keep the funnel source suppressed; only archived returns it). Card stays visible as a 'Done' win for the window, then clears. Window via config/env. Reversibility note: retired is terminal + suppressed, so add a 'recently retired' surface later if needed.",
           "desired_end_state": "Auto-retire Done pipeline cards (follow-up to phase-aware Complete & retire, merged #629/#77). A Done project should auto-retire after a visibility window (default ~48h since it reached Done) so the board self-cleans and Larry never has to click Complete & retire. Design: a healer tick (heal_projects_store or a new heal_pipeline_retire) scans ACTIVE projects with rollup status 'done', computes done-at = max(phase.updated_at where lifecycle_state=='done'), and when now-done_at > window flips state active->retired (single-committer: healer owns projects.json). The 'retired' state + suppresses_funnel_source() already exist (active+retired keep the funnel source suppressed; only archived returns it). Card stays visible as a 'Done' win for the window, then clears. Window via config/env. Reversibility note: retired is terminal + suppressed, so add a 'recently retired' surface later if needed.",
-          "lifecycle_state": "spec",
+          "lifecycle_state": "building",
           "order": 0,
           "spec_ref": "agents/beacon/specs/projects-v3-auto-retire-done-visibility-window.md",
-          "sequence_ref": null,
+          "sequence_ref": "launch-auto-retire-done-pipeline-cards-follow-up-to-pha",
           "created_at": "2026-06-23T22:07:57.930635+00:00",
-          "updated_at": "2026-06-24T02:12:28.062349+00:00"
+          "updated_at": "2026-06-24T03:30:03.169617+00:00"
         }
       ],
       "one_off": true,
