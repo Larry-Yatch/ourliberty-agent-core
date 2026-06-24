@@ -4,6 +4,122 @@
 
 ---
 
+## Iteration ~2635 — 2026-06-24T22:04Z UTC (interactive /cycle via /loop dynamic mode, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/cycle` via /loop dynamic mode.
+
+**Health:** ⚠️ Watch — PR #685 (forge/escalation-feed) CONFLICTING (carry); PR #687 (forge/forge-post-open-mergeable-rebase-001) CONFLICTING, Mirror review active since 21:55:22Z; pipeline stall cooldown expired for reconcile-hardening-mission-shipped-001 (dry-run: 1 alert would fire; re-dispatch -002 in BUILD). All other checks nominal.
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #685 (forge/escalation-feed):** CONFIRMED CONFLICTING (gh pr view → CONFLICTING, state=OPEN, reviewDecision=""). PR #687 (rebase fix) is the path forward. [carry ✅]
+- **PR #687 (forge/forge-post-open-mergeable-rebase-001):** CONFIRMED CONFLICTING (gh pr view → CONFLICTING, state=OPEN, reviewDecision=""). Mirror review started 21:55:22Z (inbox_watcher.log confirmed). Still in progress. [carry ✅]
+- **G-rule watchdog-watcher-log-stale-post-fix 1/3:** VERIFIED — 0 WARNs from ourliberty-watchdog in 40-min window. inbox_watcher started Mirror session at 21:55:22Z; in-flight-aware suppression (PR #649) working correctly for inbox_watcher-managed sessions. The 1/3 instance was a ~2-min gap between sessions. **No new instance.** [carry]
+- **G-rule ourliberty-health-notify-script-missing 1/3:** VERIFIED — 0 occurrences in 40-min window. **No new instance.** [carry]
+- **build-forge-post-open-mergeable-rebase-001 envelope:** CONFIRMED still in Forge inbox (phase=build). Mirror review dispatched (review-forge-post-open-mergeable-rebase-001.json in Mirror inbox). [carry]
+- **reconcile-hardening-mission-shipped-002:** CONFIRMED phase=build in Forge inbox. [carry ✅]
+- **forge-wip-only-auto-redispatch-001:** CONFIRMED phase=preflight. [carry ✅]
+- **heal-stall-dryrun-noop-001:** CONFIRMED phase=preflight. [carry ✅]
+- **one-time-stale-dispatch-branch-cleanup-001:** CONFIRMED phase=preflight. [carry ✅]
+- **All 8 daemons alive:** CONFIRMED (PIDs 1921593,2029112,1921360,1388801,1388982,1389067,1732118,1742173 — all Ss/Ssl/SNs). [carry ✅]
+- **Untracked Beacon spec:** `agents/beacon/specs/missions-v2-funnel-item-doorbell.md` — still untracked. Larry authoring. [carry]
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 1035, "file_length": 1035}`. 0 new alerts. Watermark stays at 1035. No tier-reset. ✅ Nominal.
+
+**Check 1 — Log noise (40-min window):** 0 WARNs/ERRORs from ourliberty-watchdog, ourliberty-outbox-notifier, or ourliberty-health in the last 40 min. inbox_watcher is actively running Mirror review since 21:55:22Z; in-flight suppression working. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message 15:12 MDT (21:12Z) — approved forge-wip-only-auto-redispatch-001. No new directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → 1 alert would fire (forge_built_no_pr:reconcile-hardening-mission-shipped-001, cooldown expired), 0 recovered, 0 suppressed. Known transient: -001 crashed, -002 re-dispatch is in BUILD; stall clears once -002 opens a PR. No new action. [⚠️ expected transient, tier-reset]
+
+**Check 4 — Pending directives:**
+- Forge inbox (5 items): `build-forge-post-open-mergeable-rebase-001.json` (build — archive pending post-Mirror review), `reconcile-hardening-mission-shipped-002.json` (build), `forge-wip-only-auto-redispatch-001.json` (preflight), `heal-stall-dryrun-noop-001.json` (preflight), `one-time-stale-dispatch-branch-cleanup-001.json` (preflight).
+- Beacon inbox: empty. ✅
+- Mirror inbox: `review-forge-post-open-mergeable-rebase-001.json` — Mirror actively reviewing PR #687 (since 21:55:22Z). [NEW since iter ~2634]
+- beacon-pending-approvals: pending=0. ✅
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-24T21:58:44Z (~6 min before check). ✅ Nominal.
+
+**Check A — Source repo:** On main. HEAD=d5d6b53c=origin/main (new since iter ~2634; committed by run_cycle.sh wrapper). Up to date. Untracked: `agents/beacon/specs/missions-v2-funnel-item-doorbell.md` (Larry authoring). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-24T21:38:37Z (~26 min ago). Within 2-hour window. ✅ Nominal.
+
+**Check C — Agent liveness:** 8/8 daemons alive (PIDs confirmed): beacon=1921593, outbox_notifier=2029112, dashboard_api=1921360, forge_bot=1388801, mirror_bot=1388982, pulse_bot=1389067, inbox_watcher=1732118, chain_event_shipper=1742173. ✅ Nominal.
+
+**Check E — PRs:**
+- agent-core PR #685: OPEN, **CONFLICTING** (confirmed). reviewDecision="". Rebase needed; PR #687 is the path forward. [⚠️ carry, tier-reset]
+- agent-core PR #687: OPEN, **CONFLICTING** (confirmed). Mirror review in progress since 21:55:22Z. [⚠️ carry, tier-reset]
+- dashboard: 0 open. ✅
+
+**Check H — Forge digest:** HEAD=d5d6b53c. 5 items in Forge inbox (2 build, 3 preflight). Mirror inbox: 1 active review (PR #687). Unchanged from iter ~2634. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. ✅
+
+**Conditional checks — Wednesday 2026-06-24 UTC (weekday=2 ∈ {0,2,4,6}):**
+- **Check I:** `pulse_check_i.py` (no `--force`) → mode=digest, journal: skipped (block for 2026-06-22 already present), DM: queued (route=digest), check-i-2026-06-24.json written, journal appended. G-rule check-i-force-bypass-dm-route: no new instance. ✅
+- **Check III:** Not Sunday → skip. ✅
+
+**G-rule updates:**
+- **G-rule watchdog-watcher-log-stale-post-fix** — VERIFY: 0 WARNs in 40-min window. No new instance. [1/3 carry]
+- **G-rule ourliberty-health-notify-script-missing** — VERIFY: 0 occurrences in 40-min window. No new instance. [1/3 carry]
+- **G-rule merge_conflict_manual_rebase-tier4** — 3/3 dispatched ~2624; PR #687 OPEN CONFLICTING, Mirror reviewing. [verifying]
+- **G-rule Forge-timeout-worktree-missing-retry-loop** — 3/3 dispatched ~2628; forge-wip-only-auto-redispatch-001 in Forge preflight. [verifying]
+- **G-rule heal-pipeline-stall-dry-run-writes-real-alerts** — 3/3 dispatched ~2627; heal-stall-dryrun-noop-001 in Forge preflight. [verifying]
+- **All other carry G-rules:** No change. [carry]
+
+**Actions taken:** 0 alerts triaged (watermark 1035 unchanged). Check I: mode=digest. PRIME: 1 intervention logged (pipeline stall cooldown + PR conflicts carry). Tier state: `record --checks-clean false` → consecutive_clean=0, last_signal_at=22:04Z.
+
+**Dispatches:** None this iter.
+
+**Standing findings (carried + verified):**
+- [yellow] **PR #685 (forge/escalation-feed)** — CONFLICTING. PR #687 (rebase fix) in Mirror review. [carry+verified]
+- [yellow] **PR #687 (forge/forge-post-open-mergeable-rebase-001)** — CONFLICTING. Mirror review active since 21:55:22Z. [carry+verified]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [blue] **reconcile-hardening-mission-shipped-001 stall** — cooldown expired; dry-run: 1 alert would fire. re-dispatch -002 in BUILD; clears once -002 opens PR. [NEW transient]
+- [blue] **build-forge-post-open-mergeable-rebase-001 envelope** — Forge inbox (build), archive pending post-Mirror review. [carry]
+- [blue] **reconcile-hardening-mission-shipped-002** — Forge BUILD. Watch for PR open. [carry]
+- [blue] **forge-wip-only-auto-redispatch-001** — Forge preflight. [carry]
+- [blue] **heal-stall-dryrun-noop-001** — Forge preflight. [carry]
+- [blue] **one-time-stale-dispatch-branch-cleanup-001** — Forge preflight. [carry]
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 3/3; PR #687 in Mirror review. [verifying]
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 3/3; forge-wip-only-auto-redispatch-001 preflight. [verifying]
+- [blue] **G-rule heal-pipeline-stall-dry-run-writes-real-alerts** — 3/3; heal-stall-dryrun-noop-001 preflight. [verifying]
+- [blue] **G-rule watchdog-watcher-log-stale-post-fix** — 1/3. No new instance. [carry]
+- [blue] **G-rule ourliberty-health-notify-script-missing** — 1/3. No new instance. [carry]
+- [blue] **G-rule auto-merge-conflict-outbox-notifier-tier4** — 1/3. [carry]
+- [blue] **G-rule heal-daemon-restart-manifest-drift-regenerated-tier4** — 1/3. [carry]
+- [blue] **G-rule check-i-force-bypass-dm-route** — 1/3. [carry]
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. [carry]
+- [blue] **G-rule sequence-step-review-escalate-null-chat** — 1/3. [carry]
+- [blue] **G-rule medic-approval-request-novel-tier4** — 1/3. [carry]
+- [blue] **G-rule beacon-claude-timeout** — 1/3. [carry]
+- [blue] **G-rule api-500-burst** — 1/3. [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. [carry]
+- [blue] **G-rule telegram-409-burst** — 2/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. [carry]
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. [carry]
+- [blue] **G-rule sync.service-deploy-restart-storm-tier4** — 1/3. [carry]
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. [carry]
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. [carry]
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. [carry]
+- [blue] **G-rule heal-daemon-restart-manifest-drift-tier4** — 2/3. [carry — dispatch at 3/3]
+- [blue] **G-rule pulse-self-summary-tier4** — 1/3. [carry]
+- [blue] **G-rule unreviewed-merge:655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. [carry]
+- [blue] **Untracked Beacon spec** — `agents/beacon/specs/missions-v2-funnel-item-doorbell.md`. Larry authoring. [carry]
+
+**PRIME DIRECTIVE:** 1 new intervention (pipeline stall cooldown + PR #685/#687 conflicts carry). Trailing-30d: systemic_fixes=63, interventions≈1107, ratio≈17.6, trend=improving.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0. Last signal: 2026-06-24T22:04Z.
+
+---
+
 ## Iteration ~2634 — 2026-06-24T21:57Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/cycle` invocation via chat.

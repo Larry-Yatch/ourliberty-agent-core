@@ -234,6 +234,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-24 22:07Z UTC (Iter ~2635, Tier 1, consecutive_clean=0)
+
+**Iter ~2635 summary:** ⚠️ Watch — PR #685 (forge/escalation-feed) CONFLICTING (carry); PR #687 (forge/forge-post-open-mergeable-rebase-001) CONFLICTING, Mirror review active since 21:55:22Z. Pipeline stall cooldown expired for reconcile-hardening-mission-shipped-001 (dry-run: 1 alert would fire; re-dispatch -002 in BUILD). 0 new alerts (watermark 1035). 8 daemons alive. G-rule watchdog-watcher-log-stale-post-fix 1/3 VERIFIED no new instance (in-flight suppression working). Check I: mode=digest. HEAD=d5d6b53c. PRIME: interventions≈1107, systemic_fixes=63, ratio≈17.6, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-24 21:57Z UTC (Iter ~2634, Tier 1, consecutive_clean=0)
 
 **Iter ~2634 summary:** ⚠️ Watch — PR #687 NEW CONFLICTING (21:44Z) — G-rule fix forge-post-open-mergeable-rebase-001 opened as PR but is itself CONFLICTING (meta-irony); PR #685 still CONFLICTING. Watchdog-watcher-log-stale WARNs above threshold (12/hr, post-PR #649 fix; G-rule watchdog-watcher-log-stale-post-fix 1/3 NEW). ourliberty-health notify-script-missing (G-rule 1/3 NEW). 0 new larry-alerts (watermark 1035). 8 daemons alive. Check I: mode=digest, cooldown-suppressed. PRIME: interventions≈1106, systemic_fixes=63, ratio≈17.5, trend=improving. Tier 1, consecutive_clean=0.
