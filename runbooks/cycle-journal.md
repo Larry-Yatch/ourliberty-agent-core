@@ -187186,3 +187186,99 @@ Watermark: 1049 → 1050. No tier-reset (Tier-3 silence).
 
 **PRIME DIRECTIVE:** 0 new interventions this iter. Trailing-30d: interventions=1089, systemic_fixes=61, ratio≈17.85, trend=improving.
 **Tier end-of-iter:** Tier **1**, consecutive_clean=1. Last signal: 2026-06-24T04:58:34Z.
+
+---
+
+## Iteration ~2584 — 2026-06-24T05:15Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 1→2)
+
+**Trigger:** Larry `/cycle` invocation (chat mode).
+
+**Health:** ✅ Clean — 0 new alerts (watermark=1050=file_length), 8/8 daemons alive, no open PRs, no pipeline stalls. 1 pending approval (hardening sequence DAG preflight) carried from prior iters — already DM'd at 04:52Z, awaiting Larry.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Daemons (re-verified):** forge_bot=1388801 (Ss) ✅, mirror_bot=1388982 (Ss) ✅, pulse_bot=1389067 (Ss) ✅, inbox_watcher=1732118 (Ssl) ✅, dashboard_api=1742129 (Ssl) ✅, chain_event_shipper=1742173 (SNs) ✅, beacon_telegram_bot=1761804 (Ss) ✅, outbox_notifier=1761924 (Ss) ✅. 8/8 alive, same PIDs as ~2583. ✅
+- **Open PRs (re-verified):** `gh pr list` → `[]`. Pipeline idle. ✅
+- **Hardening sequence `dag-preflight-orchestrator-terminal-signal-hardening-001` (re-verified):** beacon-pending-approvals.json: `status=pending`, created 04:52Z. Approval DM confirmed sent at 22:52 MDT (04:52Z) per bot log. Awaiting Larry response. [yellow — carry]
+- **push-soft-gate-block-upgrade-decision (re-verified):** 0 new alerts. [carry yellow] ✅
+- **credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED (re-verified):** 0 new alerts. [carry yellow] ✅
+- **fix-645-alert-translation-001 stall (re-verified):** heal_pipeline_stall --dry-run → `no stalls detected`. WARN for forge_built_no_pr:fix-645-alert-translation-001 absent this iter. Cooldown-suppressed or resolved — monitoring. [blue — carry] ✅
+- **Untracked Beacon spec (re-verified):** `agents/beacon/specs/missions-v2-funnel-item-doorbell.md` still present. [carry informational] ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 1050, "file_length": 1050}`. 0 new alerts. Watermark stays at 1050. ✅ Nominal.
+
+**Check 1 — Log noise (30-min window):** journalctl --user -p warning → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep (last 4h):** Beacon bot PID 1761804 (Ss) ✅. Approval DM for `dag-preflight-orchestrator-terminal-signal-hardening-001` sent 22:52 MDT (04:52Z). Beacon bot restarted 22:54 MDT (04:54Z). Last activity: 22:58 MDT (04:58Z) — Beacon outbound spec review msg. No new Larry directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → `no stalls detected`, 0 alerts fired. ✅ Nominal.
+
+**Check 4 — Pending directives:** Beacon inbox: empty. Forge inbox: empty. Mirror inbox: empty. beacon-pending-approvals: pending=1 (`dag-preflight-orchestrator-terminal-signal-hardening-001`, created 04:52Z, awaiting Larry — carry yellow). ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-24T05:04:17Z (~11 min before cycle). Within 60-min window. ✅ Nominal.
+
+**Check A — Source repo:** On main. HEAD=1ab0d31a=origin/main (clean, 0 behind, 0 ahead). Untracked: `agents/beacon/specs/missions-v2-funnel-item-doorbell.md`. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-24T04:36:31Z (~39 min ago). Within 2-hour window. ✅ Nominal.
+
+**Check C — Agent liveness:** 8/8 alive (same PIDs as ~2583). ✅ Nominal.
+
+**Check E — PRs:** No open PRs. ✅ Nominal.
+
+**Check H — Forge digest:** No active Forge worktrees. Pipeline idle. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. ✅
+
+**Conditional checks — Wednesday 2026-06-24 UTC (weekday=2 ∈ {0,2,4,6}):**
+- **Check I:** `pulse_check_i.py --force` → `journal: skipped — block for 2026-06-22 already present`. Dedup skip. Mode=digest, 0 parked proposals. ✅ Nominal.
+- **Check III:** Not Sunday → skip. ✅
+
+**G-rule assessment:**
+- **heal-daemon-restart-manifest-drift-tier4 → 2/3** [no change]. No new alerts this iter. [carry — dispatch at 3/3]
+- **heal-pipeline-stall-dry-run-writes-real-alerts → 2/3** [no change]. Dry-run: 0 alerts written. [carry]
+- All other G-rule counts unchanged from ~2583. [all carry]
+
+**Actions taken:**
+1. Check 0: 0 new alerts. Watermark unchanged at 1050.
+2. PRIME ledger: `iter_clean` appended (tier=1, template=iter-clean-nominal).
+3. Tier state: `record --checks-clean true` → consecutive_clean 1→2.
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [yellow] **Hardening sequence `dag-preflight-orchestrator-terminal-signal-hardening-001`** — Approval DM sent 04:52Z. `approve dag-preflight-orchestrator-terminal-signal-hardening-001`. Awaiting Larry. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Known false positive. Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [blue] **fix-645-alert-translation-001 stall** — WARN absent in dry-run this iter (cooldown or resolved). [monitoring]
+- [blue] **G-rule heal-daemon-restart-manifest-drift-tier4** — 2/3. [carry — watch, dispatch at 3/3]
+- [blue] **G-rule heal-pipeline-stall-dry-run-writes-real-alerts** — 2/3. [carry]
+- [blue] **G-rule sequence-step-review-escalate-null-chat** — 1/3. [carry]
+- [blue] **G-rule medic-approval-request-novel-tier4** — 1/3. [carry]
+- [blue] **G-rule beacon-claude-timeout** — 1/3. [carry]
+- [blue] **G-rule api-500-burst** — 1/3. [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. [carry]
+- [blue] **G-rule telegram-409-burst** — 2/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. [carry]
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. [carry]
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. [carry]
+- [blue] **G-rule sync.service-deploy-restart-storm-tier4** — 1/3. [carry]
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. [carry]
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 2/3. [carry]
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. [carry]
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. [carry]
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. [carry]
+- [blue] **G-rule health-notify-script-missing** — dispatch sent 2026-06-09. [carry]
+- [blue] **G-rule pulse-self-summary-tier4** — 1/3. [carry]
+- [blue] **unreviewed-merge:655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. [carry]
+- [blue] **Untracked Beacon spec** — `agents/beacon/specs/missions-v2-funnel-item-doorbell.md`. Larry authoring in progress. [carry]
+
+**PRIME DIRECTIVE:** 0 new interventions this iter. Trailing-30d: interventions=1089, systemic_fixes=61, verification_pending=21, ratio≈17.85, trend=improving.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=2. Last signal: 2026-06-24T04:58:34Z.
