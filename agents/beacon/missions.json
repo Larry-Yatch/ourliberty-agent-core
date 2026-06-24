@@ -4934,7 +4934,20 @@
       "created": "2026-06-24",
       "deferred_reason": null,
       "proposed_by": "closeout",
-      "proposed_at": "2026-06-24T04:16:51.842313+00:00"
+      "proposed_at": "2026-06-24T04:16:51.842313+00:00",
+      "briefing": {
+        "what": "Finished items now disappear from your board automatically, with no place to look them up afterward.",
+        "why": "Without a way to revisit completed work, you lose easy visibility into what's been wrapped up and cleared off your plate.",
+        "suggest": "Worth adding a simple 'recently finished' list down the road, but no rush \u2014 it's a nice-to-have, not urgent."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-24T04:30:16.047044+00:00",
+        "from_state": "proposed"
+      }
     }
   ]
 }
