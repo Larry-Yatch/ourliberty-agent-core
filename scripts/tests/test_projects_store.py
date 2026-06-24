@@ -10,7 +10,7 @@ except ImportError:  # discover loads this module top-level (no package parent)
 
 import sys
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 _SCRIPTS = str(Path(__file__).resolve().parent.parent)
@@ -645,14 +645,24 @@ class RetireCompletedProjectsTest(unittest.TestCase):
     an ACTIVE project with every phase done retires off the board; anything with
     a non-done or zero phases, and anything already terminal, is left untouched."""
 
-    @staticmethod
-    def _project(pid, state, phase_states):
-        return {
-            'id': pid,
-            'state': state,
-            'phases': [{'id': f'{pid}-ph{i}', 'lifecycle_state': s}
-                       for i, s in enumerate(phase_states)],
-        }
+    # Default phase done-stamp: well past the 48h window vs NOW, so the existing
+    # "retires" cases still retire under the default window. The window-specific
+    # cases pass a custom ``done_at`` (a recent datetime, None, or junk).
+    OLD = datetime(2026, 6, 1, 12, 0, tzinfo=timezone.utc)
+
+    @classmethod
+    def _project(cls, pid, state, phase_states, *, done_at=None):
+        """``done_at`` stamps every phase's ``updated_at``: a datetime (isoformatted),
+        a raw string (e.g. junk for the unparseable case), or None to OMIT the key
+        (the missing-stamp case). Defaults to ``OLD`` — past the default window."""
+        stamp = cls.OLD if done_at is None else done_at
+        phases = []
+        for i, s in enumerate(phase_states):
+            ph = {'id': f'{pid}-ph{i}', 'lifecycle_state': s}
+            if done_at is not False:  # False ⇒ omit updated_at entirely
+                ph['updated_at'] = stamp.isoformat() if hasattr(stamp, 'isoformat') else stamp
+            phases.append(ph)
+        return {'id': pid, 'state': state, 'phases': phases}
 
     def test_all_phases_done_active_project_retires(self):
         reg = {'projects': [self._project('p', 'active', ['done', 'done'])]}
@@ -660,11 +670,67 @@ class RetireCompletedProjectsTest(unittest.TestCase):
         self.assertEqual(retired, ['p'])
         proj = reg['projects'][0]
         self.assertEqual(proj['state'], 'retired')  # retired, NOT archived
-        # audit trail: prior_state + retired_at + retired_by marker.
+        # audit trail: prior_state + retired_at + retired_by + window provenance.
         self.assertEqual(proj['gc']['prior_state'], 'active')
         self.assertEqual(proj['gc']['retired_by'], ps.GC_RETIRED_BY)
         self.assertEqual(proj['gc']['retired_at'], NOW.isoformat())
+        self.assertEqual(proj['gc']['done_at'], self.OLD.isoformat())
+        self.assertEqual(proj['gc']['window_sec'], ps.DONE_RETIRE_VISIBILITY_SEC)
         self.assertEqual(proj['updated_at'], NOW.isoformat())
+
+    def test_done_inside_window_keeps_project_active(self):
+        # Reached Done 1h ago — inside the 48h window → linger as a visible win.
+        recent = NOW - timedelta(hours=1)
+        reg = {'projects': [self._project('p', 'active', ['done'], done_at=recent)]}
+        _, retired = ps.retire_completed_projects(reg, now=NOW)
+        self.assertEqual(retired, [])
+        self.assertEqual(reg['projects'][0]['state'], 'active')
+        self.assertNotIn('gc', reg['projects'][0])
+
+    def test_done_past_window_retires(self):
+        old = NOW - timedelta(hours=49)  # just past the default 48h window
+        reg = {'projects': [self._project('p', 'active', ['done'], done_at=old)]}
+        _, retired = ps.retire_completed_projects(reg, now=NOW)
+        self.assertEqual(retired, ['p'])
+        self.assertEqual(reg['projects'][0]['gc']['done_at'], old.isoformat())
+
+    def test_done_at_window_boundary_retires(self):
+        # age == window: NOT inside the window (strict `<`), so it retires.
+        edge = NOW - timedelta(seconds=ps.DONE_RETIRE_VISIBILITY_SEC)
+        reg = {'projects': [self._project('p', 'active', ['done'], done_at=edge)]}
+        _, retired = ps.retire_completed_projects(reg, now=NOW)
+        self.assertEqual(retired, ['p'])
+
+    def test_zero_window_retires_immediately(self):
+        recent = NOW - timedelta(seconds=1)
+        reg = {'projects': [self._project('p', 'active', ['done'], done_at=recent)]}
+        _, retired = ps.retire_completed_projects(reg, now=NOW, min_done_age_sec=0)
+        self.assertEqual(retired, ['p'])
+        self.assertEqual(reg['projects'][0]['gc']['window_sec'], 0)
+
+    def test_unparseable_done_at_keeps_project_active(self):
+        reg = {'projects': [self._project('p', 'active', ['done'], done_at='not-a-date')]}
+        _, retired = ps.retire_completed_projects(reg, now=NOW)
+        self.assertEqual(retired, [])
+        self.assertEqual(reg['projects'][0]['state'], 'active')
+
+    def test_missing_done_at_keeps_project_active(self):
+        # done_at=False ⇒ phases carry no updated_at at all (un-normalized input).
+        reg = {'projects': [self._project('p', 'active', ['done'], done_at=False)]}
+        _, retired = ps.retire_completed_projects(reg, now=NOW)
+        self.assertEqual(retired, [])
+        self.assertEqual(reg['projects'][0]['state'], 'active')
+
+    def test_done_at_is_max_over_phases(self):
+        # Multi-phase: done_at = the LATEST phase stamp. Latest = 1h ago (inside
+        # window) ⇒ kept, even though another phase finished long ago.
+        proj = self._project('p', 'active', ['done', 'done'])
+        proj['phases'][0]['updated_at'] = (NOW - timedelta(days=10)).isoformat()
+        proj['phases'][1]['updated_at'] = (NOW - timedelta(hours=1)).isoformat()
+        reg = {'projects': [proj]}
+        _, retired = ps.retire_completed_projects(reg, now=NOW)
+        self.assertEqual(retired, [])
+        self.assertEqual(reg['projects'][0]['state'], 'active')
 
     def test_brainstorm_phase_keeps_project_active(self):
         # The slice-2b shape: a single brainstorm phase, no closeout → MUST stay.

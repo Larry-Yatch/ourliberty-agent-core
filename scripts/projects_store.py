@@ -905,14 +905,61 @@ def project_is_done(project: dict[str, Any]) -> bool:
 # Drop or a mis-promote), so the transition's author is legible in the store.
 GC_RETIRED_BY = 'projects-store-gc'
 
+# A Done project lingers on "Actively working" for this long — its moment as a
+# visible win — before the GC auto-retires it. Default 48h; the caller (the
+# healer) may override via OURLIBERTY_PROJECTS_RETIRE_WINDOW_SEC, and a window of
+# 0 reproduces the original immediate-retire (used by tests / an ops override).
+DONE_RETIRE_VISIBILITY_SEC = 48 * 3600
+
+
+def _project_done_at(project: dict[str, Any]) -> Optional[datetime]:
+    """The moment a project crossed into Done: ``max`` over its phases'
+    ``updated_at`` (tz-aware). ``project_is_done`` guarantees EVERY phase is
+    ``done`` before this is called, so the latest stamp is the most-recently-
+    finished phase — the instant the whole project reached Done.
+
+    Fail-safe: each phase's stamp is parsed with ``datetime.fromisoformat``; a
+    malformed or tz-naive legacy stamp (which can't compare against the tz-aware
+    ``now``) is treated as a tz-naive→UTC coercion only when it parses, else it
+    contributes nothing. If NO phase yields a parseable stamp, returns ``None`` —
+    the caller then KEEPS the project on the board (never retire on unknown age;
+    over-eager retire is the dangerous direction, lingering is recoverable by the
+    manual button). On the live path ``normalize_registry`` guarantees every phase
+    has an ``updated_at``, so ``None`` covers only hand-built / un-normalized input."""
+    phases = project.get('phases')
+    phases = phases if isinstance(phases, list) else []
+    stamps: list[datetime] = []
+    for ph in phases:
+        if not isinstance(ph, dict):
+            continue
+        raw = ph.get('updated_at')
+        try:
+            dt = datetime.fromisoformat(raw)
+        except (ValueError, TypeError):
+            continue
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        stamps.append(dt)
+    return max(stamps) if stamps else None
+
 
 def retire_completed_projects(
     registry: dict[str, Any], *, now: Optional[datetime] = None,
+    min_done_age_sec: int = DONE_RETIRE_VISIBILITY_SEC,
 ) -> tuple[dict[str, Any], list[str]]:
-    """Flip every ACTIVE project whose phases are ALL done to ``retired``, clearing
-    it off the "Actively working" board. Returns ``(registry, retired_ids)`` — the
-    SAME registry object, mutated in place, plus the ids retired this pass (empty
-    on a no-op).
+    """Flip every ACTIVE project whose phases are ALL done — AND that has been Done
+    longer than ``min_done_age_sec`` — to ``retired``, clearing it off the
+    "Actively working" board. Returns ``(registry, retired_ids)`` — the SAME
+    registry object, mutated in place, plus the ids retired this pass (empty on a
+    no-op).
+
+    The age gate (projects-v3 auto-retire-done-visibility-window): a finished card
+    lingers as a visible Done win for ``min_done_age_sec`` (default
+    ``DONE_RETIRE_VISIBILITY_SEC`` = 48h) before the proven retire machinery clears
+    it, so Larry never has to click "Complete & retire" by hand yet still sees the
+    win. ``done_at`` = ``_project_done_at`` (max parseable phase ``updated_at``); a
+    project still inside the window — or whose age is UNKNOWN (no parseable stamp) —
+    is KEPT active. ``min_done_age_sec=0`` reproduces the original immediate-retire.
 
     Conservative + idempotent, mirroring the missions GC terminal reconciliation:
     a project with ANY non-done phase, OR zero phases, is KEPT unchanged
@@ -928,14 +975,17 @@ def retire_completed_projects(
     a Done project to ``retired``).
 
     Stamps an audit sub-field (``gc``: ``prior_state`` + ``retired_at`` +
-    ``retired_by``) on each retired project and bumps ``updated_at``. PURE over its
-    input (no IO): the SOLE committer (``heal_projects_store``) calls this each tick
-    BEFORE its atomic-write + commit, preserving the single-committer invariant.
+    ``retired_by`` + ``done_at`` + ``window_sec``) on each retired project and bumps
+    ``updated_at``, so the wait is legible: "retired N s after reaching Done at T".
+    PURE over its input (no IO): the SOLE committer (``heal_projects_store``) calls
+    this each tick BEFORE its atomic-write + commit, preserving the single-committer
+    invariant.
 
     Fail-safe: a malformed (non-dict) project is skipped, never raises — one bad
     entry never corrupts the registry or wedges the healer."""
     if not isinstance(registry, dict):
         return registry, []
+    now_dt = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     now_iso = _iso_now(now)
     retired: list[str] = []
     for proj in registry.get('projects', []) or []:
@@ -945,10 +995,17 @@ def retire_completed_projects(
             continue
         if not project_is_done(proj):
             continue
+        done_at = _project_done_at(proj)
+        if done_at is None:
+            continue  # unknown age → keep on the board (never retire blind)
+        if (now_dt - done_at).total_seconds() < min_done_age_sec:
+            continue  # still inside the visibility window → linger as a Done win
         proj['gc'] = {
             'prior_state': proj.get('state', DEFAULT_PROJECT_STATE),
             'retired_at': now_iso,
             'retired_by': GC_RETIRED_BY,
+            'done_at': done_at.isoformat(),
+            'window_sec': min_done_age_sec,
         }
         proj['state'] = 'retired'
         proj['updated_at'] = now_iso
