@@ -210,9 +210,15 @@
 
 ---
 
-## Status snapshot — updated 2026-06-24 16:14Z UTC (Iter ~2610, Tier 3, consecutive_clean=13)
+## G-rule check-i-force-bypass-dm-route — 1/3 (new, iter ~2611)
 
-**Iter ~2610 summary:** ✅ Clean — 2 Tier-3 silences (review-pass PR #674 + #675). 8/8 daemons alive (same PIDs). 0 open PRs. HEAD=17ee8f37=origin/main. Check I in digest mode (fix confirmed — PR #674 merged). Tier 3, consecutive_clean 12→13. PRIME: systemic_fixes=61, interventions=1090, ratio≈17.87, trend=improving. **Key completions this cycle:** PR #674 (check-i-repeat-dm-fix-001 — repeat Check I DMs now digest) MERGED ✅ G-rule COMPLETE; PR #675 (spec-mirror-review-visibility-001 — Mirror review visibility spec) MERGED ✅. G-rules at 2/3: revision-phase-preamble-missing, telegram-409-burst, Forge-preflight-CLARIFY_REQUEST, forge-preflight-task-id-mismatch, F24-empty-prompt-envelope-rejected, merge_conflict_manual_rebase-tier4, heal-pipeline-stall-dry-run-writes-real-alerts, heal-daemon-restart-manifest-drift-tier4, Forge-timeout-worktree-missing-retry-loop. 1/3: pulse-self-summary-tier4, sequence-step-review-escalate-null-chat (spec merged PR #675; code fix pending), medic-approval-request-novel-tier4, api-500-burst, beacon-claude-timeout, sync.service-deploy-restart-storm-tier4, seq-advancer-approval-routing-gap, heal-pipeline-stall-mirror-pass-unmerged-tier4, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch.
+**Rule:** The cycle invokes `pulse_check_i.py --force` on scheduled firing days (Mon/Wed/Fri/Sun). `--force` bypasses both the weekday gate AND the `dm_route` journal-peek added by PR #674. On a scheduled firing day, the weekday gate passes naturally — `--force` is unnecessary and its side-effect undoes PR #674's routing fix: repeat same-week Check I DMs write to larry-alerts.jsonl with route=escalate instead of route=digest. Tier-3 triage silences these correctly, but the root cause is worth fixing. Fix candidate: drop `--force` from cycle's Check I invocation on firing days (Mon/Wed/Fri/Sun); keep `--force` only for /optimize (ad-hoc path). Dispatch to Beacon at 3/3.
+
+---
+
+## Status snapshot — updated 2026-06-24 16:46Z UTC (Iter ~2611, Tier 3, consecutive_clean=14)
+
+**Iter ~2611 summary:** ✅ Clean — 1 Tier-3 silence (L1004, Check I repeat DM, force-flag bypass of dm_route). 8/8 daemons alive (same PIDs). 0 open PRs. All inboxes empty. HEAD=39c58a14=origin/main. Tier 3, consecutive_clean 13→14. PRIME: systemic_fixes=61, interventions=1090, ratio≈17.87, trend=improving. **New G-rule:** check-i-force-bypass-dm-route 1/3 (dispatch to Beacon at 3/3). G-rules at 2/3: revision-phase-preamble-missing, telegram-409-burst, Forge-preflight-CLARIFY_REQUEST, forge-preflight-task-id-mismatch, F24-empty-prompt-envelope-rejected, merge_conflict_manual_rebase-tier4, heal-pipeline-stall-dry-run-writes-real-alerts, heal-daemon-restart-manifest-drift-tier4, Forge-timeout-worktree-missing-retry-loop. 1/3: check-i-force-bypass-dm-route (new), pulse-self-summary-tier4, sequence-step-review-escalate-null-chat (spec merged PR #675; code fix pending), medic-approval-request-novel-tier4, api-500-burst, beacon-claude-timeout, sync.service-deploy-restart-storm-tier4, seq-advancer-approval-routing-gap, heal-pipeline-stall-mirror-pass-unmerged-tier4, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch.
 
 
 
