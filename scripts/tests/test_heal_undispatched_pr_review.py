@@ -141,6 +141,16 @@ class TestIsReviewablePr(unittest.TestCase):
         self.assertTrue(h._is_reviewable_pr('forge/x', is_draft=False, labels=[]))
         self.assertTrue(h._is_reviewable_pr('forge/x', is_draft=True, labels=[]))
 
+    def test_claude_non_draft_is_reviewable_without_label(self):
+        # forge-cold-start-revision S4: claude/* (Claude Code laptop PRs) are a
+        # reliable exclusive prefix → auto-routed when non-draft, no label needed.
+        self.assertTrue(
+            h._is_reviewable_pr('claude/missions-bug-k404pz', is_draft=False, labels=[]))
+
+    def test_claude_draft_is_not_reviewable(self):
+        self.assertFalse(
+            h._is_reviewable_pr('claude/wip-x', is_draft=True, labels=[]))
+
     def test_labeled_non_draft_is_reviewable(self):
         self.assertTrue(h._is_reviewable_pr('fix/x', is_draft=False, labels=self.LBL))
         self.assertTrue(h._is_reviewable_pr('docs/x', is_draft=False, labels=self.LBL))

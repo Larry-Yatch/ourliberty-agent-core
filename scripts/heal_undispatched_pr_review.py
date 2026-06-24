@@ -126,12 +126,18 @@ REPOS = (
     'Larry-Yatch/ourliberty-agent-core',
     'Larry-Yatch/ourliberty-dashboard',
 )
-# Two classes of open PR get auto-routed to a Mirror review:
+# Three classes of open PR get auto-routed to a Mirror review:
 #   1. Forge build PRs — head branch `forge/<task-id>` (the original #412 gap).
 #      Reviewed unconditionally; the proven path.
-#   2. Opt-in PRs — any PR carrying the AUTO_REVIEW_LABEL, reviewed when NOT a
+#   2. Claude Code PRs — head branch `claude/<...>` (the #653 gap). Opened on the
+#      laptop and already through the local code-review gate; `claude/` is a
+#      reliable Claude-Code-EXCLUSIVE prefix (the droplet agents never use it,
+#      unlike `fix/feat/chore`), so it gates safely on its own. Draft-gated. A
+#      session-less REVISION on one cold-starts Forge (forge-cold-start-revision).
+#   3. Opt-in PRs — any PR carrying the AUTO_REVIEW_LABEL, reviewed when NOT a
 #      draft (the #509/#510/#625 gap — PRs Larry opens by hand sat unreviewed).
 FORGE_BRANCH_PREFIX = 'forge/'
+CLAUDE_BRANCH_PREFIX = 'claude/'  # Claude Code laptop PRs (class 2 above)
 # The explicit opt-in marker for class 2. Neither branch prefix nor PR author can
 # distinguish Larry's hand-opened PRs from the agent team's: the team commits as
 # Larry's own GitHub identity AND uses the same branch prefixes (`fix/`, `feat/`,
@@ -386,6 +392,11 @@ def _is_reviewable_pr(head_ref: str, is_draft: bool, labels: Any) -> bool:
 
     - `forge/*` — Forge build PR: always (the proven path; draft state ignored,
       Forge does not draft its build PRs).
+    - `claude/*` — Claude Code laptop PR: routed when NOT a draft. `claude/` is a
+      reliable Claude-Code-exclusive prefix (the droplet agents never use it), so
+      it is a safe gate on its own — unlike `fix/feat/chore`, which both humans
+      and agents use. Already code-reviewed locally; a session-less REVISION on
+      one cold-starts Forge (forge-cold-start-revision).
     - anything else — routed only when it carries the `auto-review` label AND is
       NOT a draft. The label is the explicit opt-in (the only signal that
       distinguishes a PR cleared for the team from an agent-authored PR — see
@@ -398,6 +409,8 @@ def _is_reviewable_pr(head_ref: str, is_draft: bool, labels: Any) -> bool:
         return True
     if is_draft:
         return False
+    if head_ref.startswith(CLAUDE_BRANCH_PREFIX):
+        return True
     return AUTO_REVIEW_LABEL in (labels or [])
 
 
