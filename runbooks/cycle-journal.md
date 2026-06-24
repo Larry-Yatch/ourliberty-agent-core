@@ -4,6 +4,119 @@
 
 ---
 
+## Iteration ~2630 — 2026-06-24T21:26Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/cycle` invocation via chat.
+
+**Health:** ⚠️ Watch — PR #685 (forge/escalation-feed) still CONFLICTING; Mirror approved rev1, rebase still required. forge-wip-only-auto-redispatch-001 NEW in Forge preflight (Larry approved 15:12 MDT). forge-post-open-mergeable-rebase-001 and reconcile-hardening-002 both in BUILD. All other checks nominal.
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #685 (forge/escalation-feed):** CONFIRMED CONFLICTING (`gh pr view` → mergeable=CONFLICTING). Mirror approved rev1 (21:07Z ~2629). Rebase still needed. ✅ [carry]
+- **forge-post-open-mergeable-rebase-001:** In Forge BUILD (phase=build). ✅ [carry]
+- **reconcile-hardening-mission-shipped-002:** In Forge BUILD (phase=build). ✅ [carry]
+- **heal-stall-dryrun-noop-001:** In Forge preflight (Larry approved 15:02 MDT). ✅ [carry]
+- **one-time-stale-dispatch-branch-cleanup-001:** In Forge preflight (Larry directive ~2627). ✅ [carry]
+- **G-rule Forge-timeout-worktree-missing-retry-loop (3/3 dispatched ~2628):** UPDATED — `forge-wip-only-auto-redispatch-001.json` now in Forge preflight. This IS the Forge build for the G-rule: "bounded poll-based healer that auto-re-dispatches a Forge dispatch whose session died leaving only [WIP][session-start]." Larry approved the approval_request at 15:12 MDT; dispatched to Forge inbox. ✅ [carry+updated — now in Forge preflight]
+- **outbox_notifier PID 2029112:** ALIVE (Ss). ✅ [carry]
+- **Untracked Beacon spec:** `agents/beacon/specs/missions-v2-funnel-item-doorbell.md` — still untracked. Larry authoring. [carry]
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 1032, "file_length": 1034}`. 2 new alerts:
+- L1033 `source=outbox-notifier, kind=approval_request, approval_id=forge-wip-only-auto-redispatch-001` → Tier-3 (known-pattern, idempotent). Silenced. Larry approved + dispatched at 15:12 MDT per bot log. Delivery confirmation only.
+- L1034 `source=pulse, subject=auto-merge-conflict:685:tier4-triage, route=digest` → Tier-4 (novel — pulse self-escalation meta-alert from ~2629). Route=digest; bot already skipped DM (`alert idx=1033 route=digest; skipping DM`). No new action. Journal-note only.
+Watermark advanced 1032→1034. Tier-reset from L1034 Tier-4.
+
+**Check 1 — Log noise (30-min window):** `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message 15:12 MDT (21:12Z) — approved forge-wip-only-auto-redispatch-001. No new directives since iter ~2629. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → 0 new alerts, 0 recovered, 1 suppressed (cooldown: reconcile-hardening-mission-shipped-001). ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- Forge inbox (5 items): `build-forge-post-open-mergeable-rebase-001.json` (phase=build), `forge-wip-only-auto-redispatch-001.json` (phase=preflight, **NEW**), `heal-stall-dryrun-noop-001.json` (phase=preflight), `one-time-stale-dispatch-branch-cleanup-001.json` (phase=preflight), `reconcile-hardening-mission-shipped-002.json` (phase=build).
+- Beacon inbox: empty. ✅
+- Mirror inbox: `review-escalation-feed.json` (stale original — Mirror completed rev1 review; superseded task remains, inbox_watcher will dedup). [monitor]
+- beacon-pending-approvals: pending=0. ✅
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-24T21:18:17Z (~8 min before check). ✅ Nominal.
+
+**Check A — Source repo:** On main. HEAD=54d21c2f=origin/main. Up to date. Untracked: `agents/beacon/specs/missions-v2-funnel-item-doorbell.md` (Larry authoring). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-24T20:38:20Z (~43 min ago). Within 2-hour window. ✅ Nominal.
+
+**Check C — Agent liveness:** 8/8 daemons alive (PIDs unchanged): beacon=1921593, outbox_notifier=2029112, dashboard_api=1921360, forge_bot=1388801, mirror_bot=1388982, pulse_bot=1389067, inbox_watcher=1732118, chain_event_shipper=1742173. ✅ Nominal.
+
+**Check E — PRs:**
+- agent-core PR #685: OPEN, **CONFLICTING** (confirmed). Mirror REVIEW_PASS on rev1 (~2629). Rebase blocks auto-merge. [⚠️ carry, tier-reset]
+- dashboard: 0 open. ✅
+
+**Check H — Forge digest:** HEAD=54d21c2f. 5 items in Forge inbox (2 build + 3 preflight). forge-wip-only-auto-redispatch-001 new since ~2629. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. ✅
+
+**Conditional checks — Wednesday 2026-06-24 UTC (weekday=2 ∈ {0,2,4,6}):**
+- **Check I:** `pulse_check_i.py` (no `--force`) → mode=digest, journal skipped (block for 2026-06-22 already present), DM: cooldown-suppressed, wrote check-i-2026-06-24.json. G-rule check-i-force-bypass-dm-route: no new instance. ✅
+- **Check III:** Not Sunday → skip. ✅
+
+**G-rule updates:**
+- **G-rule Forge-timeout-worktree-missing-retry-loop** — 3/3 dispatched ~2628; forge-wip-only-auto-redispatch-001 now in **Forge preflight** (Larry approved, dispatched). [updated → Forge preflight, verifying]
+- **G-rule merge_conflict_manual_rebase-tier4** — 3/3 dispatched ~2624, forge-post-open-mergeable-rebase-001 IN BUILD. [carry]
+- **G-rule heal-pipeline-stall-dry-run-writes-real-alerts** — 3/3 dispatched ~2627, heal-stall-dryrun-noop-001 in Forge preflight. [carry]
+- **G-rule auto-merge-conflict-outbox-notifier-tier4** — 1/3. No new outbox-notifier instance this iter (L1034 is source=pulse, not outbox-notifier). [carry]
+- **G-rule heal-daemon-restart-manifest-drift-regenerated-tier4** — 1/3. No new instance. [carry]
+- **G-rule check-i-force-bypass-dm-route** — 1/3. No new instance. [carry]
+- **G-rule forge-preflight-task-id-mismatch** — 2/3. No new instance. [carry]
+- **All other carry G-rules:** No change. [carry]
+
+**Actions taken:** Triaged L1033 (Tier-3 silence) + L1034 (Tier-4 noted, bot already suppressed DM). Watermark advanced 1032→1034. PRIME: 1 intervention (PR #685 carry). Tier state: `record --checks-clean false` → consecutive_clean=0, last_signal=21:26Z.
+
+**Dispatches:** None this iter.
+
+**Standing findings (carried + verified):**
+- [yellow] **PR #685 (forge/escalation-feed)** — CONFLICTING. Mirror APPROVED rev1. forge-post-open-mergeable-rebase-001 in BUILD (systemic fix). [carry+verified]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [blue] **forge-wip-only-auto-redispatch-001** — Forge preflight. NEW. Larry approved at 15:12 MDT; G-rule Forge-timeout WIP healer build. [new, active]
+- [blue] **forge-post-open-mergeable-rebase-001** — Forge BUILD. Watch for PROCEED marker + PR open. [carry]
+- [blue] **reconcile-hardening-mission-shipped-002** — Forge BUILD. Watch for PR open + Mirror review. [carry]
+- [blue] **heal-stall-dryrun-noop-001** — Forge preflight. [carry]
+- [blue] **one-time-stale-dispatch-branch-cleanup-001** — Forge preflight. [carry]
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 3/3 dispatched ~2628; forge-wip-only-auto-redispatch-001 in Forge preflight. [updated, verifying]
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 3/3 dispatched ~2624, forge-post-open-mergeable-rebase-001 in BUILD. [verifying]
+- [blue] **G-rule heal-pipeline-stall-dry-run-writes-real-alerts** — 3/3 dispatched ~2627, heal-stall-dryrun-noop-001 in Forge preflight. [verifying]
+- [blue] **G-rule auto-merge-conflict-outbox-notifier-tier4** — 1/3. [carry]
+- [blue] **G-rule heal-daemon-restart-manifest-drift-regenerated-tier4** — 1/3. [carry]
+- [blue] **G-rule check-i-force-bypass-dm-route** — 1/3. [carry]
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. [carry]
+- [blue] **G-rule sequence-step-review-escalate-null-chat** — 1/3. [carry]
+- [blue] **G-rule medic-approval-request-novel-tier4** — 1/3. [carry]
+- [blue] **G-rule beacon-claude-timeout** — 1/3. [carry]
+- [blue] **G-rule api-500-burst** — 1/3. [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. [carry]
+- [blue] **G-rule telegram-409-burst** — 2/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. [carry]
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. [carry]
+- [blue] **G-rule sync.service-deploy-restart-storm-tier4** — 1/3. [carry]
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. [carry]
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. [carry]
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. [carry]
+- [blue] **G-rule heal-daemon-restart-manifest-drift-tier4** — 2/3. [carry — dispatch at 3/3]
+- [blue] **G-rule pulse-self-summary-tier4** — 1/3. [carry]
+- [blue] **G-rule unreviewed-merge:655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. [carry]
+- [blue] **Untracked Beacon spec** — `agents/beacon/specs/missions-v2-funnel-item-doorbell.md`. Larry authoring. [carry]
+
+**PRIME DIRECTIVE:** 1 new intervention (PR #685 carry). Trailing-30d: systemic_fixes≈63, interventions≈1102, ratio≈17.5, trend=improving.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0. Last signal: 2026-06-24T21:26Z.
+
+---
+
 ## Iteration ~2629 — 2026-06-24T21:16Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/cycle` invocation via chat.

@@ -222,6 +222,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-24 21:26Z UTC (Iter ~2630, Tier 1, consecutive_clean=0)
+
+**Iter ~2630 summary:** ⚠️ Watch — PR #685 still CONFLICTING (Mirror approved rev1); forge-post-open-mergeable-rebase-001 IN BUILD. forge-wip-only-auto-redispatch-001 NEW in Forge preflight (Larry approved approval_request 15:12 MDT — this IS the G-rule Forge-timeout healer build). reconcile-hardening-002 in Forge BUILD. L1033 Tier-3 (approval_request delivery confirm). L1034 Tier-4 (pulse meta-alert, bot suppressed DM). 2 new alerts triaged. Watermark 1032→1034. PRIME: interventions≈1102, systemic_fixes=63, ratio≈17.5, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-24 21:16Z UTC (Iter ~2629, Tier 1, consecutive_clean=0)
 
 **Iter ~2629 summary:** ⚠️ Watch — PR #686 MERGED (21:05Z) — sequence mirror-review-visibility-001 COMPLETE. PR #685 (escalation-feed) CONFLICTING but Mirror now APPROVED rev1 (21:07Z, L1032). Auto-merge blocked; rebase needed. forge-post-open-mergeable-rebase-001 in BUILD. reconcile-hardening-mission-shipped-002 in Forge build (Beacon re-dispatched). G-rule auto-merge-conflict-outbox-notifier-tier4 1/3 (new). forge-timeout-retry-loop-001 confirmed Beacon-archived (dispatch real). PRIME: systemic_fixes=63, interventions=1101, ratio≈17.5, trend=improving. Tier 1, consecutive_clean=0.
