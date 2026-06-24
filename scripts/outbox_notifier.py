@@ -5423,6 +5423,210 @@ def _post_mirror_review_commit_status(
     return state
 
 
+# build-mirror-findings-comment — Contract A of
+# agents/beacon/specs/mirror-review-visibility.md § 4. Every non-PASS Mirror
+# verdict (REVIEW_REVISION / REVIEW_ESCALATE) posts its findings as a durable
+# PR comment IN ADDITION to the `mirror-review` commit status, regardless of
+# whether a live Forge session exists ("session or not"). The findings are
+# then for-the-record + consumable by Beacon/Forge without digging into agent
+# inboxes. We post mechanically here — at the same marker-classification site
+# that posts the commit status — rather than relying on Mirror's review session
+# to shell out, because an unenforced LLM turn is not a durable guarantee
+# (the doctrine the chain-context-durability line of work hardened).
+#
+# Idempotent: the body leads with a stable hidden anchor; a re-review UPDATES
+# the existing Mirror findings comment instead of appending a new one (no
+# comment spam across revision rounds). Best-effort + daemon-never-wedge, same
+# posture as `_post_mirror_review_commit_status`: any gh error is logged and
+# swallowed — this MUST NEVER crash the notifier or block the merge flow.
+_MIRROR_FINDINGS_ANCHOR = '<!-- mirror-findings -->'
+
+# Marker types that yield a findings comment. REVIEW_PASS posts nothing (there
+# is nothing to fix); REVIEW_EMERGENCY_HALT routes via the halt-file trip +
+# broadcast priority DM, not a PR comment — Contract A's scope is the
+# revise/escalate verdicts (§ 4).
+_MIRROR_FINDINGS_MARKERS = ('review_revision', 'review_escalate')
+
+# Test seam (mirrors _POST_STATUS_FN_OVERRIDE). When set, replaces the whole
+# `_post_mirror_findings_comment` body so process_outbox integration tests
+# don't shell out to real `gh`. Production leaves this None.
+_POST_FINDINGS_FN_OVERRIDE: Optional[Any] = None
+
+
+def _render_mirror_findings_comment_body(
+    marker_type: str, payload: dict[str, Any],
+) -> str:
+    """Render the durable PR findings comment for a non-PASS Mirror verdict.
+
+    The body leads with the hidden anchor (`_MIRROR_FINDINGS_ANCHOR`) so the
+    upsert can find + update its own prior comment on re-review. Pure — no I/O;
+    unit-tested directly.
+    """
+    lines = [_MIRROR_FINDINGS_ANCHOR, '']
+    if marker_type == 'review_revision':
+        findings = payload.get('findings')
+        findings = findings if isinstance(findings, list) else []
+        severity = payload.get('severity', '?')
+        confidence = payload.get('confidence', '?')
+        lines.append(
+            f'## Mirror review: REVIEW_REVISION '
+            f'({len(findings)} finding(s), severity={severity}, '
+            f'confidence={confidence})'
+        )
+        lines.append('')
+        for i, finding in enumerate(findings, 1):
+            if not isinstance(finding, dict):
+                continue
+            file = finding.get('file', '?')
+            line_range = finding.get('line_range', '?')
+            fsev = finding.get('severity', '?')
+            desc = finding.get('description', '')
+            lines.append(f'{i}. **`{file}`** ({line_range}) — _{fsev}_')
+            if desc:
+                lines.append(f'   {desc}')
+    else:  # review_escalate
+        severity = payload.get('severity', '?')
+        confidence = payload.get('confidence', '?')
+        reason = payload.get('reason', '')
+        lines.append(
+            f'## Mirror review: REVIEW_ESCALATE '
+            f'(severity={severity}, confidence={confidence})'
+        )
+        lines.append('')
+        if reason:
+            lines.append(str(reason))
+    lines.append('')
+    lines.append(
+        '_Posted by the outbox notifier on Mirror\'s verdict; updates in place '
+        'on re-review (Contract A, mirror-review-visibility)._'
+    )
+    return '\n'.join(lines)
+
+
+def _gh_find_mirror_findings_comment(
+    repo_coords: str, pr_number: int,
+) -> Optional[int]:
+    """Return the id of the existing Mirror findings comment on the PR, or None.
+
+    Identifies the comment by the hidden anchor in its body. Read-only `gh api`
+    GET (NOT routed through gh_write). Best-effort: any transport/parse failure
+    returns None, so the caller posts a fresh comment — at worst a duplicate on
+    a degraded gh, never a crash.
+    """
+    try:
+        proc = subprocess.run(
+            ['gh', 'api', '--paginate',
+             f'repos/{repo_coords}/issues/{pr_number}/comments',
+             '--jq', '.[] | {id: .id, body: .body}'],
+            capture_output=True, text=True, timeout=_AUTO_MERGE_TIMEOUT_S,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return None
+    if proc.returncode != 0:
+        return None
+    # `--paginate --jq` emits one JSON object per line (per matched element).
+    for line in (proc.stdout or '').splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except (ValueError, json.JSONDecodeError):
+            continue
+        if not isinstance(obj, dict):
+            continue
+        body = obj.get('body') or ''
+        if _MIRROR_FINDINGS_ANCHOR in body:
+            cid = obj.get('id')
+            if isinstance(cid, int):
+                return cid
+    return None
+
+
+def _post_mirror_findings_comment(
+    data: dict[str, Any], marker_decision: dict[str, Any],
+) -> Optional[str]:
+    """Upsert Mirror's findings as a durable PR comment (Contract A).
+
+    Fires for REVIEW_REVISION / REVIEW_ESCALATE only. Idempotent via the hidden
+    anchor: updates the existing Mirror findings comment on re-review instead of
+    appending a new one. Returns 'created' / 'updated' on success, or None when
+    skipped/failed.
+
+    Best-effort: never raises into the caller and never blocks the merge flow,
+    same contract as `_post_mirror_review_commit_status`.
+    """
+    if _POST_FINDINGS_FN_OVERRIDE is not None:
+        try:
+            return _POST_FINDINGS_FN_OVERRIDE(data, marker_decision)
+        except Exception as e:  # noqa: BLE001 — test seam must not wedge daemon
+            log(
+                f'MIRROR_FINDINGS_COMMENT override raised: '
+                f'{type(e).__name__}: {e}',
+                'WARN',
+            )
+            return None
+
+    marker_type = marker_decision.get('marker_type')
+    if marker_type not in _MIRROR_FINDINGS_MARKERS:
+        return None
+    payload = marker_decision.get('payload') or {}
+    if not isinstance(payload, dict):
+        return None
+    pr_url = payload.get('pr_url')
+    task_id_log = data.get('task_id', '?')
+
+    repo_coords, pr_number, shape_reason = _pr_url_shape_check(pr_url)
+    if repo_coords is None:
+        log(
+            f'MIRROR_FINDINGS_COMMENT task={task_id_log} pr={pr_url!r} '
+            f'skipped reason=pr-url-shape-invalid ({shape_reason})',
+            'WARN',
+        )
+        return None
+
+    body = _render_mirror_findings_comment_body(marker_type, payload)
+    existing_id = _gh_find_mirror_findings_comment(repo_coords, pr_number)
+
+    try:
+        if existing_id is not None:
+            proc = gh_write(
+                ['gh', 'api', '-X', 'PATCH',
+                 f'repos/{repo_coords}/issues/comments/{existing_id}',
+                 '-f', f'body={body}'],
+                capture_output=True, text=True, timeout=_AUTO_MERGE_TIMEOUT_S,
+            )
+            action = 'updated'
+        else:
+            proc = gh_write(
+                ['gh', 'api',
+                 f'repos/{repo_coords}/issues/{pr_number}/comments',
+                 '-f', f'body={body}'],
+                capture_output=True, text=True, timeout=_AUTO_MERGE_TIMEOUT_S,
+            )
+            action = 'created'
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        log(
+            f'MIRROR_FINDINGS_COMMENT task={task_id_log} pr={pr_url} '
+            f'POST FAILED: {type(e).__name__}: {e}',
+            'WARN',
+        )
+        return None
+    if proc.returncode != 0:
+        log(
+            f'MIRROR_FINDINGS_COMMENT task={task_id_log} pr={pr_url} '
+            f'{action} gh exit={proc.returncode}: '
+            f'{(proc.stderr or "").strip()[:200]}',
+            'WARN',
+        )
+        return None
+    log(
+        f'MIRROR_FINDINGS_COMMENT task={task_id_log} pr={pr_url} '
+        f'marker={marker_type} comment {action}'
+    )
+    return action
+
+
 def _emit_auto_merge_chain_event(
     *,
     task_id: str,
@@ -10251,6 +10455,11 @@ def process_outbox(outbox_file: Path) -> str:
             # EMERGENCY_HALT post a failure status that keeps the PR blocked.
             # Best-effort — never raises, never blocks the merge flow.
             _post_mirror_review_commit_status(data, marker_decision)
+            # build-mirror-findings-comment — Contract A. On a non-PASS verdict
+            # (REVIEW_REVISION / REVIEW_ESCALATE), also post/update Mirror's
+            # findings as a durable PR comment so they're visible session-or-not
+            # (mirror-review-visibility.md § 4). Idempotent; best-effort.
+            _post_mirror_findings_comment(data, marker_decision)
 
     if marker_decision is not None:
         # Marker-driven routing. Always targets the original dispatcher

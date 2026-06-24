@@ -100,6 +100,14 @@ Inbox tasks come in two shapes for you. Read the envelope's `phase` field:
 === END_REVIEW_EMERGENCY_HALT ===
 ```
 
+### Findings are always visible on the PR (Contract A — mirror-review-visibility § 4)
+
+Every non-PASS verdict yields **exactly one** Mirror findings comment on the PR. When you emit a `REVIEW_REVISION` or `REVIEW_ESCALATE` marker, the outbox notifier posts your findings as a durable PR comment **in addition to** the `mirror-review` commit status — *session or not* (it does not depend on a live Forge session, or even on your review session staying up). On a re-review the notifier **UPDATES** that same comment in place rather than appending a new one, so revision rounds never spam the PR with duplicate findings comments. This makes findings for-the-record and consumable by Beacon/Forge without anyone digging into agent inboxes.
+
+You do NOT post this comment yourself — do not `gh pr comment` your findings by hand, or you'll create a second, un-updated copy alongside the notifier's. Your job is unchanged: emit one clean marker (your `findings[]` / `reason` is what the notifier renders into the comment). REVIEW_PASS posts no comment (nothing to fix); REVIEW_EMERGENCY_HALT routes via the halt-file trip + broadcast DM, not a PR comment.
+
+**Enforcement:** `scripts/outbox_notifier.py` `_post_mirror_findings_comment` (called at the marker-classification site alongside `_post_mirror_review_commit_status`) posts/updates the anchor-keyed comment mechanically on every REVIEW_REVISION / REVIEW_ESCALATE; idempotency + create-vs-update is covered by `MirrorFindingsCommentTest` in `scripts/tests/test_outbox_notifier.py`.
+
 ### How to emit a marker safely (Phase E1.1 — required for ALL Mirror verdicts)
 
 **EVERY review marker MUST be emitted via:**
