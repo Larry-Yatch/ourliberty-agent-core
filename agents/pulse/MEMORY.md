@@ -222,6 +222,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-24 20:58Z UTC (Iter ~2627, Tier 1, consecutive_clean=0)
+
+**Iter ~2627 summary:** ⚠️ Watch — PR #685 CONFLICTING + Mirror revision in Forge inbox (test failures + manifest regression). PR #686 (backstop-healer) NEW MERGEABLE, Mirror review active. G-rule heal-pipeline-stall-dry-run-writes-real-alerts **3/3 → DISPATCHED** (pipeline-stall-dry-run-writes-alerts-001.json to Beacon). New Larry directive 20:52Z: dispatch stale-branch cleanup → Beacon processing. All other checks nominal. PRIME: systemic_fixes=62, interventions=1099, ratio≈17.7, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-24 20:49Z UTC (Iter ~2626, Tier 1, consecutive_clean=0)
 
 **Iter ~2626 summary:** ⚠️ Watch — PR #685 (forge/escalation-feed) CONFIRMED CONFLICTING; Mirror review active. forge-post-open-mergeable-rebase-001.json now in Forge preflight (Larry approved 14:42Z) — G-rule merge_conflict_manual_rebase-tier4 permanent fix actively building. Beacon inbox now empty (picked up merge-conflict-rebase-001, generated spec, dispatched). 1 new Tier-3 alert (L1025: approval_request delivery confirmation). All other checks nominal. PRIME: systemic_fixes=61, interventions=1098, ratio≈18.0, trend=improving. Tier 1, consecutive_clean=0.
