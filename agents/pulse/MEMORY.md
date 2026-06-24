@@ -234,11 +234,15 @@
 
 ---
 
-## G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4 — 2/3 (iter ~2629, ~2636)
+## G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4 → DISPATCHED ✅ (iter ~2644, 3/3)
 
-**Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:mirror-pass-unmerged:PR#N` alerts classify Tier-4 (novel — no translation match). Bot delivers as escalate (route=escalate) and DMs Larry. Pulse does NOT send a second DM. Dispatch to Beacon at 3/3 for Tier-3 translation in alert-translations.json (bot already DMs Larry directly; Pulse silence is correct). Instances: iter ~2629 (PR#685 rev1), iter ~2636 (PR#685 L1039 at 22:07Z).
+**Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:mirror-pass-unmerged:PR#N` alerts classify Tier-4 (novel — no translation match in alert-translations.json). Bot delivers as escalate (route=escalate) and DMs Larry. Pulse does NOT send a second DM. 3/3 threshold crossed at iter ~2644 (L1047, 23:08Z). Dispatch: `heal-pipeline-stall-mirror-pass-unmerged-tier3-001.json` → Beacon inbox. verification_pending. Instances: iter ~2629 (PR#685 rev1), iter ~2636 (PR#685 L1039), iter ~2644 (PR#685 L1047).
 
 ---
+
+## Status snapshot — updated 2026-06-24 23:14Z UTC (Iter ~2644, Tier 1, consecutive_clean=0)
+
+**Iter ~2644 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry, auto-merge failed); PR #687 CONFLICTING, Mirror session 2 still running since 22:32Z (~41 min). G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4 **3/3 DISPATCHED** (heal-pipeline-stall-mirror-pass-unmerged-tier3-001 → Beacon). 4 alerts triaged (L1044-L1047, all Tier-3). Watermark 1043→1047. 8 daemons alive. No watchdog WARNs (positive signal). Check I: mode=digest, cooldown-suppressed. HEAD=8336a1b9. PRIME: interventions≈1117, systemic_fixes=65, ratio≈17.2, trend=improving. Tier 1, consecutive_clean=0.
 
 ## Status snapshot — updated 2026-06-24 23:04Z UTC (Iter ~2643, Tier 1, consecutive_clean=0)
 
