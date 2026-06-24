@@ -240,6 +240,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-24 23:44Z UTC (Iter ~2648, Tier 1, consecutive_clean=0)
+
+**Iter ~2648 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry+verified); PR #687 CONFLICTING (Mirror session 3 active ~31 min). G-rule ourliberty-health-notify-script-missing: Beacon root-cause DONE — notify_larry.py never built (6-wk TODO); "1 issue" was untracked spec (cleared via 59bb8fbc); health-notify-wire-vs-silence-001 direction-ask DM'd Larry. 1 new alert triaged (L1051 Tier-3, approval_request). Watermark 1050→1051. New HEAD=59bb8fbc (doorbell spec committed). G-rule watchdog-watcher-log-stale-post-fix: 0 WARNs during Mirror session 3 (31 min). PRIME: interventions=1120, systemic_fixes=66, ratio≈16.97, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-24 23:35Z UTC (Iter ~2647, Tier 1, consecutive_clean=0)
 
 **Iter ~2647 summary:** ⚠️ Watch — G-rule ourliberty-health-notify-script-missing **3/3 DISPATCHED** (fires every ~30 min; ourliberty-health-notify-script-missing-001 → Beacon). PR #685 CONFLICTING (carry, mergeable=UNKNOWN this iter); PR #687 CONFLICTING, Mirror session 3 active since 23:10:40Z (~25 min). 0 new alerts (watermark=1050). G-rule watchdog-stale-post-fix: 0 WARNs during Mirror session 3 (positive, fix likely working). Check I: mode=digest, cooldown-suppressed. HEAD=220ba837. PRIME: interventions=1119, systemic_fixes=66, ratio≈16.95, trend=improving. Tier 1, consecutive_clean=0.
