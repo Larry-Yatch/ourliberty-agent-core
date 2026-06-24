@@ -5112,6 +5112,23 @@
         "from_state": "proposed"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "proposed-health-notify-wire-vs-silence-001",
+      "name": "Health Notify Wire Vs Silence 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `health-notify-wire-vs-silence-001`. Last activity 2026-06-24T23:45:34.157225+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "health-notify-wire-vs-silence-001"
+      ],
+      "repo": null,
+      "created": "2026-06-24",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-24T23:53:19.814333+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-24T23:45:34.157225+00:00"
     }
   ]
 }
