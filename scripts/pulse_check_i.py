@@ -1637,6 +1637,27 @@ def main(argv: Optional[list[str]] = None) -> int:
     elif suppress_dm:
         dm_result = "suppressed (no signal, scheduled run)"
     else:
+        # Route the DM so the same weekly digest isn't DM'd 4-5×/week. The
+        # predicate mirrors append_journal's dedup exactly: is this week's
+        # `**Check I (YYYY-MM-DD):**` header already in the journal? The
+        # journal is written AFTER this DM, so the first scheduled run of a
+        # week sees the week absent → escalate (DM now), and every later
+        # same-week scheduled run sees it present → digest (no DM; the daily
+        # CEO digest still surfaces it).
+        #   - --force (on-demand /optimize): always escalate — Larry expects
+        #     a reply regardless of journal state.
+        #   - --no-journal / missing journal / read failure: escalate
+        #     (fail-loud — a routing slip must over-notify, never drop).
+        dm_route = "escalate"
+        if not args.force and not args.no_journal:
+            try:
+                if journal_path.exists():
+                    journal_text = journal_path.read_text(encoding="utf-8")
+                    if week_ending in _CHECK_I_HEADER_RE.findall(journal_text):
+                        dm_route = "digest"
+            except Exception as e:  # noqa: BLE001 — never silently suppress
+                print(f"[pulse-check-i] WARN: journal read for DM route "
+                      f"crashed ({type(e).__name__}: {e}); routing escalate")
         try:
             sys.path.insert(0, str(Path(__file__).resolve().parent))
             import larry_alerts  # type: ignore
@@ -1645,8 +1666,9 @@ def main(argv: Optional[list[str]] = None) -> int:
                 severity="warning",
                 message=dm_body,
                 subject=f"check-i-{week_ending}",
+                route=dm_route,
             )
-            dm_result = "queued" if ok else (
+            dm_result = f"queued (route={dm_route})" if ok else (
                 "cooldown-suppressed or write failed"
             )
         except Exception as e:  # noqa: BLE001
