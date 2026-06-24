@@ -4,6 +4,108 @@
 
 ---
 
+## Iteration ~2619 — 2026-06-24T20:00Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 1→0)
+
+**Trigger:** Larry `/cycle` invocation via chat.
+
+**Health:** ⚠️ Check A non-empty — Forge active build (classify-and-route, PID 1965241) has written implementation artifacts to main working tree instead of its worktree. All other checks nominal. Pipeline active: Phase 4b.2 complete, operator-needs-you-feed step 1 dispatched.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Daemons (re-verified):** beacon=1921593 ✅, outbox_notifier=1957187 ✅, dashboard_api=1921360 ✅, forge_bot=1388801 ✅, mirror_bot=1388982 ✅, pulse_bot=1389067 ✅, inbox_watcher=1732118 ✅, chain_event_shipper=1742173 ✅. 8/8 alive (same PIDs as ~2618). Plus Forge build session PID 1965241 (active). ✅
+- **Dashboard PR #91 (closed-card-badge):** MERGED at 2026-06-24T19:48:11Z (confirmed via L1019 + gh pr list). Phase 4b.2 sequence complete. ✅
+- **PR #682 (bridge already-merged no-PR forge stalls):** MERGED at 19:47:54Z. ✅
+- **operator-needs-you-feed sequence:** DAG-preflight PASSED (L1018: mirror-dag-pass:operator-needs-you-feed, 19:43Z). First step `escalation-feed.json` queued in Forge inbox (preflight phase, fresh). ✅ Active pipeline.
+- **build-classify-and-route:** Forge PID 1965241 active (`claude --resume 1286b828-3503-4d42-9a58-7ed95304d2f8`, matches inbox task session_id). Forge worktree `wt-forge-classify-and-route` on branch `forge/classify-and-route` (HEAD=d6a7413b [WIP][session-start], worktree clean, pushed). Changes appear in MAIN working tree — see Check A.
+- **Untracked Beacon spec:** `agents/beacon/specs/missions-v2-funnel-item-doorbell.md` — still untracked. Larry authoring in progress. [carry]
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 1016, "file_length": 1019}`. 3 new alerts (L1017–L1019):
+- **L1017** (source=outbox-notifier, kind=notification, intent=review-pass) → **Tier-3 silence** (review-pass known-pattern). Mirror approved PR #681 cross-ref. ✅
+- **L1018** (source=outbox-notifier, severity=warning, subject=mirror-dag-pass:operator-needs-you-feed) → **Tier-3 silence** (mirror-dag-pass known-pattern). operator-needs-you-feed sequence pending→active. ✅
+- **L1019** (source=outbox-notifier, severity=warning, subject=sequence-complete:phase4b2-closed-card-doorbell-001) → **Tier-3 silence** (sequence-complete known-pattern). Phase 4b.2 complete (PR #677 + PR #91 dashboard). ✅
+Watermark advanced 1016→1019. Nominal.
+
+**Check 1 — Log noise (30-min window):** `journalctl --user -p warning --since "30 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message 13:20 MDT ("Yes, add the #676 cross-reference.") → PR #681 dispatched, merged 19:42Z. ✅ All directives tracked in last 24h. No orphans. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → `no stalls detected`. 16 FORGE_NO_PR_SKIP entries (pr_exists/superseded). Forge classify-and-route active (PID 1965241, ~19 min at check time), within thresholds. ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- Forge inbox: `build-classify-and-route.json` (active build, PID 1965241) + `escalation-feed.json` (NEW — operator-needs-you-feed step 1 Part A, preflight phase, <5 min old). ✅ Active pipeline.
+- Beacon inbox: empty. Mirror inbox: empty. ✅
+- beacon-pending-approvals: pending=0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-24T19:46:41Z (~14 min before check). Within 60-min window. ✅ Nominal.
+
+**Check A — Source repo:** On main. HEAD=fbd69f50=origin/main. ✅ **Dirty tree (non-managed):** `scripts/outbox_notifier.py` (modified — adds classify+route functions for mirror-review-visibility Contracts B+C+D) + `scripts/for_larry_escalations.py` (untracked — new module imported by outbox_notifier.py). Forge worktree `wt-forge-classify-and-route` is CLEAN (HEAD=d6a7413b [WIP][session-start]). Changes are in the MAIN working tree, not the worktree — unexpected cross-contamination. Per Check A: non-managed dirt → never-auto. Active session ongoing (PID 1965241, 19 min). [blue] watch — if Forge completes build and opens PR, main tree cleans up. If next cycle shows same state with no PR opened, escalate.
+
+**Check B — Sync health:** last_sync=2026-06-24T19:38:20Z (~22 min ago), status=error (push-failed, same Tier-3 pattern from L1015/L1016). Self-heals on next sync tick. Within 2-hour window. ✅ Nominal (known pattern).
+
+**Check C — Agent liveness:** 8/8 alive (same PIDs as ~2618). ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs in agent-core or ourliberty-dashboard. Forge classify-and-route active (PR expected when build completes). operator-needs-you-feed escalation-feed preflight queued. ✅ Active pipeline.
+
+**Check H — Forge digest:** Merged since ~2618: PR #682 (19:47Z, fix(heal): bridge already-merged no-PR forge stalls — agent-core), PR #91 dashboard (19:48Z, feat: closed-card unread badge Phase 4b.2). 0 open Forge PRs. Active build in progress. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. ✅
+
+**Conditional checks — Wednesday 2026-06-24 UTC (weekday=2 ∈ {0,2,4,6}):**
+- **Check I:** `pulse_check_i.py` (no `--force`) → `mode=digest`, `DM: cooldown-suppressed` (block for 2026-06-22 already present, no new larry-alerts entry). G-rule check-i-force-bypass-dm-route remains 1/3. ✅
+- **Check III:** Not Sunday → skip. ✅
+
+**G-rule updates:**
+- **check-i-force-bypass-dm-route** — 1/3, no new instance this cycle. [carry]
+- **All other carry G-rules:** No change. [carry]
+
+**Actions taken:**
+1. Check 0: triage L1017/L1018/L1019 → Tier-3 silence ×3. Watermark advanced 1016→1019.
+2. PRIME ledger: `intervention` appended (tier=1, template=active-build-main-tree-contamination, detail=classify-and-route,outbox_notifier.py+for_larry_escalations.py,pid=1965241,session=1286b828).
+3. Tier state: `record --checks-clean false` → Tier 1, consecutive_clean=0.
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [blue] **Forge main-tree contamination** — `scripts/outbox_notifier.py`+`for_larry_escalations.py` written by active classify-and-route build (PID 1965241). Watch for PR → self-clears on PR open. Escalate next cycle if no PR and dirty tree persists. [NEW]
+- [blue] **fix-645-alert-translation-001 worktree stall** — Watch. [carry]
+- [blue] **G-rule sequence-step-review-escalate-null-chat** — 1/3. [carry]
+- [blue] **G-rule check-i-force-bypass-dm-route** — 1/3. [carry]
+- [blue] **G-rule medic-approval-request-novel-tier4** — 1/3. [carry]
+- [blue] **G-rule heal-pipeline-stall-dry-run-writes-real-alerts** — 2/3. [carry]
+- [blue] **G-rule beacon-claude-timeout** — 1/3. [carry]
+- [blue] **G-rule api-500-burst** — 1/3. [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. [carry]
+- [blue] **G-rule telegram-409-burst** — 2/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. [carry]
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. [carry]
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. [carry]
+- [blue] **G-rule sync.service-deploy-restart-storm-tier4** — 1/3. [carry]
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. [carry]
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 2/3. [carry]
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. [carry]
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. [carry]
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 2/3. [carry — dispatch to Beacon at 3/3]
+- [blue] **G-rule health-notify-script-missing** — dispatch sent 2026-06-09. [carry]
+- [blue] **G-rule heal-daemon-restart-manifest-drift-tier4** — 2/3. [carry — dispatch at 3/3]
+- [blue] **G-rule pulse-self-summary-tier4** — 1/3. [carry]
+- [blue] **unreviewed-merge:655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. [carry]
+- [blue] **Untracked Beacon spec** — `agents/beacon/specs/missions-v2-funnel-item-doorbell.md`. Larry authoring in progress. [carry]
+
+**PRIME DIRECTIVE:** 1 new intervention (active-build-main-tree-contamination). 0 new systemic_fixes. Trailing-30d: systemic_fixes=61, interventions=1093, ratio≈17.93, trend=improving.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0. Last signal: 2026-06-24T20:00:15Z.
+
+---
+
 ## Iteration ~2618 — 2026-06-24T19:47Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→1)
 
 **Trigger:** Larry `/cycle` invocation via `/loop` (chat mode).
