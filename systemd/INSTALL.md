@@ -451,6 +451,18 @@ Each service runs with:
 - `PrivateTmp=true` — own /tmp, isolated from other services
 - `MemoryMax=2G`, `TasksMax=64` — prevents runaway resource use
 
+**`NoNewPrivileges` carve-out.** Two units intentionally OMIT `NoNewPrivileges`
+because they must `sudo -n systemctl restart` other units:
+`ourliberty-watchdog.service` (auto-recovers downed daemons) and
+`ourliberty-sync.service` (deploy Step 7 — restarts daemons whose code a sync
+changed). `NoNewPrivileges=true` blocks the kernel-level setuid path `sudo`
+needs *regardless of sudoers config*, so under it every restart silently fails
+(`restarted=0 failed=N`) and freshly-deployed daemons keep running stale
+in-memory code. Both units preserve all their other hardening flags
+(`ProtectSystem=strict`, `ProtectHome=read-only`, kernel protections,
+`RestrictSUIDSGID`). A test in `scripts/tests/test_daemon_restart_manifest.py`
+fails if `NoNewPrivileges=true` is ever re-added to the sync unit.
+
 If a bot needs a path it doesn't currently have, edit the `ReadWritePaths=` line in the appropriate service file rather than relaxing other hardening.
 
 ## Phase activation checklist

@@ -172,6 +172,62 @@ class CommittedManifestTests(unittest.TestCase):
             )
 
 
+# -------------------- sync-unit privilege guard --------------------
+
+class SyncUnitCanSudoTests(unittest.TestCase):
+    """Regression guard for deploy-restart-gap (NoNewPrivileges variant),
+    2026-06-23.
+
+    sync_agent_core.sh Step 7 restarts daemons whose deployed code changed
+    via `sudo -n systemctl restart <unit>` (one per unit returned by
+    `units-for-changed`). systemd's `NoNewPrivileges=true` blocks the
+    kernel-level setuid path `sudo` needs *regardless of sudoers config*, so
+    under it every Step 7 restart fails (`restarted=0 failed=N`) and a
+    freshly-deployed daemon keeps running stale in-memory modules until a
+    human restarts it by hand. The fix removed `NoNewPrivileges` from
+    `ourliberty-sync.service` (mirroring the carve-out already made for
+    `ourliberty-watchdog.service`). This test fails loudly if a future
+    hardening sweep silently re-adds it and re-breaks the deploy restart.
+    """
+
+    SYNC_UNIT = m.SYSTEMD_DIR / 'ourliberty-sync.service'
+
+    def test_sync_unit_file_exists(self):
+        self.assertTrue(
+            self.SYNC_UNIT.is_file(),
+            f'sync unit file missing at {self.SYNC_UNIT}',
+        )
+
+    # systemd parses all of these as boolean-true; a guard that only checks
+    # `=true` would miss a re-hardening that used any other spelling (and
+    # `systemctl show` itself normalizes the value to `yes`, so that is the
+    # spelling a human is most likely to copy back into the unit file).
+    _TRUTHY = frozenset({'true', 'yes', 'on', '1'})
+
+    def test_sync_unit_does_not_enable_no_new_privileges(self):
+        # Mirror the manifest module's own directive-parsing idiom
+        # (`line.strip().replace(' ', '').lower()`): ignore comment lines so
+        # the explanatory `# NoNewPrivileges intentionally NOT set …` block
+        # does not trip the guard, and match an ACTIVE truthy assignment in
+        # any spelling systemd accepts.
+        offending = []
+        for line in self.SYNC_UNIT.read_text().splitlines():
+            if line.lstrip().startswith('#'):
+                continue
+            norm = line.strip().replace(' ', '').lower()
+            if not norm.startswith('nonewprivileges='):
+                continue
+            if norm.split('=', 1)[1] in self._TRUTHY:
+                offending.append(line.rstrip())
+        self.assertEqual(
+            offending, [],
+            'ourliberty-sync.service must NOT enable NoNewPrivileges — it '
+            'blocks the `sudo -n systemctl restart` in sync_agent_core.sh '
+            'Step 7, leaving freshly-deployed daemons running stale code. '
+            f'Found: {offending}',
+        )
+
+
 # -------------------- healer-side union --------------------
 
 class HealerWatchlistUnionTests(unittest.TestCase):
