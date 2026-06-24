@@ -5047,7 +5047,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-24T18:51:16.108304+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-24T18:45:33.134075+00:00"
+      "orphan_last_activity_ts": "2026-06-24T18:45:33.134075+00:00",
+      "briefing": {
+        "what": "A piece of behind-the-scenes reliability work the team finished, but the system still shows it as unfinished because of a paperwork mix-up.",
+        "why": "Until the records are corrected, this completed safety improvement won't be counted as done and could clog up how new work gets tracked and shipped.",
+        "suggest": "Approve the quick cleanup to mark it finished \u2014 it's a tidy-up of completed work, so it's low-effort, but give it a glance before signing off since it touches your tracking records."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-24T18:54:19.900437+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
