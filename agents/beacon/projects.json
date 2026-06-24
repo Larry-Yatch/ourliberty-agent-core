@@ -703,7 +703,7 @@
       "title": "Auto-retire Done pipeline cards (follow-up to phase-aware Complete & retire, merged #629/#77). A Done project should auto-retire after a visibility window (default ~48h since it reached Done) so the board self-cleans and Larry never has to click Complete & retire. Design: a healer tick (heal_projects_store or a new heal_pipeline_retire) scans ACTIVE projects with rollup status 'done', computes done-at = max(phase.updated_at where lifecycle_state=='done'), and when now-done_at > window flips state active->retired (single-committer: healer owns projects.json). The 'retired' state + suppresses_funnel_source() already exist (active+retired keep the funnel source suppressed; only archived returns it). Card stays visible as a 'Done' win for the window, then clears. Window via config/env. Reversibility note: retired is terminal + suppressed, so add a 'recently retired' surface later if needed.",
       "north_star_ref": null,
       "repo": "ourliberty-agent-core",
-      "state": "active",
+      "state": "retired",
       "phases": [
         {
           "id": "auto-retire-done-pipeline-cards-follow-up-to-pha",
@@ -736,7 +736,7 @@
       ],
       "one_off": true,
       "created_at": "2026-06-23T22:07:57.930635+00:00",
-      "updated_at": "2026-06-23T22:07:57.930635+00:00",
+      "updated_at": "2026-06-24T18:37:53.035051+00:00",
       "promoted_from": {
         "kind": "capture",
         "capture_id": "cap-auto-retire-done-pipeline-cards-follow-up-to-pha-be83"
@@ -807,7 +807,7 @@
       "title": "Missions Phase 4b.2 \u2014 closed-card doorbell",
       "north_star_ref": null,
       "repo": null,
-      "state": "active",
+      "state": "archived",
       "phases": [
         {
           "id": "missions-v2-phase4b2-closed-card-doorbell",
@@ -855,7 +855,7 @@
       ],
       "one_off": true,
       "created_at": "2026-06-24T15:50:59.823686+00:00",
-      "updated_at": "2026-06-24T15:50:59.823686+00:00",
+      "updated_at": "2026-06-24T18:39:22.760528+00:00",
       "promoted_from": {
         "kind": "mission",
         "mission_id": "missions-v2-phase4b2-closed-card-doorbell"
