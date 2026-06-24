@@ -133,6 +133,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 import larry_alerts  # noqa: E402
 import fixture_patterns  # noqa: E402
+import no_session_ledger  # noqa: E402  # S3: cold-start obligation backstop
 import safe_write_inbox  # noqa: E402  # sanitize_component: match on-disk outbox names
 from id_match import id_matches  # noqa: E402
 from log_ts import parse_log_ts  # noqa: E402  (shared log-ts parser)
@@ -220,19 +221,15 @@ _AUTO_MERGE_MERGED_RE = re.compile(
     r'\[(?P<ts>\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:?\d{2}|Z)?)\]'
     r'.*AUTO_MERGE task=(?P<task>\S+).*outcome=merged'
 )
-# Chain discipline v3 GAP 1 (Check 6). Matches the WARN line emitted by
-# outbox_notifier.py when REVIEW_REVISION fires on an envelope with no
-# `forge_build_session_id`. Production line shape:
-#   [<ts>] [notifier] [WARN] REVIEW_REVISION on task <task> has no
-#   forge_build_session_id (routing_source='beacon', chat_id=None);
-#   revision dispatch would have no session to --resume — skipping.
-# The task token is non-greedy up to the first space so the regex matches
-# both the pre-v3 ("propagation gap?") shape and the v3 ("routing_source=…")
-# shape — the direct fix changed the trailing diagnostic, not the prefix.
-_NO_FORGE_SESSION_RE = re.compile(
-    r'\[(?P<ts>\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:?\d{2}|Z)?)\]'
-    r'.*REVIEW_REVISION on task (?P<task>\S+) has no forge_build_session_id'
-)
+# Check 6 (forge-cold-start-revision S3). The session-less REVISION backstop no
+# longer scrapes the notifier log — the message text drifted and the regex went
+# dead (the #645 / #653 stalls; S0 was the interim regex fix this supersedes).
+# It now reads the durable obligation ledger (`no_session_ledger`): a cold-start
+# revision OPENS an obligation, a Mirror PASS / merge RESOLVES it. An obligation
+# still OPEN past this grace is a loop the mechanical dispatch did not close —
+# surfaced via recover-then-alert (verify the PR didn't resolve out-of-band,
+# else fire one loud, non-suppressed alert).
+NO_SESSION_STUCK_MIN = 45  # grace before a stuck cold-start obligation alerts
 
 # Chain discipline v3 GAP 3 (Check 7). routing-events.jsonl carries one
 # JSON object per line; the shape we read has these fields:
@@ -1420,62 +1417,68 @@ def check_retry_exhausted(state: dict) -> list[dict]:
 
 # ---------- Check 6: REVIEW_REVISION dispatched with no Forge session ----------
 
-def check_revision_dispatched_with_no_session(notifier_lines: list[str],
-                                              state: dict) -> list[dict]:
-    """Scan outbox-notifier.log for `no forge_build_session_id` WARN lines
-    on REVIEW_REVISION. Each unique task_id seen in the lookback window
-    produces one alert. The direct fix in `outbox_notifier.py` already
-    DMs Larry via `larry_alerts.append_alert`; this check is defense in
-    depth (catches per-subject-cooldown suppression or queue-file write
-    failures at the source).
+def check_revision_dispatched_with_no_session(state: dict) -> list[dict]:
+    """Backstop for the cold-start no-session revision loop (forge-cold-start-revision S3).
 
-    Chain discipline v3 GAP 1 (2026-05-26). Same 6h-cooldown idempotency
-    as Checks 1-5 via the shared state dict + `should_alert/record_alert`.
+    Reads the durable obligation ledger (`no_session_ledger`) instead of
+    scraping the notifier log — the old regex drifted out of match and the
+    backstop went dead (the #645 / #653 stalls). A cold-start revision OPENS an
+    obligation; a terminal Mirror verdict / merge RESOLVES it. An obligation
+    still OPEN past `NO_SESSION_STUCK_MIN` means the mechanical dispatch ran but
+    the loop never closed — Forge may have flagged a finding it could not
+    mechanically apply, or the loop stalled.
+
+    Each stuck obligation gets ONE recover-then-alert entry: the recovery
+    verifies the PR didn't resolve out-of-band (merged/closed → clear the
+    ledger, suppress the alert); otherwise a loud, non-suppressed alert fires
+    with the PR link. No silent re-deposit — the mechanical cold-start dispatch
+    already ran, so a blind re-dispatch would risk a loop. Same 6h-cooldown
+    idempotency as Checks 1-5 via `should_alert`/`record_alert`.
     """
+    try:
+        stuck = no_session_ledger.list_open(
+            older_than_minutes=NO_SESSION_STUCK_MIN,
+        )
+    except Exception as e:  # noqa: BLE001 — a ledger hiccup must not crash the timer
+        log(f'no_session_ledger.list_open failed: {type(e).__name__}: {e}',
+            'WARN')
+        return []
+    now = datetime.now(timezone.utc)
     alerts: list[dict] = []
-    seen_tasks: set[str] = set()
-    for line in notifier_lines:
-        m = _NO_FORGE_SESSION_RE.search(line)
-        if not m:
+    for ob in stuck:
+        task = ob.get('task_id')
+        if not task:
             continue
-        task = m.group('task')
-        if task in seen_tasks:
-            continue
-        ts = _parse_ts(m.group('ts'))
-        if not _within_scan_window(ts):
-            # Historical WARN replay — direct-fix DM already fired
-            # within its own cooldown when the event was fresh; another
-            # alert now would be noise. Skip per Scan window.
-            seen_tasks.add(task)
-            continue
-        seen_tasks.add(task)
-        hit, reason = _resolution_signal_present(task_id=task, since_ts=ts)
-        if hit:
-            log(
-                f'NO_SESSION_REVISION_SKIP task={task} reason={reason}',
-                'INFO',
-            )
-            continue
-        elapsed_min = int((datetime.now(timezone.utc) - ts).total_seconds() / 60)
+        pr_url = ob.get('pr_url') or ''
+        last = _parse_ts(ob.get('last_dispatch_at') or ob.get('opened_at'))
+        elapsed_min = int((now - last).total_seconds() / 60) if last else 0
+        round_num = ob.get('round', 1)
         key = f'no_session_revision:{task}'
+        pr_ref = pr_url if pr_url and pr_url != '(no pr_url)' else 'unknown'
         alerts.append({
             'key': key,
             'message': (
-                f'REVIEW_REVISION on task `{task}` fired without a Forge build '
-                f'session ({elapsed_min} min ago). Auto-resume cannot run — the '
-                f'PR was authored outside the dispatch chain (Claude-as-Forge '
-                f'or manual). Apply Mirror\'s revisions manually, or re-dispatch '
-                f'via Beacon with a fresh task_id to thread a new session.'
+                f'A cold-start (session-less) revision on task `{task}` '
+                f'(round {round_num}, PR {pr_ref}) was dispatched {elapsed_min} '
+                f'min ago but never closed — no Mirror PASS and the PR is still '
+                f'open. Forge may have flagged a finding it could not '
+                f'mechanically apply, or the revision loop stalled.'
             ),
             'subject': f'pipeline-stall:no-session-revision:{task}',
             'suggested_action': (
-                f'Read Mirror\'s findings: '
-                f'`grep "no forge_build_session_id" ~/agents/logs/outbox-notifier.log | grep "{task}"`. '
-                f'Apply the revisions to the PR branch by hand, OR re-dispatch '
-                f'via Beacon: `dispatch forge --task fix-{task}-revisions ...`.'
+                f'Review the PR ({pr_ref}). Inspect the cold-start revision + '
+                f'Forge\'s result: `grep "{task}" '
+                f'~/agents/logs/outbox-notifier.log | tail -20`. Apply the '
+                f'remaining finding by hand, or close/merge the PR — the '
+                f'obligation clears on a Mirror PASS or a merge. Ledger: '
+                f'`python3 ~/agent-core/scripts/no_session_ledger.py get {task}`.'
             ),
-            # M4: recoverable — route to Beacon for fresh-task_id re-dispatch before alerting.
-            'recovery': functools.partial(_recover_no_session_revision, task),
+            # M4 recover-then-alert: verify the PR didn't resolve out-of-band
+            # before alerting. NOT a re-dispatch — the mechanical cold-start
+            # dispatch already ran.
+            'recovery': functools.partial(
+                _recover_no_session_revision, task, pr_url,
+            ),
         })
     return alerts
 
@@ -2071,26 +2074,32 @@ def _route_revision_notify_to_beacon(*, task_id: str, intent: str,
         return False
 
 
-def _recover_no_session_revision(task: str) -> bool:
-    """Recover a no-Forge-session code-review REVISION (Check 6) by routing a
-    `code-review-revision-no-session` notify to Beacon so she re-dispatches
-    Forge with a fresh task_id (M2). Mirrors
-    `outbox_notifier._route_no_session_revision_to_beacon`."""
-    body = (
-        f'Mirror requested REVISION on task `{task}` but no Forge build '
-        f'session exists to --resume (heal-pipeline-stall backstop). '
-        f'Re-dispatch Forge with a fresh task_id to apply Mirror\'s findings '
-        f'to the existing PR branch.'
+def _recover_no_session_revision(task: str, pr_url: str = '') -> bool:
+    """Check 6 'recovery' for a stuck cold-start obligation (forge-cold-start-revision S3).
+
+    This is a VERIFY, not a re-dispatch: the mechanical cold-start revision
+    already ran (outbox_notifier), so a blind re-dispatch here would risk a
+    loop. If the PR resolved out-of-band — MERGED or CLOSED — clear the ledger
+    obligation and report recovered, so the framework suppresses the alert.
+    Otherwise the loop is genuinely stuck → return False so exactly one loud,
+    non-suppressed alert fires. (Replaces the old silent Beacon re-deposit that
+    suppressed the alert without anything actually resolving.)"""
+    pr_state = (
+        _check_pr_closed_via_gh(pr_url)
+        if pr_url and pr_url != '(no pr_url)' else None
     )
-    return _route_revision_notify_to_beacon(
-        task_id=task,
-        intent='code-review-revision-no-session',
-        notify_task_id=f'notify-no-session-revision-{task}',
-        filename=f'notify-no-session-revision-{task}.json',
-        base_extra={'original_task_id': task},
-        intent_kwargs={'pr_url': '(no pr_url)', 'branch': '(branch unknown)'},
-        body=body,
-    )
+    if pr_state in ('MERGED', 'CLOSED'):
+        try:
+            no_session_ledger.resolve_obligation(
+                task, resolution=pr_state.lower(),
+            )
+        except Exception as e:  # noqa: BLE001
+            log(f'resolve_obligation failed for {task}: '
+                f'{type(e).__name__}: {e}', 'WARN')
+        log(f'NO_SESSION_REVISION_RESOLVED task={task} pr_state={pr_state}; '
+            f'cleared ledger obligation', 'INFO')
+        return True
+    return False
 
 
 def _recover_stalled_sequence(seq_id: str, seq_path: str) -> bool:
@@ -2179,7 +2188,7 @@ def run() -> int:
     except Exception as e:
         log(f'check_retry_exhausted failed: {type(e).__name__}: {e}', 'ERROR')
     try:
-        all_alerts += check_revision_dispatched_with_no_session(notifier_lines, state)
+        all_alerts += check_revision_dispatched_with_no_session(state)
     except Exception as e:
         log(
             f'check_revision_dispatched_with_no_session failed: '

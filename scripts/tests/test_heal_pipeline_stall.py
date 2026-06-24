@@ -1437,53 +1437,88 @@ class TestRecoverThenAlert(_TempAgentsRootMixin, unittest.TestCase):
 
 
 class TestCheckRevisionDispatchedWithNoSession(_TempAgentsRootMixin, unittest.TestCase):
-    """Chain discipline v3 GAP 1 (2026-05-26). Healer-level defense:
-    re-flag any `no forge_build_session_id` WARN line not already
-    suppressed by the direct-fix alert's cooldown."""
+    """forge-cold-start-revision S3. The session-less REVISION backstop now
+    reads the durable obligation ledger (no_session_ledger): a cold-start
+    revision OPENS an obligation, a Mirror PASS / merge RESOLVES it, and an
+    obligation still OPEN past NO_SESSION_STUCK_MIN fires a recover-then-alert.
+    """
 
-    def test_fires_when_warn_line_present(self):
-        line = (
-            f'[{_ts(45)}] [notifier] [WARN] REVIEW_REVISION on task '
-            f'feedback-claude-as-forge-001 has no forge_build_session_id '
-            f"(routing_source='beacon', chat_id=None); revision dispatch "
-            f'would have no session to --resume — skipping.'
-        )
-        alerts = self.hps.check_revision_dispatched_with_no_session([line], {})
+    def setUp(self):
+        super().setUp()
+        # Sandbox the ledger to this test's root (the mixin re-imports
+        # heal_pipeline_stall but no_session_ledger keeps its import-time path).
+        self._nsl = self.hps.no_session_ledger
+        self._nsl_orig = self._nsl.LEDGER_FILE
+        self._nsl.LEDGER_FILE = self.agents_root / 'state' / 'ns-ledger.json'
+
+    def tearDown(self):
+        self._nsl.LEDGER_FILE = self._nsl_orig
+        super().tearDown()
+
+    def _open(self, task, minutes_ago=60, pr_url='https://gh/o/r/pull/7', **kw):
+        when = datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)
+        self._nsl.open_obligation(task, pr_url=pr_url, now=when, **kw)
+
+    def test_stuck_obligation_fires_alert(self):
+        self._open('stuck-1', minutes_ago=60)
+        alerts = self.hps.check_revision_dispatched_with_no_session({})
         self.assertEqual(len(alerts), 1)
-        self.assertIn('feedback-claude-as-forge-001', alerts[0]['message'])
-        self.assertIn(
-            'pipeline-stall:no-session-revision:feedback-claude-as-forge-001',
+        self.assertIn('stuck-1', alerts[0]['message'])
+        self.assertEqual(
             alerts[0]['subject'],
+            'pipeline-stall:no-session-revision:stuck-1',
         )
+        self.assertIn('https://gh/o/r/pull/7', alerts[0]['message'])
+        self.assertIn('recovery', alerts[0])
 
-    def test_dedup_per_task(self):
-        # Two WARN lines for the same task → one alert.
-        lines = [
-            f'[{_ts(45)}] [notifier] [WARN] REVIEW_REVISION on task '
-            f'dup-task has no forge_build_session_id',
-            f'[{_ts(40)}] [notifier] [WARN] REVIEW_REVISION on task '
-            f'dup-task has no forge_build_session_id',
-        ]
-        alerts = self.hps.check_revision_dispatched_with_no_session(lines, {})
-        self.assertEqual(len(alerts), 1)
-
-    def test_silent_when_no_warn_lines(self):
-        lines = [
-            f'[{_ts(45)}] [notifier] [INFO] business as usual',
-        ]
-        alerts = self.hps.check_revision_dispatched_with_no_session(lines, {})
+    def test_fresh_obligation_within_grace_no_alert(self):
+        self._open('fresh-1', minutes_ago=5)  # < NO_SESSION_STUCK_MIN
+        alerts = self.hps.check_revision_dispatched_with_no_session({})
         self.assertEqual(alerts, [])
 
-    def test_silent_against_pre_v3_warn_shape_is_still_caught(self):
-        """The pre-v3 WARN line had a different trailing diagnostic
-        ('propagation gap?'); the prefix is identical so the regex
-        catches both shapes."""
-        line = (
-            f'[{_ts(45)}] [notifier] [WARN] REVIEW_REVISION on task '
-            f'legacy-task has no forge_build_session_id (propagation gap?)'
-        )
-        alerts = self.hps.check_revision_dispatched_with_no_session([line], {})
+    def test_resolved_obligation_no_alert(self):
+        self._open('done-1', minutes_ago=60)
+        self._nsl.resolve_obligation('done-1', resolution='review-pass')
+        alerts = self.hps.check_revision_dispatched_with_no_session({})
+        self.assertEqual(alerts, [])
+
+    def test_one_alert_per_task(self):
+        # The ledger holds one row per task_id, so a task yields exactly one
+        # alert even after multiple cold-start rounds re-open it.
+        self._open('dup-task', minutes_ago=90, round_num=1)
+        self._open('dup-task', minutes_ago=60, round_num=2)
+        alerts = self.hps.check_revision_dispatched_with_no_session({})
         self.assertEqual(len(alerts), 1)
+        self.assertIn('round 2', alerts[0]['message'])
+
+    def test_silent_when_ledger_empty(self):
+        alerts = self.hps.check_revision_dispatched_with_no_session({})
+        self.assertEqual(alerts, [])
+
+    def test_recovery_resolves_on_merged_pr(self):
+        # recover-then-alert: a stuck obligation whose PR merged out-of-band is
+        # cleared and reported recovered (the framework suppresses the alert).
+        self._open('merged-1', minutes_ago=60)
+        with patch.object(self.hps, '_check_pr_closed_via_gh',
+                          return_value='MERGED'):
+            recovered = self.hps._recover_no_session_revision(
+                'merged-1', 'https://gh/o/r/pull/7')
+        self.assertTrue(recovered)
+        ob = self._nsl.get_obligation('merged-1')
+        self.assertEqual(ob['status'], self._nsl.RESOLVED)
+        self.assertEqual(ob['resolution'], 'merged')
+
+    def test_recovery_false_when_pr_still_open(self):
+        self._open('open-1', minutes_ago=60)
+        with patch.object(self.hps, '_check_pr_closed_via_gh',
+                          return_value=None):
+            recovered = self.hps._recover_no_session_revision(
+                'open-1', 'https://gh/o/r/pull/7')
+        self.assertFalse(recovered)
+        # Obligation stays OPEN so the loud alert fires.
+        self.assertEqual(
+            self._nsl.get_obligation('open-1')['status'], self._nsl.OPEN,
+        )
 
 
 class TestCheckUnroutedOpenPrs(_TempAgentsRootMixin, unittest.TestCase):
@@ -1680,16 +1715,6 @@ class TestScanWindow(_TempAgentsRootMixin, unittest.TestCase):
         marker-shape drift, presumed-resolved. Skip."""
         lines = [f'[{_ts(25 * 60)}] [notifier] [INFO] notified beacon <- mirror (mirror-result, depth=1, file=notify-historical-drift-001.json)']
         alerts = self.hps.check_mirror_marker_invisible(lines, {})
-        self.assertEqual(alerts, [])
-
-    def test_check6_skips_no_session_warn_older_than_window(self) -> None:
-        """REVIEW_REVISION no-session WARN line >24h ago: the direct-fix
-        DM fired when the WARN was fresh. Re-alerting now is noise."""
-        lines = [
-            f'[{_ts(25 * 60)}] [notifier] [WARN] REVIEW_REVISION on task '
-            f'historical-rev-001 has no forge_build_session_id'
-        ]
-        alerts = self.hps.check_revision_dispatched_with_no_session(lines, {})
         self.assertEqual(alerts, [])
 
     def test_check2_skips_pr_older_than_window(self) -> None:
@@ -1963,23 +1988,6 @@ class TestPerCheckSkipPaths(_TempAgentsRootMixin, unittest.TestCase):
         self.assertIn('reason=larry_action', skip_lines[0])
         self.assertIn('check5-resolved-001', skip_lines[0])
 
-    def test_check6_skips_on_larry_action(self) -> None:
-        lines = [
-            f'[{_ts(45)}] [notifier] [WARN] REVIEW_REVISION on task '
-            f'check6-resolved-001 has no forge_build_session_id '
-            f"(routing_source='beacon', chat_id=None); skipping."
-        ]
-        cm, captured = self._capture_logs()
-        with cm, self._patch_resolution('larry_action'):
-            alerts = self.hps.check_revision_dispatched_with_no_session(
-                lines, {},
-            )
-        self.assertEqual(alerts, [])
-        skip_lines = [m for m in captured if 'NO_SESSION_REVISION_SKIP' in m]
-        self.assertEqual(len(skip_lines), 1)
-        self.assertIn('reason=larry_action', skip_lines[0])
-        self.assertIn('check6-resolved-001', skip_lines[0])
-
     def test_check7_skips_on_larry_action(self) -> None:
         pr = {
             'number': 700,
@@ -2106,15 +2114,6 @@ class TestResolutionSignalRegressionGuards(_TempAgentsRootMixin,
             alerts = self.hps.check_retry_exhausted({})
         self.assertEqual(len(alerts), 1)
         self.assertIn('legit-stall-5', alerts[0]['message'])
-
-    def test_check6_fires_when_no_resolution_signal(self) -> None:
-        lines = [
-            f'[{_ts(45)}] [notifier] [WARN] REVIEW_REVISION on task '
-            f'legit-stall-6 has no forge_build_session_id'
-        ]
-        alerts = self.hps.check_revision_dispatched_with_no_session(lines, {})
-        self.assertEqual(len(alerts), 1)
-        self.assertIn('legit-stall-6', alerts[0]['message'])
 
     def test_check7_fires_when_no_resolution_signal(self) -> None:
         pr = {
