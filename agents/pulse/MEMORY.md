@@ -240,6 +240,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-24 23:27Z UTC (Iter ~2646, Tier 1, consecutive_clean=0)
+
+**Iter ~2646 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry); PR #687 CONFLICTING, Mirror session 2 REVIEW_PASS confirmed (archive exit_code=0), session 3 active since 23:10:40Z. alert-translation-mirror-pass-unmerged-001 pending Larry approval. 1 alert triaged (L1050, Tier-3 doorbell). Watermark 1049→1050. 8 daemons alive. G-rule watchdog-stale-post-fix: 0 WARNs during session 3 (positive, fix in preflight). Check I: mode=digest, cooldown-suppressed. HEAD=f0c1f73b. PRIME: interventions≈1118, systemic_fixes=65, ratio≈17.2, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-24 23:19Z UTC (Iter ~2645, Tier 1, consecutive_clean=0)
 
 **Iter ~2645 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry, needs rebase); PR #687 **Mirror REVIEW_PASS** (23:10Z session 2 done) AUTO_MERGE_HELD blocker=#685 file overlap; Mirror session 3 running since 23:10:40Z. alert-translation-mirror-pass-unmerged-001 pending Larry approval (reply 'approve' in Telegram). 2 alerts triaged (L1048-L1049, Tier-3). Watermark 1047→1049. 8 daemons alive. No watchdog WARNs in this window (last healthy 23:15Z). Check I: mode=digest, cooldown-suppressed. HEAD=77018b7e. PRIME: interventions≈1118, systemic_fixes=65, ratio≈17.2, trend=improving. Tier 1, consecutive_clean=0.
