@@ -4,6 +4,109 @@
 
 ---
 
+## Iteration ~2576 — 2026-06-24T03:48Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/cycle` invocation (chat mode).
+
+**Health:** ⚠️ Tier-reset — 1 Tier-4 alert (L1037: PR #664 Mirror REVIEW_PASS on r1 but auto-merge blocked by merge conflict; bot already DM'd Larry at 21:40 MDT). Pipeline active: Forge building `auto-retire-done` sequence step; Mirror reviewing PR #666 spec + original `review-664` task. dashboard_api restarted (PID 1645419→1675709, Ssl, spontaneous; 8/8 alive). HEAD=18a1167f=origin/main.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Daemons (re-verified):** chain_event=930563 (SNs) ✅, forge_bot=1388801 (Ss) ✅, mirror_bot=1388982 (Ss) ✅, pulse_bot=1389067 (Ss) ✅, inbox_watcher=1646289 (Ssl) ✅, outbox_notifier=1655425 (Ss) ✅, beacon_telegram_bot=1655673 (Ss) ✅, dashboard_api=1675709 (Ssl) ✅ [PID changed 1645419→1675709, spontaneous restart ~21:39 MDT]. 8/8 alive. ✅
+- **PR #664 (re-verified):** Mirror issued REVIEW_PASS on revision r1 (task `pr-ourliberty-agent-core-664`, confirmed via L1037 outbox-notifier alert). PR is CONFLICTING (merge conflict with main) — auto-merge blocked. GitHub API shows reviewDecision="" (Mirror tracks internally). Needs manual rebase. Larry already DM'd at 21:40 MDT. [carry yellow — needs Larry rebase action]
+- **push-soft-gate-block-upgrade-decision (re-verified):** 0 new alerts. Awaiting Larry decision. [carry yellow] ✅
+- **credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED (re-verified):** 0 new alerts. Underlying still standing. [carry yellow] ✅
+- **fix-645-alert-translation-001 stall (re-verified):** WARN `larry_alerts append failed for forge_built_no_pr:fix-645-alert-translation-001` persists in Check 3 dry-run. [carry blue] ✅
+- **Untracked Beacon spec (re-verified):** `agents/beacon/specs/missions-v2-funnel-item-doorbell.md` still present. [carry informational] ✅
+
+**New since ~2575:** PR #666 `spec(missions): Phase 4b.2 — closed-card doorbell (deferred unread badge)` opened 03:38:02Z (Forge build of `build-spec-phase4b2-closed-card-doorbell-001`); Mirror has `review-spec-phase4b2-closed-card-doorbell-001.json` (fresh). Outbox-notifier posted L1037 at 03:39Z: Mirror REVIEW_PASS on PR #664 revision r1 but auto-merge blocked (merge conflict). dashboard_api PID changed 1645419→1675709 (spontaneous restart, no healer alert). Forge build `auto-retire-done-pipeline-cards-follow-up-to-pha.json` active (03:35Z, ~13 min).
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 1036, "file_length": 1037}`. **1 new alert (L1037):**
+- L1037: `source=outbox-notifier, subject=auto-merge-conflict:Larry-Yatch/ourliberty-agent-core:664` — Mirror REVIEW_PASS on PR #664 r1; auto-merge BLOCKED (merge conflict). triage-alert → **Tier-4** (novel: no registry template, route=escalate). Bot already delivered DM to Larry at 21:40:36 MDT (idx=1036 in bot log). No second DM from Pulse. G-rule merge_conflict_manual_rebase-tier4 → **2/3**. ⚠️ tier-reset.
+Watermark advanced 1036→1037.
+
+**Check 1 — Log noise (30-min window):** journalctl --user -p warning → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep (last 4h):** Beacon bot PID 1655673 (Ss) ✅. Last activity: Larry 'go' at 21:35:32 MDT → dag-preflight-orchestrator-terminal-signal-hardening-001 approved + dispatched. Bot delivered L1037 (auto-merge-conflict:664) at 21:40:36 MDT. No untracked Pulse directives since ~2575. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → `0 new alert(s) fired, 0 recovered, 1 suppressed` (fix-645 cooldown). fix-645 WARN persists. ✅ Nominal.
+
+**Check 4 — Pending directives:** Forge inbox: `build-auto-retire-done-pipeline-cards-follow-up-to-pha.json` (21:35 MDT, active build). Mirror inbox: `dag-preflight-orchestrator-terminal-signal-hardening-001.json` (21:35 MDT, fresh), `review-pr-ourliberty-agent-core-664.json` (21:30 MDT, ~18 min, original pre-revision review task — Mirror will process and detect post-revision-pass state gracefully), `review-spec-phase4b2-closed-card-doorbell-001.json` (21:38 MDT, fresh). beacon-pending-approvals: pending=0. All fresh, none stale. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-24T03:43:57Z (~4 min before cycle). Within 60-min window. ✅ Nominal.
+
+**Check A — Source repo:** On main. HEAD=18a1167f=origin/main (clean, 0 behind, 0 ahead). Untracked: `agents/beacon/specs/missions-v2-funnel-item-doorbell.md`. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json last_sync=2026-06-24T03:09:19Z (~39 min ago). Within 2-hour window. ✅ Nominal.
+
+**Check C — Agent liveness:** 8/8 alive. dashboard_api PID 1645419→1675709 (spontaneous restart ~21:39 MDT, Ssl, active). No healer alert for this restart. [blue informational] ✅ Nominal.
+
+**Check E — PRs:**
+- ourliberty-agent-core: PR #664 `fix(pipeline): mechanical cold-start Forge revision for session-less PRs (#645/#653)` — CONFLICTING, reviewDecision="" (Mirror REVIEW_PASS on r1 per L1037). Needs manual rebase. [yellow — awaiting Larry rebase]
+- ourliberty-agent-core: PR #666 `spec(missions): Phase 4b.2 — closed-card doorbell (deferred unread badge)` — UNKNOWN, reviewDecision="", ~10 min old. Mirror reviewing. ✅ Within threshold.
+- No other open PRs.
+
+**Check H — Forge digest:** Forge building `auto-retire-done-pipeline-cards-follow-up-to-pha.json` (active). Mirror reviewing PR #666 spec + processing original `review-664` task (pre-revision, will gracefully detect post-pass state). PR #664 awaiting rebase. Pipeline active. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. ✅
+
+**Conditional checks — Wednesday 2026-06-24 UTC (weekday=2 ∈ {0,2,4,6}):**
+- **Check I:** `pulse_check_i.py --force` → `journal: skipped — block for 2026-06-22 already present`. Auto-dispatch dedup skip (prior task `pulse-auto-f8ac2e3afc-20260622`). Wrote check-i-2026-06-24.json. DM cooldown-suppressed. Mode=digest, 0 parked proposals. ✅ Nominal.
+- **Check III:** Not Sunday → skip. ✅
+
+**G-rule assessment:**
+- **merge_conflict_manual_rebase-tier4 → 2/3** [updated from 1/3]. L1037 (`source=outbox-notifier, subject=auto-merge-conflict:664`) is the 2nd occurrence. Pattern: Mirror passes revision review, PR is in merge conflict, auto-merge blocked, bot DMs Larry. At 3/3 dispatch to Beacon: propose adding a `merge-conflict-post-mirror-pass` Tier-3 translation (bot already DMs, Pulse silence is correct) + investigate whether Forge should auto-rebase after revision PR opens.
+- All other G-rule counts unchanged from ~2575. [all carry]
+
+**Actions taken:**
+1. Check 0: L1037 Tier-4 triaged (route=escalate, bot already delivered DM — no second DM from Pulse). Watermark advanced 1036→1037.
+2. PRIME ledger: `intervention` appended (tier=1, template=merge-conflict-mirror-pass-tier4, L1037).
+3. Tier state: `record --checks-clean false` → Tier 1, consecutive_clean stays 0 (tier-reset from L1037 Tier-4).
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [yellow] **PR #664 needs rebase** — Mirror REVIEW_PASS on r1; CONFLICTING (merge conflict). Larry DM'd. Rebase: `gh pr checkout 664 --repo Larry-Yatch/ourliberty-agent-core && git fetch origin && git rebase origin/main && git push --force-with-lease`. [active]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Known false positive (Mirror REVIEW_PASS confirmed). Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [blue] **PR #666** — `spec(missions): Phase 4b.2 — closed-card doorbell`. UNKNOWN, Mirror reviewing `review-spec-phase4b2-closed-card-doorbell-001.json`. [fresh — monitoring]
+- [blue] **unreviewed-merge:655** — Larry judgment. [carry]
+- [blue] **fix-645-alert-translation-001 worktree stall** — WARN persists in heal_pipeline_stall dry-run. [carry]
+- [blue] **G-rule sequence-step-review-escalate-null-chat** — 1/3. [carry]
+- [blue] **G-rule medic-approval-request-novel-tier4** — 1/3. [carry]
+- [blue] **G-rule heal-pipeline-stall-dry-run-writes-real-alerts** — 1/3. [carry]
+- [blue] **G-rule beacon-claude-timeout** — 1/3. [carry]
+- [blue] **G-rule api-500-burst** — 1/3. [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. [carry]
+- [blue] **G-rule telegram-409-burst** — 2/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. [carry]
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. [carry]
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. [carry]
+- [blue] **G-rule sync.service-deploy-restart-storm-tier4** — 1/3. [carry]
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. [carry]
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — **2/3** [updated]. [watch]
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. [carry]
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. [carry]
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. [carry]
+- [blue] **G-rule health-notify-script-missing** — dispatch sent 2026-06-09. [carry]
+- [blue] **G-rule heal-daemon-restart-manifest-drift-tier4** — 1/3. [carry]
+- [blue] **G-rule pulse-self-summary-tier4** — 1/3. [carry]
+- [blue] **unreviewed-merge:628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. [carry]
+- [blue] **Untracked Beacon spec** — `agents/beacon/specs/missions-v2-funnel-item-doorbell.md`. Larry authoring in progress. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention (L1037 Tier-4 merge-conflict-664). Trailing-30d: interventions=1087, systemic_fixes=61, verification_pending=21, ratio≈17.79, trend=improving.
+**Tier end-of-iter:** Tier **1** (reset), consecutive_clean=0. Last signal: 2026-06-24T03:48Z.
+
+---
+
 ## Iteration ~2575 — 2026-06-24T03:37Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/cycle` invocation (chat mode).
