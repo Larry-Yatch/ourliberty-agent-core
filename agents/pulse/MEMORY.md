@@ -222,6 +222,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-24 20:26Z UTC (Iter ~2623, Tier 1, consecutive_clean=2)
+
+**Iter ~2623 summary:** ✅ Nominal — all checks clean, no actions. Active pipeline: PR #684 (cred-drift boolean-skip) in Mirror review; Forge inbox has build-escalation-feed (step 1) + backstop-healer (Contract E step 3 preflight). PRIME: systemic_fixes=61, interventions=1095, ratio≈17.95, trend=improving. Tier 1, consecutive_clean=2. G-rules unchanged.
+
 ## Status snapshot — updated 2026-06-24 20:20Z UTC (Iter ~2622, Tier 1, consecutive_clean=1)
 
 **Iter ~2622 summary:** ✅ Nominal — all checks clean, no actions. New pipeline item: `backstop-healer.json` (Contract E, mirror-review-visibility step 3 preflight) in Forge inbox. PR #684 (Larry cred-drift boolean skip) in Mirror review. [blue] RETIRED: fix-645-alert-translation-001 worktree stall (PR #645 MERGED). G-rules: heal-daemon-restart-manifest-drift-regenerated-tier4 1/3, check-i-force-bypass-dm-route 1/3 (no new instances). PRIME: systemic_fixes=61, interventions=1095, ratio≈17.95, trend=improving. Tier 1, consecutive_clean=1.
