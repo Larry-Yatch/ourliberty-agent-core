@@ -76,6 +76,7 @@ from chain_envelope import (        # noqa: E402  # M1: sole envelope constructo
 )
 import dispatch_validator         # noqa: E402
 import fixture_patterns             # noqa: E402  # outbox-side fixture gate
+import for_larry_signal             # noqa: E402  # §5.2 canonical for-Larry signal
 import forge_preflight_handler as fph  # noqa: E402
 import larry_alerts                # noqa: E402
 import mirror_review_handler as mrh  # noqa: E402
@@ -1708,6 +1709,50 @@ def _preflight_outcome_event_type(marker_decision: dict[str, Any]) -> Optional[s
             else 'preflight_reject'
         )
     return None
+
+
+def _sync_clarify_exhausted_signal(
+    data: dict[str, Any], marker_decision: dict[str, Any],
+) -> None:
+    """§5.2: maintain the durable for-Larry record for a CLARIFY-exhausted build.
+
+    Rides the existing terminal-intent handler (no new poll):
+
+      * intent == 'clarification-exhausted' → write a self-clearing record
+        (task_id, last clarification question, repo) so the build appears on the
+        Waiting-on-You panel + rings the doorbell.
+      * any OTHER classified Forge marker for the same task_id → a fresh dispatch
+        was observed (Beacon re-dispatched, or Larry dropped + re-asked), so the
+        record self-clears (decision d). A no-op when no record exists.
+
+    Best-effort: a durable-signal failure must never block notify routing.
+    """
+    task_id = data.get('task_id')
+    if not task_id:
+        return
+    key = for_larry_signal.CLARIFY_EXHAUSTED_KEY_PREFIX + str(task_id)
+    try:
+        if marker_decision.get('intent') == 'clarification-exhausted':
+            payload = marker_decision.get('payload') or {}
+            question = payload.get('question') or '(no question text recorded)'
+            for_larry_signal.upsert_record(key, {
+                'id': str(task_id),
+                'task_id': task_id,
+                'headline': f'Forge is stuck on `{task_id}`',
+                'context': 'Exhausted its questions — needs a scope decision',
+                'suggested_action': f'Last question: {question}',
+                'repo': data.get('target_repo'),
+                'severity': 'warning',
+                'source_kind': 'clarify-exhausted',
+            })
+        else:
+            for_larry_signal.resolve_record(key)
+    except Exception as e:  # noqa: BLE001 — durable signal is best-effort
+        log(
+            f'for-larry clarify-exhausted signal sync failed for '
+            f'{task_id!r}: {type(e).__name__}: {e}',
+            'WARN',
+        )
 
 
 def _emit_preflight_outcome_chain_event(
@@ -10381,6 +10426,11 @@ def process_outbox(outbox_file: Path) -> str:
         # emit above is narrower — only the in-budget clarify question).
         if marker_decision:
             _emit_preflight_outcome_chain_event(data, marker_decision, agent='forge')
+            # §5.2: feed (or self-clear) the durable for-Larry signal for a
+            # CLARIFY-exhausted build. Rides this same classified-marker path
+            # (write on exhausted; clear on any other marker = re-dispatch
+            # observed) so no second poll is introduced.
+            _sync_clarify_exhausted_signal(data, marker_decision)
             # push-signal-and-substatus (B): a terminal preflight REJECT fails
             # the build-sequence step + pauses the sequence NOW, instead of
             # stranding it `dispatched` until the advancer poll / 4h backstop.

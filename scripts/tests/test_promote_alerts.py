@@ -14,6 +14,7 @@ except ImportError:  # discover loads this module top-level (no package parent)
     import _bootstrap  # noqa: F401
 
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -25,6 +26,7 @@ if str(_REPO_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_REPO_SCRIPTS))
 
 import promote_alerts as pa  # noqa: E402
+import for_larry_signal as fls  # noqa: E402
 
 NOW = datetime(2026, 6, 2, 12, 0, 0, tzinfo=timezone.utc)
 FX = 'zz-fixture-'  # all test identities use the reserved fixture namespace
@@ -289,6 +291,87 @@ class StateIOTest(unittest.TestCase):
 
     def test_load_missing_returns_empty(self):
         self.assertEqual(pa.load_state(Path('/nope/state.json')), {})
+
+
+# -------------------- §5.1 for-Larry durable signal (mirror matrix) --------------------
+
+class ForLarryRecordBuilderTest(unittest.TestCase):
+    """The pure builder: only PROMOTED, still-present candidates yield records."""
+
+    def test_promoted_candidate_yields_record(self):
+        state = {FX + 'a': {'promoted': True, 'promoted_ts': NOW.isoformat()}}
+        out = pa.for_larry_active_records([_cand('a')], state)
+        key = fls.ESCALATION_KEY_PREFIX + FX + 'a'
+        self.assertIn(key, out)
+        self.assertEqual(out[key]['dedup_identity'], FX + 'a')
+        self.assertEqual(out[key]['source_kind'], 'critical-unhandled')
+
+    def test_unpromoted_candidate_yields_nothing(self):
+        state = {FX + 'a': {'promoted': False}}
+        self.assertEqual(pa.for_larry_active_records([_cand('a')], state), {})
+
+    def test_candidate_absent_from_state_yields_nothing(self):
+        self.assertEqual(pa.for_larry_active_records([_cand('a')], {}), {})
+
+
+class ForLarrySignalCycleTest(unittest.TestCase):
+    """run_cycle(persist=True) feeds the canonical signal: crosses-bar→written,
+    self-resolves→cleared, below-bar→none (spec §5.1 mirror focus)."""
+
+    def setUp(self):
+        self.cfg = dict(pa.DEFAULT_CONFIG)
+        self._dir = tempfile.TemporaryDirectory()
+        self.signal = Path(self._dir.name) / 'for-larry-escalations.json'
+        self._prev = os.environ.get('OURLIBERTY_FOR_LARRY_SIGNAL_FILE')
+        os.environ['OURLIBERTY_FOR_LARRY_SIGNAL_FILE'] = str(self.signal)
+
+    def tearDown(self):
+        if self._prev is None:
+            os.environ.pop('OURLIBERTY_FOR_LARRY_SIGNAL_FILE', None)
+        else:
+            os.environ['OURLIBERTY_FOR_LARRY_SIGNAL_FILE'] = self._prev
+        self._dir.cleanup()
+
+    def _keys(self):
+        return {e['key'] for e in fls.active_entries()}
+
+    def _run(self, candidates, state, now):
+        return pa.run_cycle(
+            candidates=candidates, state=state, cfg=self.cfg, now=now,
+            emit_fn=_Emitter(), persist=True,
+        )
+
+    def test_crosses_bar_writes_record(self):
+        state = {FX + 'a': {
+            'first_seen_ts': NOW.isoformat(), 'last_seen_ts': NOW.isoformat(),
+            'severity': 'critical', 'task_id': FX + 'a', 'promoted': False,
+        }}
+        self._run([_cand('a')], state, NOW + timedelta(seconds=601))
+        self.assertEqual(self._keys(), {fls.ESCALATION_KEY_PREFIX + FX + 'a'})
+
+    def test_self_resolves_clears_record(self):
+        # Establish an active promoted record.
+        state = {FX + 'a': {
+            'first_seen_ts': NOW.isoformat(), 'last_seen_ts': NOW.isoformat(),
+            'severity': 'critical', 'task_id': FX + 'a', 'promoted': False,
+        }}
+        self._run([_cand('a')], state, NOW + timedelta(seconds=601))
+        self.assertEqual(self._keys(), {fls.ESCALATION_KEY_PREFIX + FX + 'a'})
+        # Next cycle: candidate gone → self-resolved → record cleared.
+        carried = pa.load_state()
+        self._run([], carried, NOW + timedelta(seconds=1202))
+        self.assertEqual(self._keys(), set())
+        rec = fls.load_records()[fls.ESCALATION_KEY_PREFIX + FX + 'a']
+        self.assertIs(rec['resolved'], True)
+
+    def test_below_bar_writes_nothing(self):
+        self._run([_cand('a', severity='warning')], {}, NOW)
+        self.assertEqual(self._keys(), set())
+
+    def test_held_critical_first_cycle_writes_nothing(self):
+        # Critical but still within self-resolve window → held, not promoted.
+        self._run([_cand('a')], {}, NOW)
+        self.assertEqual(self._keys(), set())
 
 
 if __name__ == '__main__':

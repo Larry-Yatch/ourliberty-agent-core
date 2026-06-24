@@ -13101,5 +13101,64 @@ class ReviewRequestChainEventTest(unittest.TestCase):
             len(list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))), 1)
 
 
+class ClarifyExhaustedSignalTest(unittest.TestCase):
+    """§5.2: a CLARIFY-exhausted Forge build writes a self-clearing for-Larry
+    record; any other classified marker for the same task self-clears it."""
+
+    def setUp(self):
+        import for_larry_signal as fls
+        self.fls = fls
+        self._dir = tempfile.TemporaryDirectory()
+        self.signal = Path(self._dir.name) / 'for-larry-escalations.json'
+        self._prev = os.environ.get('OURLIBERTY_FOR_LARRY_SIGNAL_FILE')
+        os.environ['OURLIBERTY_FOR_LARRY_SIGNAL_FILE'] = str(self.signal)
+
+    def tearDown(self):
+        if self._prev is None:
+            os.environ.pop('OURLIBERTY_FOR_LARRY_SIGNAL_FILE', None)
+        else:
+            os.environ['OURLIBERTY_FOR_LARRY_SIGNAL_FILE'] = self._prev
+        self._dir.cleanup()
+
+    def _keys(self):
+        return {e['key'] for e in self.fls.active_entries()}
+
+    def test_exhausted_writes_record(self):
+        on._sync_clarify_exhausted_signal(
+            {'task_id': 'zz-fixture-t1', 'target_repo': 'agent-core'},
+            {'intent': 'clarification-exhausted',
+             'payload': {'question': 'which API?'}},
+        )
+        key = self.fls.CLARIFY_EXHAUSTED_KEY_PREFIX + 'zz-fixture-t1'
+        self.assertEqual(self._keys(), {key})
+        rec = self.fls.load_records()[key]
+        self.assertIn('which API?', rec['suggested_action'])
+        self.assertEqual(rec['repo'], 'agent-core')
+
+    def test_other_marker_clears_record(self):
+        data = {'task_id': 'zz-fixture-t1', 'target_repo': 'agent-core'}
+        on._sync_clarify_exhausted_signal(
+            data, {'intent': 'clarification-exhausted',
+                   'payload': {'question': 'q?'}})
+        self.assertTrue(self._keys())
+        # A subsequent classified marker (e.g. a fresh proceed) self-clears it.
+        on._sync_clarify_exhausted_signal(data, {'intent': 'proceed'})
+        self.assertEqual(self._keys(), set())
+
+    def test_missing_task_id_is_noop(self):
+        on._sync_clarify_exhausted_signal(
+            {}, {'intent': 'clarification-exhausted'})
+        self.assertFalse(self.signal.exists())
+
+    def test_exhausted_without_question_uses_placeholder(self):
+        on._sync_clarify_exhausted_signal(
+            {'task_id': 'zz-fixture-t2'},
+            {'intent': 'clarification-exhausted'},
+        )
+        key = self.fls.CLARIFY_EXHAUSTED_KEY_PREFIX + 'zz-fixture-t2'
+        rec = self.fls.load_records()[key]
+        self.assertIn('no question text recorded', rec['suggested_action'])
+
+
 if __name__ == '__main__':
     unittest.main()

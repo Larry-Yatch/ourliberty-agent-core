@@ -61,6 +61,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 import larry_alerts  # noqa: E402  — reused for the canonical severity vocabulary
+import for_larry_signal  # noqa: E402  — the canonical durable for-Larry signal (§5.1)
 
 CONFIG_FILE = _SCRIPTS_DIR.parent / 'config' / 'promotion-rules.json'
 
@@ -333,6 +334,41 @@ def _default_emit(candidate: Candidate, reason: str) -> bool:
     )
 
 
+# -------------------- for-Larry signal (§5.1) --------------------
+
+def for_larry_active_records(
+    candidates: list[Candidate], new_state: dict[str, Any],
+) -> dict[str, dict[str, Any]]:
+    """Build the active for-Larry records for THIS cycle's promoted escalations.
+
+    A record is active iff its candidate is still in the snapshot AND its state
+    entry is `promoted` (newly this cycle, or promoted earlier and still
+    present). Keyed under `escalation:<dedup_identity>` so the durable write
+    namespaces cleanly against the CLARIFY-exhausted producer. Candidates that
+    have left the snapshot are absent here → `sync_prefix` resolves them
+    (self-clear, decision d). A below-bar escalation never reaches `promoted`,
+    so it contributes no record (alert-toil bar preserved).
+    """
+    active: dict[str, dict[str, Any]] = {}
+    for cand in candidates:
+        entry = new_state.get(cand.dedup_identity)
+        if not (entry and entry.get('promoted')):
+            continue
+        raw = cand.raw if isinstance(cand.raw, dict) else {}
+        active[for_larry_signal.ESCALATION_KEY_PREFIX + cand.dedup_identity] = {
+            'id': cand.dedup_identity,
+            'dedup_identity': cand.dedup_identity,
+            'task_id': cand.task_id,
+            'headline': cand.headline,
+            'severity': cand.severity,
+            'context': cand.detail or raw.get('context'),
+            'suggested_action': raw.get('suggested_action'),
+            'ts': entry.get('promoted_ts') or cand.ts,
+            'source_kind': 'critical-unhandled',
+        }
+    return active
+
+
 # -------------------- cycle --------------------
 
 def run_cycle(*, candidates: Optional[list[Candidate]] = None,
@@ -409,6 +445,20 @@ def run_cycle(*, candidates: Optional[list[Candidate]] = None,
     # → self-resolved (or already handled) escalations drop out silently.
     if persist:
         write_state(new_state)
+        # §5.1: the same promotion decision that emitted needs_attention also
+        # feeds the durable for-Larry signal. One transaction writes the active
+        # promoted records and resolves any escalation: record whose identity
+        # has left the snapshot — the resolve-clear rides this gate's existing
+        # idempotency (a promoted-still-present key stays active; an absent one
+        # self-clears). Best-effort: a signal-write failure must not crash the
+        # promotion cycle.
+        try:
+            for_larry_signal.sync_prefix(
+                for_larry_active_records(candidates, new_state),
+                for_larry_signal.ESCALATION_KEY_PREFIX,
+            )
+        except Exception as e:  # noqa: BLE001 — durable signal is best-effort
+            log(f'for-larry signal sync failed: {type(e).__name__}: {e}', 'WARN')
 
     return {
         'promoted': promoted,
