@@ -204,9 +204,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-24 08:06Z UTC (Iter ~2593, Tier 1, consecutive_clean=2)
+## Status snapshot — updated 2026-06-24 08:13Z UTC (Iter ~2594, Tier 1→2 de-escalation, consecutive_clean=0)
 
-**Iter ~2593 summary:** ✅ Clean — 0 new alerts. 8/8 daemons alive (same PIDs as ~2592). **Key event:** PR #673 (`push-signal-and-substatus`, hardening sequence step 2) under active Mirror review — Mirror started 08:00Z. HEAD=78e05a76=origin/main. Check I dedup-skip (block for 2026-06-22 present). PRIME: systemic_fixes=61, ratio≈17.87, trend=improving. G-rules at 2/3 (unchanged): revision-phase-preamble-missing, telegram-409-burst, Forge-preflight-CLARIFY_REQUEST, forge-preflight-task-id-mismatch, F24-empty-prompt-envelope-rejected, merge_conflict_manual_rebase-tier4, heal-pipeline-stall-dry-run-writes-real-alerts, heal-daemon-restart-manifest-drift-tier4, Forge-timeout-worktree-missing-retry-loop. 1/3: pulse-self-summary-tier4, sequence-step-review-escalate-null-chat, medic-approval-request-novel-tier4, api-500-burst, beacon-claude-timeout, sync.service-deploy-restart-storm-tier4, seq-advancer-approval-routing-gap, heal-pipeline-stall-mirror-pass-unmerged-tier4, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch.
+**Iter ~2594 summary:** ✅ Clean — 0 new alerts. 8/8 daemons alive (same PIDs as ~2593). **Key event:** Tier promoted 1→2 (3 consecutive clean iters). PR #673 (`push-signal-and-substatus`, hardening sequence step 2) under active Mirror review — Mirror started 08:00Z, ~11 min in at cycle time. HEAD=0baef700=origin/main. Check I dedup-skip (block for 2026-06-22 present). PRIME: systemic_fixes=61, ratio≈17.87, trend=improving. G-rules at 2/3 (unchanged): revision-phase-preamble-missing, telegram-409-burst, Forge-preflight-CLARIFY_REQUEST, forge-preflight-task-id-mismatch, F24-empty-prompt-envelope-rejected, merge_conflict_manual_rebase-tier4, heal-pipeline-stall-dry-run-writes-real-alerts, heal-daemon-restart-manifest-drift-tier4, Forge-timeout-worktree-missing-retry-loop. 1/3: pulse-self-summary-tier4, sequence-step-review-escalate-null-chat, medic-approval-request-novel-tier4, api-500-burst, beacon-claude-timeout, sync.service-deploy-restart-storm-tier4, seq-advancer-approval-routing-gap, heal-pipeline-stall-mirror-pass-unmerged-tier4, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch.
 
 
 
