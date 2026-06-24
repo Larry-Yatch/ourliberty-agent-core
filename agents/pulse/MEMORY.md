@@ -6,9 +6,9 @@
 
 ---
 
-## Check I firing days are Mon/Wed/Fri/Sun — NOT Sunday-only (learned 2026-06-15 iter ~1899)
+## Check I firing days are Mon/Wed/Fri/Sun — call WITHOUT --force on firing days (learned 2026-06-15 iter ~1899, updated iter ~2612)
 
-**Rule:** Check I (and Check VIII/IX/X Monday-specifics) fire on Mon/Wed/Fri/Sun per spec (UTC weekday ∈ {0,2,4,6}). Iters ~1895–1898 on Monday 2026-06-15 incorrectly skipped Check I with "Today is Monday, not Sunday." — reasoning from memory instead of spec. The `pulse_check_i.py` script itself is correct; the bug was Pulse's in-prompt gate. Always invoke `python3 ~/agent-core/scripts/pulse_check_i.py` on Mon/Wed/Fri/Sun without a Sunday-only guard.
+**Rule:** Check I fires on Mon/Wed/Fri/Sun per spec (UTC weekday ∈ {0,2,4,6}). Always invoke `python3 ~/agent-core/scripts/pulse_check_i.py` (no `--force`) on scheduled firing days — the weekday gate passes naturally and the dm_route journal-peek (PR #674) functions correctly, suppressing repeat same-week DMs. Use `--force` ONLY for `/optimize` (ad-hoc, any day). Using `--force` on a firing day bypasses dm_route and emits spurious route=escalate alerts (G-rule check-i-force-bypass-dm-route). Confirmed fixed at manual level iter ~2612; code-level dispatch to Beacon at 3/3.
 
 ---
 
@@ -216,9 +216,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-24 16:46Z UTC (Iter ~2611, Tier 3, consecutive_clean=14)
+## Status snapshot — updated 2026-06-24 17:14Z UTC (Iter ~2612, Tier 3, consecutive_clean=15)
 
-**Iter ~2611 summary:** ✅ Clean — 1 Tier-3 silence (L1004, Check I repeat DM, force-flag bypass of dm_route). 8/8 daemons alive (same PIDs). 0 open PRs. All inboxes empty. HEAD=39c58a14=origin/main. Tier 3, consecutive_clean 13→14. PRIME: systemic_fixes=61, interventions=1090, ratio≈17.87, trend=improving. **New G-rule:** check-i-force-bypass-dm-route 1/3 (dispatch to Beacon at 3/3). G-rules at 2/3: revision-phase-preamble-missing, telegram-409-burst, Forge-preflight-CLARIFY_REQUEST, forge-preflight-task-id-mismatch, F24-empty-prompt-envelope-rejected, merge_conflict_manual_rebase-tier4, heal-pipeline-stall-dry-run-writes-real-alerts, heal-daemon-restart-manifest-drift-tier4, Forge-timeout-worktree-missing-retry-loop. 1/3: check-i-force-bypass-dm-route (new), pulse-self-summary-tier4, sequence-step-review-escalate-null-chat (spec merged PR #675; code fix pending), medic-approval-request-novel-tier4, api-500-burst, beacon-claude-timeout, sync.service-deploy-restart-storm-tier4, seq-advancer-approval-routing-gap, heal-pipeline-stall-mirror-pass-unmerged-tier4, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch.
+**Iter ~2612 summary:** ✅ Clean — 0 new alerts. 8/8 daemons alive (same PIDs). 0 open PRs. All inboxes empty. HEAD=190b758f=origin/main. Tier 3, consecutive_clean 14→15. PRIME: systemic_fixes=61, interventions=1090, ratio≈17.87, trend=improving. **Key this iter:** Check I called without `--force` (manual fix for G-rule check-i-force-bypass-dm-route 1/3) — dm_route journal-peek worked correctly, no spurious escalate DM. G-rules at 2/3: revision-phase-preamble-missing, telegram-409-burst, Forge-preflight-CLARIFY_REQUEST, forge-preflight-task-id-mismatch, F24-empty-prompt-envelope-rejected, merge_conflict_manual_rebase-tier4, heal-pipeline-stall-dry-run-writes-real-alerts, heal-daemon-restart-manifest-drift-tier4, Forge-timeout-worktree-missing-retry-loop. 1/3: check-i-force-bypass-dm-route (bug avoided this iter), pulse-self-summary-tier4, sequence-step-review-escalate-null-chat (spec merged PR #675; code fix pending), medic-approval-request-novel-tier4, api-500-burst, beacon-claude-timeout, sync.service-deploy-restart-storm-tier4, seq-advancer-approval-routing-gap, heal-pipeline-stall-mirror-pass-unmerged-tier4, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch.
 
 
 
