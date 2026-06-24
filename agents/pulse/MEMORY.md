@@ -222,6 +222,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-24 20:14Z UTC (Iter ~2621, Tier 1, consecutive_clean=0)
+
+**Iter ~2621 summary:** ✅ Auto-fix — fast-forward 92f60ca8→41e58f68 (PR #683 merged mid-cycle: feat(mirror) classify+route Contracts B+C+D). [blue] watches RETIRED: Forge contamination + for_larry_escalations.py not-in-main. outbox_notifier restarted (L1024 Tier-3, new PID 1979436). New [blue]: PR #684 (Larry-authored, cred-drift boolean skip fix, MERGEABLE). Pipeline active: build-escalation-feed.json in Forge inbox (operator-needs-you-feed step 1). PRIME: systemic_fixes=61, interventions=1095, ratio≈17.95, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-24 20:09Z UTC (Iter ~2620, Tier 1, consecutive_clean=0)
 
 **Iter ~2620 summary:** ⚠️ Check 0: 2 Tier-4 novel alerts (L1022: still-stale-after-restart:outbox-notifier — self-resolved, Forge contamination cleared; L1023: manifest-drift-regenerated — informational, bot digest). Forge contamination from ~2619 CLEARED: PR #683 opened (feat(mirror) classify+route Contracts B+C+D), main tree clean. New [blue] watch: manifest tracks for_larry_escalations.py but file not in main (only in PR #683 branch — clears on merge). Pipeline active: build-escalation-feed.json in Forge inbox (operator-needs-you-feed step 1), review-classify-and-route.json in Mirror inbox. New G-rule: heal-daemon-restart-manifest-drift-regenerated-tier4 1/3. PRIME: systemic_fixes=61, interventions=1094, ratio≈17.93, trend=improving. Tier 1, consecutive_clean=0.
