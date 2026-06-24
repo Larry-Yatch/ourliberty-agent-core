@@ -10226,19 +10226,19 @@ def process_outbox(outbox_file: Path) -> str:
         # task-17's larry-direct preflight to silently skip build-phase
         # dispatch (Larry had to manually bridge the build envelope).
         #
-        # chain-context-durability S2 (M2): when a Mirror REVIEW_REVISION
-        # carries no forge_build_session_id, `_dispatch_revision_to_forge`
-        # (below) routes an actionable `code-review-revision-no-session`
-        # notify to Beacon for a fresh-task_id re-dispatch instead of
-        # resuming a (non-existent) build session. Suppress THIS generic
-        # back-leg notify in that case: its body says "revision
-        # auto-dispatched to Forge, just journal," which is factually false
-        # (no dispatch happened) and would double up with the no-session
-        # route notify. The route notify is the sole, accurate Beacon signal.
+        # forge-cold-start-revision S2: when a Mirror REVIEW_REVISION carries
+        # no forge_build_session_id, `_dispatch_revision_to_forge` (below)
+        # mechanically dispatches a FRESH Forge revision (no `--resume`) with a
+        # full cold-start brief — there is no session to resume, and Beacon is
+        # intentionally kept OUT of the cold-start loop (the old LLM-mediated
+        # Beacon route was removed). Suppress THIS generic back-leg notify in
+        # that case: its body says "revision auto-dispatched to Forge, just
+        # journal," which would now double-signal the mechanical dispatch the
+        # cold-start path already performs.
         # Only the genuine revision-dispatch path is suppressed — an
         # auto_promoted / budget_exhausted REVISION downgrades to
         # review-escalate (intent override above) and keeps its back-leg
-        # notify, since no no-session route fires for it.
+        # notify, since no cold-start dispatch fires for it.
         suppress_no_session_backleg = (
             marker_decision['marker_type'] == 'review_revision'
             and agent == 'mirror'

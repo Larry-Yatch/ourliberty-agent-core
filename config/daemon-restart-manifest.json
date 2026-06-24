@@ -186,6 +186,7 @@
         "scripts/mirror_review_handler.py",
         "scripts/missions_doorbell.py",
         "scripts/missions_narrator.py",
+        "scripts/no_session_ledger.py",
         "scripts/outbox_notifier.py",
         "scripts/projects_brainstorm_author.py",
         "scripts/projects_closeout_author.py",
