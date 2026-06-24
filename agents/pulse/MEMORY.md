@@ -222,6 +222,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-24 20:49Z UTC (Iter ~2626, Tier 1, consecutive_clean=0)
+
+**Iter ~2626 summary:** ⚠️ Watch — PR #685 (forge/escalation-feed) CONFIRMED CONFLICTING; Mirror review active. forge-post-open-mergeable-rebase-001.json now in Forge preflight (Larry approved 14:42Z) — G-rule merge_conflict_manual_rebase-tier4 permanent fix actively building. Beacon inbox now empty (picked up merge-conflict-rebase-001, generated spec, dispatched). 1 new Tier-3 alert (L1025: approval_request delivery confirmation). All other checks nominal. PRIME: systemic_fixes=61, interventions=1098, ratio≈18.0, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-24 20:43Z UTC (Iter ~2625, Tier 1, consecutive_clean=0)
 
 **Iter ~2625 summary:** ⚠️ Watch — PR #685 (forge/escalation-feed) CONFIRMED CONFLICTING; Mirror review active (review-escalation-feed.json in Mirror inbox); merge-conflict-rebase-001.json in Beacon inbox (G-rule 3/3 dispatch from ~2624, awaiting pick-up). outbox_notifier restarted (PID 1979436→2029112, heal-stale-daemon-code SIGTERM 20:37Z, clean). All other checks nominal. PRIME: systemic_fixes=61, interventions=1097, ratio≈17.98, trend=improving. Tier 1, consecutive_clean=0.
@@ -245,10 +249,6 @@
 ## Status snapshot — updated 2026-06-24 20:09Z UTC (Iter ~2620, Tier 1, consecutive_clean=0)
 
 **Iter ~2620 summary:** ⚠️ Check 0: 2 Tier-4 novel alerts (L1022: still-stale-after-restart:outbox-notifier — self-resolved, Forge contamination cleared; L1023: manifest-drift-regenerated — informational, bot digest). Forge contamination from ~2619 CLEARED: PR #683 opened (feat(mirror) classify+route Contracts B+C+D), main tree clean. New [blue] watch: manifest tracks for_larry_escalations.py but file not in main (only in PR #683 branch — clears on merge). Pipeline active: build-escalation-feed.json in Forge inbox (operator-needs-you-feed step 1), review-classify-and-route.json in Mirror inbox. New G-rule: heal-daemon-restart-manifest-drift-regenerated-tier4 1/3. PRIME: systemic_fixes=61, interventions=1094, ratio≈17.93, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-24 20:00Z UTC (Iter ~2619, Tier 1, consecutive_clean=0)
-
-**Iter ~2619 summary:** ⚠️ Check A non-empty — Forge active build (PID 1965241, classify-and-route) wrote `scripts/outbox_notifier.py` (modified) + `scripts/for_larry_escalations.py` (untracked) to MAIN working tree; Forge worktree `wt-forge-classify-and-route` is clean. Cross-contamination between worktree and main tree. [blue] watch — if PR opens next cycle, self-clears. 3 Tier-3 alerts (L1017-L1019: review-pass PR#681, mirror-dag-pass:operator-needs-you-feed, sequence-complete:phase4b2). Phase 4b.2 COMPLETE (dashboard PR #91 + agent-core PR #677 merged). operator-needs-you-feed escalation-feed step 1 queued as Forge preflight. PRIME: systemic_fixes=61, interventions=1093, ratio≈17.93, trend=improving. Tier 1, consecutive_clean=0.
 
 
 
