@@ -5128,7 +5128,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-24T23:53:19.814333+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-24T23:45:34.157225+00:00"
+      "orphan_last_activity_ts": "2026-06-24T23:45:34.157225+00:00",
+      "briefing": {
+        "what": "A safety check that's meant to warn you when our systems quietly drift out of shape has been swallowing every warning for about six weeks because the part that actually sends you the alert was never finished.",
+        "why": "It means a whole channel that's supposed to flag real problems has been silent, so if something had gone wrong you wouldn't have heard about it.",
+        "suggest": "Turn the alerts on, but keep them tightly filtered to only what truly needs your attention so you get the real warnings without the noise."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-24T23:58:11.814610+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
