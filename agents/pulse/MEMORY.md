@@ -222,9 +222,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-24 21:37Z UTC (Iter ~2632, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-24 21:42Z UTC (Iter ~2633, Tier 1, consecutive_clean=0)
 
-**Iter ~2632 summary:** ⚠️ Watch — PR #685 still CONFLICTING (Mirror REVIEW_PASS rev1 confirmed); forge-post-open-mergeable-rebase-001 and reconcile-hardening-mission-shipped-002 in BUILD; forge-wip-only-auto-redispatch-001 in Forge preflight. 0 new alerts (watermark stayed at 1035). Mirror inbox now empty (review-escalation-feed.json dedup'd by inbox_watcher). All daemons alive. Check I: mode=digest, cooldown-suppressed. PRIME: interventions≈1104, systemic_fixes=63, ratio≈17.5, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2633 summary:** ⚠️ Watch — PR #685 still CONFLICTING (forge-post-open-mergeable-rebase-001 in BUILD); reconcile-hardening-mission-shipped-002 in BUILD; forge-wip-only-auto-redispatch-001, heal-stall-dryrun-noop-001, one-time-stale-dispatch-branch-cleanup-001 in Forge preflight. 0 new alerts (watermark 1035). All 8 daemons alive. Check I: mode=digest, cooldown-suppressed. HEAD=99a76219. PRIME: interventions≈1105, systemic_fixes=63, ratio≈17.5, trend=improving. Tier 1, consecutive_clean=0.
 
 ## Status snapshot — updated 2026-06-24 21:33Z UTC (Iter ~2631, Tier 1, consecutive_clean=0)
 
