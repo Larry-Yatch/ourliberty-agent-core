@@ -43,6 +43,7 @@ import time
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 _SCRIPTS_DIR = Path(__file__).resolve().parent.parent
@@ -589,10 +590,11 @@ class TestSequenceCompletion(_AdvancerHarness):
 
 
 class TestFailureFromMirror(_AdvancerHarness):
-    """Per spec § 5.4 failure mode 1: Mirror REVISION-exhausted /
-    EMERGENCY_HALT / forge_reject in chain_events → pause + DM."""
+    """Per spec § 5.4 failure mode 1: a terminal `review_escalate` (covers
+    Mirror ESCALATE / EMERGENCY_HALT / revision-budget exhaustion) or
+    `preflight_reject` in chain_events → pause + DM."""
 
-    def test_mirror_emergency_halt_pauses(self):
+    def test_review_escalate_pauses(self):
         seq = _make_sequence(
             steps=[
                 _make_step(
@@ -604,15 +606,140 @@ class TestFailureFromMirror(_AdvancerHarness):
             current_steps=['alpha'],
         )
         self._write_sequence(seq)
-        self._patch_gates(failure='mirror_emergency_halt: credentials in diff')
+        self._patch_gates(
+            failure='review_escalate: Mirror escalated the PR to Beacon')
         self.bsa.tick()
         seq2 = self._read_sequence('seq-001')
         self.assertEqual(seq2['status'], 'paused')
         alpha = next(s for s in seq2['steps'] if s['step_id'] == 'alpha')
         self.assertEqual(alpha['status'], 'failed')
-        self.assertIn('emergency_halt', (alpha['failure_reason'] or '').lower())
+        self.assertIn('escalate', (alpha['failure_reason'] or '').lower())
         paused_dms = [d for d in self.dms if 'paused' in d['subject']]
         self.assertEqual(len(paused_dms), 1)
+
+
+class _FakeChainEvents:
+    """Minimal stand-in for the Supabase client `chain_event_says_failed`
+    queries. Supports the exact chain it builds —
+    `.table().select().eq('task_id', ...).in_('event_type', [...]).limit().execute()`
+    — and honors the two filters against an injected row list. `execute()`
+    returns `SimpleNamespace(data=<filtered rows>)`, matching the real
+    postgrest response shape the detector reads via `getattr(res, 'data', ...)`."""
+
+    def __init__(self, rows):
+        self._rows = rows
+        self._task_id = None
+        self._types = None
+
+    def table(self, _name):
+        return self
+
+    def select(self, *_a, **_kw):
+        return self
+
+    def eq(self, col, val):
+        if col == 'task_id':
+            self._task_id = val
+        return self
+
+    def in_(self, col, vals):
+        if col == 'event_type':
+            self._types = list(vals)
+        return self
+
+    def limit(self, _n):
+        return self
+
+    def execute(self):
+        rows = [
+            r for r in self._rows
+            if (self._task_id is None or r.get('task_id') == self._task_id)
+            and (self._types is None or r.get('event_type') in self._types)
+        ]
+        return SimpleNamespace(data=rows)
+
+
+class TestChainEventSaysFailed(_AdvancerHarness):
+    """Unit tests for the realigned terminal-failure detector (spec § 2A / § 6).
+
+    The prior detector keyed on event types the shipper NEVER emits
+    (`mirror_revision_exhausted` / `mirror_emergency_halt` / `forge_reject`) and
+    read a `reason` payload key that doesn't exist — so every non-merge terminal
+    fell through to the 4h stall backstop. These pin it to the REAL emitted
+    types + payload shapes, enforce the `KNOWN_EVENT_TYPES` subset invariant so
+    it can't silently drift again, and assert `review_revision` is NOT failed."""
+
+    def test_terminal_types_are_subset_of_known_event_types(self):
+        # Enforcement (spec § 8): the queried set MUST be a subset of the types
+        # the shipper actually produces, or the detector matches nothing.
+        import chain_event_shipper
+        queried = set(self.bsa.TERMINAL_FAILURE_EVENT_TYPES)
+        known = set(chain_event_shipper.KNOWN_EVENT_TYPES)
+        self.assertTrue(
+            queried <= known,
+            f'{queried - known} not in KNOWN_EVENT_TYPES — the shipper never '
+            f'emits these, so the detector would silently never match (the '
+            f'exact drift this test exists to catch).',
+        )
+
+    def test_preflight_reject_returns_reason_from_marker_type(self):
+        client = _FakeChainEvents([
+            {'event_type': 'preflight_reject', 'task_id': 'seq-x-step-a',
+             'ts': '2026-06-24T00:00:00+00:00',
+             'payload': {'agent': 'forge', 'task_id': 'seq-x-step-a',
+                         'marker_type': 'reject', 'intent': 'reject'}},
+        ])
+        reason = self.bsa.chain_event_says_failed(client, 'seq-x-step-a')
+        self.assertIsNotNone(reason)
+        self.assertIn('preflight_reject', reason)
+        self.assertIn('marker_type=reject', reason)
+        # The payload carries NO `reason` key; the detector must not surface a
+        # placeholder for a key it never reads.
+        self.assertNotIn('None', reason)
+
+    def test_preflight_reject_clarification_exhausted(self):
+        client = _FakeChainEvents([
+            {'event_type': 'preflight_reject', 'task_id': 'seq-x-step-a',
+             'ts': '2026-06-24T00:00:00+00:00',
+             'payload': {'marker_type': 'clarify',
+                         'intent': 'clarification-exhausted'}},
+        ])
+        reason = self.bsa.chain_event_says_failed(client, 'seq-x-step-a')
+        self.assertIn('clarification budget', reason.lower())
+
+    def test_review_escalate_budget_exhausted(self):
+        client = _FakeChainEvents([
+            {'event_type': 'review_escalate', 'task_id': 'seq-x-step-a',
+             'ts': '2026-06-24T00:00:00+00:00',
+             'payload': {'verdict': 'escalate', 'budget_exhausted': True}},
+        ])
+        reason = self.bsa.chain_event_says_failed(client, 'seq-x-step-a')
+        self.assertIn('review_escalate', reason)
+        self.assertIn('budget', reason.lower())
+
+    def test_review_revision_is_not_a_failure(self):
+        # review_revision keeps the step in-flight (Forge fixes + Mirror
+        # re-reviews); it is deliberately absent from the queried set, so the
+        # `.in_` filter excludes it → None (no false-fail). This is the
+        # Mirror-review focus: a revision must never pause a sequence.
+        client = _FakeChainEvents([
+            {'event_type': 'review_revision', 'task_id': 'seq-x-step-a',
+             'ts': '2026-06-24T00:00:00+00:00',
+             'payload': {'verdict': 'revision'}},
+        ])
+        self.assertIsNone(
+            self.bsa.chain_event_says_failed(client, 'seq-x-step-a'))
+
+    def test_no_terminal_event_returns_none(self):
+        self.assertIsNone(
+            self.bsa.chain_event_says_failed(_FakeChainEvents([]), 'seq-x-step-a'))
+
+    def test_none_client_returns_none(self):
+        self.assertIsNone(self.bsa.chain_event_says_failed(None, 'seq-x-step-a'))
+
+    def test_empty_task_id_returns_none(self):
+        self.assertIsNone(
+            self.bsa.chain_event_says_failed(_FakeChainEvents([]), ''))
 
 
 class TestAtomicWritePartialRecovery(_AdvancerHarness):
@@ -1389,6 +1516,32 @@ class TestStrandedDispatchEscalation(_AdvancerHarness):
         self.assertIn('stall', step['failure_reason'].lower())
         self.assertEqual(seq['status'], 'paused')
         self.assertTrue(any(d['severity'] == 'warning' for d in self.dms))
+
+    def test_stall_reads_terminal_reject_attribution(self):
+        # Spec § 2D / § 6: a stale `dispatched` step with no PR but a RECORDED
+        # terminal reject in chain_events. The stall backstop must consult the
+        # terminal result FIRST and write the correct attribution (a genuine
+        # reject that never propagated into sequence state) rather than the
+        # misleading "Forge may never have picked it up" stall guess.
+        self.bsa.chain_event_says_failed = (
+            lambda *_a, **_kw: 'preflight_reject: Forge rejected the spec at '
+            'preflight (marker_type=reject)')
+        self._write_sequence(self._dispatched(
+            repo='ourliberty-agent-core', dispatched_at=self._stale_iso()))
+        self.bsa.tick()
+        seq = self._read_sequence('seq-001')
+        step = seq['steps'][0]
+        self.assertEqual(step['status'], 'failed')
+        self.assertEqual(seq['status'], 'paused')
+        reason = step['failure_reason'] or ''
+        self.assertIn('terminal outcome', reason)
+        self.assertIn('preflight_reject', reason)
+        # The misleading stall guess must NOT be the attribution...
+        self.assertNotIn('never picked it up', reason)
+        # ...and the reason must NOT carry the stall-backstop signature, so the
+        # reconcile auto-resume guard treats this as a genuine failure (not a
+        # resumable strand).
+        self.assertNotIn('stall backstop', reason)
 
     def test_stall_suppressed_when_flag_off(self):
         # Valid repo + forward-dispatch OFF → a waiting step is expected, not

@@ -358,25 +358,67 @@ def chain_event_says_merged(
     return False
 
 
-def chain_event_says_failed(client: Any, task_id: str) -> Optional[str]:
-    """If chain_events shows a terminal-failure event for this step's PR,
-    return the failure reason; otherwise None.
+# Terminal-failure chain_event types the advancer keys on. MUST be a subset of
+# chain_event_shipper.KNOWN_EVENT_TYPES — a regression test pins this so the
+# detector can never again drift onto names the shipper does not emit (the prior
+# set `mirror_revision_exhausted`/`mirror_emergency_halt`/`forge_reject` were
+# hypothetical orchestrator-spec names that no writer ever produced):
+#   - preflight_reject: Forge rejected the spec at preflight (or a budget-
+#     exhausted clarify routed as reject). Real payload keys: marker_type, intent
+#     (NO `reason`).
+#   - review_escalate: Mirror handed the PR back to Beacon — the shipper folds
+#     ESCALATE, EMERGENCY_HALT, and revision-budget exhaustion into this one
+#     type. Real payload keys: verdict, marker_type, auto_promoted,
+#     budget_exhausted (NO `reason`).
+# review_revision is deliberately ABSENT: a revision keeps the step in-flight
+# (Forge fixes + Mirror re-reviews), it is NOT a terminal failure.
+TERMINAL_FAILURE_EVENT_TYPES: tuple[str, ...] = (
+    'preflight_reject', 'review_escalate',
+)
 
-    Recognized failure event types per spec § 5.4 failure mode 1:
-    `mirror_revision_exhausted`, `mirror_emergency_halt`, `forge_reject`.
-    Returns the first match found. None on connect failure (failure-mode
-    detection is best-effort; missing it just delays the pause-DM by one
-    tick)."""
+
+def _failure_reason_from_event(event_type: str, payload: dict[str, Any]) -> str:
+    """Human-readable failure reason derived from the REAL payload shape the
+    shipper emits for each terminal type (neither carries a `reason` key)."""
+    if not isinstance(payload, dict):
+        payload = {}
+    if event_type == 'preflight_reject':
+        marker = payload.get('marker_type') or 'reject'
+        if payload.get('intent') == 'clarification-exhausted':
+            detail = 'Forge ran out of clarification budget at preflight'
+        else:
+            detail = 'Forge rejected the spec at preflight'
+        return f'preflight_reject: {detail} (marker_type={marker})'
+    if event_type == 'review_escalate':
+        if payload.get('budget_exhausted'):
+            cause = 'Mirror revision budget exhausted'
+        elif payload.get('auto_promoted'):
+            cause = 'Mirror low-confidence revision auto-promoted to escalate'
+        elif payload.get('marker_type') == 'review_emergency_halt':
+            cause = 'Mirror emergency halt'
+        else:
+            cause = 'Mirror escalated the PR to Beacon'
+        return f'review_escalate: {cause}'
+    return f'{event_type}: terminal failure'
+
+
+def chain_event_says_failed(client: Any, task_id: str) -> Optional[str]:
+    """If chain_events shows a terminal-failure event for this step, return the
+    failure reason; otherwise None.
+
+    Keys on the types the shipper ACTUALLY emits (TERMINAL_FAILURE_EVENT_TYPES:
+    `preflight_reject`, `review_escalate`) and derives the reason from their real
+    payload keys (marker_type/intent; verdict/marker_type/auto_promoted/
+    budget_exhausted) — neither payload carries a `reason`. Returns the first
+    match found. None on connect failure (failure-mode detection is best-effort;
+    missing it just delays the pause-DM by one tick)."""
     if client is None or not task_id:
         return None
-    failure_types = (
-        'mirror_revision_exhausted', 'mirror_emergency_halt', 'forge_reject',
-    )
     try:
         res = client.table('chain_events').select(
             'event_type,payload,ts'
         ).eq('task_id', task_id).in_(
-            'event_type', list(failure_types)
+            'event_type', list(TERMINAL_FAILURE_EVENT_TYPES)
         ).limit(10).execute()
     except Exception:
         return None
@@ -384,7 +426,9 @@ def chain_event_says_failed(client: Any, task_id: str) -> Optional[str]:
     if not rows:
         return None
     row = rows[0]
-    return f'{row.get("event_type")}: {(row.get("payload") or {}).get("reason", "no reason given")}'
+    return _failure_reason_from_event(
+        row.get('event_type') or '', row.get('payload') or {},
+    )
 
 
 def gh_pr_says_merged(pr_url: str) -> Optional[bool]:
@@ -1149,7 +1193,7 @@ def _dispatched_age_sec(dispatched_at: Any, now: datetime) -> Optional[float]:
 def _escalate_stranded_dispatched_steps(
     sequence: dict[str, Any], path: Path, now: datetime,
     logger: logging.Logger, valid_repos: frozenset[str],
-    stall_enabled: bool = True,
+    stall_enabled: bool = True, supabase_client: Any = None,
 ) -> bool:
     """Backstop for a `dispatched` step that can NEVER reach a terminal gate —
     the silent-wedge class the V6 reconcile pass cannot catch (it only RETIRES
@@ -1255,13 +1299,36 @@ def _escalate_stranded_dispatched_steps(
                         f'pr_url, NOT stranding (in review).'
                     )
                     continue
-                reason = (
-                    f'dispatched ~{int(age // 3600)}h ago with no PR and no gate '
-                    f'progress (exceeds the {DISPATCH_STALL_TIMEOUT_SEC // 3600}h '
-                    f'stall backstop). Forge may never have picked it up. If this '
-                    f'is a legitimately long build, `resume sequence {seq_id}`; '
-                    f'otherwise investigate the dispatch.'
+                # Before blaming "Forge never picked it up": a non-merge
+                # terminal outcome (preflight_reject / review_escalate) often
+                # DID occur but never propagated into sequence state — only the
+                # merge path is push-wired, so every other terminal signal falls
+                # through to this time-based backstop. Consult the durable
+                # chain_events signal first and, when a terminal failure is
+                # recorded, write the CORRECT attribution (rejected / escalated)
+                # rather than the misleading stall guess.
+                chain_task_id = f'seq-{seq_id}-step-{step_id}'
+                terminal = chain_event_says_failed(
+                    supabase_client, chain_task_id,
                 )
+                if terminal is not None:
+                    reason = (
+                        f'a terminal outcome was recorded in chain_events but '
+                        f'never propagated into sequence state — {terminal}. The '
+                        f'step sat `dispatched` past the '
+                        f'{DISPATCH_STALL_TIMEOUT_SEC // 3600}h backstop because '
+                        f'the non-merge terminal signal path is not wired; this '
+                        f'is a genuine failure, not a missed dispatch.'
+                    )
+                else:
+                    reason = (
+                        f'dispatched ~{int(age // 3600)}h ago with no PR and no '
+                        f'gate progress (exceeds the '
+                        f'{DISPATCH_STALL_TIMEOUT_SEC // 3600}h stall backstop). '
+                        f'Forge may never have picked it up. If this is a '
+                        f'legitimately long build, `resume sequence {seq_id}`; '
+                        f'otherwise investigate the dispatch.'
+                    )
         if reason is None:
             continue
         # Escalate this step + pause the sequence (mirrors the failed/pause
@@ -2043,6 +2110,7 @@ def tick(now: Optional[datetime] = None) -> int:
                 if _escalate_stranded_dispatched_steps(
                     seq, path, now, logger, valid_repos,
                     stall_enabled=advancer_on,
+                    supabase_client=supabase_client,
                 ):
                     escalated_total += 1
                     # The pass mutates `seq` in place (status → paused) AND
