@@ -4948,6 +4948,23 @@
         "at": "2026-06-24T04:30:16.047044+00:00",
         "from_state": "proposed"
       }
+    },
+    {
+      "id": "proposed-soft-gate-block-upgrade-decision",
+      "name": "Soft Gate Block Upgrade Decision",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `soft-gate-block-upgrade-decision`. Last activity 2026-06-23T20:00:15.932852+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "soft-gate-block-upgrade-decision"
+      ],
+      "repo": null,
+      "created": "2026-06-24",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-24T09:31:10.182046+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-23T20:00:15.932852+00:00"
     }
   ]
 }
