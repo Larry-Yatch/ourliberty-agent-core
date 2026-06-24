@@ -193,6 +193,7 @@
         "scripts/event_briefing.py",
         "scripts/file_lock.py",
         "scripts/fixture_patterns.py",
+        "scripts/for_larry_escalations.py",
         "scripts/forge_preflight_handler.py",
         "scripts/heal_missions_card_gc.py",
         "scripts/heal_orphan_autoregister.py",
