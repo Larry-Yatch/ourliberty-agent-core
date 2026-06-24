@@ -4964,7 +4964,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-24T09:31:10.182046+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-23T20:00:15.932852+00:00"
+      "orphan_last_activity_ts": "2026-06-23T20:00:15.932852+00:00",
+      "briefing": {
+        "what": "The team has begun work on whether to upgrade how a safety checkpoint blocks things before they go through.",
+        "why": "How tightly that checkpoint holds things back affects how much gets through versus how much gets caught, so the call shapes both speed and safety.",
+        "suggest": "Take a quick look and give it your steer before the team goes further, since it's not yet attached to a clear goal."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-24T09:35:07.192091+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
