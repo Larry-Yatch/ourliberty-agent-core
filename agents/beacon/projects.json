@@ -866,7 +866,7 @@
       "title": "Orchestrator terminal-signal hardening",
       "north_star_ref": null,
       "repo": null,
-      "state": "active",
+      "state": "archived",
       "phases": [
         {
           "id": "orchestrator-terminal-signal-hardening",
@@ -882,10 +882,37 @@
       ],
       "one_off": true,
       "created_at": "2026-06-24T15:50:59.823686+00:00",
-      "updated_at": "2026-06-24T15:50:59.823686+00:00",
+      "updated_at": "2026-06-24T19:40:56.309242+00:00",
       "promoted_from": {
         "kind": "mission",
         "mission_id": "orchestrator-terminal-signal-hardening"
+      }
+    },
+    {
+      "id": "operator-needs-you-feed",
+      "title": "Operator Needs-You Feed",
+      "north_star_ref": null,
+      "repo": "ourliberty-agent-core",
+      "state": "active",
+      "phases": [
+        {
+          "id": "operator-needs-you-feed",
+          "title": "Operator Needs-You Feed",
+          "desired_end_state": "Complete the /where-we-are Waiting-on-You board + doorbell: feed the two missing needs-you classes (critical alerts the healers couldn't auto-fix; CLARIFY-exhausted builds) through the existing promote_alerts gate as durable, self-clearing for-Larry records; itemize paused / stuck-dispatched build sequences; and add live Resume/Skip/Cancel steering buttons via a new audited POST endpoint. Supersedes the archived e4-4g operator-action-queue.",
+          "lifecycle_state": "building",
+          "order": 0,
+          "spec_ref": "agents/beacon/specs/operator-needs-you-feed.md",
+          "sequence_ref": "operator-needs-you-feed",
+          "created_at": "2026-06-24T19:45:09.944739+00:00",
+          "updated_at": "2026-06-24T19:45:09.944739+00:00"
+        }
+      ],
+      "one_off": true,
+      "created_at": "2026-06-24T19:45:09.944739+00:00",
+      "updated_at": "2026-06-24T19:45:09.944739+00:00",
+      "promoted_from": {
+        "kind": "mission",
+        "mission_id": "operator-needs-you-feed"
       }
     }
   ]
