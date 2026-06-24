@@ -732,6 +732,94 @@ class DmSuppressionTests(unittest.TestCase):
         self.assertEqual(audit["mode"], "digest")
 
 
+class DmRouteTests(unittest.TestCase):
+    """G-rule check-i-repeat-dm: the first scheduled run of a week DMs
+    (route='escalate'); later same-week scheduled runs are silenced to
+    route='digest' (no repeat DM). --force always escalates.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.sidecar_dir = self.root / "ledger"
+        self.outbox_root = self.root / "outboxes"
+        self.output_dir = self.root / "out"
+        self.journal = self.root / "cycle-journal.md"
+        self.halt_flag = self.root / "halt-not-set"
+        self.sidecar_dir.mkdir(parents=True)
+
+        self.append_calls: list[dict] = []
+        outer = self
+
+        class _FakeLarryAlerts:
+            @staticmethod
+            def append_alert(**kwargs):
+                outer.append_calls.append(kwargs)
+                return True
+
+        self._sys_modules_patch = mock.patch.dict(
+            sys.modules, {"larry_alerts": _FakeLarryAlerts}
+        )
+        self._sys_modules_patch.start()
+        self.addCleanup(self._sys_modules_patch.stop)
+
+        # Signal-bearing sidecar → digest mode → DM fires (not suppressed).
+        (self.sidecar_dir / f"weekly-{WEEK_ENDING}.json").write_text(
+            json.dumps(_sidecar(retry_pct=22.0, retry_usd=3.0))
+        )
+
+    def _scheduled_argv(self, *extra: str) -> list[str]:
+        # No --force → exercises the journal-peek routing branch.
+        return [
+            "--week-ending", WEEK_ENDING,
+            "--sidecar-dir", str(self.sidecar_dir),
+            "--outbox-root", str(self.outbox_root),
+            "--output-dir", str(self.output_dir),
+            "--journal", str(self.journal),
+            "--halt-flag", str(self.halt_flag),
+            *extra,
+        ]
+
+    def test_first_scheduled_run_escalates_and_journals(self):
+        # Case (a): week not yet in the journal → escalate, block written.
+        rc = pci.main(self._scheduled_argv())
+        self.assertEqual(rc, 0)
+        self.assertEqual(len(self.append_calls), 1)
+        self.assertEqual(self.append_calls[0].get("route"), "escalate")
+        self.assertTrue(self.journal.exists())
+        self.assertIn(f"**Check I ({WEEK_ENDING}):**",
+                      self.journal.read_text())
+
+    def test_second_same_week_scheduled_run_routes_digest(self):
+        # Case (b): the second scheduled firing of the same week sees the
+        # header already journaled → digest (no repeat DM).
+        self.assertEqual(pci.main(self._scheduled_argv()), 0)
+        self.assertEqual(pci.main(self._scheduled_argv()), 0)
+        self.assertEqual(len(self.append_calls), 2)
+        self.assertEqual(self.append_calls[0].get("route"), "escalate")
+        self.assertEqual(self.append_calls[1].get("route"), "digest")
+
+    def test_force_always_escalates_even_when_week_journaled(self):
+        # Case (c): journal the week first, then a --force run must still
+        # escalate — /optimize callers expect a reply regardless.
+        self.assertEqual(pci.main(self._scheduled_argv()), 0)
+        self.assertEqual(self.append_calls[0].get("route"), "escalate")
+        self.assertIn(f"**Check I ({WEEK_ENDING}):**",
+                      self.journal.read_text())
+        self.assertEqual(pci.main(self._scheduled_argv("--force")), 0)
+        self.assertEqual(len(self.append_calls), 2)
+        self.assertEqual(self.append_calls[1].get("route"), "escalate")
+
+    def test_no_journal_run_escalates(self):
+        # Case (d): --no-journal means the journal isn't the source of
+        # truth → preserve current behavior (escalate).
+        rc = pci.main(self._scheduled_argv("--no-journal"))
+        self.assertEqual(rc, 0)
+        self.assertEqual(len(self.append_calls), 1)
+        self.assertEqual(self.append_calls[0].get("route"), "escalate")
+
+
 class WeekdayGateTests(unittest.TestCase):
     """Fire on Mon/Wed/Fri/Sun, skip on Tue/Thu/Sat unless --force."""
 
