@@ -5174,6 +5174,137 @@ class RevisionLoopTest(unittest.TestCase):
         self.assertEqual(notifications[0]['intent'], 'review-escalate')
         self.assertIn('budget', notifications[0]['message'].lower())
 
+    # ----- mirror-review-visibility (Contracts B+C+D) end-to-end -----
+
+    def _sandbox_no_session_surfaces(self):
+        """Route the for-Larry feed + approval store to this test root so the
+        no-session router's artifacts are observable and never touch prod.
+        Restored via addCleanup. emit_event is already kill-switched module-wide
+        (OURLIBERTY_DISABLE_LIVE_EMIT=1)."""
+        feed = self._root / 'blackboard' / 'for-larry-escalations.json'
+        env_orig = os.environ.get('OURLIBERTY_FOR_LARRY_FEED_FILE')
+        os.environ['OURLIBERTY_FOR_LARRY_FEED_FILE'] = str(feed)
+
+        def _restore_env():
+            if env_orig is None:
+                os.environ.pop('OURLIBERTY_FOR_LARRY_FEED_FILE', None)
+            else:
+                os.environ['OURLIBERTY_FOR_LARRY_FEED_FILE'] = env_orig
+        self.addCleanup(_restore_env)
+
+        ah_orig = on.approval.PENDING_APPROVALS_PATH
+        on.approval.PENDING_APPROVALS_PATH = (
+            self._root / 'state' / 'beacon-pending-approvals.json'
+        )
+        self.addCleanup(
+            setattr, on.approval, 'PENDING_APPROVALS_PATH', ah_orig,
+        )
+
+    def _offchain_doc_revision_outbox(self, **overrides):
+        """The #653 shape: a doc PR authored off-chain that Mirror wants
+        revised — NO forge_build_session_id (no live build), NO target_repo
+        (no chain envelope to re-dispatch). The auto-fix loop can't proceed →
+        action-needed."""
+        marker = _mirror_revision_marker(
+            task_id='offchain-doc', severity='medium', confidence='high',
+        )
+        body = _good_outbox(
+            agent='mirror', source='beacon', task_id='offchain-doc',
+            phase='review',
+            result=f'Doc PR needs a fix.\n\n{marker}',
+        )
+        body['pr_url'] = 'https://github.com/x/y/pull/653'
+        body['head_sha'] = 'deadbeefcafe'
+        body.pop('target_repo', None)
+        body.pop('forge_build_session_id', None)
+        body.update(overrides)
+        return body
+
+    def test_offchain_revision_writes_for_larry_record_no_alert(self):
+        # The real gate (spec §10): replay #653. An off-chain doc PR Mirror
+        # wants revised, with no session + no target_repo, can't self-heal →
+        # a durable for-Larry record lands on the Waiting-on-You feed, and NO
+        # standalone larry_alert (Contract C: action bucket never alerts).
+        self._sandbox_no_session_surfaces()
+        body = self._offchain_doc_revision_outbox()
+        f = self._write_outbox('mirror', 'offchain-doc.json', body)
+        on.process_outbox(f)
+
+        records = on.for_larry_escalations.list_open()
+        self.assertEqual(len(records), 1)
+        rec = records[0]
+        self.assertEqual(rec['id'], 'mirror-review:offchain-doc')
+        self.assertEqual(rec['source'], 'mirror-review')
+        self.assertTrue(rec['for_larry'])
+        self.assertFalse(rec['resolved'])
+        self.assertEqual(
+            rec['dedup_identity'],
+            'https://github.com/x/y/pull/653@deadbeefcafe',
+        )
+        # Contract C: action bucket emits NO standalone larry_alert.
+        notifications = [
+            r for _, r in self._la.read_pending(0)
+            if r.get('kind') == 'notification'
+        ]
+        self.assertEqual(notifications, [])
+        # No approval (that's the decision bucket, not this one).
+        self.assertFalse(on.approval.PENDING_APPROVALS_PATH.exists())
+
+    def test_offchain_revision_idempotent_same_head(self):
+        # Contract D: re-processing the same PR+head SHA writes exactly one
+        # record (one artifact per escalation).
+        self._sandbox_no_session_surfaces()
+        for i in range(2):
+            body = self._offchain_doc_revision_outbox()
+            f = self._write_outbox('mirror', f'offchain-doc-{i}.json', body)
+            on.process_outbox(f)
+        self.assertEqual(len(on.for_larry_escalations.list_open()), 1)
+
+    def test_offchain_record_clears_on_terminal_pass(self):
+        # Decision d (self-clearing): once the PR reaches a terminal PASS the
+        # trigger is gone, so the for-Larry record retracts.
+        self._sandbox_no_session_surfaces()
+        body = self._offchain_doc_revision_outbox()
+        f = self._write_outbox('mirror', 'offchain-doc.json', body)
+        on.process_outbox(f)
+        self.assertEqual(len(on.for_larry_escalations.list_open()), 1)
+
+        pass_marker = _mirror_pass_marker(task_id='offchain-doc')
+        pass_body = _good_outbox(
+            agent='mirror', source='beacon', task_id='offchain-doc',
+            phase='review',
+            result=f'Looks good now.\n\n{pass_marker}',
+        )
+        pass_body['pr_url'] = 'https://github.com/x/y/pull/653'
+        pass_body['head_sha'] = 'deadbeefcafe'
+        pf = self._write_outbox('mirror', 'offchain-doc-pass.json', pass_body)
+        on.process_outbox(pf)
+        self.assertEqual(on.for_larry_escalations.list_open(), [])
+
+    def test_offchain_escalate_emits_binary_approval(self):
+        # Decision bucket end-to-end: an off-chain REVIEW_ESCALATE surfaces a
+        # binary approval_request (Approvals tab), not a for-Larry record.
+        self._sandbox_no_session_surfaces()
+        marker = _mirror_escalate_marker(task_id='offchain-esc')
+        body = _good_outbox(
+            agent='mirror', source='beacon', task_id='offchain-esc',
+            phase='review',
+            result=f'Needs a human call.\n\n{marker}',
+        )
+        body['pr_url'] = 'https://github.com/x/y/pull/654'
+        body['head_sha'] = 'feedface0001'
+        f = self._write_outbox('mirror', 'offchain-esc.json', body)
+        on.process_outbox(f)
+
+        # No for-Larry record (that's the action bucket).
+        self.assertEqual(on.for_larry_escalations.list_open(), [])
+        # A binary approval landed, keyed on PR+head SHA.
+        self.assertTrue(on.approval.PENDING_APPROVALS_PATH.exists())
+        pending = json.loads(on.approval.PENDING_APPROVALS_PATH.read_text())
+        rows = pending if isinstance(pending, list) else pending.get('pending', [])
+        approval_ids = [r.get('id') for r in rows]
+        self.assertIn('mirror-review-offchain-esc-feedface', approval_ids)
+
 
 class ExtractRevisionSummaryTest(unittest.TestCase):
     """Tests for the revision-summary preamble regex."""

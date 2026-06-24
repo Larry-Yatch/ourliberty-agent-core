@@ -76,6 +76,7 @@ from chain_envelope import (        # noqa: E402  # M1: sole envelope constructo
 )
 import dispatch_validator         # noqa: E402
 import fixture_patterns             # noqa: E402  # outbox-side fixture gate
+import for_larry_escalations        # noqa: E402  # mirror-review-visibility: action-needed feed
 import forge_preflight_handler as fph  # noqa: E402
 import larry_alerts                # noqa: E402
 import mirror_review_handler as mrh  # noqa: E402
@@ -4852,6 +4853,194 @@ def _dispatch_revision_to_forge(
             + 'Larry must manually re-dispatch.',
             'WARN',
         )
+
+
+# ---- mirror-review-visibility: classify + route session-less review outcomes ----
+# Spec: agents/beacon/specs/mirror-review-visibility.md (Contracts B+C+D).
+# Classify on WIRE signals only (marker_type + session/ledger state), never on
+# finding prose — the routing site cannot read findings. Route the human-needed
+# buckets to Larry's surfaces; self-healing stays silent. One artifact per
+# escalation, idempotent on PR + head SHA.
+
+NO_SESSION_SELF_HEALING = 'self_healing'
+NO_SESSION_ACTION_NEEDED = 'action_needed'
+NO_SESSION_DECISION_NEEDED = 'decision_needed'
+
+
+def _no_session_record_id(task_id: Optional[str]) -> str:
+    """Stable for-Larry record id for a session-less PR (one active record per
+    task; cleared when the trigger clears)."""
+    return f'mirror-review:{task_id or "unknown"}'
+
+
+def _no_session_dedup_identity(
+    data: dict[str, Any], marker_decision: dict[str, Any],
+) -> str:
+    """PR + head SHA — the Contract D idempotency key. Falls back to task_id
+    when no head SHA is on the envelope (still stable across notifier
+    reprocesses of the same outbox)."""
+    task_id = data.get('task_id') or 'unknown'
+    payload = marker_decision.get('payload') or {}
+    pr = data.get('pr_url') or payload.get('pr_url') or task_id
+    head = data.get('head_sha') or ''
+    return f'{pr}@{head}'
+
+
+def _classify_no_session_review(
+    data: dict[str, Any], marker_decision: dict[str, Any],
+) -> Optional[str]:
+    """Bucket a session-less Mirror review outcome (spec §5 Contract B), or None
+    when out of scope. Signals only: marker_type + forge_build_session_id
+    presence + whether the mechanical re-dispatch can proceed (target_repo
+    derivable) + routing source. No finding-prose inspection."""
+    mtype = marker_decision.get('marker_type')
+    # Only the session-less review path is in scope. A live build session means
+    # the normal in-loop revision cascade handles it (findings go to Forge).
+    if data.get('forge_build_session_id'):
+        return None
+
+    # Decision-needed: Mirror's explicit "a human must decide" verdict, or a
+    # revision the loop can't auto-fix (low-confidence auto-promote / budget
+    # exhausted) — both reduce to approve-the-fix vs reject.
+    if mtype == 'review_escalate':
+        return NO_SESSION_DECISION_NEEDED
+    if mtype == 'review_revision' and (
+        marker_decision.get('auto_promoted')
+        or marker_decision.get('budget_exhausted')
+    ):
+        return NO_SESSION_DECISION_NEEDED
+
+    if mtype != 'review_revision':
+        return None
+
+    # A no-session REVIEW_REVISION on a Larry-owned interactive PR is out of
+    # scope: _dispatch_revision_to_forge DMs Larry directly and he drives it.
+    routing_source = data.get('original_source') or data.get('source')
+    chat_id = data.get('reply_chat_id')
+    if routing_source == 'larry' and isinstance(chat_id, int):
+        return None
+
+    # Mechanical recovery proceeds only if there's a chain envelope to
+    # re-dispatch onto — i.e. a derivable target_repo. An off-chain PR with no
+    # target_repo (the #653 class) cannot self-heal → action-needed.
+    task_id = data.get('task_id') or 'unknown'
+    target_repo = data.get('target_repo') or backfill_target_repo(task_id)
+    if not target_repo:
+        return NO_SESSION_ACTION_NEEDED
+    return NO_SESSION_SELF_HEALING
+
+
+def _emit_no_session_decision_approval(
+    data: dict[str, Any], marker_decision: dict[str, Any],
+) -> None:
+    """Decision bucket (spec §6): a BINARY approval_request on the Approvals tab
+    (never a plain larry_alert — that strands the decision, the 2026-06-03
+    deploy-notifier incident). add_pending is the durable store; the chain_event
+    is the tab feed (best-effort). Idempotent on PR + head SHA."""
+    task_id = data.get('task_id') or 'unknown'
+    head = (data.get('head_sha') or '')[:8]
+    approval_task_id = f'mirror-review-{task_id}' + (f'-{head}' if head else '')
+    # Contract D: one approval per PR+head SHA. A re-review of the same head
+    # finds the existing row (pending or history) and skips.
+    if approval.find_by_id_any_state(approval_task_id) is not None:
+        return
+    payload_in = marker_decision.get('payload') or {}
+    pr_url = data.get('pr_url') or payload_in.get('pr_url')
+    reason = (marker_decision.get('intent_kwargs') or {}).get('reason', '') or (
+        'Mirror flagged this session-less PR for a human decision.'
+    )
+    summary = (
+        f'Session-less PR `{task_id}` needs your decision. {reason}\n\n'
+        'Approve = accept Mirror\'s verdict and dispatch a fresh Forge revision '
+        'to fix it. Reject = stand down (close/abandon the PR).'
+        + (f'\nPR: {pr_url}' if pr_url else '')
+    )
+    payload = {
+        'task_id': approval_task_id,
+        'summary': summary,
+        'target_agent': 'forge',
+        'prompt': summary,
+    }
+    reply_chat = data.get('reply_chat_id')
+    chat_id = reply_chat if isinstance(reply_chat, int) else None
+    try:
+        approval.add_pending(payload, chat_id=chat_id)
+    except Exception as e:  # noqa: BLE001 — best-effort durable store
+        log(
+            f'no-session decision add_pending failed (task={task_id}): '
+            f'{type(e).__name__}: {e}',
+            'WARN',
+        )
+    try:
+        kwargs = approval.build_approval_request_chain_event(payload)
+        chain_event_emit.emit_event(**kwargs)
+    except Exception as e:  # noqa: BLE001 — best-effort tab feed (Supabase)
+        log(
+            f'no-session decision emit_event failed (task={task_id}): '
+            f'{type(e).__name__}: {e}',
+            'WARN',
+        )
+    log(
+        f'no-session decision-needed → approval_request emitted '
+        f'(task={task_id}, approval={approval_task_id})'
+    )
+
+
+def _route_no_session_review(
+    data: dict[str, Any], marker_decision: dict[str, Any],
+) -> Optional[str]:
+    """Route a classified session-less review outcome to Larry's surfaces
+    (spec §6/§7 Contracts C+D). Exactly one artifact per escalation; self-healing
+    emits nothing (and clears any stale for-Larry record — a fresh dispatch was
+    observed, decision d). Returns the bucket chosen, or None when out of scope.
+    Never raises — routing must not abort the chain."""
+    try:
+        bucket = _classify_no_session_review(data, marker_decision)
+    except Exception as e:  # noqa: BLE001 — classification must never crash the chain
+        log(
+            f'no-session review classify failed: {type(e).__name__}: {e}',
+            'WARN',
+        )
+        return None
+    if bucket is None:
+        return None
+    task_id = data.get('task_id') or 'unknown'
+    record_id = _no_session_record_id(task_id)
+
+    if bucket == NO_SESSION_SELF_HEALING:
+        # Mechanical re-dispatch fired + obligation open: zero Larry artifacts.
+        # A prior action-needed record (if any) is now stale → clear it.
+        for_larry_escalations.clear(record_id)
+        return bucket
+
+    if bucket == NO_SESSION_ACTION_NEEDED:
+        payload_in = marker_decision.get('payload') or {}
+        pr_url = data.get('pr_url') or payload_in.get('pr_url')
+        written = for_larry_escalations.upsert(
+            record_id,
+            source='mirror-review',
+            headline=f'Session-less PR needs you: `{task_id}`',
+            context=(
+                'Mirror wants changes but the auto-fix loop cannot proceed '
+                '(no chain session to re-dispatch). Go unstick it: re-dispatch '
+                f'a Forge build for `{task_id}` or close the PR.'
+                + (f' PR: {pr_url}' if pr_url else '')
+            ),
+            severity='warning',
+            pr_url=pr_url,
+            head_sha=data.get('head_sha'),
+            dedup_identity=_no_session_dedup_identity(data, marker_decision),
+        )
+        if written is not None:
+            log(
+                f'no-session action-needed → for-Larry record written '
+                f'(task={task_id})'
+            )
+        return bucket
+
+    # decision_needed
+    _emit_no_session_decision_approval(data, marker_decision)
+    return bucket
 
 
 def _dispatch_mirror_review_rerun(
@@ -10789,6 +10978,24 @@ def process_outbox(outbox_file: Path) -> str:
                     data.get('task_id') or 'unknown',
                     resolution=str(_mtype).replace('review_', ''),
                 )
+                # mirror-review-visibility (Contract C/D, decision d): the
+                # trigger for a no-session action-needed record is the OPEN
+                # obligation / unrecovered PR. A terminal verdict clears that
+                # trigger, so retract any stale for-Larry record — the PR
+                # either passed (self-heal landed) or moved to a decision
+                # artifact (escalate). Idempotent no-op when none exists.
+                for_larry_escalations.clear(
+                    _no_session_record_id(data.get('task_id'))
+                )
+
+        # mirror-review-visibility (Contracts B+C+D): classify the session-less
+        # review outcome on wire signals and route the human-needed buckets to
+        # Larry's surfaces (decision → binary approval_request; action → durable
+        # self-clearing for-Larry record; self-healing → silent). One artifact
+        # per escalation, idempotent on PR + head SHA. Runs after the dispatch +
+        # obligation bookkeeping above so the self-healing case is observable.
+        if agent == 'mirror':
+            _route_no_session_review(data, marker_decision)
 
         # false-success-notify-fix (2026-06-11): the Mirror REVIEW_PASS
         # auto-merge now runs EARLIER — before the back-leg notify — via
