@@ -216,6 +216,16 @@
 
 ---
 
+## G-rule heal-daemon-restart-manifest-drift-regenerated-tier4 — 1/3 (new, iter ~2620)
+
+**Rule:** `source=heal-daemon-restart-manifest-drift, subject=regenerated` alerts classify Tier-4 (novel) — no translation match. But these are routine healer auto-commit actions (route=digest in the alert itself; bot already silences as digest). Should add Tier-3 translation. Dispatch to Beacon at 3/3 to add `config/alert-translations.json` entry.
+
+---
+
+## Status snapshot — updated 2026-06-24 20:09Z UTC (Iter ~2620, Tier 1, consecutive_clean=0)
+
+**Iter ~2620 summary:** ⚠️ Check 0: 2 Tier-4 novel alerts (L1022: still-stale-after-restart:outbox-notifier — self-resolved, Forge contamination cleared; L1023: manifest-drift-regenerated — informational, bot digest). Forge contamination from ~2619 CLEARED: PR #683 opened (feat(mirror) classify+route Contracts B+C+D), main tree clean. New [blue] watch: manifest tracks for_larry_escalations.py but file not in main (only in PR #683 branch — clears on merge). Pipeline active: build-escalation-feed.json in Forge inbox (operator-needs-you-feed step 1), review-classify-and-route.json in Mirror inbox. New G-rule: heal-daemon-restart-manifest-drift-regenerated-tier4 1/3. PRIME: systemic_fixes=61, interventions=1094, ratio≈17.93, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-24 20:00Z UTC (Iter ~2619, Tier 1, consecutive_clean=0)
 
 **Iter ~2619 summary:** ⚠️ Check A non-empty — Forge active build (PID 1965241, classify-and-route) wrote `scripts/outbox_notifier.py` (modified) + `scripts/for_larry_escalations.py` (untracked) to MAIN working tree; Forge worktree `wt-forge-classify-and-route` is clean. Cross-contamination between worktree and main tree. [blue] watch — if PR opens next cycle, self-clears. 3 Tier-3 alerts (L1017-L1019: review-pass PR#681, mirror-dag-pass:operator-needs-you-feed, sequence-complete:phase4b2). Phase 4b.2 COMPLETE (dashboard PR #91 + agent-core PR #677 merged). operator-needs-you-feed escalation-feed step 1 queued as Forge preflight. PRIME: systemic_fixes=61, interventions=1093, ratio≈17.93, trend=improving. Tier 1, consecutive_clean=0.
