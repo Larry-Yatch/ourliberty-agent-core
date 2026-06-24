@@ -240,6 +240,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-24 22:39Z UTC (Iter ~2639, Tier 1, consecutive_clean=0)
+
+**Iter ~2639 summary:** ⚠️ Watch — PR #685 CONFLICTING (pipeline-stall cooldown active); PR #687 CONFLICTING (Mirror session reaped at 22:30Z; MalformedMirrorMarker at 22:32Z; re-review pending via marker-error envelope in Mirror inbox). 1 new alert (L1041): Tier-3 (heal-wedged-review-sessions, wedged-review-reaped). Watermark 1040→1041. 8 daemons alive. G-rule watchdog-watcher-log-stale-post-fix: 2/3 carry (same session reaped, no new independent occurrence). Check I: mode=digest, cooldown-suppressed. HEAD=eb45518b. PRIME: interventions≈1111, systemic_fixes=63, ratio≈17.6, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-24 22:31Z UTC (Iter ~2638, Tier 1, consecutive_clean=0)
 
 **Iter ~2638 summary:** ⚠️ Watch — PR #685 CONFLICTING (pipeline-stall cooldown active); PR #687 CONFLICTING (Mirror review active since 21:55Z, 0 reviews yet); G-rule watchdog-watcher-log-stale-post-fix **2/3** NEW (7 WARNs in 40-min window, in-flight suppression failing for long Mirror sessions). 0 new alerts (watermark=1040). 8 daemons alive. Check I: mode=digest, cooldown-suppressed. HEAD=e57fc076. PRIME: interventions≈1110, systemic_fixes=63, ratio≈17.6, trend=improving. Tier 1, consecutive_clean=0.
