@@ -741,6 +741,152 @@
         "kind": "capture",
         "capture_id": "cap-auto-retire-done-pipeline-cards-follow-up-to-pha-be83"
       }
+    },
+    {
+      "id": "mirror-review-visibility",
+      "title": "Mirror review visibility for session-less PRs",
+      "north_star_ref": null,
+      "repo": null,
+      "state": "active",
+      "phases": [
+        {
+          "id": "mirror-review-visibility",
+          "title": "Mirror review visibility for session-less PRs",
+          "desired_end_state": "Close the session-less-PR review gaps #653/#645 exposed: (A) Mirror posts its findings as an idempotent PR comment on every non-PASS so they're never invisible; (B) classify the no-session outcome by marker_type (self-healing / action-needed / decision-needed); (C) route human-needed buckets to Larry's surfaces (decision->Approvals tab, action->larry_alert/Operator Action Queue) \u2014 never a PR comment he won't read; (E) heal_pipeline_stall backstop for silent red-status PRs. Spec dispatched (spec-mirror-review-visibility-001); 3-step build held until orchestrator-terminal-signal-hardening lands (shared files).",
+          "lifecycle_state": "brainstorm",
+          "order": 0,
+          "spec_ref": null,
+          "sequence_ref": null,
+          "created_at": "2026-06-24T15:50:59.823686+00:00",
+          "updated_at": "2026-06-24T15:50:59.823686+00:00",
+          "brainstorm": {
+            "is_ai_draft": true,
+            "draft": {
+              "end_state": "When this phase is done, no Mirror review of a session-less PR can quietly disappear. Any review that isn't a clean pass leaves a visible, de-duplicated note on the PR itself. Every no-session outcome is sorted into one of three buckets \u2014 it heals itself, it needs someone to act, or it needs someone to decide \u2014 and the ones that need a human reach Larry where he actually looks: decisions show up in his approvals surface, actions land in his alert and operator action queue, and the self-healing ones quietly resolve without pinging him. On top of that, a PR that goes silently red is caught by a backstop instead of sitting unnoticed.",
+              "why_now": "Two recent session-less PRs slipped through and made the gap concrete: when a PR has no active session, Mirror's findings had nowhere to go. There was no guaranteed comment and no routing, so real problems sat invisible until someone happened to notice. The review path works fine for session-based PRs, so this is specifically about closing the no-session case before more reviews go unseen.",
+              "scope": "IN: posting an idempotent PR comment on every non-PASS session-less review; classifying the no-session outcome into self-healing, action-needed, and decision-needed; routing the human-needed buckets to the right operator surfaces (decisions to the approvals view, actions to the alert/operator action queue) rather than a PR comment Larry won't read; and a backstop that catches silently red PRs. OUT: changing what Mirror reviews or its pass/fail criteria; the session-based PR flow, which already surfaces correctly; and redesigning the approvals view or operator action queue themselves \u2014 we route into them as they exist.",
+              "constraints_reuse": "This is assembly, not greenfield. Reuse the existing marker-type classification rather than inventing a new taxonomy, the existing operator surfaces (approvals view, alert channel, operator action queue) as routing targets, and the existing healing/backstop machinery for the silent-red case. The session-based review path must keep working untouched. PR comments must be idempotent so re-runs update rather than pile up duplicates. One hard constraint: the build touches files that a separate in-flight hardening effort is also changing, so the work has to slot in after that lands to avoid conflicts.",
+              "options_decision": "There are a few real forks. First, how to make the PR comment idempotent: tag-and-update an existing comment, key off a stable marker, or look up by author/heading \u2014 find-and-update via a hidden marker is simplest and avoids spam. Second, how much to trust marker_type for classification: take it as authoritative, or apply our own mapping on top \u2014 trusting it is less code but exposes us to bad/missing markers. Third, what to do when an outcome is ambiguous or unclassifiable: default it to the human-visible decision path (safer, slightly noisier) or to the action path. Recommendation: update-by-marker for comments, trust marker_type but treat anything missing/unknown as a decision-needed item so it surfaces to a human rather than vanishing.",
+              "risks_guardrails": "Comment spam from re-running a review \u2014 guardrail: idempotency keyed on a stable marker so a repeat run edits the existing comment. Misclassification sending a needs-decision item to a silent channel \u2014 guardrail: default ambiguous or unknown markers to the human-visible decision path. Backstop firing on PRs that are legitimately and visibly red \u2014 guardrail: scope it to genuinely silent/stale red status, not every failure. File conflicts with the concurrent hardening effort \u2014 guardrail: hold the build until that work lands. Double-surfacing, where the same issue both posts a comment and pings an operator queue \u2014 guardrail: decide one clear rule for when both happen versus only the routed surface.",
+              "done_gate": "It's done when: a non-PASS session-less review produces exactly one PR comment, and re-running the review updates that comment instead of adding another; each no-session outcome is classified into self-healing, action-needed, or decision-needed; a decision-needed item appears in the approvals surface, an action-needed item appears in the alert/operator action queue, and a self-healing item produces no human ping; and a PR left silently red triggers the backstop. Tests cover each path: idempotent comment on repeat runs, correct bucket per marker type, correct routing target per bucket, and backstop firing on a silent red PR.",
+              "breakdown": "Three build steps, held until the shared-file hardening work lands. Step one: post an idempotent PR comment on every non-PASS session-less review. Step two: classify the no-session outcome by marker type into self-healing, action-needed, and decision-needed. Step three: route the human-needed buckets to their operator surfaces (decisions to approvals, actions to the alert/operator queue) and add the silent-red backstop. The spec is already written; the ordering dependency on the hardening effort is itself a tracked precondition rather than a build step."
+            },
+            "decisions": [
+              "When an outcome can't be cleanly classified, should it default to the human-visible decision path (safer but noisier) or the action path?",
+              "Should every non-PASS leave a PR comment even when the item is also routed to an operator surface, or only when it isn't routed elsewhere, to avoid double-surfacing?",
+              "How aggressive should the silent-red backstop be \u2014 err toward catching more (more false positives) or fewer (risk of misses)?",
+              "Confirm building after the shared-file hardening effort lands, versus splitting the work to start the independent pieces now."
+            ],
+            "decisions_overflow": false,
+            "handoff": {
+              "spec_target_path": "agents/beacon/specs/mirror-review-visibility.md",
+              "target_repo": "ourliberty-agent-core",
+              "north_star_ref": null,
+              "prior_closeout_summary": null,
+              "directive": "Work with Larry to finalize this brainstorm and author the spec at agents/beacon/specs/mirror-review-visibility.md in ourliberty-agent-core; he will mark it Ready to spec."
+            }
+          },
+          "brainstorm_provenance": {
+            "by": "beacon",
+            "model": "claude-opus-4-8",
+            "at": "2026-06-24T15:50:59.823686+00:00",
+            "from_state": "brainstorm"
+          }
+        }
+      ],
+      "one_off": true,
+      "created_at": "2026-06-24T15:50:59.823686+00:00",
+      "updated_at": "2026-06-24T15:50:59.823686+00:00",
+      "promoted_from": {
+        "kind": "mission",
+        "mission_id": "mirror-review-visibility"
+      }
+    },
+    {
+      "id": "missions-v2-phase4b2-closed-card-doorbell",
+      "title": "Missions Phase 4b.2 \u2014 closed-card doorbell",
+      "north_star_ref": null,
+      "repo": null,
+      "state": "active",
+      "phases": [
+        {
+          "id": "missions-v2-phase4b2-closed-card-doorbell",
+          "title": "Missions Phase 4b.2 \u2014 closed-card doorbell",
+          "desired_end_state": "The closed-card unread badge deferred from Phase 4b (PR #662). Server-side fix: project a compact doorbell signal (newest team_to_larry message id/ts + blocked flag) onto the card-list payload the kanban already polls (Contract E, agent-core), then render the closed-card badge from it (Contract F, dashboard). Rides the existing poll \u2014 no new endpoint, no background thread-polling (respects Phase 4b Contract A). Spec dispatched (spec-phase4b2-closed-card-doorbell-001); 2-step build follows after the spec merges.",
+          "lifecycle_state": "brainstorm",
+          "order": 0,
+          "spec_ref": null,
+          "sequence_ref": null,
+          "created_at": "2026-06-24T15:50:59.823686+00:00",
+          "updated_at": "2026-06-24T15:50:59.823686+00:00",
+          "brainstorm": {
+            "is_ai_draft": true,
+            "draft": {
+              "end_state": "When this phase is done, a card that has been closed still tells the operator at a glance whether it has unread messages waiting from the team \u2014 the closed card shows an unread badge, the same way open cards already do. The signal comes from the server: the card-list data the board already fetches will carry a small marker for each card (the most recent team-to-operator message, with its timestamp, plus a flag for whether the card is blocked), and the board paints the closed-card badge directly from that marker. Nothing new is polled and no new endpoint exists; the badge simply rides along on the data already moving.",
+              "why_now": "This is the piece that was intentionally cut from the previous phase to keep that phase shippable \u2014 it was deferred rather than dropped, so it is now the named follow-up. The previous phase deliberately ruled out adding background polling to make this work, which left closed cards unable to show unread state. Picking it up now closes that gap while the design decisions and surrounding code from the previous phase are still fresh and the agreed approach (piggyback on the existing poll) is already settled.",
+              "scope": "IN: adding a compact unread signal for each card onto the existing card-list payload on the server side (newest team-to-operator message id and timestamp, plus a blocked indicator); rendering an unread badge on closed cards from that signal in the board UI. OUT: any new endpoint; any new background or per-thread polling; changing how open-card badges already work; redesigning the message model or the board's existing fetch cadence. Anything beyond making closed cards reflect unread state through the data the board already receives is out.",
+              "constraints_reuse": "Reuse, don't rebuild: the board already polls a card-list payload on a set cadence \u2014 the unread signal is attached to that same payload, and the badge reuses the existing badge rendering rather than introducing a new component or fetch path. Two things must not break: the previous phase's commitment to no new background or thread-level polling must hold, and the open-card unread behavior that already works must remain unchanged. The change is additive \u2014 one new field flowing through an existing channel, read by existing UI.",
+              "options_decision": "The main fork is what to pack into the per-card signal. Option A: a minimal marker (newest team-to-operator message id, its timestamp, and a blocked flag) and let the UI decide read/unread by comparing against what the operator has already seen \u2014 smallest payload, keeps read-state logic where it already lives, but relies on the UI having a reliable notion of last-seen. Option B: have the server compute and send an explicit unread boolean per card \u2014 simplest for the UI, but pushes read-state knowledge to the server and risks drifting from how open cards already determine unread. A secondary fork is how the badge looks on a closed card: identical to the open-card badge, or visually distinct to signal the card is closed-but-waiting. Recommendation: Option A with a badge that matches the existing open-card style, because it stays closest to current behavior and adds the least new surface \u2014 escalate to a distinct style only if closed-but-unread proves easy to overlook.",
+              "risks_guardrails": "Risk: the signal silently inflates the card-list payload or its compute cost as card counts grow \u2014 guardrail: keep the per-card field to the few primitive values named and confirm payload size and response time stay in line with today's. Risk: closed-card and open-card badges disagree about what counts as unread, confusing the operator \u2014 guardrail: derive both from the same read/unread logic rather than a parallel path. Risk: scope creep back toward background polling to make the badge 'live' \u2014 guardrail: hold the line that the badge only updates on the existing poll, exactly as agreed in the prior phase. Risk: a card with no team-to-operator messages or an unusual state renders a stray or missing badge \u2014 guardrail: define and test the empty/blocked cases explicitly.",
+              "done_gate": "Done means: a closed card with unread team-to-operator messages visibly shows an unread badge; a closed card with nothing unread shows none; the badge state matches what the equivalent open card would show; and no new endpoint or background/thread polling was introduced \u2014 the badge updates only when the existing card-list poll refreshes. Tests should cover the server attaching the correct per-card signal (including the no-messages and blocked cases), the UI rendering the badge from that signal, and a check that open-card unread behavior is unchanged.",
+              "breakdown": "Step one (server): add the compact per-card unread signal to the existing card-list payload \u2014 the newest team-to-operator message id and timestamp plus the blocked flag \u2014 without adding any endpoint or new polling, and with tests for the populated, empty, and blocked cases. Step two (UI): render the closed-card unread badge from that signal, reusing the existing badge, and confirm it updates on the normal poll and that open-card behavior is untouched. The detailed design lands first as a spec; the two build steps follow once that spec is agreed."
+            },
+            "decisions": [
+              "Should the server send a minimal marker and let the UI decide unread, or send an explicit unread flag per card?",
+              "Should the closed-card badge look identical to the open-card badge, or be visually distinct to signal 'closed but waiting'?",
+              "Is it acceptable that the badge only refreshes on the existing poll (not live), per the no-new-polling rule?"
+            ],
+            "decisions_overflow": false,
+            "handoff": {
+              "spec_target_path": "agents/beacon/specs/missions-v2-phase4b2-closed-card-doorbell.md",
+              "target_repo": "ourliberty-agent-core",
+              "north_star_ref": null,
+              "prior_closeout_summary": null,
+              "directive": "Work with Larry to finalize this brainstorm and author the spec at agents/beacon/specs/missions-v2-phase4b2-closed-card-doorbell.md in ourliberty-agent-core; he will mark it Ready to spec."
+            }
+          },
+          "brainstorm_provenance": {
+            "by": "beacon",
+            "model": "claude-opus-4-8",
+            "at": "2026-06-24T15:50:59.823686+00:00",
+            "from_state": "brainstorm"
+          }
+        }
+      ],
+      "one_off": true,
+      "created_at": "2026-06-24T15:50:59.823686+00:00",
+      "updated_at": "2026-06-24T15:50:59.823686+00:00",
+      "promoted_from": {
+        "kind": "mission",
+        "mission_id": "missions-v2-phase4b2-closed-card-doorbell"
+      }
+    },
+    {
+      "id": "orchestrator-terminal-signal-hardening",
+      "title": "Orchestrator terminal-signal hardening",
+      "north_star_ref": null,
+      "repo": null,
+      "state": "active",
+      "phases": [
+        {
+          "id": "orchestrator-terminal-signal-hardening",
+          "title": "Orchestrator terminal-signal hardening",
+          "desired_end_state": "Make the build-sequence advancer + stall backstops propagate terminal agent outcomes correctly. Root cause: chain_event_says_failed queries event types the shipper never emits (forge_reject/mirror_* vs the real preflight_reject/review_escalate), so only the merge path is wired and non-merge terminals false-strand to the 4h timer with a misattributed reason. Re-scoped to 2 steps after reconciling vs #665/#668 (which already shipped the no-session mechanical recovery + most backstop fixes): Step 1 advancer event-type realign + stall attribution; Step 2 push-signal non-merge terminals + pr_url/substatus at PR-open.",
+          "lifecycle_state": "building",
+          "order": 0,
+          "spec_ref": null,
+          "sequence_ref": null,
+          "created_at": "2026-06-24T15:50:59.823686+00:00",
+          "updated_at": "2026-06-24T15:50:59.823686+00:00"
+        }
+      ],
+      "one_off": true,
+      "created_at": "2026-06-24T15:50:59.823686+00:00",
+      "updated_at": "2026-06-24T15:50:59.823686+00:00",
+      "promoted_from": {
+        "kind": "mission",
+        "mission_id": "orchestrator-terminal-signal-hardening"
+      }
     }
   ]
 }
