@@ -702,6 +702,13 @@ class AutomatedWorkItem(BaseModel):
     summary: Optional[str] = None
     rule_label: Optional[str] = None
     rule_action: Optional[str] = None
+    # Plain-language meaning layer (#5), authored deterministically at read by
+    # event_briefing.decision_briefing — the same {what,why,suggest} + risk
+    # contract the narrator writes onto captures, rendered by the shared
+    # BriefingBlock/RiskBadge. Optional so a sparse/older row still serializes.
+    briefing: Optional[dict[str, Any]] = None
+    risk: Optional[str] = None
+    risk_note: Optional[str] = None
 
 
 class AutomatedWorkCounts(BaseModel):
@@ -2508,6 +2515,10 @@ def _reader_automated_work(
     rows = list(getattr(resp, 'data', None) or [])
 
     now = datetime.now(timezone.utc)
+    # Enrich-at-read (#5): the deterministic plain-language meaning layer. Lazy
+    # import (scripts/ is on sys.path at module load) per this file's lazy-sibling
+    # convention; cached after first use, so it's free on the hot read path.
+    import event_briefing  # noqa: PLC0415
     counts = {'auto_approved': 0, 'asked': 0, 'rejected': 0}
     items: list[dict[str, Any]] = []
     auto_total = 0  # all auto_approve in-window (vs items, which is capped)
@@ -2530,7 +2541,7 @@ def _reader_automated_work(
         dt = _ts_to_dt(row.get('ts'))
         age = int((now - dt).total_seconds()) if dt is not None else None
         matched_rule = payload.get('matched_rule')
-        items.append({
+        item: dict[str, Any] = {
             'task_id': row.get('task_id') or payload.get('task_id'),
             'ts': row.get('ts'),
             'age_seconds': age,
@@ -2545,7 +2556,15 @@ def _reader_automated_work(
             'rule_label': _automated_work_rule_label(matched_rule),
             'rule_action': matched_rule.get('action')
             if isinstance(matched_rule, dict) else None,
-        })
+        }
+        # Deterministic plain-language meaning layer (briefing/risk/risk_note),
+        # rendered by the same BriefingBlock/RiskBadge as the other surfaces.
+        # Best-effort: a brief failure never 500s this read-only lane.
+        try:
+            item.update(event_briefing.decision_briefing(item))
+        except Exception:  # noqa: BLE001 — never 500 a read-only dashboard lane
+            pass
+        items.append(item)
     return {
         'present': True,
         'window_days': window_days,

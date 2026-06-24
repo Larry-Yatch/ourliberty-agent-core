@@ -66,6 +66,7 @@ from typing import Any, Iterable, Iterator, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import atomic_io  # noqa: E402  (shared durable atomic write, PR-E #366)
+import event_briefing  # noqa: E402  (#5 author-at-emit alert meaning layer)
 import file_lock  # noqa: E402  (shared advisory flock, PR-E2 #16)
 from log_ts import parse_log_ts  # noqa: E402  (shared log-ts parser)
 
@@ -804,6 +805,19 @@ def parse_jsonl_line(line: str, *, source: str) -> Optional[ChainEvent]:
     task_id = rec.get('task_id') or subject or None
     payload = {k: v for k, v in rec.items()
                if k not in ('ts', 'source', 'task_id')}
+    # Author-at-emit (#5): bake the deterministic plain-language meaning layer
+    # (briefing/risk/risk_note) into the alert payload so the dashboard's
+    # Operations/Alerts panel renders it straight from the row — chain_events
+    # payloads are immutable after insert, so the briefing must be present at
+    # emit. Best-effort: alert_briefing returns None (and never raises) when
+    # there is no translation to brief, leaving the raw-headline fallback intact.
+    try:
+        brief = event_briefing.alert_briefing(rec, event_type)
+    except Exception:  # noqa: BLE001 — defense in depth: never let the meaning
+        brief = None   # layer break the daemon's ingest path (alert_briefing is
+        #              # itself fail-safe; this guards future edits to it too).
+    if brief:
+        payload.update(brief)
     return make_event(
         agent=agent, event_type=event_type, ts=ts, task_id=task_id,
         payload=payload, source=source,
