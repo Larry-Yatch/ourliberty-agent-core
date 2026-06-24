@@ -4979,6 +4979,58 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "mirror-review-visibility",
+      "name": "Mirror review visibility for session-less PRs",
+      "phase": "drafting",
+      "brief": "Close the session-less-PR review gaps #653/#645 exposed: (A) Mirror posts its findings as an idempotent PR comment on every non-PASS so they're never invisible; (B) classify the no-session outcome by marker_type (self-healing / action-needed / decision-needed); (C) route human-needed buckets to Larry's surfaces (decision->Approvals tab, action->larry_alert/Operator Action Queue) \u2014 never a PR comment he won't read; (E) heal_pipeline_stall backstop for silent red-status PRs. Spec dispatched (spec-mirror-review-visibility-001); 3-step build held until orchestrator-terminal-signal-hardening lands (shared files).",
+      "spec_doc": "agents/beacon/specs/mirror-review-visibility.md",
+      "task_ids": []
+    },
+    {
+      "id": "missions-v2-phase4b-live-thread",
+      "name": "Missions Phase 4b \u2014 live-feel thread",
+      "phase": "shipped",
+      "brief": "Make the 'talk to the team' card thread feel live. Shipped 2026-06-24: Contract D clear-on-confirmed-send (#87); Contracts A+B open-thread polling + in-drawer unread/pill/refresh/doorbell-reflect (#88); Contract C /thread read-shape guards (#654) + event_id->id projection (#660); spec landed (#653) and descope of the closed-card badge to Phase 4b.2 (#662). Done-gate part 1 (replies appear <5s, no refresh) met and live. The closed-card badge is the separate missions-v2-phase4b2-closed-card-doorbell follow-on.",
+      "spec_doc": "agents/beacon/specs/missions-v2-phase4b-live-thread-poll.md",
+      "task_ids": [
+        "clear-input",
+        "live-thread",
+        "missions-v2-phase4b-spec",
+        "phase4b-contract-c-guard-tests-001",
+        "phase4b-thread-id-projection-001",
+        "fix-653-phase4b-spec-id-contract-001",
+        "descope-phase4b-closed-card-badge-001"
+      ]
+    },
+    {
+      "id": "missions-v2-phase4b2-closed-card-doorbell",
+      "name": "Missions Phase 4b.2 \u2014 closed-card doorbell",
+      "phase": "drafting",
+      "brief": "The closed-card unread badge deferred from Phase 4b (PR #662). Server-side fix: project a compact doorbell signal (newest team_to_larry message id/ts + blocked flag) onto the card-list payload the kanban already polls (Contract E, agent-core), then render the closed-card badge from it (Contract F, dashboard). Rides the existing poll \u2014 no new endpoint, no background thread-polling (respects Phase 4b Contract A). Spec dispatched (spec-phase4b2-closed-card-doorbell-001); 2-step build follows after the spec merges.",
+      "spec_doc": "agents/beacon/specs/missions-v2-phase4b2-closed-card-doorbell.md",
+      "task_ids": []
+    },
+    {
+      "id": "orchestrator-terminal-signal-hardening",
+      "name": "Orchestrator terminal-signal hardening",
+      "phase": "in_flight",
+      "brief": "Make the build-sequence advancer + stall backstops propagate terminal agent outcomes correctly. Root cause: chain_event_says_failed queries event types the shipper never emits (forge_reject/mirror_* vs the real preflight_reject/review_escalate), so only the merge path is wired and non-merge terminals false-strand to the 4h timer with a misattributed reason. Re-scoped to 2 steps after reconciling vs #665/#668 (which already shipped the no-session mechanical recovery + most backstop fixes): Step 1 advancer event-type realign + stall attribution; Step 2 push-signal non-merge terminals + pr_url/substatus at PR-open.",
+      "spec_doc": "agents/beacon/specs/orchestrator-terminal-signal-hardening.md",
+      "task_ids": []
+    },
+    {
+      "id": "projects-v3-p7",
+      "name": "Projects v3 P7 \u2014 generalize + shelf + dashboard-wide",
+      "phase": "shipped",
+      "brief": "P7 payoff phase: the plain-language card became a reusable capability on a second surface. Shipped 2026-06-24: shelf descriptor cataloging the projects-v3 capability (agent-core #638); UniversalCard extracted from the funnel card (dashboard #80, by hand); Approvals adopts the UniversalCard (dashboard #82). Autonomy-dial visibility (step 4) deferred per spec \u00a76 recommended first cut.",
+      "spec_doc": "agents/beacon/specs/projects-v3-p7-generalize-shelf-dashboard-wide.md",
+      "task_ids": [
+        "p7-shelf-descriptor",
+        "p7-universal-card",
+        "p7-approvals-adopt"
+      ]
     }
   ]
 }
