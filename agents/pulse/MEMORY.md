@@ -234,6 +234,16 @@
 
 ---
 
+## G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4 — 2/3 (iter ~2629, ~2636)
+
+**Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:mirror-pass-unmerged:PR#N` alerts classify Tier-4 (novel — no translation match). Bot delivers as escalate (route=escalate) and DMs Larry. Pulse does NOT send a second DM. Dispatch to Beacon at 3/3 for Tier-3 translation in alert-translations.json (bot already DMs Larry directly; Pulse silence is correct). Instances: iter ~2629 (PR#685 rev1), iter ~2636 (PR#685 L1039 at 22:07Z).
+
+---
+
+## Status snapshot — updated 2026-06-24 22:14Z UTC (Iter ~2636, Tier 1, consecutive_clean=0)
+
+**Iter ~2636 summary:** ⚠️ Watch — PR #685 CONFLICTING (mirror-pass-unmerged L1039 DM'd Larry; pipeline-stall in cooldown); PR #687 CONFLICTING (Mirror review active, no reviews yet). 4 new alerts triaged (L1036-L1039): 3 Tier-3, 1 Tier-4 (L1039 mirror-pass-unmerged). Watermark 1035→1039. G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4 **2/3** NEW. 8 daemons alive. Check I: mode=digest. HEAD=879158fc. PRIME: interventions≈1108, systemic_fixes=63, ratio≈17.6, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-24 22:07Z UTC (Iter ~2635, Tier 1, consecutive_clean=0)
 
 **Iter ~2635 summary:** ⚠️ Watch — PR #685 (forge/escalation-feed) CONFLICTING (carry); PR #687 (forge/forge-post-open-mergeable-rebase-001) CONFLICTING, Mirror review active since 21:55:22Z. Pipeline stall cooldown expired for reconcile-hardening-mission-shipped-001 (dry-run: 1 alert would fire; re-dispatch -002 in BUILD). 0 new alerts (watermark 1035). 8 daemons alive. G-rule watchdog-watcher-log-stale-post-fix 1/3 VERIFIED no new instance (in-flight suppression working). Check I: mode=digest. HEAD=d5d6b53c. PRIME: interventions≈1107, systemic_fixes=63, ratio≈17.6, trend=improving. Tier 1, consecutive_clean=0.
@@ -249,21 +259,5 @@
 ## Status snapshot — updated 2026-06-24 21:33Z UTC (Iter ~2631, Tier 1, consecutive_clean=0)
 
 **Iter ~2631 summary:** ⚠️ Watch — PR #685 still CONFLICTING (Mirror REVIEW_PASS rev1 confirmed); forge-post-open-mergeable-rebase-001 IN BUILD. forge-wip-only-auto-redispatch-001 in Forge preflight. reconcile-hardening-002 in BUILD. L1035 Tier-3 (heal-droplet-git-drift, Beacon spec untracked — expected). Watermark 1034→1035. PRIME: interventions≈1103, systemic_fixes=63, ratio≈17.5, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-24 21:26Z UTC (Iter ~2630, Tier 1, consecutive_clean=0)
-
-**Iter ~2630 summary:** ⚠️ Watch — PR #685 still CONFLICTING (Mirror approved rev1); forge-post-open-mergeable-rebase-001 IN BUILD. forge-wip-only-auto-redispatch-001 NEW in Forge preflight (Larry approved approval_request 15:12 MDT — this IS the G-rule Forge-timeout healer build). reconcile-hardening-002 in Forge BUILD. L1033 Tier-3 (approval_request delivery confirm). L1034 Tier-4 (pulse meta-alert, bot suppressed DM). 2 new alerts triaged. Watermark 1032→1034. PRIME: interventions≈1102, systemic_fixes=63, ratio≈17.5, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-24 21:16Z UTC (Iter ~2629, Tier 1, consecutive_clean=0)
-
-**Iter ~2629 summary:** ⚠️ Watch — PR #686 MERGED (21:05Z) — sequence mirror-review-visibility-001 COMPLETE. PR #685 (escalation-feed) CONFLICTING but Mirror now APPROVED rev1 (21:07Z, L1032). Auto-merge blocked; rebase needed. forge-post-open-mergeable-rebase-001 in BUILD. reconcile-hardening-mission-shipped-002 in Forge build (Beacon re-dispatched). G-rule auto-merge-conflict-outbox-notifier-tier4 1/3 (new). forge-timeout-retry-loop-001 confirmed Beacon-archived (dispatch real). PRIME: systemic_fixes=63, interventions=1101, ratio≈17.5, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-24 21:07Z UTC (Iter ~2628, Tier 1, consecutive_clean=0)
-
-**Iter ~2628 summary:** ⚠️ Watch — PR #685 (forge/escalation-feed) still CONFLICTING; Forge revision 2 complete (`review-escalation-feed-rev1.json` in Mirror). forge-post-open-mergeable-rebase-001 IN BUILD phase. G-rule Forge-timeout-worktree-missing-retry-loop **3/3 → DISPATCHED** (reconcile-hardening-mission-shipped-001 Forge WIP crash; medic DM sent). heal-stall-dryrun-noop-001 + one-time-stale-dispatch-branch-cleanup-001 both in Forge preflight. All other checks nominal. PRIME: systemic_fixes=63, interventions=1100, ratio≈17.5, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-24 20:58Z UTC (Iter ~2627, Tier 1, consecutive_clean=0)
-
-**Iter ~2627 summary:** ⚠️ Watch — PR #685 CONFLICTING + Mirror revision in Forge inbox (test failures + manifest regression). PR #686 (backstop-healer) NEW MERGEABLE, Mirror review active. G-rule heal-pipeline-stall-dry-run-writes-real-alerts **3/3 → DISPATCHED** (pipeline-stall-dry-run-writes-alerts-001.json to Beacon). New Larry directive 20:52Z: dispatch stale-branch cleanup → Beacon processing. All other checks nominal. PRIME: systemic_fixes=62, interventions=1099, ratio≈17.7, trend=improving. Tier 1, consecutive_clean=0.
 
 
