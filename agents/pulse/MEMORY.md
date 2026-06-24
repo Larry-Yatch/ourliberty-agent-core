@@ -198,9 +198,9 @@
 
 ---
 
-## G-rule ourliberty-health-notify-script-missing — 2/3 (iter ~2634 first, iter ~2640 second)
+## G-rule ourliberty-health-notify-script-missing → DISPATCHED ✅ (iter ~2647, 3/3)
 
-**Rule:** `ourliberty-health` emits `WARN: notify script missing, alert dropped: 1 issue(s) need attention` intermittently. The service tries to notify via a script that doesn't exist; underlying "1 issue" is unknown. journalctl query by unit name requires elevated permissions (only visible via `ourliberty-*.service` wildcard). Instances: iter ~2634 (first), iter ~2640 (22:33Z second). Dispatch to Beacon at 3/3 to investigate missing script and the suppressed health issue.
+**Rule:** `ourliberty-health` fires `WARN: notify script missing, alert dropped: 1 issue(s) need attention` every ~30 min on a regular cadence (systemd timer). NOT intermittent — fires 22:03Z, 22:33Z, 23:03Z, 23:33Z etc. continuously. Prior iters ~2641-~2646 missed it via `journalctl returned empty (permissions)`; iter ~2647 had permissions and confirmed it. 3/3 threshold crossed. Dispatch: `ourliberty-health-notify-script-missing-001.json` → Beacon inbox (iter ~2647). Fix needed: (A) identify/restore the missing notify script, (B) surface and route the unknown "1 issue" health condition. Note: prior dispatch logged 2026-06-09 under 'G-rule health-notify-script-missing' — Beacon should check whether that fix ever landed. verification_pending.
 
 ---
 
@@ -239,6 +239,10 @@
 **Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:mirror-pass-unmerged:PR#N` alerts classify Tier-4 (novel — no translation match in alert-translations.json). Bot delivers as escalate (route=escalate) and DMs Larry. Pulse does NOT send a second DM. 3/3 threshold crossed at iter ~2644 (L1047, 23:08Z). Dispatch: `heal-pipeline-stall-mirror-pass-unmerged-tier3-001.json` → Beacon inbox. verification_pending. Instances: iter ~2629 (PR#685 rev1), iter ~2636 (PR#685 L1039), iter ~2644 (PR#685 L1047).
 
 ---
+
+## Status snapshot — updated 2026-06-24 23:35Z UTC (Iter ~2647, Tier 1, consecutive_clean=0)
+
+**Iter ~2647 summary:** ⚠️ Watch — G-rule ourliberty-health-notify-script-missing **3/3 DISPATCHED** (fires every ~30 min; ourliberty-health-notify-script-missing-001 → Beacon). PR #685 CONFLICTING (carry, mergeable=UNKNOWN this iter); PR #687 CONFLICTING, Mirror session 3 active since 23:10:40Z (~25 min). 0 new alerts (watermark=1050). G-rule watchdog-stale-post-fix: 0 WARNs during Mirror session 3 (positive, fix likely working). Check I: mode=digest, cooldown-suppressed. HEAD=220ba837. PRIME: interventions=1119, systemic_fixes=66, ratio≈16.95, trend=improving. Tier 1, consecutive_clean=0.
 
 ## Status snapshot — updated 2026-06-24 23:27Z UTC (Iter ~2646, Tier 1, consecutive_clean=0)
 
