@@ -625,6 +625,75 @@ class DispatchApprovedTest(unittest.TestCase):
             data = json.load(f)
         self.assertNotIn('reply_chat_id', data)
 
+    def test_dispatch_to_beacon_resources_to_larry(self):
+        # Self-targeted approval (binary direction-ask APPROVAL_REQUEST with
+        # target_agent=beacon). source='beacon' would raise RoutingDenied at
+        # the self-dispatch (beacon->beacon) hard-topology check; re-sourcing
+        # to 'larry' lands the task in Beacon's inbox without raising.
+        entry = {
+            'id': 't-self',
+            'target_agent': 'beacon',
+            'dispatch_payload': _good_payload(
+                task_id='t-self', target_agent='beacon'),
+        }
+        dest = ah.dispatch_approved(entry)
+        self.assertTrue(dest.exists())
+        self.assertEqual(dest.parent.name, 'beacon')
+        with open(dest) as f:
+            data = json.load(f)
+        self.assertEqual(data['source'], 'larry')
+
+    def test_dispatch_to_forge_keeps_beacon_source(self):
+        # Regression guard: non-self targets are unaffected — source stays
+        # 'beacon' for forge (and by symmetry mirror / build_sequence_advancer).
+        entry = {
+            'id': 't-forge',
+            'target_agent': 'forge',
+            'dispatch_payload': _good_payload(
+                task_id='t-forge', target_agent='forge'),
+        }
+        dest = ah.dispatch_approved(entry)
+        with open(dest) as f:
+            data = json.load(f)
+        self.assertEqual(data['source'], 'beacon')
+
+    def test_dispatch_to_beacon_preserves_reply_chat_id(self):
+        # The source=larry re-source must NOT trip the accepts_from_user
+        # soft-reroute (only USER_DM_SOURCES={telegram-webhook} does), so a
+        # positive reply_chat_id still lands in Beacon's inbox intact and the
+        # closing-DM chain keeps its thread anchor.
+        entry = {
+            'id': 't-self-chat',
+            'target_agent': 'beacon',
+            'chat_id': 7998341473,
+            'dispatch_payload': _good_payload(
+                task_id='t-self-chat', target_agent='beacon'),
+        }
+        dest = ah.dispatch_approved(entry)
+        self.assertEqual(dest.parent.name, 'beacon')
+        with open(dest) as f:
+            data = json.load(f)
+        self.assertEqual(data['source'], 'larry')
+        self.assertEqual(data['reply_chat_id'], 7998341473)
+
+    def test_dispatch_to_beacon_preserves_replan_budget(self):
+        # Replan-budget propagation is independent of the re-source: a
+        # self-targeted replan approval still carries replan_count/max_replans.
+        entry = {
+            'id': 't-self-replan',
+            'target_agent': 'beacon',
+            '_replan_count': 2,
+            '_max_replans': 3,
+            'dispatch_payload': _good_payload(
+                task_id='t-self-replan', target_agent='beacon'),
+        }
+        dest = ah.dispatch_approved(entry)
+        with open(dest) as f:
+            data = json.load(f)
+        self.assertEqual(data['source'], 'larry')
+        self.assertEqual(data['replan_count'], 2)
+        self.assertEqual(data['max_replans'], 3)
+
 
 # -------------------- D3.5 5c — replan budget + discipline --------------------
 
