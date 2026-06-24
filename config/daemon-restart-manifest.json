@@ -24,6 +24,7 @@
         "scripts/cycle_prime_ledger.py",
         "scripts/dashboard_api.py",
         "scripts/dispatch_validator.py",
+        "scripts/event_briefing.py",
         "scripts/file_lock.py",
         "scripts/heal_missions_card_gc.py",
         "scripts/heal_orphan_autoregister.py",
@@ -60,12 +61,24 @@
     "ourliberty-chain-event-shipper.service": {
       "entrypoint": "scripts/chain_event_shipper.py",
       "watch_paths": [
+        "scripts/alert_triage_state.py",
         "scripts/atomic_io.py",
+        "scripts/beacon_approval_handler.py",
+        "scripts/chain_event_emit.py",
         "scripts/chain_event_shipper.py",
+        "scripts/cycle_prime_ledger.py",
+        "scripts/dispatch_validator.py",
+        "scripts/event_briefing.py",
         "scripts/file_lock.py",
+        "scripts/larry_alerts.py",
         "scripts/log_ts.py",
+        "scripts/pulse_check_heartbeat.py",
+        "scripts/pulse_check_v.py",
+        "scripts/routing_validator.py",
+        "scripts/safe_write_inbox.py",
         "scripts/supabase_factory.py",
-        "scripts/test_isolation_guard.py"
+        "scripts/test_isolation_guard.py",
+        "scripts/trust_policy.py"
       ]
     },
     "ourliberty-dashboard-api.service": {
@@ -81,6 +94,7 @@
         "scripts/cycle_prime_ledger.py",
         "scripts/dashboard_api.py",
         "scripts/dispatch_validator.py",
+        "scripts/event_briefing.py",
         "scripts/file_lock.py",
         "scripts/heal_missions_card_gc.py",
         "scripts/heal_orphan_autoregister.py",
@@ -176,6 +190,7 @@
         "scripts/cycle_prime_ledger.py",
         "scripts/dashboard_api.py",
         "scripts/dispatch_validator.py",
+        "scripts/event_briefing.py",
         "scripts/file_lock.py",
         "scripts/fixture_patterns.py",
         "scripts/forge_preflight_handler.py",
