@@ -222,6 +222,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-24 20:36Z UTC (Iter ~2624, Tier 1, consecutive_clean=0)
+
+**Iter ~2624 summary:** ⚠️ Watch — PR #685 (forge/escalation-feed, operator-needs-you-feed step 1) opened CONFLICTING; Mirror review dispatched but auto-merge will fail until conflict resolved. PR #684 MERGED (b41884d5). backstop-healer advanced to build phase (build-backstop-healer.json in Forge inbox). G-rule merge_conflict_manual_rebase-tier4 hit **3/3 → dispatched** to Beacon (merge-conflict-rebase-001.json). PRIME: systemic_fixes=61, interventions=1096, ratio≈17.93, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-24 20:26Z UTC (Iter ~2623, Tier 1, consecutive_clean=2)
 
 **Iter ~2623 summary:** ✅ Nominal — all checks clean, no actions. Active pipeline: PR #684 (cred-drift boolean-skip) in Mirror review; Forge inbox has build-escalation-feed (step 1) + backstop-healer (Contract E step 3 preflight). PRIME: systemic_fixes=61, interventions=1095, ratio≈17.95, trend=improving. Tier 1, consecutive_clean=2. G-rules unchanged.
