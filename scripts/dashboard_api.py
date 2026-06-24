@@ -6061,6 +6061,60 @@ def _card_thread_messages(
     return messages
 
 
+def _newest_team_doorbell(
+    events: list[dict[str, Any]],
+) -> Optional[dict[str, Any]]:
+    """The newest `team_to_larry` card_message in ``events`` (newest-first from
+    the fetch) projected as a compact doorbell, or None when the card has no
+    team reply yet. ``blocked`` reflects that message's ``needs_reply`` (Phase 4
+    § 9 loud-vs-quiet doorbell) — True only when it's explicitly set, so an FYI
+    reply (needs_reply false/absent) reads as a quiet dot, not a louder badge."""
+    for ev in events:
+        if (ev.get('event_type') or '') != 'card_message':
+            continue
+        msg = _shape_thread_message(ev)
+        if msg['direction'] != _CARD_MSG_TEAM:
+            continue
+        return {
+            'latest_team_id': msg['id'],
+            'latest_team_ts': msg['ts'],
+            'blocked': msg['needs_reply'] is True,
+        }
+    return None
+
+
+def _project_card_doorbells(
+    captures: list[dict[str, Any]], supabase_client: Any,
+) -> None:
+    """Project a compact per-card `doorbell` signal onto the captures list
+    in place (Missions v2 Phase 4b.2 Contract E, spec § 4). For each PARKED
+    card the kanban already polls, summarize the newest `team_to_larry`
+    card_message — its stable `event_id`, `ts`, and whether it's `blocked`
+    (needs_reply) — so a closed card gets a server-driven unread signal the
+    badge (Contract F) keys on. The open-thread poll (Contract A) is untouched.
+
+    The signal is derived from ONE bounded chain_events read batched across
+    every parked card id (`_fetch_events_for_task_ids`' single `.in_` query —
+    no per-card round-trip), grouped by card id. Fail-safe: any read error
+    degrades every card to `doorbell: null` rather than 500ing the kanban,
+    mirroring how `_reader_captures` degrades a missing file to an empty list.
+    A card with no team reply gets `doorbell: null`."""
+    parked = [
+        c for c in captures
+        if isinstance(c, dict) and c.get('state') == 'parked'
+        and isinstance(c.get('id'), str)
+    ]
+    if not parked:
+        return
+    try:
+        by_task = _fetch_events_for_task_ids(
+            supabase_client, [c['id'] for c in parked])
+    except Exception:  # noqa: BLE001 — a broken doorbell never breaks the board
+        by_task = {}
+    for cap in parked:
+        cap['doorbell'] = _newest_team_doorbell(by_task.get(cap['id']) or [])
+
+
 def _handle_capture_thread(
     *,
     capture_id: str,
@@ -9207,7 +9261,12 @@ def get_system_autonomy_posture() -> dict[str, Any]:
     dependencies=[Depends(_require_token)],
 )
 def get_missions_captures() -> dict[str, Any]:
-    return _reader_captures(_captures_json_path())
+    data = _reader_captures(_captures_json_path())
+    # Phase 4b.2 Contract E: enrich each parked card with a doorbell signal
+    # derived from one batched chain_events read. Additive + fail-safe — the
+    # file-read contract above stands even if the doorbell read degrades.
+    _project_card_doorbells(data['captures'], _get_larry_action_supabase_client())
+    return data
 
 
 class _TTLCache:
