@@ -171,8 +171,10 @@ def alert_briefing(record: dict[str, Any], event_type: str) -> Optional[dict[str
     if not isinstance(entry, dict) or not entry:
         return None
 
-    summary = (entry.get('plain_language_summary') or '').strip()
-    action = (entry.get('recommended_action') or '').strip()
+    # str()-coerce so a mis-authored config entry (non-string summary/action)
+    # can't AttributeError on .strip() — keeps the "never raises" contract literal.
+    summary = str(entry.get('plain_language_summary') or '').strip()
+    action = str(entry.get('recommended_action') or '').strip()
     if not summary and not action:
         return None  # an empty translation is no better than the headline
 
@@ -214,11 +216,13 @@ def decision_briefing(item: dict[str, Any]) -> dict[str, Any]:
     "no translation" hole). Risk = ``map_risk(decision, careful)`` so an
     auto_approved row that nonetheless touches careful-class work surfaces as
     ``careful`` — exactly the signal worth a second glance."""
+    # str()-coerce every field read so a non-string payload value can't
+    # AttributeError on .strip() (keeps the function raise-free on its own).
     decision = item.get('decision')
-    summary = (item.get('summary') or '').strip()
-    repo = (item.get('target_repo') or '').strip()
-    task_type = (item.get('task_type') or '').strip()
-    rule_label = (item.get('rule_label') or '').strip()
+    summary = str(item.get('summary') or '').strip()
+    repo = str(item.get('target_repo') or '').strip()
+    task_type = str(item.get('task_type') or '').strip()
+    rule_label = str(item.get('rule_label') or '').strip()
 
     careful = classify_careful_text(f'{summary} {task_type}')
     risk = map_risk(decision, careful)

@@ -220,5 +220,49 @@ class ShipperIntegrationTest(unittest.TestCase):
         self.assertNotIn('briefing', ev.payload)  # headline fallback intact
 
 
+class NarratorParityTest(unittest.TestCase):
+    """Drift tripwire — event_briefing keeps a deliberate self-contained copy of
+    the risk primitives (to keep the shipper daemon's import surface light), so
+    this asserts the copy stays in lockstep with missions_narrator's source."""
+
+    def test_careful_keywords_match_narrator(self):
+        import missions_narrator as mn
+        self.assertEqual(eb._CAREFUL_KEYWORDS, mn._CAREFUL_KEYWORDS)
+
+    def test_map_risk_truth_table_matches_narrator(self):
+        import missions_narrator as mn
+        for action in ('auto_approve', 'force_ask', 'reject', 'unknown'):
+            for careful in (False, True):
+                self.assertEqual(
+                    eb.map_risk(action, careful), mn.map_risk(action, careful),
+                    f'map_risk divergence: action={action} careful={careful}')
+
+
+class NonStringInputTest(unittest.TestCase):
+    """A mis-authored config entry / payload value (non-string) must not raise —
+    the field reads str()-coerce so the functions are raise-free on their own."""
+
+    def test_alert_briefing_coerces_non_string_translation_fields(self):
+        fake = {'weird': {'subj': {
+            'severity': 'WARNING', 'tier': 'SOON',
+            'plain_language_summary': 12345,       # non-string
+            'recommended_action': ['a', 'list'],   # non-string
+        }}}
+        import alert_triage_state as ats
+        with mock.patch.object(ats, 'load_translations', return_value=fake):
+            b = eb.alert_briefing({'source': 'weird', 'subject': 'subj'}, 'larry_alert')
+        self.assertIsNotNone(b)
+        self.assertEqual(b['risk'], 'medium')
+        self.assertTrue(all(isinstance(v, str) for v in b['briefing'].values()))
+
+    def test_decision_briefing_coerces_non_string_fields(self):
+        d = eb.decision_briefing({
+            'decision': 'auto_approve', 'summary': 999, 'task_type': None,
+            'target_repo': 42, 'rule_label': ['x']})
+        self.assertIn(d['risk'], eb.VALID_RISKS)
+        self.assertEqual(set(d['briefing']), {'what', 'why', 'suggest'})
+        self.assertTrue(all(isinstance(v, str) for v in d['briefing'].values()))
+
+
 if __name__ == '__main__':
     unittest.main()
