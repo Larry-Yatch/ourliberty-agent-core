@@ -40,7 +40,7 @@ The Forge↔Mirror back-and-forth is **not new work**. `_dispatch_revision_to_fo
 
 All of it is built and trusted. **The one thing that breaks for a `claude/` PR is the cold-start:** round 1 has no `forge_build_session_id` to `--resume` (`:4616`), so the `if not forge_session:` guard (`:4515`) bails instead of simply starting Forge **fresh** on the branch. The session is only the *conversation* history; the git state comes from `branch` + `target_repo`, which are on the envelope regardless — a fresh Forge can check out and edit the branch fine.
 
-So the fix is to **bootstrap the existing loop**, not build a new one: on round 1, dispatch Forge fresh (no `--resume`) with a brief rich enough to replace the missing build-conversation context; capture the fresh session id and thread it forward; from round 2 on it is the identical, already-trusted machinery.
+So the fix is to **bootstrap the existing loop**, not build a new one: dispatch Forge fresh (no `--resume`) with a brief rich enough to replace the missing build-conversation context, and let the rest of the machinery (findings serialization, budget, re-review, escalation) run unchanged. **As-built:** every session-less round re-briefs fresh (there is no captured session to thread) — a blind Forge needs context, not continuity, and re-briefing each round is the more robust choice. The normal-path rerun is left untouched.
 
 ## 4. Scope
 
@@ -52,11 +52,13 @@ So the fix is to **bootstrap the existing loop**, not build a new one: on round 
 
 ### M1 — Mechanical cold-start re-dispatch (replaces the Beacon route)
 
-In the `if not forge_session:` branch of `_dispatch_revision_to_forge`, instead of `_route_no_session_revision_to_beacon`, the notifier **directly** dispatches a fresh Forge revision via `build_chain_envelope` (M1 of chain-context-durability — the sanctioned builder). The envelope is the normal revision envelope with `session_id = None` (no `--resume`) and the round-1 brief from M2. The fresh session id Forge returns is captured into its revision outbox and threaded forward so rounds 2+ resume normally — only round 1 is special.
+In the `if not forge_session:` branch of `_dispatch_revision_to_forge`, instead of `_route_no_session_revision_to_beacon` (now removed), the notifier **directly** dispatches a fresh Forge revision via `build_chain_envelope` (M1 of chain-context-durability — the sanctioned builder). The envelope is the normal revision envelope with `session_id` **omitted** (the `forge_build_session_id` carry is `None`, which the builder's truthy guard drops), so `agent_runner` runs Forge fresh; the round-1 brief from M2 supplies the context.
 
-**Decision-finding escape valve.** Mechanical findings (e.g. a missing translation row) → Forge applies and proceeds. A judgment/values finding (e.g. an id-vs-timestamp contradiction) is not Forge's to decide: the cold-start dispatch uses a phase that supports a CLARIFY/question exit (Beacon's `phase=preflight` shape) so Forge routes the decision to Beacon → Larry rather than guessing. The human is pinged only for (i) a genuine scope/values decision, or (ii) the dispatch itself failing (M4).
+**As-built note (simpler than first specced):** there is no session capture/threading. Each cold-start round re-briefs from scratch — a blind Forge needs *context*, not session continuity, and re-briefing every round is more robust than resuming a synthetic session (each round independently carries provenance + PR intent + diff pointer + findings). One exception is preserved: an interactive `source='larry'` PR with a live chat keeps its existing direct DM (`_dm_larry_no_session_revision`); Larry owns and drives that fix.
 
-**Enforcement:** routing code in `outbox_notifier.py`; a test asserting the no-session REVISION path writes a **Forge** revision inbox file (fresh `session_id`, same branch) and does **not** route to Beacon's inbox.
+**Decision-finding escape valve (as-built).** The brief *instructs* Forge: if a finding is a judgment/values call it cannot resolve from the PR intent, leave it unapplied and say so in its result summary (rather than guess), so it surfaces to Beacon/Larry. This is a prompt instruction, not a new marker-routing path — a richer preflight-style CLARIFY exit is a possible follow-up, deliberately not wired here.
+
+**Enforcement:** routing code in `outbox_notifier.py`; a test asserting the no-session REVISION path writes a **Forge** revision inbox file (no `session_id`, same branch) carrying the cold-start brief, opens a `no_session_ledger` obligation, and does **not** route to Beacon's inbox.
 
 ### M2 — The round-1 cold-start brief (the centerpiece)
 
@@ -86,11 +88,13 @@ Repair Check 6 in `heal_pipeline_stall.py`: key it off the M3 ledger (a stuck op
 
 ### M5 — Auto-route `claude/` PRs to Mirror (Gap 1)
 
-Extend the auto-dispatch to cover `claude/` head branches, not just `forge/`: in `heal_undispatched_pr_review.py` (the GitHub-truth backstop) and the unrouted check in `heal_pipeline_stall.py`. Keep the existing head-SHA-aware dedup (`headRefOid`) so a PR updated after review re-reviews on the new head — which is also what lets a fixed PR clear its sticky `mirror-review=failure` status. Optional hardening: have Claude Code **stamp** its PRs (a `claude-code` label or body trailer) so classification is positive rather than inferred from the branch prefix.
+**As-built note:** `heal_undispatched_pr_review.py` had *already* generalized beyond `forge/` by the time this built — it auto-routes (a) `forge/` build PRs and (b) any **non-draft** PR carrying an `auto-review` **label**, across both repos, with head-SHA-aware dedup (`headRefOid`) so a re-pushed PR re-reviews (which is also what clears a sticky `mirror-review=failure`). Its own comment argues *against* branch-prefix gating for human PRs, because the team commits as Larry's identity on `fix/feat/chore` branches — so a prefix can't tell human from agent there.
 
-**Sequencing guard:** M5 opens the floodgate, so it must land **after** M3 + M4 make the session-less path reliable.
+So M5 reduced to one clause in `_is_reviewable_pr`: recognize **`claude/*`** as a third class, routed when non-draft. Unlike `fix/feat/chore`, `claude/` is a reliable *Claude-Code-exclusive* prefix (the droplet agents never use it), so it gates safely on its own without needing the label. Draft still gates (a draft is "still iterating"). The unrouted check in `heal_pipeline_stall.py` was left unchanged — once `claude/` PRs auto-route, they log a routing event and the unrouted check no longer flags them; its recovery for `claude/` is a deferred nicety, not needed for the loop to close.
 
-**Enforcement:** selection tests that a `claude/` PR past grace with no review is selected for dispatch, and that a re-pushed head re-dispatches.
+**Sequencing guard:** M5 widens what reaches the session-less path, so it lands **after** M3 + M4 make that path reliable.
+
+**Enforcement:** `_is_reviewable_pr` selection tests — a non-draft `claude/` PR is reviewable without a label; a draft `claude/` PR is not.
 
 ## 6. Build sequence
 

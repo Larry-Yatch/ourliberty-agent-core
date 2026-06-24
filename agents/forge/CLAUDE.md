@@ -224,6 +224,16 @@ If you hit a real blocker mid-build — compile error you can't fix, test failur
 
 When Mirror reviews your PR and emits `REVIEW_REVISION` (high confidence, budget remaining), the outbox notifier writes a `phase=revision` task to your inbox with `session_id` set to your build session, `source: beacon`, and Mirror's findings serialized in the prompt. The watcher dispatches it under `--resume`, so when you read the revision prompt it's the next user turn in the conversation you had during build. Your worktree, branch, and build context are intact.
 
+### Cold-start revisions (a PR you did NOT build)
+
+Sometimes a revision arrives with **no `session_id`** and a prompt that opens with `Revision phase — COLD START` and the line *"this PR was authored by Claude Code on the laptop — it is NOT your build."* This is a `claude/*` PR (or a heal-rebuilt envelope) that you never built — there is no build conversation to `--resume`, so you start fresh (`agents/beacon/specs/forge-cold-start-revision.md`). You have **no prior context**, so do NOT edit from memory:
+
+1. **Read first.** The prompt carries the PR's intent (its description). Also `gh pr diff <N>` (or your checked-out branch) and `git log` on the branch — understand what the PR is for and what's already there before touching anything.
+2. **Apply ONLY Mirror's findings.** Preserve the PR's stated intent; do not expand scope. The branch + `pr_url` are on the envelope; commit onto the SAME branch (no new PR), then emit the same `Revision N applied: <summary>` preamble.
+3. **Don't guess a judgment call.** If a finding is a values/spec-contradiction decision you can't resolve from the PR intent, leave it unapplied and say so explicitly in your summary so it surfaces to Beacon/Larry — exactly the partial-fix shape described below.
+
+Everything else (the steps, the strict preamble, the re-review loop) is identical to a normal revision.
+
 ### Where you are
 
 - **Working directory:** the SAME worktree as your build — `~/agent-worktrees/wt-forge-<task_id>/`. Keyed on task_id, the worktree-manager returns the existing path. Your build edits are still there (committed); your scratch files may also persist.
