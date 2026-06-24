@@ -4,6 +4,110 @@
 
 ---
 
+## Iteration ~2570 — 2026-06-24T02:44Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→1)
+
+**Trigger:** Larry `/cycle` invocation (chat mode).
+
+**Health:** ✅ Nominal — 0 new alerts, all mandatory + additive checks clean. 8/8 daemons alive (same PIDs). HEAD=88c24629=origin/main, clean. 2 open PRs on agent-core (#661, #662) both in active Mirror review. Dashboard PR #88 still open.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Daemons (re-verified):** chain_event=930563 (SNs) ✅, inbox_watcher=1389730 (Ssl) ✅, forge_bot=1388801 (Ss) ✅, mirror_bot=1388982 (Ss) ✅, pulse_bot=1389067 (Ss) ✅, dashboard_api=1580445 (Ssl) ✅, beacon_telegram_bot=1580654 (Ss) ✅, outbox_notifier=1580739 (Ss) ✅. 8/8 alive, same PIDs as ~2569. ✅
+- **push-soft-gate-block-upgrade-decision (re-verified):** 0 new alerts this iter. Awaiting Larry decision. [carry yellow] ✅
+- **credential-drift:OURLIBERTY_BOARD_DRAIN_ENABLED (re-verified):** watermark=1024=file_length; no new alerts. [carry yellow] ✅
+- **fix-645-alert-translation-001 stall (re-verified):** WARN `larry_alerts append failed for forge_built_no_pr:fix-645-alert-translation-001` persists in Check 3 dry-run. [carry blue] ✅
+- **dashboard PR #88 (re-verified):** Still open (22:43:31Z, forge/live-thread, MERGEABLE). Descope task built: Forge opened PR #662 (spec(missions): descope Phase 4b) at 02:38:35Z; Mirror has review-descope-phase4b-closed-card-badge-001.json queued. [carry blue — updated: Forge delivered, Mirror reviewing] ✅
+- **seq-advancer-sequence-stranded DISPATCHED (re-verified):** PR #661 (advancer-open-pr-precheck-001) open since 02:32:51Z; Mirror has review-advancer-open-pr-precheck-001.json queued. [carry → verification progressing] ✅
+- **live-thread-approval-self-dispatch-fix-001 DISPATCHED (re-verified):** Dispatched to Beacon inbox in ~2569. Beacon inbox now empty — task consumed. Downstream action (Beacon → Forge spec) status: in-progress per normal Beacon processing cadence. [carry pending Forge task] ✅
+
+**New since ~2569:** commit 88c24629 `Pulse cycle 20260624T024044Z` (run_cycle.sh auto-commit for ~2569). PR #662 `spec(missions): descope Phase 4b closed-card unread badge to a follow-on` opened by Forge at 02:38:35Z (forge/descope-phase4b-closed-card-badge-001, UNKNOWN mergeable). Beacon consumed `notify-descope-phase4b-closed-card-badge-001` from inbox (empty at cycle time). Mirror inbox: 2 review tasks (advancer-open-pr-precheck-001 + descope-phase4b-closed-card-badge-001), both fresh. HEAD=88c24629=origin/main. ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 1024, "file_length": 1024}` — **0 new alerts**. ✅ Nominal.
+
+**Check 1 — Log noise (30-min window):** journalctl --user -p warning → `-- No entries --` (0 WARN/ERROR). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot PID 1580654 (Ss) ✅. Reviewed bot log since ~2569 (02:38Z). Last entry: 02:41:19Z Larry "Check the status on this plan..." → Beacon state_log answer delivered. All directives handled by Beacon. No untracked directives for Pulse. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → `0 new alert(s) fired, 0 recovered, 1 suppressed` (fix-645 cooldown only). All FORGE_NO_PR_SKIP are pr_exists/preflight_exit/superseded_session. Fix-645 WARN persists. ✅ Nominal.
+
+**Check 4 — Pending directives:** Beacon inbox: empty. Forge inbox: empty. Mirror inbox: 2 review tasks (both fresh, within processing window). beacon-pending-approvals: pending=0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-24T02:32:59Z (~11 min before cycle). Within 60-min window. ✅ Nominal.
+
+**Check A — Source repo:** On main. HEAD=88c24629=origin/main (clean, 0 behind). Untracked: `agents/beacon/specs/missions-v2-funnel-item-doorbell.md` — new Beacon spec, uncommitted. Informational. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json last_sync=2026-06-24T02:09:09Z (~35 min ago), status=no-change. Within 2-hour window. ✅ Nominal.
+
+**Check C — Agent liveness:** 8/8 alive (same PIDs — see VERIFY-BEFORE-REASSERT). ✅ Nominal.
+
+**Check D — Inboxes:** Beacon: empty. Forge: empty. Mirror: 2 review tasks (fresh). ✅ Nominal.
+
+**Check E — PRs:**
+- ourliberty-agent-core: PR #661 `fix(advancer): check for open PR before stranding a stalled sequence step` (02:32:51Z, forge/advancer-open-pr-precheck-001, UNKNOWN, reviewDecision="") — ~11 min old, Mirror review active. ✅ Within 30-min threshold.
+- ourliberty-agent-core: PR #662 `spec(missions): descope Phase 4b closed-card unread badge to a follow-on` (02:38:35Z, forge/descope-phase4b-closed-card-badge-001, UNKNOWN, reviewDecision="") — ~5 min old, Mirror review dispatched. ✅ Very fresh.
+- ourliberty-dashboard: PR #88 (22:43:31Z, forge/live-thread, MERGEABLE, reviewDecision="") — ~4.4h, no Mirror routing for dashboard. [carry blue]
+
+**Check H — Forge digest:** Since ~2569: PR #662 opened by Forge at 02:38:35Z for descope-phase4b-closed-card-badge-001. Mirror has both PR #661 + PR #662 review tasks queued. Pipeline active. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. ✅
+
+**Conditional checks — Wednesday 2026-06-24 UTC (weekday=2 ∈ {0,2,4,6}):**
+- **Check I:** `pulse_check_i.py --force` → `journal: skipped (block for 2026-06-22 already present)`. Auto-dispatch dedup skip (prior task `pulse-auto-f8ac2e3afc-20260622`). Mode=digest, 0 parked proposals. ✅ Nominal.
+- **Check III:** Last 2026-06-11 (13d < 14d gate, not Sunday) → skip. ✅
+
+**G-rule assessment:**
+- **seq-advancer-sequence-stranded:** G-rule DISPATCHED (prior). PR #661 open, Mirror review active. [carry → verification progressing]
+- **live-thread-approval-self-dispatch-denied:** G-rule DISPATCHED (prior, ~2569). Beacon consumed task. [carry → verification in progress]
+- All other G-rule counts unchanged from ~2569. [all carry]
+
+**Actions taken:**
+1. PRIME ledger: `iter_clean` appended (tier=1, template=iter-clean).
+2. Tier state: `record --checks-clean true` → consecutive_clean 0→1 (need 2 more clean iters for Tier 2 de-escalation).
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Known false positive (Mirror REVIEW_PASS confirmed, manual merge). Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [blue] **ourliberty-dashboard PR #88 open** — `feat(missions): live-feel thread`. forge/live-thread, MERGEABLE. Descope PR #662 now in Mirror review. [carry — updated]
+- [blue] **unreviewed-merge:655** — PR #655 merged manually by Larry. Larry judgment. [carry]
+- [blue] **fix-645-alert-translation-001 worktree stall** — WARN persists in heal_pipeline_stall dry-run. [carry]
+- [blue] **G-rule seq-advancer-sequence-stranded** — DISPATCHED → PR #661 open, Mirror reviewing. [carry → verification progressing]
+- [blue] **G-rule live-thread-approval-self-dispatch-denied** — DISPATCHED (live-thread-approval-self-dispatch-fix-001 → Beacon). Beacon consumed. [carry pending Forge action]
+- [blue] **G-rule sequence-step-review-escalate-null-chat** — 1/3. [carry]
+- [blue] **G-rule medic-approval-request-novel-tier4** — 1/3. [carry]
+- [blue] **G-rule heal-pipeline-stall-dry-run-writes-real-alerts** — 1/3. [carry]
+- [blue] **G-rule beacon-claude-timeout** — 1/3. [carry]
+- [blue] **G-rule api-500-burst** — 1/3. [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. [carry]
+- [blue] **G-rule telegram-409-burst** — 2/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. [carry]
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. [carry]
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. [carry]
+- [blue] **G-rule sync.service-deploy-restart-storm-tier4** — 1/3. [carry]
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. [carry]
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 1/3. [carry]
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. [carry]
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. [carry]
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 1/3. [carry]
+- [blue] **G-rule health-notify-script-missing** — dispatch sent 2026-06-09. [carry]
+- [blue] **unreviewed-merge:628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **Stale bash orphan PID 1834248** — benign. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. Informational. [carry]
+- [blue] **Untracked Beacon spec** — `agents/beacon/specs/missions-v2-funnel-item-doorbell.md`. Beacon should commit in next session. [informational]
+
+**PRIME DIRECTIVE:** 0 interventions, 0 systemic_fixes, 0 verification_pending this iter (iter_clean). Trailing-30d: interventions=1083, systemic_fixes=60, verification_pending=21, ratio=18.05, trend=improving.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=1 (need 2 more clean iters for Tier 2 de-escalation).
+
+---
+
 ## Iteration ~2569 — 2026-06-24T02:38Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 1→0)
 
 **Trigger:** Larry `/cycle` invocation (chat mode, /loop dynamic).
