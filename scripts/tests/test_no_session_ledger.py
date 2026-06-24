@@ -114,6 +114,25 @@ def test_prune_drops_aged_resolved_keeps_open():
     assert {'keepopen', 'trigger'} <= ids  # open rows survive
 
 
+def test_prune_never_evicts_open_rows(monkeypatch):
+    # The cap must bound only RESOLVED-row growth; an OPEN obligation is never
+    # evicted (losing one would blind the backstop). cap=3, with 5 open + 2
+    # resolved → all 5 open survive, resolved dropped to honor the cap.
+    monkeypatch.setattr(nsl, '_MAX_ROWS', 3)
+    for i in range(5):
+        nsl.open_obligation(f'open{i}', pr_url=f'p{i}',
+                            now=T0 + timedelta(minutes=i))
+    for i in range(2):
+        nsl.open_obligation(f'res{i}', pr_url=f'r{i}', now=T0)
+        nsl.resolve_obligation(f'res{i}', now=T0)
+    # Any write triggers a prune.
+    nsl.open_obligation('trigger', pr_url='t', now=T0 + timedelta(minutes=10))
+    rows = nsl._load()
+    open_ids = {k for k, v in rows.items() if v['status'] == nsl.OPEN}
+    assert {'open0', 'open1', 'open2', 'open3', 'open4', 'trigger'} <= open_ids
+    assert 'res0' not in rows and 'res1' not in rows  # resolved dropped
+
+
 def test_corrupt_file_degrades_to_empty(tmp_path):
     nsl.LEDGER_FILE.parent.mkdir(parents=True, exist_ok=True)
     nsl.LEDGER_FILE.write_text('{ not json')
