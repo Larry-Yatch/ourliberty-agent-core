@@ -891,6 +891,208 @@ def apply_step_merged(
     )
 
 
+# -------------------- step-failed (push-signal non-merge terminals) --------------------
+
+
+def apply_step_failed(
+    seq_id: str,
+    step_id: str,
+    failure_reason: str,
+    actor: str = 'notifier',
+) -> Result:
+    """Mark a step `failed` from a terminal NON-merge outcome and pause the
+    sequence.
+
+    Push-signal sibling to `apply_step_merged`. Where the merge path flips a
+    step `dispatched → merged` and rolls the sequence up to `complete`, this
+    flips a step `→ failed` and pauses the sequence so no dependent step is
+    dispatched onto a broken predecessor. The notifier calls it the moment it
+    classifies a terminal failure — a Forge preflight REJECT, a marker-error /
+    dead-letter exhaustion, or a build crash — instead of leaving the step in
+    `dispatched` for the advancer to notice on a later poll.
+
+    Why push it from the notifier: a non-merge terminal otherwise leaves the
+    step `dispatched`, where the 4h stall backstop
+    (`_escalate_stranded_dispatched_steps`) eventually MISATTRIBUTES it as
+    "Forge may never have picked it up" (the slice-2b incident). Flipping the
+    step terminal here removes it from `dispatched` at once, so the stall
+    backstop never misfires and Larry sees the real reason now.
+
+    Mirrors the advancer's own failed-transition semantics
+    (`build_sequence_advancer._process_active_sequence`): status `failed`,
+    record `failure_reason`, clear `current_actor`, KEEP the step in
+    `current_steps` for operator visibility, and flip a live sequence
+    (`active`/`pending`) to `paused` with a `sequence-paused` audit entry.
+
+    Idempotent:
+      - step already `failed` → `applied=False` no-op.
+      - step already `merged` → `applied=False` no-op. A real merge is
+        terminal; a late or duplicate failure signal must NEVER clobber a
+        success (the success/failure race resolves in favor of success).
+    Step not found → hard error.
+    """
+    seq, err = _read_sequence(seq_id)
+    if err is not None:
+        return err
+    path = _seq_path(seq_id)
+    step = _find_step(seq, step_id)
+    if step is None:
+        return Result(
+            applied=False,
+            reason=f'Step `{step_id}` not found in sequence `{seq_id}`',
+            sequence_path=path,
+            error=True,
+        )
+    current = step.get('status')
+    if current == 'failed':
+        return Result(
+            applied=False,
+            reason=(
+                f'Step `{step_id}` in sequence `{seq_id}` is already '
+                f'`failed`; no-op'
+            ),
+            sequence_path=path,
+        )
+    if current == 'merged':
+        return Result(
+            applied=False,
+            reason=(
+                f'Step `{step_id}` in sequence `{seq_id}` is already '
+                f'`merged`; failure signal is a no-op (a real merge is '
+                f'terminal and is never clobbered)'
+            ),
+            sequence_path=path,
+        )
+
+    now = _now_iso()
+    step['status'] = 'failed'
+    step['failure_reason'] = failure_reason
+    step['current_actor'] = None
+    # Unlike apply_step_merged, the failed step STAYS in current_steps so the
+    # paused sequence shows operator-visibly which step broke (mirrors the
+    # advancer keeping it for visibility).
+    _append_audit(seq, {
+        'ts': now,
+        'event': 'step-failed',
+        'step_id': step_id,
+        'reason': failure_reason,
+        'actor': actor,
+    })
+    paused = seq.get('status') in ('active', 'pending')
+    if paused:
+        seq['status'] = 'paused'
+        _append_audit(seq, {
+            'ts': now,
+            'event': 'sequence-paused',
+            'reason': f'Step `{step_id}` failed: {failure_reason}',
+            'actor': actor,
+        })
+    write_err = _atomic_write(path, seq)
+    if write_err is not None:
+        return write_err
+    return Result(
+        applied=True,
+        reason=(
+            f'Step `{step_id}` in sequence `{seq_id}` transitioned '
+            f'`{current}` → `failed` ({failure_reason})'
+            + ('; sequence paused' if paused else '')
+        ),
+        sequence_path=path,
+    )
+
+
+# -------------------- step-pr-opened (pr_url + substatus at PR-open) --------------------
+
+
+def apply_step_pr_opened(
+    seq_id: str,
+    step_id: str,
+    pr_url: str,
+    actor: str = 'notifier',
+) -> Result:
+    """Record a step's `pr_url` and flip its substatus to `reviewing` when its
+    PR opens — not only at merge.
+
+    Push-signal companion to `apply_step_merged`. Forge's build phase opens one
+    PR and the notifier dispatches Mirror's review; this records that PR on the
+    step at OPEN time, which restores two things the merge-only recording lost:
+
+      1. The advancer's dual-gate `gh` leg (`gh_pr_says_merged(step.pr_url)`)
+         is computed only `if pr_url` — with `pr_url` unset until merge it was
+         dark during the whole review window. Recording it here lights that leg
+         up so the belt-and-suspenders gate works during review.
+      2. The 4h stall backstop distinguishes a step with an OPEN PR in review
+         (`pr_url` set → "in review, don't strand") from one that never opened
+         a PR (`pr_url` unset → genuine stall). Without an open-time `pr_url`
+         both looked identical.
+
+    Substatus `dispatched → reviewing` per orchestrator §5.1; `current_actor`
+    becomes `mirror` (the review is now hers). The sequence status is
+    untouched — an in-flight PR-open is not a sequence-level transition.
+
+    Idempotent / monotonic — never walks a terminal step backward:
+      - step already `merged` or `failed` → `applied=False` no-op (terminal;
+        a re-processed build outbox must not reopen review on a done step).
+      - step already `reviewing` with the SAME `pr_url` → `applied=False`
+        no-op (clean re-fire from a build-outbox re-process).
+    Step not found → hard error.
+    """
+    seq, err = _read_sequence(seq_id)
+    if err is not None:
+        return err
+    path = _seq_path(seq_id)
+    step = _find_step(seq, step_id)
+    if step is None:
+        return Result(
+            applied=False,
+            reason=f'Step `{step_id}` not found in sequence `{seq_id}`',
+            sequence_path=path,
+            error=True,
+        )
+    current = step.get('status')
+    if current in ('merged', 'failed'):
+        return Result(
+            applied=False,
+            reason=(
+                f'Step `{step_id}` in sequence `{seq_id}` is already terminal '
+                f'`{current}`; pr-open is a no-op'
+            ),
+            sequence_path=path,
+        )
+    if current == 'reviewing' and step.get('pr_url') == pr_url:
+        return Result(
+            applied=False,
+            reason=(
+                f'Step `{step_id}` in sequence `{seq_id}` is already '
+                f'`reviewing` with pr={pr_url}; no-op'
+            ),
+            sequence_path=path,
+        )
+
+    now = _now_iso()
+    step['status'] = 'reviewing'
+    step['pr_url'] = pr_url
+    step['current_actor'] = 'mirror'
+    _append_audit(seq, {
+        'ts': now,
+        'event': 'step-pr-opened',
+        'step_id': step_id,
+        'pr_url': pr_url,
+        'actor': actor,
+    })
+    write_err = _atomic_write(path, seq)
+    if write_err is not None:
+        return write_err
+    return Result(
+        applied=True,
+        reason=(
+            f'Step `{step_id}` in sequence `{seq_id}` transitioned '
+            f'`{current}` → `reviewing` (pr={pr_url})'
+        ),
+        sequence_path=path,
+    )
+
+
 # -------------------- no-delta / already-merged build outcome --------------------
 #
 # Forge's build phase opens ONE PR for the work it builds. When a build session

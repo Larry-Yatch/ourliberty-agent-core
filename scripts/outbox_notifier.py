@@ -2157,6 +2157,16 @@ def _notify_forge_marker_error(data: dict[str, Any], err_msg: str) -> None:
         _dead_letter_marker_error_to_dispatcher(
             data, original_source, err_msg, new_count,
         )
+        # push-signal-and-substatus (B): a dead-lettered marker-error cascade is
+        # terminal for a build-sequence step (the dispatch is closed; no PR will
+        # open) — fail the step + pause the sequence now instead of stranding it
+        # `dispatched` for the 4h stall backstop. No-op for non-sequence tasks.
+        _signal_sequence_step_failed(
+            task_id,
+            f'Forge marker-error retries exhausted '
+            f'({new_count}/{MAX_MARKER_ERROR_RETRIES}); dead-lettered to '
+            f'{original_source}: {err_msg}',
+        )
         return
 
     prompt = build_notify_prompt(
@@ -5756,6 +5766,214 @@ def _signal_sequence_step_merged(
         log(
             f'sequence-step-merged scan raised {type(e).__name__}: {e}; '
             f'swallowing — DM path still fires',
+            'WARN',
+        )
+    return None
+
+
+def _active_sequence_id_for_step(task_id: str) -> Optional[str]:
+    """Return the seq_id of the single active (status ∈ {pending, active})
+    sequence that contains a step whose `step_id == task_id`, or None.
+
+    Shared active-sequence scan for the push-signal helpers below
+    (`_signal_sequence_step_failed`, `_signal_sequence_step_pr_opened`),
+    using the same convention as `_signal_sequence_step_merged`: match a step
+    by `step_id == task_id` (not by parsing the id string) and skip terminal
+    sequences (complete / failed / archived / paused). Best-effort: an
+    unreadable / malformed file is logged WARN and skipped; the caller's notify
+    path never depends on the scan. Returns the FIRST matching seq_id."""
+    seq_dir = AGENTS_ROOT / 'blackboard' / 'build-sequences'
+    if not seq_dir.is_dir():
+        return None
+    for seq_path in sorted(seq_dir.glob('*.json')):
+        if seq_path.suffix != '.json':
+            continue
+        try:
+            seq = json.loads(seq_path.read_text())
+        except (OSError, json.JSONDecodeError) as e:
+            log(
+                f'sequence-step-scan: skipping {seq_path.name} '
+                f'(unreadable: {type(e).__name__}: {e})',
+                'WARN',
+            )
+            continue
+        if not isinstance(seq, dict):
+            continue
+        if seq.get('status') not in ('pending', 'active'):
+            continue
+        seq_id = seq.get('seq_id')
+        if not isinstance(seq_id, str) or not seq_id:
+            continue
+        steps = seq.get('steps') or []
+        if any(
+            isinstance(s, dict) and s.get('step_id') == task_id
+            for s in steps
+        ):
+            return seq_id
+    return None
+
+
+def _signal_sequence_step_failed(
+    task_id: str, failure_reason: str,
+) -> Optional[str]:
+    """Push-signal a build-sequence step FAILED the moment the notifier
+    classifies a terminal non-merge outcome — a Forge preflight REJECT, a
+    marker-error / dead-letter exhaustion, or a build crash — instead of
+    leaving the step `dispatched` for the advancer's gate poll + 4h stall
+    backstop to (mis)handle.
+
+    Sibling to `_signal_sequence_step_merged`. Same active-sequence scan and
+    step-match (`step_id == task_id`), same daemon-never-wedge posture: every
+    read / mutation error is logged WARN and swallowed so the notify /
+    dead-letter path the caller is on never crashes on a sequence-file
+    accident. Calls `ssh.apply_step_failed`, which flips the step `→ failed`,
+    records `failure_reason`, keeps it in `current_steps` for visibility, and
+    pauses the sequence.
+
+    On a real transition (`applied=True`) raises ONE Larry doorbell alert via
+    `larry_alerts.append_alert` — the paused sequence has no reply-chat thread,
+    so this is the same sink the advancer's pause-DM and
+    `_maybe_signal_sequence_complete` use. Because the sequence is now
+    `paused`, the advancer skips it on its next tick, so there is no
+    double-alert. The idempotent no-op branch (already failed / already merged)
+    alerts nothing.
+
+    Why this matters (slice-2b incident): a non-merge terminal otherwise leaves
+    the step `dispatched`, where `_escalate_stranded_dispatched_steps`
+    eventually MISATTRIBUTES the stall as "Forge may never have picked it up."
+    Flipping the step terminal here removes it from `dispatched` at once.
+
+    Returns the seq_id whose step was failed, or None when no active sequence
+    claimed this task_id (the common case — most outboxes are not sequence
+    steps)."""
+    try:
+        seq_id = _active_sequence_id_for_step(task_id)
+        if seq_id is None:
+            return None
+        try:
+            result = ssh.apply_step_failed(
+                seq_id=seq_id,
+                step_id=task_id,
+                failure_reason=failure_reason,
+                actor='notifier',
+            )
+        except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+            log(
+                f'SEQUENCE_STEP_FAILED seq={seq_id} step={task_id} '
+                f'apply_step_failed raised {type(e).__name__}: {e}',
+                'WARN',
+            )
+            return seq_id
+        if result.error:
+            log(
+                f'SEQUENCE_STEP_FAILED seq={seq_id} step={task_id} '
+                f'hard-error: {result.reason}',
+                'WARN',
+            )
+            return seq_id
+        if not result.applied:
+            log(
+                f'SEQUENCE_STEP_FAILED seq={seq_id} step={task_id} '
+                f'no-op ({result.reason})',
+            )
+            return seq_id
+        log(
+            f'SEQUENCE_STEP_FAILED seq={seq_id} step={task_id}: '
+            f'{failure_reason}',
+        )
+        try:
+            larry_alerts.append_alert(
+                source='outbox-notifier',
+                severity='warning',
+                message=(
+                    f'Build sequence `{seq_id}` paused — step `{task_id}` '
+                    f'failed:\n\n{failure_reason}\n\n'
+                    f'Recovery shortcuts: `resume sequence {seq_id}` / '
+                    f'`cancel sequence {seq_id}` / `retry sequence {seq_id} '
+                    f'step {task_id}` (after fixing the underlying issue).'
+                ),
+                subject=f'sequence-paused:{seq_id}',
+                route='escalate',
+            )
+        except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+            log(
+                f'SEQUENCE_STEP_FAILED seq={seq_id} step={task_id} '
+                f'pause-alert raised {type(e).__name__}: {e}; '
+                f'state already transitioned',
+                'WARN',
+            )
+        return seq_id
+    except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+        log(
+            f'sequence-step-failed scan raised {type(e).__name__}: {e}; '
+            f'swallowing — caller notify path still fires',
+            'WARN',
+        )
+    return None
+
+
+def _signal_sequence_step_pr_opened(
+    task_id: str, pr_url: str,
+) -> Optional[str]:
+    """Record `pr_url` + flip a build-sequence step to the `reviewing`
+    substatus the moment Forge's build PR opens (the notifier dispatches
+    Mirror's review at the same site), rather than recording `pr_url` only at
+    merge.
+
+    Sibling scan to `_signal_sequence_step_merged`; calls
+    `ssh.apply_step_pr_opened`. No Larry alert — an in-flight PR-open is normal
+    progress, not an operator event. daemon-never-wedge throughout: a
+    sequence-file accident is logged WARN and swallowed, and the Mirror-review
+    dispatch the caller already performed is unaffected.
+
+    Recording `pr_url` at OPEN restores (1) the advancer's dual-gate `gh` leg
+    during review — `gh_pr_says_merged(step.pr_url)` is computed only
+    `if pr_url`, so an unset value left it dark until merge — and (2) the stall
+    backstop's never-opened-a-PR vs. open-PR-in-review distinguisher.
+
+    Returns the seq_id updated, or None when no active sequence claims this
+    task_id."""
+    try:
+        seq_id = _active_sequence_id_for_step(task_id)
+        if seq_id is None:
+            return None
+        try:
+            result = ssh.apply_step_pr_opened(
+                seq_id=seq_id,
+                step_id=task_id,
+                pr_url=pr_url,
+                actor='notifier',
+            )
+        except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+            log(
+                f'SEQUENCE_STEP_PR_OPENED seq={seq_id} step={task_id} '
+                f'pr={pr_url} apply_step_pr_opened raised '
+                f'{type(e).__name__}: {e}',
+                'WARN',
+            )
+            return seq_id
+        if result.error:
+            log(
+                f'SEQUENCE_STEP_PR_OPENED seq={seq_id} step={task_id} '
+                f'pr={pr_url} hard-error: {result.reason}',
+                'WARN',
+            )
+            return seq_id
+        if result.applied:
+            log(
+                f'SEQUENCE_STEP_PR_OPENED seq={seq_id} step={task_id} '
+                f'pr={pr_url}',
+            )
+        else:
+            log(
+                f'SEQUENCE_STEP_PR_OPENED seq={seq_id} step={task_id} '
+                f'pr={pr_url} no-op ({result.reason})',
+            )
+        return seq_id
+    except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+        log(
+            f'sequence-step-pr-opened scan raised {type(e).__name__}: {e}; '
+            f'swallowing — Mirror-review dispatch still fired',
             'WARN',
         )
     return None
@@ -9660,9 +9878,16 @@ def process_outbox(outbox_file: Path) -> str:
     # Beacon below still fires via the default routing path, so Beacon
     # journals "PR opened" while Mirror starts her review.
     if agent == 'forge' and data.get('phase') == 'build':
+        build_task_id = data.get('task_id', '')
         pr_url = _extract_pr_url_from_build_result(data.get('result', ''))
         if pr_url:
             _dispatch_mirror_review(data, pr_url)
+            # push-signal-and-substatus (C): record `pr_url` + flip the
+            # sequence step to the `reviewing` substatus at PR-OPEN, not only at
+            # merge. Lights up the advancer's dual-gate `gh` leg during review
+            # and the stall backstop's open-PR-in-review distinguisher. No-op
+            # for non-sequence tasks.
+            _signal_sequence_step_pr_opened(build_task_id, pr_url)
         else:
             # No `PR opened:` line. Forge may have HONESTLY refused to open one
             # because this slice already merged via another path (a concurrent
@@ -9673,7 +9898,20 @@ def process_outbox(outbox_file: Path) -> str:
             # Larry to reconcile by hand (the 2026-06-20 incident). A genuine
             # build failure (no merged PR named) falls through unchanged and the
             # stall backstop still escalates it as a real failure.
-            _maybe_reconcile_already_merged_build(data)
+            reconciled = _maybe_reconcile_already_merged_build(data)
+            # push-signal-and-substatus (B): a build that opened NO PR and is
+            # NOT an honest already-merged no-delta (reconciled is None) AND
+            # exited non-zero is a genuine build crash — fail the step + pause
+            # the sequence now rather than stranding it `dispatched` for the 4h
+            # stall backstop (which would misattribute "never picked up").
+            # exit_code == 0 with no merged PR is an ambiguous clean refusal,
+            # left to fall through unchanged (conservative).
+            if reconciled is None and data.get('exit_code') != 0:
+                _signal_sequence_step_failed(
+                    build_task_id,
+                    f'Forge build crashed (exit_code='
+                    f'{data.get("exit_code")}) and opened no PR',
+                )
         # Build phase emits no marker (preflight-only); the guarded classifier
         # below leaves marker_decision None and the default routing path takes
         # over (Beacon notify with the full build result narrative).
@@ -9939,6 +10177,20 @@ def process_outbox(outbox_file: Path) -> str:
         # emit above is narrower — only the in-budget clarify question).
         if marker_decision:
             _emit_preflight_outcome_chain_event(data, marker_decision, agent='forge')
+            # push-signal-and-substatus (B): a terminal preflight REJECT fails
+            # the build-sequence step + pauses the sequence NOW, instead of
+            # stranding it `dispatched` until the advancer poll / 4h backstop.
+            # `_preflight_outcome_event_type` folds the over-budget
+            # clarification-exhausted case (structurally a reject) into
+            # `preflight_reject`; a PROCEED or in-budget CLARIFY is not a
+            # failure. No-op for non-sequence tasks.
+            if _preflight_outcome_event_type(marker_decision) == 'preflight_reject':
+                _signal_sequence_step_failed(
+                    data.get('task_id', ''),
+                    f'Forge preflight REJECT '
+                    f'(marker_type={marker_decision.get("marker_type")}, '
+                    f'intent={marker_decision.get("intent")})',
+                )
 
     # PR-S4 rectification (H1) — Mirror DAG-preflight result handler.
     # Fires BEFORE the regular Mirror marker classifier because DAG
