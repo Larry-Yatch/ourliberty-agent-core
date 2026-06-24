@@ -166,6 +166,34 @@ class ScanEnvFileTest(_IsolatedAgentsRoot):
             h.scan_env_file(Path('/tmp/does-not-exist-xyzzy')), set(),
         )
 
+    def test_boolean_flag_values_are_skipped(self):
+        # A boolean on/off tunable is not a credential — it must never be
+        # returned, so it can't trip MISSING_REGISTRY_ENTRY (the durable
+        # class-fix for the *_ENABLED feature-flag false-positive treadmill).
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / '.env'
+            p.write_text(
+                'OURLIBERTY_BOARD_DRAIN_ENABLED=true\n'
+                'OURLIBERTY_NEWMISSION_INGEST_ENABLED=1\n'
+                'FLAG_OFF=false\n'
+                'FLAG_NO=no\n'
+                'FLAG_ON="on"\n'
+                'FLAG_CAPS=TRUE\n'
+                'REAL_TOKEN=ghp_abcdef123\n'
+            )
+            self.assertEqual(h.scan_env_file(p), {'REAL_TOKEN'})
+
+    def test_credential_value_resembling_bool_prefix_still_returned(self):
+        # Guard the skip stays narrow: only an EXACT boolean literal is dropped.
+        # A real secret that merely starts with "true"/"on" is still a credential.
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / '.env'
+            p.write_text(
+                'TRUE_SECRET=truextra\n'   # not exactly "true"
+                'ONE_TOKEN=10\n'           # not exactly "1" or "0"
+            )
+            self.assertEqual(h.scan_env_file(p), {'TRUE_SECRET', 'ONE_TOKEN'})
+
 
 class ScanClaudeCliTest(_IsolatedAgentsRoot):
     def test_detects_active_oauth(self):
