@@ -4,6 +4,99 @@
 
 ---
 
+## Iteration ~2603 — 2026-06-24T12:18Z UTC (interactive /cycle via chat, Tier 3, consecutive_clean 5→6)
+
+**Trigger:** Larry `/cycle` invocation (chat mode).
+
+**Health:** ✅ Clean — 1 new alert post-Check-I (L995 Tier-3 silence: check-i-2026-06-22 repeat). 8/8 daemons alive (same PIDs as ~2602). 0 open PRs (agent-core + dashboard). All inboxes empty. HEAD=00d3b27f=origin/main.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Daemons (re-verified):** beacon_telegram_bot=1817592 ✅, outbox_notifier=1817345 ✅, dashboard_api=1817680 ✅, forge_bot=1388801 ✅, mirror_bot=1388982 ✅, pulse_bot=1389067 ✅, inbox_watcher=1732118 ✅, chain_event_shipper=1742173 ✅. 8/8 alive, same PIDs as ~2602. ✅
+- **Untracked Beacon spec:** `agents/beacon/specs/missions-v2-funnel-item-doorbell.md` — still untracked (git status confirmed). Larry authoring in progress. [carry]
+- **beacon-pending-approvals pending=1:** check-i-repeat-dm-fix-001 — expected pending state. [carry]
+- **All other carry items:** No change from ~2602. [carry]
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 994, "file_length": 994}`. 0 new alerts at cycle start. ✅ Nominal.
+**(Post-Check-I):** file_length=995. L995 (`source=pulse, subject=check-i-2026-06-22, route=escalate`) → **Tier-3 silence** (known-pattern match, PR #604). Another instance of the check-i-2026-06-22 repeat DM; fix (check-i-repeat-dm-fix-001) is verification_pending awaiting Larry approval. Watermark advanced 994→995. ✅ Nominal.
+
+**Check 1 — Log noise (30-min window):** `journalctl --user -p warning` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last bot log entries at 05:18 MDT (11:18Z): `notification idx=993 delivered (intent=doorbell)`. No new entries since ~2602. No new Larry directives. Bot alive. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → `no stalls detected`. All FORGE_NO_PR_SKIP entries have existing PRs/branches. ✅ Nominal.
+
+**Check 4 — Pending directives:** All inboxes empty (beacon, forge, pulse, mirror). beacon-pending-approvals: pending=1 (check-i-repeat-dm-fix-001, awaiting Larry approval — expected). ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-24T12:10:15Z (~8 min before cycle read). Within 60-min window. ✅ Nominal.
+
+**Check A — Source repo:** On main. HEAD=00d3b27f=origin/main (clean, 0 behind, 0 ahead). Latest commit: "Pulse cycle 20260624T114634Z" (wrapper auto-commit from ~2602, normal). Untracked: `agents/beacon/specs/missions-v2-funnel-item-doorbell.md` (Larry authoring in progress). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-24T11:37:56Z (~40 min ago, status=no-change). Within 2-hour window. ✅ Nominal.
+
+**Check C — Agent liveness:** 8/8 alive (same PIDs as ~2602). ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs in ourliberty-agent-core. 0 open PRs in ourliberty-dashboard. ✅ Nominal.
+
+**Check H — Forge digest:** Forge inbox empty. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. ✅
+
+**Conditional checks — Wednesday 2026-06-24 UTC (weekday=2 ∈ {0,2,4,6}):**
+- **Check I:** `pulse_check_i.py --force` → dedup-skip (block for 2026-06-22 already present; key=f8ac2e3afc). mode=digest. DM queued (L995) → Tier-3 silence. 0 parked proposals. Wrote check-i-2026-06-24.json. ✅ Nominal.
+- **Check III:** Not Sunday → skip. ✅
+
+**G-rule assessment:**
+- L995 Tier-3 (check-i-2026-06-22 repeat) → no G-rule increment. G-rule check-i-repeat-dm already at 3/3 dispatched (verification_pending check-i-repeat-dm-fix-001). Additional occurrences are noted but don't re-trigger dispatch.
+- All other G-rule counts unchanged from ~2602.
+
+**Actions taken:**
+1. Check 0 post-Check-I: L995 triaged Tier-3 (silence). Watermark 994→995.
+2. PRIME ledger: `iter_clean` appended (tier=3, template=iter-clean-nominal).
+3. Tier state: `record --checks-clean true` → consecutive_clean 5→6. Tier remains 3.
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Known false positive. Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [blue] **check-i-repeat-dm-fix-001** — Pending Larry approval (approval DM delivered 05:13 MDT). [verification_pending]
+- [blue] **fix-645-alert-translation-001 worktree stall** — WARN absent in stall dry-run; likely resolved. [watch]
+- [blue] **G-rule sequence-step-review-escalate-null-chat** — 1/3. [carry]
+- [blue] **G-rule medic-approval-request-novel-tier4** — 1/3. [carry]
+- [blue] **G-rule heal-pipeline-stall-dry-run-writes-real-alerts** — 2/3. [carry]
+- [blue] **G-rule beacon-claude-timeout** — 1/3. [carry]
+- [blue] **G-rule api-500-burst** — 1/3. [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. [carry]
+- [blue] **G-rule telegram-409-burst** — 2/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. [carry]
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. [carry]
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. [carry]
+- [blue] **G-rule sync.service-deploy-restart-storm-tier4** — 1/3. [carry]
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. [carry]
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 2/3. [carry]
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. [carry]
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. [carry]
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 2/3. [carry — dispatch to Beacon at 3/3]
+- [blue] **G-rule health-notify-script-missing** — dispatch sent 2026-06-09. [carry]
+- [blue] **G-rule heal-daemon-restart-manifest-drift-tier4** — 2/3. [carry — dispatch at 3/3]
+- [blue] **G-rule pulse-self-summary-tier4** — 1/3. [carry]
+- [blue] **unreviewed-merge:655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. [carry]
+- [blue] **Untracked Beacon spec** — `agents/beacon/specs/missions-v2-funnel-item-doorbell.md`. Larry authoring in progress. [carry]
+
+**PRIME DIRECTIVE:** 0 new dispatches this iter. Trailing-30d: systemic_fixes=61, interventions=1090, ratio≈17.87, trend=improving.
+**Tier end-of-iter:** Tier **3**, consecutive_clean=6. Last signal: 2026-06-24T07:54:06Z.
+
+---
+
 ## Iteration ~2602 — 2026-06-24T11:42Z UTC (interactive /cycle via chat, Tier 3, consecutive_clean 4→5)
 
 **Trigger:** Larry `/cycle` invocation (chat mode).
