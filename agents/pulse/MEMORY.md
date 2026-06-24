@@ -204,9 +204,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-24 08:42Z UTC (Iter ~2596, Tier 2, consecutive_clean=2)
+## Status snapshot — updated 2026-06-24 09:03Z UTC (Iter ~2597, Tier 3, consecutive_clean=0)
 
-**Iter ~2596 summary:** ✅ Clean — 0 new alerts. 8/8 daemons alive (same PIDs as ~2595, no rotations). 0 open PRs. All inboxes empty. HEAD=d5df383d=origin/main. Check I dedup-skip (block for 2026-06-22 present). PRIME: systemic_fixes=61, ratio≈17.87, trend=improving. G-rules at 2/3: revision-phase-preamble-missing, telegram-409-burst, Forge-preflight-CLARIFY_REQUEST, forge-preflight-task-id-mismatch, F24-empty-prompt-envelope-rejected, merge_conflict_manual_rebase-tier4, heal-pipeline-stall-dry-run-writes-real-alerts, heal-daemon-restart-manifest-drift-tier4, Forge-timeout-worktree-missing-retry-loop. 1/3: pulse-self-summary-tier4, sequence-step-review-escalate-null-chat, medic-approval-request-novel-tier4, api-500-burst, beacon-claude-timeout, sync.service-deploy-restart-storm-tier4, seq-advancer-approval-routing-gap, heal-pipeline-stall-mirror-pass-unmerged-tier4, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch.
+**Iter ~2597 summary:** ✅ Clean — 1 alert (L1062 check-i-2026-06-22 Tier-3 silence). 8/8 daemons alive (same PIDs as ~2596). 0 open PRs. All inboxes empty. HEAD=69369085=origin/main. Check I dedup-skip (block for 2026-06-22 present). Tier promoted 2→3. PRIME: systemic_fixes=61, ratio≈17.87, trend=improving. New G-rule: check-i-repeat-dm 1/3. G-rules at 2/3: revision-phase-preamble-missing, telegram-409-burst, Forge-preflight-CLARIFY_REQUEST, forge-preflight-task-id-mismatch, F24-empty-prompt-envelope-rejected, merge_conflict_manual_rebase-tier4, heal-pipeline-stall-dry-run-writes-real-alerts, heal-daemon-restart-manifest-drift-tier4, Forge-timeout-worktree-missing-retry-loop. 1/3: pulse-self-summary-tier4, sequence-step-review-escalate-null-chat, medic-approval-request-novel-tier4, api-500-burst, beacon-claude-timeout, sync.service-deploy-restart-storm-tier4, seq-advancer-approval-routing-gap, heal-pipeline-stall-mirror-pass-unmerged-tier4, auto-dispatch-APPROVAL_REQUEST-task-id-mismatch, check-i-repeat-dm.
 
 
 
