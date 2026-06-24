@@ -998,6 +998,126 @@
         "from_state": "parked"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-rebase-merge-stuck-pr-685-operator-needs-you-fee-bd07",
+      "title": "Rebase + merge stuck PR #685 (operator-needs-you-feed build)",
+      "note": "Mirror passed it but auto-merge can't fire \u2014 CONFLICTING/DIRTY against main; live alert pipeline-stall:mirror-pass-unmerged:PR#685 firing (23:08 2026-06-24). Final mile of the operator-action-queue -> operator-needs-you-feed thread (spec #676 merged 2026-06-24). Needs a rebase onto main to clear the conflict, then merge.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": null,
+        "branch": null,
+        "captured_at": "2026-06-24T23:23:18.982081+00:00"
+      },
+      "last_touched": "2026-06-24T23:23:18.982081+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "The finished version of your single \"needs your attention\" list \u2014 the feed that surfaces exactly what's waiting on your decision \u2014 is built and reviewed, but the last step to switch it on is jammed.",
+        "why": "This is the final piece of the thread that turns scattered action items into one prioritized queue for you, so until it ships you're still hunting for what actually needs you.",
+        "suggest": "Have someone clear the snag and turn it on today, with a quick check afterward to confirm the feed shows the right items before you rely on it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-24T23:27:54.414271+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "cap-kick-off-missions-phase-4-phase-s-two-way-board-6c6d",
+      "title": "Kick off Missions Phase 4 + Phase S (two-way board sync / no-stale-board)",
+      "note": "The one substantive UNbuilt feature from the 2026-06-24 factory scan. Specced + staged, awaiting Beacon kickoff: closes the stale-board loop (auto-close-on-merge, cost-on-card). A fresh untracked spec agents/beacon/specs/missions-v2-funnel-item-doorbell.md is already on droplet main \u2014 Beacon may be drafting the next Missions piece.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": null,
+        "branch": null,
+        "captured_at": "2026-06-24T23:23:19.317134+00:00"
+      },
+      "last_touched": "2026-06-24T23:23:19.317134+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "An upgrade that keeps your project board honest on its own \u2014 cards close themselves the moment work is actually done, and each one shows what it cost.",
+        "why": "Right now the board can quietly drift out of date, so you can't trust it at a glance \u2014 this makes it a reliable, real-time picture of where things stand and what you're spending.",
+        "suggest": "Worth doing, but let's confirm one detail about how the board reads its data before greenlighting, then start it \u2014 sensible next step, no rush."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-24T23:27:54.414271+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "cap-decide-medic-stage-2-auto-restart-leave-fenced-o-9c51",
+      "title": "Decide: Medic Stage 2 auto-restart \u2014 leave fenced or build watchdog-coordination guard",
+      "note": "Live medic-reversible-targets.json has restart_daemon_units=[] + retrigger_inbox_targets=[] (verified 2026-06-24). Fenced for a real reason: the only in-scope units (inbox-watcher, outbox-notifier) are ALREADY auto-restarted by the watchdog, so Medic restart is largely redundant. Scan recommendation: leave fenced unless you want Medic to own restarts. Capturing so the deferral is a decision, not a forgotten switch.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": null,
+        "branch": null,
+        "captured_at": "2026-06-24T23:23:19.642883+00:00"
+      },
+      "last_touched": "2026-06-24T23:23:19.642883+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A backup system that would automatically restart key services if they stall.",
+        "why": "It overlaps almost entirely with a safety net we already run, so building it adds little protection but real effort and new moving parts.",
+        "suggest": "Leave it switched off for now, and only revisit if we ever want this system to be the single owner of restarts."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-24T23:27:54.414271+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-wire-a-self-firing-freshness-reconcile-tech-debt-c8c7",
+      "title": "Wire a self-firing freshness reconcile (tech-debt-register sits empty)",
+      "note": "Root finding of the 2026-06-24 factory scan: items that LOOKED undone (test-jail, desired-state-reconciler, board-drain) were actually DONE/LIVE \u2014 docs + memory index-hooks just hadn't caught up. docs/tech-debt-register.md is empty = the leftover-tracker isn't used, so work decays silently. Durable fix = a self-firing reconcile that keeps the register/board current. This IS the system-awareness north star's own thesis (manually-maintained awareness rots).",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": null,
+        "branch": null,
+        "captured_at": "2026-06-24T23:23:19.989321+00:00"
+      },
+      "last_touched": "2026-06-24T23:23:19.989321+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "An automatic check that keeps our internal to-do list honest, so finished work shows as finished and unfinished work never quietly slips off the radar.",
+        "why": "Right now the tracker sits empty and our records drift out of date on their own, so we can waste time chasing things that are already done and miss things that aren't \u2014 we can't trust our own status at a glance.",
+        "suggest": "Worth doing, but scope it carefully and prove it on a small slice before trusting it fully \u2014 let's green-light a contained first version rather than a big build."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-24T23:27:54.414271+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
