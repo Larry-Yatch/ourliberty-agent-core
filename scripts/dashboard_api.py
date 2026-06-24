@@ -67,7 +67,7 @@ import projects_store  # noqa: E402
 # inbox_dispatch_order is the single source of the queued-lane ordering rule,
 # shared with inbox_watcher.scan_inbox so the panel matches what builds next
 # (forge-queue-fast-track). stdlib-only.
-from inbox_dispatch_order import order_pending, read_fast_tracked_at  # noqa: E402
+from inbox_dispatch_order import order_pending, read_dispatch_meta  # noqa: E402
 
 
 # ---- AGENTS_ROOT + derived paths (env-overridable for test isolation) ----
@@ -2239,12 +2239,26 @@ def _reader_agent_queue_queued(
     still `now(UTC) - file mtime` (fast-track preserves mtime, so the wait
     stays honest); `fast_tracked_at` echoes the per-item flag for the UI.
     Parameterized on `agents_root` so it stays tmpdir-testable.
+
+    Tasks already building are excluded: the dispatcher leaves a claimed
+    task's inbox file in place for the whole build (it only archives on
+    completion — see `inbox_watcher.process_task`), so without this filter
+    an in-flight build would double-list in BOTH the queued and building
+    lanes. We drop any task whose in-flight key (`task.get('task_id')` or
+    the filename stem — the dispatcher's own key) is in this agent's
+    in-flight registry. Caveat: a task in the brief pre-`run_claude` window
+    (claimed but before its in-flight sentinel exists) can still appear here
+    momentarily.
     """
     now = now or datetime.now(timezone.utc)
     inbox = agents_root / 'inboxes' / agent
     items: list[dict[str, Any]] = []
     if not inbox.is_dir():
         return items
+    building = {
+        stem for stem, entry in _load_in_flight_index(agents_root).items()
+        if entry.get('agent_id') == agent
+    }
     entries: list[tuple[float, Optional[str], str]] = []
     try:
         for e in os.scandir(inbox):
@@ -2254,7 +2268,11 @@ def _reader_agent_queue_queued(
                 mt = e.stat().st_mtime
             except OSError:
                 continue
-            entries.append((mt, read_fast_tracked_at(Path(e.path)), e.name))
+            fast_tracked_at, task_id = read_dispatch_meta(Path(e.path))
+            stem = e.name[:-len('.json')]
+            if (task_id or stem) in building:
+                continue  # already building — shown in the building lane, not here
+            entries.append((mt, fast_tracked_at, e.name))
     except OSError:
         return items
     for mt, fast_tracked_at, name in order_pending(entries):
