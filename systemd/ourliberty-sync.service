@@ -21,7 +21,16 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=ourliberty-sync
 
-NoNewPrivileges=true
+# NoNewPrivileges intentionally NOT set — sync_agent_core.sh Step 7
+# ("Restart long-running daemons whose deployed code changed") must
+# `sudo -n systemctl restart <unit>` so a deploy that changes a daemon's
+# code doesn't leave it running stale in-memory modules. Larry has NOPASSWD
+# sudo (see reference_droplet) so `sudo -n` succeeds silently at the shell,
+# but NoNewPrivileges=true blocks the kernel-level setuid path sudo needs
+# regardless of sudoers config — so under it every Step 7 restart fails
+# (restarted=0 failed=N). This mirrors the same carve-out already made for
+# ourliberty-watchdog.service, which auto-recovers daemons the same way.
+# The remaining hardening below preserves the rest of the protection envelope.
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
