@@ -778,6 +778,153 @@ class TestCheckForgeBuiltNoPr(_TempAgentsRootMixin, unittest.TestCase):
         alerts = self.hps.check_forge_built_no_pr(lines, [], merged_prs, {})
         self.assertEqual(alerts, [])
 
+    # ----- Reconciliation step 1c: already-merged bridge (#610 sibling) -----
+
+    _ALREADY_MERGED_TASK = 'fix-645-alert-translation-001'
+    _AGENT_CORE = 'Larry-Yatch/ourliberty-agent-core'
+
+    def _already_merged_result(self, pr_number: int) -> str:
+        """A Forge build result carrying the canonical no-delta contract line
+        plus the prose that drove the real 2026-06-23 false stall."""
+        return (
+            f'NO PR — already merged: #{pr_number}\n'
+            f'git diff main..HEAD is empty; the alert-translation entry was '
+            f'already committed to the branch before this dispatch ran.'
+        )
+
+    def test_bridges_already_merged_pr_in_memory(self) -> None:
+        """The #645 production case: a standalone build whose work shipped under
+        a differently-named PR. The outbox names the merged PR via the canonical
+        contract line; that PR is in the fetched merged list (no gh call). Skip,
+        not a stall — logged as reason=already_merged_bridge."""
+        task = self._ALREADY_MERGED_TASK
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'build', 'exit_code': 0,
+            'target_repo': self._AGENT_CORE,
+            'result': self._already_merged_result(645),
+        })
+        merged_prs = [{
+            'headRefName': 'fix/proposed-retirement-forge-matcher',
+            'number': 645,
+            'title': 'fix(missions): retire shipped proposed cards stuck on the lane',
+            '_repo': self._AGENT_CORE,
+        }]
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        captured: list[str] = []
+        with patch.object(self.hps, 'log',
+                          side_effect=lambda msg, level='INFO': captured.append(msg)):
+            alerts = self.hps.check_forge_built_no_pr(lines, [], merged_prs, {})
+        self.assertEqual(alerts, [])
+        skip = [m for m in captured
+                if 'FORGE_NO_PR_SKIP' in m and 'already_merged_bridge' in m]
+        self.assertEqual(len(skip), 1)
+        self.assertIn('pr=#645', skip[0])
+
+    def test_bridges_already_merged_pr_via_direct_gh_verify(self) -> None:
+        """A PR older than the 7-day merged-fetch window isn't in `merged_prs`;
+        the bridge falls back to a direct gh-MERGED verify scoped to the
+        outbox's target_repo. No in-memory match → exactly one gh call."""
+        task = self._ALREADY_MERGED_TASK
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'build', 'exit_code': 0,
+            'target_repo': self._AGENT_CORE,
+            'result': self._already_merged_result(421),
+        })
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        with patch('sequence_shortcut_helpers.gh_pr_merge_info',
+                   return_value=(
+                       'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/421',
+                       '2026-06-01T00:00:00Z')) as mock_gh:
+            alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(alerts, [])
+        mock_gh.assert_called_once_with(self._AGENT_CORE, 421)
+
+    def test_bridge_alerts_when_named_pr_not_merged(self) -> None:
+        """Safe direction: if gh cannot confirm the named PR is MERGED, the
+        bridge returns None and the build-gap alert still fires."""
+        task = self._ALREADY_MERGED_TASK
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'build', 'exit_code': 0,
+            'target_repo': self._AGENT_CORE,
+            'result': self._already_merged_result(999),
+        })
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        with patch('sequence_shortcut_helpers.gh_pr_merge_info', return_value=None):
+            alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]['subject'],
+                         f'pipeline-stall:forge-no-pr:{task}')
+
+    def test_bridge_refuses_ambiguous_number_without_target_repo(self) -> None:
+        """No target_repo on the outbox + the named #N exists in BOTH tracked
+        repos = ambiguous. Refuse to guess (no repo to scope or gh-verify) →
+        the alert fires."""
+        task = self._ALREADY_MERGED_TASK
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'build', 'exit_code': 0,
+            'result': self._already_merged_result(645),  # no target_repo
+        })
+        merged_prs = [
+            {'number': 645, 'headRefName': 'a', 'title': 't',
+             '_repo': 'Larry-Yatch/ourliberty-agent-core'},
+            {'number': 645, 'headRefName': 'b', 'title': 't',
+             '_repo': 'Larry-Yatch/ourliberty-dashboard'},
+        ]
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], merged_prs, {})
+        self.assertEqual(len(alerts), 1)
+
+    def test_bridge_unique_number_without_target_repo_skips(self) -> None:
+        """No target_repo but the named #N is unique across the fetched PRs →
+        the unique cross-repo match is unambiguous, so skip."""
+        task = self._ALREADY_MERGED_TASK
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'build', 'exit_code': 0,
+            'result': self._already_merged_result(645),
+        })
+        merged_prs = [{'number': 645, 'headRefName': 'a', 'title': 't',
+                       '_repo': 'Larry-Yatch/ourliberty-agent-core'}]
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], merged_prs, {})
+        self.assertEqual(alerts, [])
+
+    def test_bridge_ignores_open_pr_with_same_number(self) -> None:
+        """Contract guard: the bridge trusts only confirmed-MERGED PRs, never
+        the OPEN-PR list. An OPEN PR sharing the named number — a cross-repo
+        number collision, or the work genuinely still in review — must NOT
+        suppress the stall: `merged_prs` is empty and the direct gh verify
+        reports not-MERGED, so the build-gap alert still fires. (Passing the
+        open+merged list here would have let the open PR mask a real stall.)"""
+        task = self._ALREADY_MERGED_TASK
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'build', 'exit_code': 0,
+            'target_repo': self._AGENT_CORE,
+            'result': self._already_merged_result(645),
+        })
+        open_prs = [{'number': 645, 'headRefName': 'feature/unrelated',
+                     'title': 'something else', '_repo': self._AGENT_CORE}]
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        with patch('sequence_shortcut_helpers.gh_pr_merge_info', return_value=None):
+            alerts = self.hps.check_forge_built_no_pr(lines, open_prs, [], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]['subject'],
+                         f'pipeline-stall:forge-no-pr:{task}')
+
+    def test_bridge_inert_when_no_already_merged_cue(self) -> None:
+        """A normal build outbox with no already-merged contract line / cue is
+        untouched by the bridge — a genuine no-PR stall still fires."""
+        task = 'genuine-no-pr-stall-001'
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'build', 'exit_code': 0,
+            'target_repo': self._AGENT_CORE,
+            'result': 'Built the feature and ran the suite. All green.',
+        })
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]['subject'],
+                         f'pipeline-stall:forge-no-pr:{task}')
+
     def test_step5_does_not_apply_to_non_preflight_errored_task(self) -> None:
         """Gating guard: a genuine build-phase crash (phase='build',
         exit_code=1) on a task_id WITHOUT `-preflight`/`-clarify` is not a
