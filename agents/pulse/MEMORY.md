@@ -222,6 +222,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-24 21:16Z UTC (Iter ~2629, Tier 1, consecutive_clean=0)
+
+**Iter ~2629 summary:** ⚠️ Watch — PR #686 MERGED (21:05Z) — sequence mirror-review-visibility-001 COMPLETE. PR #685 (escalation-feed) CONFLICTING but Mirror now APPROVED rev1 (21:07Z, L1032). Auto-merge blocked; rebase needed. forge-post-open-mergeable-rebase-001 in BUILD. reconcile-hardening-mission-shipped-002 in Forge build (Beacon re-dispatched). G-rule auto-merge-conflict-outbox-notifier-tier4 1/3 (new). forge-timeout-retry-loop-001 confirmed Beacon-archived (dispatch real). PRIME: systemic_fixes=63, interventions=1101, ratio≈17.5, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-24 21:07Z UTC (Iter ~2628, Tier 1, consecutive_clean=0)
 
 **Iter ~2628 summary:** ⚠️ Watch — PR #685 (forge/escalation-feed) still CONFLICTING; Forge revision 2 complete (`review-escalation-feed-rev1.json` in Mirror). forge-post-open-mergeable-rebase-001 IN BUILD phase. G-rule Forge-timeout-worktree-missing-retry-loop **3/3 → DISPATCHED** (reconcile-hardening-mission-shipped-001 Forge WIP crash; medic DM sent). heal-stall-dryrun-noop-001 + one-time-stale-dispatch-branch-cleanup-001 both in Forge preflight. All other checks nominal. PRIME: systemic_fixes=63, interventions=1100, ratio≈17.5, trend=improving. Tier 1, consecutive_clean=0.
