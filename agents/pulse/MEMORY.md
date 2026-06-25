@@ -242,6 +242,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-25 00:40Z UTC (Iter ~2655, Tier 1, consecutive_clean=0)
+
+**Iter ~2655 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry, medic attempt 3 filed, awaiting Larry manual rebase); PR #687 CONFLICTING (carry, Mirror REVIEW_PASS x4, AUTO_MERGE_HELD until #685 merges). Forge session PID 2060999 (resume=6a1daec3, task=forge-post-open-mergeable-rebase-001) at 3h37m, timeout ~00:55Z. 0 new alerts. Watermark 1068 (no change). All daemons alive (8/8). Repo clean (HEAD=3cac366d=origin/main). Sync 57m ago. Check I: Thursday, skip. PRIME: interventions=1127, systemic_fixes=66, ratio=17.1, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-25 00:27Z UTC (Iter ~2654, Tier 1, consecutive_clean=0)
 
 **Iter ~2654 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry, medic attempt 3 filed, awaiting Larry manual rebase); PR #687 CONFLICTING (carry, Mirror REVIEW_PASS x2, AUTO_MERGE_HELD until #685 merges). Forge session PID 2029112 queue-depth stall (~3.5h+, 8 inbox items unchanged). 2 new alerts: L1067-L1068 both Tier-3 (sentinel+medic inbox-stall for forge-wip-only-auto-redispatch-001). Watermark 1066→1068. All daemons alive (8/8). Repo clean, sync 48m ago. Check I: Thursday, skip. PRIME: interventions=1125, systemic_fixes=66, ratio=17.0, trend=improving. Tier 1, consecutive_clean=0.
