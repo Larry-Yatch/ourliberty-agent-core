@@ -688,7 +688,12 @@
         "from_state": "parked"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
-      "updated_at": "2026-06-22T05:00:35.632545+00:00"
+      "updated_at": "2026-06-22T05:00:35.632545+00:00",
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-pipeline-empty-state-hint-a62a",
+        "stamped_at": "2026-06-25T17:05:25.638820+00:00"
+      }
     },
     {
       "id": "cap-p5-dag-status-on-cards-a822",
@@ -753,7 +758,12 @@
         "at": "2026-06-20T00:24:05.389795+00:00",
         "from_state": "parked"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-board-new-mission-has-no-confirmation-drain-lag-5dbc",
+        "stamped_at": "2026-06-25T17:05:59.478837+00:00"
+      }
     },
     {
       "id": "cap-board-launch-build-has-no-spec-select-spec-docs-fc93",
