@@ -242,6 +242,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-25 01:16Z UTC (Iter ~2660, Tier 1, consecutive_clean=0)
+
+**Iter ~2660 summary:** ⚠️ Watch — PR #685 CONFLICTING (Forge ACTIVELY rebasing via rebase-escalation-feed-685-001, PID 2305661, critical path); PR #687 CONFLICTING (carry, Mirror REVIEW_PASS x4, AUTO_MERGE_HELD blocker=#685). **KEY EVENTS:** Queue advanced since iter ~2659: 7 Forge tasks completed (one-time-stale-dispatch-branch-cleanup-001, heal-stall-dryrun-noop-001, reconcile-hardening-mission-shipped-002, forge-wip-only-auto-redispatch-001, watchdog-stale-session-aware-suppression-001, alert-translation-mirror-pass-unmerged-001, wire-agent-core-health-notify-001 resume-r1). 5 build-* envelopes + resume-wire-agent-core-health-notify-001-r1 queued in Forge inbox. 0 new alerts (watermark=1073). NEW watchdog WARN at 19:12Z (01:12Z) during active rebase session — fix not yet merged. No new Larry Telegram messages. PRIME: interventions=1132, systemic_fixes=66, ratio=17.2, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-25 01:09Z UTC (Iter ~2659, Tier 1, consecutive_clean=0)
 
 **Iter ~2659 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry; rebase-escalation-feed-685-001 queued); PR #687 CONFLICTING (carry, Mirror REVIEW_PASS x4, AUTO_MERGE_HELD blocker=#685). **KEY EVENTS:** PR #688 MERGED (reconcile-hardening-mission-shipped-002, 01:02Z, Mirror PASS, auto-merged); PR #689 MERGED (doorbell: name what needs Larry + link where to go, 4ef2d072). Beacon timed out at 18:55 MDT on Larry's "Yes rebase #687 next" directive (18:45 MDT) — no rebase task dispatched for #687; DM'd Larry (L1072). 3 new alerts: L1071 Tier-3 (review-pass silenced), L1072 self-authored, L1073 Tier-3 (forge-no-pr reconcile-001 silenced — stale after -002 merged). Watermark 1070→1073. 7 daemons alive. Forge: 7 build-phase items. wire-agent-core-health-notify-001 advancing (CLARIFY answered, resume-r1). Beacon: empty. PRIME: interventions=1131, systemic_fixes=66, ratio=17.1, trend=improving. Tier 1, consecutive_clean=0.
