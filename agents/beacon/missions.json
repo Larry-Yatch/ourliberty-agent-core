@@ -5251,7 +5251,12 @@
         "at": "2026-06-25T14:50:52.249097+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-25T15:14:15.780065+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#702"
     },
     {
       "id": "proposed-forge-no-pr-rebase-original-fp-fix-002",
