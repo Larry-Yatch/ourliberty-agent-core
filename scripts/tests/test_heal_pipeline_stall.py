@@ -1360,6 +1360,68 @@ class TestEndToEnd(_TempAgentsRootMixin, unittest.TestCase):
         self.assertIn('PR #999', call.kwargs['message'])
         self.assertIn('AUTO_MERGE never fired', call.kwargs['message'])
 
+    def test_dry_run_is_a_true_no_op(self) -> None:
+        """`run(dry_run=True)` detects the stall but performs ZERO
+        side-effecting writes: no `larry_alerts.append_alert`, and the
+        recovery primitive (`_recover_via_auto_merge`, which would run
+        `gh pr merge` on a live PR) is never invoked. The companion
+        `dry_run=False` block proves the SAME fixture genuinely triggers a
+        stall — otherwise the no-op assertion would be vacuously true."""
+        # Same Check-3 (Mirror-PASS-unmerged) fixture as
+        # test_fires_alert_on_real_stall: a PR old enough to stall, with a
+        # review-request line (satisfies Check 2), a review-pass marker
+        # (trips Check 3), and a routing event (satisfies Check 7).
+        pr = {
+            'number': 999, 'headRefName': 'forge/end2end-stuck-001', 'title': 'fix: x',
+            'createdAt': (datetime.now(timezone.utc) - timedelta(minutes=120)).isoformat(),
+            '_repo': 'Larry-Yatch/ourliberty-agent-core',
+        }
+        lines = [
+            f'[{_ts(90)}] [notifier] [INFO] review-request dispatched mirror <- beacon (task=end2end-stuck-001, file=review-x.json, pr=https://example/999)',
+            f'[{_ts(60)}] [notifier] [INFO] marker-notified beacon <- mirror (mirror-result, intent=review-pass, file=notify-end2end-stuck-001.json)',
+        ]
+        routing_events = [{
+            'source_agent': 'beacon',
+            'target_agent_final': 'mirror',
+            'phase': 'review',
+            'task_id': 'end2end-stuck-001',
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+        }]
+
+        # --- dry-run: no alert, no recovery dispatch ---
+        with patch.object(self.hps, '_all_open_prs', return_value=[pr]), \
+             patch.object(self.hps, '_all_merged_prs_recent', return_value=[]), \
+             patch.object(self.hps, '_read_recent_log_lines', return_value=lines), \
+             patch.object(self.hps, '_read_recent_routing_events', return_value=routing_events), \
+             patch.object(self.hps, 'heartbeat') as mock_heartbeat, \
+             patch.object(self.hps, 'save_state') as mock_save_state, \
+             patch.object(self.hps, '_recover_via_auto_merge') as mock_recover, \
+             patch('subprocess.run') as mock_sub, \
+             patch.object(self.hps.larry_alerts, 'append_alert', return_value=True) as mock_alert:
+            mock_sub.return_value.returncode = 0
+            mock_sub.return_value.stdout = ''
+            mock_sub.return_value.stderr = ''
+            rc = self.hps.run(dry_run=True)
+        self.assertEqual(rc, 0)
+        mock_alert.assert_not_called()
+        mock_recover.assert_not_called()
+        mock_heartbeat.assert_not_called()
+        mock_save_state.assert_not_called()
+
+        # --- honesty check: SAME fixture, real run, DOES alert ---
+        with patch.object(self.hps, '_all_open_prs', return_value=[pr]), \
+             patch.object(self.hps, '_all_merged_prs_recent', return_value=[]), \
+             patch.object(self.hps, '_read_recent_log_lines', return_value=lines), \
+             patch.object(self.hps, '_read_recent_routing_events', return_value=routing_events), \
+             patch.object(self.hps, '_recover_via_auto_merge', return_value=False), \
+             patch('subprocess.run') as mock_sub, \
+             patch.object(self.hps.larry_alerts, 'append_alert', return_value=True) as mock_alert:
+            mock_sub.return_value.returncode = 0
+            mock_sub.return_value.stdout = ''
+            mock_sub.return_value.stderr = ''
+            self.hps.run(dry_run=False)
+        self.assertEqual(mock_alert.call_count, 1)
+
     def test_multi_stall_fires_one_dm_per_unique_stall(self) -> None:
         """When multiple distinct stalls exist on different tasks, each fires
         its own DM (not collapsed). Verifies the dedup-by-key contract."""
