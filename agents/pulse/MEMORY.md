@@ -156,6 +156,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-25 04:15Z UTC (Iter ~2683, Tier 1, consecutive_clean=0)
+
+**Iter ~2683 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase approval pending Larry). **KEY EVENTS: Check 2 FINDING — Larry asked "Why 30 messages of stalled pipelines" at 04:09Z; answered inline (root: PR #687 conflict → repeated heal_pipeline_stall + medic alerts via outbox-notifier). 0 new alerts. Mirror has fresh review task for PR #692 (04:13Z). PR #692 confirmed MERGEABLE/CLEAN (not transient), reviewDecision=empty. 4 pending approvals (carry). Pipeline stall: reconcile-001 FP persists; both stall cooldowns hold.** PRIME: interventions=1155, systemic_fixes=70, vp=25, ratio≈16.5, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-25 04:08Z UTC (Iter ~2682, Tier 1, consecutive_clean=0)
 
 **Iter ~2682 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase approval pending Larry). **KEY EVENTS: 2 new alerts (L1103 mirror-pass-unmerged:PR#687 → Tier-3 silenced per PR#695; L1104 medic-diagnosis:PR#687 attempt 5 → Tier-3 silenced). All agents IDLE. 4 pending approvals (carry). Pipeline stall: reconcile-001 FP persists (fix approval pending); mirror_pass_unmerged:687 + unrouted_open_pr:692 both suppressed by cooldown. No dispatches.** PRIME: interventions=1154, systemic_fixes=70, vp=25, ratio≈16.49, trend=improving. Tier 1, consecutive_clean=0.
