@@ -187,7 +187,7 @@
       "deferred_reason": null,
       "shipped_at": "2026-06-25T17:11:23.775167+00:00",
       "shipped_by": "reconcile-two-stale-inflight-missions-shipped-001",
-      "shipped_note": "Sequence pulse-upgrade-001 completed 2026-05-29 (4/4 steps merged): alpha-1 via PR #194, alpha-2 via PR #196, beta via PR #197, gamma via PR #199. Board phase lingered in_flight because the mission's task_ids are sequence-meta ids (seq-pulse-upgrade-001-step-*, dag-preflight-pulse-upgrade-001, sequence-complete-pulse-upgrade-001) that the §3.3 shipped-reconciler exclusion (#588) doesn't cover, so the GC healer couldn't auto-ship it. Manually reconciled by Forge per task reconcile-two-stale-inflight-missions-shipped-001.",
+      "shipped_note": "Sequence pulse-upgrade-001 completed 2026-05-29 (4/4 steps merged): alpha-1 via PR #194, alpha-2 via PR #196, beta via PR #197, gamma via PR #199. Board phase lingered in_flight because the mission's task_ids are sequence-meta ids (seq-pulse-upgrade-001-step-*, dag-preflight-pulse-upgrade-001, sequence-complete-pulse-upgrade-001) that the \u00a73.3 shipped-reconciler exclusion (#588) doesn't cover, so the GC healer couldn't auto-ship it. Manually reconciled by Forge per task reconcile-two-stale-inflight-missions-shipped-001.",
       "prior_phase": "in_flight"
     },
     {
@@ -206,7 +206,7 @@
       "deferred_reason": null,
       "shipped_at": "2026-06-25T17:11:23.775167+00:00",
       "shipped_by": "reconcile-two-stale-inflight-missions-shipped-001",
-      "shipped_note": "Sequence rate-limit-resilience-001 completed 2026-05-31 (3/3 steps merged): step-c-ledger via PR #208, step-a-rotation via PR #211, step-b-resume via PR #217. Board phase lingered in_flight because the mission's task_ids are sequence-meta ids (seq-rate-limit-resilience-001-step-*) that the §3.3 shipped-reconciler exclusion (#588) doesn't cover, so the GC healer couldn't auto-ship it. Manually reconciled by Forge per task reconcile-two-stale-inflight-missions-shipped-001.",
+      "shipped_note": "Sequence rate-limit-resilience-001 completed 2026-05-31 (3/3 steps merged): step-c-ledger via PR #208, step-a-rotation via PR #211, step-b-resume via PR #217. Board phase lingered in_flight because the mission's task_ids are sequence-meta ids (seq-rate-limit-resilience-001-step-*) that the \u00a73.3 shipped-reconciler exclusion (#588) doesn't cover, so the GC healer couldn't auto-ship it. Manually reconciled by Forge per task reconcile-two-stale-inflight-missions-shipped-001.",
       "prior_phase": "in_flight"
     },
     {
@@ -5402,7 +5402,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-25T18:15:56.449879+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-25T18:12:41.043753+00:00"
+      "orphan_last_activity_ts": "2026-06-25T18:12:41.043753+00:00",
+      "briefing": {
+        "what": "A new piece of work the team kicked off on its own, not yet attached to any project or goal.",
+        "why": "Effort that isn't tied to a clear objective can quietly eat time and muddy the team's priorities if it drifts.",
+        "suggest": "Hold before greenlighting and ask the team to confirm what this is meant to achieve, since it looks like a placeholder with no real details yet."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-25T18:24:10.143435+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-board-new-mission-confirm-placeholder-001",
@@ -5419,7 +5433,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-25T18:15:56.449879+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-25T18:09:12.721187+00:00"
+      "orphan_last_activity_ts": "2026-06-25T18:09:12.721187+00:00",
+      "briefing": {
+        "what": "A new piece of work the team kicked off on its own that isn't yet attached to any approved goal or project.",
+        "why": "Effort is being spent on something with no clear business owner or objective, and it's already hit a snag and is waiting on your sign-off.",
+        "suggest": "Hold off approving until someone confirms what business goal this serves \u2014 if there isn't one, shelve it rather than greenlight unowned work."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-25T18:24:10.143435+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
