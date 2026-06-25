@@ -5,6 +5,105 @@
 ---
 
 
+## Iteration ~2700 — 2026-06-25T06:31Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry /cycle invocation via chat.
+
+**Health:** ⚠️ Watch — Outbox-notifier hot loop continues (fix pending Larry approval). PR #698 rev0 got REVIEW_REVISION; Forge applied rev1; Mirror (PID 2683047, started 00:27 MDT) now reviewing rev1. PR #699 OPEN+MERGEABLE, in Mirror queue. New pipeline stall FP: `rebase-forge-post-open-mergeable-687-001` (G-rule forge-built-no-pr-retry1-fp-001 advances to 2/3). 1 new alert (doorbell Tier-3 silence).
+
+**VERIFY-BEFORE-REASSERT:**
+- **Outbox-notifier loop**: STILL ACTIVE ✅ — log entries through 00:26:25 MDT (06:26Z UTC), AUTO_MERGE_QUEUE_RELEASE / RELEASE_DEFERRED cycle every ~5s. Fix `fix-auto-merge-already-merged-skip-001` pending Larry approval. Doorbell reminder delivered 06:22Z (L1127). [carry]
+- **PR #698 (skip-mirror-review-on-merged-or-closed-pr-001)**: OPEN, **MERGEABLE**, reviewDecision="". Mirror (PID 2647101, prior session) issued REVIEW_REVISION. Forge applied rev1. Mirror (PID 2683047, started 00:27 MDT / 06:27Z) now reviewing `-rev1.json`. ⚠️ Progress noted.
+- **PR #699 (reconcile-hardening-mission-shipped-001-retry1)**: OPEN, MERGEABLE. In Mirror queue (after PR #698 rev1). Forge archived its inbox task (reconcile-hardening-retry1 preflight completed). ✅ Progress.
+- **Pipeline stall FP**: `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` — same FP as prior iter, PR #699 (retry1) OPEN. G-rule forge-built-no-pr-retry1-fp-001 [carry]. **NEW this iter**: `DRY-RUN would alert: forge_built_no_pr:rebase-forge-post-open-mergeable-687-001` — PR #687 MERGED, but stall checker misses branch→PR match. Same gap, different task. G-rule 2/3.
+- **Pending approvals**: 1 — `fix-auto-merge-already-merged-skip-001`. Doorbell reminder delivered 06:22Z. [carry]
+- **Repo**: HEAD=b027d359=origin/main. Clean. On main. ✅
+- **Sync**: last_sync=2026-06-25T06:00:05Z (~31 min ago). status=no-change. Within 2h. ✅
+- **Daemons**: inbox_watcher (2596660), outbox_notifier (2594852, looping), beacon_telegram_bot (2594942), chain_event_shipper (2595115) — all alive. Mirror (2683047) running rev1 review. ✅
+- **sequence-paused:operator-needs-you-feed**: No new alert. Still pending Larry action. [carry ✅]
+
+**Check 0 — Alert triage:**
+- repair-watermark: repaired=false, old=1126, file_length=1127. **1 new alert (L1127)**.
+- L1127: `source=doorbell, intent=doorbell, ts=06:22Z` — reminder about `fix-auto-merge-already-merged-skip-001` approval → **Tier-3 silence** ✅ (known-pattern match). Already delivered by beacon bot as idx=1126 at 00:24:35 MDT.
+- Watermark advanced 1126→1127. ✅
+
+**Check 1 — Log noise:**
+- outbox-notifier.log: **[yellow] HOT LOOP** still active through 00:26:25 MDT (06:26Z UTC). Unchanged root cause. Fix pending Larry approval. [carry]
+- watchdog.log: overall=healthy at 00:25 MDT. No new WARN cycles this iter. G-rule watchdog-watcher-log-stale-post-pr694: 2/3, no new instance. ✅
+
+**Check 2 — Telegram sweep:**
+- beacon_telegram_bot.log: last entry `00:24:35 MDT notification idx=1126 delivered (intent=doorbell)`. No new Larry messages. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` — FP per G-rule forge-built-no-pr-retry1-fp-001 (now 2/3). PR #699 (retry1) OPEN. [carry]
+- `DRY-RUN would alert: forge_built_no_pr:rebase-forge-post-open-mergeable-687-001` — **NEW FP** this iter. PR #687 MERGED; task has WIP branch but stall checker does not match to merged PR. Same root gap as reconcile-hardening FP. G-rule forge-built-no-pr-retry1-fp-001 advances to **2/3**.
+- All others: FORGE_NO_PR_SKIP firing correctly. ✅
+
+**Check 4 — Pending directives:**
+- Beacon inbox: EMPTY ✅.
+- Forge inbox: EMPTY ✅ (reconcile-hardening-retry1 preflight task archived this cycle).
+- Mirror inbox (4 tasks, FIFO):
+  - `review-skip-mirror-review-on-merged-or-closed-pr-001-rev1.json` (00:20 MDT) — PR #698, rev1. Mirror (2683047) actively reviewing. ✅
+  - `review-skip-mirror-review-on-merged-or-closed-pr-001.json` (00:25 MDT) — **duplicate dispatch** (G-rule review-duplicate-dispatch-wip-redispatch, vp). ⚠️ [accepted; will run after rev1]
+  - `review-reconcile-hardening-mission-shipped-001-retry1.json` (00:08 MDT) — PR #699. Queued.
+  - `review-sequence-dag-operator-needs-you-feed-retry1.json` (00:00 MDT). Queued.
+- beacon-pending-approvals: 1 (`fix-auto-merge-already-merged-skip-001`). Doorbell delivered 06:22Z. ✅
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-06-25T06:24:29Z (~7 min ago). Fresh. ✅
+
+**Check A — Source repo:** HEAD=b027d359=origin/main. Clean. On main. ✅
+
+**Check B — Sync health:** last_sync=2026-06-25T06:00:05Z (~31 min ago). status=no-change. Within 2h. ✅
+
+**Check C — Agent liveness:** All 4 daemons alive. Mirror (2683047) actively reviewing PR #698 rev1. ✅
+
+**Check E — PRs:**
+- PR #698 (skip-mirror-review-on-merged-or-closed-pr-001): OPEN, **MERGEABLE**, reviewDecision="". Mirror review (rev1) in progress. ⚠️
+- PR #699 (reconcile-hardening-mission-shipped-001-retry1): OPEN, **MERGEABLE**, reviewDecision="". In Mirror queue. ⚠️
+
+**Check H — Forge digest:** Forge IDLE. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. ✅
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check III: not Sunday. Skip. ✅
+
+**G-rule updates:**
+- **forge-built-no-pr-retry1-fp-001** — **2/3** (NEW this iter: `rebase-forge-post-open-mergeable-687-001` fires FP; PR #687 MERGED, stall checker misses branch→merged-PR match). Both reconcile-hardening AND rebase-687 now show the same gap. Root cause: `sibling_pr_title_shipped` only checks MERGED PRs via title-similarity; branch-based `reason=pr_exists` misses deleted branches from merged PRs. Dispatch to Beacon at 3/3.
+- **forge-wip-redispatch-digest-tier4-001** — 1/3. No new instance. [carry]
+- **outbox-notifier-auto-merge-loop-merged-pr-001** — DISPATCHED ✅ (3/3, iter ~2695). vp. Approval pending Larry. [carry]
+- **watchdog-watcher-log-stale-post-pr694** — 2/3. No new instance. [carry]
+- **review-duplicate-dispatch-wip-redispatch** — vp. Duplicate `review-skip-mirror-review-on-merged-or-closed-pr-001.json` at 00:25 MDT confirms G-rule still active. Fix (PR #698) in Mirror review. [carry]
+- **heal-daemon-restart-manifest-drift-regenerated-tier4** — 2/3. No new instance. [carry]
+- **check-i-force-bypass-dm-route** — 1/3. Thursday, no occurrence. [carry]
+- **no-session-revision-merged-pr-fp-001** — 1/3. No new instance. [carry]
+- **unrouted-open-pr-auto-merge-held-fp-001** — 1/3. No new instance. [carry]
+
+**Actions taken:** Triaged 1 new alert (L1127): Tier-3 silence (doorbell known-pattern). Watermark advanced 1126→1127. 1 intervention row appended to PRIME ledger.
+
+**Standing findings (updated):**
+- [yellow] **Outbox-notifier hot loop** — Fix `fix-auto-merge-already-merged-skip-001` pending Larry approval (Telegram prompt 23:54 MDT; doorbell reminder 06:22Z). Self-resolves once approved → Forge builds → Mirror merges. No second DM.
+- [yellow] **PR #698 (skip-mirror-review-on-merged-or-closed-pr-001)** — OPEN, MERGEABLE. Rev0 got REVIEW_REVISION; Forge applied rev1; Mirror (PID 2683047) actively reviewing rev1. Progressing.
+- [yellow] **PR #699 (reconcile-hardening-mission-shipped-001-retry1)** — OPEN, MERGEABLE. In Mirror queue (after PR #698 rev1 + stale duplicate). Stall FP persists (forge-built-no-pr-retry1-fp-001, now 2/3).
+- [yellow] **Mirror inbox: 4 tasks** — Down from 8 (progress). PR #698 rev1 (active) + duplicate + PR #699 + seq-operator-needs-you-feed wip-retry.
+- [yellow] **Pipeline stall FP widened** — `rebase-forge-post-open-mergeable-687-001` now also fires FP. G-rule forge-built-no-pr-retry1-fp-001 advances to 2/3. Dispatch to Beacon at 3/3 (next occurrence).
+- [yellow] **sequence-paused:operator-needs-you-feed** — L1105. gate-mismatch chain_merged=False gh_merged=True. **Recovery: `resume sequence operator-needs-you-feed` via Beacon or Dashboard.** [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**PRIME DIRECTIVE:** interventions=1167, systemic_fixes=70, verification_pending=26, ratio≈16.67, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** consecutive_clean=0 (non-clean: outbox-notifier loop, PRs #698+#699 in review pipeline, new stall FP, Mirror duplicate task). Tier: 1.
+
+---
+
+
 ## Iteration ~2699 — 2026-06-25T06:18Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry /cycle invocation via chat.

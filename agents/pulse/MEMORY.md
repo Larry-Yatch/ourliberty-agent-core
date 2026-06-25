@@ -168,14 +168,14 @@
 
 ---
 
-## G-rule forge-built-no-pr-retry1-fp-001 — 1/3 (new, iter ~2698)
+## G-rule forge-built-no-pr-retry1-fp-001 — 2/3 (updated iter ~2700)
 
-**Rule:** `forge_built_no_pr` stall fires for `reconcile-hardening-mission-shipped-001` (original task has WIP branch, no PR) even though PR #699 (`forge/reconcile-hardening-mission-shipped-001-retry1`) is OPEN and MERGEABLE. `sibling_pr_title_shipped` check only scans MERGED PRs — misses OPEN retry1 PR. Same class as G-rule `no-session-revision-merged-pr-fp-001` but for OPEN state. First occurrence iter ~2698 (after forge-wip-redispatch dispatched retry1 task). Dispatch to Beacon at 3/3.
+**Rule:** `forge_built_no_pr` stall fires even when a PR exists. Two patterns confirmed: (1) `reconcile-hardening-mission-shipped-001` fires even though PR #699 (retry1) is OPEN (sibling_pr_title_shipped only checks MERGED PRs, misses OPEN retry1). (2) `rebase-forge-post-open-mergeable-687-001` fires even though PR #687 is MERGED (branch deleted post-merge, so branch-based match fails; title-based sibling match also misses). Root gap: stall checker has no path that handles "original task's PR is merged/closed AND retry1 PR is OPEN." Dispatch to Beacon at 3/3.
 
 ---
 
-## Status snapshot — updated 2026-06-25 06:18Z UTC (Iter ~2699, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 06:31Z UTC (Iter ~2700, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2699 summary:** ⚠️ Watch — Outbox-notifier hot loop continues; fix `fix-auto-merge-already-merged-skip-001` pending Larry approval. PR #698 (skip-mirror-review-on-merged-or-closed-pr-001) upgraded to MERGEABLE this iter; Mirror (PID 2647101) actively reviewing. PR #699 (reconcile-hardening-retry1) OPEN+UNKNOWN in Mirror queue. 0 new alerts. Mirror inbox: 8 tasks queued. G-rules: forge-wip-redispatch-digest-tier4-001 (1/3), forge-built-no-pr-retry1-fp-001 (1/3). PRIME: interventions=1166, systemic_fixes=70, vp=26, ratio≈16.66, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2700 summary:** ⚠️ Watch — Outbox-notifier hot loop continues; fix `fix-auto-merge-already-merged-skip-001` pending Larry approval (doorbell reminder 06:22Z). PR #698 (skip-mirror-review-on-merged-or-closed-pr-001) had rev0 REVIEW_REVISION; Forge applied rev1; Mirror (PID 2683047, started 00:27 MDT) reviewing rev1. PR #699 (reconcile-hardening-retry1) OPEN+MERGEABLE in Mirror queue. 1 new alert (L1127 doorbell Tier-3 silence). Mirror inbox: 4 tasks (down from 8). New pipeline stall FP: rebase-687. G-rules: forge-built-no-pr-retry1-fp-001 (2/3), forge-wip-redispatch-digest-tier4-001 (1/3). PRIME: interventions=1167, systemic_fixes=70, vp=26, ratio≈16.67, trend=improving. Tier 1, consecutive_clean=0.
 
 
