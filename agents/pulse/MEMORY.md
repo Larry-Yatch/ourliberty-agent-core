@@ -138,9 +138,9 @@
 
 ---
 
-## G-rule watchdog-watcher-log-stale-post-pr694 — 1/3 (new, iter ~2695)
+## G-rule watchdog-watcher-log-stale-post-pr694 — 2/3 (updated iter ~2696)
 
-**Rule:** Watchdog WARN at 05:39 UTC (23:39 MDT) — "Watcher log stale 482s with 1 non-empty inbox(es)" — while Mirror WAS actively running (PID 2612954 started 23:28 MDT). Root cause: inbox-watcher handles Forge tasks only; Mirror sessions are triggered by a separate mechanism. inbox_watcher.log goes stale after Forge completes even if Mirror is actively processing its separate inbox. PR #694 (session-aware suppression) merged at 01:57Z did not suppress this WARN — the suppression logic likely checks inbox-watcher session rather than Mirror session. First occurrence post-PR #694. Dispatch to Beacon at 3/3.
+**Rule:** Watchdog WARN at 05:39 UTC (23:39 MDT) AND 05:44 UTC (23:44 MDT) — "Watcher log stale Ns with 1 non-empty inbox(es)" — while Mirror WAS actively running (PID 2612954 started 23:28 MDT). Two distinct watchdog-complete=warning cycles within same Mirror session. Root cause: inbox-watcher handles Forge tasks only; Mirror sessions are triggered by a separate mechanism. inbox_watcher.log goes stale after Forge completes even if Mirror is actively processing its separate inbox. PR #694 (session-aware suppression) did not suppress these WARNs. Watchdog returned to healthy at 23:49 MDT (possibly Mirror inbox_watcher activity resumed after first Mirror task completed). Dispatch to Beacon at 3/3 (next Mirror session that triggers WARN).
 
 ---
 
@@ -162,8 +162,8 @@
 
 ---
 
-## Status snapshot — updated 2026-06-25 05:47Z UTC (Iter ~2695, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 05:53Z UTC (Iter ~2696, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2695 summary:** ⚠️ Watch — Dispatched `fix-auto-merge-release-deferred-merged-pr-001` to Beacon (G-rule outbox-notifier-auto-merge-loop-merged-pr-001 at 3/3 COMPLETE). New watchdog false-positive post-PR #694 (1/3, inbox_watcher stale + Mirror inbox non-empty while Mirror runs separately). **KEY EVENTS: PR #698 now MERGEABLE. Mirror actively processing stale #687 review (PID 2612954, started 23:28 MDT). Pipeline stall CLEAN. 0 new alerts (watermark 1113). Pending approvals: 0 ✅. sequence-paused:operator-needs-you-feed carry.** PRIME: interventions=1164, systemic_fixes=70, vp=26, ratio≈16.63, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2696 summary:** ⚠️ Watch — Outbox-notifier hot loop: fix `fix-auto-merge-already-merged-skip-001` pending Larry approval (Telegram prompt delivered 05:50Z). Watchdog false-positive post-PR #694 at 2/3 (two WARN cycles 23:39+23:44 MDT during Mirror session; cleared at 23:49). **KEY EVENTS: PR #698 reverted to mergeable=UNKNOWN. Mirror (PID 2612954) still processing stale #687 review task (~25 min). Pipeline stall CLEAN. 1 new alert L1114 (Tier-3 silence, watermark 1114). Pending approvals: 1 (fix-auto-merge-already-merged-skip-001). sequence-paused:operator-needs-you-feed carry.** PRIME: interventions=1164, systemic_fixes=70, vp=26, ratio≈16.63, trend=improving. Tier 1, consecutive_clean=0.
 
 

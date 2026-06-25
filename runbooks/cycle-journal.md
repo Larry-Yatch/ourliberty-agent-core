@@ -5,6 +5,98 @@
 ---
 
 
+## Iteration ~2696 — 2026-06-25T05:53Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry /cycle invocation via chat.
+
+**Health:** ⚠️ Watch — Outbox-notifier hot loop still active (fix now in Beacon pipeline, pending Larry approval for `fix-auto-merge-already-merged-skip-001`). Mirror processing stale #687 tasks. PR #698 reverted to mergeable=UNKNOWN. Watchdog false-positive WARN seen twice (23:39 + 23:44 MDT) during Mirror session; cleared at 23:49 MDT.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Outbox-notifier loop**: STILL ACTIVE ✅ — log entries through 23:50:56 MDT (05:50Z UTC), cycling every ~5s. Fix dispatched to Beacon last iter (iter ~2695). Beacon processed: `fix-auto-merge-already-merged-skip-001` plan created, approval_request sent to Larry at 05:50:04Z. **beacon-pending-approvals: 1 pending** — Larry's Telegram already received the approval prompt; no second DM needed.
+- **PR #698 (skip-mirror-review-on-merged-or-closed-pr-001)**: OPEN, mergeable=UNKNOWN (was MERGEABLE last iter; reverted — likely GitHub recomputing post Mirror activity on base). Mirror review queued 2nd.
+- **Mirror inbox (3 tasks)**: Unchanged. Mirror RUNNING (PID 2612954 Ssl, same PID as iter ~2695). Processing `review-forge-post-open-mergeable-rebase-001.json` (23:00 MDT, stale PR #687 review). ~25 min elapsed since start — normal range for Mirror.
+- **Pipeline stall**: CLEAN ✅ — `no stalls detected`.
+- **Pending approvals**: 1 — `fix-auto-merge-already-merged-skip-001`. Larry already has the Telegram prompt. [carry]
+- **sequence-paused:operator-needs-you-feed**: No new alert. Still pending Larry action. [carry ✅]
+- **Repo**: HEAD=9cb69066=origin/main. Clean. On main. ✅
+- **Sync**: last_sync=2026-06-25T05:00:05Z (~53 min ago). Within 2h. ✅
+- **Daemons**: inbox_watcher (2596660 Ssl), outbox_notifier (2594852 Ss, looping), beacon_telegram_bot (2594942 Ss), chain_event_shipper (2595115 SNs) — all alive. Mirror (2612954 Ssl) running. ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark: repaired=false, old=1113, file_length=1114. 1 new alert.
+- L1114: `source=outbox-notifier, kind=approval_request, approval_id=fix-auto-merge-already-merged-skip-001`. Delivery confirmation that Telegram prompt was sent to Larry at 05:50:04Z. triage-alert → **Tier-3 silence** (known-pattern match). ✅ Journal note only. No second DM.
+- Watermark advanced 1113→1114. ✅
+
+**Check 1 — Log noise:**
+- outbox-notifier.log: **[yellow] HOT LOOP** still active through 23:50:56 MDT (05:50Z UTC). Same root cause (re-queue behind merged blocker #697 → UNKNOWN → repeat). Fix queued. Low-CPU, no functional harm. Carry until fix merges.
+- watchdog.log: **[yellow] 2 WARN cycles** at 23:39:15 MDT and 23:44:17 MDT — "Watcher log stale N sec with 1 non-empty inbox(es)." Both false positives (Mirror WAS running). At 23:49:19 MDT, returned to healthy ✅. G-rule watchdog-watcher-log-stale-post-pr694: advancing to **2/3** (two distinct watchdog-complete=warning cycles, same Mirror session). Dispatch at 3/3.
+
+**Check 2 — Telegram sweep:**
+- No new Larry messages since 22:54 MDT. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- `no stalls detected` ✅. All tasks FORGE_NO_PR_SKIP. CLEAN.
+
+**Check 4 — Pending directives:**
+- Beacon inbox: EMPTY ✅ (fix-auto-merge envelope consumed by Beacon at 05:50Z).
+- Forge inbox: EMPTY ✅.
+- Mirror inbox (3 files, FIFO order):
+  - `review-forge-post-open-mergeable-rebase-001.json` (23:00 MDT) — PR #687 (MERGED). Mirror currently processing. ⚠️ [accepted waste]
+  - `review-skip-mirror-review-on-merged-or-closed-pr-001.json` (23:16 MDT) — PR #698. ✅
+  - `review-forge-post-open-mergeable-rebase-001-rev2.json` (23:31 MDT) — PR #687 (MERGED). Stale. ⚠️ [accepted waste]
+- beacon-pending-approvals: 1 (`fix-auto-merge-already-merged-skip-001`). Larry already has Telegram prompt. ✅
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-06-25T05:44:17Z (~9 min ago). Fresh. ✅
+
+**Check A — Source repo:** HEAD=9cb69066=origin/main. Clean. On main. ✅
+
+**Check B — Sync health:** last_sync=2026-06-25T05:00:05Z (~53 min ago). Within 2h. ✅
+
+**Check C — Agent liveness:** All 4 daemons alive. Mirror (2612954 Ssl) actively running. Watchdog healthy as of 23:49 MDT. ✅
+
+**Check E — PRs:**
+- PR #698 (skip-mirror-review-on-merged-or-closed-pr-001): OPEN, mergeable=UNKNOWN. Mirror review queued 2nd (after stale #687 task currently processing). ⚠️
+
+**Check H — Forge digest:** Forge IDLE. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. ✅
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check III: not Sunday. Skip. ✅
+
+**G-rule updates:**
+- **outbox-notifier-auto-merge-loop-merged-pr-001** — **DISPATCHED ✅ 3/3** (iter ~2695). vp. Approval `fix-auto-merge-already-merged-skip-001` pending Larry. Fix: check `state=MERGED` before re-queuing in auto-merge release path. Carry until merged.
+- **watchdog-watcher-log-stale-post-pr694** — **2/3** (was 1/3). Two WARN cycles at 23:39 and 23:44 MDT during same Mirror session. False positive: Mirror running (PID 2612954) but inbox_watcher.log stale → WARN despite no actual problem. Dispatch to Beacon at 3/3 (next Mirror session that triggers WARN).
+- **review-duplicate-dispatch-wip-redispatch** — vp. PR #698 fix in Mirror queue. [carry]
+- **heal-daemon-restart-manifest-drift-regenerated-tier4** — 2/3. No new instance. [carry]
+- **check-i-force-bypass-dm-route** — 1/3. Thursday, no occurrence. [carry]
+- **no-session-revision-merged-pr-fp-001** — 1/3. No new instance. [carry]
+- **unrouted-open-pr-auto-merge-held-fp-001** — 1/3. No new instance. [carry]
+
+**Actions taken:** Watermark advanced 1113→1114 (L1114 Tier-3 triage). 0 dispatches. 0 other auto-fixes.
+
+**Standing findings (updated):**
+- [yellow] **Outbox-notifier hot loop** — Fix plan `fix-auto-merge-already-merged-skip-001` pending Larry approval (Telegram prompt delivered 05:50Z). Will self-resolve once Larry approves → Forge builds → Mirror reviews → merges. No second DM (Larry already has the prompt).
+- [yellow] **PR #698 (skip-mirror-review-on-merged-or-closed-pr-001)** — OPEN, mergeable=UNKNOWN (reverted from MERGEABLE). Mirror review queued 2nd.
+- [yellow] **Mirror processing stale #687 review tasks** — Mirror (PID 2612954) running ~25 min on first stale task. 1 remaining stale task + 1 useful task (PR #698) in queue. Accepted waste; PR #698 fix will prevent future occurrences.
+- [yellow] **Watchdog false-positive WARN (post-PR #694)** — 2/3. Two WARN cycles (23:39 + 23:44 MDT) during Mirror session; cleared at 23:49. G-rule advancing. Dispatch at 3/3.
+- [yellow] **sequence-paused:operator-needs-you-feed** — L1105. gate-mismatch chain_merged=False gh_merged=True. **Recovery: `resume sequence operator-needs-you-feed` via Beacon or Dashboard.** [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**PRIME DIRECTIVE:** interventions=1164, systemic_fixes=70, verification_pending=26, ratio≈16.63, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** consecutive_clean=0 (non-clean: outbox-notifier loop active, Mirror stale tasks, #698 UNKNOWN, watchdog WARN pattern). Tier: 1.
+
+---
+
+
 ## Iteration ~2695 — 2026-06-25T05:47Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry /cycle invocation via chat.
