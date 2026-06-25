@@ -893,7 +893,7 @@
       "title": "Operator Needs-You Feed",
       "north_star_ref": null,
       "repo": "ourliberty-agent-core",
-      "state": "active",
+      "state": "retired",
       "phases": [
         {
           "id": "operator-needs-you-feed",
@@ -928,7 +928,7 @@
       ],
       "one_off": true,
       "created_at": "2026-06-24T19:45:09.944739+00:00",
-      "updated_at": "2026-06-24T19:45:09.944739+00:00",
+      "updated_at": "2026-06-25T23:27:46.549632+00:00",
       "promoted_from": {
         "kind": "mission",
         "mission_id": "operator-needs-you-feed"
