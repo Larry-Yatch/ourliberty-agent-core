@@ -144,6 +144,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-25 03:42Z UTC (Iter ~2678, Tier 1, consecutive_clean=0)
+
+**Iter ~2678 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase-pr-687-post-open-mergeable-001 pending Larry). **KEY EVENTS: All agents IDLE. 0 new alerts (watermark holds at 1100). 4 pending approvals (carry). Pipeline stall: reconcile-001 FP persists (fix pending). New stall output item: rebase-escalation-feed-685-001 FORGE_NO_PR_SKIP preflight_non_proceed (PR #685 MERGED, nominal). No dispatches.** PRIME: interventions=1150, systemic_fixes=70, vp=25, ratio=16.43, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-25 03:35Z UTC (Iter ~2677, Tier 1, consecutive_clean=0)
 
 **Iter ~2677 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase-pr-687-post-open-mergeable-001 pending Larry). **KEY EVENTS: All agents IDLE. 0 new alerts (watermark holds at 1100). 4 pending approvals (carry). Pipeline stall: reconcile-001 FP persists (fix pending). G-rule no-session-revision-merged-pr-fp-001 did NOT recur (FORGE_NO_PR_SKIP handled it via pr_exists). No dispatches.** PRIME: interventions=1149, systemic_fixes=70, vp=25, ratio=16.41, trend=improving. Tier 1, consecutive_clean=0.
