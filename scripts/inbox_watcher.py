@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import signal
 import sys
 import threading
@@ -46,6 +47,7 @@ from inbox_dispatch_order import order_pending, read_fast_tracked_at  # noqa: E4
 import larry_alerts  # noqa: E402
 import routing_validator  # noqa: E402
 import safe_write_inbox  # noqa: E402
+import task_terminal_state  # noqa: E402
 import worktree_manager  # noqa: E402
 
 HOME = Path.home()
@@ -450,6 +452,43 @@ def _build_outbox(agent: str, task_id: str, task: dict, task_file: Path,
     return outbox
 
 
+_GH_PR_URL_RE = re.compile(r'^https?://github\.com/([^/]+/[^/]+)/pull/(\d+)')
+
+
+def _mirror_review_pr_terminal_state(task: dict):
+    """For a Mirror `phase=review` task, return the PR's terminal state
+    (`'MERGED'`/`'CLOSED'`) when the PR under review has already left OPEN,
+    else `None`.
+
+    A non-None return means the review is pure waste: the PR is decided, so a
+    review gates nothing. The caller skips the (expensive) Opus session.
+
+    `None` means "let the review proceed" and covers EVERY uncertain path —
+    no `pr_url`, an unparseable url, an OPEN/UNKNOWN state, or any `gh` hiccup.
+    This is the execution-time half of the merged/closed guard: it runs
+    immediately before the review session launches, catching the race where the
+    merge lands AFTER the review was dispatched (the dispatch-time pre-check in
+    outbox_notifier only sees state at dispatch — observed case: review
+    dispatched ~6s before an auto-merge, then ran ~12 min post-merge for
+    $0.918). Fail-OPEN by construction so a `gh` blip never silently drops a
+    legitimate review."""
+    pr_url = task.get('pr_url')
+    if not isinstance(pr_url, str) or not pr_url:
+        return None
+    m = _GH_PR_URL_RE.search(pr_url)
+    if not m:
+        return None
+    repo_coords, pr_number = m.group(1), m.group(2)
+    raw = task_terminal_state.gh_json(
+        ['gh', 'pr', 'view', pr_number,
+         '--repo', repo_coords, '--json', 'state'],
+    )
+    if not isinstance(raw, dict):
+        return None
+    state = task_terminal_state.classify_state(raw.get('state'))
+    return state if state in task_terminal_state.TERMINAL_STATES else None
+
+
 def process_task(agent: str, task_file: Path, models_config: dict) -> None:
     try:
         task = json.loads(task_file.read_text())
@@ -554,6 +593,42 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
         return
 
     task_id = task.get("task_id") or task_file.stem
+
+    # Merged/closed-PR guard (execution-time half). A Mirror review of a PR
+    # that has already merged or closed gates nothing — it is pure cost. The
+    # dispatch-time pre-check in outbox_notifier skips most of these, but it
+    # only sees state at dispatch; a PR can merge in the seconds-to-minutes
+    # between dispatch and this launch, and the review session then runs almost
+    # entirely AFTER the merge (observed: $0.918 reviewing an already-merged
+    # PR). Re-check state here, before the worktree is built and the expensive
+    # session starts, and no-op if the PR has left OPEN. Fail-open: every
+    # uncertain path (no/unparseable pr_url, OPEN/UNKNOWN, any gh hiccup)
+    # returns None and the review proceeds, so a legitimate review is never
+    # silently dropped.
+    if agent == "mirror" and task.get("phase") == "review":
+        terminal_state = _mirror_review_pr_terminal_state(task)
+        if terminal_state is not None:
+            dest = move_to(task_file, INBOXES_ROOT / agent / ".archive")
+            log(f"[{agent}] MIRROR_REVIEW_SKIPPED_TERMINAL task={task_id} "
+                f"pr={task.get('pr_url')} state={terminal_state} "
+                f"dest={dest.name} cost=$0 (not dispatched — review gates "
+                f"nothing on a {terminal_state.lower()} PR)")
+            append_cost({
+                "ts": now_iso(),
+                "agent": agent,
+                "task_id": task_id,
+                "task_type": "review-skipped-terminal",
+                "model": None,
+                "account": "skipped",
+                "cost_usd": 0.0,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "duration_sec": 0,
+                "attempts": 0,
+                "source": "inbox-watcher",
+            })
+            return
+
     model = resolve_model(agent, task, models_config)
     timeout = task.get("timeout") or DEFAULT_TIMEOUT_SEC
     # Only consume session_id when the dispatcher explicitly opted into a
