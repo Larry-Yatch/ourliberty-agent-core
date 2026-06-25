@@ -242,6 +242,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-25 01:09Z UTC (Iter ~2659, Tier 1, consecutive_clean=0)
+
+**Iter ~2659 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry; rebase-escalation-feed-685-001 queued); PR #687 CONFLICTING (carry, Mirror REVIEW_PASS x4, AUTO_MERGE_HELD blocker=#685). **KEY EVENTS:** PR #688 MERGED (reconcile-hardening-mission-shipped-002, 01:02Z, Mirror PASS, auto-merged); PR #689 MERGED (doorbell: name what needs Larry + link where to go, 4ef2d072). Beacon timed out at 18:55 MDT on Larry's "Yes rebase #687 next" directive (18:45 MDT) — no rebase task dispatched for #687; DM'd Larry (L1072). 3 new alerts: L1071 Tier-3 (review-pass silenced), L1072 self-authored, L1073 Tier-3 (forge-no-pr reconcile-001 silenced — stale after -002 merged). Watermark 1070→1073. 7 daemons alive. Forge: 7 build-phase items. wire-agent-core-health-notify-001 advancing (CLARIFY answered, resume-r1). Beacon: empty. PRIME: interventions=1131, systemic_fixes=66, ratio=17.1, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-25 00:57Z UTC (Iter ~2658, Tier 1, consecutive_clean=0)
 
 **Iter ~2658 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry; rebase-escalation-feed-685-001 queued); PR #687 CONFLICTING (carry, Mirror REVIEW_PASS x4, AUTO_MERGE_HELD blocker=#685). **KEY EVENTS:** Queue advancing fast: reconcile-hardening-mission-shipped-002 DONE → PR #688 opened (MERGEABLE); forge-wip-only-auto-redispatch-001 DONE. Forge NOW BUILDING watchdog-stale-session-aware-suppression-001 (G-rule fix). Mirror ACTIVE reviewing PR #688. 2 new alerts: L1069 Tier-4 (mirror-pass-unmerged:PR#687, bot DM'd, no Pulse 2nd DM), L1070 Tier-3 (medic-diagnosis silenced). Watermark 1068→1070. 7 daemons alive. Repo clean (HEAD=d8f4c193=origin/main). Sync 18m ago. Check I: Thursday, skip. PRIME: interventions=1129, systemic_fixes=66, ratio=17.1, trend=improving. Tier 1, consecutive_clean=0.
