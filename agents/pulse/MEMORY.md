@@ -156,6 +156,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-25 05:11Z UTC (Iter ~2691, Tier 1, consecutive_clean=0→0)
+
+**Iter ~2691 summary:** ⚠️ Watch — Mirror returned `review_revision` for PR #687 at 04:55Z UTC (status change from iter ~2690 expectation). Beacon dispatched revision-1 to Forge + re-review-rev1 to Mirror. No revision commit on #687 branch yet. Forge ACTIVELY BUILDING `skip-mirror-review-on-merged-or-closed-pr-001` (PID 2573177, G-rule review-duplicate-dispatch fix). Mirror ACTIVELY REVIEWING PR #692 3rd review (PID 2583838). **KEY EVENTS: 1 new alert (L1106 dispatch-branch-cleanup digest, Tier-3 silence, watermark 1105→1106). Pending approvals 3→1 (only rebase-pr-687 stale artifact remains). Mirror inbox 4→3 (692 consumed). reconcile-001 FP carry. sequence-paused:operator-needs-you-feed carry. mirror_pass_unmerged cooldown EXPIRED (stale stall-checker model — state being addressed).** PRIME: interventions=1161, systemic_fixes=70, vp=25, ratio≈16.59, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-25 04:57Z UTC (Iter ~2690, Tier 1, consecutive_clean=1→0)
 
 **Iter ~2690 summary:** ⚠️ Watch — Mirror ACTIVELY REVIEWING PR #687 (PID 2537043, ~25min, no PASS yet). PR #697 NEW/queued (reconcile-001 FP fix). PR #692 AUTO_MERGE_HELD blocker=#687. Beacon timeout on "let me know when 687 merges" (04:54Z, recovered). **KEY EVENTS: 0 new alerts (watermark 1105 holds). Forge idle. Beacon/Forge inboxes empty. Mirror inbox: 3 tasks (687 in-progress, 692 3rd queued, 697 new queued). 3 pending approvals (carry). Iter ~2689 journal entry missing (state from MEMORY.md snapshot). PRIME: interventions=1161, systemic_fixes=70, vp=25, ratio≈16.59, trend=improving.** Tier 1, consecutive_clean=0.
