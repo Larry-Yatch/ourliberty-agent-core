@@ -242,11 +242,15 @@
 
 ---
 
-## G-rule review-duplicate-dispatch-wip-redispatch — 1/3 (new, iter ~2666)
+## G-rule review-duplicate-dispatch-wip-redispatch — 2/3 (iter ~2666 first, iter ~2670 second)
 
-**Rule:** When Forge completes a revision task, two separate review dispatch paths fire simultaneously: (1) outbox_notifier's revision-completion path (`-rev1.json` file) and (2) Beacon's notification-handler path (non-rev1 `.json` file). Both land in Mirror's inbox, causing Mirror to review the same PR twice in sequence. The -rev1 path is legitimate; the non-rev1 is a duplicate. Wasted Mirror time but not harmful (reviews same PR state). G-rule: track to 3/3 for Beacon fix (dedup the review dispatch). First instance: forge-wip-only-auto-redispatch-001 rev1, iter ~2666 (review-forge-wip-only-auto-redispatch-001.json + review-forge-wip-only-auto-redispatch-001-rev1.json both in Mirror inbox 2026-06-25T01:54-01:55Z).
+**Rule:** After Mirror completes a review (pass or revision), two separate dispatch paths fire: (1) the outbox_notifier's review-result path (which archives the original task and may dispatch -rev1 for revision) and (2) Beacon's notification-handler path (which re-dispatches a new `review-<task>.json` to Mirror). Both land in Mirror's inbox, causing Mirror to review the same PR twice. The -rev1 path is legitimate; the Beacon-notification-handler dispatch is the duplicate. Wasted Mirror time but not harmful. G-rule: track to 3/3 for Beacon fix. Instances: (1) iter ~2666: `review-forge-wip-only-auto-redispatch-001.json` + `-rev1.json` both in Mirror inbox; (2) iter ~2670: `review-pr-ourliberty-agent-core-692.json` reappeared in Mirror inbox after Mirror archived the original REVIEW_PASS at 02:11Z — Beacon notify-handler triggered the duplicate. Dispatch at 3/3.
 
 ---
+
+## Status snapshot — updated 2026-06-25 02:30Z UTC (Iter ~2670, Tier 1, consecutive_clean=0)
+
+**Iter ~2670 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase-pr-687-post-open-mergeable-001 approval pending Larry; blocking PR #692 auto-merge). **KEY EVENTS: PR #693 MERGED 02:25:44Z ✅ (feat: WIP-only session-death redispatch healer). PR #696 Mirror REVIEW_REVISION_REQUESTED (dry-run guard missing) → Forge quick-fix → rev1 queued in Mirror inbox. PR #692 REVIEW_PASS + MERGEABLE but AUTO_MERGE_HELD blocker=#687 (file overlap).** Always-fix: ff-main-when-behind executed (bc8d6708→d7175e2c). L1091 Tier-3 (PR #693 review-pass). Watermark 1090→1091. G-rules: heal-notify 3/3 vp (PR #696 revision advancing), manifest-drift 2/3, review-duplicate-dispatch 2/3 (2nd instance: PR #692 duplicate in Mirror inbox), check-i-force-bypass 1/3. PRIME: interventions=1143, systemic_fixes=69, ratio≈16.5, trend=improving. Tier 1, consecutive_clean=0.
 
 ## Status snapshot — updated 2026-06-25 02:20Z UTC (Iter ~2669, Tier 1, consecutive_clean=0)
 
