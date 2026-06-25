@@ -1253,11 +1253,24 @@ def _forge_rebase_target_shipped(task_id: str,
 
     Reads the archived outbox via `_load_forge_outbox`, extracts every `#<N>`
     reference from the `result`, and returns the matching PR dict IFF exactly
-    one referenced number resolves to a PR in `all_prs`. Fail-safe: missing /
-    unreadable archive, no `#<N>` reference, no resolving PR, OR ambiguity (the
-    result names two different PRs both present in the union) → None, so the
-    alert still fires. This step can only REMOVE false stalls, never mask a real
-    one."""
+    one referenced number resolves to a PR in `all_prs`.
+
+    Disambiguation (2026-06-25, fixes the residual original-task false fire):
+    when MORE than one referenced number resolves — e.g. the original task
+    `rebase-forge-post-open-mergeable-687-001` rebased PR #687 but its `result`
+    prose also narrates its now-merged blocker ('Its blocker (#685...) had
+    merged'), so `seen_numbers == {685, 687}` — intersect the resolving PR
+    numbers with the digit-groups present in the `task_id` itself
+    (`re.findall(r'\\d+', task_id)` → {687, 1}). {687, 1} ∩ {685, 687} = {687},
+    a single disambiguated target, so return that PR. The task_id's own PR
+    number is the authoritative signal for which PR the rebase targeted; the
+    other `#<N>` references are incidental narration. If the intersection is
+    empty or still names more than one PR, fall through to the fail-safe.
+
+    Fail-safe: missing / unreadable archive, no `#<N>` reference, no resolving
+    PR, OR ambiguity that the task_id cannot reduce to exactly one PR → None, so
+    the alert still fires. This step can only REMOVE false stalls, never mask a
+    real one."""
     try:
         if not task_id.startswith('rebase-'):
             return None
@@ -1274,6 +1287,14 @@ def _forge_rebase_target_shipped(task_id: str,
         seen_numbers = {pr.get('number') for pr in matches}
         if len(seen_numbers) == 1:
             return matches[0]
+        if len(seen_numbers) > 1:
+            task_id_numbers = {int(n) for n in re.findall(r'\d+', task_id)}
+            disambiguated = seen_numbers & task_id_numbers
+            if len(disambiguated) == 1:
+                target = next(iter(disambiguated))
+                for pr in matches:
+                    if pr.get('number') == target:
+                        return pr
         return None
     except Exception:
         return None
