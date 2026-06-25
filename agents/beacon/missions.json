@@ -5024,6 +5024,7 @@
       ],
       "shipped_at": "2026-06-25T00:52:13.979183+00:00",
       "shipped_by": "reconcile-hardening-mission-shipped-002",
+      "shipped_note": "Build completed via PR #672 (advancer-failure-detection — advancer terminal detection realign + stall attribution, merged 2026-06-24) and PR #673 (push-signal-and-substatus — push-signal non-merge terminals + pr_url/substatus at PR-open, merged 2026-06-24); board phase was stale because the mission was registered with empty task_ids so the GC healer had nothing to probe. Reconciled by Forge per task reconcile-hardening-mission-shipped-001-retry1.",
       "prior_phase": "in_flight"
     },
     {
