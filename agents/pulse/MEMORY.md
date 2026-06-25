@@ -168,6 +168,12 @@
 
 ---
 
+## G-rule heal-stale-daemon-code-auto-restart-failed-self-recovered — 1/3 (new, iter ~2704)
+
+**Rule:** `source=heal-stale-daemon-code, subject^=auto-restart-failed:*` alerts (route=escalate) fire when heal-stale-daemon-code's `sudo systemctl restart` times out (30s sudo timeout) while the unit is cycling. Watchdog also fires CRITICAL during the gap. Systemd's own restart policy brings the service back within ~90s. Services are running by the time Pulse triages. Triage helper: Tier-4 novel (no translation match). Fix: add `source=heal-stale-daemon-code, subject^=auto-restart-failed:` Tier-3 translation entry (informational — systemd self-healed). Dispatch to Beacon at 3/3.
+
+---
+
 ## G-rule forge-wip-redispatch-exhausted-pr-exists-fp-001 — 1/3 (new, iter ~2702)
 
 **Rule:** `source=forge-wip-redispatch, route=escalate` exhaustion alerts ("WIP-only auto-recovery EXHAUSTED") fire for tasks whose original PRs already exist (rebase-escalation-feed-685-001: PR #685 exists; rebase-forge-post-open-mergeable-687-001: PR #687 MERGED). Triage helper: Tier-4 novel (no translation). These are effective FPs — wip-redispatch retried a task whose output already shipped; retry dying WIP-only is expected. Fix: extend wip-redispatch to check PR existence before declaring exhaustion, OR add `source=forge-wip-redispatch, route=escalate, <pr_exists signal>` → Tier-3 entry to `config/alert-translations.json`. Dispatch to Beacon at 3/3.
@@ -180,8 +186,8 @@
 
 ---
 
-## Status snapshot — updated 2026-06-25 06:46Z UTC (Iter ~2702, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 07:01Z UTC (Iter ~2704, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2702 summary:** ⚠️ Watch — KEY POSITIVE: Larry approved `fix-auto-merge-already-merged-skip-001`; Forge (PID 2694471) actively building the outbox-notifier hot loop fix. 3 new Tier-4 forge-wip-redispatch exhaustion alerts: L1129 (fix-653-phase4b-spec-id-contract-001, genuine stuck build — no PR exists after 2 WIP-only failures), L1130/L1131 (FP exhaustions: PRs #685/#687 already exist). New G-rule forge-wip-redispatch-exhausted-pr-exists-fp-001 at 1/3. Pipeline stall rebase-687 FP resolved (now FORGE_NO_PR_SKIP). PR #698+#699 OPEN/UNKNOWN, Mirror reviewing. PID 1834248 zombie still alive (ask-then-do). PRIME: interventions=1169, systemic_fixes=71, vp=26, ratio≈16.46, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2704 summary:** ⚠️ Watch — KEY POSITIVES: PR #699 MERGED ✅ (missions reconcile), Forge built PR #700 (outbox-notifier hot loop fix, under Mirror review), PR #698 Mirror PASSED (auto-merge held behind #700). Service restart event at 06:55Z: heal-stale-daemon-code triggered restarts after PR merges updated script mtimes; outbox-notifier + chain-event-shipper had 90s down-gap, all services SELF-RECOVERED via systemd restart policy. Larry notified via beacon bot. New G-rule heal-stale-daemon-code-auto-restart-failed-self-recovered at 1/3. Outbox-notifier hot loop STILL ACTIVE (fix in PR #700). `heal-forge-no-pr-retry-rebase-fp-001` approval pending. PID 1834248 zombie alive (ask-then-do). PRIME: interventions=1171, systemic_fixes=71, vp=26, ratio≈16.49, trend=improving. Tier 1, consecutive_clean=0.
 
 

@@ -5,6 +5,123 @@
 ---
 
 
+## Iteration ~2704 — 2026-06-25T07:01Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry /cycle invocation via chat.
+
+**Health:** ⚠️ Watch — Service restart event at 06:55Z (heal-stale-daemon-code post-merge restart race): outbox-notifier + chain-event-shipper briefly DOWN, watchdog fired CRITICAL, all services SELF-RECOVERED within 90s via systemd restart policy. KEY POSITIVES: PR #699 MERGED ✅ (missions reconcile), Forge completed PR #700 build (outbox-notifier hot loop fix, under Mirror review), PR #698 Mirror PASSED (auto-merge held behind PR #700).
+
+**VERIFY-BEFORE-REASSERT:**
+- **Outbox-notifier loop**: STILL ACTIVE ✅ — log entries through 01:00:08 MDT (07:00Z UTC), PR #691 deferred behind #697 (MERGED). New PID 2716671 (restarted 00:56 MDT). Fix: PR #700 under Mirror review. [carry]
+- **All 4 daemons**: ALIVE with new PIDs (heal-stale-daemon-code restarted all services after PR merges updated script mtimes):
+  - beacon_telegram_bot: 2715635 (restarted 00:55 MDT, dispatch_validator.py changed) ✅
+  - inbox_watcher: 2716670 (restarted 00:56 MDT, inbox_watcher.py changed) ✅
+  - outbox_notifier: 2716671 (restarted 00:56 MDT — auto-restart-failed then systemd brought back) ✅
+  - chain_event_shipper: 2716672 (restarted 00:56 MDT — same) ✅
+- **PR #699 (reconcile-hardening-mission-shipped-001-retry1)**: **MERGED ✅** at 06:52Z. Auto-merged, branch deleted. Missions JSON complete.
+- **PR #700 (fix-auto-merge-already-merged-skip-001)**: **NEW OPEN** (06:52Z). Forge build complete. Mirror queue has `review-fix-auto-merge-already-merged-skip-001.json` (00:52 MDT). Outbox-notifier hot loop fix.
+- **PR #698 (skip-mirror-review-on-merged-or-closed-pr-001)**: Mirror PASSED at 06:53Z. Auto-merge HELD behind PR #700 (overlap: config/daemon-restart-manifest.json, scripts/inbox_watcher.py, scripts/outbox_notifier.py +3 more). Will auto-merge when PR #700 resolves. ✅ Progressing.
+- **Pipeline stall FP reconcile-hardening-001**: `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` — FP persists (original task; stall checker doesn't match retry1's PR #699 now MERGED). Fix `heal-forge-no-pr-retry-rebase-fp-001` pending Larry approval. [carry]
+- **Pipeline stall FP rebase-687-001**: suppressed (cooldown). ✅
+- **beacon-pending-approvals**: 1 — `heal-forge-no-pr-retry-rebase-fp-001`. [carry]
+- **Repo**: HEAD=129eca10=origin/main. Clean. On main. ✅
+- **Sync**: last_sync=2026-06-25T06:00:05Z (~1h ago). Within 2h ✅
+- **Zombie PID 1834248**: still alive (~27.5 days). Ask-then-do: `kill 1834248`. [carry]
+- **sequence-paused:operator-needs-you-feed**: No new alert. [carry ✅]
+
+**Check 0 — Alert triage:**
+- repair-watermark: repaired=false, old=1132, file_length=1139. **7 new alerts (L1133-L1139)**.
+- L1133: `source=outbox-notifier, intent=review-pass, task_id=reconcile-hardening-mission-shipped-001-retry1` — PR #699 Mirror approved + auto-merged. **Tier-3 silence** ✅.
+- L1134: `source=outbox-notifier, intent=review-pass, task_id=skip-mirror-review-on-merged-or-closed-pr-001` — PR #698 Mirror approved, auto-merge HELD behind PR #700. **Tier-3 silence** ✅.
+- L1135: `source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-inbox-watcher.service, route=digest` — **Tier-3 silence** ✅.
+- L1136: `source=heal-stale-daemon-code, subject=auto-restart-failed:ourliberty-outbox-notifier.service, route=escalate` — **Tier-4 novel** (no translation match). VERIFY: outbox-notifier NOW RUNNING (PID 2716671, systemd restart policy self-healed). Larry already notified via beacon bot (idx=1135 delivered 00:55:19 MDT). No second Pulse DM (actionable-only: auto-remediated). G-rule `heal-stale-daemon-code-auto-restart-failed-self-recovered` → 1/3.
+- L1137: `source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-beacon-bot.service, route=digest` — **Tier-3 silence** ✅.
+- L1138: `source=heal-stale-daemon-code, subject=auto-restart-failed:ourliberty-chain-event-shipper.service, route=escalate` — **Tier-4 novel**. VERIFY: chain-event-shipper NOW RUNNING (PID 2716672). Same pattern as L1136. No second Pulse DM. G-rule same, 1/3.
+- L1139: `source=watchdog, subject=ourliberty-outbox-notifier, route=escalate` — **Tier-4 novel**. VERIFY: outbox-notifier NOW RUNNING (PID 2716671). Watchdog CRITICAL fired at 00:55:50 MDT when service was in restart window; systemd restart policy completed at 00:56:40 MDT. Stale alert. No DM.
+- Watermark advanced 1132→1139. ✅
+
+**Service restart event — root cause** (06:52–06:57Z): PR #699 merged → outbox_notifier.py, inbox_watcher.py, dispatch_validator.py mtimes updated → heal-stale-daemon-code triggered restarts → inbox-watcher and beacon-bot restarted OK → outbox-notifier + chain-event-shipper: `sudo systemctl restart` attempted, unit went inactive, restart command timed out (30s sudo timeout) → heal-stale-daemon-code fired `route=escalate` alerts (L1136, L1138) → watchdog saw outbox-notifier inactive at 00:55:20 MDT, tried `sudo -n systemctl start`, timed out → fired CRITICAL (L1139, route=escalate) → systemd's own restart policy brought both services back at 00:56:40 MDT. Root gap: heal-stale-daemon-code + watchdog both use sudo with 30s timeouts; the systemd unit restart takes >30s in this configuration. Services ARE running. G-rule at 1/3.
+
+**Check 1 — Log noise:**
+- outbox-notifier.log: **[yellow] HOT LOOP** still active through 01:00:08 MDT (07:00Z). PR #691 / blocker #697 (MERGED). Fix in PR #700 under Mirror review. [carry]
+- watchdog.log: last entry 00:55:50 MDT (overall=critical — stale, reflects restart gap). By ps, all services UP. ✅ Watchdog next run at ~01:00 MDT will confirm healthy.
+
+**Check 2 — Telegram sweep:**
+- beacon_telegram_bot.log: last delivery at 00:55:19 MDT (idx=1135, auto-restart-failed:outbox-notifier escalation delivered to Larry). Beacon bot restarted (PID 2715635). No new Larry messages. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` — FP persists (PR #699 merged as retry1; stall checker misses). Fix `heal-forge-no-pr-retry-rebase-fp-001` pending Larry approval. [carry]
+- `suppressed (cooldown): forge_built_no_pr:rebase-forge-post-open-mergeable-687-001`. ✅
+- All others: FORGE_NO_PR_SKIP correctly. ✅
+
+**Check 4 — Pending directives:**
+- Beacon inbox: **EMPTY** ✅.
+- Forge inbox: **EMPTY** ✅. Forge completed build → PR #700 open.
+- Mirror inbox (2 tasks, FIFO):
+  - `review-fix-auto-merge-already-merged-skip-001.json` (00:52 MDT) — PR #700. Active (or queued). ✅
+  - `review-skip-mirror-review-on-merged-or-closed-pr-001.json` (00:25 MDT) — stale duplicate (PR #698 already Mirror-approved). G-rule review-duplicate-dispatch-wip-redispatch vp. ⚠️ [carry]
+- beacon-pending-approvals: 1 (`heal-forge-no-pr-retry-rebase-fp-001`). [carry]
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-06-25T06:55:06Z (~6 min ago). Fresh. ✅
+
+**Check A — Source repo:** HEAD=129eca10=origin/main. Clean. On main. ✅
+
+**Check B — Sync health:** last_sync=2026-06-25T06:00:05Z (~1h ago). Within 2h. ✅
+
+**Check C — Agent liveness:** All 4 daemons running (new PIDs post-restart). ✅
+- **[yellow] PID 1834248** — zombie bash wait-loop. Still alive (~27.5 days). Ask-then-do: `kill 1834248`. [carry]
+
+**Check E — PRs:**
+- PR #700 (fix-auto-merge-already-merged-skip-001): OPEN, UNKNOWN. Mirror reviewing. ⚠️
+- PR #698 (skip-mirror-review-on-merged-or-closed-pr-001): OPEN, UNKNOWN. Mirror PASSED. Auto-merge HELD behind PR #700. ⚠️
+
+**Check H — Forge digest:** Forge IDLE (completed PR #700 build). ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check III: not Sunday. Skip. ✅
+
+**G-rule updates:**
+- **heal-stale-daemon-code-auto-restart-failed-self-recovered** — **NEW, 1/3** (this iter). L1136 + L1138 (2 Tier-4 novel alerts, both `auto-restart-failed:*`, services both self-recovered via systemd restart policy). Also L1139 (watchdog CRITICAL during same gap). Root cause: heal-stale-daemon-code `sudo systemctl restart` times out (30s sudo timeout) when unit is slow to stop/start; systemd's own restart policy succeeds within ~90s. Fix: add `source=heal-stale-daemon-code, subject^=auto-restart-failed:` Tier-3 translation entry (informational — service self-healed by systemd). Dispatch to Beacon at 3/3.
+- **outbox-notifier-auto-merge-loop-merged-pr-001** — DISPATCHED ✅ (3/3, iter ~2695). **PROGRESSING ✅ this iter** — Forge built PR #700! Mirror reviewing. vp. [carry]
+- **forge-built-no-pr-retry1-fp-001** — DISPATCHED ✅ (3/3, iter ~2701). Beacon processed → `heal-forge-no-pr-retry-rebase-fp-001` approval in beacon-pending-approvals. Awaiting Larry approval → Forge build. vp. [carry]
+- **forge-wip-redispatch-exhausted-pr-exists-fp-001** — 1/3. No new instance. [carry]
+- **forge-wip-redispatch-digest-tier4-001** — 1/3. No new instance. [carry]
+- **watchdog-watcher-log-stale-post-pr694** — 2/3. No new instance. Watchdog running (though last=critical, self-resolves next tick). [carry]
+- **review-duplicate-dispatch-wip-redispatch** — vp. Duplicate in Mirror inbox. PR #698 (fix) approved + held behind PR #700. [carry]
+- **heal-daemon-restart-manifest-drift-regenerated-tier4** — 2/3. No new instance. [carry]
+- **check-i-force-bypass-dm-route** — 1/3. Thursday, no occurrence. [carry]
+- **no-session-revision-merged-pr-fp-001** — 1/3. No new instance. [carry]
+- **unrouted-open-pr-auto-merge-held-fp-001** — 1/3. No new instance. [carry]
+
+**Actions taken:** Triaged 7 new alerts (L1133-L1139): 4 Tier-3 silence, 3 Tier-4 novel (all self-recovered, Larry notified via beacon bot for escalate-route alerts). Watermark advanced 1132→1139. Appended 1 PRIME ledger row (intervention). No Pulse DMs (Larry already notified; services running). New G-rule `heal-stale-daemon-code-auto-restart-failed-self-recovered` at 1/3.
+
+**Standing findings (updated):**
+- [yellow] **Outbox-notifier hot loop** — Still active (PID 2716671, new). Fix in PR #700 under Mirror review. Self-resolves on Mirror → auto-merge → deploy → heal-stale-daemon-code → all clear.
+- [yellow] **Service restart event** — All 4 services restarted at ~06:55-06:56Z after PR merges updated script mtimes. Outbox-notifier + chain-event-shipper had a 90s gap before systemd self-healed. Services NOW running. Larry was notified via beacon bot. No further action needed.
+- [yellow] **PR #700 (fix-auto-merge-already-merged-skip-001)** — OPEN, UNKNOWN. Mirror reviewing. The outbox-notifier hot loop fix.
+- [yellow] **PR #698 (skip-mirror-review-on-merged-or-closed-pr-001)** — Mirror PASSED. Auto-merge HELD behind PR #700. Will auto-merge once #700 merges.
+- [yellow] **heal-forge-no-pr-retry-rebase-fp-001 pending approval** — `approve heal-forge-no-pr-retry-rebase-fp-001` unblocks pipeline stall FP fix (Pattern A: -retry1 PR; Pattern B: rebase- PR). [carry]
+- [yellow] **Forge: fix-653-phase4b-spec-id-contract-001 stuck** — WIP-only retries exhausted (L1129, iter ~2702). Larry notified (beacon bot delivered). [carry]
+- [yellow] **PID 1834248 zombie bash loop** — Still alive (~27.5 days). Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **sequence-paused:operator-needs-you-feed** — L1105. Recovery: `resume sequence operator-needs-you-feed` via Beacon or Dashboard. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**PRIME DIRECTIVE:** interventions=1171, systemic_fixes=71, verification_pending=26, ratio≈16.49, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** consecutive_clean=0 (non-clean: outbox-notifier loop, service restart event, PRs #700+#698 in pipeline, zombie PID, pending approvals). Tier: 1.
+
+---
+
+
 ## Iteration ~2703 — 2026-06-25T06:52Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry /cycle invocation via chat.
