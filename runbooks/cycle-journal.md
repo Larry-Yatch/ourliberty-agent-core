@@ -4,6 +4,103 @@
 
 ---
 
+## Iteration ~2656 — 2026-06-25T00:45Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/cycle` invocation via chat.
+
+**Health:** ⚠️ Watch — PR #685 CONFLICTING (carry; new rebase task queued); PR #687 CONFLICTING (carry, Mirror REVIEW_PASS x4, AUTO_MERGE_HELD blocker=#685); Forge session PID 2060999 approaching 4h timeout (~00:55Z). 0 new alerts. New: Beacon auto-dispatched `rebase-escalation-feed-685-001` to Forge inbox (9 items total) in response to Larry's 18:41 MDT query.
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #685 (forge/escalation-feed):** GitHub API: mergeable=CONFLICTING. Medic attempt 3 approval_request filed (L1066). NEW: `rebase-escalation-feed-685-001` queued in Forge inbox at 00:43Z — Beacon dispatched in response to Larry's query at 18:41 MDT. [carry + new rebase task in queue ✅]
+- **PR #687 (forge/forge-post-open-mergeable-rebase-001):** GitHub API: mergeable=CONFLICTING. Mirror REVIEW_PASS x4 confirmed. AUTO_MERGE_HELD blocker=#685 file overlap. [carry ✅]
+- **Forge session PID 2060999 (resume=6a1daec3, task=forge-post-open-mergeable-rebase-001):** ALIVE, elapsed 3h47m at cycle start (~00:42Z). Timeout fires ~00:55Z (~13 min). No `[forge] done` log line yet. Inbox-watcher last entry at 00:15Z (Mirror done for forge-post-open-mergeable-rebase-001, $1.82). [watch ✅]
+- **G-rule ourliberty-health-notify-script-missing:** wire-agent-core-health-notify-001 in Forge queue. journalctl permissions denied. [verification_pending ✅]
+- **G-rule watchdog-watcher-log-stale-post-fix:** Watchdog WARNs at 00:35Z (980s), 00:40Z (1245s+1545s) during Forge session. Fix (watchdog-stale-session-aware-suppression-001) in Forge preflight, not merged. [verification_pending ✅]
+- **All 8 daemons alive:** PIDs 1921593,2060999,1921360,1388801,1388982,1389067,1732118,1742173 — all confirmed. ✅
+- **Repo:** HEAD=1a60caa5=origin/main. Clean tree. ✅
+- **Beacon inbox:** EMPTY. ✅
+- **Forge inbox:** 9 items (was 8 + new: rebase-escalation-feed-685-001). ✅
+- **beacon-pending-approvals:** 0 pending. ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 1068, "file_length": 1068}`. 0 new alerts. Watermark stays 1068. ✅ Nominal.
+
+**Check 1 — Log noise:**
+- watchdog.log: WARNs continuing at ~5-min cadence during Forge session (00:35Z, 00:40Z x2). All cite stale inbox-watcher log + 1 non-empty inbox — expected while Forge session occupies the concurrency slot. Fix (watchdog-stale-session-aware-suppression-001) in Forge preflight. G-rule carry. ✅ (expected/known)
+- outbox-notifier.log: Last WARN at 15:30:53 MDT (AUTO_MERGE_SKIPPED_CONFLICTING PR#685, carry). MalformedMirrorMarker at 16:32 MDT (session 1 for PR#687 — superseded by REVIEW_PASS x4 in sessions 2-5). No new WARNs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Larry: 17:44 MDT "Go" x2 (carry, dispatched). NEW: Larry at 18:41 MDT "The operator-needs-you feed Dag seems to have been stuck most of the afternoon. What is going on?" → Beacon replied 18:43 MDT + auto-approved + dispatched `rebase-escalation-feed-685-001` to Forge inbox. Directive is now tracked (PR #685 + new rebase task). ✅ Nominal (journal note: Larry's question prompted new Forge dispatch).
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → 0 new alerts, 2 suppressed (cooldowns: `forge_built_no_pr:reconcile-hardening-mission-shipped-001`, `mirror_pass_unmerged:escalation-feed`). ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- Forge inbox (9 items): alert-translation-mirror-pass-unmerged-001, build-forge-post-open-mergeable-rebase-001, forge-wip-only-auto-redispatch-001, heal-stall-dryrun-noop-001, one-time-stale-dispatch-branch-cleanup-001, reconcile-hardening-mission-shipped-002, watchdog-stale-session-aware-suppression-001, wire-agent-core-health-notify-001, **rebase-escalation-feed-685-001** (NEW). ✅
+- Beacon inbox: EMPTY. ✅
+- Mirror inbox: EMPTY. ✅
+- beacon-pending-approvals: 0 pending. ✅
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat = 2026-06-25T00:40:34Z (~5 min ago). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=1a60caa5=origin/main. Clean tree. On main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-25T00:38:57Z (~6 min ago). Status=no-change. ✅ Nominal.
+
+**Check C — Agent liveness:** 8/8 daemons alive. Forge session PID 2060999 running (long-running, near timeout). ✅ Nominal.
+
+**Check E — PRs:**
+- agent-core PR #685 (forge/escalation-feed): OPEN, mergeable=CONFLICTING. New rebase task queued. [⚠️ carry — rebase-escalation-feed-685-001 will address when Forge processes it]
+- agent-core PR #687 (forge/forge-post-open-mergeable-rebase-001): OPEN, mergeable=CONFLICTING. Mirror REVIEW_PASS x4. AUTO_MERGE_HELD blocker=#685. [⚠️ carry — unblocks when #685 merges]
+- dashboard: 0 open. ✅
+
+**Check H — Forge digest:** HEAD=1a60caa5. 9 items in Forge queue (+1 new: rebase-escalation-feed-685-001). Beacon: empty. Mirror: empty. Forge session PID 2060999 approaching 4h timeout (~00:55Z).
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. ✅
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- **Check I:** Weekday gate fails (Thursday). Skip. ✅
+- **Check III:** Not Sunday. Skip. ✅
+
+**G-rule updates:**
+- **G-rule watchdog-watcher-log-stale-post-fix** — 3/3 dispatched (carry). WARNs at 00:35Z, 00:40Z during Forge session. Fix in Forge preflight. [verification_pending]
+- **G-rule ourliberty-health-notify-script-missing** — 3/3 dispatched (carry). wire-agent-core-health-notify-001 in Forge queue. [verification_pending]
+- **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 3/3 dispatched (carry). alert-translation-mirror-pass-unmerged-001 in Forge queue. [verification_pending]
+- **G-rule heal-daemon-restart-manifest-drift-regenerated-tier4** — 1/3 (carry; 0 new instances). Dispatch at 3/3.
+- **G-rule check-i-force-bypass-dm-route** — 1/3 (carry; 0 new instances, Thursday). Dispatch at 3/3.
+
+**New observation — rebase-escalation-feed-685-001 dispatched:** Beacon dispatched `rebase-escalation-feed-685-001` to Forge inbox at 00:43Z UTC in response to Larry's 18:41 MDT query ("The operator-needs-you feed Dag seems to have been stuck most of the afternoon"). Goal: rebase PR #685 in place onto origin/main, resolving conflicts, preserving both main's hardening/mirror-review-visibility changes AND #685's promote_alerts escalation logic. This is the critical path item — if Forge completes this, PR #685 merges, PR #687 auto-merges (REVIEW_PASS x4), and the backlog of 7 other Forge queue items begins processing. Expects Forge session PID 2060999 to complete/timeout (~00:55Z) before inbox-watcher begins this task.
+
+**Actions taken:** repair-watermark (no-op). Pipeline stall dry-run (0 alerts). Tier state recorded (non-clean). PRIME: 1 intervention logged. 0 auto-fix actions. Watermark: no change (1068).
+
+**Dispatches:** None this iter (Beacon handled Larry's query autonomously via the approval shortcut).
+
+**Standing findings (carried + verified):**
+- [yellow] **PR #685 (forge/escalation-feed)** — CONFLICTING (medic attempt 3 filed; rebase-escalation-feed-685-001 now queued in Forge). [carry + new resolution path]
+- [yellow] **PR #687 (forge/forge-post-open-mergeable-rebase-001)** — CONFLICTING. Mirror REVIEW_PASS x4. AUTO_MERGE_HELD blocker=#685. [carry — unblocks when #685 merges]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [blue] **rebase-escalation-feed-685-001** — NEW: Forge inbox. Rebase PR #685 in place. Critical path. [new]
+- [blue] **Forge session PID 2060999** — forge-post-open-mergeable-rebase-001, timeout ~00:55Z. When complete, inbox-watcher processes 9 queued items. [watch — near timeout]
+- [blue] **reconcile-hardening-mission-shipped-001 stall** — medic attempt 4 done; -002 in Forge inbox. [carry]
+- [blue] **build-forge-post-open-mergeable-rebase-001** — PR #687 opened, Mirror REVIEW_PASS x4. AUTO_MERGE_HELD until #685 merges. [carry]
+- [blue] **reconcile-hardening-mission-shipped-002** — Forge preflight (queue serialization). [carry]
+- [blue] **forge-wip-only-auto-redispatch-001** — Forge preflight. [carry]
+- [blue] **heal-stall-dryrun-noop-001** — Forge preflight. [carry]
+- [blue] **one-time-stale-dispatch-branch-cleanup-001** — Forge preflight. [carry]
+- [blue] **watchdog-stale-session-aware-suppression-001** — Forge preflight. [verification_pending — fix not merged]
+- [blue] **alert-translation-mirror-pass-unmerged-001** — Forge inbox. [verification_pending]
+- [blue] **wire-agent-core-health-notify-001** — Forge inbox. [verification_pending]
+
+**PRIME DIRECTIVE:** Trailing-30d: interventions=1128, systemic_fixes=66, ratio=17.1, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** `record --checks-clean false` → consecutive_clean=0. Tier: 1.
+
+---
+
 ## Iteration ~2655 — 2026-06-25T00:35Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/cycle` invocation via chat.

@@ -242,6 +242,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-25 00:45Z UTC (Iter ~2656, Tier 1, consecutive_clean=0)
+
+**Iter ~2656 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry; NEW: `rebase-escalation-feed-685-001` queued in Forge inbox — Beacon dispatched at 00:43Z after Larry's 18:41 MDT query about the escalation-feed DAG); PR #687 CONFLICTING (carry, Mirror REVIEW_PASS x4, AUTO_MERGE_HELD blocker=#685). Forge session PID 2060999 approaching 4h timeout (~00:55Z). 0 new alerts. Watermark 1068 (no change). All 8 daemons alive. Repo clean (HEAD=1a60caa5=origin/main). Sync 6m ago. Check I: Thursday, skip. PRIME: interventions=1128, systemic_fixes=66, ratio=17.1, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-25 00:40Z UTC (Iter ~2655, Tier 1, consecutive_clean=0)
 
 **Iter ~2655 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry, medic attempt 3 filed, awaiting Larry manual rebase); PR #687 CONFLICTING (carry, Mirror REVIEW_PASS x4, AUTO_MERGE_HELD until #685 merges). Forge session PID 2060999 (resume=6a1daec3, task=forge-post-open-mergeable-rebase-001) at 3h37m, timeout ~00:55Z. 0 new alerts. Watermark 1068 (no change). All daemons alive (8/8). Repo clean (HEAD=3cac366d=origin/main). Sync 57m ago. Check I: Thursday, skip. PRIME: interventions=1127, systemic_fixes=66, ratio=17.1, trend=improving. Tier 1, consecutive_clean=0.
