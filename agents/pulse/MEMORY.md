@@ -192,8 +192,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-25 14:18Z UTC (Iter ~2763, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 14:26Z UTC (Iter ~2764, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2763 summary:** ✅ Nominal — 1 alert (Tier-3 silenced). **PR #701 MERGED** at 14:13:35Z (heal-forge-no-pr-retry-rebase-fp-001 COMPLETE). Repo fast-forwarded 4ecf63ce→3cee80fe. 8/8 daemons alive. Pipeline stall: reconcile-hardening-001 FP **RESOLVED** ✅; rebase-forge-post-open-mergeable-687-001 original **still firing** (Pattern B in PR #701 suppresses retry1 but not original). All inboxes empty. PID 1834248 zombie still alive (~27.79d, ask-then-do). 6 stale journalctl PIDs (~30d, ask-then-do). Watchdog healthy (08:15:27 MDT). PRIME: interventions=1219, systemic_fixes=71, vp=26, ratio≈17.17, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2764 summary:** ✅ Nominal — 0 new alerts. 8/8 daemons alive. Pipeline stall: reconcile-hardening-001 FP **RESOLVED** ✅ (confirmed no longer fires); rebase-forge-post-open-mergeable-687-001 original **still firing** — fix dispatch in-flight (forge-no-pr-rebase-original-fp-fix-001.json in Beacon inbox from iter ~2763). All inboxes empty except Beacon pending fix dispatch. PID 1834248 zombie still alive (~27.79d, ask-then-do). 6 stale journalctl PIDs (~30d, ask-then-do). Watchdog healthy (08:20:36 MDT). PRIME: interventions=1219, systemic_fixes=71, vp=26, ratio≈17.17, trend=improving. Tier 1, consecutive_clean=0.
 
 
