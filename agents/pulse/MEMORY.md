@@ -156,6 +156,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-25 04:08Z UTC (Iter ~2682, Tier 1, consecutive_clean=0)
+
+**Iter ~2682 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase approval pending Larry). **KEY EVENTS: 2 new alerts (L1103 mirror-pass-unmerged:PR#687 → Tier-3 silenced per PR#695; L1104 medic-diagnosis:PR#687 attempt 5 → Tier-3 silenced). All agents IDLE. 4 pending approvals (carry). Pipeline stall: reconcile-001 FP persists (fix approval pending); mirror_pass_unmerged:687 + unrouted_open_pr:692 both suppressed by cooldown. No dispatches.** PRIME: interventions=1154, systemic_fixes=70, vp=25, ratio≈16.49, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-25 03:59Z UTC (Iter ~2681, Tier 1, consecutive_clean=0)
 
 **Iter ~2681 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase approval pending Larry). **KEY EVENTS: 1 new alert (L1102 medic-diagnosis:PR#692 → Tier-3 silenced). mirror_pass_unmerged:PR#687 cooldown EXPIRED — stall checker would now recover-then-alert (DRY-RUN; no actual alert). All agents IDLE. 4 pending approvals (carry). No dispatches.** PRIME: interventions=1153, systemic_fixes=70, vp=25, ratio≈16.47, trend=improving. Tier 1, consecutive_clean=0.
