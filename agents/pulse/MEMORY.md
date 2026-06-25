@@ -84,6 +84,12 @@
 
 ---
 
+## outbox-notifier log path (confirmed iter ~2680)
+
+**Rule:** Log file is `/home/larry/agents/logs/outbox-notifier.log` (hyphen, NOT underscore). `outbox_notifier.log` (underscore) does NOT exist. Prior journal entries saying "outbox_notifier.log" were referencing the wrong name; corrected forward.
+
+---
+
 ## §5.0 script paths — ground-truth (confirmed iter ~2183)
 
 **Rule:** `audit_due_nudge.py` and `distill_detector.py` live in `scripts/`, NOT `review/distill/`. Only `audit_cadence_signal.py` is in `review/distill/`. Always invoke: `python3 scripts/audit_due_nudge.py`, `python3 scripts/distill_detector.py`, `python3 review/distill/audit_cadence_signal.py`.
@@ -149,6 +155,10 @@
 `outbox-notifier url-shape-invalid` → PR #493 (2026-06-13). `medic-diagnosis-tier4` → PR #515 (2026-06-15). `heal-pipeline-stall:unrouted-pr` → PR #516 (2026-06-15). `check-i-repeat-dm-fix-001` → PR #674 (2026-06-24). `heal-droplet-git-drift` → PR #586 (2026-06-19). `silence-routine-weekly-alerts` → PR #604 (2026-06-20). `forge-preflight-no-marker` → PR #600 (2026-06-19). `projects-json-healer-path` → PR #603 (2026-06-20). `outbox-notifier-review-pass` → PR #604 scope. `seq-advancer-sequence-stranded` → PR #661 (2026-06-24). `catalog-accuracy-drift` → PR #6 ourliberty-graph (2026-06-22). `doorbell-tier4-pattern` → PR #648 (2026-06-23). `heal-stale-daemon-code-script-service-mismatch` → PR #647 (2026-06-23). `mirror-marker-parse-error` → PR #650 (2026-06-23). `watchdog-watcher-log-stale` → PR #649 (2026-06-23). `watchdog-watcher-log-stale-post-fix` → PR #694 (2026-06-25). `ourliberty-health-notify-script-missing` → PR #696 (2026-06-25). `heal-pipeline-stall-mirror-pass-unmerged-tier4` → PR #695 (2026-06-25).
 
 ---
+
+## Status snapshot — updated 2026-06-25 03:54Z UTC (Iter ~2680, Tier 1, consecutive_clean=0)
+
+**Iter ~2680 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase approval pending Larry). **KEY EVENTS: 1 new alert (L1101 heal-pipeline-stall:unrouted-pr:PR#692 → Tier-3 silenced). PR #692 UPGRADED to MERGEABLE/CLEAN (Mirror passed 02:48Z, routing-events confirmed). AUTO_MERGE_HELD blocker=#687 (outbox-notifier confirmed). All agents IDLE. 4 pending approvals (carry). Pipeline stall: reconcile-001 FP persists, both unrouted_open_pr:692 + mirror_pass_unmerged:687 suppressed by cooldown. No dispatches. Log path corrected: outbox-notifier.log (hyphen).** PRIME: interventions=1152, systemic_fixes=70, vp=25, ratio=16.46, trend=improving. Tier 1, consecutive_clean=0.
 
 ## Status snapshot — updated 2026-06-25 03:46Z UTC (Iter ~2679, Tier 1, consecutive_clean=0)
 
