@@ -552,5 +552,127 @@ class WaitingSourceReadersTest(unittest.TestCase):
         self.assertEqual([i['id'] for i in items], ['needs you'])
 
 
+class WaitingSequencesReaderTest(unittest.TestCase):
+    """load_waiting_sequences — paused sequences + stuck-dispatched steps as
+    source='sequence' waiting items (operator-needs-you-feed §5.3 + §5.4)."""
+
+    def _write_seq(self, d: Path, seq_id: str, seq: dict) -> None:
+        d.mkdir(parents=True, exist_ok=True)
+        (d / f'{seq_id}.json').write_text(json.dumps(seq))
+
+    def _run(self, build):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp) / 'build-sequences'
+            build(d)
+            with mock.patch.dict(
+                    os.environ, {'OURLIBERTY_BUILD_SEQUENCES_DIR': str(d)}):
+                return ssl.load_waiting_sequences(_NOW)
+
+    def test_paused_sequence_yields_one_item(self):
+        def build(d):
+            self._write_seq(d, 'seq-1', {
+                'seq_id': 'seq-1', 'status': 'paused', 'steps': [],
+                'audit_log': [
+                    {'ts': '2026-06-19T11:00:00+00:00', 'event': 'paused',
+                     'actor': 'beacon'},
+                ],
+            })
+        items = self._run(build)
+        self.assertEqual(len(items), 1)
+        it = items[0]
+        self.assertEqual(it['source'], 'sequence')
+        self.assertEqual(it['id'], 'seq-1')
+        self.assertEqual(it['seq_id'], 'seq-1')
+        self.assertIsNone(it['step_id'])
+        self.assertEqual(it['actions'], ['resume', 'cancel'])
+        self.assertIn('Paused', it['why'])
+        self.assertEqual(it['_ts'], '2026-06-19T11:00:00+00:00')
+
+    def test_fresh_dispatched_step_yields_no_item(self):
+        # Dispatched 5 minutes ago (< 15-min threshold) → not yet stuck.
+        def build(d):
+            self._write_seq(d, 'seq-1', {
+                'seq_id': 'seq-1', 'status': 'active',
+                'steps': [
+                    {'step_id': 'step-1', 'status': 'dispatched',
+                     'pr_url': None,
+                     'dispatched_at': '2026-06-19T11:55:00+00:00'},
+                ],
+            })
+        self.assertEqual(self._run(build), [])
+
+    def test_stuck_dispatched_step_yields_one_item(self):
+        # Dispatched 16 minutes ago (> 15-min threshold), no PR → stuck.
+        def build(d):
+            self._write_seq(d, 'seq-1', {
+                'seq_id': 'seq-1', 'status': 'active',
+                'steps': [
+                    {'step_id': 'step-1', 'status': 'dispatched',
+                     'pr_url': None,
+                     'dispatched_at': '2026-06-19T11:44:00+00:00'},
+                ],
+            })
+        items = self._run(build)
+        self.assertEqual(len(items), 1)
+        it = items[0]
+        self.assertEqual(it['source'], 'sequence')
+        self.assertEqual(it['id'], 'seq-1/step-1')
+        self.assertEqual(it['seq_id'], 'seq-1')
+        self.assertEqual(it['step_id'], 'step-1')
+        self.assertEqual(it['actions'], ['skip', 'cancel'])
+        self.assertIn('16m ago', it['why'])
+        self.assertEqual(it['_ts'], '2026-06-19T11:44:00+00:00')
+
+    def test_dispatched_step_with_pr_is_not_stuck(self):
+        def build(d):
+            self._write_seq(d, 'seq-1', {
+                'seq_id': 'seq-1', 'status': 'active',
+                'steps': [
+                    {'step_id': 'step-1', 'status': 'dispatched',
+                     'pr_url': 'https://github.com/o/r/pull/9',
+                     'dispatched_at': '2026-06-19T10:00:00+00:00'},
+                ],
+            })
+        self.assertEqual(self._run(build), [])
+
+    def test_step_exactly_at_threshold_is_not_stuck(self):
+        # Exactly 15 minutes → boundary is strict (> threshold), so no item.
+        def build(d):
+            self._write_seq(d, 'seq-1', {
+                'seq_id': 'seq-1', 'status': 'active',
+                'steps': [
+                    {'step_id': 'step-1', 'status': 'dispatched',
+                     'pr_url': None,
+                     'dispatched_at': '2026-06-19T11:45:00+00:00'},
+                ],
+            })
+        self.assertEqual(self._run(build), [])
+
+    def test_missing_dir_fails_open(self):
+        with mock.patch.dict(
+                os.environ,
+                {'OURLIBERTY_BUILD_SEQUENCES_DIR': '/no/such/build-seqs'}):
+            self.assertEqual(ssl.load_waiting_sequences(_NOW), [])
+
+    def test_paused_with_stuck_step_yields_both(self):
+        def build(d):
+            self._write_seq(d, 'seq-1', {
+                'seq_id': 'seq-1', 'status': 'paused',
+                'steps': [
+                    {'step_id': 'step-1', 'status': 'dispatched',
+                     'pr_url': None,
+                     'dispatched_at': '2026-06-19T11:40:00+00:00'},
+                ],
+                'audit_log': [
+                    {'ts': '2026-06-19T11:50:00+00:00', 'event': 'paused',
+                     'actor': 'beacon'},
+                ],
+            })
+        items = self._run(build)
+        self.assertEqual(len(items), 2)
+        kinds = {(i['seq_id'], i['step_id']) for i in items}
+        self.assertEqual(kinds, {('seq-1', None), ('seq-1', 'step-1')})
+
+
 if __name__ == '__main__':
     unittest.main()
