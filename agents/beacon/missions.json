@@ -5201,7 +5201,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-25T05:26:06.222391+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-25T05:16:13.781096+00:00"
+      "orphan_last_activity_ts": "2026-06-25T05:16:13.781096+00:00",
+      "briefing": {
+        "what": "A small reliability tweak so the team stops double-checking work that's already been finalized.",
+        "why": "It saves wasted effort and keeps the team focused on items that still need a decision, not ones already settled.",
+        "suggest": "Worth doing, but give it a quick once-over before it goes live to be sure nothing important gets skipped by mistake."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-25T05:32:20.686050+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
