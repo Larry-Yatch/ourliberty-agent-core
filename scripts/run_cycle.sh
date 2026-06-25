@@ -139,6 +139,29 @@ cd "$PULSE_DIR"
 # Claude Code session.
 CYCLE_OUT="${LOG_DIR}/cycle.last-output.json"
 CYCLE_OK=0
+
+# --- auth: follow the team's active account tier ---------------------------
+# Authenticate /cycle against the active tier's durable setup-token — the SAME
+# source agent_runner uses for a dispatch — rather than HOME's auto-refreshing
+# ~/.claude/.credentials.json, which rots silently on an OAuth refresh failure
+# and then 401s every iteration (the recurring false "Tier N down"). active_tier
+# reads blackboard/active-tier.json, so a dashboard tier switch or an automatic
+# rotation moves the heartbeat with the team. HOME deliberately stays put: the
+# cycle operates against /home/larry/.claude (project trust, settings, MCP) — so
+# only the auth token follows the tier. Empty token => keep prior behavior.
+# Exported (never passed as an arg) so the token cannot leak into `ps`; NEVER
+# logged. Best-effort: a lookup failure leaves the token empty and the cycle
+# simply falls back to the pre-existing credentials.json path. The active tier
+# itself is already recorded per-iteration in the cost ledger below
+# (ACCOUNT_TIER), so we don't re-resolve it here just to name it in a log line.
+CYCLE_OAUTH_TOKEN="$(timeout 10 python3 "${HOME}/agent-core/scripts/active_tier.py" active-setup-token 2>>"$LOG_FILE" || true)"
+if [ -n "$CYCLE_OAUTH_TOKEN" ]; then
+    export CLAUDE_CODE_OAUTH_TOKEN="$CYCLE_OAUTH_TOKEN"
+    log "auth: /cycle authenticating via active-tier setup_token"
+else
+    log "auth: /cycle falling back to credentials.json (no active-tier setup-token)"
+fi
+
 if claude --print --model claude-sonnet-4-6 --output-format json "Run /cycle now per the spec in ../../runbooks/cycle-prompt.md. Report findings, take auto-fix actions, write the journal entry, send any escalations." > "$CYCLE_OUT" 2>&1; then
     log "/cycle iteration completed successfully"
     CYCLE_OK=1
