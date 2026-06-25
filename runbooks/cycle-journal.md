@@ -5,6 +5,119 @@
 ---
 
 
+## Iteration ~2666 — 2026-06-25T02:00Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry /cycle invocation via chat (/loop dynamic).
+
+**Health:** ⚠️ Watch — PR #687 CONFLICTING (rebase approval pending Larry); sequence-paused:operator-needs-you-feed (unreg-approval pending Larry); PR #693 revision-1 applied, re-review queued; Mirror handling 6-item queue. All daemon/repo/sync checks nominal.
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #687 (forge/forge-post-open-mergeable-rebase-001):** CONFLICTING confirmed (gh pr list). heal-pipeline-stall fired L1085 (cooldown expired, mirror-pass-unmerged:PR#687). beacon-pending-approvals active: rebase-pr-687-post-open-mergeable-001. [carry — approval active]
+- **G-rule watchdog-watcher-log-stale-post-fix:** Last WARN 01:43Z (during Mirror PR #692 session). Watchdog entries: 01:48:42Z healthy, 01:54:16Z healthy (inbox_watcher was active on Forge/Beacon tasks). No new WARNs since 01:43Z (11 min clean). PR #694 in Mirror queue. [verification_pending — positive, no WARNs during Forge/Beacon burst]
+- **G-rule ourliberty-health-notify-script-missing:** Forge DONE build-wire-agent-core-health-notify-001 at 01:51:35Z (PR #696 opened, MERGEABLE). Mirror review task queued (review-wire-agent-core-health-notify-001.json). [verification_pending — advancing, PR #696 in Mirror queue ✅]
+- **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4:** NEW instance L1085 (cooldown expired at 01:52Z). Bot DM'd Larry. PR #695 in Mirror queue. No Pulse 2nd DM. [verification_pending — new occurrence, fix advancing]
+- **Forge inbox:** EMPTY (revision-forge-wip-only-auto-redispatch-001-1 consumed at 01:54Z). ✅
+- **Beacon inbox:** EMPTY (both notifies processed). ✅
+- **Repo:** HEAD=6db16220=origin/main. Clean. On main. ✅
+- **Sync:** last_sync=01:00:00Z (~60 min), status=success. Within 2h threshold. ✅
+- **Daemons:** beacon_telegram_bot PID 2341187, outbox_notifier PID 2340424, inbox_watcher PID 1732118 — alive. heal-stale-daemon-code heartbeat=01:51:15Z. ✅
+
+**Check 0 — Alert triage:** 3 new alerts since watermark=1083.
+- **L1084** `source=doorbell, intent=doorbell` — Tier-3 ✅ (doorbell Tier-3 silenced per PR #648; route=digest). Content: "2 items need your call: unreg-approval + rebase PR #687."
+- **L1085** `source=heal-pipeline-stall, subject=pipeline-stall:mirror-pass-unmerged:PR#687, route=escalate` — Tier-4. Bot already DM'd Larry (route=escalate). No Pulse 2nd DM. G-rule 3/3 dispatched (PR #695 will silence when merged).
+- **L1086** `source=build-sequence-advancer, subject=sequence-paused:operator-needs-you-feed, route=escalate` — Tier-4 (novel, no translation). Bot already DM'd Larry. No Pulse 2nd DM. Caused by unreg-approval-6009fbf6bfa2 blocking operator-needs-you-feed/escalation-feed DAG. Expected behavior while approval is pending.
+- Watermark advanced 1083→1086.
+
+**Check 1 — Log noise:**
+- watchdog.log: Last WARN 01:43Z (324s stale — Mirror PR #692 session). Healthy at 01:48:42Z and 01:54:16Z. No new WARNs during Forge/Beacon burst (01:51-01:54Z). PR #694 fix in Mirror queue. ✅ Expected pattern.
+- outbox-notifier.log: Active through 01:55:30Z. No ERRORs. 2 review tasks dispatched for forge-wip-only-auto-redispatch-001 (rev1 + duplicate — see New Observations). ✅
+- inbox_watcher.log: Active through 01:54:41Z. Processing Forge revision (145s, $0.95) + Beacon notifies. ✅
+
+**Check 2 — Telegram sweep:** Larry's last message: "Yes rebase #687 next" (18:45 MDT June 24 = 00:45Z). No new messages. rebase-pr-687-post-open-mergeable-001 approval pending since 01:26Z (L1080 delivered). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** Ran heal_pipeline_stall.py. 1 new alert (L1085 mirror-pass-unmerged:PR#687 — cooldown expired, auto-recovery failed: merge conflicts), 1 suppressed (reconcile-001 cooldown). ✅ Expected — PR #687 CONFLICTING is root cause.
+
+**Check 4 — Pending directives:**
+- Forge inbox: EMPTY. ✅
+- Beacon inbox: EMPTY. ✅
+- Mirror inbox: 6 items — review-alert-translation-mirror-pass-unmerged-001, review-forge-wip-only-auto-redispatch-001-rev1, review-forge-wip-only-auto-redispatch-001 (possible duplicate), review-pr-ourliberty-agent-core-692, review-watchdog-stale-session-aware-suppression-001, review-wire-agent-core-health-notify-001. ✅ Pipeline active.
+- beacon-pending-approvals: 2 (unreg-approval-6009fbf6bfa2 stale; rebase-pr-687-post-open-mergeable-001 active).
+- L1086 (sequence-paused:operator-needs-you-feed) — bot DM'd Larry re: unreg-approval pending. Dashboard: dashboard.ourliberty.dev/approvals. [carry — pending Larry action]
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=01:51:15Z (~9 min ago). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=6db16220=origin/main. Clean. On main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=01:00:00Z (~60 min), status=success. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot (2341187), outbox_notifier (2340424), inbox_watcher (1732118) — all alive. ✅ Nominal.
+
+**Check E — PRs:**
+- agent-core PR #696 (forge/wire-agent-core-health-notify-001): **NEW** MERGEABLE. Opened by Forge at 01:51Z ($1.83). Mirror review task queued. [advancing — G-rule ourliberty-health-notify fix ✅]
+- agent-core PR #695 (forge/alert-translation-mirror-pass-unmerged-001): UNKNOWN, Mirror queue. [advancing — G-rule fix]
+- agent-core PR #694 (forge/watchdog-stale-session-aware-suppression-001): UNKNOWN, Mirror queue. [advancing — G-rule fix]
+- agent-core PR #693 (forge/forge-wip-only-auto-redispatch-001): MERGEABLE. **Revision 1 applied at 01:54Z** (false-positive retries-exhausted escalation fixed; Mirror re-review queued via review-forge-wip-only-auto-redispatch-001-rev1.json). [advancing ✅]
+- agent-core PR #692 (work/forge-wedge-healer): UNKNOWN, Mirror review active since 01:40Z. [advancing]
+- agent-core PR #691 (forge/heal-stall-dryrun-noop-001): UNKNOWN. Mirror REVIEW_PASS (L1083). AUTO_MERGE_HELD behind #687. [advancing — will cascade on #687 merge]
+- agent-core PR #687 (forge/forge-post-open-mergeable-rebase-001): CONFLICTING. Rebase approval pending Larry. [⚠️ carry]
+- dashboard: 0 open. ✅
+
+**Check H — Forge digest:** Forge IDLE. Both tasks completed this window:
+- `wire-agent-core-health-notify-001` DONE at 01:51:35Z (1020s, $1.83) → PR #696 opened.
+- `forge-wip-only-auto-redispatch-001` revision-1 DONE at 01:54:07Z (145s, $0.95) → re-review dispatched.
+Forge inbox: EMPTY. Next tasks will come when Mirror finishes reviews + Beacon dispatches.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. ✅
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails (Thursday). Skip. ✅
+- Check III: not Sunday. Skip. ✅
+
+**G-rule updates:**
+- **heal-daemon-restart-manifest-drift-regenerated-tier4** — **2/3** (no new instance this iter). Dispatch at 3/3.
+- **watchdog-watcher-log-stale-post-fix** — 3/3 dispatched (carry). Watchdog healthy at 01:48:42Z and 01:54:16Z (11+ min clean during Forge/Beacon burst). PR #694 in Mirror queue. [verification_pending — positive signal]
+- **ourliberty-health-notify-script-missing** — 3/3 dispatched (carry). PR #696 MERGEABLE, Mirror review queued. [verification_pending — advancing ✅]
+- **heal-pipeline-stall-mirror-pass-unmerged-tier4** — 3/3 dispatched (carry). L1085 new occurrence (cooldown expired). PR #695 in Mirror queue. [verification_pending — new occurrence, bot DM'd]
+- **check-i-force-bypass-dm-route** — **1/3** (Thursday, no occurrence). Dispatch at 3/3.
+- **review-duplicate-dispatch-wip-redispatch** — **NEW 1/3**: both `review-forge-wip-only-auto-redispatch-001.json` (19:55:30Z) and `review-forge-wip-only-auto-redispatch-001-rev1.json` (19:54:10Z) dispatched to Mirror simultaneously. -rev1 is the legitimate post-revision re-review; non-rev1 appears to be a duplicate triggered by Beacon's notification-handler path after forge completion. This could cause Mirror to review PR #693 twice in sequence — wasted cost but not harmful. Track to 3/3 for Beacon G-rule.
+- **build-sequence-advancer-sequence-paused-tier4** — **NEW 1/1** (transient): L1086, sequence-paused:operator-needs-you-feed. Not a structural G-rule — will resolve when Larry approves/rejects unreg-approval-6009fbf6bfa2 (operator-needs-you-feed/escalation-feed). No dispatch. Journal note only.
+
+**New observations:**
+- **Forge burst completed (01:51-01:54Z):** wire-agent-core-health-notify-001 (17 min, $1.83) + wip-auto-redispatch revision-1 (145s, $0.95) both completed cleanly. System throughput strong — Forge+Beacon processed 4 tasks in ~3 min window.
+- **PR #693 revision-1:** Mirror found a real false-positive bug in the retries-exhausted escalation logic (after a successful auto-redispatch, the original branch persists and triggers a false retries-exhausted alert on the next tick). Forge fixed it in 145s — tight, targeted edit. Re-review dispatched.
+- **Mirror queue depth: 6 items.** High but healthy — all triggered by legitimate completions. Expected to drain over the next 30-60 min as Mirror works through them sequentially. No ask-then-do needed.
+- **sequence-paused:operator-needs-you-feed (L1086):** The build-sequence-advancer detected the operator-needs-you-feed DAG is waiting on the unreg-approval-6009fbf6bfa2 (escalation-feed/operator-needs-you-feed step 1A). Bot DM'd Larry. Action: Larry approves/rejects via Telegram or dashboard.ourliberty.dev/approvals. If approved, Forge will start building the escalation-feed feature.
+
+**Actions taken:** Alert triage (L1084 Tier-3, L1085 Tier-4, L1086 Tier-4). Watermark 1083→1086. PRIME intervention appended. Tier state recorded (consecutive_clean=0). No always-allowed auto-fixes (repo current, sync <2h, no stale clean+green PRs requiring enable-auto-merge).
+
+**Dispatches:** None this iter.
+
+**Standing findings (carried + verified):**
+- [yellow] **PR #687 (forge/forge-post-open-mergeable-rebase-001)** — CONFLICTING. rebase-pr-687-post-open-mergeable-001 approval pending Larry (Telegram: reply 'approve'). [carry — approval active]
+- [yellow] **unreg-approval-6009fbf6bfa2 + sequence-paused:operator-needs-you-feed** — operator-needs-you-feed/escalation-feed pending Larry approval. Dashboard: dashboard.ourliberty.dev/approvals. Bot DM'd (L1086). [carry — pending Larry action]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [blue] **PR #696** — MERGEABLE, Mirror review queued (G-rule ourliberty-health-notify fix). [advancing ✅]
+- [blue] **PR #695** — Mirror queue (G-rule mirror-pass-unmerged silence). [advancing]
+- [blue] **PR #694** — Mirror queue (G-rule watchdog fix). [advancing]
+- [blue] **PR #693** — Revision-1 applied, re-review queued. [advancing ✅]
+- [blue] **PR #692** — Mirror review active (~21 min). [advancing]
+- [blue] **PR #691** — Mirror REVIEW_PASS, AUTO_MERGE_HELD behind #687. [advancing — will cascade]
+- [blue] **review-duplicate-dispatch-wip-redispatch G-rule** — 1/3. Dispatch to Beacon at 3/3.
+
+**PRIME DIRECTIVE:** Trailing-30d: systemic_fixes=66, ratio=17.26, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** `record --checks-clean false` → consecutive_clean=0. Tier: 1.
+
+---
+
+
 ## Iteration ~2665 — 2026-06-25T01:48Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry /cycle invocation via chat (/loop dynamic).

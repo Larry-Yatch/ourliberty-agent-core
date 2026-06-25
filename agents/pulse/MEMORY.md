@@ -238,9 +238,19 @@
 
 ## G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4 → DISPATCHED ✅ (iter ~2644, 3/3)
 
-**Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:mirror-pass-unmerged:PR#N` alerts classify Tier-4 (novel — no translation match in alert-translations.json). Bot delivers as escalate (route=escalate) and DMs Larry. Pulse does NOT send a second DM. 3/3 threshold crossed at iter ~2644 (L1047, 23:08Z). Dispatch: `heal-pipeline-stall-mirror-pass-unmerged-tier3-001.json` → Beacon inbox. verification_pending. Instances: iter ~2629 (PR#685 rev1), iter ~2636 (PR#685 L1039), iter ~2644 (PR#685 L1047).
+**Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:mirror-pass-unmerged:PR#N` alerts classify Tier-4 (novel — no translation match in alert-translations.json). Bot delivers as escalate (route=escalate) and DMs Larry. Pulse does NOT send a second DM. 3/3 threshold crossed at iter ~2644 (L1047, 23:08Z). Dispatch: `heal-pipeline-stall-mirror-pass-unmerged-tier3-001.json` → Beacon inbox. verification_pending. Instances: iter ~2629 (PR#685 rev1), iter ~2636 (PR#685 L1039), iter ~2644 (PR#685 L1047), iter ~2666 (PR#687 L1085 — cooldown expired).
 
 ---
+
+## G-rule review-duplicate-dispatch-wip-redispatch — 1/3 (new, iter ~2666)
+
+**Rule:** When Forge completes a revision task, two separate review dispatch paths fire simultaneously: (1) outbox_notifier's revision-completion path (`-rev1.json` file) and (2) Beacon's notification-handler path (non-rev1 `.json` file). Both land in Mirror's inbox, causing Mirror to review the same PR twice in sequence. The -rev1 path is legitimate; the non-rev1 is a duplicate. Wasted Mirror time but not harmful (reviews same PR state). G-rule: track to 3/3 for Beacon fix (dedup the review dispatch). First instance: forge-wip-only-auto-redispatch-001 rev1, iter ~2666 (review-forge-wip-only-auto-redispatch-001.json + review-forge-wip-only-auto-redispatch-001-rev1.json both in Mirror inbox 2026-06-25T01:54-01:55Z).
+
+---
+
+## Status snapshot — updated 2026-06-25 02:00Z UTC (Iter ~2666, Tier 1, consecutive_clean=0)
+
+**Iter ~2666 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase-pr-687-post-open-mergeable-001 approval pending Larry). sequence-paused:operator-needs-you-feed (L1086 Tier-4, bot DM'd — unreg-approval-6009fbf6bfa2 blocking escalation-feed DAG, pending Larry dashboard action). **KEY EVENTS:** Forge completed wire-agent-core-health-notify-001 (01:51Z, $1.83, PR #696 MERGEABLE) + revision-1 forge-wip-only-auto-redispatch-001 (01:54Z, $0.95). Mirror inbox now 6 items (including rev1 re-review + possible duplicate dispatch). 3 new alerts (L1084 doorbell Tier-3, L1085 mirror-pass-unmerged Tier-4, L1086 sequence-paused Tier-4). Watchdog healthy 01:48Z and 01:54Z (no new WARNs since 01:43Z; PR #694 in Mirror queue). Watermark 1083→1086. G-rules: watchdog 3/3 vp (positive, healthy through Forge/Beacon burst), heal-notify 3/3 vp (PR #696 in Mirror queue ✅), mirror-pass-unmerged 3/3 vp (L1085 new occurrence), manifest-drift 2/3, review-duplicate-dispatch-wip-redispatch NEW 1/3. PRIME: systemic_fixes=66, ratio=17.26, trend=improving. Tier 1, consecutive_clean=0.
 
 ## Status snapshot — updated 2026-06-25 01:48Z UTC (Iter ~2665, Tier 1, consecutive_clean=0)
 
