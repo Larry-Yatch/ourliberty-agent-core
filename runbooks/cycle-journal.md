@@ -5,6 +5,108 @@
 ---
 
 
+## Iteration ~2664 — 2026-06-25T01:42Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry /cycle invocation via chat (/loop dynamic).
+
+**Health:** ⚠️ Watch — PR #687 CONFLICTING (rebase approval pending Larry); all other checks nominal; PR #691 Mirror REVIEW_PASS (auto-merge held behind #687); PR #692 Mirror review task auto-queued at 01:40Z.
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #687 (forge/forge-post-open-mergeable-rebase-001):** CONFLICTING (UNKNOWN mergeable per gh — consistent with prior iters, rebase not yet approved). rebase-pr-687-post-open-mergeable-001 approval_request still pending Larry. beacon-pending-approvals confirms active. [carry — approval pending]
+- **G-rule watchdog-watcher-log-stale-post-fix:** Last WARN at 01:12Z (19:12 MDT during active rebase session). 0 new WARNs since then (28+ min clean at 01:40Z check). PR #694 in Mirror review pipeline. [verification_pending — strong positive]
+- **G-rule ourliberty-health-notify-script-missing:** build-wire-agent-core-health-notify-001 still in Forge inbox (1 item, unchanged). [verification_pending — advancing]
+- **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4:** 0 new instances (pipeline stall dry-run: 0 new alerts, 2 cooldowns: reconcile-001 + mirror-pass-unmerged:forge-post-open-mergeable-rebase-001). PR #695 in Mirror review pipeline. [verification_pending]
+- **Daemons:** All 8 PIDs confirmed alive (ps output Ss/Ssl/SNs). ✅
+- **Repo:** On main, clean, HEAD=af185089=origin/main. ✅
+- **Sync:** last_sync=01:00:00Z (~42 min), status=success. ✅
+- **Beacon inbox:** EMPTY (notify-watchdog-stale-session-aware-suppression-001 processed since iter ~2663). ✅
+- **Forge inbox:** 1 item — build-wire-agent-core-health-notify-001.json. ✅
+- **Mirror inbox:** 4 items — review-alert-translation-mirror-pass-unmerged-001, review-forge-wip-only-auto-redispatch-001, review-pr-ourliberty-agent-core-692, review-watchdog-stale-session-aware-suppression-001. ✅
+- **beacon-pending-approvals:** 2 pending (unreg-approval-6009fbf6bfa2 stale; rebase-pr-687-post-open-mergeable-001 active). ✅
+
+**Check 0 — Alert triage:** repair-watermark → no-op (file_length=1083, watermark=1082). 1 new alert:
+- L1083 Tier-3 ✅ (outbox-notifier review-pass: Mirror approved PR #691 heal-stall-dryrun-noop-001; auto-merge HELD behind #687 on overlap files — route=digest)
+- Watermark advanced 1082→1083.
+
+**Check 1 — Log noise:**
+- watchdog.log: No new WARNs since 01:12Z (28+ min clean). Prior WARNs (18:00-18:46 MDT) were during long Mirror session for PR #687 — fix (PR #694 watchdog-stale-session-aware-suppression-001) in Mirror pipeline. ✅ Monitoring.
+- outbox-notifier.log: 1 WARN (19:18Z AUTO_MERGE_HELD_STALE_CONFLICT PR #687 — carry, known). No new WARNs. ✅
+- inbox-watcher.log: No WARNs. ✅
+
+**Check 2 — Telegram sweep:** Larry's last message: "Yes rebase #687 next" (18:45 MDT June 24). No new messages since iter ~2663. rebase-pr-687-post-open-mergeable-001 approval_request delivered 19:26 MDT. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → 0 new alerts, 0 recovered, 2 suppressed (cooldowns: reconcile-001, mirror-pass-unmerged:forge-post-open-mergeable-rebase-001). ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- Forge inbox: 1 item. Mirror inbox: 4 items. Beacon inbox: EMPTY. beacon-pending-approvals: 2 (1 stale, 1 active). ✅
+- Larry directive "Yes rebase #687 next" — tracked by rebase-pr-687-post-open-mergeable-001 approval_request + PR #687 in pipeline. ✅
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=01:30:50Z (~11 min ago). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=af185089=origin/main. Clean. On main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=01:00:00Z (~42 min), status=success. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 8 daemons alive at known PIDs. ✅ Nominal.
+
+**Check E — PRs:**
+- agent-core PR #695 (forge/alert-translation-mirror-pass-unmerged-001): UNKNOWN mergeable, Mirror reviewing. [advancing — G-rule fix]
+- agent-core PR #694 (forge/watchdog-stale-session-aware-suppression-001): UNKNOWN mergeable, Mirror reviewing. [advancing — G-rule fix]
+- agent-core PR #693 (forge/forge-wip-only-auto-redispatch-001): UNKNOWN mergeable, Mirror reviewing. [advancing]
+- agent-core PR #692 (work/forge-wedge-healer): UNKNOWN mergeable. **Mirror review task now queued (review-pr-ourliberty-agent-core-692.json created 01:40Z)** — resolved organically from iter ~2663 ask-then-do. [✅ routing resolved]
+- agent-core PR #691 (forge/heal-stall-dryrun-noop-001): Mirror REVIEW_PASS (L1083 01:37Z). AUTO_MERGE_HELD behind PR #687 on overlap files (scripts/heal_pipeline_stall.py, tests/test_heal_pipeline_stall.py). Will auto-merge when #687 resolves. [advancing ✅]
+- agent-core PR #687 (forge/forge-post-open-mergeable-rebase-001): CONFLICTING. Rebase approval pending Larry. [⚠️ carry]
+- dashboard: 0 open. ✅
+
+**Check H — Forge digest:** Forge inbox unchanged (1 item: build-wire-agent-core-health-notify-001). No new Forge completions since iter ~2663. Beacon empty — notify processed.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. ✅
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails (Thursday). Skip. ✅
+- Check III: not Sunday. Skip. ✅
+
+**G-rule updates:**
+- **heal-daemon-restart-manifest-drift-regenerated-tier4** — **2/3** (no new instance this iter). Dispatch at 3/3.
+- **watchdog-watcher-log-stale-post-fix** — 3/3 dispatched (carry). PR #694 in Mirror pipeline. 28+ min no new WARNs. [verification_pending — strong positive]
+- **ourliberty-health-notify-script-missing** — 3/3 dispatched (carry). Forge inbox: 1 build item. [verification_pending]
+- **heal-pipeline-stall-mirror-pass-unmerged-tier4** — 3/3 dispatched (carry). PR #695 in Mirror pipeline. 0 new instances. [verification_pending]
+- **check-i-force-bypass-dm-route** — **1/3** (Thursday skip, no new occurrence). Dispatch at 3/3.
+
+**New observations:**
+- **PR #691 Mirror REVIEW_PASS:** heal-stall-dryrun-noop-001 — Mirror approved (L1083). AUTO_MERGE_HELD behind PR #687 (file overlap). This is correct pipeline behavior: will cascade-merge once #687 resolves.
+- **PR #692 routing resolved:** review-pr-ourliberty-agent-core-692.json appeared in Mirror inbox at 01:40Z — queued by pipeline auto-detection (heal-undispatched-pr-review or outbox-notifier backstop). The iter ~2663 ask-then-do ("Larry should decide routing") resolved organically without Larry input. ✅ Good pipeline behavior.
+- **Queue throughput:** Mirror now reviewing 4 PRs concurrently; Forge down to 1 item. Strong throughput.
+
+**Actions taken:** repair-watermark (no-op). L1083 triaged Tier-3 (silenced). Watermark 1082→1083. Pipeline stall dry-run (0 new). No always-allowed auto-fixes (repo current, sync <2h). PRIME: 1 intervention appended.
+
+**Dispatches:** None this iter.
+
+**Standing findings (carried + verified):**
+- [yellow] **PR #687 (forge/forge-post-open-mergeable-rebase-001)** — CONFLICTING. rebase-pr-687-post-open-mergeable-001 approval pending Larry (Telegram: reply 'approve'). [carry — approval active]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [blue] **PR #694** — MERGEABLE, Mirror reviewing (G-rule watchdog fix). [advancing]
+- [blue] **PR #695** — MERGEABLE, Mirror reviewing (G-rule mirror-pass-unmerged silence). [advancing]
+- [blue] **PR #693** — MERGEABLE, Mirror reviewing (wip-redispatch fix). [advancing]
+- [blue] **PR #692** — MERGEABLE, Mirror reviewing (forge-wedge-healer). [advancing]
+- [blue] **PR #691** — Mirror REVIEW_PASS, AUTO_MERGE_HELD behind #687. [advancing — will cascade]
+- [blue] **build-wire-agent-core-health-notify-001** — Forge inbox. [queued]
+- [blue] **unreg-approval-6009fbf6bfa2** — stale (PR #685 shipped). Beacon clears. [stale]
+
+**PRIME DIRECTIVE:** Trailing-30d: systemic_fixes=66, ratio=17.21, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** `record --checks-clean false` → consecutive_clean=0. Tier: 1.
+
+---
+
+
 ## Iteration ~2663 — 2026-06-25T01:37Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry /cycle invocation via chat.
