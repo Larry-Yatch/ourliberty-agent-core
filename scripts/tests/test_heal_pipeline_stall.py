@@ -1067,6 +1067,173 @@ class TestCheckForgeBuiltNoPr(_TempAgentsRootMixin, unittest.TestCase):
         self.assertIsNone(
             self.hps._forge_sibling_pr_title_shipped(task, prs))
 
+    # ----- Reconciliation step 1e: retry-redispatch PR exists (2026-06-25) ---
+
+    def test_retry1_open_pr_suppresses_stall(self) -> None:
+        """A1 (production case): task
+        `reconcile-hardening-mission-shipped-001` honestly opened NO PR. Its
+        SEPARATE redispatch `-001-retry1` opened OPEN PR #699 on branch
+        `forge/reconcile-hardening-mission-shipped-001-retry1`. The retry-branch
+        match suppresses the false stall — reason=retry_pr_exists, pr=#699."""
+        task = 'reconcile-hardening-mission-shipped-001'
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'build', 'exit_code': 0,
+            'task_type': 'doc-only', 'result': 'Done. Reconciled.',
+        })
+        open_prs = [{
+            'headRefName': 'forge/reconcile-hardening-mission-shipped-001-retry1',
+            'number': 699,
+            'title': 'chore: reconcile (retry)',
+            '_repo': self._AGENT_CORE,
+        }]
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        captured: list[str] = []
+        with patch.object(self.hps, 'log',
+                          side_effect=lambda msg, level='INFO': captured.append(msg)):
+            alerts = self.hps.check_forge_built_no_pr(lines, open_prs, [], {})
+        self.assertEqual(alerts, [])
+        skip = [m for m in captured
+                if 'FORGE_NO_PR_SKIP' in m and 'retry_pr_exists' in m]
+        self.assertEqual(len(skip), 1)
+        self.assertIn('pr=#699', skip[0])
+
+    def test_retry_merged_pr_suppresses_stall(self) -> None:
+        """The retry PR need only be gh-truth (open OR merged). A MERGED
+        `-retry2` PR also suppresses the original task's stall."""
+        task = 'reconcile-hardening-mission-shipped-001'
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'build', 'exit_code': 0, 'result': 'Done.',
+        })
+        merged_prs = [{
+            'headRefName': 'forge/reconcile-hardening-mission-shipped-001-retry2',
+            'number': 701, 'title': 'chore: reconcile (retry2)',
+            '_repo': self._AGENT_CORE,
+        }]
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], merged_prs, {})
+        self.assertEqual(alerts, [])
+
+    def test_retry_sibling_outbox_aged_out_suppresses_stall(self) -> None:
+        """A2: the retry PR aged out of the live fetch window (absent from
+        all_prs), but the archived retry-sibling outbox `<task>-retry1.json`
+        carries proof a PR was opened (`PR opened:` preamble) → suppressed via
+        the archive anchor. reason=retry_pr_exists, retry_outbox names the
+        sibling file."""
+        task = 'reconcile-hardening-mission-shipped-001'
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'build', 'exit_code': 0, 'result': 'Done.',
+        })
+        self._write_archive(f'{task}-retry1', {
+            'task_id': f'{task}-retry1', 'phase': 'build', 'exit_code': 0,
+            'result': 'PR opened: https://github.com/x/y/pull/699',
+        })
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        captured: list[str] = []
+        with patch.object(self.hps, 'log',
+                          side_effect=lambda msg, level='INFO': captured.append(msg)):
+            alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(alerts, [])
+        skip = [m for m in captured
+                if 'FORGE_NO_PR_SKIP' in m and 'retry_pr_exists' in m]
+        self.assertEqual(len(skip), 1)
+        self.assertIn(f'{task}-retry1.json', skip[0])
+
+    def test_no_retry_pr_still_alerts(self) -> None:
+        """NEGATIVE (Pattern A): a genuine no-PR task with NO `-retry<N>` PR
+        anywhere and no PR-bearing retry outbox must still fire unchanged."""
+        task = 'reconcile-hardening-mission-shipped-001'
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'build', 'exit_code': 0, 'result': 'Done.',
+        })
+        self.assertIsNone(self.hps._forge_retry_pr_exists(task, []))
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]['subject'],
+                         f'pipeline-stall:forge-no-pr:{task}')
+
+    def test_retry_outbox_without_pr_proof_does_not_suppress(self) -> None:
+        """A retry-sibling outbox that resolved cleanly but shows NO PR (e.g. a
+        PROCEED that only dispatched a downstream build) is not proof of a PR —
+        the helper returns None and the stall still fires (fail-safe)."""
+        task = 'reconcile-hardening-mission-shipped-001'
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'build', 'exit_code': 0, 'result': 'Done.',
+        })
+        self._write_archive(f'{task}-retry1', {
+            'task_id': f'{task}-retry1', 'phase': 'build', 'exit_code': 0,
+            'result': 'Resolved with === PROCEED ===; dispatched downstream build.',
+        })
+        self.assertIsNone(self.hps._forge_retry_pr_exists(task, []))
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(len(alerts), 1)
+
+    # ----- Reconciliation step 1f: rebase-class target shipped (2026-06-25) --
+
+    def test_rebase_target_in_union_suppresses_stall(self) -> None:
+        """B1 (production case): task `rebase-forge-post-open-mergeable-687-001`
+        is a rebase-class task that opens no PR by design; its archived result
+        names PR #687, present in the open+merged union (here MERGED). The
+        stall is suppressed — reason=rebase_target_shipped, pr=#687."""
+        task = 'rebase-forge-post-open-mergeable-687-001'
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'build', 'exit_code': 0,
+            'result': ('PR #687 is now `MERGEABLE / CLEAN`. Done. Rebase '
+                       'complete — PR #687 ready for Mirror.'),
+        })
+        merged_prs = [{
+            'headRefName': 'forge/some-feature-687',
+            'number': 687, 'title': 'feat: the rebased work',
+            '_repo': self._AGENT_CORE,
+        }]
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        captured: list[str] = []
+        with patch.object(self.hps, 'log',
+                          side_effect=lambda msg, level='INFO': captured.append(msg)):
+            alerts = self.hps.check_forge_built_no_pr(lines, [], merged_prs, {})
+        self.assertEqual(alerts, [])
+        skip = [m for m in captured
+                if 'FORGE_NO_PR_SKIP' in m and 'rebase_target_shipped' in m]
+        self.assertEqual(len(skip), 1)
+        self.assertIn('pr=#687', skip[0])
+
+    def test_rebase_target_absent_from_union_still_alerts(self) -> None:
+        """NEGATIVE (Pattern B): a `rebase-` task whose referenced PR is NOT in
+        the open+merged union (a genuinely missing target) must still fire."""
+        task = 'rebase-forge-post-open-mergeable-687-001'
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'build', 'exit_code': 0,
+            'result': 'PR #687 is now MERGEABLE / CLEAN. Done.',
+        })
+        merged_prs = [{
+            'headRefName': 'forge/unrelated-900', 'number': 900,
+            'title': 'something else', '_repo': self._AGENT_CORE,
+        }]
+        self.assertIsNone(
+            self.hps._forge_rebase_target_shipped(task, merged_prs))
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], merged_prs, {})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]['subject'],
+                         f'pipeline-stall:forge-no-pr:{task}')
+
+    def test_rebase_helper_only_applies_to_rebase_task_ids(self) -> None:
+        """Tight-scope guard: a NON-`rebase-` task whose result happens to name
+        a PR present in the union is NOT a rebase candidate — the helper returns
+        None so the normal build-gap decision is untouched."""
+        task = 'normal-build-task-687-001'
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'build', 'exit_code': 0,
+            'result': 'Referenced PR #687 in passing. Done.',
+        })
+        merged_prs = [{
+            'headRefName': 'forge/some-feature-687', 'number': 687,
+            'title': 'feat: the work', '_repo': self._AGENT_CORE,
+        }]
+        self.assertIsNone(
+            self.hps._forge_rebase_target_shipped(task, merged_prs))
+
     def test_step5_does_not_apply_to_non_preflight_errored_task(self) -> None:
         """Gating guard: a genuine build-phase crash (phase='build',
         exit_code=1) on a task_id WITHOUT `-preflight`/`-clarify` is not a
