@@ -192,8 +192,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-25 14:44Z UTC (Iter ~2767, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 15:03Z UTC (Iter ~2770, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2767 summary:** ✅ Nominal — 0 new alerts. 8/8 daemons alive. 0 open PRs. All inboxes empty. Watchdog healthy (08:41:16 MDT). 1 stall FP still firing (rebase-687-001 original). Fix (`forge-no-pr-rebase-original-fp-fix-001`) has APPROVAL_REQUEST registered in beacon-pending-approvals (pending=1), Larry DM delivered at 08:39:54 MDT — awaiting "go". PID 1834248 zombie (~27.81d, ask-then-do). 6 stale journalctl PIDs (~30d, ask-then-do). PRIME: interventions=1221, systemic_fixes=71, vp=26, ratio≈17.20, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2770 summary:** ✅ Nominal — 0 new alerts. 8/8 daemons alive. 0 open PRs. **Larry approved `forge-no-pr-rebase-original-fp-fix-001` at 09:01:41 MDT (15:01:41Z)** — fix for rebase-687 stall FP dispatched to Forge inbox. beacon-pending-approvals: pending=0. Stall FP still fires (expected, fix not yet built). Watchdog healthy (09:01:19 MDT). PID 1834248 zombie (~27.83d, ask-then-do). 6 stale journalctl PIDs (~30d, ask-then-do). PRIME: interventions=1221, systemic_fixes=71, vp=26, ratio≈17.20, trend=improving. Tier 1, consecutive_clean=0.
 
 

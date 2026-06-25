@@ -5,6 +5,94 @@
 ---
 
 
+## Iteration ~2770 — 2026-06-25T15:03Z UTC (interactive /loop /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/loop /cycle` invocation via chat.
+
+**Health:** ✅ Nominal — 0 new alerts. 8/8 daemons alive. 0 open PRs. **Key development: Larry approved `forge-no-pr-rebase-original-fp-fix-001` at 09:01:41 MDT (15:01:41Z) — fix for rebase-687 stall FP dispatched to Forge.**
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo**: HEAD=d6707ee0=origin/main (wrapper auto-committed iter ~2769). Clean. On main. ✅
+- **Pipeline stall FP rebase-687-001**: Re-verified — `DRY-RUN would alert: forge_built_no_pr:rebase-forge-post-open-mergeable-687-001`. Still fires (1 alert). Fix now **dispatched to Forge** (`forge-no-pr-rebase-original-fp-fix-001.json` in Forge inbox) — Larry approved at 09:01:41 MDT. [carry, fix in flight]
+- **beacon-pending-approvals**: pending=0 ✅ (approval consumed by Larry's "Go" at 09:01:41 MDT).
+- **Sync**: last_sync=2026-06-25T15:00:24Z (very recent). Within 2h. ✅
+- **Daemons (re-verified)**: forge_bot=1388801 (Ss, 170239s ~47.3h) ✅, mirror_bot=1388982 (Ss, 170231s ~47.3h) ✅, pulse_bot=1389067 (Ss, 170227s ~47.3h) ✅, beacon_telegram_bot=2715635 (Ss, 29187s ~8.11h) ✅, dashboard_api=2715859 (Ssl, 29179s ~8.11h) ✅, chain_event_shipper=2716672 (SNs, 29105s ~8.08h) ✅, inbox_watcher=2754413 (Ssl, 26700s ~7.42h) ✅, outbox_notifier=2773485 (Ss, 24979s ~6.94h) ✅. 8/8 alive. ✅
+- **Watchdog**: last entry 09:01:19 MDT (15:01:19Z, ~2 min ago) — overall=healthy. ✅
+- **Zombie PID 1834248**: still alive (Ss, bash, etimes=2403855s ~27.83d). Ask-then-do. [carry]
+- **6 stale journalctl PIDs**: all alive (~30d). Ask-then-do. [carry]
+- **Stale daemon code heartbeat**: 2026-06-25T15:00:59Z (fresh). ✅
+- **Agent inboxes**: beacon=EMPTY ✅, forge=**`forge-no-pr-rebase-original-fp-fix-001.json`** (active task, Larry-approved fix) ✅, mirror=EMPTY ✅, pulse=EMPTY ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark: repaired=false, old=982, file_length=982. **0 new alerts**. Watermark unchanged at 982. ✅
+
+**Check 1 — Log noise:**
+- `journalctl --user -p warning --since "30 minutes ago"` → `-- No entries --`. ✅
+- outbox-notifier.log: Last entry 08:36:09 MDT (14:36:09Z, ~27 min before iter). No anomalous WARNs. ✅
+- watchdog.log: last entry 09:01:19 MDT (15:01:19Z, ~2 min ago) — overall=healthy. ✅
+
+**Check 2 — Telegram sweep:**
+- Beacon bot PID 2715635 (Ss) ✅. Last action: 09:01:41 MDT — Larry sent "Go", bot approved `forge-no-pr-rebase-original-fp-fix-001` and dispatched to Forge. No pending items from Larry. ✅
+
+**Check 3 — Pipeline stall (dry-run):**
+- `rebase-forge-post-open-mergeable-687-001`: **DRY-RUN would alert** (1 alert). Fix dispatched to Forge (Larry-approved at 09:01:41 MDT). [carry, fix in flight]
+- 1 alert(s) would fire, 0 recovery(ies) attempted.
+
+**Check 4 — Pending directives:**
+- Beacon inbox: EMPTY ✅
+- Forge inbox: **`forge-no-pr-rebase-original-fp-fix-001.json`** — active task (just dispatched via Larry approval)
+- Mirror inbox: EMPTY ✅
+- Pulse inbox: EMPTY ✅
+- beacon-pending-approvals: pending=0 ✅ (approval consumed)
+
+**Check 4.6 — Credential rotation:** No new rotation events. [carry OK] ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-06-25T15:00:59Z (fresh). ✅
+
+**Check A — Source repo:** HEAD=d6707ee0=origin/main. Clean. On main. ✅
+**Check B — Sync health:** last_sync=2026-06-25T15:00:24Z (very recent). Within 2h. ✅
+**Check C — Agent liveness:** 8/8 alive.
+- **[yellow] PID 1834248** — zombie bash wait-loop (~27.83d). Ask-then-do: `kill 1834248`. [carry]
+- **[yellow] 6 stale journalctl PIDs (~30d)** — PIDs 1101500, 1107838, 1118830, 1136223, 1161972, 1177335. Ask-then-do. [carry]
+
+**Check E — PRs:** 0 open PRs. ✅
+
+**Check H — Forge digest:** Forge inbox has 1 active task (`forge-no-pr-rebase-original-fp-fix-001.json` — Pattern B disambiguation fix for rebase-687 stall FP). ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check VIII/IX/X: Not Monday. Skip. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule updates:**
+- `forge-built-no-pr-retry1-fp-001` (Pattern 2) — **Fix dispatched to Forge** via Larry approval at 09:01:41 MDT. Task: `forge-no-pr-rebase-original-fp-fix-001`. G-rule transitions from vp-pending-approval → vp-fix-in-flight. Verification anchor: watch for PR from Forge implementing Pattern B task_id/PR number disambiguation in `heal_pipeline_stall.py`.
+
+**Actions taken:**
+- Watermark: no change (0 new alerts, file_length=982, watermark=982).
+- PRIME ledger: 1 iter_clean row (Tier 1, no new Pulse-driven interventions this iter).
+- Tier state: recorded non-clean (stall FP + zombie PIDs → consecutive_clean=0).
+- No auto-fixes. No new dispatches.
+
+**Standing findings (carried + verified):**
+- [yellow] **rebase-forge-post-open-mergeable-687-001 stall FP** — 1 DRY-RUN alert still fires. Fix in flight: Forge task `forge-no-pr-rebase-original-fp-fix-001.json` dispatched (Larry approved 09:01:41 MDT). Watch for PR. [carry, fix in flight]
+- [yellow] **PID 1834248 zombie bash loop** — Still alive (~27.83d). Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **6 stale journalctl PIDs (~30d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+- [yellow] **sequence-paused:operator-needs-you-feed** — Recovery: `resume sequence operator-needs-you-feed` via Beacon or Dashboard. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**PRIME DIRECTIVE:** interventions=1221, systemic_fixes=71, verification_pending=26, ratio≈17.20, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** consecutive_clean=0 (non-clean: 1 stall FP in flight, zombie PID, 6 stale journalctl PIDs). Tier: 1.
+
+---
+
+
 ## Iteration ~2769 — 2026-06-25T14:57Z UTC (interactive /loop /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/loop /cycle` invocation via chat.
