@@ -76,9 +76,30 @@ CASE 2 — silent (NO marker):
 Config (Pulse-Check-tunable; NOT hardcoded)
 -------------------------------------------
 `config/review-reaper-rules.json`: marker_grace_seconds, silent_grace_seconds,
-hard_silent_grace_seconds, streak_to_promote, enabled. Missing/malformed →
-conservative built-in defaults (never raises). Pulse adjusts the JSON; no
-constant is hand-picked in this file.
+hard_silent_grace_seconds, streak_to_promote, build_handoff_grace_seconds,
+wedge_progress_grace_seconds, enabled. Missing/malformed → conservative built-in
+defaults (never raises). Pulse adjusts the JSON; no constant is hand-picked in
+this file.
+
+Progress-staleness deadlock-break (2026-06-24 forge-post-open-mergeable-rebase-001)
+----------------------------------------------------------------------------------
+A Forge BUILD session can wedge AFTER its work is in hand (PR opened, Mirror
+passed) — e.g. on a self-referential shell wait-loop that never exits. Its PR is
+OPEN-but-not-merged and its worktree is INTACT (the process stayed alive), so the
+two decisive handoff-release signals (`_forge_handoff_is_live`: worktree-deleted /
+PR-merged-or-closed) both miss; meanwhile the `build-<task>.json` the wedged
+process never cleanly archived sits in the inbox, so the queued-build spare
+condition protects it forever. Self-sustaining deadlock: the wedge holds the
+single Forge slot, the build file can't be consumed while it does, and the file
+keeps the spare alive — so the slot leaked for ~3.9h until the 4h timeout. The
+escape hatch is a forward-PROGRESS signal: `_forge_spare_reason` releases the
+spare (bypassing BOTH the queued-build and open-unreviewed-PR guards, which only
+protect work genuinely IN FLIGHT) once the session has made no new commit AND no
+new session-log activity for `wedge_progress_grace_seconds` (~25 min, well under
+4h). The reap then kills the PID to free the slot but PRESERVES the worktree, so
+the watcher's in-process `--resume` retry finishes the task cleanly — the proven
+manual recovery. Requiring BOTH progress signals stale keeps it conservative; an
+unreadable commit age fails safe toward sparing.
 
 Coexistence with heal_zombie_main_workers.py (no double-kill)
 ------------------------------------------------------------
@@ -156,6 +177,25 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # the advancer has had a full cycle to dispatch — closing the false-positive
     # reaping that stranded ccd-s1 (2026-06-10).
     'build_handoff_grace_seconds': 300,
+    # Progress-staleness grace (2026-06-24 forge-post-open-mergeable-rebase-001
+    # incident). A Forge build session that wedges AFTER its work is in hand —
+    # PR opened, Mirror passed — keeps an OPEN (not-yet-merged) PR and an INTACT
+    # worktree, so neither decisive handoff-release signal (worktree-deleted /
+    # PR-merged-or-closed) ever fires; meanwhile the build-<task>.json it never
+    # cleanly archived sits in the inbox, so the queued-build spare condition
+    # protects it forever. That is a self-sustaining deadlock: the wedge holds
+    # the single Forge slot, its build file can't be consumed, the file keeps
+    # the spare alive. This grace is the escape hatch — a session that has made
+    # NO forward progress (no new commit in its worktree AND no new session-log
+    # activity) for this long is provably wedged: well past the ~10-min
+    # regression gate (the longest legitimate silent operation) and far under
+    # the 4h timeout=14400s backstop that used to be the only floor. When it
+    # trips, the slot is freed (kill the claude PID; the worktree is PRESERVED
+    # so agent_runner.run_claude's in-process --resume retry can finish the task
+    # cleanly, exactly as the manual recovery did). Requiring BOTH signals stale
+    # keeps it conservative — a live build mid-test keeps its JSONL warm between
+    # tool calls, so it is never falsely declared wedged.
+    'wedge_progress_grace_seconds': 1500,  # 25 min
 }
 
 # Sentinel the hard backstop is pushed to when config is mistuned (hard <=
@@ -258,7 +298,7 @@ def load_config(path: Path = CONFIG_FILE) -> dict[str, Any]:
         cfg['enabled'] = data['enabled']
     for key in ('marker_grace_seconds', 'silent_grace_seconds',
                 'hard_silent_grace_seconds', 'streak_to_promote',
-                'build_handoff_grace_seconds'):
+                'build_handoff_grace_seconds', 'wedge_progress_grace_seconds'):
         raw = data.get(key)
         if isinstance(raw, (int, float)) and not isinstance(raw, bool) and raw > 0:
             cfg[key] = int(raw)
@@ -756,6 +796,61 @@ def remove_worktree(worktree: str) -> bool:
         return False
 
 
+# ==================== forward-progress (commit) probe ====================
+
+def _worktree_head_commit_age_secs(
+    worktree: str, *, now: Optional[float] = None,
+) -> Optional[float]:
+    """Seconds since the worktree HEAD's last commit (committer timestamp), or
+    None if it can't be read.
+
+    Read-only `git log -1 --format=%ct` against the worktree. None on ANY git
+    error (no commits yet, not a worktree, timeout, bad output). The caller
+    treats None as 'progress unknown' and therefore NEVER declares a session
+    wedged on the commit signal alone — a fail-safe toward sparing, matching
+    this module's discipline that a probe failure must make us LESS aggressive,
+    never more."""
+    try:
+        out = subprocess.run(
+            ['git', '-c', f'safe.directory={worktree}', '-C', worktree,
+             'log', '-1', '--format=%ct'],
+            capture_output=True, text=True, timeout=GIT_TIMEOUT_SEC,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return None
+    if out.returncode != 0 or not out.stdout.strip():
+        return None
+    try:
+        commit_epoch = int(out.stdout.strip())
+    except ValueError:
+        return None
+    now = now if now is not None else time.time()
+    return max(0.0, now - commit_epoch)
+
+
+def _session_progress_stale(cand: Candidate, cfg: dict[str, Any]) -> bool:
+    """True iff the session has made NO forward progress — neither a new commit
+    in its worktree NOR new session-log activity — for longer than
+    wedge_progress_grace_seconds.
+
+    The two progress signals are ANDed deliberately (the 2026-06-24
+    forge-post-open-mergeable-rebase-001 incident definition: "no new git commit
+    AND no new session output file mtime"). Requiring BOTH stale is what keeps
+    it conservative: a live build inside a long foreground operation (e.g. the
+    ~10-min regression gate) writes no commit but keeps its JSONL warm between
+    tool calls, so idle_secs stays small and it is never falsely declared
+    wedged; a session frozen on BOTH for 25 min is past anything legitimate.
+
+    commit_age_secs is None (unreadable / not applicable — mirror tier, deleted
+    cwd) ⇒ progress is UNKNOWN ⇒ NOT declared stale (fail-safe toward sparing),
+    so this can only ever ADD reaps the existing decisive signals already miss,
+    never remove a spare the old logic granted on a readable-but-fresh repo."""
+    if cand.commit_age_secs is None:
+        return False
+    grace = cfg['wedge_progress_grace_seconds']
+    return cand.idle_secs > grace and cand.commit_age_secs > grace
+
+
 # ==================== forge-PR reap guard ====================
 
 def _open_pr_created_at(branch: str) -> Optional[str]:
@@ -1023,6 +1118,28 @@ def _forge_spare_reason(cand: Candidate, cfg: dict[str, Any]) -> Optional[str]:
                 f'<= marker_grace {cfg["marker_grace_seconds"]}s + advancer cadence '
                 f'{cfg["build_handoff_grace_seconds"]}s) — advancer has not yet had '
                 f'a full cycle to dispatch the next phase')
+    # Progress-staleness release (2026-06-24 forge-post-open-mergeable-rebase-001
+    # deadlock-break). A session that has made NO forward progress — no new
+    # commit AND no session-log activity — for wedge_progress_grace_seconds is
+    # WEDGED and holding the single Forge slot. None of the in-flight
+    # protections below can apply in that state: a queued build can't be
+    # consumed WHILE this session holds the only slot (the self-sustaining
+    # deadlock), and an open PR with no review yet is netted independently by
+    # heal_undispatched_pr_review (GitHub-truth). So this release deliberately
+    # bypasses BOTH (a) the queued-build spare and (b) the open-unreviewed-PR
+    # spare — those guards exist to protect work still IN FLIGHT, and a
+    # provably-no-progress session is, by definition, not in flight. Checked
+    # before the (a)/(b) probes so a wedge is released without even paying their
+    # file/gh cost. Conservative by construction (_session_progress_stale needs
+    # BOTH signals stale and a readable commit age), so it only ever adds reaps
+    # the decisive worktree-deleted / PR-merged signals already miss.
+    if _session_progress_stale(cand, cfg):
+        log(f'forge spare RELEASED (progress-stale): {Path(cand.cwd).name} idle '
+            f'{int(cand.idle_secs)}s + last commit {int(cand.commit_age_secs)}s ago, '
+            f'both > wedge_progress_grace {cfg["wedge_progress_grace_seconds"]}s — '
+            f'no forward progress, the session is wedged and holding the build '
+            f'slot; allowing reap (worktree preserved for --resume retry)', 'INFO')
+        return None
     task_id = _forge_task_id_for_cwd(cand.cwd)
     if task_id and _forge_inbox_has_queued_build(task_id):
         if _forge_handoff_is_live(cand, task_id):
@@ -1100,6 +1217,12 @@ class Candidate:
     session_id: Optional[str]
     idle_secs: float
     marker_present: bool
+    # Seconds since the worktree HEAD's last commit (committer timestamp), or
+    # None when it can't be read / isn't applicable (mirror tier, deleted cwd).
+    # The second forward-progress signal alongside idle_secs (JSONL mtime): a
+    # genuinely live build is committing or writing its transcript; a session
+    # silent on BOTH past wedge_progress_grace is provably wedged.
+    commit_age_secs: Optional[float] = None
 
 
 def scan_candidates(now: Optional[float] = None) -> list[Candidate]:
@@ -1129,9 +1252,17 @@ def scan_candidates(now: Optional[float] = None) -> list[Candidate]:
                 idle_secs = 0.0
             session_id = jsonl.stem
             marker_present = jsonl_has_terminal_marker(jsonl, tier)
+        # Second forward-progress signal (forge tier only): how long since the
+        # worktree's last commit. Skipped for mirror (no slot-holding build to
+        # rescue) and for a torn-down ('(deleted)') cwd, where there's no live
+        # worktree to query — the worktree-deleted signal already releases those.
+        commit_age_secs: Optional[float] = None
+        if tier == 'forge' and not _cwd_worktree_deleted(cwd):
+            commit_age_secs = _worktree_head_commit_age_secs(cwd, now=now)
         out.append(Candidate(
             pid=pid, cwd=cwd, tier=tier, jsonl=jsonl, session_id=session_id,
             idle_secs=idle_secs, marker_present=marker_present,
+            commit_age_secs=commit_age_secs,
         ))
     return out
 
@@ -1215,12 +1346,13 @@ def _resumed_since_scan(cand: Candidate, *, now: Optional[float] = None) -> bool
 
 
 def reap(cand: Candidate, *, case: str, reason: str,
+         remove_worktree_after_kill: bool = True,
          reaper: Callable[[int], bool] = kill_process_tree,
          worktree_remover: Callable[[str], bool] = remove_worktree,
          closure_notify: Callable[[str, str], None] = _closure_notify,
          event_emitter: Callable[..., None] = _emit_healed_event,
          verify_pid_fn: Callable[[int], Optional[str]] = proc_cwd) -> bool:
-    """Kill the session tree, remove its worktree (guarded), and notify.
+    """Kill the session tree, optionally remove its worktree (guarded), and notify.
 
     Returns True iff the kill was actually issued. Before signalling, re-verify
     the PID still belongs to the same review worktree via its /proc/<pid>/cwd —
@@ -1231,7 +1363,15 @@ def reap(cand: Candidate, *, case: str, reason: str,
     mismatch (incl. the process having exited → cwd None) aborts the WHOLE reap,
     including worktree removal: we don't tear down a worktree whose process we
     couldn't confirm we own. A genuinely-orphaned worktree from a clean exit is
-    then swept by the hourly cleanup_stale_worktrees GC instead of here."""
+    then swept by the hourly cleanup_stale_worktrees GC instead of here.
+
+    ``remove_worktree_after_kill=False`` kills the PID to free the slot but LEAVES
+    the worktree in place. Used for the progress-stale Forge wedge: the
+    build-<task>.json is still queued in the inbox, so once the slot frees the
+    watcher's in-process ``--resume`` retry (agent_runner.run_claude, returncode!=0
+    branch) re-enters THIS worktree and finishes the task cleanly — exactly the
+    proven manual recovery. If no retry materializes the worktree is a benign
+    orphan swept by the hourly cleanup_stale_worktrees GC."""
     current_cwd = verify_pid_fn(cand.pid)
     if current_cwd != cand.cwd:
         log(f'reap ABORTED pid={cand.pid} tier={cand.tier} case={case}: pid cwd '
@@ -1239,13 +1379,17 @@ def reap(cand: Candidate, *, case: str, reason: str,
             f'reused since scan); not killing', 'WARN')
         return False
     killed = reaper(cand.pid)
-    removed = worktree_remover(cand.cwd)
+    removed = worktree_remover(cand.cwd) if remove_worktree_after_kill else False
+    wt_note = (f'Worktree removed: {removed}.' if remove_worktree_after_kill
+               else 'Worktree left intact so the watcher can --resume and finish '
+                    'the task; the GC sweeps it if no retry runs.')
     log(f'HEALED pid={cand.pid} tier={cand.tier} case={case} '
-        f'killed={killed} worktree_removed={removed} reason={reason} cwd={cand.cwd}')
+        f'killed={killed} worktree_removed={removed} '
+        f'remove_worktree={remove_worktree_after_kill} reason={reason} cwd={cand.cwd}')
     event_emitter(tier=cand.tier, cwd=cand.cwd, case=case, reason=reason)
     closure_notify(
         (f'Reaped wedged {cand.tier} review session (pid {cand.pid}) — '
-         f'{reason}. Worktree removed: {removed}.'),
+         f'{reason}. {wt_note}'),
         f'wedged-review-reaped:{Path(cand.cwd).name}',
     )
     return True
@@ -1282,7 +1426,7 @@ def run_cycle(
         'scanned': len(candidates), 'case1_reaped': 0, 'case2_alerted': 0,
         'case2_auto_reaped': 0, 'case2_hard_reaped': 0, 'case2_demoted_at_gate': 0,
         'true_positives': 0, 'false_positives': 0, 'forge_spared': 0,
-        'mode_before': state.mode,
+        'worktree_preserved': 0, 'mode_before': state.mode,
     }
 
     # 1) Resolve prior Case-2 alerts → update streak.
@@ -1329,14 +1473,22 @@ def run_cycle(
                     f'({Path(cand.cwd).name}): {spare_reason}', 'INFO')
                 summary['forge_spared'] += 1
                 continue
+        # A Forge wedge released by progress-staleness still has its
+        # build-<task>.json queued in the inbox; PRESERVE the worktree on the
+        # kill so the watcher's in-process --resume retry can finish the task.
+        # (Mirror tier / unreadable commit age → False → remove as before.)
+        keep_worktree = cand.tier == 'forge' and _session_progress_stale(cand, cfg)
         if verdict == REAP_CASE1:
             if reap(cand, case='case1',
                     reason=(f'terminal marker present, idle {int(cand.idle_secs)}s '
                             f'> grace {cfg["marker_grace_seconds"]}s'),
+                    remove_worktree_after_kill=not keep_worktree,
                     reaper=reaper, worktree_remover=worktree_remover,
                     closure_notify=closure_notify, event_emitter=event_emitter,
                     verify_pid_fn=verify_pid_fn):
                 summary['case1_reaped'] += 1
+                if keep_worktree:
+                    summary['worktree_preserved'] += 1
         elif verdict == REAP_CASE2_HARD:
             # Deterministic backstop: silent far longer than any legitimate
             # review operation could run, so reap regardless of the confidence
@@ -1353,10 +1505,13 @@ def run_cycle(
                     reason=(f'no marker, idle {int(cand.idle_secs)}s > HARD silent grace '
                             f'{cfg["hard_silent_grace_seconds"]}s (deterministic wedge '
                             f'backstop — provably past any legitimate review operation)'),
+                    remove_worktree_after_kill=not keep_worktree,
                     reaper=reaper, worktree_remover=worktree_remover,
                     closure_notify=closure_notify, event_emitter=event_emitter,
                     verify_pid_fn=verify_pid_fn):
                 summary['case2_hard_reaped'] += 1
+                if keep_worktree:
+                    summary['worktree_preserved'] += 1
         elif verdict == SILENT_CASE2:
             if state.mode == MODE_AUTO_REAP:
                 # Final fresh recheck right before an irreversible kill: if the
@@ -1376,10 +1531,13 @@ def run_cycle(
                 if reap(cand, case='case2-auto',
                         reason=(f'no marker, idle {int(cand.idle_secs)}s > silent grace '
                                 f'{cfg["silent_grace_seconds"]}s (auto-reap, graduated)'),
+                        remove_worktree_after_kill=not keep_worktree,
                         reaper=reaper, worktree_remover=worktree_remover,
                         closure_notify=closure_notify, event_emitter=event_emitter,
                         verify_pid_fn=verify_pid_fn):
                     summary['case2_auto_reaped'] += 1
+                    if keep_worktree:
+                        summary['worktree_preserved'] += 1
             else:
                 # Alert-only: escalate + record pending for later verification.
                 if cand.session_id and cand.session_id not in state.pending:
@@ -1424,7 +1582,8 @@ def main() -> int:
     summary = run_cycle(cfg=cfg)
     log('HEARTBEAT scanned={scanned} case1_reaped={case1_reaped} '
         'case2_alerted={case2_alerted} case2_auto_reaped={case2_auto_reaped} '
-        'case2_hard_reaped={case2_hard_reaped} '
+        'case2_hard_reaped={case2_hard_reaped} forge_spared={forge_spared} '
+        'worktree_preserved={worktree_preserved} '
         'tp={true_positives} fp={false_positives} mode={mode_after} '
         'streak={streak}'.format(**summary))
     return 0

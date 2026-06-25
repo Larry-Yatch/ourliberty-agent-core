@@ -376,20 +376,41 @@ def record_alert(stall: dict[str, Any]) -> None:
 
 
 def _stall_dm_message(stall: dict[str, Any]) -> str:
-    """Plain-English summary for the Telegram DM."""
+    """Plain-English summary for the Telegram DM.
+
+    Forge runs ONE build at a time (per-agent concurrency 1), so a Forge queue
+    that isn't draining almost always means the single build slot is occupied —
+    most often by an in-flight session that may be wedged (the 2026-06-24
+    forge-post-open-mergeable-rebase-001 incident: a build that wedged after its
+    PR opened held the slot for ~3.9h while 8 tasks queued behind it). That is a
+    HELD SLOT, not a credentials problem — the stall copy names it explicitly so
+    a slot-occupied queue is not mis-read as a Tier 2 OAuth expiry (the salient
+    but wrong default, given how prominent the tier2-fallback alert family is)."""
     kind = stall.get('kind', '?')
     agent = stall.get('agent', '?')
     file = stall.get('file', '?')
     age_h = stall.get('age_hours', '?')
     if kind == 'inbox-stall':
-        return (
-            f'Inbox task on {agent} unpicked for {age_h}h: {file}'
-        )
+        slot_note = ''
+        if agent == 'forge':
+            slot_note = (
+                ' Forge builds one task at a time, so this usually means the '
+                'single build slot is held by an in-flight (possibly wedged) '
+                'session — check `state/in-flight/` and the wedged-session reaper '
+                '(heal_wedged_review_sessions) BEFORE suspecting auth/OAuth.'
+            )
+        return f'Inbox task on {agent} unpicked for {age_h}h: {file}.{slot_note}'
     if kind == 'in-flight-stall':
         threshold = stall.get('threshold_seconds', 0)
+        pid = stall.get('pid')
+        pid_note = f' (pid {pid})' if pid else ''
         return (
             f'In-flight task on {agent} stuck for {age_h}h '
-            f'(threshold {int(threshold/60)}m): {file}'
+            f'(threshold {int(threshold/60)}m): {file}{pid_note}. The slot is '
+            f'held by a live, non-progressing session — a HELD SLOT, not an '
+            f'auth/OAuth problem. The wedged-session reaper '
+            f'(heal_wedged_review_sessions) frees it within its progress grace; '
+            f'kill the pid to unblock the queue sooner.'
         )
     if kind == 'stale-lease':
         return (
