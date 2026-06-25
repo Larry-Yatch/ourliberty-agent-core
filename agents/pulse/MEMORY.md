@@ -242,6 +242,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-25 00:57Z UTC (Iter ~2658, Tier 1, consecutive_clean=0)
+
+**Iter ~2658 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry; rebase-escalation-feed-685-001 queued); PR #687 CONFLICTING (carry, Mirror REVIEW_PASS x4, AUTO_MERGE_HELD blocker=#685). **KEY EVENTS:** Queue advancing fast: reconcile-hardening-mission-shipped-002 DONE → PR #688 opened (MERGEABLE); forge-wip-only-auto-redispatch-001 DONE. Forge NOW BUILDING watchdog-stale-session-aware-suppression-001 (G-rule fix). Mirror ACTIVE reviewing PR #688. 2 new alerts: L1069 Tier-4 (mirror-pass-unmerged:PR#687, bot DM'd, no Pulse 2nd DM), L1070 Tier-3 (medic-diagnosis silenced). Watermark 1068→1070. 7 daemons alive. Repo clean (HEAD=d8f4c193=origin/main). Sync 18m ago. Check I: Thursday, skip. PRIME: interventions=1129, systemic_fixes=66, ratio=17.1, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-25 00:51Z UTC (Iter ~2657, Tier 1, consecutive_clean=0)
 
 **Iter ~2657 summary:** ⚠️ Watch — **KEY EVENT:** Forge session PID 2060999 (`forge-post-open-mergeable-rebase-001`) completed at 00:47Z (success=True, 3h52m, $0.59); immediately started `one-time-stale-dispatch-branch-cleanup-001`. PR #685 CONFLICTING (carry; rebase-escalation-feed-685-001 queued, critical path); PR #687 CONFLICTING (carry, Mirror REVIEW_PASS x4, AUTO_MERGE_HELD blocker=#685). 0 new alerts. Watermark 1068 (no change). 7 persistent daemons alive + Forge active. Repo clean (HEAD=073c97fd=origin/main). Sync 11m ago. Check I: Thursday, skip. Forge inbox: 8 items (one-time-stale-dispatch-branch-cleanup-001 ACTIVE). PRIME: interventions≈1129, systemic_fixes=66, ratio=17.1, trend=improving. Tier 1, consecutive_clean=0.

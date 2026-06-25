@@ -4,6 +4,106 @@
 
 ---
 
+## Iteration ~2658 — 2026-06-25T00:57Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/cycle` invocation via chat.
+
+**Health:** ⚠️ Watch — PR #685 CONFLICTING (carry; rebase-escalation-feed-685-001 in Forge queue); PR #687 CONFLICTING (carry, Mirror REVIEW_PASS x4, AUTO_MERGE_HELD blocker=#685). **KEY EVENTS:** Queue advancing rapidly: Forge completed `reconcile-hardening-mission-shipped-002` → PR #688 opened (MERGEABLE, 00:52Z); Forge completed `forge-wip-only-auto-redispatch-001` (00:55Z); Forge now ACTIVE on `watchdog-stale-session-aware-suppression-001` (G-rule fix!); Mirror ACTIVE reviewing PR #688. 2 new alerts (L1069 Tier-4, L1070 Tier-3).
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #685 (forge/escalation-feed):** OPEN, mergeable=CONFLICTING. rebase-escalation-feed-685-001 in Forge queue (queued behind active Forge task). [carry ✅]
+- **PR #687 (forge/forge-post-open-mergeable-rebase-001):** OPEN, mergeable=CONFLICTING (gh CLI confirms UNKNOWN/CONFLICTING). Mirror REVIEW_PASS x4. AUTO_MERGE_HELD blocker=#685. [carry ✅]
+- **PR #688 (reconcile orchestrator-terminal-signal-hardening to shipped):** NEW. OPEN, mergeable=MERGEABLE. Created 00:52:53Z. Mirror ACTIVE reviewing (started 00:53:08Z). [new ✅]
+- **G-rule watchdog-watcher-log-stale-post-fix:** Forge NOW BUILDING `watchdog-stale-session-aware-suppression-001` (started 00:55:43Z). Last WARNs at 18:46 MDT (00:46Z); healthy at 18:51 MDT after prior Forge session ended. Fix currently in build. [verification_pending — advancing ✅]
+- **G-rule ourliberty-health-notify-script-missing:** wire-agent-core-health-notify-001 in Forge queue (not yet active). [verification_pending ✅]
+- **7 persistent daemons alive:** PIDs 1921593,1921360,1388801,1388982,1389067,1732118,1742173 — all confirmed via ps. ✅
+- **Repo:** HEAD=d8f4c193=origin/main. Clean tree. On main. ✅
+- **Beacon inbox:** EMPTY (notify tasks for reconcile-002 and forge-wip-only-auto-redispatch-001 completed). ✅
+- **Forge inbox:** 7 items — alert-translation-mirror-pass-unmerged-001, build-heal-stall-dryrun-noop-001, build-one-time-stale-dispatch-branch-cleanup-001, forge-wip-only-auto-redispatch-001, rebase-escalation-feed-685-001, **watchdog-stale-session-aware-suppression-001 (ACTIVE)**, wire-agent-core-health-notify-001.
+- **Mirror inbox:** review-reconcile-hardening-mission-shipped-002.json (ACTIVE — Mirror session running since 00:53:08Z).
+- **beacon-pending-approvals:** 0 pending. ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 1068, "file_length": 1070}`. 2 new alerts:
+- **L1069** `source=heal-pipeline-stall, subject=pipeline-stall:mirror-pass-unmerged:PR#687` — triage helper: **Tier-4** (novel, no translation match). route=escalate (bot DM'd Larry). No Pulse 2nd DM. Journal note: G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4 verification_pending (alert-translation-mirror-pass-unmerged-001 in Forge queue to add Tier-3 translation). ⚠️ tier-reset.
+- **L1070** `source=medic, intent=medic-diagnosis` — triage helper: **Tier-3** (known-pattern match). Silenced. ✅ nominal.
+- Watermark: 1068→1070.
+
+**Check 1 — Log noise:**
+- watchdog.log: Last WARNs at 17:55–18:46 MDT (during prior long Forge session). Healthy at 18:51 MDT after Forge session PID 2060999 ended. No new WARNs observed since 18:51 MDT. NEW Forge session for `watchdog-stale-session-aware-suppression-001` started 00:55:43Z — watchdog may generate WARNs during this build. G-rule verification_pending (fix now in build). ✅ (expected/monitoring)
+- outbox-notifier.log: No new unexpected WARNs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message: 18:41 MDT (handled iter ~2656). No new messages. beacon-pending-approvals: 0. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → 0 new alert(s) fired, 0 recovered, 3 suppressed (cooldowns: forge_built_no_pr:reconcile-hardening-mission-shipped-001, mirror_pass_unmerged:forge-post-open-mergeable-rebase-001, mirror_pass_unmerged:escalation-feed). ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- Forge inbox (7 items, 1 active): alert-translation-mirror-pass-unmerged-001, build-heal-stall-dryrun-noop-001, build-one-time-stale-dispatch-branch-cleanup-001, forge-wip-only-auto-redispatch-001, rebase-escalation-feed-685-001, **watchdog-stale-session-aware-suppression-001 (ACTIVE)**, wire-agent-core-health-notify-001. ✅
+- Beacon inbox: EMPTY. ✅
+- Mirror inbox: review-reconcile-hardening-mission-shipped-002.json (ACTIVE). ✅
+- beacon-pending-approvals: 0 pending. ✅
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat = 2026-06-25T00:50:37Z (~6 min ago). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=d8f4c193=origin/main. Clean tree. On main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-25T00:38:57Z (~18 min ago). Status=no-change. ✅ Nominal (within 2h threshold).
+
+**Check C — Agent liveness:** 7 persistent daemons alive. Forge ACTIVE on watchdog-stale-session-aware-suppression-001 (started 00:55:43Z). Mirror ACTIVE on reconcile-hardening-mission-shipped-002 review (started 00:53:08Z). ✅ Nominal.
+
+**Check E — PRs:**
+- agent-core PR #685 (forge/escalation-feed): OPEN, CONFLICTING. rebase-escalation-feed-685-001 queued. [⚠️ carry]
+- agent-core PR #687 (forge/forge-post-open-mergeable-rebase-001): OPEN, CONFLICTING. Mirror REVIEW_PASS x4. AUTO_MERGE_HELD blocker=#685. [⚠️ carry]
+- agent-core PR #688 (reconcile orchestrator-terminal-signal-hardening): OPEN, **MERGEABLE**. Mirror ACTIVE reviewing. [✅ new — healthy path]
+- dashboard: 0 open. ✅
+
+**Check H — Forge digest:** HEAD=d8f4c193. Forge 7 items in queue, watchdog-stale-session-aware-suppression-001 ACTIVE. Mirror active on PR #688 review. Beacon: empty. Queue completions since last iter: reconcile-hardening-mission-shipped-002 ✅, forge-wip-only-auto-redispatch-001 ✅ (both success=True, $0.79 + $0.64).
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. ✅
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- **Check I:** Weekday gate fails (Thursday). Skip. ✅
+- **Check III:** Not Sunday. Skip. ✅
+
+**G-rule updates:**
+- **G-rule watchdog-watcher-log-stale-post-fix** — 3/3 dispatched (carry). Forge NOW BUILDING fix (watchdog-stale-session-aware-suppression-001, started 00:55:43Z). [verification_pending — advancing]
+- **G-rule ourliberty-health-notify-script-missing** — 3/3 dispatched (carry). wire-agent-core-health-notify-001 in Forge queue. [verification_pending]
+- **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 3/3 dispatched (carry). L1069 new Tier-4 instance (bot DM'd). alert-translation-mirror-pass-unmerged-001 in Forge queue. [verification_pending]
+- **G-rule heal-daemon-restart-manifest-drift-regenerated-tier4** — 1/3 (carry; 0 new instances this iter). Dispatch at 3/3.
+- **G-rule check-i-force-bypass-dm-route** — 1/3 (carry; 0 new instances, Thursday). Dispatch at 3/3.
+
+**New observations:**
+- Queue is advancing well. Forge has processed reconcile-hardening-mission-shipped-002 (140s, $0.79) and forge-wip-only-auto-redispatch-001 (160s, $0.64) since last iter. Now building the G-rule watchdog fix. Mirror simultaneously reviewing PR #688.
+- rebase-escalation-feed-685-001 is next-critical-path after active Forge task completes; this unblocks PR #685 → #687 → rest of queue.
+
+**Actions taken:** repair-watermark (no-op). Pipeline stall dry-run (0 alerts). Alert triage: L1069 Tier-4 (noted, no 2nd DM), L1070 Tier-3 (silenced). Watermark advanced 1068→1070. PRIME: 1 intervention logged. 0 auto-fix actions. Tier state recorded (non-clean).
+
+**Dispatches:** None this iter.
+
+**Standing findings (carried + verified):**
+- [yellow] **PR #685 (forge/escalation-feed)** — CONFLICTING. rebase-escalation-feed-685-001 queued in Forge (behind active task). [carry]
+- [yellow] **PR #687 (forge/forge-post-open-mergeable-rebase-001)** — CONFLICTING. Mirror REVIEW_PASS x4. AUTO_MERGE_HELD blocker=#685. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [blue] **PR #688 (reconcile orchestrator-terminal-signal-hardening)** — NEW, MERGEABLE, Mirror ACTIVE reviewing. [new — healthy path]
+- [blue] **watchdog-stale-session-aware-suppression-001** — Forge ACTIVE (G-rule fix in build). [verification_pending — advancing]
+- [blue] **rebase-escalation-feed-685-001** — Forge queue (critical path). [carry]
+- [blue] **reconcile-hardening-mission-shipped-002** — Mirror ACTIVE reviewing PR #688. [carry — advancing]
+- [blue] **forge-wip-only-auto-redispatch-001** — Completed 00:55Z ✅. [resolved]
+- [blue] **alert-translation-mirror-pass-unmerged-001** — Forge queue. [verification_pending]
+- [blue] **wire-agent-core-health-notify-001** — Forge queue. [verification_pending]
+
+**PRIME DIRECTIVE:** Trailing-30d: interventions=1129, systemic_fixes=66, ratio=17.1, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** `record --checks-clean false` → consecutive_clean=0. Tier: 1.
+
+---
+
 ## Iteration ~2657 — 2026-06-25T00:49Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/cycle` invocation via chat.
