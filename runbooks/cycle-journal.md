@@ -4,6 +4,101 @@
 
 ---
 
+
+## Iteration ~2661 -- 2026-06-25T01:22Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0->0)
+
+**Trigger:** Larry /cycle invocation via chat.
+
+**Health:** ⚠️ Watch -- **KEY EVENT: PR #685 MERGED** at 01:17:59Z (rebase-escalation-feed-685-001 succeeded; auto-merged). rebase-pr-687-001 dispatched to Beacon for PR #687 (still CONFLICTING post-#685 merge). Repo fast-forwarded to 597a03cb. Forge CLARIFY in Beacon inbox re schema conflict.
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #685 (forge/escalation-feed):** MERGED at 01:17:59Z (597a03cb). [RESOLVED ✅ shipped!]
+- **PR #687 (forge/forge-post-open-mergeable-rebase-001):** OPEN, mergeable=CONFLICTING (confirmed). Mirror REVIEW_PASS x4 (carry). rebase-pr-687-001 dispatched to Beacon. [carry — rebase dispatch sent]
+- **Orphan directive "Yes rebase #687 next":** Actioned — rebase-pr-687-001 → Beacon inbox. [resolved via dispatch]
+- **Forge CLARIFY (schema conflict):** notify-rebase-escalation-feed-685-001.json in Beacon inbox. Forge flagged schema incompatibility between for_larry_signal.py (#685) and for_larry_escalations.py (main/#683): both default to ~/agents/blackboard/for-larry-escalations.json with incompatible schemas (records-dict vs escalations-list). PR merged anyway (the rebased code landed). Beacon will triage CLARIFY. [monitoring — Beacon handling]
+- **Unregistered approval unreg-approval-6009fbf6bfa2:** References escalation-feed task (shipped as PR #685). Stale. Beacon handles. [stale — Beacon resolves]
+- **G-rule watchdog-watcher-log-stale-post-fix:** Watchdog healthy at 19:17Z after rebase session ended. Last WARN 19:12Z (during rebase). build-watchdog-stale-session-aware-suppression-001 in Forge build queue. [verification_pending — healthy post-session]
+- **G-rule ourliberty-health-notify-script-missing:** resume-wire-agent-core-health-notify-001-r1 in Forge build queue. [verification_pending]
+- **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4:** 0 new instances. healer recovered PR #685 alert (merged). [verification_pending]
+- **7 daemons alive:** 1921593,1921360,1388801,1388982,1389067,1732118,1742173 — all confirmed. ✅
+- **Repo:** Was behind 1 commit. Fast-forwarded to HEAD=597a03cb. Clean tree. On main. ✅
+- **Sync:** last_sync=2026-06-25T01:00:00Z (~22 min), status=success. ✅
+- **Beacon inbox:** 2 items — notify-rebase-escalation-feed-685-001 (Forge CLARIFY), rebase-pr-687-001 (new dispatch). ✅
+- **Forge inbox:** 5 build-phase items + 1 resume — build-alert-translation-mirror-pass-unmerged-001, build-forge-wip-only-auto-redispatch-001, build-heal-stall-dryrun-noop-001, build-one-time-stale-dispatch-branch-cleanup-001, build-watchdog-stale-session-aware-suppression-001, resume-wire-agent-core-health-notify-001-r1. ✅
+- **Mirror inbox:** EMPTY. ✅
+- **beacon-pending-approvals:** 1 pending (unreg-approval-6009fbf6bfa2 — stale escalation-feed, Beacon handles). ✅
+
+**Check 0 — Alert triage:** repair-watermark → {"repaired": false, "old_watermark": 1073, "file_length": 1073}. 0 new alerts. ✅ Nominal.
+
+**Check 1 — Log noise:**
+- watchdog.log: Last WARN at 19:12Z during active rebase session. 19:17Z healthy (session done, #685 merged). G-rule fix in Forge queue. ✅ Expected/monitoring.
+- outbox-notifier.log: WARN at 19:18Z — AUTO_MERGE_HELD_STALE_CONFLICT for PR #687 (CONFLICTING post-#685 merge; notifier DM'd Larry rebase command). Real finding, actioned via rebase-pr-687-001 dispatch. ✅
+
+**Check 2 — Telegram sweep:** Last Larry message: "Yes rebase #687 next" (18:45 MDT). Orphan directive resolved via rebase-pr-687-001 dispatch. No new messages since iter ~2660. ✅ Nominal (directive actioned).
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall --dry-run → 0 new alerts, 1 recovered (mirror_pass_unmerged:escalation-feed — PR #685 merged), 2 suppressed (cooldowns). ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- Beacon inbox: 2 items (notify + rebase dispatch). Forge inbox: 5 build + 1 resume. beacon-pending-approvals: 1 stale. ✅
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat = 2026-06-25T01:10:40Z (~12 min ago). ✅ Nominal.
+
+**Check A — Source repo:** Auto-fix: git pull --ff-only → a30b7c0e..597a03cb (PR #685). HEAD=597a03cb. Clean. On main. ✅
+
+**Check B — Sync health:** last_sync=01:00:00Z (~22 min), status=success. ✅ Nominal.
+
+**Check C — Agent liveness:** 7 persistent daemons alive. No active Forge session. ✅ Nominal.
+
+**Check E — PRs:**
+- agent-core PR #685 (forge/escalation-feed): MERGED 01:17:59Z. [✅ SHIPPED]
+- agent-core PR #687 (forge/forge-post-open-mergeable-rebase-001): CONFLICTING. rebase-pr-687-001 dispatched to Beacon. [⚠️ carry — rebase queued]
+- dashboard: 0 open. ✅
+
+**Check H — Forge digest:** HEAD=597a03cb. 5 build-phase items queued.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. ✅
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):** Check I: skip. Check III: skip. ✅
+
+**G-rule updates:**
+- **watchdog-watcher-log-stale-post-fix** — 3/3 dispatched (carry). Watchdog 19:17Z healthy post-rebase-session. Fix in Forge build queue. [verification_pending — positive]
+- **ourliberty-health-notify-script-missing** — 3/3 dispatched (carry). resume-r1 in Forge queue. [verification_pending]
+- **heal-pipeline-stall-mirror-pass-unmerged-tier4** — 3/3 dispatched (carry). 0 new instances. [verification_pending]
+- **heal-daemon-restart-manifest-drift-regenerated-tier4** — 1/3 (carry). Dispatch at 3/3.
+- **check-i-force-bypass-dm-route** — 1/3 (carry, Thursday). Dispatch at 3/3.
+
+**New observations:**
+- PR #685 shipped the operator-needs-you-feed (promote_alerts gate). for_larry_signal.py now in main. Forge CLARIFY flags schema conflict between for_larry_signal.py and for_larry_escalations.py (same output file, incompatible schemas). This is a post-merge finding — the code landed but the substrate conflict may cause runtime issues. Beacon is handling.
+- Unregistered approval unreg-approval-6009fbf6bfa2 (created 01:15:59Z by heal-unregistered-approval) references escalation-feed task, now shipped as PR #685. Stale; Beacon will resolve.
+- outbox-notifier DM'd Larry the raw git rebase command for PR #687 at 19:18Z (standard CONFLICTING-held path). Also dispatched rebase-pr-687-001 to Beacon. Dual-path is fine — whichever executes first, the other is no-op.
+
+**Actions taken:** repair-watermark (no-op). Pipeline stall dry-run (0 new, 1 recovered). fast-forward main a30b7c0e→597a03cb (always-fix, logged to cycle-actions.jsonl). Dispatched rebase-pr-687-001 → Beacon inbox. PRIME: 2 interventions appended.
+
+**Dispatches:** rebase-pr-687-001 → Beacon inbox (Larry directive "Yes rebase #687 next").
+
+**Standing findings (carried + verified):**
+- [blue] **PR #685 MERGED** at 01:17:59Z (597a03cb). operator-needs-you-feed live. [SHIPPED ✅]
+- [yellow] **PR #687 (forge/forge-post-open-mergeable-rebase-001)** — CONFLICTING. rebase-pr-687-001 dispatched to Beacon. [carry — rebase queued]
+- [yellow] **Forge CLARIFY: schema conflict (for_larry_signal.py vs for_larry_escalations.py)** — Beacon handling. [monitoring]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [blue] **build-watchdog-stale-session-aware-suppression-001** — Forge build queue. [verification_pending]
+- [blue] **build-alert-translation-mirror-pass-unmerged-001** — Forge build queue. [queued]
+- [blue] **resume-wire-agent-core-health-notify-001-r1** — Forge build queue. [queued]
+
+**PRIME DIRECTIVE:** Trailing-30d: systemic_fixes=66, ratio=17.2, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** `record --checks-clean false` → consecutive_clean=0. Tier: 1.
+
+---
+
+
 ## Iteration ~2660 — 2026-06-25T01:14Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/cycle` invocation via chat.

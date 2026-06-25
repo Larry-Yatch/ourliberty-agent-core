@@ -242,6 +242,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-25 01:22Z UTC (Iter ~2661, Tier 1, consecutive_clean=0)
+
+**Iter ~2661 summary:** ⚠️ Watch — **PR #685 MERGED** at 01:17:59Z (597a03cb, feat(operator-needs-you-feed)); PR #687 CONFLICTING (rebase-pr-687-001 dispatched to Beacon per Larry "Yes rebase #687 next" directive). Repo fast-forwarded a30b7c0e→597a03cb (always-fix). Forge CLARIFY in Beacon inbox: schema conflict for_larry_signal.py vs for_larry_escalations.py (same file, incompatible schemas — post-merge finding, Beacon handling). Unreg-approval unreg-approval-6009fbf6bfa2 is stale (escalation-feed shipped). 0 new alerts (watermark=1073). 7 daemons alive. Watchdog healthy 19:17Z post-rebase. PRIME: interventions+2, systemic_fixes=66, ratio=17.2, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-25 01:16Z UTC (Iter ~2660, Tier 1, consecutive_clean=0)
 
 **Iter ~2660 summary:** ⚠️ Watch — PR #685 CONFLICTING (Forge ACTIVELY rebasing via rebase-escalation-feed-685-001, PID 2305661, critical path); PR #687 CONFLICTING (carry, Mirror REVIEW_PASS x4, AUTO_MERGE_HELD blocker=#685). **KEY EVENTS:** Queue advanced since iter ~2659: 7 Forge tasks completed (one-time-stale-dispatch-branch-cleanup-001, heal-stall-dryrun-noop-001, reconcile-hardening-mission-shipped-002, forge-wip-only-auto-redispatch-001, watchdog-stale-session-aware-suppression-001, alert-translation-mirror-pass-unmerged-001, wire-agent-core-health-notify-001 resume-r1). 5 build-* envelopes + resume-wire-agent-core-health-notify-001-r1 queued in Forge inbox. 0 new alerts (watermark=1073). NEW watchdog WARN at 19:12Z (01:12Z) during active rebase session — fix not yet merged. No new Larry Telegram messages. PRIME: interventions=1132, systemic_fixes=66, ratio=17.2, trend=improving. Tier 1, consecutive_clean=0.
