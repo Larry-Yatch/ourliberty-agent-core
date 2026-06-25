@@ -65,7 +65,8 @@ class _Base(unittest.TestCase):
 
     # ---- fixtures ----
 
-    def write_snapshot(self, *, pending_approvals=0, escalations=0, parked=0):
+    def write_snapshot(self, *, pending_approvals=0, escalations=0, parked=0,
+                       items=None):
         doc = {
             'schema_version': 1,
             'narrative_prose': 'x',
@@ -75,12 +76,18 @@ class _Base(unittest.TestCase):
                     'pending_approvals': pending_approvals,
                     'escalations': escalations,
                     'total': parked + pending_approvals + escalations,
-                    'items': [],
+                    'items': items or [],
                     'truncated': False,
                 },
             },
         }
         self.snapshot_path.write_text(json.dumps(doc))
+
+    @staticmethod
+    def item(source, title):
+        """A minimal blocking waiting-item as the State Log emits them."""
+        return {'source': source, 'id': title, 'title': title,
+                'why': '', 'severity': 'warning'}
 
     def write_state(self, **state):
         (self.agents / 'state' / 'doorbell-state.json').write_text(
@@ -110,7 +117,8 @@ class DoorbellFiringTest(_Base):
         self.assertEqual(kwargs['source'], 'doorbell')
         self.assertEqual(kwargs['chat_id'], _LARRY_CHAT)
         self.assertIn('2 items need your call', kwargs['message'])
-        self.assertIn('check the board', kwargs['message'])
+        # The dead words "check the board" are now a real clickable link.
+        self.assertIn('https://dashboard.ourliberty.dev/approvals', kwargs['message'])
         st = self.read_state()
         self.assertEqual(st['last_count'], 2)
         self.assertEqual(st['last_dm_ts'], _NOW.isoformat())
@@ -209,20 +217,99 @@ class DoorbellFailOpenTest(_Base):
 
 
 class DoorbellMessageTest(_Base):
-    def test_singular_vs_plural_and_breakdown(self):
+    BASE = 'https://dashboard.ourliberty.dev'
+
+    # ---- fallback path: counts only, no itemized detail ----
+
+    def test_fallback_singular_vs_plural_and_link(self):
+        # Pure approvals → the /approvals surface where you act on them.
         self.assertEqual(
             self.dn.format_message(1, 1, 0),
-            '1 item needs your call — check the board.',
+            f'1 item needs your call.\n→ {self.BASE}/approvals',
         )
         self.assertEqual(
             self.dn.format_message(2, 2, 0),
-            '2 items need your call — check the board.',
+            f'2 items need your call.\n→ {self.BASE}/approvals',
         )
+
+    def test_fallback_breakdown_and_escalation_routes_to_board(self):
+        # Mixed kinds → light breakdown + the umbrella board (/where-we-are).
         self.assertEqual(
             self.dn.format_message(3, 2, 1),
-            '3 items need your call — check the board. '
-            '(2 to approve, 1 escalated)',
+            '3 items need your call. (2 to approve, 1 escalated)\n'
+            f'→ {self.BASE}/where-we-are',
         )
+
+    # ---- itemized path: names WHAT + links WHERE ----
+
+    def test_names_items_and_links(self):
+        items = [self.item('approval', 'restart dashboard-api healer')]
+        msg = self.dn.format_message(1, 1, 0, items)
+        self.assertEqual(
+            msg,
+            '1 item needs your call:\n'
+            '• Approve — restart dashboard-api healer\n'
+            f'→ {self.BASE}/approvals',
+        )
+
+    def test_escalation_present_routes_to_where_we_are(self):
+        items = [self.item('approval', 'a'), self.item('escalation', 'b')]
+        msg = self.dn.format_message(2, 1, 1, items)
+        self.assertIn('• Approve — a', msg)
+        self.assertIn('• Escalation — b', msg)
+        self.assertTrue(msg.endswith(f'→ {self.BASE}/where-we-are'))
+
+    def test_caps_named_items_with_more(self):
+        items = [self.item('approval', f't{i}') for i in range(5)]
+        msg = self.dn.format_message(5, 5, 0, items)
+        # Exactly MAX_NAMED_ITEMS named, the rest collapse to "+N more".
+        self.assertEqual(msg.count('• Approve'), self.dn.MAX_NAMED_ITEMS)
+        self.assertIn(f'• +{5 - self.dn.MAX_NAMED_ITEMS} more', msg)
+
+    def test_internal_newline_collapsed_to_one_line(self):
+        items = [self.item('approval', 'restart healer\nthen redeploy\n  api')]
+        msg = self.dn.format_message(1, 1, 0, items)
+        self.assertIn('• Approve — restart healer then redeploy api', msg)
+        # The bullet must be a single line (no wrap that reads as a 2nd item).
+        bullets = [ln for ln in msg.splitlines() if ln.startswith('• ')]
+        self.assertEqual(len(bullets), 1)
+
+    def test_long_title_trimmed(self):
+        items = [self.item('approval', 'x' * 200)]
+        msg = self.dn.format_message(1, 1, 0, items)
+        bullet = [ln for ln in msg.splitlines() if ln.startswith('• ')][0]
+        self.assertLessEqual(len(bullet), len('• Approve — ') + self.dn.TITLE_MAXLEN)
+        self.assertTrue(bullet.endswith('…'))
+
+
+class DoorbellItemizedRunTest(_Base):
+    def test_run_names_items_from_snapshot(self):
+        items = [
+            DoorbellMessageTest.item('approval', 'dispatch to forge: build X'),
+            DoorbellMessageTest.item('escalation', 'credential rotation due'),
+        ]
+        self.write_snapshot(pending_approvals=1, escalations=1, items=items)
+        sent, m = self.run_tick()
+        self.assertTrue(sent)
+        msg = m.call_args.kwargs['message']
+        self.assertIn('2 items need your call:', msg)
+        self.assertIn('• Approve — dispatch to forge: build X', msg)
+        self.assertIn('• Escalation — credential rotation due', msg)
+        self.assertIn('/where-we-are', msg)
+
+    def test_run_drops_parked_items_from_names(self):
+        # Parked items ride along in waiting_on_larry.items but are NOT blocking
+        # — the doorbell must not name them (they're excluded from the count too).
+        items = [
+            DoorbellMessageTest.item('approval', 'the only blocking thing'),
+            DoorbellMessageTest.item('parked', 'some funnel suggestion'),
+        ]
+        self.write_snapshot(pending_approvals=1, items=items)
+        sent, m = self.run_tick()
+        msg = m.call_args.kwargs['message']
+        self.assertIn('1 item needs your call:', msg)
+        self.assertIn('• Approve — the only blocking thing', msg)
+        self.assertNotIn('some funnel suggestion', msg)
 
 
 if __name__ == '__main__':
