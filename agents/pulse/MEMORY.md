@@ -204,8 +204,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-25 18:28Z UTC (Iter ~2798, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 18:35Z UTC (Iter ~2799, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2798 summary:** ✅ Nominal — no new alerts (wm=997). Beacon result received for forge-wip-redispatch-digest: two-part fix designed (healer subject change + translations two-entry); Forge dispatch pending trust-policy approval from Larry. 8/8 daemons alive. Watchdog healthy. 0 open PRs. Forge retry1 for board-new-mission-confirm-placeholder-001 in progress. PRIME: interventions=1224, systemic_fixes=71, vp=27, ratio≈17.24, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2799 summary:** ✅ Nominal — no new alerts (wm=997). 8/8 daemons alive. Watchdog healthy. 0 open PRs. Forge retry1 (board-new-mission-confirm-placeholder-001-retry1) still building. forge-wip-redispatch-digest Forge dispatch pending trust-policy approval. PRIME: interventions=1224, systemic_fixes=71, vp=27, ratio≈17.24, trend=improving. Tier 1, consecutive_clean=0.
 
 
