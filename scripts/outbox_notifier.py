@@ -4097,7 +4097,9 @@ def _review_request_already_dispatched(
     return False
 
 
-def _dispatch_mirror_review(data: dict[str, Any], pr_url: str) -> None:
+def _dispatch_mirror_review(
+    data: dict[str, Any], pr_url: str, *, pr_state_known_open: bool = False,
+) -> None:
     """Write a review-request task to Mirror's inbox after Forge opens a PR.
 
     Phase D3.5 commit 5a. Fires inside `process_outbox` when Forge's
@@ -4115,6 +4117,11 @@ def _dispatch_mirror_review(data: dict[str, Any], pr_url: str) -> None:
     Failure to write the review-request is logged WARN and non-fatal —
     the notify-to-Beacon above has already informed her of the PR; Larry
     sees the gap and can manually re-dispatch.
+
+    `pr_state_known_open`: set by callers that have ALREADY confirmed the PR
+    is OPEN this tick (the reconcile sweep), so the merged/closed dispatch-time
+    guard skips a redundant `gh pr view`. Default False — the inline
+    build-phase path performs its own cheap check.
     """
     task_id = data.get('task_id') or 'unknown'
     target_repo = data.get('target_repo')
@@ -4269,6 +4276,20 @@ def _dispatch_mirror_review(data: dict[str, Any], pr_url: str) -> None:
         )
         return
 
+    # Merged/closed-PR guard (dispatch-time half). Don't even queue a review
+    # for a PR that's already left OPEN — it gates nothing. Cheap early skip
+    # for the common case; the execution-time guard in inbox_watcher catches
+    # the race where the merge lands AFTER this dispatch. Fail-OPEN: `None`
+    # (gh hiccup / unparseable url) proceeds with the dispatch so a transient
+    # error never drops a legitimate review. Skipped when the caller already
+    # confirmed OPEN this tick (reconcile sweep) to avoid a redundant gh call.
+    if not pr_state_known_open and _mirror_review_target_is_terminal(pr_url):
+        log(
+            f'PR {pr_url} (task {task_id}) is already merged/closed; '
+            f'skipping Mirror review dispatch (review gates nothing)'
+        )
+        return
+
     # D3.5 5d cost-budget gate. AFTER the idempotency check (second-pass
     # review finding 2-#1) — see _dispatch_build_phase for rationale.
     if not _enforce_cost_budget(task_id, 'mirror-review', data):
@@ -4403,7 +4424,9 @@ def _reconcile_missed_mirror_reviews() -> None:
             f'dropped the build-phase review-request; re-dispatching',
             'WARN',
         )
-        _dispatch_mirror_review(data, pr_url)
+        # The sweep just confirmed is_open above; tell the dispatcher so its
+        # own merged/closed guard doesn't repeat the gh pr view it already did.
+        _dispatch_mirror_review(data, pr_url, pr_state_known_open=True)
 
 
 def _extract_revision_summary_from_result(
@@ -5538,6 +5561,16 @@ def _dispatch_mirror_review_rerun(
         log(
             f're-review for revision {round_num} already dispatched for '
             f'task {task_id}; skipping duplicate write'
+        )
+        return
+
+    # Merged/closed-PR guard (dispatch-time half) — same rationale as the
+    # first-review path. A re-review of a PR that already merged/closed gates
+    # nothing. Fail-OPEN on an undeterminable state.
+    if _mirror_review_target_is_terminal(pr_url):
+        log(
+            f'PR {pr_url} (task {task_id}, revision {round_num}) is already '
+            f'merged/closed; skipping Mirror re-review dispatch'
         )
         return
 
@@ -7705,6 +7738,25 @@ def _gh_pr_is_open(repo_coords: str, pr_number: int) -> Optional[bool]:
     if state in ('MERGED', 'CLOSED'):
         return False
     return None
+
+
+def _mirror_review_target_is_terminal(pr_url: Optional[str]) -> bool:
+    """True only when the PR at `pr_url` is positively MERGED or CLOSED.
+
+    The dispatch-time half of the merged/closed-review guard (used by
+    `_dispatch_mirror_review` + `_dispatch_mirror_review_rerun`). Returns
+    False — "proceed with the review" — for EVERY uncertain case: a
+    missing/unparseable url, or any gh error that leaves the state unknown
+    (`_gh_pr_is_open` → None). Fail-OPEN by construction so a transient gh
+    failure never silently drops a legitimate review; only a positively
+    observed terminal state short-circuits a dispatch."""
+    if not isinstance(pr_url, str) or not pr_url:
+        return False
+    parsed = _parse_pr_url(pr_url)
+    if parsed is None:
+        return False
+    repo_coords, pr_number = parsed
+    return _gh_pr_is_open(repo_coords, pr_number) is False
 
 
 def _find_overlap_blocker(

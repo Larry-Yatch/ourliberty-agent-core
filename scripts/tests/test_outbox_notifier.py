@@ -3997,6 +3997,12 @@ class MirrorReviewDispatchTest(unittest.TestCase):
         self._orig_gh_head = on._gh_pr_head_sha
         on._gh_pr_head_sha = lambda *a, **k: None
         self.addCleanup(setattr, on, '_gh_pr_head_sha', self._orig_gh_head)
+        # The merged/closed dispatch-time guard probes PR open-state; stub it
+        # OPEN (a freshly-opened PR) so these dispatch tests stay hermetic and
+        # don't shell out to real `gh` against the live pull/77.
+        self._orig_gh_is_open = on._gh_pr_is_open
+        on._gh_pr_is_open = lambda *a, **k: True
+        self.addCleanup(setattr, on, '_gh_pr_is_open', self._orig_gh_is_open)
         self._originals = {}
         for name in [
             'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',
