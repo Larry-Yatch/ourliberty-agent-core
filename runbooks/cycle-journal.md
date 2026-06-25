@@ -5,6 +5,104 @@
 ---
 
 
+## Iteration ~2711 — 2026-06-25T07:51Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry /cycle invocation via chat.
+
+**Health:** ⚠️ Watch — Outbox-notifier hot loop still active (PID 2754414, 07:49Z UTC last log). PR #700 under active Mirror review (PID 2754506, ~13 min elapsed). 2 stale Mirror inbox files for merged PR #698 still present; archive blocked by session perms. No new alerts this cycle.
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #700 (fix-auto-merge-already-merged-skip-001)**: OPEN, UNKNOWN. Mirror (PID 2754506, etimes=799s ~13 min) actively reviewing. [carry]
+- **Outbox-notifier hot loop**: STILL ACTIVE ✅ — log at 01:49:25 MDT (07:49Z UTC), AUTO_MERGE_RELEASE_DEFERRED every ~6s on PR #691 / blocker #697 (MERGED). Fix in PR #700. [carry]
+- **Pipeline stall FP reconcile-hardening-001**: `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` — FP persists. Fix `heal-forge-no-pr-retry-rebase-fp-001` pending Larry approval. [carry]
+- **Pipeline stall FP rebase-687-001**: `DRY-RUN would alert: forge_built_no_pr:rebase-forge-post-open-mergeable-687-001` — FP persists. [carry]
+- **beacon-pending-approvals**: 1 — `heal-forge-no-pr-retry-rebase-fp-001`. [carry]
+- **Repo**: HEAD=d639d654=origin/main. Clean. On main. ✅ (Advanced from 5fc57b2b since ~2710)
+- **Sync**: last_sync=2026-06-25T07:00:11Z (~51 min ago). Within 2h. ✅
+- **Daemons**: beacon_telegram_bot (PID 2715635), outbox_notifier (PID 2754414), chain_event_shipper (PID 2716672) — all alive. Mirror (PID 2754506) reviewing PR #700. ✅
+- **Watchdog**: overall=healthy at 01:46:47 MDT (07:46Z UTC). ✅
+- **Zombie PID 1834248**: still alive (Ss, bash, etimes=2377904s ~27.5d). Ask-then-do: `kill 1834248`. [carry]
+- **Stale daemon code heartbeat**: 2026-06-25T07:45:15Z (~6 min ago). Fresh. ✅
+- **2 stale Mirror inbox files**: `review-skip-mirror-review-on-merged-or-closed-pr-001.json` + `marker-error-skip-mirror-review-on-merged-or-closed-pr-001-1.json`. Still present. Archive blocked by session perms. [carry]
+- **3 stuck builds**: fix-653-phase4b-spec-id-contract-001, dag-preflight-phase4b-live-thread-001, review-sequence-dag-operator-needs-you-feed. Larry notified prior iters. [carry]
+
+**Check 0 — Alert triage:**
+- repair-watermark: repaired=false, old=1153, file_length=1153. **0 new alerts** (watermark=file_length). ✅ Nominal.
+
+**Check 1 — Log noise:**
+- outbox-notifier.log: **[yellow] HOT LOOP** still active at 01:49:25 MDT (07:49Z UTC). PR #691 / blocker #697 (MERGED). PID 2754414. Fix in PR #700 under Mirror review. [carry]
+- watchdog.log: overall=healthy at 01:46:47 MDT. ✅
+
+**Check 2 — Telegram sweep:**
+- beacon_telegram_bot.log: last entry `01:40:47 MDT idx=1152 delivered (source=watchdog)`. No new Larry messages. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` — FP persists. Fix `heal-forge-no-pr-retry-rebase-fp-001` pending. [carry]
+- `DRY-RUN would alert: forge_built_no_pr:rebase-forge-post-open-mergeable-687-001` — FP persists. [carry]
+- `suppressed (cooldown): retry_exhausted:skip-mirror-review-on-merged-or-closed-pr-001`. ✅
+- 2 alert(s) would fire, 0 recovery(ies) would be attempted.
+
+**Check 4 — Pending directives:**
+- Beacon inbox: **EMPTY** ✅.
+- Forge inbox: **EMPTY** ✅.
+- Mirror inbox (5 tasks):
+  - `review-skip-mirror-review-on-merged-or-closed-pr-001.json` (01:30 MDT) — **STALE** (PR #698 MERGED). Archive blocked by session perms. [carry]
+  - `marker-error-skip-mirror-review-on-merged-or-closed-pr-001-1.json` (01:28 MDT) — **STALE** (PR #698 MERGED). Archive blocked by session perms. [carry]
+  - `review-fix-auto-merge-already-merged-skip-001.json` (00:52 MDT) — PR #700. Active (Mirror PID 2754506). ✅
+  - `dag-preflight-phase4b2-closed-card-doorbell-001-re-retry1.json` (01:00 MDT) — queued.
+  - `review-sequence-dag-mirror-review-visibility-001-r-retry1.json` (01:00 MDT) — queued.
+- beacon-pending-approvals: 1 (`heal-forge-no-pr-retry-rebase-fp-001`). [carry]
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-06-25T07:45:15Z (~6 min ago). Fresh. ✅
+
+**Check A — Source repo:** HEAD=d639d654=origin/main. Clean. On main. ✅
+
+**Check B — Sync health:** last_sync=2026-06-25T07:00:11Z (~51 min ago). Within 2h. ✅
+
+**Check C — Agent liveness:** beacon_telegram_bot (PID 2715635), outbox_notifier (PID 2754414), chain_event_shipper (PID 2716672) — all alive. Mirror (PID 2754506) reviewing PR #700 (~13 min). ✅
+- **[yellow] PID 1834248** — zombie bash wait-loop. Still alive (etimes=2377904s ~27.5d). Ask-then-do: `kill 1834248`. [carry]
+
+**Check E — PRs:**
+- PR #700 (fix-auto-merge-already-merged-skip-001): OPEN, UNKNOWN. Mirror (PID 2754506) reviewing. ⚠️
+
+**Check H — Forge digest:** Forge IDLE (inbox empty). ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check III: not Sunday. Skip. ✅
+
+**G-rule updates:**
+- All G-rules carry at same counts as ~2710. No new occurrences or threshold changes this iter.
+
+**Actions taken:** Ran repair-watermark (no-op). Ran all mandatory + additive checks. 0 new alerts. 0 dispatches. Appended 1 PRIME ledger row (intervention). No Pulse DMs.
+
+**Standing findings (updated):**
+- [yellow] **Outbox-notifier hot loop** — Still active (PID 2754414). Fix in PR #700 under Mirror review (PID 2754506, ~13 min). Self-resolves on Mirror PASS → auto-merge → deploy.
+- [yellow] **PR #700 (fix-auto-merge-already-merged-skip-001)** — OPEN. Mirror (PID 2754506) reviewing.
+- [yellow] **2 stale Mirror inbox files** — `review-skip-mirror-review-on-merged-or-closed-pr-001.json` + `marker-error-skip-mirror-review-on-merged-or-closed-pr-001-1.json`. Manual cleanup: `mv ~/agents/inboxes/mirror/review-skip-mirror-review-on-merged-or-closed-pr-001.json ~/agents/inboxes/mirror/.archive/` and `mv ~/agents/inboxes/mirror/marker-error-skip-mirror-review-on-merged-or-closed-pr-001-1.json ~/agents/inboxes/mirror/.archive/`
+- [yellow] **heal-forge-no-pr-retry-rebase-fp-001 pending approval** — `approve heal-forge-no-pr-retry-rebase-fp-001` unblocks pipeline stall FP fix.
+- [yellow] **3 stuck builds** — fix-653-phase4b-spec-id-contract-001, dag-preflight-phase4b-live-thread-001, review-sequence-dag-operator-needs-you-feed. Larry notified prior iters.
+- [yellow] **Forge: dag-preflight-phase4b2-closed-card-doorbell-001-re-retry1** — In Mirror inbox (retry1). Review pending.
+- [yellow] **Forge: review-sequence-dag-mirror-review-visibility-001-r-retry1** — In Mirror inbox (retry1). Review pending.
+- [yellow] **PID 1834248 zombie bash loop** — Still alive. Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **sequence-paused:operator-needs-you-feed** — L1105. Recovery: `resume sequence operator-needs-you-feed` via Beacon or Dashboard.
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision.
+- [yellow] **unreviewed-merge:649** — Larry judgment.
+- [yellow] **unreviewed-merge:637** — Larry judgment.
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`.
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`.
+
+**PRIME DIRECTIVE:** interventions=1178, systemic_fixes=71, verification_pending=26, ratio≈16.59, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** consecutive_clean=0 (non-clean: outbox-notifier loop, PR #700, stale inbox files, zombie PID, pending approvals). Tier: 1.
+
+---
+
+
 ## Iteration ~2710 — 2026-06-25T07:46Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry /cycle invocation via chat.

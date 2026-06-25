@@ -186,8 +186,8 @@
 
 ---
 
-## Status snapshot — updated 2026-06-25 07:46Z UTC (Iter ~2710, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 07:52Z UTC (Iter ~2711, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2710 summary:** ⚠️ Watch — Outbox-notifier hot loop still active (PID 2754414, post-watchdog-restart 01:36 MDT). PR #700 under Mirror review (PID 2754506, ~8 min at check). `mirror_pass_unmerged:PR#698` stall signal RESOLVED (PR #698 MERGED). 2 stale Mirror inbox files for merged PR #698 still present (session perms block Pulse archive). 1 new alert triaged: L1153 watchdog outbox-notifier restart — Tier-4 novel, Beacon already delivered, journal-note only. New G-rule candidate: `source=watchdog, subject=ourliberty-outbox-notifier` Tier-4 (first occurrence, tracking toward 3/3). `heal-forge-no-pr-retry-rebase-fp-001` approval pending Larry. PID 1834248 zombie alive (~27.5d). PRIME: interventions=1177, systemic_fixes=71, vp=26, ratio≈16.58, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2711 summary:** ⚠️ Watch — Outbox-notifier hot loop still active (PID 2754414, 07:49Z UTC last log). PR #700 under active Mirror review (PID 2754506, ~13 min at check). 0 new alerts this cycle (watermark=file_length=1153). 2 stale Mirror inbox files for merged PR #698 still present (session perms block Pulse archive). `heal-forge-no-pr-retry-rebase-fp-001` approval pending Larry. PID 1834248 zombie alive (~27.5d). PRIME: interventions=1178, systemic_fixes=71, vp=26, ratio≈16.59, trend=improving. Tier 1, consecutive_clean=0.
 
 
