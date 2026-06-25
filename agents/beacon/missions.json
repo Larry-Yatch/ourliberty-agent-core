@@ -5237,7 +5237,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-25T14:43:54.598636+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-25T14:36:09.427905+00:00"
+      "orphan_last_activity_ts": "2026-06-25T14:36:09.427905+00:00",
+      "briefing": {
+        "what": "An internal fix so the team's automated system stops raising false 'unfinished work' alarms when a job has actually already been completed.",
+        "why": "False alarms waste attention and erode trust in the system's status reports, making it harder to tell real problems from noise.",
+        "suggest": "Approve it, but ask for a quick confirmation that it was checked against a few real cases before it goes fully live."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-25T14:50:52.249097+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-forge-no-pr-rebase-original-fp-fix-002",
@@ -5254,7 +5268,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-25T14:43:54.598636+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-25T14:36:04.425208+00:00"
+      "orphan_last_activity_ts": "2026-06-25T14:36:04.425208+00:00",
+      "briefing": {
+        "what": "Some early work the team kicked off to fix a glitch in our publishing tool, but it hasn't been packaged up or finished yet.",
+        "why": "Loose, unfinished work that isn't tied to any project tends to get forgotten and can quietly cause problems later if the underlying glitch is still live.",
+        "suggest": "Have the team confirm whether the fix is still needed and either finish it properly or set it aside, rather than leaving it half-done."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-25T14:50:52.249097+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
