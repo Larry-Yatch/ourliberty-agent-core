@@ -156,6 +156,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-25 04:33Z UTC (Iter ~2686, Tier 1, consecutive_clean=0)
+
+**Iter ~2686 summary:** ⚠️ Watch — PR #687 Mirror review in progress (~10min, dispatched 04:25Z). PR #692 AUTO_MERGE_HELD blocker=#687. **KEY EVENTS: 0 new alerts (watermark 1105 holds). Forge idle (rebase complete, task consumed). sequence-paused:operator-needs-you-feed (L1105) still pending Larry action. reconcile-001 FP carry. 4 pending approvals (carry). No dispatches.** PRIME: interventions=1158, systemic_fixes=70, vp=25, ratio≈16.54, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-25 04:28Z UTC (Iter ~2685, Tier 1, consecutive_clean=0)
 
 **Iter ~2685 summary:** ⚠️ Watch — PR #687 rebase COMPLETE (CONFLICTING→MERGEABLE ✅). Mirror actively reviewing #687 via `review-forge-post-open-mergeable-rebase-001.json`. PR #692 AUTO_MERGE_HELD blocker=#687 (cascades when #687 merges). **KEY EVENTS: 0 new alerts (watermark 1105 holds). Forge idle (rebase complete). sequence-paused:operator-needs-you-feed (L1105) still pending Larry action. reconcile-001 FP carry. 4 pending approvals (carry — skip-mirror-review + forge-no-pr-sibling-pr-title-supersession + unreg + rebase artifact). No dispatches.** PRIME: interventions=1157, systemic_fixes=70, vp=25, ratio≈16.53, trend=improving. Tier 1, consecutive_clean=0.
