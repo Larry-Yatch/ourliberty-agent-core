@@ -248,6 +248,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-25 02:47Z UTC (Iter ~2672, Tier 1, consecutive_clean=0)
+
+**Iter ~2672 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase approval pending Larry). **KEY EVENTS: Beacon processed review-duplicate-dispatch-notify-handler-fix-001 at 02:45:01Z (325s, $0.84) → NEW approval `skip-mirror-review-on-merged-or-closed-pr-001` in approvals queue (G-rule fix advancing ✅). Mirror ACTIVE reviewing PR #692 (work/forge-wedge-healer, since 02:38:04Z) — legitimate review after duplicate wip-only queue cleared. PR #696 rev1 waiting.** 3 new alerts (L1092-L1094, all Tier-3 silenced). Watermark 1091→1094. Forge EMPTY. Beacon processed dispatch. 3 pending approvals (+1 new skip-mirror-review). PRIME: interventions=1145, systemic_fixes=69, vp=24, ratio≈16.6, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-25 02:39Z UTC (Iter ~2671, Tier 1, consecutive_clean=0)
 
 **Iter ~2671 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase approval pending Larry; blocking PR #692). **KEY EVENTS: G-rule review-duplicate-dispatch-wip-redispatch 3/3 DISPATCHED ✅ (review-duplicate-dispatch-notify-handler-fix-001 → Beacon). Mirror active on 2nd `forge-wip-only-auto-redispatch-001` review (started 02:25:38Z; PR #693 merged = stale). PR #696 MERGEABLE, rev1 waiting in Mirror queue. PR #692 CLEAN+MERGEABLE, AUTO_MERGE_HELD blocker=#687.** 0 new alerts (watermark=1091). Watchdog: 10 consecutive healthy checks through 20:35 MDT. Pipeline stall dry-run: 2 false positives (reconcile-001 superseded, PR#692 has review task). Forge/Beacon EMPTY. 2 pending approvals (unreg-approval-6009fbf6bfa2, rebase-pr-687). PRIME: interventions=1144, systemic_fixes=69, vp=24, ratio≈16.6, trend=improving. Tier 1, consecutive_clean=0.
