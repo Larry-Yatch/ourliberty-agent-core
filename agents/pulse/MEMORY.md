@@ -156,6 +156,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-25 04:57Z UTC (Iter ~2690, Tier 1, consecutive_clean=1→0)
+
+**Iter ~2690 summary:** ⚠️ Watch — Mirror ACTIVELY REVIEWING PR #687 (PID 2537043, ~25min, no PASS yet). PR #697 NEW/queued (reconcile-001 FP fix). PR #692 AUTO_MERGE_HELD blocker=#687. Beacon timeout on "let me know when 687 merges" (04:54Z, recovered). **KEY EVENTS: 0 new alerts (watermark 1105 holds). Forge idle. Beacon/Forge inboxes empty. Mirror inbox: 3 tasks (687 in-progress, 692 3rd queued, 697 new queued). 3 pending approvals (carry). Iter ~2689 journal entry missing (state from MEMORY.md snapshot). PRIME: interventions=1161, systemic_fixes=70, vp=25, ratio≈16.59, trend=improving.** Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-25 04:50Z UTC (Iter ~2689, Tier 1, consecutive_clean=1)
 
 **Iter ~2689 summary:** ✅ Clean — 0 new alerts (watermark 1105 holds). 8/8 daemons alive. **KEY EVENTS: Mirror ACTIVELY REVIEWING PR #687** (PID 2537043, started 04:32Z, wt-mirror-forge-post-open-mergeable-rebase-001). PR #697 opened 04:43Z (forge-no-pr-sibling-pr-title-supersession-001 — reconcile-001 FP fix). Mirror queue: 3 tasks (#687 reviewing, #692 3rd review, #697 new). PR #692 AUTO_MERGE_HELD blocker=#687 (cascades on #687 merge). Larry directive "let me know when 687 merges" at 04:44Z — covered by auto-merge notification chain. 3 pending approvals (unreg stale; rebase-pr-687 stale; skip-mirror-review awaiting Larry). No dispatches. PRIME: interventions=1160, systemic_fixes=70, vp=25, ratio≈16.57, trend=improving. Tier 1, consecutive_clean=1.
