@@ -5,6 +5,102 @@
 ---
 
 
+## Iteration ~2687 — 2026-06-25T04:38Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry /cycle invocation via chat.
+
+**Health:** ⚠️ Watch — Mirror actively reviewing PR #687 (started 04:32Z). Beacon processing dashboard approval (started 04:35Z). PR #692 AUTO_MERGE_HELD pending #687 merge. G-rule review-duplicate-dispatch: 3rd Mirror review dispatched for PR #692 (04:35Z). reconcile-001 FP carry.
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #687 (feat(forge-build): auto-rebase post-open CONFLICTING PRs):** gh pr list → UNKNOWN/OPEN (GH API recomputing; MERGEABLE per iter ~2686 persists). Mirror ACTIVE — inbox_watcher started `forge-post-open-mergeable-rebase-001` review at 04:32:52Z (worktree wt-mirror-forge-post-open-mergeable-rebase-001). ~6min in. autoMergeRequest=null, reviewDecision="". [status change: dispatched→Mirror actively reviewing ✅]
+- **PR #692 (fix(reaper): forge-wedge-healer):** gh pr list → UNKNOWN/OPEN. Mirror passed TWICE (04:23Z, 04:32Z). AUTO_MERGE_HELD blocker=#687 (outbox-notifier 04:32:53Z). Third review-request dispatched mirror←beacon at 04:35:16Z (G-rule review-duplicate-dispatch pattern, 3/3 vp). [carry ✅]
+- **sequence-paused:operator-needs-you-feed (L1105):** Watermark=1105, file_length=1105 → 0 new alerts. No Larry messages since 04:09Z. Still pending. [carry ✅]
+- **reconcile-001 FP:** heal_pipeline_stall.py dry-run → `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001`. forge-no-pr-sibling-pr-title-supersession-001 approval in pending-approvals (4 items carry). [carry ✅]
+- **Dashboard approval (NEW):** Larry approved something via dashboard at 04:35Z. Beacon processing `larry-approval-6af4e63e95e6838682784d53975effaf694fc345` (PID 2538840, started 04:35:47Z, timeout=600s). Will resolve one of the 4 pending approvals. [new finding]
+- **All daemons:** inbox_watcher (1732118 Ssl), outbox_notifier (2340424 Ss), beacon_telegram_bot (2341187 Ss) — all alive. ✅
+- **Repo:** HEAD=d4fd3206=origin/main. Clean. On main. ✅
+- **Sync:** last_sync=2026-06-25T03:59:53Z (~39min ago). Within 2h. ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark: repaired=false, old=1105, file_length=1105. 0 new alerts. Watermark holds at 1105. ✅ Nominal.
+
+**Check 1 — Log noise:**
+- outbox-notifier.log: Last entry 22:35:16Z MDT — review-request dispatched mirror←beacon for `pr-ourliberty-agent-core-692` (3rd review for PR #692; G-rule pattern). No WARNs/ERRORs beyond known pattern. ✅ Nominal.
+- watchdog.log: Last entry 22:32:28Z MDT, overall=healthy. ✅ Nominal.
+- beacon_telegram_bot.log: Last delivery idx=1104 (sequence-paused, 22:19Z). No new Larry messages since 22:09Z (04:09Z UTC). ✅ Nominal.
+
+**Check 2 — Telegram sweep:**
+- No new Larry messages since 22:09:21 MDT (04:09Z UTC). ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` — FALSE POSITIVE (known). Fix: forge-no-pr-sibling-pr-title-supersession-001 pending Larry. [carry ✅]
+- `suppressed (cooldown): mirror_pass_unmerged:forge-post-open-mergeable-rebase-001` — Mirror actively reviewing PR #687. ✅
+- 1 DRY-RUN (FP carry). Non-clean.
+
+**Check 4 — Pending directives:**
+- Beacon inbox: `larry-approval-6af4e63e95e6838682784d53975effaf694fc345` — dashboard approval ACTIVE (started 04:35:47Z, Beacon processing). ✅
+- Forge inbox: EMPTY. ✅
+- Mirror inbox:
+  - `review-forge-post-open-mergeable-rebase-001.json` (04:25Z) — PR #687 review. Mirror ACTIVE (started 04:32:52Z). ✅
+  - `review-pr-ourliberty-agent-core-692.json` (04:35Z) — 3rd review for PR #692. G-rule review-duplicate-dispatch. ⚠️
+- beacon-pending-approvals: 4 items (carry — expect count to drop when Larry's dashboard approval resolves). One of: unreg-approval-6009fbf6bfa2, rebase-pr-687-post-open-mergeable-001, skip-mirror-review-on-merged-or-closed-pr-001, forge-no-pr-sibling-pr-title-supersession-001.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-06-25T04:33:38Z (~5min ago). Fresh. ✅
+
+**Check A — Source repo:** HEAD=d4fd3206=origin/main. Clean. On main. ✅
+
+**Check B — Sync health:** last_sync=2026-06-25T03:59:53Z (~39min ago). Within 2h. ✅
+
+**Check C — Agent liveness:** inbox_watcher (1732118 Ssl), outbox_notifier (2340424 Ss), beacon_telegram_bot (2341187 Ss) — all alive. Watchdog overall=healthy (last 04:32Z). ✅
+
+**Check E — PRs:**
+- PR #687 (feat(forge-build): auto-rebase post-open CONFLICTING PRs): UNKNOWN (GH API recomputing). Mirror ACTIVE (started 04:32:52Z, ~6min in). autoMergeRequest=null, reviewDecision="". ⚠️ [expect Mirror pass → auto-merge soon]
+- PR #692 (fix(reaper): forge-wedge-healer): UNKNOWN (GH API). Mirror passed twice. AUTO_MERGE_HELD blocker=#687. Third review in Mirror inbox (G-rule). ⚠️ [cascades when #687 merges]
+
+**Check H — Forge digest:** Forge idle. Beacon processing dashboard approval. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op. ✅
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check III: not Sunday. Skip. ✅
+
+**G-rule updates:**
+- **review-duplicate-dispatch-wip-redispatch** — 3/3 vp (carry). THIRD review for PR #692 dispatched 04:35:16Z. Pattern active. Pending skip-mirror-review-on-merged-or-closed-pr-001.
+- **stale-proposed-mission-pipeline-fp-001 vp** — carry. forge-no-pr-sibling-pr-title-supersession-001 pending Larry approval.
+- **heal-daemon-restart-manifest-drift-regenerated-tier4** — 2/3 (no new instance). Still 2/3.
+- **check-i-force-bypass-dm-route** — 1/3 (Thursday, no occurrence). Still 1/3.
+- **no-session-revision-merged-pr-fp-001** — 1/3 (not fired dry-run). Still 1/3.
+- **unrouted-open-pr-auto-merge-held-fp-001** — 1/3 (not firing — Mirror has review tasks queued). Still 1/3.
+
+**Actions taken:** None. 0 auto-fixes. 0 dispatches. 0 new alerts.
+
+**Dispatches:** None this iter.
+
+**Standing findings (updated):**
+- [yellow] **PR #687 (forge/forge-post-open-mergeable-rebase-001)** — Mirror ACTIVE review (started 04:32:52Z). Expect pass → auto-merge → #692 cascades.
+- [yellow] **Beacon processing dashboard approval** — Larry approved a pending proposal via dashboard at 04:35Z. Beacon processing (PID 2538840, started 04:35:47Z). Expect one of 4 pending approvals to resolve + Forge dispatch.
+- [yellow] **sequence-paused:operator-needs-you-feed** — L1105 (04:15Z). gate-mismatch: chain_merged=False, gh_merged=True for `escalation-feed` step. **Recovery: `resume sequence operator-needs-you-feed` via Beacon or Dashboard.**
+- [yellow] **forge-no-pr-sibling-pr-title-supersession-001** — pending Larry approval. Silences reconcile-001 FP.
+- [yellow] **unreg-approval-6009fbf6bfa2** — stale carry.
+- [yellow] **skip-mirror-review-on-merged-or-closed-pr-001** — G-rule review-duplicate-dispatch fix, pending Larry approval.
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [blue] **PR #692** — MERGEABLE (Mirror passed twice). AUTO_MERGE_HELD blocker=#687. Cascades on #687 merge.
+- [blue] **review-duplicate-dispatch-wip-redispatch (G-rule 3/3 vp)** — 3rd review for #692 dispatched. Pending skip-mirror-review-on-merged-or-closed-pr-001.
+
+**PRIME DIRECTIVE:** interventions=1159, systemic_fixes=70, verification_pending=25, ratio≈16.56, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** consecutive_clean=0 (non-clean: PR #687 active Mirror review + dashboard approval in-flight + #692 held + reconcile-001 FP). Tier: 1.
+
+---
+
+
 ## Iteration ~2686 — 2026-06-25T04:33Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry /cycle invocation via chat.

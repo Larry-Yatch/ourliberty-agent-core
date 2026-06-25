@@ -156,6 +156,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-25 04:38Z UTC (Iter ~2687, Tier 1, consecutive_clean=0)
+
+**Iter ~2687 summary:** ⚠️ Watch — Mirror ACTIVE reviewing PR #687 (started 04:32Z). Beacon processing dashboard approval (Larry approved something at 04:35Z, PID 2538840). PR #692 AUTO_MERGE_HELD pending #687 merge (Mirror passed TWICE, 3rd review dispatch). **KEY EVENTS: 0 new alerts (watermark 1105 holds). New: Larry dashboard approval → Beacon processing larry-approval-6af4e63e95e6838682784d53975effaf694fc345. G-rule review-duplicate-dispatch: 3rd review for #692 dispatched 04:35Z. sequence-paused:operator-needs-you-feed (L1105) pending. reconcile-001 FP carry. 4 pending approvals (carry — expect drop after Beacon processes). No dispatches.** PRIME: interventions=1159, systemic_fixes=70, vp=25, ratio≈16.56, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-25 04:33Z UTC (Iter ~2686, Tier 1, consecutive_clean=0)
 
 **Iter ~2686 summary:** ⚠️ Watch — PR #687 Mirror review in progress (~10min, dispatched 04:25Z). PR #692 AUTO_MERGE_HELD blocker=#687. **KEY EVENTS: 0 new alerts (watermark 1105 holds). Forge idle (rebase complete, task consumed). sequence-paused:operator-needs-you-feed (L1105) still pending Larry action. reconcile-001 FP carry. 4 pending approvals (carry). No dispatches.** PRIME: interventions=1158, systemic_fixes=70, vp=25, ratio≈16.54, trend=improving. Tier 1, consecutive_clean=0.
