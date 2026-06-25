@@ -4,6 +4,117 @@
 
 ---
 
+## Iteration ~2653 — 2026-06-25T00:22Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/cycle` invocation via chat.
+
+**Health:** ⚠️ Watch — PR #685 CONFLICTING (medic attempt 3 approval_request filed); PR #687 CONFLICTING (new confirmation this iter), Mirror REVIEW_PASS (session 4, 18:14Z, exit_code=0), AUTO_MERGE_HELD blocker=#685. Mirror session 4 ended cleanly (~18:14 MDT). Watchdog: no new WARNs since session 4 ended — positive signal. 3 new alerts triaged.
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #685 (forge/escalation-feed):** GitHub API: mergeable=UNKNOWN (recomputing). Medic L1066 approval_request (attempt 3) says CONFLICTING, AUTO_MERGE_SKIPPED_CONFLICTING x3. Carry ✅
+- **PR #687 (forge/forge-post-open-mergeable-rebase-001):** GitHub API: mergeable=CONFLICTING (confirmed this iter — changed from UNKNOWN/HELD to confirmed CONFLICTING as new commits landed on main). Mirror REVIEW_PASS (session 4, outbox archive exit_code=0, `forge-post-open-mergeable-rebase-001.2.json`). AUTO_MERGE_HELD blocker=#685 (file overlap: agents/forge/CLAUDE.md, config/daemon-restart-manifest.json, scripts/dispatch_validator.py, scripts/heal_pipeline_stall.py, scripts/outbox_notifier.py). Mirror session 4 PID 2249100: dead/completed. ✅
+- **G-rule ourliberty-health-notify-script-missing:** No WARN in last 10 min (systemd timer fires every ~30 min; cannot confirm resolved yet). `wire-agent-core-health-notify-001` still in Forge inbox. [verification_pending] ✅
+- **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4:** Pipeline stall dry-run: `mirror_pass_unmerged:escalation-feed` on cooldown (no new alert). `alert-translation-mirror-pass-unmerged-001` still in Forge inbox. [verification_pending] ✅
+- **G-rule watchdog-watcher-log-stale-post-fix:** Last WARN was 18:10:20 MDT (00:10Z) — during Mirror session 4 window. No new WARNs after session 4 ended (18:14Z). Positive signal: fix suppression may be working at session end. Fix (watchdog-stale-session-aware-suppression-001) still in Forge preflight, not merged. [verification_pending] ✅
+- **All 8 daemons alive:** CONFIRMED (PIDs 1921593,2029112,1921360,1388801,1388982,1389067,1732118,1742173 all alive per ps). ✅
+- **Repo:** HEAD=517c8f3f=origin/main. Clean tree. ✅
+- **Beacon inbox:** EMPTY. ✅
+- **Forge inbox:** 8 items (unchanged). ✅
+- **beacon-pending-approvals:** 0 pending. ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 1063, "file_length": 1066}`. 3 new alerts (L1064–L1066).
+- L1064 (`source=medic, intent=medic-diagnosis`): Triage helper → **Tier-3**. inbox-stall for heal-stall-dryrun-noop-001 (queue-depth stall, Forge busy). Medic DM'd Larry via chat_id. Journal note only. ✅
+- L1065 (`source=medic, intent=medic-diagnosis`): Triage helper → **Tier-3**. inbox-stall for reconcile-hardening-mission-shipped-002 (same queue-depth stall). Journal note only. ✅
+- L1066 (`source=medic, kind=approval_request`): Triage helper → **Tier-4** (novel — no translation for `source=medic, kind=approval_request`). Medic attempt 3 for PR #685 force-git-op (rebase + merge). Medic already DM'd Larry via chat_id=7998341473. Pulse does NOT send second DM. Journal note only. ✅
+Watermark advanced 1063→1066. ✅
+
+**Check 1 — Log noise (watchdog.log):** Last WARN at 18:10:20 MDT = 00:10Z (stale 1486s) during Mirror session 4. No new WARNs after session 4 ended (18:14Z, outbox-notifier confirmed MIRROR_REVIEW_STATUS posted at 18:14:28). G-rule watchdog-watcher-log-stale-post-fix: carry. ✅ (expected/known)
+
+**Check 2 — Telegram sweep:** Larry's last messages: 17:44:21 MDT "Go" + 17:44:25 MDT "Go" (approvals from prior iters). No new messages since. No orphaned directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → 0 new alerts, 2 suppressed (cooldowns: `forge_built_no_pr:reconcile-hardening-mission-shipped-001`, `mirror_pass_unmerged:escalation-feed`). ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- Forge inbox (8 items): alert-translation-mirror-pass-unmerged-001, build-forge-post-open-mergeable-rebase-001, forge-wip-only-auto-redispatch-001, heal-stall-dryrun-noop-001, one-time-stale-dispatch-branch-cleanup-001, reconcile-hardening-mission-shipped-002, watchdog-stale-session-aware-suppression-001, wire-agent-core-health-notify-001. Unchanged from iter ~2652. ✅
+- Beacon inbox: EMPTY. ✅
+- Mirror inbox: empty (session 4 completed at ~18:14 MDT). ✅
+- beacon-pending-approvals: 0 pending. ✅
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-25T00:10:17Z (~11 min before check). ✅ Nominal.
+
+**Check A — Source repo:** On main. HEAD=517c8f3f=origin/main. Clean tree. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-24T23:38:56Z (~43 min ago). Status=no-change. Within 2h window. ✅ Nominal.
+
+**Check C — Agent liveness:** 8/8 daemons alive (PIDs confirmed). Mirror session 4 PID 2249100 completed/dead. ✅ Nominal.
+
+**Check E — PRs:**
+- agent-core PR #685: OPEN, mergeable=UNKNOWN (GitHub recomputing). Medic attempt 3 approval_request filed. [⚠️ carry — needs manual rebase]
+- agent-core PR #687: OPEN, mergeable=CONFLICTING (confirmed this iter — new commits on main drifted the branch). Mirror REVIEW_PASS confirmed (2x: session 3 at 17:10Z, session 4 at 18:14Z). AUTO_MERGE_HELD blocker=#685. [⚠️ carry — unblocks when #685 merges]
+- dashboard: 0 open. ✅
+
+**Check H — Forge digest:** HEAD=517c8f3f. 8 items Forge inbox (unchanged). Beacon empty. Mirror inbox empty. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. ✅
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- **Check I:** Weekday gate fails (Thursday not a firing day). Skip. ✅
+- **Check III:** Not Sunday → skip. ✅
+
+**G-rule updates:**
+- **G-rule watchdog-watcher-log-stale-post-fix** — 3/3 dispatched (carry). No new WARNs after Mirror session 4 ended (positive signal, but fix not merged yet). [verification_pending]
+- **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 3/3 DISPATCHED (carry). Pipeline stall cooldown suppressed re-trigger. [verification_pending]
+- **G-rule ourliberty-health-notify-script-missing** — 3/3 DISPATCHED (carry). No new instances in 10-min window (timer fires ~30 min). [verification_pending]
+- **G-rule heal-daemon-restart-manifest-drift-regenerated-tier4** — 1/3 (carry; 0 new instances). Dispatch at 3/3.
+- **G-rule check-i-force-bypass-dm-route** — 1/3 (carry; 0 new instances). Dispatch at 3/3.
+- All other carry G-rules: No change.
+
+**New observation:** `source=medic, kind=approval_request` (L1066) returned Tier-4 with no translation. Medic already DM'd Larry directly (chat_id). Pulse notes but doesn't DM. Pattern: medic's privileged-action approval_requests appear on a per-conflict cadence. Not yet a G-rule (1 occurrence this iter; need 3/3 before dispatch). Watch.
+
+**Actions taken:** 3 alerts triaged (L1064-L1065 Tier-3, L1066 Tier-4 journal-note). Watermark advanced 1063→1066. No auto-fix actions. PRIME: 1 intervention logged. Tier state: `record --checks-clean false` → consecutive_clean=0.
+
+**Dispatches:** None this iter.
+
+**Standing findings (carried + verified):**
+- [yellow] **PR #685 (forge/escalation-feed)** — CONFLICTING (medic attempt 3 filed; awaiting Larry manual rebase + merge). [carry]
+- [yellow] **PR #687 (forge/forge-post-open-mergeable-rebase-001)** — CONFLICTING (confirmed this iter). Mirror REVIEW_PASS x2. AUTO_MERGE_HELD blocker=#685. [carry — new: now confirmed CONFLICTING]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [blue] **reconcile-hardening-mission-shipped-001 stall** — medic attempt 4/4 done; -002 in Forge inbox (queue-depth stall). [carry]
+- [blue] **build-forge-post-open-mergeable-rebase-001** — Forge BUILD done, Mirror REVIEW_PASS x2. AUTO_MERGE_HELD until #685 merges. [carry]
+- [blue] **reconcile-hardening-mission-shipped-002** — Forge preflight (queue serialization). [carry]
+- [blue] **forge-wip-only-auto-redispatch-001** — Forge preflight. [carry]
+- [blue] **heal-stall-dryrun-noop-001** — Forge preflight (queue serialization). [carry]
+- [blue] **one-time-stale-dispatch-branch-cleanup-001** — Forge preflight (queue serialization). [carry]
+- [blue] **watchdog-stale-session-aware-suppression-001** — Forge preflight. [verification_pending — fix not merged]
+- [blue] **alert-translation-mirror-pass-unmerged-001** — Forge inbox. [verification_pending]
+- [blue] **wire-agent-core-health-notify-001** — Forge inbox. [verification_pending]
+- [blue] **G-rule ourliberty-health-notify-script-missing** — Forge queue. [verification_pending]
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — Forge queue. [verification_pending]
+- [blue] **G-rule watchdog-watcher-log-stale-post-fix** — Forge preflight. [verification_pending — fix not merged]
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 3/3; PR #685 + PR #687 both CONFLICTING. [carry]
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 3/3; forge-wip-only-auto-redispatch-001 preflight. [carry]
+- [blue] **G-rule heal-pipeline-stall-dry-run-writes-real-alerts** — 3/3; heal-stall-dryrun-noop-001 preflight. [carry]
+- [blue] **G-rule auto-merge-conflict-outbox-notifier-tier4** — 1/3. [carry]
+- [blue] **G-rule heal-daemon-restart-manifest-drift-regenerated-tier4** — 1/3. [carry]
+- [blue] **G-rule check-i-force-bypass-dm-route** — 1/3. [carry]
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. [carry]
+- [blue] **G-rule sequence-step-review-escalate-null-chat** — 1/3. [carry]
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. [carry]
+- [blue] **G-rule heal-daemon-restart-manifest-drift-tier4** — 2/3. [carry — dispatch at 3/3]
+
+**PRIME DIRECTIVE:** 1 intervention logged. Trailing-30d: interventions=1124, systemic_fixes=66, ratio=17.0, trend=improving.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0. Last signal: 2026-06-25T00:21:45Z.
+
+---
+
 ## Iteration ~2652 — 2026-06-25T00:13Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/cycle` invocation via chat.

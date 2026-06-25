@@ -242,6 +242,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-25 00:22Z UTC (Iter ~2653, Tier 1, consecutive_clean=0)
+
+**Iter ~2653 summary:** ⚠️ Watch — PR #685 CONFLICTING (medic attempt 3 approval_request filed, awaiting Larry manual rebase); PR #687 CONFLICTING (new confirmation this iter), Mirror REVIEW_PASS x2 (sessions 3+4), AUTO_MERGE_HELD blocker=#685 file overlap. Mirror session 4 ended cleanly. 3 alerts: L1064-L1065 Tier-3 (medic-diagnosis), L1066 Tier-4 (medic approval_request PR#685 force-git-op, bot DM'd, no Pulse 2nd DM). Watermark 1063→1066. Beacon inbox: empty. Forge inbox: 8 items (unchanged). beacon-pending-approvals: 0. 8 daemons alive. Watchdog: no new WARNs after Mirror session 4 ended (positive signal). Check I: Thursday, skip. PRIME: interventions=1124, systemic_fixes=66, ratio=17.0, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-25 00:13Z UTC (Iter ~2652, Tier 1, consecutive_clean=0)
 
 **Iter ~2652 summary:** ⚠️ Watch — PR #685 CONFLICTING (confirmed this iter, auto-recovery failed); PR #687 UNKNOWN (Mirror session 4 active ~21 min, PID 2249100). 4 alerts triaged: L1060-L1062 Tier-3 (sentinel inbox-stall x2, medic-diagnosis x1); L1063 Tier-4 (mirror-pass-unmerged:PR#685, bot DM'd, no Pulse DM). Watermark 1059→1063. Beacon inbox: empty. Forge inbox: 8 items (unchanged). beacon-pending-approvals: 0 pending. 8 daemons alive. Watchdog: 1 WARN at 00:10Z (stale 1486s, Mirror session 4 active; fix not merged). Check I: weekday=Thursday, skip. PRIME: interventions=1123, systemic_fixes=66, ratio=17.1, trend=improving. Tier 1, consecutive_clean=0.
