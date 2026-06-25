@@ -186,8 +186,8 @@
 
 ---
 
-## Status snapshot — updated 2026-06-25 07:33Z UTC (Iter ~2708, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 07:42Z UTC (Iter ~2709, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2708 summary:** ⚠️ Watch — Outbox-notifier hot loop still active. Mirror (PID 2748617) now reviewing PR #700 (started 01:28 MDT, running tests). PR #698 has `marker-error` retry 1/3 in Mirror inbox (wedge-reaper reaped prior session PID 2716730 for PR #698 duplicate, wrote invalid terminal "All retries exhausted"). New pipeline stall FP: `retry_exhausted:skip-mirror-review-on-merged-or-closed-pr-001` (stall checker doesn't know marker-error retry is in flight — first occurrence, tracking). `rebase-687` FP cooldown expired, re-alerting in dry-run. Both PR #700 and #698 now MERGEABLE (were UNKNOWN). `heal-forge-no-pr-retry-rebase-fp-001` approval pending Larry. PID 1834248 zombie alive. PRIME: interventions=1175, systemic_fixes=71, vp=26, ratio≈16.54, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2709 summary:** ⚠️ Watch — PR #698 (skip-mirror-review-on-merged-or-closed-pr-001) MERGED 07:30:53Z (self-referential — skipped its own Mirror review via the feature it ships). Outbox-notifier hot loop still active; watchdog restarted it (new PID 2754414) after service DOWN at 01:36:20 MDT. Mirror (PID 2754506) reviewing PR #700 (new session, started ~01:36 MDT). 2 stale Mirror inbox files for merged PR #698 need manual cleanup (session perms blocked Pulse archive attempt). Pipeline stall FP rebase-687 re-alerting (cooldown re-expired). `heal-forge-no-pr-retry-rebase-fp-001` approval pending Larry. PID 1834248 zombie alive. PRIME: interventions=1176, systemic_fixes=71, vp=26, ratio≈16.57, trend=improving. Tier 1, consecutive_clean=0.
 
 
