@@ -84,6 +84,12 @@ MAX_TASK_PROBES = 60
 # flags it so the surface can say "+N more".
 WAITING_ITEMS_CAP = 25
 
+# A build-sequence step that has been `dispatched` (handed to Forge) for longer
+# than this with no PR opened is "stuck" enough to surface as a needs-you row
+# (operator-needs-you-feed spec §5.4). Hardcoded v1 per the spec — a Pulse Check
+# sibling can propose tuning later.
+STUCK_DISPATCHED_THRESHOLD_SEC = 15 * 60
+
 # Severity ordering for the waiting list — most urgent first. None sorts last.
 _SEVERITY_RANK = {'critical': 0, 'warning': 1, 'info': 2, None: 3}
 
@@ -277,6 +283,97 @@ def load_active_sequences() -> list[dict[str, Any]]:
     return out
 
 
+def _last_audit_ts(seq: dict[str, Any], event: Optional[str] = None) -> Any:
+    """Timestamp of the last audit_log entry (optionally filtered to `event`).
+    Returns None when none match — the age then degrades to 0 downstream."""
+    last = None
+    for entry in seq.get('audit_log') or []:
+        if not isinstance(entry, dict):
+            continue
+        if event is not None and entry.get('event') != event:
+            continue
+        ts = entry.get('ts')
+        if ts:
+            last = ts
+    return last
+
+
+def load_waiting_sequences(now: datetime) -> list[dict[str, Any]]:
+    """Build-sequence rows that need Larry, as waiting-items (operator-needs-you-
+    feed spec §5.3 + §5.4). Two producers, both `source='sequence'`:
+
+      1. Each `paused` sequence → one item with Resume / Cancel actions.
+      2. Each `dispatched` step with no PR whose `dispatched_at` is older than
+         STUCK_DISPATCHED_THRESHOLD_SEC → one item with Skip / Cancel actions.
+
+    Read-only on the build-sequences dir; fail-safe to []. Each item carries the
+    `seq_id` (and `step_id` for step rows) the steering endpoint needs, an
+    `actions` allowlist the render uses for buttons, and a private `_ts` that
+    build_snapshot turns into `age_seconds`. `now` is injected (not read inline)
+    so the >15-min threshold and the displayed age share one clock."""
+    import json  # local import; sequence read is a cold path
+    d = build_sequences_dir()
+    out: list[dict[str, Any]] = []
+    try:
+        if not d.is_dir():
+            return []
+        for p in sorted(d.glob('*.json')):
+            try:
+                seq = json.loads(p.read_text())
+            except (OSError, ValueError):
+                continue
+            if not isinstance(seq, dict):
+                continue
+            seq_id = seq.get('seq_id') or p.stem
+            status = seq.get('status')
+
+            if status == 'paused':
+                out.append({
+                    'source': 'sequence',
+                    'id': seq_id,
+                    'seq_id': seq_id,
+                    'step_id': None,
+                    'title': seq_id,
+                    'why': 'Paused — waiting on you to resume or cancel',
+                    'severity': 'warning',
+                    'action_hint': 'resume/cancel in Build Sequences',
+                    'actions': ['resume', 'cancel'],
+                    '_ts': _last_audit_ts(seq, 'paused') or _last_audit_ts(seq),
+                })
+
+            # Stuck-dispatched steps surface regardless of sequence status: a
+            # step left `dispatched` with no PR is the signal, whether the
+            # sequence is active or (e.g.) auto-paused around it.
+            steps = seq.get('steps') if isinstance(seq.get('steps'), list) else []
+            for step in steps:
+                if not isinstance(step, dict):
+                    continue
+                if step.get('status') != 'dispatched' or step.get('pr_url'):
+                    continue
+                age = _age_seconds(step.get('dispatched_at'), now)
+                if age <= STUCK_DISPATCHED_THRESHOLD_SEC:
+                    continue
+                step_id = step.get('step_id') or '?'
+                mins = age // 60
+                out.append({
+                    'source': 'sequence',
+                    'id': f'{seq_id}/{step_id}',
+                    'seq_id': seq_id,
+                    'step_id': step_id,
+                    'title': f'{seq_id} / {step_id}',
+                    'why': (f'Step dispatched {mins}m ago with no PR — '
+                            f'may be stuck'),
+                    'severity': 'warning',
+                    'action_hint': 'skip/cancel in Build Sequences',
+                    'actions': ['skip', 'cancel'],
+                    '_ts': step.get('dispatched_at'),
+                })
+    except OSError as e:
+        log(f'state-log: waiting-sequences read failed: {type(e).__name__}: {e}')
+        return []
+    return out
+
+
 def load_parked_items() -> list[dict[str, Any]]:
     """Parked captures awaiting Larry, as waiting-items (the itemized form of
     load_parked_count — same read). Read-only on captures.json; fail-safe to [].
@@ -431,13 +528,14 @@ def load_for_larry_escalations() -> list[dict[str, Any]]:
 def _finalize_waiting_items(
     escalations: list[dict[str, Any]],
     pending: list[dict[str, Any]],
+    sequences: list[dict[str, Any]],
     parked: list[dict[str, Any]],
     now: datetime,
 ) -> tuple[list[dict[str, Any]], bool]:
     """Turn each source's raw waiting-items into the bounded, ordered cross-source
     list (spec § 2 D2): compute `age_seconds` from the private `_ts`, order
-    most-urgent first (escalations → pending approvals → aged parked), and cap at
-    WAITING_ITEMS_CAP. Returns (items, truncated)."""
+    most-urgent first (escalations → pending approvals → sequences → aged
+    parked), and cap at WAITING_ITEMS_CAP. Returns (items, truncated)."""
     def aged(raw: list[dict[str, Any]]) -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []
         for it in raw:
@@ -448,13 +546,15 @@ def _finalize_waiting_items(
 
     esc = aged(escalations)
     pend = aged(pending)
+    seqs = aged(sequences)
     park = aged(parked)
-    # Within escalations: severity first, then oldest. Pending + parked: oldest.
+    # Within escalations: severity first, then oldest. Others: oldest first.
     esc.sort(key=lambda i: (_SEVERITY_RANK.get(i.get('severity'), 3),
                             -i.get('age_seconds', 0)))
     pend.sort(key=lambda i: -i.get('age_seconds', 0))
+    seqs.sort(key=lambda i: -i.get('age_seconds', 0))
     park.sort(key=lambda i: -i.get('age_seconds', 0))
-    ordered = esc + pend + park
+    ordered = esc + pend + seqs + park
     truncated = len(ordered) > WAITING_ITEMS_CAP
     return ordered[:WAITING_ITEMS_CAP], truncated
 
@@ -544,6 +644,7 @@ def build_snapshot(
     parked_items: Optional[list[dict[str, Any]]] = None,
     pending_approvals: Optional[list[dict[str, Any]]] = None,
     escalations: Optional[list[dict[str, Any]]] = None,
+    waiting_sequences: Optional[list[dict[str, Any]]] = None,
 ) -> dict[str, Any]:
     """Build the structured_snapshot (spec § 3) from already-loaded inputs. Pure:
     no IO beyond the injected `pipeline_probe` (which the live path backs with the
@@ -552,6 +653,7 @@ def build_snapshot(
     parked_items = parked_items or []
     pending_approvals = pending_approvals or []
     escalations = escalations or []
+    waiting_sequences = waiting_sequences or []
     in_flight_set = set(in_flight)
 
     # Gather every task id across all active missions, probe once in bulk.
@@ -611,6 +713,7 @@ def build_snapshot(
             parked_items=parked_items,
             pending_approvals=pending_approvals,
             escalations=escalations,
+            sequences=waiting_sequences,
             now=now,
         ),
         'health': None,  # reserved — NOT this slice (Slice C).
@@ -623,6 +726,7 @@ def _build_waiting_on_larry(
     parked_items: list[dict[str, Any]],
     pending_approvals: list[dict[str, Any]],
     escalations: list[dict[str, Any]],
+    sequences: list[dict[str, Any]],
     now: datetime,
 ) -> dict[str, Any]:
     """Assemble the itemized cross-source `waiting_on_larry` block (Slice 2a, spec
@@ -630,12 +734,14 @@ def _build_waiting_on_larry(
     `parked` is KEPT as a top-level count for back-compat with the current
     /where-we-are panel (which reads `waiting_on_larry.parked`)."""
     items, truncated = _finalize_waiting_items(
-        escalations, pending_approvals, parked_items, now)
+        escalations, pending_approvals, sequences, parked_items, now)
     return {
         'parked': parked,                          # KEEP — /where-we-are reads this
         'pending_approvals': len(pending_approvals),
         'escalations': len(escalations),
-        'total': parked + len(pending_approvals) + len(escalations),
+        'sequences': len(sequences),
+        'total': (parked + len(pending_approvals) + len(escalations)
+                  + len(sequences)),
         'items': items,
         'truncated': truncated,
     }
@@ -657,6 +763,7 @@ def render_fallback_narrative(snapshot: dict[str, Any]) -> str:
     parked = waiting.get('parked') or 0
     pending_approvals = waiting.get('pending_approvals') or 0
     escalations = waiting.get('escalations') or 0
+    waiting_sequences = waiting.get('sequences') or 0
     waiting_total = waiting.get('total') or 0
 
     if missions:
@@ -692,7 +799,7 @@ def render_fallback_narrative(snapshot: dict[str, Any]) -> str:
         lines.append(
             f'Waiting on you: {waiting_total} item(s) — '
             f'{pending_approvals} approval(s), {escalations} escalation(s), '
-            f'{parked} parked.')
+            f'{waiting_sequences} sequence(s), {parked} parked.')
     else:
         lines.append('Waiting on you: nothing parked.')
 
@@ -753,9 +860,12 @@ def author_narrative(
 # ---------------- the write entry point (called by the GC tick) ----------------
 
 
-def load_inputs() -> dict[str, Any]:
+def load_inputs(now: Optional[datetime] = None) -> dict[str, Any]:
     """Load every snapshot input from the droplet filesystem, each section
-    fail-safe to empty. Read-only on every source."""
+    fail-safe to empty. Read-only on every source. `now` is threaded into the
+    waiting-sequences reader so its >15-min stuck-step threshold shares the
+    snapshot's clock; it defaults to the current UTC time for ad-hoc callers."""
+    now = now or datetime.now(timezone.utc)
     parked_items = load_parked_items()
     return {
         'missions': load_active_missions(),
@@ -765,6 +875,7 @@ def load_inputs() -> dict[str, Any]:
         'parked_items': parked_items,
         'pending_approvals': load_pending_approvals(),
         'escalations': load_for_larry_escalations(),
+        'waiting_sequences': load_waiting_sequences(now),
     }
 
 
@@ -787,7 +898,7 @@ def write_state_log(
     now = now or datetime.now(timezone.utc)
     probe = pipeline_probe or _default_pipeline_probe
 
-    inputs = load_inputs()
+    inputs = load_inputs(now)
     snapshot = build_snapshot(
         missions=inputs['missions'],
         in_flight=inputs['in_flight'],
@@ -798,6 +909,7 @@ def write_state_log(
         parked_items=inputs.get('parked_items'),
         pending_approvals=inputs.get('pending_approvals'),
         escalations=inputs.get('escalations'),
+        waiting_sequences=inputs.get('waiting_sequences'),
     )
     prose, fallback = author_narrative(snapshot, use_llm=use_llm, voice_fn=voice_fn)
 

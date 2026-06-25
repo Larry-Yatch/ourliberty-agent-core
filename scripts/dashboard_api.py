@@ -335,6 +335,15 @@ LARRY_ACTION_VALID_ACTIONS: frozenset[str] = frozenset({
     'approve', 'reject', 'comment', 'mark_done',
 })
 
+# Steering verbs for POST /api/system/build-sequences/{seq_id}/action
+# (operator-needs-you-feed spec §5.5). Each delegates to the matching
+# sequence_shortcut_helpers.apply_* helper. `skip` and `retry` operate on a
+# step (step_id required); `resume` and `cancel` operate on the whole sequence.
+BUILD_SEQUENCE_ACTION_VALID_ACTIONS: frozenset[str] = frozenset({
+    'resume', 'skip', 'cancel', 'retry',
+})
+BUILD_SEQUENCE_STEP_ACTIONS: frozenset[str] = frozenset({'skip', 'retry'})
+
 # Account-tier rotation Auto/Off switch (dashboard-rotation-switch-001).
 # The live control is a runtime override file — touching ~/agents/
 # rotation.disabled forces the scheduler off on its next ~2-min tick,
@@ -1187,6 +1196,29 @@ class RotationModeUpdateResponse(BaseModel):
     config_enabled: bool
     action_event_id: str
     as_of: str
+
+
+class BuildSequenceActionRequest(BaseModel):
+    # Steering verb: resume | skip | cancel | retry. Validated against
+    # BUILD_SEQUENCE_ACTION_VALID_ACTIONS in the handler (400 on unknown).
+    action: str
+    # Required for step-scoped verbs (skip / retry); ignored for
+    # resume / cancel which operate on the whole sequence.
+    step_id: Optional[str] = None
+    # Optional operator note, forwarded to the helper (cancel / skip) and
+    # recorded in the audit payload.
+    reason: Optional[str] = None
+
+
+class BuildSequenceActionResponse(BaseModel):
+    applied: bool
+    action: str
+    seq_id: str
+    step_id: Optional[str]
+    detail: str
+    action_event_id: Optional[str]
+    audit_persisted: bool
+    audit_error: Optional[str] = None
 
 
 class CleanupReviewKeptItem(BaseModel):
@@ -8731,6 +8763,136 @@ def _handle_autonomy_posture_post(
     return trust_policy.summarize_policy(trust_policy.load_policy())
 
 
+def _handle_build_sequence_action(
+    *,
+    seq_id: str,
+    action: str,
+    step_id: Optional[str],
+    reason: Optional[str],
+    actor: str,
+    supabase_client: Any,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Pure handler for POST /api/system/build-sequences/{seq_id}/action
+    (operator-needs-you-feed spec § 5.5).
+
+    Validates the steering verb against the allowlist (unknown → 400),
+    requires step_id for the step-scoped verbs (skip / retry → 400 when
+    missing), 404s when the sequence file is absent, then delegates to the
+    matching sequence_shortcut_helpers.apply_* helper and writes a
+    larry_action audit row keyed on (seq_id, action, ts). Raises
+    HTTPException for 4xx; a helper hard error maps to 404 (not-found) /
+    500. The audit write is best-effort — the helper mutation IS the action
+    and is already on disk by the time we record it, so a failed audit write
+    returns success with audit_persisted=False + audit_error rather than a
+    500 (mirrors _handle_larry_action's audit-gap contract).
+    """
+    if action not in BUILD_SEQUENCE_ACTION_VALID_ACTIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f'invalid action={action!r}',
+        )
+    if action in BUILD_SEQUENCE_STEP_ACTIONS and not step_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f'step_id required for action={action!r}',
+        )
+
+    import sequence_shortcut_helpers as ssh  # noqa: PLC0415 — scripts/ on sys.path
+
+    # 404 pre-check via the helper's own path resolution so the existence
+    # gate stays single-sourced with the apply_* helpers (and test-isolatable
+    # by monkeypatching ssh.AGENTS_ROOT).
+    seq_path = ssh.AGENTS_ROOT / 'blackboard' / 'build-sequences' / f'{seq_id}.json'
+    if not seq_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f'sequence {seq_id!r} not found',
+        )
+
+    now = now or datetime.now(timezone.utc)
+    ts_iso = now.isoformat()
+
+    if action == 'resume':
+        result = ssh.apply_resume(seq_id, actor=actor)
+    elif action == 'cancel':
+        result = ssh.apply_cancel(seq_id, actor=actor, reason=reason)
+    elif action == 'skip':
+        result = ssh.apply_skip(seq_id, step_id, actor=actor, reason=reason)
+    else:  # retry
+        result = ssh.apply_retry(seq_id, step_id, actor=actor)
+
+    # A hard helper error (read/parse/validate/write fail, or step not found)
+    # surfaces as 404 when it's a not-found and 500 otherwise. Validation 400s
+    # already fired above, before the mutation.
+    if result.error:
+        lowered = result.reason.lower()
+        code = (
+            status.HTTP_404_NOT_FOUND
+            if 'not found' in lowered
+            else status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+        raise HTTPException(status_code=code, detail=result.reason)
+
+    # Audit row — same writer contract as _handle_rotation_mode_post (top-level
+    # `actor` column, dedup on event_id). Keyed on (seq_id, action, ts) so two
+    # distinct verbs on the same sequence in the same microsecond produce
+    # distinct ids instead of one silently dropping via ignore_duplicates.
+    # Best-effort: the apply_* mutation already landed on disk, so a failed
+    # audit write must not 500 (which would invite a re-apply on retry).
+    audit_persisted = True
+    audit_error: Optional[str] = None
+    action_event_id: Optional[str] = None
+    try:
+        compute_event_id, sanitize_payload = _import_chain_event_helpers()
+        action_payload = {
+            'control': 'build_sequence_action',
+            'seq_id': seq_id,
+            'action': action,
+            'step_id': step_id,
+            'reason': reason,
+            'applied': result.applied,
+            'detail': result.reason,
+            'sequence_path': str(result.sequence_path),
+        }
+        action_event_id = compute_event_id(
+            seq_id, 'larry_action', ts_iso, extra=action,
+        )
+        row: dict[str, Any] = {
+            'event_id': action_event_id,
+            'ts': ts_iso,
+            'agent': 'dashboard',
+            'event_type': 'larry_action',
+            'actor': actor,
+            'task_id': seq_id,
+            'payload': sanitize_payload(action_payload),
+        }
+        supabase_client.table('chain_events').upsert(
+            [row], on_conflict='event_id', ignore_duplicates=True,
+        ).execute()
+    except Exception as exc:  # noqa: BLE001 — best-effort audit; mutation landed
+        audit_persisted = False
+        audit_error = str(exc)
+        action_event_id = None
+        logger.exception(
+            'build_sequence_action AUDIT GAP: %s on sequence %s (step=%s, '
+            'actor=%s) applied on disk but audit-row write failed; this '
+            'action has no audit row.',
+            action, seq_id, step_id, actor,
+        )
+
+    return {
+        'applied': result.applied,
+        'action': action,
+        'seq_id': seq_id,
+        'step_id': step_id,
+        'detail': result.reason,
+        'action_event_id': action_event_id,
+        'audit_persisted': audit_persisted,
+        'audit_error': audit_error,
+    }
+
+
 # ---- /api/larry/cleanup-review engine (approvals-queue-rework N1 / L8) ----
 #
 # The "clean up" button. Given the current pending decision set, run the
@@ -9900,6 +10062,37 @@ def post_system_autonomy_posture(
         )
     return _handle_autonomy_posture_post(
         level=body.level,
+        actor=actor,
+        supabase_client=client,
+    )
+
+
+# POST /api/system/build-sequences/{seq_id}/action — the build-sequence STEERING
+# write (operator-needs-you-feed § 5.5), companion to the read-only
+# GET /api/system/build-sequences. Token + actor gated like /api/system/rotation;
+# delegates the chosen verb (resume|skip|cancel|retry) to the matching
+# sequence_shortcut_helpers.apply_* helper and writes an audited larry_action row.
+@app.post(
+    '/api/system/build-sequences/{seq_id}/action',
+    response_model=BuildSequenceActionResponse,
+    dependencies=[Depends(_require_token)],
+)
+def post_system_build_sequence_action(
+    seq_id: str,
+    body: BuildSequenceActionRequest,
+    actor: str = Depends(_require_actor),
+) -> dict[str, Any]:
+    client = _get_larry_action_supabase_client()
+    if client is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail='supabase unavailable',
+        )
+    return _handle_build_sequence_action(
+        seq_id=seq_id,
+        action=body.action,
+        step_id=body.step_id,
+        reason=body.reason,
         actor=actor,
         supabase_client=client,
     )
