@@ -373,9 +373,13 @@ def main() -> int:
                 + '\n\n'.join(sections)
                 + '\n\nFull state in /home/larry/agents/blackboard/agent-core-health.log'
             )
-            alerted = alert_larry(f'{len(persisted)} issue(s) need attention', message)
-            log(f'Alerted Larry: {len(persisted)} issue(s) persisted across 2 runs',
-                quiet=quiet)
+            if args.dry_run:
+                log(f'Would alert Larry: {len(persisted)} issue(s) persisted across '
+                    f'2 runs (dry-run — no DM sent)', quiet=quiet)
+            else:
+                alerted = alert_larry(f'{len(persisted)} issue(s) need attention', message)
+                log(f'Alerted Larry: {len(persisted)} issue(s) persisted across 2 runs',
+                    quiet=quiet)
         else:
             log('Issue(s) present but none persisted across 2 consecutive runs — '
                 'suppressing alert (actionable-only guard; transient mid-cycle window)',
