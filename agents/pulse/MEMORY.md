@@ -180,9 +180,9 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## G-rule forge-built-no-pr-retry1-fp-001 → PARTIAL VERIFICATION (iter ~2763)
+## G-rule forge-built-no-pr-retry1-fp-001 → VERIFICATION PENDING (iter ~2771)
 
-**Rule:** `forge_built_no_pr` stall fires even when a PR exists. Two patterns confirmed: (1) `reconcile-hardening-mission-shipped-001` fires even though PR #699 (retry1) is OPEN; (2) `rebase-forge-post-open-mergeable-687-001` fires even though PR #687 is MERGED (branch deleted). PR #701 merged at 14:13:35Z 2026-06-25. **Pattern 1 RESOLVED** ✅ — reconcile FP no longer fires (Pattern A `retry_pr_exists` suppression works). **Pattern 2 STILL FIRING** — `rebase-forge-post-open-mergeable-687-001` original fires; Pattern B (`_forge_rebase_target_shipped`) suppresses retry1 but NOT original task. verification_pending continues; secondary dispatch to Beacon needed for Pattern 2 fix.
+**Rule:** `forge_built_no_pr` stall fires even when a PR exists. Two patterns confirmed: (1) `reconcile-hardening-mission-shipped-001` fires even though PR #699 (retry1) is OPEN; (2) `rebase-forge-post-open-mergeable-687-001` fires even though PR #687 is MERGED (branch deleted). PR #701 merged at 14:13:35Z 2026-06-25. **Pattern 1 RESOLVED** ✅ — reconcile FP no longer fires. **Pattern 2: PR #702 in Mirror review** ("fix(heal): disambiguate rebase_target_shipped when result names multiple merged PRs"). verification_anchor: stall FP must go dark after PR #702 merges.
 
 ---
 
@@ -192,8 +192,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-25 15:03Z UTC (Iter ~2770, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 15:08Z UTC (Iter ~2771, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2770 summary:** ✅ Nominal — 0 new alerts. 8/8 daemons alive. 0 open PRs. **Larry approved `forge-no-pr-rebase-original-fp-fix-001` at 09:01:41 MDT (15:01:41Z)** — fix for rebase-687 stall FP dispatched to Forge inbox. beacon-pending-approvals: pending=0. Stall FP still fires (expected, fix not yet built). Watchdog healthy (09:01:19 MDT). PID 1834248 zombie (~27.83d, ask-then-do). 6 stale journalctl PIDs (~30d, ask-then-do). PRIME: interventions=1221, systemic_fixes=71, vp=26, ratio≈17.20, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2771 summary:** ✅ Nominal — 1 new alert (L983 dispatch-branch-cleanup Tier-3 silenced). 8/8 daemons alive. **PR #702 open in Mirror review** (rebase-687 stall FP fix). Forge built it at 09:06:05 MDT following Larry "Go" at 09:01:41 MDT. Watchdog healthy (09:06:19 MDT). PID 1834248 zombie (~27.82d, ask-then-do). 6 stale journalctl PIDs (~30d, ask-then-do). PRIME: interventions=1221, systemic_fixes=71, vp=26, ratio≈17.20, trend=improving. Tier 1, consecutive_clean=0.
 
 

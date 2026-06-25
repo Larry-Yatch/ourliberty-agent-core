@@ -5,6 +5,95 @@
 ---
 
 
+## Iteration ~2771 — 2026-06-25T15:08Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/cycle` invocation via chat.
+
+**Health:** ✅ Nominal — 1 new alert (L983, dispatch-branch-cleanup Tier-3 silenced). 8/8 daemons alive. 1 open PR (PR #702, Mirror review in progress). Stall FP fix advancing through pipeline. Carries only.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo**: HEAD=0f6d5131=origin/main (wrapper auto-committed iter ~2770). Clean. On main. ✅
+- **Pipeline stall FP rebase-687-001**: Re-verified — `DRY-RUN would alert: forge_built_no_pr:rebase-forge-post-open-mergeable-687-001`. Still fires (1 alert). **Fix advanced: PR #702 open (MERGEABLE), Mirror review task `review-forge-no-pr-rebase-original-fp-fix-001.json` active in Mirror's inbox.** [carry, fix in mirror review]
+- **beacon-pending-approvals**: pending=0 ✅ (Larry's approval consumed at 09:01:41 MDT, Forge built PR #702 at 09:06:05 MDT).
+- **Sync**: last_sync=2026-06-25T15:00:24Z (~8 min ago). Within 2h. ✅
+- **Daemons (re-verified)**: forge_bot=1388801 (Ss, 170539s ~47.4h) ✅, mirror_bot=1388982 (Ss, 170531s ~47.4h) ✅, pulse_bot=1389067 (Ss, 170527s ~47.4h) ✅, beacon_telegram_bot=2715635 (Ss, 29487s ~8.19h) ✅, dashboard_api=2715859 (Ssl, 29479s ~8.19h) ✅, chain_event_shipper=2716672 (SNs, 29405s ~8.17h) ✅, inbox_watcher=2754413 (Ssl, 26999s ~7.50h) ✅, outbox_notifier=2773485 (Ss, 25279s ~7.02h) ✅. 8/8 alive. ✅
+- **Watchdog**: last entry 09:06:19 MDT (15:06:19Z, ~2 min ago) — overall=healthy. ✅
+- **Zombie PID 1834248**: still alive (Ss, bash, etimes=2404138s ~27.82d). Ask-then-do. [carry]
+- **6 stale journalctl PIDs**: all alive (~30d). Ask-then-do. [carry]
+- **Stale daemon code heartbeat**: 2026-06-25T15:00:59Z (~8 min ago). Fresh. ✅
+- **Agent inboxes**: beacon=EMPTY ✅, forge=EMPTY ✅, mirror=`review-forge-no-pr-rebase-original-fp-fix-001.json` (active review task, PR #702, expected) ✅, pulse=EMPTY ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark: repaired=false, old=982, file_length=983. **1 new alert** (L983).
+- L983: `source=dispatch-branch-cleanup, route=digest, subject=summary` → triage-alert → Tier-3 silence (known-pattern match in alert-translations.json). No DM. Watermark advanced 982 → 983. ✅
+
+**Check 1 — Log noise:**
+- `journalctl --user -p warning --since "30 minutes ago"` → `-- No entries --`. ✅
+- outbox-notifier.log: Last entries show normal pipeline progression — 09:02:43 MDT Forge built PR #702; 09:06:05 MDT Mirror review dispatched. No anomalous WARNs. ✅
+- watchdog.log: last entry 09:06:19 MDT (15:06:19Z, ~2 min ago) — overall=healthy. ✅
+
+**Check 2 — Telegram sweep:**
+- Beacon bot PID 2715635 (Ss) ✅. Last action: 09:01:41 MDT — Larry sent "Go" → approved `forge-no-pr-rebase-original-fp-fix-001` → Forge built PR #702 → Mirror review dispatched at 09:06:05 MDT. No new messages from Larry since. ✅
+
+**Check 3 — Pipeline stall (dry-run):**
+- `rebase-forge-post-open-mergeable-687-001`: **DRY-RUN would alert** (1 alert). Fix in Mirror review (PR #702). [carry, fix in mirror review]
+- 1 alert(s) would fire, 0 recovery(ies) attempted.
+
+**Check 4 — Pending directives:**
+- Beacon inbox: EMPTY ✅
+- Forge inbox: EMPTY ✅
+- Mirror inbox: `review-forge-no-pr-rebase-original-fp-fix-001.json` (active review task, PR #702) [expected, in flight]
+- Pulse inbox: EMPTY ✅
+- beacon-pending-approvals: pending=0 ✅
+
+**Check 4.6 — Credential rotation:** No new rotation events. [carry OK] ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-06-25T15:00:59Z (~8 min ago). Fresh. ✅
+
+**Check A — Source repo:** HEAD=0f6d5131=origin/main. Clean. On main. ✅
+**Check B — Sync health:** last_sync=2026-06-25T15:00:24Z (~8 min ago). Within 2h. ✅
+**Check C — Agent liveness:** 8/8 alive.
+- **[yellow] PID 1834248** — zombie bash wait-loop (~27.82d). Ask-then-do: `kill 1834248`. [carry]
+- **[yellow] 6 stale journalctl PIDs (~30d)** — PIDs 1101500, 1107838, 1118830, 1136223, 1161972, 1177335. Ask-then-do. [carry]
+
+**Check E — PRs:** PR #702 open, MERGEABLE, reviewDecision="" (Mirror review in progress). Expected — fix in flight. ✅
+
+**Check H — Forge digest:** Mirror inbox has active review task for PR #702. Forge inbox empty. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check VIII/IX/X: Not Monday. Skip. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule updates:**
+- `forge-built-no-pr-retry1-fp-001` (Pattern 2) — PR #702 now in Mirror review ("fix(heal): disambiguate rebase_target_shipped when result names multiple merged PRs"). G-rule transitions: vp-fix-in-flight → verification_pending (watch for PR #702 merge + stall FP going dark). verification_anchor: `heal_pipeline_stall.py` no longer alerts `rebase-forge-post-open-mergeable-687-001` after merge.
+
+**Actions taken:**
+- Watermark: advanced 982 → 983 (1 dispatch-branch-cleanup Tier-3 silenced).
+- PRIME ledger: 1 iter_clean row appended (Tier 1).
+- Tier state: recorded non-clean (stall FP in flight, zombie PID, 6 stale journalctl PIDs → consecutive_clean=0).
+- No auto-fixes. No new dispatches.
+
+**Standing findings (carried + verified):**
+- [yellow] **rebase-forge-post-open-mergeable-687-001 stall FP** — 1 DRY-RUN alert still fires. Fix in Mirror review: PR #702. [carry, fix in mirror review]
+- [yellow] **PID 1834248 zombie bash loop** — Still alive (~27.82d). Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **6 stale journalctl PIDs (~30d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+- [yellow] **sequence-paused:operator-needs-you-feed** — Recovery: `resume sequence operator-needs-you-feed` via Beacon or Dashboard. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**PRIME DIRECTIVE:** interventions=1221, systemic_fixes=71, verification_pending=26, ratio≈17.20, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** consecutive_clean=0 (non-clean: 1 stall FP in flight, zombie PID, 6 stale journalctl PIDs). Tier: 1.
+
+---
+
+
 ## Iteration ~2770 — 2026-06-25T15:03Z UTC (interactive /loop /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/loop /cycle` invocation via chat.
