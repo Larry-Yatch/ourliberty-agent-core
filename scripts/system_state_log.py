@@ -357,33 +357,66 @@ def load_pending_approvals() -> list[dict[str, Any]]:
     return items
 
 
+def _escalation_to_waiting_item(e: dict[str, Any]) -> dict[str, Any]:
+    """Normalize one for-Larry escalation record into a waiting-item."""
+    return {
+        'source': 'escalation',
+        'id': str(e.get('id') or e.get('headline') or ''),
+        'title': str(e.get('headline') or e.get('id') or 'escalation'),
+        'why': str(e.get('context') or e.get('suggested_action') or ''),
+        'severity': _normalize_severity(e.get('severity')),
+        'action_hint': 'review escalation',
+        '_ts': e.get('ts') or e.get('created_at'),
+    }
+
+
 def load_for_larry_escalations() -> list[dict[str, Any]]:
     """For-Larry escalations awaiting Larry, as waiting-items — CONSERVATIVE:
     only entries EXPLICITLY flagged for Larry (`for_larry: true`) and not yet
     resolved. Read-only; fail-open to [].
 
-    Note (spec § 2): the ops-internal pulse-escalations.json carries no
-    for-Larry flag today, so this contributes NONE in production right now — by
-    design, we include none rather than guess "needs you" from ops noise. The
-    reader is wired so the day a canonical for-Larry signal exists (an entry
-    flagged `for_larry`, or the chain_events escalation form folded into this
-    file), it appears in the list with no schema change."""
+    Two sources fold in here (operator-needs-you-feed spec §5.1, decision c):
+
+      1. The canonical durable for-Larry signal file
+         (`for_larry_signal.active_entries`) — the substrate the promote_alerts
+         gate (critical-unhandled) and the outbox_notifier CLARIFY-exhausted
+         handler write to. This is the live producer of "needs you" rows.
+      2. The ops-internal pulse-escalations.json — carries no for-Larry flag in
+         production today (so it contributes NONE), but kept so a future
+         for-Larry-flagged entry there appears with no schema change.
+
+    Both sources share `_escalation_to_waiting_item`; both apply the same
+    conservative `for_larry: true` + not-`resolved` filter."""
     import json  # local import; escalations read is a cold path
+
+    items: list[dict[str, Any]] = []
+
+    # Source 1: the canonical durable for-Larry signal (already filtered to
+    # unresolved, for_larry records). Fail-open — a read error degrades to none.
+    try:
+        import for_larry_signal  # local import keeps the cold path cheap
+        for e in for_larry_signal.active_entries():
+            if isinstance(e, dict):
+                items.append(_escalation_to_waiting_item(e))
+    except Exception as exc:  # noqa: BLE001 — never abort the State Log tick
+        log(f'state-log: for-larry signal read failed: '
+            f'{type(exc).__name__}: {exc}')
+
+    # Source 2: the legacy pulse-escalations.json for-Larry path (back-compat).
     path = escalations_path()
     try:
         if not path.is_file():
-            return []
+            return items
         data = json.loads(path.read_text())
     except (OSError, ValueError) as e:
         log(f'state-log: escalations read failed: {type(e).__name__}: {e}')
-        return []
+        return items
     if isinstance(data, list):
         entries = data
     elif isinstance(data, dict) and isinstance(data.get('escalations'), list):
         entries = data['escalations']
     else:
-        return []
-    items: list[dict[str, Any]] = []
+        return items
     for e in entries:
         if not isinstance(e, dict):
             continue
@@ -391,15 +424,7 @@ def load_for_larry_escalations() -> list[dict[str, Any]]:
             continue
         if e.get('resolved') is True:
             continue
-        items.append({
-            'source': 'escalation',
-            'id': str(e.get('id') or e.get('headline') or ''),
-            'title': str(e.get('headline') or e.get('id') or 'escalation'),
-            'why': str(e.get('context') or e.get('suggested_action') or ''),
-            'severity': _normalize_severity(e.get('severity')),
-            'action_hint': 'review escalation',
-            '_ts': e.get('ts') or e.get('created_at'),
-        })
+        items.append(_escalation_to_waiting_item(e))
     return items
 
 

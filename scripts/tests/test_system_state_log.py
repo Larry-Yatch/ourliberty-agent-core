@@ -511,6 +511,46 @@ class WaitingSourceReadersTest(unittest.TestCase):
         self.assertEqual(pending, [])
         self.assertEqual(len(escalations), 1)
 
+    def test_signal_file_entries_fold_in(self):
+        # Source 1: the canonical durable for-Larry signal file (§5.1 decision c).
+        import for_larry_signal as fls
+        with tempfile.TemporaryDirectory() as d:
+            sig = Path(d) / 'for-larry-escalations.json'
+            with mock.patch.dict(
+                    os.environ,
+                    {'OURLIBERTY_FOR_LARRY_SIGNAL_FILE': str(sig),
+                     'OURLIBERTY_ESCALATIONS_FILE': '/no/such/esc.json'}):
+                fls.upsert_record(
+                    fls.ESCALATION_KEY_PREFIX + 'zz-fixture-a',
+                    {'id': 'zz-fixture-a', 'headline': 'critical unhandled',
+                     'severity': 'critical', 'context': 'crossed the bar'})
+                fls.upsert_record(
+                    fls.CLARIFY_EXHAUSTED_KEY_PREFIX + 'zz-fixture-b',
+                    {'id': 'zz-fixture-b', 'headline': 'Forge is stuck',
+                     'severity': 'warning'})
+                fls.resolve_record(fls.CLARIFY_EXHAUSTED_KEY_PREFIX + 'zz-fixture-b')
+                items = ssl.load_for_larry_escalations()
+        # Only the unresolved record folds in; the resolved one self-cleared.
+        self.assertEqual([i['id'] for i in items], ['zz-fixture-a'])
+        self.assertEqual(items[0]['source'], 'escalation')
+        self.assertEqual(items[0]['severity'], 'critical')
+
+    def test_signal_read_failure_does_not_break_legacy_source(self):
+        # Source 1 failing open must still let Source 2 (legacy) aggregate.
+        import for_larry_signal as fls
+        with tempfile.TemporaryDirectory() as d:
+            legacy = Path(d) / 'esc.json'
+            legacy.write_text(json.dumps([
+                {'headline': 'needs you', 'severity': 'critical',
+                 'for_larry': True, 'ts': '2026-06-19T10:00:00+00:00'}]))
+            with mock.patch.dict(
+                    os.environ,
+                    {'OURLIBERTY_ESCALATIONS_FILE': str(legacy)}), \
+                    mock.patch.object(
+                        fls, 'active_entries', side_effect=RuntimeError('boom')):
+                items = ssl.load_for_larry_escalations()
+        self.assertEqual([i['id'] for i in items], ['needs you'])
+
 
 if __name__ == '__main__':
     unittest.main()
