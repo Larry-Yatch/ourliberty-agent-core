@@ -162,7 +162,7 @@
     {
       "id": "pulse-cycle-upgrade",
       "name": "Pulse Cycle Upgrade (alpha / beta / gamma sequence)",
-      "phase": "in_flight",
+      "phase": "shipped",
       "brief": "Four-PR sequence implementing the self-optimizing operational config via Pulse Check pattern (design pass 2026-05-26). alpha-1 + alpha-2 + beta + gamma. Critical-path destination for the chain.",
       "spec_docs": [
         "agents/beacon/specs/pulse-cycle-upgrade.md",
@@ -184,12 +184,16 @@
       ],
       "repo": "ourliberty-agent-core",
       "created": "2026-05-26",
-      "deferred_reason": null
+      "deferred_reason": null,
+      "shipped_at": "2026-06-25T17:11:23.775167+00:00",
+      "shipped_by": "reconcile-two-stale-inflight-missions-shipped-001",
+      "shipped_note": "Sequence pulse-upgrade-001 completed 2026-05-29 (4/4 steps merged): alpha-1 via PR #194, alpha-2 via PR #196, beta via PR #197, gamma via PR #199. Board phase lingered in_flight because the mission's task_ids are sequence-meta ids (seq-pulse-upgrade-001-step-*, dag-preflight-pulse-upgrade-001, sequence-complete-pulse-upgrade-001) that the §3.3 shipped-reconciler exclusion (#588) doesn't cover, so the GC healer couldn't auto-ship it. Manually reconciled by Forge per task reconcile-two-stale-inflight-missions-shipped-001.",
+      "prior_phase": "in_flight"
     },
     {
       "id": "rate-limit-resilience",
       "name": "Rate-limit resilience sequence (001)",
-      "phase": "in_flight",
+      "phase": "shipped",
       "brief": "Sequence hardening the chain against Anthropic rate-limit windows (the 5h burn-rate gate plus Tier 1/Tier 2 OAuth fallback boundaries).",
       "spec_docs": [],
       "task_ids": [
@@ -199,7 +203,11 @@
       ],
       "repo": "ourliberty-agent-core",
       "created": "2026-05-29",
-      "deferred_reason": null
+      "deferred_reason": null,
+      "shipped_at": "2026-06-25T17:11:23.775167+00:00",
+      "shipped_by": "reconcile-two-stale-inflight-missions-shipped-001",
+      "shipped_note": "Sequence rate-limit-resilience-001 completed 2026-05-31 (3/3 steps merged): step-c-ledger via PR #208, step-a-rotation via PR #211, step-b-resume via PR #217. Board phase lingered in_flight because the mission's task_ids are sequence-meta ids (seq-rate-limit-resilience-001-step-*) that the §3.3 shipped-reconciler exclusion (#588) doesn't cover, so the GC healer couldn't auto-ship it. Manually reconciled by Forge per task reconcile-two-stale-inflight-missions-shipped-001.",
+      "prior_phase": "in_flight"
     },
     {
       "id": "pm-dashboard-project-due-date",
