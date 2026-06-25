@@ -1101,6 +1101,66 @@ def _forge_already_merged_bridge(task_id: str, merged_prs: list[dict]) -> Option
     return {'number': pr_number, 'url': url, 'mergedAt': merged_at, '_repo': qualified}
 
 
+def _forge_sibling_pr_title_shipped(task_id: str,
+                                    all_prs: list[dict]) -> Optional[dict]:
+    """Bridge a `forge built / no PR` task to the PR a SIBLING dispatch opened
+    for the exact same unit of work, identified by an identical `pr_title`.
+
+    Production driver (2026-06-25): task `reconcile-hardening-mission-shipped-001`
+    (archived outbox, exit_code=0, phase=build, task_type=doc-only) honestly
+    opened NO PR — its `result` is prose ('Done. ... reconciled'). A redispatch
+    `reconcile-hardening-mission-shipped-002` carried the IDENTICAL `pr_title`
+    (`chore(missions): reconcile orchestrator-terminal-signal-hardening to
+    shipped (#672/#673)`) and shipped it: its `result` names PR #688 (MERGED,
+    branch `forge/reconcile-hardening-mission-shipped-002`). So -001 is a
+    genuinely-superseded duplicate, yet every existing reconciliation step
+    missed it: `_pr_matches_task` fails (PR #688's branch + title carry the
+    `-002` token, not `-001`); `_preflight_family_shipped` only fires for
+    preflight/clarify ids; `_forge_already_merged_bridge` needs -001's own
+    `result` to carry the canonical `NO PR — already merged: #<N>` line, which
+    it does not; `_resolution_signal_present` matches only a fresh chain_event
+    for the SAME task_id, not a sibling. So this false stall fired every cycle.
+
+    Loads this task's archived outbox via `_load_forge_outbox`; reads its own
+    `pr_title` (None on missing/empty/non-str — no signal to match on, fail
+    safe). Scans the caller's already-built open+merged `all_prs` union for PRs
+    whose `title` equals this `pr_title` EXACTLY (full-string equality, never a
+    substring) AND whose branch task_id (via `_task_id_from_branch`) DIFFERS
+    from this `task_id` (a real sibling dispatch, never self). A PR in `all_prs`
+    is already gh-truth (open or merged), so no extra `gh` call is needed.
+
+    Returns the single matching sibling PR dict on exactly one match; None on
+    zero matches OR ambiguity (more than one distinct sibling PR) OR any
+    exception. Fail-safe contract identical to `_forge_already_merged_bridge`:
+    any miss, ambiguity, or error → None, so the alert still fires. This step
+    can only REMOVE false stalls, never mask a real one. An exact pr_title match
+    plus a different branch task_id is the robust, convention-independent
+    duplicate-dispatch signal; a numeric -001/-002 suffix heuristic would be
+    brittle and misfire across unrelated task families, so it is NOT used."""
+    try:
+        data = _load_forge_outbox(task_id)
+        if data is None:
+            return None
+        pr_title = data.get('pr_title')
+        if not isinstance(pr_title, str) or not pr_title:
+            return None
+        matches = []
+        for pr in all_prs:
+            if (pr.get('title') or '') != pr_title:
+                continue
+            branch_task = _task_id_from_branch(pr.get('headRefName') or '')
+            if branch_task == task_id:
+                continue
+            matches.append(pr)
+        # Exactly one sibling PR is the strong signal; ambiguity → fall through.
+        seen_numbers = {pr.get('number') for pr in matches}
+        if len(seen_numbers) == 1:
+            return matches[0]
+        return None
+    except Exception:
+        return None
+
+
 def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
                             merged_prs: list[dict], state: dict) -> list[dict]:
     """Find Forge build-done lines >FORGE_BUILT_NO_PR_MIN ago where no PR
@@ -1222,6 +1282,26 @@ def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
             log(
                 f'FORGE_NO_PR_SKIP task={task} reason=already_merged_bridge '
                 f'pr=#{bridged_pr.get("number")} repo={bridged_pr.get("_repo")}',
+                'INFO',
+            )
+            seen_tasks.add(task)
+            continue
+        # Reconciliation step 1d: a SIBLING Forge dispatch with an identical
+        # `pr_title` already opened the PR (open or merged), so this task's
+        # `built / no PR` is a superseded-duplicate false stall. Drove the
+        # 2026-06-25 `reconcile-hardening-mission-shipped-001` recurring
+        # false-fire: -001 honestly opened no PR, its redispatch -002 carried
+        # the exact same pr_title and shipped it under MERGED PR #688 (branch
+        # `forge/reconcile-hardening-mission-shipped-002`), which carries the
+        # -002 token so step 1's `_pr_matches_task` couldn't correlate it and
+        # the `_forge_already_merged_bridge` line was absent from -001's result.
+        # See `_forge_sibling_pr_title_shipped`. gh-truth-gated (scans the
+        # already-built open+merged union), fail-safe to None.
+        sibling_pr = _forge_sibling_pr_title_shipped(task, all_prs)
+        if sibling_pr is not None:
+            log(
+                f'FORGE_NO_PR_SKIP task={task} reason=sibling_pr_title_shipped '
+                f'pr=#{sibling_pr.get("number")} repo={sibling_pr.get("_repo")}',
                 'INFO',
             )
             seen_tasks.add(task)
