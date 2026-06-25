@@ -192,8 +192,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-25 14:40Z UTC (Iter ~2766, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 14:44Z UTC (Iter ~2767, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2766 summary:** ✅ Nominal — 1 Tier-3 alert (L981, approval_request delivery confirmation, silenced). Beacon processed forge-no-pr-rebase-original-fp-fix-002 (re-dispatch from iter ~2765) and re-emitted the APPROVAL_REQUEST, which is NOW PROPERLY REGISTERED in beacon-pending-approvals (pending=1, forge-no-pr-rebase-original-fp-fix-001). Marker-drop loop RESOLVED. Larry received DM at 08:36 MDT for the rebase FP fix — pending "go". 8/8 daemons alive. Watchdog healthy (08:36:16 MDT). 1 stall FP still firing (rebase-687-001 original, fix awaiting Larry approval). PID 1834248 zombie (~27.81d, ask-then-do). 6 stale journalctl PIDs (~30d, ask-then-do). PRIME: interventions=1221, systemic_fixes=71, vp=26, ratio≈17.20, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2767 summary:** ✅ Nominal — 0 new alerts. 8/8 daemons alive. 0 open PRs. All inboxes empty. Watchdog healthy (08:41:16 MDT). 1 stall FP still firing (rebase-687-001 original). Fix (`forge-no-pr-rebase-original-fp-fix-001`) has APPROVAL_REQUEST registered in beacon-pending-approvals (pending=1), Larry DM delivered at 08:39:54 MDT — awaiting "go". PID 1834248 zombie (~27.81d, ask-then-do). 6 stale journalctl PIDs (~30d, ask-then-do). PRIME: interventions=1221, systemic_fixes=71, vp=26, ratio≈17.20, trend=improving. Tier 1, consecutive_clean=0.
 
 
