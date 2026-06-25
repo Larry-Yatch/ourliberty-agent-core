@@ -46,6 +46,13 @@ toward KEEP.
 Dry-run (``--dry-run``) lists what WOULD be pruned, with the reason, and deletes
 nothing — so the safety bar can be audited against the live backlog first.
 
+``--by-pr-state`` is an opt-in one-time mode for draining the accumulated
+backlog: prune any branch whose PR is MERGED or CLOSED, bypassing ONLY the 48h
+age floor. The active-dispatch, open-PR-head, and current-branch guards remain
+intact (they are never bypassed), and the no-PR net_change paths are disabled —
+a branch with no merged/closed PR (including terminally-abandoned WIP) is KEPT.
+It does NOT change the scheduled healer's default behavior.
+
 stdlib only.
 """
 from __future__ import annotations
@@ -444,6 +451,7 @@ class BranchFacts:
     is_open_pr_head: bool
     is_merged_pr_head: bool
     net_change: str         # 'empty-wip'|'content-on-main'|'unique'|'unknown'
+    is_closed_pr_head: bool = False  # head of a CLOSED-unmerged PR (by-pr-state)
 
 
 @dataclass(frozen=True)
@@ -452,16 +460,31 @@ class Decision:
     reason: str
 
 
-def classify(facts: BranchFacts, now: float, min_age_sec: int = MIN_AGE_SECONDS) -> Decision:
+def classify(facts: BranchFacts, now: float, min_age_sec: int = MIN_AGE_SECONDS,
+             by_pr_state: bool = False) -> Decision:
     """Apply the safe-to-prune bar to one branch. Pure — all I/O is resolved
     into ``facts`` by the caller. Every ambiguous/indeterminate case returns
-    KEEP. See the module docstring for the full bar."""
+    KEEP. See the module docstring for the full bar.
+
+    ``by_pr_state`` is the opt-in one-time mode: prune any branch whose PR is
+    MERGED or CLOSED, bypassing ONLY the age floor. The active-dispatch and
+    open-PR guards still fire first (they are never bypassed), and the no-PR
+    net_change paths (empty-WIP / content-on-main) are disabled — a branch with
+    no merged/closed PR is KEPT (out of scope for this mode)."""
     # Active and open-PR guards come first and ignore age — a branch a live
     # dispatch is using or an OPEN PR head is never pruned, even if somehow old.
     if facts.is_active:
         return Decision('keep', 'active-dispatch (inbox/in-flight/worktree)')
     if facts.is_open_pr_head:
         return Decision('keep', 'open-PR head')
+    if by_pr_state:
+        # One-time PR-state sweep: age floor bypassed, net_change ignored. Only
+        # a MERGED or CLOSED PR head is pruned; everything else is kept.
+        if facts.is_merged_pr_head:
+            return Decision('prune', 'merged-PR head (by-pr-state)')
+        if facts.is_closed_pr_head:
+            return Decision('prune', 'closed-PR head (by-pr-state)')
+        return Decision('keep', 'no merged/closed PR (by-pr-state)')
     # Age guard: never race a just-created dispatch branch.
     if (now - facts.committer_ts) < min_age_sec:
         return Decision('keep', f'too-young (<{min_age_sec // 3600}h)')
@@ -550,7 +573,8 @@ class SweepResult:
     gh_unavailable: bool = False
 
 
-def sweep_repo(repo: Path, active_global: set[str], now: float, dry_run: bool) -> SweepResult:
+def sweep_repo(repo: Path, active_global: set[str], now: float, dry_run: bool,
+               by_pr_state: bool = False) -> SweepResult:
     res = SweepResult(repo=str(repo))
     if not repo.exists():
         log(f'canonical repo missing, skipping: {repo}')
@@ -566,6 +590,9 @@ def sweep_repo(repo: Path, active_global: set[str], now: float, dry_run: bool) -
         res.gh_unavailable = True
         return res
     merged_heads = _gh_pr_heads(repo, 'merged') or set()
+    # CLOSED-unmerged heads are only consulted in the opt-in by-pr-state mode. A
+    # failed query (-> None -> set()) keeps more, never deletes more — safe.
+    closed_heads = (_gh_pr_heads(repo, 'closed') or set()) if by_pr_state else set()
 
     active = set(active_global) | checked_out_branches(repo)
     cur = current_branch(repo)
@@ -585,16 +612,18 @@ def sweep_repo(repo: Path, active_global: set[str], now: float, dry_run: bool) -
                 is_active=name in active,
                 is_open_pr_head=name in open_heads,
                 is_merged_pr_head=name in merged_heads,
+                is_closed_pr_head=name in closed_heads,
                 # Only compute the (cost) diff once cheaper guards haven't already
-                # decided KEEP — active/open-PR/too-young short-circuit it.
+                # decided KEEP — active/open-PR/too-young short-circuit it. In
+                # by-pr-state mode net_change is never consulted, so skip it.
                 net_change=(
                     compute_net_change(repo, name, scope)
-                    if not (name in active or name in open_heads
+                    if not (by_pr_state or name in active or name in open_heads
                             or (now - ts) < MIN_AGE_SECONDS)
                     else 'unknown'
                 ),
             )
-            decision = classify(facts, now)
+            decision = classify(facts, now, by_pr_state=by_pr_state)
             if decision.action == 'prune':
                 to_prune.append(name)
             else:
@@ -706,6 +735,12 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument(
         '--dry-run', action='store_true',
         help='List what WOULD be pruned, with the reason; delete nothing.')
+    parser.add_argument(
+        '--by-pr-state', action='store_true',
+        help='One-time opt-in mode: prune any branch whose PR is MERGED or '
+             'CLOSED, bypassing ONLY the 48h age floor. Active-dispatch, '
+             'open-PR, and current-branch guards stay intact; branches with no '
+             'merged/closed PR (including abandoned-WIP) are kept.')
     args = parser.parse_args(argv)
 
     if KILL_SWITCH.exists():
@@ -713,6 +748,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         return 0
 
     mode = 'DRY-RUN' if args.dry_run else 'LIVE'
+    if args.by_pr_state:
+        mode += ' by-pr-state'
     log(f'Starting dispatch-branch cleanup ({mode})')
     now = datetime.now(timezone.utc).timestamp()
     active_global = active_dispatch_branches()
@@ -721,7 +758,9 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     results: list[SweepResult] = []
     for repo in load_canonical_repos():
-        results.append(sweep_repo(repo, active_global, now, args.dry_run))
+        results.append(
+            sweep_repo(repo, active_global, now, args.dry_run,
+                       by_pr_state=args.by_pr_state))
 
     _emit_summary(results, args.dry_run)
     log('Done.')
