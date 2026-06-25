@@ -192,8 +192,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-25 11:47Z UTC (Iter ~2744, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 12:28Z UTC (Iter ~2749, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2744 summary:** ✅ Nominal — 0 new alerts. All daemons alive. No open PRs. Repo clean (HEAD=cbec0e76=origin/main). Outbox-notifier hot loop RESOLVED ✅ (confirmed). 2 pipeline stall FPs still DRY-RUN firing; `heal-forge-no-pr-retry-rebase-fp-001` approval pending Larry. PID 1834248 zombie still alive (~27.69d, ask-then-do). 6 stale journalctl PIDs (~30d, ask-then-do). Watchdog healthy (05:42:14 MDT). PRIME: interventions=1211, systemic_fixes=71, vp=26, ratio≈17.06, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2749 summary:** ✅ Nominal — 0 new alerts. 8/8 daemons alive. No open PRs. Repo clean (HEAD=d1fedc55=origin/main). 2 pipeline stall FPs still DRY-RUN firing; `heal-forge-no-pr-retry-rebase-fp-001` approval pending Larry. PID 1834248 zombie still alive (~27.72d, ask-then-do). 6 stale journalctl PIDs (~30d, ask-then-do). Watchdog healthy (06:22:40 MDT). PRIME: interventions=1216, systemic_fixes=71, vp=26, ratio≈17.13, trend=improving. Tier 1, consecutive_clean=0.
 
 
