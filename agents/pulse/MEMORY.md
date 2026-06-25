@@ -192,8 +192,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-25 16:52Z UTC (Iter ~2786, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 17:03Z UTC (Iter ~2788, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2786 summary:** ✅ Nominal — 0 new alerts. 8/8 daemons alive. 0 open PRs. Pipeline clean (20 FORGE_NO_PR_SKIP). Watchdog healthy (10:48:27 MDT). PID 1834248 zombie (~27.91d, ask-then-do). 6 stale journalctl PIDs (~30.14–30.92d, ask-then-do). PRIME: interventions=1221, systemic_fixes=71, vp=26, ratio≈17.20, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2788 summary:** ✅ Nominal — 0 new alerts. 8/8 daemons alive. 0 open PRs. Pipeline clean (all FORGE_NO_PR_SKIP). Watchdog healthy (10:58:29 MDT). PID 1834248 zombie (~27.92d, ask-then-do). 6 stale journalctl PIDs (~30.1–30.9d, ask-then-do). PRIME: interventions=1221, systemic_fixes=71, vp=26, ratio≈17.20, trend=improving. Tier 1, consecutive_clean=0.
 
 
