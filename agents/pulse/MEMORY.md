@@ -168,14 +168,20 @@
 
 ---
 
+## G-rule forge-wip-redispatch-exhausted-pr-exists-fp-001 — 1/3 (new, iter ~2702)
+
+**Rule:** `source=forge-wip-redispatch, route=escalate` exhaustion alerts ("WIP-only auto-recovery EXHAUSTED") fire for tasks whose original PRs already exist (rebase-escalation-feed-685-001: PR #685 exists; rebase-forge-post-open-mergeable-687-001: PR #687 MERGED). Triage helper: Tier-4 novel (no translation). These are effective FPs — wip-redispatch retried a task whose output already shipped; retry dying WIP-only is expected. Fix: extend wip-redispatch to check PR existence before declaring exhaustion, OR add `source=forge-wip-redispatch, route=escalate, <pr_exists signal>` → Tier-3 entry to `config/alert-translations.json`. Dispatch to Beacon at 3/3.
+
+---
+
 ## G-rule forge-built-no-pr-retry1-fp-001 → DISPATCHED ✅ (3/3, iter ~2701), vp
 
 **Rule:** `forge_built_no_pr` stall fires even when a PR exists. Two patterns confirmed: (1) `reconcile-hardening-mission-shipped-001` fires even though PR #699 (retry1) is OPEN (sibling_pr_title_shipped only checks MERGED PRs, misses OPEN retry1). (2) `rebase-forge-post-open-mergeable-687-001` fires even though PR #687 is MERGED (branch deleted post-merge, so branch-based match fails; title-based sibling match also misses). L1128 was the live alert fire for pattern 2. Dispatched `direction-ask-forge-built-no-pr-retry1-fp-001` to Beacon inbox. Fix: extend `sibling_pr_title_shipped` + add `sibling_pr_title_open`/`retry1_pr_exists` skip paths in `heal_pipeline_stall.py`. verification_pending.
 
 ---
 
-## Status snapshot — updated 2026-06-25 06:38Z UTC (Iter ~2701, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 06:46Z UTC (Iter ~2702, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2701 summary:** ⚠️ Watch — Outbox-notifier hot loop continues; fix `fix-auto-merge-already-merged-skip-001` pending Larry approval. PR #698 + #699 OPEN/UNKNOWN, Mirror (PID 2683047) reviewing. Mirror inbox: 3 tasks (down from 4). G-rule forge-built-no-pr-retry1-fp-001 → DISPATCHED ✅ (3/3) to Beacon. 1 new alert (L1128 Tier-3 silence). NEW: PID 1834248 zombie bash wait-loop (~27.5 days, harmless, ask-then-do kill). PRIME: interventions=1168, systemic_fixes=71, vp=26, ratio≈16.59, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2702 summary:** ⚠️ Watch — KEY POSITIVE: Larry approved `fix-auto-merge-already-merged-skip-001`; Forge (PID 2694471) actively building the outbox-notifier hot loop fix. 3 new Tier-4 forge-wip-redispatch exhaustion alerts: L1129 (fix-653-phase4b-spec-id-contract-001, genuine stuck build — no PR exists after 2 WIP-only failures), L1130/L1131 (FP exhaustions: PRs #685/#687 already exist). New G-rule forge-wip-redispatch-exhausted-pr-exists-fp-001 at 1/3. Pipeline stall rebase-687 FP resolved (now FORGE_NO_PR_SKIP). PR #698+#699 OPEN/UNKNOWN, Mirror reviewing. PID 1834248 zombie still alive (ask-then-do). PRIME: interventions=1169, systemic_fixes=71, vp=26, ratio≈16.46, trend=improving. Tier 1, consecutive_clean=0.
 
 

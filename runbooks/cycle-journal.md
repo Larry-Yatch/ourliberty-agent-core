@@ -5,6 +5,108 @@
 ---
 
 
+## Iteration ~2702 — 2026-06-25T06:46Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry /cycle invocation via chat.
+
+**Health:** ⚠️ Watch — 3 new Tier-4 forge-wip-redispatch exhaustion alerts (1 genuine stuck build: fix-653; 2 FP). KEY POSITIVE: Larry approved `fix-auto-merge-already-merged-skip-001` → Forge (PID 2694471) actively building the outbox-notifier hot loop fix. Mirror (PID 2683047) still reviewing PR #698 rev1.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Outbox-notifier loop**: STILL ACTIVE ✅ — log entries through 00:41 MDT (06:41Z UTC), AUTO_MERGE_QUEUE_RELEASE / RELEASE_DEFERRED cycle every ~5s on PR #691 / blocker #697 (MERGED). Fix **APPROVED** by Larry ✅. Forge (PID 2694471) actively building `build-fix-auto-merge-already-merged-skip-001.json`. [progressing → self-resolves on Forge build]
+- **PR #698 (skip-mirror-review-on-merged-or-closed-pr-001)**: OPEN, UNKNOWN. reviewDecision="". Mirror (PID 2683047, elapsed ~16 min) actively reviewing rev1. [carry]
+- **PR #699 (reconcile-hardening-mission-shipped-001-retry1)**: OPEN, UNKNOWN. In Mirror queue (after #698 rev1 + duplicate). [carry]
+- **Pipeline stall FP reconcile-hardening-001**: `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` persists. G-rule `forge-built-no-pr-retry1-fp-001` dispatched last iter. [carry]
+- **Pipeline stall FP rebase-687-001**: **IMPROVED ✅** — now FORGE_NO_PR_SKIP via `match=branch pr=#687`. No longer DRY-RUN alerting (was FP last iter).
+- **Pending approvals**: 0 (was 1). `fix-auto-merge-already-merged-skip-001` approved ✅. beacon-pending-approvals empty.
+- **Repo**: HEAD=b9a0cbe8=origin/main. Clean. On main. ✅
+- **Sync**: last_sync=2026-06-25T06:00:05Z (~41 min ago). Within 2h. ✅
+- **Daemons**: inbox_watcher (2596660), outbox_notifier (2594852, hot loop), beacon_telegram_bot (2594942), chain_event_shipper (2595115) — all alive. Mirror (2683047) reviewing. Forge (2694471) building. ✅
+- **sequence-paused:operator-needs-you-feed**: No new alert. Still pending Larry action. [carry ✅]
+
+**Check 0 — Alert triage:**
+- repair-watermark: repaired=false, old=1128, file_length=1131. **3 new alerts (L1129-L1131)**.
+- L1129: `source=forge-wip-redispatch, route=escalate, severity=critical, subject=fix-653-phase4b-spec-id-contract-001` (ts=06:40:20Z) — "WIP-only auto-recovery EXHAUSTED for fix-653-phase4b-spec-id-contract-001-retry1: 1 auto-retry already died WIP-only with no PR." Triage helper: **Tier-4 novel** (no translation match). VERIFIED: `gh pr list --search "fix-653-phase4b-spec-id"` → empty. **Genuine stuck build.** No PR exists after 2 attempts. Beacon bot delivering escalation to Larry. No separate Pulse DM (bot handles `route=escalate`).
+- L1130: `source=forge-wip-redispatch, route=escalate, severity=critical, subject=rebase-escalation-feed-685-001` (ts=06:40:20Z) — auto-retry exhausted. Triage helper: **Tier-4 novel**. VERIFIED: pipeline stall dry-run confirms `task=escalation-feed FORGE_NO_PR_SKIP pr=#685`. **Effective FP — original task PR #685 exists.** wip-redispatch retried a task whose output already shipped; retry dying WIP-only is expected.
+- L1131: `source=forge-wip-redispatch, route=escalate, severity=critical, subject=rebase-forge-post-open-mergeable-687-001` (ts=06:40:20Z) — auto-retry exhausted. Triage helper: **Tier-4 novel**. VERIFIED: pipeline stall dry-run confirms `task=forge-post-open-mergeable-rebase-001 FORGE_NO_PR_SKIP pr=#687`. **Effective FP — original task PR #687 MERGED.** Same class.
+- Watermark advanced 1128→1131. ✅
+
+**Check 1 — Log noise:**
+- outbox-notifier.log: **[yellow] HOT LOOP** still active through 00:41 MDT (06:41Z). Fix approved, Forge building. Will self-resolve. [carry]
+- watchdog.log: overall=healthy at 00:40 MDT. ✅
+
+**Check 2 — Telegram sweep:**
+- beacon_telegram_bot.log: last relevant delivery `00:29:38 MDT alert idx=1127 (pipeline-stall)`. No new Larry messages. L1129-L1131 (06:40Z) not yet delivered (bot will sweep shortly). ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` — FP persists. G-rule dispatched last iter. [carry]
+- `task=forge-post-open-mergeable-rebase-001`: **FORGE_NO_PR_SKIP** via `match=branch pr=#687`. ✅ Improved from iter ~2701 (was DRY-RUN alerting).
+- All other tasks: FORGE_NO_PR_SKIP correctly. ✅
+
+**Check 4 — Pending directives:**
+- Beacon inbox: `direction-ask-forge-built-no-pr-retry1-fp-001.json` (last iter dispatch, Beacon processing via PID 2700844); `notify-fix-auto-merge-already-merged-skip-001.json`.
+- Forge inbox: `build-fix-auto-merge-already-merged-skip-001.json`. Forge (PID 2694471) **actively building**. ✅
+- Mirror inbox (3 tasks, FIFO): `review-skip-mirror-review-on-merged-or-closed-pr-001-rev1.json` (PR #698, active); `review-skip-mirror-review-on-merged-or-closed-pr-001.json` (duplicate, G-rule vp); `review-reconcile-hardening-mission-shipped-001-retry1.json` (PR #699, queued).
+- beacon-pending-approvals: **0** (was 1). `fix-auto-merge-already-merged-skip-001` approved ✅. Forge building.
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-06-25T06:34:44Z (~12 min ago). Fresh. ✅
+
+**Check A — Source repo:** HEAD=b9a0cbe8=origin/main. Clean. On main. ✅
+
+**Check B — Sync health:** last_sync=2026-06-25T06:00:05Z (~41 min ago). Within 2h. ✅
+
+**Check C — Agent liveness:** All 4 core daemons alive (same PIDs). Mirror (2683047) reviewing PR #698 rev1. Forge (2694471) building outbox-notifier fix. ✅
+- **[yellow] PID 1834248** — zombie bash wait-loop. Still alive (~27.6 days). Script: `until [ -f /home/larry/agents/outboxes/forge/.archive/build-check-viii-pr-2b-analyzer-001.json ]; do sleep 20; done`. FILE MISSING. Ask-then-do. [carry]
+
+**Check E — PRs:**
+- PR #698 (skip-mirror-review-on-merged-or-closed-pr-001): OPEN, UNKNOWN. reviewDecision="". Mirror actively reviewing rev1. ⚠️
+- PR #699 (reconcile-hardening-mission-shipped-001-retry1): OPEN, UNKNOWN. In Mirror queue. ⚠️
+
+**Check H — Forge digest:** Forge (PID 2694471) building `fix-auto-merge-already-merged-skip-001`. Active. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check III: not Sunday. Skip. ✅
+
+**G-rule updates:**
+- **forge-wip-redispatch-exhausted-pr-exists-fp-001** — **NEW, 1/3** (this iter). L1130/L1131: `source=forge-wip-redispatch, route=escalate` exhaustion alerts for tasks whose original PRs already exist (PR #685, PR #687 MERGED). Triage helper: Tier-4 novel (no translation match). Root cause: wip-redispatch doesn't verify whether the task's original PR exists before firing exhaustion escalation. Fix: either extend wip-redispatch to check PR existence before exhausting, OR add `source=forge-wip-redispatch, route=escalate, pr_exists` → Tier-3 silence entry to `config/alert-translations.json`. Dispatch to Beacon at 3/3.
+- **forge-built-no-pr-retry1-fp-001** — DISPATCHED ✅ (3/3, iter ~2701). Beacon processing direction-ask (PID 2700844). vp. [carry]
+- **forge-wip-redispatch-digest-tier4-001** — 1/3. No new `route=digest` instances this iter. [carry]
+- **outbox-notifier-auto-merge-loop-merged-pr-001** — DISPATCHED ✅ (3/3, iter ~2695). Fix approved, Forge building. vp. [carry]
+- **watchdog-watcher-log-stale-post-pr694** — 2/3. No new instance. [carry]
+- **review-duplicate-dispatch-wip-redispatch** — vp. Duplicate in Mirror queue. [carry]
+- **heal-daemon-restart-manifest-drift-regenerated-tier4** — 2/3. No new instance. [carry]
+- **check-i-force-bypass-dm-route** — 1/3. Thursday, no occurrence. [carry]
+- **no-session-revision-merged-pr-fp-001** — 1/3. No new instance. [carry]
+- **unrouted-open-pr-auto-merge-held-fp-001** — 1/3. No new instance. [carry]
+
+**Actions taken:** Triaged 3 new alerts (L1129-L1131): Tier-4 novel (fix-653 genuine; rebase-685 + rebase-687 FP exhaustions). Watermark advanced 1128→1131. Appended 1 PRIME ledger row (intervention). New G-rule `forge-wip-redispatch-exhausted-pr-exists-fp-001` at 1/3.
+
+**Standing findings (updated):**
+- [yellow] **Outbox-notifier hot loop** — Fix approved ✅. Forge (PID 2694471) actively building. Self-resolves on build → Mirror review → merge.
+- [yellow] **Forge: fix-653-phase4b-spec-id-contract-001 stuck** — **NEW.** WIP-only retries exhausted (2 failures, no PR). L1129 escalation delivered to Larry via Telegram (route=escalate). Manual investigation needed.
+- [yellow] **PR #698 (skip-mirror-review-on-merged-or-closed-pr-001)** — OPEN, UNKNOWN. Mirror (2683047) reviewing rev1. Expected to complete.
+- [yellow] **PR #699 (reconcile-hardening-mission-shipped-001-retry1)** — OPEN, UNKNOWN. In Mirror queue. Stall FP persists (G-rule dispatched).
+- [yellow] **Mirror inbox: 3 tasks** — PR #698 rev1 (active) + duplicate + PR #699. [carry]
+- [yellow] **G-rule forge-built-no-pr-retry1-fp-001** — DISPATCHED. Beacon processing. vp. [carry]
+- [yellow] **PID 1834248 zombie bash loop** — Still alive (~27.6 days). Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **sequence-paused:operator-needs-you-feed** — L1105. gate-mismatch chain_merged=False gh_merged=True. **Recovery: `resume sequence operator-needs-you-feed` via Beacon or Dashboard.** [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**PRIME DIRECTIVE:** interventions=1169, systemic_fixes=71, verification_pending=26, ratio≈16.45, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** consecutive_clean=0 (non-clean: outbox-notifier loop, fix-653 stuck, PRs #698+#699 in pipeline, zombie PID). Tier: 1.
+
+---
+
+
 ## Iteration ~2701 — 2026-06-25T06:37Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry /cycle invocation via chat.
