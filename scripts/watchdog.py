@@ -368,6 +368,31 @@ def _task_in_flight(task_id: str) -> bool:
     return _pid_alive(pid)
 
 
+def _any_live_in_flight_session() -> bool:
+    """True if any in-flight marker has an int pid that is currently alive.
+
+    A live in-flight pid is a direct proxy for the single inbox_watcher process
+    being blocked mid-session (it polls a spawned Claude session and writes zero
+    log lines for its whole duration), so a quiet watcher log is expected, not a
+    stall. Globbing errors or unparseable markers are skipped conservatively.
+    """
+    in_flight = AGENTS_ROOT / 'state' / 'in-flight'
+    try:
+        markers = list(in_flight.glob('*.json'))
+    except OSError:
+        return False
+    for marker in markers:
+        try:
+            with open(marker) as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            continue
+        pid = data.get('pid')
+        if isinstance(pid, int) and _pid_alive(pid):
+            return True
+    return False
+
+
 def _inbox_has_queued_task(agent_dir: Path) -> bool:
     """True if the inbox holds at least one *.json task that is NOT in-flight.
 
@@ -376,6 +401,11 @@ def _inbox_has_queued_task(agent_dir: Path) -> bool:
     we cannot parse is conservatively counted as queued.
     """
     for env in agent_dir.glob('*.json'):
+        # Outbox-notifier retry/terminal dead-letters are not freshly-dispatched
+        # work a healthy watcher should be picking up — skip them so a lingering
+        # one doesn't read as a stalled queue.
+        if env.name.startswith('marker-error-'):
+            continue
         try:
             with open(env) as f:
                 data = json.load(f)
@@ -613,6 +643,24 @@ def check_log_growth() -> dict:
 
     watcher_alive = is_service_alive('ourliberty-inbox-watcher.service')
 
+    if not watcher_alive:
+        return {
+            'status': 'critical',
+            'seconds_since_write': int(age),
+            'reason': 'inbox-watcher service not active',
+        }
+
+    # The single inbox_watcher process blocks in its worker-poll loop for the
+    # whole duration of every spawned Claude session, writing zero log lines, so
+    # a quiet log during a live session is expected. A live in-flight pid is the
+    # canonical proxy for that — suppress globally before scanning inboxes.
+    if _any_live_in_flight_session():
+        return {
+            'status': 'ok',
+            'seconds_since_write': int(age),
+            'reason': 'active agent session (watcher blocked, quiet log expected)',
+        }
+
     # Are any inboxes holding queued (not in-flight) work? An inbox task that
     # is actively being built keeps its envelope here for the whole build, so
     # an in-flight-with-live-pid task is excluded — otherwise a multi-minute
@@ -634,12 +682,6 @@ def check_log_growth() -> dict:
     except OSError:
         live_files = -1
 
-    if not watcher_alive:
-        return {
-            'status': 'critical',
-            'seconds_since_write': int(age),
-            'reason': 'inbox-watcher service not active',
-        }
     if live_files == 0 and age <= 43200:
         reason = (
             'work in progress (active build, watcher healthy)'
