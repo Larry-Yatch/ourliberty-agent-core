@@ -5,6 +5,94 @@
 ---
 
 
+## Iteration ~2828 — 2026-06-25T22:07Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/cycle` invocation via chat.
+
+**Health:** ✅ Nominal — 1 new alert (Tier-3 silence). PR #707 spec-in-motion-surface-001 auto-merged at 16:04:36 MDT. All inboxes empty. No open PRs. Pipeline clear.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo**: On main, clean, up to date with origin/main (HEAD=e29fc15a). ✅
+- **Sync**: status=no-change, last_sync=2026-06-25T22:01:18Z (~6 min old). Under 2h threshold. ✅
+- **Daemons**: 8/8 PIDs alive (1388801, 1388982, 1389067 Ss ~2d6h35m; 2716672 SNs ~15h10m; 2754413 Ssl ~14h30m; 3044417 Ssl, 3044692 Ss, 3044826 Ss ~1h51m). ✅
+- **Open PRs (ourliberty-agent-core)**: NONE — PR #707 auto-merged at 16:04:36 MDT. ✅ RESOLVED.
+- **Open PRs (ourliberty-dashboard)**: NONE. ✅
+- **Forge inbox**: EMPTY. ✅
+- **Mirror inbox**: EMPTY (review-spec-in-motion-surface-001 completed + PR #707 merged). ✅ RESOLVED.
+- **Beacon inbox**: EMPTY. ✅
+- **beacon-pending-approvals**: 0. ✅
+- **Watchdog**: last=16:04:30 MDT (22:04:30Z) overall=healthy. ✅
+- **heal-stale-daemon-code heartbeat**: 2026-06-25T22:05:43Z (~2 min old). Fresh. ✅
+- **Zombie PID 1834248**: Still alive (Ss, 2429311s = ~28.1d). Ask-then-do: `kill 1834248`. [carry]
+- **6 stale journalctl PIDs**: All alive (~30-31d). Ask-then-do. [carry]
+
+**Check 0 — Alert triage:**
+- `repair-watermark`: `{"repaired": false, "old_watermark": 1008, "file_length": 1009}`. **1 new alert.**
+- Alert L1009: `source=outbox-notifier, kind=notification, intent=review-pass, task_id=spec-in-motion-surface-001`. Mirror approved PR #707; auto-merged + branch deleted. triage-alert → **Tier 3** (known-pattern match, decision=silence). ✅ Watermark advanced to 1009.
+
+**Check 1 — Log noise:**
+- `journalctl --user -p warning --since "30 minutes ago"` → `-- No entries --`. ✅
+- outbox-notifier.log: Last entry 16:04:36 MDT — AUTO_MERGE spec-in-motion-surface-001/PR #707 merged. All INFO. ✅
+- watchdog.log: Last entry 16:04:30 MDT — overall=healthy. ✅
+
+**Check 2 — Telegram sweep:**
+- No new messages from Larry since 15:31:08 MDT ("Yes this captures it well, kick it off") — already processed in ~2823. Beacon auto-approved + dispatched spec-in-motion-surface-001 at 15:33:26 MDT. PR #707 opened, Mirror reviewed (~24 min), auto-merged 16:04:36 MDT. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- 19 FORGE_NO_PR_SKIP tasks (stable). **"no stalls detected"**. ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- Forge/Beacon/Mirror inboxes: all EMPTY. ✅
+- beacon-pending-approvals: 0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** Deferred (script gap). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-25T22:05:43Z (~2 min old). Fresh. ✅ Nominal.
+
+**Check A — Source repo:** On main, clean, up to date with origin/main. ✅ Nominal.
+**Check B — Sync health:** status=no-change, last_sync=22:01:18Z (~6 min old). Under 2h. ✅ Nominal.
+**Check C — Agent liveness:** 8/8 alive. ✅
+- **[yellow] PID 1834248** — zombie bash loop (~28.1d). Ask-then-do: `kill 1834248`. [carry]
+- **[yellow] 6 stale journalctl PIDs (~30-31d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+
+**Check E — PRs:**
+- ourliberty-agent-core: NO OPEN PRs. PR #707 auto-merged at 16:04:36 MDT. ✅ RESOLVED.
+- ourliberty-dashboard: NO OPEN PRs. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check VIII/IX/X: Not Monday. Skip. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule updates:**
+- All active G-rules: carry unchanged. No new occurrences this iter.
+
+**Actions taken:**
+1. Alert watermark: 1008 → 1009 (1 new alert, Tier-3 silenced).
+2. PRIME ledger: `iter_clean` appended (tier=1, template=iter-clean-nominal, ts=2026-06-25T22:07:55Z).
+3. Tier state: `record --checks-clean false` → consecutive_clean stays 0 (zombie PID + 6 stale journalctl PIDs carry). Tier remains 1. last_signal_at=2026-06-25T22:07:55Z.
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- ✅ **new-mission-card-scope-decision-001** — RESOLVED. PR #707 spec-in-motion-surface-001 auto-merged at 16:04:36 MDT. Mirror summary: doc-only spec, all grounding verified, regression gate PASS.
+- [yellow] **PID 1834248 zombie bash loop** — Still alive (~28.1d). Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **6 stale journalctl PIDs (~30-31d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+- [yellow] **forge-wip-redispatch-digest Forge dispatch** — Beacon fix designed (iter ~2798). Trust-policy approval from Larry pending. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649/637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**PRIME DIRECTIVE:** interventions=1225, systemic_fixes=71, verification_pending=27, ratio≈17.25, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0 (non-clean: zombie PID + 6 stale journalctl PIDs). Last signal: 2026-06-25T22:07:55Z.
+
+---
+
+
 ## Iteration ~2827 — 2026-06-25T22:02Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/cycle` invocation via chat.

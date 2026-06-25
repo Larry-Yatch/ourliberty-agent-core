@@ -204,8 +204,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-25 22:02Z UTC (Iter ~2827, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 22:07Z UTC (Iter ~2828, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2827 summary:** ✅ Nominal — 0 new alerts. Forge/Beacon inboxes empty, Mirror has active review-spec-in-motion-surface-001.json (PR #707, ~22-27 min in), pipeline clear (19 FORGE_NO_PR_SKIP, no stalls), 8/8 daemons alive. Standing: zombie PID 1834248 (~28.1d), 6 stale journalctl PIDs (~30-31d), forge-wip-redispatch-digest dispatch pending trust-policy approval, PR #707 in Mirror review (new-mission-card-scope-decision-001). PRIME: interventions=1225, systemic_fixes=71, vp=27, ratio≈17.25, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2828 summary:** ✅ Nominal — 1 new alert (outbox-notifier review-pass PR#707, Tier-3 silence). PR #707 spec-in-motion-surface-001 auto-merged at 16:04:36 MDT (Mirror PASS + auto-merge complete). All inboxes empty, no open PRs, pipeline clear (19 FORGE_NO_PR_SKIP, no stalls), 8/8 daemons alive. Standing: zombie PID 1834248 (~28.1d), 6 stale journalctl PIDs (~30-31d), forge-wip-redispatch-digest dispatch pending trust-policy approval. PRIME: interventions=1225, systemic_fixes=71, vp=27, ratio≈17.25, trend=improving. Tier 1, consecutive_clean=0.
 
 
