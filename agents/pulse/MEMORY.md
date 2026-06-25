@@ -242,6 +242,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-25 00:06Z UTC (Iter ~2651, Tier 1, consecutive_clean=0)
+
+**Iter ~2651 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry); PR #687 CONFLICTING (Mirror session 4 active ~13 min, PID 2249100). 5 alerts triaged: L1055-L1059 all Tier-3 (sentinel inbox-stall x2 — one false positive per medic, one queue serialization; pipeline-stall forge-no-pr:reconcile x1; medic-diagnosis x2). Watermark 1054→1059. Beacon inbox: empty. Forge inbox: 8 items (unchanged). beacon-pending-approvals: 0 pending. 8 daemons alive. Check I: weekday=Thursday, skip. Watchdog: WARNs at 18:00+18:05 MDT (10-15 min into Mirror session 4) — fix in Forge preflight not yet merged. PRIME: interventions=1122, systemic_fixes=66, ratio=17.0, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-25 00:00Z UTC (Iter ~2650, Tier 1, consecutive_clean=0)
 
 **Iter ~2650 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry); PR #687 CONFLICTING (Mirror session 4 active ~10 min, PID 2249100, started 23:50Z after session 3 reaped). 1 alert triaged: L1054 Tier-3 (heal-wedged-review-sessions wedged-review-reaped session 3). Watermark 1053→1054. Beacon inbox: empty. Forge inbox: 8 items (unchanged). beacon-pending-approvals: 0 pending. 8 daemons alive. **KEY CORRECTION:** watchdog log is `watchdog.log` (not `watchdog_watcher.log`) — prior "0 WARNs" observations may have been based on non-existent path; 1 WARN at 23:55Z (5 min into session 4) confirmed from correct log. Fix (watchdog-stale-session-aware-suppression-001) still in Forge preflight. Check I: mode=digest, cooldown-suppressed. PRIME: interventions≈1121, systemic_fixes=66, ratio≈17.0, trend=improving. Tier 1, consecutive_clean=0.
