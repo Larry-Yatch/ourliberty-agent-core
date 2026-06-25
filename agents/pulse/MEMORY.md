@@ -192,8 +192,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-25 17:03Z UTC (Iter ~2788, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 17:14Z UTC (Iter ~2789, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2788 summary:** ✅ Nominal — 0 new alerts. 8/8 daemons alive. 0 open PRs. Pipeline clean (all FORGE_NO_PR_SKIP). Watchdog healthy (10:58:29 MDT). PID 1834248 zombie (~27.92d, ask-then-do). 6 stale journalctl PIDs (~30.1–30.9d, ask-then-do). PRIME: interventions=1221, systemic_fixes=71, vp=26, ratio≈17.20, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2789 summary:** ✅ Nominal — 1 new alert L986 (dispatch-branch-cleanup digest, Tier-3 silence). 8/8 daemons alive. 0 open PRs. Pipeline ACTIVE: Forge done reconcile-two-stale-inflight-missions-shipped-001 at 17:12:39Z ($0.92), Mirror reviewing (started 17:12:50Z). Beacon processing delegate-cap-board task. Watermark=986. PID 1834248 zombie (~27.93d, ask-then-do). 6 stale journalctl PIDs (~30.9d, ask-then-do). PRIME: interventions=1221, systemic_fixes=71, vp=26, ratio≈17.20, trend=improving. Tier 1, consecutive_clean=0.
 
 
