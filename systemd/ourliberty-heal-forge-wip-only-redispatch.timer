@@ -1,0 +1,10 @@
+[Unit]
+Description=Run heal_forge_wip_only_redispatch every 10 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=10min
+Unit=ourliberty-heal-forge-wip-only-redispatch.service
+
+[Install]
+WantedBy=timers.target
