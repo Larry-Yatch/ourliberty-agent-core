@@ -162,9 +162,9 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## G-rule forge-wip-redispatch-digest-tier4-001 — 2/3 (updated iter ~2705)
+## G-rule forge-wip-redispatch-digest-tier4-001 → DISPATCHED ✅ (iter ~2797)
 
-**Rule:** `forge-wip-redispatch` healer fires alerts with `route=digest` (auto-redispatched retry1 notifications). Triage helper classifies Tier-4 (novel, no translation). But these are auto-remediated informational digests — per actionable-only discipline, no DM to Larry. Fix: add `source=forge-wip-redispatch, route=digest` → Tier-3 entry to `config/alert-translations.json`. Dispatch to Beacon at 3/3. Occurrences: iter ~2698 (9 alerts, first run); iter ~2705 (L1145 + L1147, 2 more digests).
+**Rule:** `forge-wip-redispatch` healer fires alerts with `route=digest` (auto-redispatched retry1 notifications). Triage helper classifies Tier-4 (novel, no translation). But these are auto-remediated informational digests — per actionable-only discipline, no DM to Larry. Fix: add `source=forge-wip-redispatch, route=digest` → Tier-3 entry to `config/alert-translations.json`. Dispatched to Beacon at iter ~2797 (3/3). Beacon direction-ask: pulse-direction-ask-forge-wip-redispatch-digest-tier3-001.json. verification_pending.
 
 ---
 
@@ -204,8 +204,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-25 18:12Z UTC (Iter ~2796, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 18:18Z UTC (Iter ~2797, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2796 summary:** ✅ Nominal — 3 new alerts (L993-995): 2x Tier-3 silence (heal-systemd-install-drift stuck-timer + sync.service push-failed), 1x Tier-4 self-healed (ourliberty-health push-failed; Larry already DM'd idx=993, issue resolved). 8/8 daemons alive. Cycle timer healthy (fired 18:05:15Z). PR #703 unblocked (Beacon dispatched fresh Mirror review in ~2795; now in inbox). PR #704 active Mirror review. New G-rule: ourliberty-health-sync-push-failed-tier4 at 1/3. PRIME: interventions=1223, systemic_fixes=71, vp=26, ratio≈17.23, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2797 summary:** ✅ Nominal + pipeline cleared — PR #703 AND #704 both auto-merged at 18:14Z! 2 new alerts (L996-997): L996 forge-wip-redispatch digest → Tier-4, G-rule 3/3 dispatched to Beacon (direction-ask for Tier-3 translation entry); L997 outbox-notifier review-pass → Tier-3 silence. 8/8 daemons alive. Watchdog healthy. No open PRs. Forge retry1 for board-new-mission-confirm-placeholder-001 in progress (worktree active). PRIME: interventions=1224, systemic_fixes=71, vp=26, ratio≈17.24, trend=improving. Tier 1, consecutive_clean=0.
 
 

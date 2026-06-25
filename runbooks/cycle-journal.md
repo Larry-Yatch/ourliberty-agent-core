@@ -5,6 +5,98 @@
 ---
 
 
+## Iteration ~2797 — 2026-06-25T18:17Z UTC (interactive /loop /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/loop /cycle` invocation via chat.
+
+**Health:** ✅ Nominal with notable positives — PR #703 AND PR #704 both auto-merged during this iter! G-rule forge-wip-redispatch-digest-tier4-001 hits 3/3 → direction-ask dispatched to Beacon. 8/8 daemons alive. All other checks nominal.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo**: HEAD=66f5f661=origin/main. On main. Clean (no git status output). ✅ ("Pulse cycle 20260625T181413Z" is latest commit, present on origin.)
+- **Sync**: agent-core-sync.json shows error at 18:00:46Z (push failed), but HEAD=origin/main confirms git state is current. Same transient self-heal noted in ~2796. Informational only. ✅
+- **Daemons (re-verified)**: forge_bot=1388801 (Ss, 181863s ~50.5h) ✅, mirror_bot=1388982 (Ss, 181855s) ✅, pulse_bot=1389067 (Ss, 181851s) ✅, beacon_telegram_bot=2715635 (Ss, 40811s ~11.3h) ✅, dashboard_api=2715859 (Ssl, 40802s) ✅, chain_event_shipper=2716672 (SNs, 40729s) ✅, inbox_watcher=2754413 (Ssl, 38323s ~10.6h) ✅, outbox_notifier=2773485 (Ss, 36602s ~10.2h) ✅. 8/8 alive. ✅
+- **Watchdog**: last entry 12:15:16 MDT (18:15:16Z, ~2 min before check) — overall=healthy. ✅
+- **heal-stale-daemon-code heartbeat**: 2026-06-25T18:13:54Z (~4 min old). Fresh. ✅
+- **Zombie PID 1834248**: still alive (Ss, 2415447s ~27.96d). Ask-then-do. [carry]
+- **6 stale journalctl PIDs**: all alive (1101500 1107838 1118830 1136223 1161972 1177335). Ask-then-do. [carry]
+- **beacon-pending-approvals**: `[]` → pending=0. ✅
+- **PR #703 merged (verified)**: L997 alert `intent=review-pass, source=outbox-notifier` at 18:14:47Z confirms Mirror approved + auto-merged PR #703 ("chore(missions): reconcile pulse-cycle-upgrade + rate-limit-resilience to shipped"). Branch deleted. ✅
+- **PR #704 merged (verified)**: outbox-notifier log `AUTO_MERGE task=pr-ourliberty-agent-core-704 outcome=merged` at 12:14:51 MDT (18:14:51Z). Branch deleted. Worktree torn down. ✅
+- **Open PRs**: `gh pr list --state open` → `[]`. Zero open PRs. ✅
+- **Agent inboxes**: beacon=EMPTY ✅, forge=EMPTY ✅, mirror=EMPTY ✅, pulse=EMPTY ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark: `{"repaired": false, "old_watermark": 995, "file_length": 997}`. **2 new alerts (L996–L997)**.
+- Alert L996: `source=forge-wip-redispatch, route=digest, subject=board-new-mission-confirm-placeholder-001` (18:09:12Z). Triage helper: **Tier-4** (novel, no translation match). G-rule `forge-wip-redispatch-digest-tier4-001` now at **3/3** → dispatched direction-ask to Beacon (pulse-direction-ask-forge-wip-redispatch-digest-tier3-001.json). No Tier-4 DM to Larry (G-rule dispatch is the action; Larry will see the Beacon dispatch → Forge PR path).
+- Alert L997: `source=outbox-notifier, kind=notification, intent=review-pass` (18:14:47Z) — Mirror approved PR #703, auto-merged. Triage helper: **Tier-3** silence (known-pattern match). No DM. ✅
+- Watermark advanced 995→997.
+
+**Check 1 — Log noise:**
+- `journalctl --user -p warning --since "30 minutes ago"` → `-- No entries --`. ✅
+- outbox-notifier.log: Most recent entries show PR #703 and #704 merge success (12:14 MDT). No WARNs. ✅
+- watchdog.log: last entry 12:15:16 MDT (18:15:16Z) — overall=healthy. ✅
+
+**Check 2 — Telegram sweep:**
+- Beacon bot PID 2715635 (Ss, ~11.3h) ✅. Last Larry message 11:29:56 MDT ('go') — handled by prior iters. No new orphan directives. Earlier messages (11:03/11:07 MDT re: Missions board accuracy) were addressed by ~2794 recovery chain. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- 18 tasks FORGE_NO_PR_SKIP. 1 suppressed (cooldown): `retry_exhausted:reconcile-two-stale-inflight-missions-shipped-001`. **"no stalls detected"**. ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- All inboxes EMPTY. beacon-pending-approvals=0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** heartbeat=2026-06-25T18:13:54Z (~4 min old). Fresh. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=66f5f661=origin/main. On main. Clean. ✅ Nominal.
+**Check B — Sync health:** Sync JSON error at 18:00:46Z (push failed), HEAD matches origin. Transient self-heal (same as ~2796). ✅ Informational.
+**Check C — Agent liveness:** 8/8 alive.
+- **[yellow] PID 1834248** — zombie bash loop (~27.96d). Ask-then-do. [carry]
+- **[yellow] 6 stale journalctl PIDs (~30-31d)** — Ask-then-do. [carry]
+
+**Check E — PRs:** 0 open PRs. PR #703 and #704 both merged at 18:14Z. ✅ Nominal — pipeline cleared.
+
+**Check H — Forge activity digest:**
+- **Merged this cycle**: PR #703 ("reconcile pulse-cycle-upgrade + rate-limit-resilience to shipped") and PR #704 ("reconcile 7 shipped missions stuck in drafting"). ✅
+- **Active Forge worktrees**: wt-forge-board-new-mission-confirm-placeholder-001 (original, post-reject), wt-forge-board-new-mission-confirm-placeholder-001-retry1 (retry1 auto-dispatched by forge-wip-redispatch healer at 18:09Z; task archived in Forge .archive/, worktree present = Forge building). wt-forge-reconcile-two-stale-inflight-missions-shipped-001 (PR #703's Forge worktree; teardown pending post-merge). No Forge PRs open.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check VIII/IX/X: Not Monday. Skip. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule updates:**
+- **forge-wip-redispatch-digest-tier4-001 → 3/3 DISPATCHED ✅**: L996 is the 3rd occurrence. Direction-ask dispatched to Beacon inbox (pulse-direction-ask-forge-wip-redispatch-digest-tier3-001.json). Beacon will spec + dispatch Forge to add `source=forge-wip-redispatch, route=digest` → Tier-3 entry in `config/alert-translations.json`. Mark as dispatched; pending verification.
+- All other active G-rules carry unchanged from ~2796.
+
+**Actions taken:**
+1. Check 0: Alerts L996–L997 triaged (1x Tier-4 G-rule dispatch, 1x Tier-3 silence). Watermark advanced 995→997.
+2. Dispatched direction-ask to Beacon: `pulse-direction-ask-forge-wip-redispatch-digest-tier3-001.json` (forge-wip-redispatch-digest G-rule permanent fix).
+3. PRIME ledger: `intervention` appended (tier=1, template=tier4-dispatch-to-beacon, detail=forge-wip-redispatch-digest-tier4-001 G-rule hit 3/3).
+4. Tier state: `record --checks-clean false` → consecutive_clean stays 0 (Tier-4 alert + zombie/journalctl carries). Tier remains 1.
+
+**Dispatches:** Beacon inbox — pulse-direction-ask-forge-wip-redispatch-digest-tier3-001.json.
+
+**Standing findings (carried + verified):**
+- [yellow] **PID 1834248 zombie bash loop** — Still alive (~27.96d). Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **6 stale journalctl PIDs (~30-31d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+- [yellow] **board-new-mission-confirm-placeholder-001 retry1** — Forge-wip-redispatch re-dispatched the rejected task at 18:09Z. Forge worktree wt-forge-board-new-mission-confirm-placeholder-001-retry1 present. Watch for outcome: if retry also rejected, Larry judgment call on task. [new]
+- [yellow] **sequence-paused:operator-needs-you-feed** — Recovery: `resume sequence operator-needs-you-feed` via Beacon or Dashboard. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649/637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**PRIME DIRECTIVE:** interventions=1224, systemic_fixes=71, verification_pending=26, ratio≈17.24, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0 (non-clean: Tier-4 alert dispatched + zombie PID + 6 stale journalctl PIDs). Last signal: 2026-06-25T18:18:45Z.
+
+---
+
+
 ## Iteration ~2796 — 2026-06-25T18:07Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/cycle` invocation via chat.
