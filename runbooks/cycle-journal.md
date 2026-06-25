@@ -5,6 +5,113 @@
 ---
 
 
+## Iteration ~2685 — 2026-06-25T04:28Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry /cycle invocation via chat.
+
+**Health:** ⚠️ Watch — PR #687 rebase COMPLETE (CONFLICTING→MERGEABLE ✅). Mirror actively reviewing #687. PR #692 AUTO_MERGE_HELD pending #687 merge. sequence-paused:operator-needs-you-feed (L1105) still pending Larry action. reconcile-001 FP carry.
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #687 (forge/forge-post-open-mergeable-rebase-001):** gh pr view → MERGEABLE (was CONFLICTING in iter ~2684). Rebase task `rebase-forge-post-open-mergeable-687-001` completed; Mirror review task `review-forge-post-open-mergeable-rebase-001.json` dispatched. autoMergeRequest=null, reviewDecision="", reviews=[]. [state change: CONFLICTING→MERGEABLE ✅]
+- **PR #692 (fix(reaper): forge-wedge-healer):** gh pr view → MERGEABLE, reviewDecision="". Mirror passed (forge-wedge-healer review at 22:23Z). AUTO_MERGE_HELD blocker=#687 (still OPEN). Cascades when #687 merges. [carry ✅]
+- **sequence-paused:operator-needs-you-feed:** L1105 (04:15Z). No new Larry messages, no recovery action since 22:09Z. Still pending. [carry ✅]
+- **G-rule review-duplicate-dispatch-wip-redispatch (3/3 vp):** Mirror inbox shows 2 tasks — `review-forge-post-open-mergeable-rebase-001.json` (NEW for #687) + `review-pr-ourliberty-agent-core-692.json` (duplicate carry for #692). Pattern continues. [carry ✅]
+- **stale-proposed-mission-pipeline-fp-001 vp:** forge-no-pr-sibling-pr-title-supersession-001 still in pending-approvals (03:04Z). [carry ✅]
+- **reconcile-001 FP:** DRY-RUN fires again this cycle (forge-no-pr-sibling-pr-title-supersession-001 approval pending Larry). [carry ✅]
+- **Repo:** HEAD=83960d7d=origin/main. Clean. On main. ✅
+- **Sync:** last_sync=2026-06-25T03:59:53Z (~28min ago). Within 2h. ✅
+- **Daemons:** inbox_watcher (1732118 Ssl), outbox_notifier (2340424 Ss), beacon_telegram_bot (2341187 Ss) — all alive. ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark: repaired=false, old=1105, file_length=1105. 0 new alerts. Watermark holds at 1105. ✅ Nominal.
+
+**Check 1 — Log noise:**
+- outbox-notifier.log: Last entry 22:23:17 MDT (04:23Z UTC) — AUTO_MERGE_HELD PR#692 blocker=#687, marker-notified beacon←mirror for forge-wedge-healer. No WARNs/ERRORs. ~5min idle. ✅ Nominal.
+- watchdog.log: Last entry 22:22:22 MDT (04:22Z UTC), overall=healthy. G-rule COMPLETE ✅. ✅ Nominal.
+- beacon_telegram_bot.log: Last delivery idx=1104 (sequence-paused:operator-needs-you-feed) at 22:19Z. No new Larry messages since 22:09Z. ✅ Nominal.
+
+**Check 2 — Telegram sweep:**
+- No new Larry messages since 22:09:21 MDT (04:09Z). ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` — FALSE POSITIVE (known). Fix: forge-no-pr-sibling-pr-title-supersession-001 approval pending Larry. [carry ✅]
+- `suppressed (cooldown): mirror_pass_unmerged:forge-post-open-mergeable-rebase-001` — cooldown. ✅
+- `unrouted_open_pr`: NOT firing (Mirror has review tasks queued for both #687 and #692). ✅
+- 1 DRY-RUN (FP carry). Non-clean.
+
+**Check 4 — Pending directives:**
+- Beacon inbox: EMPTY. ✅
+- Forge inbox: EMPTY. ✅ (rebase complete, task consumed)
+- Mirror inbox: 2 tasks:
+  - `review-forge-post-open-mergeable-rebase-001.json` — PR #687 review (active, fresh). ✅
+  - `review-pr-ourliberty-agent-core-692.json` — PR #692 duplicate carry. G-rule pattern. ⚠️
+- beacon-pending-approvals: 4 items (carry — structure unreadable in this pass due to file size, confirmed 4 by top-level count):
+  - unreg-approval-6009fbf6bfa2 (01:15Z) [stale carry]
+  - rebase-pr-687-post-open-mergeable-001 (01:23Z) [Forge completed; may persist as artifact]
+  - skip-mirror-review-on-merged-or-closed-pr-001 (02:45Z) [G-rule fix — needs Larry approval]
+  - forge-no-pr-sibling-pr-title-supersession-001 (03:04Z) [silence reconcile-001 FP — needs Larry approval]
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-06-25T04:23:34Z (~4min ago). Fresh. ✅
+
+**Check A — Source repo:** HEAD=83960d7d=origin/main. Clean. On main. ✅
+
+**Check B — Sync health:** last_sync=2026-06-25T03:59:53Z (~28min ago). Within 2h. ✅
+
+**Check C — Agent liveness:** inbox_watcher (1732118 Ssl), outbox_notifier (2340424 Ss), beacon_telegram_bot (2341187 Ss) — all alive. Watchdog overall=healthy (last 22:22Z). ✅
+
+**Check E — PRs:**
+- PR #687 (forge/forge-post-open-mergeable-rebase-001): **MERGEABLE** (rebase complete ✅). autoMergeRequest=null. Mirror reviewing via `review-forge-post-open-mergeable-rebase-001.json`. ⚠️ [active Mirror review — expect pass + auto-merge soon]
+- PR #692 (fix(reaper): forge-wedge-healer): MERGEABLE, reviewDecision="". Mirror passed (forge-wedge-healer review). AUTO_MERGE_HELD blocker=#687 (still OPEN). ⚠️ [cascades when #687 merges]
+
+**Check H — Forge digest:** Forge idle. Rebase task completed. Mirror reviewing #687. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. ✅
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check III: not Sunday. Skip. ✅
+
+**G-rule updates:**
+- **watchdog-watcher-log-stale-post-fix** — COMPLETE ✅ carry. ✅
+- **ourliberty-health-notify-script-missing** — COMPLETE ✅ carry. ✅
+- **review-duplicate-dispatch-wip-redispatch** — 3/3 vp (carry). Mirror inbox still shows duplicate (review-pr-ourliberty-agent-core-692.json). skip-mirror-review-on-merged-or-closed-pr-001 pending Larry.
+- **stale-proposed-mission-pipeline-fp-001 vp** — carry. forge-no-pr-sibling-pr-title-supersession-001 pending Larry.
+- **heal-daemon-restart-manifest-drift-regenerated-tier4** — 2/3 (no new instance). Still 2/3.
+- **check-i-force-bypass-dm-route** — 1/3 (Thursday, no occurrence). Still 1/3.
+- **no-session-revision-merged-pr-fp-001** — 1/3 (not fired dry-run). Still 1/3.
+- **unrouted-open-pr-auto-merge-held-fp-001** — 1/3 (not firing this run). Still 1/3.
+
+**Actions taken:**
+- No auto-fixes. No dispatches. No new alerts. PRIME: 1 intervention row appended. interventions=1157, systemic_fixes=70, vp=25, ratio≈16.53, trend=improving.
+- Tier state: consecutive_clean=0 (non-clean: PR #687 in Mirror review, #692 held, reconcile-001 FP). Tier 1.
+
+**Dispatches:** None this iter.
+
+**Standing findings (updated):**
+- [yellow] **PR #687 (forge/forge-post-open-mergeable-rebase-001)** — Rebase COMPLETE. NOW MERGEABLE. Mirror reviewing via `review-forge-post-open-mergeable-rebase-001.json`. Expect Mirror pass → auto-merge → #692 cascades. [positive transition]
+- [yellow] **sequence-paused:operator-needs-you-feed** — L1105 (04:15Z). gate-mismatch: chain_merged=False, gh_merged=True for `escalation-feed` step (PR #685 IS merged per GitHub). **Recovery: `resume sequence operator-needs-you-feed` via Beacon or Dashboard.** [no action taken yet]
+- [yellow] **forge-no-pr-sibling-pr-title-supersession-001** — pending Larry approval. Silences reconcile-001 FP.
+- [yellow] **unreg-approval-6009fbf6bfa2** — stale carry.
+- [yellow] **skip-mirror-review-on-merged-or-closed-pr-001** — G-rule review-duplicate-dispatch fix, pending Larry approval.
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [blue] **PR #692** — MERGEABLE/CLEAN. Mirror passed (forge-wedge-healer review). AUTO_MERGE_HELD blocker=#687. Cascades when #687 merges.
+- [blue] **review-duplicate-dispatch-wip-redispatch (G-rule 3/3 vp)** — pending skip-mirror-review-on-merged-or-closed-pr-001.
+- [blue] **no-session-revision-merged-pr-fp-001 (G-rule 1/3)** — tracking to 3/3.
+- [blue] **unrouted-open-pr-auto-merge-held-fp-001 (G-rule 1/3)** — tracking to 3/3.
+
+**PRIME DIRECTIVE:** interventions=1157, systemic_fixes=70, verification_pending=25, ratio≈16.53, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** consecutive_clean=0 (non-clean: PR #687 active Mirror review + sequence-paused carry + reconcile-001 FP). Tier: 1.
+
+---
+
+
 ## Iteration ~2684 — 2026-06-25T04:22Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry /cycle invocation via chat.
