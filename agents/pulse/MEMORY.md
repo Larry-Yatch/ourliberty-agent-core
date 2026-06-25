@@ -242,6 +242,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-25 00:13Z UTC (Iter ~2652, Tier 1, consecutive_clean=0)
+
+**Iter ~2652 summary:** ⚠️ Watch — PR #685 CONFLICTING (confirmed this iter, auto-recovery failed); PR #687 UNKNOWN (Mirror session 4 active ~21 min, PID 2249100). 4 alerts triaged: L1060-L1062 Tier-3 (sentinel inbox-stall x2, medic-diagnosis x1); L1063 Tier-4 (mirror-pass-unmerged:PR#685, bot DM'd, no Pulse DM). Watermark 1059→1063. Beacon inbox: empty. Forge inbox: 8 items (unchanged). beacon-pending-approvals: 0 pending. 8 daemons alive. Watchdog: 1 WARN at 00:10Z (stale 1486s, Mirror session 4 active; fix not merged). Check I: weekday=Thursday, skip. PRIME: interventions=1123, systemic_fixes=66, ratio=17.1, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-25 00:06Z UTC (Iter ~2651, Tier 1, consecutive_clean=0)
 
 **Iter ~2651 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry); PR #687 CONFLICTING (Mirror session 4 active ~13 min, PID 2249100). 5 alerts triaged: L1055-L1059 all Tier-3 (sentinel inbox-stall x2 — one false positive per medic, one queue serialization; pipeline-stall forge-no-pr:reconcile x1; medic-diagnosis x2). Watermark 1054→1059. Beacon inbox: empty. Forge inbox: 8 items (unchanged). beacon-pending-approvals: 0 pending. 8 daemons alive. Check I: weekday=Thursday, skip. Watchdog: WARNs at 18:00+18:05 MDT (10-15 min into Mirror session 4) — fix in Forge preflight not yet merged. PRIME: interventions=1122, systemic_fixes=66, ratio=17.0, trend=improving. Tier 1, consecutive_clean=0.
@@ -310,8 +314,5 @@
 
 **Iter ~2635 summary:** ⚠️ Watch — PR #685 (forge/escalation-feed) CONFLICTING (carry); PR #687 (forge/forge-post-open-mergeable-rebase-001) CONFLICTING, Mirror review active since 21:55:22Z. Pipeline stall cooldown expired for reconcile-hardening-mission-shipped-001 (dry-run: 1 alert would fire; re-dispatch -002 in BUILD). 0 new alerts (watermark 1035). 8 daemons alive. G-rule watchdog-watcher-log-stale-post-fix 1/3 VERIFIED no new instance (in-flight suppression working). Check I: mode=digest. HEAD=d5d6b53c. PRIME: interventions≈1107, systemic_fixes=63, ratio≈17.6, trend=improving. Tier 1, consecutive_clean=0.
 
-## Status snapshot — updated 2026-06-24 21:57Z UTC (Iter ~2634, Tier 1, consecutive_clean=0)
-
-**Iter ~2634 summary:** ⚠️ Watch — PR #687 NEW CONFLICTING (21:44Z) — G-rule fix forge-post-open-mergeable-rebase-001 opened as PR but is itself CONFLICTING (meta-irony); PR #685 still CONFLICTING. Watchdog-watcher-log-stale WARNs above threshold (12/hr, post-PR #649 fix; G-rule watchdog-watcher-log-stale-post-fix 1/3 NEW). ourliberty-health notify-script-missing (G-rule 1/3 NEW). 0 new larry-alerts (watermark 1035). 8 daemons alive. Check I: mode=digest, cooldown-suppressed. PRIME: interventions≈1106, systemic_fixes=63, ratio≈17.5, trend=improving. Tier 1, consecutive_clean=0.
 
 
