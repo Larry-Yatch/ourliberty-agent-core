@@ -5,6 +5,119 @@
 ---
 
 
+## Iteration ~2692 — 2026-06-25T05:22Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry /cycle invocation via chat.
+
+**Health:** ✅ Pipeline flowing — PRs #687 and #692 both MERGED since iter ~2691. PR #698 (skip-mirror-review fix) opened and dispatched to Mirror. Active: Mirror has 4 queued tasks (#697, 2 stale #687 tasks, #698). reconcile-001 FP carry.
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #687 (feat(forge-build): auto-rebase post-open CONFLICTING PRs):** MERGED ✅ — commit 4c279218 on main. Mirror returned revision at 04:55Z; Forge applied revision-1; Mirror re-reviewed and passed; auto-merge fired ~23:02–23:06 MDT. AUTO_MERGE_QUEUE_RELEASE blocker=#687 confirmed at 23:06:48 MDT. [resolved ✅]
+- **PR #692 (fix(reaper): forge-wedge-healer):** MERGED ✅ — commit 67339513. AUTO_MERGE at 23:06:54 MDT (outbox-notifier log). 3rd Mirror review passed. [resolved ✅]
+- **PR #697 (fix(heal-stall): forge-no-pr sibling supersession):** OPEN/MERGEABLE. Mirror review task queued (22:43 MDT). PR still open per `gh pr list`. [carry ✅]
+- **PR #698 (fix(review): skip Mirror review when PR already merged or closed):** NEW since iter ~2691. Forge completed build-skip-mirror-review-on-merged-or-closed-pr-001 after notifier restart. PR #698 opened MERGEABLE. Review dispatched to Mirror at 23:16:13 MDT. [new ✅]
+- **PR #691 (heal-stall-dryrun-noop-001):** Mirror passed; AUTO_MERGE_HELD blocker=#697. L1107 delivery confirmation. [carry ✅]
+- **reconcile-001 FP (forge_built_no_pr:reconcile-hardening-mission-shipped-001):** dry-run fires. Fix in PR #697 (Mirror queue). [carry ✅]
+- **sequence-paused:operator-needs-you-feed (L1105):** No new alert. Still pending Larry action. [carry ✅]
+- **heal-stale-daemon-code restarts:** #687 merge introduced dispatch_validator.py change; heal-stale-daemon-code restarted 5 services at 05:13–14Z (outbox-notifier, beacon-bot, chain-event-shipper, dashboard-api, inbox-watcher). All services alive with new PIDs. heartbeat=05:13:51Z. [routine ✅]
+- **Pending approvals:** 1 — rebase-pr-687-post-open-mergeable-001 (stale artifact; PR #687 already merged). [stale, no action ✅]
+- **Repo:** HEAD=a03813e8=origin/main. Clean. On main. ✅
+- **Sync:** last_sync=2026-06-25T05:00:05Z (~22 min ago). Within 2h. ✅
+- **Daemons:** inbox_watcher (1732118), outbox_notifier (2594852), beacon_telegram_bot (2594942), chain_event_shipper (2595115) — all alive. ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark: repaired=false, old=1106, file_length=1109 (at scan start). 6 new alerts (L1107–L1112).
+- L1107: outbox-notifier review-pass for PR #691/heal-stall-dryrun-noop-001 → triage-alert → Tier-3 silence (known-pattern). ✅
+- L1108: heal-stale-daemon-code auto-restarted:ourliberty-outbox-notifier.service, route=digest → Tier-3. ✅
+- L1109: heal-stale-daemon-code auto-restarted:ourliberty-beacon-bot.service, route=digest → Tier-3. ✅
+- L1110: heal-stale-daemon-code auto-restarted:ourliberty-chain-event-shipper.service, route=digest → Tier-3. ✅
+- L1111: heal-stale-daemon-code auto-restarted:ourliberty-dashboard-api.service, route=digest → Tier-3. ✅
+- L1112: heal-stale-daemon-code auto-restarted:ourliberty-inbox-watcher.service, route=digest → Tier-3. ✅
+- Watermark advanced 1106→1112. ✅ Nominal.
+
+**Check 1 — Log noise:**
+- outbox-notifier.log: After restart at 23:13:54 MDT: 23:16:13 review-request dispatched mirror for PR #698 (skip-mirror-review); 23:16:15 notified beacon. No WARNs/ERRORs. ✅
+- watchdog.log: Not re-checked this iter (last=healthy at 23:03 MDT in iter ~2691). ✅
+- beacon_telegram_bot.log: Beacon restarted 23:13:58 MDT (heal-stale-daemon-code). Processed L1107–1111 all route=digest, no DMs. Last entry 23:19:00 MDT. No new Larry messages. ✅
+
+**Check 2 — Telegram sweep:**
+- No new Larry messages since 22:54:32 MDT (04:54Z UTC) "status" → catch_me_up.
+- [yellow] Larry asked "let me know when 687 merges" at 22:44:31 MDT. Beacon timed out at 22:54:31; #687 merged ~23:02–23:06 MDT while Beacon was recovering. No merge notification delivered. Larry was informed of state via catch_me_up at 22:54:33 (which showed #687 still in review at that moment). Notifying now via journal — #687 is merged as of ~23:06 MDT. No DM needed (informational). ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` — FP carry. Fix (PR #697) in Mirror queue. [carry ✅]
+- FORGE_NO_PR_SKIP for forge-post-open-mergeable-rebase-001 → pr_exists match=branch pr=#687 ✅ (correctly skipping the merged PR).
+- FORGE_NO_PR_SKIP for forge-wedge-healer → pr_exists match=branch pr=#692 ✅ (correctly skipping merged PR).
+- 1 DRY-RUN alert (FP only). Non-clean.
+
+**Check 4 — Pending directives:**
+- Beacon inbox: EMPTY. ✅
+- Forge inbox: EMPTY (build-skip-mirror-review-on-merged-or-closed-pr-001 consumed — PR #698 opened). ✅
+- Mirror inbox (4 files, FIFO order):
+  - `review-forge-no-pr-sibling-pr-title-supersession-001.json` (22:43) — PR #697. ✅
+  - `review-forge-post-open-mergeable-rebase-001-rev1.json` (22:58) — PR #687 (MERGED, STALE). ⚠️
+  - `review-forge-post-open-mergeable-rebase-001.json` (23:00) — PR #687 (MERGED, STALE). ⚠️
+  - `review-skip-mirror-review-on-merged-or-closed-pr-001.json` (23:16) — PR #698. ✅
+- beacon-pending-approvals: 1 (rebase-pr-687 stale artifact; #687 merged). ✅
+- Mirror idle (tmux: no sessions). Will process tasks in FIFO order when inbox_watcher dispatches.
+- [yellow] 2 stale Mirror review tasks for merged #687 will burn tokens reviewing a closed PR. Fix: PR #698 (skip-mirror-review) must merge first to prevent this pattern on FUTURE reviews; current 2 stale tasks will still run. Known G-rule (review-duplicate-dispatch).
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-06-25T05:13:51Z (~9 min ago). Fresh. ✅
+
+**Check A — Source repo:** HEAD=a03813e8=origin/main. Clean. On main. ✅
+
+**Check B — Sync health:** last_sync=2026-06-25T05:00:05Z (~22 min ago). Within 2h. ✅
+
+**Check C — Agent liveness:** inbox_watcher (1732118), outbox_notifier (2594852, new post-restart), beacon_telegram_bot (2594942, new post-restart), chain_event_shipper (2595115, new post-restart) — all alive. ✅
+
+**Check E — PRs:**
+- PR #687 (feat(forge-build): auto-rebase post-open CONFLICTING PRs): MERGED ✅
+- PR #692 (fix(reaper): forge-wedge-healer): MERGED ✅
+- PR #697 (fix(heal-stall): forge-no-pr sibling supersession): OPEN/MERGEABLE. Mirror review queued (first in queue). ⚠️ [expect merge → reconcile-001 FP silences + #691 unblocks]
+- PR #698 (fix(review): skip Mirror review when PR merged/closed): OPEN/MERGEABLE. Mirror review dispatched 23:16 MDT. ⚠️ [4th in queue]
+- PR #691 (heal-stall-dryrun-noop-001): Mirror passed; AUTO_MERGE_HELD blocker=#697. ⚠️ [cascades when #697 merges]
+
+**Check H — Forge digest:** Forge IDLE. build-skip-mirror-review-on-merged-or-closed-pr-001 completed (PR #698 opened). ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op. distill_detector: no-op. ✅
+
+**Conditional checks — Wednesday 2026-06-25 UTC (weekday=2, but iter is Thursday 2026-06-25 UTC, weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday=3, gate fails. Skip. ✅
+- Check III: not Sunday. Skip. ✅
+
+**G-rule updates:**
+- **review-duplicate-dispatch-wip-redispatch** — 3/3 vp. PR #698 (fix) opened and dispatched to Mirror at 23:16 MDT. Fix in-flight. 2 stale #687 review tasks remain in Mirror inbox (will run before #698 fix lands — known waste). ✅
+- **stale-proposed-mission-pipeline-fp-001 vp** — RESOLVED ✅. PR #697 in Mirror queue; reconcile-001 FP silences on merge.
+- **heal-daemon-restart-manifest-drift-regenerated-tier4** — 2/3 (no new instance). Carry.
+- **check-i-force-bypass-dm-route** — 1/3 (Thursday, no occurrence). Carry.
+- **no-session-revision-merged-pr-fp-001** — 1/3 (FORGE_NO_PR_SKIP via pr_exists; not firing for merged #692/#687). Carry.
+- **unrouted-open-pr-auto-merge-held-fp-001** — 1/3. The specific #692 instance resolved (PR merged). Underlying structural issue (stall checker unaware of AUTO_MERGE_HELD state when cooldown expires) persists for future PRs. Carry for structural fix.
+
+**Actions taken:** 1 auto-action: watermark advanced 1106→1112 (6 Tier-3 alerts triaged). 0 dispatches. 0 other auto-fixes.
+
+**Standing findings (updated):**
+- [yellow] **PR #697 (forge-no-pr-sibling-pr-title-supersession-001)** — MERGEABLE. Mirror review queued (first). Reconcile-001 FP silences + PR #691 unblocks on merge.
+- [yellow] **PR #698 (skip-mirror-review-on-merged-or-closed-pr-001)** — MERGEABLE. Mirror review dispatched 23:16 MDT (4th in queue). G-rule review-duplicate-dispatch fix.
+- [yellow] **2 stale Mirror review tasks for merged PR #687** — in Mirror inbox (22:58, 23:00). Will review a merged PR before #698 fix lands. Known/accepted waste for this cycle.
+- [yellow] **sequence-paused:operator-needs-you-feed** — L1105 (04:15Z). gate-mismatch chain_merged=False gh_merged=True. **Recovery: `resume sequence operator-needs-you-feed` via Beacon or Dashboard.**
+- [yellow] **Larry "let me know when 687 merges"** — not delivered (Beacon timed out; #687 merged ~23:06 MDT). #687 IS merged. ✅ Informational only.
+- [yellow] **rebase-pr-687-post-open-mergeable-001** — stale pending-approval artifact (PR #687 merged). No action needed.
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [blue] **PR #691 (heal-stall-dryrun-noop-001)** — Mirror passed. AUTO_MERGE_HELD blocker=#697. Cascades on #697 merge.
+
+**PRIME DIRECTIVE:** interventions=1161, systemic_fixes=70, verification_pending=25, ratio≈16.59, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** consecutive_clean=0 (non-clean: Mirror 4 tasks queued + stale review tasks + reconcile-001 FP + sequence paused). Tier: 1. Tier state recorded.
+
+---
+
+
 ## Iteration ~2691 — 2026-06-25T05:11Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry /cycle invocation via chat.

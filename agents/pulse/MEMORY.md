@@ -156,6 +156,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-25 05:22Z UTC (Iter ~2692, Tier 1, consecutive_clean=0→0)
+
+**Iter ~2692 summary:** ✅ Pipeline flowing — PRs #687 and #692 both MERGED ✅ (major resolution). PR #698 (skip-mirror-review fix, G-rule review-duplicate-dispatch) opened + Mirror review dispatched 23:16 MDT. **KEY EVENTS: 6 new alerts (L1107–1112, all Tier-3 silenced, watermark 1106→1112). heal-stale-daemon-code restarted 5 services post-#687 merge (dispatch_validator.py change; all alive). Forge idle. Mirror: 4 tasks queued (#697, 2 stale #687 tasks, #698). PR #691 AUTO_MERGE_HELD blocker=#697. sequence-paused:operator-needs-you-feed carry. reconcile-001 FP carry (PR #697 in Mirror queue). Larry "let me know when 687 merges" not delivered (Beacon timed out; #687 merged ~23:06 MDT — confirmed merged.** PRIME: interventions=1161, systemic_fixes=70, vp=25, ratio≈16.59, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-25 05:11Z UTC (Iter ~2691, Tier 1, consecutive_clean=0→0)
 
 **Iter ~2691 summary:** ⚠️ Watch — Mirror returned `review_revision` for PR #687 at 04:55Z UTC (status change from iter ~2690 expectation). Beacon dispatched revision-1 to Forge + re-review-rev1 to Mirror. No revision commit on #687 branch yet. Forge ACTIVELY BUILDING `skip-mirror-review-on-merged-or-closed-pr-001` (PID 2573177, G-rule review-duplicate-dispatch fix). Mirror ACTIVELY REVIEWING PR #692 3rd review (PID 2583838). **KEY EVENTS: 1 new alert (L1106 dispatch-branch-cleanup digest, Tier-3 silence, watermark 1105→1106). Pending approvals 3→1 (only rebase-pr-687 stale artifact remains). Mirror inbox 4→3 (692 consumed). reconcile-001 FP carry. sequence-paused:operator-needs-you-feed carry. mirror_pass_unmerged cooldown EXPIRED (stale stall-checker model — state being addressed).** PRIME: interventions=1161, systemic_fixes=70, vp=25, ratio≈16.59, trend=improving. Tier 1, consecutive_clean=0.
@@ -232,7 +236,4 @@
 
 **Iter ~2673 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase approval pending Larry). **KEY EVENTS: PR #696 (wire-agent-core-health-notify-001) MERGED 02:49:38Z ✅ — G-rule ourliberty-health-notify COMPLETE. G-rule stale-proposed-mission-pipeline-fp-001 3/3 DISPATCHED → Beacon. All agents IDLE.** 2 alerts (L1095-L1096, both Tier-3). Watermark 1094→1096. PR #692 MERGEABLE/CLEAN, AUTO_MERGE_HELD blocker=#687. PRIME: interventions=1146, systemic_fixes=70, vp=25, ratio≈16.4, trend=improving. Tier 1, consecutive_clean=0.
 
-## Status snapshot — updated 2026-06-25 02:47Z UTC (Iter ~2672, Tier 1, consecutive_clean=0)
-
-**Iter ~2672 summary:** ⚠️ Watch — PR #687 CONFLICTING. **KEY EVENTS: Beacon processed review-duplicate-dispatch-notify-handler-fix-001 (325s, $0.84) → NEW approval `skip-mirror-review-on-merged-or-closed-pr-001`. Mirror ACTIVE reviewing PR #692. PR #696 rev1 waiting.** 3 alerts (L1092-L1094, all Tier-3). Watermark 1091→1094. PRIME: interventions=1145, systemic_fixes=69, vp=24, ratio≈16.6, trend=improving. Tier 1, consecutive_clean=0.
 
