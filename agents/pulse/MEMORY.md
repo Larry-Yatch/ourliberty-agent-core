@@ -138,6 +138,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-25 03:18Z UTC (Iter ~2675, Tier 1, consecutive_clean=0)
+
+**Iter ~2675 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase-pr-687-post-open-mergeable-001 pending Larry). **KEY EVENTS: All agents IDLE. 1 new alert (L1099 Tier-3 approval_request delivery confirmation, silenced). Watermark 1098→1099. 4 pending approvals (carry). No dispatches.** Pipeline stall: reconcile-001 FP (fix approval pending). Check I: Thursday, skip. PRIME: interventions=1148, systemic_fixes=70, vp=25, ratio=16.4, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-25 03:07Z UTC (Iter ~2674, Tier 1, consecutive_clean=0)
 
 **Iter ~2674 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase-pr-687-post-open-mergeable-001 pending Larry). **KEY EVENTS: Beacon processed stale-proposed-mission-pipeline-fp-001 (270s, $0.87) → NEW approval `forge-no-pr-sibling-pr-title-supersession-001` (03:04Z, DM'd Larry; root cause was PR-title sibling supersession, not missions.json). All agents IDLE.** 2 alerts (L1097-L1098, both Tier-3). Watermark 1096→1098. 4 pending approvals (unreg-approval-6009fbf6bfa2 stale; rebase-pr-687 active; skip-mirror-review; forge-no-pr-sibling-pr-title-supersession-001 NEW). Pipeline stall: reconcile-001 FP (fix pending approval). Check I: Thursday, skip. PRIME: interventions=1147, systemic_fixes=70, vp=25, ratio≈16.39, trend=improving. Tier 1, consecutive_clean=0.

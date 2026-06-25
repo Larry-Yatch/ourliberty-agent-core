@@ -5,6 +5,105 @@
 ---
 
 
+## Iteration ~2675 — 2026-06-25T03:18Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry /cycle invocation via chat.
+
+**Health:** ⚠️ Watch — PR #687 CONFLICTING (rebase approval pending Larry). **KEY EVENTS: Beacon processed stale-proposed-mission-pipeline-fp-001 (03:03:57Z) in prior iter → approval forge-no-pr-sibling-pr-title-supersession-001 in queue. All agents IDLE. 1 new alert (L1099 Tier-3 silenced). No dispatches this iter.**
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #687 (forge/forge-post-open-mergeable-rebase-001):** CONFLICTING/DIRTY confirmed (gh API: mergeable=CONFLICTING, mergeStateStatus=DIRTY). rebase-pr-687-post-open-mergeable-001 still in beacon-pending-approvals (01:23Z). [carry ✅]
+- **PR #692 (fix(reaper): forge-wedge-healer):** MERGEABLE/CLEAN confirmed (gh API). AUTO_MERGE_HELD blocker=#687. [cascades when #687 resolves ✅]
+- **G-rule watchdog-watcher-log-stale-post-fix:** COMPLETE ✅ carry-verified. watchdog.log: last entry 21:15:46 MDT (03:15:46 UTC), all healthy. No WARNs since 19:43 MDT. ✅
+- **G-rule ourliberty-health-notify-script-missing:** COMPLETE ✅ carry (PR #696 MERGED prior iter). ✅
+- **G-rule review-duplicate-dispatch-wip-redispatch:** 3/3 vp (carry). skip-mirror-review-on-merged-or-closed-pr-001 pending Larry approval. [carry ✅]
+- **stale-proposed-mission-pipeline-fp-001 (G-rule vp):** Beacon DONE 03:03:57Z prior iter. forge-no-pr-sibling-pr-title-supersession-001 approval in pending list (03:04Z). Still vp. [advancing ✅]
+- **Repo:** HEAD=6da95c37=origin/main. Clean. On main. ✅
+- **Sync:** last_sync=2026-06-25T02:59:39Z (~19m ago at check time). status=no-change. Within 2h. ✅
+- **Daemons:** inbox_watcher PID 1732118 (Ssl), outbox_notifier PID 2340424 (Ss), beacon_telegram_bot PID 2341187 (Ss) — all alive. ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark: no-op (old=1098, file_length=1099). ✅
+- **L1099** `source=outbox-notifier, kind=approval_request, approval_id=forge-no-pr-sibling-pr-title-supersession-001` — Tier-3 ✅ (known-pattern: approval_request delivery confirmation, route=digest, silence). Helper confirmed.
+- Watermark advanced 1098→1099. ✅
+
+**Check 1 — Log noise:**
+- watchdog.log: Last entry 21:15:46 MDT (03:15:46 UTC). Healthy pattern continuing. Last WARN 19:43 MDT (01:43 UTC, during Mirror session). G-rule COMPLETE ✅ holding. ✅ Nominal.
+- inbox_watcher.log: Last entry 03:03:57Z (Beacon done stale-proposed-mission-pipeline-fp-001). All agents IDLE since. No WARNs. ✅ Nominal.
+
+**Check 2 — Telegram sweep:**
+- Last Larry message: "Yes rebase #687 next" (18:45 MDT = 00:45Z). No new directives. ✅ Nominal.
+- Last bot outbound: idx=1098 approval_request (forge-no-pr-sibling-pr-title-supersession-001) delivered 21:07 MDT (03:07Z). ✅
+
+**Check 3 — Pipeline stall (dry-run):**
+- `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` — **FALSE POSITIVE** (known). Beacon fix pending Larry approval: forge-no-pr-sibling-pr-title-supersession-001. ✅ Carry.
+- `suppressed (cooldown): mirror_pass_unmerged:forge-post-open-mergeable-rebase-001` — PR #687. Cooldown. ✅
+- `suppressed (cooldown): unrouted_open_pr:Larry-Yatch/ourliberty-agent-core:692` — PR #692. Cooldown. ✅
+- 0 actual alerts fired. ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- Forge/Beacon/Mirror inboxes: all EMPTY. ✅
+- beacon-pending-approvals: 4 items (all carry):
+  - `unreg-approval-6009fbf6bfa2` (01:15Z) [stale carry]
+  - `rebase-pr-687-post-open-mergeable-001` (01:23Z) [active — Larry to approve PR #687 rebase]
+  - `skip-mirror-review-on-merged-or-closed-pr-001` (02:45Z) [G-rule fix]
+  - `forge-no-pr-sibling-pr-title-supersession-001` (03:04Z) [silence reconcile-001 FP via PR-title sibling supersession fix]
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-25T03:12:25Z (~6m ago at check time). ✅
+
+**Check A — Source repo:** HEAD=6da95c37=origin/main. Clean. On main. 0 commits behind. ✅
+
+**Check B — Sync health:** last_sync=2026-06-25T02:59:39Z (~19m ago). status=no-change. Within 2h. ✅
+
+**Check C — Agent liveness:** inbox_watcher (1732118 Ssl), outbox_notifier (2340424 Ss), beacon_telegram_bot (2341187 Ss) — all alive. ✅
+
+**Check E — PRs:**
+- PR #687 (forge/forge-post-open-mergeable-rebase-001): CONFLICTING/DIRTY. Rebase approval pending Larry. ⚠️
+- PR #692 (fix(reaper): forge-wedge-healer): MERGEABLE/CLEAN. AUTO_MERGE_HELD blocker=#687. [cascades when #687 resolves]
+
+**Check H — Forge digest:** IDLE (inbox EMPTY). ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. ✅
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check III: not Sunday. Skip. ✅
+
+**G-rule updates:**
+- **watchdog-watcher-log-stale-post-fix** — COMPLETE ✅ carry-verified (healthy entries to 03:15 UTC, 0 WARNs in window). ✅
+- **ourliberty-health-notify-script-missing** — COMPLETE ✅ carry. ✅
+- **review-duplicate-dispatch-wip-redispatch** — 3/3 vp (carry). skip-mirror-review-on-merged-or-closed-pr-001 pending Larry approval.
+- **stale-proposed-mission-pipeline-fp-001 vp** — Beacon DONE prior iter. forge-no-pr-sibling-pr-title-supersession-001 approval in queue. Still vp.
+- **heal-daemon-restart-manifest-drift-regenerated-tier4** — 2/3 (no new instance this iter). Dispatch at 3/3.
+- **check-i-force-bypass-dm-route** — 1/3 (Thursday, no occurrence). Dispatch at 3/3.
+
+**Actions taken:**
+- Alert triage: L1099 Tier-3 silenced. Watermark 1098→1099.
+- PRIME: intervention row appended (alert-triage-check0). interventions=1148, systemic_fixes=70, vp=25, ratio=16.4, trend=improving.
+- Tier state: recorded not-clean (consecutive_clean=0). Tier 1.
+
+**Dispatches:** None this iter.
+
+**Standing findings (carried + verified):**
+- [yellow] **PR #687 (forge/forge-post-open-mergeable-rebase-001)** — CONFLICTING. rebase-pr-687-post-open-mergeable-001 approval pending Larry. Blocking PR #692. [carry]
+- [yellow] **forge-no-pr-sibling-pr-title-supersession-001** — approval (03:04Z). Silence reconcile-001 FP stall via PR-title sibling supersession. [needs Larry approval]
+- [yellow] **unreg-approval-6009fbf6bfa2 + sequence-paused:operator-needs-you-feed** — Dashboard. [carry]
+- [yellow] **skip-mirror-review-on-merged-or-closed-pr-001** — G-rule review-duplicate-dispatch fix, pending Larry approval. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**PRIME DIRECTIVE:** interventions=1148 (+1 this iter), systemic_fixes=70, verification_pending=25, ratio=16.4, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** consecutive_clean=0 (carry findings). Tier: 1.
+
+---
+
+
 ## Iteration ~2674 — 2026-06-25T03:07Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry /cycle invocation via chat.
