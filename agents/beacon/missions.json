@@ -5491,7 +5491,20 @@
       "created": "2026-06-25",
       "deferred_reason": null,
       "proposed_by": "closeout",
-      "proposed_at": "2026-06-25T20:30:42.892738+00:00"
+      "proposed_at": "2026-06-25T20:30:42.892738+00:00",
+      "briefing": {
+        "what": "The team set up a new, cleaner way to handle urgent alerts while keeping the old system running alongside it so nothing breaks during the switch.",
+        "why": "Running both systems at once is fine for now, but leaving the old one in place indefinitely creates clutter that slows future work and invites confusion.",
+        "suggest": "No rush \u2014 let the new system prove itself for a bit, then give the team a green light to retire the old one when they're confident it's safe."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-25T20:35:19.955198+00:00",
+        "from_state": "proposed"
+      }
     },
     {
       "id": "the-steering-endpoint-and-proxy-accept-a-retry-action-but-the-dashboard-only-surfaces-resume-skip-cancel-buttons-so-the-retry-path-is-wired-up-without-a-way-to-trigger-it-from-the-ui",
@@ -5504,7 +5517,20 @@
       "created": "2026-06-25",
       "deferred_reason": null,
       "proposed_by": "closeout",
-      "proposed_at": "2026-06-25T20:30:42.893523+00:00"
+      "proposed_at": "2026-06-25T20:30:42.893523+00:00",
+      "briefing": {
+        "what": "Your control panel can already \"retry\" a stalled job behind the scenes, but there's no button for it \u2014 so right now only Resume, Skip, and Cancel are clickable.",
+        "why": "When something stalls, retry is often the fastest fix; without a button, your team has to work around it, which slows recovery and wastes the capability you already built.",
+        "suggest": "Worth adding the Retry button to round out the controls \u2014 it's a small, low-stakes finish to work that's already in place, so go ahead when it fits the schedule."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-25T20:35:19.955198+00:00",
+        "from_state": "proposed"
+      }
     },
     {
       "id": "the-stuck-dispatched-threshold-is-fixed-at-15-minutes-as-a-hardcoded-module-constant-so-adjusting-how-long-a-step-waits-before-flagging-larry-requires-a-code-change",
@@ -5517,7 +5543,20 @@
       "created": "2026-06-25",
       "deferred_reason": null,
       "proposed_by": "closeout",
-      "proposed_at": "2026-06-25T20:30:42.894082+00:00"
+      "proposed_at": "2026-06-25T20:30:42.894082+00:00",
+      "briefing": {
+        "what": "Right now the system waits a fixed 15 minutes before flagging a stalled step for you, and changing that wait time means a developer has to step in.",
+        "why": "You can't tune how quickly things get escalated to your attention without paying for engineering time, so the system stays rigid as your needs change.",
+        "suggest": "Worth doing when convenient \u2014 have the team make this wait time adjustable so you can dial it up or down yourself, but there's no urgency."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-25T20:35:19.955198+00:00",
+        "from_state": "proposed"
+      }
     }
   ]
 }
