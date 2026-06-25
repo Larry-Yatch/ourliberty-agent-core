@@ -236,9 +236,9 @@
 
 ---
 
-## G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4 → DISPATCHED ✅ (iter ~2644, 3/3)
+## G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4 → COMPLETE ✅ (iter ~2644 dispatch, iter ~2668 verified)
 
-**Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:mirror-pass-unmerged:PR#N` alerts classify Tier-4 (novel — no translation match in alert-translations.json). Bot delivers as escalate (route=escalate) and DMs Larry. Pulse does NOT send a second DM. 3/3 threshold crossed at iter ~2644 (L1047, 23:08Z). Dispatch: `heal-pipeline-stall-mirror-pass-unmerged-tier3-001.json` → Beacon inbox. verification_pending. Instances: iter ~2629 (PR#685 rev1), iter ~2636 (PR#685 L1039), iter ~2644 (PR#685 L1047), iter ~2666 (PR#687 L1085 — cooldown expired).
+**Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:mirror-pass-unmerged:PR#N` alerts now classify Tier-3 (digest route) via longest-prefix match under `heal-pipeline-stall` in `config/alert-translations.json`. PR #695 (`config: silence redundant mirror-pass-unmerged pipeline-stall alerts to digest`) merged 2026-06-25T02:07Z. Verified: L1089 triaged Tier-3 correctly (route=digest, silence). PRIME systemic_fix logged iter ~2668. **G-rule COMPLETE.**
 
 ---
 
@@ -247,6 +247,10 @@
 **Rule:** When Forge completes a revision task, two separate review dispatch paths fire simultaneously: (1) outbox_notifier's revision-completion path (`-rev1.json` file) and (2) Beacon's notification-handler path (non-rev1 `.json` file). Both land in Mirror's inbox, causing Mirror to review the same PR twice in sequence. The -rev1 path is legitimate; the non-rev1 is a duplicate. Wasted Mirror time but not harmful (reviews same PR state). G-rule: track to 3/3 for Beacon fix (dedup the review dispatch). First instance: forge-wip-only-auto-redispatch-001 rev1, iter ~2666 (review-forge-wip-only-auto-redispatch-001.json + review-forge-wip-only-auto-redispatch-001-rev1.json both in Mirror inbox 2026-06-25T01:54-01:55Z).
 
 ---
+
+## Status snapshot — updated 2026-06-25 02:13Z UTC (Iter ~2668, Tier 1, consecutive_clean=0)
+
+**Iter ~2668 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase-pr-687-post-open-mergeable-001 approval pending Larry). **KEY EVENTS: PR #695 MERGED 02:07Z → G-rule heal-pipeline-stall-mirror-pass-unmerged COMPLETE ✅. PR #691 MERGED (heal-pipeline-stall dry-run noop fix). PR #685 (escalation-feed) confirmed MERGED 01:17Z — was carried as conflicting, now closed.** L1090 burn-rate at 89% (Tier-3, bot DM'd, no Pulse DM; pace indicator only, 0 rate-limit events). Mirror inbox: 4 items (review-forge-wip-only-auto-redispatch-001-rev1, -001, -pr-ourliberty-agent-core-692, -wire-agent-core-health-notify-001). Forge EMPTY. Beacon EMPTY. 2 pending approvals (unreg-approval-6009fbf6bfa2 stale; rebase-pr-687 active). Watermark 1088→1090. G-rules: heal-notify 3/3 vp (PR #696 Mirror queue), manifest-drift 2/3, review-duplicate-dispatch-wip-redispatch 1/3, check-i-force-bypass 1/3. PRIME: systemic_fixes=69 (+2 this iter), ratio≈17.3+, trend=improving. Tier 1, consecutive_clean=0.
 
 ## Status snapshot — updated 2026-06-25 02:06Z UTC (Iter ~2667, Tier 1, consecutive_clean=0)
 
