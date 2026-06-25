@@ -234,24 +234,63 @@ class SkipCasesTest(_Base):
 
 class ExhaustedEscalationTest(_Base):
     def test_exhausted_escalates_exactly_once(self):
+        # Realistic exhaustion: the family is at MAX and the latest RETRY's OWN
+        # branch is itself WIP-only abandoned (the retry also died mid-build).
         self._archive_original()
-        self._seed_ledger({'synthetic-wip-001': {'attempts': h.MAX_AUTO_RETRIES,
-                                                  'escalated': False}})
-        branches = [('forge/synthetic-wip-001', time.time() - 3600)]
+        self._seed_ledger({'synthetic-wip-001': {
+            'attempts': h.MAX_AUTO_RETRIES,
+            'last_retry_task_id': 'synthetic-wip-001-retry1',
+            'escalated': False}})
+        branches = [('forge/synthetic-wip-001-retry1', time.time() - 3600)]
 
-        # Tick 1: ledger already at MAX, not yet escalated -> ONE loud alert.
+        # Tick 1: the retry branch is abandoned -> ONE loud alert.
         with self._git_world(branches):
             self._run()
         routes = [c.args[0] for c in self._alerts.call_args_list]
         self.assertEqual(routes, ['escalate'])
         self.assertTrue(self._ledger()['synthetic-wip-001']['escalated'])
         # No envelope written on the escalation path.
-        self.assertNotIn('synthetic-wip-001-retry1.json', self._inbox_files())
+        self.assertNotIn('synthetic-wip-001-retry1-retry1.json', self._inbox_files())
 
         # Tick 2: escalated flag set -> silent, no repeat alert.
         with self._git_world(branches):
             self._run()
         self.assertEqual(self._alerts.call_count, 1)
+
+    def test_no_false_escalation_on_lingering_original_after_redispatch(self):
+        # Regression for Mirror review #693 rev 1: after a successful redispatch
+        # the original forge/<base> branch lingers empty-wip (branch GC waits
+        # 48h) while the retry is healthily building under <base>-retry1. The
+        # next tick must NOT fire a false 'retries-exhausted' escalation off the
+        # lingering original.
+        self._archive_original()
+        old = time.time() - 3600
+
+        # Tick 1: redispatch the abandoned original.
+        with self._git_world([('forge/synthetic-wip-001', old)]):
+            self._run()
+        self.assertIn('synthetic-wip-001-retry1.json', self._inbox_files())
+        self.assertEqual([c.args[0] for c in self._alerts.call_args_list],
+                         ['digest'])
+
+        # inbox_watcher consumes the retry envelope within seconds and the retry
+        # is now building: remove it from the live inbox, register it in-flight,
+        # and its own WIP checkpoint branch exists.
+        (h.INBOXES_ROOT / 'forge' / 'synthetic-wip-001-retry1.json').unlink()
+        self._write_in_flight('synthetic-wip-001-retry1', os.getpid())
+        branches = [('forge/synthetic-wip-001', old),
+                    ('forge/synthetic-wip-001-retry1', old)]
+
+        # Tick 2: original lingers, retry is live in-flight. NO escalation,
+        # NO second redispatch.
+        with self._git_world(branches):
+            self._run()
+        self.assertEqual(self._alerts.call_count, 1)  # still just the digest
+        escalate_calls = [c for c in self._alerts.call_args_list
+                          if c.args[0] == 'escalate']
+        self.assertEqual(escalate_calls, [])
+        self.assertFalse(self._ledger()['synthetic-wip-001'].get('escalated'))
+        self.assertNotIn('synthetic-wip-001-retry1-retry1.json', self._inbox_files())
 
 
 class KillSwitchTest(_Base):

@@ -49,10 +49,14 @@ stripped base stem (``_ledger_base``), the live-inbox family-root check
 of which turns the second tick into a no-op; covered by
 ``test_second_tick_is_noop_via_ledger`` and ``test_skips_when_retry_already_pending``.
 
-NEVER fire more than one loud Larry alert per exhausted family. **Enforcement:**
-the ``escalated`` flag persisted in the ledger entry gates the escalate-route
-alert; subsequent ticks read it and stay silent — covered by
-``test_exhausted_escalates_exactly_once``.
+NEVER fire a loud Larry alert unless the latest RETRY itself died WIP-only, and
+never more than once per exhausted family. **Enforcement:** the escalate path in
+``evaluate`` requires the candidate branch to BE the ledger's
+``last_retry_task_id`` (the lingering original branch is skipped, so a healthy or
+merged retry never triggers a false 'exhausted' DM), and the persisted
+``escalated`` flag bounds it to one alert — covered by
+``test_exhausted_escalates_exactly_once`` and
+``test_no_false_escalation_on_lingering_original_after_redispatch``.
 
 NEVER act when disabled or under test. **Enforcement:** ``main`` returns early on
 ``~/agents/healers.disabled``; the inbox write calls
@@ -366,6 +370,21 @@ def evaluate(cand: Candidate, now: float, open_heads: set[str],
     if attempts >= MAX_AUTO_RETRIES:
         if entry.get('escalated'):
             return 'skip', 'retries-exhausted (already escalated)'
+        # Exhaustion keys on the latest RETRY's outcome, NOT the original
+        # branch's persistence. After a successful redispatch the original
+        # forge/<base> branch stays empty-wip until branch GC (48h), and its
+        # PR/in-flight live under the retry id (forge/<base>-retryN), so it
+        # passes gates 2-4 here every tick — escalating off it would fire a
+        # FALSE 'exhausted' DM while the retry is healthily building or already
+        # merged (Mirror review #693, rev 1). So only the retry's OWN abandoned
+        # branch may escalate: gates 2-4 above already proved THIS candidate is
+        # WIP-only / no-PR / not-in-flight / not-queued, so when the candidate
+        # IS the retry branch the retry is genuinely abandoned. The lingering
+        # original (or any earlier retry) is skipped; if the latest retry also
+        # dies WIP-only its own branch surfaces and escalates exactly once.
+        last_retry = entry.get('last_retry_task_id')
+        if last_retry and cand.branch_stem != last_retry:
+            return 'skip', 'superseded by active retry (original branch lingering)'
         return 'escalate', f'retries-exhausted (attempts={attempts})'
 
     return 'redispatch', 'wip-only abandoned dispatch'
