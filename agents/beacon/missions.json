@@ -5015,10 +5015,16 @@
     {
       "id": "orchestrator-terminal-signal-hardening",
       "name": "Orchestrator terminal-signal hardening",
-      "phase": "in_flight",
+      "phase": "shipped",
       "brief": "Make the build-sequence advancer + stall backstops propagate terminal agent outcomes correctly. Root cause: chain_event_says_failed queries event types the shipper never emits (forge_reject/mirror_* vs the real preflight_reject/review_escalate), so only the merge path is wired and non-merge terminals false-strand to the 4h timer with a misattributed reason. Re-scoped to 2 steps after reconciling vs #665/#668 (which already shipped the no-session mechanical recovery + most backstop fixes): Step 1 advancer event-type realign + stall attribution; Step 2 push-signal non-merge terminals + pr_url/substatus at PR-open.",
       "spec_doc": "agents/beacon/specs/orchestrator-terminal-signal-hardening.md",
-      "task_ids": []
+      "task_ids": [
+        "advancer-failure-detection",
+        "push-signal-and-substatus"
+      ],
+      "shipped_at": "2026-06-25T00:52:13.979183+00:00",
+      "shipped_by": "reconcile-hardening-mission-shipped-002",
+      "prior_phase": "in_flight"
     },
     {
       "id": "projects-v3-p7",
