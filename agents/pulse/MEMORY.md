@@ -192,7 +192,7 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## G-rule outbox-notifier-notification-intent-reject-tier4-001 — 1/3 (new, iter ~2792)
+## G-rule outbox-notifier-notification-intent-reject-tier4-001 — 2/3 (updated iter ~2810)
 
 **Rule:** `source=outbox-notifier, kind=notification, intent=reject` alerts classify Tier-4 (novel, no translation match). These are routine Forge-rejection delivery confirmations — outbox-notifier always DMs Larry for rejects; a Pulse DM is duplicate noise. Fix: add `source=outbox-notifier, kind=notification, intent=reject` → Tier-3 entry to `config/alert-translations.json`. Dispatch to Beacon at 3/3.
 
@@ -204,8 +204,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-25 19:48Z UTC (Iter ~2809, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 20:00Z UTC (Iter ~2810, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2809 summary:** ✅ Nominal — 0 new alerts (wm=1000), 8/8 daemons alive, watchdog healthy. Pipeline progressing: Forge completed board-new-mission-confirmation-placeholder-001 ($0.95, 390s) → PR #92 in ourliberty-dashboard OPEN MERGEABLE ("feat(where-are-we): split Active missions into Actively building + Initiatives"). Mirror queue: sequence-rows-endpoint review active (since 19:40:57Z) + pr-ourliberty-dashboard-92 queued (19:45:28Z). Beacon notify-board-new-mission in progress (19:47:32Z). PR #706 (sequence-rows-endpoint) OPEN MERGEABLE. Standing: zombie PID 1834248 (~28d), 6 stale journalctl PIDs, forge-wip-redispatch-digest Forge dispatch pending trust-policy approval. PRIME: interventions=1225, systemic_fixes=71, vp=27, ratio≈17.25, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2810 summary:** ✅ Nominal — 1 new alert (L1001: outbox-notifier reject-delivery-confirm, Tier-4 suppressed, G-rule 2/3). 8/8 daemons alive, watchdog healthy. board-new-mission-confirmation-placeholder-001 REJECTED by Forge at preflight (task obsolete, missions kanban retired). Larry DM'd (idx=1000), replied with follow-up direction ("agree narrative cadence, deeper exploration"); Beacon active resumed session. PR #706 (sequence-rows-endpoint) under Mirror review (PID 3017743). PR #92 (ourliberty-dashboard) Mirror review queued. Standing: zombie PID 1834248 (~28d), 6 stale journalctl PIDs, forge-wip-redispatch-digest pending trust-policy approval. PRIME: interventions=1225, systemic_fixes=71, vp=27, ratio≈17.25, trend=improving. Tier 1, consecutive_clean=0.
 
 
