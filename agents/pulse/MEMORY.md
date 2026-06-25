@@ -186,8 +186,8 @@
 
 ---
 
-## Status snapshot — updated 2026-06-25 07:27Z UTC (Iter ~2707, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 07:33Z UTC (Iter ~2708, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2707 summary:** ⚠️ Watch — Outbox-notifier hot loop still active, PR #700 under Mirror review (PID 2716730, ~27.5 min). 0 new alerts. New dry-run signal: `mirror_pass_unmerged:PR#698` (expected FP — auto-merge held behind #700; self-resolves on #700 merge). All other findings carry. G-rules unchanged. `heal-forge-no-pr-retry-rebase-fp-001` approval pending Larry. PID 1834248 zombie alive. PRIME: interventions=1174, systemic_fixes=71, vp=26, ratio≈16.54, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2708 summary:** ⚠️ Watch — Outbox-notifier hot loop still active. Mirror (PID 2748617) now reviewing PR #700 (started 01:28 MDT, running tests). PR #698 has `marker-error` retry 1/3 in Mirror inbox (wedge-reaper reaped prior session PID 2716730 for PR #698 duplicate, wrote invalid terminal "All retries exhausted"). New pipeline stall FP: `retry_exhausted:skip-mirror-review-on-merged-or-closed-pr-001` (stall checker doesn't know marker-error retry is in flight — first occurrence, tracking). `rebase-687` FP cooldown expired, re-alerting in dry-run. Both PR #700 and #698 now MERGEABLE (were UNKNOWN). `heal-forge-no-pr-retry-rebase-fp-001` approval pending Larry. PID 1834248 zombie alive. PRIME: interventions=1175, systemic_fixes=71, vp=26, ratio≈16.54, trend=improving. Tier 1, consecutive_clean=0.
 
 

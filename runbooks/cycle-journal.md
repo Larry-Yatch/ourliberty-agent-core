@@ -5,6 +5,111 @@
 ---
 
 
+## Iteration ~2708 — 2026-06-25T07:33Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry /cycle invocation via chat.
+
+**Health:** ⚠️ Watch — Outbox-notifier hot loop still active. Mirror (PID 2748617) picked up PR #700 review (started 01:28 MDT, running tests). New `marker-error` retry for PR #698 in Mirror inbox (wedge-reaper reaped the prior session, wrote invalid terminal). Pipeline stall dry-run gains 2 new FP signals: `rebase-687` cooldown expired (re-alerting), `retry_exhausted:skip-mirror-review-on-merged-or-closed-pr-001` (FP — marker-error retry in flight, stall checker unaware).
+
+**VERIFY-BEFORE-REASSERT:**
+- **Outbox-notifier loop**: STILL ACTIVE ✅ — log at 01:31:06 MDT (07:31Z UTC), AUTO_MERGE_RELEASE_DEFERRED every ~6s on PR #691 / blocker #697 (MERGED). Fix in PR #700, Mirror reviewing. [carry]
+- **PR #700 (fix-auto-merge-already-merged-skip-001)**: OPEN, **MERGEABLE** (was UNKNOWN). reviewDecision="". Mirror (PID 2748617) reviewing (started 01:28 MDT, running tests at 01:30 MDT). [carry, new session]
+- **PR #698 (skip-mirror-review-on-merged-or-closed-pr-001)**: OPEN, **MERGEABLE** (was UNKNOWN). Wedge-reaped session wrote invalid terminal "All retries exhausted"; `marker-error-skip-mirror-review-on-merged-or-closed-pr-001-1.json` now in Mirror inbox (revision_count=0, max_revisions=3 — 2 retries remaining). [carry, state updated]
+- **Pipeline stall FP reconcile-hardening-001**: `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` — FP persists. Fix `heal-forge-no-pr-retry-rebase-fp-001` pending Larry approval. [carry]
+- **Pipeline stall FP rebase-687-001**: **cooldown EXPIRED** — now re-alerting in dry-run as `DRY-RUN would alert: forge_built_no_pr:rebase-forge-post-open-mergeable-687-001`. FP (PR #687 MERGED, branch deleted, G-rule vp). [carry, escalated from suppressed]
+- **beacon-pending-approvals**: 1 — `heal-forge-no-pr-retry-rebase-fp-001`. [carry]
+- **Repo**: HEAD=6717ae9e=origin/main. Clean. On main. ✅
+- **Sync**: last_sync=2026-06-25T07:00:11Z (~33 min ago). Within 2h. ✅
+- **Daemons**: beacon_telegram_bot (PID 2715635), outbox_notifier (PID 2716671), chain_event_shipper (PID 2716672) — all alive. Mirror (PID 2748617) reviewing PR #700. ✅
+- **Watchdog**: overall=healthy at 01:26:18 MDT. ✅
+- **Zombie PID 1834248**: still alive (Ss, bash, etimes=27d+12h). Ask-then-do: `kill 1834248`. [carry]
+- **Stale daemon code heartbeat**: 2026-06-25T07:25:12Z (~8 min ago). Fresh. ✅
+- **3 stuck builds** (fix-653-phase4b-spec-id-contract-001, dag-preflight-phase4b-live-thread-001, review-sequence-dag-operator-needs-you-feed): Larry notified prior iters. [carry]
+- **sequence-paused:operator-needs-you-feed**: No new alert. [carry]
+
+**Check 0 — Alert triage:**
+- repair-watermark: repaired=false, old=1149, file_length=1150. **1 new alert (L1150).**
+- L1150 (idx=1149): `source=heal-wedged-review-sessions, severity=warning, route=closure, subject=wedged-review-reaped:wt-mirror-skip-mirror-review-on-merged-or-closed-pr-001` at 07:26:25Z — Mirror session (PID 2716730) reaped after terminal marker present + idle 434s > grace 300s. Worktree removed. Triage helper: **Tier-3 silence** ✅ (known-pattern match in alert-translations.json). No DM.
+- Watermark advanced 1149→1150. ✅
+
+**Check 1 — Log noise:**
+- outbox-notifier.log: **[yellow] HOT LOOP** still active at 01:31:06 MDT (07:31Z UTC). PR #691 / blocker #697 (MERGED). Fix in PR #700 under Mirror review. [carry]
+- watchdog.log: overall=healthy at 01:26:18 MDT. ✅
+
+**Check 2 — Telegram sweep:**
+- beacon_telegram_bot.log: last entry `01:10:30 MDT idx=1148 delivered (heal-claude-max-burn-rate)`. No new Larry messages. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` — FP persists. Fix pending Larry approval. [carry]
+- `DRY-RUN would alert: forge_built_no_pr:rebase-forge-post-open-mergeable-687-001` — **NEW (cooldown expired)**. FP: PR #687 MERGED, branch deleted. G-rule `forge-built-no-pr-retry1-fp-001` vp. [carry, now re-alerting]
+- `DRY-RUN would recover-then-alert: mirror_pass_unmerged:skip-mirror-review-on-merged-or-closed-pr-001 (PR#698)` — [carry]
+- **NEW**: `DRY-RUN would alert: retry_exhausted:skip-mirror-review-on-merged-or-closed-pr-001` — FP: wedge-reaper wrote invalid terminal; actual marker-error retry in Mirror inbox (revision_count=0, max_revisions=3, 2 retries remaining). Stall checker unaware of in-flight marker-error retry. First occurrence of `retry_exhausted` stall FP for marker-error case.
+- 4 alert(s) would fire, 1 recovery would be attempted.
+
+**Check 4 — Pending directives:**
+- Beacon inbox: **EMPTY** ✅.
+- Forge inbox: **EMPTY** ✅.
+- Mirror inbox (4 tasks, FIFO by mtime):
+  - `marker-error-skip-mirror-review-on-merged-or-closed-pr-001-1.json` (01:28 MDT) — **NEW**. Wedge-reaper terminal "All retries exhausted" rejected as invalid marker; outbox-notifier wrapped as marker-error retry (revision_count=0/3). Mirror needs to re-emit verdict for PR #698.
+  - `review-fix-auto-merge-already-merged-skip-001.json` (00:52 MDT) — PR #700. Active (Mirror PID 2748617, running tests since 01:28 MDT). ✅
+  - `dag-preflight-phase4b2-closed-card-doorbell-001-re-retry1.json` (01:00 MDT) — queued.
+  - `review-sequence-dag-mirror-review-visibility-001-r-retry1.json` (01:00 MDT) — queued.
+- beacon-pending-approvals: 1 (`heal-forge-no-pr-retry-rebase-fp-001`). [carry]
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-06-25T07:25:12Z (~8 min ago). Fresh. ✅
+
+**Check A — Source repo:** HEAD=6717ae9e=origin/main. Clean. On main. ✅
+
+**Check B — Sync health:** last_sync=2026-06-25T07:00:11Z (~33 min ago). Within 2h. ✅
+
+**Check C — Agent liveness:** beacon_telegram_bot (PID 2715635), outbox_notifier (PID 2716671), chain_event_shipper (PID 2716672) — all alive (unchanged). Mirror (PID 2748617) reviewing PR #700 (01:28 MDT start). ✅
+- **[yellow] PID 1834248** — zombie bash wait-loop. Still alive (etimes=27d+12h). Ask-then-do: `kill 1834248`. [carry]
+
+**Check E — PRs:**
+- PR #700 (fix-auto-merge-already-merged-skip-001): OPEN, **MERGEABLE**. Mirror (PID 2748617) reviewing. ⚠️
+- PR #698 (skip-mirror-review-on-merged-or-closed-pr-001): OPEN, **MERGEABLE**. Marker-error retry 1/3 in Mirror inbox. ⚠️
+
+**Check H — Forge digest:** Forge IDLE (no open tasks). ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check III: not Sunday. Skip. ✅
+
+**G-rule updates:**
+- All G-rules carry at same counts as ~2707. No threshold changes.
+- **New pattern this iter**: `retry_exhausted` stall FP for marker-error case (stall checker fires `retry_exhausted` when wedge-reaper wrote invalid terminal, even though a marker-error retry is in flight in Mirror inbox). First occurrence — not yet a G-rule. Tracking. If recurs 2 more times, dispatch to Beacon.
+- **rebase-forge-post-open-mergeable-687-001 FP**: cooldown expired, dry-run re-alerting. G-rule `forge-built-no-pr-retry1-fp-001` vp (no new count). [carry]
+- All other G-rules: unchanged from ~2707.
+
+**Actions taken:** Triaged 1 new alert (L1150): Tier-3 silence (heal-wedged-review-sessions, known-pattern). Watermark advanced 1149→1150. Appended 1 PRIME ledger row (intervention). Tier state recorded non-clean. 0 Pulse DMs (no new Tier-4 alerts; all carry findings previously notified).
+
+**Standing findings (updated):**
+- [yellow] **Outbox-notifier hot loop** — Still active (PID 2716671). Fix in PR #700 under Mirror review (PID 2748617, started 01:28 MDT). Self-resolves on Mirror PASS → auto-merge → deploy.
+- [yellow] **PR #700 (fix-auto-merge-already-merged-skip-001)** — OPEN, MERGEABLE. Mirror (PID 2748617) reviewing.
+- [yellow] **PR #698 (skip-mirror-review-on-merged-or-closed-pr-001)** — OPEN, MERGEABLE. Marker-error retry 1/3 queued in Mirror inbox.
+- [yellow] **heal-forge-no-pr-retry-rebase-fp-001 pending approval** — `approve heal-forge-no-pr-retry-rebase-fp-001` unblocks pipeline stall FP fix.
+- [yellow] **3 stuck builds** — fix-653-phase4b-spec-id-contract-001, dag-preflight-phase4b-live-thread-001, review-sequence-dag-operator-needs-you-feed. WIP-only exhausted, no PR. Larry notified (prior iters).
+- [yellow] **Forge: dag-preflight-phase4b2-closed-card-doorbell-001-re-retry1** — In Mirror inbox (retry1). Review pending.
+- [yellow] **Forge: review-sequence-dag-mirror-review-visibility-001-r-retry1** — In Mirror inbox (retry1). Review pending.
+- [yellow] **PID 1834248 zombie bash loop** — Still alive. Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **sequence-paused:operator-needs-you-feed** — L1105. Recovery: `resume sequence operator-needs-you-feed` via Beacon or Dashboard.
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision.
+- [yellow] **unreviewed-merge:649** — Larry judgment.
+- [yellow] **unreviewed-merge:637** — Larry judgment.
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`.
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`.
+
+**PRIME DIRECTIVE:** interventions=1175, systemic_fixes=71, verification_pending=26, ratio≈16.54, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** consecutive_clean=0 (non-clean: outbox-notifier loop, PRs #700+#698, marker-error retry, 3 stuck builds, zombie PID, pending approvals). Tier: 1.
+
+---
+
+
 ## Iteration ~2707 — 2026-06-25T07:26Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry /cycle invocation via chat.
