@@ -204,8 +204,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-25 18:35Z UTC (Iter ~2799, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 18:44Z UTC (Iter ~2800, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2799 summary:** ✅ Nominal — no new alerts (wm=997). 8/8 daemons alive. Watchdog healthy. 0 open PRs. Forge retry1 (board-new-mission-confirm-placeholder-001-retry1) still building. forge-wip-redispatch-digest Forge dispatch pending trust-policy approval. PRIME: interventions=1224, systemic_fixes=71, vp=27, ratio≈17.24, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2800 summary:** ⚠️ Notable — L998 Tier-4: forge-wip-redispatch EXHAUSTED for board-new-mission-confirm-placeholder-001 (retry1 also died WIP-only, no PR). Genuine failure (no PR exists). outbox-notifier will DM Larry via route=escalate. 8/8 daemons alive. Watchdog healthy. 0 open PRs. forge-wip-redispatch-digest Forge dispatch still pending trust-policy approval. PRIME: interventions=1225, systemic_fixes=71, vp=27, ratio≈17.25, trend=improving. Tier 1, consecutive_clean=0.
 
 
