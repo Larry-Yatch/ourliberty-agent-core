@@ -242,6 +242,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-25 00:51Z UTC (Iter ~2657, Tier 1, consecutive_clean=0)
+
+**Iter ~2657 summary:** ⚠️ Watch — **KEY EVENT:** Forge session PID 2060999 (`forge-post-open-mergeable-rebase-001`) completed at 00:47Z (success=True, 3h52m, $0.59); immediately started `one-time-stale-dispatch-branch-cleanup-001`. PR #685 CONFLICTING (carry; rebase-escalation-feed-685-001 queued, critical path); PR #687 CONFLICTING (carry, Mirror REVIEW_PASS x4, AUTO_MERGE_HELD blocker=#685). 0 new alerts. Watermark 1068 (no change). 7 persistent daemons alive + Forge active. Repo clean (HEAD=073c97fd=origin/main). Sync 11m ago. Check I: Thursday, skip. Forge inbox: 8 items (one-time-stale-dispatch-branch-cleanup-001 ACTIVE). PRIME: interventions≈1129, systemic_fixes=66, ratio=17.1, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-25 00:45Z UTC (Iter ~2656, Tier 1, consecutive_clean=0)
 
 **Iter ~2656 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry; NEW: `rebase-escalation-feed-685-001` queued in Forge inbox — Beacon dispatched at 00:43Z after Larry's 18:41 MDT query about the escalation-feed DAG); PR #687 CONFLICTING (carry, Mirror REVIEW_PASS x4, AUTO_MERGE_HELD blocker=#685). Forge session PID 2060999 approaching 4h timeout (~00:55Z). 0 new alerts. Watermark 1068 (no change). All 8 daemons alive. Repo clean (HEAD=1a60caa5=origin/main). Sync 6m ago. Check I: Thursday, skip. PRIME: interventions=1128, systemic_fixes=66, ratio=17.1, trend=improving. Tier 1, consecutive_clean=0.
@@ -325,10 +329,6 @@
 ## Status snapshot — updated 2026-06-24 22:14Z UTC (Iter ~2636, Tier 1, consecutive_clean=0)
 
 **Iter ~2636 summary:** ⚠️ Watch — PR #685 CONFLICTING (mirror-pass-unmerged L1039 DM'd Larry; pipeline-stall in cooldown); PR #687 CONFLICTING (Mirror review active, no reviews yet). 4 new alerts triaged (L1036-L1039): 3 Tier-3, 1 Tier-4 (L1039 mirror-pass-unmerged). Watermark 1035→1039. G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4 **2/3** NEW. 8 daemons alive. Check I: mode=digest. HEAD=879158fc. PRIME: interventions≈1108, systemic_fixes=63, ratio≈17.6, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-24 22:07Z UTC (Iter ~2635, Tier 1, consecutive_clean=0)
-
-**Iter ~2635 summary:** ⚠️ Watch — PR #685 (forge/escalation-feed) CONFLICTING (carry); PR #687 (forge/forge-post-open-mergeable-rebase-001) CONFLICTING, Mirror review active since 21:55:22Z. Pipeline stall cooldown expired for reconcile-hardening-mission-shipped-001 (dry-run: 1 alert would fire; re-dispatch -002 in BUILD). 0 new alerts (watermark 1035). 8 daemons alive. G-rule watchdog-watcher-log-stale-post-fix 1/3 VERIFIED no new instance (in-flight suppression working). Check I: mode=digest. HEAD=d5d6b53c. PRIME: interventions≈1107, systemic_fixes=63, ratio≈17.6, trend=improving. Tier 1, consecutive_clean=0.
 
 
 
