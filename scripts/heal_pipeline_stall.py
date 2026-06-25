@@ -136,6 +136,7 @@ import larry_alerts  # noqa: E402
 import fixture_patterns  # noqa: E402
 import no_session_ledger  # noqa: E402  # S3: cold-start obligation backstop
 import for_larry_escalations  # noqa: E402  # mirror-review-visibility Contract C/E action surface
+import rebase_obligation_ledger  # noqa: E402  # post-open auto-rebase backstop
 import safe_write_inbox  # noqa: E402  # sanitize_component: match on-disk outbox names
 from heal_undispatched_pr_review import task_id_for_branch  # noqa: E402  # canonical PR->task_id key
 from id_match import id_matches  # noqa: E402
@@ -240,6 +241,16 @@ _AUTO_MERGE_MERGED_RE = re.compile(
 # surfaced via recover-then-alert (verify the PR didn't resolve out-of-band,
 # else fire one loud, non-suppressed alert).
 NO_SESSION_STUCK_MIN = 45  # grace before a stuck cold-start obligation alerts
+
+# Check 10 (forge-post-open-mergeable-rebase-001). The post-open auto-rebase
+# backstop reads the SIBLING `rebase_obligation_ledger`: the notifier OPENS an
+# obligation when it dispatches a phase=rebase to Forge (PR opened CONFLICTING
+# because main advanced), and RESOLVES it when the rebased PR comes back
+# MERGEABLE and Mirror is dispatched. An obligation still OPEN past this grace is
+# a rebase loop the mechanical dispatch did not close — Forge may have aborted a
+# conflicted rebase and surfaced a blocker that failed to route, or the rebase
+# session died. Same recover-then-alert shape as Check 6.
+REBASE_STUCK_MIN = 45  # grace before a stuck rebase obligation alerts
 
 # Chain discipline v3 GAP 3 (Check 7). routing-events.jsonl carries one
 # JSON object per line; the shape we read has these fields:
@@ -1679,6 +1690,75 @@ def check_revision_dispatched_with_no_session(state: dict) -> list[dict]:
     return alerts
 
 
+# ---------- Check 10: post-open auto-rebase obligation stuck OPEN ----------
+
+def check_rebase_obligation_stuck(state: dict) -> list[dict]:
+    """Backstop for the post-open auto-rebase loop (forge-post-open-mergeable-rebase-001).
+
+    Reads the durable `rebase_obligation_ledger`. The notifier OPENS an
+    obligation when it dispatches a phase=rebase to Forge (a PR opened
+    CONFLICTING because main advanced) and RESOLVES it when the rebased PR comes
+    back MERGEABLE and Mirror is dispatched. An obligation still OPEN past
+    `REBASE_STUCK_MIN` means the loop never closed — Forge may have aborted a
+    conflicted rebase and surfaced a blocker that failed to route, the
+    re-emitted `PR updated:` was dropped, or the rebase round cap was hit while
+    main kept advancing.
+
+    Each stuck obligation gets ONE recover-then-alert entry: the recovery
+    verifies the PR didn't resolve out-of-band (merged/closed → clear the
+    ledger, suppress the alert); otherwise a loud, non-suppressed alert fires
+    with the PR link. No silent re-dispatch — the mechanical rebase dispatch
+    already ran. Same 6h-cooldown idempotency as the other checks.
+    """
+    try:
+        stuck = rebase_obligation_ledger.list_open(
+            older_than_minutes=REBASE_STUCK_MIN,
+        )
+    except Exception as e:  # noqa: BLE001 — a ledger hiccup must not crash the timer
+        log(f'rebase_obligation_ledger.list_open failed: {type(e).__name__}: {e}',
+            'WARN')
+        return []
+    now = datetime.now(timezone.utc)
+    alerts: list[dict] = []
+    for ob in stuck:
+        task = ob.get('task_id')
+        if not task:
+            continue
+        pr_url = ob.get('pr_url') or ''
+        last = _parse_ts(ob.get('last_dispatch_at') or ob.get('opened_at'))
+        elapsed_min = int((now - last).total_seconds() / 60) if last else 0
+        round_num = ob.get('round', 1)
+        pr_ref = pr_url if pr_url and pr_url != '(no pr_url)' else 'unknown'
+        alerts.append({
+            'key': f'rebase_obligation:{task}',
+            'message': (
+                f'A post-open auto-rebase on task `{task}` (round {round_num}, '
+                f'PR {pr_ref}) was dispatched {elapsed_min} min ago but never '
+                f'closed — the PR opened CONFLICTING with main and the rebase '
+                f'loop did not reach a MERGEABLE state. Forge may have aborted a '
+                f'conflicted rebase and surfaced a blocker that failed to route, '
+                f'or main kept advancing past the rebase retry cap.'
+            ),
+            'subject': f'pipeline-stall:rebase-obligation:{task}',
+            'suggested_action': (
+                f'Review the PR ({pr_ref}). Inspect the rebase dispatch + '
+                f'Forge\'s result: `grep "{task}" '
+                f'~/agents/logs/outbox-notifier.log | tail -20`. Rebase by hand '
+                f'(`gh pr checkout <N> && git fetch origin && git rebase '
+                f'origin/main && git push --force-with-lease`), or close/merge '
+                f'the PR — the obligation clears on a MERGEABLE re-check or a '
+                f'merge. Ledger: `python3 ~/agent-core/scripts/'
+                f'rebase_obligation_ledger.py get {task}`.'
+            ),
+            # recover-then-alert: verify the PR didn't resolve out-of-band before
+            # alerting. NOT a re-dispatch — the mechanical rebase dispatch ran.
+            'recovery': functools.partial(
+                _recover_rebase_obligation, task, pr_url,
+            ),
+        })
+    return alerts
+
+
 # ---------- Check 9: Sequence stuck pending after unresolved DAG REVISION ----------
 def check_stalled_pending_sequence(state: dict) -> list[dict]:
     """Scan build-sequences for any sequence stuck in `status: pending`
@@ -2439,6 +2519,37 @@ def _recover_no_session_revision(task: str, pr_url: str = '') -> bool:
     return False  # confirmed OPEN (or any live state) → genuinely stuck
 
 
+def _recover_rebase_obligation(task: str, pr_url: str = '') -> bool:
+    """Check 10 'recovery' for a stuck rebase obligation (forge-post-open-mergeable-rebase-001).
+
+    VERIFY, not re-dispatch (the mechanical rebase dispatch already ran). Same
+    three outcomes as `_recover_no_session_revision`:
+      - PR MERGED / CLOSED → clear the ledger obligation, suppress the alert.
+      - PR confirmed OPEN → return False so one loud, non-suppressed alert fires.
+      - state UNVERIFIABLE (no pr_url / gh unreachable) → return True to suppress
+        this round (verify-before-alarm); the obligation stays OPEN and re-checks.
+    """
+    if not pr_url or pr_url == '(no pr_url)':
+        return True  # nothing to verify against → defer rather than false-alert
+    pr_state = _gh_pr_state(pr_url)
+    if pr_state in ('MERGED', 'CLOSED'):
+        try:
+            rebase_obligation_ledger.resolve_obligation(
+                task, resolution=pr_state.lower(),
+            )
+        except Exception as e:  # noqa: BLE001
+            log(f'rebase resolve_obligation failed for {task}: '
+                f'{type(e).__name__}: {e}', 'WARN')
+        log(f'REBASE_OBLIGATION_RESOLVED task={task} pr_state={pr_state}; '
+            f'cleared ledger obligation', 'INFO')
+        return True
+    if pr_state is None:
+        log(f'REBASE_OBLIGATION task={task} pr_state unverifiable (gh '
+            f'unreachable); deferring alert to next tick', 'INFO')
+        return True
+    return False  # confirmed OPEN (or any live state) → genuinely stuck
+
+
 def _recover_stalled_sequence(seq_id: str, seq_path: str) -> bool:
     """Recover a sequence stuck pending after an unresolved DAG-preflight
     REVISION (Check 9) by re-routing the `dag-preflight-revision` notify to
@@ -2611,6 +2722,13 @@ def run(dry_run: bool = False) -> int:
     except Exception as e:
         log(
             f'check_revision_dispatched_with_no_session failed: '
+            f'{type(e).__name__}: {e}', 'ERROR'
+        )
+    try:
+        all_alerts += check_rebase_obligation_stuck(state)
+    except Exception as e:
+        log(
+            f'check_rebase_obligation_stuck failed: '
             f'{type(e).__name__}: {e}', 'ERROR'
         )
     try:

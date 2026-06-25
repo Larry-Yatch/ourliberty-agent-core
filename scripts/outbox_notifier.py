@@ -82,6 +82,7 @@ import forge_preflight_handler as fph  # noqa: E402
 import larry_alerts                # noqa: E402
 import mirror_review_handler as mrh  # noqa: E402
 import no_session_ledger            # noqa: E402  # S1: cold-start obligation ledger
+import rebase_obligation_ledger     # noqa: E402  # post-open auto-rebase obligation ledger
 import routing_validator            # noqa: E402  # allowed_repos source of truth
 import safe_write_inbox             # noqa: E402
 import sequence_shortcut_helpers as ssh  # noqa: E402  # V6: step-merged signal
@@ -4900,6 +4901,278 @@ def _dispatch_revision_to_forge(
         )
 
 
+# forge-post-open-mergeable-rebase-001 — Layer-2 mechanical guarantee.
+# Cap on how many times the notifier will re-dispatch a rebase for one task. A
+# clean rebase that comes back still-CONFLICTING means main advanced AGAIN
+# between Forge's rebase and our re-check (a real but rare race); a few retries
+# absorb it. Past the cap we stop re-dispatching and leave the obligation OPEN so
+# the healer surfaces it to Larry — never an unbounded rebase loop.
+_REBASE_MAX_ROUNDS = 3
+
+
+def _dispatch_rebase_to_forge(
+    data: dict[str, Any], pr_url: str, *, round_num: int = 1,
+) -> bool:
+    """Write a `phase=rebase` task to Forge after a PR opens CONFLICTING.
+
+    forge-post-open-mergeable-rebase-001 (Layer 2). Called from the build-phase
+    PR-opened path INSTEAD of `_dispatch_mirror_review` when the freshly-opened
+    PR's mergeable state is CONFLICTING — main advanced during the build, so the
+    PR is doomed and Mirror must not be dispatched onto it (success criterion 3).
+    Forge re-runs under `--resume` of its build session (worktree intact), rebases
+    the branch onto origin/main, force-pushes with --force-with-lease, and
+    re-emits `PR updated:` — which re-enters the notifier's phase=rebase handler,
+    re-checks mergeability, and dispatches Mirror once MERGEABLE.
+
+    A durable obligation is opened in `rebase_obligation_ledger` so the healer can
+    verify the loop actually closed even if Forge's in-session step never ran or
+    the re-emitted `PR updated:` was dropped (success criterion 4).
+
+    Returns True if a rebase dispatch was written (or was already in flight —
+    idempotent), False if it could not be dispatched (no target_repo). Failure to
+    write is logged WARN and non-fatal; the obligation + healer remain the
+    backstop.
+    """
+    task_id = data.get('task_id') or 'unknown'
+    target_repo = data.get('target_repo')
+    if not target_repo:
+        target_repo = backfill_target_repo(task_id)
+        if target_repo:
+            log(
+                f'target_repo backfilled to `{target_repo}` for task {task_id} '
+                f'from chain_events (rebase dispatch)',
+                'INFO',
+            )
+    if not target_repo:
+        # Without target_repo, Forge's worktree gate rejects the dispatch. Surface
+        # the gap rather than silently dropping — the PR is CONFLICTING and will
+        # otherwise strand on the human-visible held_conflict backstop.
+        log(
+            f'PR {pr_url} on task {task_id} is CONFLICTING but no target_repo on '
+            f'envelope and none derivable from chain_events; cannot dispatch '
+            f'rebase. Larry must rebase manually.',
+            'WARN',
+        )
+        return False
+
+    branch = data.get('branch')
+    forge_session = data.get('claude_session_id')
+
+    # Resolve the PR head this rebase targets, for the obligation row + dedup.
+    head_sha: Optional[str] = None
+    _cand = data.get('head_sha')
+    if isinstance(_cand, str) and _cand:
+        head_sha = _cand
+    else:
+        _pr_coords = _parse_pr_url(pr_url)
+        if _pr_coords is not None:
+            head_sha = _gh_pr_head_sha(_pr_coords[0], _pr_coords[1])
+
+    rebase_prompt = '\n'.join([
+        f'Rebase phase. The PR you just opened for task `{task_id}` is '
+        f'CONFLICTING with main — main advanced during your build, so the PR '
+        f'cannot merge as-is. Rebase it onto current main BEFORE Mirror reviews '
+        f'it (a CONFLICTING PR is never dispatched to Mirror).',
+        '',
+        f'Task: `{task_id}`',
+        f'PR: {pr_url}',
+        *([f'Branch: `{branch}`'] if branch else []),
+        '',
+        'Follow the Rebase phase protocol in your CLAUDE.md:',
+        '  1. `git fetch origin` then `git rebase origin/main` in this worktree.',
+        '  2. CLEAN rebase (exit 0, no conflict markers) → `git push '
+        '--force-with-lease` and emit a result starting with '
+        f'`PR updated: {pr_url}` (the notifier re-checks mergeability and '
+        'dispatches Mirror once it is MERGEABLE).',
+        '  3. CONFLICTED rebase → `git rebase --abort` (never leave a '
+        'half-rebased worktree or push a broken branch), then end with a '
+        'plain BLOCKER PARAGRAPH (NOT a marker) naming the conflicting files '
+        'and the upstream change that moved main. The notifier routes that '
+        'blocker to Beacon, who decides fresh-rebased-build vs sequencing vs '
+        'escalation.',
+    ])
+
+    rebase_base: dict[str, Any] = {
+        'task_id': task_id,
+        'prompt': rebase_prompt,
+        'source': 'beacon',
+        'phase': 'rebase',
+        'dispatched_by': 'outbox-notifier',
+    }
+    if forge_session:
+        # --resume the build session so Forge's worktree + build context are
+        # intact. Omitted only if somehow absent (the worktree is keyed on
+        # task_id either way, so a fresh run still lands in the right tree).
+        rebase_base['session_id'] = forge_session
+    if branch:
+        rebase_base['branch'] = branch
+    if head_sha:
+        rebase_base['head_sha'] = head_sha
+    for f_name in ('pr_title', 'pr_body', 'max_clarifications'):
+        if data.get(f_name) is not None:
+            rebase_base[f_name] = data[f_name]
+
+    rebase_task = build_chain_envelope(
+        rebase_base,
+        data,
+        carry={
+            'forge_build_session_id': data.get('claude_session_id'),
+            'target_repo': target_repo,
+            'pr_url': pr_url,
+            'reply_chat_id': CARRY,
+            'replan_count': CARRY,
+            'max_replans': CARRY,
+            'revision_count': CARRY,
+        },
+    )
+
+    rebase_filename = safe_write_inbox.canonical_inbox_name(
+        f'rebase-{task_id}-{round_num}.json'
+    )
+    forge_inbox = safe_write_inbox.INBOXES_ROOT / 'forge'
+
+    def _open_obligation() -> None:
+        # Record/refresh the durable obligation BEFORE concluding the dispatch is
+        # in flight — the healer must see it even if a prior dispatch crashed
+        # after writing the inbox file but before opening the obligation.
+        rebase_obligation_ledger.open_obligation(
+            task_id,
+            pr_url=pr_url or '(no pr_url)',
+            branch=branch,
+            target_repo=target_repo,
+            head_sha=head_sha,
+            round_num=round_num,
+        )
+
+    if (
+        (forge_inbox / rebase_filename).exists()
+        or (forge_inbox / '.archive' / rebase_filename).exists()
+        or (forge_inbox / '.invalid' / rebase_filename).exists()
+    ):
+        log(
+            f'rebase round {round_num} already dispatched for task {task_id} '
+            f'(file or archive or .invalid present); skipping duplicate write'
+        )
+        _open_obligation()
+        return True
+
+    if not _enforce_cost_budget(task_id, 'rebase-to-forge', data):
+        return False
+
+    try:
+        dest = safe_write_inbox.safe_write_inbox(
+            target_agent='forge',
+            task_dict=rebase_task,
+            source_agent='beacon',
+            filename=rebase_filename,
+        )
+        resume_note = (
+            f'resume={forge_session[:12]}...' if forge_session else 'fresh'
+        )
+        log(
+            f'rebase round {round_num} dispatched forge <- beacon '
+            f'(task={task_id}, file={dest.name}, pr={pr_url}, {resume_note})'
+        )
+        _open_obligation()
+        return True
+    except (
+        safe_write_inbox.DispatchRejected,
+        safe_write_inbox.RoutingDenied,
+    ) as e:
+        log(
+            f'rebase dispatch FAILED for task {task_id} round {round_num}: '
+            f'{type(e).__name__}: {e}. PR {pr_url} is CONFLICTING and will '
+            f'strand on the held_conflict backstop; Larry must rebase manually.',
+            'WARN',
+        )
+        return False
+
+
+def _handle_pr_mergeable_before_review(
+    data: dict[str, Any], pr_url: str, *, is_rebase_phase: bool = False,
+) -> bool:
+    """Gate Mirror dispatch on the PR's mergeable state (Layer 2).
+
+    forge-post-open-mergeable-rebase-001. Polls the PR's mergeable state past
+    GitHub's async UNKNOWN. Returns True when the caller should proceed to
+    dispatch Mirror (MERGEABLE, or UNKNOWN-after-poll treated optimistically),
+    False when it should NOT (CONFLICTING — a rebase was dispatched instead, or
+    the rebase round cap was hit and the obligation was left open for the healer).
+
+    `is_rebase_phase=False` is the build-phase PR-opened call: a CONFLICTING PR
+    opens a fresh round-1 rebase obligation. `is_rebase_phase=True` is the
+    re-check after Forge's rebase re-emits `PR updated:`: a now-MERGEABLE PR
+    RESOLVES the obligation (and proceeds to Mirror); a still-CONFLICTING PR means
+    main re-advanced — re-dispatch a higher rebase round up to `_REBASE_MAX_ROUNDS`,
+    after which we stop and leave the obligation open (healer surfaces it)."""
+    task_id = data.get('task_id') or 'unknown'
+    parsed = _parse_pr_url(pr_url)
+    if parsed is None:
+        # Can't check mergeability without coords; don't block the cascade —
+        # proceed to Mirror (prior behavior). The auto-merge gate still re-checks.
+        log(
+            f'mergeable-gate: unparseable pr_url={pr_url} (task={task_id}); '
+            f'proceeding to Mirror without rebase check',
+            'INFO',
+        )
+        return True
+    repo_coords, pr_number = parsed
+    status = _poll_pr_mergeable(repo_coords, pr_number)
+
+    if status == 'conflicting':
+        # Determine the round. A fresh build-phase conflict starts at round 1; a
+        # rebase-phase conflict (main re-advanced) bumps the existing round.
+        existing = rebase_obligation_ledger.get_obligation(task_id)
+        prev_round = existing.get('round', 0) if isinstance(existing, dict) else 0
+        if not isinstance(prev_round, int) or prev_round < 0:
+            prev_round = 0
+        next_round = prev_round + 1
+        if next_round > _REBASE_MAX_ROUNDS:
+            log(
+                f'mergeable-gate: PR {pr_url} (task={task_id}) STILL CONFLICTING '
+                f'after {prev_round} rebase round(s) — main keeps advancing. '
+                f'Hit cap {_REBASE_MAX_ROUNDS}; leaving obligation OPEN for the '
+                f'healer + held_conflict backstop. NOT dispatching Mirror.',
+                'WARN',
+            )
+            # Keep the obligation open + fresh so the healer's grace window is
+            # measured from now (we did act this tick).
+            rebase_obligation_ledger.open_obligation(
+                task_id,
+                pr_url=pr_url or '(no pr_url)',
+                branch=data.get('branch'),
+                target_repo=data.get('target_repo'),
+                head_sha=data.get('head_sha'),
+                round_num=prev_round,
+            )
+            return False
+        log(
+            f'mergeable-gate: PR {pr_url} (task={task_id}) is CONFLICTING — '
+            f'dispatching rebase round {next_round} to Forge; NOT dispatching '
+            f'Mirror onto a doomed PR',
+            'WARN',
+        )
+        _dispatch_rebase_to_forge(data, pr_url, round_num=next_round)
+        return False
+
+    # MERGEABLE (or UNKNOWN-after-poll). If this is the rebase-phase re-check, a
+    # mergeable PR means the rebase landed — resolve the obligation. (A still-
+    # UNKNOWN result also clears: GitHub couldn't confirm a conflict, so we let
+    # Mirror + the auto-merge gate carry it rather than re-rebasing on a guess.)
+    if is_rebase_phase:
+        resolved = rebase_obligation_ledger.resolve_obligation(
+            task_id,
+            resolution='mergeable' if status == 'mergeable' else 'mergeable-unknown',
+        )
+        if resolved:
+            log(
+                f'mergeable-gate: PR {pr_url} (task={task_id}) is {status} after '
+                f'rebase — resolved obligation, dispatching Mirror',
+                'INFO',
+            )
+    return True
+
+
 # ---- mirror-review-visibility: classify + route session-less review outcomes ----
 # Spec: agents/beacon/specs/mirror-review-visibility.md (Contracts B+C+D).
 # Classify on WIRE signals only (marker_type + session/ledger state), never on
@@ -7277,6 +7550,48 @@ def _gh_pr_mergeable_status(repo_coords: str, pr_number: int) -> str:
     if not isinstance(raw, str):
         return 'unknown'
     return _GH_MERGEABLE_TO_GATE_STATUS.get(raw.upper(), 'unknown')
+
+
+# forge-post-open-mergeable-rebase-001 — bounded poll over `gh pr view --json
+# mergeable`. GitHub computes mergeability asynchronously, so a PR queried
+# immediately after `gh pr create` (or after a force-push) usually returns
+# UNKNOWN for a few seconds before settling to MERGEABLE / CONFLICTING. The
+# auto-rebase gate must distinguish a definitive CONFLICTING (dispatch a rebase)
+# from a transient UNKNOWN (wait, then proceed). Cap the wait so a wedged GitHub
+# can never block the notifier's poll loop indefinitely.
+_MERGEABLE_POLL_MAX = 6        # ~6 attempts
+_MERGEABLE_POLL_INTERVAL_S = 5.0  # ~5s apart → ~30s worst-case bounded wait
+
+
+def _poll_pr_mergeable(
+    repo_coords: str,
+    pr_number: int,
+    *,
+    max_polls: int = _MERGEABLE_POLL_MAX,
+    interval_s: float = _MERGEABLE_POLL_INTERVAL_S,
+    sleep=time.sleep,
+) -> str:
+    """Poll `_gh_pr_mergeable_status` past GitHub's async UNKNOWN.
+
+    Returns 'mergeable' / 'conflicting' as soon as GitHub settles, or 'unknown'
+    if the poll budget exhausts while still UNKNOWN (or every attempt hit a
+    transport error). Callers treat a settled 'conflicting' as the auto-rebase
+    trigger; a still-'unknown' result is treated optimistically (proceed to
+    Mirror — the final auto-merge gate re-checks mergeability and the
+    `held_conflict` path remains the human-visible backstop), so a slow GitHub
+    never strands a PR.
+
+    `sleep` is injectable so tests exercise the poll/settle logic without real
+    delay. No sleep after the final attempt."""
+    status = 'unknown'
+    attempts = max(1, max_polls)
+    for attempt in range(attempts):
+        status = _gh_pr_mergeable_status(repo_coords, pr_number)
+        if status in ('mergeable', 'conflicting'):
+            return status
+        if attempt < attempts - 1:
+            sleep(interval_s)
+    return status
 
 
 def _gh_pr_merge_freshness(
@@ -10319,12 +10634,20 @@ def process_outbox(outbox_file: Path) -> str:
         build_task_id = data.get('task_id', '')
         pr_url = _extract_pr_url_from_build_result(data.get('result', ''))
         if pr_url:
-            _dispatch_mirror_review(data, pr_url)
+            # forge-post-open-mergeable-rebase-001 (Layer 2): a PR that opened
+            # CONFLICTING because main advanced during the build must NOT go to
+            # Mirror onto a doomed PR. Gate the review dispatch on mergeability —
+            # on CONFLICTING this dispatches a phase=rebase back to Forge (+ opens
+            # a durable obligation) and returns False so Mirror is skipped; Mirror
+            # is dispatched on the rebase phase's re-check once MERGEABLE.
+            if _handle_pr_mergeable_before_review(data, pr_url):
+                _dispatch_mirror_review(data, pr_url)
             # push-signal-and-substatus (C): record `pr_url` + flip the
             # sequence step to the `reviewing` substatus at PR-OPEN, not only at
             # merge. Lights up the advancer's dual-gate `gh` leg during review
             # and the stall backstop's open-PR-in-review distinguisher. No-op
-            # for non-sequence tasks.
+            # for non-sequence tasks. Fires regardless of the rebase gate — the
+            # PR is open either way; the rebase obligation covers the stall case.
             _signal_sequence_step_pr_opened(build_task_id, pr_url)
         else:
             # No `PR opened:` line. Forge may have HONESTLY refused to open one
@@ -10353,6 +10676,27 @@ def process_outbox(outbox_file: Path) -> str:
         # Build phase emits no marker (preflight-only); the guarded classifier
         # below leaves marker_decision None and the default routing path takes
         # over (Beacon notify with the full build result narrative).
+
+    # forge-post-open-mergeable-rebase-001 (Layer 2) — Forge rebase-phase outbox.
+    # Forge re-ran under --resume after the build-phase mergeable gate found the
+    # PR CONFLICTING, rebased onto origin/main, force-pushed, and re-emitted
+    # `PR updated:`. Re-check mergeability: dispatch Mirror once MERGEABLE
+    # (resolving the durable obligation), or re-dispatch a higher rebase round if
+    # main re-advanced (bounded by _REBASE_MAX_ROUNDS). When Forge instead
+    # aborted a conflicted rebase and emitted a BLOCKER PARAGRAPH (no
+    # `PR updated:` line), there's no pr_url here — the obligation stays OPEN
+    # (healer backstop) and the default routing path below returns the blocker to
+    # Beacon, exactly like a build-phase blocker.
+    if agent == 'forge' and data.get('phase') == 'rebase':
+        rebase_task_id = data.get('task_id', '')
+        pr_url = _extract_pr_url_from_build_result(data.get('result', ''))
+        if pr_url:
+            if _handle_pr_mergeable_before_review(data, pr_url, is_rebase_phase=True):
+                _dispatch_mirror_review(data, pr_url)
+            _signal_sequence_step_pr_opened(rebase_task_id, pr_url)
+        # No `PR updated:` line → Forge surfaced a rebase-conflict blocker. Leave
+        # the obligation OPEN; the default routing path returns the blocker to
+        # Beacon and the healer fires if it fails to route.
 
     # D3.5 commit 5b — Forge revision-phase outbox. Strict gate per Larry's
     # signoff (Option 3 — strict on revision, lenient on build):

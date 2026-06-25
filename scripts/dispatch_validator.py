@@ -111,7 +111,10 @@ ALLOWED_INTENTS = {
 # phase (review-request task lands in her inbox after Forge opens a PR).
 # `revision` is the Forge revision phase wired in 5b (Mirror's REVIEW_REVISION
 # routes a fresh task back to Forge under --resume).
-ALLOWED_PHASES = {'preflight', 'build', 'review', 'revision', 'routing-signal'}
+# `rebase` (forge-post-open-mergeable-rebase-001) is the Forge rebase phase: the
+# notifier dispatches it back to Forge under --resume when a freshly-opened PR is
+# CONFLICTING because main advanced during the build, BEFORE Mirror is dispatched.
+ALLOWED_PHASES = {'preflight', 'build', 'review', 'revision', 'rebase', 'routing-signal'}
 
 # PR-S4 rectification (H2): target_agents whose envelopes are routing
 # signals — short prompts like `kickoff <seq-id>` or
