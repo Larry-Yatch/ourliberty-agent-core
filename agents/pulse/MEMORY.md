@@ -192,8 +192,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-25 14:26Z UTC (Iter ~2764, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 14:35Z UTC (Iter ~2765, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2764 summary:** ✅ Nominal — 0 new alerts. 8/8 daemons alive. Pipeline stall: reconcile-hardening-001 FP **RESOLVED** ✅ (confirmed no longer fires); rebase-forge-post-open-mergeable-687-001 original **still firing** — fix dispatch in-flight (forge-no-pr-rebase-original-fp-fix-001.json in Beacon inbox from iter ~2763). All inboxes empty except Beacon pending fix dispatch. PID 1834248 zombie still alive (~27.79d, ask-then-do). 6 stale journalctl PIDs (~30d, ask-then-do). Watchdog healthy (08:20:36 MDT). PRIME: interventions=1219, systemic_fixes=71, vp=26, ratio≈17.17, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2765 summary:** ⚠️ Signal — 1 new alert (L980, Tier 4). Beacon specced the rebase FP fix in iter ~2763 but APPROVAL_REQUEST marker dropped (rendered via bash, inert; reply_chat_id=null dropped DM). Iter ~2764 detected the drop and wrote source=pulse escalation to larry-alerts.jsonl. This iter re-dispatched `forge-no-pr-rebase-original-fp-fix-002` to Beacon inbox asking it to re-emit the approval marker pasted in reply text. 8/8 daemons alive. Watchdog healthy (08:25:50 MDT). 1 stall FP still firing (rebase-687-001 original). PID 1834248 zombie (~27.80d, ask-then-do). 6 stale journalctl PIDs (~30d, ask-then-do). PRIME: interventions=1220, systemic_fixes=71, vp=26, ratio≈17.18, trend=improving. Tier 1, consecutive_clean=0.
 
 

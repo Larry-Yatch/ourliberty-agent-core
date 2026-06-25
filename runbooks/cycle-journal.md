@@ -5,6 +5,98 @@
 ---
 
 
+## Iteration ~2765 — 2026-06-25T14:35Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/cycle` invocation via chat.
+
+**Health:** ⚠️ Signal — 1 new alert (L980, Tier 4, re-dispatched). 8/8 daemons alive. 1 pipeline stall FP still firing. Beacon re-dispatch sent for rebase FP marker-drop class.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo**: HEAD=b767e8b0=origin/main. Clean (cycle-journal.md modified, expected). On main. ✅
+- **Pipeline stall FP rebase-687-001**: Re-verified — `DRY-RUN would alert: forge_built_no_pr:rebase-forge-post-open-mergeable-687-001`. Still fires (1 alert). Fix re-dispatched this iter (forge-no-pr-rebase-original-fp-fix-002 → Beacon inbox). [carry, updated]
+- **beacon-pending-approvals**: pending=0 ✅
+- **Sync**: last_sync=2026-06-25T14:00:20Z (~35 min ago). Within 2h. ✅
+- **Daemons (re-verified)**: forge_bot=1388801 (Ss, 168263s ~46.7h) ✅, mirror_bot=1388982 (Ss, 168255s ~46.7h) ✅, pulse_bot=1389067 (Ss, 168252s ~46.7h) ✅, beacon_telegram_bot=2715635 (Ss, 27212s ~7.56h) ✅, dashboard_api=2715859 (Ssl, 27203s ~7.56h) ✅, chain_event_shipper=2716672 (SNs, 27130s ~7.54h) ✅, inbox_watcher=2754413 (Ssl, 24724s ~6.87h) ✅, outbox_notifier=2773485 (Ss, 23003s ~6.39h) ✅. 8/8 alive. ✅
+- **Watchdog**: last entry 08:25:50 MDT (14:25:50Z, ~9 min ago) — overall=healthy. ✅
+- **Zombie PID 1834248**: still alive (Ss, bash, etimes=2401831s ~27.80d). Ask-then-do. [carry]
+- **6 stale journalctl PIDs**: all alive (S, etimes ~2596K–2662Ks ~30d). Ask-then-do. [carry]
+- **Stale daemon code heartbeat**: 2026-06-25T14:20:36Z (~15 min ago). Within expected range. ✅
+- **Agent inboxes**: beacon=forge-no-pr-rebase-original-fp-fix-002.json (deposited this iter) ✅, forge=EMPTY ✅, mirror=EMPTY ✅, pulse=EMPTY (notify file processed) ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark: repaired=false, old=979, file_length=980. **1 new alert** at L980.
+- L980: `{"source":"pulse","severity":"warning","route":"escalate","subject":"rebase-687 FP fix spec ready but Forge dispatch stalled (marker drop)"}` — Tier 4 (novel, no translation match). Helper decision: "ask". Route: re-dispatch to Beacon. **Action**: wrote `forge-no-pr-rebase-original-fp-fix-002.json` to Beacon inbox (direction-ask: re-emit APPROVAL_REQUEST with marker pasted in reply text, not via marker.py). Watermark advanced 979→980. ✅
+
+**What L980 means**: Iter ~2764 processed the Beacon notify file (`notify-forge-no-pr-rebase-original-fp-fix-001.json`). Beacon had specced the fix (Pattern B extension for original rebase task) but its APPROVAL_REQUEST marker was rendered via bash (inert) and reply_chat_id=null dropped the DM. No Forge task created. Iter ~2764 wrote the source=pulse escalation to document the drop. This iter re-routes to Beacon with an explicit instruction to paste the approval marker in reply text.
+
+**Check 1 — Log noise:**
+- `journalctl --user -p warning --since "30 minutes ago"` → `-- No entries --`. ✅
+- outbox-notifier.log: Last substantive entry 08:13:36 MDT (14:13:36Z) — PR #701 AUTO_MERGE complete. No anomalous WARNs since. ✅
+- watchdog.log: last entry 08:25:50 MDT (14:25:50Z, ~9 min ago) — overall=healthy. ✅
+
+**Check 2 — Telegram sweep:**
+- Beacon bot PID 2715635 (Ss) ✅. Last Larry message: 07:11:34 MDT 'Go' → approved heal-forge-no-pr-retry-rebase-fp-001. Last bot DM: 08:14:40 MDT idx=978 (review-pass). No new messages. Nominal. ✅
+
+**Check 3 — Pipeline stall (dry-run):**
+- `reconcile-hardening-mission-shipped-001`: FORGE_NO_PR_SKIP (Pattern A retry_pr_exists) — no longer fires ✅
+- `rebase-forge-post-open-mergeable-687-001`: **DRY-RUN would alert** (1 alert). Fix re-dispatched this iter. [carry, updated]
+- 1 alert(s) would fire, 0 recovery(ies) attempted.
+
+**Check 4 — Pending directives:**
+- Beacon inbox: **forge-no-pr-rebase-original-fp-fix-002.json** (deposited this iter) ✅
+- Forge inbox: EMPTY ✅
+- Mirror inbox: EMPTY ✅
+- Pulse inbox: EMPTY (notify file processed) ✅
+- beacon-pending-approvals: 0 pending ✅
+
+**Check 4.6 — Credential rotation:** No new rotation events in Telegram log. [carry OK] ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-06-25T14:20:36Z (~15 min ago). Fresh. ✅
+
+**Check A — Source repo:** HEAD=b767e8b0=origin/main. Clean. On main. ✅
+**Check B — Sync health:** last_sync=2026-06-25T14:00:20Z (~35 min ago). Within 2h. ✅
+**Check C — Agent liveness:** 8/8 alive.
+- **[yellow] PID 1834248** — zombie bash wait-loop (~27.80d). Ask-then-do: `kill 1834248`. [carry]
+- **[yellow] 6 stale journalctl PIDs (~30d)** — PIDs 1101500, 1107838, 1118830, 1136223, 1161972, 1177335. Ask-then-do. [carry]
+
+**Check E — PRs:** `gh pr list --state open` → [] (none). ✅
+
+**Check H — Forge digest:** Beacon inbox has new dispatch. All other agent inboxes empty. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check VIII/IX/X: Not Monday. Skip. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule updates:**
+- `forge-built-no-pr-retry1-fp-001` (vp) — Pattern 2 (original rebase-687 task) still firing. Re-dispatched forge-no-pr-rebase-original-fp-fix-002 to Beacon (marker-drop class: 2nd occurrence of APPROVAL_REQUEST drop for this fix). [active, updated]
+
+**Actions taken:**
+- Watermark advanced 979→980 (1 Tier-4 alert: source=pulse marker-drop escalation).
+- **Dispatch**: `forge-no-pr-rebase-original-fp-fix-002` → Beacon inbox (re-emit APPROVAL_REQUEST for Pattern B extension).
+- PRIME ledger: 1 intervention row (marker-drop-redispatch, Tier 1).
+- Tier state recorded: non-clean. Tier 1, consecutive_clean=0.
+
+**Standing findings (carried + verified):**
+- [yellow] **rebase-forge-post-open-mergeable-687-001 stall FP** — 1 DRY-RUN alert still fires. Fix re-dispatched (forge-no-pr-rebase-original-fp-fix-002 in Beacon inbox, this iter). APPROVAL_REQUEST marker-drop was the blocker; re-dispatch asks Beacon to paste marker in reply text. [active, updated]
+- [yellow] **PID 1834248 zombie bash loop** — Still alive (~27.80d). Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **6 stale journalctl PIDs (~30d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+- [yellow] **sequence-paused:operator-needs-you-feed** — Recovery: `resume sequence operator-needs-you-feed` via Beacon or Dashboard. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**PRIME DIRECTIVE:** interventions=1220, systemic_fixes=71, verification_pending=26, ratio≈17.18, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** consecutive_clean=0 (non-clean: 1 new alert dispatched, 1 stall FP, zombie PID, 6 stale journalctl PIDs). Tier: 1.
+
+---
+
+
 ## Iteration ~2764 — 2026-06-25T14:26Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/cycle` invocation via chat.
@@ -93,6 +185,18 @@
 
 ---
 
+
+### Inter-cycle notification — 2026-06-25T14:24Z UTC
+
+**Source:** Beacon result-notification (inter-agent notify, intent=result-notification, task=forge-no-pr-rebase-original-fp-fix-001).
+
+**Summary:** Beacon diagnosed the residual `forge_built_no_pr:rebase-forge-post-open-mergeable-687-001` FP and specced a fix.
+
+**Root cause confirmed:** Pattern B (`_forge_rebase_target_shipped`) in `scripts/heal_pipeline_stall.py` fails when the original task's `result` prose narrates **two** merged PR numbers (#685 and #687). The `len == 1` guard on `seen_numbers` returns `None` for the original task (retry1 was caught by `_forge_already_merged_bridge` because it contains a canonical `NO PR — already merged: #687` line; the original doesn't). Fix: in the `>1` ambiguity branch, intersect `seen_numbers` with digit-groups extracted from the task_id (`…-687-001` → `{687}`) to disambiguate. Fail-safe preserved — residual ambiguity still falls through to alert. Acceptance: `--dry-run` emits `FORGE_NO_PR_SKIP … reason=rebase_target_shipped pr=#687` for that task, zero alerts, plus unit tests for both the hit and the still-ambiguous fail-safe.
+
+**Dispatch gap detected:** Beacon's result says "APPROVAL_REQUEST marker is pasted above" but the outbox-notifier log (08:24:27 MDT) shows only `notified pulse <- beacon (beacon-result)` — no subsequent `approval_request` chain event, no Forge inbox task, `beacon-pending-approvals` empty. Marker likely rendered via `marker.py` Bash (inert for dispatch, per known failure mode). `reply_chat_id=null` also dropped the Larry DM. Fix spec is fully captured in Beacon task archive (`~/agents/outboxes/beacon/.archive/forge-no-pr-rebase-original-fp-fix-001.json`) but Forge has no task. larry_alerts DM queued; re-dispatch needed.
+
+---
 
 ## Iteration ~2763 — 2026-06-25T14:18Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
