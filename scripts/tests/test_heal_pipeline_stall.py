@@ -925,6 +925,148 @@ class TestCheckForgeBuiltNoPr(_TempAgentsRootMixin, unittest.TestCase):
         self.assertEqual(alerts[0]['subject'],
                          f'pipeline-stall:forge-no-pr:{task}')
 
+    # ----- Reconciliation step 1d: sibling-pr_title shipped (2026-06-25) -----
+
+    _SIBLING_PR_TITLE = (
+        'chore(missions): reconcile orchestrator-terminal-signal-hardening '
+        'to shipped (#672/#673)'
+    )
+
+    def test_sibling_pr_title_shipped_suppresses_stall(self) -> None:
+        """The 2026-06-25 production case: task
+        `reconcile-hardening-mission-shipped-001` honestly opened NO PR (its
+        result is prose). The redispatch `-002` carried the IDENTICAL pr_title
+        and shipped it under MERGED PR #688 on branch `forge/...-002`, whose
+        branch + title carry the -002 token so `_pr_matches_task` can't
+        correlate it and no `already merged: #N` line is in -001's result.
+        The exact-pr_title sibling match suppresses the false stall —
+        reason=sibling_pr_title_shipped, pr=#688."""
+        task = 'reconcile-hardening-mission-shipped-001'
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'build', 'exit_code': 0,
+            'task_type': 'doc-only', 'pr_title': self._SIBLING_PR_TITLE,
+            'result': 'Done. The JSON parses cleanly and the entry is reconciled.',
+        })
+        merged_prs = [{
+            'headRefName': 'forge/reconcile-hardening-mission-shipped-002',
+            'number': 688,
+            'title': self._SIBLING_PR_TITLE,
+            '_repo': self._AGENT_CORE,
+        }]
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        captured: list[str] = []
+        with patch.object(self.hps, 'log',
+                          side_effect=lambda msg, level='INFO': captured.append(msg)):
+            alerts = self.hps.check_forge_built_no_pr(lines, [], merged_prs, {})
+        self.assertEqual(alerts, [])
+        skip = [m for m in captured
+                if 'FORGE_NO_PR_SKIP' in m and 'sibling_pr_title_shipped' in m]
+        self.assertEqual(len(skip), 1)
+        self.assertIn('pr=#688', skip[0])
+
+    def test_sibling_pr_title_matches_open_pr_too(self) -> None:
+        """The sibling PR need only be gh-truth (in the open+merged union); an
+        OPEN sibling PR with the identical pr_title also suppresses the stall."""
+        task = 'reconcile-hardening-mission-shipped-001'
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'build', 'exit_code': 0,
+            'pr_title': self._SIBLING_PR_TITLE, 'result': 'Done.',
+        })
+        open_prs = [{
+            'headRefName': 'forge/reconcile-hardening-mission-shipped-002',
+            'number': 688, 'title': self._SIBLING_PR_TITLE, '_repo': self._AGENT_CORE,
+        }]
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        alerts = self.hps.check_forge_built_no_pr(lines, open_prs, [], {})
+        self.assertEqual(alerts, [])
+
+    def test_unique_pr_title_still_alerts(self) -> None:
+        """No sibling carries this pr_title — a genuine no-PR stall must still
+        fire unchanged. Guards against the step silencing real stalls."""
+        task = 'reconcile-hardening-mission-shipped-001'
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'build', 'exit_code': 0,
+            'pr_title': self._SIBLING_PR_TITLE, 'result': 'Done.',
+        })
+        merged_prs = [{
+            'headRefName': 'forge/some-unrelated-task-009',
+            'number': 700,
+            'title': 'feat(other): a completely different unit of work',
+            '_repo': self._AGENT_CORE,
+        }]
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], merged_prs, {})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]['subject'],
+                         f'pipeline-stall:forge-no-pr:{task}')
+
+    def test_sibling_helper_none_on_missing_pr_title(self) -> None:
+        """No pr_title on the outbox = no signal to match on → helper returns
+        None and the build-gap alert fires (fail-safe)."""
+        task = 'reconcile-hardening-mission-shipped-001'
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'build', 'exit_code': 0, 'result': 'Done.',
+        })
+        merged_prs = [{
+            'headRefName': 'forge/reconcile-hardening-mission-shipped-002',
+            'number': 688, 'title': self._SIBLING_PR_TITLE, '_repo': self._AGENT_CORE,
+        }]
+        self.assertIsNone(
+            self.hps._forge_sibling_pr_title_shipped(task, merged_prs))
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], merged_prs, {})
+        self.assertEqual(len(alerts), 1)
+
+    def test_sibling_helper_ignores_self_same_task_id(self) -> None:
+        """A PR with the matching pr_title but the SAME branch task_id is self,
+        not a sibling — the helper must not match its own (absent) PR. Here only
+        a same-task_id PR exists, so the helper returns None."""
+        task = 'reconcile-hardening-mission-shipped-001'
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'build', 'exit_code': 0,
+            'pr_title': self._SIBLING_PR_TITLE, 'result': 'Done.',
+        })
+        self_pr = [{
+            'headRefName': f'forge/{task}',
+            'number': 688, 'title': self._SIBLING_PR_TITLE, '_repo': self._AGENT_CORE,
+        }]
+        self.assertIsNone(
+            self.hps._forge_sibling_pr_title_shipped(task, self_pr))
+
+    def test_sibling_helper_none_on_ambiguous_two_siblings(self) -> None:
+        """Two DISTINCT sibling PRs share the pr_title = ambiguous; refuse to
+        guess (return None) so the alert still fires rather than bridging to an
+        arbitrary one."""
+        task = 'reconcile-hardening-mission-shipped-001'
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'build', 'exit_code': 0,
+            'pr_title': self._SIBLING_PR_TITLE, 'result': 'Done.',
+        })
+        prs = [
+            {'headRefName': 'forge/reconcile-hardening-mission-shipped-002',
+             'number': 688, 'title': self._SIBLING_PR_TITLE, '_repo': self._AGENT_CORE},
+            {'headRefName': 'forge/reconcile-hardening-mission-shipped-003',
+             'number': 689, 'title': self._SIBLING_PR_TITLE, '_repo': self._AGENT_CORE},
+        ]
+        self.assertIsNone(
+            self.hps._forge_sibling_pr_title_shipped(task, prs))
+
+    def test_sibling_helper_requires_exact_title_not_substring(self) -> None:
+        """Substring is intentionally NOT accepted: a PR whose title merely
+        CONTAINS the pr_title (with extra text) is not an exact match → None."""
+        task = 'reconcile-hardening-mission-shipped-001'
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'build', 'exit_code': 0,
+            'pr_title': self._SIBLING_PR_TITLE, 'result': 'Done.',
+        })
+        prs = [{
+            'headRefName': 'forge/reconcile-hardening-mission-shipped-002',
+            'number': 688, 'title': self._SIBLING_PR_TITLE + ' and more',
+            '_repo': self._AGENT_CORE,
+        }]
+        self.assertIsNone(
+            self.hps._forge_sibling_pr_title_shipped(task, prs))
+
     def test_step5_does_not_apply_to_non_preflight_errored_task(self) -> None:
         """Gating guard: a genuine build-phase crash (phase='build',
         exit_code=1) on a task_id WITHOUT `-preflight`/`-clarify` is not a
