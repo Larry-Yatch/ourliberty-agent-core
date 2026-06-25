@@ -204,8 +204,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-25 20:27Z UTC (Iter ~2814, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 20:35Z UTC (Iter ~2815, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2814 summary:** ✅ Nominal — 1 new alert (L1006: forge-wip-redispatch board-new-mission-confirmation-placeholder-001-retry1, Tier-4 known-G-rule, journal-only). Forge COMPLETED waiting-panel-render build (step 3 operator-needs-you-feed, $3.96). PR #93 opened ourliberty-dashboard, Mirror review dispatched 20:24:42Z. board-new-mission-confirmation-placeholder-001-retry1.json queued in Forge inbox. No open PRs in ourliberty-agent-core. Standing: zombie PID 1834248 (~28d), 6 stale journalctl PIDs (~30-31d), forge-wip-redispatch-digest Forge dispatch pending trust-policy approval. PRIME: interventions=1225, systemic_fixes=71, vp=27, ratio≈17.25, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2815 summary:** ✅ Nominal — 1 new alert (L1007: outbox-notifier sequence-complete operator-needs-you-feed, Tier-3 silenced). **operator-needs-you-feed COMPLETE** (all 3 steps: PRs #685, #706, #93 merged; DM sent 14:30:42 MDT; Beacon closeout at 20:29:53Z; 3 follow-ups in Suggested lane). Forge ACTIVE on board-new-mission-confirmation-placeholder-001-retry1 (started 20:24:47Z). reconcile-two-stale-inflight-missions-shipped-001 resolved (wedged-healer reaped, PR #703 merged 18:14Z). No open PRs (agent-core or dashboard). Standing: zombie PID 1834248 (~28d), 6 stale journalctl PIDs (~30-31d), forge-wip-redispatch-digest dispatch pending trust-policy approval. PRIME: interventions=1225, systemic_fixes=71, vp=27, ratio≈17.25, trend=improving. Tier 1, consecutive_clean=0.
 
 

@@ -5,6 +5,101 @@
 ---
 
 
+## Iteration ~2815 — 2026-06-25T20:35Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/cycle` invocation via chat.
+
+**Health:** ✅ Nominal — 1 new alert (L1007, Tier-3 silenced: outbox-notifier sequence-complete). **Major milestone:** `operator-needs-you-feed` sequence COMPLETE — all 3 steps merged (PRs #685, #706, #93). PR #93 (waiting-panel-render) merged 14:29:50 MDT; Beacon authored closeout at 20:29:53Z. Forge ACTIVELY running `board-new-mission-confirmation-placeholder-001-retry1` (started 20:24:47Z). reconcile-two-stale-inflight-missions-shipped-001 fully resolved (wedged-review healer reaped at 17:45Z, Mirror re-ran, PR #703 merged 18:14Z).
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo**: HEAD=e7907d29=origin/main. On main. ✅ Dirty: `agents/beacon/projects.json` (+21 lines) — Beacon closeout of operator-needs-you-feed (lifecycle_state→done, authored 20:29:53Z). Expected Beacon activity; sync will commit on next tick.
+- **Sync**: status=no-change, last_sync=2026-06-25T20:01:13Z (~34 min old). Under 2h threshold. ✅
+- **Daemons**: 8/8 PIDs alive (1388801, 1388982, 1389067 Ss ~2d4h52m; 2716672 SNs ~13h41m; 2754413 Ssl ~13h01m; 3044417 Ssl, 3044692 Ss, 3044826 Ss ~15 min post-restart). ✅
+- **Forge**: ACTIVELY running `board-new-mission-confirmation-placeholder-001-retry1` (inbox_watcher start at 20:24:47Z, ~11 min). ✅ Expected.
+- **Watchdog**: last=14:27:54 MDT (20:27:54Z) overall=healthy. ✅
+- **heal-stale-daemon-code heartbeat**: 2026-06-25T20:25:18Z (~10 min old). Fresh. ✅
+- **Zombie PID 1834248**: Still alive (Ss, 28-01:12:28). Ask-then-do. [carry]
+- **6 stale journalctl PIDs**: All alive (~30-31d). Ask-then-do. [carry]
+- **beacon-pending-approvals**: 0. ✅
+- **Open PRs (ourliberty-agent-core)**: NONE. PR #703 MERGED 18:14Z, PR #705 MERGED 19:20Z. ✅
+- **Open PRs (ourliberty-dashboard)**: PR #93 MERGED 14:29:50 MDT. NONE open. ✅
+- **Forge inbox**: `board-new-mission-confirmation-placeholder-001-retry1.json` (ACTIVE — started 20:24:47Z). ✅
+- **Mirror inbox**: EMPTY. ✅ (marker-error-reconcile-two-stale-inflight-missions-shipped-001-1.json gone — PR #703 merged, issue self-resolved)
+- **Beacon inbox**: EMPTY. ✅
+- **outbox-notifier.log**: PR #93 auto-merged 14:29:50 MDT; SEQUENCE_COMPLETE operator-needs-you-feed signaled 14:30:42 MDT (event+DM emitted); AUTO_MERGE_WORKTREE_TEARDOWN (forge + mirror) at 14:30:44-45 MDT; Beacon closeout notify 14:30:45-31:08 MDT. All INFO since restart. ✅
+
+**Check 0 — Alert triage:**
+- `repair-watermark`: `{"repaired": false, "old_watermark": 1006, "file_length": 1007}`. **1 new alert at L1007**.
+- **L1007**: `source=outbox-notifier, subject=sequence-complete:operator-needs-you-feed, route=escalate`. Helper: **Tier-3** (known-pattern match in alert-translations.json). Silenced. Larry already DM'd directly by outbox-notifier at 14:30:42 MDT. Watermark advanced to 1007. ✅ Nominal (no tier-reset per Tier-3 carve-out).
+
+**Check 1 — Log noise:**
+- `journalctl --user -p warning --since "30 minutes ago"` → `-- No entries --`. ✅
+- outbox-notifier.log: All INFO. Sequence complete events, worktree teardown. Latest: 14:31:08 MDT. ✅
+- watchdog.log: 14:27:54 MDT — overall=healthy. ✅
+
+**Check 2 — Telegram sweep:**
+- Last Larry message: 13:57:33 MDT. Beacon replied 14:01:37 MDT. No new directives this iter. Sequence-complete DM sent to Larry at 14:30:42 MDT. Bot functioning. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- 25 FORGE_NO_PR_SKIP tasks (pr_exists / preflight_exit / preflight_non_proceed / sibling_pr_title_shipped / rebase_target_shipped / already_merged_bridge). **"no stalls detected"**. ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- Forge inbox: `board-new-mission-confirmation-placeholder-001-retry1.json` (ACTIVE — inbox_watcher started 20:24:47Z). ✅ Expected.
+- Mirror inbox: EMPTY. ✅
+- Beacon inbox: EMPTY. ✅
+- beacon-pending-approvals: 0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** credential_rotation_check.py not found — same script gap as prior iters; schema_version check deferred. No new alert from this substrate. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-25T20:25:18Z (~10 min old). Fresh. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=e7907d29=origin/main. On main. Dirty: `agents/beacon/projects.json` (Beacon closeout, expected). ✅ Informational (sync handles commit).
+**Check B — Sync health:** status=no-change, last_sync=20:01:13Z (~34 min old). Under 2h. ✅ Nominal.
+**Check C — Agent liveness:** 8/8 alive. Forge active (board-new-mission-confirmation-placeholder-001-retry1). ✅
+- **[yellow] PID 1834248** — zombie bash loop (~28d). Ask-then-do: `kill 1834248`. [carry]
+- **[yellow] 6 stale journalctl PIDs (~30-31d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+
+**Check E — PRs:**
+- ourliberty-agent-core: NO OPEN PRs. PR #703 MERGED 18:14Z, PR #705 MERGED 19:20Z. ✅
+- ourliberty-dashboard: PR #93 MERGED 14:29:50 MDT. NO OPEN PRs. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check VIII/IX/X: Not Monday. Skip. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule updates:**
+- All active G-rules: carry unchanged from ~2814. No new occurrences this iter.
+
+**Actions taken:**
+1. Alert watermark: 1006 → 1007 (L1007 Tier-3 silenced).
+2. PRIME ledger: `iter_clean` appended (tier=1, template=iter-clean-nominal).
+3. Tier state: `record --checks-clean false` → consecutive_clean stays 0 (zombie PID + 6 stale journalctl PIDs carry). Tier remains 1.
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [green] **operator-needs-you-feed COMPLETE** — All 3 steps merged (PR #685 escalation-feed, PR #706 sequence-rows-endpoint, PR #93 waiting-panel-render). Sequence-complete DM sent 14:30:42 MDT. 3 follow-ups dropped into funnel Suggested lane. Beacon closeout authored at 20:29:53Z (projects.json lifecycle_state→done). ✅ Done.
+- [green] **reconcile-two-stale-inflight-missions-shipped-001** — RESOLVED. heal-wedged-review-sessions reaped stuck session at 17:45Z. Mirror re-ran successfully. PR #703 merged 18:14Z. Mirror inbox empty. ✅ Done.
+- [yellow] **board-new-mission-confirmation-placeholder-001 → retry1 ACTIVE** — Forge running retry1 (started 20:24:47Z). Task has been rejected twice at preflight (spec targeting retired Missions kanban UI). Watch for preflight exit or WIP-only death this cycle. Carry until Forge done.
+- [yellow] **new-mission-card-scope-decision-001** — Beacon replied to Larry's follow-up 14:01:37 MDT. Awaiting Larry decision on scope (confirm `approve new-mission-card-scope-decision-001` = keep toast only vs net-new board lane). [carry]
+- [yellow] **PID 1834248 zombie bash loop** — Still alive (~28d). Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **6 stale journalctl PIDs (~30-31d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+- [yellow] **forge-wip-redispatch-digest Forge dispatch** — Beacon fix designed (iter ~2798). Trust-policy approval from Larry pending. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649/637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**PRIME DIRECTIVE:** interventions=1225, systemic_fixes=71, verification_pending=27, ratio≈17.25, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0 (non-clean: zombie PID + 6 stale journalctl PIDs). Last signal: 2026-06-25T20:35:29Z.
+
+---
+
+
 ## Iteration ~2814 — 2026-06-25T20:27Z UTC (interactive /loop /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/loop /cycle` invocation via chat.
