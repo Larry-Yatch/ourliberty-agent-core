@@ -119,6 +119,76 @@ class ClassifyTest(unittest.TestCase):
         self.assertIn('active', d.reason)
 
 
+# ---------- classify(): the opt-in --by-pr-state mode ----------
+
+
+class ByPrStateClassifyTest(unittest.TestCase):
+    def test_merged_pr_head_pruned_ignoring_age_and_content(self):
+        # Young + unique content would be KEPT in normal mode; by-pr-state prunes
+        # it purely on the merged-PR state.
+        d = cdb.classify(
+            _facts(committer_ts=YOUNG_TS, is_merged_pr_head=True,
+                   net_change='unique'),
+            NOW, by_pr_state=True)
+        self.assertEqual(d.action, 'prune')
+        self.assertIn('merged', d.reason)
+        self.assertIn('by-pr-state', d.reason)
+
+    def test_closed_pr_head_pruned_ignoring_age(self):
+        # A CLOSED-unmerged PR head is never pruned in normal mode (no signal for
+        # it); by-pr-state prunes it, bypassing the age floor.
+        d = cdb.classify(
+            _facts(committer_ts=YOUNG_TS, is_closed_pr_head=True,
+                   net_change='unique'),
+            NOW, by_pr_state=True)
+        self.assertEqual(d.action, 'prune')
+        self.assertIn('closed', d.reason)
+        self.assertIn('by-pr-state', d.reason)
+
+    def test_no_pr_branch_is_kept_even_if_empty_wip(self):
+        # OUT OF SCOPE for this mode: a no-PR branch (here empty-WIP, which
+        # normal mode prunes) is KEPT because it has no merged/closed PR.
+        d = cdb.classify(_facts(net_change='empty-wip'), NOW, by_pr_state=True)
+        self.assertEqual(d.action, 'keep')
+        self.assertIn('no merged/closed', d.reason)
+
+    def test_no_pr_branch_content_on_main_is_kept(self):
+        d = cdb.classify(
+            _facts(net_change='content-on-main'), NOW, by_pr_state=True)
+        self.assertEqual(d.action, 'keep')
+        self.assertIn('no merged/closed', d.reason)
+
+    def test_active_guard_still_intact(self):
+        # The active-dispatch guard is NEVER bypassed, even for a merged-PR head.
+        d = cdb.classify(
+            _facts(is_active=True, is_merged_pr_head=True), NOW, by_pr_state=True)
+        self.assertEqual(d.action, 'keep')
+        self.assertIn('active', d.reason)
+
+    def test_open_pr_guard_still_intact(self):
+        # An open PR head is kept even if it also somehow matched a closed head.
+        d = cdb.classify(
+            _facts(is_open_pr_head=True, is_closed_pr_head=True),
+            NOW, by_pr_state=True)
+        self.assertEqual(d.action, 'keep')
+        self.assertIn('open-PR', d.reason)
+
+    def test_merged_takes_precedence_over_closed(self):
+        d = cdb.classify(
+            _facts(is_merged_pr_head=True, is_closed_pr_head=True),
+            NOW, by_pr_state=True)
+        self.assertEqual(d.action, 'prune')
+        self.assertIn('merged', d.reason)
+
+    def test_default_mode_ignores_closed_head(self):
+        # Without by_pr_state, a CLOSED-unmerged head with unique content is KEPT
+        # (the closed signal is by-pr-state-only).
+        d = cdb.classify(
+            _facts(is_closed_pr_head=True, net_change='unique'), NOW)
+        self.assertEqual(d.action, 'keep')
+        self.assertIn('unique', d.reason)
+
+
 # ---------- branch-name reconstruction consistency ----------
 
 
