@@ -180,9 +180,9 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## G-rule forge-built-no-pr-retry1-fp-001 → DISPATCHED ✅ (3/3, iter ~2701), vp
+## G-rule forge-built-no-pr-retry1-fp-001 → PARTIAL VERIFICATION (iter ~2763)
 
-**Rule:** `forge_built_no_pr` stall fires even when a PR exists. Two patterns confirmed: (1) `reconcile-hardening-mission-shipped-001` fires even though PR #699 (retry1) is OPEN (sibling_pr_title_shipped only checks MERGED PRs, misses OPEN retry1). (2) `rebase-forge-post-open-mergeable-687-001` fires even though PR #687 is MERGED (branch deleted post-merge, so branch-based match fails; title-based sibling match also misses). L1128 was the live alert fire for pattern 2. Dispatched `direction-ask-forge-built-no-pr-retry1-fp-001` to Beacon inbox. Fix: extend `sibling_pr_title_shipped` + add `sibling_pr_title_open`/`retry1_pr_exists` skip paths in `heal_pipeline_stall.py`. verification_pending.
+**Rule:** `forge_built_no_pr` stall fires even when a PR exists. Two patterns confirmed: (1) `reconcile-hardening-mission-shipped-001` fires even though PR #699 (retry1) is OPEN; (2) `rebase-forge-post-open-mergeable-687-001` fires even though PR #687 is MERGED (branch deleted). PR #701 merged at 14:13:35Z 2026-06-25. **Pattern 1 RESOLVED** ✅ — reconcile FP no longer fires (Pattern A `retry_pr_exists` suppression works). **Pattern 2 STILL FIRING** — `rebase-forge-post-open-mergeable-687-001` original fires; Pattern B (`_forge_rebase_target_shipped`) suppresses retry1 but NOT original task. verification_pending continues; secondary dispatch to Beacon needed for Pattern 2 fix.
 
 ---
 
@@ -192,8 +192,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-25 13:56Z UTC (Iter ~2761, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 14:18Z UTC (Iter ~2763, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2761 summary:** ✅ Nominal — 0 new alerts. 8/8 daemons alive. **PR #701 Mirror retry session PID 2864167 active (~9 min)** — `heal-forge-no-pr-retry-rebase-fp-001`. Repo clean (HEAD=4569b2f7=origin/main). 2 pipeline stall FPs still DRY-RUN firing (fix in PR #701, Mirror retry reviewing). PID 1834248 zombie still alive (~27.78d, ask-then-do). 6 stale journalctl PIDs (~30d, ask-then-do). Watchdog healthy (07:55:16 MDT). PRIME: interventions=1218, systemic_fixes=71, vp=26, ratio≈17.15, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2763 summary:** ✅ Nominal — 1 alert (Tier-3 silenced). **PR #701 MERGED** at 14:13:35Z (heal-forge-no-pr-retry-rebase-fp-001 COMPLETE). Repo fast-forwarded 4ecf63ce→3cee80fe. 8/8 daemons alive. Pipeline stall: reconcile-hardening-001 FP **RESOLVED** ✅; rebase-forge-post-open-mergeable-687-001 original **still firing** (Pattern B in PR #701 suppresses retry1 but not original). All inboxes empty. PID 1834248 zombie still alive (~27.79d, ask-then-do). 6 stale journalctl PIDs (~30d, ask-then-do). Watchdog healthy (08:15:27 MDT). PRIME: interventions=1219, systemic_fixes=71, vp=26, ratio≈17.17, trend=improving. Tier 1, consecutive_clean=0.
 
 
