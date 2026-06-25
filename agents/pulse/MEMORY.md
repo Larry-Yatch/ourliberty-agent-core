@@ -156,6 +156,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-25 04:22Z UTC (Iter ~2684, Tier 1, consecutive_clean=0)
+
+**Iter ~2684 summary:** ⚠️ Watch — PR #687 CONFLICTING (Forge rebase IN PROGRESS, auto-approved 04:13Z, worktree tests running 04:16Z). **KEY EVENTS: L1105 sequence-paused:operator-needs-you-feed (Tier-4, escalation-feed gate-mismatch chain_merged=False/gh_merged=True, delivered to Larry 04:19Z). Mirror inbox: 2 tasks for PR #692 (G-rule review-duplicate-dispatch pattern confirmed again). 1 new alert, watermark 1104→1105. All daemons alive. No new Larry directives. Pipeline stall: 1 DRY-RUN (reconcile-001 FP only). 4 pending approvals (rebase-pr-687 auto-resolved; 3 others carry).** PRIME: interventions=1156, systemic_fixes=70, vp=25, ratio≈16.51, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-25 04:15Z UTC (Iter ~2683, Tier 1, consecutive_clean=0)
 
 **Iter ~2683 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase approval pending Larry). **KEY EVENTS: Check 2 FINDING — Larry asked "Why 30 messages of stalled pipelines" at 04:09Z; answered inline (root: PR #687 conflict → repeated heal_pipeline_stall + medic alerts via outbox-notifier). 0 new alerts. Mirror has fresh review task for PR #692 (04:13Z). PR #692 confirmed MERGEABLE/CLEAN (not transient), reviewDecision=empty. 4 pending approvals (carry). Pipeline stall: reconcile-001 FP persists; both stall cooldowns hold.** PRIME: interventions=1155, systemic_fixes=70, vp=25, ratio≈16.5, trend=improving. Tier 1, consecutive_clean=0.
