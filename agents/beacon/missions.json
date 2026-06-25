@@ -4240,7 +4240,7 @@
     {
       "id": "pipeline-empty-state-hint",
       "name": "Pipeline empty-state hint",
-      "phase": "drafting",
+      "phase": "shipped",
       "brief": "When 'Actively working' is empty, show a quiet one-line hint instead of self-hiding. Guinea-pig: first live dogfood of the P4 closeout (launched through the board to exercise Building\u2192Done + closeout). Spec: agents/beacon/specs/projects-v3-pipeline-empty-state.md",
       "spec_docs": [
         "agents/beacon/specs/projects-v3-pipeline-empty-state.md"
@@ -4248,7 +4248,11 @@
       "task_ids": [],
       "repo": "ourliberty-dashboard",
       "created": "2026-06-19",
-      "deferred_reason": null
+      "deferred_reason": null,
+      "shipped_at": "2026-06-25T17:24:45.114693+00:00",
+      "shipped_by": "manual-reconcile",
+      "prior_phase": "drafting",
+      "shipped_note": "phase reconcile: work already merged \u2014 dashboard PR #66 (merged)"
     },
     {
       "id": "automated-tests-and-type-checks-could-not-run-in-the-build-sandbox-so-the-change-still-needs-npm-test-or-ci-to-confirm-it-is-green",
@@ -4375,7 +4379,7 @@
     {
       "id": "system-self-awareness-slice-1-state-log",
       "name": "System self-awareness - Slice 1 (State Log)",
-      "phase": "drafting",
+      "phase": "shipped",
       "brief": "Slice 1: whole-system work-in-flight State Log (generalize the missions Narrator). Build STRICTLY from the spec doc.",
       "spec_docs": [
         "agents/beacon/specs/system-awareness-slice-1-state-log.md"
@@ -4383,7 +4387,11 @@
       "task_ids": [],
       "repo": "ourliberty-agent-core",
       "created": "2026-06-20",
-      "deferred_reason": null
+      "deferred_reason": null,
+      "shipped_at": "2026-06-25T17:24:45.114693+00:00",
+      "shipped_by": "manual-reconcile",
+      "prior_phase": "drafting",
+      "shipped_note": "phase reconcile: work already merged \u2014 agent-core PR #602 (merged); narrator live"
     },
     {
       "id": "dashboard-rendering-of-the-state-log-was-explicitly-deferred-to-a-fast-follow-and-still-needs-to-be-built",
@@ -4415,7 +4423,7 @@
     {
       "id": "system-self-awareness-slice-1b-where-are-we",
       "name": "System self-awareness - Slice 1b (Where are we)",
-      "phase": "drafting",
+      "phase": "shipped",
       "brief": "Read-only dashboard view of the live State Log (GET /api/system/state-log) \u2014 the glance surface for Slice 1. Build STRICTLY from the spec doc.",
       "spec_docs": [
         "agents/beacon/specs/system-awareness-slice-1b-dashboard-where-are-we.md"
@@ -4423,7 +4431,11 @@
       "task_ids": [],
       "repo": "ourliberty-dashboard",
       "created": "2026-06-21",
-      "deferred_reason": null
+      "deferred_reason": null,
+      "shipped_at": "2026-06-25T17:24:45.114693+00:00",
+      "shipped_by": "manual-reconcile",
+      "prior_phase": "drafting",
+      "shipped_note": "phase reconcile: work already merged \u2014 dashboard PR #73 (merged 2026-06-21)"
     },
     {
       "id": "confirm-the-new-where-are-we-page-actually-renders-correctly-against-the-live-deployed-endpoint-which-the-build-left-unverified",
@@ -4455,7 +4467,7 @@
     {
       "id": "system-self-awareness-slice-2a-waiting-on-larry",
       "name": "System self-awareness - Slice 2a (Waiting on Larry)",
-      "phase": "drafting",
+      "phase": "shipped",
       "brief": "Extend the State Log's waiting_on_larry into an itemized cross-source list (parked + pending approvals + for-Larry escalations), read-only, reusing existing sources. Build STRICTLY from the spec doc.",
       "spec_docs": [
         "agents/beacon/specs/system-awareness-slice-2a-waiting-on-larry-substrate.md"
@@ -4463,7 +4475,11 @@
       "task_ids": [],
       "repo": "ourliberty-agent-core",
       "created": "2026-06-21",
-      "deferred_reason": null
+      "deferred_reason": null,
+      "shipped_at": "2026-06-25T17:24:45.114693+00:00",
+      "shipped_by": "manual-reconcile",
+      "prior_phase": "drafting",
+      "shipped_note": "phase reconcile: work already merged \u2014 agent-core PR #620 (merged)"
     },
     {
       "id": "adding-pending-merge-prs-as-a-waiting-source-was-deferred",
@@ -4547,7 +4563,7 @@
     {
       "id": "system-self-awareness-slice-2b-waiting-on-larry-render",
       "name": "System self-awareness - Slice 2b (Waiting-on-Larry render)",
-      "phase": "drafting",
+      "phase": "shipped",
       "brief": "Render the itemized waiting_on_larry.items[] on the /where-we-are 'Waiting on you' panel: source badge + title + plain-English why + relative age, in the substrate's order. Link approvals/escalations to /approvals, parked to /missions; reuse the Slice-1b page + Approvals tab, do not rebuild. Normalize the parked why dict-repr via cleanWhy. Update lib/types + extend vitest. Full spec: agents/beacon/specs/system-awareness-slice-2b-waiting-on-larry-render.md",
       "spec_docs": [
         "agents/beacon/specs/system-awareness-slice-2b-waiting-on-larry-render.md"
@@ -4555,7 +4571,11 @@
       "task_ids": [],
       "repo": "ourliberty-dashboard",
       "created": "2026-06-22",
-      "deferred_reason": null
+      "deferred_reason": null,
+      "shipped_at": "2026-06-25T17:24:45.114693+00:00",
+      "shipped_by": "manual-reconcile",
+      "prior_phase": "drafting",
+      "shipped_note": "phase reconcile: work already merged \u2014 dashboard PR #79 (merged)"
     },
     {
       "id": "proposed-pr-625-mirror-review-dispatch-001",
@@ -4983,10 +5003,14 @@
     {
       "id": "mirror-review-visibility",
       "name": "Mirror review visibility for session-less PRs",
-      "phase": "drafting",
+      "phase": "shipped",
       "brief": "Close the session-less-PR review gaps #653/#645 exposed: (A) Mirror posts its findings as an idempotent PR comment on every non-PASS so they're never invisible; (B) classify the no-session outcome by marker_type (self-healing / action-needed / decision-needed); (C) route human-needed buckets to Larry's surfaces (decision->Approvals tab, action->larry_alert/Operator Action Queue) \u2014 never a PR comment he won't read; (E) heal_pipeline_stall backstop for silent red-status PRs. Spec dispatched (spec-mirror-review-visibility-001); 3-step build held until orchestrator-terminal-signal-hardening lands (shared files).",
       "spec_doc": "agents/beacon/specs/mirror-review-visibility.md",
-      "task_ids": []
+      "task_ids": [],
+      "shipped_at": "2026-06-25T17:24:45.114693+00:00",
+      "shipped_by": "manual-reconcile",
+      "prior_phase": "drafting",
+      "shipped_note": "phase reconcile: work already merged \u2014 agent-core PR #680/#683/#686 (merged)"
     },
     {
       "id": "missions-v2-phase4b-live-thread",
@@ -5007,10 +5031,14 @@
     {
       "id": "missions-v2-phase4b2-closed-card-doorbell",
       "name": "Missions Phase 4b.2 \u2014 closed-card doorbell",
-      "phase": "drafting",
+      "phase": "shipped",
       "brief": "The closed-card unread badge deferred from Phase 4b (PR #662). Server-side fix: project a compact doorbell signal (newest team_to_larry message id/ts + blocked flag) onto the card-list payload the kanban already polls (Contract E, agent-core), then render the closed-card badge from it (Contract F, dashboard). Rides the existing poll \u2014 no new endpoint, no background thread-polling (respects Phase 4b Contract A). Spec dispatched (spec-phase4b2-closed-card-doorbell-001); 2-step build follows after the spec merges.",
       "spec_doc": "agents/beacon/specs/missions-v2-phase4b2-closed-card-doorbell.md",
-      "task_ids": []
+      "task_ids": [],
+      "shipped_at": "2026-06-25T17:24:45.114693+00:00",
+      "shipped_by": "manual-reconcile",
+      "prior_phase": "drafting",
+      "shipped_note": "phase reconcile: work already merged \u2014 agent-core PR #677 + dashboard PR #91 (merged)"
     },
     {
       "id": "orchestrator-terminal-signal-hardening",
