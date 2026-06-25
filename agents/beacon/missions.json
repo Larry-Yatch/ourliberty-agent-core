@@ -5479,6 +5479,45 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "the-new-escalation-signal-file-was-added-as-the-primary-source-while-the-older-pulse-escalations-file-is-still-read-in-parallel-for-back-compatibility-leaving-a-legacy-path-that-will-eventually-need-retiring",
+      "name": "The new escalation signal file was added as the primary source while the older pulse-escalations file is still read in parallel for back-compatibility, leaving a legacy path that will eventually need retiring.",
+      "phase": "proposed",
+      "brief": "Loose end from the \"Operator Needs-You Feed\" closeout: The new escalation signal file was added as the primary source while the older pulse-escalations file is still read in parallel for back-compatibility, leaving a legacy path that will eventually need retiring.",
+      "spec_docs": [],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-25",
+      "deferred_reason": null,
+      "proposed_by": "closeout",
+      "proposed_at": "2026-06-25T20:30:42.892738+00:00"
+    },
+    {
+      "id": "the-steering-endpoint-and-proxy-accept-a-retry-action-but-the-dashboard-only-surfaces-resume-skip-cancel-buttons-so-the-retry-path-is-wired-up-without-a-way-to-trigger-it-from-the-ui",
+      "name": "The steering endpoint and proxy accept a 'retry' action, but the dashboard only surfaces Resume/Skip/Cancel buttons, so the retry path is wired up without a way to trigger it from the UI.",
+      "phase": "proposed",
+      "brief": "Loose end from the \"Operator Needs-You Feed\" closeout: The steering endpoint and proxy accept a 'retry' action, but the dashboard only surfaces Resume/Skip/Cancel buttons, so the retry path is wired up without a way to trigger it from the UI.",
+      "spec_docs": [],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-25",
+      "deferred_reason": null,
+      "proposed_by": "closeout",
+      "proposed_at": "2026-06-25T20:30:42.893523+00:00"
+    },
+    {
+      "id": "the-stuck-dispatched-threshold-is-fixed-at-15-minutes-as-a-hardcoded-module-constant-so-adjusting-how-long-a-step-waits-before-flagging-larry-requires-a-code-change",
+      "name": "The stuck-dispatched threshold is fixed at 15 minutes as a hardcoded module constant, so adjusting how long a step waits before flagging Larry requires a code change.",
+      "phase": "proposed",
+      "brief": "Loose end from the \"Operator Needs-You Feed\" closeout: The stuck-dispatched threshold is fixed at 15 minutes as a hardcoded module constant, so adjusting how long a step waits before flagging Larry requires a code change.",
+      "spec_docs": [],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-25",
+      "deferred_reason": null,
+      "proposed_by": "closeout",
+      "proposed_at": "2026-06-25T20:30:42.894082+00:00"
     }
   ]
 }
