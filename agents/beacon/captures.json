@@ -657,7 +657,8 @@
         "at": "2026-06-17T00:56:19.915890+00:00",
         "from_state": "parked"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "aging": true
     },
     {
       "id": "cap-pipeline-empty-state-hint-a62a",
