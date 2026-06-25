@@ -503,9 +503,49 @@ class CheckLogGrowthTest(_IsolatedRootsTest):
                 mock.patch.object(watchdog, 'log') as logged:
             result = watchdog.check_log_growth()
         self.assertEqual(result['status'], 'ok')
-        self.assertIn('work in progress', result['reason'])
+        self.assertIn('active agent session', result['reason'])
         for call in logged.call_args_list:
             self.assertNotIn('Watcher log stale', call.args[0])
+
+    def test_live_session_suppresses_other_inbox_queue(self):
+        # Live in-flight session in inbox A globally suppresses even a genuine
+        # non-in-flight queued task sitting in inbox B.
+        self._stale_log()
+        self._inbox_task('forge', 'task-build-001')
+        self._in_flight_marker('task-build-001', pid=4242)
+        self._inbox_task('mirror', 'task-queued-elsewhere')
+        with mock.patch.object(watchdog, 'is_service_alive', return_value=True), \
+                mock.patch.object(watchdog, '_pid_alive', return_value=True), \
+                mock.patch.object(watchdog, 'log') as logged:
+            result = watchdog.check_log_growth()
+        self.assertEqual(result['status'], 'ok')
+        self.assertIn('active agent session', result['reason'])
+        for call in logged.call_args_list:
+            self.assertNotIn('Watcher log stale', call.args[0])
+
+    def test_marker_error_only_inbox_is_ok(self):
+        # No live session; the only inbox file is an outbox-notifier dead-letter.
+        self._stale_log()
+        inbox = self._tmp_path / 'inboxes' / 'forge'
+        inbox.mkdir(parents=True, exist_ok=True)
+        (inbox / 'marker-error-deadletter.json').write_text(
+            json.dumps({'task_id': 'task-dead-letter'})
+        )
+        with mock.patch.object(watchdog, 'is_service_alive', return_value=True), \
+                mock.patch.object(watchdog, 'log') as logged:
+            result = watchdog.check_log_growth()
+        self.assertEqual(result['status'], 'ok')
+        for call in logged.call_args_list:
+            self.assertNotIn('Watcher log stale', call.args[0])
+
+    def test_genuine_build_no_session_still_warns(self):
+        # No live session, healthy watcher, fresh build envelope -> real stall.
+        self._stale_log()
+        self._inbox_task('forge', 'task-build-fresh')
+        with mock.patch.object(watchdog, 'is_service_alive', return_value=True):
+            result = watchdog.check_log_growth()
+        self.assertEqual(result['status'], 'warning')
+        self.assertEqual(result['queued_inboxes'], 1)
 
     def test_queued_task_no_marker_still_warns(self):
         # Inbox task with NO in-flight marker -> genuinely queued -> warn.
