@@ -162,9 +162,9 @@
 
 ---
 
-## G-rule forge-wip-redispatch-digest-tier4-001 — 1/3 (new, iter ~2698)
+## G-rule forge-wip-redispatch-digest-tier4-001 — 2/3 (updated iter ~2705)
 
-**Rule:** `forge-wip-redispatch` healer (new service, first run 2026-06-25T06:00Z) fires 9 alerts all with `route=digest`. Triage helper classifies Tier-4 (novel, no translation). But these are auto-remediated informational digests — per actionable-only discipline, no DM to Larry. Fix: add `source=forge-wip-redispatch, route=digest` → Tier-3 entry to `config/alert-translations.json`. Dispatch to Beacon at 3/3.
+**Rule:** `forge-wip-redispatch` healer fires alerts with `route=digest` (auto-redispatched retry1 notifications). Triage helper classifies Tier-4 (novel, no translation). But these are auto-remediated informational digests — per actionable-only discipline, no DM to Larry. Fix: add `source=forge-wip-redispatch, route=digest` → Tier-3 entry to `config/alert-translations.json`. Dispatch to Beacon at 3/3. Occurrences: iter ~2698 (9 alerts, first run); iter ~2705 (L1145 + L1147, 2 more digests).
 
 ---
 
@@ -174,9 +174,9 @@
 
 ---
 
-## G-rule forge-wip-redispatch-exhausted-pr-exists-fp-001 — 1/3 (new, iter ~2702)
+## G-rule forge-wip-redispatch-exhausted-pr-exists-fp-001 — 2/3 (updated iter ~2705)
 
-**Rule:** `source=forge-wip-redispatch, route=escalate` exhaustion alerts ("WIP-only auto-recovery EXHAUSTED") fire for tasks whose original PRs already exist (rebase-escalation-feed-685-001: PR #685 exists; rebase-forge-post-open-mergeable-687-001: PR #687 MERGED). Triage helper: Tier-4 novel (no translation). These are effective FPs — wip-redispatch retried a task whose output already shipped; retry dying WIP-only is expected. Fix: extend wip-redispatch to check PR existence before declaring exhaustion, OR add `source=forge-wip-redispatch, route=escalate, <pr_exists signal>` → Tier-3 entry to `config/alert-translations.json`. Dispatch to Beacon at 3/3.
+**Rule:** `source=forge-wip-redispatch, route=escalate` exhaustion alerts ("WIP-only auto-recovery EXHAUSTED") fire for tasks whose original PRs already exist. FP class: wip-redispatch retried a task whose output already shipped; retry dying WIP-only is expected. Fix: extend wip-redispatch to check PR existence before declaring exhaustion, OR add `source=forge-wip-redispatch, route=escalate, <pr_exists signal>` → Tier-3 entry. Dispatch to Beacon at 3/3. Occurrences: iter ~2702 (L1130 rebase-escalation-feed PR #685 exists; L1131 rebase-forge-post-open-mergeable-687 PR #687 MERGED); iter ~2705 (L1146 reconcile-hardening-mission-shipped-001 PR #699 MERGED).
 
 ---
 
@@ -186,8 +186,8 @@
 
 ---
 
-## Status snapshot — updated 2026-06-25 07:01Z UTC (Iter ~2704, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 07:12Z UTC (Iter ~2705, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2704 summary:** ⚠️ Watch — KEY POSITIVES: PR #699 MERGED ✅ (missions reconcile), Forge built PR #700 (outbox-notifier hot loop fix, under Mirror review), PR #698 Mirror PASSED (auto-merge held behind #700). Service restart event at 06:55Z: heal-stale-daemon-code triggered restarts after PR merges updated script mtimes; outbox-notifier + chain-event-shipper had 90s down-gap, all services SELF-RECOVERED via systemd restart policy. Larry notified via beacon bot. New G-rule heal-stale-daemon-code-auto-restart-failed-self-recovered at 1/3. Outbox-notifier hot loop STILL ACTIVE (fix in PR #700). `heal-forge-no-pr-retry-rebase-fp-001` approval pending. PID 1834248 zombie alive (ask-then-do). PRIME: interventions=1171, systemic_fixes=71, vp=26, ratio≈16.49, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2705 summary:** ⚠️ Watch — Outbox-notifier hot loop still active, PR #700 under Mirror review (PID 2716730). 9 new alerts: 3x Tier-3 medic-diagnosis silence ✅; 2x genuine stuck builds (dag-preflight-phase4b-live-thread-001, review-sequence-dag-operator-needs-you-feed — WIP-only exhausted, no PR, Larry notified); 1x FP reconcile-hardening (PR #699 MERGED); 2x digest digests (informational retry1 dispatches in Mirror inbox); 1x stale watchdog (service running). G-rules forge-wip-redispatch-digest-tier4-001 and forge-wip-redispatch-exhausted-pr-exists-fp-001 each at 2/3. `heal-forge-no-pr-retry-rebase-fp-001` approval pending. PID 1834248 zombie alive. PRIME: interventions=1172, systemic_fixes=71, vp=26, ratio≈16.51, trend=improving. Tier 1, consecutive_clean=0.
 
 
