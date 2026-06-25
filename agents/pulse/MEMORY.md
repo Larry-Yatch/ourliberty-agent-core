@@ -192,8 +192,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-25 15:15Z UTC (Iter ~2772, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 15:19Z UTC (Iter ~2773, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2772 summary:** ✅ Nominal — 1 new alert (L984 review-pass Tier-3 silenced). 8/8 daemons alive. **PR #702 merged 09:09:27 MDT** (rebase-687 stall FP fix). Stall dry-run: 0 stalls detected ✅. G-rule `forge-built-no-pr-retry1-fp-001` COMPLETE ✅. Watchdog healthy (09:11:20 MDT). PID 1834248 zombie (~27.83d, ask-then-do). 6 stale journalctl PIDs (~30d, ask-then-do). PRIME: interventions=1221, systemic_fixes=71, vp=26, ratio≈17.20, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2773 summary:** ✅ Nominal — 0 new alerts. 8/8 daemons alive. 0 open PRs. Pipeline clean (all tasks FORGE_NO_PR_SKIP). Watchdog healthy (09:16:21 MDT). PID 1834248 zombie (~27.84d, ask-then-do). 6 stale journalctl PIDs (~30.8d, ask-then-do). PRIME: interventions=1221, systemic_fixes=71, vp=26, ratio≈17.20, trend=improving. Tier 1, consecutive_clean=0.
 
 
