@@ -162,8 +162,20 @@
 
 ---
 
-## Status snapshot — updated 2026-06-25 06:01Z UTC (Iter ~2697, Tier 1, consecutive_clean=0→0)
+## G-rule forge-wip-redispatch-digest-tier4-001 — 1/3 (new, iter ~2698)
 
-**Iter ~2697 summary:** ⚠️ Watch — Outbox-notifier hot loop continues; fix `fix-auto-merge-already-merged-skip-001` pending Larry approval (prompt delivered 23:54 MDT). **KEY EVENTS: Mirror (PID 2647101) actively reviewing PR #698 NOW (started 23:57 MDT). Watchdog healthy at 23:59 MDT during new Mirror session — PR #694 suppression working this cycle. G-rule watchdog-watcher-log-stale-post-pr694 stays at 2/3. Pipeline CLEAN. 0 new alerts (watermark 1114). Pending approvals: 1 (fix-auto-merge-already-merged-skip-001). 1 stale #687 Mirror task remains after #698. sequence-paused:operator-needs-you-feed carry.** PRIME: interventions=1164, systemic_fixes=70, vp=26, ratio≈16.63, trend=improving. Tier 1, consecutive_clean=0.
+**Rule:** `forge-wip-redispatch` healer (new service, first run 2026-06-25T06:00Z) fires 9 alerts all with `route=digest`. Triage helper classifies Tier-4 (novel, no translation). But these are auto-remediated informational digests — per actionable-only discipline, no DM to Larry. Fix: add `source=forge-wip-redispatch, route=digest` → Tier-3 entry to `config/alert-translations.json`. Dispatch to Beacon at 3/3.
+
+---
+
+## G-rule forge-built-no-pr-retry1-fp-001 — 1/3 (new, iter ~2698)
+
+**Rule:** `forge_built_no_pr` stall fires for `reconcile-hardening-mission-shipped-001` (original task has WIP branch, no PR) even though PR #699 (`forge/reconcile-hardening-mission-shipped-001-retry1`) is OPEN and MERGEABLE. `sibling_pr_title_shipped` check only scans MERGED PRs — misses OPEN retry1 PR. Same class as G-rule `no-session-revision-merged-pr-fp-001` but for OPEN state. First occurrence iter ~2698 (after forge-wip-redispatch dispatched retry1 task). Dispatch to Beacon at 3/3.
+
+---
+
+## Status snapshot — updated 2026-06-25 06:13Z UTC (Iter ~2698, Tier 1, consecutive_clean=0→0)
+
+**Iter ~2698 summary:** ⚠️ Watch — Outbox-notifier hot loop continues; fix pending Larry approval. NEW: `ourliberty-heal-forge-wip-only-redispatch` healer installed and ran for first time at 06:00Z — dispatched 9 WIP-retry tasks (4 forge, 5 mirror). PR #699 (reconcile-hardening-retry1) now OPEN+MERGEABLE. Mirror (PID 2647101) reviewing PR #698 (regression test running). Mirror inbox: 8 tasks queued. Cycle timer was stuck and auto-healed at 06:00Z. G-rules: forge-wip-redispatch-digest-tier4-001 (1/3), forge-built-no-pr-retry1-fp-001 (1/3). PRIME: interventions=1165, systemic_fixes=70, vp=26, ratio≈16.64, trend=improving. Tier 1, consecutive_clean=0.
 
 

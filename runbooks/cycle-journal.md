@@ -5,6 +5,113 @@
 ---
 
 
+## Iteration ~2698 — 2026-06-25T06:13Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry /cycle invocation via chat.
+
+**Health:** ⚠️ Watch — Outbox-notifier hot loop continues (fix pending Larry approval). Mirror (PID 2647101) actively reviewing PR #698 (regression test running). 9 Tier-4 novel alerts from new `forge-wip-redispatch` healer (all route=digest, auto-remediated). New PR #699 open for reconcile-hardening retry. `ourliberty-cycle.timer` was stuck and auto-healed at 06:00Z.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Outbox-notifier loop**: STILL ACTIVE ✅ — log entries through 00:07:49 MDT (06:07Z UTC), cycling every ~5s. Blocker=#697 (MERGED) releasing #691 (MERGED, mergeable=UNKNOWN). Fix `fix-auto-merge-already-merged-skip-001` pending Larry approval (delivered 23:54 MDT). No second DM needed. [carry]
+- **PR #698 (skip-mirror-review-on-merged-or-closed-pr-001)**: OPEN, mergeable=MERGEABLE, reviewDecision="". Mirror (PID 2647101) actively running — subprocess running `test_regression_check.py` (regression gate pass in progress). ⚠️ In progress.
+- **PR #699 (reconcile-hardening-mission-shipped-001-retry1)**: NEW this iter. OPEN, MERGEABLE. `review-reconcile-hardening-mission-shipped-001-retry1.json` in Mirror inbox. forge-wip-redispatch created this retry dispatch; forge inbox has `reconcile-hardening-mission-shipped-001-retry1.json` queued.
+- **Pipeline stall**: dry-run shows `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` BUT PR #699 (retry1) is already OPEN. FP — stall checker's `sibling_pr_title_shipped` only checks MERGED PRs, missing this OPEN retry1 PR. G-rule tracking: forge-built-no-pr-retry1-fp-001 (1/3).
+- **Pending approvals**: 1 — `fix-auto-merge-already-merged-skip-001`. Larry still has Telegram prompt. [carry]
+- **Cycle timer**: `ourliberty-cycle.timer` was stuck (NextElapseUSecRealtime=empty) — auto-healed at 06:00:08Z by `heal-systemd-install-drift`. [blue] Automated cycles should resume normally.
+- **New healer `ourliberty-heal-forge-wip-only-redispatch`**: auto-installed at 06:00Z (service + timer). First run dispatched 9 retry tasks: 4 Forge (3 immediately archived via FORGE_NO_PR_SKIP; 1 active: reconcile-hardening-retry1) + 5 Mirror reviews.
+- **Repo**: HEAD=96c53ec7=origin/main. Clean. On main. ✅
+- **Sync**: last_sync=2026-06-25T06:00:05Z (~13 min ago). Within 2h. ✅
+- **Daemons**: inbox_watcher (2596660), outbox_notifier (2594852, looping), beacon_telegram_bot (2594942), chain_event_shipper (2595115) — all alive. Mirror (2647101) running. ✅
+- **sequence-paused:operator-needs-you-feed**: No new alert. Still pending Larry action. [carry ✅]
+
+**Check 0 — Alert triage:**
+- repair-watermark: repaired=false, old=1114, file_length=1126. **12 new alerts (L1115-L1126)**.
+- L1115: heal-systemd-install-drift, install-healed:ourliberty-heal-forge-wip-only-redispatch.service (06:00:03Z) → **Tier-3 silence** ✅ (known-pattern). Route=digest.
+- L1116: heal-systemd-install-drift, install-healed:ourliberty-heal-forge-wip-only-redispatch.timer (06:00:05Z) → **Tier-3 silence** ✅ (known-pattern). Route=digest.
+- L1117: heal-systemd-install-drift, stuck-timer-healed:ourliberty-cycle.timer (06:00:08Z) → **Tier-3 silence** ✅ (known-pattern). Route=digest. Notable: cycle timer was stuck; healer auto-fixed.
+- L1118-L1126: forge-wip-redispatch (9 alerts, 06:00:10-11Z) → **Tier-4 novel** (no registry template, no translation match). Route=digest. Beacon bot correctly skipped DMs. Per actionable-only discipline: no DM to Larry (auto-remediated digests). G-rule forge-wip-redispatch-digest-tier4-001 (1/3) — propose Tier-3 translation at 3/3.
+- Watermark advanced 1114→1126. ✅
+
+**Check 1 — Log noise:**
+- outbox-notifier.log: **[yellow] HOT LOOP** still active through 00:07:49 MDT (06:07Z UTC). Same root cause. Fix pending approval. [carry]
+- watchdog.log: overall=healthy at 00:04:45 MDT. No new WARN instances this iter. G-rule watchdog-watcher-log-stale-post-pr694: **2/3** (no new instance — last 2 WARNs were during prior Mirror session 2612954). ✅
+
+**Check 2 — Telegram sweep:**
+- No new Larry messages. Beacon bot processing alert idx=1121-1125 digests (skipping DMs per route=digest). ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` — but PR #699 (retry1) is already OPEN and MERGEABLE. FP per note above. In live mode, stall healer would fire an alert. However Forge has `reconcile-hardening-mission-shipped-001-retry1.json` in inbox and Mirror has the review task — the retry chain is already running. Not a real stall. G-rule forge-built-no-pr-retry1-fp-001 (1/3).
+- Other tasks: FORGE_NO_PR_SKIP correctly suppressing rebase-escalation-feed-685-001 (pr=#685 merged) and others. ✅
+
+**Check 4 — Pending directives:**
+- Beacon inbox: EMPTY ✅.
+- Forge inbox: 1 active task — `reconcile-hardening-mission-shipped-001-retry1.json` (just dispatched by wip-redispatch). 3 retry1 forge tasks correctly archived (.archive): fix-653-retry1, rebase-escalation-retry1, rebase-forge-post-open-687-retry1. ✅
+- Mirror inbox (8 tasks, FIFO):
+  - `review-forge-post-open-mergeable-rebase-001-rev2.json` (23:31 MDT) — PR #687 (MERGED). ⚠️ [accepted waste]
+  - `review-skip-mirror-review-on-merged-or-closed-pr-001.json` (23:16 MDT) — **PR #698**. Mirror (2647101) reviewing NOW. ✅
+  - `review-reconcile-hardening-mission-shipped-001-retry1.json` (new) — **PR #699**. Queued.
+  - `dag-preflight-phase4b-live-thread-001-retry1.json` (new, wip-retry). Queued.
+  - `dag-preflight-phase4b2-closed-card-doorbell-001-retry1.json` (new, wip-retry). Queued.
+  - `review-sequence-dag-launch-auto-retire-done-pipeli-retry1.json` (new, wip-retry). Queued.
+  - `review-sequence-dag-mirror-review-visibility-001-retry1.json` (new, wip-retry). Queued.
+  - `review-sequence-dag-operator-needs-you-feed-retry1.json` (new, wip-retry). Queued.
+- beacon-pending-approvals: 1 (`fix-auto-merge-already-merged-skip-001`). Larry has prompt. ✅
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-06-25T06:04:19Z (~9 min ago). Fresh. ✅
+
+**Check A — Source repo:** HEAD=96c53ec7=origin/main. Clean. On main. ✅
+
+**Check B — Sync health:** last_sync=2026-06-25T06:00:05Z (~13 min ago). Within 2h. ✅
+
+**Check C — Agent liveness:** All 4 daemons alive. Mirror (2647101) actively reviewing PR #698 (regression test subprocess running). ✅
+
+**Check E — PRs:**
+- PR #698 (skip-mirror-review-on-merged-or-closed-pr-001): OPEN, MERGEABLE, reviewDecision="". Mirror review in progress. ⚠️
+- PR #699 (reconcile-hardening-mission-shipped-001-retry1): OPEN, MERGEABLE, reviewDecision="". In Mirror queue (3rd position after stale #687 waste + active #698). 🆕
+
+**Check H — Forge digest:** Forge IDLE (1 queued task). ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. ✅
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check III: not Sunday. Skip. ✅
+
+**G-rule updates:**
+- **forge-wip-redispatch-digest-tier4-001** — **NEW (1/3)**. forge-wip-redispatch healer (just installed) fired 9 alerts at 06:00Z, all route=digest, Tier-4 novel (no translation). Auto-remediated; beacon bot correctly skipped DMs. Propose adding `source=forge-wip-redispatch, route=digest` → Tier-3 entry to `config/alert-translations.json`. Dispatch to Beacon at 3/3.
+- **forge-built-no-pr-retry1-fp-001** — **NEW (1/3)**. `forge_built_no_pr` stall would fire for `reconcile-hardening-mission-shipped-001` even though PR #699 (retry1) is OPEN. `sibling_pr_title_shipped` only checks MERGED PRs; misses OPEN retry1. Sub-class of G-rule `no-session-revision-merged-pr-fp-001`. First occurrence. Dispatch at 3/3.
+- **outbox-notifier-auto-merge-loop-merged-pr-001** — DISPATCHED ✅ (3/3, iter ~2695). vp. Approval `fix-auto-merge-already-merged-skip-001` pending Larry. [carry until merged]
+- **watchdog-watcher-log-stale-post-pr694** — **2/3** (no new instance this iter). Watchdog healthy. [carry]
+- **review-duplicate-dispatch-wip-redispatch** — vp. PR #698 Mirror review in progress. [carry]
+- **heal-daemon-restart-manifest-drift-regenerated-tier4** — 2/3. No new instance. [carry]
+- **check-i-force-bypass-dm-route** — 1/3. Thursday, no occurrence. [carry]
+- **no-session-revision-merged-pr-fp-001** — 1/3. No new instance. [carry]
+- **unrouted-open-pr-auto-merge-held-fp-001** — 1/3. No new instance. [carry]
+
+**Actions taken:** Triaged 12 new alerts (L1115-L1126): 3 Tier-3 silence, 9 Tier-4 journal-only (no DM per actionable-only discipline, route=digest). Watermark advanced 1114→1126. Recorded 1 intervention to PRIME ledger.
+
+**Standing findings (updated):**
+- [yellow] **Outbox-notifier hot loop** — Fix `fix-auto-merge-already-merged-skip-001` pending Larry approval (Telegram prompt delivered 23:54 MDT). Will self-resolve once approved → Forge builds → Mirror reviews → merges. No second DM.
+- [yellow] **PR #698 (skip-mirror-review-on-merged-or-closed-pr-001)** — OPEN, MERGEABLE. Mirror (PID 2647101) actively reviewing (regression test running). Near completion.
+- [yellow] **PR #699 (reconcile-hardening-mission-shipped-001-retry1)** — 🆕 OPEN, MERGEABLE. In Mirror queue (3rd, after stale #687 waste + #698). Forge also has retry1 task queued. Stall checker FP (forge-built-no-pr-retry1-fp-001 G-rule, 1/3).
+- [yellow] **Mirror inbox: 8 tasks** — Heavy queue. 1 stale #687 waste + PR #698 (active) + PR #699 + 5 wip-retry reviews. Will work through queue.
+- [yellow] **sequence-paused:operator-needs-you-feed** — L1105. gate-mismatch chain_merged=False gh_merged=True. **Recovery: `resume sequence operator-needs-you-feed` via Beacon or Dashboard.** [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [blue] **Cycle timer was stuck** — `ourliberty-cycle.timer` stuck at 06:00Z, auto-healed by heal-systemd-install-drift. Automated cycles should resume. No action needed.
+
+**PRIME DIRECTIVE:** interventions=1165, systemic_fixes=70, verification_pending=26, ratio≈16.64, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** consecutive_clean=0 (non-clean: outbox-notifier loop, PR #698 in review, stall FP, Tier-4 novel alerts). Tier: 1.
+
+---
+
+
 ## Iteration ~2697 — 2026-06-25T06:01Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry /cycle invocation via chat.
