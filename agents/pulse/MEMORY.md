@@ -196,6 +196,8 @@
 
 **Rule:** PR #649 was COMPLETE after 5 clean Check 1 scans (iter ~2531). Pattern re-emerged: iter ~2634 (idle gap), iter ~2638 (long Mirror session for PR #687, 7 WARNs/40 min), iter ~2640 (NEW session for PR #687 backstop review at 22:40Z). 3/3 threshold crossed iter ~2640. Dispatch: `watchdog-stale-post-pr649-regression-fix-001.json` to Beacon inbox. Fix needed: suppress watchdog stale-log WARNs when (a) inbox_watcher has live in-flight Mirror session PID + open worktree, OR (b) all inboxes empty. verification_pending.
 
+**LOG PATH CORRECTION (iter ~2650):** Watchdog log is `/home/larry/agents/logs/watchdog.log` (NOT `watchdog_watcher.log`). `watchdog_watcher.log` does not exist. Prior iters reporting "0 WARNs" while checking `watchdog_watcher.log` were checking a non-existent file and got empty output. Check 1 must use `watchdog.log`. WARNs still appearing during early Mirror session windows (fix watchdog-stale-session-aware-suppression-001 not yet merged as of iter ~2650).
+
 ---
 
 ## G-rule ourliberty-health-notify-script-missing → DISPATCHED ✅ (iter ~2647, 3/3)
@@ -239,6 +241,10 @@
 **Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:mirror-pass-unmerged:PR#N` alerts classify Tier-4 (novel — no translation match in alert-translations.json). Bot delivers as escalate (route=escalate) and DMs Larry. Pulse does NOT send a second DM. 3/3 threshold crossed at iter ~2644 (L1047, 23:08Z). Dispatch: `heal-pipeline-stall-mirror-pass-unmerged-tier3-001.json` → Beacon inbox. verification_pending. Instances: iter ~2629 (PR#685 rev1), iter ~2636 (PR#685 L1039), iter ~2644 (PR#685 L1047).
 
 ---
+
+## Status snapshot — updated 2026-06-25 00:00Z UTC (Iter ~2650, Tier 1, consecutive_clean=0)
+
+**Iter ~2650 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry); PR #687 CONFLICTING (Mirror session 4 active ~10 min, PID 2249100, started 23:50Z after session 3 reaped). 1 alert triaged: L1054 Tier-3 (heal-wedged-review-sessions wedged-review-reaped session 3). Watermark 1053→1054. Beacon inbox: empty. Forge inbox: 8 items (unchanged). beacon-pending-approvals: 0 pending. 8 daemons alive. **KEY CORRECTION:** watchdog log is `watchdog.log` (not `watchdog_watcher.log`) — prior "0 WARNs" observations may have been based on non-existent path; 1 WARN at 23:55Z (5 min into session 4) confirmed from correct log. Fix (watchdog-stale-session-aware-suppression-001) still in Forge preflight. Check I: mode=digest, cooldown-suppressed. PRIME: interventions≈1121, systemic_fixes=66, ratio≈17.0, trend=improving. Tier 1, consecutive_clean=0.
 
 ## Status snapshot — updated 2026-06-24 23:52Z UTC (Iter ~2649, Tier 1, consecutive_clean=0)
 
