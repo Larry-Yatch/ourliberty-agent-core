@@ -158,7 +158,7 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ## Completed G-rules — condensed for space (COMPLETE ✅)
 
-`outbox-notifier url-shape-invalid` → PR #493 (2026-06-13). `medic-diagnosis-tier4` → PR #515 (2026-06-15). `heal-pipeline-stall:unrouted-pr` → PR #516 (2026-06-15). `check-i-repeat-dm-fix-001` → PR #674 (2026-06-24). `heal-droplet-git-drift` → PR #586 (2026-06-19). `silence-routine-weekly-alerts` → PR #604 (2026-06-20). `forge-preflight-no-marker` → PR #600 (2026-06-19). `projects-json-healer-path` → PR #603 (2026-06-20). `outbox-notifier-review-pass` → PR #604 scope. `seq-advancer-sequence-stranded` → PR #661 (2026-06-24). `catalog-accuracy-drift` → PR #6 ourliberty-graph (2026-06-22). `doorbell-tier4-pattern` → PR #648 (2026-06-23). `heal-stale-daemon-code-script-service-mismatch` → PR #647 (2026-06-23). `mirror-marker-parse-error` → PR #650 (2026-06-23). `watchdog-watcher-log-stale` → PR #649 (2026-06-23). `watchdog-watcher-log-stale-post-fix` → PR #694 (2026-06-25). `ourliberty-health-notify-script-missing` → PR #696 (2026-06-25). `heal-pipeline-stall-mirror-pass-unmerged-tier4` → PR #695 (2026-06-25). `stale-proposed-mission-pipeline-fp-001` → PR #697 (2026-06-25, sibling_pr_title_shipped suppression). `outbox-notifier-auto-merge-loop-merged-pr-001` → PR #700 (2026-06-25, verified iter ~2713).
+`outbox-notifier url-shape-invalid` → PR #493 (2026-06-13). `medic-diagnosis-tier4` → PR #515 (2026-06-15). `heal-pipeline-stall:unrouted-pr` → PR #516 (2026-06-15). `check-i-repeat-dm-fix-001` → PR #674 (2026-06-24). `heal-droplet-git-drift` → PR #586 (2026-06-19). `silence-routine-weekly-alerts` → PR #604 (2026-06-20). `forge-preflight-no-marker` → PR #600 (2026-06-19). `projects-json-healer-path` → PR #603 (2026-06-20). `outbox-notifier-review-pass` → PR #604 scope. `seq-advancer-sequence-stranded` → PR #661 (2026-06-24). `catalog-accuracy-drift` → PR #6 ourliberty-graph (2026-06-22). `doorbell-tier4-pattern` → PR #648 (2026-06-23). `heal-stale-daemon-code-script-service-mismatch` → PR #647 (2026-06-23). `mirror-marker-parse-error` → PR #650 (2026-06-23). `watchdog-watcher-log-stale` → PR #649 (2026-06-23). `watchdog-watcher-log-stale-post-fix` → PR #694 (2026-06-25). `ourliberty-health-notify-script-missing` → PR #696 (2026-06-25). `heal-pipeline-stall-mirror-pass-unmerged-tier4` → PR #695 (2026-06-25). `stale-proposed-mission-pipeline-fp-001` → PR #697 (2026-06-25, sibling_pr_title_shipped suppression). `outbox-notifier-auto-merge-loop-merged-pr-001` → PR #700 (2026-06-25, verified iter ~2713). `forge-built-no-pr-retry1-fp-001` → PR #701 (pattern1) + PR #702 (pattern2, rebase_target_shipped disambiguation, both 2026-06-25, verified iter ~2772).
 
 ---
 
@@ -180,9 +180,9 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## G-rule forge-built-no-pr-retry1-fp-001 → VERIFICATION PENDING (iter ~2771)
+## G-rule forge-built-no-pr-retry1-fp-001 → COMPLETE ✅ (iter ~2772)
 
-**Rule:** `forge_built_no_pr` stall fires even when a PR exists. Two patterns confirmed: (1) `reconcile-hardening-mission-shipped-001` fires even though PR #699 (retry1) is OPEN; (2) `rebase-forge-post-open-mergeable-687-001` fires even though PR #687 is MERGED (branch deleted). PR #701 merged at 14:13:35Z 2026-06-25. **Pattern 1 RESOLVED** ✅ — reconcile FP no longer fires. **Pattern 2: PR #702 in Mirror review** ("fix(heal): disambiguate rebase_target_shipped when result names multiple merged PRs"). verification_anchor: stall FP must go dark after PR #702 merges.
+**Rule:** `forge_built_no_pr` stall fires even when a PR exists. Pattern 1 (reconcile-hardening-mission-shipped-001 / PR #699) RESOLVED via PR #701 (14:13:35Z 2026-06-25). Pattern 2 (rebase-forge-post-open-mergeable-687-001 / PR #687 MERGED) RESOLVED via PR #702 (merged 09:09:27 MDT 2026-06-25; `rebase_target_shipped` disambiguation). **Verified iter ~2772: stall dry-run shows FORGE_NO_PR_SKIP reason=rebase_target_shipped, "no stalls detected".** Moving to Completed G-rules.
 
 ---
 
@@ -192,8 +192,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-25 15:08Z UTC (Iter ~2771, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 15:15Z UTC (Iter ~2772, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2771 summary:** ✅ Nominal — 1 new alert (L983 dispatch-branch-cleanup Tier-3 silenced). 8/8 daemons alive. **PR #702 open in Mirror review** (rebase-687 stall FP fix). Forge built it at 09:06:05 MDT following Larry "Go" at 09:01:41 MDT. Watchdog healthy (09:06:19 MDT). PID 1834248 zombie (~27.82d, ask-then-do). 6 stale journalctl PIDs (~30d, ask-then-do). PRIME: interventions=1221, systemic_fixes=71, vp=26, ratio≈17.20, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2772 summary:** ✅ Nominal — 1 new alert (L984 review-pass Tier-3 silenced). 8/8 daemons alive. **PR #702 merged 09:09:27 MDT** (rebase-687 stall FP fix). Stall dry-run: 0 stalls detected ✅. G-rule `forge-built-no-pr-retry1-fp-001` COMPLETE ✅. Watchdog healthy (09:11:20 MDT). PID 1834248 zombie (~27.83d, ask-then-do). 6 stale journalctl PIDs (~30d, ask-then-do). PRIME: interventions=1221, systemic_fixes=71, vp=26, ratio≈17.20, trend=improving. Tier 1, consecutive_clean=0.
 
 
