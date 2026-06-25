@@ -5221,6 +5221,40 @@
       "retired_by": "heal_orphan_autoregister",
       "retired_at": "2026-06-25T07:41:24.675694+00:00",
       "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-forge-no-pr-rebase-original-fp-fix-001",
+      "name": "Forge No PR Rebase Original Fp Fix 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `forge-no-pr-rebase-original-fp-fix-001`. Last activity 2026-06-25T14:36:09.427905+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "forge-no-pr-rebase-original-fp-fix-001"
+      ],
+      "repo": null,
+      "created": "2026-06-25",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-25T14:43:54.598636+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-25T14:36:09.427905+00:00"
+    },
+    {
+      "id": "proposed-forge-no-pr-rebase-original-fp-fix-002",
+      "name": "Forge No PR Rebase Original Fp Fix 002",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `forge-no-pr-rebase-original-fp-fix-002`. Last activity 2026-06-25T14:36:04.425208+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "forge-no-pr-rebase-original-fp-fix-002"
+      ],
+      "repo": null,
+      "created": "2026-06-25",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-25T14:43:54.598636+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-25T14:36:04.425208+00:00"
     }
   ]
 }
