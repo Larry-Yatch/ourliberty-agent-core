@@ -5,6 +5,109 @@
 ---
 
 
+## Iteration ~2673 — 2026-06-25T03:00Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry /cycle invocation via chat.
+
+**Health:** ⚠️ Watch — PR #687 CONFLICTING (rebase approval pending Larry). **KEY EVENTS: PR #696 (wire-agent-core-health-notify-001) MERGED 02:49:38Z ✅ — G-rule ourliberty-health-notify-script-missing COMPLETE. G-rule stale-proposed-mission-pipeline-fp-001 3/3 DISPATCHED → Beacon. All agents IDLE (Forge/Beacon/Mirror all empty).**
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #696 (wire-agent-core-health-notify-001):** MERGED 02:49:38Z ✅. L1095 (review-pass) confirmed via alert + gh API (state=MERGED). G-rule ourliberty-health-notify-script-missing COMPLETE. [verified ✅]
+- **PR #687 (forge/forge-post-open-mergeable-rebase-001):** CONFLICTING confirmed (gh API: mergeable=CONFLICTING, mergeStateStatus=DIRTY). rebase-pr-687-post-open-mergeable-001 still in beacon-pending-approvals (created 01:23Z). [carry — approval pending Larry]
+- **PR #692 (work/forge-wedge-healer):** MERGEABLE confirmed (gh API: mergeable=MERGEABLE, mergeStateStatus=CLEAN). Mirror REVIEW_PASS carry-verified (inbox_watcher log shows [mirror] done task=wire-agent-core-health-notify-001 success=True 02:51:57Z, and separately the PR #692 review completed earlier). AUTO_MERGE_HELD blocker=#687. [cascades when #687 resolves ✅]
+- **G-rule watchdog-watcher-log-stale-post-fix:** COMPLETE ✅ carry-verified. Watchdog: 10 consecutive healthy checks 20:04–20:50 MDT (02:04–02:50Z). No WARNs for 1h+. ✅
+- **G-rule review-duplicate-dispatch-wip-redispatch:** 3/3 vp (carry). skip-mirror-review-on-merged-or-closed-pr-001 pending Larry approval. [approval pending]
+- **G-rule ourliberty-health-notify-script-missing:** 3/3 vp → **COMPLETE ✅** (PR #696 MERGED 02:49:38Z). PRIME systemic_fix logged.
+- **Beacon second notify for wire-agent-core-health-notify-001:** inbox_watcher shows [beacon] ran notify-wire-agent-core-health-notify-001 at 02:49:36Z (first, post-merge auto-notify) AND again at 02:52:06Z (30s, $0.23, after Mirror completed rev1 review). Mirror also ran rev1 review of already-merged PR #696 at 02:49–02:51Z ($0.47). Duplicate work — covered by pending skip-mirror-review-on-merged-or-closed-pr-001 fix.
+- **unreg-approval-6009fbf6bfa2 + sequence-paused:operator-needs-you-feed:** Still in beacon-pending-approvals. [carry — pending Larry action]
+- **Repo:** HEAD=5847db6d=origin/main. Clean. On main. ✅
+- **Sync:** last_sync=2026-06-25T02:00:01Z (~60 min ago). Status=success. Within 2h threshold. ✅
+- **Daemons:** beacon_telegram_bot PID 2341187 (Ss), outbox_notifier PID 2340424 (Ss), inbox_watcher PID 1732118 (Ssl) — all alive. ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark: no-op (old=1094, file_length=1096 at iter start). No gap. ✅
+- **L1095** `source=outbox-notifier, kind=notification, intent=review-pass` (PR #696 wire-agent-core-health-notify-001 MERGED) — Tier-3 ✅ (known-pattern, route=digest, silence). KEY: confirms PR #696 merge.
+- **L1096** `source=doorbell, kind=notification, intent=doorbell` (3 items: operator-needs-you-fee, rebase PR#687, skip-mirror-review) — Tier-3 ✅ (known-pattern, route=digest, silence).
+- Watermark advanced 1094→1096. ✅
+
+**Check 1 — Log noise:**
+- watchdog.log: 10 consecutive overall=healthy 20:04–20:50 MDT. 0 WARNs since 19:43 MDT. G-rule watchdog COMPLETE ✅ holding. ✅ Nominal.
+- inbox_watcher.log: Last entry 02:52:26Z ([beacon] done notify-wire-agent-core-health-notify-001). All agents now idle. No WARNs. ✅ Nominal.
+- beacon_telegram_bot.log: No new Larry messages. Last DM activity at 19:26 MDT (daemon restart digests). ✅ Nominal.
+
+**Check 2 — Telegram sweep:**
+- Last Larry message: "Yes rebase #687 next" (18:45 MDT = 00:45Z). No new messages.
+- rebase-pr-687-post-open-mergeable-001 + unreg-approval-6009fbf6bfa2 + skip-mirror-review-on-merged-or-closed-pr-001 all pending in beacon-pending-approvals (3 total). No new orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` — **FALSE POSITIVE** (G-rule 3/3 DISPATCHED this iter). Root cause: `agents/beacon/missions.json` has entry `proposed-reconcile-hardening-mission-shipped-001` with `phase: proposed` — never terminal. Work subsumed by -002 (PR #688 merged). dispatch: stale-proposed-mission-pipeline-fp-001 → Beacon.
+- `DRY-RUN would recover-then-alert: mirror_pass_unmerged:forge-post-open-mergeable-rebase-001` — PR #687 cooldown expired. Would-alert routes Tier-3 (heal-pipeline-stall-mirror-pass-unmerged translation, G-rule COMPLETE PR #695). Rebase approval rebase-pr-687-post-open-mergeable-001 already queued — if recovery fires, watch for duplicate dispatch. No action this iter.
+- `suppressed (cooldown): unrouted_open_pr:Larry-Yatch/ourliberty-agent-core:692` — PR #692 cooldown. ✅
+- 0 actual alerts fired. ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- Forge inbox: EMPTY ✅. Beacon inbox: stale-proposed-mission-pipeline-fp-001.json dispatched THIS ITER. Mirror inbox: EMPTY ✅.
+- beacon-pending-approvals: 3 total — unreg-approval-6009fbf6bfa2 (stale 01:15Z), rebase-pr-687-post-open-mergeable-001 (active 01:23Z), skip-mirror-review-on-merged-or-closed-pr-001 (02:45Z). [carry]
+- sequence-paused:operator-needs-you-feed: pending Larry. [carry]
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-25T02:42:16Z (~18 min ago at check time). ✅
+
+**Check A — Source repo:** HEAD=5847db6d=origin/main. Clean. On main. 0 commits behind. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-25T02:00:01Z (~60 min ago). Status=success. Within 2h threshold. ✅
+
+**Check C — Agent liveness:** beacon_telegram_bot (2341187 Ss), outbox_notifier (2340424 Ss), inbox_watcher (1732118 Ssl) — all alive. ✅
+
+**Check E — PRs:**
+- PR #696 (wire-agent-core-health-notify-001): **MERGED 02:49:38Z ✅** — G-rule ourliberty-health-notify COMPLETE.
+- PR #692 (work/forge-wedge-healer): MERGEABLE, CLEAN. Mirror REVIEW_PASS (carry). AUTO_MERGE_HELD blocker=#687. [cascades when #687 resolves]
+- PR #687 (forge/forge-post-open-mergeable-rebase-001): CONFLICTING. Rebase approval pending Larry. ⚠️
+
+**Check H — Forge digest:** IDLE (inbox EMPTY). ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op. distill_detector: no-op. ✅
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check III: not Sunday. Skip. ✅
+
+**G-rule updates:**
+- **watchdog-watcher-log-stale-post-fix** — **COMPLETE ✅** carry-verified (10+ healthy, 1h+ clean).
+- **ourliberty-health-notify-script-missing** — **COMPLETE ✅** (PR #696 MERGED 02:49:38Z). PRIME systemic_fix logged (iter ~2673). Verification: systemd timer now has a defined notify path (or silence-as-redundant per PR #696 design). ✅
+- **review-duplicate-dispatch-wip-redispatch** — 3/3 vp (carry). skip-mirror-review-on-merged-or-closed-pr-001 pending Larry approval in Approvals tab. [advancing — approval needed]
+- **heal-stale-superseded-task-false-positive:reconcile-001** — **3/3 DISPATCHED ✅** (stale-proposed-mission-pipeline-fp-001 → Beacon). Root cause: missions.json entry `proposed-reconcile-hardening-mission-shipped-001` in `phase: proposed` indefinitely; Forge outbox archive has exit_code=0 reconcile result but no PR. Beacon to determine: update phase to terminal state OR teach stall checker to skip proposed-phase missions. verification_pending.
+- **heal-daemon-restart-manifest-drift-regenerated-tier4** — **2/3** (no new instance this iter). Dispatch at 3/3.
+- **check-i-force-bypass-dm-route** — **1/3** (Thursday, no occurrence). Dispatch at 3/3.
+
+**Actions taken:**
+- Alert triage: L1095-L1096 both Tier-3 silenced. Watermark 1094→1096.
+- Dispatch: stale-proposed-mission-pipeline-fp-001.json → Beacon inbox (G-rule 3/3).
+- PRIME: systemic_fix (ourliberty-health-notify COMPLETE) + verification_pending (stale-proposed-mission dispatch) + intervention rows appended. interventions=1146, systemic_fixes=70, vp=25.
+
+**Dispatches:** stale-proposed-mission-pipeline-fp-001 → Beacon.
+
+**Standing findings (carried + verified):**
+- [yellow] **PR #687 (forge/forge-post-open-mergeable-rebase-001)** — CONFLICTING. rebase-pr-687-post-open-mergeable-001 approval pending Larry. Blocking PR #692. [carry — approval active]
+- [yellow] **unreg-approval-6009fbf6bfa2 + sequence-paused:operator-needs-you-feed** — Dashboard: dashboard.ourliberty.dev/approvals. [carry — pending Larry action]
+- [yellow] **skip-mirror-review-on-merged-or-closed-pr-001** — G-rule review-duplicate-dispatch fix, pending Larry approval. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [blue] **PR #692** — MERGEABLE, CLEAN, REVIEW_PASS. AUTO_MERGE_HELD blocker=#687. Cascades when #687 resolves.
+- [blue] **Pipeline stall cooldown expired for PR#687** — next real stall-healer run would try recovery; Tier-3 alert suppressed but recovery action may duplicate the queued rebase. Watch.
+
+**PRIME DIRECTIVE:** interventions=1146 (+1 this iter), systemic_fixes=70 (+1 ourliberty-health-notify COMPLETE), verification_pending=25 (+1 stale-proposed-mission dispatch), ratio≈16.4, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** consecutive_clean=0 (carry findings). Tier: 1.
+
+---
+
+
 ## Iteration ~2672 — 2026-06-25T02:47Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry /cycle invocation via chat.

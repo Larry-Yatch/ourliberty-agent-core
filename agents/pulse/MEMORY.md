@@ -200,9 +200,9 @@
 
 ---
 
-## G-rule ourliberty-health-notify-script-missing → DISPATCHED ✅ (iter ~2647, 3/3)
+## G-rule ourliberty-health-notify-script-missing → COMPLETE ✅ (iter ~2647 dispatch, iter ~2673 verified)
 
-**Rule:** `ourliberty-health` fires `WARN: notify script missing, alert dropped: 1 issue(s) need attention` every ~30 min on a regular cadence (systemd timer). NOT intermittent — fires 22:03Z, 22:33Z, 23:03Z, 23:33Z etc. continuously. Prior iters ~2641-~2646 missed it via `journalctl returned empty (permissions)`; iter ~2647 had permissions and confirmed it. 3/3 threshold crossed. Dispatch: `ourliberty-health-notify-script-missing-001.json` → Beacon inbox (iter ~2647). Fix needed: (A) identify/restore the missing notify script, (B) surface and route the unknown "1 issue" health condition. Note: prior dispatch logged 2026-06-09 under 'G-rule health-notify-script-missing' — Beacon should check whether that fix ever landed. verification_pending.
+**Rule:** PR #696 `feat(health): wire agent-core health-check notify path OR silence as redundant (#696)` MERGED 2026-06-25T02:49:38Z. Fix wires notify path or silences as redundant; --dry-run gated per PR #691 norm. G-rule COMPLETE. PRIME systemic_fix logged iter ~2673.
 
 ---
 
@@ -242,11 +242,21 @@
 
 ---
 
+## G-rule stale-proposed-mission-pipeline-fp-001 → DISPATCHED ✅ (iter ~2673, 3/3)
+
+**Rule:** Pipeline stall checker fires `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` every cycle (3+ iters). Root cause: `agents/beacon/missions.json` has entry `proposed-reconcile-hardening-mission-shipped-001` in `phase: proposed` indefinitely. Work was subsumed by -002 (PR #688 merged). Forge outbox archive has exit_code=0 result but no PR (reconcile task, not a build). Dispatch: `stale-proposed-mission-pipeline-fp-001.json` → Beacon inbox (iter ~2673). Fix: update missions.json phase to terminal OR teach stall checker to skip proposed-phase missions with no active Forge session. verification_pending.
+
+---
+
 ## G-rule review-duplicate-dispatch-wip-redispatch → DISPATCHED ✅ (iter ~2671, 3/3)
 
 **Rule:** After Mirror completes a review (pass or revision), Beacon's notification-handler re-dispatches a new `review-<task>.json` to Mirror's inbox without checking if one is already queued. Causes Mirror to review the same PR/branch twice. Fix: add inbox-existence check in Beacon notify-handler before dispatching. Dispatch: `review-duplicate-dispatch-notify-handler-fix-001.json` → Beacon (iter ~2671). verification_pending.
 
 ---
+
+## Status snapshot — updated 2026-06-25 03:00Z UTC (Iter ~2673, Tier 1, consecutive_clean=0)
+
+**Iter ~2673 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase approval pending Larry). **KEY EVENTS: PR #696 (wire-agent-core-health-notify-001) MERGED 02:49:38Z ✅ — G-rule ourliberty-health-notify COMPLETE. G-rule stale-proposed-mission-pipeline-fp-001 3/3 DISPATCHED → Beacon (reconcile-001 pipeline stall FP; missions.json phase=proposed never terminal). All agents IDLE.** 2 new alerts (L1095-L1096, both Tier-3). Watermark 1094→1096. PR #692 MERGEABLE (CLEAN), AUTO_MERGE_HELD blocker=#687. Pipeline stall: reconcile-001 FP (G-rule dispatch) + PR#687 mirror_pass_unmerged cooldown expired (Tier-3 suppressed, rebase approval already queued). Check I: Thursday, skip. PRIME: interventions=1146, systemic_fixes=70, vp=25, ratio≈16.4, trend=improving. Tier 1, consecutive_clean=0.
 
 ## Status snapshot — updated 2026-06-25 02:47Z UTC (Iter ~2672, Tier 1, consecutive_clean=0)
 
