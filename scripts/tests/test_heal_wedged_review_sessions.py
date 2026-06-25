@@ -58,17 +58,19 @@ CFG = {
     'hard_silent_grace_seconds': 3600,
     'streak_to_promote': 3,
     'build_handoff_grace_seconds': 300,
+    'wedge_progress_grace_seconds': 1500,
 }
 
 
 def _cand(*, pid=1000, tier='mirror', name='build-x', idle=0.0,
-          marker=False, has_jsonl=True, session_id='sess-1', cwd=None):
+          marker=False, has_jsonl=True, session_id='sess-1', cwd=None,
+          commit_age=None):
     cwd = cwd or f'/home/larry/agent-worktrees/wt-{tier}-{name}'
     jsonl = Path(f'/tmp/{session_id}.jsonl') if has_jsonl else None
     return h.Candidate(
         pid=pid, cwd=cwd, tier=tier, jsonl=jsonl,
         session_id=session_id if has_jsonl else None,
-        idle_secs=idle, marker_present=marker,
+        idle_secs=idle, marker_present=marker, commit_age_secs=commit_age,
     )
 
 
@@ -1150,6 +1152,174 @@ class TestForgeWedgeDeadlockRegression(unittest.TestCase):
         self.assertEqual(rec.killed, [])
         self.assertEqual(summary['case1_reaped'], 0)
         self.assertEqual(summary['forge_spared'], 1)
+
+
+class TestSessionProgressStale(unittest.TestCase):
+    """Pure forward-progress predicate: a session is wedged only when BOTH
+    signals (commit age + JSONL idle) are stale past the grace, and never when
+    the commit age is unreadable (fail-safe toward sparing)."""
+
+    def test_both_signals_stale_is_wedged(self):
+        cand = _cand(tier='forge', idle=1600, commit_age=1600)
+        self.assertTrue(h._session_progress_stale(cand, CFG))
+
+    def test_fresh_jsonl_is_not_wedged(self):
+        # Live build mid-long-operation: no new commit, but the JSONL is warm
+        # (idle below grace) → spared. This is the false-positive guard.
+        cand = _cand(tier='forge', idle=200, commit_age=9999)
+        self.assertFalse(h._session_progress_stale(cand, CFG))
+
+    def test_recent_commit_is_not_wedged(self):
+        # Actively committing build: idle is high but a commit landed recently.
+        cand = _cand(tier='forge', idle=9999, commit_age=200)
+        self.assertFalse(h._session_progress_stale(cand, CFG))
+
+    def test_unreadable_commit_age_fails_safe_to_not_wedged(self):
+        cand = _cand(tier='forge', idle=9999, commit_age=None)
+        self.assertFalse(h._session_progress_stale(cand, CFG))
+
+    def test_boundary_is_strict_greater_than(self):
+        # Exactly at the grace is NOT yet stale (strict >).
+        g = CFG['wedge_progress_grace_seconds']
+        self.assertFalse(
+            h._session_progress_stale(_cand(tier='forge', idle=g, commit_age=g), CFG))
+        self.assertTrue(
+            h._session_progress_stale(
+                _cand(tier='forge', idle=g + 1, commit_age=g + 1), CFG))
+
+
+class TestForgeProgressStaleDeadlockBreak(unittest.TestCase):
+    """The 2026-06-24 forge-post-open-mergeable-rebase-001 deadlock. A Forge
+    build session that wedged AFTER PR-open: marker present, queued build file
+    still in the inbox, worktree intact, PR open-but-not-merged. The old
+    decisive signals (worktree-deleted / merged-closed) both miss, so the
+    queued-build spare protected it forever. The progress-staleness gate must
+    RELEASE it (bypassing the queued-build + open-PR spares) and reap it WITH
+    the worktree preserved for the watcher's --resume retry."""
+
+    def _wedged(self, **kw):
+        kw.setdefault('tier', 'forge')
+        kw.setdefault('name', 'forge-post-open-mergeable-rebase-001')
+        kw.setdefault('marker', True)        # PR opened → terminal marker present
+        kw.setdefault('idle', 11000)         # ~3h idle, like the incident
+        kw.setdefault('commit_age', 11000)   # last commit (PR push) ~3h ago
+        return _cand(**kw)
+
+    def test_spare_reason_releases_on_progress_staleness(self):
+        # Even with a queued build present and an open (un-merged) PR — the exact
+        # incident state — the spare must RELEASE because no progress was made.
+        from unittest import mock
+        cand = self._wedged(pid=2060999)
+        with mock.patch.object(h, '_forge_inbox_has_queued_build',
+                               return_value=True), \
+             mock.patch.object(h, '_forge_branch_pr_merged_or_closed',
+                               return_value=False), \
+             mock.patch.object(h, '_forge_branch_has_open_unreviewed_pr',
+                               return_value=True):
+            reason = h._forge_spare_reason(cand, CFG)
+        self.assertIsNone(reason)  # released — not spared
+
+    def test_progress_stale_release_bypasses_queue_and_pr_probes(self):
+        # The cheap pure progress check short-circuits BEFORE the file/gh probes.
+        from unittest import mock
+        cand = self._wedged()
+        with mock.patch.object(h, '_forge_inbox_has_queued_build') as m_q, \
+             mock.patch.object(h, '_forge_branch_has_open_unreviewed_pr') as m_pr:
+            reason = h._forge_spare_reason(cand, CFG)
+        self.assertIsNone(reason)
+        m_q.assert_not_called()
+        m_pr.assert_not_called()
+
+    def test_full_cycle_reaps_wedge_and_preserves_worktree(self):
+        from unittest import mock
+        rec = _Recorder()
+        cand = self._wedged(pid=2060999)
+        with mock.patch.object(h, '_forge_inbox_has_queued_build',
+                               return_value=True), \
+             mock.patch.object(h, '_forge_branch_pr_merged_or_closed',
+                               return_value=False), \
+             mock.patch.object(h, '_forge_branch_has_open_unreviewed_pr',
+                               return_value=True):
+            summary = _run(rec, [cand], h.ConfidenceState())
+        self.assertEqual(rec.killed, [2060999])      # slot freed
+        self.assertEqual(rec.removed, [])            # worktree PRESERVED for --resume
+        self.assertEqual(summary['case1_reaped'], 1)
+        self.assertEqual(summary['worktree_preserved'], 1)
+        self.assertEqual(summary['forge_spared'], 0)
+        self.assertEqual(len(rec.closures), 1)
+
+    def test_live_handoff_with_fresh_progress_still_spared(self):
+        # Regression guard: a genuinely live handoff (recent commit) with a
+        # queued build is STILL spared — progress-staleness must not regress #441.
+        from unittest import mock
+        rec = _Recorder()
+        cand = self._wedged(commit_age=120)  # committed 2 min ago → live
+        with mock.patch.object(h, '_forge_inbox_has_queued_build',
+                               return_value=True), \
+             mock.patch.object(h, '_forge_branch_pr_merged_or_closed',
+                               return_value=False), \
+             mock.patch.object(h, '_forge_branch_has_open_unreviewed_pr',
+                               return_value=False):
+            summary = _run(rec, [cand], h.ConfidenceState())
+        self.assertEqual(rec.killed, [])
+        self.assertEqual(summary['forge_spared'], 1)
+        self.assertEqual(summary['case1_reaped'], 0)
+
+    def test_mirror_session_never_progress_reaped(self):
+        # Mirror has no slot-holding build; commit_age is never populated, so the
+        # progress gate is inert for it (and worktree removal is unchanged).
+        cand = _cand(tier='mirror', idle=11000, commit_age=None)
+        self.assertFalse(h._session_progress_stale(cand, CFG))
+
+
+class TestWedgeProgressGraceConfig(unittest.TestCase):
+    def test_default_present(self):
+        cfg = h.load_config(Path('/nonexistent/review-reaper-rules.json'))
+        self.assertEqual(cfg['wedge_progress_grace_seconds'], 1500)
+
+    def test_valid_override(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / 'c.json'
+            p.write_text(json.dumps({'wedge_progress_grace_seconds': 600}))
+            cfg = h.load_config(p)
+            self.assertEqual(cfg['wedge_progress_grace_seconds'], 600)
+
+    def test_negative_falls_back(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / 'c.json'
+            p.write_text(json.dumps({'wedge_progress_grace_seconds': -5}))
+            cfg = h.load_config(p)
+            self.assertEqual(cfg['wedge_progress_grace_seconds'], 1500)
+
+
+class TestWorktreeHeadCommitAge(unittest.TestCase):
+    """The commit-age probe: parses `git log -1 --format=%ct`, fails safe to
+    None on any git error so the caller never declares a wedge on a bad read."""
+
+    def _git(self, stdout, returncode=0):
+        from unittest import mock
+        out = mock.Mock(returncode=returncode, stdout=stdout, stderr='')
+        return mock.patch.object(h.subprocess, 'run', return_value=out)
+
+    def test_parses_epoch_into_age(self):
+        with self._git('1000\n'):
+            age = h._worktree_head_commit_age_secs('/wt', now=1600.0)
+        self.assertEqual(age, 600.0)
+
+    def test_future_commit_clamps_to_zero(self):
+        with self._git('2000\n'):
+            self.assertEqual(
+                h._worktree_head_commit_age_secs('/wt', now=1600.0), 0.0)
+
+    def test_git_failure_is_none(self):
+        with self._git('', returncode=1):
+            self.assertIsNone(h._worktree_head_commit_age_secs('/wt', now=1600.0))
+
+    def test_non_numeric_output_is_none(self):
+        with self._git('not-a-number\n'):
+            self.assertIsNone(h._worktree_head_commit_age_secs('/wt', now=1600.0))
 
 
 if __name__ == '__main__':

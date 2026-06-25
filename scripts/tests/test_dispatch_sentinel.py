@@ -469,6 +469,40 @@ class SentinelLarryAlertsTest(_IsolatedAgentsRoot):
         )
 
 
+class StallMessageCopyTest(unittest.TestCase):
+    """A slot-occupied Forge queue must be explained as a HELD SLOT, never left
+    to read as a Tier 2 OAuth expiry (the 2026-06-24
+    forge-post-open-mergeable-rebase-001 incident)."""
+
+    def test_forge_inbox_stall_names_held_slot_not_auth(self):
+        msg = ds._stall_dm_message({
+            'kind': 'inbox-stall', 'agent': 'forge',
+            'file': 'build-x.json', 'age_hours': 3.1,
+        })
+        self.assertIn('build slot', msg.lower())
+        self.assertIn('wedged-session reaper', msg)
+        # Steers away from the wrong default.
+        self.assertIn('auth', msg.lower())
+
+    def test_in_flight_stall_explicitly_rules_out_oauth(self):
+        msg = ds._stall_dm_message({
+            'kind': 'in-flight-stall', 'agent': 'forge',
+            'file': 'build-x.json', 'age_hours': 3.9,
+            'threshold_seconds': 3600, 'pid': 2060999,
+        })
+        self.assertIn('held slot', msg.lower())
+        self.assertIn('2060999', msg)
+        self.assertIn('OAuth', msg)  # named only to say it is NOT the cause
+        self.assertIn('not an', msg.lower())
+
+    def test_non_forge_inbox_stall_has_no_slot_note(self):
+        msg = ds._stall_dm_message({
+            'kind': 'inbox-stall', 'agent': 'beacon',
+            'file': 'x.json', 'age_hours': 3.1,
+        })
+        self.assertNotIn('build slot', msg.lower())
+
+
 try:
     from . import _chokepoint_optout
 except ImportError:
