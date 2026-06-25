@@ -5,6 +5,94 @@
 ---
 
 
+## Iteration ~2713 — 2026-06-25T08:07Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry /cycle invocation via chat.
+
+**Health:** ⚡ Improving — Outbox-notifier hot loop **RESOLVED**. PR #700 fix live at 08:05Z; `AUTO_MERGE_SKIP_ALREADY_MERGED` entries confirm loop stopped. All inboxes empty. No open PRs. Remaining items are pre-existing pending-Larry carries.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Outbox-notifier hot loop**: **RESOLVED** ✅ — `AUTO_MERGE_SKIP_ALREADY_MERGED` for PR #691 (blocker #697 MERGED) + PR #698 (blocker #700 MERGED) at 02:05:27-28 MDT. heal-stale-daemon-code auto-restarted service at 08:05:28Z (library mtime post-PR700 = 07:52:29Z; service pre-restart start = 07:36:45Z). New code live. Loop stopped. [resolved]
+- **outbox-notifier-auto-merge-loop-merged-pr-001** G-rule vp: **VERIFIED COMPLETE** ✅ — Fix in git (PR #700) + service restarted with new code + loop stopped. G-rule done.
+- **Pipeline stall FP reconcile-hardening-001**: `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` — FP persists. Fix `heal-forge-no-pr-retry-rebase-fp-001` pending Larry approval. [carry]
+- **Pipeline stall FP rebase-687-001**: `DRY-RUN would alert: forge_built_no_pr:rebase-forge-post-open-mergeable-687-001` — FP persists. [carry]
+- **beacon-pending-approvals**: 1 (`heal-forge-no-pr-retry-rebase-fp-001`). [carry]
+- **Repo**: HEAD=5d370716=origin/main. Clean. On main. ✅
+- **Sync**: last_sync=2026-06-25T08:00:16Z (~7 min ago at check). ✅
+- **Daemons**: beacon_telegram_bot (PID 2715635), outbox_notifier (PID 2754414 — new code), chain_event_shipper (PID 2716672) — all alive. ✅
+- **Watchdog**: overall=healthy at 02:02:10 MDT. ✅
+- **Zombie PID 1834248**: still alive (Ss, bash, etimes=2378811s ~27.5d). Ask-then-do: `kill 1834248`. [carry]
+- **Stale daemon code heartbeat**: 2026-06-25T08:05:19Z (~2 min ago at check). Fresh. ✅
+- **All agent inboxes**: EMPTY (beacon, forge, mirror). ✅ [resolved from carry — mirror fully cleared since ~2712]
+- **No open PRs**: confirmed via `gh pr list → []`. ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark: repaired=false, old=1155, file_length=1156. **1 new alert (L1156, idx=1155).**
+- L1156 (idx=1155): `source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-outbox-notifier.service` at 08:05:28Z — healer confirmed outbox-notifier restarted with PR #700 fix live (library changed 15.7 min after pre-restart start; commit 03a74217 now running). Triage helper: **Tier-3 silence** ✅ (known-pattern match in alert-translations.json). Route=digest. Beacon suppressed DM. Journal-note only.
+- Watermark advanced 1155→1156. ✅
+
+**Check 1 — Log noise:**
+- outbox-notifier.log: **RESOLVED** ✅ — Last entries 02:05:27-28 MDT show `AUTO_MERGE_SKIP_ALREADY_MERGED` for PR #691 (state=MERGED → removed from queue) and PR #698 (state=MERGED → removed from queue). No activity since. Loop stopped.
+- watchdog.log: overall=healthy at 02:02:10 MDT. ✅
+
+**Check 2 — Telegram sweep:**
+- beacon_telegram_bot.log: last entry `02:06:01 MDT idx=1155 route=digest; skipping DM (source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-outbox-notifier.service)`. No new Larry messages. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` — FP persists. Fix `heal-forge-no-pr-retry-rebase-fp-001` pending. [carry]
+- `DRY-RUN would alert: forge_built_no_pr:rebase-forge-post-open-mergeable-687-001` — FP persists. [carry]
+- 2 alert(s) would fire, 0 recovery(ies) attempted.
+
+**Check 4 — Pending directives:**
+- Beacon inbox: **EMPTY** ✅
+- Forge inbox: **EMPTY** ✅
+- Mirror inbox: **EMPTY** ✅ (all cleared)
+- beacon-pending-approvals: 1 (`heal-forge-no-pr-retry-rebase-fp-001`). [carry]
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-06-25T08:05:19Z (~2 min ago at check). Fresh. ✅
+
+**Check A — Source repo:** HEAD=5d370716=origin/main. Clean. On main. ✅
+
+**Check B — Sync health:** last_sync=2026-06-25T08:00:16Z (~7 min ago at check). ✅
+
+**Check C — Agent liveness:** beacon_telegram_bot (PID 2715635), outbox_notifier (PID 2754414 — new code live), chain_event_shipper (PID 2716672) — all alive. ✅
+- **[yellow] PID 1834248** — zombie bash wait-loop. Still alive (etimes=2378811s ~27.5d). Ask-then-do: `kill 1834248`. [carry]
+
+**Check E — PRs:** No open PRs. ✅
+
+**Check H — Forge digest:** Forge IDLE (inbox/outbox/WIP empty). ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check III: not Sunday. Skip. ✅
+
+**G-rule updates:**
+- **outbox-notifier-auto-merge-loop-merged-pr-001** → **COMPLETE** ✅: G-rule vp verified this iter. Service restarted with PR #700 fix. `AUTO_MERGE_SKIP_ALREADY_MERGED` confirms loop stopped. Added to Completed G-rules; removed from vp tracking.
+- All other G-rules: unchanged from ~2712.
+
+**Actions taken:** Triaged L1156 (Tier-3 silence, no DM). Watermark advanced 1155→1156. Appended 1 PRIME ledger row (intervention). Tier state recorded non-clean. G-rule outbox-notifier-auto-merge-loop-merged-pr-001 marked COMPLETE.
+
+**Standing findings (updated):**
+- [yellow] **heal-forge-no-pr-retry-rebase-fp-001 pending approval** — `approve heal-forge-no-pr-retry-rebase-fp-001` unblocks 2 pipeline stall FPs.
+- [yellow] **PID 1834248 zombie bash loop** — Still alive. Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **sequence-paused:operator-needs-you-feed** — Recovery: `resume sequence operator-needs-you-feed` via Beacon or Dashboard.
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision.
+- [yellow] **unreviewed-merge:649** — Larry judgment.
+- [yellow] **unreviewed-merge:637** — Larry judgment.
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`.
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`.
+
+**PRIME DIRECTIVE:** interventions=1180, systemic_fixes=71, verification_pending=25 (outbox-notifier-loop vp resolved), ratio≈16.62, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** consecutive_clean=0 (non-clean: 2 stall FPs, zombie PID, pending approval). Tier: 1.
+
+---
+
+
 ## Iteration ~2712 — 2026-06-25T08:00Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry /cycle invocation via chat.

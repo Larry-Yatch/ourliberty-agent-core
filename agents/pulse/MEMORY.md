@@ -132,9 +132,9 @@
 
 ---
 
-## G-rule outbox-notifier-auto-merge-loop-merged-pr-001 → DISPATCHED ✅ (3/3, iter ~2695), vp
+## G-rule outbox-notifier-auto-merge-loop-merged-pr-001 → COMPLETE ✅ (iter ~2713)
 
-**Rule:** After a blocker PR merges, outbox-notifier releases queued PRs from the auto-merge queue. If the released PR has `mergeable=UNKNOWN` (GitHub reports UNKNOWN for recently-merged PRs post-base-move), outbox-notifier re-queues behind the (already merged) blocker. The blocker merge fires another release, triggering another UNKNOWN check → infinite loop at ~5s/cycle. Fix: check `state=MERGED` before deferring/re-queuing in auto-merge release path; don't re-queue behind merged blocker. Dispatched `fix-auto-merge-release-deferred-merged-pr-001.json` to Beacon inbox at iter ~2695. verification_pending.
+PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entries at 02:05:27-28 MDT confirmed loop stopped. heal-stale-daemon-code auto-restarted outbox-notifier at 08:05:28Z with new code (commit 03a74217). Added to Completed G-rules.
 
 ---
 
@@ -158,7 +158,7 @@
 
 ## Completed G-rules — condensed for space (COMPLETE ✅)
 
-`outbox-notifier url-shape-invalid` → PR #493 (2026-06-13). `medic-diagnosis-tier4` → PR #515 (2026-06-15). `heal-pipeline-stall:unrouted-pr` → PR #516 (2026-06-15). `check-i-repeat-dm-fix-001` → PR #674 (2026-06-24). `heal-droplet-git-drift` → PR #586 (2026-06-19). `silence-routine-weekly-alerts` → PR #604 (2026-06-20). `forge-preflight-no-marker` → PR #600 (2026-06-19). `projects-json-healer-path` → PR #603 (2026-06-20). `outbox-notifier-review-pass` → PR #604 scope. `seq-advancer-sequence-stranded` → PR #661 (2026-06-24). `catalog-accuracy-drift` → PR #6 ourliberty-graph (2026-06-22). `doorbell-tier4-pattern` → PR #648 (2026-06-23). `heal-stale-daemon-code-script-service-mismatch` → PR #647 (2026-06-23). `mirror-marker-parse-error` → PR #650 (2026-06-23). `watchdog-watcher-log-stale` → PR #649 (2026-06-23). `watchdog-watcher-log-stale-post-fix` → PR #694 (2026-06-25). `ourliberty-health-notify-script-missing` → PR #696 (2026-06-25). `heal-pipeline-stall-mirror-pass-unmerged-tier4` → PR #695 (2026-06-25). `stale-proposed-mission-pipeline-fp-001` → PR #697 (2026-06-25, sibling_pr_title_shipped suppression).
+`outbox-notifier url-shape-invalid` → PR #493 (2026-06-13). `medic-diagnosis-tier4` → PR #515 (2026-06-15). `heal-pipeline-stall:unrouted-pr` → PR #516 (2026-06-15). `check-i-repeat-dm-fix-001` → PR #674 (2026-06-24). `heal-droplet-git-drift` → PR #586 (2026-06-19). `silence-routine-weekly-alerts` → PR #604 (2026-06-20). `forge-preflight-no-marker` → PR #600 (2026-06-19). `projects-json-healer-path` → PR #603 (2026-06-20). `outbox-notifier-review-pass` → PR #604 scope. `seq-advancer-sequence-stranded` → PR #661 (2026-06-24). `catalog-accuracy-drift` → PR #6 ourliberty-graph (2026-06-22). `doorbell-tier4-pattern` → PR #648 (2026-06-23). `heal-stale-daemon-code-script-service-mismatch` → PR #647 (2026-06-23). `mirror-marker-parse-error` → PR #650 (2026-06-23). `watchdog-watcher-log-stale` → PR #649 (2026-06-23). `watchdog-watcher-log-stale-post-fix` → PR #694 (2026-06-25). `ourliberty-health-notify-script-missing` → PR #696 (2026-06-25). `heal-pipeline-stall-mirror-pass-unmerged-tier4` → PR #695 (2026-06-25). `stale-proposed-mission-pipeline-fp-001` → PR #697 (2026-06-25, sibling_pr_title_shipped suppression). `outbox-notifier-auto-merge-loop-merged-pr-001` → PR #700 (2026-06-25, verified iter ~2713).
 
 ---
 
@@ -192,8 +192,8 @@
 
 ---
 
-## Status snapshot — updated 2026-06-25 08:00Z UTC (Iter ~2712, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 08:09Z UTC (Iter ~2713, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2712 summary:** ⚠️ Watch — PR #700 MERGED at 07:51:29Z (outbox-notifier loop fix deployed to git). Outbox-notifier (PID 2754414) still running pre-PR700 code; started at 07:36Z before merge. heal-stale-daemon-code gave up; Larry notified via Beacon (idx=1154). Loop still active (~5s/cycle). 2 new alerts triaged (L1154 Tier-3, L1155 Tier-4). Mirror inbox fully cleared. 3 stuck builds presumed resolved (no stall signal + Forge empty). `heal-forge-no-pr-retry-rebase-fp-001` approval pending Larry. PID 1834248 zombie alive (~27.5d). outbox-notifier-auto-merge-loop-merged-pr-001 vp (fix merged, loop stops on service restart). PRIME: interventions=1179, systemic_fixes=71, vp=26, ratio≈16.60, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2713 summary:** ⚡ Improving — Outbox-notifier hot loop RESOLVED at 08:05:28Z. heal-stale-daemon-code auto-restarted service with PR #700 fix (commit 03a74217); `AUTO_MERGE_SKIP_ALREADY_MERGED` entries confirm loop stopped. All inboxes empty (beacon, forge, mirror). No open PRs. 1 new alert triaged (L1156 Tier-3 silence). G-rule `outbox-notifier-auto-merge-loop-merged-pr-001` COMPLETE ✅. `heal-forge-no-pr-retry-rebase-fp-001` approval pending Larry (2 pipeline stall FPs still DRY-RUN firing). PID 1834248 zombie alive (~27.5d). PRIME: interventions=1180, systemic_fixes=71, vp=25, ratio≈16.62, trend=improving. Tier 1, consecutive_clean=0.
 
 
