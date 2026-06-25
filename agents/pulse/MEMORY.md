@@ -204,8 +204,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-25 20:13Z UTC (Iter ~2812, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 20:21Z UTC (Iter ~2813, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2812 summary:** ✅ Nominal — 1 new alert (L1002: dispatch-branch-cleanup Tier-3 silenced). PR #706 (sequence-rows-endpoint, operator-needs-you-feed step 2B) **MERGED** at 20:07:12Z. Forge active on step 3 (waiting-panel-render, started 20:11:09Z, claude-opus-4-8). PR #92 (ourliberty-dashboard) open MERGEABLE, Mirror review queued. board-new-mission-confirmation-placeholder-001 REJECTED; Larry gave follow-up direction; Beacon responded 14:01:37 MDT, new-mission-card-scope-decision-001 pending. Standing: zombie PID 1834248 (~29d), 6 stale journalctl PIDs (~31d), forge-wip-redispatch-digest pending trust-policy approval. PRIME: interventions=1225, systemic_fixes=71, vp=27, ratio≈17.25, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2813 summary:** ✅ Nominal — 3 new alerts (L1003-L1005: heal-stale-daemon-code auto-restarts of dashboard-api/beacon-bot/outbox-notifier, all Tier-3 silenced). PR #92 (ourliberty-dashboard "feat(where-are-we): split Active missions") **MERGED** at 20:12:54Z. Forge on build-phase for waiting-panel-render (step 3 operator-needs-you-feed, started 20:14:10Z, claude-opus-4-8). 3 services restarted by heal-stale-daemon-code (dashboard_api.py mtime updated by PR #706); new PIDs: uvicorn/dashboard-api=3044417, beacon_telegram_bot=3044692, outbox_notifier=3044826 — all healthy. No open PRs in either repo. Standing: zombie PID 1834248 (~29d), 6 stale journalctl PIDs (~31d), forge-wip-redispatch-digest pending trust-policy approval. PRIME: interventions=1225, systemic_fixes=71, vp=27, ratio≈17.25, trend=improving. Tier 1, consecutive_clean=0.
 
 
