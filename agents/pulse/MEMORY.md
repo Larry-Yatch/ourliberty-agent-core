@@ -204,8 +204,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-25 19:13Z UTC (Iter ~2804, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 19:26Z UTC (Iter ~2805, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2804 summary:** ✅ Nominal — 1 new alert (dispatch-branch-cleanup digest, Tier-3 silence, wm→999), 8/8 daemons alive, watchdog healthy, 0 open PRs, pipeline clean. New: Larry approved "Yes spec the fix for the wedge in Dag" at 13:09 MDT; Forge task `sequence-rows-endpoint` dispatched at 13:10 MDT (operator-needs-you-feed step 2B in progress). Standing: board-new-mission-confirm-placeholder-001 EXHAUSTED (Larry was active on dashboard ~13:03 MDT, resolution unconfirmed), zombie PID 1834248 (~28d), 6 stale journalctl PIDs, forge-wip-redispatch-digest Forge dispatch pending trust-policy approval. PRIME: interventions=1225, systemic_fixes=71, vp=27, ratio≈17.25, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2805 summary:** ✅ Nominal — 1 new alert (review-pass PR #705, Tier-3 silence, wm→1000), 8/8 daemons alive, watchdog healthy, 0 open PRs, pipeline clean. PR #705 (spec-advancer-step-merge-by-pr-identity-001 doc-only spec) merged 13:20 MDT. Active: `build-sequence-rows-endpoint.json` (Forge build phase since 13:13 MDT). New: `board-new-mission-confirmation-placeholder-001.json` fresh Beacon dispatch to Forge preflight (~13:21 MDT — resolves prior EXHAUSTED standing finding). Sync push-failed transient CLEARED (was error in ~2796–~2803; now status=no-change). Standing: zombie PID 1834248 (~28d), 6 stale journalctl PIDs, forge-wip-redispatch-digest Forge dispatch pending trust-policy approval. PRIME: interventions=1225, systemic_fixes=71, vp=27, ratio≈17.25, trend=improving. Tier 1, consecutive_clean=0.
 
 

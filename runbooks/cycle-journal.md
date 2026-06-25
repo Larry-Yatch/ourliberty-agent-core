@@ -5,6 +5,94 @@
 ---
 
 
+## Iteration ~2805 — 2026-06-25T19:26Z UTC (interactive /loop /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/loop /cycle` invocation via chat.
+
+**Health:** ✅ Nominal — 1 new alert L1000 (Tier-3 silence), 8/8 daemons alive, watchdog healthy, 0 open PRs, pipeline clean. Updates: PR #705 merged 13:20 MDT; Forge build-sequence-rows-endpoint active; board-new-mission-confirmation-placeholder-001 fresh Beacon dispatch to Forge preflight; sync push-failed transient cleared.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo**: HEAD=9926586d=origin/main. On main. Clean. ✅ (Latest commit: "Pulse cycle 20260625T191454Z".)
+- **Sync**: agent-core-sync.json `status=no-change, last_sync=2026-06-25T19:01:09Z, commit=2692262e` — JSON is behind HEAD (cycle commits pushed after last sync pull); origin/main confirmed at 9926586d via `git rev-parse`. Push-failed transient from ~2796–~2803 is CLEARED. ✅ Healthy.
+- **Daemons**: PIDs 1388801 (forge_bot Ss, 2d3h), 1388982 (mirror_bot Ss), 1389067 (pulse_bot Ss), 2715635 (beacon_telegram_bot Ss, 12h), 2715859 (dashboard_api Ssl), 2716672 (chain_event_shipper SNs), 2754413 (inbox_watcher Ssl), 2773485 (outbox_notifier Ss). 8/8 alive. ✅
+- **Watchdog**: last entry 13:16:21 MDT (19:16:21Z) — overall=healthy. ✅
+- **heal-stale-daemon-code heartbeat**: 2026-06-25T19:24:51Z (~2 min old at check time). Fresh. ✅
+- **Zombie PID 1834248**: Still alive (Ss, 28-00:05:22 — bash loop waiting on `.archive/build-check-viii-pr-2b-analyzer-001.json`). Ask-then-do. [carry]
+- **6 stale journalctl PIDs**: All alive (1101500 1107838 1118830 1136223 1161972 1177335, S, ~31d). Ask-then-do. [carry]
+- **beacon-pending-approvals**: pending=0. ✅
+- **Open PRs**: 0. ✅
+- **Forge inbox**: `build-sequence-rows-endpoint.json` (build phase, dispatched 13:13:24 MDT — active) + `board-new-mission-confirmation-placeholder-001.json` (preflight, new Beacon dispatch ~13:21 MDT). Both expected. ✅
+- **Other inboxes**: All EMPTY. ✅
+- **outbox-notifier.log**: Last entry 13:20:53 MDT (queued completion DM for spec-advancer review-pass). No WARNs. ✅
+- **inbox_watcher.log**: Mirror done `spec-advancer-step-merge-by-pr-identity-001` at 19:20:44Z ($0.49, 125s); Beacon done notify at 19:21:32Z ($0.32, 35s). Active Forge build session likely in progress. ✅
+
+**Check 0 — Alert triage:**
+- `repair-watermark`: `{"repaired": false, "old_watermark": 999, "file_length": 1000}`. 1 new alert at L1000.
+- L1000: `source=outbox-notifier, kind=notification, intent=review-pass` (PR #705 `spec-advancer-step-merge-by-pr-identity-001` auto-merged + branch deleted) → triage-helper: **Tier-3 silence** (known-pattern match in alert-translations.json). No DM. Watermark advanced to 1000. ✅
+
+**Check 1 — Log noise:**
+- `journalctl --user -p warning --since "30 minutes ago"` → `-- No entries --`. ✅
+- outbox-notifier.log: Last entry 13:20:53 MDT. No WARNs. ✅
+- watchdog.log: 13:16:21 MDT — overall=healthy. ✅
+
+**Check 2 — Telegram sweep:**
+- inbox_watcher: Mirror completed `spec-advancer-step-merge-by-pr-identity-001` (PR #705 doc-only spec) at 13:20 MDT. PR #705 auto-merged at 13:20:52 MDT. Beacon notified at 13:21 MDT. ✅ System running correctly.
+- No new Telegram input from Larry since 13:09 MDT (operator-needs-you-feed approval at iter ~2804). ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- 14 tasks FORGE_NO_PR_SKIP (various reasons; down from 25 at ~2804 as recent PRs merged). **"no stalls detected"**. ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- Forge inbox: `build-sequence-rows-endpoint.json` (active build, not stale) + `board-new-mission-confirmation-placeholder-001.json` (preflight, fresh ~4 min). Both active. ✅
+- All other inboxes EMPTY. beacon-pending-approvals=0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-25T19:24:51Z (~2 min old). Fresh. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=9926586d=origin/main. On main. Clean. ✅ Nominal.
+**Check B — Sync health:** Status=no-change. Push-failed transient CLEARED. ✅ Nominal. (JSON commit behind HEAD is expected — next sync will catch up.)
+**Check C — Agent liveness:** 8/8 alive.
+- **[yellow] PID 1834248** — zombie bash loop (~28d). Ask-then-do: `kill 1834248`. [carry]
+- **[yellow] 6 stale journalctl PIDs (~31d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+
+**Check E — PRs:** 0 open PRs. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check VIII/IX/X: Not Monday. Skip. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule updates:**
+- All active G-rules carry unchanged from ~2804. No new occurrences this iter.
+
+**Actions taken:**
+1. Check 0: Triaged L1000 → Tier-3 silence (review-pass PR #705). Watermark advanced 999→1000.
+2. PRIME ledger: `iter_clean` appended (tier=1, template=iter-clean-nominal).
+3. Tier state: `record --checks-clean false` → consecutive_clean stays 0 (zombie + journalctl PIDs carry). Tier remains 1.
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [yellow] **board-new-mission-confirm-placeholder-001 EXHAUSTED** → **RESOLVED**: Beacon dispatched `board-new-mission-confirmation-placeholder-001.json` (new task_id, full "confirmation") to Forge inbox at preflight ~13:21 MDT. System self-corrected. Standing finding cleared. ✅
+- [green] **sequence-paused:operator-needs-you-feed** → **IN PROGRESS**: `build-sequence-rows-endpoint.json` actively running in Forge (build phase since 13:13 MDT). Carry until PR merges.
+- [yellow] **PID 1834248 zombie bash loop** — Still alive (~28d). Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **6 stale journalctl PIDs (~31d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+- [yellow] **forge-wip-redispatch-digest Forge dispatch** — Beacon fix designed (iter ~2798). Trust-policy approval from Larry pending. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649/637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**PRIME DIRECTIVE:** interventions=1225, systemic_fixes=71, verification_pending=27, ratio≈17.25, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0 (non-clean: zombie PID + 6 stale journalctl PIDs). Last signal: 2026-06-25T19:26:29Z.
+
+---
+
+
 ## Iteration ~2804 — 2026-06-25T19:13Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/cycle` invocation via chat.
