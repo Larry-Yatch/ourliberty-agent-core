@@ -248,6 +248,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-25 02:20Z UTC (Iter ~2669, Tier 1, consecutive_clean=0)
+
+**Iter ~2669 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase-pr-687-post-open-mergeable-001 approval pending Larry). sequence-paused:operator-needs-you-feed pending Larry action. **KEY EVENT: Mirror ACTIVE reviewing PR #696 (wire-agent-core-health-notify-001, PID 2427878, started 02:11Z) — G-rule ourliberty-health-notify-script-missing fix in final review stage.** 0 new alerts (watermark=1090=file_length). Forge EMPTY. Beacon EMPTY. Mirror inbox: 4 items (rev1+001 for wip-only-auto-redispatch, pr-692, wire-health-notify). Watchdog: 5 consecutive healthy checks post-PR #694 merge including during active Mirror session. G-rules: heal-notify 3/3 vp (PR #696 Mirror ACTIVE), manifest-drift 2/3, review-duplicate-dispatch 1/3, check-i-force-bypass 1/3. PRIME: interventions=1142, systemic_fixes=69, ratio≈16.5, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-25 02:13Z UTC (Iter ~2668, Tier 1, consecutive_clean=0)
 
 **Iter ~2668 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase-pr-687-post-open-mergeable-001 approval pending Larry). **KEY EVENTS: PR #695 MERGED 02:07Z → G-rule heal-pipeline-stall-mirror-pass-unmerged COMPLETE ✅. PR #691 MERGED (heal-pipeline-stall dry-run noop fix). PR #685 (escalation-feed) confirmed MERGED 01:17Z — was carried as conflicting, now closed.** L1090 burn-rate at 89% (Tier-3, bot DM'd, no Pulse DM; pace indicator only, 0 rate-limit events). Mirror inbox: 4 items (review-forge-wip-only-auto-redispatch-001-rev1, -001, -pr-ourliberty-agent-core-692, -wire-agent-core-health-notify-001). Forge EMPTY. Beacon EMPTY. 2 pending approvals (unreg-approval-6009fbf6bfa2 stale; rebase-pr-687 active). Watermark 1088→1090. G-rules: heal-notify 3/3 vp (PR #696 Mirror queue), manifest-drift 2/3, review-duplicate-dispatch-wip-redispatch 1/3, check-i-force-bypass 1/3. PRIME: systemic_fixes=69 (+2 this iter), ratio≈17.3+, trend=improving. Tier 1, consecutive_clean=0.
