@@ -1172,6 +1172,113 @@ def _forge_sibling_pr_title_shipped(task_id: str,
         return None
 
 
+def _forge_retry_pr_exists(task_id: str,
+                           all_prs: list[dict]) -> Optional[dict]:
+    """Bridge a `forge built / no PR` task to the PR a `-retry<N>` REDISPATCH
+    opened for it. Returns a representative PR dict (or a synthetic marker dict)
+    when proof of a retry-sibling PR exists, else None.
+
+    Production driver (2026-06-25): task `reconcile-hardening-mission-shipped-001`
+    (doc-only, exit 0) honestly opened NO PR. A SEPARATE redispatch
+    `reconcile-hardening-mission-shipped-001-retry1` opened PR #699 (OPEN, in
+    the Mirror queue) on branch `forge/reconcile-hardening-mission-shipped-001-
+    retry1`. The sibling-pr_title step does NOT suppress -001 (different driver:
+    a retry redispatch can re-key the pr_title or have none), so -001's stall
+    keeps firing. The robust, convention-independent signal is the BRANCH: a PR
+    whose branch task_id (via `_task_id_from_branch`) is exactly
+    `<original-task-id>-retry<N>` proves the retry redispatch opened the PR —
+    independent of title text or fetch-window quirks.
+
+    Two independent proofs (either suffices):
+      a) a PR in `all_prs` (open OR merged — already gh-truth) whose branch
+         task_id matches `^<re.escape(task_id)>-retry\\d+$`; OR
+      b) an archived retry-sibling outbox `<task_id>-retry*.json` that
+         `_outbox_shows_pr` confirms opened/updated a PR. Covers a retry PR
+         that has aged out of the live fetch window — keyed on the always-
+         present archive, mirroring `_forge_retry_succeeded`'s archive anchor.
+
+    Fail-safe: any miss / unreadable archive / exception → None, so the alert
+    still fires. This step can only REMOVE false stalls, never mask a real one
+    (a genuinely no-PR task has no `-retry<N>` PR and no PR-bearing retry
+    outbox). Reuses `_task_id_from_branch` + `_outbox_shows_pr` (the established
+    conventions), not a fresh matcher that could drift."""
+    try:
+        retry_branch_re = re.compile(rf'^{re.escape(task_id)}-retry\d+$')
+        # Proof (a): a live open/merged PR on the retry branch.
+        for pr in all_prs:
+            branch_task = _task_id_from_branch(pr.get('headRefName') or '')
+            if branch_task and retry_branch_re.match(branch_task):
+                return pr
+        # Proof (b): an archived retry-sibling outbox that opened a PR (the
+        # retry PR may have aged out of the fetch window). The on-disk stem is
+        # sanitize(f'{task_id}.json') minus '.json'; escape it so a glob
+        # metacharacter surviving a task_id is matched literally, then append
+        # the literal `-retry` plus a `*` wildcard for the suffix + `.json`.
+        archive_stem = safe_write_inbox.sanitize_component(
+            f'{task_id}.json')[:-len('.json')]
+        pattern = f'{_glob.escape(archive_stem)}-retry*.json'
+        for sib in sorted(FORGE_OUTBOX_ARCHIVE.glob(pattern)):
+            try:
+                with open(sib, errors='replace') as f:
+                    data = json.load(f)
+            except (OSError, json.JSONDecodeError):
+                continue
+            if isinstance(data, dict) and _outbox_shows_pr(data):
+                return {'number': None, '_repo': None, '_retry_outbox': sib.name}
+        return None
+    except Exception:
+        return None
+
+
+def _forge_rebase_target_shipped(task_id: str,
+                                 all_prs: list[dict]) -> Optional[dict]:
+    """Suppress a `forge built / no PR` stall for a REBASE-class task, which by
+    design operates on an EXISTING PR and opens none of its own. Returns the
+    targeted PR dict when the task named a PR that exists in the open+merged
+    union (gh-truth), else None.
+
+    Applies ONLY when `task_id.startswith('rebase-')` — a deliberately tight
+    scope, because rebase tasks are the only class expected to open no PR while
+    still doing real work. Every other task is left to the normal build-gap
+    decision.
+
+    Production driver (2026-06-25): task `rebase-forge-post-open-mergeable-687-
+    001` rebased PR #687 to `MERGEABLE / CLEAN`; its archived `result` reads
+    'PR #687 is now MERGEABLE / CLEAN. Done. Rebase complete — PR #687...'.
+    PR #687 then MERGED with its branch deleted, so both branch-match and
+    title-match fail and the stall fires (live alert L1128). The robust signal:
+    the rebase task's own `result` names `#<N>` and PR #<N> is present in the
+    already-fetched open+merged `all_prs` union — the work landed on the PR it
+    targeted; no new PR is expected.
+
+    Reads the archived outbox via `_load_forge_outbox`, extracts every `#<N>`
+    reference from the `result`, and returns the matching PR dict IFF exactly
+    one referenced number resolves to a PR in `all_prs`. Fail-safe: missing /
+    unreadable archive, no `#<N>` reference, no resolving PR, OR ambiguity (the
+    result names two different PRs both present in the union) → None, so the
+    alert still fires. This step can only REMOVE false stalls, never mask a real
+    one."""
+    try:
+        if not task_id.startswith('rebase-'):
+            return None
+        data = _load_forge_outbox(task_id)
+        if data is None:
+            return None
+        result = data.get('result')
+        if not isinstance(result, str) or not result:
+            return None
+        referenced = {int(n) for n in re.findall(r'#(\d+)', result)}
+        if not referenced:
+            return None
+        matches = [pr for pr in all_prs if pr.get('number') in referenced]
+        seen_numbers = {pr.get('number') for pr in matches}
+        if len(seen_numbers) == 1:
+            return matches[0]
+        return None
+    except Exception:
+        return None
+
+
 def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
                             merged_prs: list[dict], state: dict) -> list[dict]:
     """Find Forge build-done lines >FORGE_BUILT_NO_PR_MIN ago where no PR
@@ -1313,6 +1420,46 @@ def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
             log(
                 f'FORGE_NO_PR_SKIP task={task} reason=sibling_pr_title_shipped '
                 f'pr=#{sibling_pr.get("number")} repo={sibling_pr.get("_repo")}',
+                'INFO',
+            )
+            seen_tasks.add(task)
+            continue
+        # Reconciliation step 1e: a `-retry<N>` REDISPATCH of this task opened
+        # the PR, so this original task's `built / no PR` is a superseded false
+        # stall. Drove the 2026-06-25 `reconcile-hardening-mission-shipped-001`
+        # recurring false-fire: -001 (doc-only, exit 0) opened no PR, its
+        # redispatch -001-retry1 opened OPEN PR #699 on branch
+        # `forge/reconcile-hardening-mission-shipped-001-retry1`, whose branch
+        # task_id carries the `-retry1` token so step 1's `_pr_matches_task`
+        # couldn't correlate it and the sibling-pr_title step's driver (an
+        # identical pr_title) does not hold for a retry redispatch. See
+        # `_forge_retry_pr_exists`: a retry-branch PR in the open+merged union,
+        # or a PR-bearing archived retry-sibling outbox (aged-out case).
+        # gh-truth / archive-anchored, fail-safe to None.
+        retry_pr = _forge_retry_pr_exists(task, all_prs)
+        if retry_pr is not None:
+            log(
+                f'FORGE_NO_PR_SKIP task={task} reason=retry_pr_exists '
+                f'pr=#{retry_pr.get("number")} repo={retry_pr.get("_repo")} '
+                f'retry_outbox={retry_pr.get("_retry_outbox")!r}',
+                'INFO',
+            )
+            seen_tasks.add(task)
+            continue
+        # Reconciliation step 1f: a REBASE-class task (task_id starts with
+        # `rebase-`) operates on an EXISTING PR by design and opens none of its
+        # own. Drove the 2026-06-25 `rebase-forge-post-open-mergeable-687-001`
+        # false stall (live alert L1128): its archived `result` names PR #687,
+        # which it rebased to MERGEABLE/CLEAN before #687 MERGED with its branch
+        # deleted — so both branch-match and title-match fail and the stall
+        # fired. See `_forge_rebase_target_shipped`: the rebase task's `result`
+        # names `#<N>` and PR #<N> is present in the open+merged union.
+        # gh-truth-gated, tightly scoped to `rebase-` ids, fail-safe to None.
+        rebase_pr = _forge_rebase_target_shipped(task, all_prs)
+        if rebase_pr is not None:
+            log(
+                f'FORGE_NO_PR_SKIP task={task} reason=rebase_target_shipped '
+                f'pr=#{rebase_pr.get("number")} repo={rebase_pr.get("_repo")}',
                 'INFO',
             )
             seen_tasks.add(task)
