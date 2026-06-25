@@ -204,8 +204,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-25 20:00Z UTC (Iter ~2810, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 20:13Z UTC (Iter ~2812, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2810 summary:** ✅ Nominal — 1 new alert (L1001: outbox-notifier reject-delivery-confirm, Tier-4 suppressed, G-rule 2/3). 8/8 daemons alive, watchdog healthy. board-new-mission-confirmation-placeholder-001 REJECTED by Forge at preflight (task obsolete, missions kanban retired). Larry DM'd (idx=1000), replied with follow-up direction ("agree narrative cadence, deeper exploration"); Beacon active resumed session. PR #706 (sequence-rows-endpoint) under Mirror review (PID 3017743). PR #92 (ourliberty-dashboard) Mirror review queued. Standing: zombie PID 1834248 (~28d), 6 stale journalctl PIDs, forge-wip-redispatch-digest pending trust-policy approval. PRIME: interventions=1225, systemic_fixes=71, vp=27, ratio≈17.25, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2812 summary:** ✅ Nominal — 1 new alert (L1002: dispatch-branch-cleanup Tier-3 silenced). PR #706 (sequence-rows-endpoint, operator-needs-you-feed step 2B) **MERGED** at 20:07:12Z. Forge active on step 3 (waiting-panel-render, started 20:11:09Z, claude-opus-4-8). PR #92 (ourliberty-dashboard) open MERGEABLE, Mirror review queued. board-new-mission-confirmation-placeholder-001 REJECTED; Larry gave follow-up direction; Beacon responded 14:01:37 MDT, new-mission-card-scope-decision-001 pending. Standing: zombie PID 1834248 (~29d), 6 stale journalctl PIDs (~31d), forge-wip-redispatch-digest pending trust-policy approval. PRIME: interventions=1225, systemic_fixes=71, vp=27, ratio≈17.25, trend=improving. Tier 1, consecutive_clean=0.
 
 
