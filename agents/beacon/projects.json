@@ -899,12 +899,31 @@
           "id": "operator-needs-you-feed",
           "title": "Operator Needs-You Feed",
           "desired_end_state": "Complete the /where-we-are Waiting-on-You board + doorbell: feed the two missing needs-you classes (critical alerts the healers couldn't auto-fix; CLARIFY-exhausted builds) through the existing promote_alerts gate as durable, self-clearing for-Larry records; itemize paused / stuck-dispatched build sequences; and add live Resume/Skip/Cancel steering buttons via a new audited POST endpoint. Supersedes the archived e4-4g operator-action-queue.",
-          "lifecycle_state": "building",
+          "lifecycle_state": "done",
           "order": 0,
           "spec_ref": "agents/beacon/specs/operator-needs-you-feed.md",
           "sequence_ref": "operator-needs-you-feed",
           "created_at": "2026-06-24T19:45:09.944739+00:00",
-          "updated_at": "2026-06-24T19:45:09.944739+00:00"
+          "updated_at": "2026-06-25T20:30:13.425732+00:00",
+          "closeout": {
+            "summary": "The \"Waiting on You\" board and doorbell alert are now the complete, single place to see everything that needs your attention \u2014 including the two kinds of items that used to only flash by in Telegram, plus paused or stuck work, each with Resume/Skip/Cancel buttons you can press right there. The next phase can build on a finished front door: anything that genuinely needs you now lands in one spot and clears itself once handled.",
+            "shipped": "Two previously-buried classes now appear on the board: urgent problems the system couldn't fix on its own, and builds that got stuck after asking you all the questions they were allowed to. Paused and stalled work is itemized with live Resume/Skip/Cancel buttons (with a confirm step before anything destructive), delivered across PRs #685, #706, and #93.",
+            "changed_vs_spec": "The build largely followed the plan. The one notable choice was reusing the existing attention-routing machinery and battle-tested action buttons rather than building new versions from scratch, which the original draft had leaned toward.",
+            "learnings": "The key discovery was that the \"does this need the CEO?\" decision logic already existed and was already running \u2014 so the work became feeding the board from that one source instead of inventing a second one, which avoids double-pinging you. A reusable signal component was also created that future \"needs-you\" items can plug into without new plumbing.",
+            "cost": "3 PRs of build work.",
+            "done_gate_met": true
+          },
+          "closeout_provenance": {
+            "by": "beacon",
+            "model": "claude-opus-4-8",
+            "at": "2026-06-25T20:29:53.486124+00:00",
+            "from_state": "done",
+            "pr_numbers": [
+              "685",
+              "706",
+              "93"
+            ]
+          }
         }
       ],
       "one_off": true,
