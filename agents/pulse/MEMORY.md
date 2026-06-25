@@ -242,11 +242,15 @@
 
 ---
 
-## G-rule review-duplicate-dispatch-wip-redispatch — 2/3 (iter ~2666 first, iter ~2670 second)
+## G-rule review-duplicate-dispatch-wip-redispatch → DISPATCHED ✅ (iter ~2671, 3/3)
 
-**Rule:** After Mirror completes a review (pass or revision), two separate dispatch paths fire: (1) the outbox_notifier's review-result path (which archives the original task and may dispatch -rev1 for revision) and (2) Beacon's notification-handler path (which re-dispatches a new `review-<task>.json` to Mirror). Both land in Mirror's inbox, causing Mirror to review the same PR twice. The -rev1 path is legitimate; the Beacon-notification-handler dispatch is the duplicate. Wasted Mirror time but not harmful. G-rule: track to 3/3 for Beacon fix. Instances: (1) iter ~2666: `review-forge-wip-only-auto-redispatch-001.json` + `-rev1.json` both in Mirror inbox; (2) iter ~2670: `review-pr-ourliberty-agent-core-692.json` reappeared in Mirror inbox after Mirror archived the original REVIEW_PASS at 02:11Z — Beacon notify-handler triggered the duplicate. Dispatch at 3/3.
+**Rule:** After Mirror completes a review (pass or revision), Beacon's notification-handler re-dispatches a new `review-<task>.json` to Mirror's inbox without checking if one is already queued. Causes Mirror to review the same PR/branch twice. Fix: add inbox-existence check in Beacon notify-handler before dispatching. Dispatch: `review-duplicate-dispatch-notify-handler-fix-001.json` → Beacon (iter ~2671). verification_pending.
 
 ---
+
+## Status snapshot — updated 2026-06-25 02:39Z UTC (Iter ~2671, Tier 1, consecutive_clean=0)
+
+**Iter ~2671 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase approval pending Larry; blocking PR #692). **KEY EVENTS: G-rule review-duplicate-dispatch-wip-redispatch 3/3 DISPATCHED ✅ (review-duplicate-dispatch-notify-handler-fix-001 → Beacon). Mirror active on 2nd `forge-wip-only-auto-redispatch-001` review (started 02:25:38Z; PR #693 merged = stale). PR #696 MERGEABLE, rev1 waiting in Mirror queue. PR #692 CLEAN+MERGEABLE, AUTO_MERGE_HELD blocker=#687.** 0 new alerts (watermark=1091). Watchdog: 10 consecutive healthy checks through 20:35 MDT. Pipeline stall dry-run: 2 false positives (reconcile-001 superseded, PR#692 has review task). Forge/Beacon EMPTY. 2 pending approvals (unreg-approval-6009fbf6bfa2, rebase-pr-687). PRIME: interventions=1144, systemic_fixes=69, vp=24, ratio≈16.6, trend=improving. Tier 1, consecutive_clean=0.
 
 ## Status snapshot — updated 2026-06-25 02:30Z UTC (Iter ~2670, Tier 1, consecutive_clean=0)
 
@@ -276,17 +280,6 @@
 
 **Iter ~2663 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase-pr-687-post-open-mergeable-001 approval pending Larry). PR #692 (work/forge-wedge-healer) MERGEABLE, opened by Larry directly from desktop at 01:27Z outside pipeline — no Mirror review task queued; ask-then-do. PR #690 AUTO-MERGED this iter (01:35Z, one-time-stale-dispatch-branch-cleanup-001). Queue velocity high: 5 PRs MERGEABLE in Mirror pipeline (PRs #691+#693+#694+#695+now-merged #690). Forge down to 1 item (build-wire-agent-core-health-notify). 1 alert (L1082 Tier-3 review-pass). Watermark 1081→1082. Watchdog: 0 new WARNs since 01:12Z (25+ min clean). G-rules: watchdog 3/3 verification_pending (PR #694 in review), heal-notify 3/3 (Forge building), mirror-pass-unmerged 3/3 (PR #695 in review), manifest-drift 2/3. PRIME: systemic_fixes=66, ratio=17.20, trend=improving. Tier 1, consecutive_clean=0.
 
-## Status snapshot — updated 2026-06-25 01:31Z UTC (Iter ~2662, Tier 1, consecutive_clean=0)
-
-**Iter ~2662 summary:** ⚠️ Watch — PR #687 CONFLICTING, rebase-pr-687-post-open-mergeable-001 approval pending Larry. PRs #690+#691 opened MERGEABLE (Forge built dispatch-branch-cleanup + heal-stall-dryrun-noop); Mirror reviewing both. 8 alerts (L1074-L1081): 7 Tier-3, 1 Tier-4 (heal-daemon-restart-manifest-drift:regenerated G-rule 2/3). 3 daemons auto-restarted by heal-stale-daemon-code after PR #685 shipped (outbox-notifier, beacon-bot, dashboard-api); all alive. Watchdog healthy 4 clean checks since 19:17Z. Watermark 1073→1081. PRIME: interventions=1134, systemic_fixes=66, ratio=17.18, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-25 01:16Z UTC (Iter ~2660, Tier 1, consecutive_clean=0)
-
-**Iter ~2660 summary:** ⚠️ Watch — PR #685 CONFLICTING (Forge ACTIVELY rebasing via rebase-escalation-feed-685-001, PID 2305661, critical path); PR #687 CONFLICTING (carry, Mirror REVIEW_PASS x4, AUTO_MERGE_HELD blocker=#685). **KEY EVENTS:** Queue advanced since iter ~2659: 7 Forge tasks completed (one-time-stale-dispatch-branch-cleanup-001, heal-stall-dryrun-noop-001, reconcile-hardening-mission-shipped-002, forge-wip-only-auto-redispatch-001, watchdog-stale-session-aware-suppression-001, alert-translation-mirror-pass-unmerged-001, wire-agent-core-health-notify-001 resume-r1). 5 build-* envelopes + resume-wire-agent-core-health-notify-001-r1 queued in Forge inbox. 0 new alerts (watermark=1073). NEW watchdog WARN at 19:12Z (01:12Z) during active rebase session — fix not yet merged. No new Larry Telegram messages. PRIME: interventions=1132, systemic_fixes=66, ratio=17.2, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-25 01:09Z UTC (Iter ~2659, Tier 1, consecutive_clean=0)
-
-**Iter ~2659 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry; rebase-escalation-feed-685-001 queued); PR #687 CONFLICTING (carry, Mirror REVIEW_PASS x4, AUTO_MERGE_HELD blocker=#685). **KEY EVENTS:** PR #688 MERGED (reconcile-hardening-mission-shipped-002, 01:02Z, Mirror PASS, auto-merged); PR #689 MERGED (doorbell: name what needs Larry + link where to go, 4ef2d072). Beacon timed out at 18:55 MDT on Larry's "Yes rebase #687 next" directive (18:45 MDT) — no rebase task dispatched for #687; DM'd Larry (L1072). 3 new alerts: L1071 Tier-3 (review-pass silenced), L1072 self-authored, L1073 Tier-3 (forge-no-pr reconcile-001 silenced — stale after -002 merged). Watermark 1070→1073. 7 daemons alive. Forge: 7 build-phase items. wire-agent-core-health-notify-001 advancing (CLARIFY answered, resume-r1). Beacon: empty. PRIME: interventions=1131, systemic_fixes=66, ratio=17.1, trend=improving. Tier 1, consecutive_clean=0.
 
 ## Status snapshot — updated 2026-06-25 00:57Z UTC (Iter ~2658, Tier 1, consecutive_clean=0)
 
