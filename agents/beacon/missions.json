@@ -5386,6 +5386,40 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-board-new-mission-confirm-placeholder-001-retry1",
+      "name": "Board New Mission Confirm Placeholder 001 Retry1",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `board-new-mission-confirm-placeholder-001-retry1`. Last activity 2026-06-25T18:12:41.043753+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "board-new-mission-confirm-placeholder-001-retry1"
+      ],
+      "repo": null,
+      "created": "2026-06-25",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-25T18:15:56.449879+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-25T18:12:41.043753+00:00"
+    },
+    {
+      "id": "proposed-board-new-mission-confirm-placeholder-001",
+      "name": "Board New Mission Confirm Placeholder 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `board-new-mission-confirm-placeholder-001`. Last activity 2026-06-25T18:09:12.721187+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "board-new-mission-confirm-placeholder-001"
+      ],
+      "repo": null,
+      "created": "2026-06-25",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-25T18:15:56.449879+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-25T18:09:12.721187+00:00"
     }
   ]
 }
