@@ -230,9 +230,9 @@
 
 ---
 
-## G-rule heal-daemon-restart-manifest-drift-regenerated-tier4 — 1/3 (new, iter ~2620)
+## G-rule heal-daemon-restart-manifest-drift-regenerated-tier4 — 2/3 (new, iter ~2620; updated iter ~2662)
 
-**Rule:** `source=heal-daemon-restart-manifest-drift, subject=regenerated` alerts classify Tier-4 (novel) — no translation match. But these are routine healer auto-commit actions (route=digest in the alert itself; bot already silences as digest). Should add Tier-3 translation. Dispatch to Beacon at 3/3 to add `config/alert-translations.json` entry.
+**Rule:** `source=heal-daemon-restart-manifest-drift, subject=regenerated` alerts classify Tier-4 (novel) — no translation match. But these are routine healer auto-commit actions (route=digest in the alert itself; bot already silences as digest). Should add Tier-3 translation. Dispatch to Beacon at 3/3 to add `config/alert-translations.json` entry. Occurrences: iter ~2620 (post manifest-drift healer firing), iter ~2662 (L1077 post PR #685 ship — manifest updated to track for_larry_escalations.py).
 
 ---
 
@@ -242,9 +242,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-25 01:22Z UTC (Iter ~2661, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-25 01:31Z UTC (Iter ~2662, Tier 1, consecutive_clean=0)
 
-**Iter ~2661 summary:** ⚠️ Watch — **PR #685 MERGED** at 01:17:59Z (597a03cb, feat(operator-needs-you-feed)); PR #687 CONFLICTING (rebase-pr-687-001 dispatched to Beacon per Larry "Yes rebase #687 next" directive). Repo fast-forwarded a30b7c0e→597a03cb (always-fix). Forge CLARIFY in Beacon inbox: schema conflict for_larry_signal.py vs for_larry_escalations.py (same file, incompatible schemas — post-merge finding, Beacon handling). Unreg-approval unreg-approval-6009fbf6bfa2 is stale (escalation-feed shipped). 0 new alerts (watermark=1073). 7 daemons alive. Watchdog healthy 19:17Z post-rebase. PRIME: interventions+2, systemic_fixes=66, ratio=17.2, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2662 summary:** ⚠️ Watch — PR #687 CONFLICTING, rebase-pr-687-post-open-mergeable-001 approval pending Larry. PRs #690+#691 opened MERGEABLE (Forge built dispatch-branch-cleanup + heal-stall-dryrun-noop); Mirror reviewing both. 8 alerts (L1074-L1081): 7 Tier-3, 1 Tier-4 (heal-daemon-restart-manifest-drift:regenerated G-rule 2/3). 3 daemons auto-restarted by heal-stale-daemon-code after PR #685 shipped (outbox-notifier, beacon-bot, dashboard-api); all alive. Watchdog healthy 4 clean checks since 19:17Z. Watermark 1073→1081. PRIME: interventions=1134, systemic_fixes=66, ratio=17.18, trend=improving. Tier 1, consecutive_clean=0.
 
 ## Status snapshot — updated 2026-06-25 01:16Z UTC (Iter ~2660, Tier 1, consecutive_clean=0)
 
