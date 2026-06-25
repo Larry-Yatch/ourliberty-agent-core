@@ -145,6 +145,7 @@ sudo systemctl enable --now ourliberty-heal-pulse-check-staleness.timer  # liven
 # above. Run the seed first regardless.
 sudo systemctl enable --now ourliberty-heal-unregistered-approval.timer  # direction-ask reconciliation net (every 15 min; OnCalendar) — needs EnvironmentFile=.env.larry for Supabase creds
 sudo systemctl enable --now ourliberty-heal-missions-card-gc.timer  # missions-v2 Phase 1 § 6 (every 10 min) — retires stale desktop-session cards, ages parked captures, commits captures.json delta to main; needs EnvironmentFile=.env.larry for Supabase + gh + git push
+sudo systemctl enable --now ourliberty-heal-merged-pr-board-reconcile.timer  # off-board merged-PR backstop (every 30 min, OnCalendar) — surfaces off-board missions whose work merged to the for-Larry needs-you lane (evidence only; NEVER mutates the board); needs EnvironmentFile=.env.larry for gh
 sudo systemctl enable --now ourliberty-heal-orphan-autoregister.timer  # missions-v2 Phase 3 § 6 (every 15 min) — proposes phase=proposed missions.json threads for non-terminal orphans (idempotent + fail-safe); needs EnvironmentFile=.env.larry for Supabase + gh + git push. NOTE: enable only once the dashboard "Proposed" affordance (p3-dashboard-proposed-lane) has shipped, else proposed entries render in the kanban without their own lane.
 
 # Long-running ingestion daemon (not a timer; default disabled at activation gate)
