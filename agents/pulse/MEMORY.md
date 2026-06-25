@@ -120,6 +120,12 @@
 
 ---
 
+## G-rule unrouted-open-pr-auto-merge-held-fp-001 — 1/3 (new, iter ~2679)
+
+**Rule:** `heal_pipeline_stall.py` dry-run fires `unrouted_open_pr:692` when the cooldown expires, even though outbox-notifier has correctly held auto-merge via `AUTO_MERGE_HELD blocker=#687` (overlap on agents/forge/CLAUDE.md, config/review-reaper-rules.json, scripts/dispatch_sentinel.py, etc.). The stall checker has no visibility into the AUTO_MERGE_HELD state when the cooldown window closes — it re-alerts as if the PR is unrouted. Fix: stall checker should check outbox-notifier log or a state file for AUTO_MERGE_HELD status before firing `unrouted_open_pr`. First occurrence iter ~2679 (cooldown expired after Mirror passed PR #692 at 20:48Z on 2026-06-24). Dispatch to Beacon at 3/3.
+
+---
+
 ## G-rule stale-proposed-mission-pipeline-fp-001 → vp advancing (iter ~2673 dispatch, Beacon processed iter ~2674)
 
 **Rule:** Pipeline stall checker fires `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` every cycle. Root cause (corrected by Beacon iter ~2674): NOT missions.json — real fix is PR-title sibling supersession (reconcile-001 superseded by -002/PR#688 but no supersession check catches same-family different-token PRs). Beacon produced `forge-no-pr-sibling-pr-title-supersession-001` approval (03:04Z 2026-06-25, DM'd Larry). verification_pending: needs Larry approval → Forge build → Mirror review → merge.
@@ -143,6 +149,10 @@
 `outbox-notifier url-shape-invalid` → PR #493 (2026-06-13). `medic-diagnosis-tier4` → PR #515 (2026-06-15). `heal-pipeline-stall:unrouted-pr` → PR #516 (2026-06-15). `check-i-repeat-dm-fix-001` → PR #674 (2026-06-24). `heal-droplet-git-drift` → PR #586 (2026-06-19). `silence-routine-weekly-alerts` → PR #604 (2026-06-20). `forge-preflight-no-marker` → PR #600 (2026-06-19). `projects-json-healer-path` → PR #603 (2026-06-20). `outbox-notifier-review-pass` → PR #604 scope. `seq-advancer-sequence-stranded` → PR #661 (2026-06-24). `catalog-accuracy-drift` → PR #6 ourliberty-graph (2026-06-22). `doorbell-tier4-pattern` → PR #648 (2026-06-23). `heal-stale-daemon-code-script-service-mismatch` → PR #647 (2026-06-23). `mirror-marker-parse-error` → PR #650 (2026-06-23). `watchdog-watcher-log-stale` → PR #649 (2026-06-23). `watchdog-watcher-log-stale-post-fix` → PR #694 (2026-06-25). `ourliberty-health-notify-script-missing` → PR #696 (2026-06-25). `heal-pipeline-stall-mirror-pass-unmerged-tier4` → PR #695 (2026-06-25).
 
 ---
+
+## Status snapshot — updated 2026-06-25 03:46Z UTC (Iter ~2679, Tier 1, consecutive_clean=0)
+
+**Iter ~2679 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase-pr-687-post-open-mergeable-001 pending Larry). **KEY EVENTS: All agents IDLE. 0 new alerts (watermark holds at 1100). 4 pending approvals (carry). Pipeline stall: reconcile-001 FP persists (fix pending). NEW G-rule: unrouted-open-pr-auto-merge-held-fp-001 (1/3) — stall checker fires unrouted_open_pr:692 when cooldown expires despite AUTO_MERGE_HELD blocker=#687. No dispatches.** PRIME: interventions=1151, systemic_fixes=70, vp=25, ratio=16.44, trend=improving. Tier 1, consecutive_clean=0.
 
 ## Status snapshot — updated 2026-06-25 03:42Z UTC (Iter ~2678, Tier 1, consecutive_clean=0)
 
