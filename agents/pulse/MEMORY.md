@@ -204,8 +204,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-25 20:40Z UTC (Iter ~2816, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 20:46Z UTC (Iter ~2817, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2816 summary:** ✅ Nominal — 0 new alerts. **Pipeline advancement:** Forge completed `board-new-mission-confirmation-placeholder-001-retry1` at 20:38:28Z ($3.71); PR #94 opened ourliberty-dashboard ("feat(missions): instant confirmation + optimistic placeholder card on +New mission"); Mirror review dispatched 20:38:28Z, actively running (model=claude-opus-4-8). operator-needs-you-feed COMPLETE (all 3 steps merged, Beacon closeout at 20:29:53Z). No open PRs in agent-core. Standing: zombie PID 1834248 (~28d), 6 stale journalctl PIDs (~30-31d), forge-wip-redispatch-digest dispatch pending trust-policy approval, new-mission-card-scope-decision awaiting Larry direction. PRIME: interventions=1225, systemic_fixes=71, vp=27, ratio≈17.25, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2817 summary:** ✅ Nominal — 1 alert (L1008, Tier-3 silenced). **Pipeline clear:** board-new-mission-confirmation-placeholder-001-retry1 COMPLETE — PR #94 (ourliberty-dashboard "feat(missions): instant confirmation + optimistic placeholder card on +New mission") auto-merged 20:43:54Z ($3.71). operator-needs-you-feed COMPLETE (all 3 steps merged). All inboxes empty, no active work in flight. Standing: zombie PID 1834248 (~28d), 6 stale journalctl PIDs (~31d), forge-wip-redispatch-digest dispatch pending trust-policy approval, new-mission-card-scope-decision awaiting Larry direction. PRIME: interventions=1225, systemic_fixes=71, vp=27, ratio≈17.25, trend=improving. Tier 1, consecutive_clean=0.
 
 
