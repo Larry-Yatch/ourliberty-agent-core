@@ -204,8 +204,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-25 19:37Z UTC (Iter ~2807, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 19:44Z UTC (Iter ~2808, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2807 summary:** ✅ Nominal — 0 new alerts (wm=1000), 8/8 daemons alive, watchdog healthy, 0 open PRs, pipeline clean. Forge `sequence-rows-endpoint` build active (~19 min running since 19:18:32Z). `board-new-mission-confirmation-placeholder-001` queued in Forge inbox (Larry approved at 13:19 MDT). Standing: zombie PID 1834248 (~28d), 6 stale journalctl PIDs, forge-wip-redispatch-digest Forge dispatch pending trust-policy approval. PRIME: interventions=1225, systemic_fixes=71, vp=27, ratio≈17.25, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2808 summary:** ✅ Nominal — 0 new alerts (wm=1000), 8/8 daemons alive, watchdog healthy. Pipeline progressing: Forge completed sequence-rows-endpoint ($4.20, 1335s) → PR #706 open MERGEABLE (Mirror actively reviewing since 19:40:57Z). Forge started board-new-mission-confirmation-placeholder-001 preflight at 19:40:55Z (target=ourliberty-dashboard; first attempt returned CLARIFY_REQUEST — active-missions kanban retired). Standing: zombie PID 1834248 (~28d), 6 stale journalctl PIDs, forge-wip-redispatch-digest Forge dispatch pending trust-policy approval. PRIME: interventions=1225, systemic_fixes=71, vp=27, ratio≈17.25, trend=improving. Tier 1, consecutive_clean=0.
 
 
