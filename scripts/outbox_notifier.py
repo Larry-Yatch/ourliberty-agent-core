@@ -1283,8 +1283,13 @@ def _maybe_dm_larry(
         # canonical closing DM is `_dm_larry_stale_revalidation`, fired in the
         # gate; a second DM here would duplicate it (same pairing as
         # held_conflict / `_dm_larry_rebase_needed`).
+        #   * release_already_merged — fix-auto-merge-already-merged-skip: the
+        #     released PR was ALREADY merged/closed, so Larry already got the
+        #     `merged` closing DM when it actually merged; a second DM on this
+        #     skip path would be duplicate noise (actionable-only discipline).
         if merge_outcome in (
             'deferred_unknown', 'held_conflict', 'held_stale_regression',
+            'release_already_merged',
         ):
             log(
                 f'review-pass closing DM suppressed (outcome='
@@ -7639,9 +7644,15 @@ def _gh_pr_merge_freshness(
         {
           'mergeable':    'mergeable' | 'conflicting' | 'unknown',
           'merge_state':  <raw mergeStateStatus, e.g. 'CLEAN'/'BEHIND'/'DIRTY'>,
+          'state':        <raw OPEN | MERGED | CLOSED terminal state>,
           'base_sha':     <current base-branch (main) tip OID>,
           'head_sha':     <PR head commit OID>,
         }
+
+    `state` is the OPEN/MERGED/CLOSED terminal state. The release-path gate
+    uses it to skip re-queuing a released PR that is ALREADY MERGED/CLOSED:
+    such a PR permanently reports mergeable=UNKNOWN post-base-move, which
+    would otherwise route into the UNKNOWN defer branch and loop forever.
 
     Returns None on any transport error / non-zero exit / parse failure —
     the caller treats None as "couldn't confirm freshness", which fails
@@ -7655,7 +7666,7 @@ def _gh_pr_merge_freshness(
         proc = subprocess.run(
             ['gh', 'pr', 'view', str(pr_number),
              '--repo', repo_coords,
-             '--json', 'mergeable,mergeStateStatus,baseRefOid,headRefOid'],
+             '--json', 'mergeable,mergeStateStatus,state,baseRefOid,headRefOid'],
             capture_output=True, text=True, timeout=_AUTO_MERGE_TIMEOUT_S,
         )
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
@@ -7684,6 +7695,7 @@ def _gh_pr_merge_freshness(
     return {
         'mergeable': mergeable,
         'merge_state': data.get('mergeStateStatus'),
+        'state': data.get('state'),
         'base_sha': data.get('baseRefOid'),
         'head_sha': data.get('headRefOid'),
     }
@@ -8227,6 +8239,31 @@ def _revalidate_held_merge_before_fire(
             changed_files, release_entry,
             reason='freshness lookup failed (transient gh error)',
         )
+
+    # fix-auto-merge-already-merged-skip: a released PR that is ALREADY
+    # MERGED/CLOSED (the blocker merged, moved main under it, and GitHub
+    # auto-merged it via base-move) permanently reports mergeable=UNKNOWN,
+    # so it would fall into the UNKNOWN defer branch below and re-queue
+    # behind the now-merged blocker forever (~5s sweep loop). It is already
+    # resolved — remove it from the queue and stop. `_queue_release` already
+    # `_queue_remove_pr`-ed this entry before invoking the gate, so returning
+    # without re-queuing leaves it removed and breaks the loop. Do NOT call
+    # `_defer_held_revalidation` here.
+    terminal_state = fresh.get('state')
+    if terminal_state in ('MERGED', 'CLOSED'):
+        resolved = 'merged' if terminal_state == 'MERGED' else 'closed'
+        log(
+            f'AUTO_MERGE_SKIP_ALREADY_MERGED task={task_id} pr={pr_url} '
+            f'(state={terminal_state}; released PR already {resolved}, '
+            f'removing from queue — not deferring)',
+        )
+        return {
+            'merge_outcome': 'release_already_merged',
+            'merge_reason': f'released PR already {resolved}; '
+                            'removed from queue',
+            'pr_number': pr_number,
+            'repo_coords': repo_coords,
+        }
 
     mergeable = fresh.get('mergeable')
     if mergeable == 'conflicting':

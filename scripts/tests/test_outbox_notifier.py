@@ -4600,6 +4600,25 @@ class MaybeDmLarryTest(unittest.TestCase):
         self.assertIn('pull/1', notifs[0]['message'])
         self.assertIn('All clean', notifs[0]['message'])
 
+    def test_review_pass_release_already_merged_suppresses_dm(self):
+        # fix-auto-merge-already-merged-skip: the released PR was already
+        # merged/closed, so Larry already got the `merged` closing DM when it
+        # actually merged. A second DM on this skip path would be duplicate
+        # noise — suppress it (same review-pass suppression family as
+        # deferred_unknown / held_conflict / held_stale_regression).
+        data = {
+            'task_id': 'real-already-merged', 'reply_chat_id': 7998341473,
+            'agent': 'mirror',
+        }
+        decision = self._decision('review-pass', 'review_pass', payload={
+            'task_id': 'real-already-merged',
+            'pr_url': 'https://github.com/x/y/pull/9',
+            'summary': 'All clean.',
+        })
+        decision['merge_outcome'] = 'release_already_merged'
+        on._maybe_dm_larry(data, decision)
+        self.assertEqual(self._read_notifications(), [])
+
     def test_review_revision_does_not_dm_in_5b(self):
         # D3.5 5b: REVIEW_REVISION is mid-chain (revision auto-dispatched to
         # Forge). Larry only gets DM on terminal intents — escalate (incl.
