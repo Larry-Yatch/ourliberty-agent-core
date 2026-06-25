@@ -5,6 +5,98 @@
 ---
 
 
+## Iteration ~2792 — 2026-06-25T17:39Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/cycle` invocation via chat.
+
+**Health:** ⚡ Notable — Forge REJECTED `board-new-mission-confirm-placeholder-001` at preflight (spec targets retired UI surface). Pending approval carry RESOLVED. All daemons nominal. 2 open PRs in pipeline (#703 Mirror active, #704 awaiting dispatch).
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo**: HEAD=4479d156=origin/main. On main. Clean. ✅ (fetch dry-run: already up to date)
+- **Sync**: last_sync=2026-06-25T17:00:39Z (~39 min ago). Within 2h. ✅
+- **Daemons (re-verified)**: forge_bot=1388801 (Ss, 179508s ~49.9h) ✅, mirror_bot=1388982 (Ss, 179500s ~49.9h) ✅, pulse_bot=1389067 (Ss, 179496s ~49.9h) ✅, beacon_telegram_bot=2715635 (Ss, 38456s ~10.7h) ✅, dashboard_api=2715859 (Ssl, 38448s ~10.7h) ✅, chain_event_shipper=2716672 (SNs, 38374s ~10.7h) ✅, inbox_watcher=2754413 (Ssl, 35968s ~10.0h) ✅, outbox_notifier=2773485 (Ss, 34248s ~9.5h) ✅. 8/8 alive. ✅
+- **Watchdog**: last entry 11:34:20 MDT (17:34:20Z, ~5 min before cycle) — overall=healthy. ✅
+- **heal-stale-daemon-code heartbeat**: 2026-06-25T17:33:19Z. Fresh. ✅
+- **Zombie PID 1834248**: still alive (Ss, etimes=2413096s ~27.94d). Ask-then-do. [carry]
+- **6 stale journalctl PIDs**: all alive (PIDs 1101500 1107838 1118830 1136223 1161972 1177335). Ask-then-do. [carry]
+- **beacon-pending-approvals**: pending=0. `board-new-mission-confirm-placeholder-001` RESOLVED — Forge rejected at preflight; outbox-notifier delivered rejection DM to Larry at 11:33:53 MDT. ✅ Carry CLEARED.
+- **Agent inboxes**: beacon=EMPTY ✅, forge=EMPTY ✅, mirror=`review-reconcile-two-stale-inflight-missions-shipped-001.json` (Mirror in-flight, started 17:12:50Z, ~26 min at cycle time) ✅, pulse=EMPTY ✅
+- **Telegram**: Last Larry message 11:29:56 MDT (`approved board-new-mission-confirm-placeholder-001`). No new messages after. Rejection DM delivered 11:37 MDT. No orphan directives. ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark: `{"repaired": false, "old_watermark": 988, "file_length": 989}`. **1 new alert at L989**.
+- Alert L989: `source=outbox-notifier, kind=notification, intent=reject, task_id=board-new-mission-confirm-placeholder-001` (17:33:53Z). Triage helper: **Tier-4** (novel — no registry template, no translation match).
+  - **DM suppressed**: outbox-notifier already delivered rejection DM to Larry at 11:33:53 MDT (bot log confirms delivery at 11:37 MDT). A Pulse DM would be identical duplicate — actionable-only discipline applies.
+  - **G-rule 1/3**: `source=outbox-notifier, kind=notification, intent=reject` is a routine delivery-confirmation pattern. Should be Tier-3 in alert-translations.json. Dispatch to Beacon at 3/3.
+- Watermark advanced to 989.
+
+**Check 1 — Log noise:**
+- `journalctl --user -p warning --since "30 minutes ago"` → `-- No entries --`. ✅
+- outbox-notifier.log: Last relevant: `queued completion DM ... intent=reject (task=board-new-mission-confirm-placeholder-001)` at 11:33:53 MDT. Prior WARN at 11:32:18 MDT: `MalformedForgeMarker phase=preflight` (retry 1/3, resolved on retry 2). No active WARNs. ✅
+- watchdog.log: last entry 11:34:20 MDT — overall=healthy. ✅
+
+**Check 2 — Telegram sweep:**
+- Beacon bot PID 2715635 (Ss, ~10.7h) ✅. Last Larry message 11:29:56 MDT (approved board-new-mission-confirm-placeholder-001 → dispatched to Forge at 11:29:56 MDT). No new messages since. Rejection DM delivered at 11:37 MDT; Larry hasn't responded yet (pending his decision on re-spec vs. drop). No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- 28 tasks all FORGE_NO_PR_SKIP. **"no stalls detected"**. ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- Beacon inbox: EMPTY ✅
+- Forge inbox: EMPTY ✅
+- Mirror inbox: `review-reconcile-two-stale-inflight-missions-shipped-001.json` — Mirror in-flight review of PR #703 (started 17:12:50Z, ~26 min at cycle time). ✅ Active.
+- beacon-pending-approvals: 0. board-new-mission-confirm-placeholder-001 cleared (Forge reject). ✅
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** heartbeat=2026-06-25T17:33:19Z. Fresh. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=4479d156=origin/main. On main. Clean. ✅ Nominal.
+**Check B — Sync health:** last_sync=2026-06-25T17:00:39Z (~39 min). Within 2h. ✅ Nominal.
+**Check C — Agent liveness:** 8/8 alive.
+- **[yellow] PID 1834248** — zombie bash wait-loop (~27.94d). Ask-then-do: `kill 1834248`. [carry]
+- **[yellow] 6 stale journalctl PIDs (~30.9d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+
+**Check E — PRs:** 2 open PRs.
+- PR #703: "chore(missions): reconcile pulse-cycle-upgrade + rate-limit-resilience to shipped" — MERGEABLE, Mirror in-flight (started 17:12:50Z, ~26 min). ✅ Active.
+- PR #704: "chore(missions): reconcile 7 shipped missions stuck in drafting" — MERGEABLE, created 17:25:32Z (~14 min old at cycle time). Mirror review dispatch pending (grace period should be expiring). ✅ Active.
+
+**Check H — Forge digest:** reconcile-two-stale-inflight-missions-shipped-001 complete (Forge 17:12:39Z), Mirror reviewing PR #703. board-new-mission-confirm-placeholder-001 REJECTED by Forge at preflight (17:33:53Z) — spec targets retired legacy Missions kanban (replaced by Pipeline+Funnel board at app/missions/page.tsx:34-40). Buildable items already shipped (handleNewMissionSuccess, Queuing… button). Larry notified. Beacon should re-spec if feature still desired.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check VIII/IX/X: Not Monday. Skip. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule updates:**
+- **G-rule outbox-notifier-notification-intent-reject-tier4-001 — 1/3 (new, iter ~2792)**: `source=outbox-notifier, kind=notification, intent=reject` alerts classify Tier-4 (novel). These are routine Forge-rejection delivery confirmations — outbox-notifier always DMs Larry for rejects (reject intent), making a Pulse DM duplicate noise. Fix: add `source=outbox-notifier, kind=notification, intent=reject` → Tier-3 entry to `config/alert-translations.json`. Dispatch to Beacon at 3/3.
+
+**Actions taken:**
+1. Check 0: Alert L989 triaged → Tier-4 (novel). DM suppressed (duplicate — outbox-notifier already delivered). Watermark advanced to 989.
+2. PRIME ledger: `intervention` appended (tier=1, template=alert-tier4-forge-reject-duplicate-suppressed).
+3. Tier state: `record --checks-clean false` → consecutive_clean stays 0 (zombie+journalctl carries). Tier remains 1.
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [yellow] **PID 1834248 zombie bash loop** — Still alive (~27.94d). Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **6 stale journalctl PIDs (~30.9d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+- [yellow] **board-new-mission-confirm-placeholder-001** — RESOLVED. Forge rejected (spec targets retired UI). Larry DM'd 11:33:53 MDT. Awaiting Larry's call on re-spec vs. drop. No longer pending approval.
+- [yellow] **sequence-paused:operator-needs-you-feed** — Recovery: `resume sequence operator-needs-you-feed` via Beacon or Dashboard. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649/637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**PRIME DIRECTIVE:** interventions=1222, systemic_fixes=71, verification_pending=26, ratio≈17.21, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0 (non-clean: zombie PID + 6 stale journalctl PIDs + new Tier-4 alert). Last signal: 2026-06-25T17:39:27Z.
+
+---
+
+
 ## Iteration ~2791 — 2026-06-25T17:28Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/cycle` invocation via chat.

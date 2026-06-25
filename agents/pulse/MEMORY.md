@@ -192,8 +192,14 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-25 17:14Z UTC (Iter ~2789, Tier 1, consecutive_clean=0→0)
+## G-rule outbox-notifier-notification-intent-reject-tier4-001 — 1/3 (new, iter ~2792)
 
-**Iter ~2789 summary:** ✅ Nominal — 1 new alert L986 (dispatch-branch-cleanup digest, Tier-3 silence). 8/8 daemons alive. 0 open PRs. Pipeline ACTIVE: Forge done reconcile-two-stale-inflight-missions-shipped-001 at 17:12:39Z ($0.92), Mirror reviewing (started 17:12:50Z). Beacon processing delegate-cap-board task. Watermark=986. PID 1834248 zombie (~27.93d, ask-then-do). 6 stale journalctl PIDs (~30.9d, ask-then-do). PRIME: interventions=1221, systemic_fixes=71, vp=26, ratio≈17.20, trend=improving. Tier 1, consecutive_clean=0.
+**Rule:** `source=outbox-notifier, kind=notification, intent=reject` alerts classify Tier-4 (novel, no translation match). These are routine Forge-rejection delivery confirmations — outbox-notifier always DMs Larry for rejects; a Pulse DM is duplicate noise. Fix: add `source=outbox-notifier, kind=notification, intent=reject` → Tier-3 entry to `config/alert-translations.json`. Dispatch to Beacon at 3/3.
+
+---
+
+## Status snapshot — updated 2026-06-25 17:39Z UTC (Iter ~2792, Tier 1, consecutive_clean=0→0)
+
+**Iter ~2792 summary:** ⚡ Notable — Forge REJECTED `board-new-mission-confirm-placeholder-001` at preflight (spec targets retired Missions kanban). Pending approval carry RESOLVED; Larry DM'd. 8/8 daemons alive. 2 open PRs (#703 Mirror active, #704 awaiting dispatch). Watermark=989. PID 1834248 zombie (~27.94d, ask-then-do). 6 stale journalctl PIDs (~30.9d, ask-then-do). PRIME: interventions=1222, systemic_fixes=71, vp=26, ratio≈17.21, trend=improving. Tier 1, consecutive_clean=0.
 
 
