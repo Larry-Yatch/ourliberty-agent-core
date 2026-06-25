@@ -1739,6 +1739,128 @@ class TestCheckRevisionDispatchedWithNoSession(_TempAgentsRootMixin, unittest.Te
         )
 
 
+class TestCheckRebaseObligationStuck(_TempAgentsRootMixin, unittest.TestCase):
+    """forge-post-open-mergeable-rebase-001 Check 10. The post-open auto-rebase
+    backstop reads the durable obligation ledger (rebase_obligation_ledger): the
+    notifier OPENS an obligation when it dispatches a phase=rebase to Forge (PR
+    opened CONFLICTING because main advanced) and RESOLVES it when the rebased PR
+    comes back MERGEABLE and Mirror is dispatched. An obligation still OPEN past
+    REBASE_STUCK_MIN fires a recover-then-alert. Mirrors the sibling Check 6
+    coverage (TestCheckRevisionDispatchedWithNoSession).
+    """
+
+    def setUp(self):
+        super().setUp()
+        # Sandbox the ledger to this test's root (the mixin re-imports
+        # heal_pipeline_stall but rebase_obligation_ledger keeps its import-time
+        # path).
+        self._rol = self.hps.rebase_obligation_ledger
+        self._rol_orig = self._rol.LEDGER_FILE
+        self._rol.LEDGER_FILE = self.agents_root / 'state' / 'rebase-ledger.json'
+
+    def tearDown(self):
+        self._rol.LEDGER_FILE = self._rol_orig
+        super().tearDown()
+
+    def _open(self, task, minutes_ago=60, pr_url='https://gh/o/r/pull/7', **kw):
+        when = datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)
+        self._rol.open_obligation(task, pr_url=pr_url, now=when, **kw)
+
+    def test_stuck_obligation_fires_alert(self):
+        self._open('stuck-1', minutes_ago=60)
+        alerts = self.hps.check_rebase_obligation_stuck({})
+        self.assertEqual(len(alerts), 1)
+        self.assertIn('stuck-1', alerts[0]['message'])
+        self.assertEqual(
+            alerts[0]['subject'],
+            'pipeline-stall:rebase-obligation:stuck-1',
+        )
+        self.assertIn('https://gh/o/r/pull/7', alerts[0]['message'])
+        self.assertIn('recovery', alerts[0])
+
+    def test_fresh_obligation_within_grace_no_alert(self):
+        self._open('fresh-1', minutes_ago=5)  # < REBASE_STUCK_MIN
+        alerts = self.hps.check_rebase_obligation_stuck({})
+        self.assertEqual(alerts, [])
+
+    def test_resolved_obligation_no_alert(self):
+        self._open('done-1', minutes_ago=60)
+        self._rol.resolve_obligation('done-1', resolution='mergeable')
+        alerts = self.hps.check_rebase_obligation_stuck({})
+        self.assertEqual(alerts, [])
+
+    def test_one_alert_per_task(self):
+        # The ledger holds one row per task_id, so a task yields exactly one
+        # alert even after multiple rebase rounds re-open it.
+        self._open('dup-task', minutes_ago=90, round_num=1)
+        self._open('dup-task', minutes_ago=60, round_num=2)
+        alerts = self.hps.check_rebase_obligation_stuck({})
+        self.assertEqual(len(alerts), 1)
+        self.assertIn('round 2', alerts[0]['message'])
+
+    def test_silent_when_ledger_empty(self):
+        alerts = self.hps.check_rebase_obligation_stuck({})
+        self.assertEqual(alerts, [])
+
+    def test_recovery_resolves_on_merged_pr(self):
+        # recover-then-alert: a stuck obligation whose PR merged out-of-band is
+        # cleared and reported recovered (the framework suppresses the alert).
+        self._open('merged-1', minutes_ago=60)
+        with patch.object(self.hps, '_gh_pr_state', return_value='MERGED'):
+            recovered = self.hps._recover_rebase_obligation(
+                'merged-1', 'https://gh/o/r/pull/7')
+        self.assertTrue(recovered)
+        ob = self._rol.get_obligation('merged-1')
+        self.assertEqual(ob['status'], self._rol.RESOLVED)
+        self.assertEqual(ob['resolution'], 'merged')
+
+    def test_recovery_resolves_on_closed_pr(self):
+        # A PR closed out-of-band (e.g. superseded) also clears the obligation.
+        self._open('closed-1', minutes_ago=60)
+        with patch.object(self.hps, '_gh_pr_state', return_value='CLOSED'):
+            recovered = self.hps._recover_rebase_obligation(
+                'closed-1', 'https://gh/o/r/pull/7')
+        self.assertTrue(recovered)
+        ob = self._rol.get_obligation('closed-1')
+        self.assertEqual(ob['status'], self._rol.RESOLVED)
+        self.assertEqual(ob['resolution'], 'closed')
+
+    def test_recovery_false_when_pr_confirmed_open(self):
+        self._open('open-1', minutes_ago=60)
+        with patch.object(self.hps, '_gh_pr_state', return_value='OPEN'):
+            recovered = self.hps._recover_rebase_obligation(
+                'open-1', 'https://gh/o/r/pull/7')
+        self.assertFalse(recovered)  # confirmed OPEN → stuck → loud alert fires
+        self.assertEqual(
+            self._rol.get_obligation('open-1')['status'], self._rol.OPEN,
+        )
+
+    def test_recovery_defers_when_gh_unreachable(self):
+        # verify-before-alarm: gh unreachable (state None) must NOT fire a
+        # false alert — suppress this round, leave the obligation OPEN to retry.
+        self._open('unknown-1', minutes_ago=60)
+        with patch.object(self.hps, '_gh_pr_state', return_value=None):
+            recovered = self.hps._recover_rebase_obligation(
+                'unknown-1', 'https://gh/o/r/pull/7')
+        self.assertTrue(recovered)  # suppress (defer), not alert
+        self.assertEqual(
+            self._rol.get_obligation('unknown-1')['status'], self._rol.OPEN,
+        )
+
+    def test_recovery_defers_when_pr_url_empty(self):
+        # No pr_url to verify against → defer (suppress) rather than false-alert;
+        # the obligation stays OPEN and re-checks next tick. _gh_pr_state must
+        # not even be consulted.
+        self._open('nopr-1', minutes_ago=60, pr_url='')
+        with patch.object(self.hps, '_gh_pr_state') as mock_state:
+            recovered = self.hps._recover_rebase_obligation('nopr-1', '')
+        self.assertTrue(recovered)
+        mock_state.assert_not_called()
+        self.assertEqual(
+            self._rol.get_obligation('nopr-1')['status'], self._rol.OPEN,
+        )
+
+
 class TestCheckUnroutedOpenPrs(_TempAgentsRootMixin, unittest.TestCase):
     """Chain discipline v3 GAP 3 (2026-05-26). Externally-authored PRs
     that skip the notifier's review-request auto-dispatch must DM Larry
