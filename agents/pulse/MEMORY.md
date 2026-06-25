@@ -198,8 +198,14 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-25 18:00Z UTC (Iter ~2795, Tier 1, consecutive_clean=0→0)
+## G-rule ourliberty-health-sync-push-failed-tier4-001 — 1/3 (new, iter ~2796)
 
-**Iter ~2795 summary:** ✅ Nominal — No new alerts (wm=992). 8/8 daemons alive. Watchdog healthy. PR #703 recovery in-progress (Beacon direction-ask `redispatch-mirror-pr703-stuck-review-001` dispatched ~2794, awaiting Beacon pickup). PR #704 Mirror review active. board-new-mission-confirm-placeholder-001 carry (Larry decides re-spec vs. drop). PID 1834248 zombie (~27.95d, ask-then-do). 6 stale journalctl PIDs (~30-31d, ask-then-do). PRIME: interventions=1223, systemic_fixes=71, vp=26, ratio≈17.23, trend=improving. Tier 1, consecutive_clean=0.
+**Rule:** `source=ourliberty-health, subject=sync_agent_core: auto-commit push failed` alerts classify Tier-4 (novel). But this is a transient self-healing event — the sync wrapper commits+pushes successfully on the next tick. `source=sync.service, subject=sync-blocked:auto-commit-push-failed` is already Tier-3. Larry gets DM'd unnecessarily (outbox-notifier delivers route=escalate). Fix: add `source=ourliberty-health, subject^=sync_agent_core: auto-commit push failed` → Tier-3 entry to `config/alert-translations.json`. Dispatch to Beacon at 3/3.
+
+---
+
+## Status snapshot — updated 2026-06-25 18:12Z UTC (Iter ~2796, Tier 1, consecutive_clean=0→0)
+
+**Iter ~2796 summary:** ✅ Nominal — 3 new alerts (L993-995): 2x Tier-3 silence (heal-systemd-install-drift stuck-timer + sync.service push-failed), 1x Tier-4 self-healed (ourliberty-health push-failed; Larry already DM'd idx=993, issue resolved). 8/8 daemons alive. Cycle timer healthy (fired 18:05:15Z). PR #703 unblocked (Beacon dispatched fresh Mirror review in ~2795; now in inbox). PR #704 active Mirror review. New G-rule: ourliberty-health-sync-push-failed-tier4 at 1/3. PRIME: interventions=1223, systemic_fixes=71, vp=26, ratio≈17.23, trend=improving. Tier 1, consecutive_clean=0.
 
 

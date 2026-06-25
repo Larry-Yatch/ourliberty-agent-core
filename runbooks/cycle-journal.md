@@ -5,6 +5,99 @@
 ---
 
 
+## Iteration ~2796 — 2026-06-25T18:07Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/cycle` invocation via chat.
+
+**Health:** ✅ Nominal — 3 new alerts triaged (2x Tier-3 silence, 1x Tier-4 self-healed). 8/8 daemons alive. Cycle timer healthy (fired 18:05:15Z; post-fire transient at check time, not stuck). Watchdog healthy. PR #703 unblocked (fresh Mirror review in inbox). PR #704 active Mirror review. Carries only.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo**: HEAD=0a0a18de=origin/main. On main. Clean. ✅ (2 commits ahead of prior cycle: "Pulse cycle 20260625T180249Z" + "GC healer")
+- **Sync**: sync JSON shows error at 18:00:46Z (push failed), but HEAD=origin/main — wrapper auto-committed + pushed successfully at 18:02:49Z. Transient; self-healed. ✅
+- **Daemons (re-verified)**: forge_bot=1388801 (Ss, 181356s) ✅, mirror_bot=1388982 (Ss, 181348s) ✅, pulse_bot=1389067 (Ss, 181344s) ✅, beacon_telegram_bot=2715635 (Ss, 40305s ~11.2h) ✅, dashboard_api=2715859 (Ssl, 40296s) ✅, chain_event_shipper=2716672 (SNs, 40223s) ✅, inbox_watcher=2754413 (Ssl, 37817s) ✅, outbox_notifier=2773485 (Ss, 36096s) ✅. 8/8 alive. ✅
+- **Watchdog**: last entry 12:05:16 MDT (18:05:16Z, ~2 min before check) — overall=healthy. ✅
+- **Cycle timer**: `ourliberty-cycle.service` ActiveState=active, SubState=running. `cycle-last-run.flag` mtime=12:05:15 MDT. Timer fired successfully at 18:05:15Z post-healer-restart. `NextElapse=infinity` at check time is the known transient post-fire recompute state (fired < 2 min ago). ✅
+- **heal-stale-daemon-code heartbeat**: 2026-06-25T18:03:43Z (~4 min old). Fresh. ✅
+- **Zombie PID 1834248**: still alive (Ss, 2414975s ~27.96d). Ask-then-do. [carry]
+- **6 stale journalctl PIDs**: all alive (1101500 1107838 1118830 1136223 1161972 1177335). Ask-then-do. [carry]
+- **beacon-pending-approvals**: pending=0. ✅
+- **Agent inboxes**: beacon=EMPTY (redispatch-mirror-pr703-stuck-review-001 processed + archived by Beacon in ~2795) ✅, forge=EMPTY ✅, mirror=2 (review-pr-ourliberty-agent-core-703.json at 11:59, review-pr-ourliberty-agent-core-704.json at 11:40) ✅, pulse=EMPTY ✅
+- **Active worktrees**: wt-forge-board-new-mission-confirm-placeholder-001 (11:30, post-reject teardown pending), wt-forge-reconcile-two-stale-inflight-missions-shipped-001 (11:10, awaiting PR #703 merge), wt-mirror-pr-ourliberty-agent-core-704 (11:47, active review). Normal state.
+
+**Check 0 — Alert triage:**
+- repair-watermark: `{"repaired": false, "old_watermark": 992, "file_length": 995}`. **3 new alerts (L993–L995)**.
+- Alert L993: `source=heal-systemd-install-drift, route=digest, subject=stuck-timer-healed:ourliberty-cycle.timer` (18:00:08Z). Triage helper: **Tier-3** silence (known-pattern match). No DM. ✅
+- Alert L994: `source=ourliberty-health, route=escalate, subject=sync_agent_core: auto-commit push failed` (18:00:46Z). Triage helper: **Tier-4** (novel, no translation match). VERIFY: current HEAD=0a0a18de=origin/main — push failure was transient; wrapper committed+pushed "Pulse cycle 20260625T180249Z" at 18:02:49Z. Larry already notified via outbox-notifier idx=993 at 12:02:15 MDT. Issue resolved, no Pulse DM needed. G-rule candidate at 1/3 — `source=ourliberty-health, subject^=sync_agent_core: auto-commit push failed` should be Tier-3 (same class as `source=sync.service` which is already Tier-3). Dispatch to Beacon at 3/3.
+- Alert L995: `source=sync.service, route=digest, subject=sync-blocked:auto-commit-push-failed` (18:00:46Z). Triage helper: **Tier-3** silence (known-pattern match). No DM. ✅
+- Watermark advanced to 995.
+
+**Check 1 — Log noise:**
+- `journalctl --user -p warning --since "30 minutes ago"` → `-- No entries --`. ✅
+- outbox-notifier.log: Last entry 11:59:52 MDT (INFO: beacon result for redispatch direction-ask). No new WARNs. ✅
+- watchdog.log: last entry 12:05:16 MDT (18:05:16Z) — overall=healthy. ✅
+
+**Check 2 — Telegram sweep:**
+- Beacon bot PID 2715635 (Ss, ~11.2h) ✅. Last Larry message 11:29:56 MDT ('go'). Last alert delivered: idx=993 at 12:02:15 MDT (ourliberty-health sync push failed). No new messages from Larry since 11:29:56 MDT. No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- 18 tasks FORGE_NO_PR_SKIP. 1 suppressed (cooldown): `retry_exhausted:reconcile-two-stale-inflight-missions-shipped-001`. **"no stalls detected"**. ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- Beacon inbox: EMPTY (redispatch-mirror-pr703-stuck-review-001 archived) ✅
+- Forge inbox: EMPTY ✅
+- Mirror inbox: review-703 (11:59, fresh recovery dispatch) + review-704 (11:40, active review in wt) ✅
+- beacon-pending-approvals: 0 ✅
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** heartbeat=2026-06-25T18:03:43Z (~4 min old). Fresh. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=0a0a18de=origin/main. On main. Clean. ✅ Nominal.
+**Check B — Sync health:** sync JSON shows error state (18:00:46Z push failed), but current git state HEAD=origin/main (in sync). Wrapper committed+pushed at 18:02:49Z post-failure. Transient self-heal; sync JSON updates on next sync_agent_core.sh run. ✅ Informational only.
+**Check C — Agent liveness:** 8/8 alive.
+- **[yellow] PID 1834248** — zombie bash loop (~27.96d). Ask-then-do. [carry]
+- **[yellow] 6 stale journalctl PIDs (~30-31d)** — Ask-then-do. [carry]
+
+**Check E — PRs:** 2 open PRs.
+- PR #703: "chore(missions): reconcile pulse-cycle-upgrade + rate-limit-resilience to shipped" — mergeable=UNKNOWN, reviewDecision="" — Fresh Mirror review task in inbox (dispatched by Beacon in ~2795 recovery). No longer stuck; review pending inbox_watcher pickup after #704 completes. ✅
+- PR #704: "chore(missions): reconcile 7 shipped missions stuck in drafting" — mergeable=UNKNOWN, reviewDecision="" — Active Mirror review in wt-mirror-pr-ourliberty-agent-core-704 (~20 min at cycle time). ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check VIII/IX/X: Not Monday. Skip. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule updates:**
+- **New: `ourliberty-health-sync-push-failed-tier4-001` — 1/3** (new). `source=ourliberty-health, subject=sync_agent_core: auto-commit push failed` classifies Tier-4 (novel). But it's a transient self-healing event; `source=sync.service` variant is already Tier-3. Fix: add Tier-3 translation entry for this `ourliberty-health` variant. Dispatch to Beacon at 3/3.
+- All other active G-rules carry unchanged from ~2795.
+
+**Actions taken:**
+1. Check 0: Alerts L993–L995 triaged (2x Tier-3, 1x Tier-4 self-healed). Watermark advanced 992→995.
+2. PRIME ledger: `iter_clean` appended (tier=1, template=iter-clean-nominal).
+3. Tier state: `record --checks-clean false` → consecutive_clean stays 0 (zombie PID + journalctl PIDs carries). Tier remains 1.
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [yellow] **PID 1834248 zombie bash loop** — Still alive (~27.96d). Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **6 stale journalctl PIDs (~30-31d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+- [yellow] **PR #703** — Fresh Mirror review pending (no longer stuck). [downgraded from stuck to normal pipeline]
+- [yellow] **board-new-mission-confirm-placeholder-001** — Forge rejected. Awaiting Larry re-spec vs. drop. [carry]
+- [yellow] **sequence-paused:operator-needs-you-feed** — Recovery: `resume sequence operator-needs-you-feed` via Beacon or Dashboard. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649/637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**PRIME DIRECTIVE:** interventions=1223, systemic_fixes=71, verification_pending=26, ratio≈17.23, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0 (non-clean: zombie PID + 6 stale journalctl PIDs carries). Last signal: 2026-06-25T18:12:32Z.
+
+---
+
+
 ## Iteration ~2795 — 2026-06-25T18:00Z UTC (interactive /loop /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/loop /cycle` invocation via chat.
