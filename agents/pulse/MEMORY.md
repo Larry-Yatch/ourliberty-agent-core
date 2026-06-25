@@ -186,8 +186,8 @@
 
 ---
 
-## Status snapshot — updated 2026-06-25 07:20Z UTC (Iter ~2706, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 07:27Z UTC (Iter ~2707, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2706 summary:** ⚠️ Watch — Outbox-notifier hot loop still active, PR #700 under Mirror review (PID 2716730, ~84 min, opus-4-8). 1 new alert: Tier-3 silence heal-claude-max-burn-rate (92% 5h pace; Mirror session likely driver). All other findings carry. G-rules at same counts. `heal-forge-no-pr-retry-rebase-fp-001` approval pending Larry. PID 1834248 zombie alive. PRIME: interventions=1173, systemic_fixes=71, vp=26, ratio≈16.52, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2707 summary:** ⚠️ Watch — Outbox-notifier hot loop still active, PR #700 under Mirror review (PID 2716730, ~27.5 min). 0 new alerts. New dry-run signal: `mirror_pass_unmerged:PR#698` (expected FP — auto-merge held behind #700; self-resolves on #700 merge). All other findings carry. G-rules unchanged. `heal-forge-no-pr-retry-rebase-fp-001` approval pending Larry. PID 1834248 zombie alive. PRIME: interventions=1174, systemic_fixes=71, vp=26, ratio≈16.54, trend=improving. Tier 1, consecutive_clean=0.
 
 
