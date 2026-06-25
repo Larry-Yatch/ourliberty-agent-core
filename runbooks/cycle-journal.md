@@ -5,6 +5,113 @@
 ---
 
 
+## Iteration ~2681 — 2026-06-25T03:59Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry /cycle invocation via chat.
+
+**Health:** ⚠️ Watch — PR #687 CONFLICTING (rebase approval pending Larry). **KEY EVENTS: 1 new alert (L1102 medic-diagnosis:PR#692 → Tier-3 silenced). mirror_pass_unmerged:PR#687 cooldown EXPIRED — stall checker would now `recover-then-alert` (DRY-RUN; no actual alert fired). PR #692 UNKNOWN/transient, AUTO_MERGE_HELD blocker=#687 confirmed. All agents IDLE. 4 pending approvals (all carry). No dispatches.**
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #687 (forge/forge-post-open-mergeable-rebase-001):** GitHub returned mergeable=UNKNOWN (transient). Prior iters confirmed CONFLICTING/DIRTY; rebase not yet performed. rebase-pr-687-post-open-mergeable-001 in pending-approvals (01:23Z). heal_pipeline_stall dry-run confirms `mirror_pass_unmerged:forge-post-open-mergeable-rebase-001` now past cooldown, would `recover-then-alert`. Carry CONFLICTING. [carry ✅]
+- **PR #692 (fix(reaper): forge-wedge-healer):** GitHub returned mergeable=UNKNOWN/UNKNOWN (transient). Prior confirmed MERGEABLE/CLEAN. AUTO_MERGE_HELD blocker=#687 still valid per outbox-notifier.log (20:48Z). Carry. [carry ✅]
+- **G-rule watchdog-watcher-log-stale-post-fix:** COMPLETE ✅. watchdog.log last entry 21:56:47 MDT (03:56:47Z), overall=healthy. ✅
+- **G-rule ourliberty-health-notify-script-missing:** COMPLETE ✅ carry. ✅
+- **G-rule review-duplicate-dispatch-wip-redispatch:** 3/3 vp (carry). skip-mirror-review-on-merged-or-closed-pr-001 pending Larry. [carry ✅]
+- **stale-proposed-mission-pipeline-fp-001 vp:** forge-no-pr-sibling-pr-title-supersession-001 in pending-approvals (03:04Z). Still vp. [carry ✅]
+- **no-session-revision-merged-pr-fp-001 (G-rule 1/3):** NOT fired this iter. Still 1/3. [carry ✅]
+- **unrouted-open-pr-auto-merge-held-fp-001 (G-rule 1/3):** suppressed (cooldown) in Check 3 this iter. Not a new G-rule occurrence. Still 1/3. [carry ✅]
+- **Repo:** HEAD=b0132b6b=origin/main. Clean. On main. ✅
+- **Sync:** last_sync=2026-06-25T02:59:39Z (~59min ago). status=no-change. Within 2h. ✅
+- **Daemons:** inbox_watcher PID 1732118 (Ssl), outbox_notifier PID 2340424 (Ss), beacon_telegram_bot PID 2341187 (Ss) — all alive. ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark: no-op (repaired=false, old=1101, file_length=1102). 1 new alert.
+- L1102: `{"ts":"2026-06-25T03:50:04Z","source":"medic","kind":"notification","intent":"medic-diagnosis",...PR#692 medic-diagnosis attempt 2}` — triage-alert returned tier=3 (known-pattern match in alert-translations.json), decision=silence. Watermark 1101→1102. ✅ Silenced.
+
+**Check 1 — Log noise:**
+- outbox-notifier.log: Last entry 21:04Z MDT (03:04Z UTC) — stale-proposed-mission APPROVAL_REQUEST queued. No WARNs/ERRORs. IDLE (~56min). ✅ Nominal.
+- watchdog.log: Last entry 21:56:47 MDT (03:56:47Z), overall=healthy. G-rule COMPLETE ✅ holding. ✅ Nominal.
+- beacon_telegram_bot.log: Last delivery idx=1101 at 21:52:25 MDT (03:52:25Z). No new Larry messages. ✅ Nominal.
+
+**Check 2 — Telegram sweep:**
+- No new Larry directives since prior iter. ✅
+- No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` — **FALSE POSITIVE** (known). Fix: forge-no-pr-sibling-pr-title-supersession-001 approval pending Larry. [carry ✅]
+- **NEW:** `DRY-RUN would recover-then-alert: mirror_pass_unmerged:forge-post-open-mergeable-rebase-001` — cooldown EXPIRED (was suppressed last 2 iters). Stall checker would now attempt recovery + alert on PR #687. Root: rebase approval pending Larry. Not actionable by Pulse; Larry's approval `rebase-pr-687-post-open-mergeable-001` is the gate. ⚠️
+- `suppressed (cooldown): unrouted_open_pr:Larry-Yatch/ourliberty-agent-core:692` — PR #692. Cooldown. ✅
+- 2 DRY-RUN items (1 FP carry, 1 new cooldown-expiry signal), 0 actual alerts fired. ⚠️ Non-clean.
+
+**Check 4 — Pending directives:**
+- Forge/Beacon/Mirror inboxes: all EMPTY. ✅
+- beacon-pending-approvals: 4 items (all carry):
+  - `unreg-approval-6009fbf6bfa2` (01:15Z) [stale carry]
+  - `rebase-pr-687-post-open-mergeable-001` (01:23Z) [active — Larry to approve PR #687 rebase]
+  - `skip-mirror-review-on-merged-or-closed-pr-001` (02:45Z) [G-rule fix]
+  - `forge-no-pr-sibling-pr-title-supersession-001` (03:04Z) [silence reconcile-001 FP]
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-25T03:52:55Z (~6min ago). Fresh. ✅
+
+**Check A — Source repo:** HEAD=b0132b6b=origin/main. Clean. On main. 0 commits behind. ✅
+
+**Check B — Sync health:** last_sync=2026-06-25T02:59:39Z (~59min ago). status=no-change. Within 2h. ✅
+
+**Check C — Agent liveness:** inbox_watcher (1732118 Ssl), outbox_notifier (2340424 Ss), beacon_telegram_bot (2341187 Ss) — all alive. ✅
+
+**Check E — PRs:**
+- PR #692 (fix(reaper): forge-wedge-healer): UNKNOWN/UNKNOWN (GitHub transient). Was MERGEABLE/CLEAN prior iters. AUTO_MERGE_HELD blocker=#687 (confirmed outbox-notifier.log 20:48Z). Cascades when #687 resolves. ⚠️ [carry — hold intentional]
+- PR #687 (forge/forge-post-open-mergeable-rebase-001): UNKNOWN/UNKNOWN (transient; underlying CONFLICTING). mirror_pass_unmerged cooldown expired. Rebase approval pending Larry. ⚠️
+
+**Check H — Forge digest:** IDLE (all inboxes EMPTY). ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. ✅
+
+**Conditional checks — Wednesday 2026-06-25 UTC (weekday=2, IS in {0,2,4,6}):**
+- Wait — today is Thursday 2026-06-25 UTC (2026-06-24 was Wednesday). Current date: 2026-06-25. Weekday(2026-06-25) = Wednesday is day 2 in Python (Monday=0). Let me verify: 2026-06-25 is a Thursday? June 25, 2026 — let me compute. June 1, 2026 was a Monday (from prior context). So June 25 = June 1 + 24 days = Monday + 24 = Monday + 3 weeks + 3 days = Thursday. weekday=3. NOT in {0,2,4,6}.
+- Check I: weekday=3 (Thursday), gate fails. Skip. ✅
+- Check III: not Sunday. Skip. ✅
+
+**G-rule updates:**
+- **watchdog-watcher-log-stale-post-fix** — COMPLETE ✅ carry-verified. ✅
+- **ourliberty-health-notify-script-missing** — COMPLETE ✅ carry. ✅
+- **review-duplicate-dispatch-wip-redispatch** — 3/3 vp (carry). skip-mirror-review-on-merged-or-closed-pr-001 pending Larry.
+- **stale-proposed-mission-pipeline-fp-001 vp** — forge-no-pr-sibling-pr-title-supersession-001 approval in queue. Still vp.
+- **heal-daemon-restart-manifest-drift-regenerated-tier4** — 2/3 (no new instance this iter). Dispatch at 3/3.
+- **check-i-force-bypass-dm-route** — 1/3 (Thursday, no occurrence). Dispatch at 3/3.
+- **no-session-revision-merged-pr-fp-001** — 1/3 (no new occurrence). Still 1/3.
+- **unrouted-open-pr-auto-merge-held-fp-001** — 1/3 (suppressed by cooldown this iter; not a new occurrence). Still 1/3.
+
+**Actions taken:**
+- Alert triage: L1102 classified Tier-3 (medic-diagnosis known-pattern), watermark advanced 1101→1102.
+- PRIME: 1 intervention row appended (PR #687 carry + cooldown-expiry signal + L1102 Tier-3 silence). interventions=1153, systemic_fixes=70, vp=25, ratio≈16.47, trend=improving.
+- Tier state: consecutive_clean=0 (non-clean: PR #687 + mirror_pass_unmerged cooldown expiry). Tier 1.
+
+**Dispatches:** None this iter.
+
+**Standing findings (carried + verified):**
+- [yellow] **PR #687 (forge/forge-post-open-mergeable-rebase-001)** — CONFLICTING (rebase not done; GitHub UNKNOWN transient). rebase-pr-687-post-open-mergeable-001 approval pending Larry. Blocking PR #692. mirror_pass_unmerged cooldown now expired — stall checker would act in real runs. [carry]
+- [yellow] **forge-no-pr-sibling-pr-title-supersession-001** — approval (03:04Z). Silence reconcile-001 FP. [needs Larry approval]
+- [yellow] **unreg-approval-6009fbf6bfa2 + sequence-paused:operator-needs-you-feed** — Dashboard. [carry]
+- [yellow] **skip-mirror-review-on-merged-or-closed-pr-001** — G-rule review-duplicate-dispatch fix, pending Larry approval. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [blue] **PR #692** — AUTO_MERGE_HELD (blocker=#687). Cascades when #687 resolves.
+- [blue] **unrouted-open-pr-auto-merge-held-fp-001 (G-rule 1/3)** — tracking to 3/3.
+- [blue] **no-session-revision-merged-pr-fp-001 (G-rule 1/3)** — tracking to 3/3.
+
+**PRIME DIRECTIVE:** interventions=1153, systemic_fixes=70, verification_pending=25, ratio≈16.47, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** consecutive_clean=0 (non-clean: PR #687 carry + cooldown-expiry signal). Tier: 1.
+
+---
+
+
 ## Iteration ~2680 — 2026-06-25T03:54Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry /cycle invocation via chat.

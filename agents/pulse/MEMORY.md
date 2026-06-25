@@ -156,6 +156,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-25 03:59Z UTC (Iter ~2681, Tier 1, consecutive_clean=0)
+
+**Iter ~2681 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase approval pending Larry). **KEY EVENTS: 1 new alert (L1102 medic-diagnosis:PR#692 → Tier-3 silenced). mirror_pass_unmerged:PR#687 cooldown EXPIRED — stall checker would now recover-then-alert (DRY-RUN; no actual alert). All agents IDLE. 4 pending approvals (carry). No dispatches.** PRIME: interventions=1153, systemic_fixes=70, vp=25, ratio≈16.47, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-25 03:54Z UTC (Iter ~2680, Tier 1, consecutive_clean=0)
 
 **Iter ~2680 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase approval pending Larry). **KEY EVENTS: 1 new alert (L1101 heal-pipeline-stall:unrouted-pr:PR#692 → Tier-3 silenced). PR #692 UPGRADED to MERGEABLE/CLEAN (Mirror passed 02:48Z, routing-events confirmed). AUTO_MERGE_HELD blocker=#687 (outbox-notifier confirmed). All agents IDLE. 4 pending approvals (carry). Pipeline stall: reconcile-001 FP persists, both unrouted_open_pr:692 + mirror_pass_unmerged:687 suppressed by cooldown. No dispatches. Log path corrected: outbox-notifier.log (hyphen).** PRIME: interventions=1152, systemic_fixes=70, vp=25, ratio=16.46, trend=improving. Tier 1, consecutive_clean=0.
