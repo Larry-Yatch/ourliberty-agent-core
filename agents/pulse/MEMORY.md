@@ -132,9 +132,9 @@
 
 ---
 
-## G-rule stale-proposed-mission-pipeline-fp-001 → vp advancing (iter ~2673 dispatch, Beacon processed iter ~2674)
+## G-rule outbox-notifier-auto-merge-loop-merged-pr-001 — 1/3 (new, iter ~2693)
 
-**Rule:** Pipeline stall checker fires `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` every cycle. Root cause (corrected by Beacon iter ~2674): NOT missions.json — real fix is PR-title sibling supersession (reconcile-001 superseded by -002/PR#688 but no supersession check catches same-family different-token PRs). Beacon produced `forge-no-pr-sibling-pr-title-supersession-001` approval (03:04Z 2026-06-25, DM'd Larry). verification_pending: needs Larry approval → Forge build → Mirror review → merge.
+**Rule:** After a blocker PR merges, outbox-notifier releases queued PRs from the auto-merge queue. If the released PR has `mergeable=UNKNOWN` (GitHub reports UNKNOWN for recently-merged PRs post-base-move), outbox-notifier re-queues behind the (already merged) blocker. The blocker merge fires another release, triggering another UNKNOWN check → infinite loop at ~5s/cycle. PR #691 hit this after #697 merged: notifier looped for 5+ minutes. Root cause: auto-merge queue release path checks `mergeable` not `state=MERGED`. Fix: check `state=MERGED` before deferring/re-queuing; don't re-queue behind a merged blocker. Dispatch to Beacon at 3/3.
 
 ---
 
@@ -152,88 +152,12 @@
 
 ## Completed G-rules — condensed for space (COMPLETE ✅)
 
-`outbox-notifier url-shape-invalid` → PR #493 (2026-06-13). `medic-diagnosis-tier4` → PR #515 (2026-06-15). `heal-pipeline-stall:unrouted-pr` → PR #516 (2026-06-15). `check-i-repeat-dm-fix-001` → PR #674 (2026-06-24). `heal-droplet-git-drift` → PR #586 (2026-06-19). `silence-routine-weekly-alerts` → PR #604 (2026-06-20). `forge-preflight-no-marker` → PR #600 (2026-06-19). `projects-json-healer-path` → PR #603 (2026-06-20). `outbox-notifier-review-pass` → PR #604 scope. `seq-advancer-sequence-stranded` → PR #661 (2026-06-24). `catalog-accuracy-drift` → PR #6 ourliberty-graph (2026-06-22). `doorbell-tier4-pattern` → PR #648 (2026-06-23). `heal-stale-daemon-code-script-service-mismatch` → PR #647 (2026-06-23). `mirror-marker-parse-error` → PR #650 (2026-06-23). `watchdog-watcher-log-stale` → PR #649 (2026-06-23). `watchdog-watcher-log-stale-post-fix` → PR #694 (2026-06-25). `ourliberty-health-notify-script-missing` → PR #696 (2026-06-25). `heal-pipeline-stall-mirror-pass-unmerged-tier4` → PR #695 (2026-06-25).
+`outbox-notifier url-shape-invalid` → PR #493 (2026-06-13). `medic-diagnosis-tier4` → PR #515 (2026-06-15). `heal-pipeline-stall:unrouted-pr` → PR #516 (2026-06-15). `check-i-repeat-dm-fix-001` → PR #674 (2026-06-24). `heal-droplet-git-drift` → PR #586 (2026-06-19). `silence-routine-weekly-alerts` → PR #604 (2026-06-20). `forge-preflight-no-marker` → PR #600 (2026-06-19). `projects-json-healer-path` → PR #603 (2026-06-20). `outbox-notifier-review-pass` → PR #604 scope. `seq-advancer-sequence-stranded` → PR #661 (2026-06-24). `catalog-accuracy-drift` → PR #6 ourliberty-graph (2026-06-22). `doorbell-tier4-pattern` → PR #648 (2026-06-23). `heal-stale-daemon-code-script-service-mismatch` → PR #647 (2026-06-23). `mirror-marker-parse-error` → PR #650 (2026-06-23). `watchdog-watcher-log-stale` → PR #649 (2026-06-23). `watchdog-watcher-log-stale-post-fix` → PR #694 (2026-06-25). `ourliberty-health-notify-script-missing` → PR #696 (2026-06-25). `heal-pipeline-stall-mirror-pass-unmerged-tier4` → PR #695 (2026-06-25). `stale-proposed-mission-pipeline-fp-001` → PR #697 (2026-06-25, sibling_pr_title_shipped suppression).
 
 ---
 
-## Status snapshot — updated 2026-06-25 05:22Z UTC (Iter ~2692, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 05:31Z UTC (Iter ~2693, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2692 summary:** ✅ Pipeline flowing — PRs #687 and #692 both MERGED ✅ (major resolution). PR #698 (skip-mirror-review fix, G-rule review-duplicate-dispatch) opened + Mirror review dispatched 23:16 MDT. **KEY EVENTS: 6 new alerts (L1107–1112, all Tier-3 silenced, watermark 1106→1112). heal-stale-daemon-code restarted 5 services post-#687 merge (dispatch_validator.py change; all alive). Forge idle. Mirror: 4 tasks queued (#697, 2 stale #687 tasks, #698). PR #691 AUTO_MERGE_HELD blocker=#697. sequence-paused:operator-needs-you-feed carry. reconcile-001 FP carry (PR #697 in Mirror queue). Larry "let me know when 687 merges" not delivered (Beacon timed out; #687 merged ~23:06 MDT — confirmed merged.** PRIME: interventions=1161, systemic_fixes=70, vp=25, ratio≈16.59, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-25 05:11Z UTC (Iter ~2691, Tier 1, consecutive_clean=0→0)
-
-**Iter ~2691 summary:** ⚠️ Watch — Mirror returned `review_revision` for PR #687 at 04:55Z UTC (status change from iter ~2690 expectation). Beacon dispatched revision-1 to Forge + re-review-rev1 to Mirror. No revision commit on #687 branch yet. Forge ACTIVELY BUILDING `skip-mirror-review-on-merged-or-closed-pr-001` (PID 2573177, G-rule review-duplicate-dispatch fix). Mirror ACTIVELY REVIEWING PR #692 3rd review (PID 2583838). **KEY EVENTS: 1 new alert (L1106 dispatch-branch-cleanup digest, Tier-3 silence, watermark 1105→1106). Pending approvals 3→1 (only rebase-pr-687 stale artifact remains). Mirror inbox 4→3 (692 consumed). reconcile-001 FP carry. sequence-paused:operator-needs-you-feed carry. mirror_pass_unmerged cooldown EXPIRED (stale stall-checker model — state being addressed).** PRIME: interventions=1161, systemic_fixes=70, vp=25, ratio≈16.59, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-25 04:57Z UTC (Iter ~2690, Tier 1, consecutive_clean=1→0)
-
-**Iter ~2690 summary:** ⚠️ Watch — Mirror ACTIVELY REVIEWING PR #687 (PID 2537043, ~25min, no PASS yet). PR #697 NEW/queued (reconcile-001 FP fix). PR #692 AUTO_MERGE_HELD blocker=#687. Beacon timeout on "let me know when 687 merges" (04:54Z, recovered). **KEY EVENTS: 0 new alerts (watermark 1105 holds). Forge idle. Beacon/Forge inboxes empty. Mirror inbox: 3 tasks (687 in-progress, 692 3rd queued, 697 new queued). 3 pending approvals (carry). Iter ~2689 journal entry missing (state from MEMORY.md snapshot). PRIME: interventions=1161, systemic_fixes=70, vp=25, ratio≈16.59, trend=improving.** Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-25 04:50Z UTC (Iter ~2689, Tier 1, consecutive_clean=1)
-
-**Iter ~2689 summary:** ✅ Clean — 0 new alerts (watermark 1105 holds). 8/8 daemons alive. **KEY EVENTS: Mirror ACTIVELY REVIEWING PR #687** (PID 2537043, started 04:32Z, wt-mirror-forge-post-open-mergeable-rebase-001). PR #697 opened 04:43Z (forge-no-pr-sibling-pr-title-supersession-001 — reconcile-001 FP fix). Mirror queue: 3 tasks (#687 reviewing, #692 3rd review, #697 new). PR #692 AUTO_MERGE_HELD blocker=#687 (cascades on #687 merge). Larry directive "let me know when 687 merges" at 04:44Z — covered by auto-merge notification chain. 3 pending approvals (unreg stale; rebase-pr-687 stale; skip-mirror-review awaiting Larry). No dispatches. PRIME: interventions=1160, systemic_fixes=70, vp=25, ratio≈16.57, trend=improving. Tier 1, consecutive_clean=1.
-
-## Status snapshot — updated 2026-06-25 04:45Z UTC (Iter ~2688, Tier 1, consecutive_clean=0)
-
-**Iter ~2688 summary:** ⚠️ Watch — Forge ACTIVELY BUILDING `forge-no-pr-sibling-pr-title-supersession-001` (reconcile-001 FP fix, dispatched 04:40Z). PR #687 in Mirror review queue (MERGEABLE per iter ~2685). PR #692 AUTO_MERGE_HELD blocker=#687 (Mirror passed twice). **KEY EVENTS: 0 new alerts (watermark 1105 holds). Pending approvals 4→3 (forge-no-pr-sibling-pr-title-supersession-001 resolved by Larry dashboard approval 04:35Z; Beacon dispatched Forge 04:40Z). G-rule stale-proposed-mission-pipeline-fp-001 vp RESOLVED — fix in-flight. sequence-paused:operator-needs-you-feed (L1105) carry. No dispatches.** PRIME: interventions=1160, systemic_fixes=70, vp=25, ratio≈16.57, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-25 04:38Z UTC (Iter ~2687, Tier 1, consecutive_clean=0)
-
-**Iter ~2687 summary:** ⚠️ Watch — Mirror ACTIVE reviewing PR #687 (started 04:32Z). Beacon processing dashboard approval (Larry approved something at 04:35Z, PID 2538840). PR #692 AUTO_MERGE_HELD pending #687 merge (Mirror passed TWICE, 3rd review dispatch). **KEY EVENTS: 0 new alerts (watermark 1105 holds). New: Larry dashboard approval → Beacon processing larry-approval-6af4e63e95e6838682784d53975effaf694fc345. G-rule review-duplicate-dispatch: 3rd review for #692 dispatched 04:35Z. sequence-paused:operator-needs-you-feed (L1105) pending. reconcile-001 FP carry. 4 pending approvals (carry — expect drop after Beacon processes). No dispatches.** PRIME: interventions=1159, systemic_fixes=70, vp=25, ratio≈16.56, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-25 04:33Z UTC (Iter ~2686, Tier 1, consecutive_clean=0)
-
-**Iter ~2686 summary:** ⚠️ Watch — PR #687 Mirror review in progress (~10min, dispatched 04:25Z). PR #692 AUTO_MERGE_HELD blocker=#687. **KEY EVENTS: 0 new alerts (watermark 1105 holds). Forge idle (rebase complete, task consumed). sequence-paused:operator-needs-you-feed (L1105) still pending Larry action. reconcile-001 FP carry. 4 pending approvals (carry). No dispatches.** PRIME: interventions=1158, systemic_fixes=70, vp=25, ratio≈16.54, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-25 04:28Z UTC (Iter ~2685, Tier 1, consecutive_clean=0)
-
-**Iter ~2685 summary:** ⚠️ Watch — PR #687 rebase COMPLETE (CONFLICTING→MERGEABLE ✅). Mirror actively reviewing #687 via `review-forge-post-open-mergeable-rebase-001.json`. PR #692 AUTO_MERGE_HELD blocker=#687 (cascades when #687 merges). **KEY EVENTS: 0 new alerts (watermark 1105 holds). Forge idle (rebase complete). sequence-paused:operator-needs-you-feed (L1105) still pending Larry action. reconcile-001 FP carry. 4 pending approvals (carry — skip-mirror-review + forge-no-pr-sibling-pr-title-supersession + unreg + rebase artifact). No dispatches.** PRIME: interventions=1157, systemic_fixes=70, vp=25, ratio≈16.53, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-25 04:22Z UTC (Iter ~2684, Tier 1, consecutive_clean=0)
-
-**Iter ~2684 summary:** ⚠️ Watch — PR #687 CONFLICTING (Forge rebase IN PROGRESS, auto-approved 04:13Z, worktree tests running 04:16Z). **KEY EVENTS: L1105 sequence-paused:operator-needs-you-feed (Tier-4, escalation-feed gate-mismatch chain_merged=False/gh_merged=True, delivered to Larry 04:19Z). Mirror inbox: 2 tasks for PR #692 (G-rule review-duplicate-dispatch pattern confirmed again). 1 new alert, watermark 1104→1105. All daemons alive. No new Larry directives. Pipeline stall: 1 DRY-RUN (reconcile-001 FP only). 4 pending approvals (rebase-pr-687 auto-resolved; 3 others carry).** PRIME: interventions=1156, systemic_fixes=70, vp=25, ratio≈16.51, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-25 04:15Z UTC (Iter ~2683, Tier 1, consecutive_clean=0)
-
-**Iter ~2683 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase approval pending Larry). **KEY EVENTS: Check 2 FINDING — Larry asked "Why 30 messages of stalled pipelines" at 04:09Z; answered inline (root: PR #687 conflict → repeated heal_pipeline_stall + medic alerts via outbox-notifier). 0 new alerts. Mirror has fresh review task for PR #692 (04:13Z). PR #692 confirmed MERGEABLE/CLEAN (not transient), reviewDecision=empty. 4 pending approvals (carry). Pipeline stall: reconcile-001 FP persists; both stall cooldowns hold.** PRIME: interventions=1155, systemic_fixes=70, vp=25, ratio≈16.5, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-25 04:08Z UTC (Iter ~2682, Tier 1, consecutive_clean=0)
-
-**Iter ~2682 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase approval pending Larry). **KEY EVENTS: 2 new alerts (L1103 mirror-pass-unmerged:PR#687 → Tier-3 silenced per PR#695; L1104 medic-diagnosis:PR#687 attempt 5 → Tier-3 silenced). All agents IDLE. 4 pending approvals (carry). Pipeline stall: reconcile-001 FP persists (fix approval pending); mirror_pass_unmerged:687 + unrouted_open_pr:692 both suppressed by cooldown. No dispatches.** PRIME: interventions=1154, systemic_fixes=70, vp=25, ratio≈16.49, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-25 03:59Z UTC (Iter ~2681, Tier 1, consecutive_clean=0)
-
-**Iter ~2681 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase approval pending Larry). **KEY EVENTS: 1 new alert (L1102 medic-diagnosis:PR#692 → Tier-3 silenced). mirror_pass_unmerged:PR#687 cooldown EXPIRED — stall checker would now recover-then-alert (DRY-RUN; no actual alert). All agents IDLE. 4 pending approvals (carry). No dispatches.** PRIME: interventions=1153, systemic_fixes=70, vp=25, ratio≈16.47, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-25 03:54Z UTC (Iter ~2680, Tier 1, consecutive_clean=0)
-
-**Iter ~2680 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase approval pending Larry). **KEY EVENTS: 1 new alert (L1101 heal-pipeline-stall:unrouted-pr:PR#692 → Tier-3 silenced). PR #692 UPGRADED to MERGEABLE/CLEAN (Mirror passed 02:48Z, routing-events confirmed). AUTO_MERGE_HELD blocker=#687 (outbox-notifier confirmed). All agents IDLE. 4 pending approvals (carry). Pipeline stall: reconcile-001 FP persists, both unrouted_open_pr:692 + mirror_pass_unmerged:687 suppressed by cooldown. No dispatches. Log path corrected: outbox-notifier.log (hyphen).** PRIME: interventions=1152, systemic_fixes=70, vp=25, ratio=16.46, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-25 03:46Z UTC (Iter ~2679, Tier 1, consecutive_clean=0)
-
-**Iter ~2679 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase-pr-687-post-open-mergeable-001 pending Larry). **KEY EVENTS: All agents IDLE. 0 new alerts (watermark holds at 1100). 4 pending approvals (carry). Pipeline stall: reconcile-001 FP persists (fix pending). NEW G-rule: unrouted-open-pr-auto-merge-held-fp-001 (1/3) — stall checker fires unrouted_open_pr:692 when cooldown expires despite AUTO_MERGE_HELD blocker=#687. No dispatches.** PRIME: interventions=1151, systemic_fixes=70, vp=25, ratio=16.44, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-25 03:42Z UTC (Iter ~2678, Tier 1, consecutive_clean=0)
-
-**Iter ~2678 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase-pr-687-post-open-mergeable-001 pending Larry). **KEY EVENTS: All agents IDLE. 0 new alerts (watermark holds at 1100). 4 pending approvals (carry). Pipeline stall: reconcile-001 FP persists (fix pending). New stall output item: rebase-escalation-feed-685-001 FORGE_NO_PR_SKIP preflight_non_proceed (PR #685 MERGED, nominal). No dispatches.** PRIME: interventions=1150, systemic_fixes=70, vp=25, ratio=16.43, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-25 03:35Z UTC (Iter ~2677, Tier 1, consecutive_clean=0)
-
-**Iter ~2677 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase-pr-687-post-open-mergeable-001 pending Larry). **KEY EVENTS: All agents IDLE. 0 new alerts (watermark holds at 1100). 4 pending approvals (carry). Pipeline stall: reconcile-001 FP persists (fix pending). G-rule no-session-revision-merged-pr-fp-001 did NOT recur (FORGE_NO_PR_SKIP handled it via pr_exists). No dispatches.** PRIME: interventions=1149, systemic_fixes=70, vp=25, ratio=16.41, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-25 03:28Z UTC (Iter ~2676, Tier 1, consecutive_clean=0)
-
-**Iter ~2676 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase-pr-687-post-open-mergeable-001 pending Larry). **KEY EVENTS: All agents IDLE. 1 new alert (L1100 doorbell Tier-3 silenced). Watermark 1099→1100. New G-rule candidate: no-session-revision-merged-pr-fp-001 (1/3) — stall checker fires no_session_revision for forge-wip-only-auto-redispatch-001 despite PR #693 MERGED. 4 pending approvals (carry). No dispatches.** Pipeline stall: reconcile-001 FP (fix approval pending). Check I: Thursday, skip. PRIME: interventions=1149, systemic_fixes=70, vp=25, ratio=16.41, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-25 03:18Z UTC (Iter ~2675, Tier 1, consecutive_clean=0)
-
-**Iter ~2675 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase-pr-687-post-open-mergeable-001 pending Larry). **KEY EVENTS: All agents IDLE. 1 new alert (L1099 Tier-3 approval_request delivery confirmation, silenced). Watermark 1098→1099. 4 pending approvals (carry). No dispatches.** Pipeline stall: reconcile-001 FP (fix approval pending). Check I: Thursday, skip. PRIME: interventions=1148, systemic_fixes=70, vp=25, ratio=16.4, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-25 03:07Z UTC (Iter ~2674, Tier 1, consecutive_clean=0)
-
-**Iter ~2674 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase-pr-687-post-open-mergeable-001 pending Larry). **KEY EVENTS: Beacon processed stale-proposed-mission-pipeline-fp-001 (270s, $0.87) → NEW approval `forge-no-pr-sibling-pr-title-supersession-001` (03:04Z, DM'd Larry; root cause was PR-title sibling supersession, not missions.json). All agents IDLE.** 2 alerts (L1097-L1098, both Tier-3). Watermark 1096→1098. 4 pending approvals (unreg-approval-6009fbf6bfa2 stale; rebase-pr-687 active; skip-mirror-review; forge-no-pr-sibling-pr-title-supersession-001 NEW). Pipeline stall: reconcile-001 FP (fix pending approval). Check I: Thursday, skip. PRIME: interventions=1147, systemic_fixes=70, vp=25, ratio≈16.39, trend=improving. Tier 1, consecutive_clean=0.
-
-## Status snapshot — updated 2026-06-25 03:00Z UTC (Iter ~2673, Tier 1, consecutive_clean=0)
-
-**Iter ~2673 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase approval pending Larry). **KEY EVENTS: PR #696 (wire-agent-core-health-notify-001) MERGED 02:49:38Z ✅ — G-rule ourliberty-health-notify COMPLETE. G-rule stale-proposed-mission-pipeline-fp-001 3/3 DISPATCHED → Beacon. All agents IDLE.** 2 alerts (L1095-L1096, both Tier-3). Watermark 1094→1096. PR #692 MERGEABLE/CLEAN, AUTO_MERGE_HELD blocker=#687. PRIME: interventions=1146, systemic_fixes=70, vp=25, ratio≈16.4, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2693 summary:** ⚠️ Watch — Outbox-notifier in hot loop (merged PR #691 mergeable=UNKNOWN retry every ~5s; new G-rule outbox-notifier-auto-merge-loop-merged-pr-001 1/3). **KEY EVENTS: PR #697 MERGED ✅ (05:24Z, G-rule stale-proposed-mission-pipeline-fp-001 COMPLETE); PR #691 MERGED ✅ (cascaded after #697). Pipeline stall CLEAN (no stalls detected — reconcile-001 FP silenced by sibling_pr_title_shipped). 1 new alert (L1113, Tier-3 review-pass watermark 1112→1113). Pending approvals: 0 ✅. PR #698 (skip-mirror-review fix) OPEN/MERGEABLE, 3rd in Mirror queue behind 2 stale #687 tasks. sequence-paused:operator-needs-you-feed carry.** PRIME: interventions=1162, systemic_fixes=70, vp=25, ratio≈16.60, trend=improving. Tier 1, consecutive_clean=0.
 
 
