@@ -242,6 +242,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-25 01:48Z UTC (Iter ~2665, Tier 1, consecutive_clean=0)
+
+**Iter ~2665 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase-pr-687-post-open-mergeable-001 approval pending Larry). PR #692 Mirror review ACTIVE since 01:40Z (outbox-notifier dispatched review task). Mirror inbox: 4 items (PRs #692, #693, #694, #695 queued). PR #691 Mirror REVIEW_PASS, AUTO_MERGE_HELD behind #687 (cascades when #687 resolves). Forge running build-wire-agent-core-health-notify-001 (active ~14 min). 0 new alerts (watermark=1083). Watchdog WARN 01:43Z (stale 324s — Mirror PR #692 active session; expected behavior). G-rules: watchdog 3/3 vp (new WARN, fix PR #694 in Mirror queue), heal-notify 3/3 vp (Forge building), mirror-pass-unmerged 3/3 vp (PR #695 in Mirror queue), manifest-drift 2/3. PRIME: systemic_fixes=66, ratio=17.23, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-25 01:42Z UTC (Iter ~2664, Tier 1, consecutive_clean=0)
 
 **Iter ~2664 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase-pr-687-post-open-mergeable-001 approval pending Larry). PR #691 Mirror REVIEW_PASS (auto-merge held behind #687 on file overlap — cascades when #687 resolves). PR #692 (work/forge-wedge-healer) Mirror review task auto-queued at 01:40Z (resolved iter ~2663 ask-then-do organically). 1 alert (L1083 Tier-3 review-pass silenced). Watermark 1082→1083. Watchdog: 0 new WARNs since 01:12Z (28+ min clean; PR #694 in Mirror pipeline). G-rules: watchdog 3/3 verification_pending (positive), heal-notify 3/3 verification_pending, mirror-pass-unmerged 3/3 verification_pending (PR #695 reviewing), manifest-drift 2/3. PRIME: systemic_fixes=66, ratio=17.21, trend=improving. Tier 1, consecutive_clean=0.
