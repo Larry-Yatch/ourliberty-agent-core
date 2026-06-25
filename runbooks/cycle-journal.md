@@ -5,6 +5,92 @@
 ---
 
 
+## Iteration ~2790 — 2026-06-25T17:20Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/cycle` invocation via chat.
+
+**Health:** ✅ Nominal — 1 new alert (Tier-3 silence). 8/8 daemons alive. PR #703 open (Mirror in-flight review). Beacon pending approval for dashboard task (Larry already DM'd). Carries only.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo**: HEAD=87b746f1=origin/main. On main. Clean. ✅ (new commit since ~2789: Pulse cycle 20260625T171711Z)
+- **Sync**: last_sync=2026-06-25T17:00:39Z (~20 min ago). Within 2h. ✅
+- **Daemons (re-verified)**: forge_bot=1388801 (Ss, 178413s ~49.6h) ✅, mirror_bot=1388982 (Ss, 178405s ~49.6h) ✅, pulse_bot=1389067 (Ss, 178401s ~49.6h) ✅, beacon_telegram_bot=2715635 (Ss, 37361s ~10.4h) ✅, dashboard_api=2715859 (Ssl, 37353s ~10.4h) ✅, chain_event_shipper=2716672 (SNs, 37280s ~10.4h) ✅, inbox_watcher=2754413 (Ssl, 34874s ~9.7h) ✅, outbox_notifier=2773485 (Ss, 33153s ~9.2h) ✅. 8/8 alive. Same PIDs as ~2789. ✅
+- **Watchdog**: last entry 11:14:00 MDT (17:14:00Z, ~6 min before cycle) — overall=healthy. ✅
+- **heal-stale-daemon-code heartbeat**: 2026-06-25T17:13:09Z. Fresh. ✅
+- **Zombie PID 1834248**: still alive (Ss, etimes=2412053s ~27.93d). Ask-then-do. [carry]
+- **6 stale journalctl PIDs**: all alive (PIDs 1101500 1107838 1118830 1136223 1161972 1177335, etimes ~30.9d). Ask-then-do. [carry]
+- **beacon-pending-approvals**: pending=1 — `board-new-mission-confirm-placeholder-001` (APPROVAL_REQUEST). Outbox-notifier delivered DM to Larry at 11:16:49 MDT. Awaiting Larry's approval. [active, not stalled]
+- **Agent inboxes**: beacon=EMPTY ✅, forge=EMPTY ✅, mirror=`review-reconcile-two-stale-inflight-missions-shipped-001.json` (Mirror actively reviewing PR #703, started 17:12:50Z) ✅, pulse=EMPTY ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark: `{"repaired": false, "old_watermark": 986, "file_length": 987}`. **1 new alert at L987**.
+- Alert L987: `source=outbox-notifier, kind=approval_request, approval_id=board-new-mission-confirm-placeholder-001` (17:15:06Z) — triage helper: Tier-3 silence (known-pattern match). No DM. ✅
+- Watermark advanced to 987.
+
+**Check 1 — Log noise:**
+- `journalctl --user -p warning --since "30 minutes ago"` → `-- No entries --`. ✅
+- outbox-notifier.log: Last entry 11:15:06Z — APPROVAL_REQUEST queued (board-new-mission-confirm-placeholder-001). No WARNs. ✅
+- watchdog.log: last entry 11:14:00 MDT (17:14:00Z) — overall=healthy. ✅
+
+**Check 2 — Telegram sweep:**
+- Beacon bot PID 2715635 (Ss, ~10.4h) ✅. Last Larry message: "yes check on if the fix landed, then go forward from there" at 11:07:18 MDT → Beacon auto-approved + dispatched `reconcile-two-stale-inflight-missions-shipped-001` at 11:10:15 MDT. Latest bot action: approval_request idx=986 delivered at 11:16:49 MDT (board-new-mission-confirm-placeholder-001, APPROVAL_REQUEST pending Larry). No new messages from Larry since. No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- 19 tasks all FORGE_NO_PR_SKIP. **"no stalls detected"**. ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- Beacon inbox: EMPTY ✅
+- Forge inbox: EMPTY ✅
+- Mirror inbox: `review-reconcile-two-stale-inflight-missions-shipped-001.json` — Mirror in-flight review of PR #703 (started 17:12:50Z, ~7 min at cycle time). ✅ Active.
+- beacon-pending-approvals: pending=1 — `board-new-mission-confirm-placeholder-001`. Larry already DM'd at 11:16:49 MDT. Pulse does not DM again (outbox-notifier already delivered). [noted]
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** heartbeat=2026-06-25T17:13:09Z. Fresh. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=87b746f1=origin/main. On main. Clean. ✅ Nominal.
+**Check B — Sync health:** last_sync=2026-06-25T17:00:39Z (~20 min). Within 2h. ✅ Nominal.
+**Check C — Agent liveness:** 8/8 alive.
+- **[yellow] PID 1834248** — zombie bash wait-loop (~27.93d). Ask-then-do: `kill 1834248`. [carry]
+- **[yellow] 6 stale journalctl PIDs (~30.9d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+
+**Check E — PRs:** PR #703 open — "chore(missions): reconcile pulse-cycle-upgrade + rate-limit-resilience to shipped", MERGEABLE, Mirror in-flight review (started 17:12:50Z). Not a stall. ✅ Active.
+
+**Check H — Forge digest:** reconcile-two-stale-inflight-missions-shipped-001 complete (Forge 17:12:39Z, $0.92), Mirror reviewing PR #703 (started 17:12:50Z). ✅ Active.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check VIII/IX/X: Not Monday. Skip. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule updates:** No new occurrences this iter. All active G-rules carry unchanged from ~2789.
+
+**Actions taken:**
+1. Check 0: Alert L987 triaged → Tier-3 silence. Watermark advanced to 987.
+2. PRIME ledger: `iter_clean` appended (tier=1, template=iter-clean-nominal).
+3. Tier state: `record --checks-clean false` → consecutive_clean stays 0 (zombie+journalctl carries). Tier remains 1.
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [yellow] **PID 1834248 zombie bash loop** — Still alive (~27.93d). Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **6 stale journalctl PIDs (~30.9d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+- [yellow] **board-new-mission-confirm-placeholder-001 APPROVAL_REQUEST** — Pending Larry approval (DM delivered 11:16:49 MDT). [active]
+- [yellow] **sequence-paused:operator-needs-you-feed** — Recovery: `resume sequence operator-needs-you-feed` via Beacon or Dashboard. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649/637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**PRIME DIRECTIVE:** interventions=1221, systemic_fixes=71, verification_pending=26, ratio≈17.20, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0 (non-clean: zombie PID + 6 stale journalctl PIDs). Last signal: 2026-06-25T17:20:10Z.
+
+---
+
+
 ## Iteration ~2789 — 2026-06-25T17:14Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/cycle` invocation via chat.
