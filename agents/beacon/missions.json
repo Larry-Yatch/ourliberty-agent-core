@@ -5448,6 +5448,23 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-pulse-direction-ask-forge-wip-redispatch-digest-tier3-001",
+      "name": "Pulse Direction Ask Forge WIP Redispatch Digest Tier3 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pulse-direction-ask-forge-wip-redispatch-digest-tier3-001`. Last activity 2026-06-25T18:22:51.50563+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pulse-direction-ask-forge-wip-redispatch-digest-tier3-001"
+      ],
+      "repo": null,
+      "created": "2026-06-25",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-25T18:31:02.614437+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-25T18:22:51.50563+00:00"
     }
   ]
 }
