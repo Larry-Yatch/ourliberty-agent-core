@@ -5,6 +5,93 @@
 ---
 
 
+## Iteration ~2740 — 2026-06-25T11:23Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry /cycle invocation via chat.
+
+**Health:** ✅ Nominal — 0 new alerts. All daemons alive. No open PRs. Repo clean+current. New observation: 6 stale journalctl PIDs (~30d from old anti-pattern session). Carries only otherwise.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Outbox-notifier hot loop**: **RESOLVED** ✅ — Log last entry 02:05:28 MDT (08:05:28Z). PID 2773485 alive (etimes=11738s ~3.26h). Confirmed. [carry-resolved]
+- **Pipeline stall FP reconcile-hardening-001**: `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` — FP persists. Fix `heal-forge-no-pr-retry-rebase-fp-001` pending Larry approval. [carry]
+- **Pipeline stall FP rebase-687-001**: `DRY-RUN would alert: forge_built_no_pr:rebase-forge-post-open-mergeable-687-001` — FP persists. [carry]
+- **beacon-pending-approvals**: 1 (`heal-forge-no-pr-retry-rebase-fp-001`). [carry]
+- **Repo**: HEAD=28633b31=origin/main. Clean. On main. ✅ (Advanced from 0d017cac since ~2739 — wrapper auto-commit)
+- **Sync**: last_sync=2026-06-25T11:00:16Z (~23 min ago). Within 2h. ✅
+- **Daemons**: beacon_telegram_bot (PID 2715635, etimes=15947s ~4.43h), outbox_notifier (PID 2773485, etimes=11738s ~3.26h), chain_event_shipper (PID 2716672, etimes=15865s ~4.41h), inbox_watcher (PID 2754413, etimes=13459s ~3.74h) — all alive. ✅
+- **Watchdog**: last entry 05:21:36 MDT (11:21:36Z), overall=healthy. ✅
+- **Zombie PID 1834248**: still alive (Ss, bash, etimes=2390563s ~27.66d). Ask-then-do: `kill 1834248`. [carry]
+- **Stale daemon code heartbeat**: 2026-06-25T11:18:35Z (~5 min ago). Fresh. ✅
+- **All agent inboxes**: EMPTY (beacon, forge, mirror). ✅
+- **No open PRs**: confirmed via `gh pr list → []`. ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark: repaired=false, old=976, file_length=976. **0 new alerts**. Watermark unchanged at 976. ✅
+
+**Check 1 — Log noise:**
+- outbox-notifier.log: Silent since 02:05:28 MDT (08:05:28Z). All INFO. ✅
+- watchdog.log: Continuous healthy entries through 05:21:36 MDT (11:21:36Z). ✅
+
+**Check 2 — Telegram sweep:**
+- beacon_telegram_bot.log: last entry `04:27:15 MDT notification idx=975 delivered (intent=doorbell)`. No new Larry messages. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` — FP persists. [carry]
+- `DRY-RUN would alert: forge_built_no_pr:rebase-forge-post-open-mergeable-687-001` — FP persists. [carry]
+- 2 alert(s) would fire, 0 recovery(ies) attempted.
+
+**Check 4 — Pending directives:**
+- Beacon inbox: **EMPTY** ✅
+- Forge inbox: **EMPTY** ✅
+- Mirror inbox: **EMPTY** ✅
+- beacon-pending-approvals: 1 (`heal-forge-no-pr-retry-rebase-fp-001`). [carry]
+
+**Check 4.6 — Credential rotation:** 0 new rotation-due alerts per Check 0 watermark. ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-06-25T11:18:35Z (~5 min ago). Fresh. ✅
+
+**Check A — Source repo:** HEAD=28633b31=origin/main. Clean. On main. ✅
+
+**Check B — Sync health:** last_sync=2026-06-25T11:00:16Z (~23 min ago). Within 2h. ✅
+
+**Check C — Agent liveness:** beacon_telegram_bot (PID 2715635), outbox_notifier (PID 2773485 — PR #700 code), chain_event_shipper (PID 2716672), inbox_watcher (PID 2754413) — all alive. ✅
+- **[yellow] PID 1834248** — zombie bash wait-loop. Still alive (etimes=2390563s ~27.66d). Ask-then-do: `kill 1834248`. [carry]
+- **[yellow] 6 stale journalctl PIDs** (NEW observation) — PIDs 1101500, 1107838, 1118830, 1136223, 1161972, 1177335. All running `journalctl -fu ourliberty-inbox-watcher.service --since 1 minute ago --no-pager`, etimes ~30d (spawned ~2026-05-26 from old post-cycle anti-pattern sessions). Benign (stdin-blocked, not consuming CPU), but noise. Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`.
+
+**Check E — PRs:** No open PRs. ✅
+
+**Check H — Forge digest:** Forge WIP empty. IDLE. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check VIII: Not Monday. Skip. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule updates:**
+- No new G-rule occurrences this iter. All G-rules carry at same counts as ~2739.
+
+**Actions taken:** repair-watermark no-op. 0 new alerts (watermark unchanged at 976). All mandatory + additive checks nominal. 0 dispatches. Appended 1 PRIME ledger row (intervention). Tier state non-clean.
+
+**Standing findings (updated):**
+- [yellow] **heal-forge-no-pr-retry-rebase-fp-001 pending approval** — `approve heal-forge-no-pr-retry-rebase-fp-001` unblocks 2 pipeline stall FPs.
+- [yellow] **PID 1834248 zombie bash loop** — Still alive (~27.66d). Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **6 stale journalctl PIDs (~30d)** — New observation this iter. Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`.
+- [yellow] **sequence-paused:operator-needs-you-feed** — Recovery: `resume sequence operator-needs-you-feed` via Beacon or Dashboard.
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision.
+- [yellow] **unreviewed-merge:649** — Larry judgment.
+- [yellow] **unreviewed-merge:637** — Larry judgment.
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`.
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`.
+
+**PRIME DIRECTIVE:** interventions=1207, systemic_fixes=71, verification_pending=26, ratio≈16.99, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** consecutive_clean=0 (non-clean: 2 stall FPs, zombie PID, 6 stale journalctl PIDs, pending approval). Tier: 1.
+
+---
+
+
 ## Iteration ~2739 — 2026-06-25T11:17Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry /cycle invocation via chat.
