@@ -5,6 +5,92 @@
 ---
 
 
+## Iteration ~2804 — 2026-06-25T19:13Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/cycle` invocation via chat.
+
+**Health:** ✅ Nominal — 1 new alert (Tier-3 silence), 8/8 daemons alive, watchdog healthy, 0 open PRs, pipeline clean. New: Forge task `sequence-rows-endpoint` dispatched by Beacon (operator-needs-you-feed step 2B).
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo**: HEAD=caeb75e4=origin/main. On main. Clean. ✅ (Latest commit: "Pulse cycle 20260625T190352Z".)
+- **Sync**: agent-core-sync.json `status=no-change, last_success=null, commit=2692262e` — post-push-failed transient in JSON; HEAD matches origin. ✅ Informational.
+- **Daemons (re-verified)**: PIDs 1388801 (python3 Ss), 1388982 (python3 Ss), 1389067 (python3 Ss), 2715635 (python3 Ss), 2715859 (python3 Ssl), 2716672 (python3 SNs), 2754413 (python3 Ssl), 2773485 (python3 Ss). 8/8 alive. ✅
+- **Watchdog**: last entry 13:06:16 MDT (19:06:16Z) — overall=healthy. ✅
+- **heal-stale-daemon-code heartbeat**: 2026-06-25T19:04:40Z (~8 min old at check time). Fresh. ✅
+- **Zombie PID 1834248**: Still alive (Ss, 27d 23h 52m). Ask-then-do. [carry]
+- **6 stale journalctl PIDs**: All alive (1101500 1107838 1118830 1136223 1161972 1177335, S, ~30–31d). Ask-then-do. [carry]
+- **beacon-pending-approvals**: pending=0. ✅
+- **Open PRs**: `gh pr list` → `[]`. Zero open PRs. ✅
+- **Forge inbox**: `sequence-rows-endpoint.json` present (dispatched by Beacon at 13:10:38 MDT). Active Forge task. ✅ (Expected — see Check 2.)
+- **Other inboxes**: All EMPTY. ✅
+- **outbox-notifier.log**: Last entry 13:10:38 MDT `headless-approval-request dispatched forge <- beacon (task=sequence-rows-endpoint)`. No WARNs. ✅
+
+**Check 0 — Alert triage:**
+- `repair-watermark`: `{"repaired": false, "old_watermark": 998, "file_length": 999}`. 1 new alert at L999.
+- L999: `source=dispatch-branch-cleanup, subject=summary, route=digest` → triage-helper: **Tier-3 silence** (known-pattern match). No DM. Watermark advanced to 999. ✅
+
+**Check 1 — Log noise:**
+- `journalctl --user -p warning --since "30 minutes ago"` → `-- No entries --`. ✅
+- outbox-notifier.log: Most recent entry 13:10:38 MDT (headless-approval-request → Forge). No WARNs. ✅
+- watchdog.log: 13:06:16 MDT — overall=healthy. ✅
+
+**Check 2 — Telegram sweep:**
+- Larry active 13:03–13:09 MDT: asked Beacon about "clicking delegate to team on two missions." Beacon replied at 13:06:56, 13:08:42. At 13:09:52 Larry: *"Yes spec the fix for the wedge in Dag"* → Beacon dispatched `sequence-rows-endpoint` to Forge at 13:10:38 MDT (operator-needs-you-feed step 2B: itemize paused/stuck build sequences + audited POST steering endpoint). ✅ System responding correctly to Larry direction.
+
+**Check 3 — Pipeline stall (dry-run):**
+- 25 tasks FORGE_NO_PR_SKIP (various reasons). **"no stalls detected"**. ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- Forge inbox: `sequence-rows-endpoint.json` (active, newly dispatched). Not stale — just arrived. ✅
+- All other inboxes EMPTY. beacon-pending-approvals=0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-25T19:04:40Z (~8 min old). Fresh. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=caeb75e4=origin/main. On main. Clean. ✅ Nominal.
+**Check B — Sync health:** Sync JSON stale push-failed transient. HEAD matches origin. ✅ Informational.
+**Check C — Agent liveness:** 8/8 alive.
+- **[yellow] PID 1834248** — zombie bash loop (~28d). Ask-then-do. [carry]
+- **[yellow] 6 stale journalctl PIDs (~30–31d)** — Ask-then-do. [carry]
+
+**Check E — PRs:** 0 open PRs. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check VIII/IX/X: Not Monday. Skip. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule updates:**
+- All active G-rules carry unchanged from ~2803. No new occurrences this iter.
+
+**Actions taken:**
+1. Check 0: Triaged alert 999 → Tier-3 silence (dispatch-branch-cleanup digest). Watermark advanced 998→999.
+2. PRIME ledger: `iter_clean` appended (tier=1, template=iter-clean-nominal).
+3. Tier state: `record --checks-clean false` → consecutive_clean stays 0 (zombie + journalctl PIDs carry). Tier remains 1.
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [yellow] **board-new-mission-confirm-placeholder-001 EXHAUSTED** — Both original and retry1 died WIP-only. DM delivered Larry 12:42:38 MDT (alert idx=997). Larry was active on dashboard ~13:03 MDT re: missions; response/resolution unconfirmed. Awaiting Larry explicit resolution. [carry]
+- [yellow] **PID 1834248 zombie bash loop** — Still alive (~28d). Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **6 stale journalctl PIDs (~30–31d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+- [yellow] **forge-wip-redispatch-digest Forge dispatch** — Beacon fix designed (iter ~2798). Trust-policy approval from Larry pending. [carry]
+- [yellow] **sequence-paused:operator-needs-you-feed** — **UPDATE:** Larry approved "Yes spec the fix" at 13:09 MDT; Forge task `sequence-rows-endpoint` dispatched at 13:10 MDT (step 2B). Fix in progress — carry until PR merges.
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649/637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**PRIME DIRECTIVE:** interventions=1225, systemic_fixes=71, verification_pending=27, ratio≈17.25, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0 (non-clean: zombie PID + 6 stale journalctl PIDs). Last signal: 2026-06-25T19:13:08Z.
+
+---
+
+
 ## Iteration ~2803 — 2026-06-25T19:02Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/cycle` invocation via chat.
