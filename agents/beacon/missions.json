@@ -5288,6 +5288,23 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-card-message-cap-investigate-retry-clarification-cost-sources-7995",
+      "name": "Card Message Cap Investigate Retry Clarification Cost Sources 7995",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `card-message-cap-investigate-retry-clarification-cost-sources-7995`. Last activity 2026-06-25T17:04:55.703149+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "card-message-cap-investigate-retry-clarification-cost-sources-7995"
+      ],
+      "repo": null,
+      "created": "2026-06-25",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-25T17:15:18.779700+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-25T17:04:55.703149+00:00"
     }
   ]
 }
