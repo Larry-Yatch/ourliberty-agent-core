@@ -192,11 +192,11 @@
 
 ---
 
-## G-rule watchdog-watcher-log-stale-post-fix → DISPATCHED (iter ~2640, 3/3)
+## G-rule watchdog-watcher-log-stale-post-fix → COMPLETE ✅ (iter ~2640 dispatch, iter ~2667 verified)
 
-**Rule:** PR #649 was COMPLETE after 5 clean Check 1 scans (iter ~2531). Pattern re-emerged: iter ~2634 (idle gap), iter ~2638 (long Mirror session for PR #687, 7 WARNs/40 min), iter ~2640 (NEW session for PR #687 backstop review at 22:40Z). 3/3 threshold crossed iter ~2640. Dispatch: `watchdog-stale-post-pr649-regression-fix-001.json` to Beacon inbox. Fix needed: suppress watchdog stale-log WARNs when (a) inbox_watcher has live in-flight Mirror session PID + open worktree, OR (b) all inboxes empty. verification_pending.
+**Rule:** PR #694 `fix(watchdog): session-aware suppression of stale-log false positives` merged 2026-06-25T01:57Z. Fix suppresses watchdog stale-log WARNs when inbox_watcher has a live in-flight Mirror session PID + open worktree. Verified: watchdog healthy at 01:59Z post-merge, 0 WARNs since merge. PRIME systemic_fix logged iter ~2667. **G-rule COMPLETE.**
 
-**LOG PATH CORRECTION (iter ~2650):** Watchdog log is `/home/larry/agents/logs/watchdog.log` (NOT `watchdog_watcher.log`). `watchdog_watcher.log` does not exist. Prior iters reporting "0 WARNs" while checking `watchdog_watcher.log` were checking a non-existent file and got empty output. Check 1 must use `watchdog.log`. WARNs still appearing during early Mirror session windows (fix watchdog-stale-session-aware-suppression-001 not yet merged as of iter ~2650).
+**LOG PATH:** Watchdog log is `/home/larry/agents/logs/watchdog.log` (NOT `watchdog_watcher.log`).
 
 ---
 
@@ -248,9 +248,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-25 02:00Z UTC (Iter ~2666, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-25 02:06Z UTC (Iter ~2667, Tier 1, consecutive_clean=0)
 
-**Iter ~2666 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase-pr-687-post-open-mergeable-001 approval pending Larry). sequence-paused:operator-needs-you-feed (L1086 Tier-4, bot DM'd — unreg-approval-6009fbf6bfa2 blocking escalation-feed DAG, pending Larry dashboard action). **KEY EVENTS:** Forge completed wire-agent-core-health-notify-001 (01:51Z, $1.83, PR #696 MERGEABLE) + revision-1 forge-wip-only-auto-redispatch-001 (01:54Z, $0.95). Mirror inbox now 6 items (including rev1 re-review + possible duplicate dispatch). 3 new alerts (L1084 doorbell Tier-3, L1085 mirror-pass-unmerged Tier-4, L1086 sequence-paused Tier-4). Watchdog healthy 01:48Z and 01:54Z (no new WARNs since 01:43Z; PR #694 in Mirror queue). Watermark 1083→1086. G-rules: watchdog 3/3 vp (positive, healthy through Forge/Beacon burst), heal-notify 3/3 vp (PR #696 in Mirror queue ✅), mirror-pass-unmerged 3/3 vp (L1085 new occurrence), manifest-drift 2/3, review-duplicate-dispatch-wip-redispatch NEW 1/3. PRIME: systemic_fixes=66, ratio=17.26, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2667 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase-pr-687-post-open-mergeable-001 approval pending Larry). sequence-paused:operator-needs-you-feed (unreg-approval-6009fbf6bfa2 pending Larry, L1086 bot DM'd). **KEY EVENT: PR #694 (watchdog-stale-session-aware-suppression-001) MERGED 01:57Z → G-rule watchdog-watcher-log-stale-post-fix COMPLETE ✅.** 2 new alerts (L1087 medic-diagnosis Tier-3, L1088 review-pass PR#694 Tier-3). Watermark 1086→1088. Beacon/Forge EMPTY. Mirror: 5 items (review-alert-translation-mirror-pass-unmerged-001, review-forge-wip-only-auto-redispatch-001-rev1, review-forge-wip-only-auto-redispatch-001, review-pr-ourliberty-agent-core-692, review-wire-agent-core-health-notify-001). G-rules: watchdog COMPLETE ✅ (PR #694 merged), heal-notify 3/3 vp (PR #696 in Mirror queue), mirror-pass-unmerged 3/3 vp (PR #695 in Mirror queue), manifest-drift 2/3, review-duplicate-dispatch-wip-redispatch 1/3. PRIME: systemic_fixes=67, ratio≈17.3, trend=improving. Tier 1, consecutive_clean=0.
 
 ## Status snapshot — updated 2026-06-25 01:48Z UTC (Iter ~2665, Tier 1, consecutive_clean=0)
 

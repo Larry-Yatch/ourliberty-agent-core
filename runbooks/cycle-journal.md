@@ -5,6 +5,106 @@
 ---
 
 
+## Iteration ~2667 — 2026-06-25T02:06Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry /cycle invocation via chat (/loop dynamic).
+
+**Health:** ⚠️ Watch — PR #687 CONFLICTING (rebase approval pending Larry); sequence-paused:operator-needs-you-feed pending Larry action. **KEY EVENT: PR #694 (watchdog-stale-session-aware-suppression-001) MERGED 01:57Z → G-rule watchdog-watcher-log-stale-post-fix COMPLETE ✅.** All other checks nominal.
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #687 (forge/forge-post-open-mergeable-rebase-001):** CONFLICTING — gh shows UNKNOWN mergeable (consistent with prior iters). beacon-pending-approvals confirms rebase-pr-687-post-open-mergeable-001 still active. [carry — approval pending]
+- **G-rule watchdog-watcher-log-stale-post-fix:** PR #694 MERGED at 01:57Z (L1088 review-pass, auto-merged + branch deleted). Watchdog healthy at 01:59:19Z (post-merge). Last WARN was 01:43Z (before merge). **G-rule COMPLETE ✅.** PRIME systemic_fix appended this iter.
+- **G-rule ourliberty-health-notify-script-missing:** PR #696 in Mirror queue (5 items). [verification_pending — advancing]
+- **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4:** PR #695 in Mirror queue. 0 new instances (cooldown: mirror-pass-unmerged:PR#687). [verification_pending]
+- **sequence-paused:operator-needs-you-feed:** Carry from L1086 (01:55Z). Bot DM'd Larry. No new firing this iter. [carry — pending Larry action]
+- **Forge inbox:** EMPTY ✅
+- **Beacon inbox:** EMPTY ✅
+- **Mirror inbox:** 5 items — review-alert-translation-mirror-pass-unmerged-001, review-forge-wip-only-auto-redispatch-001-rev1, review-forge-wip-only-auto-redispatch-001, review-pr-ourliberty-agent-core-692, review-wire-agent-core-health-notify-001. ✅
+- **Repo:** HEAD=ec93eafe=origin/main. Clean. On main. ✅
+- **Sync:** last_sync=2026-06-25T02:00:01Z (~6 min). Status=success. ✅
+- **Daemons:** beacon_telegram_bot PID 2341187, outbox_notifier PID 2340424, inbox_watcher PID 1732118 — all alive (Ssl/Ss/Ss). ✅
+
+**Check 0 — Alert triage:** 2 new alerts since watermark=1086.
+- **L1087** `source=medic, intent=medic-diagnosis` — Tier-3 ✅ (helper: known-pattern match, route=digest, silence). Medic attempt 3 for PR #687 rebase diagnosis. No Pulse DM.
+- **L1088** `source=outbox-notifier, intent=review-pass` — Tier-3 ✅ (helper: known-pattern match, route=digest, silence). Mirror approved PR #694 (`watchdog-stale-session-aware-suppression-001`). Auto-merged + branch deleted at 01:57Z. G-rule COMPLETE.
+- Watermark advanced 1086→1088.
+
+**Check 1 — Log noise:**
+- watchdog.log: Last WARN 01:43Z (pre-PR #694 merge). Healthy at 01:48Z, 01:54Z, 01:59Z (all post-merge). **Fix working — 0 WARNs since PR #694 merged at 01:57Z.** ✅
+- outbox-notifier, inbox_watcher logs: nominal per prior checks. ✅
+
+**Check 2 — Telegram sweep:** Larry's last message: "Yes rebase #687 next" (18:45 MDT June 24 = 00:45Z June 25). No new messages. rebase-pr-687-post-open-mergeable-001 approval pending since 01:26Z. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** dry-run → 0 new alerts, 0 recovered, 2 suppressed (cooldowns: reconcile-hardening-mission-shipped-001 + mirror-pass-unmerged:forge-post-open-mergeable-rebase-001). ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- Forge inbox: EMPTY. Beacon inbox: EMPTY. Mirror inbox: 5 items (active pipeline). ✅
+- beacon-pending-approvals: 2 (unreg-approval-6009fbf6bfa2 stale; rebase-pr-687-post-open-mergeable-001 active). [carry]
+- sequence-paused:operator-needs-you-feed: pending Larry approval/rejection. [carry]
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=01:51:15Z (~15 min ago at check time). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=ec93eafe=origin/main. Clean. On main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=02:00:01Z (~6 min), status=success. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** beacon_telegram_bot (2341187), outbox_notifier (2340424), inbox_watcher (1732118) — alive. ✅ Nominal.
+
+**Check E — PRs:**
+- agent-core PR #696 (forge/wire-agent-core-health-notify-001): UNKNOWN, Mirror queue. [advancing — G-rule ourliberty-health-notify fix ✅]
+- agent-core PR #695 (forge/alert-translation-mirror-pass-unmerged-001): UNKNOWN, Mirror queue. [advancing — G-rule fix]
+- agent-core PR #694 (forge/watchdog-stale-session-aware-suppression-001): **MERGED 01:57Z** ✅ G-rule COMPLETE.
+- agent-core PR #693 (forge/forge-wip-only-auto-redispatch-001): UNKNOWN, Mirror queue (rev1 re-review). [advancing]
+- agent-core PR #692 (work/forge-wedge-healer): UNKNOWN, Mirror queue. [advancing]
+- agent-core PR #691 (forge/heal-stall-dryrun-noop-001): Mirror REVIEW_PASS (L1083). AUTO_MERGE_HELD behind #687. [advancing — cascades on #687 merge]
+- agent-core PR #687 (forge/forge-post-open-mergeable-rebase-001): CONFLICTING. Rebase approval pending Larry. [⚠️ carry]
+- dashboard: 0 open. ✅
+
+**Check H — Forge digest:** Forge IDLE (inbox EMPTY). All pending tasks completed. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. ✅
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails (Thursday). Skip. ✅
+- Check III: not Sunday. Skip. ✅
+
+**G-rule updates:**
+- **watchdog-watcher-log-stale-post-fix** — **COMPLETE ✅** PR #694 merged 01:57Z. Watchdog healthy 01:59Z (post-merge, 0 WARNs). PRIME systemic_fix appended. Per SOUL.md teach-to-fish: 3 interventions → 1 code fix → pattern eliminated. Will update MEMORY.md.
+- **ourliberty-health-notify-script-missing** — 3/3 dispatched (carry). PR #696 in Mirror queue. [verification_pending]
+- **heal-pipeline-stall-mirror-pass-unmerged-tier4** — 3/3 dispatched (carry). PR #695 in Mirror queue. 0 new instances (cooldown). [verification_pending]
+- **heal-daemon-restart-manifest-drift-regenerated-tier4** — **2/3** (no new instance). Dispatch at 3/3.
+- **review-duplicate-dispatch-wip-redispatch** — **1/3** (no new instance). Dispatch at 3/3.
+- **check-i-force-bypass-dm-route** — **1/3** (Thursday, no occurrence).
+
+**Actions taken:** Alert triage (L1087 Tier-3, L1088 Tier-3). Watermark 1086→1088. PRIME intervention + systemic_fix appended. Tier state recorded (consecutive_clean=0). No always-allowed auto-fixes (repo current, sync <2h, no stale PRs needing enable-auto-merge).
+
+**Dispatches:** None this iter.
+
+**Standing findings (carried + verified):**
+- [yellow] **PR #687 (forge/forge-post-open-mergeable-rebase-001)** — CONFLICTING. rebase-pr-687-post-open-mergeable-001 approval pending Larry (Telegram: reply 'approve'). [carry — approval active]
+- [yellow] **unreg-approval-6009fbf6bfa2 + sequence-paused:operator-needs-you-feed** — escalation-feed DAG paused. Dashboard: dashboard.ourliberty.dev/approvals. Bot DM'd (L1086). [carry — pending Larry action]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+- [yellow] **unreviewed-merge:607** — Larry judgment. [carry]
+- [blue] **PR #696** — Mirror queue (G-rule ourliberty-health-notify fix). [advancing ✅]
+- [blue] **PR #695** — Mirror queue (G-rule mirror-pass-unmerged silence). [advancing]
+- [blue] **PR #693** — Mirror queue (rev1 re-review). [advancing ✅]
+- [blue] **PR #692** — Mirror queue. [advancing]
+- [blue] **PR #691** — Mirror REVIEW_PASS, AUTO_MERGE_HELD behind #687. [cascades on #687 merge]
+- [blue] **review-duplicate-dispatch-wip-redispatch G-rule** — 1/3. Dispatch at 3/3.
+
+**PRIME DIRECTIVE:** Trailing-30d: systemic_fixes=67, ratio≈17.3, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** `record --checks-clean false` → consecutive_clean=0. Tier: 1.
+
+---
+
+
 ## Iteration ~2666 — 2026-06-25T02:00Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry /cycle invocation via chat (/loop dynamic).
