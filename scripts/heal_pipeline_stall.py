@@ -116,6 +116,7 @@ Phase E4 followup, 2026-05-26.
 
 from __future__ import annotations
 
+import argparse
 import functools
 import json
 import os
@@ -2557,12 +2558,22 @@ def _alert_is_fixture(alert: dict) -> bool:
     return task.startswith('real-') or task.startswith('prod-')
 
 
-def run() -> int:
-    """Single pass. Returns 0 always (healer never fails systemd)."""
+def run(dry_run: bool = False) -> int:
+    """Single pass. Returns 0 always (healer never fails systemd).
+
+    `dry_run=True` makes the pass a true no-op: every check still runs (that's
+    what makes the preview useful) and the per-key cooldown is still READ, but
+    every side-effecting WRITE is suppressed — no heartbeat, no recovery
+    primitive (those dispatch to Mirror/Beacon inboxes and run `gh pr merge`),
+    no `larry_alerts.append_alert`, no `record_alert`/`save_state` cooldown
+    stamp. Each stall that WOULD fire is logged instead. Default `False`
+    preserves exactly today's production behavior (the systemd timer invokes
+    with no flags)."""
     if KILL_SWITCH.exists():
         log('kill switch present — exiting', 'INFO')
         return 0
-    heartbeat()
+    if not dry_run:
+        heartbeat()
     state = load_state()
     try:
         notifier_lines = _read_recent_log_lines(OUTBOX_NOTIFIER_LOG, LOG_LOOKBACK_HOURS)
@@ -2624,17 +2635,36 @@ def run() -> int:
 
     if not all_alerts:
         log('no stalls detected', 'INFO')
-        save_state(state)
+        if not dry_run:
+            save_state(state)
         return 0
 
     fired = 0
     recovered_count = 0
+    would_fire = 0
+    would_recover = 0
     for alert in all_alerts:
         if _alert_is_fixture(alert):
             log(f'suppressed (fixture task): {alert["key"]}', 'INFO')
             continue
         if not should_alert(state, alert['key']):
             log(f'suppressed (cooldown): {alert["key"]}', 'INFO')
+            continue
+        if dry_run:
+            # No writes: log what WOULD happen and move on. A recoverable
+            # stall would attempt auto-remediation FIRST (and only alert if
+            # it failed); a non-recoverable one would alert directly. We
+            # cannot know whether the recovery would land without running it
+            # (which is exactly the side effect dry-run forbids), so report
+            # the attempt, not the outcome.
+            if alert.get('recovery') is not None:
+                would_recover += 1
+                log(f'DRY-RUN would recover-then-alert: {alert["key"]} '
+                    f'(subject={alert["subject"]!r})', 'INFO')
+            else:
+                would_fire += 1
+                log(f'DRY-RUN would alert: {alert["key"]} '
+                    f'(subject={alert["subject"]!r})', 'INFO')
             continue
         # M4 recover-then-alert: a recoverable stall attempts auto-remediation
         # FIRST and alerts only if it does not land. A successful recovery
@@ -2676,11 +2706,31 @@ def run() -> int:
             log(f'alerted: {alert["key"]}', 'INFO')
         else:
             log(f'larry_alerts append failed for {alert["key"]}', 'WARN')
+    if dry_run:
+        log(f'DRY-RUN: {would_fire + would_recover} alert(s) would fire, '
+            f'{would_recover} recovery(ies) would be attempted; '
+            f'no writes performed', 'INFO')
+        return 0
     log(f'done: {fired} new alert(s) fired, {recovered_count} recovered, '
         f'{len(all_alerts) - fired - recovered_count} suppressed', 'INFO')
     save_state(state)
     return 0
 
 
+def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description='Proactively DM Larry when work stops flowing in the '
+                    'pipeline. Runs every 15 min via systemd timer.',
+    )
+    parser.add_argument(
+        '--dry-run', action='store_true',
+        help='Detect and log what WOULD be alerted/recovered, but perform '
+             'zero side-effecting writes (no alerts, no recovery dispatch, '
+             'no state/heartbeat mutation).',
+    )
+    return parser.parse_args(argv)
+
+
 if __name__ == '__main__':
-    sys.exit(run())
+    args = _parse_args()
+    sys.exit(run(dry_run=args.dry_run))
