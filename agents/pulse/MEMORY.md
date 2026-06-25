@@ -162,9 +162,9 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## G-rule forge-wip-redispatch-digest-tier4-001 → DISPATCHED ✅ (iter ~2797)
+## G-rule forge-wip-redispatch-digest-tier4-001 → DISPATCHED ✅ (iter ~2797), Beacon fix designed (iter ~2798), Forge dispatch pending
 
-**Rule:** `forge-wip-redispatch` healer fires alerts with `route=digest` (auto-redispatched retry1 notifications). Triage helper classifies Tier-4 (novel, no translation). But these are auto-remediated informational digests — per actionable-only discipline, no DM to Larry. Fix: add `source=forge-wip-redispatch, route=digest` → Tier-3 entry to `config/alert-translations.json`. Dispatched to Beacon at iter ~2797 (3/3). Beacon direction-ask: pulse-direction-ask-forge-wip-redispatch-digest-tier3-001.json. verification_pending.
+**Rule:** `forge-wip-redispatch` healer fires alerts with `route=digest` (auto-redispatched retry1 notifications). Triage helper classifies Tier-4 (novel, no translation). But these are auto-remediated informational digests — per actionable-only discipline, no DM to Larry. **Beacon result (iter ~2798):** Naive `route=digest` catch-all would also silence critical `route=escalate` exhausted alerts. Two-part fix: (1) healer changes escalate subject `base` → `exhausted:{base}` for distinguishability; (2) `alert-translations.json` gets `forge-wip-redispatch` `"*"` catch-all PLUS `"exhausted": {never_silence: true}`. Forge dispatch pending trust-policy approval from Larry. verification_pending.
 
 ---
 
@@ -204,8 +204,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-25 18:18Z UTC (Iter ~2797, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 18:28Z UTC (Iter ~2798, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2797 summary:** ✅ Nominal + pipeline cleared — PR #703 AND #704 both auto-merged at 18:14Z! 2 new alerts (L996-997): L996 forge-wip-redispatch digest → Tier-4, G-rule 3/3 dispatched to Beacon (direction-ask for Tier-3 translation entry); L997 outbox-notifier review-pass → Tier-3 silence. 8/8 daemons alive. Watchdog healthy. No open PRs. Forge retry1 for board-new-mission-confirm-placeholder-001 in progress (worktree active). PRIME: interventions=1224, systemic_fixes=71, vp=26, ratio≈17.24, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2798 summary:** ✅ Nominal — no new alerts (wm=997). Beacon result received for forge-wip-redispatch-digest: two-part fix designed (healer subject change + translations two-entry); Forge dispatch pending trust-policy approval from Larry. 8/8 daemons alive. Watchdog healthy. 0 open PRs. Forge retry1 for board-new-mission-confirm-placeholder-001 in progress. PRIME: interventions=1224, systemic_fixes=71, vp=27, ratio≈17.24, trend=improving. Tier 1, consecutive_clean=0.
 
 

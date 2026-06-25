@@ -5,6 +5,97 @@
 ---
 
 
+## Iteration ~2798 — 2026-06-25T18:28Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/cycle` invocation via chat.
+
+**Health:** ✅ Nominal — no new alerts (wm=997 unchanged), 8/8 daemons alive, no open PRs, pipeline clean. Beacon result received for forge-wip-redispatch-digest G-rule: two-part fix designed (healer subject change + translations two-entry). Forge dispatch pending trust-policy approval from Larry.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo**: HEAD=f213dddf=origin/main. On main. Clean. ✅ ("Pulse cycle 20260625T182154Z" is latest commit.)
+- **Sync**: agent-core-sync.json shows error at 18:00:46Z (push failed), commit=f06cd143 — same stale-sync-JSON state as ~2796/~2797. HEAD=f213dddf=origin/main confirms in sync. Transient; self-healed. ✅ Informational.
+- **Daemons (re-verified)**: forge_bot=1388801 (Ss, 182311s ~50.6h) ✅, mirror_bot=1388982 (Ss, 182303s) ✅, pulse_bot=1389067 (Ss, 182299s) ✅, beacon_telegram_bot=2715635 (Ss, 41259s ~11.5h) ✅, dashboard_api=2715859 (Ssl, 41251s) ✅, chain_event_shipper=2716672 (SNs, 41177s) ✅, inbox_watcher=2754413 (Ssl, 38772s ~10.8h) ✅, outbox_notifier=2773485 (Ss, 37051s ~10.3h) ✅. 8/8 alive. ✅
+- **Watchdog**: last entry 12:20:20 MDT (18:20:20Z, ~8 min before check) — overall=healthy. ✅
+- **heal-stale-daemon-code heartbeat**: 2026-06-25T18:13:54Z (~15 min old). Fresh. ✅
+- **Zombie PID 1834248**: still alive (Ss, 2415913s ~27.96d). Ask-then-do. [carry]
+- **6 stale journalctl PIDs**: all alive (1101500 1107838 1118830 1136223 1161972 1177335). Ask-then-do. [carry]
+- **beacon-pending-approvals**: pending=0. ✅
+- **Open PRs**: `gh pr list` → `[]`. Zero open PRs. ✅
+- **Agent inboxes**: beacon=EMPTY ✅, forge=EMPTY ✅, mirror=EMPTY ✅, pulse=EMPTY (notify-pulse task archived by inbox_watcher at 18:23:46Z) ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark: `{"repaired": false, "old_watermark": 997, "file_length": 997}`. No new alerts since ~2797. ✅ Nominal.
+
+**Check 1 — Log noise:**
+- `journalctl --user -p warning --since "30 minutes ago"` → `-- No entries --`. ✅
+- outbox-notifier.log: Last entry 12:22:52 MDT (`notified pulse <- beacon`). No WARNs. ✅
+- watchdog.log: last entry 12:20:20 MDT (18:20:20Z) — overall=healthy. ✅
+
+**Check 2 — Telegram sweep:**
+- Beacon bot PID 2715635 (Ss, ~11.5h) ✅. Last Larry message 11:29:56 MDT ('go'). No new messages. No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- 19 tasks FORGE_NO_PR_SKIP. **"no stalls detected"**. ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- All inboxes EMPTY. beacon-pending-approvals=0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** heartbeat=2026-06-25T18:13:54Z (~15 min old). Fresh. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=f213dddf=origin/main. On main. Clean. ✅ Nominal.
+**Check B — Sync health:** Sync JSON stale error (18:00:46Z push failed) — same transient as ~2796/~2797. ✅ Informational.
+**Check C — Agent liveness:** 8/8 alive.
+- **[yellow] PID 1834248** — zombie bash loop (~27.96d). Ask-then-do. [carry]
+- **[yellow] 6 stale journalctl PIDs (~30-31d)** — Ask-then-do. [carry]
+
+**Check E — PRs:** 0 open PRs. ✅ Nominal.
+
+**Check H — Forge activity digest:**
+- inbox_watcher activity since ~2797:
+  - 18:18:41–18:22:51Z: Beacon session processed `pulse-direction-ask-forge-wip-redispatch-digest-tier3-001` ($0.82, 250s).
+  - 18:22:56–18:23:46Z: Pulse session processed `notify-pulse-direction-ask-forge-wip-redispatch-digest-tier3-001` ($0.14, 50s). Result notification archived.
+- **Beacon result for forge-wip-redispatch-digest**: Beacon flagged that a naive `route=digest` catch-all would silence BOTH the routine digest AND the critical `route=escalate` exhausted alert. Designed two-part fix: (1) healer (`heal_forge_wip_only_redispatch.py`) changes escalate subject from `base` → `exhausted:{base}` for distinguishability; (2) `alert-translations.json` gets `forge-wip-redispatch` with `"*"` catch-all (silences digest subjects) plus `"exhausted"` entry tagged `never_silence: true` (keeps critical alert at Tier-4). Beacon claimed dispatch to Forge.
+- **Forge dispatch status unclear**: No Forge task found in forge inbox, archive, or inbox_watcher log as of 18:25Z (3 min post-Beacon). Beacon noted "trust policy will likely ask you to approve." Likely APPROVAL_REQUEST pending; will surface via Telegram. Watch next iter for larry-alert.
+- Active worktrees: wt-forge-board-new-mission-confirm-placeholder-001-retry1 (active build), wt-forge-board-new-mission-confirm-placeholder-001 (teardown pending), wt-forge-reconcile-two-stale-inflight-missions-shipped-001 (teardown pending).
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check VIII/IX/X: Not Monday. Skip. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule updates:**
+- **forge-wip-redispatch-digest-tier4-001 → DISPATCHED ✅ (iter ~2797), Beacon fix designed (iter ~2798)**: Two-part fix (healer subject + translations two-entry). Forge dispatch pending trust-policy approval. PRIME `verification_pending` row pending until PR opens.
+- All other active G-rules carry unchanged from ~2797.
+
+**Actions taken:**
+1. Check 0: No new alerts (wm=997 unchanged). No action.
+2. PRIME ledger: `iter_clean` appended (tier=1, template=iter-clean-nominal).
+3. Tier state: `record --checks-clean false` → consecutive_clean stays 0 (zombie + journalctl PIDs carries). Tier remains 1.
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [yellow] **PID 1834248 zombie bash loop** — Still alive (~27.96d). Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **6 stale journalctl PIDs (~30-31d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+- [yellow] **board-new-mission-confirm-placeholder-001 retry1** — Forge building in wt-forge-board-new-mission-confirm-placeholder-001-retry1. Watch for outcome. [carry]
+- [yellow] **forge-wip-redispatch-digest Forge dispatch** — Beacon designed two-part fix; trust-policy approval from Larry likely needed. Watch for APPROVAL_REQUEST in next cycle. [new]
+- [yellow] **sequence-paused:operator-needs-you-feed** — Recovery: `resume sequence operator-needs-you-feed` via Beacon or Dashboard. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649/637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**PRIME DIRECTIVE:** interventions=1224, systemic_fixes=71, verification_pending=27, ratio≈17.24, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0 (non-clean: zombie PID + 6 stale journalctl PIDs). Last signal: 2026-06-25T18:28:46Z.
+
+---
+
+
 ## Iteration ~2797 — 2026-06-25T18:17Z UTC (interactive /loop /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/loop /cycle` invocation via chat.
@@ -96,6 +187,21 @@
 
 ---
 
+## Notify — 2026-06-25T~18:22Z UTC | from=beacon | task=pulse-direction-ask-forge-wip-redispatch-digest-tier3-001 | status=SUCCESS
+
+**Result received.** Beacon completed the direction-ask dispatched in ~2797.
+
+**Key finding — naive catch-all would have been wrong:** The triage classifier is route-blind (silences on `source+subject`, not `route`). `forge-wip-redispatch` fires two alerts with the same dynamic subject: `route=digest` (routine noise, silence) and `route=escalate` (retries-exhausted, must surface). A `"*"` catch-all would have silenced the critical exhausted alert. Beacon caught this before specing.
+
+**Two-part fix dispatched to Forge (preflight):**
+1. **Healer change** (`heal_forge_wip_only_redispatch.py`): escalate subject prefix changes `base` → `exhausted:{base}` so it's distinguishable from the digest subject.
+2. **Translations** (`alert-translations.json`): `forge-wip-redispatch` entry with `"*"` catch-all (silences digest) + `"exhausted"` entry tagged `never_silence: true` (keeps critical alert at Tier-4).
+
+**PR classification:** touches a `.py` healer (not config-only) → trust policy will prompt Larry to approve rather than auto-dispatch.
+
+**G-rule update:** `forge-wip-redispatch-digest-tier4-001` status: DISPATCHED (Beacon→Forge preflight). Pending Forge PR + Mirror review + Larry approval.
+
+---
 
 ## Iteration ~2796 — 2026-06-25T18:07Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
