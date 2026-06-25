@@ -5,6 +5,97 @@
 ---
 
 
+## Iteration ~2811 — 2026-06-25T20:05Z UTC (interactive /loop /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/loop /cycle` invocation via chat.
+
+**Health:** ✅ Nominal — 0 new alerts (wm=1001 unchanged), 8/8 daemons alive, watchdog healthy, pipeline progressing. Key update since ~2810: Beacon responded to Larry's follow-up direction at 14:01:37 MDT ("The exploration paid off..."). Mirror actively reviewing `sequence-rows-endpoint` (PID 3017743, ~24 min). PR #92 (ourliberty-dashboard) queued for Mirror. No stalls.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo**: HEAD=b1977bf2=origin/main. On main. Clean. ✅
+- **Sync**: agent-core-sync.json `status=no-change, last_sync=2026-06-25T20:01:13Z` (~4 min old). Fresh. ✅
+- **Daemons**: PIDs 1388801 (Ss, 2d4h19m), 1388982 (Ss, 2d4h19m), 1389067 (Ss, 2d4h19m), 2715635 (Ss, 13h08m), 2715859 (Ssl, 13h08m), 2716672 (SNs, 13h07m), 2754413 (Ssl, 12h27m), 2773485 (Ss, 11h58m). 8/8 alive. ✅
+- **Watchdog**: last entry 14:02:20 MDT (20:02:20Z) — overall=healthy. ✅
+- **heal-stale-daemon-code heartbeat**: 2026-06-25T19:55:15Z (~10 min old at check time). Fresh. ✅
+- **Zombie PID 1834248**: Still alive (Ss, 28-00:46m). Ask-then-do. [carry]
+- **6 stale journalctl PIDs**: All alive (1101500 1107838 1118830 1136223 1161972 1177335, S, ~30–31d). Ask-then-do. [carry]
+- **beacon-pending-approvals**: 0. ✅
+- **Open PRs**: PR #706 (sequence-rows-endpoint, ourliberty-agent-core) OPEN, UNKNOWN mergeable (Mirror PID 3017743 actively reviewing, 24+ min). PR #92 (ourliberty-dashboard) OPEN, MERGEABLE (Mirror review queued). Both expected in-progress. ✅
+- **Forge inbox**: EMPTY. ✅
+- **Mirror inbox**: `review-sequence-rows-endpoint.json` (active) + `review-pr-ourliberty-dashboard-92.json` (queued). ✅
+- **Beacon inbox**: EMPTY. (Beacon completed `notify-board-new-mission-confirmation-placeholder-001` at 19:54:17Z; responded to Larry's follow-up at 14:01:37 MDT.) ✅
+- **outbox-notifier.log**: Last entry at 13:53:20 MDT (reject delivery queued for board-new-mission). All INFO. No WARNs. ✅
+- **inbox_watcher.log**: Last entry 19:54:17Z — Beacon done `notify-board-new-mission-confirmation-placeholder-001`. Mirror sequence-rows-endpoint still running (no done entry). ✅
+
+**Check 0 — Alert triage:**
+- `repair-watermark`: `{"repaired": false, "old_watermark": 1001, "file_length": 1001}`. **0 new alerts**. ✅ Nominal.
+
+**Check 1 — Log noise:**
+- `journalctl --user -p warning --since "30 minutes ago"` → `-- No entries --`. ✅
+- outbox-notifier.log: Last entries at 13:53:20 MDT (reject queued). All INFO. No WARNs. ✅
+- watchdog.log: 14:02:20 MDT — overall=healthy. ✅
+
+**Check 2 — Telegram sweep:**
+- Larry's last message: `'I agree with the narrative cadence suggestion...'` at 13:57:33 MDT. Beacon replied at 14:01:37 MDT. No new Larry input since ~2810. Expected — Larry reviewing Beacon response. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- 23 FORGE_NO_PR_SKIP tasks (various already_merged_bridge / pr_exists / preflight_exit / sibling_pr_title_shipped / rebase_target_shipped reasons). **"no stalls detected"**. ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- Forge inbox: EMPTY. ✅
+- Mirror inbox: `review-sequence-rows-endpoint.json` (active, PID 3017743, ~24 min running) + `review-pr-ourliberty-dashboard-92.json` (queued). Both expected. ✅
+- Beacon inbox: EMPTY. ✅
+- beacon-pending-approvals: 0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-25T19:55:15Z (~10 min old). Fresh. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=b1977bf2=origin/main. On main. Clean. ✅ Nominal.
+**Check B — Sync health:** Status=no-change, last_sync=20:01:13Z (~4 min old). Fresh. ✅ Nominal.
+**Check C — Agent liveness:** 8/8 alive. Mirror PID 3017743 alive (24+ min into sequence-rows-endpoint review). ✅
+- **[yellow] PID 1834248** — zombie bash loop (~28d). Ask-then-do: `kill 1834248`. [carry]
+- **[yellow] 6 stale journalctl PIDs (~30–31d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+
+**Check E — PRs:**
+- PR #706 (sequence-rows-endpoint, ourliberty-agent-core) — OPEN, UNKNOWN mergeable, Mirror actively reviewing (PID 3017743). ✅ Expected.
+- PR #92 (ourliberty-dashboard) — OPEN, MERGEABLE, Mirror review queued. ✅ Expected.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check VIII/IX/X: Not Monday. Skip. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule updates:**
+- All active G-rules carry unchanged from ~2810. No new occurrences this iter.
+
+**Actions taken:**
+1. PRIME ledger: `iter_clean` appended (tier=1, template=iter-clean-nominal).
+2. Tier state: `record --checks-clean false` → consecutive_clean stays 0 (zombie PID + 6 stale journalctl PIDs carry). Tier remains 1.
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [green] **sequence-rows-endpoint PR #706** — Open, Mirror actively reviewing (PID 3017743, started 19:40:57Z, ~24 min). Carry until Mirror passes + auto-merge completes.
+- [green] **PR #92 (ourliberty-dashboard)** — Open MERGEABLE, Mirror review queued. Carry until Mirror passes + auto-merge completes.
+- [yellow] **board-new-mission-confirmation-placeholder-001 → REJECTED** — Forge rejected at preflight. Beacon DM'd Larry (idx=1000, 13:56:49 MDT). Larry provided follow-up direction at 13:57:33 MDT; Beacon responded 14:01:37 MDT. Carry until Beacon surfaces new spec or closes as obsolete.
+- [yellow] **PID 1834248 zombie bash loop** — Still alive (~28d). Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **6 stale journalctl PIDs (~30–31d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+- [yellow] **forge-wip-redispatch-digest Forge dispatch** — Beacon fix designed (iter ~2798). Trust-policy approval from Larry pending. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649/637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**PRIME DIRECTIVE:** interventions=1225, systemic_fixes=71, verification_pending=27, ratio≈17.25, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0 (non-clean: zombie PID + 6 stale journalctl PIDs). Last signal: 2026-06-25T20:05:46Z.
+
+---
+
+
 ## Iteration ~2810 — 2026-06-25T20:00Z UTC (interactive /loop /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/loop /cycle` invocation via chat.
