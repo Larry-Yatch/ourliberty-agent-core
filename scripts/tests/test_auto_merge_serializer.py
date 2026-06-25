@@ -492,6 +492,114 @@ class StaleApprovalRevalidationTest(SerializerTestBase):
         # And the merged blocker is preserved so the sweep re-releases it.
         self.assertEqual(q[0]['blocker_pr_number'], self.BLOCKER)
 
+    def _revalidate(self, release_entry):
+        return self.on._revalidate_held_merge_before_fire(
+            pr_url=_pr_url(REPO, self.HELD),
+            repo_coords=REPO,
+            pr_number=self.HELD,
+            task_id='t-held',
+            summary='held summary',
+            chat_id=777,
+            changed_files=[self.FILE],
+            release_entry=release_entry,
+        )
+
+    def test_release_gate_already_merged_returns_skip_outcome(self):
+        """fix-auto-merge-already-merged-skip (a): the released PR is ALREADY
+        MERGED (auto-merged via the blocker's base-move) and so permanently
+        reports mergeable=UNKNOWN. The gate must return a release_already_merged
+        outcome WITHOUT calling _defer_held_revalidation — the entry was already
+        removed by _queue_release, so not re-queuing terminates the ~5s loop.
+        """
+        self.gh.pr_state[(REPO, self.HELD)] = 'MERGED'
+        self.gh.pr_mergeable[(REPO, self.HELD)] = 'UNKNOWN'
+        with mock.patch.object(self.on, '_defer_held_revalidation') as defer:
+            result = self._revalidate(
+                {'blocker_pr_number': self.BLOCKER,
+                 'approved_base_sha': 'baseAAAA00000000'},
+            )
+        self.assertIsNotNone(result)
+        self.assertEqual(result['merge_outcome'], 'release_already_merged')
+        self.assertEqual(result['pr_number'], self.HELD)
+        self.assertEqual(result['repo_coords'], REPO)
+        # The loop-sustaining re-queue path must NOT be taken.
+        defer.assert_not_called()
+        # No merge shell-out (the PR is already merged).
+        self.assertNotIn((REPO, self.HELD), self.gh.merge_calls)
+        # Exactly one skip line; no defer line.
+        log_text = self.on.LOG_FILE.read_text(encoding='utf-8')
+        self.assertEqual(log_text.count('AUTO_MERGE_SKIP_ALREADY_MERGED'), 1)
+        self.assertIn('state=MERGED', log_text)
+        self.assertNotIn('AUTO_MERGE_RELEASE_DEFERRED', log_text)
+
+    def test_release_gate_already_closed_returns_skip_outcome(self):
+        """fix-auto-merge-already-merged-skip (b): a CLOSED released PR is
+        likewise terminal — same skip outcome, no defer.
+        """
+        self.gh.pr_state[(REPO, self.HELD)] = 'CLOSED'
+        self.gh.pr_mergeable[(REPO, self.HELD)] = 'UNKNOWN'
+        with mock.patch.object(self.on, '_defer_held_revalidation') as defer:
+            result = self._revalidate(
+                {'blocker_pr_number': self.BLOCKER,
+                 'approved_base_sha': 'baseAAAA00000000'},
+            )
+        self.assertEqual(result['merge_outcome'], 'release_already_merged')
+        defer.assert_not_called()
+        log_text = self.on.LOG_FILE.read_text(encoding='utf-8')
+        self.assertIn('AUTO_MERGE_SKIP_ALREADY_MERGED', log_text)
+        self.assertIn('state=CLOSED', log_text)
+
+    def test_release_gate_open_unknown_still_defers(self):
+        """fix-auto-merge-already-merged-skip (c) regression guard: a genuinely
+        OPEN PR that hit a transient mergeable=UNKNOWN must STILL route to the
+        defer/re-queue path — the terminal-state skip only fires on MERGED/CLOSED.
+        """
+        self.gh.pr_state[(REPO, self.HELD)] = 'OPEN'
+        self.gh.pr_mergeable[(REPO, self.HELD)] = 'UNKNOWN'
+        self.gh.pr_base[(REPO, self.HELD)] = 'baseBBBB99999999'
+        with mock.patch.object(
+            self.on, '_defer_held_revalidation',
+            return_value={'merge_outcome': 'deferred_unknown'},
+        ) as defer:
+            result = self._revalidate(
+                {'blocker_pr_number': self.BLOCKER,
+                 'approved_base_sha': 'baseAAAA00000000'},
+            )
+        defer.assert_called_once()
+        self.assertEqual(result['merge_outcome'], 'deferred_unknown')
+        # The skip line must never fire for an OPEN PR. (defer is mocked, so the
+        # log file may not exist — its absence is itself proof of no skip line.)
+        log_text = (
+            self.on.LOG_FILE.read_text(encoding='utf-8')
+            if self.on.LOG_FILE.exists() else ''
+        )
+        self.assertNotIn('AUTO_MERGE_SKIP_ALREADY_MERGED', log_text)
+
+    def test_already_merged_release_removes_entry_and_terminates_loop(self):
+        """End-to-end: a blocker merge whose released PR is already MERGED logs
+        one skip line and leaves the queue empty — no re-queue, no defer, and a
+        follow-up sweep finds nothing to release (the loop terminates).
+        """
+        self._hold_behind_blocker()
+        # Blocker merges, main moves, and GitHub auto-merged HELD via the
+        # base-move so it is already MERGED + permanently mergeable=UNKNOWN.
+        self.gh.pr_base[(REPO, self.HELD)] = 'baseBBBB99999999'
+        self.gh.pr_mergeable[(REPO, self.HELD)] = 'UNKNOWN'
+        self.gh.pr_state[(REPO, self.HELD)] = 'MERGED'
+        self._merge_blocker()
+
+        # Entry removed (not re-queued); HELD's merge never re-fired.
+        self.assertEqual(self.on._load_auto_merge_queue(), [])
+        self.assertNotIn((REPO, self.HELD), self.gh.merge_calls)
+        log_text = self.on.LOG_FILE.read_text(encoding='utf-8')
+        self.assertIn('AUTO_MERGE_SKIP_ALREADY_MERGED', log_text)
+        self.assertNotIn('AUTO_MERGE_RELEASE_DEFERRED', log_text)
+
+        # A follow-up sweep has nothing to release — the loop is broken.
+        self.gh.merge_calls.clear()
+        self.on._auto_merge_queue_sweep()
+        self.assertEqual(self.gh.merge_calls, [])
+
 
 class ChainedBlockersTest(SerializerTestBase):
     """A < B < C all overlap; A merges → B+C released; C may re-hold behind B."""
