@@ -144,6 +144,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-25 03:35Z UTC (Iter ~2677, Tier 1, consecutive_clean=0)
+
+**Iter ~2677 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase-pr-687-post-open-mergeable-001 pending Larry). **KEY EVENTS: All agents IDLE. 0 new alerts (watermark holds at 1100). 4 pending approvals (carry). Pipeline stall: reconcile-001 FP persists (fix pending). G-rule no-session-revision-merged-pr-fp-001 did NOT recur (FORGE_NO_PR_SKIP handled it via pr_exists). No dispatches.** PRIME: interventions=1149, systemic_fixes=70, vp=25, ratio=16.41, trend=improving. Tier 1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-06-25 03:28Z UTC (Iter ~2676, Tier 1, consecutive_clean=0)
 
 **Iter ~2676 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase-pr-687-post-open-mergeable-001 pending Larry). **KEY EVENTS: All agents IDLE. 1 new alert (L1100 doorbell Tier-3 silenced). Watermark 1099→1100. New G-rule candidate: no-session-revision-merged-pr-fp-001 (1/3) — stall checker fires no_session_revision for forge-wip-only-auto-redispatch-001 despite PR #693 MERGED. 4 pending approvals (carry). No dispatches.** Pipeline stall: reconcile-001 FP (fix approval pending). Check I: Thursday, skip. PRIME: interventions=1149, systemic_fixes=70, vp=25, ratio=16.41, trend=improving. Tier 1, consecutive_clean=0.
