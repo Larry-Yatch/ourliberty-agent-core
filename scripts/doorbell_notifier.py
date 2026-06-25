@@ -4,10 +4,12 @@ need Larry's decision.
 
 System self-awareness (the "standing brain"), the "poke me for the rest" half
 of the autonomy-visibility ask: Beacon does the work it can and rings a
-DOORBELL — a one-line "N items need your call — check the board" — when
-force_ask approvals + escalations pile up. A doorbell, never a wall (Larry's
-rule): the count + a pointer to the board, NOT the item detail (that lives on
-the /where-we-are + Approvals surfaces).
+DOORBELL when force_ask approvals + escalations pile up. The DM is actionable —
+it names WHAT needs Larry (the top blocking items, by title) and links WHERE to
+go (a clickable board URL routed to the right surface), so a bare count is never
+left dangling. Still a doorbell, never a wall (Larry's rule): the top few items
+are named and capped at MAX_NAMED_ITEMS (then "+N more"); the FULL list + each
+item's context lives on the board the link points to, not in the DM.
 
 Reads the SAME substrate the dashboard renders — the State Log snapshot's
 `waiting_on_larry` — so the doorbell and the board can never disagree. Counts
@@ -60,6 +62,19 @@ STATE_LOG_PATH = Path(
 )
 STATE_FILE = AGENTS_ROOT / 'state' / 'doorbell-state.json'
 LOG_FILE = AGENTS_ROOT / 'logs' / 'doorbell.log'
+
+# The dashboard frontend base — the doorbell turns "the board" into an actual
+# clickable destination (mirrors heal_missions_card_gc._DASHBOARD_BASE).
+# Env-overridable so tests can assert the link without hard-coding the host.
+DASHBOARD_BASE = os.environ.get(
+    'OURLIBERTY_DASHBOARD_BASE', 'https://dashboard.ourliberty.dev')
+
+# How many blocking items to NAME in the DM before collapsing to "+N more".
+# A doorbell, never a wall (Larry's rule): enough to know WHAT without dumping
+# the queue — the full list + context lives on the board the link points to.
+MAX_NAMED_ITEMS = 3
+# Trim a single item's title so one bullet stays one glanceable line.
+TITLE_MAXLEN = 70
 
 # A gentle reminder cadence while items remain (overridable). The timer ticks
 # more often (~30 min) so an INCREASE is noticed promptly; this gates the
@@ -148,15 +163,72 @@ def _parse_ts(s: object) -> Optional[datetime]:
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
-def format_message(needs: int, approvals: int, escalations: int) -> str:
-    """One calm line — the count + a pointer to the board, with a light
-    breakdown only when both kinds are present. Never the item detail."""
+def _board_link(approvals: int, escalations: int) -> str:
+    """The clickable destination that replaces the dead words "check the board".
+    Pure approvals land on the surface where you act on them (/approvals);
+    anything with an escalation goes to the umbrella board (/where-we-are),
+    which shows both kinds."""
+    path = '/approvals' if escalations == 0 else '/where-we-are'
+    return f'{DASHBOARD_BASE}{path}'
+
+
+def _blocking_items(items: object) -> list[dict]:
+    """The BLOCKING waiting-items (approvals + escalations) from the snapshot's
+    `waiting_on_larry.items`, in the urgency order the State Log already sorted
+    them. Parked intake is dropped — it's excluded from the doorbell count too
+    (module docstring). Fail-soft: a missing/odd `items` yields []."""
+    if not isinstance(items, list):
+        return []
+    return [
+        it for it in items
+        if isinstance(it, dict) and it.get('source') in ('approval', 'escalation')
+    ]
+
+
+def _item_line(item: dict) -> str:
+    """One glanceable bullet: a kind tag + the item's own title, trimmed so the
+    DM stays a doorbell (the full title + context lives on the board)."""
+    tag = 'Approve' if item.get('source') == 'approval' else 'Escalation'
+    # Collapse internal whitespace (titles can carry newlines) so one bullet
+    # stays one line — a wrapped bullet reads like a second item.
+    title = ' '.join(str(item.get('title') or '').split()) or '(no summary)'
+    if len(title) > TITLE_MAXLEN:
+        title = title[:TITLE_MAXLEN - 1].rstrip() + '…'
+    return f'• {tag} — {title}'
+
+
+def format_message(
+    needs: int, approvals: int, escalations: int,
+    items: object = None,
+) -> str:
+    """The doorbell DM body. Tells Larry WHAT needs him (the top blocking items,
+    by name) and WHERE to go (a clickable board link) — not just a bare count.
+
+    When the snapshot carries itemized `waiting_on_larry.items`, render a headline
+    + up to MAX_NAMED_ITEMS named bullets (+"N more" when the count exceeds what
+    we name) + the deep-link. When it doesn't (older snapshot / counts only),
+    fall back to the calm one-liner with a light breakdown, still link-suffixed
+    so "where to go" is never missing."""
     verb = 'needs' if needs == 1 else 'need'
     noun = 'item' if needs == 1 else 'items'
-    breakdown = ''
-    if approvals and escalations:
-        breakdown = f' ({approvals} to approve, {escalations} escalated)'
-    return f'{needs} {noun} {verb} your call — check the board.{breakdown}'
+    link = _board_link(approvals, escalations)
+    blocking = _blocking_items(items)
+
+    if not blocking:
+        # No itemized detail available — keep the old calm line, but make the
+        # board a real link instead of dead words.
+        breakdown = ''
+        if approvals and escalations:
+            breakdown = f' ({approvals} to approve, {escalations} escalated)'
+        return f'{needs} {noun} {verb} your call.{breakdown}\n→ {link}'
+
+    lines = [f'{needs} {noun} {verb} your call:']
+    lines.extend(_item_line(it) for it in blocking[:MAX_NAMED_ITEMS])
+    remaining = needs - min(len(blocking), MAX_NAMED_ITEMS)
+    if remaining > 0:
+        lines.append(f'• +{remaining} more')
+    lines.append(f'→ {link}')
+    return '\n'.join(lines)
 
 
 def run(now: Optional[datetime] = None) -> bool:
@@ -195,7 +267,7 @@ def run(now: Optional[datetime] = None) -> bool:
         save_state({'last_count': needs, 'last_dm_ts': state.get('last_dm_ts')})
         return False
 
-    msg = format_message(needs, approvals, escalations)
+    msg = format_message(needs, approvals, escalations, waiting.get('items'))
     sent = larry_alerts.append_notification(
         source='doorbell', intent='doorbell', message=msg, chat_id=chat_id,
     )
