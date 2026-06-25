@@ -1234,6 +1234,90 @@ class TestCheckForgeBuiltNoPr(_TempAgentsRootMixin, unittest.TestCase):
         self.assertIsNone(
             self.hps._forge_rebase_target_shipped(task, merged_prs))
 
+    def test_rebase_target_disambiguated_by_task_id_pr_number(self) -> None:
+        """B1' (residual production case, 2026-06-25): the ORIGINAL task
+        `rebase-forge-post-open-mergeable-687-001` rebased PR #687, but its
+        archived result ALSO narrates its now-merged blocker #685 ('Its blocker
+        (#685...) had merged'). Both #685 and #687 are in the merged union, so
+        seen_numbers == {685, 687} (ambiguous). The task_id's own digit-groups
+        {687, 1} disambiguate to the single target #687 — the helper returns the
+        #687 PR dict and the stall is suppressed."""
+        task = 'rebase-forge-post-open-mergeable-687-001'
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'build', 'exit_code': 0,
+            'result': ('PR #687 is now `MERGEABLE / CLEAN`. Its blocker '
+                       '(#685, the upstream fix) had merged, unblocking the '
+                       'rebase. Done. PR #687 ready for Mirror.'),
+        })
+        merged_prs = [
+            {'headRefName': 'forge/the-blocker-685', 'number': 685,
+             'title': 'fix: upstream blocker', '_repo': self._AGENT_CORE},
+            {'headRefName': 'forge/some-feature-687', 'number': 687,
+             'title': 'feat: the rebased work', '_repo': self._AGENT_CORE},
+        ]
+        target = self.hps._forge_rebase_target_shipped(task, merged_prs)
+        self.assertIsNotNone(target)
+        self.assertEqual(target.get('number'), 687)
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        captured: list[str] = []
+        with patch.object(self.hps, 'log',
+                          side_effect=lambda msg, level='INFO': captured.append(msg)):
+            alerts = self.hps.check_forge_built_no_pr(lines, [], merged_prs, {})
+        self.assertEqual(alerts, [])
+        skip = [m for m in captured
+                if 'FORGE_NO_PR_SKIP' in m and 'rebase_target_shipped' in m]
+        self.assertEqual(len(skip), 1)
+        self.assertIn('pr=#687', skip[0])
+
+    def test_rebase_ambiguous_no_task_id_match_still_alerts(self) -> None:
+        """NEGATIVE fail-safe: the result names two PRs (#900, #901) both in the
+        union, but NEITHER matches a task_id digit-group ({555, 1}). The
+        intersection is empty, so the helper cannot disambiguate — it returns
+        None and the stall still fires. Disambiguation can only REMOVE false
+        stalls, never mask a real one."""
+        task = 'rebase-forge-something-555-001'
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'build', 'exit_code': 0,
+            'result': 'Rebased atop #900; superseded by #901. Done.',
+        })
+        merged_prs = [
+            {'headRefName': 'forge/a-900', 'number': 900,
+             'title': 'feat: a', '_repo': self._AGENT_CORE},
+            {'headRefName': 'forge/b-901', 'number': 901,
+             'title': 'feat: b', '_repo': self._AGENT_CORE},
+        ]
+        self.assertIsNone(
+            self.hps._forge_rebase_target_shipped(task, merged_prs))
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], merged_prs, {})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]['subject'],
+                         f'pipeline-stall:forge-no-pr:{task}')
+
+    def test_rebase_ambiguous_task_id_matches_two_still_alerts(self) -> None:
+        """NEGATIVE fail-safe: the result names two PRs (#687, #1) both in the
+        union AND both present as task_id digit-groups ({687, 1}). The
+        intersection still has two members, so the helper cannot reduce to a
+        single target — it returns None and the stall still fires."""
+        task = 'rebase-forge-post-open-mergeable-687-001'
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'build', 'exit_code': 0,
+            'result': 'Rebased PR #687 over PR #1. Done.',
+        })
+        merged_prs = [
+            {'headRefName': 'forge/the-root-1', 'number': 1,
+             'title': 'feat: root', '_repo': self._AGENT_CORE},
+            {'headRefName': 'forge/some-feature-687', 'number': 687,
+             'title': 'feat: the rebased work', '_repo': self._AGENT_CORE},
+        ]
+        self.assertIsNone(
+            self.hps._forge_rebase_target_shipped(task, merged_prs))
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], merged_prs, {})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]['subject'],
+                         f'pipeline-stall:forge-no-pr:{task}')
+
     def test_step5_does_not_apply_to_non_preflight_errored_task(self) -> None:
         """Gating guard: a genuine build-phase crash (phase='build',
         exit_code=1) on a task_id WITHOUT `-preflight`/`-clarify` is not a
