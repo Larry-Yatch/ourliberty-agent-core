@@ -174,8 +174,8 @@
 
 ---
 
-## Status snapshot — updated 2026-06-25 06:13Z UTC (Iter ~2698, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 06:18Z UTC (Iter ~2699, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2698 summary:** ⚠️ Watch — Outbox-notifier hot loop continues; fix pending Larry approval. NEW: `ourliberty-heal-forge-wip-only-redispatch` healer installed and ran for first time at 06:00Z — dispatched 9 WIP-retry tasks (4 forge, 5 mirror). PR #699 (reconcile-hardening-retry1) now OPEN+MERGEABLE. Mirror (PID 2647101) reviewing PR #698 (regression test running). Mirror inbox: 8 tasks queued. Cycle timer was stuck and auto-healed at 06:00Z. G-rules: forge-wip-redispatch-digest-tier4-001 (1/3), forge-built-no-pr-retry1-fp-001 (1/3). PRIME: interventions=1165, systemic_fixes=70, vp=26, ratio≈16.64, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2699 summary:** ⚠️ Watch — Outbox-notifier hot loop continues; fix `fix-auto-merge-already-merged-skip-001` pending Larry approval. PR #698 (skip-mirror-review-on-merged-or-closed-pr-001) upgraded to MERGEABLE this iter; Mirror (PID 2647101) actively reviewing. PR #699 (reconcile-hardening-retry1) OPEN+UNKNOWN in Mirror queue. 0 new alerts. Mirror inbox: 8 tasks queued. G-rules: forge-wip-redispatch-digest-tier4-001 (1/3), forge-built-no-pr-retry1-fp-001 (1/3). PRIME: interventions=1166, systemic_fixes=70, vp=26, ratio≈16.66, trend=improving. Tier 1, consecutive_clean=0.
 
 
