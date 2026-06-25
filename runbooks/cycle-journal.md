@@ -5,6 +5,109 @@
 ---
 
 
+## Iteration ~2701 — 2026-06-25T06:37Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry /cycle invocation via chat.
+
+**Health:** ⚠️ Watch — Outbox-notifier hot loop continues (fix pending Larry approval). Mirror (PID 2683047) still reviewing; inbox down to 3 tasks (was 4). PR #698 + #699 both OPEN/UNKNOWN. G-rule `forge-built-no-pr-retry1-fp-001` reached 3/3 → dispatch sent to Beacon. New finding: PID 1834248 zombie bash wait-loop running 27.5 days.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Outbox-notifier loop**: STILL ACTIVE ✅ — log entries through 00:34:05 MDT (06:34Z UTC), AUTO_MERGE_QUEUE_RELEASE / RELEASE_DEFERRED cycle every ~5s on PR #691 / blocker #697 (MERGED). Fix `fix-auto-merge-already-merged-skip-001` pending Larry approval. [carry]
+- **PR #698 (skip-mirror-review-on-merged-or-closed-pr-001)**: OPEN, mergeable=UNKNOWN (was MERGEABLE last iter — GitHub recomputing). reviewDecision="". Mirror (2683047) still running. [carry]
+- **PR #699 (reconcile-hardening-mission-shipped-001-retry1)**: OPEN, mergeable=UNKNOWN. In Mirror queue. [carry]
+- **Pipeline stall FP**: `reconcile-hardening-mission-shipped-001` dry-run still fires. `rebase-forge-post-open-mergeable-687-001` suppressed by cooldown (live alert L1128 fired at 06:27Z). G-rule `forge-built-no-pr-retry1-fp-001` **→ 3/3 this iter**. [dispatched]
+- **Pending approvals**: 1 — `fix-auto-merge-already-merged-skip-001`. Doorbell delivered 06:22Z. [carry]
+- **Mirror inbox**: 3 tasks (down from 4 — `review-forge-post-open-mergeable-rebase-001-rev2.json` for merged PR #687 is gone; likely processed/archived by Mirror). ✅ Progress.
+- **Repo**: HEAD=3179d469=origin/main. Clean. On main. ✅
+- **Sync**: last_sync=2026-06-25T06:00:05Z (~37 min ago). Within 2h. ✅
+- **Daemons**: inbox_watcher (2596660), outbox_notifier (2594852, looping), beacon_telegram_bot (2594942), chain_event_shipper (2595115) — all alive. Mirror (2683047) running. ✅
+- **sequence-paused:operator-needs-you-feed**: No new alert. Still pending Larry action. [carry ✅]
+
+**Check 0 — Alert triage:**
+- repair-watermark: repaired=false, old=1127, file_length=1128. **1 new alert (L1128)**.
+- L1128: `source=heal-pipeline-stall, route=escalate, subject=pipeline-stall:forge-no-pr:rebase-forge-post-open-mergeable-687-001` (ts=06:27:52Z) — triage helper: **Tier-3 silence** ✅ (known-pattern in alert-translations.json). Beacon bot delivered this to Larry at 00:29:38 MDT (route=escalate delivery was upstream of Pulse triage). No additional DM from Pulse.
+- Watermark advanced 1127→1128. ✅
+
+**Check 1 — Log noise:**
+- outbox-notifier.log: **[yellow] HOT LOOP** still active through 00:34:05 MDT (06:34Z UTC). Same root cause. Fix pending Larry approval. [carry]
+- watchdog.log: overall=healthy at 00:35:18 MDT. No WARN cycles. ✅
+
+**Check 2 — Telegram sweep:**
+- beacon_telegram_bot.log: last relevant entry `00:29:38 MDT alert idx=1127 delivered (route=escalate, pipeline-stall)`. No new Larry messages since. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` — FP persists. PR #699 (retry1) OPEN; `sibling_pr_title_shipped` only checks MERGED PRs. [carry]
+- `suppressed (cooldown): forge_built_no_pr:rebase-forge-post-open-mergeable-687-001` — live alert L1128 already fired at 06:27Z; now in cooldown. [carry]
+- G-rule `forge-built-no-pr-retry1-fp-001` → **3/3** (L1128 is the live fire; prior iters had two dry-run occurrences). Dispatch sent this iter. ✅
+- `rebase-escalation-feed-685-001`: FORGE_NO_PR_SKIP via `sibling_pr_title_shipped` pr=#685. ✅ (PR #697 fix working.)
+- All other tasks: FORGE_NO_PR_SKIP correctly. ✅
+
+**Check 4 — Pending directives:**
+- Beacon inbox: now has `direction-ask-forge-built-no-pr-retry1-fp-001.json` (just dispatched). ✅
+- Forge inbox: EMPTY ✅.
+- Mirror inbox (3 tasks, FIFO):
+  - `review-skip-mirror-review-on-merged-or-closed-pr-001-rev1.json` (00:20 MDT) — PR #698. Mirror (2683047) actively reviewing. ✅
+  - `review-skip-mirror-review-on-merged-or-closed-pr-001.json` (00:25 MDT) — duplicate (G-rule review-duplicate-dispatch-wip-redispatch, vp). ⚠️
+  - `review-reconcile-hardening-mission-shipped-001-retry1.json` (00:08 MDT) — PR #699. Queued.
+- beacon-pending-approvals: 1 (`fix-auto-merge-already-merged-skip-001`). Doorbell 06:22Z. ✅
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-06-25T06:24:29Z (~13 min ago). Fresh. ✅
+
+**Check A — Source repo:** HEAD=3179d469=origin/main. Clean. On main. ✅
+
+**Check B — Sync health:** last_sync=2026-06-25T06:00:05Z (~37 min ago). Within 2h. ✅
+
+**Check C — Agent liveness:** All 4 daemons alive (same PIDs as prior iter). Mirror (2683047) running (27.5 days? No — started 00:27 MDT, ~10 min). ✅
+- **[yellow] NEW: PID 1834248** — zombie bash wait-loop. ELAPSED=2,373,472 sec (~27.5 days). Script: `until [ -f /home/larry/agents/outboxes/forge/.archive/build-check-viii-pr-2b-analyzer-001.json ]; do sleep 20; done`. **File DOES NOT EXIST** and likely never will. Exact post-cycle exit discipline anti-pattern (CLAUDE.md). This is an ask-then-do: should Larry kill PID 1834248? Process is harmless (sleeping 20s intervals) but was a session from ~2026-05-28.
+
+**Check E — PRs:**
+- PR #698 (skip-mirror-review-on-merged-or-closed-pr-001): OPEN, UNKNOWN (was MERGEABLE). reviewDecision="". Mirror (2683047) reviewing rev1. ⚠️
+- PR #699 (reconcile-hardening-mission-shipped-001-retry1): OPEN, UNKNOWN. In Mirror queue. ⚠️
+
+**Check H — Forge digest:** Forge IDLE. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. ✅
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check III: not Sunday. Skip. ✅
+
+**G-rule updates:**
+- **forge-built-no-pr-retry1-fp-001** — **DISPATCHED ✅ (3/3, this iter)**. `direction-ask-forge-built-no-pr-retry1-fp-001` sent to Beacon inbox. Fix: extend `sibling_pr_title_shipped` + add `sibling_pr_title_open` / `retry1_pr_exists` skip paths in `heal_pipeline_stall.py`. verification_pending.
+- **forge-wip-redispatch-digest-tier4-001** — 1/3. No new instance. [carry]
+- **outbox-notifier-auto-merge-loop-merged-pr-001** — DISPATCHED ✅ (3/3, iter ~2695). vp. Approval pending Larry. [carry]
+- **watchdog-watcher-log-stale-post-pr694** — 2/3. No new instance. Watchdog healthy. [carry]
+- **review-duplicate-dispatch-wip-redispatch** — vp. Duplicate task still in Mirror inbox. [carry]
+- **heal-daemon-restart-manifest-drift-regenerated-tier4** — 2/3. No new instance. [carry]
+- **check-i-force-bypass-dm-route** — 1/3. Thursday, no occurrence. [carry]
+- **no-session-revision-merged-pr-fp-001** — 1/3. No new instance. [carry]
+- **unrouted-open-pr-auto-merge-held-fp-001** — 1/3. No new instance. [carry]
+
+**Actions taken:** Triaged 1 new alert (L1128): Tier-3 silence (heal-pipeline-stall known-pattern). Watermark advanced 1127→1128. Dispatched `direction-ask-forge-built-no-pr-retry1-fp-001` to Beacon inbox (G-rule 3/3). Appended 2 PRIME ledger rows (1 intervention + 1 systemic_fix).
+
+**Standing findings (updated):**
+- [yellow] **Outbox-notifier hot loop** — Fix `fix-auto-merge-already-merged-skip-001` pending Larry approval. Doorbell delivered 06:22Z. No second DM.
+- [yellow] **PID 1834248 zombie bash loop** — **NEW.** Running ~27.5 days. Waiting for `build-check-viii-pr-2b-analyzer-001.json` (FILE MISSING). Ask-then-do: `kill 1834248` is safe — it's a stale monitoring loop with no active work. Larry can confirm before Pulse acts.
+- [yellow] **PR #698 (skip-mirror-review-on-merged-or-closed-pr-001)** — OPEN, UNKNOWN. Mirror (2683047) reviewing rev1. Expected to complete.
+- [yellow] **PR #699 (reconcile-hardening-mission-shipped-001-retry1)** — OPEN, UNKNOWN. In Mirror queue (after PR #698 rev1 + duplicate).
+- [yellow] **Mirror inbox: 3 tasks** — Down from 4 (progress). PR #698 rev1 (active) + duplicate + PR #699.
+- [yellow] **G-rule forge-built-no-pr-retry1-fp-001** — DISPATCHED. `direction-ask-forge-built-no-pr-retry1-fp-001` in Beacon inbox. vp.
+- [yellow] **sequence-paused:operator-needs-you-feed** — L1105. gate-mismatch chain_merged=False gh_merged=True. **Recovery: `resume sequence operator-needs-you-feed` via Beacon or Dashboard.** [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**PRIME DIRECTIVE:** interventions=1168, systemic_fixes=71, verification_pending=26, ratio≈16.59, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** consecutive_clean=0 (non-clean: outbox-notifier loop, zombie PID 1834248, PRs #698+#699 in pipeline, G-rule dispatch). Tier: 1.
+
+---
+
+
 ## Iteration ~2700 — 2026-06-25T06:31Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry /cycle invocation via chat.

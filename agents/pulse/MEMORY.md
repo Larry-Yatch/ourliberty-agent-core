@@ -168,14 +168,14 @@
 
 ---
 
-## G-rule forge-built-no-pr-retry1-fp-001 — 2/3 (updated iter ~2700)
+## G-rule forge-built-no-pr-retry1-fp-001 → DISPATCHED ✅ (3/3, iter ~2701), vp
 
-**Rule:** `forge_built_no_pr` stall fires even when a PR exists. Two patterns confirmed: (1) `reconcile-hardening-mission-shipped-001` fires even though PR #699 (retry1) is OPEN (sibling_pr_title_shipped only checks MERGED PRs, misses OPEN retry1). (2) `rebase-forge-post-open-mergeable-687-001` fires even though PR #687 is MERGED (branch deleted post-merge, so branch-based match fails; title-based sibling match also misses). Root gap: stall checker has no path that handles "original task's PR is merged/closed AND retry1 PR is OPEN." Dispatch to Beacon at 3/3.
+**Rule:** `forge_built_no_pr` stall fires even when a PR exists. Two patterns confirmed: (1) `reconcile-hardening-mission-shipped-001` fires even though PR #699 (retry1) is OPEN (sibling_pr_title_shipped only checks MERGED PRs, misses OPEN retry1). (2) `rebase-forge-post-open-mergeable-687-001` fires even though PR #687 is MERGED (branch deleted post-merge, so branch-based match fails; title-based sibling match also misses). L1128 was the live alert fire for pattern 2. Dispatched `direction-ask-forge-built-no-pr-retry1-fp-001` to Beacon inbox. Fix: extend `sibling_pr_title_shipped` + add `sibling_pr_title_open`/`retry1_pr_exists` skip paths in `heal_pipeline_stall.py`. verification_pending.
 
 ---
 
-## Status snapshot — updated 2026-06-25 06:31Z UTC (Iter ~2700, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 06:38Z UTC (Iter ~2701, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2700 summary:** ⚠️ Watch — Outbox-notifier hot loop continues; fix `fix-auto-merge-already-merged-skip-001` pending Larry approval (doorbell reminder 06:22Z). PR #698 (skip-mirror-review-on-merged-or-closed-pr-001) had rev0 REVIEW_REVISION; Forge applied rev1; Mirror (PID 2683047, started 00:27 MDT) reviewing rev1. PR #699 (reconcile-hardening-retry1) OPEN+MERGEABLE in Mirror queue. 1 new alert (L1127 doorbell Tier-3 silence). Mirror inbox: 4 tasks (down from 8). New pipeline stall FP: rebase-687. G-rules: forge-built-no-pr-retry1-fp-001 (2/3), forge-wip-redispatch-digest-tier4-001 (1/3). PRIME: interventions=1167, systemic_fixes=70, vp=26, ratio≈16.67, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2701 summary:** ⚠️ Watch — Outbox-notifier hot loop continues; fix `fix-auto-merge-already-merged-skip-001` pending Larry approval. PR #698 + #699 OPEN/UNKNOWN, Mirror (PID 2683047) reviewing. Mirror inbox: 3 tasks (down from 4). G-rule forge-built-no-pr-retry1-fp-001 → DISPATCHED ✅ (3/3) to Beacon. 1 new alert (L1128 Tier-3 silence). NEW: PID 1834248 zombie bash wait-loop (~27.5 days, harmless, ask-then-do kill). PRIME: interventions=1168, systemic_fixes=71, vp=26, ratio≈16.59, trend=improving. Tier 1, consecutive_clean=0.
 
 
