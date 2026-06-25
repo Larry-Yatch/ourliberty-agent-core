@@ -5,6 +5,97 @@
 ---
 
 
+## Iteration ~2712 — 2026-06-25T08:00Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry /cycle invocation via chat.
+
+**Health:** ⚠️ Watch — Outbox-notifier (PID 2754414) running stale code; PR #700 deployed to git at 07:51Z but service started at 07:36Z (pre-merge). Hot loop still active at 01:58:59 MDT. heal-stale-daemon-code gave up; Larry notified via Beacon at 01:55:56 MDT. Next auto-sync in ~60 min. 0 open PRs; Mirror inbox fully cleared.
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #700 (fix-auto-merge-already-merged-skip-001)**: **MERGED** ✅ 07:51:29Z. Loop fix in git. [resolved from carry]
+- **2 stale Mirror inbox files**: **RESOLVED** ✅ Mirror inbox fully empty as of 01:53 MDT (both archived). [resolved]
+- **Outbox-notifier hot loop**: STILL ACTIVE — last log 01:58:59 MDT (07:58Z). PID 2754414 (pre-PR700 code). Stops on next service restart. [carry — stale service]
+- **Pipeline stall FP reconcile-hardening-001**: `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` — FP persists. Fix `heal-forge-no-pr-retry-rebase-fp-001` pending Larry approval. [carry]
+- **Pipeline stall FP rebase-687-001**: `DRY-RUN would alert: forge_built_no_pr:rebase-forge-post-open-mergeable-687-001` — FP persists. [carry]
+- **3 stuck builds** (fix-653-phase4b-spec-id-contract-001, dag-preflight-phase4b-live-thread-001, review-sequence-dag-operator-needs-you-feed): No stall signal in dry-run; Forge inbox/outbox/WIP all empty. **Presumed resolved.** [resolved tentatively]
+- **beacon-pending-approvals**: 1 (`heal-forge-no-pr-retry-rebase-fp-001`). [carry]
+- **Repo**: HEAD=ca67fbad=origin/main. Clean. On main. ✅
+- **Sync**: last_sync=2026-06-25T07:00:11Z (~58 min ago). Within 2h. ✅
+- **Daemons**: beacon_telegram_bot (PID 2715635), outbox_notifier (PID 2754414), chain_event_shipper (PID 2716672) — all alive. ✅
+- **Watchdog**: overall=healthy at 01:52:00 MDT. ✅
+- **Zombie PID 1834248**: still alive (Ss, bash, etimes=2378291s ~27.5d). Ask-then-do: `kill 1834248`. [carry]
+- **Stale daemon code heartbeat**: 2026-06-25T07:55:15Z (~5 min ago). Fresh. ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark: repaired=false, old=1153, file_length=1155. **2 new alerts (L1154, L1155).**
+- L1154 (idx=1153): `source=outbox-notifier, intent=review-pass` at 07:51:32Z — Mirror approved PR #700, auto-merged + branch deleted. Triage helper: **Tier-3 silence** ✅ (known-pattern match). Beacon delivered idx=1153 at 01:55:56 MDT. Journal-note only.
+- L1155 (idx=1154): `source=heal-stale-daemon-code, subject=still-stale-after-restart:ourliberty-outbox-notifier.service` at 07:55:17Z — healer gave up; service still running pre-PR700 code. Triage helper: **Tier-4** (novel, no translation match). Beacon delivered idx=1154 at 01:55:56 MDT (Larry already notified). No second Pulse DM.
+- Watermark advanced 1153→1155. ✅
+
+**Check 1 — Log noise:**
+- outbox-notifier.log: **[yellow] HOT LOOP** still active at 01:58:59 MDT. PR #698 re-queuing behind merged blocker #700. PID 2754414 (pre-PR700 code). Stops on next service restart with new code.
+- watchdog.log: overall=healthy at 01:52:00 MDT. ✅
+
+**Check 2 — Telegram sweep:**
+- beacon_telegram_bot.log: last entries `01:55:56 MDT idx=1153 delivered (intent=review-pass)` + `01:55:56 MDT idx=1154 delivered (source=heal-stale-daemon-code, subject=still-stale-after-restart:ourliberty-outbox-notifier.service)`. No new Larry messages. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` — FP persists. Fix `heal-forge-no-pr-retry-rebase-fp-001` pending. [carry]
+- `DRY-RUN would alert: forge_built_no_pr:rebase-forge-post-open-mergeable-687-001` — FP persists. [carry]
+- 2 alert(s) would fire, 0 recovery(ies) attempted.
+
+**Check 4 — Pending directives:**
+- Beacon inbox: **EMPTY** ✅
+- Forge inbox: **EMPTY** ✅ (outbox + WIP also empty)
+- Mirror inbox: **EMPTY** ✅ (all 5 tasks from ~2711 resolved/archived by 01:53 MDT)
+- beacon-pending-approvals: 1 (`heal-forge-no-pr-retry-rebase-fp-001`). [carry]
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-06-25T07:55:15Z (~5 min ago). Fresh. ✅
+
+**Check A — Source repo:** HEAD=ca67fbad=origin/main. Clean. On main. ✅
+
+**Check B — Sync health:** last_sync=2026-06-25T07:00:11Z (~58 min ago). Within 2h. ✅
+
+**Check C — Agent liveness:** beacon_telegram_bot (PID 2715635), outbox_notifier (PID 2754414), chain_event_shipper (PID 2716672) — all alive. ✅
+- **[yellow] PID 1834248** — zombie bash wait-loop. Still alive (etimes=2378291s ~27.5d). Ask-then-do: `kill 1834248`. [carry]
+
+**Check E — PRs:** No open PRs. ✅ (PR #700 merged 07:51:29Z — last open PR resolved.)
+
+**Check H — Forge digest:** Forge IDLE (inbox/outbox/WIP empty). ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check III: not Sunday. Skip. ✅
+
+**G-rule updates:**
+- **outbox-notifier-auto-merge-loop-merged-pr-001** (vp → partially verified): PR #700 MERGED at 07:51:29Z. Fix is in git. Service still running pre-PR700 code → loop still active. Verification completes when loop stops on next service restart. Still vp.
+- **heal-stale-daemon-code-still-stale-after-restart** (new, 1/3): `source=heal-stale-daemon-code, subject^=still-stale-after-restart:` Tier-4 (genuine ask-then-do — healer gave up, service needs manual intervention). First occurrence. Not a silence candidate. Tracking.
+- All other G-rules: unchanged from ~2711.
+
+**Actions taken:** Triaged L1154 (Tier-3 silence) + L1155 (Tier-4, Larry already notified by Beacon). Watermark advanced 1153→1155. Appended 1 PRIME ledger row (intervention). Cycle tier recorded: non-clean.
+
+**Standing findings (updated):**
+- [yellow] **Outbox-notifier stale code + hot loop** — PID 2754414 running pre-PR700 code. Hot loop active (~5s/cycle, PR #698 re-queuing behind merged #700). Larry notified (Beacon idx=1154). Resolves on next sync (~60 min) + service restart. Manual immediate: `bash ~/agent-core/scripts/sync_agent_core.sh && sudo systemctl restart ourliberty-outbox-notifier.service`.
+- [yellow] **heal-forge-no-pr-retry-rebase-fp-001 pending approval** — `approve heal-forge-no-pr-retry-rebase-fp-001` unblocks 2 pipeline stall FPs.
+- [yellow] **PID 1834248 zombie bash loop** — Still alive. Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **sequence-paused:operator-needs-you-feed** — Recovery: `resume sequence operator-needs-you-feed` via Beacon or Dashboard.
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision.
+- [yellow] **unreviewed-merge:649** — Larry judgment.
+- [yellow] **unreviewed-merge:637** — Larry judgment.
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`.
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`.
+
+**PRIME DIRECTIVE:** interventions=1179, systemic_fixes=71, verification_pending=26, ratio≈16.60, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** consecutive_clean=0 (non-clean: stale outbox-notifier + hot loop, 2 stall FPs, zombie PID, pending approval). Tier: 1.
+
+---
+
+
 ## Iteration ~2711 — 2026-06-25T07:51Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry /cycle invocation via chat.

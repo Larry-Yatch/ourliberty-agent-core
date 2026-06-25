@@ -186,8 +186,14 @@
 
 ---
 
-## Status snapshot — updated 2026-06-25 07:52Z UTC (Iter ~2711, Tier 1, consecutive_clean=0→0)
+## G-rule heal-stale-daemon-code-still-stale-after-restart — 1/3 (new, iter ~2712)
 
-**Iter ~2711 summary:** ⚠️ Watch — Outbox-notifier hot loop still active (PID 2754414, 07:49Z UTC last log). PR #700 under active Mirror review (PID 2754506, ~13 min at check). 0 new alerts this cycle (watermark=file_length=1153). 2 stale Mirror inbox files for merged PR #698 still present (session perms block Pulse archive). `heal-forge-no-pr-retry-rebase-fp-001` approval pending Larry. PID 1834248 zombie alive (~27.5d). PRIME: interventions=1178, systemic_fixes=71, vp=26, ratio≈16.59, trend=improving. Tier 1, consecutive_clean=0.
+**Rule:** `source=heal-stale-daemon-code, subject^=still-stale-after-restart:` alerts fire when the healer attempted a restart but the service's ActiveEnterTimestamp is STILL older than the script file (healer won't retry). Different from `auto-restart-failed` (where systemd self-heals) — here the service IS running, just with old code. Genuine ask-then-do. Remediation: `bash ~/agent-core/scripts/sync_agent_core.sh && sudo systemctl restart <service>`. NOT a silence candidate. First occurrence iter ~2712 (outbox-notifier running pre-PR700 code). Dispatch to Beacon at 3/3 only if healer needs retry-more-aggressively behavior; otherwise leave as ask-then-do.
+
+---
+
+## Status snapshot — updated 2026-06-25 08:00Z UTC (Iter ~2712, Tier 1, consecutive_clean=0→0)
+
+**Iter ~2712 summary:** ⚠️ Watch — PR #700 MERGED at 07:51:29Z (outbox-notifier loop fix deployed to git). Outbox-notifier (PID 2754414) still running pre-PR700 code; started at 07:36Z before merge. heal-stale-daemon-code gave up; Larry notified via Beacon (idx=1154). Loop still active (~5s/cycle). 2 new alerts triaged (L1154 Tier-3, L1155 Tier-4). Mirror inbox fully cleared. 3 stuck builds presumed resolved (no stall signal + Forge empty). `heal-forge-no-pr-retry-rebase-fp-001` approval pending Larry. PID 1834248 zombie alive (~27.5d). outbox-notifier-auto-merge-loop-merged-pr-001 vp (fix merged, loop stops on service restart). PRIME: interventions=1179, systemic_fixes=71, vp=26, ratio≈16.60, trend=improving. Tier 1, consecutive_clean=0.
 
 
