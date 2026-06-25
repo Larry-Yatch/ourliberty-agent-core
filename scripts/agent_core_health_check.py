@@ -53,7 +53,8 @@ SCRIPTS_DIR = Path('/home/larry/agents/scripts')
 SYNC_SCRIPT = SCRIPTS_DIR / 'sync_agent_core.sh'
 SYNC_STATUS_FILE = Path('/home/larry/agents/blackboard/agent-core-sync.json')
 HEALTH_LOG = Path('/home/larry/agents/blackboard/agent-core-health.log')
-NOTIFY_SCRIPT = SCRIPTS_DIR / 'notify_larry.py'  # TODO(Larry): wire up Phase D notify
+HEALTH_STATE_FILE = Path('/home/larry/agents/blackboard/agent-core-health-state.json')
+NOTIFY_SCRIPT = SCRIPTS_DIR / 'notify_larry.py'
 
 SYNC_STALE_HOURS = 6
 GIT_TIMEOUT = 30
@@ -103,6 +104,43 @@ def alert_larry(subject: str, message: str) -> bool:
     except (subprocess.TimeoutExpired, FileNotFoundError) as e:
         log(f'WARN: alert send failed: {e}')
         return False
+
+
+def read_prior_issue_names() -> set[str]:
+    """Issue check-names flagged on the previous run (for the persist-2-runs gate)."""
+    try:
+        with open(HEALTH_STATE_FILE) as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return set()
+    names = data.get('issue_names', [])
+    return set(names) if isinstance(names, list) else set()
+
+
+def write_issue_names(names) -> None:
+    """Persist the current run's issue check-names for the next run to compare."""
+    try:
+        HEALTH_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        tmp = HEALTH_STATE_FILE.with_name(HEALTH_STATE_FILE.name + '.tmp')
+        with open(tmp, 'w') as f:
+            json.dump(
+                {'issue_names': sorted(names),
+                 'updated': datetime.now(timezone.utc).isoformat()},
+                f,
+            )
+        os.replace(tmp, HEALTH_STATE_FILE)
+    except OSError as e:
+        log(f'WARN: could not persist health state: {e}')
+
+
+def persisted_issues(issues, prior_names):
+    """Issues from this run that were ALSO flagged on the previous run.
+
+    The persist-2-runs gate: an issue alerts only once it has survived two
+    consecutive runs, so the transient mid-cycle dirty-tree window self-clears
+    instead of paging.
+    """
+    return [(name, result) for name, result in issues if name in prior_names]
 
 
 def check_branch() -> dict:
@@ -310,19 +348,45 @@ def main() -> int:
         if sync_result.get('ok'):
             auto_fixed.append('sync_freshness: triggered sync_agent_core.sh successfully')
 
+    # Persist-2-runs guard (actionable-only). The working tree is briefly dirty
+    # and/or has untracked files while Pulse commits mid-cycle; that single-run
+    # blip clears before the next run, so alerting on it is noise. Only alert
+    # about an issue that was ALSO flagged on the previous run — genuine drift
+    # persists run-over-run and still surfaces (one run later), while transients
+    # self-clear. State is keyed on the set of failing check-names.
+    alerted = False
     if issues:
         log(f'{len(issues)} issue(s) require human attention', quiet=quiet)
-        sections = []
-        for name, result in issues:
-            detail = result.get('detail', 'unknown')
-            remediation = result.get('remediation', '(no remediation hint)')
-            sections.append(f'• {name}: {detail}\n  → {remediation}')
-        message = (
-            'ourliberty-agent-core repo health check found issues that need your judgment:\n\n'
-            + '\n\n'.join(sections)
-            + '\n\nFull state in /home/larry/agents/blackboard/agent-core-health.log'
-        )
-        alert_larry(f'{len(issues)} issue(s) need attention', message)
+        prior_names = read_prior_issue_names()
+        current_names = {name for name, _ in issues}
+        if not args.dry_run:
+            write_issue_names(current_names)
+        persisted = persisted_issues(issues, prior_names)
+        if persisted:
+            sections = []
+            for name, result in persisted:
+                detail = result.get('detail', 'unknown')
+                remediation = result.get('remediation', '(no remediation hint)')
+                sections.append(f'• {name}: {detail}\n  → {remediation}')
+            message = (
+                'ourliberty-agent-core repo health check found issues that need your judgment:\n\n'
+                + '\n\n'.join(sections)
+                + '\n\nFull state in /home/larry/agents/blackboard/agent-core-health.log'
+            )
+            if args.dry_run:
+                log(f'Would alert Larry: {len(persisted)} issue(s) persisted across '
+                    f'2 runs (dry-run — no DM sent)', quiet=quiet)
+            else:
+                alerted = alert_larry(f'{len(persisted)} issue(s) need attention', message)
+                log(f'Alerted Larry: {len(persisted)} issue(s) persisted across 2 runs',
+                    quiet=quiet)
+        else:
+            log('Issue(s) present but none persisted across 2 consecutive runs — '
+                'suppressing alert (actionable-only guard; transient mid-cycle window)',
+                quiet=quiet)
+    elif not args.dry_run:
+        # Healthy: clear the prior-run signature so a future blip starts fresh.
+        write_issue_names(set())
 
     if auto_fixed:
         log(f'Auto-fixed: {auto_fixed}', quiet=quiet)
@@ -338,7 +402,9 @@ def main() -> int:
         if auto_fixed:
             print(f'\nAuto-fixed: {", ".join(auto_fixed)}')
         if issues:
-            print(f'\nNeeds attention: {len(issues)} issue(s) — Larry alerted via notify.')
+            status = ('Larry alerted via notify' if alerted
+                      else 'alert held (not yet persisted across 2 runs)')
+            print(f'\nNeeds attention: {len(issues)} issue(s) — {status}.')
 
     return 0 if not issues else 1
 
