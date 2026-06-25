@@ -5,6 +5,92 @@
 ---
 
 
+## Iteration ~2795 — 2026-06-25T18:00Z UTC (interactive /loop /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/loop /cycle` invocation via chat.
+
+**Health:** ✅ Nominal — no new alerts (wm=992 unchanged), 8/8 daemons alive, watchdog healthy. PR #703 recovery via Beacon direction-ask dispatched in prior iter (~2794); PR #704 Mirror review active. Carries only.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo**: HEAD=f06cd143=origin/main. On main. Clean. ✅
+- **Sync**: last_sync=2026-06-25T17:00:39Z (~57 min ago). Within 2h. ✅
+- **Daemons (re-verified)**: forge_bot=1388801 (Ss, 180823s ~50.23h) ✅, mirror_bot=1388982 (Ss, 180815s) ✅, pulse_bot=1389067 (Ss, 180811s) ✅, beacon_telegram_bot=2715635 (Ss, 39771s ~11.05h) ✅, dashboard_api=2715859 (Ssl, 39763s) ✅, chain_event_shipper=2716672 (SNs, 39689s) ✅, inbox_watcher=2754413 (Ssl, 37284s ~10.36h) ✅, outbox_notifier=2773485 (Ss, 35563s ~9.88h) ✅. 8/8 alive. ✅
+- **Watchdog**: last entry 11:55:16 MDT (17:55:16Z, ~5 min before cycle) — overall=healthy. ✅
+- **heal-stale-daemon-code heartbeat**: 2026-06-25T17:53:43Z (~6 min old). Fresh. ✅
+- **Zombie PID 1834248**: still alive (Ss, etimes=2414459s ~27.95d). Ask-then-do. [carry]
+- **6 stale journalctl PIDs**: all alive (1101500 1107838 1118830 1136223 1161972 1177335). Ask-then-do. [carry]
+- **beacon-pending-approvals**: pending=0. ✅
+- **Agent inboxes**: beacon=1 (redispatch-mirror-pr703-stuck-review-001, dispatched ~2794 ~8 min ago) ✅, forge=EMPTY ✅, mirror=2 (marker-error-reconcile dead [Beacon handling]; review-704 active ~17 min) ✅, pulse=EMPTY ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark: `{"repaired": false, "old_watermark": 992, "file_length": 992}`. No new alerts since ~2794. ✅ Nominal.
+
+**Check 1 — Log noise:**
+- `journalctl --user -p warning --since "30 minutes ago"` → `-- No entries --`. ✅
+- outbox-notifier.log: Last WARN was 11:47:30 MDT (mirror marker-error for PR #703, prior iter). No new WARNs. ✅
+- watchdog.log: last entry 11:55:16 MDT (17:55:16Z) — overall=healthy. ✅
+
+**Check 2 — Telegram sweep:**
+- Beacon bot PID 2715635 (Ss, ~11.05h) ✅. Last Larry message 11:29:56 MDT ('go'). Last alert delivered: idx=991 at 11:52:10 MDT (medic-diagnosis for PR #703 stall). No new messages from Larry since. No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- 18 tasks FORGE_NO_PR_SKIP. 1 suppressed (cooldown): `retry_exhausted:reconcile-two-stale-inflight-missions-shipped-001`. **"no stalls detected"**. ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- Beacon inbox: 1 task (redispatch-mirror-pr703-stuck-review-001) dispatched ~2794, Beacon not yet acted. ✅
+- Forge inbox: EMPTY ✅
+- Mirror inbox: dead marker-error (Beacon handling via direction-ask); review-704 active (~17 min). ✅
+- beacon-pending-approvals: 0. ✅
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` → OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** heartbeat=2026-06-25T17:53:43Z (~6 min old). Fresh. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=f06cd143=origin/main. On main. Clean. ✅ Nominal.
+**Check B — Sync health:** last_sync=2026-06-25T17:00:39Z (~57 min). Within 2h. ✅ Nominal.
+**Check C — Agent liveness:** 8/8 alive.
+- **[yellow] PID 1834248** — zombie bash loop (~27.95d). Ask-then-do: `kill 1834248`. [carry]
+- **[yellow] 6 stale journalctl PIDs (~30-31d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+
+**Check E — PRs:** 2 open PRs.
+- PR #703: "chore(missions): reconcile pulse-cycle-upgrade + rate-limit-resilience to shipped" — mergeable=MERGEABLE, reviewDecision="" — Awaiting fresh Mirror review (Beacon direction-ask in-flight). ✅ Recovery in-progress.
+- PR #704: "chore(missions): reconcile 7 shipped missions stuck in drafting" — UNKNOWN mergeable, Mirror review active (~17 min at cycle time). ✅ Active.
+
+**Check H — Forge digest:** No new Forge activity this iter. Pipeline: Beacon handling PR #703 recovery; Mirror reviewing #704. ✅ Active.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check VIII/IX/X: Not Monday. Skip. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule updates:** No new G-rule occurrences this iter. All active G-rules carry unchanged from ~2794.
+
+**Actions taken:**
+1. PRIME ledger: `iter_clean` appended (tier=1, template=iter-clean-nominal).
+2. Tier state: `record --checks-clean false` → consecutive_clean stays 0 (PR #703 recovery in-progress + zombie+journalctl carries). Tier remains 1.
+
+**Dispatches:** None (Beacon direction-ask for PR #703 dispatched in ~2794; awaiting pickup).
+
+**Standing findings (carried + verified):**
+- [yellow] **PID 1834248 zombie bash loop** — Still alive (~27.95d). Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **6 stale journalctl PIDs (~30-31d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+- [yellow] **PR #703 stuck** — Beacon direction-ask dispatched at ~2794. Awaiting Beacon pickup and Mirror re-review. [active dispatch]
+- [yellow] **board-new-mission-confirm-placeholder-001** — Forge rejected (spec targets retired UI). Larry DM'd 11:37 MDT. Awaiting Larry re-spec vs. drop decision. [carry]
+- [yellow] **sequence-paused:operator-needs-you-feed** — Recovery: `resume sequence operator-needs-you-feed` via Beacon or Dashboard. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649/637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**PRIME DIRECTIVE:** interventions=1223, systemic_fixes=71, verification_pending=26, ratio≈17.23, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0 (non-clean: PR #703 recovery in-progress + zombie PID + 6 stale journalctl PIDs). Last signal: 2026-06-25T18:00:17Z.
+
+---
+
+
 ## Iteration ~2794 — 2026-06-25T17:52Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/cycle` invocation via chat.
@@ -93,6 +179,9 @@
 
 **PRIME DIRECTIVE:** interventions=1223, systemic_fixes=71, verification_pending=26, ratio≈17.23, trend=improving. Tier 1, consecutive_clean=0.
 **Tier end-of-iter:** Tier **1**, consecutive_clean=0 (non-clean: PR #703 stuck + zombie PID + 6 stale journalctl PIDs). Last signal: 2026-06-25T17:55:11Z.
+
+**[Inter-agent result — 2026-06-25T~18:00Z] `redispatch-mirror-pr703-stuck-review-001` → SUCCESS (Beacon)**
+Beacon completed PR #703 recovery: (1) archived dead `marker-error-reconcile-two-stale-inflight-missions-shipped-001-1.json` → `.archive/`; (2) wrote fresh Mirror review task `review-pr-ourliberty-agent-core-703.json` (task_id `pr-ourliberty-agent-core-703`) via `safe_write_inbox` — new task_id avoids dedup collision with the dead original. Mirror inbox now holds active #704 (pid 2958188 reviewing) + pending fresh #703. Once #704 completes, inbox watcher spawns the #703 session. PR #703 stuck finding is **resolved** — removing from carried standings next iter.
 
 ---
 
