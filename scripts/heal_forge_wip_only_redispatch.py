@@ -1,0 +1,568 @@
+#!/usr/bin/env python3
+"""heal_forge_wip_only_redispatch.py — auto-re-dispatch a Forge/Mirror build whose
+session died leaving ONLY the ``[WIP][session-start]`` checkpoint commit.
+
+THE FAILURE PATTERN (Pulse § G rule 'Forge-timeout-worktree-missing-retry-loop';
+3 observed instances, latest 2026-06-24 task=reconcile-hardening-mission-shipped-001):
+Forge is dispatched, ``worktree_manager.setup_branch_checkpoint`` pushes a
+``[WIP][session-start] <stem>`` commit to ``forge/<task>``, then the session dies
+mid-build (API overload / context limit / silent crash on a heavier task). The
+branch tip stays the WIP-only commit: no build commit lands, no PR opens, and the
+inbox file was already consumed (archived to
+``~/agents/inboxes/forge/.archive/<task>.json``). Nothing auto-recovers this
+signature today: ``heal_abandoned_inbox_tasks`` only recovers tasks whose inbox
+file STILL exists; ``heal_phantom_dispatch_claim`` is detection-only;
+``heal_pipeline_stall`` Check 1 (forge-built-no-PR) is alert-only by design AND
+needs a terminal ``done success=True`` log line this failure never emits.
+
+WHAT THIS HEALER DOES (poll-based, bounded, zero-LLM): every tick it enumerates
+``forge/*`` and ``mirror/*`` dispatch branches across the canonical repos, finds
+the ones that match the WIP-only / dead-session / no-PR / not-already-requeued
+signature, and mechanically re-queues the SAME task ONCE by rebuilding a fresh
+inbox envelope from the archived original. A durable ledger keyed by the original
+task stem bounds auto-retries to ``MAX_AUTO_RETRIES`` (default 1); once exhausted
+it fires exactly ONE loud Larry alert and never redispatches that family again.
+
+DETECTION SIGNATURE — a branch is a candidate only when ALL hold; any ambiguous
+or indeterminate signal => SKIP, never redispatch:
+  1. WIP-only: the branch tip adds NOTHING over its merge-base with origin/main
+     (only the empty WIP commit). Classified by the SAME merge-base/changed-files
+     classifier ``cleanup_dispatch_branches.compute_net_change`` ('empty-wip').
+  2. Session ended: no live in-flight claim (``state/in-flight/<task>.json`` with
+     a signalable pid).
+  3. No open PR AND no merged PR whose head is this dispatch branch.
+  4. No live (un-archived) inbox file already queued for this task family (covers
+     the already-requeued case — e.g. a pending ``<task>-002`` manual retry).
+  5. Branch tip older than ``GRACE_SECONDS`` (default 1800) so a live build is
+     never raced.
+
+MUST re-dispatch from the archived ORIGINAL envelope, never from reconstructed
+chat prose. **Enforcement:** ``build_retry_envelope`` reads only
+``inboxes/<agent>/.archive/<base>.json`` (``_find_archived_original``); if that
+file is absent or ambiguous the candidate is SKIPPED (no synthesized envelope is
+ever written) — exercised by ``test_skips_when_no_archived_original``.
+
+MUST guarantee re-running NEVER double-dispatches the same family. **Enforcement:**
+three independent idempotency gates — the durable ledger keyed by the retry-suffix-
+stripped base stem (``_ledger_base``), the live-inbox family-root check
+(``_live_inbox_family_roots``), and the retry-suffixed ``task_id`` itself — any one
+of which turns the second tick into a no-op; covered by
+``test_second_tick_is_noop_via_ledger`` and ``test_skips_when_retry_already_pending``.
+
+NEVER fire a loud Larry alert unless the latest RETRY itself died WIP-only, and
+never more than once per exhausted family. **Enforcement:** the escalate path in
+``evaluate`` requires the candidate branch to BE the ledger's
+``last_retry_task_id`` (the lingering original branch is skipped, so a healthy or
+merged retry never triggers a false 'exhausted' DM), and the persisted
+``escalated`` flag bounds it to one alert — covered by
+``test_exhausted_escalates_exactly_once`` and
+``test_no_false_escalation_on_lingering_original_after_redispatch``.
+
+NEVER act when disabled or under test. **Enforcement:** ``main`` returns early on
+``~/agents/healers.disabled``; the inbox write calls
+``test_isolation_guard.refuse_under_test('inbox-write')`` first, so a test that
+reaches the real write un-mocked fails loud rather than dispatching to production.
+
+stdlib only (plus sibling repo modules).
+"""
+from __future__ import annotations
+
+import json
+import os
+import re
+import sys
+import tempfile
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+
+# Repo scripts dir on sys.path so sibling imports resolve when run by systemd.
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+import cleanup_dispatch_branches as cdb  # noqa: E402  branch classifier + git/gh helpers
+from test_isolation_guard import refuse_under_test  # noqa: E402
+
+AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
+KILL_SWITCH = AGENTS_ROOT / 'healers.disabled'
+INBOXES_ROOT = AGENTS_ROOT / 'inboxes'
+IN_FLIGHT_DIR = AGENTS_ROOT / 'state' / 'in-flight'
+LEDGER_PATH = AGENTS_ROOT / 'state' / 'forge_wip_redispatch_ledger.json'
+LOG_FILE = AGENTS_ROOT / 'logs' / 'heal_forge_wip_only_redispatch.log'
+
+# Both agents that create a pushed WIP checkpoint via the inbox_watcher worktree
+# path (worktree_enabled in agent-models.json). Mirrors cleanup_dispatch_branches.
+DISPATCH_AGENTS = ('forge', 'mirror')
+
+# Branch tip must be older than this before we touch it, so a live build that
+# just pushed its WIP checkpoint (and is still grinding) is never raced. 30 min
+# comfortably exceeds the checkpoint→first-build-commit gap of a healthy build.
+GRACE_SECONDS = 1800
+
+# Auto-retries per ORIGINAL task family. 1 means: one mechanical re-queue, then
+# escalate to Larry. The ledger enforces this across ticks and across the whole
+# retry chain (the base stem is retry-suffix-stripped).
+MAX_AUTO_RETRIES = 1
+
+ALERT_SOURCE = 'forge-wip-redispatch'
+
+# A healer-minted retry suffix: `<base>-retry<N>`. Stripped to recover the base
+# family stem so the ledger bounds the whole chain, not each retry separately.
+_RETRY_SUFFIX_RE = re.compile(r'-retry\d+$')
+# A trailing numeric counter (`-001`, `-002`) — the manual-requeue convention.
+# Used ONLY for the "already requeued" dedup family-root, never for ledger keys.
+_NUMERIC_SUFFIX_RE = re.compile(r'-\d+$')
+
+
+# ---------- logging ----------
+
+
+def _log_path() -> Path:
+    override = os.environ.get('OURLIBERTY_LOG_DIR')
+    if override:
+        return Path(override) / 'heal_forge_wip_only_redispatch.log'
+    return LOG_FILE
+
+
+def log(level: str, msg: str) -> None:
+    line = f'[{datetime.now(timezone.utc).isoformat()}] [{level}] {msg}'
+    print(line, flush=True)
+    try:
+        path = _log_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, 'a', encoding='utf-8') as f:
+            f.write(line + '\n')
+    except OSError:
+        # A full/read-only log FS must never crash the healer.
+        pass
+
+
+# ---------- task-id / family helpers ----------
+
+
+def _ledger_base(stem: str) -> str:
+    """The ledger family key: the task stem with a healer retry suffix stripped.
+    ``foo-001`` -> ``foo-001``; ``foo-001-retry1`` -> ``foo-001``. Keying on this
+    makes the retry chain share ONE ledger entry, so MAX_AUTO_RETRIES bounds the
+    whole family rather than resetting on each generated retry branch."""
+    return _RETRY_SUFFIX_RE.sub('', stem)
+
+
+def _family_root(stem: str) -> str:
+    """The broad dedup root used to recognize an already-pending requeue of the
+    SAME work: strip a healer retry suffix AND a trailing numeric counter.
+    ``reconcile-...-001`` and ``reconcile-...-002`` and
+    ``reconcile-...-001-retry1`` all collapse to ``reconcile-...``. Deliberately
+    generous — a false match here only makes us SKIP (never redispatch), the safe
+    direction per the 'any ambiguous signal => SKIP' doctrine."""
+    return _NUMERIC_SUFFIX_RE.sub('', _RETRY_SUFFIX_RE.sub('', stem))
+
+
+def _task_from_branch(branch: str) -> Optional[str]:
+    """Sanitized task stem from a ``<agent>/<stem>`` dispatch branch, or None."""
+    for agent in DISPATCH_AGENTS:
+        prefix = f'{agent}/'
+        if branch.startswith(prefix):
+            return branch[len(prefix):]
+    return None
+
+
+# ---------- archived-original lookup (source of truth for re-dispatch) ----------
+
+
+def _find_archived_original(agent: str, branch_stem: str) -> Optional[Path]:
+    """Locate the archived original envelope for a candidate branch.
+
+    The dispatch branch name carries the WORKTREE-sanitized task stem (chars
+    mapped to '-', truncated to 50), which may not equal the original task_id
+    byte-for-byte. So we match by re-sanitizing each archived filename's stem the
+    SAME way (cdb._sanitize_task_id) and comparing to the branch's stem. Returns
+    the unique match, or None when there is no match OR more than one (ambiguous
+    => caller SKIPs — we never guess which original to re-dispatch)."""
+    archive = INBOXES_ROOT / agent / '.archive'
+    if not archive.is_dir():
+        return None
+    matches = [
+        f for f in archive.glob('*.json')
+        if cdb._sanitize_task_id(f.stem) == branch_stem
+    ]
+    if len(matches) == 1:
+        return matches[0]
+    return None
+
+
+# ---------- live-state gates ----------
+
+
+def _has_live_in_flight(stems: list[str]) -> bool:
+    """True if any of ``stems`` has a live in-flight registry entry (a signalable
+    pid). agent_runner keys state/in-flight/<task_stem>.json on the raw task_id,
+    so we check both the branch (sanitized) stem and the original stem."""
+    if not IN_FLIGHT_DIR.is_dir():
+        return False
+    for stem in stems:
+        if not stem:
+            continue
+        f = IN_FLIGHT_DIR / f'{stem}.json'
+        try:
+            entry = json.loads(f.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(entry, dict) and cdb._pid_alive(entry.get('pid')):
+            return True
+    return False
+
+
+def _live_inbox_family_roots(agent: str) -> set[str]:
+    """Family roots (_family_root) of every LIVE top-level inbox task for ``agent``
+    — the set of work already queued. A candidate whose family root is in here is
+    already being retried (by a human, the abandoned-inbox healer, or a prior tick
+    of this one) and MUST NOT be piled on. Scans only ``*.json`` at the top level;
+    .archive/ and .invalid/ (terminal) are correctly excluded."""
+    roots: set[str] = set()
+    inbox = INBOXES_ROOT / agent
+    if not inbox.is_dir():
+        return roots
+    for f in inbox.glob('*.json'):
+        try:
+            body = json.loads(f.read_text())
+        except (OSError, json.JSONDecodeError):
+            # Unreadable -> use the filename stem so we still dedup conservatively.
+            roots.add(_family_root(f.stem))
+            continue
+        task_id = body.get('task_id') if isinstance(body, dict) else None
+        roots.add(_family_root(str(task_id) if task_id else f.stem))
+    return roots
+
+
+# ---------- ledger ----------
+
+
+def load_ledger() -> dict:
+    try:
+        data = json.loads(LEDGER_PATH.read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def save_ledger(ledger: dict) -> None:
+    """Atomic tmp+os.replace write so a crash mid-write never corrupts the ledger
+    (a corrupt ledger reads as empty and would reset every family's attempt
+    count — the one way this healer could double-dispatch)."""
+    LEDGER_PATH.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(LEDGER_PATH.parent), suffix='.tmp')
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            json.dump(ledger, f, indent=2, sort_keys=True)
+        os.replace(tmp, LEDGER_PATH)
+    except OSError as exc:
+        log('ERROR', f'ledger save failed: {exc}')
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+
+
+# ---------- re-dispatch envelope ----------
+
+# Envelope fields preserved verbatim from the archived original. phase is forced
+# to 'build' and task_id is replaced with the retry-suffixed id; everything else
+# the build needs is carried through unchanged.
+_PRESERVE_FIELDS = (
+    'prompt', 'summary', 'target_agent', 'target_repo', 'task_type',
+    'pr_title', 'changed_files', 'source', 'reply_chat_id',
+)
+
+
+def build_retry_envelope(original: dict, retry_task_id: str) -> dict:
+    env: dict = {'task_id': retry_task_id}
+    for key in _PRESERVE_FIELDS:
+        if key in original:
+            env[key] = original[key]
+    env['phase'] = 'build'
+    env['redispatch_of'] = original.get('task_id')
+    return env
+
+
+def _atomic_write_envelope(dest: Path, envelope: dict) -> None:
+    """tmp+os.replace write into the agent inbox. Guarded: a test that reaches
+    this un-mocked trips refuse_under_test rather than writing to the live tree."""
+    refuse_under_test('inbox-write')
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(dest.parent), suffix='.tmp')
+    with os.fdopen(fd, 'w', encoding='utf-8') as f:
+        json.dump(envelope, f, indent=2)
+    os.replace(tmp, dest)
+
+
+# ---------- alerting (actionable-only) ----------
+
+
+def _emit_alert(route: str, severity: str, message: str, subject: str) -> None:
+    """One best-effort larry_alerts line. route='digest' for routine auto-redispatch
+    (daily CEO digest, never a DM); route='escalate' only for retries-exhausted."""
+    try:
+        import larry_alerts
+    except Exception as exc:  # noqa: BLE001 — alerting is best-effort
+        log('WARN', f'larry_alerts unavailable: {exc}')
+        return
+    larry_alerts.append_alert(
+        source=ALERT_SOURCE, severity=severity, message=message,
+        subject=subject, route=route,
+    )
+
+
+# ---------- per-candidate decision ----------
+
+
+@dataclass
+class Candidate:
+    repo: Path
+    agent: str
+    branch: str          # short, no origin/ (e.g. 'forge/foo-001')
+    branch_stem: str     # sanitized task stem from the branch
+    committer_ts: int
+
+
+def _open_and_merged_heads(repo: Path) -> Optional[tuple[set[str], set[str]]]:
+    """(open_heads, merged_heads) for ``repo`` via gh, or None if the OPEN-PR list
+    is unavailable. None is a hard stop for the repo: without it we cannot prove a
+    branch is not still an open PR head, so we refuse to redispatch anything there."""
+    open_heads = cdb._gh_pr_heads(repo, 'open')
+    if open_heads is None:
+        return None
+    merged_heads = cdb._gh_pr_heads(repo, 'merged') or set()
+    return open_heads, merged_heads
+
+
+def evaluate(cand: Candidate, now: float, open_heads: set[str],
+             merged_heads: set[str], ledger: dict) -> tuple[str, str]:
+    """Pure-ish decision for one candidate. Returns (action, reason) where action
+    is 'redispatch' | 'escalate' | 'skip'. All git/gh/inbox I/O is resolved by the
+    caller except the cheap inbox/in-flight/archive lookups (read-only)."""
+    base = _ledger_base(cand.branch_stem)
+
+    # Gate 5 (age): never race a live build that just pushed its checkpoint.
+    if (now - cand.committer_ts) < GRACE_SECONDS:
+        return 'skip', f'too-young (<{GRACE_SECONDS}s)'
+
+    # Gate 3: an open or merged PR for this branch means the work is not abandoned.
+    if cand.branch in open_heads:
+        return 'skip', 'open-PR head'
+    if cand.branch in merged_heads:
+        return 'skip', 'merged-PR head'
+
+    # Gate 2: a live session is still building this task.
+    if _has_live_in_flight([cand.branch_stem, base]):
+        return 'skip', 'live in-flight session'
+
+    # Gate 4: already requeued (human, abandoned-inbox healer, or a prior tick).
+    root = _family_root(cand.branch_stem)
+    if root in _live_inbox_family_roots(cand.agent):
+        return 'skip', 'already-requeued (live inbox family member)'
+
+    # Ledger: bound auto-retries per family.
+    entry = ledger.get(base) or {}
+    attempts = int(entry.get('attempts', 0) or 0)
+    if attempts >= MAX_AUTO_RETRIES:
+        if entry.get('escalated'):
+            return 'skip', 'retries-exhausted (already escalated)'
+        # Exhaustion keys on the latest RETRY's outcome, NOT the original
+        # branch's persistence. After a successful redispatch the original
+        # forge/<base> branch stays empty-wip until branch GC (48h), and its
+        # PR/in-flight live under the retry id (forge/<base>-retryN), so it
+        # passes gates 2-4 here every tick — escalating off it would fire a
+        # FALSE 'exhausted' DM while the retry is healthily building or already
+        # merged (Mirror review #693, rev 1). So only the retry's OWN abandoned
+        # branch may escalate: gates 2-4 above already proved THIS candidate is
+        # WIP-only / no-PR / not-in-flight / not-queued, so when the candidate
+        # IS the retry branch the retry is genuinely abandoned. The lingering
+        # original (or any earlier retry) is skipped; if the latest retry also
+        # dies WIP-only its own branch surfaces and escalates exactly once.
+        last_retry = entry.get('last_retry_task_id')
+        if last_retry and cand.branch_stem != last_retry:
+            return 'skip', 'superseded by active retry (original branch lingering)'
+        return 'escalate', f'retries-exhausted (attempts={attempts})'
+
+    return 'redispatch', 'wip-only abandoned dispatch'
+
+
+# ---------- per-repo sweep ----------
+
+
+@dataclass
+class SweepCounts:
+    scanned: int = 0
+    redispatched: int = 0
+    escalated: int = 0
+    skipped: int = 0
+
+
+def _collect_candidates(repo: Path) -> list[Candidate]:
+    """WIP-only candidate branches in ``repo`` across both scopes. The checkpoint
+    is pushed to origin, so origin/<branch> is authoritative; local is included
+    so a droplet that still has the local ref is covered too. Dedup by branch
+    name (a branch present in both scopes is one candidate)."""
+    cdb.fetch_prune(repo)
+    seen: dict[str, Candidate] = {}
+    for scope in ('remote', 'local'):
+        for name, ts in cdb.list_candidate_branches(repo, scope):
+            stem = _task_from_branch(name)
+            if not stem or name in seen:
+                continue
+            if cdb.compute_net_change(repo, name, scope) != 'empty-wip':
+                continue
+            agent = name.split('/', 1)[0]
+            seen[name] = Candidate(repo=repo, agent=agent, branch=name,
+                                   branch_stem=stem, committer_ts=ts)
+    return list(seen.values())
+
+
+def _do_redispatch(cand: Candidate, ledger: dict) -> bool:
+    """Rebuild + write the retry envelope and record the attempt. Returns True on a
+    successful write. Dedup-by-base ledger: the retry id is `<base>-retry<N>`."""
+    base = _ledger_base(cand.branch_stem)
+    original_path = _find_archived_original(cand.agent, cand.branch_stem)
+    if original_path is None:
+        log('SKIP', f'{cand.branch}: no unambiguous archived original — not '
+                    f'synthesizing an envelope')
+        return False
+    try:
+        original = json.loads(original_path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        log('SKIP', f'{cand.branch}: archived original unreadable: {exc}')
+        return False
+    if not isinstance(original, dict):
+        log('SKIP', f'{cand.branch}: archived original is not an object')
+        return False
+
+    entry = ledger.get(base) or {}
+    attempts = int(entry.get('attempts', 0) or 0)
+    retry_task_id = f'{base}-retry{attempts + 1}'
+    envelope = build_retry_envelope(original, retry_task_id)
+
+    dest = INBOXES_ROOT / cand.agent / f'{retry_task_id}.json'
+    if dest.exists():
+        # Belt-and-suspenders: never overwrite an existing queued retry.
+        log('SKIP', f'{cand.branch}: retry envelope {dest.name} already exists')
+        return False
+    try:
+        _atomic_write_envelope(dest, envelope)
+    except OSError as exc:
+        log('ERROR', f'{cand.branch}: redispatch write failed: {exc}')
+        return False
+
+    ledger[base] = {
+        'attempts': attempts + 1,
+        'last_attempt_ts': datetime.now(timezone.utc).isoformat(),
+        'last_retry_task_id': retry_task_id,
+        'branch': cand.branch,
+        'escalated': bool(entry.get('escalated', False)),
+    }
+    log('HEALED', f'{cand.branch}: re-dispatched as {cand.agent}/{retry_task_id} '
+                  f'(attempt {attempts + 1}/{MAX_AUTO_RETRIES})')
+    _emit_alert('digest', 'warning',
+                f'Auto-re-dispatched WIP-only abandoned {cand.agent} build '
+                f'{cand.branch} as {retry_task_id} '
+                f'(attempt {attempts + 1}/{MAX_AUTO_RETRIES}).',
+                subject=base)
+    return True
+
+
+def _do_escalate(cand: Candidate, ledger: dict) -> None:
+    """Fire the ONE loud retries-exhausted alert and mark the family escalated so
+    no later tick repeats it."""
+    base = _ledger_base(cand.branch_stem)
+    entry = ledger.get(base) or {}
+    entry['escalated'] = True
+    entry.setdefault('attempts', MAX_AUTO_RETRIES)
+    entry['last_escalation_ts'] = datetime.now(timezone.utc).isoformat()
+    entry['branch'] = cand.branch
+    ledger[base] = entry
+    log('ESCALATE', f'{cand.branch}: auto-recovery exhausted '
+                    f'(attempts={entry.get("attempts")}); escalating to Larry')
+    _emit_alert('escalate', 'critical',
+                f'Forge WIP-only auto-recovery EXHAUSTED for {base} '
+                f'(branch {cand.branch}): {MAX_AUTO_RETRIES} auto-retry already '
+                f'died WIP-only with no PR. Manual investigation needed — the '
+                f'task keeps dying mid-build before any commit lands.',
+                subject=base)
+
+
+def sweep_repo(repo: Path, ledger: dict, now: float) -> SweepCounts:
+    counts = SweepCounts()
+    if not repo.exists():
+        log('WARN', f'canonical repo missing, skipping: {repo}')
+        return counts
+
+    heads = _open_and_merged_heads(repo)
+    if heads is None:
+        log('SKIP', f'repo {repo}: open-PR list unavailable (gh) — refusing to '
+                    f'redispatch this repo this tick')
+        return counts
+    open_heads, merged_heads = heads
+
+    # One base family acted on at most once per tick (dedup original + retry
+    # branches of the same family that may both be present).
+    acted_bases: set[str] = set()
+    for cand in _collect_candidates(repo):
+        counts.scanned += 1
+        base = _ledger_base(cand.branch_stem)
+        if base in acted_bases:
+            continue
+        action, reason = evaluate(cand, now, open_heads, merged_heads, ledger)
+        if action == 'redispatch':
+            if _do_redispatch(cand, ledger):
+                counts.redispatched += 1
+                acted_bases.add(base)
+            else:
+                counts.skipped += 1
+        elif action == 'escalate':
+            _do_escalate(cand, ledger)
+            counts.escalated += 1
+            acted_bases.add(base)
+        else:
+            counts.skipped += 1
+            log('SKIP', f'{cand.branch}: {reason}')
+    return counts
+
+
+# ---------- main ----------
+
+
+def main(argv: Optional[list[str]] = None) -> int:
+    if KILL_SWITCH.exists():
+        log('KILLED_BY_SWITCH', 'healers.disabled present, exiting')
+        return 0
+
+    now = datetime.now(timezone.utc).timestamp()
+    try:
+        repos = cdb.load_canonical_repos()
+    except RuntimeError as exc:
+        log('ERROR', f'cannot load canonical repos: {exc}')
+        return 0
+
+    ledger = load_ledger()
+    total = SweepCounts()
+    for repo in repos:
+        c = sweep_repo(repo, ledger, now)
+        total.scanned += c.scanned
+        total.redispatched += c.redispatched
+        total.escalated += c.escalated
+        total.skipped += c.skipped
+
+    if total.redispatched or total.escalated:
+        save_ledger(ledger)
+
+    log('HEARTBEAT',
+        f'scanned={total.scanned} redispatched={total.redispatched} '
+        f'escalated={total.escalated} skipped={total.skipped} '
+        f'grace_s={GRACE_SECONDS} max_retries={MAX_AUTO_RETRIES}')
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())
