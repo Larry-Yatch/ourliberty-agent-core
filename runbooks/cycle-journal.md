@@ -5,6 +5,101 @@
 ---
 
 
+## Iteration ~2694 — 2026-06-25T05:38Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry /cycle invocation via chat.
+
+**Health:** ⚠️ Watch — Outbox-notifier hot loop continues (AUTO_MERGE_RELEASE_DEFERRED for merged PR #691, every ~5s; now >1hr active, G-rule 1/3→2/3). Mirror consumed rev1 for merged #687 and dispatched rev2 — 2 stale #687 review tasks remain ahead of PR #698 fix. Otherwise pipeline clean.
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #691 (fix heal-stall dry-run noop):** MERGED ✅ — confirmed via `gh pr view`.
+- **PR #697 (fix heal-stall sibling supersession):** MERGED ✅ — merged ~05:24Z (iter ~2693).
+- **PR #687 (feat(forge-build): auto-rebase post-open CONFLICTING PRs):** MERGED ✅ — mergedAt=2026-06-25T05:06:47Z. Confirmed.
+- **PR #698 (fix(review): skip Mirror review when PR already merged or closed):** OPEN, mergeable=UNKNOWN (GitHub recomputing). Mirror review queued (3rd in queue, behind 2 stale #687 tasks). ⚠️
+- **reconcile-001 FP:** SILENCED ✅ — dry-run shows `no stalls detected`. sibling_pr_title_shipped(pr=#688) suppression holding.
+- **Outbox-notifier loop:** STILL ACTIVE — last log entry at 23:36:29 MDT (05:36Z UTC). Loop: AUTO_MERGE_QUEUE_RELEASE blocker=#697 (MERGED) → releasing #691 (MERGED) → mergeable=UNKNOWN → re-queued behind #697 → repeat every ~5s. PID 2594852 Ss, low-CPU (0.5%). Not self-resolving (GitHub reports UNKNOWN as permanent state for merged PRs post-base-move). G-rule 1/3→2/3 this iter.
+- **Mirror inbox change since iter ~2693:** `review-forge-post-open-mergeable-rebase-001-rev1.json` (22:58 MDT) was consumed; `review-forge-post-open-mergeable-rebase-001-rev2.json` appeared at 23:31 MDT — Mirror reviewed rev1 of merged PR #687 and dispatched rev2 review task. Known G-rule `review-duplicate-dispatch-wip-redispatch` symptom continuing. [accepted waste until PR #698 merges]
+- **sequence-paused:operator-needs-you-feed (L1105):** No new alert. Still pending Larry action. [carry ✅]
+- **Pending approvals:** 0 ✅
+- **Repo:** HEAD=310a78f7=origin/main. Clean. On main. ✅
+- **Sync:** last_sync=2026-06-25T05:00:05Z (~38 min ago). Within 2h. ✅
+- **Daemons:** inbox_watcher (2596660 Ssl), outbox_notifier (2594852 Ss, looping), beacon_telegram_bot (2594942 Ss), chain_event_shipper (2595115 SNs) — all alive. Watchdog=healthy at 23:34:14 MDT. ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark: repaired=false, old=1113, file_length=1113. No new alerts. ✅ Nominal. Watermark unchanged.
+
+**Check 1 — Log noise:**
+- outbox-notifier.log: **[yellow] HOT LOOP** — AUTO_MERGE_RELEASE_DEFERRED for merged PR #691 every ~5s, active since 23:26 MDT (~05:26Z UTC), now >1hr. Pattern firing ~720 INFO lines/hr (well above 50/24h systemic threshold). Low functional impact (all PRs correctly merged; loop generates no DMs). G-rule outbox-notifier-auto-merge-loop-merged-pr-001 advancing to 2/3. Root cause: auto-merge queue release path re-queues behind merged blocker (#697) when released PR (#691) reports mergeable=UNKNOWN. Fix: check `state=MERGED` before deferring in release path.
+- watchdog.log: overall=healthy at 23:34:14 MDT. ✅
+- beacon_telegram_bot.log: No new Larry messages since 22:54:32 MDT. Last delivery idx=1112 at 23:29 MDT. ✅
+
+**Check 2 — Telegram sweep:**
+- No new Larry directives. Larry's "let me know when 687 merges" (22:44 MDT) was not delivered (Beacon timed out at 22:54). #687 DID merge at 05:06Z — informational note for journal; Larry received catch_me_up at 22:54 and has since triggered multiple /cycle runs, so he's aware of system state. No orphan directive action needed. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- `no stalls detected` ✅. All FORGE_NO_PR_SKIP firing correctly (sibling_pr_title_shipped, pr_exists for all completed tasks). CLEAN. ✅
+
+**Check 4 — Pending directives:**
+- Beacon inbox: EMPTY. ✅
+- Forge inbox: EMPTY. ✅
+- Mirror inbox (3 files, FIFO order):
+  - `review-forge-post-open-mergeable-rebase-001.json` (23:00 MDT) — PR #687 (MERGED). Stale, will burn tokens. ⚠️
+  - `review-forge-post-open-mergeable-rebase-001-rev2.json` (23:31 MDT) — PR #687 (MERGED). New since ~2693; will also burn tokens. ⚠️
+  - `review-skip-mirror-review-on-merged-or-closed-pr-001.json` (23:16 MDT) — PR #698 (fix). ✅
+- beacon-pending-approvals: 0. ✅
+
+**Check 4.6 — Credential rotation:** validate_token_rotation_schedule.py → OK. ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-06-25T05:34:14Z (~4 min ago). Fresh. ✅
+
+**Check A — Source repo:** HEAD=310a78f7=origin/main. Clean. On main. ✅
+
+**Check B — Sync health:** last_sync=2026-06-25T05:00:05Z (~38 min ago). Within 2h. ✅
+
+**Check C — Agent liveness:** inbox_watcher (2596660 Ssl), outbox_notifier (2594852 Ss, looping but alive), beacon_telegram_bot (2594942 Ss), chain_event_shipper (2595115 SNs) — all alive. Watchdog=healthy. ✅
+
+**Check E — PRs:**
+- PR #687: MERGED ✅ (05:06:47Z)
+- PR #691: MERGED ✅
+- PR #697: MERGED ✅ (05:24Z)
+- PR #698 (skip-mirror-review-on-merged-or-closed-pr-001): OPEN, mergeable=UNKNOWN. Mirror review queued 3rd. ⚠️
+
+**Check H — Forge digest:** Forge IDLE. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. ✅
+
+**Conditional checks — Thursday 2026-06-25 UTC (weekday=3, NOT in {0,2,4,6}):**
+- Check I: weekday gate fails. Skip. ✅
+- Check III: not Sunday. Skip. ✅
+
+**G-rule updates:**
+- **outbox-notifier-auto-merge-loop-merged-pr-001** — **2/3** (was 1/3). Loop still active >1hr (iter ~2693 first observation + this iter = 2 distinct iter observations). Dispatch to Beacon at 3/3. Fix: check `state=MERGED` before re-queuing in auto-merge queue release path; don't re-queue behind merged blocker.
+- **review-duplicate-dispatch-wip-redispatch** — vp (3/3 dispatched, PR #698 in queue). rev2 appearing is one more symptom before the fix lands. Known. Carry.
+- **heal-daemon-restart-manifest-drift-regenerated-tier4** — 2/3. No new instance. Carry.
+- **check-i-force-bypass-dm-route** — 1/3. Thursday, no occurrence. Carry.
+- **no-session-revision-merged-pr-fp-001** — 1/3. No new instance. Carry.
+- **unrouted-open-pr-auto-merge-held-fp-001** — 1/3. No new instance. Carry.
+
+**Actions taken:** 0. No new alerts. No auto-fixes. Watermark unchanged at 1113.
+
+**Standing findings (updated):**
+- [yellow] **Outbox-notifier hot loop** — AUTO_MERGE_RELEASE_DEFERRED for merged PR #691 every ~5s since 23:26 MDT. Now >1hr active. G-rule 2/3. Will dispatch to Beacon next iter if still active (3/3 threshold). Low functional impact. No Larry DM yet.
+- [yellow] **PR #698 (skip-mirror-review-on-merged-or-closed-pr-001)** — OPEN, mergeable=UNKNOWN. Mirror review queued 3rd (behind 2 stale #687 tasks).
+- [yellow] **2 stale Mirror review tasks for merged PR #687** — `review-forge-post-open-mergeable-rebase-001.json` (23:00) + `review-forge-post-open-mergeable-rebase-001-rev2.json` (23:31). Will run before PR #698 fix. Known/accepted waste.
+- [yellow] **sequence-paused:operator-needs-you-feed** — L1105. gate-mismatch chain_merged=False gh_merged=True. **Recovery: `resume sequence operator-needs-you-feed` via Beacon or Dashboard.** [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**PRIME DIRECTIVE:** interventions=1162, systemic_fixes=70, verification_pending=25, ratio≈16.60, trend=improving. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** consecutive_clean=0 (non-clean: outbox-notifier loop + 2 stale Mirror tasks + #698 pending). Tier: 1.
+
+---
+
+
 ## Iteration ~2693 — 2026-06-25T05:31Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry /cycle invocation via chat.

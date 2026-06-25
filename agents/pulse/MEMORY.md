@@ -132,9 +132,9 @@
 
 ---
 
-## G-rule outbox-notifier-auto-merge-loop-merged-pr-001 — 1/3 (new, iter ~2693)
+## G-rule outbox-notifier-auto-merge-loop-merged-pr-001 — 2/3 (iter ~2693 first, iter ~2694 second)
 
-**Rule:** After a blocker PR merges, outbox-notifier releases queued PRs from the auto-merge queue. If the released PR has `mergeable=UNKNOWN` (GitHub reports UNKNOWN for recently-merged PRs post-base-move), outbox-notifier re-queues behind the (already merged) blocker. The blocker merge fires another release, triggering another UNKNOWN check → infinite loop at ~5s/cycle. PR #691 hit this after #697 merged: notifier looped for 5+ minutes. Root cause: auto-merge queue release path checks `mergeable` not `state=MERGED`. Fix: check `state=MERGED` before deferring/re-queuing; don't re-queue behind a merged blocker. Dispatch to Beacon at 3/3.
+**Rule:** After a blocker PR merges, outbox-notifier releases queued PRs from the auto-merge queue. If the released PR has `mergeable=UNKNOWN` (GitHub reports UNKNOWN for recently-merged PRs post-base-move), outbox-notifier re-queues behind the (already merged) blocker. The blocker merge fires another release, triggering another UNKNOWN check → infinite loop at ~5s/cycle. PR #691 hit this after #697 merged: notifier looped for >1hr (still active at iter ~2694). Root cause: auto-merge queue release path checks `mergeable` not `state=MERGED`. Fix: check `state=MERGED` before deferring/re-queuing; don't re-queue behind a merged blocker. Dispatch to Beacon at 3/3.
 
 ---
 
@@ -156,8 +156,8 @@
 
 ---
 
-## Status snapshot — updated 2026-06-25 05:31Z UTC (Iter ~2693, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 05:38Z UTC (Iter ~2694, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2693 summary:** ⚠️ Watch — Outbox-notifier in hot loop (merged PR #691 mergeable=UNKNOWN retry every ~5s; new G-rule outbox-notifier-auto-merge-loop-merged-pr-001 1/3). **KEY EVENTS: PR #697 MERGED ✅ (05:24Z, G-rule stale-proposed-mission-pipeline-fp-001 COMPLETE); PR #691 MERGED ✅ (cascaded after #697). Pipeline stall CLEAN (no stalls detected — reconcile-001 FP silenced by sibling_pr_title_shipped). 1 new alert (L1113, Tier-3 review-pass watermark 1112→1113). Pending approvals: 0 ✅. PR #698 (skip-mirror-review fix) OPEN/MERGEABLE, 3rd in Mirror queue behind 2 stale #687 tasks. sequence-paused:operator-needs-you-feed carry.** PRIME: interventions=1162, systemic_fixes=70, vp=25, ratio≈16.60, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2694 summary:** ⚠️ Watch — Outbox-notifier hot loop continues (merged PR #691 mergeable=UNKNOWN, every ~5s >1hr; G-rule outbox-notifier-auto-merge-loop-merged-pr-001 now 2/3; dispatch to Beacon at 3/3). **KEY EVENTS: PRs #687 #691 #697 all MERGED ✅. Pipeline stall CLEAN. 0 new alerts (watermark 1113=file_length). Mirror consumed rev1 for merged #687, dispatched rev2 (23:31 MDT) — review-duplicate-dispatch-wip-redispatch vp continuing; 2 stale #687 tasks ahead of PR #698 fix. Pending approvals: 0 ✅. sequence-paused:operator-needs-you-feed carry.** PRIME: interventions=1162, systemic_fixes=70, vp=25, ratio≈16.60, trend=improving. Tier 1, consecutive_clean=0.
 
 
