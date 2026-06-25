@@ -132,9 +132,15 @@
 
 ---
 
-## G-rule outbox-notifier-auto-merge-loop-merged-pr-001 — 2/3 (iter ~2693 first, iter ~2694 second)
+## G-rule outbox-notifier-auto-merge-loop-merged-pr-001 → DISPATCHED ✅ (3/3, iter ~2695), vp
 
-**Rule:** After a blocker PR merges, outbox-notifier releases queued PRs from the auto-merge queue. If the released PR has `mergeable=UNKNOWN` (GitHub reports UNKNOWN for recently-merged PRs post-base-move), outbox-notifier re-queues behind the (already merged) blocker. The blocker merge fires another release, triggering another UNKNOWN check → infinite loop at ~5s/cycle. PR #691 hit this after #697 merged: notifier looped for >1hr (still active at iter ~2694). Root cause: auto-merge queue release path checks `mergeable` not `state=MERGED`. Fix: check `state=MERGED` before deferring/re-queuing; don't re-queue behind a merged blocker. Dispatch to Beacon at 3/3.
+**Rule:** After a blocker PR merges, outbox-notifier releases queued PRs from the auto-merge queue. If the released PR has `mergeable=UNKNOWN` (GitHub reports UNKNOWN for recently-merged PRs post-base-move), outbox-notifier re-queues behind the (already merged) blocker. The blocker merge fires another release, triggering another UNKNOWN check → infinite loop at ~5s/cycle. Fix: check `state=MERGED` before deferring/re-queuing in auto-merge release path; don't re-queue behind merged blocker. Dispatched `fix-auto-merge-release-deferred-merged-pr-001.json` to Beacon inbox at iter ~2695. verification_pending.
+
+---
+
+## G-rule watchdog-watcher-log-stale-post-pr694 — 1/3 (new, iter ~2695)
+
+**Rule:** Watchdog WARN at 05:39 UTC (23:39 MDT) — "Watcher log stale 482s with 1 non-empty inbox(es)" — while Mirror WAS actively running (PID 2612954 started 23:28 MDT). Root cause: inbox-watcher handles Forge tasks only; Mirror sessions are triggered by a separate mechanism. inbox_watcher.log goes stale after Forge completes even if Mirror is actively processing its separate inbox. PR #694 (session-aware suppression) merged at 01:57Z did not suppress this WARN — the suppression logic likely checks inbox-watcher session rather than Mirror session. First occurrence post-PR #694. Dispatch to Beacon at 3/3.
 
 ---
 
@@ -156,8 +162,8 @@
 
 ---
 
-## Status snapshot — updated 2026-06-25 05:38Z UTC (Iter ~2694, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 05:47Z UTC (Iter ~2695, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2694 summary:** ⚠️ Watch — Outbox-notifier hot loop continues (merged PR #691 mergeable=UNKNOWN, every ~5s >1hr; G-rule outbox-notifier-auto-merge-loop-merged-pr-001 now 2/3; dispatch to Beacon at 3/3). **KEY EVENTS: PRs #687 #691 #697 all MERGED ✅. Pipeline stall CLEAN. 0 new alerts (watermark 1113=file_length). Mirror consumed rev1 for merged #687, dispatched rev2 (23:31 MDT) — review-duplicate-dispatch-wip-redispatch vp continuing; 2 stale #687 tasks ahead of PR #698 fix. Pending approvals: 0 ✅. sequence-paused:operator-needs-you-feed carry.** PRIME: interventions=1162, systemic_fixes=70, vp=25, ratio≈16.60, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2695 summary:** ⚠️ Watch — Dispatched `fix-auto-merge-release-deferred-merged-pr-001` to Beacon (G-rule outbox-notifier-auto-merge-loop-merged-pr-001 at 3/3 COMPLETE). New watchdog false-positive post-PR #694 (1/3, inbox_watcher stale + Mirror inbox non-empty while Mirror runs separately). **KEY EVENTS: PR #698 now MERGEABLE. Mirror actively processing stale #687 review (PID 2612954, started 23:28 MDT). Pipeline stall CLEAN. 0 new alerts (watermark 1113). Pending approvals: 0 ✅. sequence-paused:operator-needs-you-feed carry.** PRIME: interventions=1164, systemic_fixes=70, vp=26, ratio≈16.63, trend=improving. Tier 1, consecutive_clean=0.
 
 
