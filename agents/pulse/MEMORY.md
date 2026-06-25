@@ -114,6 +114,12 @@
 
 ---
 
+## G-rule no-session-revision-merged-pr-fp-001 — 1/3 (new, iter ~2676)
+
+**Rule:** `heal_pipeline_stall.py` dry-run fires `no_session_revision:forge-wip-only-auto-redispatch-001` even though PR #693 (the task's output) is MERGED. Root cause: the `no_session_revision` stall check doesn't verify whether the task's corresponding PR is already merged before alerting. The `forge_built_no_pr` rule has FORGE_NO_PR_SKIP logic for this; `no_session_revision` does not. Same class as the reconcile-001 FP but for a different stall rule. First occurrence iter ~2676. Dispatch to Beacon at 3/3.
+
+---
+
 ## G-rule stale-proposed-mission-pipeline-fp-001 → vp advancing (iter ~2673 dispatch, Beacon processed iter ~2674)
 
 **Rule:** Pipeline stall checker fires `DRY-RUN would alert: forge_built_no_pr:reconcile-hardening-mission-shipped-001` every cycle. Root cause (corrected by Beacon iter ~2674): NOT missions.json — real fix is PR-title sibling supersession (reconcile-001 superseded by -002/PR#688 but no supersession check catches same-family different-token PRs). Beacon produced `forge-no-pr-sibling-pr-title-supersession-001` approval (03:04Z 2026-06-25, DM'd Larry). verification_pending: needs Larry approval → Forge build → Mirror review → merge.
@@ -137,6 +143,10 @@
 `outbox-notifier url-shape-invalid` → PR #493 (2026-06-13). `medic-diagnosis-tier4` → PR #515 (2026-06-15). `heal-pipeline-stall:unrouted-pr` → PR #516 (2026-06-15). `check-i-repeat-dm-fix-001` → PR #674 (2026-06-24). `heal-droplet-git-drift` → PR #586 (2026-06-19). `silence-routine-weekly-alerts` → PR #604 (2026-06-20). `forge-preflight-no-marker` → PR #600 (2026-06-19). `projects-json-healer-path` → PR #603 (2026-06-20). `outbox-notifier-review-pass` → PR #604 scope. `seq-advancer-sequence-stranded` → PR #661 (2026-06-24). `catalog-accuracy-drift` → PR #6 ourliberty-graph (2026-06-22). `doorbell-tier4-pattern` → PR #648 (2026-06-23). `heal-stale-daemon-code-script-service-mismatch` → PR #647 (2026-06-23). `mirror-marker-parse-error` → PR #650 (2026-06-23). `watchdog-watcher-log-stale` → PR #649 (2026-06-23). `watchdog-watcher-log-stale-post-fix` → PR #694 (2026-06-25). `ourliberty-health-notify-script-missing` → PR #696 (2026-06-25). `heal-pipeline-stall-mirror-pass-unmerged-tier4` → PR #695 (2026-06-25).
 
 ---
+
+## Status snapshot — updated 2026-06-25 03:28Z UTC (Iter ~2676, Tier 1, consecutive_clean=0)
+
+**Iter ~2676 summary:** ⚠️ Watch — PR #687 CONFLICTING (rebase-pr-687-post-open-mergeable-001 pending Larry). **KEY EVENTS: All agents IDLE. 1 new alert (L1100 doorbell Tier-3 silenced). Watermark 1099→1100. New G-rule candidate: no-session-revision-merged-pr-fp-001 (1/3) — stall checker fires no_session_revision for forge-wip-only-auto-redispatch-001 despite PR #693 MERGED. 4 pending approvals (carry). No dispatches.** Pipeline stall: reconcile-001 FP (fix approval pending). Check I: Thursday, skip. PRIME: interventions=1149, systemic_fixes=70, vp=25, ratio=16.41, trend=improving. Tier 1, consecutive_clean=0.
 
 ## Status snapshot — updated 2026-06-25 03:18Z UTC (Iter ~2675, Tier 1, consecutive_clean=0)
 
