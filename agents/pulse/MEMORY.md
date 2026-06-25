@@ -198,8 +198,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-25 17:39Z UTC (Iter ~2792, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-25 17:55Z UTC (Iter ~2794, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2792 summary:** ⚡ Notable — Forge REJECTED `board-new-mission-confirm-placeholder-001` at preflight (spec targets retired Missions kanban). Pending approval carry RESOLVED; Larry DM'd. 8/8 daemons alive. 2 open PRs (#703 Mirror active, #704 awaiting dispatch). Watermark=989. PID 1834248 zombie (~27.94d, ask-then-do). 6 stale journalctl PIDs (~30.9d, ask-then-do). PRIME: interventions=1222, systemic_fixes=71, vp=26, ratio≈17.21, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2794 summary:** ⚡ Notable — PR #703 Mirror review stuck (wedge+reap: Mirror session idle-reaped at 17:45Z, marker-error retry dead, worktree gone). Dispatched Beacon direction-ask (redispatch-mirror-pr703-stuck-review-001) to archive dead marker-error file + redispatch fresh Mirror review. Sandbox blocked direct mv — routed to Beacon. PR #704 Mirror review active. board-new-mission-confirm-placeholder-001 carry (Larry decides re-spec vs. drop). 8/8 daemons alive. Watermark=992. PID 1834248 zombie (~27.95d, ask-then-do). 6 stale journalctl PIDs (~31d, ask-then-do). PRIME: interventions=1223, systemic_fixes=71, vp=26, ratio≈17.23, trend=improving. Tier 1, consecutive_clean=0.
 
 
