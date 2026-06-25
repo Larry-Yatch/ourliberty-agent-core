@@ -5335,7 +5335,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-25T18:00:45.122008+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-25T17:59:51.265512+00:00"
+      "orphan_last_activity_ts": "2026-06-25T17:59:51.265512+00:00",
+      "briefing": {
+        "what": "A piece of work the team kicked off that got stuck waiting on a review and had to be restarted.",
+        "why": "Stalled work that nobody's tracking ties up effort and quietly delays whatever it was meant to deliver.",
+        "suggest": "Have someone confirm it's now moving and decide whether it's worth finishing before we put more time into it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-25T18:03:43.809679+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
