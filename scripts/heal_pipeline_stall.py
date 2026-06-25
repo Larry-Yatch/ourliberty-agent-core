@@ -134,7 +134,9 @@ if str(_SCRIPTS_DIR) not in sys.path:
 import larry_alerts  # noqa: E402
 import fixture_patterns  # noqa: E402
 import no_session_ledger  # noqa: E402  # S3: cold-start obligation backstop
+import for_larry_escalations  # noqa: E402  # mirror-review-visibility Contract C/E action surface
 import safe_write_inbox  # noqa: E402  # sanitize_component: match on-disk outbox names
+from heal_undispatched_pr_review import task_id_for_branch  # noqa: E402  # canonical PR->task_id key
 from id_match import id_matches  # noqa: E402
 from log_ts import parse_log_ts  # noqa: E402  (shared log-ts parser)
 
@@ -192,6 +194,13 @@ LOG_LOOKBACK_HOURS = 24              # Read at most this far back into outbox-no
 JOURNAL_LOOKBACK_HOURS = 1           # Read at most this far back for retry-exhausted lines
 ALERT_DEDUP_HOURS = 1                # Same stall key not re-DMed within this window
 STALLED_PENDING_SEQUENCE_MIN = 30    # 30 min — sequence pending after unresolved DAG REVISION
+# Check 10 (mirror-review-visibility Contract E, spec §8). Backstop grace before
+# a PR sitting on a RED `mirror-review` commit status is treated as the #653
+# silent-red shape. Deliberately the longest threshold here: a healthy revision
+# loop (Mirror REVISION -> Forge re-push -> re-review) flips the status well
+# inside this window, so the backstop only fires after every faster path
+# (step-2 routing, the live revision loop, Check 6) has had its chance.
+RED_MIRROR_STATUS_MIN = 90           # 90 min — red mirror-review status gone quiet
 
 # Bounded scan window for stall-trigger events. Events whose anchor
 # timestamp is older than this are treated as historical record, not
@@ -269,6 +278,14 @@ _TIER2_LOG_NAMES = (
     'forge.log', 'mirror.log', 'pulse.log', 'beacon.log',
     'beacon_telegram_bot.log',
 )
+
+# Check 10 (Contract E). The commit-status context outbox_notifier posts a
+# Mirror verdict under (`_MIRROR_REVIEW_STATUS_CONTEXT` there). A "red" status
+# is GitHub state FAILURE or ERROR — the notifier maps every non-PASS verdict
+# (REVISION / ESCALATE / EMERGENCY_HALT) to `failure`, so a red status alone
+# cannot distinguish those verdicts; the backstop routes to the action surface
+# (spec §8) rather than re-deriving Mirror's exact bucket.
+MIRROR_REVIEW_STATUS_CONTEXT = 'mirror-review'
 
 
 def log(msg: str, level: str = 'INFO') -> None:
@@ -563,6 +580,76 @@ def _check_pr_closed_via_gh(pr_url: str) -> Optional[str]:
     behavior). Thin wrapper over `_gh_pr_state`."""
     state = _gh_pr_state(pr_url)
     return state if state in ('MERGED', 'CLOSED') else None
+
+
+# Test seam (mirrors the notifier's `_POST_STATUS_FN_OVERRIDE`). When set,
+# replaces the whole `_mirror_review_status` body so Check 10's tests don't
+# shell out to real `gh`. Signature: (repo, pr_number) -> (state, head_sha,
+# red_since). Production leaves this None.
+_MIRROR_REVIEW_STATUS_FN_OVERRIDE: Optional[Any] = None
+
+
+def _mirror_review_status(
+    repo: str, pr_number: int,
+) -> tuple[Optional[str], Optional[str], Optional[datetime]]:
+    """Read the `mirror-review` commit status on a PR's head (Check 10).
+
+    Returns ``(state, head_sha, red_since)``:
+      * ``state`` — the lowercased GitHub status state of the `mirror-review`
+        context (``'failure'`` / ``'error'`` / ``'success'`` / ``'pending'``),
+        or None when no such context exists OR gh is unreachable. The
+        None-vs-state distinction keeps a gh outage from masquerading as
+        "not red" — a None simply means "couldn't read", so the check skips
+        rather than acting on a guess.
+      * ``head_sha`` — the PR head oid (the Contract D dedup identity), or None.
+      * ``red_since`` — when the status context was posted (its ``createdAt``),
+        falling back to None when gh doesn't surface it (the caller then uses
+        the PR's own age as the gate).
+
+    Reads via ``gh pr view --json statusCheckRollup,headRefOid`` — the rollup
+    flattens both check-runs and commit statuses; the `mirror-review` verdict is
+    a ``StatusContext``. Fail-safe: any transport/parse error → (None, None,
+    None)."""
+    if _MIRROR_REVIEW_STATUS_FN_OVERRIDE is not None:
+        try:
+            return _MIRROR_REVIEW_STATUS_FN_OVERRIDE(repo, pr_number)
+        except Exception as e:  # noqa: BLE001 — test seam must not crash the healer
+            log(f'_mirror_review_status override raised for {repo}#{pr_number}: '
+                f'{type(e).__name__}: {e}', 'WARN')
+            return None, None, None
+    try:
+        result = subprocess.run(
+            ['gh', 'pr', 'view', str(pr_number), '--repo', repo,
+             '--json', 'statusCheckRollup,headRefOid'],
+            capture_output=True, text=True, timeout=GH_TIMEOUT_S,
+            env={**os.environ,
+                 'PATH': '/usr/bin:/usr/local/bin:' + os.environ.get('PATH', '')},
+        )
+        if result.returncode != 0:
+            return None, None, None
+        data = json.loads(result.stdout or '{}')
+    except (subprocess.TimeoutExpired, json.JSONDecodeError, FileNotFoundError,
+            OSError) as e:
+        log(f'_mirror_review_status gh failed for {repo}#{pr_number}: '
+            f'{type(e).__name__}: {e}', 'WARN')
+        return None, None, None
+    head_sha = data.get('headRefOid') if isinstance(data, dict) else None
+    if not (isinstance(head_sha, str) and head_sha):
+        head_sha = None
+    rollup = data.get('statusCheckRollup') if isinstance(data, dict) else None
+    if not isinstance(rollup, list):
+        return None, head_sha, None
+    for ctx in rollup:
+        if not isinstance(ctx, dict):
+            continue
+        if ctx.get('context') != MIRROR_REVIEW_STATUS_CONTEXT:
+            continue
+        raw_state = ctx.get('state')
+        state = raw_state.lower() if isinstance(raw_state, str) else None
+        red_since = _parse_ts(ctx['createdAt']) if isinstance(
+            ctx.get('createdAt'), str) else None
+        return state, head_sha, red_since
+    return None, head_sha, None
 
 
 def _resolution_signal_present(
@@ -1695,6 +1782,136 @@ def check_stalled_pending_sequence(state: dict) -> list[dict]:
     return alerts
 
 
+# ---------- Check 10: Silent red mirror-review status (Contract E) ----------
+
+def _self_heal_in_progress(task_id: str) -> bool:
+    """True iff a no-session self-heal obligation is OPEN for this task — the
+    mechanical cold-start re-dispatch (`_dispatch_revision_to_forge`) is running
+    and Check 6 owns it once it goes stuck. Fail-safe: a ledger error returns
+    False (don't suppress a genuine silent-red on infra trouble)."""
+    if not task_id:
+        return False
+    try:
+        ob = no_session_ledger.get_obligation(task_id)
+    except Exception as e:  # noqa: BLE001
+        log(f'_self_heal_in_progress ledger read failed for {task_id}: '
+            f'{type(e).__name__}: {e}', 'WARN')
+        return False
+    return isinstance(ob, dict) and ob.get('status') == no_session_ledger.OPEN
+
+
+def _larry_artifact_exists(task_id: str, head_sha: Optional[str]) -> bool:
+    """True iff a Larry-facing artifact already covers this PR — an OPEN
+    for-Larry "Waiting on You" record (action bucket) OR a decision approval on
+    the Approvals tab (decision bucket). Uses the SAME id derivations the step-2
+    routing site uses (`mirror-review:<task>` and `mirror-review-<task>[-<sha8>]`)
+    so the backstop never double-notifies a case step 2 already surfaced
+    (Contract D). Fail-safe: read errors return False."""
+    record_id = f'mirror-review:{task_id}'
+    try:
+        rec = for_larry_escalations.get(record_id)
+        if isinstance(rec, dict) and rec.get('resolved') is not True:
+            return True
+    except Exception as e:  # noqa: BLE001
+        log(f'_larry_artifact_exists feed read failed for {task_id}: '
+            f'{type(e).__name__}: {e}', 'WARN')
+    try:
+        import beacon_approval_handler as approval
+        base = f'mirror-review-{task_id}'
+        if approval.find_by_id_any_state(base) is not None:
+            return True
+        if head_sha and approval.find_by_id_any_state(
+                f'{base}-{head_sha[:8]}') is not None:
+            return True
+    except Exception as e:  # noqa: BLE001
+        log(f'_larry_artifact_exists approval read failed for {task_id}: '
+            f'{type(e).__name__}: {e}', 'WARN')
+    return False
+
+
+def check_red_mirror_status_no_artifact(open_prs: list[dict],
+                                        state: dict) -> list[dict]:
+    """Backstop the #653 silent-red failure mode (mirror-review-visibility
+    Contract E, spec §8).
+
+    Catches an OPEN PR sitting on a RED `mirror-review` commit status
+    (state=failure/error) past `RED_MIRROR_STATUS_MIN` where BOTH:
+      * no self-heal is in progress (no OPEN no_session_ledger obligation), AND
+      * no Larry-facing artifact exists (no OPEN Waiting-on-You record, no
+        Approvals-tab decision).
+
+    That is exactly the shape #653 hit: a session-less PR Mirror wants revised
+    whose findings reach no one — recoverable only by manual digging. The M4
+    recover-then-alert posture (spec §8): the `recovery` promotes it to its
+    Contract C surface (the action-needed durable for-Larry record) FIRST; the
+    fallback larry_alert fires ONLY if even that write fails — so a healthy
+    catch produces exactly one Waiting-on-You record and zero double-notify with
+    step-2 routing.
+    """
+    now = datetime.now(timezone.utc)
+    alerts: list[dict] = []
+    for pr in open_prs:
+        repo = pr.get('_repo')
+        number = pr.get('number')
+        branch = pr.get('headRefName', '') or ''
+        if not repo or number is None:
+            continue
+        # Cheap pre-filter: a red status cannot have aged past the threshold on a
+        # PR younger than it, so skip the per-PR gh status call for fresh PRs.
+        created = _parse_ts(pr.get('createdAt', ''))
+        if created and (now - created).total_seconds() < RED_MIRROR_STATUS_MIN * 60:
+            continue
+        status_state, head_sha, red_since = _mirror_review_status(repo, number)
+        # Only a confirmed RED status is in scope. None (no context / gh
+        # unreachable) and the green/pending states are skipped — verify before
+        # alarm; an outage must not look like a stall.
+        if status_state not in ('failure', 'error'):
+            continue
+        # Gate on how long the status has been red. Prefer the status's own
+        # post time; fall back to the PR's age when gh didn't surface it.
+        red_since = red_since or created
+        if red_since is None:
+            continue
+        if not _within_scan_window(red_since, now=now):
+            continue  # long-abandoned red PR is historical record, not a stall
+        elapsed_min = int((now - red_since).total_seconds() / 60)
+        if elapsed_min < RED_MIRROR_STATUS_MIN:
+            continue
+        # Canonical task_id — the SAME key the review-request envelope (and
+        # therefore step-2 routing) used, so the artifact + ledger guards and
+        # the recovery's record_id line up exactly (no double-notify).
+        task_id = task_id_for_branch(branch, number, repo)
+        if _self_heal_in_progress(task_id):
+            continue
+        if _larry_artifact_exists(task_id, head_sha):
+            continue
+        pr_url = f'https://github.com/{repo}/pull/{number}'
+        record_id = f'mirror-review:{task_id}'
+        alerts.append({
+            'key': f'red_mirror_status:{repo}:{number}',
+            'message': (
+                f'PR #{number} ({repo}) on branch `{branch}` has carried a RED '
+                f'`mirror-review` status for {elapsed_min} min with no self-heal '
+                f'in progress and nothing on your surfaces (no Waiting-on-You '
+                f'record, no approval). Mirror wants changes but the finding is '
+                f'reachable only by digging into the PR — the #653 silent-red '
+                f'shape.'
+            ),
+            'subject': f'pipeline-stall:red-mirror-status:PR#{number}',
+            'suggested_action': (
+                f'Review the PR ({pr_url}) — Mirror\'s findings are on its '
+                f'review/commit-status. Then re-dispatch a Forge build for '
+                f'`{task_id}` via Beacon, or close the PR.'
+            ),
+            # M4 / Contract E: recoverable — promote to the action-needed
+            # Waiting-on-You surface before alerting.
+            'recovery': functools.partial(
+                _recover_red_mirror_status, task_id, pr_url, head_sha, record_id,
+            ),
+        })
+    return alerts
+
+
 # ---------- Check 7: Open PRs with no review-request dispatch logged ----------
 
 def _read_recent_routing_events(hours: int) -> list[dict]:
@@ -2244,6 +2461,78 @@ def _recover_stalled_sequence(seq_id: str, seq_path: str) -> bool:
     )
 
 
+def _recover_red_mirror_status(task_id: str, pr_url: str,
+                               head_sha: Optional[str],
+                               record_id: str) -> bool:
+    """Check 10 'recovery' for the #653 silent-red backstop (Contract E).
+
+    The recovery IS the promotion: surface the silent-red PR on its Contract C
+    action-needed surface — the durable, self-clearing for-Larry "Waiting on
+    You" record. On success the framework suppresses the alert (the record IS
+    Larry's surface; a separate DM would be the forbidden double-notify). The
+    fallback larry_alert fires ONLY when even that write fails. Outcomes:
+      - PR MERGED / CLOSED → the red status is moot; clear any record and
+        report recovered (suppress).
+      - state UNVERIFIABLE (gh unreachable) → return True to defer rather than
+        write/alert on an unknown state (verify-before-alarm). The next tick
+        re-checks once gh recovers.
+      - PR confirmed live → upsert the for-Larry record and report recovered
+        iff an OPEN record exists afterward; a write failure (no open record)
+        returns False so exactly one fallback alert fires.
+
+    Idempotent (Contract D): `dedup_identity` is the SAME `{pr_url}@{head_sha}`
+    step-2 routing uses, so a re-run on the same head is a no-op upsert and a
+    fresh push refreshes the record in place — never a duplicate."""
+    pr_state = _gh_pr_state(pr_url) if pr_url else None
+    if pr_state in ('MERGED', 'CLOSED'):
+        try:
+            for_larry_escalations.clear(record_id)
+        except Exception as e:  # noqa: BLE001
+            log(f'red-mirror clear failed for {record_id}: '
+                f'{type(e).__name__}: {e}', 'WARN')
+        log(f'RED_MIRROR_RESOLVED task={task_id} pr_state={pr_state}; '
+            f'cleared for-Larry record', 'INFO')
+        return True
+    if pr_url and pr_state is None:
+        # gh unreachable — do NOT write or alert on an unverifiable state.
+        log(f'RED_MIRROR task={task_id} pr_state unverifiable (gh '
+            f'unreachable); deferring to next tick', 'INFO')
+        return True
+    dedup_identity = f'{pr_url or task_id}@{head_sha or ""}'
+    try:
+        for_larry_escalations.upsert(
+            record_id,
+            source='mirror-review',
+            headline=f'Session-less PR needs you: {task_id}',
+            context=(
+                f'Mirror wants changes on {pr_url or task_id} but no session '
+                f'is dispatched and nothing self-healed. Review the PR, then '
+                f're-dispatch a Forge build for `{task_id}` via Beacon, or '
+                f'close the PR.'
+            ),
+            severity='warning',
+            pr_url=pr_url or None,
+            head_sha=head_sha,
+            dedup_identity=dedup_identity,
+        )
+    except Exception as e:  # noqa: BLE001
+        log(f'red-mirror upsert raised for {record_id}: '
+            f'{type(e).__name__}: {e}', 'WARN')
+    # upsert returns None on both idempotent no-op AND write failure, so verify
+    # the durable state directly: an OPEN record means Larry IS covered.
+    try:
+        rec = for_larry_escalations.get(record_id)
+    except Exception as e:  # noqa: BLE001
+        log(f'red-mirror verify-read failed for {record_id}: '
+            f'{type(e).__name__}: {e}', 'WARN')
+        return False
+    recovered = isinstance(rec, dict) and rec.get('resolved') is not True
+    if recovered:
+        log(f'RED_MIRROR_ROUTED task={task_id} → for-Larry record '
+            f'{record_id} (Contract C action surface)', 'INFO')
+    return recovered
+
+
 # ---------- Main ----------
 
 def _alert_is_fixture(alert: dict) -> bool:
@@ -2327,6 +2616,11 @@ def run() -> int:
     except Exception as e:
         log(f'check_stalled_pending_sequence failed: {type(e).__name__}: {e}',
             'ERROR')
+    try:
+        all_alerts += check_red_mirror_status_no_artifact(open_prs, state)
+    except Exception as e:
+        log(f'check_red_mirror_status_no_artifact failed: '
+            f'{type(e).__name__}: {e}', 'ERROR')
 
     if not all_alerts:
         log('no stalls detected', 'INFO')

@@ -192,6 +192,20 @@
 
 ---
 
+## G-rule watchdog-watcher-log-stale-post-fix → DISPATCHED (iter ~2640, 3/3)
+
+**Rule:** PR #649 was COMPLETE after 5 clean Check 1 scans (iter ~2531). Pattern re-emerged: iter ~2634 (idle gap), iter ~2638 (long Mirror session for PR #687, 7 WARNs/40 min), iter ~2640 (NEW session for PR #687 backstop review at 22:40Z). 3/3 threshold crossed iter ~2640. Dispatch: `watchdog-stale-post-pr649-regression-fix-001.json` to Beacon inbox. Fix needed: suppress watchdog stale-log WARNs when (a) inbox_watcher has live in-flight Mirror session PID + open worktree, OR (b) all inboxes empty. verification_pending.
+
+**LOG PATH CORRECTION (iter ~2650):** Watchdog log is `/home/larry/agents/logs/watchdog.log` (NOT `watchdog_watcher.log`). `watchdog_watcher.log` does not exist. Prior iters reporting "0 WARNs" while checking `watchdog_watcher.log` were checking a non-existent file and got empty output. Check 1 must use `watchdog.log`. WARNs still appearing during early Mirror session windows (fix watchdog-stale-session-aware-suppression-001 not yet merged as of iter ~2650).
+
+---
+
+## G-rule ourliberty-health-notify-script-missing → DISPATCHED ✅ (iter ~2647, 3/3)
+
+**Rule:** `ourliberty-health` fires `WARN: notify script missing, alert dropped: 1 issue(s) need attention` every ~30 min on a regular cadence (systemd timer). NOT intermittent — fires 22:03Z, 22:33Z, 23:03Z, 23:33Z etc. continuously. Prior iters ~2641-~2646 missed it via `journalctl returned empty (permissions)`; iter ~2647 had permissions and confirmed it. 3/3 threshold crossed. Dispatch: `ourliberty-health-notify-script-missing-001.json` → Beacon inbox (iter ~2647). Fix needed: (A) identify/restore the missing notify script, (B) surface and route the unknown "1 issue" health condition. Note: prior dispatch logged 2026-06-09 under 'G-rule health-notify-script-missing' — Beacon should check whether that fix ever landed. verification_pending.
+
+---
+
 ## G-rule watchdog-watcher-log-stale → COMPLETE ✅ (iter ~2522 dispatch, iter ~2531 verified)
 
 **Rule:** PR #649 `fix-watchdog-stale-log-inflight-aware-001` merged 2026-06-23T14:54Z. Fix makes the watchdog in-flight-aware (active build state suppresses stale-log WARNs). Verified via 5 consecutive clean Check 1 scans post-merge — no stale-log WARNs detected. PRIME systemic_fix logged iter ~2531. **G-rule COMPLETE.**
@@ -216,9 +230,109 @@
 
 ---
 
-## Status snapshot — updated 2026-06-24 19:47Z UTC (Iter ~2618, Tier 1, consecutive_clean=1)
+## G-rule heal-daemon-restart-manifest-drift-regenerated-tier4 — 1/3 (new, iter ~2620)
 
-**Iter ~2618 summary:** ✅ Nominal — all checks clean. 1 Tier-3 alert (sync-push-fail self-healing). 8/8 daemons alive: outbox_notifier restarted PID→1957187 at 19:36Z (heal-stale-daemon-code post-PR #680 deploy). PR #681 merged 19:42Z. Pipeline active: dashboard PR #91 (closed-card-badge) in Mirror review, Forge classify-and-route task queued, Mirror reviewing sequence-dag-operator-needs-you-feed. Tier 1, consecutive_clean=1. PRIME: systemic_fixes=61, interventions=1092, ratio≈17.90, trend=improving. G-rules: check-i-force-bypass-dm-route 1/3, all others unchanged. add-676-crossref [blue] watch RETIRED (PR #681 merged cleanly).
+**Rule:** `source=heal-daemon-restart-manifest-drift, subject=regenerated` alerts classify Tier-4 (novel) — no translation match. But these are routine healer auto-commit actions (route=digest in the alert itself; bot already silences as digest). Should add Tier-3 translation. Dispatch to Beacon at 3/3 to add `config/alert-translations.json` entry.
+
+---
+
+## G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4 → DISPATCHED ✅ (iter ~2644, 3/3)
+
+**Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:mirror-pass-unmerged:PR#N` alerts classify Tier-4 (novel — no translation match in alert-translations.json). Bot delivers as escalate (route=escalate) and DMs Larry. Pulse does NOT send a second DM. 3/3 threshold crossed at iter ~2644 (L1047, 23:08Z). Dispatch: `heal-pipeline-stall-mirror-pass-unmerged-tier3-001.json` → Beacon inbox. verification_pending. Instances: iter ~2629 (PR#685 rev1), iter ~2636 (PR#685 L1039), iter ~2644 (PR#685 L1047).
+
+---
+
+## Status snapshot — updated 2026-06-25 00:57Z UTC (Iter ~2658, Tier 1, consecutive_clean=0)
+
+**Iter ~2658 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry; rebase-escalation-feed-685-001 queued); PR #687 CONFLICTING (carry, Mirror REVIEW_PASS x4, AUTO_MERGE_HELD blocker=#685). **KEY EVENTS:** Queue advancing fast: reconcile-hardening-mission-shipped-002 DONE → PR #688 opened (MERGEABLE); forge-wip-only-auto-redispatch-001 DONE. Forge NOW BUILDING watchdog-stale-session-aware-suppression-001 (G-rule fix). Mirror ACTIVE reviewing PR #688. 2 new alerts: L1069 Tier-4 (mirror-pass-unmerged:PR#687, bot DM'd, no Pulse 2nd DM), L1070 Tier-3 (medic-diagnosis silenced). Watermark 1068→1070. 7 daemons alive. Repo clean (HEAD=d8f4c193=origin/main). Sync 18m ago. Check I: Thursday, skip. PRIME: interventions=1129, systemic_fixes=66, ratio=17.1, trend=improving. Tier 1, consecutive_clean=0.
+
+## Status snapshot — updated 2026-06-25 00:51Z UTC (Iter ~2657, Tier 1, consecutive_clean=0)
+
+**Iter ~2657 summary:** ⚠️ Watch — **KEY EVENT:** Forge session PID 2060999 (`forge-post-open-mergeable-rebase-001`) completed at 00:47Z (success=True, 3h52m, $0.59); immediately started `one-time-stale-dispatch-branch-cleanup-001`. PR #685 CONFLICTING (carry; rebase-escalation-feed-685-001 queued, critical path); PR #687 CONFLICTING (carry, Mirror REVIEW_PASS x4, AUTO_MERGE_HELD blocker=#685). 0 new alerts. Watermark 1068 (no change). 7 persistent daemons alive + Forge active. Repo clean (HEAD=073c97fd=origin/main). Sync 11m ago. Check I: Thursday, skip. Forge inbox: 8 items (one-time-stale-dispatch-branch-cleanup-001 ACTIVE). PRIME: interventions≈1129, systemic_fixes=66, ratio=17.1, trend=improving. Tier 1, consecutive_clean=0.
+
+## Status snapshot — updated 2026-06-25 00:45Z UTC (Iter ~2656, Tier 1, consecutive_clean=0)
+
+**Iter ~2656 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry; NEW: `rebase-escalation-feed-685-001` queued in Forge inbox — Beacon dispatched at 00:43Z after Larry's 18:41 MDT query about the escalation-feed DAG); PR #687 CONFLICTING (carry, Mirror REVIEW_PASS x4, AUTO_MERGE_HELD blocker=#685). Forge session PID 2060999 approaching 4h timeout (~00:55Z). 0 new alerts. Watermark 1068 (no change). All 8 daemons alive. Repo clean (HEAD=1a60caa5=origin/main). Sync 6m ago. Check I: Thursday, skip. PRIME: interventions=1128, systemic_fixes=66, ratio=17.1, trend=improving. Tier 1, consecutive_clean=0.
+
+## Status snapshot — updated 2026-06-25 00:40Z UTC (Iter ~2655, Tier 1, consecutive_clean=0)
+
+**Iter ~2655 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry, medic attempt 3 filed, awaiting Larry manual rebase); PR #687 CONFLICTING (carry, Mirror REVIEW_PASS x4, AUTO_MERGE_HELD until #685 merges). Forge session PID 2060999 (resume=6a1daec3, task=forge-post-open-mergeable-rebase-001) at 3h37m, timeout ~00:55Z. 0 new alerts. Watermark 1068 (no change). All daemons alive (8/8). Repo clean (HEAD=3cac366d=origin/main). Sync 57m ago. Check I: Thursday, skip. PRIME: interventions=1127, systemic_fixes=66, ratio=17.1, trend=improving. Tier 1, consecutive_clean=0.
+
+## Status snapshot — updated 2026-06-25 00:27Z UTC (Iter ~2654, Tier 1, consecutive_clean=0)
+
+**Iter ~2654 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry, medic attempt 3 filed, awaiting Larry manual rebase); PR #687 CONFLICTING (carry, Mirror REVIEW_PASS x2, AUTO_MERGE_HELD until #685 merges). Forge session PID 2029112 queue-depth stall (~3.5h+, 8 inbox items unchanged). 2 new alerts: L1067-L1068 both Tier-3 (sentinel+medic inbox-stall for forge-wip-only-auto-redispatch-001). Watermark 1066→1068. All daemons alive (8/8). Repo clean, sync 48m ago. Check I: Thursday, skip. PRIME: interventions=1125, systemic_fixes=66, ratio=17.0, trend=improving. Tier 1, consecutive_clean=0.
+
+## Status snapshot — updated 2026-06-25 00:22Z UTC (Iter ~2653, Tier 1, consecutive_clean=0)
+
+**Iter ~2653 summary:** ⚠️ Watch — PR #685 CONFLICTING (medic attempt 3 approval_request filed, awaiting Larry manual rebase); PR #687 CONFLICTING (new confirmation this iter), Mirror REVIEW_PASS x2 (sessions 3+4), AUTO_MERGE_HELD blocker=#685 file overlap. Mirror session 4 ended cleanly. 3 alerts: L1064-L1065 Tier-3 (medic-diagnosis), L1066 Tier-4 (medic approval_request PR#685 force-git-op, bot DM'd, no Pulse 2nd DM). Watermark 1063→1066. Beacon inbox: empty. Forge inbox: 8 items (unchanged). beacon-pending-approvals: 0. 8 daemons alive. Watchdog: no new WARNs after Mirror session 4 ended (positive signal). Check I: Thursday, skip. PRIME: interventions=1124, systemic_fixes=66, ratio=17.0, trend=improving. Tier 1, consecutive_clean=0.
+
+## Status snapshot — updated 2026-06-25 00:13Z UTC (Iter ~2652, Tier 1, consecutive_clean=0)
+
+**Iter ~2652 summary:** ⚠️ Watch — PR #685 CONFLICTING (confirmed this iter, auto-recovery failed); PR #687 UNKNOWN (Mirror session 4 active ~21 min, PID 2249100). 4 alerts triaged: L1060-L1062 Tier-3 (sentinel inbox-stall x2, medic-diagnosis x1); L1063 Tier-4 (mirror-pass-unmerged:PR#685, bot DM'd, no Pulse DM). Watermark 1059→1063. Beacon inbox: empty. Forge inbox: 8 items (unchanged). beacon-pending-approvals: 0 pending. 8 daemons alive. Watchdog: 1 WARN at 00:10Z (stale 1486s, Mirror session 4 active; fix not merged). Check I: weekday=Thursday, skip. PRIME: interventions=1123, systemic_fixes=66, ratio=17.1, trend=improving. Tier 1, consecutive_clean=0.
+
+## Status snapshot — updated 2026-06-25 00:06Z UTC (Iter ~2651, Tier 1, consecutive_clean=0)
+
+**Iter ~2651 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry); PR #687 CONFLICTING (Mirror session 4 active ~13 min, PID 2249100). 5 alerts triaged: L1055-L1059 all Tier-3 (sentinel inbox-stall x2 — one false positive per medic, one queue serialization; pipeline-stall forge-no-pr:reconcile x1; medic-diagnosis x2). Watermark 1054→1059. Beacon inbox: empty. Forge inbox: 8 items (unchanged). beacon-pending-approvals: 0 pending. 8 daemons alive. Check I: weekday=Thursday, skip. Watchdog: WARNs at 18:00+18:05 MDT (10-15 min into Mirror session 4) — fix in Forge preflight not yet merged. PRIME: interventions=1122, systemic_fixes=66, ratio=17.0, trend=improving. Tier 1, consecutive_clean=0.
+
+## Status snapshot — updated 2026-06-25 00:00Z UTC (Iter ~2650, Tier 1, consecutive_clean=0)
+
+**Iter ~2650 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry); PR #687 CONFLICTING (Mirror session 4 active ~10 min, PID 2249100, started 23:50Z after session 3 reaped). 1 alert triaged: L1054 Tier-3 (heal-wedged-review-sessions wedged-review-reaped session 3). Watermark 1053→1054. Beacon inbox: empty. Forge inbox: 8 items (unchanged). beacon-pending-approvals: 0 pending. 8 daemons alive. **KEY CORRECTION:** watchdog log is `watchdog.log` (not `watchdog_watcher.log`) — prior "0 WARNs" observations may have been based on non-existent path; 1 WARN at 23:55Z (5 min into session 4) confirmed from correct log. Fix (watchdog-stale-session-aware-suppression-001) still in Forge preflight. Check I: mode=digest, cooldown-suppressed. PRIME: interventions≈1121, systemic_fixes=66, ratio≈17.0, trend=improving. Tier 1, consecutive_clean=0.
+
+## Status snapshot — updated 2026-06-24 23:52Z UTC (Iter ~2649, Tier 1, consecutive_clean=0)
+
+**Iter ~2649 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry); PR #687 CONFLICTING (Mirror session 3 active ~39 min). Larry approved BOTH pending direction-asks at 17:44 MDT: `health-notify-wire-vs-silence-001` (Beacon completed 23:45:34Z, $0.318; `wire-agent-core-health-notify-001` → Forge inbox) + `alert-translation-mirror-pass-unmerged-001` (→ Forge inbox). Forge inbox now 8 items (+2 new). 2 alerts triaged: L1052 Tier-4 (mirror-pass-unmerged:PR#687, bot DM'd, no Pulse DM), L1053 Tier-3 (medic-diagnosis). Watermark 1051→1053. beacon-pending-approvals: 0 pending. 8 daemons alive. Watchdog: 0 WARNs during Mirror session 3 (~39 min) — positive signal for fix. Check I: mode=digest, cooldown-suppressed. PRIME: interventions=1120, systemic_fixes=66, ratio≈16.97, trend=improving. Tier 1, consecutive_clean=0.
+
+## Status snapshot — updated 2026-06-24 23:44Z UTC (Iter ~2648, Tier 1, consecutive_clean=0)
+
+**Iter ~2648 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry+verified); PR #687 CONFLICTING (Mirror session 3 active ~31 min). G-rule ourliberty-health-notify-script-missing: Beacon root-cause DONE — notify_larry.py never built (6-wk TODO); "1 issue" was untracked spec (cleared via 59bb8fbc); health-notify-wire-vs-silence-001 direction-ask DM'd Larry. 1 new alert triaged (L1051 Tier-3, approval_request). Watermark 1050→1051. New HEAD=59bb8fbc (doorbell spec committed). G-rule watchdog-watcher-log-stale-post-fix: 0 WARNs during Mirror session 3 (31 min). PRIME: interventions=1120, systemic_fixes=66, ratio≈16.97, trend=improving. Tier 1, consecutive_clean=0.
+
+## Status snapshot — updated 2026-06-24 23:35Z UTC (Iter ~2647, Tier 1, consecutive_clean=0)
+
+**Iter ~2647 summary:** ⚠️ Watch — G-rule ourliberty-health-notify-script-missing **3/3 DISPATCHED** (fires every ~30 min; ourliberty-health-notify-script-missing-001 → Beacon). PR #685 CONFLICTING (carry, mergeable=UNKNOWN this iter); PR #687 CONFLICTING, Mirror session 3 active since 23:10:40Z (~25 min). 0 new alerts (watermark=1050). G-rule watchdog-stale-post-fix: 0 WARNs during Mirror session 3 (positive, fix likely working). Check I: mode=digest, cooldown-suppressed. HEAD=220ba837. PRIME: interventions=1119, systemic_fixes=66, ratio≈16.95, trend=improving. Tier 1, consecutive_clean=0.
+
+## Status snapshot — updated 2026-06-24 23:27Z UTC (Iter ~2646, Tier 1, consecutive_clean=0)
+
+**Iter ~2646 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry); PR #687 CONFLICTING, Mirror session 2 REVIEW_PASS confirmed (archive exit_code=0), session 3 active since 23:10:40Z. alert-translation-mirror-pass-unmerged-001 pending Larry approval. 1 alert triaged (L1050, Tier-3 doorbell). Watermark 1049→1050. 8 daemons alive. G-rule watchdog-stale-post-fix: 0 WARNs during session 3 (positive, fix in preflight). Check I: mode=digest, cooldown-suppressed. HEAD=f0c1f73b. PRIME: interventions≈1118, systemic_fixes=65, ratio≈17.2, trend=improving. Tier 1, consecutive_clean=0.
+
+## Status snapshot — updated 2026-06-24 23:19Z UTC (Iter ~2645, Tier 1, consecutive_clean=0)
+
+**Iter ~2645 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry, needs rebase); PR #687 **Mirror REVIEW_PASS** (23:10Z session 2 done) AUTO_MERGE_HELD blocker=#685 file overlap; Mirror session 3 running since 23:10:40Z. alert-translation-mirror-pass-unmerged-001 pending Larry approval (reply 'approve' in Telegram). 2 alerts triaged (L1048-L1049, Tier-3). Watermark 1047→1049. 8 daemons alive. No watchdog WARNs in this window (last healthy 23:15Z). Check I: mode=digest, cooldown-suppressed. HEAD=77018b7e. PRIME: interventions≈1118, systemic_fixes=65, ratio≈17.2, trend=improving. Tier 1, consecutive_clean=0.
+
+## Status snapshot — updated 2026-06-24 23:14Z UTC (Iter ~2644, Tier 1, consecutive_clean=0)
+
+**Iter ~2644 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry, auto-merge failed); PR #687 CONFLICTING, Mirror session 2 still running since 22:32Z (~41 min). G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4 **3/3 DISPATCHED** (heal-pipeline-stall-mirror-pass-unmerged-tier3-001 → Beacon). 4 alerts triaged (L1044-L1047, all Tier-3). Watermark 1043→1047. 8 daemons alive. No watchdog WARNs (positive signal). Check I: mode=digest, cooldown-suppressed. HEAD=8336a1b9. PRIME: interventions≈1117, systemic_fixes=65, ratio≈17.2, trend=improving. Tier 1, consecutive_clean=0.
+
+## Status snapshot — updated 2026-06-24 23:04Z UTC (Iter ~2643, Tier 1, consecutive_clean=0)
+
+**Iter ~2643 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry); PR #687 CONFLICTING, Mirror session 2 still running since 22:32Z (~32 min). reconcile-hardening-mission-shipped-001 stall: cooldown expired, L1043 fired (Tier-3 silenced), worktree exists, reconcile-002 in Forge BUILD. 1 alert triaged (L1043 Tier-3). Watermark 1042→1043. 8 daemons alive. Check I: mode=digest, DM route=digest. HEAD=c4b82b08. PRIME: interventions≈1115, systemic_fixes=64, ratio≈17.4, trend=improving. Tier 1, consecutive_clean=0.
+
+## Status snapshot — updated 2026-06-24 22:58Z UTC (Iter ~2642, Tier 1, consecutive_clean=0)
+
+**Iter ~2642 summary:** ⚠️ Watch — PR #685 CONFLICTING (carry); PR #687 CONFLICTING, Mirror session 2 active since 22:32Z. L1042 new alert: Tier-3 (approval_request watchdog-stale-session-aware-suppression-001 — Larry approved at 22:54Z, dispatched to Forge preflight). Beacon inbox NOW EMPTY (watchdog task processed). Forge inbox: 6 items (5 carry + watchdog fix NEW). No new watchdog WARNs (watchdog healthy 22:55Z). G-rule watchdog-watcher-log-stale-post-fix: verification_pending progressing (fix in Forge preflight). ourliberty-health-notify-script-missing: 2/3 (0 new). 8 daemons alive. Check I: mode=digest, cooldown-suppressed. HEAD=504eac1f. PRIME: interventions≈1114, systemic_fixes=64, ratio≈17.4, trend=improving. Tier 1, consecutive_clean=0.
+
+## Status snapshot — updated 2026-06-24 22:52Z UTC (Iter ~2641, Tier 1, consecutive_clean=0)
+
+**Iter ~2641 summary:** ⚠️ Watch — PR #685 CONFLICTING (pipeline-stall cooldown active); PR #687 CONFLICTING (Mirror backstop review session active since 22:44Z — new worktree created, inbox_watcher processing). G-rule watchdog-watcher-log-stale-post-fix: 3/3 dispatched (verification_pending; new WARN at 22:50Z for active Mirror session, fix in Beacon inbox). ourliberty-health-notify-script-missing: 2/3 carry (0 new instances). 0 new alerts (watermark=1041). 8 daemons alive. Check I: mode=digest, cooldown-suppressed. HEAD=4bc66f02. PRIME: interventions≈1113, systemic_fixes=64, ratio≈17.4, trend=improving. Tier 1, consecutive_clean=0.
+
+## Status snapshot — updated 2026-06-24 22:45Z UTC (Iter ~2640, Tier 1, consecutive_clean=0)
+
+**Iter ~2640 summary:** ⚠️ Watch — PR #685 CONFLICTING (pipeline-stall cooldown active); PR #687 CONFLICTING (MalformedMirrorMarker; heal-undispatched-pr-review backstop dispatched at 22:35Z; inbox_watcher processing backstop review; 2 Mirror inbox items). G-rule watchdog-watcher-log-stale-post-fix **3/3 DISPATCHED** (watchdog-stale-post-pr649-regression-fix-001 → Beacon inbox). ourliberty-health-notify-script-missing **2/3** (22:33Z second occurrence). 0 new alerts (watermark=1041). 8 daemons alive. Check I: mode=digest, cooldown-suppressed. HEAD=f9e31ea9. PRIME: interventions≈1112, systemic_fixes=64, ratio≈17.4, trend=improving. Tier 1, consecutive_clean=0.
+
+## Status snapshot — updated 2026-06-24 22:39Z UTC (Iter ~2639, Tier 1, consecutive_clean=0)
+
+**Iter ~2639 summary:** ⚠️ Watch — PR #685 CONFLICTING (pipeline-stall cooldown active); PR #687 CONFLICTING (Mirror session reaped at 22:30Z; MalformedMirrorMarker at 22:32Z; re-review pending via marker-error envelope in Mirror inbox). 1 new alert (L1041): Tier-3 (heal-wedged-review-sessions, wedged-review-reaped). Watermark 1040→1041. 8 daemons alive. G-rule watchdog-watcher-log-stale-post-fix: 2/3 carry (same session reaped, no new independent occurrence). Check I: mode=digest, cooldown-suppressed. HEAD=eb45518b. PRIME: interventions≈1111, systemic_fixes=63, ratio≈17.6, trend=improving. Tier 1, consecutive_clean=0.
+
+## Status snapshot — updated 2026-06-24 22:31Z UTC (Iter ~2638, Tier 1, consecutive_clean=0)
+
+**Iter ~2638 summary:** ⚠️ Watch — PR #685 CONFLICTING (pipeline-stall cooldown active); PR #687 CONFLICTING (Mirror review active since 21:55Z, 0 reviews yet); G-rule watchdog-watcher-log-stale-post-fix **2/3** NEW (7 WARNs in 40-min window, in-flight suppression failing for long Mirror sessions). 0 new alerts (watermark=1040). 8 daemons alive. Check I: mode=digest, cooldown-suppressed. HEAD=e57fc076. PRIME: interventions≈1110, systemic_fixes=63, ratio≈17.6, trend=improving. Tier 1, consecutive_clean=0.
+
+## Status snapshot — updated 2026-06-24 22:20Z UTC (Iter ~2637, Tier 1, consecutive_clean=0)
+
+**Iter ~2637 summary:** ⚠️ Watch — PR #685 CONFLICTING (pipeline-stall cooldown active); PR #687 CONFLICTING (Mirror review active, no reviews yet). 1 new alert (L1040): Tier-3 (medic-diagnosis). Watermark 1039→1040. 8 daemons alive. Check I: mode=digest, cooldown-suppressed. HEAD=b8019068. PRIME: interventions≈1109, systemic_fixes=63, ratio≈17.6, trend=improving. Tier 1, consecutive_clean=0.
+
+## Status snapshot — updated 2026-06-24 22:14Z UTC (Iter ~2636, Tier 1, consecutive_clean=0)
+
+**Iter ~2636 summary:** ⚠️ Watch — PR #685 CONFLICTING (mirror-pass-unmerged L1039 DM'd Larry; pipeline-stall in cooldown); PR #687 CONFLICTING (Mirror review active, no reviews yet). 4 new alerts triaged (L1036-L1039): 3 Tier-3, 1 Tier-4 (L1039 mirror-pass-unmerged). Watermark 1035→1039. G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4 **2/3** NEW. 8 daemons alive. Check I: mode=digest. HEAD=879158fc. PRIME: interventions≈1108, systemic_fixes=63, ratio≈17.6, trend=improving. Tier 1, consecutive_clean=0.
 
 
 

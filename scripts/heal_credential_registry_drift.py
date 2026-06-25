@@ -375,11 +375,29 @@ def resolve_registry(
 
 # -------------------- scanners --------------------
 
+# Boolean feature-flag literals. A key whose value is exactly one of these is a
+# tunable on/off switch (e.g. OURLIBERTY_BOARD_DRAIN_ENABLED), NOT a credential:
+# it has nothing to expire and nothing to rotate, so the env_file scanner treats
+# it as absent (no MISSING_REGISTRY_ENTRY). This is the durable class-fix for the
+# false-positive treadmill where every new *_ENABLED flag needed a hand-added
+# ignored_keys entry. It is strictly SAFER than a name-suffix wildcard: a real
+# secret is never the literal string "true"/"1"/"on", so this can never swallow
+# one (whereas a secret named FOO_ENABLED with a real value is still caught).
+# Set matches the truthy/falsy vocab the flags themselves parse (see
+# drain_board_to_beacon.py `_enabled`: '1','true','yes','on').
+_BOOLEAN_FLAG_VALUES = frozenset({
+    'true', 'false', '1', '0', 'yes', 'no', 'on', 'off',
+})
+
+
 def scan_env_file(env_path: Path) -> set[str]:
-    """Return the set of KEY names with non-empty values in an env file.
+    """Return the set of KEY names with non-empty, non-boolean values in an env
+    file.
 
     Per registry's env_file scanner_strategy: parse KEY=value lines; ignore
-    comments and blank lines; non-empty value = present.
+    comments and blank lines; non-empty value = present. Keys whose value is a
+    boolean flag literal (`_BOOLEAN_FLAG_VALUES`) are skipped — they are
+    tunables, not credentials, and must never enter drift detection.
     """
     if not env_path.exists():
         return set()
@@ -398,8 +416,13 @@ def scan_env_file(env_path: Path) -> set[str]:
                 continue
             # Strip surrounding quotes for emptiness check.
             unquoted = value.strip("'").strip('"').strip()
-            if unquoted:
-                names.add(key)
+            if not unquoted:
+                continue
+            # Skip boolean feature-flag values — these are on/off tunables, not
+            # credentials, so they have no place in the rotation registry.
+            if unquoted.lower() in _BOOLEAN_FLAG_VALUES:
+                continue
+            names.add(key)
     except OSError as e:
         log(f'scan_env_file read error on {env_path}: {e}', 'WARN')
     return names

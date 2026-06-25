@@ -2596,5 +2596,245 @@ class TestStalledPendingSequence(_TempAgentsRootMixin, unittest.TestCase):
         self.assertFalse(self.hps.should_alert(state, a1['key']))
 
 
+class TestCheckRedMirrorStatusNoArtifact(_TempAgentsRootMixin, unittest.TestCase):
+    """mirror-review-visibility Contract E (spec §8 / §10-E). The backstop for
+    the #653 silent-red failure mode: a session-less PR sitting on a RED
+    `mirror-review` commit status past threshold with no self-heal in progress
+    and nothing on Larry's surfaces is promoted to its Contract C action surface
+    (the for-Larry Waiting-on-You record) recover-FIRST, and alerts exactly once
+    only if that promotion fails."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        # Sandbox the no_session_ledger (the _self_heal_in_progress guard reads
+        # it) to this test's root.
+        self._nsl = self.hps.no_session_ledger
+        self._nsl_orig = self._nsl.LEDGER_FILE
+        self._nsl.LEDGER_FILE = self.agents_root / 'state' / 'ns-ledger.json'
+        # Sandbox the for-Larry feed to a temp file; feed_path() reads this env
+        # live on every call.
+        self._feed = self.agents_root / 'blackboard' / 'for-larry-escalations.json'
+        self._feed_env_orig = os.environ.get('OURLIBERTY_FOR_LARRY_FEED_FILE')
+        os.environ['OURLIBERTY_FOR_LARRY_FEED_FILE'] = str(self._feed)
+        self._fle = self.hps.for_larry_escalations
+        # Pin the Approvals-tab lookup to "nothing known" so _larry_artifact_exists
+        # is driven purely by the sandboxed for-Larry feed, never the host's real
+        # approvals state.
+        patcher = patch('beacon_approval_handler.find_by_id_any_state',
+                        return_value=None)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def tearDown(self) -> None:
+        self._nsl.LEDGER_FILE = self._nsl_orig
+        if self._feed_env_orig is None:
+            os.environ.pop('OURLIBERTY_FOR_LARRY_FEED_FILE', None)
+        else:
+            os.environ['OURLIBERTY_FOR_LARRY_FEED_FILE'] = self._feed_env_orig
+        super().tearDown()
+
+    def _pr(self, number=7, branch='forge/silent-red', repo='owner/repo',
+            created_min_ago=200):
+        created = (datetime.now(timezone.utc)
+                   - timedelta(minutes=created_min_ago))
+        return {
+            '_repo': repo,
+            'number': number,
+            'headRefName': branch,
+            'createdAt': created.strftime('%Y-%m-%dT%H:%M:%SZ'),
+        }
+
+    def _status(self, state='failure', sha='deadbeefcafe', red_min_ago=120):
+        red_since = (datetime.now(timezone.utc)
+                     - timedelta(minutes=red_min_ago)) if red_min_ago else None
+        return (state, sha, red_since)
+
+    # ---- detection ----
+
+    def test_red_status_past_threshold_no_artifact_alerts(self) -> None:
+        with patch.object(self.hps, '_mirror_review_status',
+                          return_value=self._status()):
+            alerts = self.hps.check_red_mirror_status_no_artifact([self._pr()], {})
+        self.assertEqual(len(alerts), 1)
+        a = alerts[0]
+        self.assertEqual(a['key'], 'red_mirror_status:owner/repo:7')
+        self.assertEqual(a['subject'], 'pipeline-stall:red-mirror-status:PR#7')
+        self.assertIn('silent-red', a['message'])
+        self.assertIn('recovery', a)
+
+    def test_green_status_no_alert(self) -> None:
+        with patch.object(self.hps, '_mirror_review_status',
+                          return_value=self._status(state='success')):
+            alerts = self.hps.check_red_mirror_status_no_artifact([self._pr()], {})
+        self.assertEqual(alerts, [])
+
+    def test_pending_status_no_alert(self) -> None:
+        with patch.object(self.hps, '_mirror_review_status',
+                          return_value=self._status(state='pending')):
+            alerts = self.hps.check_red_mirror_status_no_artifact([self._pr()], {})
+        self.assertEqual(alerts, [])
+
+    def test_gh_unreachable_no_alert(self) -> None:
+        # _mirror_review_status returns (None, None, None) on a gh outage — a
+        # verify-before-alarm skip, not a stall.
+        with patch.object(self.hps, '_mirror_review_status',
+                          return_value=(None, None, None)):
+            alerts = self.hps.check_red_mirror_status_no_artifact([self._pr()], {})
+        self.assertEqual(alerts, [])
+
+    def test_fresh_red_within_threshold_no_alert(self) -> None:
+        # Old PR (passes the cheap createdAt pre-filter) but the status only just
+        # went red — under RED_MIRROR_STATUS_MIN, so not yet a stall.
+        with patch.object(self.hps, '_mirror_review_status',
+                          return_value=self._status(red_min_ago=10)):
+            alerts = self.hps.check_red_mirror_status_no_artifact([self._pr()], {})
+        self.assertEqual(alerts, [])
+
+    def test_young_pr_skipped_by_prefilter(self) -> None:
+        # A PR younger than the threshold can't have a red status older than it;
+        # the pre-filter skips the per-PR gh call entirely.
+        called = []
+
+        def _spy(repo, number):
+            called.append((repo, number))
+            return self._status()
+
+        with patch.object(self.hps, '_mirror_review_status', side_effect=_spy):
+            alerts = self.hps.check_red_mirror_status_no_artifact(
+                [self._pr(created_min_ago=10)], {})
+        self.assertEqual(alerts, [])
+        self.assertEqual(called, [])  # gh never consulted
+
+    def test_long_abandoned_red_outside_window_no_alert(self) -> None:
+        with patch.object(self.hps, '_mirror_review_status',
+                          return_value=self._status(red_min_ago=60 * 48)):
+            alerts = self.hps.check_red_mirror_status_no_artifact(
+                [self._pr(created_min_ago=60 * 48)], {})
+        self.assertEqual(alerts, [])
+
+    # ---- guards: no double-notify with step 2 ----
+
+    def test_self_heal_in_progress_skips(self) -> None:
+        # An OPEN no_session_ledger obligation means the mechanical cold-start
+        # re-dispatch owns this task (Check 6) — the backstop must defer.
+        self._nsl.open_obligation('silent-red', pr_url='https://x/pull/7')
+        with patch.object(self.hps, '_mirror_review_status',
+                          return_value=self._status()):
+            alerts = self.hps.check_red_mirror_status_no_artifact([self._pr()], {})
+        self.assertEqual(alerts, [])
+
+    def test_existing_for_larry_record_skips(self) -> None:
+        # Step 2 already surfaced this exact case — an OPEN Waiting-on-You record
+        # under the SAME record_id — so the backstop must not double-notify.
+        self._fle.upsert('mirror-review:silent-red', headline='h', context='c',
+                         pr_url='https://github.com/owner/repo/pull/7',
+                         head_sha='deadbeefcafe',
+                         dedup_identity='https://github.com/owner/repo/pull/7@deadbeefcafe')
+        with patch.object(self.hps, '_mirror_review_status',
+                          return_value=self._status()):
+            alerts = self.hps.check_red_mirror_status_no_artifact([self._pr()], {})
+        self.assertEqual(alerts, [])
+
+    def test_non_forge_branch_uses_pr_keyed_task_id(self) -> None:
+        # An off-chain branch (the #653 shape) has no chain task_id; the canonical
+        # key is pr-<repo>-<number>, matching step-2 routing exactly.
+        with patch.object(self.hps, '_mirror_review_status',
+                          return_value=self._status()):
+            alerts = self.hps.check_red_mirror_status_no_artifact(
+                [self._pr(branch='claude/auto-fix')], {})
+        self.assertEqual(len(alerts), 1)
+        rec = self._fle.get('mirror-review:pr-repo-7')
+        self.assertIsNone(rec)  # detection only; recovery hasn't run yet
+        self.assertIn('pr-repo-7', alerts[0]['suggested_action'])
+
+    # ---- recovery: recover-then-route before any alert ----
+
+    def _recovery_for(self, alerts):
+        self.assertEqual(len(alerts), 1)
+        return alerts[0]['recovery']
+
+    def test_recovery_routes_to_for_larry_record(self) -> None:
+        with patch.object(self.hps, '_mirror_review_status',
+                          return_value=self._status()):
+            alerts = self.hps.check_red_mirror_status_no_artifact([self._pr()], {})
+        recovery = self._recovery_for(alerts)
+        with patch.object(self.hps, '_gh_pr_state', return_value='OPEN'):
+            recovered = recovery()
+        self.assertTrue(recovered)  # routed → framework suppresses the alert
+        rec = self._fle.get('mirror-review:silent-red')
+        self.assertIsInstance(rec, dict)
+        self.assertIs(rec['resolved'], False)
+        self.assertEqual(rec['pr_url'], 'https://github.com/owner/repo/pull/7')
+
+    def test_recovery_idempotent_no_duplicate_record(self) -> None:
+        with patch.object(self.hps, '_mirror_review_status',
+                          return_value=self._status()):
+            alerts = self.hps.check_red_mirror_status_no_artifact([self._pr()], {})
+        recovery = self._recovery_for(alerts)
+        with patch.object(self.hps, '_gh_pr_state', return_value='OPEN'):
+            self.assertTrue(recovery())
+            self.assertTrue(recovery())  # same head → idempotent
+        rows = self._fle.list_open()
+        self.assertEqual(
+            [r['id'] for r in rows], ['mirror-review:silent-red'])
+
+    def test_recovery_clears_record_on_merged_pr(self) -> None:
+        # PR merged out-of-band → the red status is moot; an existing record is
+        # cleared and recovery reports success.
+        self._fle.upsert('mirror-review:silent-red', headline='h', context='c',
+                         pr_url='https://github.com/owner/repo/pull/7',
+                         head_sha='deadbeefcafe', dedup_identity='x@y')
+        with patch.object(self.hps, '_gh_pr_state', return_value='MERGED'):
+            recovered = self.hps._recover_red_mirror_status(
+                'silent-red', 'https://github.com/owner/repo/pull/7',
+                'deadbeefcafe', 'mirror-review:silent-red')
+        self.assertTrue(recovered)
+        self.assertEqual(self._fle.list_open(), [])
+
+    def test_recovery_defers_when_gh_unreachable(self) -> None:
+        # gh unreachable (state None) with a known pr_url → defer, write nothing,
+        # suppress the alert this round.
+        with patch.object(self.hps, '_gh_pr_state', return_value=None):
+            recovered = self.hps._recover_red_mirror_status(
+                'silent-red', 'https://github.com/owner/repo/pull/7',
+                'deadbeefcafe', 'mirror-review:silent-red')
+        self.assertTrue(recovered)
+        self.assertEqual(self._fle.list_open(), [])
+
+    def test_recovery_false_when_write_fails_so_alert_fires(self) -> None:
+        # If the durable promotion does not land (no open record afterward),
+        # recovery returns False → the framework fires exactly one fallback alert.
+        with patch.object(self.hps, '_gh_pr_state', return_value='OPEN'), \
+                patch.object(self._fle, 'upsert', return_value=None), \
+                patch.object(self._fle, 'get', return_value=None):
+            recovered = self.hps._recover_red_mirror_status(
+                'silent-red', 'https://github.com/owner/repo/pull/7',
+                'deadbeefcafe', 'mirror-review:silent-red')
+        self.assertFalse(recovered)
+
+    def test_end_to_end_recover_then_route_suppresses_alert(self) -> None:
+        # §10-E: the synthetic silent-red PR routes recover-then-alert — the
+        # for-Larry record is written and NO Larry DM is appended.
+        appended: list = []
+        with patch.object(self.hps, '_all_open_prs', return_value=[self._pr()]), \
+                patch.object(self.hps, '_all_merged_prs_recent', return_value=[]), \
+                patch.object(self.hps, '_mirror_review_status',
+                             return_value=self._status()), \
+                patch.object(self.hps, '_gh_pr_state', return_value='OPEN'), \
+                patch.object(self.hps.larry_alerts, 'append_alert',
+                             side_effect=lambda **kw: appended.append(kw) or True):
+            rc = self.hps.run()
+        self.assertEqual(rc, 0)
+        # The silent-red stall recovered → its DM is suppressed. (Other checks
+        # may DM on this bare fixture PR; we assert only that OUR subject never
+        # paged.)
+        red_dms = [a for a in appended
+                   if a.get('subject') == 'pipeline-stall:red-mirror-status:PR#7']
+        self.assertEqual(red_dms, [])
+        rec = self._fle.get('mirror-review:silent-red')
+        self.assertIsInstance(rec, dict)
+        self.assertIs(rec['resolved'], False)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -68,6 +68,8 @@ A PR that adds a credential but is missing any of these 4 artifacts fails review
 
 DMs continue every 6h until reconciled — fail-closed posture per Larry's Q2 decision in E1.5 design. Annoying by design; the alternative (silent drift) is worse.
 
+**Feature flags are not credentials.** The `env_file` scanner auto-skips any key whose value is a boolean literal (`true/false/1/0/yes/no/on/off`) — these are on/off tunables (e.g. `OURLIBERTY_BOARD_DRAIN_ENABLED`) with nothing to rotate. Do **not** add a fabricated registry entry or an `ignored_keys` allowlist line for them; the skip handles them automatically. The `ignored_keys` allowlist remains only for genuinely non-boolean non-secrets (URLs, chat IDs). This is strictly safer than a name-suffix wildcard: a real secret is never the literal string `true`/`on`, so the skip can never swallow one.
+
 The healer ships with a kill-switch: env var `OURLIBERTY_CREDENTIALS_HEALER_ENABLED=true` is required; default is dry-run (logs would-DM but doesn't actually send). Activation pattern matches `heal_pr_auto_merge` from E1.3.
 
 ---

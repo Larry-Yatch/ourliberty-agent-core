@@ -5015,10 +5015,16 @@
     {
       "id": "orchestrator-terminal-signal-hardening",
       "name": "Orchestrator terminal-signal hardening",
-      "phase": "in_flight",
+      "phase": "shipped",
       "brief": "Make the build-sequence advancer + stall backstops propagate terminal agent outcomes correctly. Root cause: chain_event_says_failed queries event types the shipper never emits (forge_reject/mirror_* vs the real preflight_reject/review_escalate), so only the merge path is wired and non-merge terminals false-strand to the 4h timer with a misattributed reason. Re-scoped to 2 steps after reconciling vs #665/#668 (which already shipped the no-session mechanical recovery + most backstop fixes): Step 1 advancer event-type realign + stall attribution; Step 2 push-signal non-merge terminals + pr_url/substatus at PR-open.",
       "spec_doc": "agents/beacon/specs/orchestrator-terminal-signal-hardening.md",
-      "task_ids": []
+      "task_ids": [
+        "advancer-failure-detection",
+        "push-signal-and-substatus"
+      ],
+      "shipped_at": "2026-06-25T00:52:13.979183+00:00",
+      "shipped_by": "reconcile-hardening-mission-shipped-002",
+      "prior_phase": "in_flight"
     },
     {
       "id": "projects-v3-p7",
@@ -5081,6 +5087,68 @@
       "deferred_reason": null,
       "proposed_by": "beacon",
       "proposed_at": "2026-06-24T19:30:00+00:00"
+    },
+    {
+      "id": "proposed-ourliberty-health-notify-script-missing-001",
+      "name": "Ourliberty Health Notify Script Missing 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `ourliberty-health-notify-script-missing-001`. Last activity 2026-06-24T23:35:13.999001+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "ourliberty-health-notify-script-missing-001"
+      ],
+      "repo": null,
+      "created": "2026-06-24",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-24T23:38:05.354770+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-24T23:35:13.999001+00:00",
+      "briefing": {
+        "what": "A piece of work flagging that the tool meant to send you health alerts about the Ourliberty system isn't in place yet.",
+        "why": "Without it, problems with the system could go unnoticed until they become bigger, more expensive issues.",
+        "suggest": "Have someone confirm what's actually missing before greenlighting the work, since this started on its own without a clear owner or goal."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-24T23:48:10.481374+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "proposed-health-notify-wire-vs-silence-001",
+      "name": "Health Notify Wire Vs Silence 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `health-notify-wire-vs-silence-001`. Last activity 2026-06-24T23:45:34.157225+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "health-notify-wire-vs-silence-001"
+      ],
+      "repo": null,
+      "created": "2026-06-24",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-24T23:53:19.814333+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-24T23:45:34.157225+00:00",
+      "briefing": {
+        "what": "A safety check that's meant to warn you when our systems quietly drift out of shape has been swallowing every warning for about six weeks because the part that actually sends you the alert was never finished.",
+        "why": "It means a whole channel that's supposed to flag real problems has been silent, so if something had gone wrong you wouldn't have heard about it.",
+        "suggest": "Turn the alerts on, but keep them tightly filtered to only what truly needs your attention so you get the real warnings without the noise."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-24T23:58:11.814610+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
