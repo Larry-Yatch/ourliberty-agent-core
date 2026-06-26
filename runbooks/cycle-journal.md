@@ -5,6 +5,102 @@
 ---
 
 
+## Iteration ~2856 — 2026-06-26T03:18Z UTC (interactive /loop /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/loop /cycle` invocation via chat (self-paced dynamic loop, iter 2).
+
+**Health:** ✅→⚠️ Improved — PR #711 MERGED (Mirror PASS 21:14 MDT); Mirror session PID 3196288 gone ✅. 8/8 daemons alive. 0 new alerts. Stall dry-run clean. Zombie PID 1834248 + 6 stale journalctl PIDs carry. APPROVAL_REQUEST mirror-marker-discipline-spec-update-001 pending.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo (re-verified):** On main. HEAD=541843fc=origin/main ("Pulse cycle 20260626T031419Z"). Clean. ✅
+- **Sync (re-verified):** last_sync=2026-06-26T03:01:49Z (~17 min old at scan). Under 2h. ✅
+- **Daemons (re-verified):** chain_event_shipper=2716672 ✅, dashboard_api=3044417 ✅, outbox_notifier=3044826 ✅, inbox_watcher=3107973 ✅, beacon=3141782 ✅, forge_bot=3141897 ✅, mirror_bot=3142077 ✅, pulse_bot=3142169 ✅. 8/8 alive. Mirror session PID 3196288 GONE — completed. ✅
+- **Watchdog (re-verified):** last=21:15:25 MDT (03:15:25Z) — overall=healthy. ✅ (~1 min before scan)
+- **PR #711 (re-verified):** `gh pr view 711` → state=MERGED, mergedAt=2026-06-26T03:14:02Z. ✅ RESOLVED from prior carry.
+- **Mirror review (re-verified):** outbox-notifier.log 21:14:04 MDT: "mirror review_pass marker … intent=review-pass". AUTO_MERGE skipped=pr-state-MERGED (already terminal). ✅
+- **beacon-pending-approvals (re-verified):** pending=1 (mirror-marker-discipline-spec-update-001), history=301. Expected carry. ✅
+- **Zombie PID 1834248 (re-verified):** alive (~28d 7h 57m, Ss, bash poll loop awaiting build-check-viii-pr-2b-analyzer-001.json archive — target NOT FOUND). [carry ask-then-do]
+- **6 stale journalctl PIDs (re-verified):** 1101500, 1107838, 1118830, 1136223, 1161972, 1177335 — all alive (~30-31d+). [carry ask-then-do]
+- **Watermark (re-verified):** repair-watermark → `{"repaired": false, "old_watermark": 1033, "file_length": 1033}`. 0 new alerts. ✅
+
+**Check 0 — Alert triage:**
+- `repair-watermark` → no-op (watermark 1033 = file_length 1033).
+- 0 new alerts since iter ~2855 watermark. ✅ Nominal.
+
+**Check 1 — Log noise (30-min / outbox-notifier / watchdog):**
+- `journalctl --user -p warning --since "30 minutes ago"` → `-- No entries --`. ✅
+- outbox-notifier.log: Last entries 21:14–21:15 MDT — Mirror REVIEW_PASS for PR #711, AUTO_MERGE skipped (already merged). No new WARNs. ✅
+- watchdog.log: last=21:15:25 MDT — overall=healthy. ✅ Nominal.
+
+**Check 2 — Telegram sweep (last 4h):**
+- beacon_telegram_bot.log: Larry last messaged 19:04 MDT ("beacon?") — ~8.2h ago. No new messages. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- `heal_pipeline_stall --dry-run` → `no stalls detected`. All FORGE_NO_PR_SKIP reasons confirmed. ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- Beacon inbox: `notify-pr-ourliberty-agent-core-711.json` (21:15 MDT, ~1 min old) — Mirror→Beacon review-pass notification for PR #711. Beacon bot alive (PID 3141782). Not stale; active pickup expected. ✅
+- Forge inbox: EMPTY. ✅
+- Mirror inbox: EMPTY (prior PR #711 review files archived). ✅
+- beacon-pending-approvals: 1 pending (mirror-marker-discipline-spec-update-001). Expected carry. ✅
+
+**Check 5 — Stale daemon code:**
+- Heartbeat=2026-06-26T03:08:49Z (~7 min before scan). Fresh. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=541843fc=origin/main. On main. Clean. ✅ Nominal.
+**Check B — Sync health:** last_sync=2026-06-26T03:01:49Z (~17 min). Under 2h. ✅ Nominal.
+**Check C — Agent liveness:** 8/8 procs alive (ps-verified). Mirror session PID 3196288 gone (completed). Watchdog healthy (21:15:25 MDT). ✅
+- **[yellow carry] PID 1834248** — bash poll loop (~28d 7h 57m, target archive file not found). Ask-then-do: `kill 1834248`. [carry]
+- **[yellow carry] 6 stale journalctl PIDs (~30-31d+)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+**Check E — PRs:**
+- **PR #711** (agent-core) — MERGED at 2026-06-26T03:14:02Z. ✅ RESOLVED.
+- **Dashboard:** 0 open PRs. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Friday 2026-06-26 UTC (weekday=4, IS in {0,2,4,6}):**
+- Check I: Artifact `check-i-2026-06-26.json` exists (ran iter ~2849). Cooldown-suppressed. Skip. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule assessment:**
+- **`mirror-marker-severity-blocking-pr711-001`** → DISPATCHED ✅ (iter ~2852), APPROVAL_REQUEST pending=1. PR #711 now MERGED. G-rule systemic fix pending Larry `approve mirror-marker-discipline-spec-update-001`. verification_pending.
+- All other G-rule counts unchanged from iter ~2855.
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op. 0 new alerts. Watermark remains 1033.
+2. §5.0: all no-op.
+3. Check I: cooldown-suppressed. Skip.
+4. PRIME ledger: `intervention` appended (tier=1, template=check-c-zombie-journalctl-carry, detail=zombie PID 1834248 + 6 stale journalctl PIDs carry; PR #711 MERGED noted; ts=2026-06-26T03:18:27Z).
+5. Tier state: `record --checks-clean false` → consecutive_clean=0. Tier remains 1. last_signal_at=2026-06-26T03:18:30Z.
+
+**Dispatches:** None this iter.
+
+**Standing findings (carried + verified):**
+- [yellow] **PR #711** — MERGED ✅ at 2026-06-26T03:14:02Z. Mirror review PASSED 21:14 MDT. RESOLVED.
+- [yellow] **mirror-marker-discipline-spec-update-001 pending approval** — APPROVAL_REQUEST queued at 02:59:07Z. Awaiting Larry `approve mirror-marker-discipline-spec-update-001`. [carry]
+- [yellow] **Zombie PID 1834248** — bash poll loop (~28d 8h, target archive file not found). Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **6 stale journalctl PIDs (~30-31d+)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+- [yellow] **Orphan directives — auth_401 window** — Larry's 17:26/17:28 MDT questions; build shipped (PRs #706-#707); Larry silent 8h+. [carry, no DM]
+- [yellow] **unreviewed-merge:710** — PR #710 merged without Mirror review. Larry judgment. [carry]
+- [yellow] **unreviewed-merge:709** — PR #709 merged without Mirror review. Larry judgment. [carry]
+- [yellow] **forge-wip-redispatch-digest Forge dispatch** — Beacon fix designed (iter ~2798). Trust-policy approval from Larry pending. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649/637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — Session-bound; self-healing. PR #709 separate. [carry — monitor]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Awaiting Larry. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [blue] **heal-stale-daemon-code-state.json MISSING** — healer heartbeat fresh; informational. [carry]
+- [blue] **G-rules (unchanged):** heal-daemon-restart-manifest-drift (2/3), watchdog-watcher-log-stale-post-pr694 (2/3), no-session-revision-merged-pr-fp-001 (1/3), unrouted-open-pr-auto-merge-held-fp-001 (1/3), forge-wip-redispatch-digest-tier4-001 (dispatched vp), forge-wip-redispatch-exhausted-pr-exists-fp-001 (2/3), heal-stale-daemon-code-auto-restart-failed-self-recovered (1/3), heal-stale-daemon-code-still-stale-after-restart (1/3), outbox-notifier-notification-intent-reject-tier4-001 (2/3), ourliberty-health-sync-push-failed-tier4-001 (1/3), mirror-marker-severity-blocking-pr711-001 → DISPATCHED ✅ vp, unrouted-open-pr-active-mirror-session-fp-001 (1/3), medic-dispatcher-delivery-failure-tier4-001 (1/3), forge-revision-preamble-missing-pr711-001 (1/3).
+- [blue] **unreviewed-merge:655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. [carry]
+
+**PRIME DIRECTIVE:** 1 new intervention this iter (zombie+stale-journalctl carry). Trailing-30d: interventions=1234, systemic_fixes=72, vp=27, ratio≈17.14, trend=improving.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0 (non-clean: zombie PID + 6 stale journalctl). Last signal: 2026-06-26T03:18:30Z.
+
+---
+
+
 ## Iteration ~2855 — 2026-06-26T03:12Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/cycle` invocation via chat.
