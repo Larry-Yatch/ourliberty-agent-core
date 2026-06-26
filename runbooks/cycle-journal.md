@@ -5,6 +5,114 @@
 ---
 
 
+## Iteration ~2980 — 2026-06-26T17:59Z UTC (interactive /cycle via chat, Tier 1, 2 new findings)
+
+**Trigger:** Larry `/cycle` via chat.
+
+**Health:** ⚠️ 2 new findings — Mirror PR #720 review wedged (worktree deleted on SIGTERM, retry exhausted), unreviewed-merge:723 (Larry merged directly). All daemons healthy. Approval `heal-forge-no-pr-pr-task-id-closed-001` pending Larry. PRs #721/#722 still queued in Mirror. Tier 1, consecutive_clean=0.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo (re-verified):** HEAD=e4115375=origin/main (Pulse cycle 20260626T175111Z). On main. Clean. Up to date. ✅
+- **Sync (re-verified):** last_sync=2026-06-26T17:02:39Z (~57 min at check time). Under 2h threshold. ✅
+- **Watchdog (re-verified):** last tick 11:47:55 MDT (17:47:55Z) — healthy 5-min ticks. ✅
+- **Heal-daemon heartbeat (re-verified):** 2026-06-26T17:47:39Z (~12 min at check time). Under 60-min threshold. ✅
+- **Mirror PID 3618489 (re-verified):** DEAD — session ended. PR #720 review NOT completed (outbox empty, marker-error in inbox). ⚠️ NEW: wedged (see Check E).
+- **PR #720 (re-verified):** OPEN. Mirror review wedged (worktree deleted, retry attempts 2-4 failed FileNotFoundError, marker-error-pr-ourliberty-agent-core-720-1.json in inbox). [updated]
+- **PR #721 (re-verified):** OPEN. Mirror inbox: review-pr-ourliberty-agent-core-721.json. ✅ [carry]
+- **PR #722 (re-verified):** OPEN. Mirror inbox: review-pr-ourliberty-agent-core-722.json. ✅ [carry]
+- **Forge inbox (re-verified):** EMPTY. ✅
+- **Beacon inbox (re-verified):** EMPTY. ✅
+- **beacon-pending-approvals (re-verified):** pending=1 (`heal-forge-no-pr-pr-task-id-closed-001`, plan summary: fix forge_built_no_pr healer FP on pr-<repo>-<num> task_ids). Awaiting Larry approval via Telegram. ✅
+- **outbox-notifier (re-verified):** PID 3475738 alive. Last log 11:49:32 MDT. ✅
+- **beacon-bot (re-verified):** PID 3476104 alive. ✅
+- **Stale worktree wt-mirror-pr-ourliberty-agent-core-713 (re-verified):** GONE — `agent-worktrees/` empty. [cleared ✅]
+
+**Check 0 — Alert triage:**
+- repair-watermark → {repaired:false, old_watermark=1025, file_length=1027}. 2 new alerts (lines 1026-1027).
+- **Line 1026:** `{"source": "outbox-notifier", "kind": "approval_request", "approval_id": "heal-forge-no-pr-pr-task-id-closed-001"}` — delivery confirmation: Beacon processed the direction-ask from iter ~2979 and queued APPROVAL_REQUEST for Larry. Helper → **Tier-3** (known-pattern match: approval_request delivery). Silenced. ✅
+- **Line 1027:** `{"source": "heal-unreviewed-merge-detector", "subject": "unreviewed-merge:723", "route": "escalate"}` — PR #723 merged by Larry-Yatch without Mirror review. Helper → **Tier-4** (never-silence pattern, route=escalate). outbox-notifier already DM'd Larry via route=escalate. Journal note. [yellow] ✅
+- Watermark advanced 1025→1027. ✅
+
+**Check 1 — Log noise:**
+- watchdog.log: last tick 11:47:55 MDT (17:47:55Z) — healthy 5-min ticks. No WARNs. ✅
+- outbox-notifier.log: last entry 11:49:32 MDT (APPROVAL_REQUEST for heal-forge-no-pr-pr-task-id-closed-001 queued). No errors. ✅
+- mirror_claude_code.log: ⚠️ **NEW** — attempts 2-4/5 for PR #720 all failed with `Exception: [Errno 2] No such file or directory: '/home/larry/agent-worktrees/wt-mirror-pr-ourliberty-agent-core-720'`. Worktree deleted after attempt 1 exit 143 (SIGTERM at ~33 min). Retry logic does not recreate worktree. Attempt 5/5 likely pending or also failed. **G-rule candidate: mirror-runner-missing-worktree-retry-001 (1/3).**
+
+**Check 2 — Telegram sweep:**
+- beacon_telegram_bot.log: no new Larry messages since 10:19:23 MDT (handled iter ~2974). No orphaned directives. ✅
+
+**Check 3 — Pipeline stall (dry-run):**
+- **1 FP: `forge_built_no_pr:pr-ourliberty-agent-core-712`** (PR #712 CLOSED-not-merged). G-rule dispatched iter ~2979, approval pending Larry. [carry]
+- MIRROR_ACTIVE_SKIP: pr-720 (inbox_task_present — but item is a marker-error, not a live review task; **false suppress**). pr-721, pr-722 (inbox_task_present — live review tasks). ✅ for 721/722.
+- All other tasks: FORGE_NO_PR_SKIP correctly applied. No live stalls. ✅
+
+**Check 4 — Pending directives:**
+- Beacon inbox: empty. ✅ Forge inbox: empty. ✅
+- beacon-pending: 1 (`heal-forge-no-pr-pr-task-id-closed-001`). Awaiting Larry. ✅
+- Mirror inbox: marker-error-pr-ourliberty-agent-core-720-1.json + review-721 + review-722. PR #720 wedged.
+
+**Check 5 — Stale daemon code:**
+- Heartbeat=2026-06-26T17:47:39Z (~12 min at check time). Under 60-min threshold. ✅
+
+**Check A — Source repo:** HEAD=e4115375=origin/main. On main. Clean. Up to date. ✅
+**Check B — Sync health:** last_sync=17:02:39Z (~57 min). Under 2h threshold. ✅
+**Check C — Agent liveness:** Watchdog healthy (17:47:55Z, 5-min ticks). Heal-daemon fresh (17:47:39Z). outbox-notifier PID 3475738 alive. beacon-bot PID 3476104 alive. Mirror: PID 3618489 dead (session exhausted on PR #720 retry failure). PRs #721/#722 in inbox queue. ✅ (daemons nominal; Mirror runner for PR #720 is the open question).
+**Check E — PRs:**
+- [yellow] **PR #720** — OPEN. Mirror review **WEDGED**: attempt 1 killed (exit 143/SIGTERM, ~33 min in); worktree deleted post-kill; retry attempts 2-4 fail `FileNotFoundError: wt-mirror-pr-ourliberty-agent-core-720`. marker-error in inbox. Outbox empty. Beacon not auto-re-dispatched yet. Monitor next iter for self-recovery. [new finding]
+- [yellow] **PR #721** — OPEN. Mirror inbox queued. fix(needs-you): phantom "stuck" rows. [carry]
+- [yellow] **PR #722** — OPEN. Mirror inbox queued. fix(missions): reconcile stale in_flight phase. [carry]
+- [yellow] **unreviewed-merge:723** — PR #723 merged by Larry without Mirror review. fix(reaper): search tier2 personal HOME for session JSONL — unblind Mirror wedge detection. outbox-notifier DM'd Larry at 17:50Z. Larry judgment. [new finding]
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅
+
+**Conditional checks — Friday 2026-06-26 UTC (weekday=4, firing set):**
+- Check I: invoked (no --force). mode=digest, journal block for 2026-06-22 already present; auto-dispatch dedup skip (key=f8ac2e3afc). DM cooldown-suppressed. Artifact written to check-i-2026-06-26.json. auto-dispatched: 0. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule assessment:**
+- **mirror-runner-missing-worktree-retry-001 → 1/3 (NEW)** — Mirror runner tears down worktree after SIGTERM (exit 143); retry attempts fail FileNotFoundError because worktree is gone. Bug: retry logic should recreate worktree or handle missing-worktree gracefully. First occurrence iter ~2980. Dispatch to Beacon at 3/3.
+- **forge-built-no-pr-pr-task-id-closed-fp-001 → DISPATCHED ✅, vp** — approval queued (heal-forge-no-pr-pr-task-id-closed-001), pending Larry. [carry]
+- **beacon-erofs-concurrent-claude-sessions-001 → DISPATCHED ✅, vp** — PR #720 now wedged (Mirror can't complete review). Until PR #720 merges, EROFS risk persists. [carry — updated status]
+- All other G-rules: unchanged from iter ~2979.
+
+**Actions taken:**
+1. Check 0: 2 alerts triaged (1 Tier-3 silenced, 1 Tier-4 journal-noted). Watermark 1025→1027. ✅
+2. §5.0: all no-op. ✅
+3. Check I: invoked no-force, mode=digest, cooldown-suppressed. ✅
+4. PRIME ledger: 2 intervention rows appended (mirror-review-wedged-missing-worktree, unreviewed-merge:723). ✅
+5. Tier state: record --checks-clean false → **Tier 1**, consecutive_clean=0. ✅
+
+**Dispatches:** None this iter.
+
+**Standing findings (carried + verified):**
+- [yellow] **PR #720 — Mirror review WEDGED** — exit 143 (SIGTERM) after 33 min, worktree missing on retry 2-4/5. Monitor for self-recovery. [new]
+- [yellow] **PR #721 — Mirror queue** — fix(needs-you): phantom "stuck" rows. [carry]
+- [yellow] **PR #722 — Mirror queue** — fix(missions): reconcile stale in_flight phase. [carry]
+- [yellow] **unreviewed-merge:723** — Larry merged PR #723 directly. fix(reaper): unblind Mirror wedge detection. Larry judgment. [new]
+- [yellow] **unreviewed-merge:713** — Larry judgment. [carry]
+- [yellow] **Zombie PID 1834248** — bash poll loop (29d+). Ask-then-do. [carry]
+- [yellow] **6 stale journalctl PIDs (31d+)** — Ask-then-do. [carry]
+- [yellow] **forge-wip-redispatch-digest Forge dispatch** — Beacon fix designed. Trust-policy approval pending. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — approve check-viii-update-2026-06-15. Awaiting Larry. [carry]
+- [yellow] **Check III threshold proposals** — approve threshold-update-2026-06-11. Awaiting Larry. [carry]
+- [yellow] **unreviewed-merge:710/709** — Larry judgment. [carry]
+- [blue] **heal-forge-no-pr-pr-task-id-closed-001 approval** — pending Larry tap on Telegram. Beacon dispatched APPROVAL_REQUEST at 17:49Z. [carry]
+- [blue] **beacon-erofs-concurrent-claude-sessions-001 — DISPATCHED ✅, vp** — PR #720 wedged in Mirror. EROFS risk persists. [carry — updated]
+- [blue] **heal-stale-daemon-code-auto-restart-failed-self-recovered — 2/3** — dispatch at 3/3. [carry]
+- [blue] **pulse-source-alert-delivery-confirm-tier4-001 — 2/3** — dispatch at 3/3. [carry]
+- [blue] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced. [carry]
+- [blue] **ourliberty-health-sync-push-failed-tier4-001 — 2/3** — dispatch at 3/3. [carry]
+- [blue] **mirror-runner-missing-worktree-retry-001 — 1/3** — dispatch at 3/3. [new]
+- [blue] **G-rules (unchanged):** sentinel-inflight-stall-mirror-tier4 (2/3), review-duplicate-dispatch-wip-redispatch (vp), check-i-force-bypass-dm-route (2/3), heal-daemon-restart-manifest-drift (2/3), no-session-revision-merged-pr-fp-001 (1/3), unrouted-open-pr-auto-merge-held-fp-001 (1/3), forge-wip-redispatch-digest-tier4-001 (dispatched vp), forge-wip-redispatch-exhausted-pr-exists-fp-001 (2/3), heal-stale-daemon-code-still-stale-after-restart (1/3), outbox-notifier-notification-intent-reject-tier4-001 (2/3), ourliberty-health-sync-push-failed-tier4-001 (2/3), forge-revision-preamble-missing-pr711-001 (1/3), no-session-revision-active-mirror-session-fp-001 (DISPATCHED ✅ vp), pulse-source-alert-delivery-confirm-tier4-001 (2/3), forge-built-no-pr-pr-task-id-closed-fp-001 (DISPATCHED ✅ vp).
+- [blue] **unreviewed-merge:649/637/655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+
+**PRIME DIRECTIVE:** 2 interventions (mirror-review-wedged-missing-worktree, unreviewed-merge:723). Trailing-30d: interventions=1326, systemic_fixes=75, vp=28, ratio=17.68, trend=improving. **Tier 1**, consecutive_clean=0.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0. Last signal: 2026-06-26T17:58:45Z.
+
+---
+
+
 ## Iteration ~2979 — 2026-06-26T17:47Z UTC (interactive /cycle via chat, Tier 2→1, G-rule dispatch)
 
 **Trigger:** Larry `/cycle` via chat.

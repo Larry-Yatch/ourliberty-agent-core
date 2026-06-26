@@ -261,8 +261,14 @@ PR #715 (fix(healer): skip forge_built_no_pr stall when task PR is CLOSED) MERGE
 
 ---
 
-## Status snapshot — updated 2026-06-26 17:47Z UTC (Iter ~2979, Tier 1, consecutive_clean=0)
+## G-rule mirror-runner-missing-worktree-retry-001 — 1/3 (new, iter ~2980)
 
-**Iter ~2979 summary:** ⚠️ G-rule dispatch. 1 alert Tier-3 silenced (pulse.check-i). forge-built-no-pr-pr-task-id-closed-fp-001 hit 3/3 → direction-ask dispatched to Beacon (timeout auto-corrected 86400→14400 by validator). Mirror active PR #720 (~28 min). PRs #721/#722 queued. Check I: mode=digest, cooldown-suppressed. §5.0 all no-op. PRIME: intervention+vp appended, systemic_fixes=75, vp=28, ratio=17.65, trend=improving. **Tier reset 2→1** (dispatch action). Tier 1, consecutive_clean=0.
+**Rule:** Mirror runner tears down the worktree after a SIGTERM kill (exit 143) of the claude subprocess. Retry attempts (2-5) then fail immediately with `Exception: [Errno 2] No such file or directory: wt-mirror-pr-<task>`. Mirror review never completes; outbox empty; Beacon doesn't auto-re-dispatch. Root cause: runner's retry logic doesn't recreate the worktree when the prior attempt was killed. Fix: Mirror runner should either (a) recreate the worktree at retry start if missing, or (b) detect missing worktree and request a fresh review dispatch from outbox-notifier. First occurrence iter ~2980 (PR #720, review killed ~33 min in, worktree wt-mirror-pr-ourliberty-agent-core-720). Dispatch to Beacon at 3/3.
+
+---
+
+## Status snapshot — updated 2026-06-26 17:59Z UTC (Iter ~2980, Tier 1, consecutive_clean=0)
+
+**Iter ~2980 summary:** ⚠️ 2 new findings. Mirror PR #720 review wedged (worktree deleted on SIGTERM, retries 2-4 fail FileNotFoundError). unreviewed-merge:723 (Larry merged directly, outbox-notifier DM'd). Approval `heal-forge-no-pr-pr-task-id-closed-001` pending Larry. Stale worktree wt-mirror-pr-ourliberty-agent-core-713 cleared (gone). G-rule mirror-runner-missing-worktree-retry-001 1/3. Check I: mode=digest, cooldown-suppressed. PRIME: 2 interventions, ratio=17.68. Tier 1, consecutive_clean=0.
 
 
