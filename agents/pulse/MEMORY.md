@@ -267,8 +267,8 @@ PR #715 (fix(healer): skip forge_built_no_pr stall when task PR is CLOSED) MERGE
 
 ---
 
-## Status snapshot — updated 2026-06-26 18:16Z UTC (Iter ~2982, Tier 1, consecutive_clean=2)
+## Status snapshot — updated 2026-06-26 18:24Z UTC (Iter ~2983, Tier 2, consecutive_clean=0)
 
-**Iter ~2982 summary:** ✅ Clean. 0 new alerts. PR #722 Mirror active (~17 min at check, under 60-min). PRs #720/#724/#725 in Mirror queue. PR #725 (G-rule forge-built-no-pr-pr-task-id-closed-fp-001) progressing toward merge. All daemons nominal post-PR #721 code reload. PRIME: iter_clean. Tier 1, consecutive_clean=2.
+**Iter ~2983 summary:** ✅ Clean. 0 new alerts. PR #722 AUTO_MERGED at 18:21:30Z (fix(missions): reconcile shipped Operator Needs-You Feed off stale in_flight phase). Mirror new session active since 18:21:22Z (picking up PR #724/#725/#720 queue). PRs #720/#724/#725 in Mirror queue. PR #725 (G-rule forge-built-no-pr-pr-task-id-closed-fp-001) progressing toward merge. PRIME: iter_clean. **Tier 1→2 de-escalation** (consecutive_clean 2→3→promoted). Tier 2, consecutive_clean=0.
 
 
