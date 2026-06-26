@@ -146,7 +146,7 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ## G-rule review-duplicate-dispatch-wip-redispatch → DISPATCHED ✅ (iter ~2671, 3/3), vp
 
-**Rule:** After Mirror completes a review, Beacon's notification-handler re-dispatches a new `review-<task>.json` to Mirror's inbox without checking if one is already queued. Fix: add inbox-existence check in Beacon notify-handler before dispatching. `skip-mirror-review-on-merged-or-closed-pr-001` approval pending Larry. verification_pending.
+**Rule:** After Mirror completes a review, Beacon's notification-handler re-dispatches a new `review-<task>.json` to Mirror's inbox without checking if one is already queued. Fix: add inbox-existence check in Beacon notify-handler before dispatching. `skip-mirror-review-on-merged-or-closed-pr-001` approval pending Larry. verification_pending. **Mitigation (iter ~2919):** When duplicate original review (revision_count=0) appears while rev1 is running, archive it via `archive-duplicate-inbox-task` allow-list action. Prevents Mirror from restarting review from scratch after finishing rev1.
 
 ---
 
@@ -252,8 +252,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 10:10Z UTC (Iter ~2918, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 10:17Z UTC (Iter ~2919, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2918 summary:** ⚠️ Active — Mirror PID 3308724 COMPLETED at 10:06:36Z (4h3m session; REVIEW_REVISION round-2: WIP commit `f2d7ac52` reverts manifest fix, `test_committed_manifest_matches_regeneration` fails at HEAD). New Mirror PID 3375805 started 10:06Z doing rev1 re-review. 0 new alerts. Pipeline stall: 0 (all cooldowns). beacon-pending: 3 unchanged. 8/8 daemons alive. Watchdog healthy (10:05:37Z). Sync at 10:02:20Z (~8 min). Check I cooldown-suppressed. Forge inbox EMPTY; revision-2 awaits Mirror rev1 re-review verdict. PRIME: interventions≈1296+, systemic_fixes=73, vp=27, ratio≈17.7, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2919 summary:** ⚠️ Active — Mirror PID 3375805 at 06:40 elapsed doing rev1 re-review of PR #713. FOUND+ARCHIVED duplicate `review-pr-ourliberty-agent-core-713.json` (revision_count=0 re-dispatched by outbox-notifier at 10:10:31Z while rev1 was running; G-rule review-duplicate-dispatch-wip-redispatch, vp). 0 new alerts. Pipeline stall: 0. beacon-pending: 3 unchanged. 8/8 daemons alive. Watchdog healthy (10:10:38Z). Sync at 10:02:20Z (~15 min). Check I cooldown-suppressed. Forge inbox EMPTY; revision-2 dispatched when Mirror rev1 finishes. PRIME: interventions≈1297+, systemic_fixes=73, vp=27, ratio≈17.7, trend=improving. Tier 1, consecutive_clean=0.
 
 
