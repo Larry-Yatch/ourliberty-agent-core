@@ -1129,6 +1129,66 @@
         "from_state": "parked"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "cap-migrate-watchdog-717-probe-to-pipeline-live-stat-b7bb",
+      "title": "Migrate watchdog #717 probe to pipeline_live_state.agent_dispatch_live",
+      "note": "After PR #717 merges, replace watchdog.py _any_live_dispatch_lease with pipeline_live_state.agent_dispatch_live (shipped in PR #719). Deletes the 3rd hand-rolled 'is X live' probe \u2014 completes the live-state-helper consolidation. Blocked until #717 is merged. Low risk, watchdog-only.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": null,
+        "branch": null,
+        "captured_at": "2026-06-26T14:53:12.650181+00:00"
+      },
+      "last_touched": "2026-06-26T14:53:12.650181+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A small cleanup that swaps in a single shared way to check whether work is actively running, replacing the last of three older one-off versions doing the same thing.",
+        "why": "Having one consistent check instead of three reduces the chance of a blind spot where the system thinks work is stalled when it isn't, keeping our automation reliable.",
+        "suggest": "Worth doing, but it depends on another in-progress change finishing first \u2014 let that land, then proceed carefully and verify the watchdog still behaves correctly afterward."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-26T14:55:50.087187+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-forensic-29-mirror-malformed-marker-pr-stranding-7378",
+      "title": "Forensic: ~29 Mirror malformed-marker PR strandings/window leak through existing enforcement",
+      "note": "Emit-time marker enforcement already exists (agent_runner build_review_marker_reminder_system_prompt + marker-error retry + PASS-prose synthesizer), yet ~29 tasks/window still strand on MalformedMirrorMarker. Mine outbox-notifier.log for the residual pattern of the leak-throughs (non-PASS prose verdicts? retry also malformed?) then a targeted fix \u2014 likely extend the prose synthesizer or tighten the reminder. Evidence-first, NOT a blind rebuild.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": null,
+        "branch": null,
+        "captured_at": "2026-06-26T14:53:13.040670+00:00"
+      },
+      "last_touched": "2026-06-26T14:53:13.040670+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "Our automated review system has a quality checkpoint that's supposed to catch bad reviews before they get stuck, but about 29 jobs per cycle are still slipping through and stalling.",
+        "why": "Each stalled job is work that quietly stops moving until someone notices, slowing down delivery and eroding trust that the system runs itself.",
+        "suggest": "Worth a short, evidence-based look to pin down exactly why these are leaking through before committing to any fix \u2014 don't greenlight a big rebuild yet."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-26T14:55:50.087187+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
