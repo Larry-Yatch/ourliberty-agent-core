@@ -1,0 +1,15 @@
+[Unit]
+Description=Run the sequence-complete mission reconciler every 30 minutes (flip single-owner missions to shipped; surface umbrellas)
+
+[Timer]
+# OnCalendar (not OnUnitActiveSec) per the OnUnitActiveSec-dies lesson: a missed
+# tick (host asleep / unit inactive) must still fire on the next wall-clock slot.
+# Offset off the round :00/:30 boundary AND off the merged-pr-reconcile :7/:37
+# slots so the missions-touching healers don't all fire at once.
+OnCalendar=*-*-* *:13/30:00
+RandomizedDelaySec=120
+Persistent=true
+Unit=ourliberty-heal-completed-sequence-mission-reconcile.service
+
+[Install]
+WantedBy=timers.target
