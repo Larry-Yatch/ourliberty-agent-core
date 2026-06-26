@@ -228,8 +228,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 04:57Z UTC (Iter ~2871, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 05:04Z UTC (Iter ~2872, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2871 summary:** ⚠️ Drift — PR #712 "fix(narrator): authenticate claude with the durable per-tier setup-token" still under active Mirror review (PID 3242227, elapsed=12:48, dispatched 04:45:31Z). Stuck dispatch (mirror-marker-discipline-spec-update-001) carries from iter ~2866 (Forge inbox empty, pending-approvals status=pending). All 8 daemons alive. 0 new alerts. Stall dry-run clean. Zombie PID 1834248 + 6 stale journalctl PIDs carry. G-rule check-i-force-bypass-dm-route stable at 2/3. Check I cooldown-suppressed. PRIME: interventions=1249, systemic_fixes=72, vp=27, ratio≈17.35, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2872 summary:** ⚠️ Drift — PR #712 "fix(narrator): authenticate claude with the durable per-tier setup-token" still under active Mirror review (PID 3242227, elapsed=~20 min since ~04:48Z, dispatched 04:45:31Z). 32 min past creation (past 30-min threshold) but Mirror IS actively reviewing — no stall. Stuck dispatch (mirror-marker-discipline-spec-update-001) carries from iter ~2866 (Forge inbox empty, pending-approvals status=pending). All 8 daemons alive. 0 new alerts. Stall dry-run clean. Zombie PID 1834248 + 6 stale journalctl PIDs carry. G-rule check-i-force-bypass-dm-route stable at 2/3. Check I cooldown-suppressed. PRIME: interventions=1250, systemic_fixes=72, vp=27, ratio≈17.36, trend=improving. Tier 1, consecutive_clean=0.
 
 
