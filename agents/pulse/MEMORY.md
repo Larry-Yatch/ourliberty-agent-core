@@ -267,8 +267,8 @@ PR #725 (fix(healer): skip forge_built_no_pr for pr-<repo>-<num> tasks whose nam
 
 ---
 
-## Status snapshot — updated 2026-06-26 20:42Z UTC (Iter ~2992, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-26 20:52Z UTC (Iter ~2993, Tier 1, consecutive_clean=1)
 
-**Iter ~2992 summary:** ⚠️ Intervention. 2 new alerts (both Tier-3 silenced). Archived stale duplicate `review-pr-ourliberty-agent-core-726.json` (revision_count=0, allow-list). G-rule forge-revision-preamble-missing-pr711-001 → DISPATCHED ✅ (3/3, Beacon direction-ask). PR #726 OPEN (Mirror reviewing rev2, regression check). PR #728 OPEN (Mirror reviewing silence task). Watermark 1049→1051. PRIME: intervention + systemic_fix. Tier 3 → Tier 1 (implementation: any non-clean → Tier 1).
+**Iter ~2993 summary:** ✅ Nominal. 1 alert (Tier-3 silence: approval_request delivery confirm for forge-revision-preamble-discipline-001). PR #726 MIRROR_ACTIVE_SKIP (PID 3734902 alive). PR #728 Mirror review queued. PR #729 NEW (Larry-opened larry/projects-terminal-mission-reconcile, < 30 min, monitoring). forge-revision-preamble-discipline-001 PENDING Larry approval. Watermark 1051→1052. PRIME: iter_clean. Tier 1, consecutive_clean 0→1.
 
 
