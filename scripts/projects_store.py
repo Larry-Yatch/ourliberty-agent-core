@@ -341,6 +341,16 @@ _MISSION_PHASE_TO_LIFECYCLE: dict[str, str] = {
     'in_flight': 'building',
 }
 
+# Mission phases that mean the work is FINISHED — a project mirrored from such a
+# mission should be Done (then GC-retired), never stuck at its mirror-time
+# lifecycle. `mirror_missions_as_projects` only MINTS (for active missions); it
+# never re-touches an existing project when its source mission later ships, and
+# the building→done stamp is EVENT-driven (SEQUENCE_COMPLETE / build close). So a
+# mission whose build merged BEFORE the mirror ran — the project is born after its
+# own completion event — has no future event to advance it. This is the set the
+# timer-driven backstop (`reconcile_terminal_mission_projects`) reconciles.
+_TERMINAL_MISSION_PHASES: tuple[str, ...] = ('shipped', 'retired')
+
 _SEQ_STEP_RE = re.compile(r'^seq-(?P<seq>.+?)-step-')  # non-greedy: split at the FIRST -step-
 
 
@@ -941,6 +951,77 @@ def _project_done_at(project: dict[str, Any]) -> Optional[datetime]:
             dt = dt.replace(tzinfo=timezone.utc)
         stamps.append(dt)
     return max(stamps) if stamps else None
+
+
+def reconcile_terminal_mission_projects(
+    registry: dict[str, Any],
+    missions: Any,
+    now: Optional[datetime] = None,
+) -> list[str]:
+    """Done-stamp every phase of an ACTIVE project mirrored from a mission that has
+    since reached a TERMINAL phase (``shipped``/``retired``), so the GC retire
+    (``retire_completed_projects``) can then sweep it off "Actively working". The
+    timer-driven backstop for the mirror↔ship race (see ``_TERMINAL_MISSION_PHASES``):
+    a project born at ``building`` AFTER its own build already merged has no future
+    event to advance it, so it sits ``building`` forever and the all-phases-done GC
+    never catches it.
+
+    Each tick, cross-reference the (already-read) missions list and Done-stamp the
+    matching projects. The phase ``updated_at`` is set to the mission's OWN terminal
+    timestamp (``shipped_at``/``retired_at``) when parseable — NOT ``now`` — so the
+    48h visibility window (``retire_completed_projects``) measures from when the work
+    TRULY finished: a long-shipped straggler retires promptly instead of being
+    granted a fresh 48h "win".
+
+    PURE over its inputs (no IO). Conservative + idempotent: touches only ACTIVE
+    projects whose ``promoted_from.mission_id`` matches a terminal mission and that
+    are not ALREADY all-done (the GC owns those). Returns the ids reconciled this
+    tick (empty on a no-op). Fail-safe on junk: non-dict entries are skipped."""
+    if not isinstance(registry, dict) or not isinstance(missions, list):
+        return []
+    projects = registry.get('projects')
+    if not isinstance(projects, list):
+        return []
+    # mission_id -> terminal timestamp (shipped_at / retired_at); terminal missions only
+    terminal: dict[str, Any] = {}
+    for m in missions:
+        if not isinstance(m, dict) or m.get('phase') not in _TERMINAL_MISSION_PHASES:
+            continue
+        mid = _coerce_str(m.get('id'))
+        if mid is not None:
+            terminal[mid] = m.get('shipped_at') or m.get('retired_at')
+    if not terminal:
+        return []
+    reconciled: list[str] = []
+    for proj in projects:
+        if not isinstance(proj, dict):
+            continue
+        if proj.get('state', DEFAULT_PROJECT_STATE) != 'active':
+            continue
+        promoted = proj.get('promoted_from')
+        if not isinstance(promoted, dict) or promoted.get('kind') != 'mission':
+            continue
+        mid = _coerce_str(promoted.get('mission_id'))
+        if mid is None or mid not in terminal:
+            continue
+        if project_is_done(proj):
+            continue  # already all-done — retire_completed_projects owns it
+        # Stamp at the mission's TRUE terminal time so the retire window measures
+        # from real completion; fall back to `now` for an unparseable/missing stamp.
+        try:
+            stamp_dt: Optional[datetime] = datetime.fromisoformat(terminal[mid])
+            if stamp_dt.tzinfo is None:
+                stamp_dt = stamp_dt.replace(tzinfo=timezone.utc)
+        except (ValueError, TypeError):
+            stamp_dt = now
+        phases = proj.get('phases')
+        phases = phases if isinstance(phases, list) else []
+        # List (not any()) so EVERY phase is stamped — any() would short-circuit.
+        changed = [stamp_phase_done(ph, now=stamp_dt) for ph in phases]
+        if any(changed):
+            proj['updated_at'] = _iso_now(now)
+            reconciled.append(_coerce_str(proj.get('id')) or mid)
+    return reconciled
 
 
 def retire_completed_projects(

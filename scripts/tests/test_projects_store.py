@@ -803,5 +803,122 @@ class RetireCompletedProjectsTest(unittest.TestCase):
         self.assertIs(out, reg)  # mutated in place
 
 
+
+
+class ReconcileTerminalMissionProjectsTest(unittest.TestCase):
+    """reconcile_terminal_mission_projects: the mirror<->ship-race backstop. An
+    ACTIVE project mirrored from a mission that has SINCE shipped/retired gets its
+    phases Done-stamped (at the mission's OWN terminal time) so the GC retire can
+    sweep it. Closes the gap where a project born `building` after its build already
+    merged never gets a building->done event."""
+
+    SHIP = datetime(2026, 6, 10, 12, 0, tzinfo=timezone.utc)
+
+    @classmethod
+    def _project(cls, pid, mission_id, lifecycle="building", state="active"):
+        return {
+            "id": pid, "state": state,
+            "promoted_from": {"kind": "mission", "mission_id": mission_id},
+            "phases": [{"id": pid, "lifecycle_state": lifecycle,
+                        "updated_at": cls.SHIP.isoformat()}],
+        }
+
+    @staticmethod
+    def _mission(mid, phase="shipped", **extra):
+        m = {"id": mid, "phase": phase}
+        m.update(extra)
+        return m
+
+    def test_shipped_mission_done_stamps_at_ship_time(self):
+        reg = {"projects": [self._project("m1", "m1")]}
+        out = ps.reconcile_terminal_mission_projects(
+            reg, [self._mission("m1", "shipped", shipped_at=self.SHIP.isoformat())],
+            now=NOW)
+        self.assertEqual(out, ["m1"])
+        ph = reg["projects"][0]["phases"][0]
+        self.assertEqual(ph["lifecycle_state"], "done")
+        # updated_at carries the mission's TRUE ship time, not NOW.
+        self.assertEqual(ph["updated_at"], self.SHIP.isoformat())
+        self.assertEqual(reg["projects"][0]["updated_at"], NOW.isoformat())
+
+    def test_retired_mission_is_terminal_too(self):
+        reg = {"projects": [self._project("m1", "m1")]}
+        out = ps.reconcile_terminal_mission_projects(
+            reg, [self._mission("m1", "retired", retired_at=self.SHIP.isoformat())],
+            now=NOW)
+        self.assertEqual(out, ["m1"])
+        self.assertEqual(reg["projects"][0]["phases"][0]["lifecycle_state"], "done")
+
+    def test_then_retire_sweeps_it_in_same_window(self):
+        # End-to-end: reconcile Done-stamps at SHIP (well past 48h vs NOW), so the
+        # existing retire then clears it off the board in the same pipeline.
+        reg = {"projects": [self._project("m1", "m1")]}
+        ps.reconcile_terminal_mission_projects(
+            reg, [self._mission("m1", "shipped", shipped_at=self.SHIP.isoformat())],
+            now=NOW)
+        _, retired = ps.retire_completed_projects(reg, now=NOW)
+        self.assertEqual(retired, ["m1"])
+        self.assertEqual(reg["projects"][0]["state"], "retired")
+        self.assertEqual(reg["projects"][0]["gc"]["done_at"], self.SHIP.isoformat())
+
+    def test_in_flight_mission_left_untouched(self):
+        reg = {"projects": [self._project("m1", "m1")]}
+        out = ps.reconcile_terminal_mission_projects(
+            reg, [self._mission("m1", "in_flight")], now=NOW)
+        self.assertEqual(out, [])
+        self.assertEqual(reg["projects"][0]["phases"][0]["lifecycle_state"], "building")
+
+    def test_already_done_project_skipped(self):
+        reg = {"projects": [self._project("m1", "m1", lifecycle="done")]}
+        out = ps.reconcile_terminal_mission_projects(
+            reg, [self._mission("m1", "shipped", shipped_at=self.SHIP.isoformat())],
+            now=NOW)
+        self.assertEqual(out, [])  # all-done already -> the GC owns it
+
+    def test_archived_project_skipped(self):
+        reg = {"projects": [self._project("m1", "m1", state="archived")]}
+        out = ps.reconcile_terminal_mission_projects(
+            reg, [self._mission("m1", "shipped", shipped_at=self.SHIP.isoformat())],
+            now=NOW)
+        self.assertEqual(out, [])
+
+    def test_non_mission_promotion_skipped(self):
+        proj = self._project("m1", "m1")
+        proj["promoted_from"] = {"kind": "capture", "capture_id": "c1"}
+        reg = {"projects": [proj]}
+        out = ps.reconcile_terminal_mission_projects(
+            reg, [self._mission("m1", "shipped", shipped_at=self.SHIP.isoformat())],
+            now=NOW)
+        self.assertEqual(out, [])
+
+    def test_unparseable_ship_stamp_falls_back_to_now(self):
+        reg = {"projects": [self._project("m1", "m1")]}
+        out = ps.reconcile_terminal_mission_projects(
+            reg, [self._mission("m1", "shipped", shipped_at="not-a-date")], now=NOW)
+        self.assertEqual(out, ["m1"])
+        self.assertEqual(reg["projects"][0]["phases"][0]["updated_at"], NOW.isoformat())
+
+    def test_junk_inputs_safe(self):
+        self.assertEqual(ps.reconcile_terminal_mission_projects({}, "not-a-list"), [])
+        self.assertEqual(ps.reconcile_terminal_mission_projects("nope", []), [])
+        self.assertEqual(
+            ps.reconcile_terminal_mission_projects(
+                {"projects": ["junk", None, 3]},
+                [self._mission("m1", "shipped")], now=NOW),
+            [])
+
+    def test_multi_phase_all_stamped_no_short_circuit(self):
+        proj = self._project("m1", "m1")
+        proj["phases"].append({"id": "m1-ph2", "lifecycle_state": "building",
+                               "updated_at": self.SHIP.isoformat()})
+        reg = {"projects": [proj]}
+        out = ps.reconcile_terminal_mission_projects(
+            reg, [self._mission("m1", "shipped", shipped_at=self.SHIP.isoformat())],
+            now=NOW)
+        self.assertEqual(out, ["m1"])
+        self.assertTrue(all(ph["lifecycle_state"] == "done"
+                            for ph in reg["projects"][0]["phases"]))
+
+
 if __name__ == '__main__':
     unittest.main()
