@@ -255,9 +255,9 @@ PR #715 (fix(healer): skip forge_built_no_pr stall when task PR is CLOSED) MERGE
 
 ---
 
-## G-rule forge-built-no-pr-pr-task-id-closed-fp-001 → DISPATCHED ✅ (re-dispatched 2026-06-26T17:45Z after dead-letter)
+## G-rule forge-built-no-pr-pr-task-id-closed-fp-001 → PR #725 OPEN, verification_pending (updated iter ~2981)
 
-**Rule:** `forge_built_no_pr` stall fires for `pr-<repo>-<num>` task_ids (e.g., `pr-ourliberty-agent-core-712`) when the referenced PR is CLOSED-not-merged. PR #715's CLOSED-PR skip uses `_pr_matches_task` which requires the closed PR's branch to match the task_id pattern — but for `pr-<repo>-<num>` tasks, the task IS named after the PR number, not a Forge-built PR with a matching branch. Fix: stall checker should detect `pr-<repo>-<num>` task_id format and look up PR #{num} directly; if CLOSED or MERGED, skip. Occurrences: idx=1005 07:45Z (1/3); cooldown-expired dry-run 14:53Z (2/3); 3/3 dispatch dead-lettered (timeout=86400 out of bounds), re-dispatched 17:45Z with timeout=14400. verification_pending.
+**Rule:** `forge_built_no_pr` stall fires for `pr-<repo>-<num>` task_ids (e.g., `pr-ourliberty-agent-core-712`) when the referenced PR is CLOSED-not-merged. PR #715's CLOSED-PR skip uses `_pr_matches_task` which requires the closed PR's branch to match the task_id pattern — but for `pr-<repo>-<num>` tasks, the task IS named after the PR number, not a Forge-built PR with a matching branch. Fix: stall checker should detect `pr-<repo>-<num>` task_id format and look up PR #{num} directly; if CLOSED or MERGED, skip. Occurrences: idx=1005 07:45Z (1/3); cooldown-expired dry-run 14:53Z (2/3); 3/3 dispatch dead-lettered (timeout=86400 out of bounds), re-dispatched 17:45Z with timeout=14400. **PR #725 opened by Forge ~18:06:41Z (iter ~2981); Mirror review dispatched 12:07:03 MDT.** verification_pending merge.
 
 ---
 
@@ -267,8 +267,8 @@ PR #715 (fix(healer): skip forge_built_no_pr stall when task PR is CLOSED) MERGE
 
 ---
 
-## Status snapshot — updated 2026-06-26 17:59Z UTC (Iter ~2980, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-26 18:10Z UTC (Iter ~2981, Tier 1, consecutive_clean=1)
 
-**Iter ~2980 summary:** ⚠️ 2 new findings. Mirror PR #720 review wedged (worktree deleted on SIGTERM, retries 2-4 fail FileNotFoundError). unreviewed-merge:723 (Larry merged directly, outbox-notifier DM'd). Approval `heal-forge-no-pr-pr-task-id-closed-001` pending Larry. Stale worktree wt-mirror-pr-ourliberty-agent-core-713 cleared (gone). G-rule mirror-runner-missing-worktree-retry-001 1/3. Check I: mode=digest, cooldown-suppressed. PRIME: 2 interventions, ratio=17.68. Tier 1, consecutive_clean=0.
+**Iter ~2981 summary:** ✅ Clean. 9 alerts, all Tier-3 silenced. PR #721 MERGED (fix(needs-you) phantom stuck rows). PR #725 NEW (Forge fix for forge_built_no_pr FP on pr-<repo>-<num>; Mirror review dispatched). Larry approved heal-forge-no-pr-pr-task-id-closed-001 at 12:02 MDT. Daemons reloaded at 18:07Z (system_state_log.py from PR #721). PR #722 Mirror active review in progress (~11 min at check). G-rule forge-built-no-pr-pr-task-id-closed-fp-001 → PR #725 vp. mirror-runner-missing-worktree-retry-001 still 1/3. PRIME: iter_clean. Tier 1, consecutive_clean=1.
 
 

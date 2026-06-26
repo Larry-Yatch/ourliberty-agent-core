@@ -5,6 +5,93 @@
 ---
 
 
+## Iteration ~2981 — 2026-06-26T18:10Z UTC (interactive /cycle via chat, Tier 1, clean)
+
+**Trigger:** Larry `/cycle` via chat.
+
+**Health:** ✅ Nominal — no new active findings. 9 new alerts, all Tier-3 silenced. PR #725 opened by Forge (G-rule fix). All daemons healthy post-code-reload. Mirror actively reviewing PR #722. Tier 1, consecutive_clean=1.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo (re-verified):** HEAD=632afd9f=origin/main (Pulse cycle 20260626T180105Z). On main. Clean. Up to date. ✅
+- **Sync (re-verified):** last_sync=2026-06-26T18:02:40Z (~7 min at check time). Under 2h threshold. ✅
+- **Watchdog (re-verified):** last tick 12:03:11 MDT (18:03:11Z) — healthy 5-min ticks. ✅
+- **Heal-daemon heartbeat (re-verified):** 2026-06-26T17:57:40Z (~12 min at check time). Under 60-min threshold. ✅
+- **Daemons restarted at 18:07Z (re-verified):** heal-stale-daemon-code reloaded beacon-bot (18:07:51Z), dashboard-api (18:07:55Z), outbox-notifier (18:07:59Z) — all due to system_state_log.py change in PR #721. All route=digest (Tier-3 silenced). outbox-notifier confirmed alive, new PID 3639835. ✅
+- **PR #721 (re-verified):** MERGED at 11:57:35 MDT by outbox-notifier AUTO_MERGE. ✅ [cleared]
+- **PR #722 (re-verified):** OPEN. Mirror actively reviewing (live_pid; started 11:57:30 MDT, ~11 min at check time). ✅
+- **PR #720 (re-verified):** OPEN. Fresh Mirror review dispatch in inbox (18:00:20Z re-dispatch). heal-wedged-review-sessions reaped worktree at 17:53:18Z. ✅
+- **PR #724 (re-verified):** OPEN. Mirror review in inbox (queued, dispatched 18:00:16Z). ✅
+- **PR #725 (re-verified — NEW this iter):** OPEN. `fix(healer): skip forge_built_no_pr for pr-<repo>-<num> tasks whose named PR is closed/merged`. Opened ~18:06:41Z by Forge for heal-forge-no-pr-pr-task-id-closed-001. Mirror review dispatched 12:07:03 MDT. G-rule `forge-built-no-pr-pr-task-id-closed-fp-001` verification_pending. ✅ [new]
+- **Forge inbox (re-verified):** EMPTY — Forge completed heal-forge-no-pr-pr-task-id-closed-001. ✅
+- **Beacon inbox (re-verified):** notify-heal-forge-no-pr-pr-task-id-closed-001.json (processed Forge result notification). ✅
+- **beacon-pending-approvals (re-verified):** pending=0. Larry approved `heal-forge-no-pr-pr-task-id-closed-001` at 12:02:04 MDT. All clear. ✅ [cleared from ~2980]
+
+**Check 0 — Alert triage:**
+- repair-watermark → {repaired:false, old_watermark=1027, file_length=1033}. 6 new alerts (lines 1028-1033).
+- **Line 1028:** `source=heal-wedged-review-sessions, subject=wedged-review-reaped:wt-mirror-pr-ourliberty-agent-core-720, route=closure` → Tier-3 silenced. ✅
+- **Line 1029:** `source=heal-pipeline-stall, subject=pipeline-stall:retry-exhausted:pr-ourliberty-agent-core-720, route=escalate` → Tier-3 silenced. ✅
+- **Line 1030:** `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#720, route=escalate` → Tier-3 silenced (medic confirmed routing existed; real failure was worktree ENOENT). ✅
+- **Line 1031:** `source=doorbell, intent=doorbell` (approval reminder) → Tier-3 silenced. ✅
+- **Lines 1032-1033:** `source=medic, intent=medic-diagnosis` (paired diagnoses for above stalls) → Tier-3 silenced. ✅
+- Additional 3 alerts appeared during triage (lines 1034-1036): `source=heal-stale-daemon-code, subject=auto-restarted:{beacon-bot, dashboard-api, outbox-notifier}.service, route=digest` — all Tier-3 silenced (routine successful restarts after system_state_log.py changed in PR #721). ✅
+- Watermark advanced 1027→1036. ✅
+
+**Check 1 — Log noise:**
+- watchdog.log: healthy 5-min ticks through 12:03:11 MDT. No WARNs. ✅
+- outbox-notifier.log: no errors post-restart. mirror-review dispatched for PRs #720, #724, #725 at 12:00-12:07 MDT. ✅
+- mirror.log: PR #720 all retries exhausted by 11:55:45 MDT (prior known). PR #721 completed 11:57:28 MDT (→ auto-merge). PR #722 started 11:57:30 MDT. No new errors. ✅
+
+**Check 2 — Telegram sweep:**
+- beacon_telegram_bot.log: Larry approved `heal-forge-no-pr-pr-task-id-closed-001` at 12:02:04 MDT ('go'). Dispatched to Forge inbox at 12:02:07 MDT. No other Larry messages since iter ~2980. No orphaned directives. ✅
+
+**Check 3 — Pipeline stall (dry-run):**
+- **1 FP: `forge_built_no_pr:pr-ourliberty-agent-core-712`** (PR #712 CLOSED-not-merged). Fix = PR #725 (pending Mirror review + merge). [carry]
+- MIRROR_ACTIVE_SKIP: pr-722 (live_pid — Mirror started review at 11:57:30 MDT). ✅
+- MIRROR_ACTIVE_SKIP: pr-720 (inbox_task_present — fresh dispatch). ✅
+- retry_exhausted:pr-720 suppressed (cooldown). ✅
+- All other tasks: FORGE_NO_PR_SKIP correctly applied. No live stalls. ✅
+
+**Check 4 — Pending directives:**
+- Beacon inbox: notify only (processed). Forge inbox: empty. ✅
+- beacon-pending: 0. All cleared. ✅
+- Mirror inbox: 5 items (marker-error-720, review-720, review-722, review-724, review-heal-forge-no-pr-pr-task-id-closed-001). Active queue. ✅
+
+**Check 5 — Stale daemon code:**
+- Heartbeat=2026-06-26T17:57:40Z (~12 min at check time). Under 60-min threshold. ✅
+
+**Check A — Source repo:** HEAD=632afd9f=origin/main. On main. Clean. Up to date. ✅
+**Check B — Sync health:** last_sync=18:02:40Z (~7 min). Under 2h threshold. ✅
+**Check C — Agent liveness:** Watchdog healthy (12:03:11 MDT). Heal-daemon fresh (17:57:40Z). beacon-bot restarted at 18:07:51Z (code-reload). outbox-notifier restarted at 18:07:59Z, new PID 3639835 alive. All daemons healthy. ✅
+**Check E — PRs:**
+- [carry] **PR #720** — OPEN. Fresh Mirror review in inbox. G-rule `beacon-erofs-concurrent-claude-sessions-001` (DISPATCHED, vp) AND `mirror-runner-missing-worktree-retry-001` (1/3). Monitor for ENOENT recurrence on re-attempt.
+- [in-progress] **PR #722** — OPEN. Mirror actively reviewing (live_pid, ~11 min). Expected merge when complete.
+- [queued] **PR #724** — OPEN. Mirror review in inbox.
+- [new] **PR #725** — OPEN. Forge's fix for `forge_built_no_pr` FP on `pr-<repo>-<num>` task_ids. Mirror review in inbox. G-rule `forge-built-no-pr-pr-task-id-closed-fp-001` verification_pending.
+- [carry] **unreviewed-merge:723** — Larry notified by outbox-notifier. No further Pulse action.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅
+
+**Conditional checks — Friday 2026-06-26 UTC (weekday=4, firing set):**
+- Check I: invoked (no --force). mode=digest, journal block for 2026-06-22 already present; auto-dispatch dedup skip (key=f8ac2e3afc). DM cooldown-suppressed. Same as iter ~2980. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule assessment:**
+- **forge-built-no-pr-pr-task-id-closed-fp-001 → PR #725 OPEN (vp)** — Forge completed build; PR #725 open; Mirror review dispatched. G-rule verification_pending merge. [updated: was DISPATCHED, now has PR]
+- **beacon-erofs-concurrent-claude-sessions-001 → DISPATCHED ✅, vp** — PR #720 still OPEN, pending Mirror review. Until merged, EROFS risk persists during concurrent sessions. [carry]
+- **mirror-runner-missing-worktree-retry-001 → 1/3** — No new occurrence this iter. [carry]
+- All other G-rules: unchanged from iter ~2980.
+
+**Actions taken:**
+1. Check 0: 9 alerts triaged (all Tier-3 silenced). Watermark 1027→1036. ✅
+2. §5.0: all no-op. ✅
+3. PRIME ledger: iter_clean appended. ✅
+4. Tier state: consecutive_clean 0→1. ✅
+
+**Escalations:** None.
+
+---
+
+
 ## Iteration ~2980 — 2026-06-26T17:59Z UTC (interactive /cycle via chat, Tier 1, 2 new findings)
 
 **Trigger:** Larry `/cycle` via chat.
