@@ -253,8 +253,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 12:20Z UTC (Iter ~2936, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 12:27Z UTC (Iter ~2937, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2936 summary:** ⚠️ Active — PR #713 REVIEW_ESCALATE carry. 0 new alerts. All stalls cooldown-suppressed (forge_built_no_pr:712, no_session_revision:713, unrouted_open_pr:713). Repo HEAD=b347fe02=origin/main. All inboxes EMPTY. beacon-pending: 5 unchanged. Watchdog healthy (06:13:21 MDT). 8/8 daemons alive. PRIME: systemic_fixes=74, vp=27, ratio=17.61, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2937 summary:** ⚠️ Active — PR #713 REVIEW_ESCALATE carry. 0 new alerts. All stalls cooldown-suppressed (forge_built_no_pr:712, no_session_revision:713, unrouted_open_pr:713). Repo HEAD=85f9bbfe=origin/main. All inboxes EMPTY. beacon-pending: 5 unchanged. Watchdog healthy (06:23:49 MDT). 8/8 daemons alive. **Notable: PR #713 mergeable changed UNKNOWN→MERGEABLE this iter.** PRIME: systemic_fixes=74, vp=27, ratio=17.61, trend=improving. Tier 1, consecutive_clean=0.
 
 
