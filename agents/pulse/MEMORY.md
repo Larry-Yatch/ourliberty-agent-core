@@ -168,9 +168,9 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## G-rule heal-stale-daemon-code-auto-restart-failed-self-recovered — 1/3 (new, iter ~2704)
+## G-rule heal-stale-daemon-code-auto-restart-failed-self-recovered — 2/3 (updated iter ~2947)
 
-**Rule:** `source=heal-stale-daemon-code, subject^=auto-restart-failed:*` alerts (route=escalate) fire when heal-stale-daemon-code's `sudo systemctl restart` times out (30s sudo timeout) while the unit is cycling. Watchdog also fires CRITICAL during the gap. Systemd's own restart policy brings the service back within ~90s. Services are running by the time Pulse triages. Triage helper: Tier-4 novel (no translation match). Fix: add `source=heal-stale-daemon-code, subject^=auto-restart-failed:` Tier-3 translation entry (informational — systemd self-healed). Dispatch to Beacon at 3/3.
+**Rule:** `source=heal-stale-daemon-code, subject^=auto-restart-failed:*` alerts (route=escalate) fire when heal-stale-daemon-code's `sudo systemctl restart` times out (30s sudo timeout) while the unit is cycling. Watchdog also fires CRITICAL during the gap. Systemd's own restart policy brings the service back within ~90s. Services are running by the time Pulse triages. Triage helper: Tier-4 novel (no translation match). Occurrences: iter ~2704 (1/3); iter ~2947 (`auto-restart-failed:ourliberty-outbox-notifier.service` — mass restart triggered by active_tier.py code change from PR #713; PID 3475738 alive at triage time). Fix: add `source=heal-stale-daemon-code, subject^=auto-restart-failed:` Tier-3 translation entry (informational — systemd self-healed). Dispatch to Beacon at 3/3.
 
 ---
 
@@ -247,9 +247,9 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## G-rule pulse-source-alert-delivery-confirm-tier4-001 — 1/3 (new, iter ~2906)
+## G-rule pulse-source-alert-delivery-confirm-tier4-001 — 2/3 (updated iter ~2947)
 
-**Rule:** `source=pulse` alerts in larry-alerts.jsonl (e.g., `subject=pr713-status-answer`) classify Tier-4 (novel, no translation match). But these are delivery confirmations of Pulse's own prior-iter DMs already sent via route=escalate — a second DM to Larry would be duplicate noise. Same class as `approval_request` delivery confirmations (already Tier-3 silenced). Fix: add `source=pulse` → Tier-3 entry to `config/alert-translations.json`. Dispatch to Beacon at 3/3.
+**Rule:** `source=pulse` alerts in larry-alerts.jsonl classify Tier-4 (novel, no translation match). But these are delivery confirmations of Pulse's own prior-iter DMs already sent via route=escalate — a second DM to Larry would be duplicate noise. Same class as `approval_request` delivery confirmations (already Tier-3 silenced). Occurrences: iter ~2906 (`subject=pr713-status-answer`); iter ~2947 (`subject=larry-question-orphan-erofs-07h25`). Fix: add `source=pulse` → Tier-3 entry to `config/alert-translations.json`. Dispatch to Beacon at 3/3.
 
 ---
 
@@ -259,8 +259,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 13:41Z UTC (Iter ~2946, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 13:52Z UTC (Iter ~2947, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2946 summary:** ⚠️ Active — PR #713 MERGED ✅ (13:37:20Z, fix(claude-auth) durable token for all droplet spawns — MAJOR MILESTONE). PR #715 (fix forge_built_no_pr on closed PR) + PR #716 NEW (fix(heal-stall): suppress unrouted_open_pr while Mirror active) — both in Mirror review, both MERGEABLE. Forge building watchdog-mirror-active-stale-suppression-001 (started 07:34 MDT). Larry's 07:25 MDT question orphan (EROFS bounced x2, DM sent [yellow]). beacon-pending=1 (medic-dispatcher-delivery-failure-translation-001). Watchdog 07:35:16 MDT healthy. Repo HEAD=7dcd8bd4=origin/main (fast-forwarded mid-cycle). PRIME: systemic_fixes=75, vp=27, ratio=17.39, trend=improving. Tier 1, consecutive_clean=0. G-rule: beacon-erofs-concurrent-claude-sessions-001 (2/3, no new occurrence iter ~2946).
+**Iter ~2947 summary:** ⚠️ Active — Mass daemon restart (heal-stale-daemon-code; active_tier.py from PR #713 triggered stale-code detection; 6 services restarted, outbox-notifier transiently failed then self-healed via systemd). Larry's 07:25 MDT EROFS-orphaned question answered by Beacon at 07:46 MDT ✅. Larry approved medic-dispatcher-delivery-failure-translation-001 → dispatched to Forge ✅. beacon-pending=0 ✅. PR #715 + #716 in Mirror review (MERGEABLE=UNKNOWN). Forge inbox: build-watchdog-mirror-active-stale-suppression-001 (re-queued post-restart) + medic-dispatcher-delivery-failure-translation-001 (new). unreviewed-merge:713 new standing finding (Larry judgment, already delivered by outbox-notifier). G-rules updated: heal-stale-daemon-code-auto-restart-failed-self-recovered 2/3, pulse-source-alert-delivery-confirm-tier4-001 2/3. Repo HEAD=03d83c3e=origin/main. PRIME: systemic_fixes=75, vp=27, ratio=17.39. Tier 1, consecutive_clean=0.
 
 
