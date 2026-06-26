@@ -1,0 +1,15 @@
+[Unit]
+Description=Run the off-board merged-PR board-reconcile backstop every 30 minutes
+
+[Timer]
+# OnCalendar (not OnUnitActiveSec) per the OnUnitActiveSec-dies lesson: a missed
+# tick (host asleep / unit inactive) must still fire on the next wall-clock slot.
+# Offset off the round :00/:30 boundary so this gh-listing healer doesn't contend
+# with the other git/gh-touching healers that fire on the hour/half-hour.
+OnCalendar=*-*-* *:7/30:00
+RandomizedDelaySec=120
+Persistent=true
+Unit=ourliberty-heal-merged-pr-board-reconcile.service
+
+[Install]
+WantedBy=timers.target
