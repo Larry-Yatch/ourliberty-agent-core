@@ -27,6 +27,7 @@ _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_REPO_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_REPO_SCRIPTS))
 
+import dispatch_lease  # noqa: E402  # TTL constant for the dispatch-lease tests
 import larry_alerts  # noqa: E402
 import watchdog  # noqa: E402
 
@@ -561,6 +562,71 @@ class CheckLogGrowthTest(_IsolatedRootsTest):
         self._stale_log()
         self._inbox_task('forge', 'task-dead-003')
         self._in_flight_marker('task-dead-003', pid=999999)
+        with mock.patch.object(watchdog, 'is_service_alive', return_value=True), \
+                mock.patch.object(watchdog, '_pid_alive', return_value=False):
+            result = watchdog.check_log_growth()
+        self.assertEqual(result['status'], 'warning')
+        self.assertEqual(result['queued_inboxes'], 1)
+
+    # ---- dispatch-lease suppression (active Mirror review) ----
+
+    def _dispatch_lease(self, agent: str, pid: int, age_seconds: float = 0.0):
+        import time as _time
+        d = self._tmp_path / 'state' / 'dispatch-leases'
+        d.mkdir(parents=True, exist_ok=True)
+        # Real lease filenames carry the literal colon (inbox:<agent>.lease) —
+        # _safe_identity only rewrites '/' and '..', not ':'.
+        (d / f'inbox:{agent}.lease').write_text(json.dumps({
+            'identity': f'inbox:{agent}',
+            'holder_pid': pid,
+            'timestamp_renewed': _time.time() - age_seconds,
+        }))
+
+    def test_active_mirror_review_lease_suppresses_warn(self):
+        # The Mirror-active scenario the fix targets: Mirror's review-request
+        # envelope sits in its inbox AND inbox:mirror is held by a live pid,
+        # but there is NO in-flight marker (the shared-task_stem clobber deleted
+        # it). The dispatch lease is the suppression signal -> ok, no WARN.
+        self._stale_log()
+        self._inbox_task('mirror', 'pr-ourliberty-agent-core-713')
+        self._dispatch_lease('mirror', pid=4242)
+        with mock.patch.object(watchdog, 'is_service_alive', return_value=True), \
+                mock.patch.object(watchdog, '_pid_alive', return_value=True), \
+                mock.patch.object(watchdog, 'log') as logged:
+            result = watchdog.check_log_growth()
+        self.assertEqual(result['status'], 'ok')
+        self.assertIn('dispatch lease', result['reason'])
+        for call in logged.call_args_list:
+            self.assertNotIn('Watcher log stale', call.args[0])
+
+    def test_mirror_review_envelope_no_session_still_warns(self):
+        # Guardrail: a review-request envelope with NO held lease and NO marker
+        # is a genuinely stalled review (not an active session) -> must warn.
+        self._stale_log()
+        self._inbox_task('mirror', 'pr-ourliberty-agent-core-713')
+        with mock.patch.object(watchdog, 'is_service_alive', return_value=True):
+            result = watchdog.check_log_growth()
+        self.assertEqual(result['status'], 'warning')
+        self.assertEqual(result['queued_inboxes'], 1)
+
+    def test_stale_dispatch_lease_does_not_suppress(self):
+        # Lease present but past TTL (holder died without releasing) -> not a
+        # live session -> the queued review still warns.
+        self._stale_log()
+        self._inbox_task('mirror', 'pr-ourliberty-agent-core-713')
+        self._dispatch_lease('mirror', pid=4242,
+                             age_seconds=dispatch_lease.TTL_SECONDS + 60)
+        with mock.patch.object(watchdog, 'is_service_alive', return_value=True), \
+                mock.patch.object(watchdog, '_pid_alive', return_value=True):
+            result = watchdog.check_log_growth()
+        self.assertEqual(result['status'], 'warning')
+        self.assertEqual(result['queued_inboxes'], 1)
+
+    def test_dispatch_lease_dead_holder_does_not_suppress(self):
+        # Lease fresh but holder pid dead -> not a live session -> warn.
+        self._stale_log()
+        self._inbox_task('mirror', 'pr-ourliberty-agent-core-713')
+        self._dispatch_lease('mirror', pid=999999)
         with mock.patch.object(watchdog, 'is_service_alive', return_value=True), \
                 mock.patch.object(watchdog, '_pid_alive', return_value=False):
             result = watchdog.check_log_growth()

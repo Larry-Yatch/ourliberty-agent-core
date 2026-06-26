@@ -61,6 +61,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 import bot_liveness_policy  # noqa: E402
+import dispatch_lease  # noqa: E402  # TTL constant for the dispatch-lease suppressor
 import larry_alerts  # noqa: E402
 from atomic_io import atomic_write_json  # noqa: E402
 
@@ -393,6 +394,56 @@ def _any_live_in_flight_session() -> bool:
     return False
 
 
+# inbox_watcher runs one thread per agent (scripts/inbox_watcher.py AGENTS),
+# each holding a per-agent `inbox:<agent>` dispatch lease for the whole duration
+# of the Claude session it spawns. Mirror is the case this list exists for, but
+# any agent's held lease is an equally valid "watcher mid-session" proxy.
+_INBOX_LEASE_AGENTS = ('beacon', 'forge', 'mirror', 'pulse')
+
+
+def _any_live_dispatch_lease() -> bool:
+    """True if any inbox dispatch lease is held by a live holder right now.
+
+    A held ``inbox:<agent>`` lease is the authoritative proxy for the watcher's
+    per-agent thread being blocked inside ``run_claude`` for the whole duration
+    of a spawned Claude session (it polls the session and writes zero log lines).
+    It is strictly more reliable than the in-flight marker for the Mirror-review
+    case: a Mirror review reuses the Forge build's ``task_id`` as its
+    ``task_stem`` (outbox_notifier._dispatch_mirror_review), so both write the
+    SAME ``state/in-flight/<stem>.json`` and the build's
+    ``agent_runner._unregister_in_flight`` (keyed on stem only) can delete the
+    review's marker while the review is still live — leaving
+    ``_any_live_in_flight_session`` blind to the active review
+    (watchdog-mirror-active-stale-suppression-001). The per-agent lease cannot be
+    clobbered that way: it is keyed by agent, renewed on a 60s heartbeat, and
+    only counts when it is within TTL AND its holder pid is alive.
+
+    Read directly from ``AGENTS_ROOT`` (not via ``dispatch_lease.is_held``, whose
+    LEASES_DIR is fixed at import) so the suppressor stays scoped to the same
+    state root the rest of these checks use — which also keeps it test-isolated.
+    Conservative: an unreadable/half-written lease is skipped, never counted. In
+    lease 'off' mode no lease files exist and this is always False, degrading
+    cleanly to the in-flight-marker signal alone.
+    """
+    leases_dir = AGENTS_ROOT / 'state' / 'dispatch-leases'
+    for agent in _INBOX_LEASE_AGENTS:
+        try:
+            with open(leases_dir / f'inbox:{agent}.lease') as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            continue
+        try:
+            age = time.time() - float(data.get('timestamp_renewed', 0))
+        except (TypeError, ValueError):
+            continue
+        if age >= dispatch_lease.TTL_SECONDS:
+            continue  # stale lease — holder died without releasing
+        pid = data.get('holder_pid')
+        if isinstance(pid, int) and _pid_alive(pid):
+            return True
+    return False
+
+
 def _inbox_has_queued_task(agent_dir: Path) -> bool:
     """True if the inbox holds at least one *.json task that is NOT in-flight.
 
@@ -659,6 +710,21 @@ def check_log_growth() -> dict:
             'status': 'ok',
             'seconds_since_write': int(age),
             'reason': 'active agent session (watcher blocked, quiet log expected)',
+        }
+
+    # The in-flight marker is unreliable for Mirror reviews: the review reuses
+    # the Forge build's task_id as its task_stem, so the build's
+    # _unregister_in_flight can clobber the review's marker mid-review (see
+    # _any_live_dispatch_lease). The per-agent dispatch lease is the
+    # clobber-immune fallback — a held+live lease means the watcher is blocked in
+    # a session right now, so a quiet log is expected. Extends PR #694's
+    # session-aware suppression to the Mirror-active case
+    # (watchdog-mirror-active-stale-suppression-001).
+    if _any_live_dispatch_lease():
+        return {
+            'status': 'ok',
+            'seconds_since_write': int(age),
+            'reason': 'active dispatch lease (watcher mid-session, quiet log expected)',
         }
 
     # Are any inboxes holding queued (not in-flight) work? An inbox task that
