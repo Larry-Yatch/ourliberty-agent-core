@@ -218,9 +218,9 @@ PR #716 (fix(heal-stall): suppress unrouted_open_pr alert while Mirror is active
 
 ---
 
-## G-rule forge-revision-preamble-missing-pr711-001 — 2/3 (updated iter ~2990)
+## G-rule forge-revision-preamble-missing-pr711-001 → DISPATCHED ✅ (iter ~2992), vp
 
-**Rule:** outbox-notifier fires `forge revision-phase outbox without "Revision N applied:" preamble: <task>.json; treating as marker-error` when Forge submits a revision outbox file lacking the expected "Revision N applied:" preamble. Treated as marker-error; retry fires; review proceeds and PR still merges. Fix: Forge build-sequence discipline or outbox-notifier tolerance. Dispatch to Beacon at 3/3. Occurrences: iter ~2851 (PR #711, 1/3); iter ~2990 (PR #720 rev2 at 13:39:07 MDT, 2/3).
+**Rule:** outbox-notifier fires `forge revision-phase outbox without "Revision N applied:" preamble: <task>.json; treating as marker-error` when Forge submits a revision outbox file lacking the expected "Revision N applied:" preamble. Treated as marker-error; retry fires; review proceeds and PR still merges. Fix: Forge build-sequence discipline or outbox-notifier tolerance. Dispatched `forge-revision-preamble-missing-direction-ask-001.json` to Beacon inbox at iter ~2992 (3/3). Occurrences: iter ~2851 (PR #711, 1/3); iter ~2990 (PR #720 rev2, 2/3); iter ~2992 (PR #726, 3/3 × 2 retries at 14:26:10 + 14:26:31 MDT). verification_pending.
 
 ---
 
@@ -267,8 +267,8 @@ PR #725 (fix(healer): skip forge_built_no_pr for pr-<repo>-<num> tasks whose nam
 
 ---
 
-## Status snapshot — updated 2026-06-26 20:11Z UTC (Iter ~2991, Tier 3, consecutive_clean=0)
+## Status snapshot — updated 2026-06-26 20:42Z UTC (Iter ~2992, Tier 1, consecutive_clean=0)
 
-**Iter ~2991 summary:** ⚠️ Intervention. 7 new alerts (6 Tier-3, 1 Tier-4). G-rule ourliberty-health-sync-push-failed-tier4-001 → DISPATCHED ✅ (3/3, Beacon direction-ask). PR #726 OPEN (Mirror reviewing, ~15 min, normal). PR #727 MERGED (forge-queue lane overlap). Sync push failed 19:50Z then self-healed. Watermark 1042→1049. PRIME: intervention + systemic_fix. Tier 2 → Tier 3 de-escalation (consecutive_clean 2→3).
+**Iter ~2992 summary:** ⚠️ Intervention. 2 new alerts (both Tier-3 silenced). Archived stale duplicate `review-pr-ourliberty-agent-core-726.json` (revision_count=0, allow-list). G-rule forge-revision-preamble-missing-pr711-001 → DISPATCHED ✅ (3/3, Beacon direction-ask). PR #726 OPEN (Mirror reviewing rev2, regression check). PR #728 OPEN (Mirror reviewing silence task). Watermark 1049→1051. PRIME: intervention + systemic_fix. Tier 3 → Tier 1 (implementation: any non-clean → Tier 1).
 
 

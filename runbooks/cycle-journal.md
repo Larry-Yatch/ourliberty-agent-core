@@ -5,6 +5,106 @@
 ---
 
 
+## Iteration ~2992 — 2026-06-26T20:42Z UTC (interactive /cycle via chat, Tier 3→1, G-rule 3/3 dispatch)
+
+**Trigger:** Larry `/cycle` via chat.
+
+**Health:** ⚠️ Intervention — 2 new alerts (both Tier-3 silenced). Archive: stale duplicate `review-pr-ourliberty-agent-core-726.json` (revision_count=0, always-fix). G-rule `forge-revision-preamble-missing-pr711-001` → **3/3 → DISPATCHED** to Beacon. PR #726 Mirror actively reviewing rev2 (PID 3740551, regression check). PR #728 Mirror reviewing silence task (PID 3734902). **Tier 3 → Tier 1** (implementation: any non-clean iter resets to Tier 1; additive-only findings).
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo (re-verified):** HEAD=aefe44b7=origin/main. On main. Clean. Up to date. ✅ (new commits: chore(missions) healer auto-commits since iter ~2991)
+- **Sync (re-verified):** sync.json still shows status=error (last_sync=19:50:54Z residual from push-fail). Repo confirmed HEAD=origin/main — self-healed. G-rule dispatch (ourliberty-health-sync-push-failed-tier4-001) already done iter ~2991. PR #728 (silence task) built and in Mirror review. ✅
+- **Watchdog (re-verified):** last tick 14:33:05 MDT (20:33:05Z) — healthy 5-min ticks. ✅
+- **Heal-daemon heartbeat (re-verified):** 2026-06-26T20:29:27Z (~13 min). Under 60-min threshold. ✅
+- **PR #726 (re-verified):** OPEN. Mirror reviewing rev2 (PID 3740551, etime 12+ min, regression check retry step). Rev2 triggered by outbox-notifier after Forge submitted without "Revision N applied:" preamble (G-rule 3rd occurrence). PR state: OPEN, reviewDecision="". [monitoring]
+- **PR #728 (new):** OPEN, MERGEABLE. "chore(alerts): Tier-3 silence ourliberty-health sync auto-commit-push-failed duplicate". Mirror reviewing (PID 3734902, etime 12+ min, 14:31:23 MDT dispatch). [new, monitoring]
+- **duplicate review-...-726.json (resolved):** revision_count=0 file was in Mirror inbox while rev2 being reviewed. Archived per allow-list (archive-duplicate-inbox-task). ✅
+- **PID 3714142 (wedged alert FP re-verified):** wedge alert (idx=1050, 20:17:52Z) fired before session completed at 14:21:14 MDT (3 min gap). PID confirmed dead post-completion. Tier-3 silenced (known pattern in alert-translations.json). ✅
+- **forge-revision-preamble-missing-pr711-001 (3rd occurrence, new):** outbox-notifier WARN at 14:26:10 and 14:26:31 MDT for pr-ourliberty-agent-core-726.json (retry 1/3 + 2/3). 3/3 → dispatched. [resolved per dispatch]
+- **Pipeline stall (re-verified):** dry-run → "no stalls detected". All FORGE_NO_PR_SKIP tasks showing correct reasons. ✅
+- **All other G-rules (carried, no new occurrences this iter):** unchanged from iter ~2991.
+
+**Check 0 — Alert triage:**
+- repair-watermark: {repaired:false, old_watermark=1049, file_length=1051}. 2 new alerts.
+- idx=1049: `source=outbox-notifier, kind=approval_request, approval_id=silence-ourliberty-health-sync-push-failed-001` → Tier-3 silence. ✅ (Larry approved at 14:27:59 MDT; build-phase dispatched to Forge; review-request to Mirror → PR #728)
+- idx=1050: `source=heal-wedged-review-sessions, subject=wedged-review-silent:wt-mirror-pr-ourliberty-agent-core-726, route=escalate` → Tier-3 silence. ✅ (known pattern; outbox-notifier already DM'd Larry; session completed naturally 3 min after alert; PID dead)
+- Watermark: 1049→1051. ✅
+
+**Check 1 — Log noise:**
+- watchdog.log: healthy 5-min ticks through 14:33:05 MDT. No WARNs. ✅
+- outbox-notifier.log: PR #726 rev2 pipeline active (revision-2 dispatch 14:25:05, marker-error retries 14:26:10/14:26:31, re-review dispatched 14:26:46). Forge revision preamble missing → G-rule 3/3. PR #728 build+review pipeline complete (14:29:22 build, 14:31:23 review-request). ✅
+- mirror.log: 2 active sessions (PID 3734902 etime 12+ min = PR #728 silence review; PID 3740551 etime 5+ min = PR #726 rev2 regression check retry). Normal. ✅
+
+**Check 2 — Telegram sweep:**
+- beacon_telegram_bot.log: Larry "Go" at 14:27:59 MDT (approved silence-ourliberty-health-sync-push-failed-001). Dispatched to Forge at 14:28:02 MDT. No further Larry messages. ✅
+
+**Check 3 — Pipeline stall (dry-run):**
+- No stalls detected. ✅
+
+**Check 4 — Pending directives:**
+- Beacon inbox: forge-revision-preamble-missing-direction-ask-001.json (just dispatched). Forge EMPTY. Mirror: 2 items (review-...-726-rev2.json, review-silence-...728.json — both in progress). beacon-pending=0. ✅
+
+**Check 5 — Stale daemon code:**
+- Heartbeat=2026-06-26T20:29:27Z (~13 min). Under 60-min threshold. ✅
+
+**Check A — Source repo:** HEAD=aefe44b7=origin/main. On main. Clean. Up to date. ✅
+**Check B — Sync health:** sync.json status=error (residual 19:50Z). Repo is current (HEAD=origin/main confirmed). Self-healed. G-rule dispatched. ✅
+**Check C — Agent liveness:** Watchdog healthy (20:33:05Z, 5-min ticks). Heal-daemon fresh (20:29:27Z). Mirror: 2 active sessions (normal). beacon-bot running. ✅
+**Check D — Inbox:** Archived stale duplicate `review-pr-ourliberty-agent-core-726.json` (revision_count=0 while rev2 in review). Always-fix. ✅
+**Check E — PRs:**
+- **PR #726** — OPEN. Mirror reviewing rev2 (PID 3740551, regression check). ⚠️ [monitoring]
+- **PR #728** — OPEN, MERGEABLE. "chore(alerts): Tier-3 silence ourliberty-health sync". Mirror reviewing (PID 3734902). [new, monitoring]
+- [carry] **unreviewed-merge:723** — Larry judgment.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅
+
+**Conditional checks — Friday 2026-06-26 UTC (weekday=4, firing set):**
+- Check I: invoked (no --force). mode=digest, cooldown-suppressed (journal-block for 2026-06-22 already present). ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule assessment:**
+- `forge-revision-preamble-missing-pr711-001` → **DISPATCHED ✅ 3/3** (iter ~2992, envelope `forge-revision-preamble-missing-direction-ask-001.json` to Beacon inbox). ✅
+- `review-duplicate-dispatch-wip-redispatch` → mitigation applied (archive stale revision_count=0 task). DISPATCHED ✅ vp (carry). [carry]
+- All other G-rules: unchanged from iter ~2991.
+
+**Actions taken:**
+1. Check 0: triaged 2 alerts (both Tier-3 silence). Watermark 1049→1051. ✅
+2. Check D: archived stale duplicate `review-pr-ourliberty-agent-core-726.json` (revision_count=0). Logged to cycle-actions.jsonl. ✅
+3. G-rule `forge-revision-preamble-missing-pr711-001` → 3/3 → dispatched `forge-revision-preamble-missing-direction-ask-001.json` to Beacon inbox. ✅
+4. Check I: invoked no-force, cooldown-suppressed. ✅
+5. §5.0: all no-op. ✅
+6. PRIME ledger: intervention + systemic_fix appended. ✅
+7. Tier state: `record --checks-clean false` → **Tier 3 → Tier 1** (implementation resets any non-clean iter to Tier 1; additive-only findings, all mandatory checks clean). consecutive_clean=0.
+
+**Escalations:** None (all alerts Tier-3 silenced; G-rule dispatch is systemic fix path; PR #726 and #728 being actively reviewed, normal cadence).
+
+**Standing findings (carried + verified):**
+- [yellow] **PR #726 — Mirror reviewing rev2** — PID 3740551 (regression check, active). fix(mirror): wall-clock bounds. G-rule forge-revision-preamble (3rd occurrence on this PR). [monitoring]
+- [yellow] **PR #728 — Mirror reviewing** — PID 3734902 (~12 min). chore(alerts): Tier-3 silence ourliberty-health push-fail. [new, monitoring]
+- [yellow] **unreviewed-merge:723** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:713** — Larry judgment. [carry]
+- [yellow] **Zombie PID 1834248** — bash poll loop (29d+). Ask-then-do. [carry]
+- [yellow] **6 stale journalctl PIDs (31d+)** — Ask-then-do. [carry]
+- [yellow] **forge-wip-redispatch-digest Forge dispatch** — Beacon fix designed. Trust-policy approval pending. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — approve check-viii-update-2026-06-15. Awaiting Larry. [carry]
+- [yellow] **Check III threshold proposals** — approve threshold-update-2026-06-11. Awaiting Larry. [carry]
+- [yellow] **unreviewed-merge:710/709** — Larry judgment. [carry]
+- [blue] **forge-revision-preamble-missing-pr711-001 — DISPATCHED ✅ 3/3** — direction-ask to Beacon; verification_pending. [updated]
+- [blue] **ourliberty-health-sync-push-failed-tier4-001 — DISPATCHED ✅** — PR #728 built, Mirror reviewing. verification_pending. [carry]
+- [blue] **heal-stale-daemon-code-auto-restart-failed-self-recovered — 2/3** — dispatch at 3/3. [carry]
+- [blue] **pulse-source-alert-delivery-confirm-tier4-001 — 2/3** — dispatch at 3/3. [carry]
+- [blue] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced. [carry]
+- [blue] **mirror-runner-missing-worktree-retry-001 — 1/3** — dispatch at 3/3. [carry]
+- [blue] **G-rules (unchanged):** sentinel-inflight-stall-mirror-tier4 (2/3), review-duplicate-dispatch-wip-redispatch (vp), check-i-force-bypass-dm-route (2/3), heal-daemon-restart-manifest-drift (2/3), no-session-revision-merged-pr-fp-001 (1/3), unrouted-open-pr-auto-merge-held-fp-001 (1/3), forge-wip-redispatch-digest-tier4-001 (dispatched vp), forge-wip-redispatch-exhausted-pr-exists-fp-001 (2/3), heal-stale-daemon-code-still-stale-after-restart (1/3), outbox-notifier-notification-intent-reject-tier4-001 (2/3), no-session-revision-active-mirror-session-fp-001 (DISPATCHED ✅ vp).
+- [blue] **unreviewed-merge:649/637/655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+
+**PRIME DIRECTIVE:** intervention + systemic_fix. Trailing-30d: interventions=1329, systemic_fixes=77, vp=28, ratio≈17.26.
+**Tier end-of-iter:** Tier **1** (reset from 3; implementation behavior: any non-clean → Tier 1), consecutive_clean=0. Last signal: 2026-06-26T20:42:42Z.
+
+---
+
+
 ## Iteration ~2991 — 2026-06-26T20:11Z UTC (interactive /cycle via chat, Tier 2→3, G-rule dispatch)
 
 **Trigger:** Larry `/cycle` via chat.
