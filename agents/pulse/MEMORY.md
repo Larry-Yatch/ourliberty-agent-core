@@ -204,8 +204,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 00:21Z UTC (Iter ~2830, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 00:26Z UTC (Iter ~2831, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2830 summary:** ✅ Nominal — 2 new alerts (L1020-L1021), both Tier-3 silences (ledger weekly-2026-06-22 + pulse check-i-2026-06-22 digest). Check I no-op (already fired iter ~2829 same day, journal block present, DM cooldown-suppressed). PR #708 feat(missions): off-board merged-PR board-reconcile backstop — active Mirror review (~11 min at cycle time). Zombie PID 1834248 + 6 stale journalctl PIDs carry. Watermark 1019→1021. PRIME: interventions=1226, systemic_fixes=71, vp=27, ratio≈17.27, trend=stable. Tier 1, consecutive_clean=0.
+**Iter ~2831 summary:** ✅ Nominal — 0 new alerts. Check I no-op (block for week-of-2026-06-22 already present, DM cooldown-suppressed, dedup-skip key=f8ac2e3afc). PR #708 feat(missions): off-board merged-PR board-reconcile backstop — active Mirror review (~16 min at cycle time). Zombie PID 1834248 + 6 stale journalctl PIDs carry. Watermark stays 1021. PRIME: interventions=1226, systemic_fixes=71, vp=27, ratio≈17.27, trend=improving. Tier 1, consecutive_clean=0.
 
 
