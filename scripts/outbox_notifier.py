@@ -4795,20 +4795,15 @@ def _dispatch_revision_to_forge(
             f'`Revision {next_count} applied: <summary>` (strict per 5b — '
             'missing prefix dead-letters back to you).',
             '',
-            'This is a resumed conversation. Do NOT open with a conversational '
+            f'ROUND-{next_count} TRAP: this is a resumed conversation. A prior '
+            f'round\'s `Revision {next_count - 1} applied:` line already exists '
+            'earlier in this session, and the gate is anchored to the start of '
+            'THIS response only. Do NOT open with a conversational '
             'acknowledgement of the new findings — the preamble '
             f'`Revision {next_count} applied:` must be the VERY FIRST characters '
-            'of THIS response, before any other text. The gate is anchored to '
-            'the start of THIS response only.',
+            'of THIS response, before any other text. The earlier preamble does '
+            'NOT count.',
         ])
-        if next_count >= 2:
-            revision_prompt_lines.append(
-                f'ROUND-{next_count} TRAP: a prior round\'s '
-                f'`Revision {next_count - 1} applied:` line already exists '
-                'earlier in this session. That earlier preamble does NOT count '
-                f'— THIS response must still START with `Revision {next_count} '
-                'applied:`.'
-            )
         revision_prompt = '\n'.join(revision_prompt_lines)
 
     revision_base: dict[str, Any] = {
