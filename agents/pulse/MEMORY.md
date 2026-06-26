@@ -204,9 +204,9 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## G-rule unrouted-open-pr-active-mirror-session-fp-001 — 2/3 (updated iter ~2881)
+## G-rule unrouted-open-pr-active-mirror-session-fp-001 → DISPATCHED ✅ (iter ~2903, 3/3)
 
-**Rule:** `heal_pipeline_stall.py` dry-run fires `unrouted_open_pr:<pr>` after cooldown expiry even when Mirror IS actively reviewing the PR (active PID + inbox task present). Occurrences: iter ~2848 (PR #711, Mirror PID 3172100 running); iter ~2881 (PR #713, Mirror PID 3308724 active ~4 min reviewing rev1). Stall checker has no visibility into active Mirror sessions (distinct from G-rule `unrouted-open-pr-auto-merge-held-fp-001` which was about AUTO_MERGE_HELD outbox-notifier state on PR #692). Fix: stall checker should check for active agent sessions (inbox task presence or live PID) before firing `unrouted_open_pr`. Dispatch to Beacon at 3/3.
+**Rule:** `heal_pipeline_stall.py` dry-run fires `unrouted_open_pr:<pr>` after cooldown expiry even when Mirror IS actively reviewing the PR (active PID + inbox task present). Occurrences: iter ~2848 (PR #711, Mirror PID 3172100 running); iter ~2881 (PR #713, Mirror PID 3308724 active ~4 min reviewing rev1); iter ~2903 (PR #713, Mirror PID 3308724 at 2h17m, cooldown expired again). Fix: add `MIRROR_ACTIVE_SKIP` suppression (check inbox task presence or live PID) before firing `unrouted_open_pr`. Dispatched `direction-ask-unrouted-pr-active-mirror-session-fix-001.json` to Beacon inbox at iter ~2903. May fold in `no-session-revision-active-mirror-session-fp-001` (same root cause class). verification_pending.
 
 ---
 
@@ -240,14 +240,14 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## G-rule forge-built-no-pr-closed-pr-fp-001 — 1/3 (new, iter ~2892)
+## G-rule forge-built-no-pr-closed-pr-fp-001 — 2/3 (updated iter ~2903)
 
-**Rule:** `forge_built_no_pr` stall fires for tasks whose PR is CLOSED (not merged, not open). First occurrence: pr-ourliberty-agent-core-712 (headRefName=fix/narrator-durable-token, CLOSED, superseded by PR #713). Different from prior FP class where PR exists but stall checker missed it — here PR was deliberately closed/abandoned. Fix: stall checker should skip `forge_built_no_pr` for tasks with a closed (non-merged) PR. Dispatch to Beacon at 3/3.
+**Rule:** `forge_built_no_pr` stall fires for tasks whose PR is CLOSED (not merged, not open). Occurrences: iter ~2892 (first: pr-ourliberty-agent-core-712, headRefName=fix/narrator-durable-token, CLOSED, superseded by PR #713); iter ~2903 (second: same PR #712 CLOSED, cooldown expired again). Different from prior FP class where PR exists but stall checker missed it — here PR was deliberately closed/abandoned. Fix: stall checker should skip `forge_built_no_pr` for tasks with a closed (non-merged) PR. Dispatch to Beacon at 3/3.
 
 ---
 
-## Status snapshot — updated 2026-06-26 08:18Z UTC (Iter ~2902, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 08:25Z UTC (Iter ~2903, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2902 summary:** ⚠️ Active — Mirror PID 3308724 at ~2h12m56s elapsed (way past 60-min threshold; sentinel fired at idx=1048). 0 new alerts. Pipeline stall: 0 (all cooldown-suppressed). 8/8 daemons alive. Watchdog healthy (08:12:57Z). Check I cooldown-suppressed. beacon-pending: 1 (medic-dispatcher-delivery-failure-translation-001 awaiting Larry approval). Zombie PID 1834248 + 6 stale journalctl PIDs carry. PR #713 revision still active (Mirror outbox empty). PRIME: interventions=1280, systemic_fixes=72, vp=27, ratio≈17.78, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2903 summary:** ⚠️ Active — Mirror PID 3308724 at ~2h17m41s elapsed (well past 60-min threshold). 0 new alerts. Pipeline stall: 2 FP would-fire alerts (cooldowns expired: forge_built_no_pr:712 + unrouted_open_pr:713). 8/8 daemons alive. Watchdog healthy (08:23:20Z). Check I cooldown-suppressed. beacon-pending: 1 (medic-dispatcher-delivery-failure-translation-001 awaiting Larry approval). Zombie PID 1834248 + 6 stale journalctl PIDs carry. PR #713 revision still active (Mirror outbox empty). G-rule `unrouted-open-pr-active-mirror-session-fp-001` → 3/3 DISPATCHED to Beacon. PRIME: interventions=1281, systemic_fixes=72, vp=27, ratio≈17.79, trend=improving. Tier 1, consecutive_clean=0.
 
 
