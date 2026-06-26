@@ -2018,9 +2018,20 @@ def _read_proc_cmdline(pid: int) -> Optional[str]:
     return ' '.join(p.decode('utf-8', errors='replace') for p in parts if p)
 
 
-# Worktree dir names follow the pattern `wt-<agent>-<task_id>`. Strict regex
-# so we don't mis-parse a stray directory.
-_WORKTREE_RE = re.compile(r'^wt-(?P<agent>[a-z]+)-(?P<task_id>[a-z0-9][a-z0-9-]*)$')
+# Worktree dir names follow the pattern `wt-<agent>-<task_id>`, where the
+# task_id segment is the SANITIZED stem produced by `worktree_manager.
+# _sanitize_task_id` (and its two locked-consistent siblings): every char
+# outside `[A-Za-z0-9_-]` is mapped to `-` and the result is capped at 50.
+# The task_id class here must therefore admit that full charset — uppercase,
+# `_`, and a leading `-` (e.g. raw `:foo` sanitizes to `-foo`) are all real
+# dir names. An earlier `[a-z0-9][a-z0-9-]*` class silently failed to parse
+# those, so a genuinely-building task whose id wasn't a clean lowercase slug
+# never reached the building lane. Agent stays `[a-z]+` (agent ids are
+# lowercase) so the split between agent and task_id remains the first `-`.
+# ASCII-only by design: forge task_ids are ASCII slugs, and `_sanitize_task_id`
+# would only emit a non-ASCII char from a non-ASCII `isalnum()` input (none in
+# practice) — not worth mirroring `str.isalnum()`'s Unicode reach in a regex.
+_WORKTREE_RE = re.compile(r'^wt-(?P<agent>[a-z]+)-(?P<task_id>[A-Za-z0-9_-]+)$')
 
 
 def _parse_worktree_name(name: str) -> tuple[Optional[str], Optional[str], Optional[str]]:
@@ -2192,7 +2203,24 @@ def _reader_system_worktrees(
     """
     captured_at = now or datetime.now(timezone.utc)
     in_flight = _load_in_flight_index(agents_root)
-    in_flight_stems = set(in_flight.keys())
+    # The worktree dir bakes in the SANITIZED task stem (`worktree_manager.
+    # _sanitize_task_id`: non-`[A-Za-z0-9_-]` -> `-`, capped at 50), but the
+    # in-flight sentinel is keyed by the RAW `task_stem`. Comparing the parsed
+    # dir stem against the raw stems misses any task whose id isn't already a
+    # clean slug (`foo:bar` -> dir `foo-bar` != stem `foo:bar`; an id > 50
+    # chars truncates) — it would read as not-in-flight and silently vanish
+    # from the building lane while genuinely building. Match instead on the
+    # stem the dir actually carries: the sentinel records it as `worktree_stem`
+    # (`agent_runner._register_in_flight`), and falling back to `task_stem`
+    # covers both pre-field sentinels and the common slug-clean case where
+    # raw == sanitized. Keyed by (agent_id, worktree_stem) so a dir matches
+    # only its own agent's sentinel.
+    in_flight_by_wt: dict[tuple[str, str], dict[str, Any]] = {}
+    for entry in in_flight.values():
+        agent_id = entry.get('agent_id')
+        wt_stem = entry.get('worktree_stem') or entry.get('task_stem')
+        if isinstance(agent_id, str) and isinstance(wt_stem, str) and wt_stem:
+            in_flight_by_wt.setdefault((agent_id, wt_stem), entry)
     worktrees: list[dict[str, Any]] = []
     if not worktrees_root.is_dir():
         return {
@@ -2212,12 +2240,23 @@ def _reader_system_worktrees(
         name = entry.name
         if not name.startswith('wt-'):
             continue
-        agent, task_id, branch = _parse_worktree_name(name)
+        agent, parsed_stem, branch = _parse_worktree_name(name)
         mt = _safe_mtime(entry)
         age_seconds: Optional[float] = None
         if mt is not None:
             age_seconds = (captured_at - datetime.fromtimestamp(mt, tz=timezone.utc)).total_seconds()
-        is_in_flight = task_id in in_flight_stems if task_id else False
+        matched = (
+            in_flight_by_wt.get((agent, parsed_stem))
+            if agent and parsed_stem else None
+        )
+        is_in_flight = matched is not None
+        # Surface the sentinel's canonical (unsanitized) task_stem so the
+        # building lane shows the real id and matches the unsanitized id the
+        # review_request carries (the building<->in_review dedup keys on it).
+        # `branch` keeps the parsed sanitized stem — that IS the on-disk git
+        # branch (`derive_branch_name` uses the same sanitizer).
+        canonical = matched.get('task_stem') if matched else None
+        task_id = canonical if isinstance(canonical, str) and canonical else parsed_stem
         worktrees.append({
             'name': name,
             'agent': agent,
@@ -2909,11 +2948,11 @@ def _reader_agent_queue(
         # double-list in BOTH the building and in_review lanes. Mirror the
         # queued->building dedup (see _reader_agent_queue_queued): the earlier
         # lane drops any task that has advanced to the later one; in_review
-        # wins. Keyed on task_id, which is safe here: a task only reaches the
-        # building lane when its sanitized worktree id equals its in-flight
-        # task_stem (`is_in_flight`), i.e. a clean slug, and the review_request
-        # carries that same unsanitized id — so the ids that can double-list
-        # are exactly the ones that compare equal. When the chain_events fetch
+        # wins. Keyed on task_id, which is safe here: the building lane now
+        # surfaces the sentinel's UNSANITIZED task_stem (see
+        # _reader_system_worktrees), the same id the review_request carries, so
+        # they compare equal even for a non-slug id whose worktree dir was
+        # sanitized. When the chain_events fetch
         # is unavailable in_review degrades to [] above, so nothing is dropped
         # and the task stays in building (fail safe toward the earlier lane)
         # rather than vanishing from both.
