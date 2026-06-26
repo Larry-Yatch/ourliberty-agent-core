@@ -241,9 +241,9 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## G-rule forge-built-no-pr-closed-pr-fp-001 — 2/3 (updated iter ~2903)
+## G-rule forge-built-no-pr-closed-pr-fp-001 → DISPATCHED ✅ (iter ~2939), vp
 
-**Rule:** `forge_built_no_pr` stall fires for tasks whose PR is CLOSED (not merged, not open). Occurrences: iter ~2892 (first: pr-ourliberty-agent-core-712, headRefName=fix/narrator-durable-token, CLOSED, superseded by PR #713); iter ~2903 (second: same PR #712 CLOSED, cooldown expired again). Different from prior FP class where PR exists but stall checker missed it — here PR was deliberately closed/abandoned. Fix: stall checker should skip `forge_built_no_pr` for tasks with a closed (non-merged) PR. Dispatch to Beacon at 3/3.
+**Rule:** `forge_built_no_pr` stall fires for tasks whose PR is CLOSED (not merged, not open). Occurrences: iter ~2892, iter ~2903, iter ~2939 (3/3). Fix: stall checker should skip `forge_built_no_pr` for tasks with a closed (non-merged) PR, analogous to FORGE_NO_PR_SKIP pr_exists logic. direction-ask-forge-no-pr-closed-pr-fix-001.json dispatched to Beacon inbox at iter ~2939. verification_pending.
 
 ---
 
@@ -253,8 +253,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 12:33Z UTC (Iter ~2938, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 12:44Z UTC (Iter ~2939, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2938 summary:** ⚠️ Active — PR #713 REVIEW_ESCALATE carry. 0 new alerts. All stalls cooldown-suppressed (forge_built_no_pr:712, no_session_revision:713, unrouted_open_pr:713). Repo HEAD=8f5c19b9=origin/main. All inboxes EMPTY. beacon-pending: 5 unchanged. Watchdog healthy (06:28:50 MDT). 8/8 daemons alive. PR #713 mergeable=UNKNOWN (flipped back from MERGEABLE at iter ~2937 — GitHub recomputing, transient). PRIME: systemic_fixes=74, vp=27, ratio=17.61, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2939 summary:** ⚠️ Active — PR #713 REVIEW_ESCALATE carry. 2 new alerts (both Tier-3 silenced: heal-pipeline-stall forge-no-pr:712 + unrouted-pr:713). G-rule forge-built-no-pr-closed-pr-fp-001 hit 3/3 → direction-ask-forge-no-pr-closed-pr-fix-001 dispatched to Beacon. Repo HEAD=05fab23c=origin/main. beacon-pending: 5 unchanged. Watchdog healthy (06:38:56 MDT). 8/8 daemons alive. PR #713 mergeable=UNKNOWN (transient). PRIME: systemic_fixes=75, vp=27, ratio=17.39, trend=improving. Tier 1, consecutive_clean=0.
 
 
