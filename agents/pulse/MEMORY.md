@@ -265,8 +265,8 @@ PR #715 (fix(healer): skip forge_built_no_pr stall when task PR is CLOSED) MERGE
 
 ---
 
-## Status snapshot — updated 2026-06-26 15:29Z UTC (Iter ~2961, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 15:33Z UTC (Iter ~2962, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2961 summary:** ✅ Near-nominal. 1 new alert (line 1019): source=pulse route=digest subject=check-i-2026-06-22 → Tier-3 silence (known translation). Watermark advanced to 1019. Same carry FP: forge_built_no_pr:pr-ourliberty-agent-core-712 (G-rule 2/3). PR #717 Mirror reviewing (~50 min, PID 3533331). PR #718/#719 Mirror queue. Check I: dm_route digest (correct). pulse-source-alert-delivery-confirm-tier4-001 clarification: check-i digest alerts already Tier-3 via known translation; G-rule only targets route=escalate delivery confirmations. PRIME: systemic_fixes=75, vp=27, ratio=17.48. Tier 1, consecutive_clean=0.
+**Iter ~2962 summary:** ✅ Near-nominal. 0 new alerts. Watermark holds at 1019. Same carry FP: forge_built_no_pr:pr-ourliberty-agent-core-712 (G-rule 2/3). PR #717 Mirror reviewing (~54 min, PID 3533331). PR #718/#719 Mirror queue. Check I: dm_route digest (correct, cooldown-suppressed). §5.0 all no-op. PRIME: systemic_fixes=75, vp=27, ratio=17.49. Tier 1, consecutive_clean=0.
 
 
