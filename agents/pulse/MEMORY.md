@@ -108,9 +108,9 @@
 
 ---
 
-## G-rule check-i-force-bypass-dm-route — 1/3 (new, iter ~2611)
+## G-rule check-i-force-bypass-dm-route — 2/3 (updated iter ~2869)
 
-**Rule:** The cycle invokes `pulse_check_i.py --force` on scheduled firing days. `--force` bypasses both the weekday gate AND the `dm_route` journal-peek (PR #674). On a scheduled firing day, `--force` is unnecessary. Fix: drop `--force` from cycle's Check I invocation on firing days (Mon/Wed/Fri/Sun); keep `--force` only for /optimize. Dispatch to Beacon at 3/3.
+**Rule:** The cycle invokes `pulse_check_i.py --force` on scheduled firing days. `--force` bypasses both the weekday gate AND the `dm_route` journal-peek (PR #674). On a scheduled firing day, `--force` is unnecessary. Fix: drop `--force` from cycle's Check I invocation on firing days (Mon/Wed/Fri/Sun); keep `--force` only for /optimize. Occurrences: iter ~2611 (1/3), iter ~2869 (2/3, duplicate Check I digest at 04:38:04Z for week 2026-06-22, same day as 03:30:23Z; dm_route correctly downgraded to digest). Dispatch to Beacon at 3/3.
 
 ---
 
@@ -228,8 +228,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 04:40Z UTC (Iter ~2868, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 04:49Z UTC (Iter ~2869, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2868 summary:** ⚠️ Drift — PR #712 "fix(narrator): authenticate claude with the durable per-tier setup-token" OPEN and MERGEABLE (~7 min old); outbox-notifier hasn't dispatched Mirror review yet (monitoring, < 30 min). Stuck dispatch (mirror-marker-discipline-spec-update-001) carries from iter ~2866 (Forge inbox empty, pending-approvals status=pending). All 8 daemons alive. 0 new alerts. Stall dry-run clean. Zombie PID 1834248 + 6 stale journalctl PIDs carry. Check I cooldown-suppressed. PRIME: interventions=1246, systemic_fixes=72, vp=27, ratio≈17.31, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2869 summary:** ⚠️ Drift — PR #712 "fix(narrator): authenticate claude with the durable per-tier setup-token" OPEN, Mirror review dispatched 04:45:31Z (14 min after creation). Stuck dispatch (mirror-marker-discipline-spec-update-001) carries from iter ~2866 (Forge inbox empty, pending-approvals status=pending). All 8 daemons alive. 1 new alert (Tier-3 silence, duplicate Check I digest). Stall dry-run clean. Zombie PID 1834248 + 6 stale journalctl PIDs carry. G-rule check-i-force-bypass-dm-route updated 1/3→2/3. Check I cooldown-suppressed. PRIME: interventions=1247, systemic_fixes=72, vp=27, ratio≈17.32, trend=improving. Tier 1, consecutive_clean=0.
 
 
