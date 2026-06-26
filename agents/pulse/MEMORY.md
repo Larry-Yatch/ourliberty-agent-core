@@ -259,8 +259,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 14:29Z UTC (Iter ~2953, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 14:34Z UTC (Iter ~2954, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2953 summary:** ✅ Nominal — 1 new alert (L1016: source=pulse subject=check-i-2026-06-22 route=digest, Tier-3 silenced). PR #715 Mirror PASS + AUTO_MERGE_HELD behind #716. PR #716 + #717 + #718 in Mirror review. Forge inbox: empty. Beacon inbox: empty. beacon-pending=0. Repo HEAD=1dbeefdc=origin/main. Watchdog healthy (14:21:20Z). Sync 27 min old. Pipeline stall dry-run: 0 alerts. Zombie PID 1834248 still alive (28d19h09m). PRIME: systemic_fixes=75, vp=27, ratio=17.4. Tier 1, consecutive_clean=0. Check I: dm_route digest (no-force correct, repeat suppressed). Watermark at 1016.
+**Iter ~2954 summary:** ✅ Nominal — 0 new alerts. Mirror actively reviewing PRs #716/#717/#718 (PID 3509077, started 14:12Z). PR #715 Mirror PASS + AUTO_MERGE_HELD behind #716. Forge inbox: empty. Beacon inbox: empty. beacon-pending=0. Repo HEAD=7cd65e50=origin/main. Watchdog healthy (14:32:03Z). Sync 32 min old. Pipeline stall dry-run: 0 alerts. Zombie PID 1834248 still alive (28d19h+). PRIME: systemic_fixes=75, vp=27, ratio=17.4. Tier 1, consecutive_clean=0. Check I: dm_route digest (no-force correct, repeat suppressed). Watermark at 1016.
 
 
