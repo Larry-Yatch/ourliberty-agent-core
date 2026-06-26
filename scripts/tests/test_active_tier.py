@@ -699,5 +699,73 @@ class SetupTokenFileFallbackTest(unittest.TestCase):
         self.assertTrue(active_tier.tier_auth_ok('tier2', now=now))
 
 
+class ActiveSetupTokenTest(unittest.TestCase):
+    """active_setup_token() resolves the *active* tier (blackboard/
+    active-tier.json) then that tier's setup-token. This is what run_cycle.sh
+    uses so the /cycle heartbeat authenticates against the SAME account the
+    team does — following a dashboard switch / rotation — instead of pinning to
+    HOME's auto-refreshing ~/.claude/.credentials.json."""
+
+    def setUp(self):
+        import os
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        # active-tier.json lives under OURLIBERTY_AGENTS_ROOT/blackboard.
+        self._prev_root = os.environ.get('OURLIBERTY_AGENTS_ROOT')
+        os.environ['OURLIBERTY_AGENTS_ROOT'] = str(self.root)
+        # Control the setup-token env vars + disable the on-disk env-file
+        # fallback so the dev box's real ~/credentials/.env.larry can't leak in.
+        self._prev_t1 = os.environ.pop('CLAUDE_CODE_OAUTH_TOKEN_TIER1', None)
+        self._prev_t2 = os.environ.pop('CLAUDE_CODE_OAUTH_TOKEN_TIER2', None)
+        self._prev_env_file = os.environ.get('OURLIBERTY_CREDENTIALS_ENV_FILE')
+        os.environ['OURLIBERTY_CREDENTIALS_ENV_FILE'] = str(
+            self.root / 'no-such.env')
+
+    def tearDown(self):
+        import os
+        for name, prev in (
+            ('OURLIBERTY_AGENTS_ROOT', self._prev_root),
+            ('CLAUDE_CODE_OAUTH_TOKEN_TIER1', self._prev_t1),
+            ('CLAUDE_CODE_OAUTH_TOKEN_TIER2', self._prev_t2),
+            ('OURLIBERTY_CREDENTIALS_ENV_FILE', self._prev_env_file),
+        ):
+            if prev is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = prev
+        self.tmp.cleanup()
+
+    def _set_active_tier(self, tier):
+        path = self.root / 'blackboard' / 'active-tier.json'
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({'tier': tier}))
+
+    def test_returns_active_tier2_token(self):
+        import os
+        self._set_active_tier('tier2')
+        os.environ['CLAUDE_CODE_OAUTH_TOKEN_TIER2'] = 'sk-tier2'
+        self.assertEqual(active_tier.active_setup_token(), 'sk-tier2')
+
+    def test_follows_active_tier_to_tier1(self):
+        import os
+        # Active tier is tier1 → return tier1's token even though tier2's is set.
+        self._set_active_tier('tier1')
+        os.environ['CLAUDE_CODE_OAUTH_TOKEN_TIER1'] = 'sk-tier1'
+        os.environ['CLAUDE_CODE_OAUTH_TOKEN_TIER2'] = 'sk-tier2'
+        self.assertEqual(active_tier.active_setup_token(), 'sk-tier1')
+
+    def test_none_when_unconfigured(self):
+        # Active tier set, but no token env var + env-file fallback missing →
+        # None, so run_cycle.sh cleanly falls back to credentials.json.
+        self._set_active_tier('tier2')
+        self.assertIsNone(active_tier.active_setup_token())
+
+    def test_missing_state_defaults_to_tier1_token(self):
+        import os
+        # No active-tier.json → read() defaults to tier1; resolve tier1's token.
+        os.environ['CLAUDE_CODE_OAUTH_TOKEN_TIER1'] = 'sk-tier1-default'
+        self.assertEqual(active_tier.active_setup_token(), 'sk-tier1-default')
+
+
 if __name__ == '__main__':
     unittest.main()

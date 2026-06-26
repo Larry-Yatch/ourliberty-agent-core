@@ -144,6 +144,18 @@ def _setup_token_for_tier(tier):
             or _setup_token_from_env_file(env_name)
             or None)
 
+
+def active_setup_token():
+    """Setup-token for the *currently active* tier, or None if unconfigured.
+
+    Resolves ``read()['tier']`` (blackboard/active-tier.json) then the per-tier
+    token, so a caller authenticates against the SAME account a dispatch would.
+    This lets the /cycle heartbeat follow the team's tier switch / rotation
+    instead of pinning to HOME's auto-refreshing ``~/.claude/.credentials.json``
+    (which rots silently on an OAuth refresh failure and then 401s every
+    iteration — the recurring false "Tier N down"). Never log the return value."""
+    return _setup_token_for_tier(read()['tier'])
+
 # Max backoff when the "resets <time>" message is unparseable. Spec § 6.3.
 _COOLDOWN_BACKOFF_CAP = timedelta(minutes=30)
 # Base unit for capped exponential backoff: 1 min, doubling each attempt.
@@ -491,3 +503,16 @@ def _write(state):
     tmp = path.with_suffix(path.suffix + '.tmp')
     tmp.write_text(json.dumps(state, indent=2))
     tmp.replace(path)
+
+
+if __name__ == '__main__':  # pragma: no cover
+    # Thin single-purpose CLI so run_cycle.sh can resolve the active tier's
+    # setup-token without re-implementing the precedence rules. The token goes
+    # to stdout for capture only — empty when unconfigured (caller falls back to
+    # the credentials.json path). NEVER log the printed value.
+    import sys
+    if len(sys.argv) == 2 and sys.argv[1] == 'active-setup-token':
+        sys.stdout.write(active_setup_token() or '')
+    else:
+        sys.stderr.write('usage: active_tier.py active-setup-token\n')
+        sys.exit(2)
