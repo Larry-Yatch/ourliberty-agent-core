@@ -252,8 +252,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 11:37Z UTC (Iter ~2931, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 11:53Z UTC (Iter ~2932, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2931 summary:** ⚠️ Active — PR #713 REVIEW_ESCALATE pending Larry decision (approval_request `mirror-review-pr-ourliberty-agent-core-713`). 0 new alerts. All inboxes EMPTY. beacon-pending: 5 unchanged. Watchdog healthy (last tick 05:32:20 MDT). 8/8 daemons alive. Pipeline stall: 0. Sync ~35 min. PR #713 MERGEABLE=UNKNOWN (GitHub recomputation). PRIME: systemic_fixes=74, vp=27, ratio=17.61, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2932 summary:** ⚠️ Active — PR #713 REVIEW_ESCALATE carry (structural: session-start WIP automation clobbered Forge's manifest fix TWICE; approval_request `mirror-review-pr-ourliberty-agent-core-713` in beacon-pending item 4, plan_summary has full structural diagnosis). 4 new alerts: 2 Tier-3 silenced (heal-pipeline-stall FPs), 2 Tier-4 (medic-dispatcher G-rule DISPATCHED ✅ vp; bot delivered at 05:40 MDT). All inboxes EMPTY. beacon-pending: 5 unchanged. Watchdog healthy (last tick 05:42:35 MDT). 8/8 daemons alive. Pipeline stall: 0. Sync ~51 min. PRIME: systemic_fixes=74, vp=27, ratio=17.61, trend=improving. Tier 1, consecutive_clean=0.
 
 
