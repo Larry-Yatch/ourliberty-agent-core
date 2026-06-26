@@ -6067,7 +6067,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-26T23:16:19.984582+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-26T23:10:32.574864+00:00"
+      "orphan_last_activity_ts": "2026-06-26T23:10:32.574864+00:00",
+      "briefing": {
+        "what": "An automatic fix kicked in to restart a piece of the system that had stalled, but the restart didn't take.",
+        "why": "If this part stays down, the team's work can quietly back up and stall until someone steps in.",
+        "suggest": "Have someone confirm it's back up and running before moving on, since the automatic safety net didn't catch it this time."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-26T23:20:22.197269+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     },
     {
       "id": "proposed-direction-ask-auto-restart-failed-tier3-translation-001",
@@ -6084,7 +6098,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-26T23:16:19.984582+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-26T23:08:27.551593+00:00"
+      "orphan_last_activity_ts": "2026-06-26T23:08:27.551593+00:00",
+      "briefing": {
+        "what": "The team picked up a piece of work to fix a feature that was supposed to recover on its own but failed to restart.",
+        "why": "Until it's resolved, this feature can silently stay down, which could quietly disrupt service without anyone noticing.",
+        "suggest": "Give the team a quick green light to keep going, but ask for a clear answer on what broke before they call it done."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-26T23:20:22.197269+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
