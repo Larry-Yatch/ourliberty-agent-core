@@ -1,0 +1,26 @@
+[Unit]
+Description=Self-healing healer — re-bind a dangled /home/larry/.claude.json mount (EROFS [claude exit 1] fix)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/heal_claude_json_bind_drift.py
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/runbooks/claude-json-bind-drift.md
+After=network.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/heal_claude_json_bind_drift.py
+# Probes are fast (one open()/close() per persistent unit); a tick that has to
+# restart several dangled units costs ~RESTART_SETTLE_S each, so allow headroom.
+TimeoutStartSec=120
+Nice=10
+# NOTE: deliberately NO ProtectHome/NoNewPrivileges hardening block. This healer
+# must `sudo -n nsenter -m -t <pid>` into other units' mount namespaces (needs
+# CAP_SYS_ADMIN) and `sudo -n systemctl restart` them — both impossible under
+# NoNewPrivileges=true. Mirrors ourliberty-heal-stale-daemon-code.service, which
+# likewise runs as larry and shells to `sudo -n systemctl`.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-heal-claude-json-bind-drift
