@@ -226029,3 +226029,102 @@ Watermark: 1049 → 1050. No tier-reset (Tier-3 silence).
 **G-rule update:** `forge-built-no-pr-pr-task-id-closed-fp-001` — dispatch re-attempted. Treat as DISPATCHED ✅ pending Beacon pickup.
 
 **PRIME DIRECTIVE:** +1 intervention (corrected failed dispatch). No systemic_fix row yet — that fires when Beacon confirms pickup and Forge builds.
+
+---
+
+## Iteration ~2988 — 2026-06-26T19:17Z UTC (interactive /cycle via chat, Tier 1→2, consecutive_clean 2→0 [de-escalated])
+
+**Trigger:** Larry `/cycle` invocation (chat mode, via /loop).
+
+**Health:** ✅ Nominal — all checks clean. 1 new alert (Tier-3 silenced). Mirror actively reviewing PR #725 (~7 min). PR #720 rev1 queued. PR #724 merged. Tier de-escalated to 2 (consecutive_clean reached 3).
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo (re-verified):** HEAD=42a44c73=origin/main (Pulse cycle 20260626T191055Z). On main. Clean. Up to date. ✅
+- **Sync (re-verified):** last_sync=2026-06-26T19:02:49Z (~15 min ago). Within 2h threshold. ✅
+- **heal-daemon heartbeat (re-verified):** 2026-06-26T19:08:17Z (~9 min). Under 60-min threshold. ✅
+- **Daemons (re-verified):** chain_event_shipper=2716672 (Jun25) ✅, inbox_watcher=3475737 (07:47) ✅, forge/mirror/pulse agent_telegram_bots=3474401/3474662/3474932 (07:45) ✅, beacon_telegram_bot=3639560 (12:07) ✅, dashboard_api=3639738 (12:07) ✅, outbox_notifier=3639835 (12:07) ✅. 8/8 alive. ✅ (Beacon/dashboard/outbox restarted at 12:07 MDT by heal-stale-daemon-code post-code-change.)
+- **PR #720 (re-verified):** OPEN. review-pr-ourliberty-agent-core-720-rev1.json in Mirror inbox. wt-mirror-pr-ourliberty-agent-core-720 worktree exists. Reaped at 11:56 MDT; medic re-dispatched. [queued] ✅
+- **PR #725 (re-verified):** OPEN. Mirror review active (PID 3690286, started 13:10 MDT / 19:10Z, ~7 min in). wt-mirror-heal-forge-no-pr-pr-task-id-closed-001 exists. ✅
+- **PR #724 (re-verified):** MERGED — feat(missions): reconcile single-owner mission to shipped on build-sequence complete. Commit 1ee1753b. ✅
+- **Beacon inbox / Forge inbox / beacon-pending (re-verified):** all empty / 0. ✅
+- **Watermark (re-verified):** 1038 at iter start; file_length=1039. 1 new alert triaged; watermark advanced 1038→1039. ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark: {repaired:false, old_watermark:1038, file_length:1039}. 1 new alert.
+- Line 1039: source=dispatch-branch-cleanup, route=digest, subject=summary — "pruned 4 local + 4 remote stale branch(es)".
+- triage-alert → **Tier-3** (known-pattern match). Silenced. No DM.
+- Watermark 1038→1039. ✅ Nominal.
+
+**Check 1 — Log noise:** journalctl --user -p warning --since "30 minutes ago" → No entries. ✅ Nominal.
+
+**Check 2 — Telegram sweep:**
+- Larry "status" at 13:09 MDT (catch_me_up delivered). Prior: "go" at 12:02 MDT → approved heal-forge-no-pr-pr-task-id-closed-001 → PR #725 dispatched. No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- 1 DRY-RUN would fire: forge_built_no_pr:pr-ourliberty-agent-core-712 (known FP, G-rule vp via PR #725). MIRROR_ACTIVE_SKIP for pr-ourliberty-agent-core-720 (inbox_task_present). 15 FORGE_NO_PR_SKIP entries normal. 0 actual alerts. ✅ Nominal.
+
+**Check 4 — Pending directives:** Beacon/Forge inboxes empty ✅. Mirror: 2 tasks (PR #725 active, PR #720 rev1 queued). beacon-pending: 0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-26T19:08:17Z (~9 min). ✅ Nominal.
+
+**Check A — Source repo:** HEAD=42a44c73=origin/main. Clean, up to date. ✅
+**Check B — Sync health:** last_sync=19:02:49Z (~15 min). ✅
+**Check C — Agent liveness:** 8/8 alive (ps-verified). Mirror PID 3690286 active (PR #725 review, 13:10 MDT start). ✅
+**Check E — PRs:** 2 open: #720 (EROFS fix, rev1 queued, ~3.8h), #725 (forge-no-pr-pr-task-id-closed fix, Mirror active, ~1.2h). Both <72h. PR #724 merged. ✅ Nominal.
+**Check H — Forge digest:** PR #724 merged (feat/missions reconcile, 1ee1753b). 2 open PRs <72h. Forge inbox empty. ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Friday 2026-06-26 UTC (weekday=4 in {0,2,4,6}):**
+- **Check I:** invoked (no --force). journal skipped — block for 2026-06-22 already present. dm_route=digest, cooldown-suppressed. wrote check-i-2026-06-26.json. auto-dispatched: 0. ✅
+- **Check III:** Not Sunday → skip. ✅
+
+**G-rule assessment:**
+- **forge-built-no-pr-pr-task-id-closed-fp-001 → vp ✅** — PR #725 OPEN, Mirror actively reviewing. Verification pending merge + FP disappearance.
+- **sentinel-inflight-stall-mirror-tier4 — 2/3** — no new occurrences. Dispatch at 3/3. [carry]
+- All other G-rule counts unchanged. [carry]
+
+**New findings:**
+- **unreviewed-merge:723** — heal-unreviewed-merge-detector fired at 11:51 MDT (idx=1026, DM'd to Larry). PR #723 merged without Mirror review. Larry judgment. [new yellow]
+
+**Actions taken:**
+1. Check 0: dispatch-branch-cleanup Tier-3 silenced. Watermark 1038→1039. ✅
+2. Check I: invoked no-force, cooldown-suppressed. ✅
+3. §5.0: all no-op. ✅
+4. PRIME ledger: iter_clean appended (tier=1, template=iter-clean-nominal). ✅
+5. Tier state: record --checks-clean true → consecutive_clean 2→3 → **DE-ESCALATED Tier 1→2** (consecutive_clean reset to 0). ✅
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [yellow] **unreviewed-merge:723** — NEW. PR #723 merged without Mirror review. Larry DM'd at 11:51 MDT. [new]
+- [yellow] **PR #720 — Mirror rev1 queued** — EROFS .claude.json fix. Reaped+re-dispatched. [carry vp]
+- [yellow] **PR #725 — Mirror active review** — forge_built_no_pr pr-task-id-closed fix. [carry vp]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry. [carry]
+- [yellow] **unreviewed-merge:649/637/607/709/710** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — approve check-viii-update-2026-06-15. Awaiting Larry. [carry]
+- [yellow] **Check III threshold proposals** — approve threshold-update-2026-06-11. Awaiting Larry. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [blue] **G-rule forge-built-no-pr-pr-task-id-closed-fp-001 → vp ✅** — PR #725 Mirror review. [carry vp]
+- [blue] **G-rule beacon-erofs-concurrent-claude-sessions-001 → vp ✅** — PR #720 Mirror queue. [carry vp]
+- [blue] **G-rule sentinel-inflight-stall-mirror-tier4 — 2/3** — dispatch at 3/3. [carry]
+- [blue] **G-rule heal-daemon-restart-manifest-drift-tier4 — 2/3** — dispatch at 3/3. [carry]
+- [blue] **G-rule heal-stale-daemon-code-auto-restart-failed-self-recovered — 2/3** — dispatch at 3/3. [carry]
+- [blue] **G-rule pulse-source-alert-delivery-confirm-tier4-001 — 2/3** — dispatch at 3/3. [carry]
+- [blue] **G-rule check-i-force-bypass-dm-route — 2/3** — dispatch at 3/3. [carry]
+- [blue] **G-rule forge-wip-redispatch-exhausted-pr-exists-fp-001 — 2/3** — dispatch at 3/3. [carry]
+- [blue] **G-rule outbox-notifier-notification-intent-reject-tier4-001 — 2/3** — dispatch at 3/3. [carry]
+- [blue] **G-rule ourliberty-health-sync-push-failed-tier4-001 — 2/3** — dispatch at 3/3. [carry]
+- [blue] **G-rule forge-wip-redispatch-digest-tier4-001 — DISPATCHED ✅ vp** — Forge dispatch pending trust-policy approval. [carry vp]
+- [blue] **G-rule no-session-revision-active-mirror-session-fp-001 — DISPATCHED ✅ vp** — [carry vp]
+- [blue] **G-rule mirror-runner-missing-worktree-retry-001 — 1/3** — [carry]
+- [blue] **G-rule review-duplicate-dispatch-wip-redispatch — DISPATCHED ✅ vp** — [carry vp]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. [carry]
+- [blue] **Stale worktree wt-mirror-pr-ourliberty-agent-core-713** — PR #713 long merged. [carry]
+- [blue] **unreviewed-merge:655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **Untracked Beacon spec** — agents/beacon/specs/missions-v2-funnel-item-doorbell.md. Larry authoring. [carry]
+
+**PRIME DIRECTIVE:** 0 new interventions. Trailing-30d: systemic_fixes=75, vp=28, ratio=17.69, trend=improving.
+**Tier end-of-iter:** DE-ESCALATED Tier **1→2**, consecutive_clean=0. Last signal: 2026-06-26T18:56:42Z.
