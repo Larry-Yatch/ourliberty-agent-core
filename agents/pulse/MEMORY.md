@@ -253,8 +253,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 12:54Z UTC (Iter ~2941, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 13:01Z UTC (Iter ~2942, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2941 summary:** ⚠️ Active — PR #713 REVIEW_ESCALATE carry. 0 new alerts. beacon-pending=6 (unchanged: medic-dispatcher-001, heal-stall-mirror-active, no-session-revision-mirror-active, mirror-review-713, watchdog-mirror-active-stale, heal-forge-no-pr-closed-skip-001). Repo HEAD=4c741d09=origin/main. Watchdog healthy (06:49:01 MDT). 8/8 daemons alive. PR #713 mergeable=UNKNOWN (transient). PRIME: systemic_fixes=75, vp=27, ratio=17.39, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2942 summary:** ⚠️ Active — PR #713 REVIEW_ESCALATE carry. 1 new alert (doorbell Tier-3 silenced). beacon-pending=6 (unchanged: medic-dispatcher-001, heal-stall-mirror-active, no-session-revision-mirror-active, mirror-review-713, watchdog-mirror-active-stale, heal-forge-no-pr-closed-skip-001). Repo HEAD=6d9995d8=origin/main. Watchdog healthy (06:59:19 MDT). 8/8 daemons alive. PR #713 mergeable=UNKNOWN (transient). PRIME: systemic_fixes=75, vp=27, ratio=17.39, trend=improving. Tier 1, consecutive_clean=0.
 
 
