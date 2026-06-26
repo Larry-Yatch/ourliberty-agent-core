@@ -265,8 +265,8 @@ PR #715 (fix(healer): skip forge_built_no_pr stall when task PR is CLOSED) MERGE
 
 ---
 
-## Status snapshot — updated 2026-06-26 16:24Z UTC (Iter ~2968, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-26 16:32Z UTC (Iter ~2969, Tier 1, consecutive_clean=0)
 
-**Iter ~2968 summary:** ⚠️ Near-nominal. 1 new alert (Check I delivery confirm, Tier-3, watermark 1021→1022). Mirror PID 3533331 stuck 1h44m on PR #717; Beacon confirmed stuck to Larry at 10:20 MDT. PRs #717/#718/#719/#720 all OPEN. Carry FP: forge_built_no_pr:pr-ourliberty-agent-core-712 (G-rule 2/3). Check I: dm_route=digest, cooldown-suppressed (correct). §5.0 all no-op. PRIME: interventions=1317, systemic_fixes=75, vp=27, ratio=17.56, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2969 summary:** ✅ Near-nominal. 0 new alerts (watermark 1022=1022). Mirror self-healed: old PID 3533331 (stuck 1h44m+) ended by reaper after sentinel at 09:46 MDT; new PID 3574053 started 10:26 MDT reviewing PR #717 (~2 min at check time). PRs #717/#718/#719/#720 all OPEN. Carry FP: forge_built_no_pr:pr-ourliberty-agent-core-712 (G-rule 2/3). Check I: skipped re-run (ran at iter ~2968). §5.0 all no-op. PRIME: interventions=1318, systemic_fixes=75, vp=27, ratio=17.573, trend=improving. Tier 1, consecutive_clean=0.
 
 
