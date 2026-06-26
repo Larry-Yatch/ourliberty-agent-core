@@ -41,6 +41,20 @@
       "recommended_action": "None at the Pulse layer — the medic chat_id DM is the primary delivery and is already in your thread. If the diagnosed condition stays unresolved, Medic re-escalates via its own chat_id path. Producer: medic module; payload carries intent=medic-diagnosis + chat_id."
     }
   },
+  "medic-dispatcher": {
+    "heal-pipeline-stall:pipeline-stall:unrouted-pr": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "The Medic relay failed to deliver a duplicate of an underlying heal-pipeline-stall:pipeline-stall:unrouted-pr alert that outbox-notifier ALREADY delivered to you via route=escalate. medic-dispatcher counts Medic's deliberate no-op (Medic ran but emitted no source=medic notification for this known stall) as a delivery failure and wraps it as a relay-failure alert. There is no Pulse-layer action — the underlying alert is already in your thread; this is surfaced only for the digest record.",
+      "recommended_action": "None at the Pulse layer — the underlying heal-pipeline-stall:pipeline-stall:unrouted-pr alert was already delivered route=escalate. If medic-dispatcher relay failures recur for genuinely-undelivered alerts (where Medic is the sole delivery path), investigate run_medic.sh + the operator allowlist. G-rule: medic-dispatcher-delivery-failure-tier4-001."
+    },
+    "heal-pipeline-stall:pipeline-stall:no-session-revision": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "The Medic relay failed to deliver a duplicate of an underlying heal-pipeline-stall:pipeline-stall:no-session-revision alert that outbox-notifier ALREADY delivered to you via route=escalate. medic-dispatcher counts Medic's deliberate no-op (Medic ran but emitted no source=medic notification for this known stall) as a delivery failure and wraps it as a relay-failure alert. There is no Pulse-layer action — the underlying alert is already in your thread; this is surfaced only for the digest record.",
+      "recommended_action": "None at the Pulse layer — the underlying heal-pipeline-stall:pipeline-stall:no-session-revision alert was already delivered route=escalate. If medic-dispatcher relay failures recur for genuinely-undelivered alerts (where Medic is the sole delivery path), investigate run_medic.sh + the operator allowlist. G-rule: medic-dispatcher-delivery-failure-tier4-001."
+    }
+  },
   "heal-pipeline-stall": {
     "pipeline-stall:forge-no-pr": {
       "severity": "URGENT",
