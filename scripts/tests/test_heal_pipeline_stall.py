@@ -314,6 +314,16 @@ class TestCheckForgeBuiltNoPr(_TempAgentsRootMixin, unittest.TestCase):
         alerts = self.hps.check_forge_built_no_pr(lines, [], merged_prs, {})
         self.assertEqual(alerts, [])
 
+    def test_skips_when_pr_is_closed(self) -> None:
+        """A CLOSED-not-merged PR for the task is a deliberate abandonment —
+        not a stall. Fixes the forge-built-no-pr-closed-pr-fp recurrence
+        (PR #712 CLOSED, refiring each 6h cooldown)."""
+        lines = [_watcher_forge_done_line('closed-task-001', minutes_ago=180)]
+        closed_prs = [{'headRefName': 'forge/closed-task-001', 'number': 712,
+                       'state': 'CLOSED', '_repo': 'x/y'}]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], [], {}, closed_prs=closed_prs)
+        self.assertEqual(alerts, [])
+
     # ----- Reconciliation cases (2026-05-26 false-fire fix) -----
 
     def test_skips_when_branch_truncated_prefix_matches(self) -> None:
@@ -3164,6 +3174,44 @@ class TestMergedPrFetchTruncation(_TempAgentsRootMixin, unittest.TestCase):
         out, warns = self._run(prs)
         self.assertEqual(len(out), limit - 1)  # the 8-day-old PR is filtered out
         self.assertEqual(warns, [])
+
+
+class TestClosedPrFetchFiltersMerged(_TempAgentsRootMixin, unittest.TestCase):
+    """`_all_closed_prs_recent` fetches `--state closed`, which gh treats as a
+    superset that INCLUDES merged PRs. The explicit `state == 'CLOSED'` guard
+    must drop those merged entries (they're handled by `_all_merged_prs_recent`
+    via the step-1 pr_exists path), keeping only genuinely closed-not-merged
+    PRs inside the 7-day window."""
+
+    @staticmethod
+    def _pr(num: int, state: str, minutes_ago: int) -> dict:
+        dt = datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)
+        return {'number': num, 'title': f'pr {num}', 'state': state,
+                'closedAt': dt.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                'headRefName': f'forge/x-{num}'}
+
+    def _run(self, prs: list) -> list:
+        with patch.object(self.hps, 'REPOS', ['x/y']), \
+             patch.object(self.hps, 'gh_pr_list', return_value=prs):
+            return self.hps._all_closed_prs_recent()
+
+    def test_drops_merged_keeps_closed(self) -> None:
+        prs = [self._pr(1, 'CLOSED', minutes_ago=60),
+               self._pr(2, 'MERGED', minutes_ago=60),
+               self._pr(3, 'CLOSED', minutes_ago=120)]
+        out = self._run(prs)
+        self.assertEqual({pr['number'] for pr in out}, {1, 3})
+
+    def test_filters_out_stale_closed(self) -> None:
+        prs = [self._pr(1, 'CLOSED', minutes_ago=60),
+               self._pr(2, 'CLOSED', minutes_ago=8 * 24 * 60)]
+        out = self._run(prs)
+        self.assertEqual({pr['number'] for pr in out}, {1})
+
+    def test_fail_safe_empty_on_gh_failure(self) -> None:
+        with patch.object(self.hps, 'REPOS', ['x/y']), \
+             patch.object(self.hps, 'gh_pr_list', return_value=[]):
+            self.assertEqual(self.hps._all_closed_prs_recent(), [])
 
 
 def _iso(minutes_ago: int) -> str:

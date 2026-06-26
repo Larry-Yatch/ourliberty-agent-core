@@ -434,7 +434,7 @@ def gh_pr_list(repo: str, state: str = 'all', limit: int = 50) -> list[dict]:
         result = subprocess.run(
             ['gh', 'pr', 'list', '--repo', repo, '--state', state,
              '--limit', str(limit), '--json',
-             'number,title,state,mergedAt,headRefName,createdAt'],
+             'number,title,state,mergedAt,closedAt,headRefName,createdAt'],
             capture_output=True, text=True, timeout=GH_TIMEOUT_S,
             env={**os.environ, 'PATH': '/usr/bin:/usr/local/bin:' + os.environ.get('PATH', '')},
         )
@@ -499,6 +499,51 @@ def _all_merged_prs_recent() -> list[dict]:
                     f'{_MERGED_PR_FETCH_LIMIT} cap with the oldest result '
                     f'({oldest}) still inside the 7-day window — older '
                     f'in-window merges may be truncated; bump '
+                    f'_MERGED_PR_FETCH_LIMIT.',
+                    'WARN',
+                )
+    return out
+
+
+def _all_closed_prs_recent() -> list[dict]:
+    """Return CLOSED-not-merged PRs across tracked repos in the last 7 days,
+    augmented with `_repo`. Used to skip the forge-built-no-PR check for a
+    task whose PR was opened and then deliberately CLOSED (abandoned or
+    superseded) — a valid resolution, not a stall.
+
+    gh's `--state closed` set ALSO includes merged PRs (GitHub treats merged
+    as a closed subset), so we keep ONLY entries whose `state == 'CLOSED'`;
+    merged PRs are already handled by `_all_merged_prs_recent` via the
+    step-1 pr_exists path. Window-filters on `closedAt` within the same
+    7-day cutoff and reuses the identical fetch-limit cap-WARN discipline.
+    Fail-safe to [] on gh failure (mirrors the merged helper), preserving the
+    legitimate alert path."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    out = []
+    for repo in REPOS:
+        raw = gh_pr_list(repo, state='closed', limit=_MERGED_PR_FETCH_LIMIT)
+        for pr in raw:
+            if pr.get('state') != 'CLOSED':
+                continue
+            closed = pr.get('closedAt')
+            if not closed:
+                continue
+            ts = _parse_ts(closed)
+            if ts and ts >= cutoff:
+                pr['_repo'] = repo
+                out.append(pr)
+        # Same no-silent-caps discipline as `_all_merged_prs_recent`: if we
+        # fetched exactly the limit AND the oldest result is still inside the
+        # 7-day window, older in-window closures may have fallen off the tail.
+        if len(raw) >= _MERGED_PR_FETCH_LIMIT:
+            oldest = raw[-1].get('closedAt') if raw else None
+            oldest_ts = _parse_ts(oldest) if oldest else None
+            if oldest_ts and oldest_ts >= cutoff:
+                log(
+                    f'closed-PR fetch for {repo} hit the '
+                    f'{_MERGED_PR_FETCH_LIMIT} cap with the oldest result '
+                    f'({oldest}) still inside the 7-day window — older '
+                    f'in-window closures may be truncated; bump '
                     f'_MERGED_PR_FETCH_LIMIT.',
                     'WARN',
                 )
@@ -1312,7 +1357,8 @@ def _forge_rebase_target_shipped(task_id: str,
 
 
 def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
-                            merged_prs: list[dict], state: dict) -> list[dict]:
+                            merged_prs: list[dict], state: dict,
+                            closed_prs: Optional[list[dict]] = None) -> list[dict]:
     """Find Forge build-done lines >FORGE_BUILT_NO_PR_MIN ago where no PR
     matches the task_id on any tracked repo. Returns list of alert dicts.
 
@@ -1368,6 +1414,7 @@ def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
     `FORGE_NO_PR_SKIP` is the canonical forensic identifier."""
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=FORGE_BUILT_NO_PR_MIN)
     all_prs = open_prs + merged_prs
+    closed_prs = closed_prs or []
     alerts: list[dict] = []
     seen_tasks: set[str] = set()
     for line in watcher_lines:
@@ -1400,6 +1447,27 @@ def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
                 f'FORGE_NO_PR_SKIP task={task} reason=pr_exists '
                 f'match={match_reason} pr=#{matched_pr.get("number")} '
                 f'repo={matched_pr.get("_repo")}',
+                'INFO',
+            )
+            seen_tasks.add(task)
+            continue
+        # Reconciliation step 1a: a PR for this task was opened and then
+        # CLOSED-not-merged (deliberately abandoned or superseded). gh's
+        # `--state merged`/`--state open` fetchers never surface it, so step 1
+        # can't correlate it and the task would fall through to a false stall.
+        # A closed PR is a valid resolution — skip, exactly analogous to the
+        # open/merged pr_exists path. Fixes the `forge-built-no-pr-closed-pr-fp`
+        # recurrence (PR #712 CLOSED, refiring each 6h cooldown).
+        closed_match = None
+        for pr in closed_prs:
+            if _pr_matches_task(pr, task):
+                closed_match = pr
+                break
+        if closed_match is not None:
+            log(
+                f'FORGE_NO_PR_SKIP task={task} reason=pr_closed '
+                f'pr=#{closed_match.get("number")} '
+                f'repo={closed_match.get("_repo")}',
                 'INFO',
             )
             seen_tasks.add(task)
@@ -3059,6 +3127,7 @@ def run(dry_run: bool = False) -> int:
         watcher_lines = _read_recent_log_lines(INBOX_WATCHER_LOG, LOG_LOOKBACK_HOURS)
         open_prs = _all_open_prs()
         merged_prs = _all_merged_prs_recent()
+        closed_prs = _all_closed_prs_recent()
         routing_events = _read_recent_routing_events(ROUTING_EVENTS_LOOKBACK_HOURS)
     except Exception as e:
         log(f'pre-flight read failed: {type(e).__name__}: {e}', 'ERROR')
@@ -3066,7 +3135,8 @@ def run(dry_run: bool = False) -> int:
 
     all_alerts: list[dict] = []
     try:
-        all_alerts += check_forge_built_no_pr(watcher_lines, open_prs, merged_prs, state)
+        all_alerts += check_forge_built_no_pr(watcher_lines, open_prs, merged_prs, state,
+                                              closed_prs=closed_prs)
     except Exception as e:
         log(f'check_forge_built_no_pr failed: {type(e).__name__}: {e}', 'ERROR')
     try:
