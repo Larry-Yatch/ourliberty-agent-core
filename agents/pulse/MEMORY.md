@@ -246,8 +246,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 07:35Z UTC (Iter ~2895, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 07:43Z UTC (Iter ~2896, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2895 summary:** ⚠️ Active — Mirror PID 3308724 at ~93 min elapsed (past 60-min threshold; sentinel fired at idx=1048). 1 new alert: L1055 Tier-3 silence (no-session-revision:713 known pattern). Pipeline stall: 0 alerts (all cooldown-suppressed). 8/8 daemons alive. Watchdog healthy (07:32:19Z). Check I cooldown-suppressed. beacon-pending: 1 (medic-dispatcher-delivery-failure-translation-001 awaiting Larry approval). Zombie PID 1834248 + 6 stale journalctl PIDs carry. PR #713 revision still active. PRIME: interventions=1273, systemic_fixes=72, vp=27, ratio≈17.68, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2896 summary:** ⚠️ Active — Mirror PID 3308724 at ~1h38m elapsed (past 60-min threshold; sentinel fired at idx=1048). 0 new alerts. Pipeline stall: 0 (all cooldown-suppressed). 8/8 daemons alive. Watchdog healthy (07:37:19Z). Check I cooldown-suppressed. beacon-pending: 1 (medic-dispatcher-delivery-failure-translation-001 awaiting Larry approval). Zombie PID 1834248 + 6 stale journalctl PIDs carry. PR #713 revision still active. PRIME: interventions=1274, systemic_fixes=72, vp=27, ratio≈17.69, trend=improving. Tier 1, consecutive_clean=0.
 
 
