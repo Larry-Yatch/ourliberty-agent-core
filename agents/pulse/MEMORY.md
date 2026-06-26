@@ -228,9 +228,9 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## G-rule no-session-revision-active-mirror-session-fp-001 — 1/3 (new, iter ~2885)
+## G-rule no-session-revision-active-mirror-session-fp-001 — 2/3 (updated iter ~2905)
 
-**Rule:** `heal_pipeline_stall.py` dry-run fires `no_session_revision:pr-ourliberty-agent-core-713` even though Mirror IS actively reviewing rev1 (PID 3308724, ~26 min elapsed, inbox task review-pr-ourliberty-agent-core-713-rev1.json present). Stall checker fires `no_session_revision` because no `session_revision` chain event exists, without checking whether an active agent session is in progress. Same root cause class as `unrouted-open-pr-active-mirror-session-fp-001` (2/3) — stall checker blind to active agent sessions. May fold into the same fix. Healer invocation suppressed (would conflict with active review). Dispatch to Beacon at 3/3 (or fold into unrouted-open-pr-active-mirror-session-fp-001 fix if confirmed same path).
+**Rule:** `heal_pipeline_stall.py` dry-run fires `no_session_revision:pr-ourliberty-agent-core-713` even though Mirror IS actively reviewing rev1. Stall checker blind to active agent sessions — same root cause class as `unrouted-open-pr-active-mirror-session-fp-001` (DISPATCHED ✅). Occurrences: iter ~2885 (1/3, Mirror 26-min in); iter ~2905 (2/3, Mirror 2h31m+ when cooldown expired). Beacon's direction-ask-unrouted-pr-active-mirror-session-fix-001 notes "May fold in no-session-revision-active-mirror-session-fp-001" — likely covered by same fix. Dispatch to Beacon at 3/3 if not already covered by pending fix.
 
 ---
 
@@ -246,8 +246,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 08:32Z UTC (Iter ~2904, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 08:39Z UTC (Iter ~2905, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2904 summary:** ⚠️ Active — Mirror PID 3308724 at ~2h30m+ elapsed. 3 new alerts: L1058 forge-no-pr:712 Tier-3 ✅, L1059 unrouted-pr:713 Tier-3 ✅, L1060 medic-dispatcher Tier-4 (G-rule DISPATCHED vp, no new DM). Pipeline stall: 0 (all cooldown-suppressed). 8/8 daemons alive. Watchdog healthy (08:28:20Z). Check I cooldown-suppressed. beacon-pending: 2 (medic-dispatcher-delivery-failure-translation-001 + direction-ask-unrouted-pr-active-mirror-session-fix-001, both APPROVAL_REQUEST queued to Larry). PR #713 revision active (Mirror outbox empty). PRIME: interventions=1282, systemic_fixes=72, vp=27, ratio≈17.81, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2905 summary:** ⚠️ Active — Mirror PID 3308724 at ~2h31m elapsed. 1 new alert: L1061 outbox-notifier approval_request Tier-3 ✅. Pipeline stall: no_session_revision:713 cooldown expired (FP, G-rule 2/3). 8/8 daemons alive. Watchdog healthy (08:34:05Z). Check I cooldown-suppressed. beacon-pending: 2 (medic-dispatcher-delivery-failure-translation-001 + direction-ask-unrouted-pr-active-mirror-session-fix-001). Beacon EROFS (00:53-00:55 MDT) was transient — `.claude.json` writable at 02:34 MDT. DM sent to Larry answering "Is pipeline stalled on 713?" (No — Mirror actively reviewing rev1). PR #713 revision active. PRIME: interventions=1282, systemic_fixes=72, vp=27, ratio≈17.81, trend=improving. Tier 1, consecutive_clean=0.
 
 
