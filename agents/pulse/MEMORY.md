@@ -228,8 +228,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 06:14Z UTC (Iter ~2882, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 06:19Z UTC (Iter ~2883, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2882 summary:** ✅ Active — PR #713 revision cycle: Mirror PID 3308724 reviewing rev1 (~9.5 min elapsed). 1 new alert Tier-3 silenced (heal-stale-daemon-code auto-restarted:outbox-notifier.service — PR #714 mirror_review_handler.py now live). Outbox-notifier PID: 3313639 (was 3220349, restarted 06:10:28Z). All 8 daemons alive. Stall dry-run: 1 FP (unrouted_open_pr:713 — G-rule unrouted-open-pr-active-mirror-session-fp-001 still 2/3). pending-approvals=0. Watermark=1043. Watchdog healthy (06:10:20Z). Zombie PID 1834248 (28d 10h 53m) + 6 stale journalctl PIDs carry. Check I cooldown-suppressed (check-i-2026-06-26.json present). PRIME: interventions=1259, systemic_fixes=72, vp=27, ratio≈17.49, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2883 summary:** ✅ Active — PR #713 revision cycle: Mirror PID 3308724 reviewing rev1 (~14 min elapsed). 1 new alert Tier-3 silenced (heal-pipeline-stall unrouted-pr:PR#713 — known-pattern). All 8 daemons alive. Stall dry-run: 0 alerts (unrouted_open_pr:713 cooldown-suppressed). pending-approvals=0. Watermark=1044. Watchdog healthy (06:15:20Z). Zombie PID 1834248 (28d 11h) + 6 stale journalctl PIDs carry. Check I cooldown-suppressed (check-i-2026-06-26.json present). PRIME: interventions=1260, systemic_fixes=72, vp=27, ratio≈17.51, trend=improving. Tier 1, consecutive_clean=0.
 
 
