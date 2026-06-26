@@ -216,8 +216,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 02:26Z UTC (Iter ~2848, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 02:33Z UTC (Iter ~2849, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2848 summary:** ⚠️ Non-nominal (carries) — PR #711 Mirror 3rd review session active (PID 3172100, since 20:10 MDT). marker-error-2 retry fired at 02:10:59Z (severity='blocking'); G-rule mirror-marker-severity-blocking-pr711-001 now 2/3. Stall dry-run fires FP for PR #711 (Mirror active session invisible); G-rule unrouted-open-pr-active-mirror-session-fp-001 NEW 1/3. 8/8 daemons alive. 0 new alerts (watermark=1028). Check I Friday-cooldown-suppressed. PRIME: interventions=1227, systemic_fixes=71, vp=27, ratio≈17.28, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2849 summary:** ⚠️ Non-nominal (carries) — PR #711 Mirror 3rd review session active (PID 3172100, 21 min as of scan). 2 new alerts both Tier-3 silence (L1029 check-i digest, L1030 pipeline-stall:unrouted-pr:PR#711). Watermark advanced to 1030. 8/8 daemons alive. Stall dry-run clean (PR #711 cooldown-suppressed). Check I Friday-cooldown-suppressed. §5.0 all no-op. PRIME: interventions=1227, systemic_fixes=71, vp=27, ratio≈17.28, trend=improving. Tier 1, consecutive_clean=0.
 
 
