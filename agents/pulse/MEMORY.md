@@ -222,8 +222,14 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 02:39Z UTC (Iter ~2850, Tier 1, consecutive_clean=0→0)
+## G-rule forge-revision-preamble-missing-pr711-001 — 1/3 (new, iter ~2851)
 
-**Iter ~2850 summary:** ⚠️ Non-nominal — L1031 medic-dispatcher Tier-4 new (bot DM'd Larry at 02:33Z; G-rule medic-dispatcher-delivery-failure-tier4-001 new 1/3). PR #711 Mirror 3rd review active (PID 3172100, 27 min). 8/8 daemons alive. Stall dry-run clean. Check I Friday already-ran (cooldown). §5.0 all no-op. PRIME: interventions=1228, systemic_fixes=71, vp=27, ratio≈17.30, trend=improving. Tier 1, consecutive_clean=0.
+**Rule:** outbox-notifier fires `forge revision-phase outbox without "Revision N applied:" preamble: pr-ourliberty-agent-core-711.json; treating as marker-error` when Forge submits a revision outbox file lacking the expected "Revision N applied:" preamble. Treated as marker-error by outbox-notifier. Distinct from Mirror's MalformedMirrorMarker severity/findings issues (G-rule `mirror-marker-severity-blocking-pr711-001`). Fix: Forge build-sequence discipline or outbox-notifier tolerance. Dispatch to Beacon at 3/3.
+
+---
+
+## Status snapshot — updated 2026-06-26 02:47Z UTC (Iter ~2851, Tier 1, consecutive_clean=0→0)
+
+**Iter ~2851 summary:** ⚠️ Non-nominal (carry) — 2 orphan Larry directives from auth_401 window (17:26/17:28 MDT; Beacon self-healed 19:28 MDT; build shipped PRs #703-#707); new WARN 20:42 MDT forge revision preamble missing (G-rule forge-revision-preamble-missing-pr711-001 new 1/3). 8/8 daemons alive. Stall dry-run clean. Check I Friday cooldown-suppressed. §5.0 all no-op. PRIME: interventions=1229, systemic_fixes=71, vp=27, ratio≈17.31, trend=improving. Tier 1, consecutive_clean=0.
 
 

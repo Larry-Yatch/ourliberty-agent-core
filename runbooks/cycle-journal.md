@@ -5,6 +5,107 @@
 ---
 
 
+## Iteration ~2851 — 2026-06-26T02:47Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/cycle` invocation via chat.
+
+**Health:** ⚠️ Non-nominal (carry) — 2 orphan Larry directives from auth_401 window (17:26/17:28 MDT 2026-06-25, unanswered); Beacon self-healed via 19:28 MDT restart; carry items from prior iters. 8/8 daemons alive. Stall dry-run clean. 4 PRs merged since last iter.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo (re-verified):** On main. HEAD=0fe7bec2=origin/main. Clean. ✅
+- **Sync (re-verified):** last_sync=2026-06-26T02:01:40Z (~46 min old). Under 2h. ✅
+- **Daemons (re-verified):** chain_event_shipper=2716672 ✅, dashboard_api=3044417 ✅, outbox_notifier=3044826 ✅, inbox_watcher=3107973 ✅, beacon=3141782 ✅, forge_bot=3141897 ✅, mirror_bot=3142077 ✅, pulse_bot=3142169 ✅. 8/8 alive. Watchdog last=20:40:07 MDT — overall=healthy. ✅
+- **Open PRs (re-verified):** PR #711 — OPEN, MERGEABLE, reviewDecision="". Mirror 3rd review was active last iter (PID 3172100). New marker-error at 20:42 MDT (forge revision-phase preamble missing). [monitor]
+- **beacon-pending-approvals (re-verified):** 0 pending, 301 history. ✅
+- **Zombie PID 1834248 (re-verified):** Alive (28d 7h 26m, Ss, bash poll loop awaiting `build-check-viii-pr-2b-analyzer-001.json`). [carry ask-then-do]
+- **6 stale journalctl PIDs (re-verified):** 1101500 (~31d 7h 40m), 1107838 (~31d 7h 15m), 1118830 (~31d 3h 39m), 1136223 (~30d 22h 15m), 1161972 (~30d 14h 11m), 1177335 (~30d 13h 24m). All alive. [carry ask-then-do]
+- **Watermark (re-verified):** repair-watermark no-op. Watermark=file_length=1031. No new alerts. ✅
+
+**Check 0 — Alert triage:**
+- `repair-watermark` → `{"repaired": false, "old_watermark": 1031, "file_length": 1031}`. No new alerts.
+- Watermark=1031=file_length. ✅ Nominal.
+
+**Check 1 — Log noise (30-min / 1h / 24h windows):**
+- `journalctl --user -p warning --since "30 minutes ago"` → `-- No entries --`. ✅
+- outbox-notifier.log: 3 WARNs in last 4h, all for PR #711:
+  - 20:05:55 MDT: `MalformedMirrorMarker: findings must be non-empty list` (Mirror retry 1/3)
+  - 20:10:59 MDT: `MalformedMirrorMarker: severity 'blocking'` (Mirror retry 2/3)
+  - **NEW 20:42:43 MDT:** `forge revision-phase outbox without "Revision N applied:" preamble: pr-ourliberty-agent-core-711.json; treating as marker-error`
+  - All 3 are PR #711-scoped, sub-threshold per signature. Sub-threshold trending; journal note. New pattern at 20:42: Forge revision preamble missing → `forge-revision-preamble-missing-pr711-001` (1/3 new).
+- watchdog.log: last=20:40:07 MDT — overall=healthy. ✅ Sub-threshold.
+
+**Check 2 — Telegram sweep (last 4h):**
+- beacon_telegram_bot.log: Significant auth_401 pattern (17:26–19:05 MDT) on session `1b5ed242-...` (resume-session account-bound). Alerts L1011 (17:27 MDT), L1021 (19:02 MDT) already delivered and triaged in prior iters. Bot auto-restarted twice by heal-stale-daemon-code (18:06 MDT and 19:28 MDT). Clean since 19:28 MDT. No new auth_401 errors.
+- **[yellow] Orphan directives during auth_401 window:** Larry asked "What happened to this build sequence?" (17:26 MDT) and "where are we on this build the team does not seem to be on it" (17:28 MDT) — both received auth_401 responses, never answered. Larry last messaged at 19:04 MDT (~1.5h+ ago from iter time). Larry did not re-ask after 19:28 MDT restart. Note: PR #707 (spec-in-motion) had already merged at 22:04Z = 16:04 MDT, and PR #706 merged at 20:07Z = 14:07 MDT — build sequence WAS progressing normally. Context: Larry was frustrated during the auth_401 window; build shipped regardless. No DM warranted (self-healed + Larry silent for 6h+). [yellow carry, Check 4 finding]
+
+**Check 3 — Pipeline stall (dry-run):**
+- `heal_pipeline_stall --dry-run` → `DRY-RUN: 0 alert(s) would fire` (PR #711 `unrouted_open_pr` cooldown-suppressed). ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- Beacon inbox: EMPTY. ✅
+- Mirror inbox: still shows PR #711 task (active 3rd review). Not stale.
+- beacon-pending-approvals: 0 pending. ✅
+- Orphan directives: 2 (from Check 2). Larry inactive for 6h+; build sequence shipped. Journal-note only, no DM. [yellow carry]
+
+**Check 5 — Stale daemon code:**
+- Heartbeat=2026-06-26T02:38:19Z (~9 min before scan). Fresh. ✅ Nominal.
+- heal-stale-daemon-code-state.json: empty (known carry informational). [blue carry]
+
+**Check A — Source repo:** HEAD=0fe7bec2=origin/main. On main. Clean. ✅ Nominal.
+**Check B — Sync health:** last_sync=2026-06-26T02:01:40Z (~46 min). Under 2h. ✅ Nominal.
+**Check C — Agent liveness:** 8/8 procs running (ps-verified). Watchdog healthy (20:40:07 MDT). ✅
+- **[yellow carry] PID 1834248** — bash poll loop (~28d 7h 26m). Ask-then-do: `kill 1834248`.
+- **[yellow carry] 6 stale journalctl PIDs (~30-31d+)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`.
+**Check E — PRs:**
+- **PR #711** (agent-core) — OPEN, MERGEABLE, reviewDecision="". Mirror 3rd review (PID 3172100 from prior iter). New marker-error at 20:42 MDT: Forge revision-phase preamble missing. [monitor]
+- **Forge digest:** 4 PRs merged since last iter: PR #703 (18:14Z chore missions-reconcile), PR #705 (19:20Z spec-advancer step-merge), PR #706 (20:07Z feat sequence-rows+audited-steering), PR #707 (22:04Z spec-in-motion visibility). ✅ Pipeline active and shipping.
+- **Dashboard:** 0 open PRs. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Friday 2026-06-26 UTC (weekday=4, IS in {0,2,4,6}):**
+- Check I: Artifact `check-i-2026-06-26.json` already exists (ran iter ~2849). Cooldown-suppressed. Skip. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule assessment:**
+- **`forge-revision-preamble-missing-pr711-001`**: NEW **1/3**. outbox-notifier WARN at 20:42 MDT: `forge revision-phase outbox without "Revision N applied:" preamble: pr-ourliberty-agent-core-711.json`. Forge submitted revision content without the expected preamble; treated as marker-error. Distinct from G-rule `mirror-marker-severity-blocking-pr711-001` (Mirror's malformed severity/findings). First occurrence. Dispatch to Beacon at 3/3.
+- **`mirror-marker-severity-blocking-pr711-001`** (2/3): no new occurrence of Mirror's severity='blocking' or empty-findings this iter. Count unchanged.
+- All other G-rule counts unchanged from iter ~2850.
+
+**Actions taken:**
+1. Check 0: watermark repair no-op. No new alerts. Nominal.
+2. §5.0: all no-op.
+3. Check I: cooldown-suppressed. Skip.
+4. PRIME ledger: `intervention` appended (tier=1, template=check-4-orphan-directive, detail=Larry-17:26/17:28-MDT-auth401-window-unanswered-build-sequence-query; ts=2026-06-26T02:47:53Z).
+5. Tier state: `record --checks-clean false` → consecutive_clean=0 (orphan directives carry + zombie PID + 6 stale journalctl). Tier remains 1. last_signal_at=2026-06-26T02:47:54Z.
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [yellow] **Orphan directives — auth_401 window** — Larry's 17:26/17:28 MDT build-sequence questions unanswered; bot self-healed 19:28 MDT, Larry silent 6h+, build shipped (PRs #706-#707). Context note. [carry, no DM]
+- [yellow] **PR #711** — OPEN, MERGEABLE. Mirror 3rd review. New marker-error 20:42 MDT (forge revision preamble missing). Pipeline self-managing. [monitor]
+- [yellow] **Zombie PID 1834248** — bash poll loop (~28d 7h). Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **6 stale journalctl PIDs (~30-31d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+- [yellow] **unreviewed-merge:710** — PR #710 merged without Mirror review. Larry judgment. [carry]
+- [yellow] **unreviewed-merge:709** — PR #709 merged without Mirror review. Larry judgment. [carry]
+- [yellow] **forge-wip-redispatch-digest Forge dispatch** — Beacon fix designed (iter ~2798). Trust-policy approval from Larry pending. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649/637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — Session-bound auth_401 pattern recurred today (17:26–19:05 MDT); self-healed via 19:28 MDT restart. PR #709 fix separate. [carry — monitor]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Awaiting Larry. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [blue] **heal-stale-daemon-code-state.json MISSING** — healer heartbeat fresh; informational. [carry]
+- [blue] **G-rules (updated):** heal-daemon-restart-manifest-drift (2/3), watchdog-watcher-log-stale-post-pr694 (2/3), no-session-revision-merged-pr-fp-001 (1/3), unrouted-open-pr-auto-merge-held-fp-001 (1/3), forge-wip-redispatch-digest-tier4-001 (dispatched vp), forge-wip-redispatch-exhausted-pr-exists-fp-001 (2/3), heal-stale-daemon-code-auto-restart-failed-self-recovered (1/3), heal-stale-daemon-code-still-stale-after-restart (1/3), outbox-notifier-notification-intent-reject-tier4-001 (2/3), ourliberty-health-sync-push-failed-tier4-001 (1/3), mirror-marker-severity-blocking-pr711-001 (2/3), unrouted-open-pr-active-mirror-session-fp-001 (1/3), medic-dispatcher-delivery-failure-tier4-001 (1/3), **forge-revision-preamble-missing-pr711-001 (1/3 NEW)**.
+- [blue] **unreviewed-merge:655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. [carry]
+
+**PRIME DIRECTIVE:** 1 new intervention this iter (orphan-directive carry claimed). Trailing-30d: interventions=1229, systemic_fixes=71, vp=27, ratio≈17.31, trend=improving.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0 (non-clean: orphan directives + zombie PID + 6 stale journalctl + PR #711 non-nominal). Last signal: 2026-06-26T02:47:54Z.
+
+---
+
+
 ## Iteration ~2850 — 2026-06-26T02:39Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/cycle` invocation via chat.
