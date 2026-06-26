@@ -90,6 +90,17 @@ WAITING_ITEMS_CAP = 25
 # sibling can propose tuning later.
 STUCK_DISPATCHED_THRESHOLD_SEC = 15 * 60
 
+# Build-sequence statuses past the live window. A terminal sequence's leftover
+# `dispatched` step (e.g. an archived bootstrap whose step was never cleaned up)
+# is residue, not actionable work: the steering verbs (skip/cancel/resume) no-op
+# on these statuses (sequence_shortcut_helpers), and the Build Sequences ladder
+# hides them — so surfacing them as "may be stuck" points Larry at a dead end and
+# never self-clears (the step status is frozen once the sequence ends). Live
+# statuses (active/pending/paused) still surface, preserving the "active or
+# auto-paused" intent in load_waiting_sequences.
+_TERMINAL_SEQUENCE_STATUSES = frozenset(
+    {'complete', 'failed', 'archived', 'retired'})
+
 # Severity ordering for the waiting list — most urgent first. None sorts last.
 _SEVERITY_RANK = {'critical': 0, 'warning': 1, 'info': 2, None: 3}
 
@@ -326,6 +337,13 @@ def load_waiting_sequences(now: datetime) -> list[dict[str, Any]]:
                 continue
             seq_id = seq.get('seq_id') or p.stem
             status = seq.get('status')
+
+            # A terminal sequence is done — its leftover dispatched steps are
+            # residue, not a stuck-step signal. Skip the whole file so phantom
+            # "may be stuck" rows can't accumulate forever (they never self-
+            # clear: the step status is frozen and the steering buttons no-op).
+            if status in _TERMINAL_SEQUENCE_STATUSES:
+                continue
 
             if status == 'paused':
                 out.append({
