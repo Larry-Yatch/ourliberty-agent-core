@@ -204,8 +204,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 01:14Z UTC (Iter ~2838, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 01:20Z UTC (Iter ~2839, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2838 summary:** ✅ Nominal — 0 new alerts, 0 stalls, 0 open PRs, 8/8 daemons alive, watchdog healthy. No new findings. Check I Friday: cooldown-suppressed no-op. Zombie PID 1834248 (~28d5h55m, archive MISSING). 6 stale journalctl PIDs carry. watermark=1022. PRIME: interventions=1227, systemic_fixes=71, vp=27, ratio≈17.28, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2839 summary:** ✅ Nominal — 1 new Tier-3 alert (Check I digest silence, no DM). New PR #711 ("feat(missions): confirm_shipped action") opened 01:17:33Z, 4 min old, under 30m stale threshold — pipeline will self-manage. 0 stalls, 8/8 daemons alive, watchdog healthy. Check I Friday: cooldown-suppressed no-op. Zombie PID 1834248 (~28d6h, archive MISSING) + 6 stale journalctl PIDs (~30-31d) carry. watermark=1023. PRIME: interventions=1227, systemic_fixes=71, vp=27, ratio≈17.28, trend=improving. Tier 1, consecutive_clean=0.
 
 
