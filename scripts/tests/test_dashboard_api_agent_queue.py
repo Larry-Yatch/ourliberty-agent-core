@@ -332,6 +332,101 @@ class BuildingLaneTest(_Base):
         self.assertIn('age_seconds', building[0])
 
 
+# ============= building <-> in_review dedup (overlap fix) =============
+
+class BuildingInReviewDedupTest(_Base):
+    """A forge build keeps its worktree/in-flight sentinel through review, so a
+    task awaiting a verdict reads as in-flight (building lane) AND has an open
+    review_request (in_review lane). The later lane wins: it must show ONLY in
+    in_review, never both. Mirrors QueuedLaneInFlightFilterTest one step down
+    the lifecycle."""
+
+    # task_ids are lowercase slugs: only a task whose sanitized worktree id
+    # equals its in-flight task_stem (i.e. a clean slug) ever reaches the
+    # building lane, and the review_request carries that same id — so these
+    # are exactly the ids that can double-list.
+    def _building_worktree(self, task_stem: str) -> None:
+        _make_worktree(self.worktrees_root, f'wt-forge-{task_stem}')
+        _write_in_flight(self.agents_root,
+                         task_stem=task_stem, agent_id='forge')
+
+    def test_in_review_task_excluded_from_building(self):
+        # Same task is both in-flight (building) and under review.
+        self._building_worktree('task-a')
+        rows = [
+            {'agent': 'forge', 'task_id': 'task-a',
+             'event_type': 'review_request', 'pr_url': 'https://pr/A',
+             'ts': datetime.now(timezone.utc).isoformat()},
+        ]
+        c = _client(self.agents_root, self.worktrees_root,
+                    _ChainEventsClient(rows))
+        r = c.get('/api/system/agent-queue', headers=AUTH)
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual([x['task_id'] for x in body['in_review']], ['task-a'])
+        self.assertEqual([x['task_id'] for x in body['building']], [])
+
+    def test_still_building_task_stays_in_building(self):
+        # In-flight but NOT yet under review -> still belongs in building.
+        self._building_worktree('task-a')
+        c = _client(self.agents_root, self.worktrees_root,
+                    _ChainEventsClient([]))
+        r = c.get('/api/system/agent-queue', headers=AUTH)
+        self.assertEqual([x['task_id'] for x in r.json()['building']],
+                         ['task-a'])
+
+    def test_closed_review_task_stays_in_building(self):
+        # review_request THEN a verdict -> not in_review (closed); the worktree
+        # is mid-rebuild, so it must remain in the building lane.
+        self._building_worktree('task-a')
+        now = datetime.now(timezone.utc)
+        rows = [
+            {'agent': 'forge', 'task_id': 'task-a',
+             'event_type': 'review_request', 'pr_url': 'https://pr/A',
+             'ts': (now - timedelta(minutes=20)).isoformat()},
+            {'agent': 'mirror', 'task_id': 'task-a',
+             'event_type': 'review_revision', 'pr_url': 'https://pr/A',
+             'ts': (now - timedelta(minutes=5)).isoformat()},
+        ]
+        c = _client(self.agents_root, self.worktrees_root,
+                    _ChainEventsClient(rows))
+        r = c.get('/api/system/agent-queue', headers=AUTH)
+        body = r.json()
+        self.assertEqual(body['in_review'], [])
+        self.assertEqual([x['task_id'] for x in body['building']], ['task-a'])
+
+    def test_fetch_failure_does_not_drop_from_building(self):
+        # Mirror verdict fetch raises -> in_review degrades to []. The task
+        # must NOT vanish from both lanes; it stays visible in building.
+        self._building_worktree('task-a')
+        rows = [
+            {'agent': 'forge', 'task_id': 'task-a',
+             'event_type': 'review_request', 'pr_url': 'https://pr/A',
+             'ts': datetime.now(timezone.utc).isoformat()},
+        ]
+        c = _client(self.agents_root, self.worktrees_root,
+                    _MirrorFetchFailsClient(rows))
+        r = c.get('/api/system/agent-queue', headers=AUTH)
+        body = r.json()
+        self.assertEqual(body['in_review'], [])
+        self.assertEqual([x['task_id'] for x in body['building']], ['task-a'])
+
+    def test_other_in_review_task_does_not_drop_building(self):
+        # A different task under review must not evict an unrelated in-flight
+        # build from the building lane.
+        self._building_worktree('task-a')
+        rows = [
+            {'agent': 'forge', 'task_id': 'task-b',
+             'event_type': 'review_request', 'pr_url': 'https://pr/B',
+             'ts': datetime.now(timezone.utc).isoformat()},
+        ]
+        c = _client(self.agents_root, self.worktrees_root,
+                    _ChainEventsClient(rows))
+        r = c.get('/api/system/agent-queue', headers=AUTH)
+        self.assertEqual([x['task_id'] for x in r.json()['building']],
+                         ['task-a'])
+
+
 # ==================== in_review lane ====================
 
 class InReviewLaneTest(_Base):

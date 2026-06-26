@@ -2900,13 +2900,35 @@ def _reader_agent_queue(
             [] if rows is None or verdict_rows is None
             else _derive_in_review(rows, verdict_rows)
         )
+        building = _reader_agent_queue_building(
+            agents_root, worktrees_root, agent, now=now,
+        )
+        # A forge build keeps its worktree (and in-flight sentinel) through
+        # review — the worktree is only torn down on completion — so a task
+        # whose PR is now in review still reads as in-flight and would
+        # double-list in BOTH the building and in_review lanes. Mirror the
+        # queued->building dedup (see _reader_agent_queue_queued): the earlier
+        # lane drops any task that has advanced to the later one; in_review
+        # wins. Keyed on task_id, which is safe here: a task only reaches the
+        # building lane when its sanitized worktree id equals its in-flight
+        # task_stem (`is_in_flight`), i.e. a clean slug, and the review_request
+        # carries that same unsanitized id — so the ids that can double-list
+        # are exactly the ones that compare equal. When the chain_events fetch
+        # is unavailable in_review degrades to [] above, so nothing is dropped
+        # and the task stays in building (fail safe toward the earlier lane)
+        # rather than vanishing from both.
+        in_review_ids = {
+            r.get('task_id') for r in in_review if r.get('task_id')
+        }
+        if in_review_ids:
+            building = [
+                b for b in building if b.get('task_id') not in in_review_ids
+            ]
         return {
             'agent': agent,
             'archetype': archetype,
             'queued': queued,
-            'building': _reader_agent_queue_building(
-                agents_root, worktrees_root, agent, now=now,
-            ),
+            'building': building,
             'in_review': in_review,
             'active': [],
             'done_today': _derive_done_today(
