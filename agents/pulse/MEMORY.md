@@ -252,8 +252,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 10:49Z UTC (Iter ~2923, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 10:57Z UTC (Iter ~2924, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2923 summary:** ⚠️ Active — Mirror PID 3380711 COMPLETED with REVIEW_ESCALATE on PR #713 (sha=a3e9d589157c, 04:42:45Z). approval_request `mirror-review-pr-ourliberty-agent-core-713` now in beacon-pending item 4. Beacon processed direction-ask-watchdog → approval_request `watchdog-mirror-active-stale-suppression-001` delivered to Larry via Telegram 10:45:22Z. 1 new alert L987 (Tier-3 silence — delivery confirmation of watchdog approval_request). Watchdog healthy 04:41:16Z (no more WARNs). Mirror inbox residual stale item; archive blocked by session sandbox. beacon-pending: 4. 8/8 daemons alive. Pipeline stall: 0. PRIME: interventions≈1301+, systemic_fixes=74, vp=28, ratio≈17.6, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2924 summary:** ⚠️ Active — PR #713 REVIEW_ESCALATE pending Larry decision (approval_request `mirror-review-pr-ourliberty-agent-core-713`). 0 new alerts. Mirror inbox stale residual (revision_count=0) archived (5th this session). beacon-pending: 5 (added: watchdog-mirror-active-stale-suppression-001). Watchdog healthy 10:51:18Z. 8/8 daemons alive. Pipeline stall: 0. PRIME: interventions≈1302, systemic_fixes=74, vp=27, ratio≈17.59, trend=improving. Tier 1, consecutive_clean=0.
 
 
