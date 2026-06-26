@@ -7127,6 +7127,7 @@ def _handle_mission_action(
     args: dict[str, Any],
     missions_path: Path,
     projects_path: Path,
+    actor: str = '',
 ) -> dict[str, Any]:
     """Dispatch POST /api/system/missions/{id}/action to the per-action handler.
     defer / resume / reprioritize / dismiss / drop / snooze are PR-backed →
@@ -7135,7 +7136,9 @@ def _handle_mission_action(
     phase_id, status, applied} (no missions.json PR). `drop` is the funnel-facing
     verb for the dismiss semantics (acknowledged=true, phase stays proposed —
     keeps the autoregister healer from re-proposing); `dismiss` is kept as its
-    alias. Unknown action → 400."""
+    alias. `confirm_shipped` is the one-click confirm of a "looks shipped"
+    off-board mission (on-disk delta, NOT PR-backed) → {applied, status}.
+    Unknown action → 400."""
     if action == 'defer':
         return _handle_mission_defer(
             mission_id=mission_id,
@@ -7174,13 +7177,76 @@ def _handle_mission_action(
             snoozed_until=args.get('snoozed_until'),
             missions_path=missions_path,
         )
+    if action == 'confirm_shipped':
+        return _handle_mission_confirm_shipped(
+            mission_id=mission_id,
+            missions_path=missions_path,
+            actor=actor,
+        )
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail=(
             f'invalid action={action!r}; expected '
-            'defer|resume|reprioritize|accept|dismiss|drop|snooze'
+            'defer|resume|reprioritize|accept|dismiss|drop|snooze|confirm_shipped'
         ),
     )
+
+
+def _handle_mission_confirm_shipped(
+    *,
+    mission_id: str,
+    missions_path: Path,
+    actor: str,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """`confirm_shipped` — Larry's one-click confirm of a "looks shipped" off-board
+    mission surfaced in the Where-are-we needs-you lane by
+    heal_merged_pr_board_reconcile.
+
+    One-click DIRECT write through the single missions.json committer (NOT
+    PR-backed — mirrors capture `drop`): flips phase → 'shipped' with the
+    auto-shipper's CORE audit stamp (shipped_at / shipped_by / prior_phase, the
+    same three fields heal_missions_card_gc writes) plus a `shipped_note`
+    recording that this was a human confirm, then resolves the for-Larry signal
+    so the needs-you row clears immediately.
+    heal_missions_card_gc (the SOLE missions.json git committer) version-controls
+    the on-disk delta on its next tick — we never git-commit here.
+
+    409 if already shipped (double-click guard); 404 if no such mission."""
+    now = now or datetime.now(timezone.utc)
+    with _NEW_MISSION_LOCK:
+        registry = _read_missions_registry(missions_path)
+        mission = _find_mission(registry['missions'], mission_id)
+        prior = mission.get('phase')
+        if prior == 'shipped':
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={'error': 'mission already shipped',
+                        'mission_id': mission_id},
+            )
+        mission['phase'] = 'shipped'
+        mission['shipped_at'] = now.isoformat()
+        mission['shipped_by'] = actor or 'dashboard:confirm_shipped'
+        mission['prior_phase'] = prior
+        mission['shipped_note'] = (
+            'confirmed shipped from the Where-are-we needs-you lane '
+            '(off-board merged-PR backstop)'
+        )
+        _atomic_write_json(missions_path, registry)
+
+    # Clear the surfaced needs-you row immediately (idempotent with the healer's
+    # own sync_prefix self-clear on its next tick). Fail-soft: a signal-resolve
+    # hiccup must never fail the phase flip that already applied on disk.
+    try:
+        import for_larry_signal  # noqa: PLC0415 — sibling module, lazy import
+        import heal_merged_pr_board_reconcile as _reconcile  # noqa: PLC0415
+        for_larry_signal.resolve_record(_reconcile.SIGNAL_PREFIX + mission_id)
+    except Exception as exc:  # noqa: BLE001 — never undo an applied flip
+        logger.warning(
+            'confirm_shipped: signal resolve failed for %s '
+            '(phase flip applied): %s', mission_id, exc)
+
+    return {'applied': True, 'status': 'shipped'}
 
 
 def _handle_funnel_promote(
@@ -9650,6 +9716,7 @@ def post_mission_action(
         args=body.model_dump(exclude={'action'}, exclude_none=True),
         missions_path=_missions_json_path(),
         projects_path=_projects_json_path(),
+        actor=actor,
     )
 
 
