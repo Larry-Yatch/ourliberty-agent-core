@@ -234,8 +234,20 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 07:12Z UTC (Iter ~2891, Tier 1, consecutive_clean=0→0)
+## G-rule sentinel-inflight-stall-mirror-tier4 — 1/3 (new, iter ~2892)
 
-**Iter ~2891 summary:** ⚠️ Active — Mirror PID 3308724 at 01:08:09 elapsed (EXCEEDS 35-min feature-dev threshold by ~33 min; outbox empty). 0 new alerts (watermark 1048=file_length). Stall dry-run: 0 alerts (both cooldowns). All 8 daemons alive. Watchdog healthy (07:07:03Z). Check I cooldown-suppressed. Zombie PID 1834248 (28d 11h 52m) + 6 stale journalctl PIDs carry. Beacon bot EROFS failures confirm PR #713 critical. PRIME: interventions=1269, systemic_fixes=72, vp=27, ratio≈17.63, trend=improving. Tier 1, consecutive_clean=0.
+**Rule:** `source=sentinel, subject^=in-flight-stall:` alerts classify Tier-4 (novel, no translation match). Fired when Mirror session exceeds 60-min in-flight threshold. Sentinel message says heal_wedged_review_sessions auto-recovers; kill PID unblocks sooner. Fix: add `source=sentinel, subject^=in-flight-stall:` → Tier-3 (if healer reliably self-recovers) OR Tier-2 (kill-PID action needed). Track at 3/3 before dispatching.
+
+---
+
+## G-rule forge-built-no-pr-closed-pr-fp-001 — 1/3 (new, iter ~2892)
+
+**Rule:** `forge_built_no_pr` stall fires for tasks whose PR is CLOSED (not merged, not open). First occurrence: pr-ourliberty-agent-core-712 (headRefName=fix/narrator-durable-token, CLOSED, superseded by PR #713). Different from prior FP class where PR exists but stall checker missed it — here PR was deliberately closed/abandoned. Fix: stall checker should skip `forge_built_no_pr` for tasks with a closed (non-merged) PR. Dispatch to Beacon at 3/3.
+
+---
+
+## Status snapshot — updated 2026-06-26 07:18Z UTC (Iter ~2892, Tier 1, consecutive_clean=0→0)
+
+**Iter ~2892 summary:** ⚠️ Active — New Tier-4 alert L1049: sentinel in-flight-stall Mirror PID 3308724 at 1.13h+ (60m threshold); DM already delivered by outbox-notifier (idx=1048); heal_wedged_review_sessions recovery path. Stall dry-run: 2 would-fire (forge_built_no_pr:712 new FP + unrouted_open_pr:713 cooldown expired). 8/8 daemons alive. Watchdog healthy (07:12:15Z). Check I cooldown-suppressed. Zombie PID 1834248 + 6 stale journalctl PIDs carry. Beacon bot EROFS confirms PR #713 critical. PRIME: interventions=1270, systemic_fixes=72, vp=27, ratio≈17.64, trend=improving. Tier 1, consecutive_clean=0.
 
 
