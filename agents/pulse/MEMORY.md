@@ -252,8 +252,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 09:53Z UTC (Iter ~2916, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 10:00Z UTC (Iter ~2917, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2916 summary:** ⚠️ Active — Mirror PID 3308724 at ~3h48m elapsed. 1 new alert L982 (medic-dispatcher:no-session-revision → Tier-4, G-rule vp, no DM; fix medic-dispatcher-delivery-failure-translation-001 pending beacon-pending item 1). Pipeline stall: 0 (all cooldowns). beacon-pending: 3 unchanged. 8/8 daemons alive. Watchdog healthy (09:50:19Z). Sync fresh (09:02:20Z). Check I cooldown-suppressed. PR #713 revision active (Mirror inbox has rev1 task). PRIME: interventions≈1294+, systemic_fixes=73, vp=27, ratio≈17.7+, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2917 summary:** ⚠️ Active — Mirror PID 3308724 at ~3h52m elapsed. 0 new alerts (first zero-alert iter in recent memory). Pipeline stall: 0 (all cooldowns). beacon-pending: 3 unchanged. 8/8 daemons alive. Watchdog healthy (09:55:28Z). Sync at 09:02:20Z (~58 min). Check I cooldown-suppressed. PR #713 revision active (Mirror inbox has rev1 task). PRIME: interventions≈1295+, systemic_fixes=73, vp=27, ratio≈17.7+, trend=improving. Tier 1, consecutive_clean=0.
 
 
