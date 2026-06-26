@@ -204,8 +204,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 01:20Z UTC (Iter ~2839, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 01:28Z UTC (Iter ~2840, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2839 summary:** ✅ Nominal — 1 new Tier-3 alert (Check I digest silence, no DM). New PR #711 ("feat(missions): confirm_shipped action") opened 01:17:33Z, 4 min old, under 30m stale threshold — pipeline will self-manage. 0 stalls, 8/8 daemons alive, watchdog healthy. Check I Friday: cooldown-suppressed no-op. Zombie PID 1834248 (~28d6h, archive MISSING) + 6 stale journalctl PIDs (~30-31d) carry. watermark=1023. PRIME: interventions=1227, systemic_fixes=71, vp=27, ratio≈17.28, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2840 summary:** ✅ Nominal — 1 new Tier-4 alert (unreviewed-merge:710, PR #710 "fix(bots): authenticate Beacon + Forge chat bridges" merged by Larry without Mirror review, already DM'd by outbox-notifier idx=1023, Larry judgment). 2 new PRs: #711 (agent-core) + #95 (dashboard), both ~9-11 min old, under 30-min threshold — pipeline self-managing. 0 stalls, 8/8 daemons alive, watchdog healthy (01:22:59Z). Check I Friday: cooldown-suppressed no-op. Zombie PID 1834248 (~28d6h9m, archive MISSING) + 6 stale journalctl PIDs (~30-31d) carry. watermark=1024. PRIME: interventions=1227, systemic_fixes=71, vp=27, ratio≈17.28, trend=improving. Tier 1, consecutive_clean=0.
 
 
