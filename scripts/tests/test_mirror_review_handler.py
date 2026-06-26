@@ -653,6 +653,122 @@ class RenderMarkerTest(unittest.TestCase):
                 self.assertIn(mtype, mrh.MARKER_KEYWORDS)
                 self.assertIn(mtype, mrh.REQUIRED_FIELDS)
 
+    # ---- semantic-gate parity (mirror-marker-discipline-spec-update-001) ----
+    # render_marker shares check_marker_semantics with parse_mirror_marker, so
+    # render-time self-check and parse-time ingestion can't drift. PR #711 hit
+    # three malformed-marker shapes the parser rejected but render let through;
+    # these lock render to the same gate.
+
+    def _revision_payload(self, severity='medium', confidence='high',
+                          findings=None):
+        if findings is None:
+            findings = [{'file': 'a.py', 'line': 1, 'issue': 'typo'}]
+        return {
+            'task_id': 't-001', 'pr_url': 'https://github.com/x/y/pull/1',
+            'findings': findings, 'severity': severity, 'confidence': confidence,
+        }
+
+    def test_render_revision_out_of_enum_severity_raises_value_error(self):
+        # PR #711 shape: severity='blocking' is not a valid value at all.
+        # 'high' belongs in ESCALATE, 'critical' in EMERGENCY_HALT — none are
+        # valid on REVISION.
+        for bad in ('blocking', 'high', 'critical'):
+            with self.subTest(severity=bad):
+                with self.assertRaisesRegex(ValueError, 'severity'):
+                    mrh.render_marker(
+                        'review_revision', **self._revision_payload(severity=bad),
+                    )
+
+    def test_render_revision_empty_findings_raises_value_error(self):
+        # PR #711 shape: REVIEW_REVISION with [] findings should have been PASS.
+        with self.assertRaisesRegex(ValueError, 'non-empty list'):
+            mrh.render_marker(
+                'review_revision', **self._revision_payload(findings=[]),
+            )
+
+    def test_render_revision_non_list_findings_raises_value_error(self):
+        with self.assertRaisesRegex(ValueError, 'non-empty list'):
+            mrh.render_marker(
+                'review_revision',
+                **self._revision_payload(findings='not-a-list'),
+            )
+
+    def test_render_revision_invalid_confidence_raises_value_error(self):
+        with self.assertRaisesRegex(ValueError, 'confidence'):
+            mrh.render_marker(
+                'review_revision',
+                **self._revision_payload(confidence='vibes'),
+            )
+
+    def test_render_revision_valid_low_medium_renders(self):
+        # Valid low/medium severity + non-empty findings + valid confidence
+        # still produces the canonical block and parses clean.
+        for sev in ('low', 'medium'):
+            with self.subTest(severity=sev):
+                rendered = mrh.render_marker(
+                    'review_revision', **self._revision_payload(severity=sev),
+                )
+                ptype, ppayload, _ = mrh.parse_mirror_marker(rendered)
+                self.assertEqual(ptype, 'review_revision')
+                self.assertEqual(ppayload['severity'], sev)
+                self.assertEqual(len(ppayload['findings']), 1)
+
+    def test_render_escalate_out_of_enum_severity_raises_value_error(self):
+        # ESCALATE is severity=high only; low/medium belong to REVISION.
+        for bad in ('low', 'medium', 'blocking'):
+            with self.subTest(severity=bad):
+                with self.assertRaisesRegex(ValueError, 'severity'):
+                    mrh.render_marker(
+                        'review_escalate',
+                        task_id='t-001',
+                        pr_url='https://github.com/x/y/pull/1',
+                        reason='spec mismatch', severity=bad, confidence='high',
+                    )
+
+    def test_shared_helper_exercised_from_both_paths(self):
+        # The same check_marker_semantics call gates render AND parse: a payload
+        # that render rejects is one parse rejects too (same diagnostic text,
+        # different exception type per each path's contract).
+        bad = self._revision_payload(severity='blocking')
+        with self.assertRaises(ValueError) as render_ctx:
+            mrh.render_marker('review_revision', **bad)
+        # Build the equivalent raw marker block and run it through the parser.
+        block = (
+            '=== REVIEW_REVISION ===\n'
+            + json.dumps(bad)
+            + '\n=== END_REVIEW_REVISION ==='
+        )
+        with self.assertRaises(mrh.MalformedMirrorMarker) as parse_ctx:
+            mrh.parse_mirror_marker(block)
+        self.assertIn('blocking', str(render_ctx.exception))
+        self.assertIn('blocking', str(parse_ctx.exception))
+
+
+class CheckMarkerSemanticsTest(unittest.TestCase):
+    """The shared validator directly — both callers route through it."""
+
+    def test_pass_and_emergency_halt_are_noops(self):
+        # Markers without severity/confidence/findings fields don't trip it.
+        mrh.check_marker_semantics(
+            'review_pass',
+            {'task_id': 't', 'pr_url': 'u', 'summary': 's'},
+        )
+        mrh.check_marker_semantics(
+            'review_emergency_halt',
+            {'task_id': 't', 'pr_url': 'u', 'reason': 'r', 'evidence': 'e'},
+        )
+
+    def test_valid_revision_passes(self):
+        mrh.check_marker_semantics('review_revision', {
+            'severity': 'medium', 'confidence': 'high',
+            'findings': [{'file': 'x'}],
+        })
+
+    def test_valid_escalate_passes(self):
+        mrh.check_marker_semantics('review_escalate', {
+            'severity': 'high', 'confidence': 'medium', 'reason': 'r',
+        })
+
 
 if __name__ == '__main__':
     unittest.main()
