@@ -407,6 +407,26 @@ def run_once(*, dry_run: bool, now: Optional[datetime] = None) -> int:
     if dropped:
         log(f'dropped {len(dropped)} malformed project/phase entr(y/ies): {dropped}')
 
+    # Terminal-mission reconcile: Done-stamp any ACTIVE project mirrored from a
+    # mission that has SINCE shipped/retired, so the GC retire below can sweep it
+    # off "Actively working". Closes the mirror↔ship race — a project born at
+    # `building` AFTER its build already merged has no event to advance it (see
+    # projects_store.reconcile_terminal_mission_projects). Operates on `normalized`
+    # and runs BEFORE the retire pass, so a freshly-Done project already past its
+    # visibility window retires in the SAME tick. Fail-safe: a fault reconciles
+    # nothing and never blocks the write+commit below.
+    reconciled: list[str] = []
+    try:
+        reconciled = projects_store.reconcile_terminal_mission_projects(
+            normalized, read_missions(missions_path(repo_paths)), now=now)
+        if reconciled:
+            verb = 'would reconcile' if dry_run else 'reconciled'
+            log(f'{verb} {len(reconciled)} project(s) whose source mission is '
+                f'terminal (shipped/retired) → Done: {reconciled}')
+    except Exception as e:  # noqa: BLE001 — fail-safe: never block the committer
+        log(f'terminal-mission reconcile raised: {type(e).__name__}: {e} '
+            f'— reconciling nothing this tick')
+
     # Project-level GC reconciliation: retire any ACTIVE project whose phases are
     # ALL done off the "Actively working" board (projects-stale-gc-archive-
     # completed). The project analogue of the missions GC terminal reconciliation —
@@ -437,8 +457,11 @@ def run_once(*, dry_run: bool, now: Optional[datetime] = None) -> int:
     # both `raw` and `normalized` and the `!=` check alone would miss the delta.
     # `bool(retired)` forces the commit for the GC retire delta (it mutates
     # `normalized` after the `!=` baseline was captured against `raw`).
+    # `bool(reconciled)` joins the gate for the same reason as `bool(retired)`:
+    # the terminal-mission reconcile Done-stamps phases on `normalized` AFTER the
+    # `!=` baseline was captured against `raw`, so the `!=` check alone would miss it.
     changed = ((normalized != raw) or bool(minted) or bool(authored)
-               or bool(retired) or not path.exists())
+               or bool(reconciled) or bool(retired) or not path.exists())
     n_projects = len(normalized.get('projects', []))
     core = repo_paths.get('ourliberty-agent-core')
     # North Star docs the closeout may have ticked (non-committer wrote them to
