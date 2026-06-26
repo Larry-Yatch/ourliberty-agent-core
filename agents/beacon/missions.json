@@ -5931,7 +5931,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-26T20:15:16.012809+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-26T20:11:11.078687+00:00"
+      "orphan_last_activity_ts": "2026-06-26T20:11:11.078687+00:00",
+      "briefing": {
+        "what": "A routine sync that keeps your health data flowing between systems hit a snag and didn't go through, and the team picked it up on their own.",
+        "why": "If it keeps failing, the information your operation relies on could fall out of date without anyone noticing.",
+        "suggest": "Let the team confirm what went wrong and retry it, but ask for a quick word back before they make any larger changes."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-26T20:19:20.030608+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
