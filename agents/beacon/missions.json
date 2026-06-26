@@ -6051,6 +6051,40 @@
       "retired_by": "heal_orphan_autoregister",
       "retired_at": "2026-06-26T22:31:09.862771+00:00",
       "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-heal-stale-daemon-auto-restart-failed-pr-dispatch-001",
+      "name": "Heal Stale Daemon Auto Restart Failed PR Dispatch 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `heal-stale-daemon-auto-restart-failed-pr-dispatch-001`. Last activity 2026-06-26T23:10:32.574864+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "heal-stale-daemon-auto-restart-failed-pr-dispatch-001"
+      ],
+      "repo": null,
+      "created": "2026-06-26",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-26T23:16:19.984582+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-26T23:10:32.574864+00:00"
+    },
+    {
+      "id": "proposed-direction-ask-auto-restart-failed-tier3-translation-001",
+      "name": "Direction Ask Auto Restart Failed Tier3 Translation 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `direction-ask-auto-restart-failed-tier3-translation-001`. Last activity 2026-06-26T23:08:27.551593+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "direction-ask-auto-restart-failed-tier3-translation-001"
+      ],
+      "repo": null,
+      "created": "2026-06-26",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-26T23:16:19.984582+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-26T23:08:27.551593+00:00"
     }
   ]
 }
