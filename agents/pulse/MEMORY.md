@@ -216,9 +216,9 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## G-rule medic-dispatcher-delivery-failure-tier4-001 — 1/3 (new, iter ~2850)
+## G-rule medic-dispatcher-delivery-failure-tier4-001 — 2/3 (updated iter ~2884)
 
-**Rule:** `source=medic-dispatcher` alerts classify Tier-4 (novel, no translation match). These fire when the medic relay for a healer alert fails to deliver 3 times (medic ran but no `source=medic` notification reached larry-alerts.jsonl). Root cause here: underlying stall alert for PR#711 is a FP (Mirror IS actively reviewing; see G-rule `unrouted-open-pr-active-mirror-session-fp-001`). Medic delivery failure is a separate concern from the FP stall. Bot delivers route=escalate independently. Fix: add `source=medic-dispatcher` translation entry → Tier-3 for known-FP stall patterns, OR investigate medic relay reliability (run_medic.sh, operator allowlist). Dispatch to Beacon at 3/3.
+**Rule:** `source=medic-dispatcher` alerts classify Tier-4 (novel, no translation match). These fire when the medic relay for a healer alert fails to deliver 3 times (medic ran but no `source=medic` notification reached larry-alerts.jsonl). Occurrences: iter ~2850 PR#711 (1/3); iter ~2884 PR#713 L1045 (2/3) — underlying stall already delivered via outbox-notifier route=escalate (idx=1043); Mirror actively reviewing rev1; no DM warranted (actionable-only). Fix: add `source=medic-dispatcher` translation entry → Tier-3 for known-FP stall patterns, OR investigate medic relay reliability (run_medic.sh, operator allowlist). Dispatch to Beacon at 3/3.
 
 ---
 
@@ -228,8 +228,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 06:19Z UTC (Iter ~2883, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 06:25Z UTC (Iter ~2884, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2883 summary:** ✅ Active — PR #713 revision cycle: Mirror PID 3308724 reviewing rev1 (~14 min elapsed). 1 new alert Tier-3 silenced (heal-pipeline-stall unrouted-pr:PR#713 — known-pattern). All 8 daemons alive. Stall dry-run: 0 alerts (unrouted_open_pr:713 cooldown-suppressed). pending-approvals=0. Watermark=1044. Watchdog healthy (06:15:20Z). Zombie PID 1834248 (28d 11h) + 6 stale journalctl PIDs carry. Check I cooldown-suppressed (check-i-2026-06-26.json present). PRIME: interventions=1260, systemic_fixes=72, vp=27, ratio≈17.51, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2884 summary:** ✅ Active — PR #713 revision cycle: Mirror PID 3308724 reviewing rev1 (~19 min elapsed). 1 new alert Tier-4 (medic-dispatcher delivery-failure PR#713 — G-rule 2/3, no DM; underlying already delivered idx=1043). All 8 daemons alive. Stall dry-run: 0 alerts (cooldown-suppressed). pending-approvals=0. Watermark=1045. Watchdog healthy (06:20:56Z). Zombie PID 1834248 (28d 11h) + 6 stale journalctl PIDs carry. Check I cooldown-suppressed. PRIME: interventions=1261, systemic_fixes=72, vp=27, ratio≈17.53, trend=improving. Tier 1, consecutive_clean=0.
 
 
