@@ -259,8 +259,14 @@ PR #715 (fix(healer): skip forge_built_no_pr stall when task PR is CLOSED) MERGE
 
 ---
 
-## Status snapshot — updated 2026-06-26 14:41Z UTC (Iter ~2955, Tier 1, consecutive_clean=0→0)
+## G-rule forge-built-no-pr-pr-task-id-closed-fp-001 — 2/3 (new, iter ~2956)
 
-**Iter ~2955 summary:** ⚡ Active — PRs #715+#716 MERGED (08:38Z). 2 G-rules complete. Fast-forward applied (6f18d0b0→d27cc1c7). Mirror PID 3533331 reviewing PR #717. PR #718 queued. 2 new Tier-3 silenced alerts (outbox-notifier review-pass). Watermark at 1018. Check I: dm_route digest (correct). Zombie PID 1834248 alive (28d19h+). PRIME: systemic_fixes=75, vp=25 (−2), ratio≈18.0. Tier 1, consecutive_clean=0.
+**Rule:** `forge_built_no_pr` stall fires for `pr-<repo>-<num>` task_ids (e.g., `pr-ourliberty-agent-core-712`) when the referenced PR is CLOSED-not-merged. PR #715's CLOSED-PR skip uses `_pr_matches_task` which requires the closed PR's branch to match the task_id pattern — but for `pr-<repo>-<num>` tasks, the task IS named after the PR number, not a Forge-built PR with a matching branch. Fix: stall checker should detect `pr-<repo>-<num>` task_id format and look up PR #{num} directly; if CLOSED or MERGED, skip. Occurrences: idx=1005 07:45Z (1/3); cooldown-expired dry-run 14:53Z (2/3). Dispatch to Beacon at 3/3.
+
+---
+
+## Status snapshot — updated 2026-06-26 14:53Z UTC (Iter ~2956, Tier 1, consecutive_clean=0→0)
+
+**Iter ~2956 summary:** ⚠️ Pipeline stall 1 would-fire: forge_built_no_pr:pr-ourliberty-agent-core-712 (FP, PR #712 CLOSED, G-rule 2/3). PR #717 in Mirror review (PID 3533331 ~15 min). PR #718 Forge building. No new alerts (watermark 1018). Check I: dm_route digest (correct). PRIME: systemic_fixes=75, vp=27, ratio≈17.4. Tier 1, consecutive_clean=0.
 
 
