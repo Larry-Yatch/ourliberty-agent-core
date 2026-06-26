@@ -265,8 +265,8 @@ PR #715 (fix(healer): skip forge_built_no_pr stall when task PR is CLOSED) MERGE
 
 ---
 
-## Status snapshot — updated 2026-06-26 15:05Z UTC (Iter ~2958, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 15:13Z UTC (Iter ~2959, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2958 summary:** ✅ Near-nominal. captures.json self-resolved (GC healer 43ce983c). Same carry FP: forge_built_no_pr:pr-ourliberty-agent-core-712 (G-rule 2/3). PR #717 Mirror reviewing (~27 min, PID 3533331). PR #718 in Mirror queue. PR #719 Larry-authored (pipeline-live-state), awaiting Larry trigger for Mirror review. 0 new alerts (watermark 1018). Check I: dm_route digest (correct). PRIME: systemic_fixes=75, vp=27, ratio=17.44. Tier 1, consecutive_clean=0.
+**Iter ~2959 summary:** ✅ Near-nominal. PR #719 now in Mirror queue (review-pr-ourliberty-agent-core-719.json dispatched 15:05:16Z by outbox-notifier). Same carry FP: forge_built_no_pr:pr-ourliberty-agent-core-712 (G-rule 2/3). PR #717 Mirror reviewing (~33 min, PID 3533331). PR #718 Mirror queue. 0 new alerts (watermark 1018). Check I: dm_route digest (correct). PRIME: systemic_fixes=75, vp=27, ratio=17.45. Tier 1, consecutive_clean=0.
 
 
