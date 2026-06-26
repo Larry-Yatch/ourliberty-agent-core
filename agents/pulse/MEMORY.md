@@ -267,8 +267,10 @@ PR #725 (fix(healer): skip forge_built_no_pr for pr-<repo>-<num> tasks whose nam
 
 ---
 
-## Status snapshot — updated 2026-06-26 20:52Z UTC (Iter ~2993, Tier 1, consecutive_clean=1)
+## Status snapshot — updated 2026-06-26 21:00Z UTC (Iter ~2994, Tier 1, consecutive_clean=2)
 
-**Iter ~2993 summary:** ✅ Nominal. 1 alert (Tier-3 silence: approval_request delivery confirm for forge-revision-preamble-discipline-001). PR #726 MIRROR_ACTIVE_SKIP (PID 3734902 alive). PR #728 Mirror review queued. PR #729 NEW (Larry-opened larry/projects-terminal-mission-reconcile, < 30 min, monitoring). forge-revision-preamble-discipline-001 PENDING Larry approval. Watermark 1051→1052. PRIME: iter_clean. Tier 1, consecutive_clean 0→1.
+**Iter ~2994 summary:** ✅ Nominal. 1 alert (Tier-3 silence: pulse check-i-2026-06-22 digest). PR #726 MERGED ✅ at 20:55:57Z (fix(mirror): wall-clock bounds on review steps). Sync error RESOLVED (status=no-change). PR #728 in Mirror review (PID 3760017, ~5 min). PR #729 Mirror review queued. forge-revision-preamble-discipline-001 PENDING Larry approval. Watermark 1052→1053. PRIME: iter_clean. Tier 1, consecutive_clean 1→2.
+
+**Observation:** `pulse-source-alert-delivery-confirm-tier4-001` G-rule (2/3) — triage helper returned Tier-3 this iter for source=pulse alert, contradicting the G-rule claim of no translation match. Translation appears to already exist in alert-translations.json. G-rule may be partially or fully complete. Monitor next source=pulse alert occurrence before deciding to increment to 3/3 or mark complete.
 
 
