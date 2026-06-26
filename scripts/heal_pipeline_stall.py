@@ -144,6 +144,17 @@ from log_ts import parse_log_ts  # noqa: E402  (shared log-ts parser)
 
 HOME = Path.home()
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', str(HOME / 'agents')))
+# Production review worktrees live under ~/agent-worktrees (NOT under
+# AGENTS_ROOT). Env-overridable for tests, matching heal_phantom_dispatch_claim
+# / dashboard_api conventions.
+WORKTREES_ROOT = Path(
+    os.environ.get('OURLIBERTY_WORKTREES_ROOT', str(HOME / 'agent-worktrees'))
+)
+# The kernel appends this to /proc/<pid>/cwd when a still-running process's
+# working directory (here, a Mirror review worktree) was removed out from
+# under it. A live mid-review session still reads cleanly; we strip the suffix
+# so a torn-down cwd is name-matched the same way.
+_DELETED_CWD_SUFFIX = ' (deleted)'
 KILL_SWITCH = AGENTS_ROOT / 'healers.disabled'
 LOG_FILE = AGENTS_ROOT / 'logs' / 'heal-pipeline-stall.log'
 HEARTBEAT_FILE = AGENTS_ROOT / 'blackboard' / 'heal-pipeline-stall.heartbeat'
@@ -2274,6 +2285,98 @@ def _read_recent_routing_events(hours: int) -> list[dict]:
     return out
 
 
+def _claude_pids() -> list[int]:
+    """All live `claude` PIDs (broad match; cwd filtering happens in the
+    caller). `pgrep` is NOT a `claude`/LLM subprocess — pure process listing,
+    same shape as heal_wedged_review_sessions.claude_pids."""
+    try:
+        out = subprocess.run(
+            ['pgrep', '-f', 'claude'],
+            capture_output=True, text=True, timeout=5,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return []
+    if out.returncode != 0:
+        return []
+    return [int(s) for s in out.stdout.split() if s.isdigit()]
+
+
+def _proc_cwd(pid: int) -> Optional[str]:
+    """The cwd of `pid` via /proc, or None if unreadable (race/permission)."""
+    try:
+        return os.readlink(f'/proc/{pid}/cwd')
+    except OSError:
+        return None
+
+
+# Matches the remainder of a Mirror review worktree name AFTER the
+# `wt-mirror-pr-<repo_short>-` prefix is stripped: a leading integer PR number,
+# optionally followed by a single `-rev<N>` or `-replan<N>` revision suffix and
+# nothing else. Anchored both ends so `713` never matches a `13` PR (and vice
+# versa) — the boundary discipline the FP report demands.
+_MIRROR_WT_REMAINDER_RE = re.compile(r'^(\d+)(?:-(?:rev|replan)\d+)?$')
+
+
+def _mirror_session_active_for_pr(
+    repo_short: str, pr_number: int,
+) -> tuple[bool, str]:
+    """Is a Mirror review session live (or freshly dispatched) for this PR?
+
+    Two independent, cheap, claude-subprocess-free signals — either true =>
+    active:
+
+      live_pid: a `claude` process whose cwd sits inside a
+        `wt-mirror-pr-<repo_short>-<pr_number>` worktree (tolerating a
+        trailing `-rev<N>`/`-replan<N>` and the kernel `(deleted)` cwd suffix),
+        boundary-matched on the PR-number segment.
+      inbox_task_present: a dispatched review task file
+        `review-pr-<repo_short>-<pr_number>[...]` sits in Mirror's inbox.
+
+    Returns (active, reason); reason is '' when inactive. Used by
+    check_unrouted_open_prs to suppress the `unrouted_open_pr` alert while
+    Mirror is mid-review — the stall checker otherwise has no visibility into
+    active agent sessions and re-fires after its 6h cooldown (G-rule
+    unrouted-open-pr-active-mirror-session-fp-001).
+    """
+    wt_prefix = str(WORKTREES_ROOT / 'wt-mirror-')
+    name_prefix = f'wt-mirror-pr-{repo_short}-'
+    for pid in _claude_pids():
+        cwd = _proc_cwd(pid)
+        if not cwd:
+            continue
+        if cwd.endswith(_DELETED_CWD_SUFFIX):
+            cwd = cwd[: -len(_DELETED_CWD_SUFFIX)]
+        if not cwd.startswith(wt_prefix):
+            continue
+        # The worktree name is the first path segment under WORKTREES_ROOT
+        # (a review session's cwd is the worktree root, but slicing the first
+        # segment also tolerates a nested cwd).
+        rel = cwd[len(str(WORKTREES_ROOT)):].lstrip('/')
+        worktree_name = rel.split('/', 1)[0]
+        if not worktree_name.startswith(name_prefix):
+            continue
+        remainder = worktree_name[len(name_prefix):]
+        m = _MIRROR_WT_REMAINDER_RE.match(remainder)
+        if m and int(m.group(1)) == pr_number:
+            return True, 'live_pid'
+
+    mirror_inbox = AGENTS_ROOT / 'inboxes' / 'mirror'
+    file_prefix = f'review-pr-{repo_short}-{pr_number}'
+    try:
+        hits = mirror_inbox.glob(f'{file_prefix}*.json')
+    except OSError:
+        hits = iter(())
+    for hit in hits:
+        # Boundary-guard the glob's trailing `*` so a `7130` task never
+        # suppresses a `713` PR: the char after the PR number must be the
+        # extension dot or a revision-suffix dash.
+        rest = hit.name[len(file_prefix):]
+        if rest.startswith('.') or rest.startswith('-'):
+            return True, 'inbox_task_present'
+
+    return False, ''
+
+
 def check_unrouted_open_prs(open_prs: list[dict],
                             routing_events: list[dict],
                             state: dict) -> list[dict]:
@@ -2350,6 +2453,23 @@ def check_unrouted_open_prs(open_prs: list[dict],
                     'INFO',
                 )
                 continue
+        # Active-Mirror suppression (G-rule unrouted-open-pr-active-mirror-
+        # session-fp-001): the alert means "no review will happen until Larry
+        # routes it", but a live review session (or a freshly dispatched review
+        # task) is exactly that routing in flight. The stall checker has no
+        # session visibility on its own, so it re-fires after the 6h cooldown
+        # mid-review. Skip while a Mirror session is active for this PR.
+        repo_short = pr['_repo'].rsplit('/', 1)[-1]
+        mirror_active, mirror_reason = _mirror_session_active_for_pr(
+            repo_short, pr['number'],
+        )
+        if mirror_active:
+            log(
+                f'MIRROR_ACTIVE_SKIP task=pr-{repo_short}-{pr["number"]} '
+                f'reason={mirror_reason}',
+                'INFO',
+            )
+            continue
         key = f'unrouted_open_pr:{pr["_repo"]}:{pr["number"]}'
         alert = {
             'key': key,

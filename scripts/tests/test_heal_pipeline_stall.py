@@ -2339,6 +2339,104 @@ class TestCheckUnroutedOpenPrs(_TempAgentsRootMixin, unittest.TestCase):
         # `source_agent='outbox-notifier'` is NOT 'beacon' → no match.
         self.assertEqual(len(alerts), 1)
 
+    # ---- Active-Mirror suppression (G-rule unrouted-open-pr-active-mirror-
+    # session-fp-001). The alert must not fire while a Mirror review session is
+    # live (a `wt-mirror-pr-<repo>-<num>` claude proc) or a review task is
+    # freshly dispatched (a `review-pr-<repo>-<num>*.json` inbox file). ----
+
+    def _mirror_cwd(self, name: str) -> str:
+        return str(self.hps.WORKTREES_ROOT / name)
+
+    def test_suppressed_when_live_mirror_proc_for_pr(self):
+        # PR #711: a live `claude` proc cwd'd in its review worktree → skip.
+        prs = [self._make_pr(711, 'larry/manual-pr-001', age_min=180)]
+        cwd = self._mirror_cwd('wt-mirror-pr-ourliberty-agent-core-711')
+        with patch.object(self.hps, '_claude_pids', return_value=[4242]), \
+                patch.object(self.hps, '_proc_cwd', return_value=cwd):
+            alerts = self.hps.check_unrouted_open_prs(prs, [], {})
+        self.assertEqual(alerts, [])
+
+    def test_suppressed_when_live_mirror_proc_revision_suffix(self):
+        # A `-rev1` review worktree still suppresses; the kernel `(deleted)`
+        # suffix on a torn-down cwd is tolerated too.
+        prs = [self._make_pr(713, 'larry/manual-pr-002', age_min=180)]
+        cwd = self._mirror_cwd(
+            'wt-mirror-pr-ourliberty-agent-core-713-rev2') + ' (deleted)'
+        with patch.object(self.hps, '_claude_pids', return_value=[99]), \
+                patch.object(self.hps, '_proc_cwd', return_value=cwd):
+            alerts = self.hps.check_unrouted_open_prs(prs, [], {})
+        self.assertEqual(alerts, [])
+
+    def test_not_suppressed_when_proc_pr_number_is_boundary_mismatch(self):
+        # A live #713 review proc must NOT suppress the #13 PR (and there's no
+        # inbox file), so the alert still fires. Boundary discipline.
+        prs = [self._make_pr(13, 'larry/manual-pr-003', age_min=180)]
+        cwd = self._mirror_cwd('wt-mirror-pr-ourliberty-agent-core-713')
+        with patch.object(self.hps, '_claude_pids', return_value=[7]), \
+                patch.object(self.hps, '_proc_cwd', return_value=cwd):
+            alerts = self.hps.check_unrouted_open_prs(prs, [], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertIn('PR #13', alerts[0]['message'])
+
+    def test_suppressed_when_review_inbox_task_present(self):
+        # No live proc, but a dispatched review task file sits in Mirror's
+        # inbox → still in flight, skip.
+        mirror_inbox = self.agents_root / 'inboxes' / 'mirror'
+        mirror_inbox.mkdir(parents=True)
+        (mirror_inbox / 'review-pr-ourliberty-agent-core-711.json').write_text(
+            '{}')
+        prs = [self._make_pr(711, 'larry/manual-pr-004', age_min=180)]
+        with patch.object(self.hps, '_claude_pids', return_value=[]):
+            alerts = self.hps.check_unrouted_open_prs(prs, [], {})
+        self.assertEqual(alerts, [])
+
+    def test_inbox_task_boundary_does_not_oversuppress(self):
+        # A `review-pr-...-7130.json` task must NOT suppress the #713 PR.
+        mirror_inbox = self.agents_root / 'inboxes' / 'mirror'
+        mirror_inbox.mkdir(parents=True)
+        (mirror_inbox / 'review-pr-ourliberty-agent-core-7130.json').write_text(
+            '{}')
+        prs = [self._make_pr(713, 'larry/manual-pr-005', age_min=180)]
+        with patch.object(self.hps, '_claude_pids', return_value=[]):
+            alerts = self.hps.check_unrouted_open_prs(prs, [], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertIn('PR #713', alerts[0]['message'])
+
+    def test_fires_when_no_mirror_session_active(self):
+        # No live proc, no inbox task → genuinely unrouted, alert fires.
+        prs = [self._make_pr(720, 'larry/manual-pr-006', age_min=180)]
+        with patch.object(self.hps, '_claude_pids', return_value=[]):
+            alerts = self.hps.check_unrouted_open_prs(prs, [], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertIn('PR #720', alerts[0]['message'])
+
+    def test_mirror_session_helper_reasons(self):
+        # Direct helper coverage: reason strings are the documented forensic
+        # identifiers logged as MIRROR_ACTIVE_SKIP reason=<...>.
+        cwd = self._mirror_cwd('wt-mirror-pr-ourliberty-agent-core-711')
+        with patch.object(self.hps, '_claude_pids', return_value=[1]), \
+                patch.object(self.hps, '_proc_cwd', return_value=cwd):
+            active, reason = self.hps._mirror_session_active_for_pr(
+                'ourliberty-agent-core', 711)
+        self.assertTrue(active)
+        self.assertEqual(reason, 'live_pid')
+
+        mirror_inbox = self.agents_root / 'inboxes' / 'mirror'
+        mirror_inbox.mkdir(parents=True)
+        (mirror_inbox / 'review-pr-ourliberty-agent-core-711-rev1.json'
+         ).write_text('{}')
+        with patch.object(self.hps, '_claude_pids', return_value=[]):
+            active, reason = self.hps._mirror_session_active_for_pr(
+                'ourliberty-agent-core', 711)
+        self.assertTrue(active)
+        self.assertEqual(reason, 'inbox_task_present')
+
+        with patch.object(self.hps, '_claude_pids', return_value=[]):
+            active, reason = self.hps._mirror_session_active_for_pr(
+                'ourliberty-agent-core', 999)
+        self.assertFalse(active)
+        self.assertEqual(reason, '')
+
 
 class TestReadRecentRoutingEvents(_TempAgentsRootMixin, unittest.TestCase):
     """Chain discipline v3 GAP 3 — the routing-events.jsonl reader."""
