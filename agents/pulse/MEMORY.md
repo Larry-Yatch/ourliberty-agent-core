@@ -231,6 +231,7 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 ## G-rule no-session-revision-active-mirror-session-fp-001 → DISPATCHED ✅ (iter ~2906), vp
 
 **Rule:** `heal_pipeline_stall.py` fires `no_session_revision:<task_id>` when cooldown expires even though Mirror IS actively reviewing. Three occurrences: iter ~2885 (Mirror 26-min in), iter ~2905 (Mirror 2h31m+), iter ~2906 (L1062, Mirror 2h39m+ live healer fired). `heal-stall-mirror-active-suppression-001` (pending approval) scoped this OUT; dispatched `direction-ask-no-session-revision-active-mirror-fix-001.json` to Beacon at iter ~2906. Fix: add `NO_SESSION_REVISION_MIRROR_ACTIVE_SKIP` suppression in `check_revision_dispatched_with_no_session` using same `_mirror_session_active_for_pr` helper. verification_pending.
+**Alert triage note (corrected iter ~2935):** translations.json HAS a `pipeline-stall:no-session-revision` entry (WARNING/SOON tier) — Pulse's triage ALREADY correctly Tier-3 silences no-session-revision alerts. Prior MEMORY "NO entry" claim (iter ~2933) was wrong — that search used underscore ("no_session") instead of hyphen ("no-session"). This G-rule is about preventing the stall CHECKER from firing FPs when Mirror is active, not about alert triage.
 
 ---
 
@@ -252,10 +253,10 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 12:06Z UTC (Iter ~2934, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 12:13Z UTC (Iter ~2935, Tier 1, consecutive_clean=0→0)
 
-**MEMORY correction (iter ~2933):** G-rule no-session-revision-active-mirror-session-fp-001 — prior journal standing findings carried "translations.json LIVE" claim. This is WRONG. Direct query of config/alert-translations.json returns [] for "no_session" keys — NO translation entry exists. Alert was delivered to Larry at idx=980,981 (03:44:48 MDT). Stall-checker code fix (MIRROR_ACTIVE_SKIP in heal_pipeline_stall.py) is beacon-pending item 3 (not yet Forge-dispatched). Standing findings corrected forward from iter ~2933.
+**MEMORY correction (iter ~2935):** G-rule no-session-revision-active-mirror-session-fp-001 — iter ~2933 correction was itself WRONG. translations.json HAS a `pipeline-stall:no-session-revision` entry (WARNING/SOON tier). The iter ~2933 direct query searched for "no_session" (underscore); the actual key uses "no-session" (hyphen), so the search returned []. triage-alert correctly classifies these as Tier 3 (known-pattern) — the original claim "translations.json LIVE" was correct all along. The beacon-pending item 3 (MIRROR_ACTIVE_SKIP in heal_pipeline_stall.py) is about preventing FP stall FIRES when Mirror is active, not about Pulse's alert triage (which was already correct).
 
-**Iter ~2934 summary:** ⚠️ Active — PR #713 REVIEW_ESCALATE carry. 2 new alerts: ourliberty-health push-fail Tier-4 self-healed (G-rule 2/3), sync.service Tier-3 silenced. no_session_revision:713 cooldown EXPIRED carry. Sync fresh (12:02:21Z). Repo HEAD=8b0b78cf. All inboxes EMPTY. beacon-pending: 5 unchanged. Watchdog healthy (06:03:19 MDT). 8/8 daemons alive. PRIME: systemic_fixes=74, vp=27, ratio=17.61, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2935 summary:** ⚠️ Active — PR #713 REVIEW_ESCALATE carry. 2 new alerts: L996 heal-pipeline-stall no-session-revision Tier-3 silenced (translation match), L997 medic-dispatcher Tier-4 known G-rule vp. Live stall fired 12:07:37Z, auto-recovery failed, cooldown reset. Repo HEAD=14352d55=origin/main. All inboxes EMPTY. beacon-pending: 5 unchanged. Watchdog healthy (06:08:19 MDT). 8/8 daemons alive. PRIME: systemic_fixes=74, vp=27, ratio=17.61, trend=improving. Tier 1, consecutive_clean=0.
 
 
