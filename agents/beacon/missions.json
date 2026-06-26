@@ -6129,7 +6129,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-26T23:31:53.913844+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-26T23:25:26.474075+00:00"
+      "orphan_last_activity_ts": "2026-06-26T23:25:26.474075+00:00",
+      "briefing": {
+        "what": "A small safeguard that lets one of our automated helpers catch and fix its own first garbled message right after it restarts, instead of waiting on a slow back-and-forth to recover.",
+        "why": "Right now that first hiccup after a restart causes a sluggish do-over, so this makes the system snap back faster and feel more reliable when work is flowing.",
+        "suggest": "Worth doing, but approve it on the condition the team confirms it's been tested so the new self-check can't accidentally block good messages."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-26T23:40:39.916046+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-direction-ask-mirror-malformed-post-restart-fix-001",
@@ -6146,7 +6160,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-26T23:31:53.913844+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-26T23:25:22.737876+00:00"
+      "orphan_last_activity_ts": "2026-06-26T23:25:22.737876+00:00",
+      "briefing": {
+        "what": "The team is fixing a glitch where questions meant to reach you were coming through garbled after a system restart.",
+        "why": "If the questions you need to weigh in on arrive broken, decisions stall and things can slip through without your input.",
+        "suggest": "Let them finish the fix, but ask for a quick confirmation that your questions now come through cleanly before calling it done."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-26T23:40:39.916046+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
