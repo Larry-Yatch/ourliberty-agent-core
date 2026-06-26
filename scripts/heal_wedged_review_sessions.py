@@ -148,6 +148,18 @@ HEARTBEAT_FILE = AGENTS_ROOT / 'blackboard' / 'heal-wedged-review-sessions.heart
 # registry: a JSON doc holding a tail-read execution streak + mode.
 STATE_FILE = AGENTS_ROOT / 'state' / 'review-reaper-confidence.json'
 CLAUDE_PROJECTS_DIR = HOME / '.claude' / 'projects'
+# Tier2 sessions (Mirror, and Forge under the auth HOME-swap) run with
+# HOME=/home/larry/.claude-larry-personal (agent_runner.TIER2_HOME), so their
+# Claude Code session JSONL lands under THAT home's projects dir — NOT the login
+# HOME's. A reaper that searched only CLAUDE_PROJECTS_DIR found no JSONL for any
+# tier2 session, fell into scan_candidates' `jsonl is None -> idle_secs=0.0`
+# branch, and SKIPped it forever: the reaper was structurally blind to Mirror
+# wedges (every one needed a manual kill). Search BOTH roots so the existing
+# machinery (hard 60-min backstop, confidence ladder, progress-staleness) finally
+# applies to tier2; the newest-mtime JSONL across roots is the live session.
+TIER2_HOME = Path(os.environ.get('OURLIBERTY_TIER2_HOME', '/home/larry/.claude-larry-personal'))
+TIER2_CLAUDE_PROJECTS_DIR = TIER2_HOME / '.claude' / 'projects'
+CLAUDE_PROJECTS_DIRS: tuple[Path, ...] = (CLAUDE_PROJECTS_DIR, TIER2_CLAUDE_PROJECTS_DIR)
 CONFIG_FILE = _SCRIPTS_DIR.parent / 'config' / 'review-reaper-rules.json'
 
 # Review-tier worktrees this healer owns.
@@ -385,16 +397,30 @@ def cwd_to_slug(cwd: str) -> str:
 
 
 def session_jsonl_for_cwd(
-    cwd: str, projects_dir: Path = CLAUDE_PROJECTS_DIR,
+    cwd: str, projects_dir: Optional[Path] = None,
 ) -> Optional[Path]:
-    """The most-recently-modified *.jsonl in the cwd's project-slug dir, or
-    None if the dir is absent/empty. The newest JSONL is the session the
-    live process is writing to."""
-    slug_dir = projects_dir / cwd_to_slug(cwd)
-    try:
-        candidates = [p for p in slug_dir.glob('*.jsonl') if p.is_file()]
-    except OSError:
-        return None
+    """The most-recently-modified *.jsonl for the cwd's project-slug, across ALL
+    Claude projects roots, or None if none exists.
+
+    Searches both the login HOME's projects dir AND the tier2 personal HOME's
+    (``CLAUDE_PROJECTS_DIRS``): tier2 review sessions (Mirror, Forge under the
+    auth HOME-swap) write their JSONL under the personal HOME, so a single-root
+    search of the login HOME missed every tier2 session — the reaper's blind
+    spot. The newest-mtime JSONL across roots is the session the live process is
+    writing to.
+
+    ``projects_dir`` (a single Path) is honored for back-compat with callers/
+    tests that pin one root; the default (None) searches all roots.
+    """
+    roots = (projects_dir,) if projects_dir is not None else CLAUDE_PROJECTS_DIRS
+    slug = cwd_to_slug(cwd)
+    candidates: list[Path] = []
+    for root in roots:
+        slug_dir = root / slug
+        try:
+            candidates.extend(p for p in slug_dir.glob('*.jsonl') if p.is_file())
+        except OSError:
+            continue
     if not candidates:
         return None
     return max(candidates, key=lambda p: p.stat().st_mtime)
