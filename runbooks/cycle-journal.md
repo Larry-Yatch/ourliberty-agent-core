@@ -5,6 +5,100 @@
 ---
 
 
+## Iteration ~2850 — 2026-06-26T02:39Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/cycle` invocation via chat.
+
+**Health:** ⚠️ Non-nominal (carries) — L1031 medic-dispatcher Tier-4 (new, bot already DM'd Larry at 02:33Z); PR #711 Mirror 3rd review session active (PID 3172100, 27 min as of scan); zombie PID 1834248 + 6 stale journalctl PIDs carry. All 8 daemons alive. Stall dry-run clean.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo (re-verified):** On main. HEAD=753b4741=origin/main. Clean. ✅
+- **Sync (re-verified):** last_sync=2026-06-26T02:01:40Z (~37 min old). Under 2h. ✅
+- **Daemons (re-verified):** chain_event_shipper=2716672 (SNs, 19h40m) ✅, dashboard_api=3044417 (Ssl, 6h22m) ✅, outbox_notifier=3044826 (Ss, 6h21m) ✅, inbox_watcher=3107973 (Ssl, 2h30m) ✅, beacon=3141782 (Ss, 1h9m) ✅, forge_bot=3141897 (Ss, 1h9m) ✅, mirror_bot=3142077 (Ss, 1h9m) ✅, pulse_bot=3142169 (Ss, 1h9m) ✅. 8/8 alive. Plus active session: mirror_review=3172100 (PR #711 3rd review, 27 min). ✅
+- **Watchdog (re-verified):** last=20:34:48 MDT (02:34:48Z) — overall=healthy. ✅
+- **Open PRs (re-verified):** PR #711 (agent-core) — OPEN, UNKNOWN mergeable (GitHub computing), reviewDecision="". Mirror 3rd review PID 3172100 active (27 min). Dashboard: 0 open PRs. ✅
+- **beacon-pending-approvals (re-verified):** 0 pending, 301 history. ✅
+- **Zombie PID 1834248 (re-verified):** Alive (28d 7h 18m, Ss, bash poll loop awaiting `build-check-viii-pr-2b-analyzer-001.json`). [carry ask-then-do]
+- **6 stale journalctl PIDs (re-verified):** 1101500 (~31d 7h 32m), 1107838 (~31d 7h 8m), 1118830 (~31d 3h 31m), 1136223 (~30d 22h 8m), 1161972 (~30d 14h 4m), 1177335 (~30d 13h 16m). All alive. [carry ask-then-do]
+- **Watermark:** 1030→1031 (1 new alert: L1031 Tier-4). ✅
+
+**Check 0 — Alert triage:**
+- `repair-watermark` → `{"repaired": false, "old_watermark": 1030, "file_length": 1031}`. 1 new alert.
+- **L1031** `source=medic-dispatcher, severity=warning, route=escalate, subject=heal-pipeline-stall:pipeline-stall:unrouted-pr:PR#711` — Content: medic escalation for PR#711 unrouted-pr alert failed to deliver 3 times (fingerprint heal-pipeline-stall:pipeline-stall:unrouted-pr:PR#711); no longer auto-retried; investigate run_medic.sh and operator allowlist. Triage helper: Tier-4 (novel, no translation match for source=medic-dispatcher). Bot already DM'd Larry at 02:33:39Z (bot idx=1030 delivered). No second Pulse DM. Journal-note only. Watermark advanced to 1031. New G-rule medic-dispatcher-delivery-failure-tier4-001 (1/3). [tier-reset]
+
+**Check 1 — Log noise (30-min window):**
+- `journalctl --user -p warning --since "30 minutes ago"` → `-- No entries --`. ✅
+- outbox-notifier.log: Last WARN at 20:10:59 MDT (02:10:59Z) — marker-error retry 2/3 for PR #711 (pre-cycle, 26 min stale). No new WARNs. ✅
+- watchdog.log: last=20:34:48 MDT (02:34:48Z) — overall=healthy. ✅ Nominal.
+
+**Check 2 — Telegram sweep (last 4h):**
+- beacon_telegram_bot.log: Bot restarted 19:28 MDT. Auto-restart digests (idx=1024-1027) at 19:33 MDT. Last Larry message not found in last 4h. No orphaned directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- `heal_pipeline_stall --dry-run` → `DRY-RUN: 0 alert(s) would fire` (PR #711 `unrouted_open_pr` cooldown-suppressed). ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- Beacon inbox: EMPTY. Forge inbox: EMPTY. ✅
+- Mirror inbox: `marker-error-pr-ourliberty-agent-core-711-2.json` + `review-pr-ourliberty-agent-core-711.json` (active session PID 3172100). Not stale. ✅
+- beacon-pending-approvals: 0 pending. ✅ Nominal.
+
+**Check 5 — Stale daemon code:**
+- Heartbeat=2026-06-26T02:28:18Z (~11 min before scan). Fresh. ✅ Nominal.
+- heal-stale-daemon-code-state.json: MISSING (carry informational).
+
+**Check A — Source repo:** HEAD=753b4741=origin/main. On main. Clean. ✅ Nominal.
+**Check B — Sync health:** last_sync=2026-06-26T02:01:40Z (~37 min). Under 2h. ✅ Nominal.
+**Check C — Agent liveness:** 8/8 procs running (verified via ps). Watchdog healthy (02:34:48Z). ✅
+- **[yellow carry] PID 1834248** — bash poll loop (~28d 7h). Ask-then-do: `kill 1834248`.
+- **[yellow carry] 6 stale journalctl PIDs (~30-31d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`.
+**Check E — PRs:**
+- **PR #711** (agent-core) — OPEN, UNKNOWN mergeable. Mirror 3rd review (PID 3172100, 27 min). Pipeline self-managing. [monitor]
+- **Dashboard** — 0 open PRs. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Friday 2026-06-26 UTC (weekday=4, IS in {0,2,4,6}):**
+- Check I: Friday gate. Artifact `check-i-2026-06-26.json` already exists (ran in iter ~2849, cooldown-suppressed). Skip. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule assessment:**
+- **`medic-dispatcher-delivery-failure-tier4-001`**: NEW **1/3**. `source=medic-dispatcher` alerts classify Tier-4 (novel, no translation). Medic relay for heal-pipeline-stall PR#711 alert failed 3 times. Underlying condition is a FP stall (Mirror IS reviewing PR#711 — G-rule `unrouted-open-pr-active-mirror-session-fp-001` 1/3). Two separate concerns: (1) stall checker fires on active Mirror session (existing G-rule); (2) medic relay delivery failing independently. Bot delivered route=escalate alert to Larry. Fix: add `source=medic-dispatcher` translation entry → Tier-3 if subject references a known-FP stall pattern; OR investigate medic relay reliability. Dispatch to Beacon at 3/3.
+- All other G-rule counts unchanged from iter ~2849.
+
+**Actions taken:**
+1. Check 0: 1 new alert (L1031 Tier-4 novel, bot already delivered). Watermark advanced to 1031.
+2. §5.0: all no-op.
+3. Check I/III: cooldown-suppressed / not Sunday. Skip.
+4. PRIME ledger: `intervention` appended (tier=1, template=check-0-tier4-novel, detail=L1031 medic-dispatcher failure; ts=2026-06-26T02:39:32Z).
+5. Tier state: `record --checks-clean false` → consecutive_clean=0 (L1031 Tier-4 tier-reset + zombie PID + 6 stale journalctl + PR #711 carry). Tier remains 1. last_signal_at=2026-06-26T02:39:35Z.
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [yellow] **L1031 medic-dispatcher Tier-4** — medic relay failed 3 times for PR#711 stall alert; bot DM'd Larry at 02:33Z. Awaiting Larry triage direction. [new carry]
+- [yellow] **Zombie PID 1834248** — bash poll loop (~28d 7h). Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **6 stale journalctl PIDs (~30-31d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+- [yellow] **PR #711** — Mirror 3rd review session active (PID 3172100, 27 min). marker-error 2/3. Pipeline self-managing. [monitor]
+- [yellow] **unreviewed-merge:710** — PR #710 merged without Mirror review. Larry judgment. [carry]
+- [yellow] **unreviewed-merge:709** — PR #709 merged without Mirror review. Larry judgment. [carry]
+- [yellow] **forge-wip-redispatch-digest Forge dispatch** — Beacon fix designed (iter ~2798). Trust-policy approval from Larry pending. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649/637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — PR #709 fixed; session-bound auth_401 separate known pattern. [carry — monitor]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Awaiting Larry. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [blue] **heal-stale-daemon-code-state.json MISSING** — healer heartbeat fresh; informational. [carry]
+- [blue] **G-rules (updated):** heal-daemon-restart-manifest-drift (2/3), watchdog-watcher-log-stale-post-pr694 (2/3), no-session-revision-merged-pr-fp-001 (1/3), unrouted-open-pr-auto-merge-held-fp-001 (1/3), forge-wip-redispatch-digest-tier4-001 (dispatched vp), forge-wip-redispatch-exhausted-pr-exists-fp-001 (2/3), heal-stale-daemon-code-auto-restart-failed-self-recovered (1/3), heal-stale-daemon-code-still-stale-after-restart (1/3), outbox-notifier-notification-intent-reject-tier4-001 (2/3), ourliberty-health-sync-push-failed-tier4-001 (1/3), mirror-marker-severity-blocking-pr711-001 (2/3), unrouted-open-pr-active-mirror-session-fp-001 (1/3), **medic-dispatcher-delivery-failure-tier4-001 (1/3 NEW)**.
+- [blue] **unreviewed-merge:655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. [carry]
+
+**PRIME DIRECTIVE:** 1 new intervention this iter (L1031 Tier-4 claimed). Trailing-30d: interventions=1228, systemic_fixes=71, vp=27, ratio≈17.30, trend=improving.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0 (non-clean: L1031 Tier-4 + zombie PID + 6 stale journalctl + PR #711 non-nominal). Last signal: 2026-06-26T02:39:35Z.
+
+---
+
+
 ## Iteration ~2849 — 2026-06-26T02:33Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/cycle` invocation via chat.
