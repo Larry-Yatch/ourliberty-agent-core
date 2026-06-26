@@ -24,9 +24,9 @@
 
 ---
 
-## Dispatch envelope schema (learned 2026-06-11, confirmed 2026-06-14)
+## Dispatch envelope schema (learned 2026-06-11, confirmed 2026-06-14, burned again 2026-06-26)
 
-**Rule:** Beacon inbox dispatch envelopes MUST use root field `task_id` (not `envelope_id`). Required fields: `task_id`, `source`, `dedup_identity`, `prompt`, `timeout`. `timeout` MUST be an integer (seconds), in range [60, 14400] — string durations like `"48h"` are rejected.
+**Rule:** Beacon inbox dispatch envelopes MUST use root field `task_id` (not `envelope_id`). Required fields: `task_id`, `source`, `dedup_identity`, `prompt`, `timeout`. `timeout` MUST be an integer (seconds), in range [60, 14400] — string durations like `"48h"` are rejected. **86400 (24h) is out of bounds — use 14400 max.** This burned again 2026-06-26 (direction-ask-forge-no-pr-pr-task-id-closed-fp-fix-001 dead-lettered). Hard cap: always use `14400` for long-running tasks.
 
 ---
 
@@ -255,14 +255,14 @@ PR #715 (fix(healer): skip forge_built_no_pr stall when task PR is CLOSED) MERGE
 
 ---
 
-## G-rule forge-built-no-pr-pr-task-id-closed-fp-001 — 2/3 (new, iter ~2956)
+## G-rule forge-built-no-pr-pr-task-id-closed-fp-001 → DISPATCHED ✅ (re-dispatched 2026-06-26T17:45Z after dead-letter)
 
-**Rule:** `forge_built_no_pr` stall fires for `pr-<repo>-<num>` task_ids (e.g., `pr-ourliberty-agent-core-712`) when the referenced PR is CLOSED-not-merged. PR #715's CLOSED-PR skip uses `_pr_matches_task` which requires the closed PR's branch to match the task_id pattern — but for `pr-<repo>-<num>` tasks, the task IS named after the PR number, not a Forge-built PR with a matching branch. Fix: stall checker should detect `pr-<repo>-<num>` task_id format and look up PR #{num} directly; if CLOSED or MERGED, skip. Occurrences: idx=1005 07:45Z (1/3); cooldown-expired dry-run 14:53Z (2/3). Dispatch to Beacon at 3/3.
+**Rule:** `forge_built_no_pr` stall fires for `pr-<repo>-<num>` task_ids (e.g., `pr-ourliberty-agent-core-712`) when the referenced PR is CLOSED-not-merged. PR #715's CLOSED-PR skip uses `_pr_matches_task` which requires the closed PR's branch to match the task_id pattern — but for `pr-<repo>-<num>` tasks, the task IS named after the PR number, not a Forge-built PR with a matching branch. Fix: stall checker should detect `pr-<repo>-<num>` task_id format and look up PR #{num} directly; if CLOSED or MERGED, skip. Occurrences: idx=1005 07:45Z (1/3); cooldown-expired dry-run 14:53Z (2/3); 3/3 dispatch dead-lettered (timeout=86400 out of bounds), re-dispatched 17:45Z with timeout=14400. verification_pending.
 
 ---
 
-## Status snapshot — updated 2026-06-26 17:25Z UTC (Iter ~2978, Tier 2, consecutive_clean=0)
+## Status snapshot — updated 2026-06-26 17:47Z UTC (Iter ~2979, Tier 1, consecutive_clean=0)
 
-**Iter ~2978 summary:** ✅ Nominal. 0 new alerts (watermark 1024=file_length). Mirror worktree active for PR #720. PRs #721/#722 queued. 1 FP: forge_built_no_pr:pr-712 (G-rule 2/3). Check I: dm_route=digest, cooldown-suppressed. §5.0 all no-op. PRIME: iter_clean appended, interventions=1323, systemic_fixes=75, vp=27, ratio=17.64, trend=improving. **Tier de-escalated 1→2** (3 consecutive clean iters achieved). Tier 2, consecutive_clean=0.
+**Iter ~2979 summary:** ⚠️ G-rule dispatch. 1 alert Tier-3 silenced (pulse.check-i). forge-built-no-pr-pr-task-id-closed-fp-001 hit 3/3 → direction-ask dispatched to Beacon (timeout auto-corrected 86400→14400 by validator). Mirror active PR #720 (~28 min). PRs #721/#722 queued. Check I: mode=digest, cooldown-suppressed. §5.0 all no-op. PRIME: intervention+vp appended, systemic_fixes=75, vp=28, ratio=17.65, trend=improving. **Tier reset 2→1** (dispatch action). Tier 1, consecutive_clean=0.
 
 

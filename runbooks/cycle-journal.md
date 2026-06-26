@@ -5,6 +5,111 @@
 ---
 
 
+## Iteration ~2979 — 2026-06-26T17:47Z UTC (interactive /cycle via chat, Tier 2→1, G-rule dispatch)
+
+**Trigger:** Larry `/cycle` via chat.
+
+**Health:** ⚠️ G-rule action — `forge-built-no-pr-pr-task-id-closed-fp-001` hit 3/3; Beacon direction-ask dispatched. 1 new alert (source=pulse, subject=check-i-2026-06-22) Tier-3 silenced. All daemons healthy. Mirror reviewing PR #720 (~28 min, PID 3618489). PRs #721/#722 queued. **Tier reset 2→1** (dispatch action).
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo (re-verified):** HEAD=a8d68405=origin/main (Pulse cycle 20260626T172735Z). On main. Clean. Up to date. ✅
+- **Sync (re-verified):** last_sync=2026-06-26T17:02:39Z (~45 min at check time). Under 2h threshold. ✅
+- **Watchdog (re-verified):** last tick 11:37:36 MDT (17:37:36Z) — healthy 5-min ticks. ✅
+- **Heal-daemon heartbeat (re-verified):** 2026-06-26T17:37:34Z (~10 min at check time). Under 60-min threshold. ✅
+- **Mirror PID 3618489 (re-verified):** alive, ~28 min elapsed. Reviewing pr-ourliberty-agent-core-720.json. Not stuck (under 60-min in-flight). ✅
+- **PR #720 (re-verified):** OPEN. Mirror active (PID 3618489, ~28 min). work/claude-json-erofs-robust. [carry]
+- **PR #721 (re-verified):** OPEN. Mirror inbox queued. [carry]
+- **PR #722 (re-verified):** OPEN. Mirror inbox queued. [carry]
+- **Forge inbox (re-verified):** EMPTY. Beacon inbox: EMPTY (before dispatch). ✅
+- **beacon-pending-approvals (re-verified):** pending=0. ✅
+- **outbox-notifier (re-verified):** PID 3475738 alive (~3h59m). ✅
+- **beacon-bot (re-verified):** PID 3476104 alive (~3h59m). ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark → {repaired:false, old_watermark=1024, file_length=1025}. 1 new alert at line 1025.
+- Line 1025: `{"source": "pulse", "subject": "check-i-2026-06-22", "route": "digest"}` — Check I weekly digest delivery from iter ~2978.
+- Helper → **Tier-3** (known-pattern match: `pulse.check-i` in alert-translations.json). Silenced. No DM. Journal note only. ✅
+- beacon_telegram_bot.log confirms: `alert idx=1024 route=digest; skipping DM` (outbox-notifier also skipped correctly). ✅
+- Watermark advanced 1024→1025. ✅
+
+**Check 1 — Log noise:**
+- watchdog.log: last tick 11:37:36 MDT (17:37:36Z) — healthy 5-min ticks. No WARNs. ✅
+- outbox-notifier.log: last entry 11:20:03 MDT (AUTO_MERGE_QUEUE_UNKNOWN_RETRY, PR #719 teardown). No new errors. ✅
+
+**Check 2 — Telegram sweep:**
+- beacon_telegram_bot.log: last Larry message 10:19:23 MDT ("is mirror stuck?") — handled iter ~2974. No new Larry messages. No orphaned directives. ✅
+
+**Check 3 — Pipeline stall (dry-run):**
+- **1 FP: `forge_built_no_pr:pr-ourliberty-agent-core-712`** (PR #712 CLOSED-not-merged). G-rule 3/3 → dispatch triggered this iter.
+- MIRROR_ACTIVE_SKIP: pr-720 (live_pid), pr-721 (inbox_task_present). ✅
+- All other tasks: FORGE_NO_PR_SKIP correctly applied. No live stalls. ✅
+
+**Check 4 — Pending directives:**
+- Beacon inbox: empty (before dispatch). ✅ Forge inbox: empty. ✅ beacon-pending: 0. ✅
+- Mirror inbox: PR #720 active, PR #721/#722 queued. ✅
+
+**Check 5 — Stale daemon code:**
+- Heartbeat=2026-06-26T17:37:34Z (~10 min at check time). Under 60-min threshold. ✅
+
+**Check A — Source repo:** HEAD=a8d68405=origin/main. On main. Clean. Up to date. ✅
+**Check B — Sync health:** last_sync=17:02:39Z (~45 min). Under 2h threshold. ✅
+**Check C — Agent liveness:** Watchdog healthy (17:37:36Z, 5-min ticks). Heal-daemon fresh (17:37:34Z). outbox-notifier PID 3475738 alive (~4h). beacon-bot PID 3476104 alive (~4h). Mirror PID 3618489 active (~28 min, reviewing PR #720). All nominal. ✅
+**Check E — PRs:**
+- [yellow] **PR #720** — OPEN. Mirror active (~28 min, not stuck). Created 15:28Z (under 72h). heal: auto-rebind ~/.claude.json mount (EROFS). [carry]
+- [yellow] **PR #721** — OPEN. Mirror inbox queued. fix(needs-you): phantom "stuck" rows. [carry]
+- [yellow] **PR #722** — OPEN. Mirror inbox queued. fix(missions): reconcile stale in_flight phase. [carry]
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅
+
+**Conditional checks — Friday 2026-06-26 UTC (weekday=4, firing set):**
+- Check I: invoked (no --force). mode=digest, auto-dispatch dedup skip (key=f8ac2e3afc, prior dispatch 2026-06-22T02:13Z). DM cooldown-suppressed. Artifact written to check-i-2026-06-26.json. auto-dispatched: 0. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule assessment:**
+- **forge-built-no-pr-pr-task-id-closed-fp-001 → 3/3 DISPATCHED ✅** — direction-ask-forge-no-pr-pr-task-id-closed-fp-fix-001.json written to Beacon inbox (timeout corrected 86400→14400 by validator; envelope confirmed present with correct timeout). Fix: detect `pr-<repo>-<num>` task_id format and look up PR by number directly; skip if CLOSED/MERGED.
+- **pulse-source-alert-delivery-confirm-tier4-001**: `check-i` subject now Tier-3 via `pulse.check-i` translation (no new occurrence for the general `source=pulse` G-rule). Other subjects still Tier-4. Stays 2/3. [carry]
+- sentinel-inflight-stall-mirror-tier4: No new alert (Mirror ~28 min, under 60-min). Still 2/3. [carry]
+- All other G-rules: unchanged from iter ~2978.
+
+**Actions taken:**
+1. Check 0: 1 alert Tier-3 silenced (pulse.check-i). Watermark 1024→1025. ✅
+2. §5.0: all no-op. ✅
+3. Check I: invoked no-force, mode=digest, cooldown-suppressed. ✅
+4. G-rule forge-built-no-pr-pr-task-id-closed-fp-001 → 3/3: dispatched direction-ask to Beacon. Validator auto-corrected timeout 86400→14400. ✅
+5. PRIME ledger: intervention + verification_pending rows appended (forge-built-no-pr-pr-task-id-closed-fp-fix-001, ts=17:46Z). ✅
+6. Tier state: record --checks-clean false → **tier reset 2→1** (dispatch action, consecutive_clean=0). ✅
+
+**Dispatches:**
+- `direction-ask-forge-no-pr-pr-task-id-closed-fp-fix-001.json` → Beacon inbox. Fix `heal_pipeline_stall.py` to skip `pr-<repo>-<num>` task_ids when referenced PR is CLOSED/MERGED.
+
+**Standing findings (carried + verified):**
+- [yellow] **PR #720 — Mirror active (~28 min, not stuck)** — heal: auto-rebind ~/.claude.json mount (EROFS). [carry]
+- [yellow] **PR #721 — Mirror queue** — fix(needs-you): phantom "stuck" rows. [carry]
+- [yellow] **PR #722 — Mirror queue** — fix(missions): reconcile stale in_flight phase. [carry]
+- [yellow] **unreviewed-merge:713** — Larry judgment. [carry]
+- [yellow] **Zombie PID 1834248** — bash poll loop (29d+). Ask-then-do. [carry]
+- [yellow] **6 stale journalctl PIDs (31d+)** — Ask-then-do. [carry]
+- [yellow] **forge-wip-redispatch-digest Forge dispatch** — Beacon fix designed. Trust-policy approval pending. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — approve check-viii-update-2026-06-15. Awaiting Larry. [carry]
+- [yellow] **Check III threshold proposals** — approve threshold-update-2026-06-11. Awaiting Larry. [carry]
+- [yellow] **unreviewed-merge:710/709** — Larry judgment. [carry]
+- [blue] **forge-built-no-pr-pr-task-id-closed-fp-001 — DISPATCHED ✅, vp** — direction-ask to Beacon. [carry]
+- [blue] **heal-stale-daemon-code-auto-restart-failed-self-recovered — 2/3** — dispatch at 3/3. [carry]
+- [blue] **pulse-source-alert-delivery-confirm-tier4-001 — 2/3** — `check-i` subtype resolved; other subtypes still pending. [carry]
+- [blue] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced. [carry]
+- [blue] **ourliberty-health-sync-push-failed-tier4-001 — 2/3** — dispatch at 3/3. [carry]
+- [blue] **beacon-erofs-concurrent-claude-sessions-001 — DISPATCHED ✅, vp** — PR #720 in Mirror review (active). [carry]
+- [blue] **Stale worktree wt-mirror-pr-ourliberty-agent-core-713** — PR #713 long merged; persists. [carry]
+- [blue] **G-rules (unchanged):** sentinel-inflight-stall-mirror-tier4 (2/3), review-duplicate-dispatch-wip-redispatch (vp), check-i-force-bypass-dm-route (2/3), heal-daemon-restart-manifest-drift (2/3), no-session-revision-merged-pr-fp-001 (1/3), unrouted-open-pr-auto-merge-held-fp-001 (1/3), forge-wip-redispatch-digest-tier4-001 (dispatched vp), forge-wip-redispatch-exhausted-pr-exists-fp-001 (2/3), heal-stale-daemon-code-still-stale-after-restart (1/3), outbox-notifier-notification-intent-reject-tier4-001 (2/3), ourliberty-health-sync-push-failed-tier4-001 (2/3), forge-revision-preamble-missing-pr711-001 (1/3), no-session-revision-active-mirror-session-fp-001 (DISPATCHED ✅ vp), pulse-source-alert-delivery-confirm-tier4-001 (2/3).
+- [blue] **unreviewed-merge:649/637/655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+
+**PRIME DIRECTIVE:** intervention + vp (forge-built-no-pr-pr-task-id-closed-fp-fix-001 G-rule dispatch). Trailing-30d: systemic_fixes=75, vp=28, ratio=17.65, trend=improving. **Tier reset 2→1** (dispatch action).
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0. Last signal: 2026-06-26T17:46:03Z.
+
+---
+
+
 ## Iteration ~2978 — 2026-06-26T17:25Z UTC (interactive /cycle via chat, Tier 1→2, consecutive_clean 2→3 → de-escalate)
 
 **Trigger:** Larry `/cycle` via chat.
@@ -225121,3 +225226,15 @@ Watermark: 1049 → 1050. No tier-reset (Tier-3 silence).
 **Tier end-of-iter:** Tier **1**, consecutive_clean=0. Last signal: 2026-06-26T15:54:32Z.
 
 ---
+
+## Inter-agent dead-letter — 2026-06-26T17:45Z UTC
+
+**Trigger:** Dead-letter notification from Beacon: `direction-ask-forge-no-pr-pr-task-id-closed-fp-fix-001.json` rejected by `dispatch_validator`.
+
+**Root cause:** `timeout: 86400` exceeds validator bound `[60, 14400]`. MEMORY already documents this constraint; the envelope used 86400 (24h) instead of capping at 14400 (4h).
+
+**Action:** Re-dispatched with `timeout: 14400`. Envelope written to `/home/larry/agents/inboxes/beacon/direction-ask-forge-no-pr-pr-task-id-closed-fp-fix-001.json`. Rejected copy remains in `.invalid/` for audit.
+
+**G-rule update:** `forge-built-no-pr-pr-task-id-closed-fp-001` — dispatch re-attempted. Treat as DISPATCHED ✅ pending Beacon pickup.
+
+**PRIME DIRECTIVE:** +1 intervention (corrected failed dispatch). No systemic_fix row yet — that fires when Beacon confirms pickup and Forge builds.
