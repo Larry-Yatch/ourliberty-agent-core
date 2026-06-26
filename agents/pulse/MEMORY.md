@@ -265,8 +265,8 @@ PR #715 (fix(healer): skip forge_built_no_pr stall when task PR is CLOSED) MERGE
 
 ---
 
-## Status snapshot — updated 2026-06-26 15:54Z UTC (Iter ~2964, Tier 1, consecutive_clean=1→0)
+## Status snapshot — updated 2026-06-26 16:00Z UTC (Iter ~2965, Tier 1, consecutive_clean=0)
 
-**Iter ~2964 summary:** ⚠️ Near-nominal. 1 new alert: sentinel in-flight-stall for Mirror PR #717 session (PID 3533331, 1.13h+). Tier-4 triage. outbox-notifier already DM'd Larry at 09:48:46 MDT — Pulse duplicate suppressed. G-rule sentinel-inflight-stall-mirror-tier4 → 2/3. Watermark advanced 1019→1020. PR #720 Mirror queue (EROFS fix). PRs #717/#718/#719/#720 all OPEN. Carry FP: forge_built_no_pr:pr-ourliberty-agent-core-712 (G-rule 2/3). Check I: dm_route digest (correct). §5.0 all no-op. PRIME: systemic_fixes=75, vp=27, ratio=17.51. Tier 1, consecutive_clean=0.
+**Iter ~2965 summary:** ✅ Near-nominal. 0 new alerts (watermark=1020=file_length). Mirror PID 3533331 still reviewing PR #717 at ~82 min; sentinel fired 2/3 at 09:48:46 MDT (outbox-notifier DM'd Larry; Pulse suppressed duplicate). PR #720 (EROFS fix) now in Mirror review queue (dispatched 09:40:31 MDT). PRs #717/#718/#719/#720 all OPEN. Carry FP: forge_built_no_pr:pr-ourliberty-agent-core-712 (G-rule 2/3). Check I: dm_route=digest, cooldown-suppressed (correct). §5.0 all no-op. PRIME: systemic_fixes=75, vp=27, ratio=17.52. Tier 1, consecutive_clean=0.
 
 
