@@ -455,8 +455,16 @@ def load_pending_approvals() -> list[dict[str, Any]]:
 
 
 def _escalation_to_waiting_item(e: dict[str, Any]) -> dict[str, Any]:
-    """Normalize one for-Larry escalation record into a waiting-item."""
-    return {
+    """Normalize one for-Larry escalation record into a waiting-item.
+
+    A record produced by heal_merged_pr_board_reconcile (a "looks shipped"
+    off-board mission) carries a `mission_id` + `source` tag; pass those through
+    plus a `mission_actions: ['confirm_shipped']` affordance so the Where-are-we
+    needs-you row can render a one-click confirm that flips the mission to
+    shipped. (Kept distinct from the sequence-row `actions` allowlist so the two
+    vocabularies never mix.) Other escalations carry neither (read-only links as
+    before)."""
+    item: dict[str, Any] = {
         'source': 'escalation',
         'id': str(e.get('id') or e.get('headline') or ''),
         'title': str(e.get('headline') or e.get('id') or 'escalation'),
@@ -465,6 +473,12 @@ def _escalation_to_waiting_item(e: dict[str, Any]) -> dict[str, Any]:
         'action_hint': 'review escalation',
         '_ts': e.get('ts') or e.get('created_at'),
     }
+    mission_id = e.get('mission_id')
+    if mission_id and e.get('source') == 'heal_merged_pr_board_reconcile':
+        item['mission_id'] = str(mission_id)
+        item['mission_actions'] = ['confirm_shipped']
+        item['action_hint'] = 'confirm shipped'
+    return item
 
 
 def load_for_larry_escalations() -> list[dict[str, Any]]:
