@@ -211924,3 +211924,96 @@ Watermark: 1049 → 1050. No tier-reset (Tier-3 silence).
 **Tier end-of-iter:** Tier **3**, consecutive_clean=15. Last signal: 2026-06-24T07:54:06Z.
 
 ---
+
+## Iteration ~2847 — 2026-06-26T02:16Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/cycle` invocation (chat mode).
+
+**Health:** ⚠️ Non-nominal — Mirror marker error for PR #711 in-flight (retry 2/3). All other checks nominal. 8/8 daemons alive (new PIDs from 01:28Z restart with PR #710 auth fix). Pipeline otherwise clean.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Daemons (re-verified):** beacon_telegram_bot=3141782 (Ss, 43 min) ✅, forge_bot=3141897 (Ss) ✅, mirror_bot=3142077 (Ss) ✅, pulse_bot=3142169 (Ss) ✅, inbox_watcher=3107973 (Ssl, 2.1h) ✅, dashboard_api=3044417 (Ssl, 5.9h) ✅, outbox_notifier=3044826 (Ss, 5.9h) ✅, chain_event_shipper=2716672 (SNs, 19.3h) ✅. 8/8 alive. New bots PIDs from 01:28Z restart. ✅
+- **PR #711 (re-verified):** OPEN, feat/confirm-shipped-action. Mirror review task in inbox. Marker error active (see Check 4). Not yet APPROVED. [in-flight] ✅
+- **Beacon 401 auth errors (re-verified):** 401 errors ran ~23:26 UTC (2026-06-25) to ~01:04 UTC (session 1b5ed242, session-bound). PRs #709 and #710 merged by Larry (emergency; unreviewed). Bots restarted at 01:28Z with PR #710 fix. No 401 errors since restart. [resolved per code fix — unverified under load] ✅
+- **Watermark 1028 holds (re-verified):** repair-watermark no-op (old_watermark=1028, file_length=1028). 0 new alerts. ✅
+
+**Check 0 — Alert triage:** repair-watermark — no repair needed (watermark=1028, file_length=1028). 0 new alerts past watermark. ✅ Nominal.
+
+**Check 1 — Log noise (30-min window):** `journalctl --user -p warning --since "30 minutes ago"` — No entries. ✅ Nominal.
+
+**Check 2 — Telegram sweep (last 4h):** Beacon bot PID 3141782 alive ✅. Prior 401 auth failures (23:26 UTC to 01:04 UTC) resolved by PRs #709/#710 + 01:28Z restart. No Larry directives since 01:04 UTC. Watchdog last healthy: 02:09 UTC. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` — no stalls detected (22 FORGE_NO_PR_SKIP entries; all pr_exists / already_merged_bridge / rebase_target_shipped / preflight_non_proceed). ✅ Nominal.
+
+**Check 4 — Pending directives:** Beacon inbox: empty ✅. Forge inbox: empty ✅. Mirror inbox: `review-pr-ourliberty-agent-core-711.json` + `marker-error-pr-ourliberty-agent-core-711-2.json` (in-flight). beacon-pending-approvals: pending=0 ✅. **Finding:** Mirror emitted REVIEW_REVISION with severity='blocking' for PR #711 (invalid — must be 'low' or 'medium'; 'blocking' belongs in REVIEW_EMERGENCY_HALT). outbox-notifier dispatched marker-error-2 at 02:10:59Z (retry 2/3). Mirror receiving corrective guidance. ⚠️ tier-reset.
+
+**Check 4.6 — Credential rotation:** `validate_token_rotation_schedule.py` — OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-26T02:08:16Z (8 min before cycle). Healer alive ✅. State file (`heal-stale-daemon-code-state.json`) absent — likely post-restart race (healer triggered 01:28Z bot restarts, state file not re-written yet this restart cycle). Not escalating given fresh heartbeat. [blue soft carry]
+
+**Check A — Source repo:** On main. HEAD=0936481f=origin/main (clean, 0 behind, 0 ahead). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-26T02:01:40Z (~15 min ago). Within 2h window. ✅ Nominal.
+
+**Check C — Agent liveness:** 8/8 alive (ps-verified above). ✅ Nominal.
+
+**Check E — PRs:** 1 open: PR #711 (feat/confirm-shipped-action, mergeable=UNKNOWN, no review decision — Mirror active). Expected in-flight state. ✅ Nominal.
+
+**Check H — Forge digest:** Merged today: PR #708 (feat/missions off-board board-reconcile, 00:35Z), #709 (fix/cycle auth, 00:03Z), #710 (fix/bots auth, 01:17Z). 1 open: #711 (Mirror reviewing, 53 min old, within 72h). ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. ✅
+
+**Conditional checks — Thursday 2026-06-26 UTC (weekday=3):** Check I: not Mon/Wed/Fri/Sun — skip. Check III: not Sunday — skip. ✅
+
+**G-rule assessment:**
+- **mirror-marker-severity-blocking-pr711-001 — 1/3 NEW.** Mirror emitted REVIEW_REVISION with severity='blocking' for PR #711; rejected by outbox-notifier (must be 'low'/'medium'; 'blocking' belongs in REVIEW_EMERGENCY_HALT). New variant of completed G-rule mirror-marker-parse-error (PR #650). Mirror retrying with corrective guidance. Track; dispatch to Beacon at 3/3 if pattern recurs.
+- **heal-daemon-restart-manifest-drift-tier4** — 2/3 [carry]. No new occurrences. [dispatch at 3/3]
+- **heal-pipeline-stall-dry-run-writes-real-alerts** — 2/3 [carry]. Dry-run 0 real alerts. [carry]
+- All other G-rule counts unchanged from ~2846. [all carry]
+
+**Actions taken:**
+1. Check 0: 0 new alerts. Watermark unchanged at 1028.
+2. PRIME ledger: `iter_clean` appended (tier=1, template=iter-clean-nominal, PR #711 marker error in-flight, no Pulse action).
+3. Tier state: `record --checks-clean false` — consecutive_clean stays 0, last_signal_at=2026-06-26T02:16:49Z. Tier remains 1.
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [yellow] **unreviewed-merge:709** — Larry emergency merge during auth outage. Larry judgment. [new carry]
+- [yellow] **unreviewed-merge:710** — Larry emergency merge during auth outage. Larry judgment. [new carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649/637/607** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — docs/runbooks/rotate-claude-setup-tokens.md. PRs #709/#710 may have resolved root cause (code fix for correct setup-token usage); carry pending next probe verification. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Awaiting Larry. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [blue] **PR #711 Mirror marker error retry 2/3** — severity='blocking' in REVIEW_REVISION invalid. Mirror receiving corrective guidance. [watch — escalate if retry 3 fails]
+- [blue] **Check 5 state file absent** — heartbeat fresh (02:08Z); post-restart gap likely. [monitor]
+- [blue] **G-rule mirror-marker-severity-blocking-pr711-001** — 1/3. [watch — dispatch at 3/3]
+- [blue] **G-rule heal-daemon-restart-manifest-drift-tier4** — 2/3. [carry — dispatch at 3/3]
+- [blue] **G-rule heal-pipeline-stall-dry-run-writes-real-alerts** — 2/3. [carry]
+- [blue] **G-rule sequence-step-review-escalate-null-chat** — 1/3. [carry]
+- [blue] **G-rule medic-approval-request-novel-tier4** — 1/3. [carry]
+- [blue] **G-rule beacon-claude-timeout** — 1/3. [carry]
+- [blue] **G-rule api-500-burst** — 1/3. [carry]
+- [blue] **G-rule revision-phase-preamble-missing** — 2/3. [carry]
+- [blue] **G-rule telegram-409-burst** — 2/3. [carry]
+- [blue] **G-rule F24-empty-prompt-envelope-rejected** — 2/3. [carry]
+- [blue] **G-rule Forge-preflight-CLARIFY_REQUEST** — 2/3. [carry]
+- [blue] **G-rule forge-preflight-task-id-mismatch** — 2/3. [carry]
+- [blue] **G-rule sync.service-deploy-restart-storm-tier4** — 1/3. [carry]
+- [blue] **G-rule seq-advancer-approval-routing-gap** — 1/3. [carry]
+- [blue] **G-rule merge_conflict_manual_rebase-tier4** — 2/3. [carry]
+- [blue] **G-rule heal-pipeline-stall-mirror-pass-unmerged-tier4** — 1/3. [carry]
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch** — 1/3. [carry]
+- [blue] **G-rule Forge-timeout-worktree-missing-retry-loop** — 2/3. [carry]
+- [blue] **G-rule check-i-force-bypass-dm-route** — 1/3. [carry]
+- [blue] **G-rule health-notify-script-missing** — dispatch sent 2026-06-09. [carry]
+- [blue] **unreviewed-merge:655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. [carry]
+- [blue] **Untracked Beacon spec** — `agents/beacon/specs/missions-v2-funnel-item-doorbell.md`. Larry authoring. [carry]
+
+**PRIME DIRECTIVE:** 0 new interventions this iter. Trailing-30d: interventions=1227, systemic_fixes=71, vp=27, ratio≈17.28, trend=improving.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0. Last signal: 2026-06-26T02:16:49Z.
+
+---

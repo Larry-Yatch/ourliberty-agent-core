@@ -204,8 +204,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 02:05Z UTC (Iter ~2846, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 02:16Z UTC (Iter ~2847, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2846 summary:** ✅ Nominal — 0 new alerts. 8/8 daemons alive, watchdog healthy (01:59:01Z). PR #95 dashboard MERGED at 02:02:22Z (Mirror PASS → auto-merge). PR #711 agent-core rev1 in active Mirror review (PID 3167824 since 20:02 MDT; rev1 + duplicate original review both in Mirror inbox — G-rule review-duplicate-dispatch vp). Check I Friday: cooldown-suppressed. Zombie PID 1834248 + 6 stale journalctl PIDs carry. watermark=1028. PRIME: interventions=1227, systemic_fixes=71, vp=27, ratio≈17.28, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2847 summary:** ⚠️ Non-nominal — Mirror marker error PR #711 (severity='blocking' in REVIEW_REVISION, retry 2/3). 8/8 daemons alive (new PIDs from 01:28Z restart). PRs #709/#710 merged by Larry (emergency unreviewed; auth outage fix). PR #711 Mirror review in-flight (confirm_shipped action). Beacon 401 auth resolved post-restart. No new alerts (watermark=1028). G-rule mirror-marker-severity-blocking-pr711-001 1/3 NEW. PRIME: interventions=1227, systemic_fixes=71, vp=27, ratio≈17.28, trend=improving. Tier 1, consecutive_clean=0.
 
 
