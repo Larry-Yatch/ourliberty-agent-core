@@ -5798,7 +5798,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-26T08:39:19.147271+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-26T08:29:52.088144+00:00"
+      "orphan_last_activity_ts": "2026-06-26T08:29:52.088144+00:00",
+      "briefing": {
+        "what": "Heal Stall Mirror Active Suppression 001",
+        "why": "Work the team started that isn't tied to a tracked project yet \u2014 worth a decision.",
+        "suggest": "Have the team run it down and propose next steps."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-26T08:42:00.043442+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-direction-ask-unrouted-pr-active-mirror-session-fix-001",
@@ -5815,7 +5829,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-26T08:39:19.147271+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-26T08:29:47.125733+00:00"
+      "orphan_last_activity_ts": "2026-06-26T08:29:47.125733+00:00",
+      "briefing": {
+        "what": "Direction Ask Unrouted PR Active Mirror Session Fix 001",
+        "why": "Work the team started that isn't tied to a tracked project yet \u2014 worth a decision.",
+        "suggest": "Have the team run it down and propose next steps."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-26T08:42:00.043442+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-fix-wedged-reaper-spares-active-build-worktree-002",
