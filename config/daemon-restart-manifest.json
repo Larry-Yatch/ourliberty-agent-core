@@ -86,7 +86,6 @@
     "ourliberty-dashboard-api.service": {
       "entrypoint": "scripts/dashboard_api.py",
       "watch_paths": [
-        "scripts/active_tier.py",
         "scripts/alert_triage_state.py",
         "scripts/atomic_io.py",
         "scripts/beacon_approval_handler.py",
@@ -188,7 +187,6 @@
     "ourliberty-outbox-notifier.service": {
       "entrypoint": "scripts/outbox_notifier.py",
       "watch_paths": [
-        "scripts/active_tier.py",
         "scripts/alert_triage_state.py",
         "scripts/atomic_io.py",
         "scripts/beacon_approval_handler.py",
