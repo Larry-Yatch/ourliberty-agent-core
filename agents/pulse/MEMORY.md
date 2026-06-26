@@ -204,8 +204,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 01:34Z UTC (Iter ~2841, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 01:39Z UTC (Iter ~2842, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2841 summary:** ✅ Nominal — 4 new Tier-3 alerts (heal-stale-daemon-code auto-restarted beacon/forge/mirror/pulse bots at 01:28Z after PR #710 new code went live; all silenced). Beacon auth_401 stale-session SELF-RESOLVED (bot restarted with fresh session). New bot PIDs: beacon=3141782, forge=3141897, mirror=3142077, pulse=3142169. 0 stalls, 8/8 daemons alive, watchdog healthy (01:28:01Z). PRs #711 (agent-core) + #95 (dashboard) ~16 min old — Mirror review dispatched, pipeline self-managing. Check I Friday: cooldown-suppressed. Zombie PID 1834248 (~28d6h14m) + 6 stale journalctl PIDs (~30-31d) carry. watermark=1028. PRIME: interventions=1227, systemic_fixes=71, vp=27, ratio≈17.28, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2842 summary:** ✅ Nominal — 0 new alerts. Beacon auth_401 stale-session FULLY RESOLVED (dropped from standing findings). 8/8 daemons alive, watchdog healthy (01:33:16Z). PRs #711 (agent-core) + #95 (dashboard) ~20 min old — Mirror review in queue, pipeline self-managing. Check I Friday: cooldown-suppressed. Zombie PID 1834248 (~28d6h19m) + 6 stale journalctl PIDs (~30-31d) carry. watermark=1028. PRIME: interventions=1227, systemic_fixes=71, vp=27, ratio≈17.28, trend=improving. Tier 1, consecutive_clean=0.
 
 
