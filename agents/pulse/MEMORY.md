@@ -252,8 +252,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 10:17Z UTC (Iter ~2919, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 10:23Z UTC (Iter ~2920, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2919 summary:** ⚠️ Active — Mirror PID 3375805 at 06:40 elapsed doing rev1 re-review of PR #713. FOUND+ARCHIVED duplicate `review-pr-ourliberty-agent-core-713.json` (revision_count=0 re-dispatched by outbox-notifier at 10:10:31Z while rev1 was running; G-rule review-duplicate-dispatch-wip-redispatch, vp). 0 new alerts. Pipeline stall: 0. beacon-pending: 3 unchanged. 8/8 daemons alive. Watchdog healthy (10:10:38Z). Sync at 10:02:20Z (~15 min). Check I cooldown-suppressed. Forge inbox EMPTY; revision-2 dispatched when Mirror rev1 finishes. PRIME: interventions≈1297+, systemic_fixes=73, vp=27, ratio≈17.7, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2920 summary:** ⚠️ Active — Mirror PID 3375805 COMPLETED rev1 at 04:14:09Z (REVIEW_REVISION round 2: WIP commit f2d7ac52 reverted Forge's manifest fix). Forge completed revision-2 in ~60s. Mirror PID 3380711 started 04:14Z doing rev2 review (revision_count=2, 08:46 elapsed at scan). Another duplicate `review-pr-ourliberty-agent-core-713.json` (revision_count=0) dispatched at 04:20:06Z — ARCHIVED. 1 new alert L983 (catalog-accuracy-drift, Tier-3). beacon-pending: 3 unchanged. 8/8 daemons alive. Pipeline stall: 0. PRIME: interventions≈1298+, systemic_fixes=73, vp=27, ratio≈17.8, trend=improving. Tier 1, consecutive_clean=0.
 
 
