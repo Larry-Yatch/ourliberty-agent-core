@@ -259,8 +259,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 13:32Z UTC (Iter ~2945, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 13:41Z UTC (Iter ~2946, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2945 summary:** ⚠️ Active — PR #713 in Forge revision-2. PR #715 NEW (heal-forge-no-pr-closed-skip-001 fix: skip forge_built_no_pr stall when task PR is CLOSED; Mirror reviewing). Beacon EROFS x2 (07:26-07:27 MDT, transient concurrent-session issue; Larry's plain-language question unanswered; bot alive PID 3220237). Larry approved 5th item (heal-stall-mirror-active-suppression-001) → Forge inbox. beacon-pending=1 (medic-dispatcher-delivery-failure-translation-001; dashboard approval unprocessed in Beacon inbox). 3 Forge tasks active. Watchdog 07:30:11 MDT healthy. Repo HEAD=a7d40077=origin/main. PRIME: systemic_fixes=75, vp=27, ratio=17.39, trend=improving. Tier 1, consecutive_clean=0. New G-rule: beacon-erofs-concurrent-claude-sessions-001 (2/3).
+**Iter ~2946 summary:** ⚠️ Active — PR #713 MERGED ✅ (13:37:20Z, fix(claude-auth) durable token for all droplet spawns — MAJOR MILESTONE). PR #715 (fix forge_built_no_pr on closed PR) + PR #716 NEW (fix(heal-stall): suppress unrouted_open_pr while Mirror active) — both in Mirror review, both MERGEABLE. Forge building watchdog-mirror-active-stale-suppression-001 (started 07:34 MDT). Larry's 07:25 MDT question orphan (EROFS bounced x2, DM sent [yellow]). beacon-pending=1 (medic-dispatcher-delivery-failure-translation-001). Watchdog 07:35:16 MDT healthy. Repo HEAD=7dcd8bd4=origin/main (fast-forwarded mid-cycle). PRIME: systemic_fixes=75, vp=27, ratio=17.39, trend=improving. Tier 1, consecutive_clean=0. G-rule: beacon-erofs-concurrent-claude-sessions-001 (2/3, no new occurrence iter ~2946).
 
 
