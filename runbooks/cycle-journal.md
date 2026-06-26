@@ -5,6 +5,105 @@
 ---
 
 
+## Iteration ~3004 — 2026-06-26T23:37Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean=0)
+
+**Trigger:** Larry `/cycle` via chat.
+
+**Health:** ⚠️ Check 1 WARN — 2 new WARNs since iter ~3003: forge-preamble-missing (revision-2) + mirror-malformed REVIEW_ESCALATE (no JSON body). Both from DISPATCHED ✅ G-rules; pipeline progressing. 1 new alert (idx=1076 doorbell) Tier-3 silenced. Mirror actively re-reviewing PR #731 (PID 3842198). All agents alive.
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #731 (re-verified):** OPEN, MERGEABLE=UNKNOWN. Forge inbox empty (revision-2 submitted). Mirror inbox: marker-error-forge-revision-preamble-discipline-001-1.json present. Mirror PID 3842198 active (re-review in progress after REVIEW_ESCALATE no-JSON-body error at 17:32:58 MDT). [active pipeline]
+- **direction-ask-mirror-malformed-post-restart-fix-001 (re-verified):** APPROVAL_REQUEST mirror-marker-self-validate-gate-001 still in beacon-pending-approvals.json (entry [2], 23:25:26Z). Pending Larry's "go". [carry]
+- **tier3-silence-auto-restart-failed-001 (re-verified):** Still in beacon-pending-approvals.json (entry [1], 23:11:46Z). Pending Larry. [carry]
+- **Dirty working tree (re-verified):** M config/alert-translations.json. Same as prior iters. Expected transient. [yellow, carry]
+- **Repo (re-verified):** HEAD=ORIGIN=191eced9. On main. Dirty. ✅ (wrapper successfully committed after iter ~3003: "Pulse cycle 20260626T233217Z"; also "chore(missions): autoregister healer — reconcile proposed lane" merged to origin)
+- **Sync (re-verified):** status=no-change, last_sync=22:51:15Z (~46 min). Under 2h. ✅
+- **Watchdog (re-verified):** healthy 5-min ticks through 17:32:07 MDT (23:32:07Z). ✅
+- **Heal-daemon heartbeat (re-verified):** 2026-06-26T23:30:36Z (~7 min at check time). Under 60-min. ✅
+- **Pipeline stall (re-verified):** dry-run → "no stalls detected". All tasks FORGE_NO_PR_SKIP. ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark: {repaired:false, old_watermark=1076, file_length=1077}. 1 new alert.
+- idx=1076: source=doorbell, kind=notification, intent=doorbell → Tier-3 silence (known-pattern). Doorbell digest for 2 pending dashboard approvals. beacon-bot delivered at 17:30:53 MDT (Larry already DM'd). Journal-note only.
+- Watermark: 1076→1077. ✅
+
+**Check 1 — Log noise (new since iter ~3003, after 23:30Z):**
+- outbox-notifier.log new since 23:30Z:
+  - **17:30:37 MDT WARN:** `forge revision-phase outbox without "Revision N applied:" preamble: forge-revision-preamble-discipline-001.json; treating as marker-error` — G-rule `forge-revision-preamble-missing-pr711-001` **DISPATCHED ✅ vp**, another occurrence on revision-2. PR #731 IS the fix. marker-error → Forge retry. [tier-reset signal]
+  - **17:32:58 MDT WARN:** `mirror marker error in forge-revision-preamble-discipline-001.json: MalformedMirrorMarker: Marker opening delimiter(s) found (['REVIEW_ESCALATE']) but no valid JSON object between them and the closing delimiter.` — G-rule `mirror-malformed-verdict-post-restart-001` **DISPATCHED ✅ vp**, another occurrence (revision-2 review, different subtype: has delimiters but no JSON body). marker-error written to Mirror (retry 1/3 this round). [tier-reset signal]
+- watchdog.log: healthy 5-min ticks through 17:32:07 MDT. ✅
+- 2 distinct WARNs. Both from already-dispatched G-rules. Tier-reset. Pipeline recovering (Mirror PID 3842198 re-reviewing).
+
+**Check 2 — Telegram sweep (last 4h):**
+- Last beacon-bot entry: 17:30:53 MDT — notification idx=1076 delivered (intent=doorbell). ✅
+- No new Larry directives since "go" at 15:46:18 MDT. ✅
+
+**Check 3 — Pipeline stall (dry-run):**
+- No stalls detected. All tasks FORGE_NO_PR_SKIP with correct reasons. ✅
+
+**Check 4 — Pending directives:**
+- beacon-pending-approvals.json: 3 entries (unchanged from iter ~3003):
+  - Entry [0] 21:49:13Z: mirror-review-silence-ourliberty-health-sync-push-failed-001 — STALE (PR #728 merged, chat_id=null). [carry]
+  - Entry [1] 23:11:46Z: tier3-silence-auto-restart-failed-001 — ACTIVE. Pending Larry. [carry]
+  - Entry [2] 23:25:26Z: mirror-marker-self-validate-gate-001 — ACTIVE. Pending Larry. [carry]
+- No unhandled Larry directives. ✅
+
+**Check 5 — Stale daemon code:**
+- Heartbeat=2026-06-26T23:30:36Z (~7 min). Under 60-min threshold. ✅
+
+**Check A — Source repo:** HEAD=ORIGIN=191eced9. On main. `M config/alert-translations.json` (dirty). Expected transient. [yellow, non-blocking carry]
+**Check B — Sync health:** status=no-change, last_sync=22:51:15Z (~46 min). Under 2h. ✅
+**Check C — Agent liveness:** outbox-notifier PID 3822088 ✅. dashboard-api PID 3820986 ✅. beacon-bot PID 3821234 ✅. 3× agent_telegram_bot (PIDs 3821337/3821487/3821587) ✅. inbox-watcher PID 3822087 ✅. chain_event_shipper PID 2716672 ✅. Mirror PID 3842198 (claude-opus-4-8, re-reviewing PR #731 marker-error retry) ✅. Forge: no active session (revision-2 submitted). Watchdog ticks through 17:32:07 MDT ✅. Heal-daemon 23:30:36Z ✅. **All expected agents alive.**
+**Check E — PRs:**
+- **PR #731** — OPEN, MERGEABLE=UNKNOWN. Forge revision-2 submitted (inbox empty). Mirror re-reviewing (PID 3842198, marker-error retry 1/3 for REVIEW_ESCALATE no-JSON-body at 17:32:58 MDT). [active pipeline, monitoring]
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅
+
+**Conditional checks — Friday 2026-06-26 UTC (weekday=4, firing set):**
+- Check I: invoked (no --force). journal-block for 2026-06-22 already present → cooldown-suppressed. Artifact written: check-i-2026-06-26.json. DM: cooldown-suppressed. auto-dispatched: 0. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule assessment:**
+- `forge-revision-preamble-missing-pr711-001` — **DISPATCHED ✅ vp** — revision-2 also missing preamble (17:30:37 MDT). PR #731 is the fix, in active revision cycle. [carry, additional occurrence]
+- `mirror-malformed-verdict-post-restart-001` — **DISPATCHED ✅ vp** — REVIEW_ESCALATE no-JSON at 17:32:58 MDT (revision-2 review). Mirror re-reviewing. APPROVAL_REQUEST mirror-marker-self-validate-gate-001 pending Larry. [carry, additional occurrence]
+- All other G-rules: unchanged from iter ~3003.
+
+**Actions taken:**
+1. Check 0: triaged 1 alert (idx=1076 doorbell → Tier-3). Watermark 1076→1077. ✅
+2. Check I: invoked no-force, cooldown-suppressed. ✅
+3. §5.0: all no-op. ✅
+4. PRIME ledger: intervention appended (check-1-warn-dispatched-grule-recurrence). ✅
+5. Tier state: checks-clean=false (2 WARNs) → consecutive_clean=0. Tier 1. last_signal_at=23:37:29Z. ✅
+
+**Escalations:** None. Both G-rules DISPATCHED ✅. Larry has both APPROVAL_REQUESTs in Telegram. Doorbell Tier-3 silenced. Journal-note only.
+
+**Standing findings (carried + verified):**
+- [yellow] **PR #731 — active revision/review cycle** — Forge revision-2 submitted (inbox empty). Mirror re-reviewing (PID 3842198, marker-error retry). OPEN, MERGEABLE=UNKNOWN. Both G-rules (preamble + malformed) occurring in revision-2 cycle; PR #731 is the fix. [active pipeline, monitoring]
+- [yellow] **mirror-marker-self-validate-gate-001 APPROVAL_REQUEST** — Beacon's plan for Mirror cold-start marker validation gate. Pending Larry's "go". [carry]
+- [yellow] **tier3-silence-auto-restart-failed-001 APPROVAL_REQUEST** — Pending Larry's "go". `M config/alert-translations.json` on main working tree. [carry]
+- [yellow] **Stale beacon-pending: mirror-review-silence-ourliberty-health-sync-push-failed-001** — PR #728 merged; chat_id=null; stale. [carry]
+- [yellow] **unreviewed-merge:723** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:713** — Larry judgment. [carry]
+- [yellow] **Zombie PID 1834248** — bash poll loop (29d+). Ask-then-do. [carry]
+- [yellow] **6 stale journalctl PIDs (31d+)** — Ask-then-do. [carry]
+- [yellow] **forge-wip-redispatch-digest Forge dispatch** — Beacon fix designed. Trust-policy approval pending. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — approve check-viii-update-2026-06-15. Awaiting Larry. [carry]
+- [yellow] **Check III threshold proposals** — approve threshold-update-2026-06-11. Awaiting Larry. [carry]
+- [yellow] **unreviewed-merge:710/709** — Larry judgment. [carry]
+- [blue] **mirror-malformed-verdict-post-restart-001 — DISPATCHED ✅ vp** — additional occurrence rev2 (REVIEW_ESCALATE no JSON). Mirror re-reviewing. [carry]
+- [blue] **heal-stale-daemon-code-auto-restart-failed-self-recovered — DISPATCHED ✅ vp** — PR pending Larry approval. [carry]
+- [blue] **forge-revision-preamble-missing-pr711-001 — DISPATCHED ✅ vp** — rev2 also missing preamble. PR #731 IS the fix. [carry]
+- [blue] **mirror-runner-missing-worktree-retry-001 — 1/3** — dispatch at 3/3. [carry]
+- [blue] **G-rules (unchanged):** sentinel-inflight-stall-mirror-tier4 (2/3), review-duplicate-dispatch-wip-redispatch (vp), check-i-force-bypass-dm-route (2/3), heal-daemon-restart-manifest-drift (2/3), no-session-revision-merged-pr-fp-001 (1/3), unrouted-open-pr-auto-merge-held-fp-001 (1/3), forge-wip-redispatch-digest-tier4-001 (dispatched vp), forge-wip-redispatch-exhausted-pr-exists-fp-001 (2/3), heal-stale-daemon-code-still-stale-after-restart (1/3), outbox-notifier-notification-intent-reject-tier4-001 (2/3), no-session-revision-active-mirror-session-fp-001 (DISPATCHED ✅ vp), forge-revision-preamble-missing-pr711-001 (DISPATCHED ✅ vp).
+- [blue] **unreviewed-merge:649/637/655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+
+**PRIME DIRECTIVE:** intervention. Trailing-30d: interventions=1333, systemic_fixes=79, vp=28, ratio≈16.87, trend=improving.
+**Tier end-of-iter:** Tier **1** (consecutive_clean=0; last_signal_at=2026-06-26T23:37:29Z). 2 new WARNs → consecutive_clean=0. Tier 1 (no change).
+
+---
+
+
 ## Iteration ~3003 — 2026-06-26T23:30Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean=1)
 
 **Trigger:** Larry `/cycle` via chat.

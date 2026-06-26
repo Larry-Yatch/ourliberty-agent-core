@@ -273,8 +273,8 @@ PR #725 (fix(healer): skip forge_built_no_pr for pr-<repo>-<num> tasks whose nam
 
 ---
 
-## Status snapshot — updated 2026-06-26 23:30Z UTC (Iter ~3003, Tier 1, consecutive_clean=1)
+## Status snapshot — updated 2026-06-26 23:37Z UTC (Iter ~3004, Tier 1, consecutive_clean=0)
 
-**Iter ~3003 summary:** ✅ Nominal. 1 alert (idx=1075 APPROVAL_REQUEST mirror-marker-self-validate-gate-001) Tier-3 silenced. Beacon processed direction-ask-mirror-malformed-post-restart-fix-001 → plan mirror-marker-self-validate-gate-001 APPROVAL_REQUEST delivered to Larry at 17:25:49 MDT. Forge revision-2 building (PID 3833974). 0 new WARNs. PR #731 OPEN MERGEABLE. M config/alert-translations.json dirty (expected transient). 2 active APPROVAL_REQUESTs pending Larry: tier3-silence-auto-restart-failed-001 + mirror-marker-self-validate-gate-001. PRIME: iter_clean. Tier 1 (consecutive_clean=1).
+**Iter ~3004 summary:** ⚠️ Check 1 WARN. 2 new WARNs: forge-preamble-missing revision-2 + mirror-malformed REVIEW_ESCALATE no-JSON-body (both DISPATCHED ✅ G-rules, pipeline recovering). 1 alert (idx=1076 doorbell) Tier-3 silenced. Mirror PID 3842198 actively re-reviewing PR #731 (marker-error retry). Forge inbox empty (revision-2 submitted). PR #731 OPEN MERGEABLE=UNKNOWN. M config/alert-translations.json dirty (expected transient). 2 active APPROVAL_REQUESTs pending Larry: tier3-silence-auto-restart-failed-001 + mirror-marker-self-validate-gate-001. PRIME: intervention. Tier 1 (consecutive_clean=0).
 
 
