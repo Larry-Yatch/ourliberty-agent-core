@@ -252,8 +252,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 11:23Z UTC (Iter ~2928, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 11:27Z UTC (Iter ~2929, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2928 summary:** ⚠️ Active — PR #713 REVIEW_ESCALATE pending Larry decision (approval_request `mirror-review-pr-ourliberty-agent-core-713`). 0 new alerts. All inboxes EMPTY. beacon-pending: 5 unchanged. Watchdog healthy (last tick 05:17:10 MDT). 8/8 daemons alive. Pipeline stall: 0. Sync ~21 min. PR #713 MERGEABLE=MERGEABLE (GitHub reverted from UNKNOWN). PRIME: interventions=1303, systemic_fixes=74, vp=27, ratio=17.61, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2929 summary:** ⚠️ Active — PR #713 REVIEW_ESCALATE pending Larry decision (approval_request `mirror-review-pr-ourliberty-agent-core-713`). 0 new alerts. All inboxes EMPTY. beacon-pending: 5 unchanged. Watchdog healthy (last tick 05:22:20 MDT). 8/8 daemons alive. Pipeline stall: 0. Sync ~25 min. PR #713 MERGEABLE=UNKNOWN (GitHub recomputation). PRIME: interventions=1303, systemic_fixes=74, vp=27, ratio=17.61, trend=improving. Tier 1, consecutive_clean=0.
 
 
