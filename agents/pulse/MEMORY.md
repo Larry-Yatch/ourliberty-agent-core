@@ -252,8 +252,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 08:55Z UTC (Iter ~2907, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 09:01Z UTC (Iter ~2908, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2907 summary:** ⚠️ Active — Mirror PID 3308724 at ~2h49m elapsed. 3 new alerts: 1x Tier-3 silence, 2x Tier-4 no-DM (medic-dispatcher, G-rule DISPATCHED ✅ vp). Positive: Beacon picked up direction-ask-no-session-revision-active-mirror-fix-001.json (dispatched ~2906) and queued APPROVAL_REQUEST no-session-revision-mirror-active-fp-001 to Larry. beacon-pending: 3 (medic-dispatcher fix + heal-stall-mirror-active-suppression-001 + no-session-revision-mirror-active-fp-001). Pipeline stall: 0 (all cooldowns). 8/8 daemons alive. Watchdog healthy (08:49:20Z). Check I cooldown-suppressed. PR #713 revision active. PRIME: interventions≈1285+, systemic_fixes=73, vp=27, ratio≈17.60, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2908 summary:** ⚠️ Active — Mirror PID 3308724 at ~2h56m elapsed. 1 new alert: L1070 doorbell Tier-3 silence (3 pending approvals doorbell). beacon-pending: 3 (medic-dispatcher fix + heal-stall-mirror-active-suppression-001 + no-session-revision-mirror-active-fp-001, all queued to Larry; doorbell at 08:57:53Z). Pipeline stall: 0 (all cooldowns). 8/8 daemons alive. Watchdog healthy (08:59:24Z). Check I cooldown-suppressed. PR #713 revision active (Mirror outbox empty). PRIME: interventions≈1286+, systemic_fixes=73, vp=27, ratio≈17.60, trend=improving. Tier 1, consecutive_clean=0.
 
 
