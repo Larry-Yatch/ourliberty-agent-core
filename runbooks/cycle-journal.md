@@ -5,6 +5,107 @@
 ---
 
 
+## Iteration ~2936 — 2026-06-26T12:18Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/cycle` via chat.
+
+**Health:** ⚠️ Active — PR #713 REVIEW_ESCALATE carry. 0 new alerts. beacon-pending=5 unchanged. All stalls cooldown-suppressed. 8/8 daemons alive. Watchdog healthy (06:13:21 MDT). Repo HEAD=b347fe02=origin/main.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo (re-verified):** On main. HEAD=b347fe02=origin/main. Clean. behind=0, ahead=0. ✅ (new commit: "Pulse cycle 20260626T121708Z")
+- **Sync (re-verified):** agent-core-sync.json shows last_sync=2026-06-26T12:02:21Z, status=error (self-healed push failure carry — underlying repo current, HEAD=b347fe02=origin/main). ✅
+- **Watchdog (re-verified):** tick at 06:13:21 MDT (12:13:21Z UTC) — healthy. ✅
+- **PR #713 (re-verified):** OPEN. HEAD=a3e9d589157c. MERGEABLE=UNKNOWN (GitHub recomputing). reviewDecision="" (empty). updatedAt=2026-06-26T11:08:07Z (unchanged). ⚠️ [carry — STILL TRUE]
+- **Beacon inbox (re-verified):** EMPTY. ✅
+- **Forge inbox (re-verified):** EMPTY. ✅
+- **Mirror inbox (re-verified):** EMPTY. ✅
+- **beacon-pending-approvals (re-verified):** pending=5. Unchanged. ⚠️
+- **Watermark (re-verified):** repair-watermark → {repaired:false, old_watermark=997, file_length=997}. 0 new alerts. ✅
+- **heal-daemon heartbeat (re-verified):** 2026-06-26T12:14:43Z (~3 min before scan). Under 60-min threshold. ✅
+- **Pipeline stall dry-run (re-verified):** 0 alerts. All cooldown-suppressed: forge_built_no_pr:712, no_session_revision:713, unrouted_open_pr:713. ✅
+- **Zombie PID 1834248 (re-verified):** Alive (28d17h00m). Ss state. bash poll loop. [carry — STILL TRUE]
+- **6 stale journalctl PIDs (re-verified):** All alive (31-30d+). S state. [carry — STILL TRUE]
+
+**Check 0 — Alert triage (0 new alerts):**
+- repair-watermark → {repaired:false, old_watermark=997, file_length=997}. 0 new alerts since iter ~2935. Watermark unchanged at 997. ✅ Nominal.
+
+**Check 1 — Log noise:**
+- journalctl --user -p warning (last 30 min): No entries. ✅
+- outbox-notifier.log: Last entry 05:08:08 MDT (revision-1 dup-skip for pr-713). No new activity. ✅
+- watchdog.log: Ticks through 06:13:21 MDT — overall=healthy. ✅
+
+**Check 2 — Telegram sweep (last 4h):**
+- beacon_telegram_bot.log: Last delivery idx=996 at 06:11:11 MDT (medic-dispatcher). No new Larry messages since iter ~2935. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- 0 alerts would fire. All cooldown-suppressed (forge_built_no_pr:712, no_session_revision:713, unrouted_open_pr:713). ✅
+
+**Check 4 — Pending directives:**
+- Beacon inbox: EMPTY. ✅
+- Forge inbox: EMPTY. ✅
+- Mirror inbox: EMPTY. ✅
+- beacon-pending-approvals: 5 pending. Unchanged. ⚠️ [Larry decision needed]
+
+**Check 5 — Stale daemon code:**
+- Heartbeat=2026-06-26T12:14:43Z (~3 min). Under 60-min threshold. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=b347fe02=origin/main. On main. Clean. behind=0, ahead=0. ✅ Nominal.
+**Check B — Sync health:** agent-core-sync.json status=error (12:02:21Z carry). Underlying repo HEAD=b347fe02=origin/main current. ✅ Nominal.
+**Check C — Agent liveness:** Watchdog on-schedule 06:13:21 MDT. 8/8 daemons alive.
+- **[yellow carry] PID 1834248** — bash poll loop (28d17h00m). Ss state. Ask-then-do: kill 1834248. [carry]
+- **[yellow carry] 6 stale journalctl PIDs (30-31d+)** — S state. Ask-then-do: kill 1101500 1107838 1118830 1136223 1161972 1177335. [carry]
+**Check E — PRs:**
+- **[yellow] PR #713** — REVIEW_ESCALATE (structural). HEAD=a3e9d589157c. OPEN. MERGEABLE=UNKNOWN. reviewDecision="" (empty). updatedAt=11:08:07Z. no_session_revision:713 cooldown active (stall last fired 12:07:37Z). approval_request=mirror-review-pr-ourliberty-agent-core-713 in beacon-pending item 4. **Larry decision: approve / reject / human-intervention on session-start manifest regeneration.** [carry]
+**Check H — Forge PRs:** Only PR #713 open. 0 other Forge-branch PRs. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅
+
+**Conditional checks — Friday 2026-06-26 UTC (weekday=4, IS in firing set {0,2,4,6}):**
+- Check I: check-i-2026-06-26.json EXISTS (created 04:38Z Jun 26) → cooldown-suppressed. Skip. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule assessment:**
+- No new occurrences of any G-rule this iter. All carries from iter ~2935.
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op. 0 new alerts. Watermark unchanged at 997. ✅
+2. §5.0: all no-op.
+3. Check I: cooldown-suppressed.
+4. PRIME ledger: iter_clean row appended (0 new alerts, 0 interventions, 0 dispatches). Ratio unchanged: 17.61.
+5. Tier state: record --checks-clean false → consecutive_clean=0. Tier remains 1. last_signal_at=2026-06-26T12:18Z.
+
+**Dispatches:** None this iter.
+
+**Standing findings (carried + verified):**
+- [yellow] **PR #713 — REVIEW_ESCALATE (structural)** — fix(claude-auth) durable token all droplet spawns. OPEN. MERGEABLE=UNKNOWN. HEAD=a3e9d589157c. Mirror ESCALATE at 04:42Z. no_session_revision cooldown active. beacon-pending item 4. **Larry decision: approve / reject / human-intervention on session-start manifest regeneration.** [carry]
+- [yellow] **beacon-pending-approvals: 5** — (1) medic-dispatcher-delivery-failure-translation-001; (2) heal-stall-mirror-active-suppression-001; (3) no-session-revision-mirror-active-fp-001; (4) mirror-review-pr-ourliberty-agent-core-713 (REVIEW_ESCALATE structural); (5) watchdog-mirror-active-stale-suppression-001. [carry]
+- [yellow] **no_session_revision:713 stall cooldown active** — last fired 12:07:37Z, recovery failed, new cooldown. beacon-pending item 4 is the gate. [carry]
+- [yellow] **forge_built_no_pr:pr-ourliberty-agent-core-712** — PR #712 CLOSED. Cooldown-suppressed. G-rule forge-built-no-pr-closed-pr-fp-001 (2/3). [carry]
+- [yellow] **unrouted_open_pr:713 cooldown-suppressed** — G-rule unrouted-open-pr-active-mirror-session-fp-001 DISPATCHED ✅. beacon-pending item 2. [carry]
+- [yellow] **medic-dispatcher-delivery-failure** — Tier-4, G-rule DISPATCHED ✅ vp. beacon-pending item 1. [carry]
+- [yellow] **watchdog-watcher-log-stale-post-pr694 → DISPATCHED ✅ vp** — beacon-pending item 5. [carry]
+- [yellow] **Zombie PID 1834248** — bash poll loop (28d17h00m). Ask-then-do: kill 1834248. [carry]
+- [yellow] **6 stale journalctl PIDs (31-30d+)** — Ask-then-do: kill 1101500 1107838 1118830 1136223 1161972 1177335. [carry]
+- [yellow] **unreviewed-merge:710/709** — Larry judgment. [carry]
+- [yellow] **forge-wip-redispatch-digest Forge dispatch** — Beacon fix designed (iter ~2798). Trust-policy approval from Larry pending. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649/637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — approve check-viii-update-2026-06-15. Awaiting Larry. [carry]
+- [yellow] **Check III threshold proposals** — approve threshold-update-2026-06-11. Awaiting Larry. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying standing. [carry]
+- [blue] **ourliberty-health-sync-push-failed-tier4-001 — 2/3** — push-fail at 12:02:21Z, self-healed. Dispatch to Beacon at 3/3. [carry]
+- [blue] **EROFS on .claude.json** — Not recurred. Appears transient. [carry]
+- [blue] **heal-stale-daemon-code-state.json MISSING** — heartbeat fresh; informational. [carry]
+- [blue] **G-rules:** review-duplicate-dispatch-wip-redispatch (vp), medic-dispatcher-delivery-failure-tier4-001 (DISPATCHED ✅ vp), sentinel-inflight-stall-mirror-tier4 (1/3), forge-built-no-pr-closed-pr-fp-001 (2/3), check-i-force-bypass-dm-route (2/3), heal-daemon-restart-manifest-drift (2/3), watchdog-watcher-log-stale-post-pr694 (DISPATCHED ✅ vp), no-session-revision-merged-pr-fp-001 (1/3), unrouted-open-pr-auto-merge-held-fp-001 (1/3), forge-wip-redispatch-digest-tier4-001 (dispatched vp), forge-wip-redispatch-exhausted-pr-exists-fp-001 (2/3), heal-stale-daemon-code-auto-restart-failed-self-recovered (1/3), heal-stale-daemon-code-still-stale-after-restart (1/3), outbox-notifier-notification-intent-reject-tier4-001 (2/3), ourliberty-health-sync-push-failed-tier4-001 (2/3), unrouted-open-pr-active-mirror-session-fp-001 (DISPATCHED ✅), forge-revision-preamble-missing-pr711-001 (1/3), no-session-revision-active-mirror-session-fp-001 (DISPATCHED ✅ — translations.json HAS `pipeline-stall:no-session-revision` entry; MEMORY corrected iter ~2935), pulse-source-alert-delivery-confirm-tier4-001 (1/3).
+- [blue] **unreviewed-merge:655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. [carry]
+
+**PRIME DIRECTIVE:** 0 new interventions. Trailing-30d: systemic_fixes=74, vp=27, ratio=17.61, trend=improving.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0 (non-clean: PR #713 REVIEW_ESCALATE + beacon-pending 5 + zombie PID + 6 stale journalctls). Last signal: 2026-06-26T12:18Z.
+
+---
+
+
 ## Iteration ~2935 — 2026-06-26T12:13Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/cycle` via chat.
