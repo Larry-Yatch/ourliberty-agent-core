@@ -2361,8 +2361,9 @@ class TestCheckUnroutedOpenPrs(_TempAgentsRootMixin, unittest.TestCase):
         # PR #711: a live `claude` proc cwd'd in its review worktree → skip.
         prs = [self._make_pr(711, 'larry/manual-pr-001', age_min=180)]
         cwd = self._mirror_cwd('wt-mirror-pr-ourliberty-agent-core-711')
-        with patch.object(self.hps, '_claude_pids', return_value=[4242]), \
-                patch.object(self.hps, '_proc_cwd', return_value=cwd):
+        # The probe moved to pipeline_live_state (#716 de-dup); patch it there.
+        with patch('pipeline_live_state._claude_pids', return_value=[4242]), \
+                patch('pipeline_live_state._proc_cwd', return_value=cwd):
             alerts = self.hps.check_unrouted_open_prs(prs, [], {})
         self.assertEqual(alerts, [])
 
@@ -2372,8 +2373,8 @@ class TestCheckUnroutedOpenPrs(_TempAgentsRootMixin, unittest.TestCase):
         prs = [self._make_pr(713, 'larry/manual-pr-002', age_min=180)]
         cwd = self._mirror_cwd(
             'wt-mirror-pr-ourliberty-agent-core-713-rev2') + ' (deleted)'
-        with patch.object(self.hps, '_claude_pids', return_value=[99]), \
-                patch.object(self.hps, '_proc_cwd', return_value=cwd):
+        with patch('pipeline_live_state._claude_pids', return_value=[99]), \
+                patch('pipeline_live_state._proc_cwd', return_value=cwd):
             alerts = self.hps.check_unrouted_open_prs(prs, [], {})
         self.assertEqual(alerts, [])
 
@@ -2382,8 +2383,8 @@ class TestCheckUnroutedOpenPrs(_TempAgentsRootMixin, unittest.TestCase):
         # inbox file), so the alert still fires. Boundary discipline.
         prs = [self._make_pr(13, 'larry/manual-pr-003', age_min=180)]
         cwd = self._mirror_cwd('wt-mirror-pr-ourliberty-agent-core-713')
-        with patch.object(self.hps, '_claude_pids', return_value=[7]), \
-                patch.object(self.hps, '_proc_cwd', return_value=cwd):
+        with patch('pipeline_live_state._claude_pids', return_value=[7]), \
+                patch('pipeline_live_state._proc_cwd', return_value=cwd):
             alerts = self.hps.check_unrouted_open_prs(prs, [], {})
         self.assertEqual(len(alerts), 1)
         self.assertIn('PR #13', alerts[0]['message'])
@@ -2396,7 +2397,7 @@ class TestCheckUnroutedOpenPrs(_TempAgentsRootMixin, unittest.TestCase):
         (mirror_inbox / 'review-pr-ourliberty-agent-core-711.json').write_text(
             '{}')
         prs = [self._make_pr(711, 'larry/manual-pr-004', age_min=180)]
-        with patch.object(self.hps, '_claude_pids', return_value=[]):
+        with patch('pipeline_live_state._claude_pids', return_value=[]):
             alerts = self.hps.check_unrouted_open_prs(prs, [], {})
         self.assertEqual(alerts, [])
 
@@ -2407,7 +2408,7 @@ class TestCheckUnroutedOpenPrs(_TempAgentsRootMixin, unittest.TestCase):
         (mirror_inbox / 'review-pr-ourliberty-agent-core-7130.json').write_text(
             '{}')
         prs = [self._make_pr(713, 'larry/manual-pr-005', age_min=180)]
-        with patch.object(self.hps, '_claude_pids', return_value=[]):
+        with patch('pipeline_live_state._claude_pids', return_value=[]):
             alerts = self.hps.check_unrouted_open_prs(prs, [], {})
         self.assertEqual(len(alerts), 1)
         self.assertIn('PR #713', alerts[0]['message'])
@@ -2415,7 +2416,7 @@ class TestCheckUnroutedOpenPrs(_TempAgentsRootMixin, unittest.TestCase):
     def test_fires_when_no_mirror_session_active(self):
         # No live proc, no inbox task → genuinely unrouted, alert fires.
         prs = [self._make_pr(720, 'larry/manual-pr-006', age_min=180)]
-        with patch.object(self.hps, '_claude_pids', return_value=[]):
+        with patch('pipeline_live_state._claude_pids', return_value=[]):
             alerts = self.hps.check_unrouted_open_prs(prs, [], {})
         self.assertEqual(len(alerts), 1)
         self.assertIn('PR #720', alerts[0]['message'])
@@ -2424,8 +2425,8 @@ class TestCheckUnroutedOpenPrs(_TempAgentsRootMixin, unittest.TestCase):
         # Direct helper coverage: reason strings are the documented forensic
         # identifiers logged as MIRROR_ACTIVE_SKIP reason=<...>.
         cwd = self._mirror_cwd('wt-mirror-pr-ourliberty-agent-core-711')
-        with patch.object(self.hps, '_claude_pids', return_value=[1]), \
-                patch.object(self.hps, '_proc_cwd', return_value=cwd):
+        with patch('pipeline_live_state._claude_pids', return_value=[1]), \
+                patch('pipeline_live_state._proc_cwd', return_value=cwd):
             active, reason = self.hps._mirror_session_active_for_pr(
                 'ourliberty-agent-core', 711)
         self.assertTrue(active)
@@ -2435,13 +2436,13 @@ class TestCheckUnroutedOpenPrs(_TempAgentsRootMixin, unittest.TestCase):
         mirror_inbox.mkdir(parents=True)
         (mirror_inbox / 'review-pr-ourliberty-agent-core-711-rev1.json'
          ).write_text('{}')
-        with patch.object(self.hps, '_claude_pids', return_value=[]):
+        with patch('pipeline_live_state._claude_pids', return_value=[]):
             active, reason = self.hps._mirror_session_active_for_pr(
                 'ourliberty-agent-core', 711)
         self.assertTrue(active)
         self.assertEqual(reason, 'inbox_task_present')
 
-        with patch.object(self.hps, '_claude_pids', return_value=[]):
+        with patch('pipeline_live_state._claude_pids', return_value=[]):
             active, reason = self.hps._mirror_session_active_for_pr(
                 'ourliberty-agent-core', 999)
         self.assertFalse(active)
