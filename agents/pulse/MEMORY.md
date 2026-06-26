@@ -259,8 +259,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 13:52Z UTC (Iter ~2947, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 14:02Z UTC (Iter ~2949, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2947 summary:** ⚠️ Active — Mass daemon restart (heal-stale-daemon-code; active_tier.py from PR #713 triggered stale-code detection; 6 services restarted, outbox-notifier transiently failed then self-healed via systemd). Larry's 07:25 MDT EROFS-orphaned question answered by Beacon at 07:46 MDT ✅. Larry approved medic-dispatcher-delivery-failure-translation-001 → dispatched to Forge ✅. beacon-pending=0 ✅. PR #715 + #716 in Mirror review (MERGEABLE=UNKNOWN). Forge inbox: build-watchdog-mirror-active-stale-suppression-001 (re-queued post-restart) + medic-dispatcher-delivery-failure-translation-001 (new). unreviewed-merge:713 new standing finding (Larry judgment, already delivered by outbox-notifier). G-rules updated: heal-stale-daemon-code-auto-restart-failed-self-recovered 2/3, pulse-source-alert-delivery-confirm-tier4-001 2/3. Repo HEAD=03d83c3e=origin/main. PRIME: systemic_fixes=75, vp=27, ratio=17.39. Tier 1, consecutive_clean=0.
+**Iter ~2949 summary:** ✅ Nominal — 0 new alerts. PR #715 + #716 still in Mirror review (MERGEABLE=UNKNOWN). Forge inbox: 2 tasks (build-watchdog-mirror-active-stale-suppression-001 re-queued post-restart, medic-dispatcher-delivery-failure-translation-001 Larry-approved). beacon-pending=0. Repo HEAD=8c149ac3=origin/main (cycle 20260626T135944Z). Watchdog healthy (14:00:20Z). Sync 60 min old (under 2h). Pipeline stall dry-run: 0 alerts. Zombie PID 1834248 still alive (28d18h43m). PRIME: systemic_fixes=75, vp=27, ratio=17.4. Tier 1, consecutive_clean=0. G-rules unchanged from iter ~2948.
 
 
