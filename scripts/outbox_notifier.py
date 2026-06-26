@@ -4636,6 +4636,13 @@ def _build_cold_start_revision_prompt(
         f'`Revision {next_count} applied: <summary>` (strict — a missing prefix '
         'dead-letters back to you).',
         '',
+        f'The preamble `Revision {next_count} applied:` must be the VERY FIRST '
+        'characters of THIS response — no acknowledgement, greeting, or preface '
+        'before it. The gate is anchored to the start of your response. If '
+        f'`Revision {next_count - 1} applied:` (a prior round) appears earlier in '
+        'this conversation, that does NOT satisfy the gate: THIS response must '
+        f'still START with `Revision {next_count} applied:`.',
+        '',
         'If a finding is a judgment/values call you cannot resolve from the PR '
         'intent (e.g. an ambiguous spec contradiction), do NOT guess: leave '
         'that finding unapplied and say so explicitly in your result summary so '
@@ -4787,6 +4794,15 @@ def _dispatch_revision_to_forge(
             '(PR auto-updates), and emit a one-line result starting with '
             f'`Revision {next_count} applied: <summary>` (strict per 5b — '
             'missing prefix dead-letters back to you).',
+            '',
+            f'ROUND-{next_count} TRAP: this is a resumed conversation. A prior '
+            f'round\'s `Revision {next_count - 1} applied:` line already exists '
+            'earlier in this session, and the gate is anchored to the start of '
+            'THIS response only. Do NOT open with a conversational '
+            'acknowledgement of the new findings — the preamble '
+            f'`Revision {next_count} applied:` must be the VERY FIRST characters '
+            'of THIS response, before any other text. The earlier preamble does '
+            'NOT count.',
         ])
         revision_prompt = '\n'.join(revision_prompt_lines)
 
@@ -10807,6 +10823,20 @@ def process_outbox(outbox_file: Path) -> str:
                 f'preamble: {outbox_file.name}; treating as marker-error',
                 'WARN',
             )
+            _round = data.get('revision_count')
+            _n = _round if isinstance(_round, int) and _round >= 1 else None
+            _round2_trap = (
+                'ROUND-2+ TRAP: this is a resumed conversation. Even though a '
+                + (f'"Revision {_n - 1} applied:" ' if _n and _n > 1
+                   else '"Revision N-1 applied:" ')
+                + 'line appears earlier in this conversation, THIS response must '
+                + (f'START with "Revision {_n} applied:". ' if _n
+                   else 'START with "Revision N applied:". ')
+                + 'The gate is anchored to the start of THIS response only — '
+                'the earlier round\'s preamble does NOT satisfy it. Do NOT open '
+                'with a conversational acknowledgement of the findings; the '
+                'preamble must be the VERY FIRST characters of your reply.'
+            )
             _notify_forge_marker_error(
                 data,
                 'phase=revision requires response to START with '
@@ -10814,7 +10844,7 @@ def process_outbox(outbox_file: Path) -> str:
                 'found. Re-read agents/forge/CLAUDE.md Revision phase '
                 'protocol — the preamble is the structural signal that '
                 'revision completed; the rest of the response is narrative '
-                'underneath.',
+                'underneath. ' + _round2_trap,
             )
             _archive_outbox(outbox_file)
             return 'marker-error'

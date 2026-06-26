@@ -5093,6 +5093,36 @@ class RevisionLoopTest(unittest.TestCase):
             [],
         )
 
+    def test_round2_missing_preamble_retry_carries_trap_wording(self):
+        # The recurring churn (PR #711/#720/#726): on round 2+ Forge resumes a
+        # session that already holds her round-1 "Revision 1 applied:" line, so
+        # her new preamble lands mid-response and the strict gate bounces it.
+        # The marker-error retry must call out the round-2 trap with the
+        # CONCRETE round numbers from the envelope so the bounce self-corrects.
+        body = _good_outbox(
+            agent='forge', source='beacon', task_id='round2-trap',
+            phase='revision', target_repo='ourliberty-agent-core',
+            claude_session_id='forge-sess',
+            result=(
+                'Thanks — I see Mirror\'s new findings. I applied them.\n'
+                'Revision 2 applied: fixed the off-by-one per finding 2.'
+            ),
+        )
+        body['revision_count'] = 2
+        f = self._write_outbox('forge', 'revision-round2-trap-2.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'marker-error')
+        marker_errors = list(
+            (on.INBOXES_ROOT / 'forge').glob('marker-error-*.json')
+        )
+        self.assertEqual(len(marker_errors), 1)
+        prompt = json.loads(marker_errors[0].read_text())['prompt']
+        # Round-2 trap callout present, with concrete prior/current rounds.
+        self.assertIn('TRAP', prompt)
+        self.assertIn('resumed conversation', prompt)
+        self.assertIn('Revision 1 applied:', prompt)
+        self.assertIn('Revision 2 applied:', prompt)
+
     def test_rereview_dispatch_idempotent_on_reprocess(self):
         body = self._forge_revision_outbox(round_num=1)
         f = self._write_outbox('forge', 'revision-prod-loop-1.json', body)
