@@ -204,8 +204,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 01:59Z UTC (Iter ~2845, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 02:05Z UTC (Iter ~2846, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2845 summary:** ✅ Nominal — 0 new alerts. 8/8 daemons alive, watchdog healthy (01:53:33Z). PR #711 (agent-core) in active revision (REVIEW_REVISION at 19:55Z, Forge revision + Mirror re-review both dispatched). PR #95 (dashboard) queued in Mirror inbox. Check I Friday: cooldown-suppressed. Zombie PID 1834248 + 6 stale journalctl PIDs carry. watermark=1028. PRIME: interventions=1227, systemic_fixes=71, vp=27, ratio≈17.28, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2846 summary:** ✅ Nominal — 0 new alerts. 8/8 daemons alive, watchdog healthy (01:59:01Z). PR #95 dashboard MERGED at 02:02:22Z (Mirror PASS → auto-merge). PR #711 agent-core rev1 in active Mirror review (PID 3167824 since 20:02 MDT; rev1 + duplicate original review both in Mirror inbox — G-rule review-duplicate-dispatch vp). Check I Friday: cooldown-suppressed. Zombie PID 1834248 + 6 stale journalctl PIDs carry. watermark=1028. PRIME: interventions=1227, systemic_fixes=71, vp=27, ratio≈17.28, trend=improving. Tier 1, consecutive_clean=0.
 
 
