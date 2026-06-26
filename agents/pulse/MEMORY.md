@@ -138,9 +138,9 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## G-rule watchdog-watcher-log-stale-post-pr694 — 2/3 (updated iter ~2696)
+## G-rule watchdog-watcher-log-stale-post-pr694 → DISPATCHED ✅ (iter ~2922), vp
 
-**Rule:** Watchdog WARN at 05:39 UTC (23:39 MDT) AND 05:44 UTC (23:44 MDT) — "Watcher log stale Ns with 1 non-empty inbox(es)" — while Mirror WAS actively running (PID 2612954 started 23:28 MDT). Two distinct watchdog-complete=warning cycles within same Mirror session. Root cause: inbox-watcher handles Forge tasks only; Mirror sessions are triggered by a separate mechanism. inbox_watcher.log goes stale after Forge completes even if Mirror is actively processing its separate inbox. PR #694 (session-aware suppression) did not suppress these WARNs. Watchdog returned to healthy at 23:49 MDT (possibly Mirror inbox_watcher activity resumed after first Mirror task completed). Dispatch to Beacon at 3/3 (next Mirror session that triggers WARN).
+**Rule:** Watchdog fires WARN "Watcher log stale Ns with 1 non-empty inbox(es)" repeatedly while Mirror is actively running. Root cause: inbox-watcher handles Forge tasks only; Mirror sessions triggered via separate mechanism; inbox_watcher.log goes stale during Mirror sessions. PR #694 partial fix. Fix: add MIRROR_ACTIVE_SKIP suppression in watchdog stale-log warning path. Dispatched `direction-ask-watchdog-stale-mirror-session-fix-001.json` to Beacon inbox at iter ~2922. verification_pending.
 
 ---
 
@@ -252,8 +252,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 10:28Z UTC (Iter ~2921, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 10:40Z UTC (Iter ~2922, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2921 summary:** ⚠️ Active — Mirror PID 3380711 alive at 13:06 elapsed doing rev2 (revision_count=2) of PR #713. outbox-notifier re-dispatched original review (revision_count=0) AGAIN at 04:25:08Z → archived. Watchdog WARNs at 04:21+04:26 MDT (inbox_watcher stale during Mirror session, G-rule watchdog-watcher-log-stale-post-pr694 2/3). 0 new alerts. beacon-pending: 3 unchanged. 8/8 daemons alive. Pipeline stall: 0. PRIME: interventions≈1299+, systemic_fixes=73, vp=27, ratio≈17.8, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2922 summary:** ⚠️ Active — Mirror PID 3380711 alive at 21:57 elapsed doing rev2 of PR #713. 4 new alerts (L984 Tier-3, L985 Tier-3, L986 Tier-4, L987 Tier-4; medic-dispatcher G-rule DISPATCHED vp). Duplicate mirror inbox archived (4th this session, G-rule review-duplicate-dispatch-wip-redispatch vp). Watchdog WARNs 04:31+04:36 MDT → G-rule watchdog-watcher-log-stale-post-pr694 reached 3/3 → DISPATCHED direction-ask-watchdog-stale-mirror-session-fix-001 to Beacon. beacon-pending: 3 unchanged. 8/8 daemons alive. Pipeline stall: 0. PRIME: interventions≈1300+, systemic_fixes=74, vp=28, ratio≈17.6, trend=improving. Tier 1, consecutive_clean=0.
 
 
