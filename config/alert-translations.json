@@ -642,5 +642,13 @@
       "plain_language_summary": "An inbox envelope was dropped to <agent>/.invalid because the layer-2 routing table denied its (source -> target) pair, even though it passed layer-1 source validation. A control surface lost this action silently -- its API call may have returned success while the work was discarded. This is the standing tripwire for the 2026-05-28 dashboard gap (dashboard Approve/Reject envelopes passed source validation but had no FRESH_DISPATCH_ROUTES entry). The subject carries the source->target route after the colon; the body carries the dropped envelope id. No auto-replay -- the envelope is gone, not retried.",
       "recommended_action": "Check whether the source legitimately should reach the target. If yes, add the route to routing_validator.FRESH_DISPATCH_ROUTES (the test_dispatch_route_parity guard exists for exactly this) and re-issue the dropped action manually (its id is in the alert body). If the denial is correct (a genuinely unlisted source), no action -- the alert confirms the gate held. Look in ~/agents/inboxes/<agent>/.invalid/ for the dropped envelope and its .reason sidecar."
     }
+  },
+  "ourliberty-health": {
+    "sync_agent_core: auto-commit push failed": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "sync_agent_core auto-committed Pulse runtime files but the push to origin/main failed and was rolled back; the working tree is consistent and sync retries the push on the next tick (~5 min). Routine self-healing transient - the companion sync.service digest alert (sync-blocked:auto-commit-push-failed) already covers it, so this escalate-route ourliberty-health duplicate needs no separate action.",
+      "recommended_action": "No action - self-heals on the next sync tick. If the failure persists across many ticks, the actionable signal is the sync.service sync-blocked digest, not this one."
+    }
   }
 }
