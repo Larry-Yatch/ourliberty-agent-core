@@ -158,7 +158,7 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ## Completed G-rules — condensed for space (COMPLETE ✅)
 
-`outbox-notifier url-shape-invalid` → PR #493 (2026-06-13). `medic-diagnosis-tier4` → PR #515 (2026-06-15). `heal-pipeline-stall:unrouted-pr` → PR #516 (2026-06-15). `check-i-repeat-dm-fix-001` → PR #674 (2026-06-24). `heal-droplet-git-drift` → PR #586 (2026-06-19). `silence-routine-weekly-alerts` → PR #604 (2026-06-20). `forge-preflight-no-marker` → PR #600 (2026-06-19). `projects-json-healer-path` → PR #603 (2026-06-20). `outbox-notifier-review-pass` → PR #604 scope. `seq-advancer-sequence-stranded` → PR #661 (2026-06-24). `catalog-accuracy-drift` → PR #6 ourliberty-graph (2026-06-22). `doorbell-tier4-pattern` → PR #648 (2026-06-23). `heal-stale-daemon-code-script-service-mismatch` → PR #647 (2026-06-23). `mirror-marker-parse-error` → PR #650 (2026-06-23). `watchdog-watcher-log-stale` → PR #649 (2026-06-23). `watchdog-watcher-log-stale-post-fix` → PR #694 (2026-06-25). `ourliberty-health-notify-script-missing` → PR #696 (2026-06-25). `heal-pipeline-stall-mirror-pass-unmerged-tier4` → PR #695 (2026-06-25). `stale-proposed-mission-pipeline-fp-001` → PR #697 (2026-06-25, sibling_pr_title_shipped suppression). `outbox-notifier-auto-merge-loop-merged-pr-001` → PR #700 (2026-06-25, verified iter ~2713). `forge-built-no-pr-retry1-fp-001` → PR #701 (pattern1) + PR #702 (pattern2, rebase_target_shipped disambiguation, both 2026-06-25, verified iter ~2772). `mirror-marker-severity-blocking-pr711-001` → PR #714 (2026-06-26T06:03:41Z, Mirror REVIEW_PASS + auto-merged).
+`outbox-notifier url-shape-invalid` → PR #493 (2026-06-13). `medic-diagnosis-tier4` → PR #515 (2026-06-15). `heal-pipeline-stall:unrouted-pr` → PR #516 (2026-06-15). `check-i-repeat-dm-fix-001` → PR #674 (2026-06-24). `heal-droplet-git-drift` → PR #586 (2026-06-19). `silence-routine-weekly-alerts` → PR #604 (2026-06-20). `forge-preflight-no-marker` → PR #600 (2026-06-19). `projects-json-healer-path` → PR #603 (2026-06-20). `outbox-notifier-review-pass` → PR #604 scope. `seq-advancer-sequence-stranded` → PR #661 (2026-06-24). `catalog-accuracy-drift` → PR #6 ourliberty-graph (2026-06-22). `doorbell-tier4-pattern` → PR #648 (2026-06-23). `heal-stale-daemon-code-script-service-mismatch` → PR #647 (2026-06-23). `mirror-marker-parse-error` → PR #650 (2026-06-23). `watchdog-watcher-log-stale` → PR #649 (2026-06-23). `watchdog-watcher-log-stale-post-fix` → PR #694 (2026-06-25). `ourliberty-health-notify-script-missing` → PR #696 (2026-06-25). `heal-pipeline-stall-mirror-pass-unmerged-tier4` → PR #695 (2026-06-25). `stale-proposed-mission-pipeline-fp-001` → PR #697 (2026-06-25, sibling_pr_title_shipped suppression). `outbox-notifier-auto-merge-loop-merged-pr-001` → PR #700 (2026-06-25, verified iter ~2713). `forge-built-no-pr-retry1-fp-001` → PR #701 (pattern1) + PR #702 (pattern2, rebase_target_shipped disambiguation, both 2026-06-25, verified iter ~2772). `mirror-marker-severity-blocking-pr711-001` → PR #714 (2026-06-26T06:03:41Z, Mirror REVIEW_PASS + auto-merged). `unrouted-open-pr-active-mirror-session-fp-001` → PR #716 (2026-06-26T14:38:28Z, MIRROR_ACTIVE_SKIP suppression). `forge-built-no-pr-closed-pr-fp-001` → PR #715 (2026-06-26T14:38:35Z, CLOSED-not-merged PR skip in check_forge_built_no_pr).
 
 ---
 
@@ -204,9 +204,9 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## G-rule unrouted-open-pr-active-mirror-session-fp-001 → DISPATCHED ✅ (iter ~2903, 3/3)
+## G-rule unrouted-open-pr-active-mirror-session-fp-001 → COMPLETE ✅ (iter ~2955)
 
-**Rule:** `heal_pipeline_stall.py` dry-run fires `unrouted_open_pr:<pr>` after cooldown expiry even when Mirror IS actively reviewing the PR (active PID + inbox task present). Occurrences: iter ~2848 (PR #711, Mirror PID 3172100 running); iter ~2881 (PR #713, Mirror PID 3308724 active ~4 min reviewing rev1); iter ~2903 (PR #713, Mirror PID 3308724 at 2h17m, cooldown expired again). Fix: add `MIRROR_ACTIVE_SKIP` suppression (check inbox task presence or live PID) before firing `unrouted_open_pr`. Dispatched `direction-ask-unrouted-pr-active-mirror-session-fix-001.json` to Beacon inbox at iter ~2903. May fold in `no-session-revision-active-mirror-session-fp-001` (same root cause class). verification_pending.
+PR #716 (fix(heal-stall): suppress unrouted_open_pr alert while Mirror is actively reviewing) MERGED 2026-06-26T14:38:28Z. Fix verified live. Moving to Completed G-rules.
 
 ---
 
@@ -241,9 +241,9 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## G-rule forge-built-no-pr-closed-pr-fp-001 → DISPATCHED ✅ (iter ~2939), vp
+## G-rule forge-built-no-pr-closed-pr-fp-001 → COMPLETE ✅ (iter ~2955)
 
-**Rule:** `forge_built_no_pr` stall fires for tasks whose PR is CLOSED (not merged, not open). Occurrences: iter ~2892, iter ~2903, iter ~2939 (3/3). Fix: stall checker should skip `forge_built_no_pr` for tasks with a closed (non-merged) PR, analogous to FORGE_NO_PR_SKIP pr_exists logic. direction-ask-forge-no-pr-closed-pr-fix-001.json dispatched to Beacon inbox at iter ~2939. verification_pending.
+PR #715 (fix(healer): skip forge_built_no_pr stall when task PR is CLOSED) MERGED 2026-06-26T14:38:35Z. Fix verified live. Moving to Completed G-rules.
 
 ---
 
@@ -259,8 +259,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 14:34Z UTC (Iter ~2954, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 14:41Z UTC (Iter ~2955, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2954 summary:** ✅ Nominal — 0 new alerts. Mirror actively reviewing PRs #716/#717/#718 (PID 3509077, started 14:12Z). PR #715 Mirror PASS + AUTO_MERGE_HELD behind #716. Forge inbox: empty. Beacon inbox: empty. beacon-pending=0. Repo HEAD=7cd65e50=origin/main. Watchdog healthy (14:32:03Z). Sync 32 min old. Pipeline stall dry-run: 0 alerts. Zombie PID 1834248 still alive (28d19h+). PRIME: systemic_fixes=75, vp=27, ratio=17.4. Tier 1, consecutive_clean=0. Check I: dm_route digest (no-force correct, repeat suppressed). Watermark at 1016.
+**Iter ~2955 summary:** ⚡ Active — PRs #715+#716 MERGED (08:38Z). 2 G-rules complete. Fast-forward applied (6f18d0b0→d27cc1c7). Mirror PID 3533331 reviewing PR #717. PR #718 queued. 2 new Tier-3 silenced alerts (outbox-notifier review-pass). Watermark at 1018. Check I: dm_route digest (correct). Zombie PID 1834248 alive (28d19h+). PRIME: systemic_fixes=75, vp=25 (−2), ratio≈18.0. Tier 1, consecutive_clean=0.
 
 
