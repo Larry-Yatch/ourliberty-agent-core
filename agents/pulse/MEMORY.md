@@ -216,9 +216,9 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## G-rule medic-dispatcher-delivery-failure-tier4-001 → DISPATCHED ✅ (iter ~2893), vp
+## G-rule medic-dispatcher-delivery-failure-tier4-001 → PR #718 in Mirror review (iter ~2951), vp
 
-**Rule:** `source=medic-dispatcher` alerts classify Tier-4 (novel, no translation match). Occurrences: iter ~2850 PR#711 (1/3); iter ~2884 PR#713 (2/3); iter ~2893 PR#713 L1052 (3/3). Direction-ask dispatched to Beacon (direction-ask-medic-dispatcher-tier4-fix-001.json). Fix: add `source=medic-dispatcher` → Tier-3 entry to config/alert-translations.json (scoped to cases where outbox-notifier already delivered the escalate route). verification_pending.
+**Rule:** `source=medic-dispatcher` alerts classify Tier-4 (novel, no translation match). Occurrences: iter ~2850 PR#711 (1/3); iter ~2884 PR#713 (2/3); iter ~2893 PR#713 L1052 (3/3). Direction-ask dispatched to Beacon (direction-ask-medic-dispatcher-tier4-fix-001.json). Forge built medic-dispatcher-delivery-failure-translation-001 → PR #718 opened 2026-06-26T14:08:50Z. Fix: add `source=medic-dispatcher` → Tier-3 entry to config/alert-translations.json (scoped to cases where outbox-notifier already delivered the escalate route). In Mirror review. verification_pending.
 
 ---
 
@@ -259,8 +259,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 14:10Z UTC (Iter ~2950, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 14:12Z UTC (Iter ~2951, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2950 summary:** ✅ Nominal — 0 new alerts. PR #715 + #716 + #717 in Mirror review (#717 NEW: watchdog-mirror-active-stale-suppression-001, MERGEABLE). Forge inbox: 1 task (medic-dispatcher-delivery-failure-translation-001 Larry-approved, queued). beacon-pending=0. Repo HEAD=a9cb7960=origin/main. Watchdog healthy (14:05:20Z). Sync 8 min old. Pipeline stall dry-run: 0 alerts. Zombie PID 1834248 still alive (28d18h49m). PRIME: systemic_fixes=75, vp=27, ratio=17.4. Tier 1, consecutive_clean=0. G-rules unchanged from iter ~2949.
+**Iter ~2951 summary:** ✅ Nominal — 0 new alerts. PR #715 + #716 + #717 + #718 in Mirror review (#718 NEW: medic-dispatcher-delivery-failure-translation-001, built by Forge post-iter ~2950). Forge inbox: 0 tasks (cleared). beacon-pending=0. Repo HEAD=93cd0cd5=origin/main. Watchdog healthy (14:10:49Z). Sync 10 min old. Pipeline stall dry-run: 0 alerts. Zombie PID 1834248 still alive (28d18h53m). PRIME: systemic_fixes=75, vp=27, ratio=17.4. Tier 1, consecutive_clean=0. G-rule medic-dispatcher-delivery-failure-tier4-001 updated to PR #718 in Mirror review.
 
 
