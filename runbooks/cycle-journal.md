@@ -5,6 +5,111 @@
 ---
 
 
+## Iteration ~2977 — 2026-06-26T17:21Z UTC (interactive /cycle via /loop, Tier 1, consecutive_clean 1→2)
+
+**Trigger:** Larry `/loop /cycle` via chat.
+
+**Health:** ✅ Nominal — PR #719 MERGED 17:20:01Z (pipeline live-state primitive, 25-min Mirror review). 0 new alerts. Mirror PID 3618489 reviewing PR #720 (~1 min in). 3 PRs in queue. All daemons healthy.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo (re-verified):** HEAD=3a4444ef=origin/main (Pulse cycle 20260626T171813Z). On main. Clean. Up to date. ✅
+- **Sync (re-verified):** last_sync=2026-06-26T17:02:39Z (~19 min). Under 2h threshold. ✅
+- **Watchdog (re-verified):** last tick 11:17:20 MDT (17:17:20Z) — healthy 5-min ticks. ✅
+- **Heal-daemon heartbeat (re-verified):** 2026-06-26T17:17:19Z (~5 min at check time). Under 60-min threshold. ✅
+- **Mirror PID 3597547 (re-verified):** DEAD — review of PR #719 COMPLETE. ✅
+- **PR #719 (re-verified):** MERGED 17:20:01Z — fix(pipeline): shared live-state primitive — de-dup stall-detector probes (#716) + guard re-dispatch. Auto-merged by outbox-notifier at 17:20:02Z. Worktree torn down. ✅ [cleared]
+- **Mirror PID 3618489 (new):** alive, 43s elapsed at check time. Reviewing pr-ourliberty-agent-core-720.json. Not stuck. ✅
+- **PR #720 (re-verified):** OPEN. Mirror reviewing (live_pid 3618489). [carry]
+- **PR #721 (re-verified):** OPEN. Mirror inbox queued. [carry]
+- **PR #722 (re-verified):** OPEN. Mirror inbox queued. [carry]
+- **Forge inbox (re-verified):** EMPTY. ✅
+- **Beacon inbox (re-verified):** EMPTY. ✅
+- **beacon-pending-approvals (re-verified):** pending=0. ✅
+- **outbox-notifier (re-verified):** PID 3475738 alive. Last log 11:20:03 MDT (PR #719 auto-merge teardown). ✅
+- **beacon-bot (re-verified):** PID 3476104 alive. ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark → {repaired:false, old_watermark=1024, file_length=1024}. 0 new alerts. ✅
+- Re-checked post-PR-#719-merge: file_length still 1024. No new alert rows. ✅
+- Watermark holds at 1024. Nominal.
+
+**Check 1 — Log noise:**
+- watchdog.log: last tick 11:17:20 MDT (17:17:20Z) — healthy 5-min ticks. No WARNs. ✅
+- outbox-notifier.log: last active entry 11:20:03 MDT (PR #719 auto-merge worktree teardown). PID 3475738 alive. ✅
+
+**Check 2 — Telegram sweep:**
+- beacon_telegram_bot.log: last Larry message 10:19:23 MDT ("is mirror stuck?") — handled iter ~2974. No new Larry messages. No orphaned directives. ✅
+
+**Check 3 — Pipeline stall (dry-run):**
+- **1 FP would fire: `forge_built_no_pr:pr-ourliberty-agent-core-712`** (PR #712 CLOSED-not-merged). G-rule `forge-built-no-pr-pr-task-id-closed-fp-001` 2/3. [carry]
+- MIRROR_ACTIVE_SKIP: pr-720 (live_pid 3618489). ✅
+- PR #719 no longer in stall scan (MERGED). ✅
+- All other tasks: FORGE_NO_PR_SKIP correctly applied. No live stalls. ✅
+
+**Check 4 — Pending directives:**
+- Beacon inbox: empty. ✅ Forge inbox: empty. ✅ beacon-pending: 0. ✅
+- Mirror inbox: 3 review tasks (PR #720 active, PR #721/#722 queued). ✅
+
+**Check 5 — Stale daemon code:**
+- Heartbeat=2026-06-26T17:17:19Z (~5 min at check time). Under 60-min threshold. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=3a4444ef=origin/main. On main. Clean. Up to date. ✅
+**Check B — Sync health:** last_sync=17:02:39Z (~19 min). Under 2h threshold. ✅
+**Check C — Agent liveness:** Watchdog healthy (17:17:20Z, 5-min ticks). Heal-daemon fresh (17:17:19Z). outbox-notifier PID 3475738 alive. beacon-bot PID 3476104 alive. Mirror PID 3618489 active (~1 min, reviewing PR #720). All nominal. ✅
+**Check E — PRs:**
+- [green] **PR #719 — MERGED 17:20:01Z** — fix(pipeline): shared live-state primitive — de-dup stall-detector probes + guard re-dispatch. 25-min Mirror review. Auto-merged. ✅
+- [yellow] **PR #720** — OPEN. Mirror actively reviewing (PID 3618489, ~1 min, not stuck). fix: auto-rebind ~/.claude.json mount (EROFS). [carry]
+- [yellow] **PR #721** — OPEN. Mirror inbox queued. fix(needs-you): phantom "stuck" rows in terminal build-sequences. [carry]
+- [yellow] **PR #722** — OPEN. Mirror inbox queued. fix(missions): reconcile shipped Operator Needs-You Feed off stale in_flight phase. [carry]
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅
+
+**Conditional checks — Friday 2026-06-26 UTC (weekday=4, firing set):**
+- Check I: journal block for 2026-06-22 already present; dm_route=digest, cooldown-suppressed. auto-dispatched: 0. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule assessment:**
+- sentinel-inflight-stall-mirror-tier4: PR #719 completed in ~25 min — well under 60-min in-flight threshold. No new sentinel alert this iter. Still 2/3. [carry]
+- forge-built-no-pr-pr-task-id-closed-fp-001: 2/3 carry. [carry]
+- All other G-rules: unchanged from iter ~2976.
+
+**Actions taken:**
+1. Check 0: 0 new alerts. Watermark 1024 unchanged. ✅
+2. §5.0: all no-op. ✅
+3. Check I: invoked no-force, dm_route=digest (correct). ✅
+4. PRIME ledger: iter_clean row appended (ts=17:21:56Z). ✅
+5. Tier state: record --checks-clean true → consecutive_clean=2. Tier 1. ✅
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [yellow] **PR #720 — Mirror actively reviewing (~1 min, not stuck)** — fix: auto-rebind ~/.claude.json mount (EROFS). [carry]
+- [yellow] **PR #721 — Mirror queue** — fix(needs-you): phantom "stuck" rows in terminal build-sequences. [carry]
+- [yellow] **PR #722 — Mirror queue** — fix(missions): reconcile shipped Operator Needs-You Feed off stale in_flight phase. [carry]
+- [yellow] **unreviewed-merge:713** — Larry judgment. [carry]
+- [yellow] **Zombie PID 1834248** — bash poll loop (29d+). Ask-then-do. [carry]
+- [yellow] **6 stale journalctl PIDs (31d+)** — Ask-then-do. [carry]
+- [yellow] **forge-wip-redispatch-digest Forge dispatch** — Beacon fix designed. Trust-policy approval pending. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — approve check-viii-update-2026-06-15. Awaiting Larry. [carry]
+- [yellow] **Check III threshold proposals** — approve threshold-update-2026-06-11. Awaiting Larry. [carry]
+- [yellow] **unreviewed-merge:710/709** — Larry judgment. [carry]
+- [blue] **forge-built-no-pr-pr-task-id-closed-fp-001 — 2/3** — dispatch at 3/3. [carry]
+- [blue] **heal-stale-daemon-code-auto-restart-failed-self-recovered — 2/3** — dispatch at 3/3. [carry]
+- [blue] **pulse-source-alert-delivery-confirm-tier4-001 — 2/3** — dispatch at 3/3. [carry]
+- [blue] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced. [carry]
+- [blue] **ourliberty-health-sync-push-failed-tier4-001 — 2/3** — dispatch at 3/3. [carry]
+- [blue] **beacon-erofs-concurrent-claude-sessions-001 — DISPATCHED ✅, vp** — PR #720 in Mirror review (active). [carry]
+- [blue] **Stale worktree wt-mirror-pr-ourliberty-agent-core-713** — PR #713 long merged; persists. [carry]
+- [blue] **G-rules (unchanged):** sentinel-inflight-stall-mirror-tier4 (2/3), review-duplicate-dispatch-wip-redispatch (vp), check-i-force-bypass-dm-route (2/3), heal-daemon-restart-manifest-drift (2/3), no-session-revision-merged-pr-fp-001 (1/3), unrouted-open-pr-auto-merge-held-fp-001 (1/3), forge-wip-redispatch-digest-tier4-001 (dispatched vp), forge-wip-redispatch-exhausted-pr-exists-fp-001 (2/3), heal-stale-daemon-code-still-stale-after-restart (1/3), outbox-notifier-notification-intent-reject-tier4-001 (2/3), ourliberty-health-sync-push-failed-tier4-001 (2/3), forge-revision-preamble-missing-pr711-001 (1/3), no-session-revision-active-mirror-session-fp-001 (DISPATCHED ✅ vp), pulse-source-alert-delivery-confirm-tier4-001 (2/3), forge-built-no-pr-pr-task-id-closed-fp-001 (2/3).
+- [blue] **unreviewed-merge:649/637/655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+
+**PRIME DIRECTIVE:** iter_clean (no new interventions this iter). Trailing-30d: interventions=1323, systemic_fixes=75, vp=27, ratio=17.64, trend=improving. Tier 1, consecutive_clean=2.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=2. Last signal: 2026-06-26T17:10:37Z.
+
+---
+
+
 ## Iteration ~2976 — 2026-06-26T17:16Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→1)
 
 **Trigger:** Larry `/cycle` via chat.
