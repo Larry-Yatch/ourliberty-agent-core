@@ -161,32 +161,6 @@
       "recommended_action": "None -- the daemon was restarted onto the new code and verified live. Self-healed; details appear in the daily digest. Runbook: runbooks/heal-stale-daemon-code.md."
     }
   },
-  "heal-claude-json-bind-drift": {
-    "rebound": {
-      "severity": "INFO",
-      "tier": "FYI",
-      "plain_language_summary": "A Telegram bot's claude config file mount had gone read-only (the file was atomically replaced on the host after the unit started, so the bot was failing with `[claude exit 1]` and looked offline). The healer restarted the unit to re-bind the current file and confirmed it is writable again. No action needed — a routine self-heal surfaced for the record only.",
-      "recommended_action": "None — the bot was restarted and re-verified writable. Self-healed; details appear in the daily digest. Runbook: runbooks/claude-json-bind-drift.md."
-    },
-    "repair-failed": {
-      "severity": "URGENT",
-      "tier": "NOW",
-      "plain_language_summary": "A Telegram bot's claude config file mount went read-only (EROFS) and the healer tried to fix it by restarting the unit, but the restart did NOT bring the bot back. The bot is likely still offline or replying with `[claude exit 1]`, and there is no automatic retry.",
-      "recommended_action": "Restart the unit by hand (`sudo systemctl restart <unit>`) and check `journalctl -u <unit> -n 50` for why it failed to come up. Runbook: runbooks/claude-json-bind-drift.md."
-    },
-    "still-dangled": {
-      "severity": "URGENT",
-      "tier": "NOW",
-      "plain_language_summary": "A bot's claude config file mount went read-only again within minutes of an automatic restart — the auto-repair fired recently and the problem came right back, so the healer stopped restarting to avoid a loop. This points at a structural problem: the read-write carve-out may have been removed from the unit file, or something is replacing the config file every few minutes.",
-      "recommended_action": "Confirm the carve-out is still present (`systemctl cat <unit> | grep ReadWritePaths`), then restart by hand (`sudo systemctl restart <unit>`) and investigate what is replacing the file. Runbook: runbooks/claude-json-bind-drift.md."
-    },
-    "probe-blind": {
-      "severity": "WARNING",
-      "tier": "SOON",
-      "plain_language_summary": "The healer that fixes read-only claude-config mounts cannot probe a bot's mount namespace (its `sudo -n` / `nsenter` access failed). The healer is BLIND for that unit — if its config mount goes read-only, it will NOT be auto-repaired and the bot will look offline until someone restarts it by hand.",
-      "recommended_action": "Fix the droplet sudoers NOPASSWD contract for nsenter and confirm `nsenter` (util-linux) is installed, so the healer can probe and auto-repair again. Runbook: runbooks/claude-json-bind-drift.md."
-    }
-  },
   "heal-credential-registry-drift": {
     "credential-drift:MISSING_REGISTRY_ENTRY": {
       "severity": "WARNING",
