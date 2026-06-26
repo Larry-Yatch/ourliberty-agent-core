@@ -1189,6 +1189,36 @@
         "from_state": "parked"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "cap-mirror-review-wedge-replace-unbounded-until-poll-aa33",
+      "title": "Mirror review wedge: replace unbounded until-poll with a bounded wait (root cause)",
+      "note": "ROOT CAUSE of the recurring Mirror review wedges (2026-06-26): Mirror review sessions background a long command (regression check / subagent) and poll its output file with an UNBOUNDED until-loop: until [ -s <task>.output ] && grep -qE 'verdict|timed out|Traceback' ...; do sleep 15; done. When the awaited sentinel never arrives (command finished w/o emitting it), the session hangs forever, holds the per-agent inbox:mirror lease, and starves the whole review queue. NOT PR-specific (hit #717 twice AND #720). Fix = bounded wait with a wall-clock timeout (the system already ships scripts/wait_for_pid.sh for exactly this) \u2014 find where this poll is generated (Mirror CLAUDE.md review procedure or a helper) and replace the unbounded until with a timeout. The reaper tier2-blindspot fix (PR pushed work/reaper-tier2-projects-dir) is only the 60-min SAFETY NET; this is the prevention. HIGH priority.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "reaper-tier2-blindspot",
+        "branch": "work/reaper-tier2-projects-dir",
+        "captured_at": "2026-06-26T17:44:12.128318+00:00"
+      },
+      "last_touched": "2026-06-26T17:44:12.128318+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "Our quality-review line occasionally freezes up because a check waits forever for a signal that sometimes never comes, and one stuck review blocks everything behind it.",
+        "why": "When it jams, the whole review queue stalls \u2014 work piles up and nothing ships until someone clears it by hand, which has already happened repeatedly this week.",
+        "suggest": "Approve the fix that puts a time limit on that wait so a stuck review gives up on its own instead of freezing the line \u2014 but have it verified on a couple of real cases before we rely on it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-26T17:47:39.933351+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
