@@ -228,8 +228,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 04:03Z UTC (Iter ~2863, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 04:10Z UTC (Iter ~2864, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2863 summary:** ✅ Nominal — 8/8 daemons alive. 0 new alerts. 0 open PRs. Stall dry-run clean. Zombie PID 1834248 + 6 stale journalctl PIDs carry (unchanged). APPROVAL_REQUEST mirror-marker-discipline-spec-update-001 pending=1 (awaiting Larry `approve`). Check I cooldown-suppressed (Friday, week-2026-06-22 block). §5.0 all no-op. Watchdog healthy (04:01:20Z). PRIME: interventions=1240, systemic_fixes=72, vp=27, ratio≈17.22, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2864 summary:** ✅ Nominal — 8/8 daemons alive. 0 new alerts. 0 open PRs. Stall dry-run clean. Zombie PID 1834248 + 6 stale journalctl PIDs carry (unchanged). ⭐ Larry approved `mirror-marker-discipline-spec-update-001` via dashboard — `larry-approval-c5251287...` in Beacon inbox; Beacon processing pending → Forge dispatch expected. Check I cooldown-suppressed (Friday, week-2026-06-22 block). §5.0 all no-op. Watchdog healthy (04:06:23Z). PRIME: interventions=1242, systemic_fixes=72, vp=27, ratio≈17.25, trend=improving. Tier 1, consecutive_clean=0.
 
 
