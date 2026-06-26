@@ -59,6 +59,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -71,6 +72,7 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
+import active_tier  # noqa: E402
 import trust_policy  # noqa: E402
 from heal_missions_card_gc import (  # noqa: E402
     atomic_write_captures,
@@ -356,6 +358,32 @@ def parse_briefing_json(text: str) -> Optional[dict[str, Any]]:
     return None
 
 
+def _claude_env() -> dict[str, str]:
+    """Process env for the narrator's ``claude`` spawn, authenticated with the
+    ACTIVE tier's long-lived setup-token (``active_tier.active_setup_token``)
+    instead of HOME's auto-refreshing ``~/.claude/.credentials.json``.
+
+    WHY: the default OAuth credential rots headlessly — its ~14h access token
+    expires and nothing refreshes it on the droplet, so every direct ``claude``
+    call 401s and the State Log glance drops to "(basic summary — AI write
+    unavailable)". The agent team (agent_runner) already authenticates via the
+    durable per-tier setup-tokens; this puts the narrator family on the SAME
+    durable path so it follows the team's tier and never depends on the rotting
+    default token.
+
+    Fail-safe + no-op: when no setup-token is configured (or resolution raises),
+    the env is returned unchanged and ``claude`` uses the default credential
+    exactly as before. The token value is NEVER logged."""
+    env = os.environ.copy()
+    try:
+        token = active_tier.active_setup_token()
+    except Exception:  # noqa: BLE001 — auth resolution must never break the spawn
+        token = None
+    if token:
+        env['CLAUDE_CODE_OAUTH_TOKEN'] = token
+    return env
+
+
 def claude_json_roundtrip(
     prompt: str, *, model: str = NARRATOR_MODEL,
 ) -> Optional[dict[str, Any]]:
@@ -373,7 +401,7 @@ def claude_json_roundtrip(
         proc = subprocess.run(
             ['claude', '--print', '--model', model,
              '--output-format', 'json', prompt],
-            capture_output=True, text=True,
+            capture_output=True, text=True, env=_claude_env(),
             timeout=CLAUDE_TIMEOUT_SEC, check=False,
         )
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:

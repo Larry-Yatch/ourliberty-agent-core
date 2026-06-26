@@ -995,5 +995,41 @@ class ApprovalSweepTest(unittest.TestCase):
                 mn.author_pending_approvals(now=NOW, use_llm=False), (0, 0))
 
 
+class ClaudeEnvDurableTokenTest(unittest.TestCase):
+    """The narrator's claude spawn authenticates with the active tier's durable
+    setup-token (not HOME's rotting credentials.json) — fail-safe to a no-op."""
+
+    def test_sets_oauth_token_from_active_tier(self):
+        with patch.object(mn.active_tier, 'active_setup_token',
+                          return_value='sk-durable-xyz'):
+            env = mn._claude_env()
+        self.assertEqual(env['CLAUDE_CODE_OAUTH_TOKEN'], 'sk-durable-xyz')
+
+    def test_no_token_configured_is_noop(self):
+        # No setup-token → env carries no injected token (claude falls back to
+        # the default credential exactly as before).
+        with patch.dict(mn.os.environ, {}, clear=False), \
+                patch.object(mn.active_tier, 'active_setup_token',
+                             return_value=None):
+            mn.os.environ.pop('CLAUDE_CODE_OAUTH_TOKEN', None)
+            env = mn._claude_env()
+        self.assertNotIn('CLAUDE_CODE_OAUTH_TOKEN', env)
+
+    def test_resolution_error_is_fail_safe(self):
+        # active_setup_token raising must not break the spawn — env is unchanged.
+        with patch.object(mn.active_tier, 'active_setup_token',
+                          side_effect=RuntimeError('boom')):
+            mn.os.environ.pop('CLAUDE_CODE_OAUTH_TOKEN', None)
+            env = mn._claude_env()  # must not raise
+        self.assertNotIn('CLAUDE_CODE_OAUTH_TOKEN', env)
+
+    def test_env_is_a_copy_preserving_other_vars(self):
+        with patch.dict(mn.os.environ, {'OL_MARKER_XYZ': '1'}, clear=False), \
+                patch.object(mn.active_tier, 'active_setup_token',
+                             return_value='tok'):
+            env = mn._claude_env()
+        self.assertEqual(env.get('OL_MARKER_XYZ'), '1')  # inherits process env
+
+
 if __name__ == '__main__':
     unittest.main()
