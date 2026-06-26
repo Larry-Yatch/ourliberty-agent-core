@@ -5635,7 +5635,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-26T04:51:18.523107+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-26T04:45:33.815107+00:00"
+      "orphan_last_activity_ts": "2026-06-26T04:45:33.815107+00:00",
+      "briefing": {
+        "what": "PR Ourliberty Agent Core 712",
+        "why": "Work the team started that isn't tied to a tracked project yet \u2014 worth a decision.",
+        "suggest": "Have the team run it down and propose next steps."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-26T05:00:00.754272+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
