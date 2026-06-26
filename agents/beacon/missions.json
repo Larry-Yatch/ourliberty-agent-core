@@ -5754,7 +5754,12 @@
         "at": "2026-06-26T07:41:42.770884+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-26T16:58:28.593946+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#718"
     },
     {
       "id": "proposed-direction-ask-medic-dispatcher-tier4-fix-001",
