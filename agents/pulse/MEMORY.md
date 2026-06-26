@@ -198,9 +198,9 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## G-rule mirror-marker-severity-blocking-pr711-001 → DISPATCHED ✅ APPROVED ✅ FORGE-DISPATCH-STUCK ⚠️ (iter ~2866)
+## G-rule mirror-marker-severity-blocking-pr711-001 → DISPATCHED ✅ APPROVED ✅ FORGE BUILDING ✅ (iter ~2874)
 
-**Rule:** Mirror produced 3 malformed markers on PR #711: (1) REVIEW_REVISION empty findings (iter ~2847), (2) REVIEW_REVISION severity='blocking' (iter ~2848), (3) REVIEW_PASS prose inside JSON block (iter ~2852). Dispatched `mirror-marker-discipline-spec-update-001` to Beacon → Larry approved via dashboard (iter ~2864). Beacon processed larry-approval at 04:21:44Z 2026-06-26 but re-emitted APPROVAL_REQUEST instead of calling dispatch_approved(); notifier skipped duplicate (status=pending in pending-approvals). Forge build NEVER STARTED. Escalation written iter ~2866. Larry intervention needed: write dispatch_payload to Forge inbox OR re-trigger Beacon with correct approval-dispatch path.
+**Rule:** Mirror produced 3 malformed markers on PR #711: (1) REVIEW_REVISION empty findings (iter ~2847), (2) REVIEW_REVISION severity='blocking' (iter ~2848), (3) REVIEW_PASS prose inside JSON block (iter ~2852). Dispatched `mirror-marker-discipline-spec-update-001` to Beacon → Larry approved via dashboard (iter ~2864). Was stuck (iter ~2866): Beacon re-emitted APPROVAL_REQUEST instead of dispatch_approved(). RESOLVED (iter ~2874): Larry typed "Go" in Telegram at 05:10:57Z 2026-06-26 → Beacon dispatched build-phase to Forge at 05:12:44Z → Forge PID 3266713 building since 05:13Z (wt-forge-mirror-marker-discipline-spec-update-001). Monitoring for PR output.
 
 ---
 
@@ -228,8 +228,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 05:11Z UTC (Iter ~2873, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 05:18Z UTC (Iter ~2874, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2873 summary:** ⚠️ Drift — PR #712 CLOSED at 05:05:17Z (Larry replaced with PR #713); Mirror PID 3242227 still reviewing closed PR #712 (~26 min, self-resolving race). PR #713 "fix(claude-auth): all droplet claude spawns on durable token + regression guard" OPEN MERGEABLE created 05:05:02Z, Mirror dispatch pending. Stuck dispatch (mirror-marker-discipline-spec-update-001) carries from iter ~2866. All 8 daemons alive. 0 new alerts. Stall dry-run clean. Zombie PID 1834248 + 6 stale journalctl PIDs carry. G-rule check-i-force-bypass-dm-route stable at 2/3. Check I cooldown-suppressed. PRIME: interventions=1251, systemic_fixes=72, vp=27, ratio≈17.38, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2874 summary:** ✅ Active — mirror-marker-discipline-spec-update-001 UNBLOCKED (Larry "Go" at 05:10:57Z; Forge PID 3266713 building since 05:13Z). PR #712 CLOSED cycle resolved cleanly. PR #713 "fix(claude-auth): all droplet claude spawns on durable token + regression guard" OPEN MERGEABLE, Mirror PID 3267368 reviewing since 05:15:52Z. pending-approvals=0. All 8 daemons alive. 0 new alerts. Stall dry-run clean. Zombie PID 1834248 + 6 stale journalctl PIDs carry. G-rule check-i-force-bypass-dm-route stable at 2/3. Check I cooldown-suppressed. PRIME: interventions=1252, systemic_fixes=72, vp=27, ratio≈17.39, trend=improving. Tier 1, consecutive_clean=0.
 
 
