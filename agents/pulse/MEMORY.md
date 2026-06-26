@@ -267,8 +267,8 @@ PR #715 (fix(healer): skip forge_built_no_pr stall when task PR is CLOSED) MERGE
 
 ---
 
-## Status snapshot — updated 2026-06-26 18:40Z UTC (Iter ~2984, Tier 2, consecutive_clean=1)
+## Status snapshot — updated 2026-06-26 18:56Z UTC (Iter ~2985, Tier 1, consecutive_clean=0)
 
-**Iter ~2984 summary:** ✅ Clean. 0 new alerts. Mirror actively reviewing PR #720 (worktree `wt-mirror-pr-ourliberty-agent-core-720` confirmed live — re-dispatch from iter ~2983 worked). PRs #724/#725 queued. mirror-runner-missing-worktree-retry-001 (1/3): no new occurrence, watching. PR #725 (G-rule forge-built-no-pr-pr-task-id-closed-fp-001) in Mirror queue. PRIME: iter_clean. Tier 2, consecutive_clean=1.
+**Iter ~2985 summary:** ⚠️ Archive action. 2 new alerts (both Tier-3 silenced): pulse check-i delivery confirm + heal-wedged-review-sessions (PR #720 session completed REVIEW_REVISION 59s after alert — not wedged, just slow). PR #720 REVIEW_REVISION issued 12:45 MDT ($1.44); Forge revision-1 dispatched; rev1 re-review in Mirror inbox. Mirror now reviewing PR #724. Archived stale round=0 review-pr-ourliberty-agent-core-720.json from Mirror inbox. PRIME: 1 intervention (archive-duplicate-inbox-task). Tier 2→1, consecutive_clean=0.
 
 
