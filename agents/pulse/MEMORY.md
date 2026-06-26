@@ -228,8 +228,14 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 06:25Z UTC (Iter ~2884, Tier 1, consecutive_clean=0→0)
+## G-rule no-session-revision-active-mirror-session-fp-001 — 1/3 (new, iter ~2885)
 
-**Iter ~2884 summary:** ✅ Active — PR #713 revision cycle: Mirror PID 3308724 reviewing rev1 (~19 min elapsed). 1 new alert Tier-4 (medic-dispatcher delivery-failure PR#713 — G-rule 2/3, no DM; underlying already delivered idx=1043). All 8 daemons alive. Stall dry-run: 0 alerts (cooldown-suppressed). pending-approvals=0. Watermark=1045. Watchdog healthy (06:20:56Z). Zombie PID 1834248 (28d 11h) + 6 stale journalctl PIDs carry. Check I cooldown-suppressed. PRIME: interventions=1261, systemic_fixes=72, vp=27, ratio≈17.53, trend=improving. Tier 1, consecutive_clean=0.
+**Rule:** `heal_pipeline_stall.py` dry-run fires `no_session_revision:pr-ourliberty-agent-core-713` even though Mirror IS actively reviewing rev1 (PID 3308724, ~26 min elapsed, inbox task review-pr-ourliberty-agent-core-713-rev1.json present). Stall checker fires `no_session_revision` because no `session_revision` chain event exists, without checking whether an active agent session is in progress. Same root cause class as `unrouted-open-pr-active-mirror-session-fp-001` (2/3) — stall checker blind to active agent sessions. May fold into the same fix. Healer invocation suppressed (would conflict with active review). Dispatch to Beacon at 3/3 (or fold into unrouted-open-pr-active-mirror-session-fp-001 fix if confirmed same path).
+
+---
+
+## Status snapshot — updated 2026-06-26 06:29Z UTC (Iter ~2885, Tier 1, consecutive_clean=0→0)
+
+**Iter ~2885 summary:** ⚠️ Active — PR #713 revision cycle: Mirror PID 3308724 reviewing rev1 (~26 min elapsed). 0 new alerts (watermark=1045 steady). Stall dry-run: 1 alert WOULD fire (`no_session_revision:713` — new G-rule candidate 1/3; healer suppressed, Mirror active). `unrouted_open_pr:713` cooldown-suppressed. All 8 daemons alive. Watchdog healthy (06:26Z). Check I cooldown-suppressed. Zombie PID 1834248 (28d 11h) + 6 stale journalctl PIDs carry. PRIME: interventions=1263, systemic_fixes=72, vp=27, ratio≈17.54, trend=improving. Tier 1, consecutive_clean=0.
 
 
