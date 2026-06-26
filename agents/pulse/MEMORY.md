@@ -204,8 +204,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 00:31Z UTC (Iter ~2832, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 00:38Z UTC (Iter ~2833, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2832 summary:** ✅ Nominal — 0 new alerts. Check I no-op (block for week-of-2026-06-22 already present, DM cooldown-suppressed, dedup-skip key=f8ac2e3afc). PR #708 feat(missions): off-board merged-PR board-reconcile backstop — active Mirror review (~19 min at cycle time). Zombie PID 1834248 + 6 stale journalctl PIDs carry. Watermark stays 1021. PRIME: interventions=1226, systemic_fixes=71, vp=27, ratio≈17.27, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2833 summary:** ✅ Nominal — 0 new alerts. PR #708 feat(missions): off-board merged-PR board-reconcile backstop — MERGED at 00:35:36Z (Mirror pass + auto-merge). PR #709 "fix(cycle): authenticate /cycle via the active-tier setup-token" merged at 00:03:44Z; bots restarted at ~00:12Z by heal-stale-daemon-code; auth_401 carry tentatively resolved. Check I no-op (week-of-2026-06-22 block present, cooldown-suppressed). No open PRs. Zombie PID 1834248 + 6 stale journalctl PIDs carry. Watermark stays 1021. PRIME: interventions=1226, systemic_fixes=71, vp=27, ratio≈17.27, trend=improving. Tier 1, consecutive_clean=0.
 
 
