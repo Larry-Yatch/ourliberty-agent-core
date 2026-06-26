@@ -315,7 +315,10 @@
         "at": "2026-06-17T06:00:01.633456+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-06-26T00:03:45.435494+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-p3-dashboard-proposed-lane",
@@ -558,7 +561,10 @@
         "at": "2026-06-17T06:00:01.633456+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-06-26T00:03:45.435494+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-fix-headless-approval-dedup-spawn-failure-wedge-002",
@@ -800,7 +806,10 @@
         "at": "2026-06-17T06:10:10.187179+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-06-26T00:03:45.435494+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-medic-diagnosis",
@@ -1780,7 +1789,10 @@
         "at": "2026-06-17T06:10:10.187179+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-06-26T00:03:45.435494+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-fix-notifier-review-dispatch-reliability",
@@ -1883,7 +1895,10 @@
         "at": "2026-06-17T06:20:16.057578+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-06-26T00:03:45.435494+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-build-forge-queue-ui-move-20260604T042018Z",
@@ -1957,7 +1972,10 @@
         "at": "2026-06-17T06:20:16.057578+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-06-26T00:03:45.435494+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-step-digest-generator",
@@ -2974,7 +2992,10 @@
         "at": "2026-06-17T06:40:20.347632+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-06-26T00:03:45.435494+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-ceo-digest-daily-2026-06-11",
@@ -3265,7 +3286,10 @@
         "at": "2026-06-17T06:40:20.347632+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-06-26T00:03:45.435494+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-alert-triage-intent-fallback-001",
@@ -3317,7 +3341,10 @@
         "at": "2026-06-17T06:40:20.347632+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-06-26T00:03:45.435494+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-build-test-suite-green-001",
