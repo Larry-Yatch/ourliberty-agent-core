@@ -216,9 +216,9 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## G-rule medic-dispatcher-delivery-failure-tier4-001 — 2/3 (updated iter ~2884)
+## G-rule medic-dispatcher-delivery-failure-tier4-001 → DISPATCHED ✅ (iter ~2893), vp
 
-**Rule:** `source=medic-dispatcher` alerts classify Tier-4 (novel, no translation match). These fire when the medic relay for a healer alert fails to deliver 3 times (medic ran but no `source=medic` notification reached larry-alerts.jsonl). Occurrences: iter ~2850 PR#711 (1/3); iter ~2884 PR#713 L1045 (2/3) — underlying stall already delivered via outbox-notifier route=escalate (idx=1043); Mirror actively reviewing rev1; no DM warranted (actionable-only). Fix: add `source=medic-dispatcher` translation entry → Tier-3 for known-FP stall patterns, OR investigate medic relay reliability (run_medic.sh, operator allowlist). Dispatch to Beacon at 3/3.
+**Rule:** `source=medic-dispatcher` alerts classify Tier-4 (novel, no translation match). Occurrences: iter ~2850 PR#711 (1/3); iter ~2884 PR#713 (2/3); iter ~2893 PR#713 L1052 (3/3). Direction-ask dispatched to Beacon (direction-ask-medic-dispatcher-tier4-fix-001.json). Fix: add `source=medic-dispatcher` → Tier-3 entry to config/alert-translations.json (scoped to cases where outbox-notifier already delivered the escalate route). verification_pending.
 
 ---
 
@@ -246,8 +246,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 07:18Z UTC (Iter ~2892, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 07:25Z UTC (Iter ~2893, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2892 summary:** ⚠️ Active — New Tier-4 alert L1049: sentinel in-flight-stall Mirror PID 3308724 at 1.13h+ (60m threshold); DM already delivered by outbox-notifier (idx=1048); heal_wedged_review_sessions recovery path. Stall dry-run: 2 would-fire (forge_built_no_pr:712 new FP + unrouted_open_pr:713 cooldown expired). 8/8 daemons alive. Watchdog healthy (07:12:15Z). Check I cooldown-suppressed. Zombie PID 1834248 + 6 stale journalctl PIDs carry. Beacon bot EROFS confirms PR #713 critical. PRIME: interventions=1270, systemic_fixes=72, vp=27, ratio≈17.64, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2893 summary:** ⚠️ Active — Mirror PID 3308724 at ~1h36m+ elapsed (past 60-min threshold; sentinel DM'd Larry at idx=1048). 3 new alerts: L1050/L1051 Tier-3 silenced (known-pattern), L1052 medic-dispatcher Tier-4 (G-rule 3/3 → dispatched to Beacon, vp). Pipeline stall: 0 alerts (all cooldown-suppressed). 8/8 daemons alive. Watchdog healthy (07:22:17Z). Check I cooldown-suppressed. Zombie PID 1834248 + 6 stale journalctl PIDs carry. Beacon bot EROFS confirms PR #713 critical. PRIME: interventions=1271, systemic_fixes=72, vp=27, ratio≈17.65, trend=improving. Tier 1, consecutive_clean=0.
 
 
