@@ -246,8 +246,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 07:25Z UTC (Iter ~2893, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 07:32Z UTC (Iter ~2894, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2893 summary:** ⚠️ Active — Mirror PID 3308724 at ~1h36m+ elapsed (past 60-min threshold; sentinel DM'd Larry at idx=1048). 3 new alerts: L1050/L1051 Tier-3 silenced (known-pattern), L1052 medic-dispatcher Tier-4 (G-rule 3/3 → dispatched to Beacon, vp). Pipeline stall: 0 alerts (all cooldown-suppressed). 8/8 daemons alive. Watchdog healthy (07:22:17Z). Check I cooldown-suppressed. Zombie PID 1834248 + 6 stale journalctl PIDs carry. Beacon bot EROFS confirms PR #713 critical. PRIME: interventions=1271, systemic_fixes=72, vp=27, ratio≈17.65, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2894 summary:** ⚠️ Active — Mirror PID 3308724 at ~1h27m+ elapsed (past 60-min threshold; sentinel fired at idx=1048). 2 new alerts: L1053 Tier-4 medic-dispatcher/712-FP (same-class as G-rule already dispatched; no new DM), L1054 Tier-3 resolved (approval_request delivery confirm). Pipeline stall: 0 alerts (all cooldown-suppressed). 8/8 daemons alive. Watchdog healthy (07:27:17Z). Check I cooldown-suppressed. beacon-pending: medic-dispatcher-delivery-failure-translation-001 awaiting Larry approval (Beacon's doc-only fix spec). Zombie PID 1834248 + 6 stale journalctl PIDs carry. Beacon bot EROFS confirms PR #713 critical. PRIME: interventions=1272, systemic_fixes=72, vp=27, ratio≈17.67, trend=improving. Tier 1, consecutive_clean=0.
 
 
