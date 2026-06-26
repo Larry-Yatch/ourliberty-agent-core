@@ -6001,7 +6001,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-26T22:15:40.862055+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-26T22:10:21.946005+00:00"
+      "orphan_last_activity_ts": "2026-06-26T22:10:21.946005+00:00",
+      "briefing": {
+        "what": "The team has started tightening up an internal messaging routine so that follow-up updates always include the required label, instead of occasionally dropping it and triggering a string of error notices.",
+        "why": "Those dropped labels create repeated false alarms that waste attention and erode trust in the alert system, so cleaning this up keeps the team focused on real issues.",
+        "suggest": "Let this work continue, but since it touches a sensitive safeguard, ask for a quick confirmation that the fix doesn't weaken any existing checks before it's finalized."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-26T22:20:16.933638+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-ourliberty-agent-core-730",
@@ -6018,7 +6032,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-26T22:15:40.862055+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-26T22:00:37.246504+00:00"
+      "orphan_last_activity_ts": "2026-06-26T22:00:37.246504+00:00",
+      "briefing": {
+        "what": "A piece of work the team kicked off on their own that hasn't been attached to any of our active priorities yet.",
+        "why": "Unattached work can quietly eat time and drift away from what the business actually needs right now.",
+        "suggest": "Take a quick look to confirm it's worth pursuing and tie it to a real priority before it goes further \u2014 or set it aside if it isn't."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-26T22:20:16.933638+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
