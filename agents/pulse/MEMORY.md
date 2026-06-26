@@ -267,8 +267,8 @@ PR #715 (fix(healer): skip forge_built_no_pr stall when task PR is CLOSED) MERGE
 
 ---
 
-## Status snapshot — updated 2026-06-26 18:10Z UTC (Iter ~2981, Tier 1, consecutive_clean=1)
+## Status snapshot — updated 2026-06-26 18:16Z UTC (Iter ~2982, Tier 1, consecutive_clean=2)
 
-**Iter ~2981 summary:** ✅ Clean. 9 alerts, all Tier-3 silenced. PR #721 MERGED (fix(needs-you) phantom stuck rows). PR #725 NEW (Forge fix for forge_built_no_pr FP on pr-<repo>-<num>; Mirror review dispatched). Larry approved heal-forge-no-pr-pr-task-id-closed-001 at 12:02 MDT. Daemons reloaded at 18:07Z (system_state_log.py from PR #721). PR #722 Mirror active review in progress (~11 min at check). G-rule forge-built-no-pr-pr-task-id-closed-fp-001 → PR #725 vp. mirror-runner-missing-worktree-retry-001 still 1/3. PRIME: iter_clean. Tier 1, consecutive_clean=1.
+**Iter ~2982 summary:** ✅ Clean. 0 new alerts. PR #722 Mirror active (~17 min at check, under 60-min). PRs #720/#724/#725 in Mirror queue. PR #725 (G-rule forge-built-no-pr-pr-task-id-closed-fp-001) progressing toward merge. All daemons nominal post-PR #721 code reload. PRIME: iter_clean. Tier 1, consecutive_clean=2.
 
 
