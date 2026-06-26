@@ -9080,12 +9080,14 @@ def _cleanup_review_verify_uncertain(
     if str(scripts_dir) not in sys.path:
         sys.path.insert(0, str(scripts_dir))
     from test_isolation_guard import refuse_under_test  # noqa: PLC0415
+    import active_tier  # noqa: PLC0415 — durable per-tier setup-token bridge
     refuse_under_test('claude-spawn')
     try:
         proc = subprocess.run(
             ['claude', '--print', '--model', CLEANUP_REVIEW_VERIFY_MODEL,
              '--output-format', 'json', prompt],
-            capture_output=True, text=True, timeout=timeout, check=False,
+            capture_output=True, text=True,
+            env=active_tier.durable_claude_env(), timeout=timeout, check=False,
         )
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         return {}

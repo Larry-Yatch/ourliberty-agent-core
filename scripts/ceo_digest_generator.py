@@ -49,6 +49,7 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
+import active_tier  # noqa: E402
 import chain_event_emit as cee  # noqa: E402
 import larry_alerts  # noqa: E402
 import task_terminal_state as tts  # noqa: E402 — shared terminal-state probe
@@ -547,6 +548,7 @@ def generate_ceo_voice(prompt: str) -> tuple[Optional[str], Optional[float]]:
             ['claude', '--print', '--model', DIGEST_MODEL,
              '--output-format', 'json', prompt],
             capture_output=True, text=True,
+            env=active_tier.durable_claude_env(),
             timeout=CLAUDE_TIMEOUT_SEC, check=False,
         )
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:

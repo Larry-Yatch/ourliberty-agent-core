@@ -28,6 +28,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_REPO_SCRIPTS) not in sys.path:
@@ -765,6 +766,45 @@ class ActiveSetupTokenTest(unittest.TestCase):
         # No active-tier.json → read() defaults to tier1; resolve tier1's token.
         os.environ['CLAUDE_CODE_OAUTH_TOKEN_TIER1'] = 'sk-tier1-default'
         self.assertEqual(active_tier.active_setup_token(), 'sk-tier1-default')
+
+
+class DurableClaudeEnvTest(unittest.TestCase):
+    """durable_claude_env() bridges the bare CLAUDE_CODE_OAUTH_TOKEN from the
+    active tier's setup-token; fail-safe no-op when none is configured. Patches
+    active_setup_token directly so it's isolated from tier/env state."""
+
+    def test_sets_bare_token_from_active_setup_token(self):
+        with mock.patch.object(
+                active_tier, 'active_setup_token', return_value='sk-durable'):
+            env = active_tier.durable_claude_env({'PATH': '/bin'})
+        self.assertEqual(env['CLAUDE_CODE_OAUTH_TOKEN'], 'sk-durable')
+        self.assertEqual(env['PATH'], '/bin')  # base preserved
+
+    def test_no_token_is_noop(self):
+        with mock.patch.object(
+                active_tier, 'active_setup_token', return_value=None):
+            env = active_tier.durable_claude_env({'PATH': '/bin'})
+        self.assertNotIn('CLAUDE_CODE_OAUTH_TOKEN', env)
+        self.assertEqual(env['PATH'], '/bin')
+
+    def test_resolution_error_is_fail_safe(self):
+        with mock.patch.object(
+                active_tier, 'active_setup_token',
+                side_effect=RuntimeError('boom')):
+            env = active_tier.durable_claude_env({'PATH': '/bin'})  # must not raise
+        self.assertNotIn('CLAUDE_CODE_OAUTH_TOKEN', env)
+
+    def test_defaults_to_os_environ_copy(self):
+        os.environ['OL_MARKER_DCE'] = '1'
+        try:
+            with mock.patch.object(
+                    active_tier, 'active_setup_token', return_value='tok'):
+                env = active_tier.durable_claude_env()
+            self.assertEqual(env.get('OL_MARKER_DCE'), '1')
+            env['OL_MARKER_DCE'] = '2'  # mutating the copy must not touch os.environ
+            self.assertEqual(os.environ['OL_MARKER_DCE'], '1')
+        finally:
+            os.environ.pop('OL_MARKER_DCE', None)
 
 
 if __name__ == '__main__':
