@@ -234,8 +234,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 07:05Z UTC (Iter ~2889, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 07:08Z UTC (Iter ~2890, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2889 summary:** ⚠️ Active — Mirror PID 3308724 at 57:36 elapsed (EXCEEDS 35-min feature-dev threshold by ~22 min; outbox empty). 1 new alert L1048 Tier-3 silenced (Pulse own status-update DM delivery record). Stall dry-run: 0 alerts (both cooldowns). All 8 daemons alive (forge/mirror/pulse bots run as agent_telegram_bot.py — confirmed via direct PID check). Watchdog healthy (06:56:55Z). Check I cooldown-suppressed. Zombie PID 1834248 (28d 11h 44m) + 6 stale journalctl PIDs carry. PRIME: interventions=1266, systemic_fixes=72, vp=27, ratio≈17.58, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2890 summary:** ⚠️ Active — Mirror PID 3308724 at 01:02:06 elapsed (EXCEEDS 35-min feature-dev threshold by ~27 min; outbox empty). 0 new alerts (watermark 1048=file_length). Stall dry-run: 0 alerts (both cooldowns). All 8 daemons alive. Watchdog healthy (07:01:56Z). Check I cooldown-suppressed. Zombie PID 1834248 (28d 11h 47m) + 6 stale journalctl PIDs carry. Beacon bot EROFS failures confirm PR #713 critical. PRIME: interventions=1268, systemic_fixes=72, vp=27, ratio≈17.61, trend=improving. Tier 1, consecutive_clean=0.
 
 
