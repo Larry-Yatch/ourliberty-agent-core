@@ -611,14 +611,17 @@ def _emit_foreground_warning() -> None:
     """
     print(
         'WARNING: test_regression_check.py must be run FOREGROUND.\n'
-        '  Do not background with & and poll for completion.\n'
-        '  Poll loops re-deriving liveness via `pgrep` (self-match) or a\n'
-        '  `/proc/<pid>` path test (empty pgrep -> /proc/ is always a dir) have\n'
-        '  hung Mirror reviews 71 min (PR #101) and 102 min (PR #334).\n'
-        '  The script has no completion flag file; the only completion signal\n'
-        '  is the exit code returned synchronously. If you ever must wait on a\n'
-        '  backgrounded PID elsewhere, use scripts/wait_for_pid.sh (captures the\n'
-        '  PID once, gates on `kill -0`, has a wall-clock timeout).',
+        '  Do not background it (shell & OR the Bash tool background mode) and\n'
+        '  poll for completion. Poll loops have hung Mirror reviews: `pgrep`\n'
+        '  self-match (PR #101, 71 min), empty pgrep -> /proc/ always-a-dir\n'
+        '  (PR #334, 102 min), and a content sentinel that never arrived\n'
+        '  (PR #717/#720, ~85-100 min). The script has no completion flag file;\n'
+        '  the only completion signal is the exit code returned synchronously.\n'
+        '  To bound the runtime, wrap it foreground in scripts/run_review_step.sh\n'
+        '  (--timeout N; exits 124 + a REVIEW_STEP_TIMED_OUT banner on timeout).\n'
+        '  Only if a process is ALREADY backgrounded with a shell & and cannot\n'
+        '  run foreground, use scripts/wait_for_pid.sh (captures the PID once,\n'
+        '  gates on `kill -0`, has a wall-clock timeout).',
         file=sys.stderr,
     )
 
