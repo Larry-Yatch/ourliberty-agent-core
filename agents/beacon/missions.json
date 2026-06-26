@@ -5782,6 +5782,62 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-heal-stall-mirror-active-suppression-001",
+      "name": "Heal Stall Mirror Active Suppression 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `heal-stall-mirror-active-suppression-001`. Last activity 2026-06-26T08:29:52.088144+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "heal-stall-mirror-active-suppression-001"
+      ],
+      "repo": null,
+      "created": "2026-06-26",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-26T08:39:19.147271+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-26T08:29:52.088144+00:00"
+    },
+    {
+      "id": "proposed-direction-ask-unrouted-pr-active-mirror-session-fix-001",
+      "name": "Direction Ask Unrouted PR Active Mirror Session Fix 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `direction-ask-unrouted-pr-active-mirror-session-fix-001`. Last activity 2026-06-26T08:29:47.125733+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "direction-ask-unrouted-pr-active-mirror-session-fix-001"
+      ],
+      "repo": null,
+      "created": "2026-06-26",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-26T08:39:19.147271+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-26T08:29:47.125733+00:00"
+    },
+    {
+      "id": "proposed-fix-wedged-reaper-spares-active-build-worktree-002",
+      "name": "Fix Wedged Reaper Spares Active Build Worktree 002",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `fix-wedged-reaper-spares-active-build-worktree-002`. Last activity 2026-06-11T02:18:37.279106+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "fix-wedged-reaper-spares-active-build-worktree-002"
+      ],
+      "repo": null,
+      "created": "2026-06-26",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-26T08:39:19.147271+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-11T02:18:37.279106+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-26T08:39:19.147271+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#441"
     }
   ]
 }
