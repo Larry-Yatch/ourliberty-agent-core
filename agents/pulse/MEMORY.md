@@ -253,9 +253,9 @@ PR #715 (fix(healer): skip forge_built_no_pr stall when task PR is CLOSED) MERGE
 
 ---
 
-## G-rule beacon-erofs-concurrent-claude-sessions-001 — 2/3 (new, iter ~2945)
+## G-rule beacon-erofs-concurrent-claude-sessions-001 → DISPATCHED ✅, vp (iter ~2963)
 
-**Rule:** Beacon's claude subprocess fails with "EROFS: read-only file system, open '/home/larry/.claude.json'" when a concurrent Claude Code session (e.g., Pulse interactive) is active. Filesystem is healthy (/dev/vda1 10% full); .claude.json has normal permissions. Root cause: concurrent Claude Code sessions writing/locking .claude.json simultaneously. Occurrences: iter ~[prior] (noted as [blue] carry "EROFS not recurred"), iter ~2945 (07:26-07:27 MDT, x2 failures, Larry's question bounced). Fix: investigate session-isolation or file-locking behavior to prevent EROFS under concurrent-session scenarios. Dispatch to Beacon at 3/3.
+**Rule:** Beacon's claude subprocess fails with "EROFS: read-only file system, open '/home/larry/.claude.json'" when a concurrent Claude Code session (e.g., Pulse interactive) is active. Occurrences: iter ~2945 (2/3). **Fix:** PR #720 (work/claude-json-erofs-robust, "heal: auto-rebind dangled ~/.claude.json mount") opened 2026-06-26T15:28Z; Mirror review dispatched 15:40Z. Verification pending PR merge + absence of EROFS failures.
 
 ---
 
@@ -265,8 +265,8 @@ PR #715 (fix(healer): skip forge_built_no_pr stall when task PR is CLOSED) MERGE
 
 ---
 
-## Status snapshot — updated 2026-06-26 15:33Z UTC (Iter ~2962, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 15:45Z UTC (Iter ~2963, Tier 1, consecutive_clean=0→1)
 
-**Iter ~2962 summary:** ✅ Near-nominal. 0 new alerts. Watermark holds at 1019. Same carry FP: forge_built_no_pr:pr-ourliberty-agent-core-712 (G-rule 2/3). PR #717 Mirror reviewing (~54 min, PID 3533331). PR #718/#719 Mirror queue. Check I: dm_route digest (correct, cooldown-suppressed). §5.0 all no-op. PRIME: systemic_fixes=75, vp=27, ratio=17.49. Tier 1, consecutive_clean=0.
+**Iter ~2963 summary:** ✅ Clean. 0 new alerts. 8/8 daemons alive. Watermark holds at 1019. Same carry FP: forge_built_no_pr:pr-ourliberty-agent-core-712 (G-rule 2/3). PR #717 Mirror reviewing (~67 min, PID 3533331). PR #718/#719/#720 Mirror queue. PR #720 new: EROFS .claude.json fix (G-rule beacon-erofs-concurrent-claude-sessions-001 → DISPATCHED ✅, vp). PRs #715/#716 merged at 14:38Z. Check I: dm_route digest (correct, cooldown-suppressed). §5.0 all no-op. PRIME: systemic_fixes=75, vp=27, ratio=17.51. Tier 1, consecutive_clean=1.
 
 
