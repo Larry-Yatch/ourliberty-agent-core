@@ -6113,6 +6113,40 @@
         "from_state": "proposed"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "proposed-mirror-marker-self-validate-gate-001",
+      "name": "Mirror Marker Self Validate Gate 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `mirror-marker-self-validate-gate-001`. Last activity 2026-06-26T23:25:26.474075+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "mirror-marker-self-validate-gate-001"
+      ],
+      "repo": null,
+      "created": "2026-06-26",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-26T23:31:53.913844+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-26T23:25:26.474075+00:00"
+    },
+    {
+      "id": "proposed-direction-ask-mirror-malformed-post-restart-fix-001",
+      "name": "Direction Ask Mirror Malformed Post Restart Fix 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `direction-ask-mirror-malformed-post-restart-fix-001`. Last activity 2026-06-26T23:25:22.737876+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "direction-ask-mirror-malformed-post-restart-fix-001"
+      ],
+      "repo": null,
+      "created": "2026-06-26",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-26T23:31:53.913844+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-26T23:25:22.737876+00:00"
     }
   ]
 }
