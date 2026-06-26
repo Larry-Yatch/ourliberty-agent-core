@@ -1,0 +1,42 @@
+[Unit]
+Description=Reconcile a single-owner mission to shipped when its build SEQUENCE reaches status:complete; surface umbrella (multi-sequence) missions to needs-you — NEVER auto-retires an umbrella
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/heal_completed_sequence_mission_reconcile.py
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/heal_completed_sequence_mission_reconcile.py --apply
+
+TimeoutStartSec=120
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-heal-completed-sequence-mission-reconcile
+
+# Reads the build-sequence files + missions.json; no gh / git / network. Tiny.
+MemoryMax=256M
+MemoryHigh=128M
+
+# Hardening — matches the board-drain pattern (the analog that also writes
+# missions.json). Writes: the missions.json ship delta (under ~/agent-core) AND
+# the for-Larry needs-you signal (under ~/agents). The COMMIT of the missions
+# delta is left to heal_missions_card_gc (single-committer invariant), so this
+# unit never runs git. Read-only everywhere else.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /home/larry/agent-core /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target
