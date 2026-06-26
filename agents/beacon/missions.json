@@ -5150,7 +5150,11 @@
     {
       "id": "operator-needs-you-feed",
       "name": "Operator Needs-You Feed",
-      "phase": "in_flight",
+      "phase": "shipped",
+      "prior_phase": "in_flight",
+      "shipped_at": "2026-06-26T00:00:00+00:00",
+      "shipped_by": "claude-desktop-reconcile",
+      "shipped_note": "Shipped via the 3-step build sequence operator-needs-you-feed.json (status=complete): PR #685 (escalation feed), #706 (sequence itemization + steering endpoint), and ourliberty-dashboard #93 (waiting-panel render) — all merged 2026-06-25. Board phase was stale at in_flight because the mission's task_ids are synthetic seq-step ids the GC healer cannot probe (same class as operator-ux-catch-me-up-shortcut), so neither auto-advance nor the heal_merged_pr_board_reconcile backstop could retire it. Manually reconciled and live-verified on /where-we-are 2026-06-26.",
       "brief": "Complete the /where-we-are Waiting-on-You board + doorbell: feed the two missing needs-you classes (critical alerts the healers couldn't auto-fix; CLARIFY-exhausted builds) through the existing promote_alerts gate as durable, self-clearing for-Larry records; itemize paused / stuck-dispatched build sequences; and add live Resume/Skip/Cancel steering buttons via a new audited POST endpoint. Supersedes the archived e4-4g operator-action-queue.",
       "spec_docs": [
         "agents/beacon/specs/operator-needs-you-feed.md"
