@@ -210,7 +210,7 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## G-rule ourliberty-health-sync-push-failed-tier4-001 — 1/3 (new, iter ~2796)
+## G-rule ourliberty-health-sync-push-failed-tier4-001 — 2/3 (updated iter ~2934)
 
 **Rule:** `source=ourliberty-health, subject=sync_agent_core: auto-commit push failed` alerts classify Tier-4 (novel). But this is a transient self-healing event — the sync wrapper commits+pushes successfully on the next tick. `source=sync.service, subject=sync-blocked:auto-commit-push-failed` is already Tier-3. Larry gets DM'd unnecessarily (outbox-notifier delivers route=escalate). Fix: add `source=ourliberty-health, subject^=sync_agent_core: auto-commit push failed` → Tier-3 entry to `config/alert-translations.json`. Dispatch to Beacon at 3/3.
 
@@ -252,10 +252,10 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 11:59Z UTC (Iter ~2933, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 12:06Z UTC (Iter ~2934, Tier 1, consecutive_clean=0→0)
 
 **MEMORY correction (iter ~2933):** G-rule no-session-revision-active-mirror-session-fp-001 — prior journal standing findings carried "translations.json LIVE" claim. This is WRONG. Direct query of config/alert-translations.json returns [] for "no_session" keys — NO translation entry exists. Alert was delivered to Larry at idx=980,981 (03:44:48 MDT). Stall-checker code fix (MIRROR_ACTIVE_SKIP in heal_pipeline_stall.py) is beacon-pending item 3 (not yet Forge-dispatched). Standing findings corrected forward from iter ~2933.
 
-**Iter ~2933 summary:** ⚠️ Active — PR #713 REVIEW_ESCALATE carry. MERGEABLE transitioned UNKNOWN→MERGEABLE (GitHub computation lag; no substantive change). no_session_revision:713 stall cooldown EXPIRED — live stall will fire recover-then-alert on next cron run; recovery action (re-dispatch Forge) counterproductive given WIP clobber pattern; beacon-pending item 4 is the human gate. 0 new alerts. All inboxes EMPTY. beacon-pending: 5 unchanged. Watchdog healthy (ticks 05:47:58, 05:53:02 MDT). 8/8 daemons alive. Sync ~57 min. PRIME: interventions=1303, systemic_fixes=74, vp=27, ratio=17.61, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2934 summary:** ⚠️ Active — PR #713 REVIEW_ESCALATE carry. 2 new alerts: ourliberty-health push-fail Tier-4 self-healed (G-rule 2/3), sync.service Tier-3 silenced. no_session_revision:713 cooldown EXPIRED carry. Sync fresh (12:02:21Z). Repo HEAD=8b0b78cf. All inboxes EMPTY. beacon-pending: 5 unchanged. Watchdog healthy (06:03:19 MDT). 8/8 daemons alive. PRIME: systemic_fixes=74, vp=27, ratio=17.61, trend=improving. Tier 1, consecutive_clean=0.
 
 
