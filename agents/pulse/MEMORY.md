@@ -204,8 +204,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 01:48Z UTC (Iter ~2843, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 01:52Z UTC (Iter ~2844, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2843 summary:** ✅ Nominal — 0 new alerts. 8/8 daemons alive, watchdog healthy (01:43:19Z). PRs #711 (agent-core) + #95 (dashboard) ~30-31 min old — Mirror review in active processing (tasks in inbox), pipeline self-managing. Check I Friday: cooldown-suppressed. Zombie PID 1834248 (~28d6h31m) + 6 stale journalctl PIDs (~30-31d) carry. watermark=1028. PRIME: interventions=1227, systemic_fixes=71, vp=27, ratio≈17.28, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2844 summary:** ✅ Nominal — 0 new alerts. 8/8 daemons alive, watchdog healthy (01:48:20Z). PRs #711 (agent-core) + #95 (dashboard) ~34 min old — Mirror review in active processing (tasks in inbox), pipeline self-managing. Check I Friday: cooldown-suppressed. Zombie PID 1834248 (~28d6h33m) + 6 stale journalctl PIDs (~30-31d) carry. watermark=1028. PRIME: interventions=1227, systemic_fixes=71, vp=27, ratio≈17.28, trend=improving. Tier 1, consecutive_clean=0.
 
 
