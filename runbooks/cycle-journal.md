@@ -5,6 +5,195 @@
 ---
 
 
+## Iteration ~2867 — 2026-06-26T04:31Z UTC (interactive /cycle via loop, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/cycle` invocation via loop skill.
+
+**Health:** ⚠️ Drift — PR #712 open (Larry-authored, brand new). Stuck dispatch (mirror-marker-discipline-spec-update-001) carries from iter ~2866. All 8 daemons alive. 0 new alerts. Stall dry-run clean. Zombie PID 1834248 + 6 stale journalctl PIDs carry.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo (re-verified):** On main. HEAD=3d6ffc66=origin/main. Dirty: agents/pulse/MEMORY.md + runbooks/cycle-journal.md (Pulse cycle files, expected pre-wrapper-commit). ✅
+- **Sync (re-verified):** last_sync=2026-06-26T04:01:59Z (~30 min old at scan). Under 2h. ✅
+- **Daemons (re-verified):** All 8 PIDs alive (ps-verified). chain_event_shipper=2716672, inbox_watcher=3107973, forge_bot=3141897, mirror_bot=3142077, pulse_bot=3142169, dashboard_api=3219975, beacon=3220237, outbox_notifier=3220349. ✅
+- **Watchdog (re-verified):** last=2026-06-25T22:27:10 MDT (04:27:10Z) — overall=healthy. ✅
+- **PRs (re-verified):** gh pr list → 1 open: **PR #712** "fix(narrator): authenticate claude with the durable per-tier setup-token". Author=Larry-Yatch. Created 04:31:49Z (2 min old). MERGEABLE, no CI, auto-merge not enabled. ⚠️ [new finding]
+- **beacon-pending-approvals (re-verified):** pending=1 (mirror-marker-discipline-spec-update-001, status=pending — STUCK; Forge dispatch never started). ⚠️ [carry from iter ~2866]
+- **Zombie PID 1834248 (re-verified):** Alive (~28d 9h 14min, Ss bash poll loop). [carry ask-then-do]
+- **6 stale journalctl PIDs (re-verified):** 1101500, 1107838, 1118830, 1136223, 1161972, 1177335 — all alive (~31d+). [carry ask-then-do]
+- **Watermark (re-verified):** {"repaired": false, "old_watermark": 1039, "file_length": 1039}. 0 new alerts. ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark → no-op. 0 new alerts (watermark=file_length=1039). ✅ Nominal.
+
+**Check 1 — Log noise (30-min / outbox-notifier / watchdog):**
+- journalctl --user -p warning → No entries. ✅
+- outbox-notifier.log: last entries at 04:21:48-49Z (beacon pulse-auto-dispatch stuck dispatch entries from iter ~2866). No new WARNs. ✅
+- watchdog.log: last=04:27:10Z — overall=healthy. ✅ Nominal.
+
+**Check 2 — Telegram sweep (last 4h):**
+- beacon_telegram_bot.log: last entry 22:09:31 MDT (dispatch-branch-cleanup digest skip). No new Larry messages. 409 burst at 21:43 MDT = prior cycle artifact (carry). ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- heal_pipeline_stall --dry-run → all FORGE_NO_PR_SKIP, no stalls detected. ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- Beacon inbox: EMPTY. ✅
+- Forge inbox: EMPTY. ✅
+- Mirror inbox: EMPTY. ✅
+- beacon-pending-approvals: pending=1 (mirror-marker-discipline-spec-update-001, STUCK — carry). ⚠️
+
+**Check 5 — Stale daemon code:**
+- Heartbeat=2026-06-26T04:29:35Z (~2 min before scan). Fresh. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=3d6ffc66=origin/main. On main. Dirty: Pulse cycle files (expected). ✅ Nominal.
+**Check B — Sync health:** last_sync=2026-06-26T04:01:59Z (~30 min). Under 2h. ✅ Nominal.
+**Check C — Agent liveness:** 8/8 procs alive (ps-verified). Watchdog healthy (04:27:10Z). ✅
+- **[yellow carry] PID 1834248** — bash poll loop (~28d 9h 14min, target archive file not found). Ask-then-do: kill 1834248. [carry]
+- **[yellow carry] 6 stale journalctl PIDs (~31d+)** — Ask-then-do: kill 1101500 1107838 1118830 1136223 1161972 1177335. [carry]
+**Check E — PRs:**
+- **[yellow new] PR #712** — "fix(narrator): authenticate claude with the durable per-tier setup-token". Author=Larry-Yatch (manual push). Created 04:31:49Z (2 min old at check). MERGEABLE, no CI, auto-merge not enabled. Outbox-notifier should dispatch Mirror review automatically within ~5 min. No Pulse action at this stage (PR < 30 min, not yet clean+green). Monitoring next iter.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Friday 2026-06-26 UTC (weekday=4, IS in firing set {0,2,4,6}):**
+- Check I: check-i-2026-06-26.json exists (written iter ~2866). Cooldown-suppressed. Skip. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule assessment:**
+- **mirror-marker-severity-blocking-pr711-001** → DISPATCHED ✅ APPROVED ✅ FORGE-DISPATCH-STUCK ⚠️ (iter ~2866). Re-verified iter ~2867: Forge inbox still empty, pending-approvals still status=pending. No change. Carry.
+- All other G-rule counts unchanged from iter ~2866.
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op. 0 new alerts. Watermark unchanged (1039).
+2. §5.0: all no-op.
+3. Check I: cooldown-suppressed (check-i-2026-06-26.json present).
+4. PRIME ledger: intervention appended (tier=1, template=check-e-new-pr-larry-author-712, detail=PR #712 fix(narrator) authenticate claude with durable per-tier setup-token; created 04:31:49Z by Larry-Yatch; no CI, no auto-merge; monitoring).
+5. Tier state: record --checks-clean false → consecutive_clean=0. Tier remains 1. last_signal_at=2026-06-26T04:35Z.
+
+**Dispatches:** None this iter.
+
+**Standing findings (carried + verified):**
+- [yellow] **mirror-marker-discipline-spec-update-001 — FORGE DISPATCH STUCK** — beacon-pending-approvals status=pending. Forge inbox empty. Escalation written iter ~2866. Larry intervention needed. [carry]
+- [yellow] **PR #712** — fix(narrator) durable per-tier setup-token. Author=Larry. Created 04:31:49Z. Outbox-notifier dispatching Mirror review. [new — monitoring]
+- [yellow] **Zombie PID 1834248** — bash poll loop (~28d 9h 14min, target archive file not found). Ask-then-do: kill 1834248. [carry]
+- [yellow] **6 stale journalctl PIDs (~31d+)** — Ask-then-do: kill 1101500 1107838 1118830 1136223 1161972 1177335. [carry]
+- [yellow] **Orphan directives — auth_401 window** — Larry's 19:04 MDT "beacon?" session-bound; self-healing. [carry, no DM]
+- [yellow] **unreviewed-merge:710** — PR #710 merged without Mirror review. Larry judgment. [carry]
+- [yellow] **unreviewed-merge:709** — PR #709 merged without Mirror review. Larry judgment. [carry]
+- [yellow] **forge-wip-redispatch-digest Forge dispatch** — Beacon fix designed (iter ~2798). Trust-policy approval from Larry pending. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649/637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — approve check-viii-update-2026-06-15. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — Session-bound; self-healing. [carry — monitor]
+- [yellow] **Check III threshold proposals** — approve threshold-update-2026-06-11. Awaiting Larry. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [blue] **heal-stale-daemon-code-state.json MISSING** — healer heartbeat fresh; informational. [carry]
+- [blue] **G-rules (unchanged):** heal-daemon-restart-manifest-drift (2/3), watchdog-watcher-log-stale-post-pr694 (2/3), no-session-revision-merged-pr-fp-001 (1/3), unrouted-open-pr-auto-merge-held-fp-001 (1/3), forge-wip-redispatch-digest-tier4-001 (dispatched vp), forge-wip-redispatch-exhausted-pr-exists-fp-001 (2/3), heal-stale-daemon-code-auto-restart-failed-self-recovered (1/3), heal-stale-daemon-code-still-stale-after-restart (1/3), outbox-notifier-notification-intent-reject-tier4-001 (2/3), ourliberty-health-sync-push-failed-tier4-001 (1/3), mirror-marker-severity-blocking-pr711-001 → DISPATCHED ✅ APPROVED ✅ FORGE-DISPATCH-STUCK ⚠️ (escalated iter ~2866), unrouted-open-pr-active-mirror-session-fp-001 (1/3), medic-dispatcher-delivery-failure-tier4-001 (1/3), forge-revision-preamble-missing-pr711-001 (1/3).
+- [blue] **unreviewed-merge:655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. [carry]
+
+**PRIME DIRECTIVE:** 1 new intervention this iter (new open PR #712 by Larry). Trailing-30d: interventions=1245, systemic_fixes=72, vp=27, ratio≈17.29, trend=improving.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0 (non-clean: zombie PID + 6 stale journalctl + stuck dispatch + PR #712 open). Last signal: 2026-06-26T04:35Z.
+
+---
+
+
+## Iteration ~2866 — 2026-06-26T04:27Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/cycle` invocation via chat (loop mode).
+
+**Health:** ⚠️ Stuck dispatch — mirror-marker-discipline-spec-update-001 Forge dispatch did NOT fire. Beacon processed larry-approval-c5251287 at 04:21:44Z (success=True, 2 attempts, 840s) but re-emitted an APPROVAL_REQUEST marker instead of writing to Forge inbox; outbox-notifier skipped as duplicate (pending-approvals still status=pending). All 8 daemons alive. 0 new alerts. 0 open PRs. Stall dry-run clean. Zombie PID 1834248 + 6 stale journalctl PIDs carry (unchanged).
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo (re-verified):** On main. HEAD=3d6ffc66=origin/main ("Pulse cycle 20260626T041925Z"). Clean. 0 behind. ✅
+- **Sync (re-verified):** last_sync=2026-06-26T04:01:59Z (~25 min old at scan). Under 2h. ✅
+- **Daemons (re-verified):** chain_event_shipper=2716672 (etime=21:23:44) ✅, inbox_watcher=3107973 (etime=04:13:17) ✅, forge_bot=3141897 (etime=02:52:16) ✅, mirror_bot=3142077 (etime=02:52:12) ✅, pulse_bot=3142169 (etime=02:52:08) ✅, dashboard_api=3219975 (etime=01:01:29) ✅, beacon=3220237 (etime=01:01:23) ✅, outbox_notifier=3220349 (etime=01:01:18) ✅. 8/8 alive (ps-verified). ✅
+- **Watchdog (re-verified):** last=22:16:28 MDT (04:16:28Z) — overall=healthy. ✅
+- **PRs (re-verified):** gh pr list → [] on both agent-core and dashboard. 0 open PRs. ✅
+- **beacon-pending-approvals (re-verified):** pending=1 (mirror-marker-discipline-spec-update-001, status=pending — STUCK; Beacon processed larry-approval but did not dispatch to Forge). ⚠️
+- **Zombie PID 1834248 (re-verified):** Alive (~28d 9h+, Ss bash poll loop — target build-check-viii-pr-2b-analyzer-001.json NOT FOUND). [carry ask-then-do]
+- **6 stale journalctl PIDs (re-verified):** 1101500, 1107838, 1118830, 1136223, 1161972, 1177335 — all alive (~31d+). [carry ask-then-do]
+- **Watermark (re-verified):** {"repaired": false, "old_watermark": 1039, "file_length": 1039}. 0 new alerts. ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark → no-op. 0 new alerts (watermark=file_length=1039). ✅ Nominal.
+
+**Check 1 — Log noise (30-min / outbox-notifier / watchdog):**
+- journalctl --user -p warning → No entries. ✅
+- outbox-notifier.log: 2 new entries at 04:21:48-49Z (from Beacon's larry-approval session completing):
+  - `beacon pulse-auto-dispatch APPROVAL_REQUEST for larry-approval-c5251287… has no valid reply_chat_id (None); falling back to default Larry chat`
+  - `beacon pulse-auto-dispatch APPROVAL_REQUEST for larry-approval-c5251287… already has an entry (id=mirror-marker-discipline-spec-update-001, status=pending); skipping duplicate add_pending + alert queue`
+  These confirm the stuck-dispatch root cause. Not WARN-class errors — expected notifier behavior for a duplicate. Explains why beacon-pending-approvals is stuck.
+- watchdog.log: last=04:16:28Z — overall=healthy. ✅ Nominal.
+
+**Check 2 — Telegram sweep (last 4h):**
+- beacon_telegram_bot.log: last entry 22:09:31 MDT (dispatch-branch-cleanup digest skip). No new Larry messages. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- heal_pipeline_stall --dry-run → all FORGE_NO_PR_SKIP, no stalls detected. ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- **Beacon inbox: NOW EMPTY** — larry-approval-c5251287 processed at 04:07:44–04:21:44Z (840s, 2 attempts, success=True, archived). ✅ (processed)
+- **NEW FINDING: Beacon re-emitted APPROVAL_REQUEST instead of Forge dispatch.** Beacon's session for the larry-approval produced an APPROVAL_REQUEST marker for mirror-marker-discipline-spec-update-001. Outbox-notifier at 04:21:48Z detected it as a duplicate of the existing pending entry (status=pending) and skipped. Forge inbox is empty — NO FORGE TASK DISPATCHED. The dispatch chain is broken; mirror-marker fix will not ship without intervention. [yellow — ask-then-do escalation written]
+  Root cause per MEMORY.md: "APPROVAL_REQUEST marker doesn't route for source=dashboard; use dispatch_approved/safe_write_inbox + resolve()." Beacon's larry-approval handler used the APPROVAL_REQUEST re-emission path rather than the correct dispatch_approved path. This is the same class of bug as the dashboard-approve path issue documented in memory.
+- Forge inbox: EMPTY. ✅
+- Mirror inbox: EMPTY. ✅
+
+**Check 5 — Stale daemon code:**
+- Heartbeat=2026-06-26T04:19:20Z (~8 min before scan). Fresh. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=3d6ffc66=origin/main. On main. Clean. 0 behind. ✅ Nominal.
+**Check B — Sync health:** last_sync=2026-06-26T04:01:59Z (~25 min). Under 2h. ✅ Nominal.
+**Check C — Agent liveness:** 8/8 procs alive (ps-verified). Watchdog healthy (04:16:28Z). ✅
+- **[yellow carry] PID 1834248** — bash poll loop (~28d 9h+, target archive file not found). Ask-then-do: kill 1834248. [carry]
+- **[yellow carry] 6 stale journalctl PIDs (~31d+)** — Ask-then-do: kill 1101500 1107838 1118830 1136223 1161972 1177335. [carry]
+**Check E — PRs:** 0 open PRs (agent-core + dashboard). ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Friday 2026-06-26 UTC (weekday=4, IS in firing set):**
+- Check I: Invoked without --force (firing day). Cooldown-suppressed — block for 2026-06-22 already present (ran at 04:17Z same day). DM suppressed. Wrote check-i-2026-06-26.json. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule assessment:**
+- **mirror-marker-severity-blocking-pr711-001** → DISPATCHED ✅ (iter ~2852), APPROVED ✅ (iter ~2864). **FORGE DISPATCH STUCK (iter ~2866):** Beacon re-emitted APPROVAL_REQUEST instead of writing to Forge inbox; notifier skipped duplicate; pending-approvals status=pending; Forge build never started. Escalation written to pulse-escalations.json. verification_pending DOWNGRADED — task never reached Forge.
+- All other G-rule counts unchanged from iter ~2865.
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op. 0 new alerts. Watermark unchanged (1039).
+2. §5.0: all no-op.
+3. Check I: cooldown-suppressed (week-2026-06-22 block, ran at 04:17Z same day).
+4. PRIME ledger: intervention appended (tier=1, template=check-4-stuck-dispatch-mirror-marker, detail=mirror-marker-discipline-spec-update-001 Forge dispatch stuck — Beacon re-emitted APPROVAL_REQUEST instead of direct Forge inbox write; notifier skipped duplicate; pending-approvals status=pending; escalation written; ts=2026-06-26T04:27Z).
+5. Escalation: pulse-escalations.json updated (mirror-marker-stuck-dispatch, yellow, ask-then-do).
+6. Tier state: record --checks-clean false → consecutive_clean=0. Tier remains 1. last_signal_at=2026-06-26T04:27Z.
+
+**Dispatches:** None this iter (stuck-dispatch finding is ask-then-do — escalation written, not dispatching autonomously).
+
+**Standing findings (carried + verified):**
+- [yellow] **mirror-marker-discipline-spec-update-001 — FORGE DISPATCH STUCK** — Beacon processed larry-approval at 04:21:44Z but re-emitted APPROVAL_REQUEST instead of writing to Forge inbox. Notifier skipped duplicate. pending-approvals status=pending. Forge build never started. Larry intervention needed: manually trigger the Forge dispatch OR re-run Beacon's larry-approval handler with the correct dispatch_approved path. [escalation written]
+- [yellow] **Zombie PID 1834248** — bash poll loop (~28d 9h+, target archive file not found). Ask-then-do: kill 1834248. [carry]
+- [yellow] **6 stale journalctl PIDs (~31d+)** — Ask-then-do: kill 1101500 1107838 1118830 1136223 1161972 1177335. [carry]
+- [yellow] **Orphan directives — auth_401 window** — Larry's 19:04 MDT "beacon?" session-bound; self-healing. [carry, no DM]
+- [yellow] **unreviewed-merge:710** — PR #710 merged without Mirror review. Larry judgment. [carry]
+- [yellow] **unreviewed-merge:709** — PR #709 merged without Mirror review. Larry judgment. [carry]
+- [yellow] **forge-wip-redispatch-digest Forge dispatch** — Beacon fix designed (iter ~2798). Trust-policy approval from Larry pending. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649/637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — approve check-viii-update-2026-06-15. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — Session-bound; self-healing. [carry — monitor]
+- [yellow] **Check III threshold proposals** — approve threshold-update-2026-06-11. Awaiting Larry. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [blue] **heal-stale-daemon-code-state.json MISSING** — healer heartbeat fresh; informational. [carry]
+- [blue] **G-rules (updated mirror-marker):** heal-daemon-restart-manifest-drift (2/3), watchdog-watcher-log-stale-post-pr694 (2/3), no-session-revision-merged-pr-fp-001 (1/3), unrouted-open-pr-auto-merge-held-fp-001 (1/3), forge-wip-redispatch-digest-tier4-001 (dispatched vp), forge-wip-redispatch-exhausted-pr-exists-fp-001 (2/3), heal-stale-daemon-code-auto-restart-failed-self-recovered (1/3), heal-stale-daemon-code-still-stale-after-restart (1/3), outbox-notifier-notification-intent-reject-tier4-001 (2/3), ourliberty-health-sync-push-failed-tier4-001 (1/3), mirror-marker-severity-blocking-pr711-001 → DISPATCHED ✅ APPROVED ✅ FORGE-DISPATCH-STUCK ⚠️ (escalated iter ~2866), unrouted-open-pr-active-mirror-session-fp-001 (1/3), medic-dispatcher-delivery-failure-tier4-001 (1/3), forge-revision-preamble-missing-pr711-001 (1/3).
+- [blue] **unreviewed-merge:655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. [carry]
+
+**PRIME DIRECTIVE:** 1 new intervention this iter (stuck dispatch mirror-marker). Trailing-30d: interventions=1244, systemic_fixes=72, vp=27, ratio≈17.28, trend=improving.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0 (non-clean: zombie PID + 6 stale journalctl + stuck dispatch). Last signal: 2026-06-26T04:27Z.
+
+---
+
+
 ## Iteration ~2865 — 2026-06-26T04:17Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/cycle` invocation via chat (loop mode).

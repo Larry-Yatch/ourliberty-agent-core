@@ -198,9 +198,9 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## G-rule mirror-marker-severity-blocking-pr711-001 → DISPATCHED ✅ (iter ~2852)
+## G-rule mirror-marker-severity-blocking-pr711-001 → DISPATCHED ✅ APPROVED ✅ FORGE-DISPATCH-STUCK ⚠️ (iter ~2866)
 
-**Rule:** Mirror produced 3 malformed markers on PR #711: (1) REVIEW_REVISION empty findings (iter ~2847), (2) REVIEW_REVISION severity='blocking' (iter ~2848), (3) REVIEW_PASS prose inside JSON block (iter ~2852). Dispatched `mirror-marker-discipline-spec-update-001` to Beacon: update Mirror CLAUDE.md with severity enumeration [low/medium], non-empty findings requirement, JSON-only-inside-delimiters rule. Moving to Completed G-rules on next condense. verification_pending.
+**Rule:** Mirror produced 3 malformed markers on PR #711: (1) REVIEW_REVISION empty findings (iter ~2847), (2) REVIEW_REVISION severity='blocking' (iter ~2848), (3) REVIEW_PASS prose inside JSON block (iter ~2852). Dispatched `mirror-marker-discipline-spec-update-001` to Beacon → Larry approved via dashboard (iter ~2864). Beacon processed larry-approval at 04:21:44Z 2026-06-26 but re-emitted APPROVAL_REQUEST instead of calling dispatch_approved(); notifier skipped duplicate (status=pending in pending-approvals). Forge build NEVER STARTED. Escalation written iter ~2866. Larry intervention needed: write dispatch_payload to Forge inbox OR re-trigger Beacon with correct approval-dispatch path.
 
 ---
 
@@ -228,8 +228,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 04:17Z UTC (Iter ~2865, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 04:35Z UTC (Iter ~2867, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2865 summary:** ✅ Nominal — 8/8 daemons alive. 1 new alert (Tier 3 silence, dispatch-branch-cleanup digest). 0 open PRs. Stall dry-run clean. Zombie PID 1834248 + 6 stale journalctl PIDs carry (unchanged). larry-approval-c5251287 in Beacon inbox (monitoring → Forge dispatch expected). Check I cooldown-suppressed (Friday, week-2026-06-22 block). §5.0 all no-op. Watchdog healthy (04:11:24Z). PRIME: interventions=1243, systemic_fixes=72, vp=27, ratio≈17.26, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2867 summary:** ⚠️ Drift — PR #712 "fix(narrator): authenticate claude with the durable per-tier setup-token" created 04:31:49Z by Larry-Yatch (manual push); no CI, no auto-merge, outbox-notifier should dispatch Mirror review. Stuck dispatch (mirror-marker-discipline-spec-update-001) carries from iter ~2866 (Forge inbox still empty, pending-approvals still pending). All 8 daemons alive. 0 new alerts. Stall dry-run clean. Zombie PID 1834248 + 6 stale journalctl PIDs carry. Check I cooldown-suppressed. PRIME: interventions=1245, systemic_fixes=72, vp=27, ratio≈17.29, trend=improving. Tier 1, consecutive_clean=0.
 
 
