@@ -945,17 +945,17 @@
           "id": "forge-wip-only-redispatch",
           "title": "Forge WIP-only session-death auto-redispatch",
           "desired_end_state": "New bounded, poll-based healer (scripts/heal_forge_wip_only_redispatch.py + systemd timer) that detects a Forge/Mirror dispatch whose session died leaving ONLY the [WIP][session-start] checkpoint commit (no build commit, no PR, inbox already archived) and mechanically re-queues the SAME task once with strict dedup, escalating to Larry only when auto-recovery is exhausted. Closes the coverage gap behind Pulse G-rule 'Forge-timeout-worktree-missing-retry-loop' (3 observed instances, latest 2026-06-24 reconcile-hardening-mission-shipped-001). Related mission: orchestrator-terminal-signal-hardening.",
-          "lifecycle_state": "building",
+          "lifecycle_state": "done",
           "order": 0,
           "spec_ref": null,
           "sequence_ref": null,
           "created_at": "2026-06-25T02:30:10.450012+00:00",
-          "updated_at": "2026-06-25T02:30:10.450012+00:00"
+          "updated_at": "2026-06-25T02:30:10.795255+00:00"
         }
       ],
       "one_off": true,
       "created_at": "2026-06-25T02:30:10.450012+00:00",
-      "updated_at": "2026-06-25T02:30:10.450012+00:00",
+      "updated_at": "2026-06-26T21:30:16.357322+00:00",
       "promoted_from": {
         "kind": "mission",
         "mission_id": "forge-wip-only-redispatch"
