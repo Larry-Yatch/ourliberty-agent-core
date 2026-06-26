@@ -5816,7 +5816,12 @@
         "at": "2026-06-26T08:42:00.043442+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-26T14:42:26.596881+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#716"
     },
     {
       "id": "proposed-direction-ask-unrouted-pr-active-mirror-session-fix-001",
