@@ -5,6 +5,110 @@
 ---
 
 
+## Iteration ~2991 — 2026-06-26T20:11Z UTC (interactive /cycle via chat, Tier 2→3, G-rule dispatch)
+
+**Trigger:** Larry `/cycle` via chat.
+
+**Health:** ⚠️ Intervention — 7 new alerts (6 Tier-3 silenced, 1 Tier-4 → G-rule 3/3 dispatch). sync push failed at 19:50Z then self-healed. PR #726 Mirror actively reviewing (~15 min, normal). PR #727 MERGED (forge-queue lane overlap fix); heal-stale-daemon-code correctly restarted 3 services. **Tier 2 → Tier 3** (consecutive_clean 2→3 → de-escalated).
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo (re-verified):** HEAD=d86066a3=origin/main. On main. Clean. Up to date. ✅ (new: PR #727 merged, PR #726 open)
+- **Sync (re-verified):** sync.json shows status=error, last_sync=2026-06-26T19:50:54Z. BUT: repo is clean+up-to-date with origin (git confirms d86066a3=origin/main). Push failed transiently at 19:50Z, self-healed on next tick. Self-resolved. ✅
+- **Watchdog (re-verified):** last tick 14:02:10 MDT (20:02:10Z) — healthy 5-min ticks. ✅
+- **Heal-daemon heartbeat (re-verified):** 2026-06-26T19:58:56Z (~12 min). Under 60-min threshold. ✅
+- **PR #726 (new):** OPEN. "fix(mirror): bound every review step on the wall clock — prevent the inbox:mirror hang class (#717/#720)". Mirror actively reviewing — PID 3714142 alive (started 13:55:24 MDT, ~15+ min in, normal). Mirror inbox has review-pr-ourliberty-agent-core-726.json. [monitoring]
+- **PR #727 (resolved):** MERGED. "Fix forge-queue building↔in_review lane overlap". commit 1fc10b8e. heal-stale-daemon-code auto-restarted dashboard-api, beacon-bot, outbox-notifier at 13:59 MDT (dashboard_api.py changed). All services running fresh code. ✅
+- **All other inboxes (re-verified):** Beacon EMPTY (before dispatch), Forge EMPTY. beacon-pending=0. ✅
+- **outbox-notifier (re-verified):** Restarted 13:59:09 MDT (post-PR#727 stale-code restart). Quiet since (no outbox activity). ✅
+- **forge-revision-preamble-missing-pr711-001 (carry, no new occurrence):** Last occurred iter ~2990 (PR #720 rev2). 2/3. [carry]
+- **mirror-runner-missing-worktree-retry-001 (carry, no new occurrence):** 1/3 unchanged. [carry]
+- **ourliberty-health-sync-push-failed-tier4-001 (NEW 3/3):** idx=1043 fires at 19:50:54Z. Route=escalate — outbox-notifier already DM'd Larry at 13:54:33 MDT. Sync self-healed. G-rule 3/3 → dispatched. ✅
+- **Pipeline stall (re-verified):** `heal_pipeline_stall.py --dry-run` → "no stalls detected". All prior FP tasks FORGE_NO_PR_SKIP. ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark: {repaired:false, old_watermark=1042, file_length=1048 (+1 during iter → 1049}. 7 new alerts.
+- idx=1042: `source=pulse, subject=check-i-2026-06-22, route=digest` → Tier-3 silence. ✅ (outbox-notifier skipped DM)
+- idx=1043: `source=ourliberty-health, subject=sync_agent_core: auto-commit push failed, route=escalate` → Tier-4 novel. Outbox-notifier already DM'd Larry 13:54:33 MDT. G-rule `ourliberty-health-sync-push-failed-tier4-001` → **3/3 → dispatched**. ⚠️
+- idx=1044: `source=sync.service, subject=sync-blocked:auto-commit-push-failed, route=digest` → Tier-3 silence. ✅
+- idx=1045: `source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-dashboard-api.service, route=digest` → Tier-3 silence. ✅ (PR#727 code change, correct behavior)
+- idx=1046: `source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-beacon-bot.service, route=digest` → Tier-3 silence. ✅
+- idx=1047: `source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-outbox-notifier.service, route=digest` → Tier-3 silence. ✅
+- idx=1048: `source=dispatch-branch-cleanup, subject=summary, route=digest` → Tier-3 silence. ✅ (pruned 6 local + 6 remote stale branches)
+- Watermark: 1042→1049. ✅
+
+**Check 1 — Log noise:**
+- watchdog.log: healthy 5-min ticks through 14:02:10 MDT. No WARNs. ✅
+- outbox-notifier.log: quiet since 13:59:09 MDT restart (no outbox activity, Mirror still reviewing). ✅
+- mirror.log: session started 13:55:24 MDT (PR #726, ~15+ min, no Completed entry — normal). ✅
+
+**Check 2 — Telegram sweep:**
+- beacon_telegram_bot.log: last meaningful Larry message 13:24:16 MDT (handled iter ~2989). Post-restart bot scanning alerts in digest mode. No new Larry directives. ✅
+
+**Check 3 — Pipeline stall (dry-run):**
+- No stalls detected. ✅
+
+**Check 4 — Pending directives:**
+- Beacon inbox: 1 item (ourliberty-health-sync-push-failed-tier4-translation-001 — just dispatched). Forge EMPTY. Mirror inbox: review-pr-ourliberty-agent-core-726.json (in progress). beacon-pending=0. ✅
+
+**Check 5 — Stale daemon code:**
+- Heartbeat=2026-06-26T19:58:56Z (~12 min). Under 60-min threshold. ✅
+
+**Check A — Source repo:** HEAD=d86066a3=origin/main. On main. Clean. Up to date. ✅
+**Check B — Sync health:** Push failed 19:50Z then self-healed (repo confirms up-to-date). G-rule dispatch handles the Tier-4 DM class. ✅
+**Check C — Agent liveness:** Watchdog healthy (20:02:10Z). Heal-daemon fresh (19:58:56Z). outbox-notifier running (restarted 13:59:09 MDT, quiet — normal). beacon-bot running. Mirror: PID 3714142 alive (PR #726, ~15 min, normal). ✅
+**Check E — PRs:**
+- **PR #726** — OPEN. Mirror actively reviewing (~15 min). "fix(mirror): bound every review step on wall clock". [monitoring]
+- **PR #727** — MERGED ✅ 1fc10b8e. Forge-queue lane overlap fix. heal-stale-daemon-code correctly handled code reload.
+- [carry] **unreviewed-merge:723** — Larry judgment. [carry]
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅
+
+**Conditional checks — Friday 2026-06-26 UTC (weekday=4, firing set):**
+- Check I: invoked (no --force). mode=digest, cooldown-suppressed (journal-block for 2026-06-22 already present — handled iter ~2990). ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule assessment:**
+- `ourliberty-health-sync-push-failed-tier4-001` → **DISPATCHED ✅ 3/3** (iter ~2991, envelope to Beacon inbox).
+- `forge-revision-preamble-missing-pr711-001` → 2/3 unchanged. [carry]
+- `mirror-runner-missing-worktree-retry-001` → 1/3 unchanged. [carry]
+- All other G-rules: unchanged.
+
+**Actions taken:**
+1. Check 0: triaged 7 alerts (6 Tier-3 silence, 1 Tier-4 G-rule dispatch). Watermark 1042→1049. ✅
+2. Dispatched `ourliberty-health-sync-push-failed-tier4-translation-001` to Beacon inbox (G-rule 3/3). ✅
+3. Check I: invoked no-force, cooldown-suppressed. ✅
+4. §5.0: all no-op. ✅
+5. PRIME ledger: intervention + systemic_fix appended. ✅
+6. Tier state: consecutive_clean 2→3 → **promoted Tier 2 → Tier 3**. ✅
+
+**Escalations:** None (Tier-4 DM for idx=1043 already delivered by outbox-notifier; G-rule dispatch is the systemic fix).
+
+**Standing findings (carried + verified):**
+- [yellow] **PR #726 — Mirror actively reviewing** — PID 3714142, ~15 min (normal). fix(mirror): wall-clock bounds on review steps. [new, monitoring]
+- [yellow] **unreviewed-merge:723** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:713** — Larry judgment. [carry]
+- [yellow] **Zombie PID 1834248** — bash poll loop (29d+). Ask-then-do. [carry]
+- [yellow] **6 stale journalctl PIDs (31d+)** — Ask-then-do. [carry]
+- [yellow] **forge-wip-redispatch-digest Forge dispatch** — Beacon fix designed. Trust-policy approval pending. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — approve check-viii-update-2026-06-15. Awaiting Larry. [carry]
+- [yellow] **Check III threshold proposals** — approve threshold-update-2026-06-11. Awaiting Larry. [carry]
+- [yellow] **unreviewed-merge:710/709** — Larry judgment. [carry]
+- [blue] **ourliberty-health-sync-push-failed-tier4-001 — DISPATCHED ✅** — Beacon direction-ask sent. verification_pending. [updated]
+- [blue] **forge-revision-preamble-missing-pr711-001 — 2/3** — dispatch at 3/3. [carry]
+- [blue] **heal-stale-daemon-code-auto-restart-failed-self-recovered — 2/3** — dispatch at 3/3. [carry]
+- [blue] **pulse-source-alert-delivery-confirm-tier4-001 — 2/3** — dispatch at 3/3. [carry]
+- [blue] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced. [carry]
+- [blue] **mirror-runner-missing-worktree-retry-001 — 1/3** — dispatch at 3/3. [carry]
+- [blue] **G-rules (unchanged):** sentinel-inflight-stall-mirror-tier4 (2/3), review-duplicate-dispatch-wip-redispatch (vp), check-i-force-bypass-dm-route (2/3), heal-daemon-restart-manifest-drift (2/3), no-session-revision-merged-pr-fp-001 (1/3), unrouted-open-pr-auto-merge-held-fp-001 (1/3), forge-wip-redispatch-digest-tier4-001 (dispatched vp), forge-wip-redispatch-exhausted-pr-exists-fp-001 (2/3), heal-stale-daemon-code-still-stale-after-restart (1/3), outbox-notifier-notification-intent-reject-tier4-001 (2/3), no-session-revision-active-mirror-session-fp-001 (DISPATCHED ✅ vp).
+- [blue] **unreviewed-merge:649/637/655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+
+**PRIME DIRECTIVE:** intervention + systemic_fix. Trailing-30d: interventions=1328, systemic_fixes=76, vp=28, ratio≈17.47.
+**Tier end-of-iter:** Tier **3** (promoted from 2), consecutive_clean=0. Last signal: 2026-06-26T18:56:42Z.
+
+---
+
+
 ## Iteration ~2990 — 2026-06-26T19:49Z UTC (interactive /cycle via chat, Tier 2, clean)
 
 **Trigger:** Larry `/cycle` via chat.

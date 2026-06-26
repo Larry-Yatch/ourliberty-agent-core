@@ -210,9 +210,9 @@ PR #716 (fix(heal-stall): suppress unrouted_open_pr alert while Mirror is active
 
 ---
 
-## G-rule ourliberty-health-sync-push-failed-tier4-001 — 2/3 (updated iter ~2934)
+## G-rule ourliberty-health-sync-push-failed-tier4-001 → DISPATCHED ✅ (iter ~2991), vp
 
-**Rule:** `source=ourliberty-health, subject=sync_agent_core: auto-commit push failed` alerts classify Tier-4 (novel). But this is a transient self-healing event — the sync wrapper commits+pushes successfully on the next tick. `source=sync.service, subject=sync-blocked:auto-commit-push-failed` is already Tier-3. Larry gets DM'd unnecessarily (outbox-notifier delivers route=escalate). Fix: add `source=ourliberty-health, subject^=sync_agent_core: auto-commit push failed` → Tier-3 entry to `config/alert-translations.json`. Dispatch to Beacon at 3/3.
+**Rule:** `source=ourliberty-health, subject=sync_agent_core: auto-commit push failed` alerts classify Tier-4 (novel). But this is a transient self-healing event — the sync wrapper commits+pushes successfully on the next tick. `source=sync.service, subject=sync-blocked:auto-commit-push-failed` is already Tier-3. Larry gets DM'd unnecessarily (outbox-notifier delivers route=escalate). Fix: add `source=ourliberty-health, subject^=sync_agent_core: auto-commit push failed` → Tier-3 entry to `config/alert-translations.json`. Dispatched direction-ask `ourliberty-health-sync-push-failed-tier4-translation-001` to Beacon inbox (iter ~2991, 3/3). verification_pending.
 
 ---
 
@@ -267,8 +267,8 @@ PR #725 (fix(healer): skip forge_built_no_pr for pr-<repo>-<num> tasks whose nam
 
 ---
 
-## Status snapshot — updated 2026-06-26 19:49Z UTC (Iter ~2990, Tier 2, consecutive_clean=2)
+## Status snapshot — updated 2026-06-26 20:11Z UTC (Iter ~2991, Tier 3, consecutive_clean=0)
 
-**Iter ~2990 summary:** ✅ Nominal. 3 new alerts (all Tier-3 silenced). PR #720 MERGED 19:42:49Z (beacon-erofs G-rule COMPLETE ✅). PR #725 MERGED 19:33:58Z (forge-built-no-pr-pr-task-id-closed G-rule COMPLETE ✅, stall fix verified). All inboxes EMPTY. forge-revision-preamble-missing-pr711-001 → 2/3 (PR #720 rev2). Watermark 1039→1042. PRIME: iter_clean. Tier 2, consecutive_clean=1→2.
+**Iter ~2991 summary:** ⚠️ Intervention. 7 new alerts (6 Tier-3, 1 Tier-4). G-rule ourliberty-health-sync-push-failed-tier4-001 → DISPATCHED ✅ (3/3, Beacon direction-ask). PR #726 OPEN (Mirror reviewing, ~15 min, normal). PR #727 MERGED (forge-queue lane overlap). Sync push failed 19:50Z then self-healed. Watermark 1042→1049. PRIME: intervention + systemic_fix. Tier 2 → Tier 3 de-escalation (consecutive_clean 2→3).
 
 
