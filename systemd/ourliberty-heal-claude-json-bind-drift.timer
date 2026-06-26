@@ -1,0 +1,17 @@
+[Unit]
+Description=Run heal_claude_json_bind_drift every 2 minutes
+
+[Timer]
+# 2-min cadence: a dangled /home/larry/.claude.json mount makes the chat bridges
+# reply a bare `[claude exit 1]` and look offline, so the detection window is
+# user-facing — keep it short. The per-unit 15-min RESTART_COOLDOWN still caps
+# each unit to one restart per window, so a fast tick only speeds DETECTION
+# (no restart storms); a healthy tick is a cheap nsenter open()/close() sweep.
+OnBootSec=2min
+OnUnitActiveSec=2min
+Persistent=true
+RandomizedDelaySec=10s
+Unit=ourliberty-heal-claude-json-bind-drift.service
+
+[Install]
+WantedBy=timers.target
