@@ -5,6 +5,126 @@
 ---
 
 
+## Iteration ~3000 — 2026-06-26T23:08Z UTC (interactive /cycle via chat, Tier 3→1 reset, consecutive_clean=0)
+
+**Trigger:** Larry `/cycle` via chat.
+
+**Health:** ⚠️ Tier-4 alert — heal-stale-daemon-code `auto-restart-failed:ourliberty-outbox-notifier.service` (self-recovered per medic). G-rule heal-stale-daemon-code-auto-restart-failed-self-recovered **3/3 → DISPATCHED ✅**. Tier-reset 3→1. PR #731 active revision/review cycle (not stuck). All agents alive. 8 alerts triaged (7× Tier-3 silence, 1× Tier-4 dispatched).
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #731 (re-verified):** OPEN, MERGEABLE, reviewDecision="". Branch: forge/forge-revision-preamble-discipline-001. Mirror inbox has 2 review files (review-forge-revision-preamble-discipline-001-rev1.json at 22:51Z, review-forge-revision-preamble-discipline-001.json at 22:55Z). Forge has no pending revision task (inbox empty). Forge's revision-1 push (sha=d66a296e17a9) was reviewed by Mirror → REVIEW_REVISION (16:53:57 MDT). outbox-notifier tried to dispatch next revision but blocked ("revision-1 already dispatched (skip)"); dispatched another Mirror review at 16:55:34 MDT instead. Pipeline active, Mirror reviewing now (~15 min in at check time). [active pipeline, monitoring]
+- **Stale beacon-pending (re-verified):** mirror-review-silence-ourliberty-health-sync-push-failed-001 still present in beacon-pending-approvals.json (created 21:49:13Z). PR #728 was merged 21:50:20Z. chat_id=null. Stale. Beacon cleanup needed. [carry]
+- **Repo (re-verified):** HEAD=27242cca=origin/main. On main. Clean. Up to date. ✅
+- **Sync (re-verified):** status=no-change, last_sync=2026-06-26T22:51:15Z (~17 min at check time). Under 2h. ✅
+- **Watchdog (re-verified):** healthy 5-min ticks through 16:55:59 MDT (22:55:59Z). ✅
+- **Heal-daemon heartbeat (re-verified):** 2026-06-26T23:00:20Z (~8 min at check time). Under 60-min threshold. ✅
+- **Pipeline stall (re-verified):** dry-run → "no stalls detected". All tasks FORGE_NO_PR_SKIP with correct reasons. ✅
+- **outbox-notifier (re-verified):** alive PID 3822088 (ps-confirmed), started 16:42 MDT. systemctl --user false-negative (expected per MEMORY). Active, last log entry 16:55:34 MDT. ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark: {repaired:false, old_watermark=1065, file_length=1073}. 8 new alerts.
+- idx=1065: source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-dashboard-api.service, route=digest → Tier-3 silence. dashboard-api restarted after PR #730 updated scripts/dashboard_api.py (61.1 min newer). ✅
+- idx=1066: source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-beacon-bot.service, route=digest → Tier-3 silence. ✅
+- idx=1067: source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-forge-bot.service, route=digest → Tier-3 silence. ✅
+- idx=1068: source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-inbox-watcher.service, route=digest → Tier-3 silence. ✅
+- idx=1069: source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-mirror-bot.service, route=digest → Tier-3 silence. ✅
+- idx=1070: source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-pulse-bot.service, route=digest → Tier-3 silence. ✅
+  (All 6 restarts triggered by PR #730 merge updating scripts/agent_runner.py + scripts/dashboard_api.py. Beacon bot confirmed route=digest at 16:45:27 MDT; no Larry DM for any of these.)
+- idx=1071: source=heal-stale-daemon-code, subject=auto-restart-failed:ourliberty-outbox-notifier.service, route=escalate → Tier-4 novel (no translation match). Healer restart timed out (3s check window < ~75s startup latency). Larry DM'd at 16:45:27 MDT via beacon bot. **G-rule heal-stale-daemon-code-auto-restart-failed-self-recovered → 3/3 → DISPATCHED ✅.** Tier-reset.
+- idx=1072: source=medic, intent=medic-diagnosis, route=escalate → Tier-3 silence (known-pattern). Medic confirms: outbox-notifier self-recovered ~75s after failed restart (now active since 16:42:01 MDT). Beacon bot delivered notification at 16:45:28 MDT. ✅
+- Watermark: 1065→1073. ✅
+
+**Check 1 — Log noise:**
+- outbox-notifier.log (new since iter ~2999):
+  - 6× heal-stale-daemon-code restarts (16:40:21-16:40:46 MDT) — triggered by PR #730 deploy. route=digest for 5, route=escalate for outbox-notifier itself. ✅
+  - outbox-notifier SIGTERM+restart at 16:40:43/16:42:02 MDT — outbox-notifier itself restarted as part of the mass-restart. ✅
+  - 16:50:48 WARN: `forge revision-phase outbox without "Revision N applied:" preamble: forge-revision-preamble-discipline-001.json; treating as marker-error` — G-rule forge-revision-preamble-missing-pr711-001 DISPATCHED ✅, PR #731 is the fix. 5th occurrence (4 prior confirmed). [ongoing pipeline, carries forward]
+  - 16:53:59: `revision-1 already dispatched for task forge-revision-preamble-discipline-001 (file or archive or .invalid present); skipping duplicate write` — outbox-notifier blocked from dispatching revision-2 because revision-1 file exists in archive. Subsequent review redispatch at 16:55:34. Pipeline active. [monitoring]
+- Max WARN in new window: 2 distinct signatures. Below threshold. ✅
+- watchdog.log: healthy 5-min ticks through 16:55:59 MDT. No WARNs. ✅
+
+**Check 2 — Telegram sweep (last 4h):**
+- Last Larry directive: "go" at 15:46:18 MDT (handled iter ~2998). No new directives since then. ✅
+- Beacon bot delivered: alert 1071 (auto-restart-failed DM) + notification 1072 (medic-diagnosis) at 16:45:27-28 MDT. These are the only new outbound DMs.
+
+**Check 3 — Pipeline stall (dry-run):**
+- No stalls detected. All tasks FORGE_NO_PR_SKIP with correct reasons. ✅
+
+**Check 4 — Pending directives:**
+- beacon-pending-approvals.json: 1 entry (mirror-review-silence-ourliberty-health-sync-push-failed-001, created 21:49:13Z). STALE — PR #728 MERGED 21:50:20Z. chat_id=null; harmless. [carry for Beacon cleanup]
+- No unhandled Larry directives. ✅
+
+**Check 5 — Stale daemon code:**
+- Heartbeat=2026-06-26T23:00:20Z (~8 min). Under 60-min threshold. ✅
+
+**Check A — Source repo:** HEAD=27242cca=origin/main. On main. Clean. Up to date. ✅
+**Check B — Sync health:** status=no-change, last_sync=22:51:15Z (~17 min). Under 2h. ✅
+**Check C — Agent liveness:** outbox-notifier PID 3822088 (ps-verified, alive since 16:42 MDT) ✅. dashboard-api PID 3820986 ✅. beacon-bot PID 3821234 ✅. forge-bot, mirror-bot, pulse-bot (3× agent_telegram_bot.py, all started 16:40 MDT) ✅. inbox-watcher PID 3822087 ✅. Watchdog healthy 5-min ticks through 22:55:59Z ✅. Heal-daemon 23:00:20Z ✅. chain_event_shipper PID 2716672 (Jun25 start, long-running normal) ✅. **All agent processes alive.**
+**Check E — PRs:**
+- **PR #731** — OPEN, MERGEABLE. title: "fix(notifier): make Forge revision-preamble discipline rev2-proof". Forge pushed revision-1 (sha=d66a296e17a9). Mirror REVIEW_REVISION at 16:53:57 MDT. Mirror reviewing again (dispatched 16:55:34 MDT). Pipeline active. [monitoring]
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅
+
+**Conditional checks — Friday 2026-06-26 UTC (weekday=4, firing set):**
+- Check I: invoked (no --force). journal-block for 2026-06-22 already present → cooldown-suppressed. Wrote check-i-2026-06-26.json. DM: queued (route=digest). auto-dispatched: 0. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule assessment:**
+- `heal-stale-daemon-code-auto-restart-failed-self-recovered` — **DISPATCHED ✅ (3/3)** — idx=1071 this iter. direction-ask-auto-restart-failed-tier3-translation-001 written to Beacon inbox. Fix: add source=heal-stale-daemon-code subject^=auto-restart-failed: Tier-3 translation entry. verification_pending. [new this iter]
+- `mirror-malformed-verdict-post-restart-001` — **2/3** — no new occurrence this iter. Mirror's REVIEW_REVISION at 16:53:57 MDT (sha=d66a296e17a9) was clean (MIRROR_FINDINGS_COMMENT updated, proper marker). [carry, no change]
+- `forge-revision-preamble-missing-pr711-001` — **DISPATCHED ✅** — 5th occurrence this iter (16:50:48 MDT, PR #731 rev1). PR #731 (the fix) under active revision cycle. [carry]
+- `review-duplicate-dispatch-wip-redispatch` — **vp** — 2 review files in Mirror inbox for forge-revision-preamble-discipline-001. Mitigation check: both are from distinct dispatch events (16:51:09 rev1-review + 16:55:34 regular-review), not same-origin duplicates. No archive action triggered. [monitoring]
+- All other G-rules: unchanged from iter ~2999.
+
+**Actions taken:**
+1. Check 0: triaged 8 alerts (7× Tier-3 silence, 1× Tier-4 → dispatch). Watermark 1065→1073. ✅
+2. Check I: invoked no-force, cooldown-suppressed. Wrote check-i-2026-06-26.json. ✅
+3. §5.0: all no-op. ✅
+4. Dispatched direction-ask-auto-restart-failed-tier3-translation-001 to Beacon inbox (G-rule 3/3 systemic fix). ✅
+5. PRIME ledger: intervention + systemic_fix appended. ✅
+6. Tier state: --checks-clean false → tier-reset 3→1 (consecutive_clean=0). ✅
+
+**Escalations:** None new. Larry was already DM'd about idx=1071 (auto-restart-failed) and idx=1072 (medic-diagnosis) via beacon bot at 16:45 MDT. Pulse journal-notes only; direction-ask to Beacon dispatched for permanent fix.
+
+**Standing findings (carried + verified):**
+- [yellow] **PR #731 — active revision/review cycle** — Mirror reviewing (dispatched 16:55:34 MDT). Forge pushed revision-1 (sha=d66a296e17a9). Next outcome: REVIEW_PASS (auto-merge) or REVIEW_REVISION (revision-2 dispatch). [monitoring]
+- [yellow] **Stale beacon-pending: mirror-review-silence-ourliberty-health-sync-push-failed-001** — PR #728 merged; chat_id=null; stale. Beacon cleanup needed. [carry]
+- [yellow] **unreviewed-merge:723** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:713** — Larry judgment. [carry]
+- [yellow] **Zombie PID 1834248** — bash poll loop (29d+). Ask-then-do. [carry]
+- [yellow] **6 stale journalctl PIDs (31d+)** — Ask-then-do. [carry]
+- [yellow] **forge-wip-redispatch-digest Forge dispatch** — Beacon fix designed. Trust-policy approval pending. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — approve check-viii-update-2026-06-15. Awaiting Larry. [carry]
+- [yellow] **Check III threshold proposals** — approve threshold-update-2026-06-11. Awaiting Larry. [carry]
+- [yellow] **unreviewed-merge:710/709** — Larry judgment. [carry]
+- [blue] **heal-stale-daemon-code-auto-restart-failed-self-recovered — DISPATCHED ✅ (3/3)** — direction-ask-auto-restart-failed-tier3-translation-001 written to Beacon inbox. Fix: Tier-3 translation for subject^=auto-restart-failed:. verification_pending. [new this iter]
+- [blue] **forge-revision-preamble-missing-pr711-001 — DISPATCHED ✅ vp** — 5th occurrence this iter. PR #731 (fix) under active revision cycle. [carry]
+- [blue] **mirror-malformed-verdict-post-restart-001 — 2/3** — no new occurrence this iter. Dispatch to Beacon at 3/3. [carry]
+- [blue] **heal-stale-daemon-code-auto-restart-failed-self-recovered — 2/3→DISPATCHED ✅** — moved to dispatched this iter. [carry]
+- [blue] **mirror-runner-missing-worktree-retry-001 — 1/3** — dispatch at 3/3. [carry]
+- [blue] **G-rules (unchanged):** sentinel-inflight-stall-mirror-tier4 (2/3), review-duplicate-dispatch-wip-redispatch (vp), check-i-force-bypass-dm-route (2/3), heal-daemon-restart-manifest-drift (2/3), no-session-revision-merged-pr-fp-001 (1/3), unrouted-open-pr-auto-merge-held-fp-001 (1/3), forge-wip-redispatch-digest-tier4-001 (dispatched vp), forge-wip-redispatch-exhausted-pr-exists-fp-001 (2/3), heal-stale-daemon-code-still-stale-after-restart (1/3), outbox-notifier-notification-intent-reject-tier4-001 (2/3), no-session-revision-active-mirror-session-fp-001 (DISPATCHED ✅ vp), forge-revision-preamble-missing-pr711-001 (DISPATCHED ✅ vp).
+- [blue] **unreviewed-merge:649/637/655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+
+**PRIME DIRECTIVE:** intervention + systemic_fix. Trailing-30d: interventions=1330, systemic_fixes=78, vp=28, ratio≈17.05, trend=improving.
+**Tier end-of-iter:** Tier **1** (reset from 3; consecutive_clean=0; last_signal_at=2026-06-26T23:08:07Z). Tier-4 alert forced reset.
+
+---
+
+
+## Notify — 2026-06-26T22:55Z UTC (inter-agent result: Beacon direction-ask-auto-restart-failed-tier3-translation-001)
+
+**From:** beacon | **Status:** SUCCESS
+
+**What landed:** Beacon added `auto-restart-failed` key under `heal-stale-daemon-code` in `config/alert-translations.json` (severity=INFO, tier=FYI). The new entry silences the `auto-restart-failed:<service>` subject pattern to the digest — a confirmed timing-window false alarm (healer's 3s post-restart check fires before systemd's RestartSec=10 + After= ordering brings the unit back within ~90s; Medic confirms self-recovery in all 3 observed cases: iters ~2704/~2947/~3000). Guardrail verified: `still-stale-after-restart:` is explicitly NOT present in the entry. Change is on working tree, uncommitted.
+
+**Action taken:** Dispatched `heal-stale-daemon-auto-restart-failed-pr-dispatch-001` to Beacon's inbox authorizing the `doc-only` PR to Forge.
+
+**G-rule update:** `heal-stale-daemon-code-auto-restart-failed-self-recovered` → **vp** (fix dispatched, pending PR merge). Will resolve to complete on merge.
+
+---
+
+
 ## Iteration ~2999 — 2026-06-26T22:36Z UTC (interactive /cycle via chat, Tier 3, consecutive_clean=1)
 
 **Trigger:** Larry `/cycle` via chat.

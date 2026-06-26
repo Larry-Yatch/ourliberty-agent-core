@@ -168,9 +168,9 @@ PR #717 (fix: suppress spurious watchdog stale-log WARN during active Mirror rev
 
 ---
 
-## G-rule heal-stale-daemon-code-auto-restart-failed-self-recovered — 2/3 (updated iter ~2947)
+## G-rule heal-stale-daemon-code-auto-restart-failed-self-recovered → DISPATCHED ✅ (iter ~3000), vp
 
-**Rule:** `source=heal-stale-daemon-code, subject^=auto-restart-failed:*` alerts (route=escalate) fire when heal-stale-daemon-code's `sudo systemctl restart` times out (30s sudo timeout) while the unit is cycling. Watchdog also fires CRITICAL during the gap. Systemd's own restart policy brings the service back within ~90s. Services are running by the time Pulse triages. Triage helper: Tier-4 novel (no translation match). Occurrences: iter ~2704 (1/3); iter ~2947 (`auto-restart-failed:ourliberty-outbox-notifier.service` — mass restart triggered by active_tier.py code change from PR #713; PID 3475738 alive at triage time). Fix: add `source=heal-stale-daemon-code, subject^=auto-restart-failed:` Tier-3 translation entry (informational — systemd self-healed). Dispatch to Beacon at 3/3.
+**Rule:** `source=heal-stale-daemon-code, subject^=auto-restart-failed:*` alerts (route=escalate) fire when heal-stale-daemon-code's `sudo systemctl restart` times out (3s post-restart check window shorter than ~75s startup latency). Systemd self-heals within ~90s in all 3 cases. Triage helper: Tier-4 novel (no translation match). Occurrences: iter ~2704 (1/3); iter ~2947 (2/3, ourliberty-outbox-notifier.service, PR #713 mass-restart); iter ~3000 (3/3, ourliberty-outbox-notifier.service, PR #730 mass-restart). Dispatched `direction-ask-auto-restart-failed-tier3-translation-001` to Beacon inbox at iter ~3000. Fix: add source=heal-stale-daemon-code subject^=auto-restart-failed: Tier-3 translation entry. Do NOT silence subject^=still-stale-after-restart: (different, genuine ask-then-do). verification_pending.
 
 ---
 
@@ -273,8 +273,8 @@ PR #725 (fix(healer): skip forge_built_no_pr for pr-<repo>-<num> tasks whose nam
 
 ---
 
-## Status snapshot — updated 2026-06-26 22:36Z UTC (Iter ~2999, Tier 3, consecutive_clean=1)
+## Status snapshot — updated 2026-06-26 23:08Z UTC (Iter ~3000, Tier 1, consecutive_clean=0)
 
-**Iter ~2999 summary:** ✅ Nominal. PR #730 MERGED (fix(dashboard): building-lane non-slug task_ids, 22:31:16Z). 2 alerts Tier-3 silenced. PR #731 (forge-revision-preamble-discipline-001 fix): Mirror REVIEW_REVISION (clean marker) → revision-1 dispatched to Forge (22:33:56Z, cold start). pulse-source-alert-delivery-confirm-tier4-001 G-rule COMPLETE ✅ (translation confirmed present, 3× Tier-3). Check I cooldown-suppressed (Friday, week block already present). No stalls. Watermark 1063→1065. PRIME: iter_clean. Tier 3 (consecutive_clean 0→1).
+**Iter ~3000 summary:** ⚠️ Tier-4 alert: heal-stale-daemon-code auto-restart-failed:ourliberty-outbox-notifier.service (self-recovered per medic, 3rd occurrence → G-rule DISPATCHED ✅). 8 alerts triaged (7× Tier-3, 1× Tier-4). PR #731 (forge-revision-preamble-discipline-001 fix) OPEN, active revision/review cycle — Forge pushed revision-1 (sha=d66a296e17a9), Mirror REVIEW_REVISION, Mirror reviewing again. Preamble-missing WARN fired 5th time during revision (5/3 past threshold, fix PR in flight). direction-ask-auto-restart-failed-tier3-translation-001 dispatched to Beacon. Check I cooldown-suppressed (week 2026-06-22 block). No stalls. Watermark 1065→1073. PRIME: intervention+systemic_fix. Tier-reset 3→1.
 
 
