@@ -246,8 +246,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 08:25Z UTC (Iter ~2903, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 08:32Z UTC (Iter ~2904, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2903 summary:** ⚠️ Active — Mirror PID 3308724 at ~2h17m41s elapsed (well past 60-min threshold). 0 new alerts. Pipeline stall: 2 FP would-fire alerts (cooldowns expired: forge_built_no_pr:712 + unrouted_open_pr:713). 8/8 daemons alive. Watchdog healthy (08:23:20Z). Check I cooldown-suppressed. beacon-pending: 1 (medic-dispatcher-delivery-failure-translation-001 awaiting Larry approval). Zombie PID 1834248 + 6 stale journalctl PIDs carry. PR #713 revision still active (Mirror outbox empty). G-rule `unrouted-open-pr-active-mirror-session-fp-001` → 3/3 DISPATCHED to Beacon. PRIME: interventions=1281, systemic_fixes=72, vp=27, ratio≈17.79, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2904 summary:** ⚠️ Active — Mirror PID 3308724 at ~2h30m+ elapsed. 3 new alerts: L1058 forge-no-pr:712 Tier-3 ✅, L1059 unrouted-pr:713 Tier-3 ✅, L1060 medic-dispatcher Tier-4 (G-rule DISPATCHED vp, no new DM). Pipeline stall: 0 (all cooldown-suppressed). 8/8 daemons alive. Watchdog healthy (08:28:20Z). Check I cooldown-suppressed. beacon-pending: 2 (medic-dispatcher-delivery-failure-translation-001 + direction-ask-unrouted-pr-active-mirror-session-fix-001, both APPROVAL_REQUEST queued to Larry). PR #713 revision active (Mirror outbox empty). PRIME: interventions=1282, systemic_fixes=72, vp=27, ratio≈17.81, trend=improving. Tier 1, consecutive_clean=0.
 
 
