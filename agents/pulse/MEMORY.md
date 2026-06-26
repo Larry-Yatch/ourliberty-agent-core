@@ -198,14 +198,26 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
+## G-rule mirror-marker-severity-blocking-pr711-001 — 2/3 (new iter ~2847, updated iter ~2848)
+
+**Rule:** Mirror emits REVIEW_REVISION with `severity: "blocking"` (and in one instance, empty `findings` list). Both are invalid. Valid severity values are `low` / `medium`; `blocking` belongs in REVIEW_EMERGENCY_HALT, and `high` in REVIEW_ESCALATE. Root cause: Mirror's review prompt or marker-discipline doc permits `severity: "blocking"` which outbox-notifier rejects with `MalformedMirrorMarker`. Occurrences: retry 1/3 at 20:05:55Z (empty findings), retry 2/3 at 02:10:59Z (severity='blocking') — both for PR #711. Dispatch to Beacon at 3/3 to update Mirror's marker-discipline spec + add `severity` field enumeration enforcement.
+
+---
+
+## G-rule unrouted-open-pr-active-mirror-session-fp-001 — 1/3 (new, iter ~2848)
+
+**Rule:** `heal_pipeline_stall.py` dry-run fires `unrouted_open_pr:<pr>` after cooldown expiry even when Mirror IS actively reviewing the PR (active PID + inbox task present). PR #711 triggered this: created 01:17Z, cooldown expired by ~02:21Z, but Mirror review PID 3172100 was running. Stall checker has no visibility into active Mirror sessions (distinct from G-rule `unrouted-open-pr-auto-merge-held-fp-001` which was about AUTO_MERGE_HELD outbox-notifier state on PR #692). Fix: stall checker should check for active agent sessions (inbox task presence or live PID) before firing `unrouted_open_pr`. Dispatch to Beacon at 3/3.
+
+---
+
 ## G-rule ourliberty-health-sync-push-failed-tier4-001 — 1/3 (new, iter ~2796)
 
 **Rule:** `source=ourliberty-health, subject=sync_agent_core: auto-commit push failed` alerts classify Tier-4 (novel). But this is a transient self-healing event — the sync wrapper commits+pushes successfully on the next tick. `source=sync.service, subject=sync-blocked:auto-commit-push-failed` is already Tier-3. Larry gets DM'd unnecessarily (outbox-notifier delivers route=escalate). Fix: add `source=ourliberty-health, subject^=sync_agent_core: auto-commit push failed` → Tier-3 entry to `config/alert-translations.json`. Dispatch to Beacon at 3/3.
 
 ---
 
-## Status snapshot — updated 2026-06-26 02:16Z UTC (Iter ~2847, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 02:26Z UTC (Iter ~2848, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2847 summary:** ⚠️ Non-nominal — Mirror marker error PR #711 (severity='blocking' in REVIEW_REVISION, retry 2/3). 8/8 daemons alive (new PIDs from 01:28Z restart). PRs #709/#710 merged by Larry (emergency unreviewed; auth outage fix). PR #711 Mirror review in-flight (confirm_shipped action). Beacon 401 auth resolved post-restart. No new alerts (watermark=1028). G-rule mirror-marker-severity-blocking-pr711-001 1/3 NEW. PRIME: interventions=1227, systemic_fixes=71, vp=27, ratio≈17.28, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2848 summary:** ⚠️ Non-nominal (carries) — PR #711 Mirror 3rd review session active (PID 3172100, since 20:10 MDT). marker-error-2 retry fired at 02:10:59Z (severity='blocking'); G-rule mirror-marker-severity-blocking-pr711-001 now 2/3. Stall dry-run fires FP for PR #711 (Mirror active session invisible); G-rule unrouted-open-pr-active-mirror-session-fp-001 NEW 1/3. 8/8 daemons alive. 0 new alerts (watermark=1028). Check I Friday-cooldown-suppressed. PRIME: interventions=1227, systemic_fixes=71, vp=27, ratio≈17.28, trend=improving. Tier 1, consecutive_clean=0.
 
 
