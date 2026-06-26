@@ -228,8 +228,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 03:01Z UTC (Iter ~2853, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 03:07Z UTC (Iter ~2854, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2853 summary:** ⚠️ Non-nominal (carries) — Mirror 5th review active (PID 3196288, PR #711); APPROVAL_REQUEST for mirror-marker-discipline-spec-update-001 queued to Larry's Telegram at 02:59Z (Beacon processed iter ~2852 dispatch correctly); zombie PID 1834248 + 6 stale journalctl PIDs carry. 8/8 daemons alive. No new alerts (watermark=1031). Stall dry-run clean. beacon-pending-approvals pending=1. Check I Friday cooldown-suppressed. §5.0 all no-op. PRIME: interventions=1231, systemic_fixes=72, vp=27, ratio≈17.08, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2854 summary:** ⚠️ Non-nominal (carries) — Mirror 5th review active (PID 3196288, PR #711, ~18 min); APPROVAL_REQUEST for mirror-marker-discipline-spec-update-001 pending=1 (awaiting Larry `approve`); zombie PID 1834248 + 6 stale journalctl PIDs carry. 8/8 daemons alive. 1 new alert (Tier-3 silenced: outbox-notifier approval_request delivery confirmation, watermark 1031→1032). Stall dry-run clean. Check I Friday cooldown-suppressed. §5.0 all no-op. PRIME: interventions=1232, systemic_fixes=72, vp=27, ratio≈17.11, trend=improving. Tier 1, consecutive_clean=0.
 
 
