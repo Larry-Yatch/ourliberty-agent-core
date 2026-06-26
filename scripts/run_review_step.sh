@@ -9,7 +9,7 @@
 # Mirror reviews have repeatedly wedged the WHOLE review queue by hand-rolling
 # an unbounded poll around a long step. The step is backgrounded, then a shell
 # loop waits for it — and when the awaited signal never arrives, the loop spins
-# forever, the parent `claude -p` review stays blocked on that one Bash call,
+# forever, the parent review process stays blocked on that one Bash call,
 # and the hung session holds the per-agent `inbox:mirror` dispatch lease, which
 # serializes ALL Mirror reviews. Every PR queued behind it dead-stalls until a
 # human kills the process by hand.
