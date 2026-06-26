@@ -228,8 +228,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 03:39Z UTC (Iter ~2859, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 03:45Z UTC (Iter ~2860, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2859 summary:** ✅ Nominal — 8/8 daemons alive. 1 Tier-3 silence (Check-I digest). 0 open PRs. Stall dry-run clean. Zombie PID 1834248 + 6 stale journalctl PIDs carry. APPROVAL_REQUEST mirror-marker-discipline-spec-update-001 pending=1 (awaiting Larry `approve`). Check I cooldown-suppressed (Friday, week-2026-06-22 block present). §5.0 all no-op. PRIME: interventions=1237, systemic_fixes=72, vp=27, ratio≈17.18, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2860 summary:** ✅ Nominal — 8/8 daemons alive. 0 new alerts. 0 open PRs. Stall dry-run clean. Zombie PID 1834248 + 6 stale journalctl PIDs carry. APPROVAL_REQUEST mirror-marker-discipline-spec-update-001 pending=1 (awaiting Larry `approve`). Check I cooldown-suppressed (Friday, week-2026-06-22 block present). §5.0 all no-op. Self-correction: erroneous `beacon_telegram_bot.py get-messages` call caused 409 burst; running bot PID 3220237 unaffected. PRIME: interventions=1238, systemic_fixes=72, vp=27, ratio≈17.19, trend=improving. Tier 1, consecutive_clean=0.
 
 
