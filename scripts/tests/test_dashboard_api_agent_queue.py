@@ -162,13 +162,20 @@ def _write_inbox_file(agents_root: Path, agent: str, name: str,
 
 def _write_in_flight(agents_root: Path, *, task_stem: str, agent_id: str,
                      pid: int = 4242,
-                     started_at: str = '2026-06-03T07:00:00+00:00') -> None:
+                     started_at: str = '2026-06-03T07:00:00+00:00',
+                     worktree_stem: Optional[str] = None) -> None:
     import json
     p = agents_root / 'state' / 'in-flight' / f'{task_stem}.json'
-    p.write_text(json.dumps({
+    entry = {
         'task_stem': task_stem, 'agent_id': agent_id,
         'pid': pid, 'started_at': started_at,
-    }))
+    }
+    # Mirror agent_runner._register_in_flight, which stamps the sanitized
+    # worktree dir-stem. Omit it to exercise the task_stem fallback path
+    # (pre-field sentinels / clean slugs).
+    if worktree_stem is not None:
+        entry['worktree_stem'] = worktree_stem
+    p.write_text(json.dumps(entry))
 
 
 def _make_worktree(worktrees_root: Path, name: str) -> None:
@@ -330,6 +337,86 @@ class BuildingLaneTest(_Base):
         self.assertEqual(building[0]['task_id'], 'build-thing-001')
         self.assertIn('branch', building[0])
         self.assertIn('age_seconds', building[0])
+
+
+class BuildingLaneSanitizedTaskIdTest(_Base):
+    """Regression: a genuinely-building task whose id is NOT a clean lowercase
+    slug must still appear in the building lane.
+
+    The worktree dir bakes in the SANITIZED stem (`worktree_manager.
+    _sanitize_task_id`: non-`[A-Za-z0-9_-]` -> `-`, capped at 50), while the
+    in-flight sentinel is keyed by the RAW task_stem. The old reader compared
+    the parsed dir stem against the raw stems and used a lowercase-only regex,
+    so any non-slug id silently vanished from the lane while genuinely
+    building. Two failure shapes are covered:
+
+      * uppercase/`_` — preserved by the sanitizer (raw == sanitized), so the
+        only break was the lowercase-only `_WORKTREE_RE` failing to PARSE the
+        dir; the widened charset fixes it via the `task_stem` fallback.
+      * a char mapped to `-` (`foo:bar` -> `foo-bar`) — raw != sanitized, so
+        matching needs the sentinel's `worktree_stem`; the canonical RAW id is
+        then surfaced as the lane's task_id.
+    """
+
+    def test_uppercase_and_underscore_id_appears(self):
+        # `_sanitize_task_id('Build_Thing_07')` == 'Build_Thing_07' (uppercase
+        # and `_` are preserved), so the dir carries the raw stem verbatim and
+        # the `task_stem` fallback matches even without a `worktree_stem` field
+        # — the fix here is purely the widened `_WORKTREE_RE` charset.
+        _make_worktree(self.worktrees_root, 'wt-forge-Build_Thing_07')
+        _write_in_flight(self.agents_root,
+                         task_stem='Build_Thing_07', agent_id='forge')
+
+        c = _client(self.agents_root, self.worktrees_root)
+        r = c.get('/api/system/agent-queue', headers=AUTH)
+        self.assertEqual(r.status_code, 200)
+        building = r.json()['building']
+        self.assertEqual([b['task_id'] for b in building], ['Build_Thing_07'])
+        self.assertEqual(building[0]['branch'], 'forge/Build_Thing_07')
+
+    def test_mapped_char_id_matches_via_worktree_stem(self):
+        # `foo:bar` sanitizes to `foo-bar` for the dir, so raw != sanitized.
+        # The sentinel records the sanitized `worktree_stem`; membership must
+        # match on it, and the lane must surface the canonical RAW id.
+        _make_worktree(self.worktrees_root, 'wt-forge-foo-bar')
+        _write_in_flight(self.agents_root,
+                         task_stem='foo:bar', agent_id='forge',
+                         worktree_stem='foo-bar')
+
+        c = _client(self.agents_root, self.worktrees_root)
+        r = c.get('/api/system/agent-queue', headers=AUTH)
+        self.assertEqual(r.status_code, 200)
+        building = r.json()['building']
+        self.assertEqual([b['task_id'] for b in building], ['foo:bar'])
+
+    def test_over_length_id_matches_via_worktree_stem(self):
+        # An id longer than the sanitizer's 50-char cap: the dir stem is the
+        # truncation, raw != sanitized, so the `worktree_stem` link is required.
+        raw = 'b' * 60
+        truncated = 'b' * 50
+        _make_worktree(self.worktrees_root, f'wt-forge-{truncated}')
+        _write_in_flight(self.agents_root,
+                         task_stem=raw, agent_id='forge',
+                         worktree_stem=truncated)
+
+        c = _client(self.agents_root, self.worktrees_root)
+        r = c.get('/api/system/agent-queue', headers=AUTH)
+        self.assertEqual(r.status_code, 200)
+        building = r.json()['building']
+        self.assertEqual([b['task_id'] for b in building], [raw])
+
+    def test_wrong_agent_sanitized_stem_does_not_match(self):
+        # A mirror sentinel sharing the sanitized stem must NOT light up a
+        # forge worktree — membership is keyed by (agent_id, worktree_stem).
+        _make_worktree(self.worktrees_root, 'wt-forge-foo-bar')
+        _write_in_flight(self.agents_root,
+                         task_stem='foo:bar', agent_id='mirror',
+                         worktree_stem='foo-bar')
+
+        c = _client(self.agents_root, self.worktrees_root)
+        r = c.get('/api/system/agent-queue', headers=AUTH)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['building'], [])
 
 
 # ============= building <-> in_review dedup (overlap fix) =============

@@ -1084,6 +1084,14 @@ def _register_in_flight(task_stem, agent_id, pid):
     IN_FLIGHT_DIR.mkdir(parents=True, exist_ok=True)
     entry = {
         'task_stem': task_stem,
+        # The exact stem baked into this task's `wt-<agent>-<stem>` worktree
+        # dir, via the SAME locked-consistent sanitizer that names the dir.
+        # `task_stem` is the RAW id; readers that cross-reference the on-disk
+        # worktree name (dashboard_api's building lane) need the sanitized form
+        # to match, and for a non-slug id (`foo:bar`, > 50 chars) raw !=
+        # sanitized. Recording it here makes the consumer a pure equality
+        # check instead of re-deriving the sanitizer (avoids a 4th copy).
+        'worktree_stem': _worktree_safe_stem(task_stem),
         'agent_id': agent_id,
         'pid': pid,
         'started_at': datetime.now(timezone.utc).isoformat(),
