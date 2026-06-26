@@ -259,8 +259,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 14:12Z UTC (Iter ~2951, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 14:18Z UTC (Iter ~2952, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2951 summary:** ✅ Nominal — 0 new alerts. PR #715 + #716 + #717 + #718 in Mirror review (#718 NEW: medic-dispatcher-delivery-failure-translation-001, built by Forge post-iter ~2950). Forge inbox: 0 tasks (cleared). beacon-pending=0. Repo HEAD=93cd0cd5=origin/main. Watchdog healthy (14:10:49Z). Sync 10 min old. Pipeline stall dry-run: 0 alerts. Zombie PID 1834248 still alive (28d18h53m). PRIME: systemic_fixes=75, vp=27, ratio=17.4. Tier 1, consecutive_clean=0. G-rule medic-dispatcher-delivery-failure-tier4-001 updated to PR #718 in Mirror review.
+**Iter ~2952 summary:** ✅ Nominal — 1 new alert (L1015: outbox-notifier review-pass PR #715, Tier-3 silenced). PR #715 Mirror PASS + AUTO_MERGE_HELD behind #716 (overlap heal_pipeline_stall.py). PR #716 + #717 + #718 in Mirror review. Forge inbox: empty. Beacon inbox: empty. beacon-pending=0. Repo HEAD=c3002e18=origin/main. Watchdog healthy (14:10:49Z). Sync 16 min old. Pipeline stall dry-run: 0 alerts. Zombie PID 1834248 still alive (28d18h58m). PRIME: systemic_fixes=75, vp=27, ratio=17.4. Tier 1, consecutive_clean=0. Check I: dm_route digest (no-force correct per MEMORY discipline, repeat suppressed). Watermark at 1015.
 
 
