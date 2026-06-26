@@ -265,8 +265,8 @@ PR #715 (fix(healer): skip forge_built_no_pr stall when task PR is CLOSED) MERGE
 
 ---
 
-## Status snapshot — updated 2026-06-26 15:00Z UTC (Iter ~2957, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 15:05Z UTC (Iter ~2958, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2957 summary:** ⚠️ Same FP: forge_built_no_pr:pr-ourliberty-agent-core-712 (G-rule 2/3). NEW: PR #719 Larry-authored (work/pipeline-live-state, 14:52Z) — shared pipeline_live_state.py primitive (root-cause stall FP fix); not in Forge→Mirror pipeline, no Mirror review auto-queued. PR #717 Mirror reviewing (~22 min, PID 3533331). PR #718 in Mirror queue. agents/beacon/captures.json dirty (GC healer lag, transient). 0 new alerts (watermark 1018). Check I: dm_route digest (correct). PRIME: systemic_fixes=75, vp=27, ratio≈17.4. Tier 1, consecutive_clean=0.
+**Iter ~2958 summary:** ✅ Near-nominal. captures.json self-resolved (GC healer 43ce983c). Same carry FP: forge_built_no_pr:pr-ourliberty-agent-core-712 (G-rule 2/3). PR #717 Mirror reviewing (~27 min, PID 3533331). PR #718 in Mirror queue. PR #719 Larry-authored (pipeline-live-state), awaiting Larry trigger for Mirror review. 0 new alerts (watermark 1018). Check I: dm_route digest (correct). PRIME: systemic_fixes=75, vp=27, ratio=17.44. Tier 1, consecutive_clean=0.
 
 
