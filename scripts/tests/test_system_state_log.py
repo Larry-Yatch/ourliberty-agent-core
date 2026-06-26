@@ -654,6 +654,25 @@ class WaitingSequencesReaderTest(unittest.TestCase):
                 {'OURLIBERTY_BUILD_SEQUENCES_DIR': '/no/such/build-seqs'}):
             self.assertEqual(ssl.load_waiting_sequences(_NOW), [])
 
+    def test_terminal_sequence_with_stuck_step_yields_nothing(self):
+        # An archived/complete/failed/retired sequence whose leftover step is
+        # still `dispatched` with no PR (real case: orchestrator-bootstrap-001,
+        # archived weeks ago) must NOT surface — it's residue, not stuck work.
+        # The ladder hides terminal sequences and the steering verbs no-op on
+        # them, so a row here would be a dead end that never self-clears.
+        for terminal in ('archived', 'complete', 'failed', 'retired'):
+            with self.subTest(status=terminal):
+                def build(d):
+                    self._write_seq(d, 'seq-old', {
+                        'seq_id': 'seq-old', 'status': terminal,
+                        'steps': [
+                            {'step_id': 'step-root', 'status': 'dispatched',
+                             'pr_url': None,
+                             'dispatched_at': '2026-06-19T11:00:00+00:00'},
+                        ],
+                    })
+                self.assertEqual(self._run(build), [])
+
     def test_paused_with_stuck_step_yields_both(self):
         def build(d):
             self._write_seq(d, 'seq-1', {
