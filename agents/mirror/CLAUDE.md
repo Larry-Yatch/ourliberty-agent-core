@@ -286,15 +286,28 @@ python3 scripts/test_regression_check.py \
 
 The gate is a Bash check, not a judgment call — the script's exit code is the contract.
 
-**Run synchronously. Never background this check.** The script takes 1–10 minutes (pytest runs twice — once at parent SHA, once at head SHA — both with internal timeouts per `--timeout-per-sha`). Run it as a foreground Bash command and wait for the exit code. Do NOT background it (`&`) and poll for a flag file. Three failure modes have actually fired and burned the full 4h `timeout=14400s` Mirror window:
+**Run synchronously. Never background this check.** The script takes 1–10 minutes (pytest runs twice — once at parent SHA, once at head SHA — both with internal timeouts per `--timeout-per-sha`). Run it as a foreground Bash command and wait for the exit code. Do NOT background it — neither with a shell `&` nor with the **Bash tool's background mode** — and then poll for completion. Four failure modes have actually fired and burned 71–102 min of Mirror window apiece:
 
 1. **Self-matching pgrep.** A poll loop like `until [ -f /tmp/regression-done ] || ! kill -0 $(pgrep -f test_regression_check.py | head -1); do sleep 3; done` matches its own shell process via `pgrep -f` — the bash command line contains the literal pattern string `test_regression_check.py`, so `pgrep` returns the poll loop's own PID, `kill -0` always succeeds, and the loop never exits. (PR #101, 2026-05-25 — hung 71 min.)
 2. **Empty pgrep → `/proc/` always-a-directory.** The "fix" for #1 — the bracket trick `pgrep -f '[t]est_regression_check.py'` — then created a *new* wedge: `until [ ! -d /proc/$(pgrep -f '[t]est_regression_check.py' | head -1) ]; do sleep 3; done`. Once the check finishes, `pgrep` returns empty, command substitution collapses `/proc/$()` to `/proc/` (always a directory), `[ ! -d /proc/ ]` is never true, and the loop never exits. (PR #334, 2026-06-05 — hung 102 min, blocked inbox-watcher.) The lesson from both: **never re-derive liveness each iteration** (via `pgrep` or a `/proc/<pid>` path test) and **never poll without a wall-clock timeout.**
 3. **Missing completion flag.** `test_regression_check.py` does not write any `/tmp/regression-done` flag. If you start it backgrounded and poll for one, you'll wait forever until the watcher's hard timeout kills the whole review.
+4. **Content sentinel that never arrives.** Backgrounding a step via the Bash tool's background mode and polling its output file for a keyword — `until [ -s /tmp/claude-1000/<slug>/<sid>/tasks/<id>.output ] && grep -qE 'verdict|timed out|Traceback' <that file>; do sleep 15; done` — wedges whenever the step finishes WITHOUT writing one of those words (it emitted only warnings and exited 0). The sentinel never appears, the `until` never exits, and you can't fall back to `wait_for_pid.sh` because the Bash tool's background mode hides the child's `$!`. (PR #717 hung this way twice + PR #720 ~29 min, 2026-06-26.) The lesson: **a content match is not a completion signal** — don't gate a wait on a string the step might never print.
 
-Either failure hangs the entire Mirror review and blocks every PR queued behind it. Just run the check foreground.
+Each failure hangs the entire Mirror review and, because your session keeps holding the per-agent `inbox:mirror` lease, blocks **every** PR queued behind it until a human kills the process. Just run the check foreground.
 
-**If you ever genuinely must wait on a backgrounded PID** (not for this check — it's foreground-only — but anywhere else), do NOT hand-roll a poll loop. Capture the PID once and use the safe primitive: `mypid=$!` immediately after the `&`, then `bash scripts/wait_for_pid.sh "$mypid"`. It gates liveness solely on `kill -0` of the captured PID (no pgrep, no `/proc` path test), has a built-in wall-clock timeout, and exits 124 loudly on timeout so inbox-watcher retries instead of the pipeline wedging.
+**Generalize this to EVERY long step of a review** — the regression check, a subagent task, any slow command. The deterministic primitive is `scripts/run_review_step.sh`: it runs the command in the foreground under a hard wall-clock ceiling, kills the whole process group on timeout, and returns ONE unambiguous result — so there is never anything to background or poll.
+
+```bash
+bash scripts/run_review_step.sh --timeout 900 --label 'regression check' -- \
+  python3 scripts/test_regression_check.py --parent-sha <base> --head-sha <head> --output json
+```
+
+- It exits with the command's OWN exit code when the step completes in budget — read it exactly as you would a plain foreground run (exit 0 = PASS, 1 = BLOCK, 2 = analysis-failed for the regression check).
+- On timeout it prints a `=== REVIEW_STEP_TIMED_OUT ===` banner and exits **124**. A timed-out step is **INCONCLUSIVE** — emit `REVIEW_ESCALATE` with the timeout as the reason. Never keep waiting, and never emit `REVIEW_PASS` on a step that did not finish.
+
+**Enforcement:** `scripts/run_review_step.sh` (foreground + wall-clock ceiling + process-group kill + exit 124; tested in `scripts/tests/test_run_review_step.py`) is the mechanism, and `agent_runner.build_review_bounded_step_system_prompt` injects this rule as a dispatcher-set `--append-system-prompt` on every `phase=review` Mirror dispatch (tested in `scripts/tests/test_agent_runner_review_bounded_step_reminder.py`). PR #723's wedge-reaper (`scripts/heal_wedged_review_sessions.py`) remains the 60-min recovery backstop.
+
+**If a process is ALREADY backgrounded with a shell `&` and you genuinely cannot run it foreground** (a rare case — prefer `run_review_step.sh`), do NOT hand-roll a poll loop. Capture the PID once and use `bash scripts/wait_for_pid.sh "$mypid"` (`mypid=$!` immediately after the `&`). It gates liveness solely on `kill -0` of the captured PID (no pgrep, no `/proc` path test, no content sentinel), has a built-in wall-clock timeout, and exits 124 loudly on timeout. Note this does NOT cover the Bash tool's background mode, which hides `$!` — for that, don't background at all; use `run_review_step.sh`.
 
 ### What "REVIEW_ESCALATE" means vs "REVIEW_REVISION"
 

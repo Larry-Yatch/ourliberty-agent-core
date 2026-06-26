@@ -994,6 +994,81 @@ def review_marker_reminder_args(phase, expected_agent):
     return ['--append-system-prompt', build_review_marker_reminder_system_prompt()]
 
 
+# === Deterministic bounded-step reminder (hard, dispatcher-set) =============
+# The second half of the Mirror-review-can't-hang guarantee. A review that runs
+# a long step (the test regression check, a subagent task, any slow command)
+# and then hand-rolls an UNBOUNDED poll waiting for it has wedged the WHOLE
+# review queue for 71-102 min, three times, each until a human killed it:
+#   - PR #101  (2026-05-25): self-matching `pgrep -f`.
+#   - PR #334  (2026-06-05): empty `pgrep` -> `/proc/$()` collapses to `/proc/`.
+#   - PR #717/#720 (2026-06-26): a Bash-tool *background-mode* command polled by
+#     `until [ -s <task>.output ] && grep -qE 'verdict|timed out|Traceback' ...;
+#     do sleep 15; done` — the content sentinel never arrived (the step emitted
+#     only warnings, exited 0) so the poll spun forever. The hung session held
+#     the per-agent `inbox:mirror` lease, serializing EVERY queued review.
+# agents/mirror/CLAUDE.md already carries this discipline in prose; more prose
+# there isn't the fix. The fix is the same last-in-context system-prompt
+# injection the marker reminder uses: it does not depend on the model reading
+# the manual and the task prompt cannot override it. Gated identically to the
+# marker reminder (phase=='review' + Mirror), so it fires on the first review
+# attempt and every retry alike. PR #723's wedge-reaper stays the 60-min
+# backstop; this is the prevention.
+
+REVIEW_BOUNDED_STEP_REMINDER_MARKER = (
+    "BOUNDED-STEP REQUIREMENT (authoritative — dispatcher-set)"
+)
+
+
+def build_review_bounded_step_system_prompt():
+    """Authoritative reminder APPENDED to the worker's system prompt on every
+    phase=review Mirror dispatch: long steps run FOREGROUND + wall-clock-bounded,
+    never backgrounded-and-polled.
+
+    Derived from no input — the gating (phase + agent) happens in the args
+    wrapper — so the text is a fixed, last-in-context instruction the task
+    prompt's phrasing cannot override.
+    """
+    return (
+        "=" * 70 + "\n"
+        + REVIEW_BOUNDED_STEP_REMINDER_MARKER + "\n"
+        + "=" * 70 + "\n\n"
+        "Run EVERY long step of this review — the test regression check, any\n"
+        "subagent task, any slow command — in the FOREGROUND under a hard\n"
+        "wall-clock ceiling, and read its exit code synchronously. Use:\n\n"
+        "    bash ~/agent-core/scripts/run_review_step.sh --timeout 900 \\\n"
+        "        --label '<what this is>' -- <command> [args...]\n\n"
+        "NEVER background a step (the Bash tool's background mode, or a shell\n"
+        "`&`) and then poll for it — NOT with `until ... grep -qE\n"
+        "'verdict|timed out|Traceback' <output-file>; do sleep N; done`, NOT\n"
+        "with a `pgrep`/`/proc/<pid>` liveness test, NOT for a flag file. A\n"
+        "content sentinel may NEVER be written (a step can emit only warnings\n"
+        "and exit 0), and an unbounded poll then spins forever — your session\n"
+        "holds the `inbox:mirror` lease and stalls EVERY queued review until a\n"
+        "human kills it. This has wedged the queue 71-102 min three times.\n\n"
+        "If `run_review_step.sh` exits 124 (you'll see a\n"
+        "`=== REVIEW_STEP_TIMED_OUT ===` banner), the step is INCONCLUSIVE:\n"
+        "emit `=== REVIEW_ESCALATE ===` with the timeout as the reason. Never\n"
+        "hang waiting for it, and never emit `=== REVIEW_PASS ===` on a step\n"
+        "that did not complete.\n"
+        + "=" * 70
+    )
+
+
+def review_bounded_step_reminder_args(phase, expected_agent):
+    """Return the CLI args that inject the bounded-step reminder.
+
+    ``['--append-system-prompt', <reminder>]`` only when this is a Mirror
+    review dispatch (``phase == 'review'`` AND the dispatched agent is
+    ``mirror``), else ``[]``. Pure and centralized so the spawn path and the
+    tests share one source of truth — same gate as the marker reminder.
+    """
+    if str(phase).strip().lower() != 'review':
+        return []
+    if str(expected_agent).strip().lower() != 'mirror':
+        return []
+    return ['--append-system-prompt', build_review_bounded_step_system_prompt()]
+
+
 CANCEL_DIR = AGENTS_ROOT / 'blackboard'
 CANCEL_POLL_INTERVAL = 5  # seconds between cancel checks during worker execution
 
@@ -1215,6 +1290,15 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
             # dead-letter for a retry. No-op for non-review phases / non-mirror
             # agents — see review_marker_reminder_args.
             cmd.extend(review_marker_reminder_args(phase, expected_agent))
+            # Symmetric deterministic bounded-step reminder: on every
+            # phase=review Mirror dispatch, append a last-in-context
+            # instruction that long steps (regression check, subagents, slow
+            # commands) run FOREGROUND under run_review_step.sh's wall-clock
+            # ceiling and ESCALATE on timeout — never backgrounded-and-polled,
+            # the unbounded-poll wedge that has starved the inbox:mirror queue
+            # for 71-102 min (#101/#334/#717/#720). No-op for non-review phases
+            # / non-mirror agents — see review_bounded_step_reminder_args.
+            cmd.extend(review_bounded_step_reminder_args(phase, expected_agent))
             if fallback and fallback != model:
                 cmd.extend(['--fallback-model', fallback])
             if session_id:
