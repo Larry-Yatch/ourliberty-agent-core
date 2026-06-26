@@ -252,8 +252,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 09:35Z UTC (Iter ~2913, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 09:41Z UTC (Iter ~2914, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2913 summary:** ⚠️ Active — Mirror PID 3308724 at ~3h32m elapsed. 4 new alerts: L1071-L1072 Tier-3 silence (known pattern), L1073-L1074 Tier-4 medic-dispatcher delivery failure (G-rule DISPATCHED vp). beacon-pending: 3 unchanged. Pipeline stall: 0 (all cooldowns). 8/8 daemons alive. Watchdog healthy (09:29:57Z). Sync fresh (09:02:20Z). Check I cooldown-suppressed. PR #713 revision active (Mirror outbox empty). EROFS on .claude.json at ~06:34-06:55Z transient/resolved (Pulse answered Larry's question via idx=1062 iter ~2906). PRIME: interventions≈1291+, systemic_fixes=73, vp=27, ratio≈17.68, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2914 summary:** ⚠️ Active — Mirror PID 3308724 at ~3h35m elapsed. 0 new alerts. KEY CHANGE: no_session_revision:713 cooldown EXPIRED (was suppressed in ~2913; next live healer run will fire real alert, will triage Tier-3). beacon-pending: 3 unchanged. Pipeline stall: no_session_revision:713 would fire (cooldown expired), forge_built_no_pr:712 and unrouted_open_pr:713 still cooldown-suppressed. 8/8 daemons alive. Watchdog healthy (09:34:58Z). Sync fresh (09:02:20Z). Check I cooldown-suppressed. PR #713 revision active (Mirror outbox empty). PRIME: interventions≈1292+, systemic_fixes=73, vp=27, ratio≈17.68, trend=improving. Tier 1, consecutive_clean=0.
 
 
