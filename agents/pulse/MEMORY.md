@@ -234,8 +234,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 06:36Z UTC (Iter ~2886, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 06:45Z UTC (Iter ~2887, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2886 summary:** ⚠️ Active — PR #713 revision cycle: Mirror PID 3308724 at 30:46 elapsed (approaching 35-min feature-dev threshold; under threshold). 1 new alert Tier-3 silenced (L1046 heal-pipeline-stall no-session-revision:713). Stall dry-run: 0 alerts (both cooldown-suppressed). All 8 daemons alive. Watchdog healthy (06:31Z). Check I cooldown-suppressed. Zombie PID 1834248 (28d 11h 17m) + 6 stale journalctl PIDs carry. PRIME: interventions=1264, systemic_fixes=72, vp=27, ratio≈17.56, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2887 summary:** ⚠️ Active — Mirror PID 3308724 at 40:10 elapsed (EXCEEDS 35-min feature-dev threshold; outbox empty). Tier-2 probe session 1b5ed242 ran post-auth-refresh at 06:34Z, hit EROFS on .claude.json after ~$4/4-turns; Larry DM'd [claude exit 1]. L1047 medic-dispatcher Tier-3 silenced (stale-cache coincidence; G-rule remains 2/3). Stall dry-run: 0 alerts (both cooldown-suppressed). All 8 daemons alive. Watchdog healthy (06:41Z). Check I cooldown-suppressed. Zombie PID 1834248 (28d 11h 25m) + 6 stale journalctl PIDs carry. PRIME: interventions=1264, systemic_fixes=72, vp=27, ratio≈17.56, trend=improving. Tier 1, consecutive_clean=0.
 
 
