@@ -5946,6 +5946,23 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-silence-ourliberty-health-sync-push-failed-001",
+      "name": "Silence Ourliberty Health Sync Push Failed 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `silence-ourliberty-health-sync-push-failed-001`. Last activity 2026-06-26T20:15:26.737401+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "silence-ourliberty-health-sync-push-failed-001"
+      ],
+      "repo": null,
+      "created": "2026-06-26",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-26T20:30:15.847444+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-26T20:15:26.737401+00:00"
     }
   ]
 }
