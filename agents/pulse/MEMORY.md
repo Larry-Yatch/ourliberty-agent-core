@@ -253,8 +253,14 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 13:24Z UTC (Iter ~2944, Tier 1, consecutive_clean=0→0)
+## G-rule beacon-erofs-concurrent-claude-sessions-001 — 2/3 (new, iter ~2945)
 
-**Iter ~2944 summary:** ⚠️ Active — PR #713 in Forge revision-2 (Larry approved mirror-review-pr-713 at 07:21 MDT). Larry cleared 4 of 6 beacon-pending in rapid succession (07:19-07:22 MDT): heal-forge-no-pr-closed-skip-001 (Forge building), watchdog-mirror-active-stale-suppression-001 (Forge building), mirror-review-pr-ourliberty-agent-core-713 (Forge building revision-2), no-session-revision-mirror-active-fp-001 (Beacon designing). beacon-pending=2 (medic-dispatcher-delivery-failure-translation-001, heal-stall-mirror-active-suppression-001). 2 new alerts Tier-3 silenced (no-session-revision:713, medic-dispatcher pair). Repo HEAD=fa1331f0=origin/main. Watchdog healthy (07:19:49 MDT). PRIME: systemic_fixes=75, vp=27, ratio=17.39, trend=improving. Tier 1, consecutive_clean=0.
+**Rule:** Beacon's claude subprocess fails with "EROFS: read-only file system, open '/home/larry/.claude.json'" when a concurrent Claude Code session (e.g., Pulse interactive) is active. Filesystem is healthy (/dev/vda1 10% full); .claude.json has normal permissions. Root cause: concurrent Claude Code sessions writing/locking .claude.json simultaneously. Occurrences: iter ~[prior] (noted as [blue] carry "EROFS not recurred"), iter ~2945 (07:26-07:27 MDT, x2 failures, Larry's question bounced). Fix: investigate session-isolation or file-locking behavior to prevent EROFS under concurrent-session scenarios. Dispatch to Beacon at 3/3.
+
+---
+
+## Status snapshot — updated 2026-06-26 13:32Z UTC (Iter ~2945, Tier 1, consecutive_clean=0→0)
+
+**Iter ~2945 summary:** ⚠️ Active — PR #713 in Forge revision-2. PR #715 NEW (heal-forge-no-pr-closed-skip-001 fix: skip forge_built_no_pr stall when task PR is CLOSED; Mirror reviewing). Beacon EROFS x2 (07:26-07:27 MDT, transient concurrent-session issue; Larry's plain-language question unanswered; bot alive PID 3220237). Larry approved 5th item (heal-stall-mirror-active-suppression-001) → Forge inbox. beacon-pending=1 (medic-dispatcher-delivery-failure-translation-001; dashboard approval unprocessed in Beacon inbox). 3 Forge tasks active. Watchdog 07:30:11 MDT healthy. Repo HEAD=a7d40077=origin/main. PRIME: systemic_fixes=75, vp=27, ratio=17.39, trend=improving. Tier 1, consecutive_clean=0. New G-rule: beacon-erofs-concurrent-claude-sessions-001 (2/3).
 
 
