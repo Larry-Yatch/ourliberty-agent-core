@@ -651,6 +651,39 @@ def _check_pr_closed_via_gh(pr_url: str) -> Optional[str]:
     return state if state in ('MERGED', 'CLOSED') else None
 
 
+_PR_TASK_ID_RE = re.compile(r'^pr-([a-zA-Z0-9_-]+)-([0-9]+)$')
+
+
+def _forge_pr_task_id_resolved(task: str) -> Optional[str]:
+    """For a task_id shaped `pr-<repo>-<num>` (the task is named directly after
+    an existing PR number rather than a Forge-built branch), return the gh-truth
+    state string ('MERGED' or 'CLOSED') of that named PR, else None.
+
+    `_pr_matches_task` only correlates `forge/<task_id>` branches or title
+    tokens, so it never matches a PR named in the task_id itself — those tasks
+    fall through to a false `forge_built_no_pr` stall even when the named PR is
+    CLOSED-not-merged (e.g. PR #712).
+
+    Fail-safe to None on EVERY non-terminal branch — a non-matching task_id, an
+    unmappable repo, an OPEN PR, or any gh/JSON error — so the task falls through
+    to the remaining reconciliation steps and existing alert behavior is
+    preserved. Suppression happens ONLY on a gh-confirmed CLOSED/MERGED state;
+    an outage must never masquerade as a positive skip signal (mirrors the
+    verify-before-alarm posture on `_gh_pr_state`)."""
+    m = _PR_TASK_ID_RE.match(task)
+    if not m:
+        return None
+    bare_repo, num = m.group(1), m.group(2)
+    slug = next(
+        (r for r in REPOS if r.split('/', 1)[-1] == bare_repo),
+        None,
+    )
+    if slug is None:
+        return None
+    url = f'https://github.com/{slug}/pull/{num}'
+    return _check_pr_closed_via_gh(url)
+
+
 # Test seam (mirrors the notifier's `_POST_STATUS_FN_OVERRIDE`). When set,
 # replaces the whole `_mirror_review_status` body so Check 10's tests don't
 # shell out to real `gh`. Signature: (repo, pr_number) -> (state, head_sha,
@@ -1469,6 +1502,24 @@ def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
                 f'FORGE_NO_PR_SKIP task={task} reason=pr_closed '
                 f'pr=#{closed_match.get("number")} '
                 f'repo={closed_match.get("_repo")}',
+                'INFO',
+            )
+            seen_tasks.add(task)
+            continue
+        # Reconciliation step 1a2: the task_id is itself shaped `pr-<repo>-<num>`
+        # — named directly after an existing PR number rather than a Forge-built
+        # branch. `_pr_matches_task` only correlates `forge/<task_id>` branches
+        # or title tokens, so it never matches a PR named in the task_id itself
+        # and the alert fires even when that PR is CLOSED-not-merged (PR #712,
+        # CLOSED). `_forge_pr_task_id_resolved` gh-resolves the named PR and
+        # returns its state ONLY when MERGED/CLOSED (fail-safe None on
+        # non-match / unmappable repo / OPEN / gh error). A terminal state is a
+        # valid resolution — skip, exactly analogous to the step-1a closed path.
+        pr_task_state = _forge_pr_task_id_resolved(task)
+        if pr_task_state is not None:
+            log(
+                f'FORGE_NO_PR_SKIP task={task} '
+                f'reason=pr_task_id_closed_or_merged pr_state={pr_task_state}',
                 'INFO',
             )
             seen_tasks.add(task)
