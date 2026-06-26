@@ -228,8 +228,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 03:25Z UTC (Iter ~2857, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 03:33Z UTC (Iter ~2858, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2857 summary:** ✅ Nominal — heal-stale-daemon-code auto-restarted dashboard_api (PID 3219975), beacon-bot (PID 3220237), outbox_notifier (PID 3220349) for PR #711 (confirm_shipped / dashboard_api.py update). 3 route=digest alerts Tier-3 silenced. 0 open PRs. Stall dry-run clean. 8/8 daemons alive (new PIDs verified). Zombie PID 1834248 + 6 stale journalctl PIDs carry. APPROVAL_REQUEST mirror-marker-discipline-spec-update-001 pending=1 (awaiting Larry `approve`). Check I Friday cooldown-suppressed. §5.0 all no-op. PRIME: interventions=1235, systemic_fixes=72, vp=27, ratio≈17.15, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2858 summary:** ✅ Nominal — 8/8 daemons alive. 1 Tier-3 silence (doorbell). 0 open PRs. Stall dry-run clean. Zombie PID 1834248 + 6 stale journalctl PIDs carry. APPROVAL_REQUEST mirror-marker-discipline-spec-update-001 pending=1 (awaiting Larry `approve`). Check I ran (Friday firing day, no --force) — 0 proposals, DM suppressed (route=digest). §5.0 all no-op. PRIME: interventions=1236, systemic_fixes=72, vp=27, ratio≈17.17, trend=improving. Tier 1, consecutive_clean=0.
 
 
