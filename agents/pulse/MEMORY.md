@@ -267,8 +267,8 @@ PR #715 (fix(healer): skip forge_built_no_pr stall when task PR is CLOSED) MERGE
 
 ---
 
-## Status snapshot — updated 2026-06-26 19:02Z UTC (Iter ~2986, Tier 1, consecutive_clean=1)
+## Status snapshot — updated 2026-06-26 19:10Z UTC (Iter ~2987, Tier 1, consecutive_clean=2)
 
-**Iter ~2986 summary:** ✅ Nominal. 0 new alerts. Mirror actively reviewing PR #724 (~17 min). PRs #720 (rev1 queued), #724 (active), #725 (queued) in Mirror inbox. All daemons healthy. §5.0 no-op. Check I cooldown-suppressed. PRIME: iter_clean. Tier 1, consecutive_clean=0→1.
+**Iter ~2987 summary:** ✅ Nominal. 0 new alerts. Mirror actively reviewing PR #724 (~22 min). PRs #720 (rev1 queued), #724 (active), #725 (queued) in Mirror inbox. All daemons healthy. §5.0 no-op. Check I cooldown-suppressed. PRIME: iter_clean. Tier 1, consecutive_clean=1→2.
 
 
