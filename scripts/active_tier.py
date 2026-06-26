@@ -156,6 +156,35 @@ def active_setup_token():
     iteration — the recurring false "Tier N down"). Never log the return value."""
     return _setup_token_for_tier(read()['tier'])
 
+
+def durable_claude_env(env=None):
+    """THE canonical process-env for a direct ``claude`` *inference* spawn.
+
+    Returns an env dict with the bare ``CLAUDE_CODE_OAUTH_TOKEN`` (the var the
+    ``claude`` CLI reads) bridged from the ACTIVE tier's long-lived setup-token
+    (``CLAUDE_CODE_OAUTH_TOKEN_TIER{1,2}``). Any direct spawn MUST authenticate
+    through this (or the equivalent ``agent_runner._apply_tier_auth`` /
+    ``run_cycle.sh`` export) — otherwise the child inherits HOME's
+    ``~/.claude/.credentials.json``, which rots headlessly (~14h token, no
+    refresh on the fleet) and then 401s every call (the "(basic summary — AI
+    write unavailable)" / Medic-silent / digest-raw class of failure).
+
+    Pass the result as ``subprocess.run(..., env=durable_claude_env())``. Base
+    defaults to ``os.environ`` (a copy); pass ``env=`` to extend a custom base.
+
+    Fail-safe + no-op: when no setup-token is configured (or resolution raises),
+    the env is returned unchanged and ``claude`` uses the default credential
+    exactly as before — so this is harmless where setup-tokens aren't provisioned
+    (e.g. desktop). The token value is NEVER logged."""
+    out = dict(env) if env is not None else os.environ.copy()
+    try:
+        token = active_setup_token()
+    except Exception:  # noqa: BLE001 — auth resolution must never break a spawn
+        token = None
+    if token:
+        out['CLAUDE_CODE_OAUTH_TOKEN'] = token
+    return out
+
 # Max backoff when the "resets <time>" message is unparseable. Spec § 6.3.
 _COOLDOWN_BACKOFF_CAP = timedelta(minutes=30)
 # Base unit for capped exponential backoff: 1 min, doubling each attempt.

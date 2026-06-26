@@ -77,6 +77,20 @@ export LARRY_CHAT_ID="${TELEGRAM_CHAT_ID_LARRY:-}"
 MEDIC_CHAT_ID="${TELEGRAM_CHAT_ID_LARRY:-}"
 PROMPT_BODY="${PROMPT_BODY} IMPORTANT: when you emit via scripts/larry_alerts.py append_notification / append_approval_request, write --chat-id ${MEDIC_CHAT_ID} as a LITERAL integer. Never use a shell variable (e.g. \$LARRY_CHAT_ID) in any command -- Claude Code blocks commands containing variable expansions, so the escalation would be denied and silently fail."
 
+# Authenticate Medic against the active tier's durable setup-token (the SAME
+# source agent_runner / run_cycle.sh use) rather than HOME's auto-refreshing
+# ~/.claude/.credentials.json, which rots headlessly (~14h, no refresh) and then
+# 401s every tick -- which would silently stop Medic. Exported (never an arg) so
+# it can't leak into `ps`; NEVER logged. Best-effort: an empty lookup leaves the
+# token unset and Medic falls back to the prior credentials.json path.
+MEDIC_OAUTH_TOKEN="$(timeout 10 python3 "${HOME}/agent-core/scripts/active_tier.py" active-setup-token 2>>"$LOG_FILE" || true)"
+if [ -n "$MEDIC_OAUTH_TOKEN" ]; then
+    export CLAUDE_CODE_OAUTH_TOKEN="$MEDIC_OAUTH_TOKEN"
+    log "auth: Medic authenticating via active-tier setup_token"
+else
+    log "auth: Medic falling back to credentials.json (no active-tier setup-token)"
+fi
+
 if timeout "$CLAUDE_TIMEOUT" claude --print --model claude-sonnet-4-6 --output-format json "$PROMPT_BODY" > "$MEDIC_OUT" 2>&1; then
     log "Medic operator completed successfully"
     MEDIC_OK=1

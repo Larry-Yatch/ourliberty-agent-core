@@ -71,6 +71,7 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
+import active_tier  # noqa: E402
 import trust_policy  # noqa: E402
 from heal_missions_card_gc import (  # noqa: E402
     atomic_write_captures,
@@ -374,6 +375,7 @@ def claude_json_roundtrip(
             ['claude', '--print', '--model', model,
              '--output-format', 'json', prompt],
             capture_output=True, text=True,
+            env=active_tier.durable_claude_env(),
             timeout=CLAUDE_TIMEOUT_SEC, check=False,
         )
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
