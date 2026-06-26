@@ -5,6 +5,92 @@
 ---
 
 
+## Iteration ~2837 — 2026-06-26T01:07Z UTC (interactive /loop /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/loop /cycle` invocation via chat.
+
+**Health:** ✅ Nominal — 1 new Tier 3 alert (Beacon auth_401 stale --resume session, known pattern, silenced). 0 new interventions. 8/8 daemons alive, watchdog healthy, 0 open PRs, no stalls.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo (re-verified):** On main. HEAD=bc625322=origin/main. Clean. ✅
+- **Sync (re-verified):** last_sync=2026-06-26T01:01:39Z (~6 min old). Under 2h. ✅
+- **Daemons (re-verified):** chain_event_shipper=2716672 (SNs ~18h10m) ✅, dashboard_api=3044417 (Ssl ~4h51m) ✅, outbox_notifier=3044826 (Ss ~4h51m) ✅, beacon=3107734 (Ss ~59m) ✅, inbox_watcher=3107973 (Ssl ~59m) ✅, forge=3107855 (Ss ~59m) ✅, mirror=3108060 (Ss ~59m) ✅, pulse=3108242 (Ss ~59m) ✅. 8/8 alive. ✅
+- **Watchdog (re-verified):** last=19:01:59 MDT (01:01:59Z) — overall=healthy. ✅
+- **Open PRs (re-verified):** ourliberty-agent-core: 0. ourliberty-dashboard: 0. ✅
+- **beacon-pending-approvals (re-verified):** 0 pending. ✅
+- **Zombie PID 1834248 (re-verified):** Still alive (~28d5h49m). Bash poll loop for MISSING archive (build-check-viii-pr-2b-analyzer-001.json). Will never exit. [carry ask-then-do]
+- **6 stale journalctl PIDs (re-verified):** PIDs 1101500 (~31d6h03m), 1107838 (~31d5h38m), 1118830 (~31d2h02m), 1136223 (~30d20h38m), 1161972 (~30d12h34m), 1177335 (~30d11h46m). Still alive. [carry ask-then-do]
+- **Watermark:** 1021 → 1022 (1 new alert, Tier 3 silence). ✅
+
+**Check 0 — Alert triage:**
+- `repair-watermark` → `{"repaired": false, "old_watermark": 1021, "file_length": 1022}`. 1 new alert at line 1022.
+- Alert 1022: `{"source": "beacon-telegram-bot", "subject": "claude_tier1_failed_on_resume_session_bound:auth_401", "route": "escalate", "ts": "2026-06-26T01:01:25Z"}` → triage-alert helper → **Tier 3 silence** (known-pattern match in alert-translations.json). route overridden to digest. No DM. ✅
+- Watermark advanced to 1022. ✅
+
+**Check 1 — Log noise (30-min window):**
+- `journalctl --user -p warning --since "30 minutes ago"` → `-- No entries --`. ✅
+- outbox-notifier.log: Last entry 18:35:36 MDT (00:35Z) — AUTO_MERGE PR #708. No new entries. ✅
+- watchdog.log: 19:01:59 MDT (01:01:59Z) — overall=healthy. ✅ Nominal.
+
+**Check 2 — Telegram sweep (last 4h):**
+- Beacon bot log: Larry messaged at 19:01:15 MDT ("beacon are you there") and 19:04:52 MDT ("beacon?"). Both hit auth_401 on stale --resume session 1b5ed242-2385-430c-9447-34a6e4c3bb58. Bot correctly sent TIER2_FALLBACK_SKIPPED error DMs back each time. Recovery: wait for Tier 1 5h window (clears ~22:53 MDT / 04:53Z) OR start fresh Beacon chat. No Pulse action needed — bot already notified Larry. [journal note only, not a new finding]
+- Alert idx=1021 was delivered at 19:02:27 MDT (first auth_401 incident). Alert idx=1022 (line 1022) was the second at 01:01:25Z — already triaged Tier 3. ✅
+
+**Check 3 — Pipeline stall (dry-run):**
+- `heal_pipeline_stall --dry-run` → `no stalls detected`. 19+ FORGE_NO_PR_SKIP entries stable (pr_exists, already_merged, preflight_exit, retry_pr_exists, rebase_target_shipped). `tier2-fallback SKIPPED (by-design, auto-remediated)` for beacon-bot auth_401 (correct). ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- Forge/Beacon/Mirror inboxes: EMPTY. beacon-pending-approvals: 0. ✅ Nominal.
+
+**Check 5 — Stale daemon code:**
+- Heartbeat=2026-06-26T00:57:37Z (~10 min before cycle). Fresh. ✅ Nominal.
+- heal-stale-daemon-code-state.json: MISSING (carry from prior iters). Healer heartbeat fresh; informational.
+
+**Check A — Source repo:** HEAD=bc625322=origin/main. On main. Clean. ✅ Nominal.
+**Check B — Sync health:** last_sync=2026-06-26T01:01:39Z (~6 min). Under 2h. ✅ Nominal.
+**Check C — Agent liveness:** 8/8 procs running (forge=3107855, mirror=3108060 verified via ps). Watchdog healthy (01:01:59Z). ✅
+- **[yellow carry] PID 1834248** — zombie bash poll loop (~28d5h49m). Ask-then-do: `kill 1834248`.
+- **[yellow carry] 6 stale journalctl PIDs (~30-31d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`.
+**Check E — PRs:** ourliberty-agent-core: 0. ourliberty-dashboard: 0. ✅ Nominal.
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Friday 2026-06-26 UTC (weekday=4, IS in {0,2,4,6} — CHECK I FIRES):**
+- Check I: weekday=4 qualifies. Invoked without `--force`. Block for week-of-2026-06-22 already present — suppressed. DM: cooldown-suppressed. Auto-dispatch dedup-skip: key=f8ac2e3afc (prior dispatch 2026-06-22). check-i-2026-06-26.json already exists. No-op. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule assessment:** No new occurrences this iter. All G-rule counts unchanged from ~2836. [all carry]
+
+**Actions taken:**
+1. Check 0: Alert 1022 triaged Tier 3 silence. Watermark advanced 1021 → 1022.
+2. Check I: Friday gate no-op (cooldown-suppressed).
+3. PRIME ledger: `iter_clean` appended (tier=1, template=iter-clean-nominal, ts=2026-06-26T01:09:33Z).
+4. Tier state: `record --checks-clean false` → consecutive_clean=0 (zombie PID + 6 journalctl PIDs carry). Tier remains 1. last_signal_at=2026-06-26T01:09:34Z.
+
+**Dispatches:** None.
+
+**Standing findings (carried + verified):**
+- [yellow] **Zombie PID 1834248** — bash poll loop (~28d5h49m), archive target missing. Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **6 stale journalctl PIDs (~30-31d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+- [yellow] **Beacon auth_401 on stale --resume session** — Larry messaged Beacon 2x at 19:01 and 19:04 MDT, both 401'd on session 1b5ed242. Bot sent error DMs. Clears at ~22:53 MDT or fresh chat. [new journal note, Tier 3 silenced]
+- [yellow] **unreviewed-merge:709** — PR #709 merged without Mirror review. Larry judgment. [carry]
+- [yellow] **forge-wip-redispatch-digest Forge dispatch** — Beacon fix designed (iter ~2798). Trust-policy approval from Larry pending. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649/637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — PR #709 fixed; bots restarted; session-bound auth_401 is a separate known pattern. [carry — monitor]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Awaiting Larry. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [blue] **heal-stale-daemon-code-state.json MISSING** — healer heartbeat fresh; informational. [carry]
+- [blue] **G-rules (all carry from ~2836):** heal-daemon-restart-manifest-drift (2/3), watchdog-watcher-log-stale-post-pr694 (2/3), no-session-revision-merged-pr-fp-001 (1/3), unrouted-open-pr-auto-merge-held-fp-001 (1/3), forge-wip-redispatch-digest-tier4-001 (dispatched vp), forge-wip-redispatch-exhausted-pr-exists-fp-001 (2/3), heal-stale-daemon-code-auto-restart-failed-self-recovered (1/3), heal-stale-daemon-code-still-stale-after-restart (1/3), outbox-notifier-notification-intent-reject-tier4-001 (2/3), ourliberty-health-sync-push-failed-tier4-001 (1/3).
+- [blue] **unreviewed-merge:655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. [carry]
+
+**PRIME DIRECTIVE:** 0 new interventions this iter (iter_clean). Trailing-30d: interventions=1227, systemic_fixes=71, vp=27, ratio≈17.28, trend=improving.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0 (non-clean: zombie PID + 6 stale journalctl PIDs). Last signal: 2026-06-26T01:09:34Z.
+
+---
+
+
 ## Iteration ~2836 — 2026-06-26T01:01Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/cycle` invocation via chat.
