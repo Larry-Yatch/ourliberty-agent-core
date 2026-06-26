@@ -252,8 +252,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 09:41Z UTC (Iter ~2914, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 09:47Z UTC (Iter ~2915, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2914 summary:** ⚠️ Active — Mirror PID 3308724 at ~3h35m elapsed. 0 new alerts. KEY CHANGE: no_session_revision:713 cooldown EXPIRED (was suppressed in ~2913; next live healer run will fire real alert, will triage Tier-3). beacon-pending: 3 unchanged. Pipeline stall: no_session_revision:713 would fire (cooldown expired), forge_built_no_pr:712 and unrouted_open_pr:713 still cooldown-suppressed. 8/8 daemons alive. Watchdog healthy (09:34:58Z). Sync fresh (09:02:20Z). Check I cooldown-suppressed. PR #713 revision active (Mirror outbox empty). PRIME: interventions≈1292+, systemic_fixes=73, vp=27, ratio≈17.68, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2915 summary:** ⚠️ Active — Mirror PID 3308724 at ~3h41m elapsed. 1 new alert L981 (no_session_revision:713 → Tier-3 silenced; **translations.json fix CONFIRMED LIVE** for G-rule no-session-revision-active-mirror-session-fp-001). Pipeline stall: 0 (all cooldowns). beacon-pending: 3 unchanged. 8/8 daemons alive. Watchdog healthy (09:45:16Z). Sync fresh (09:02:20Z). Check I cooldown-suppressed. PR #713 revision active (Mirror outbox empty). PRIME: interventions≈1293+, systemic_fixes=73, vp=27, ratio≈17.71, trend=improving. Tier 1, consecutive_clean=0.
 
 
