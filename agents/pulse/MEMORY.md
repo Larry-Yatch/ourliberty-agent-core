@@ -273,8 +273,14 @@ PR #725 (fix(healer): skip forge_built_no_pr for pr-<repo>-<num> tasks whose nam
 
 ---
 
-## Status snapshot — updated 2026-06-26 23:37Z UTC (Iter ~3004, Tier 1, consecutive_clean=0)
+## G-rule ourliberty-health-clean-tree-dirty-tier4-001 — 1/3 (new, iter ~3005)
 
-**Iter ~3004 summary:** ⚠️ Check 1 WARN. 2 new WARNs: forge-preamble-missing revision-2 + mirror-malformed REVIEW_ESCALATE no-JSON-body (both DISPATCHED ✅ G-rules, pipeline recovering). 1 alert (idx=1076 doorbell) Tier-3 silenced. Mirror PID 3842198 actively re-reviewing PR #731 (marker-error retry). Forge inbox empty (revision-2 submitted). PR #731 OPEN MERGEABLE=UNKNOWN. M config/alert-translations.json dirty (expected transient). 2 active APPROVAL_REQUESTs pending Larry: tier3-silence-auto-restart-failed-001 + mirror-marker-self-validate-gate-001. PRIME: intervention. Tier 1 (consecutive_clean=0).
+**Rule:** `source=ourliberty-health` alerts with `clean_tree` variant subject classify Tier-4 (novel, no translation match). Fires when heal_droplet_git_drift detects dirty working tree. Only translation in alert-translations.json is `sync_agent_core: auto-commit push failed` (PR #728). Clean-tree variant has no entry. Fix: add `ourliberty-health` clean-tree variant entry to alert-translations.json pointing to pending-approval resolution. Dispatch to Beacon at 3/3 OR self-resolves when dirty tree resolves (tier3-silence-auto-restart-failed-001 approval lands). First occurrence iter ~3005.
+
+---
+
+## Status snapshot — updated 2026-06-26 23:49Z UTC (Iter ~3005, Tier 1, consecutive_clean=0)
+
+**Iter ~3005 summary:** ⚠️ Check 0 Tier-4 (ourliberty-health clean-tree alert, new G-rule 1/3). Check 1 — 1 new WARN (beacon-replan-no-chatid, null reply_chat_id for notify-forge-revision-preamble-discipline-001). Check 4 — NEW beacon-pending entry [3] (23:35:50Z): mirror-review-forge-revision-preamble-discipline-001 REVIEW_ESCALATE on PR #731 rev2, UNDELIVERABLE (null chatid). PR #731 OPEN MERGEABLE=UNKNOWN stuck pending Larry's call. Escalation written to pulse-escalations.json. 3 active APPROVAL_REQUESTs pending Larry (entries [1][2][3]). M config/alert-translations.json dirty. PRIME: intervention. Tier 1 (consecutive_clean=0).
 
 
