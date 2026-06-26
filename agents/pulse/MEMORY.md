@@ -234,8 +234,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 06:29Z UTC (Iter ~2885, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 06:36Z UTC (Iter ~2886, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2885 summary:** ⚠️ Active — PR #713 revision cycle: Mirror PID 3308724 reviewing rev1 (~26 min elapsed). 0 new alerts (watermark=1045 steady). Stall dry-run: 1 alert WOULD fire (`no_session_revision:713` — new G-rule candidate 1/3; healer suppressed, Mirror active). `unrouted_open_pr:713` cooldown-suppressed. All 8 daemons alive. Watchdog healthy (06:26Z). Check I cooldown-suppressed. Zombie PID 1834248 (28d 11h) + 6 stale journalctl PIDs carry. PRIME: interventions=1263, systemic_fixes=72, vp=27, ratio≈17.54, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2886 summary:** ⚠️ Active — PR #713 revision cycle: Mirror PID 3308724 at 30:46 elapsed (approaching 35-min feature-dev threshold; under threshold). 1 new alert Tier-3 silenced (L1046 heal-pipeline-stall no-session-revision:713). Stall dry-run: 0 alerts (both cooldown-suppressed). All 8 daemons alive. Watchdog healthy (06:31Z). Check I cooldown-suppressed. Zombie PID 1834248 (28d 11h 17m) + 6 stale journalctl PIDs carry. PRIME: interventions=1264, systemic_fixes=72, vp=27, ratio≈17.56, trend=improving. Tier 1, consecutive_clean=0.
 
 
