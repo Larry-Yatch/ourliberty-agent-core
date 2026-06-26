@@ -324,6 +324,77 @@ class TestCheckForgeBuiltNoPr(_TempAgentsRootMixin, unittest.TestCase):
         alerts = self.hps.check_forge_built_no_pr(lines, [], [], {}, closed_prs=closed_prs)
         self.assertEqual(alerts, [])
 
+    # ----- pr-<repo>-<num> task_id reconciliation (step 1a2) -----
+    # The task is named directly after an existing PR number, so
+    # `_pr_matches_task` (branch/title only) never correlates it; the named PR
+    # is gh-resolved instead. Fixes the recurring `forge_built_no_pr` FP on
+    # `pr-ourliberty-agent-core-712` (PR #712 CLOSED).
+
+    _PR_TASK_REPOS = [
+        'Larry-Yatch/ourliberty-agent-core',
+        'Larry-Yatch/ourliberty-dashboard',
+    ]
+
+    def test_skips_when_pr_task_id_named_pr_is_closed(self) -> None:
+        """`pr-<repo>-<num>` task whose named PR is gh-confirmed CLOSED is a
+        valid resolution — zero alerts, one FORGE_NO_PR_SKIP."""
+        lines = [_watcher_forge_done_line('pr-ourliberty-agent-core-712',
+                                          minutes_ago=180)]
+        with patch.object(self.hps, 'REPOS', self._PR_TASK_REPOS), \
+                patch.object(self.hps, '_gh_pr_state', return_value='CLOSED'):
+            alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(alerts, [])
+
+    def test_skips_when_pr_task_id_named_pr_is_merged(self) -> None:
+        """Same shape, named PR gh-confirmed MERGED — also a valid resolution."""
+        lines = [_watcher_forge_done_line('pr-ourliberty-agent-core-712',
+                                          minutes_ago=180)]
+        with patch.object(self.hps, 'REPOS', self._PR_TASK_REPOS), \
+                patch.object(self.hps, '_gh_pr_state', return_value='MERGED'):
+            alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(alerts, [])
+
+    def test_pr_task_id_open_not_suppressed(self) -> None:
+        """An OPEN named PR is NOT a resolution — the new step must not suppress;
+        the task falls through to the normal build-gap alert (fail-safe)."""
+        lines = [_watcher_forge_done_line('pr-ourliberty-agent-core-712',
+                                          minutes_ago=180)]
+        with patch.object(self.hps, 'REPOS', self._PR_TASK_REPOS), \
+                patch.object(self.hps, '_gh_pr_state', return_value='OPEN'):
+            alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]['key'],
+                         'forge_built_no_pr:pr-ourliberty-agent-core-712')
+
+    def test_pr_task_id_gh_error_not_suppressed(self) -> None:
+        """A gh transport/JSON error (`_gh_pr_state` -> None) must NOT suppress —
+        an outage cannot masquerade as a positive skip signal."""
+        lines = [_watcher_forge_done_line('pr-ourliberty-agent-core-712',
+                                          minutes_ago=180)]
+        with patch.object(self.hps, 'REPOS', self._PR_TASK_REPOS), \
+                patch.object(self.hps, '_gh_pr_state', return_value=None):
+            alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]['key'],
+                         'forge_built_no_pr:pr-ourliberty-agent-core-712')
+
+    def test_pr_task_id_helper_no_shellout_on_non_match(self) -> None:
+        """A task_id that doesn't match `pr-<repo>-<num>` returns None without
+        shelling out to gh."""
+        with patch.object(self.hps, '_gh_pr_state') as mock_state:
+            self.assertIsNone(
+                self.hps._forge_pr_task_id_resolved('regular-task-001'))
+            mock_state.assert_not_called()
+
+    def test_pr_task_id_helper_no_shellout_on_unmappable_repo(self) -> None:
+        """A `pr-<repo>-<num>` whose repo maps to no REPOS slug returns None
+        (fail-safe) without shelling out."""
+        with patch.object(self.hps, 'REPOS', self._PR_TASK_REPOS), \
+                patch.object(self.hps, '_gh_pr_state') as mock_state:
+            self.assertIsNone(
+                self.hps._forge_pr_task_id_resolved('pr-some-other-repo-5'))
+            mock_state.assert_not_called()
+
     # ----- Reconciliation cases (2026-05-26 false-fire fix) -----
 
     def test_skips_when_branch_truncated_prefix_matches(self) -> None:
