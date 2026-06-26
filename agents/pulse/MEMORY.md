@@ -204,8 +204,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 01:09Z UTC (Iter ~2837, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 01:14Z UTC (Iter ~2838, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2837 summary:** ✅ Nominal — 1 new alert (Tier 3 silence: beacon auth_401 stale --resume session, silenced by alert-translations.json). 0 stalls, 0 open PRs, 8/8 daemons alive, watchdog healthy. Larry messaged Beacon at 19:01+19:04 MDT — both hit auth_401 on session 1b5ed242; bot sent error DMs; clears ~22:53 MDT. Check I Friday: cooldown-suppressed no-op. Zombie PID 1834248 (~28d5h49m, archive MISSING). 6 stale journalctl PIDs carry. watermark=1022. PRIME: interventions=1227, systemic_fixes=71, vp=27, ratio≈17.28, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2838 summary:** ✅ Nominal — 0 new alerts, 0 stalls, 0 open PRs, 8/8 daemons alive, watchdog healthy. No new findings. Check I Friday: cooldown-suppressed no-op. Zombie PID 1834248 (~28d5h55m, archive MISSING). 6 stale journalctl PIDs carry. watermark=1022. PRIME: interventions=1227, systemic_fixes=71, vp=27, ratio≈17.28, trend=improving. Tier 1, consecutive_clean=0.
 
 
