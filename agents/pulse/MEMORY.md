@@ -267,14 +267,14 @@ PR #725 (fix(healer): skip forge_built_no_pr for pr-<repo>-<num> tasks whose nam
 
 ---
 
-## G-rule mirror-malformed-verdict-post-restart-001 — 2/3 (updated iter ~2997)
+## G-rule mirror-malformed-verdict-post-restart-001 → DISPATCHED ✅ (iter ~3001), vp
 
-**Rule:** Mirror produces malformed marker outputs after mirror-bot restarts. PR #728 (no canonical verdict marker — prose verdict) and PR #729 (REVIEW_PASS delimiter no JSON) both failed at 15:15-15:18 MDT after mirror-bot restart at 21:10Z (PR #726 code). PR #728 retry also produced REVIEW_PASS delimiter no-JSON-body at 15:33:07 MDT (iter ~2997). Different from PR #711 class (COMPLETE ✅ via PR #714). Retry mechanism working (PR #729 ultimately MERGED). Occurrences: iter ~2996 (1/3, PR #728+#729 initial); iter ~2997 (2/3, PR #728 retry malformed). Dispatch to Beacon at 3/3.
+**Rule:** Mirror produces malformed marker outputs after mirror-bot restarts. PR #728 (no canonical verdict marker — prose verdict) and PR #729 (REVIEW_PASS delimiter no JSON) both failed at 15:15-15:18 MDT after mirror-bot restart at 21:10Z (PR #726 code). PR #728 retry also produced REVIEW_PASS delimiter no-JSON-body at 15:33:07 MDT (iter ~2997). Third occurrence: PR #731 review at 17:04:25 MDT (2026-06-26) after mirror-bot restart at 16:40:38 MDT post-PR #730 merge — "none found" (prose verdict). Dispatched `direction-ask-mirror-malformed-post-restart-fix-001` to Beacon inbox at iter ~3001. Fix requested: canonical-marker validation self-check before outbox submit, or mandatory CLAUDE.md preamble load on cold-start. Different from PR #711 class (COMPLETE ✅ via PR #714). verification_pending.
 
 ---
 
-## Status snapshot — updated 2026-06-26 23:08Z UTC (Iter ~3000, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-26 23:17Z UTC (Iter ~3001, Tier 1, consecutive_clean=0)
 
-**Iter ~3000 summary:** ⚠️ Tier-4 alert: heal-stale-daemon-code auto-restart-failed:ourliberty-outbox-notifier.service (self-recovered per medic, 3rd occurrence → G-rule DISPATCHED ✅). 8 alerts triaged (7× Tier-3, 1× Tier-4). PR #731 (forge-revision-preamble-discipline-001 fix) OPEN, active revision/review cycle — Forge pushed revision-1 (sha=d66a296e17a9), Mirror REVIEW_REVISION, Mirror reviewing again. Preamble-missing WARN fired 5th time during revision (5/3 past threshold, fix PR in flight). direction-ask-auto-restart-failed-tier3-translation-001 dispatched to Beacon. Check I cooldown-suppressed (week 2026-06-22 block). No stalls. Watermark 1065→1073. PRIME: intervention+systemic_fix. Tier-reset 3→1.
+**Iter ~3001 summary:** ⚠️ Check 1 WARN: mirror-malformed-verdict-post-restart-001 3/3 (PR #731 malformed verdict at 17:04:25 MDT, post-16:40:38 MDT mirror-bot restart). direction-ask-mirror-malformed-post-restart-fix-001 dispatched to Beacon. 2 alerts triaged (both Tier-3). PR #731 pipeline active (Mirror re-reviewing after marker-error retry). APPROVAL_REQUEST tier3-silence-auto-restart-failed-001 pending Larry (alert-translations.json auto-restart-failed fix). M config/alert-translations.json dirty on working tree (expected transient). Check I cooldown-suppressed. No stalls. Watermark 1073→1075. PRIME: intervention+systemic_fix. Tier 1 (consecutive_clean=0).
 
 
