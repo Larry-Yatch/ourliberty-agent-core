@@ -228,8 +228,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 05:30Z UTC (Iter ~2876, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 05:37Z UTC (Iter ~2877, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2876 summary:** ✅ Active — PR #713 fix(claude-auth) under Mirror PID 3267368 review (13:24 elapsed since 05:15:52Z dispatch). PR #714 "fix: harden Mirror marker discipline" queued in Mirror inbox. mirror-marker-discipline-spec-update-001 FORGE COMPLETE ✅ MIRROR REVIEWING (PR #714) ✅. pending-approvals=0. All 8 daemons alive. 0 new alerts. Stall dry-run clean. Zombie PID 1834248 + 6 stale journalctl PIDs carry. G-rule check-i-force-bypass-dm-route stable at 2/3. Check I cooldown-suppressed. PRIME: interventions=1254, systemic_fixes=72, vp=27, ratio≈17.42, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2877 summary:** ✅ Active — PR #713 fix(claude-auth) under Mirror PID 3267368 review (~21 min elapsed since 05:15:52Z dispatch, under 30-min threshold). PR #714 "fix: harden Mirror marker discipline" queued in Mirror inbox. mirror-marker-discipline-spec-update-001 FORGE COMPLETE ✅ MIRROR REVIEWING (PR #714) ✅. pending-approvals=0. All 8 daemons alive. 0 new alerts (watermark=file_length=1040). Stall dry-run clean. Watchdog healthy (05:34:04Z). Zombie PID 1834248 (28d 10h 17m) + 6 stale journalctl PIDs carry. G-rule check-i-force-bypass-dm-route stable at 2/3. Check I cooldown-suppressed (check-i-2026-06-26.json present). PRIME: interventions=1255, systemic_fixes=72, vp=27, ratio≈17.43, trend=improving. Tier 1, consecutive_clean=0.
 
 
