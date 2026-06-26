@@ -5814,6 +5814,65 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         task = json.loads(revisions[0].read_text())
         self.assertEqual(task['previous_findings'], findings)
 
+    def _revision_dispatch_inputs(self, *, revision_count):
+        data = {
+            'task_id': 'round-trap',
+            'forge_build_session_id': 'forge-sess',
+            'target_repo': 'ourliberty-agent-core',
+            'branch': 'forge/round-trap',
+            'pr_url': 'https://github.com/x/y/pull/1',
+            'revision_count': revision_count,
+            'max_revisions': 3,
+        }
+        decision = {
+            'marker_type': 'review_revision',
+            'payload': {
+                'task_id': 'round-trap', 'pr_url': data['pr_url'],
+                'findings': [
+                    {'file': 'a.py', 'line_range': 'L10',
+                     'severity': 'medium', 'description': 'fix it'},
+                ],
+                'severity': 'medium', 'confidence': 'high',
+            },
+        }
+        return data, decision
+
+    def test_round1_revision_dispatch_omits_false_prior_round_trap(self):
+        # Mirror finding: the resume-branch prompt appended the ROUND-N trap
+        # unconditionally. On round 1 (revision_count=0 → next_count=1) the
+        # build session is resumed and NO prior revision preamble exists, so
+        # claiming a prior `Revision 0 applied:` line is false (and round 0 is
+        # rejected by the M-3 validator). The trap must be gated to round 2+.
+        data, decision = self._revision_dispatch_inputs(revision_count=0)
+        on._dispatch_revision_to_forge(data, decision)
+        revisions = list(
+            (on.INBOXES_ROOT / 'forge').glob('revision-round-trap-*.json')
+        )
+        self.assertEqual(len(revisions), 1)
+        prompt = json.loads(revisions[0].read_text())['prompt']
+        # No false prior-round claim on the dominant round-1 path.
+        self.assertNotIn('TRAP', prompt)
+        self.assertNotIn('Revision 0 applied:', prompt)
+        self.assertNotIn('already exists', prompt)
+        # The core preamble-discipline instruction is still present.
+        self.assertIn('VERY FIRST characters', prompt)
+        self.assertIn('Revision 1 applied:', prompt)
+
+    def test_round2_revision_dispatch_carries_prior_round_trap(self):
+        # On round 2 (revision_count=1 → next_count=2) the resumed session
+        # really does hold a `Revision 1 applied:` line, so the trap is true
+        # and must name the concrete prior/current round numbers.
+        data, decision = self._revision_dispatch_inputs(revision_count=1)
+        on._dispatch_revision_to_forge(data, decision)
+        revisions = list(
+            (on.INBOXES_ROOT / 'forge').glob('revision-round-trap-*.json')
+        )
+        self.assertEqual(len(revisions), 1)
+        prompt = json.loads(revisions[0].read_text())['prompt']
+        self.assertIn('ROUND-2 TRAP', prompt)
+        self.assertIn('Revision 1 applied:', prompt)
+        self.assertIn('Revision 2 applied:', prompt)
+
     def test_m8_rereview_prompt_includes_previous_findings(self):
         # Forge's revision outbox carries previous_findings via _build_outbox
         # propagation; _dispatch_mirror_review_rerun reads them and injects
