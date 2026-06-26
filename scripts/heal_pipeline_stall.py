@@ -138,6 +138,7 @@ import no_session_ledger  # noqa: E402  # S3: cold-start obligation backstop
 import for_larry_escalations  # noqa: E402  # mirror-review-visibility Contract C/E action surface
 import rebase_obligation_ledger  # noqa: E402  # post-open auto-rebase backstop
 import safe_write_inbox  # noqa: E402  # sanitize_component: match on-disk outbox names
+import pipeline_live_state  # noqa: E402  # canonical "is pipeline work live?" probes
 from heal_undispatched_pr_review import task_id_for_branch  # noqa: E402  # canonical PR->task_id key
 from id_match import id_matches  # noqa: E402
 from log_ts import parse_log_ts  # noqa: E402  (shared log-ts parser)
@@ -2353,96 +2354,22 @@ def _read_recent_routing_events(hours: int) -> list[dict]:
     return out
 
 
-def _claude_pids() -> list[int]:
-    """All live `claude` PIDs (broad match; cwd filtering happens in the
-    caller). `pgrep` is NOT a `claude`/LLM subprocess — pure process listing,
-    same shape as heal_wedged_review_sessions.claude_pids."""
-    try:
-        out = subprocess.run(
-            ['pgrep', '-f', 'claude'],
-            capture_output=True, text=True, timeout=5,
-        )
-    except (subprocess.TimeoutExpired, OSError):
-        return []
-    if out.returncode != 0:
-        return []
-    return [int(s) for s in out.stdout.split() if s.isdigit()]
-
-
-def _proc_cwd(pid: int) -> Optional[str]:
-    """The cwd of `pid` via /proc, or None if unreadable (race/permission)."""
-    try:
-        return os.readlink(f'/proc/{pid}/cwd')
-    except OSError:
-        return None
-
-
-# Matches the remainder of a Mirror review worktree name AFTER the
-# `wt-mirror-pr-<repo_short>-` prefix is stripped: a leading integer PR number,
-# optionally followed by a single `-rev<N>` or `-replan<N>` revision suffix and
-# nothing else. Anchored both ends so `713` never matches a `13` PR (and vice
-# versa) — the boundary discipline the FP report demands.
-_MIRROR_WT_REMAINDER_RE = re.compile(r'^(\d+)(?:-(?:rev|replan)\d+)?$')
-
-
 def _mirror_session_active_for_pr(
     repo_short: str, pr_number: int,
 ) -> tuple[bool, str]:
     """Is a Mirror review session live (or freshly dispatched) for this PR?
 
-    Two independent, cheap, claude-subprocess-free signals — either true =>
-    active:
+    Thin delegator to the canonical probe — the logic now lives in
+    `pipeline_live_state.pr_review_in_progress` (de-duped from this module's
+    original #716 implementation). Kept under its original name + signature so
+    the `check_unrouted_open_prs` call site (and its tests) are unchanged.
 
-      live_pid: a `claude` process whose cwd sits inside a
-        `wt-mirror-pr-<repo_short>-<pr_number>` worktree (tolerating a
-        trailing `-rev<N>`/`-replan<N>` and the kernel `(deleted)` cwd suffix),
-        boundary-matched on the PR-number segment.
-      inbox_task_present: a dispatched review task file
-        `review-pr-<repo_short>-<pr_number>[...]` sits in Mirror's inbox.
-
-    Returns (active, reason); reason is '' when inactive. Used by
-    check_unrouted_open_prs to suppress the `unrouted_open_pr` alert while
-    Mirror is mid-review — the stall checker otherwise has no visibility into
-    active agent sessions and re-fires after its 6h cooldown (G-rule
+    Used by check_unrouted_open_prs to suppress the `unrouted_open_pr` alert
+    while Mirror is mid-review — the stall checker otherwise has no visibility
+    into active agent sessions and re-fires after its 6h cooldown (G-rule
     unrouted-open-pr-active-mirror-session-fp-001).
     """
-    wt_prefix = str(WORKTREES_ROOT / 'wt-mirror-')
-    name_prefix = f'wt-mirror-pr-{repo_short}-'
-    for pid in _claude_pids():
-        cwd = _proc_cwd(pid)
-        if not cwd:
-            continue
-        if cwd.endswith(_DELETED_CWD_SUFFIX):
-            cwd = cwd[: -len(_DELETED_CWD_SUFFIX)]
-        if not cwd.startswith(wt_prefix):
-            continue
-        # The worktree name is the first path segment under WORKTREES_ROOT
-        # (a review session's cwd is the worktree root, but slicing the first
-        # segment also tolerates a nested cwd).
-        rel = cwd[len(str(WORKTREES_ROOT)):].lstrip('/')
-        worktree_name = rel.split('/', 1)[0]
-        if not worktree_name.startswith(name_prefix):
-            continue
-        remainder = worktree_name[len(name_prefix):]
-        m = _MIRROR_WT_REMAINDER_RE.match(remainder)
-        if m and int(m.group(1)) == pr_number:
-            return True, 'live_pid'
-
-    mirror_inbox = AGENTS_ROOT / 'inboxes' / 'mirror'
-    file_prefix = f'review-pr-{repo_short}-{pr_number}'
-    try:
-        hits = mirror_inbox.glob(f'{file_prefix}*.json')
-    except OSError:
-        hits = iter(())
-    for hit in hits:
-        # Boundary-guard the glob's trailing `*` so a `7130` task never
-        # suppresses a `713` PR: the char after the PR number must be the
-        # extension dot or a revision-suffix dash.
-        rest = hit.name[len(file_prefix):]
-        if rest.startswith('.') or rest.startswith('-'):
-            return True, 'inbox_task_present'
-
-    return False, ''
+    return pipeline_live_state.pr_review_in_progress(repo_short, pr_number)
 
 
 def check_unrouted_open_prs(open_prs: list[dict],

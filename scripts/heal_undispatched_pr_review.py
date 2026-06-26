@@ -109,6 +109,8 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
+import pipeline_live_state  # noqa: E402  # canonical "is a review live?" probe
+
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
 KILL_SWITCH = AGENTS_ROOT / 'healers.disabled'
 LOG_FILE = AGENTS_ROOT / 'logs' / 'heal-undispatched-pr-review.log'
@@ -587,6 +589,26 @@ def main() -> int:
                 log(f'PR #{pr["number"]} no longer open (merged/closed since '
                     f'listing); skipping review dispatch', 'INFO')
                 continue
+
+        # Active-review guard (shared with heal_pipeline_stall via #716's probe,
+        # now the canonical pipeline_live_state.pr_review_in_progress). The
+        # `_already_dispatched` predicate above keys off the inbox TASK FILE,
+        # which Mirror MOVES out of its inbox the instant it picks the review up
+        # — so a review that is actively RUNNING (claude proc live in its
+        # `wt-mirror-pr-<repo>-<num>` worktree) no longer has an inbox file and
+        # would pass `_already_dispatched`, letting this backstop re-dispatch a
+        # duplicate review of a PR already mid-review. The probe catches that
+        # live-proc case. Fail-safe: it returns (False,'') on any error, so a
+        # probe hiccup never blocks a legitimate dispatch.
+        repo_short = _repo_segment(pr.get('_repo') or '')
+        review_live, live_reason = pipeline_live_state.pr_review_in_progress(
+            repo_short, pr['number'],
+        )
+        if review_live:
+            log(f'ACTIVE_REVIEW_SKIP task={pr["task_id"]} reason={live_reason} '
+                f'pr={url} — Mirror review already in progress; not re-dispatching',
+                'INFO')
+            continue
 
         log(f'ORPHANED_PR_REVIEW PR #{pr["number"]} task={pr["task_id"]} '
             f'pr={url} — no Mirror review dispatched; dispatching backstop review',
