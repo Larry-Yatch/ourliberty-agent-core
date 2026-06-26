@@ -184,6 +184,21 @@ def call_agent(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[st
         cmd += ["--resume", session_id]
     cmd += [prompt]
 
+    # Authenticate via Tier 1's long-lived setup-token — the account this bot's
+    # HOME=/home/larry (active_tier.TIER1_HOME) is bound to — reusing the same
+    # resolver agent_runner uses for a dispatch. Without it claude fell back to
+    # HOME's ~/.claude/.credentials.json, which rots silently on an OAuth refresh
+    # failure and then 401s every message; this bespoke chat bridge never picked
+    # up the setup-token path that dispatches use. The token matches the
+    # session's bound account, so --resume continuity holds.
+    env = {**os.environ}
+    _auth_source = agent_runner._apply_tier_auth(
+        env, 'tier1', os.environ.get('CLAUDE_CODE_OAUTH_TOKEN', ''),
+    )
+    # Log the auth source (NOT the token) so a future auth regression is visible
+    # — this bridge's silent auth path is why the 2026-06-25 incident took hours
+    # to pin down. Mirrors agent_runner's auth= attribution.
+    log(f"call_agent: primary auth={_auth_source} (tier1)")
     try:
         result = subprocess.run(
             cmd,
@@ -191,6 +206,7 @@ def call_agent(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[st
             capture_output=True,
             text=True,
             timeout=CLAUDE_TIMEOUT_SEC,
+            env=env,
         )
     except subprocess.TimeoutExpired:
         return (f"[{AGENT.title()} timed out after 10 min — please retry, ideally with a tighter scope]", session_id)

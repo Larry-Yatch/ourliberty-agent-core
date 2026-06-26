@@ -444,7 +444,22 @@ def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[s
         cmd += ["--resume", session_id]
     cmd += [prompt]
 
-    result = _run_claude_once(cmd)
+    # Primary attempt authenticates via Tier 1's long-lived setup-token — the
+    # account this bot's HOME=/home/larry (active_tier.TIER1_HOME) is bound to —
+    # mirroring agent_runner._apply_tier_auth. Without it the primary fell back
+    # to HOME's ~/.claude/.credentials.json, which rots silently on an OAuth
+    # refresh failure and then 401s every message; on a --resume session the
+    # Tier 2 fallback below is refused (session-bound), leaving Beacon dead to
+    # Larry. The token matches the session's bound account, so --resume
+    # continuity is preserved. None (token unconfigured) => prior behavior.
+    # Log the auth source (NOT the token) so a future auth regression is
+    # visible in the log — the 2026-06-25 incident was invisible precisely
+    # because the bot's primary auth path emitted no signal. Mirrors the
+    # tier2-fallback auth= log below and agent_runner's attribution.
+    _t1_token = active_tier._setup_token_for_tier('tier1')
+    log(f"call_beacon: primary auth="
+        f"{'setup_token' if _t1_token else 'credentials_json'} (tier1)")
+    result = _run_claude_once(cmd, oauth_token=_t1_token)
     if result is None:
         return ("[Beacon timed out or claude binary missing — please retry]", session_id)
 

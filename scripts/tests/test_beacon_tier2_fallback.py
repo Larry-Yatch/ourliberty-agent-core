@@ -121,6 +121,44 @@ class BeaconBotRefuseOnResumeTest(_TempDirBase):
         self.assertEqual(sess, 's2')
 
 
+class BeaconBotPrimaryUsesTier1SetupTokenTest(_TempDirBase):
+    """The primary call_beacon attempt must authenticate via Tier 1's
+    setup-token (the account HOME=/home/larry is bound to), NOT HOME's
+    auto-refreshing credentials.json. Regression guard for the 2026-06-25
+    dead-default-token incident: the primary 401'd on every message and a
+    --resume session could not recover (Tier 2 fallback refused as
+    session-bound), leaving Beacon dead to Larry."""
+
+    def setUp(self):
+        super().setUp()
+        self.bot = importlib.import_module('beacon_telegram_bot')
+        _p = mock.patch.object(self.bot, '_append_bot_quota_event')
+        self.quota_mock = _p.start()
+        self.addCleanup(_p.stop)
+
+    def test_primary_attempt_passes_tier1_setup_token(self):
+        ok = mock.Mock(
+            returncode=0,
+            stdout=json.dumps({'result': 'hi', 'session_id': 'sess-x'}),
+            stderr='',
+        )
+        run_mock = mock.Mock(return_value=ok)
+        with mock.patch.object(self.bot, '_run_claude_once', run_mock), \
+             mock.patch.object(self.bot.active_tier, '_setup_token_for_tier',
+                               return_value='tier1-tok') as tok_mock:
+            reply, sess = self.bot.call_beacon('hello', 'sess-x')
+        # One successful primary call — no fallback needed.
+        self.assertEqual(run_mock.call_count, 1)
+        # The primary attempt authenticated via the Tier 1 setup-token, so a
+        # rotted credentials.json no longer 401s the heartbeat.
+        self.assertEqual(
+            run_mock.call_args_list[0].kwargs.get('oauth_token'), 'tier1-tok')
+        tok_mock.assert_any_call('tier1')
+        # --resume continuity preserved (HOME unchanged, same-account token).
+        self.assertEqual(reply, 'hi')
+        self.assertEqual(sess, 'sess-x')
+
+
 class BeaconBotT2StdoutReturnedTest(_TempDirBase):
     """Verify the t2.stdout fix at the former line 338. Mock Tier 1 and
     Tier 2 with DISTINCT stdouts; assert the returned body contains Tier
