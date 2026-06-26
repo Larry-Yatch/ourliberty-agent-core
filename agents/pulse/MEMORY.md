@@ -253,8 +253,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 13:13Z UTC (Iter ~2943, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 13:24Z UTC (Iter ~2944, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2943 summary:** ⚠️ Active — PR #713 REVIEW_ESCALATE carry. 0 new alerts. no_session_revision:713 cooldown EXPIRED (Tier-3 silence). Sync error carry CLEARED (status=no-change 13:02:28Z). beacon-pending=6 (unchanged: medic-dispatcher-001, heal-stall-mirror-active, no-session-revision-mirror-active, mirror-review-713, watchdog-mirror-active-stale, heal-forge-no-pr-closed-skip-001). Repo HEAD=9b5aaf38=origin/main. Watchdog healthy (07:09:42 MDT). 8/8 daemons alive. PR #713 mergeable=UNKNOWN (transient). PRIME: systemic_fixes=75, vp=27, ratio=17.39, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2944 summary:** ⚠️ Active — PR #713 in Forge revision-2 (Larry approved mirror-review-pr-713 at 07:21 MDT). Larry cleared 4 of 6 beacon-pending in rapid succession (07:19-07:22 MDT): heal-forge-no-pr-closed-skip-001 (Forge building), watchdog-mirror-active-stale-suppression-001 (Forge building), mirror-review-pr-ourliberty-agent-core-713 (Forge building revision-2), no-session-revision-mirror-active-fp-001 (Beacon designing). beacon-pending=2 (medic-dispatcher-delivery-failure-translation-001, heal-stall-mirror-active-suppression-001). 2 new alerts Tier-3 silenced (no-session-revision:713, medic-dispatcher pair). Repo HEAD=fa1331f0=origin/main. Watchdog healthy (07:19:49 MDT). PRIME: systemic_fixes=75, vp=27, ratio=17.39, trend=improving. Tier 1, consecutive_clean=0.
 
 
