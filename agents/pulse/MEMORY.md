@@ -252,8 +252,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 09:17Z UTC (Iter ~2911, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 09:22Z UTC (Iter ~2912, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2911 summary:** ⚠️ Active — Mirror PID 3308724 at ~3h13m elapsed. 0 new alerts. beacon-pending: 3 (medic-dispatcher fix + heal-stall-mirror-active-suppression-001 + no-session-revision-mirror-active-fp-001, all queued to Larry via Telegram). Pipeline stall: 0 (all cooldowns). 8/8 daemons alive. Watchdog healthy (09:14:30Z). Sync fresh (09:02:20Z). Check I cooldown-suppressed. PR #713 revision active (Mirror outbox empty). PRIME: interventions≈1289+, systemic_fixes=73, vp=27, ratio≈17.66, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2912 summary:** ⚠️ Active — Mirror PID 3308724 at ~3h17m elapsed. 0 new alerts. beacon-pending: 3 (medic-dispatcher fix + heal-stall-mirror-active-suppression-001 + no-session-revision-mirror-active-fp-001, all queued to Larry via Telegram). Pipeline stall: 0 (all cooldowns). 8/8 daemons alive. Watchdog healthy (09:19:35Z). Sync fresh (09:02:20Z). Check I cooldown-suppressed. PR #713 revision active (Mirror outbox empty). PRIME: interventions≈1290+, systemic_fixes=73, vp=27, ratio≈17.66, trend=improving. Tier 1, consecutive_clean=0.
 
 
