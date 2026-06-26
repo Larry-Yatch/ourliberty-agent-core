@@ -253,8 +253,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 12:44Z UTC (Iter ~2939, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 12:49Z UTC (Iter ~2940, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2939 summary:** ⚠️ Active — PR #713 REVIEW_ESCALATE carry. 2 new alerts (both Tier-3 silenced: heal-pipeline-stall forge-no-pr:712 + unrouted-pr:713). G-rule forge-built-no-pr-closed-pr-fp-001 hit 3/3 → direction-ask-forge-no-pr-closed-pr-fix-001 dispatched to Beacon. Repo HEAD=05fab23c=origin/main. beacon-pending: 5 unchanged. Watchdog healthy (06:38:56 MDT). 8/8 daemons alive. PR #713 mergeable=UNKNOWN (transient). PRIME: systemic_fixes=75, vp=27, ratio=17.39, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2940 summary:** ⚠️ Active — PR #713 REVIEW_ESCALATE carry. 1 new alert (Tier-3 silenced: approval_request heal-forge-no-pr-closed-skip-001 — Beacon processed iter ~2939 direction-ask in ~6 min, plan ready). beacon-pending=6 (+1: heal-forge-no-pr-closed-skip-001). Repo HEAD=91555c05=origin/main. Watchdog healthy (06:43:58 MDT). 8/8 daemons alive. PR #713 mergeable=UNKNOWN (transient). PRIME: systemic_fixes=75, vp=27, ratio=17.39, trend=improving. Tier 1, consecutive_clean=0.
 
 
