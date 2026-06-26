@@ -1322,5 +1322,55 @@ class TestWorktreeHeadCommitAge(unittest.TestCase):
             self.assertIsNone(h._worktree_head_commit_age_secs('/wt', now=1600.0))
 
 
+class TestSessionJsonlTier2Discovery(unittest.TestCase):
+    """Regression for the tier2 blind spot: Mirror (and Forge under the auth
+    HOME-swap) write their session JSONL under the personal HOME's projects dir,
+    not the login HOME's. A reaper that searched only the login HOME found no
+    JSONL, set idle_secs=0.0, and never reaped a Mirror wedge."""
+
+    CWD = '/home/larry/agent-worktrees/wt-mirror-pr-ourliberty-agent-core-719'
+
+    def setUp(self):
+        self._tmp = tempfile.mkdtemp(prefix='ol-test-projects-')
+        self.login_root = Path(self._tmp) / 'login' / 'projects'
+        self.tier2_root = Path(self._tmp) / 'tier2' / 'projects'
+        self.login_root.mkdir(parents=True)
+        self.tier2_root.mkdir(parents=True)
+        self._orig_dirs = h.CLAUDE_PROJECTS_DIRS
+        h.CLAUDE_PROJECTS_DIRS = (self.login_root, self.tier2_root)
+
+    def tearDown(self):
+        h.CLAUDE_PROJECTS_DIRS = self._orig_dirs
+        import shutil
+        shutil.rmtree(self._tmp, ignore_errors=True)
+
+    def _write_jsonl(self, root: Path, name: str, mtime: float) -> Path:
+        slug_dir = root / h.cwd_to_slug(self.CWD)
+        slug_dir.mkdir(parents=True, exist_ok=True)
+        p = slug_dir / name
+        p.write_text('{"type": "assistant"}\n')
+        os.utime(p, (mtime, mtime))
+        return p
+
+    def test_finds_jsonl_under_tier2_home_when_login_absent(self):
+        # The blind spot: only the tier2 root has the session JSONL.
+        want = self._write_jsonl(self.tier2_root, 'sess-tier2.jsonl', 1000.0)
+        self.assertEqual(h.session_jsonl_for_cwd(self.CWD), want)
+
+    def test_newest_mtime_wins_across_roots(self):
+        self._write_jsonl(self.login_root, 'old.jsonl', 1000.0)
+        newer = self._write_jsonl(self.tier2_root, 'new.jsonl', 2000.0)
+        self.assertEqual(h.session_jsonl_for_cwd(self.CWD), newer)
+
+    def test_none_when_no_root_has_the_slug(self):
+        self.assertIsNone(h.session_jsonl_for_cwd(self.CWD))
+
+    def test_single_projects_dir_arg_is_back_compat(self):
+        # A pinned single root searches only that root (legacy callers/tests).
+        self._write_jsonl(self.tier2_root, 'sess-tier2.jsonl', 1000.0)
+        self.assertIsNone(
+            h.session_jsonl_for_cwd(self.CWD, projects_dir=self.login_root))
+
+
 if __name__ == '__main__':
     unittest.main()
