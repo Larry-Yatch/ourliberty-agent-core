@@ -228,8 +228,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 04:35Z UTC (Iter ~2867, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 04:40Z UTC (Iter ~2868, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2867 summary:** ⚠️ Drift — PR #712 "fix(narrator): authenticate claude with the durable per-tier setup-token" created 04:31:49Z by Larry-Yatch (manual push); no CI, no auto-merge, outbox-notifier should dispatch Mirror review. Stuck dispatch (mirror-marker-discipline-spec-update-001) carries from iter ~2866 (Forge inbox still empty, pending-approvals still pending). All 8 daemons alive. 0 new alerts. Stall dry-run clean. Zombie PID 1834248 + 6 stale journalctl PIDs carry. Check I cooldown-suppressed. PRIME: interventions=1245, systemic_fixes=72, vp=27, ratio≈17.29, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2868 summary:** ⚠️ Drift — PR #712 "fix(narrator): authenticate claude with the durable per-tier setup-token" OPEN and MERGEABLE (~7 min old); outbox-notifier hasn't dispatched Mirror review yet (monitoring, < 30 min). Stuck dispatch (mirror-marker-discipline-spec-update-001) carries from iter ~2866 (Forge inbox empty, pending-approvals status=pending). All 8 daemons alive. 0 new alerts. Stall dry-run clean. Zombie PID 1834248 + 6 stale journalctl PIDs carry. Check I cooldown-suppressed. PRIME: interventions=1246, systemic_fixes=72, vp=27, ratio≈17.31, trend=improving. Tier 1, consecutive_clean=0.
 
 
