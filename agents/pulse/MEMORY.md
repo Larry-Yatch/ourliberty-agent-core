@@ -267,8 +267,8 @@ PR #715 (fix(healer): skip forge_built_no_pr stall when task PR is CLOSED) MERGE
 
 ---
 
-## Status snapshot — updated 2026-06-26 18:24Z UTC (Iter ~2983, Tier 2, consecutive_clean=0)
+## Status snapshot — updated 2026-06-26 18:40Z UTC (Iter ~2984, Tier 2, consecutive_clean=1)
 
-**Iter ~2983 summary:** ✅ Clean. 0 new alerts. PR #722 AUTO_MERGED at 18:21:30Z (fix(missions): reconcile shipped Operator Needs-You Feed off stale in_flight phase). Mirror new session active since 18:21:22Z (picking up PR #724/#725/#720 queue). PRs #720/#724/#725 in Mirror queue. PR #725 (G-rule forge-built-no-pr-pr-task-id-closed-fp-001) progressing toward merge. PRIME: iter_clean. **Tier 1→2 de-escalation** (consecutive_clean 2→3→promoted). Tier 2, consecutive_clean=0.
+**Iter ~2984 summary:** ✅ Clean. 0 new alerts. Mirror actively reviewing PR #720 (worktree `wt-mirror-pr-ourliberty-agent-core-720` confirmed live — re-dispatch from iter ~2983 worked). PRs #724/#725 queued. mirror-runner-missing-worktree-retry-001 (1/3): no new occurrence, watching. PR #725 (G-rule forge-built-no-pr-pr-task-id-closed-fp-001) in Mirror queue. PRIME: iter_clean. Tier 2, consecutive_clean=1.
 
 
