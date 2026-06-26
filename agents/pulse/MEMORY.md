@@ -158,7 +158,7 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ## Completed G-rules — condensed for space (COMPLETE ✅)
 
-`outbox-notifier url-shape-invalid` → PR #493 (2026-06-13). `medic-diagnosis-tier4` → PR #515 (2026-06-15). `heal-pipeline-stall:unrouted-pr` → PR #516 (2026-06-15). `check-i-repeat-dm-fix-001` → PR #674 (2026-06-24). `heal-droplet-git-drift` → PR #586 (2026-06-19). `silence-routine-weekly-alerts` → PR #604 (2026-06-20). `forge-preflight-no-marker` → PR #600 (2026-06-19). `projects-json-healer-path` → PR #603 (2026-06-20). `outbox-notifier-review-pass` → PR #604 scope. `seq-advancer-sequence-stranded` → PR #661 (2026-06-24). `catalog-accuracy-drift` → PR #6 ourliberty-graph (2026-06-22). `doorbell-tier4-pattern` → PR #648 (2026-06-23). `heal-stale-daemon-code-script-service-mismatch` → PR #647 (2026-06-23). `mirror-marker-parse-error` → PR #650 (2026-06-23). `watchdog-watcher-log-stale` → PR #649 (2026-06-23). `watchdog-watcher-log-stale-post-fix` → PR #694 (2026-06-25). `ourliberty-health-notify-script-missing` → PR #696 (2026-06-25). `heal-pipeline-stall-mirror-pass-unmerged-tier4` → PR #695 (2026-06-25). `stale-proposed-mission-pipeline-fp-001` → PR #697 (2026-06-25, sibling_pr_title_shipped suppression). `outbox-notifier-auto-merge-loop-merged-pr-001` → PR #700 (2026-06-25, verified iter ~2713). `forge-built-no-pr-retry1-fp-001` → PR #701 (pattern1) + PR #702 (pattern2, rebase_target_shipped disambiguation, both 2026-06-25, verified iter ~2772).
+`outbox-notifier url-shape-invalid` → PR #493 (2026-06-13). `medic-diagnosis-tier4` → PR #515 (2026-06-15). `heal-pipeline-stall:unrouted-pr` → PR #516 (2026-06-15). `check-i-repeat-dm-fix-001` → PR #674 (2026-06-24). `heal-droplet-git-drift` → PR #586 (2026-06-19). `silence-routine-weekly-alerts` → PR #604 (2026-06-20). `forge-preflight-no-marker` → PR #600 (2026-06-19). `projects-json-healer-path` → PR #603 (2026-06-20). `outbox-notifier-review-pass` → PR #604 scope. `seq-advancer-sequence-stranded` → PR #661 (2026-06-24). `catalog-accuracy-drift` → PR #6 ourliberty-graph (2026-06-22). `doorbell-tier4-pattern` → PR #648 (2026-06-23). `heal-stale-daemon-code-script-service-mismatch` → PR #647 (2026-06-23). `mirror-marker-parse-error` → PR #650 (2026-06-23). `watchdog-watcher-log-stale` → PR #649 (2026-06-23). `watchdog-watcher-log-stale-post-fix` → PR #694 (2026-06-25). `ourliberty-health-notify-script-missing` → PR #696 (2026-06-25). `heal-pipeline-stall-mirror-pass-unmerged-tier4` → PR #695 (2026-06-25). `stale-proposed-mission-pipeline-fp-001` → PR #697 (2026-06-25, sibling_pr_title_shipped suppression). `outbox-notifier-auto-merge-loop-merged-pr-001` → PR #700 (2026-06-25, verified iter ~2713). `forge-built-no-pr-retry1-fp-001` → PR #701 (pattern1) + PR #702 (pattern2, rebase_target_shipped disambiguation, both 2026-06-25, verified iter ~2772). `mirror-marker-severity-blocking-pr711-001` → PR #714 (2026-06-26T06:03:41Z, Mirror REVIEW_PASS + auto-merged).
 
 ---
 
@@ -198,15 +198,15 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## G-rule mirror-marker-severity-blocking-pr711-001 → DISPATCHED ✅ APPROVED ✅ FORGE COMPLETE ✅ MIRROR REVIEWING PR #714 ✅ (iter ~2875)
+## G-rule mirror-marker-severity-blocking-pr711-001 → COMPLETE ✅ (iter ~2881)
 
-**Rule:** Mirror produced 3 malformed markers on PR #711: (1) REVIEW_REVISION empty findings (iter ~2847), (2) REVIEW_REVISION severity='blocking' (iter ~2848), (3) REVIEW_PASS prose inside JSON block (iter ~2852). Dispatched `mirror-marker-discipline-spec-update-001` to Beacon → Larry approved via dashboard (iter ~2864). Was stuck (iter ~2866); RESOLVED (iter ~2874): Larry "Go" at 05:10:57Z → Forge built. Forge PID 3266713 COMPLETE (iter ~2875): PR #714 "fix: harden Mirror marker discipline (severity enum, non-empty findings, JSON-only blocks)" opened 05:23:31Z. Mirror review dispatched 05:23:46Z (queued behind PR #713). Monitoring for REVIEW_PASS + merge.
+**Rule:** Mirror produced 3 malformed markers on PR #711: (1) REVIEW_REVISION empty findings (iter ~2847), (2) REVIEW_REVISION severity='blocking' (iter ~2848), (3) REVIEW_PASS prose inside JSON block (iter ~2852). Dispatched `mirror-marker-discipline-spec-update-001` to Beacon → Larry approved "Go" 05:10:57Z → Forge built PR #714 → Mirror REVIEW_PASS → AUTO_MERGE at 2026-06-26T06:03:41Z. **COMPLETE ✅ Moved to Completed G-rules below.**
 
 ---
 
-## G-rule unrouted-open-pr-active-mirror-session-fp-001 — 1/3 (new, iter ~2848)
+## G-rule unrouted-open-pr-active-mirror-session-fp-001 — 2/3 (updated iter ~2881)
 
-**Rule:** `heal_pipeline_stall.py` dry-run fires `unrouted_open_pr:<pr>` after cooldown expiry even when Mirror IS actively reviewing the PR (active PID + inbox task present). PR #711 triggered this: created 01:17Z, cooldown expired by ~02:21Z, but Mirror review PID 3172100 was running. Stall checker has no visibility into active Mirror sessions (distinct from G-rule `unrouted-open-pr-auto-merge-held-fp-001` which was about AUTO_MERGE_HELD outbox-notifier state on PR #692). Fix: stall checker should check for active agent sessions (inbox task presence or live PID) before firing `unrouted_open_pr`. Dispatch to Beacon at 3/3.
+**Rule:** `heal_pipeline_stall.py` dry-run fires `unrouted_open_pr:<pr>` after cooldown expiry even when Mirror IS actively reviewing the PR (active PID + inbox task present). Occurrences: iter ~2848 (PR #711, Mirror PID 3172100 running); iter ~2881 (PR #713, Mirror PID 3308724 active ~4 min reviewing rev1). Stall checker has no visibility into active Mirror sessions (distinct from G-rule `unrouted-open-pr-auto-merge-held-fp-001` which was about AUTO_MERGE_HELD outbox-notifier state on PR #692). Fix: stall checker should check for active agent sessions (inbox task presence or live PID) before firing `unrouted_open_pr`. Dispatch to Beacon at 3/3.
 
 ---
 
@@ -228,8 +228,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 05:58Z UTC (Iter ~2880, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 06:08Z UTC (Iter ~2881, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2880 summary:** ✅ Active — PR #713 revision cycle: Mirror PID 3288792 reviewing rev1 (~17 min elapsed). PR #714 queued in Mirror inbox. mirror-marker-severity-blocking-pr711-001 FORGE COMPLETE ✅ MIRROR REVIEWING (PR #714) ✅. pending-approvals=0. All 8 daemons alive. 0 new alerts (watermark=1040). Stall dry-run clean. Watchdog healthy (05:55:07Z). Zombie PID 1834248 (28d 10h 38m) + 6 stale journalctl PIDs carry. G-rule check-i-force-bypass-dm-route stable at 2/3. Check I cooldown-suppressed (check-i-2026-06-26.json present). PRIME: interventions=1258, systemic_fixes=72, vp=27, ratio≈17.47, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2881 summary:** ✅ Active — PR #714 MERGED ✅ (mirror-marker-severity-blocking-pr711-001 COMPLETE). PR #713 revision cycle: Mirror PID 3308724 reviewing rev1 (~4 min elapsed). 2 new alerts both Tier-3 silenced (heal-systemd-install-drift stuck-timer-healed, outbox-notifier review-pass). Pipeline stall dry-run: 1 FP (unrouted_open_pr:713 — G-rule unrouted-open-pr-active-mirror-session-fp-001 now 2/3). pending-approvals=0. All 8 daemons alive. Watermark=1042. Watchdog healthy (00:05:19Z). Zombie PID 1834248 (28d 10h 48m) + 6 stale journalctl PIDs carry. G-rule check-i-force-bypass-dm-route stable at 2/3. Check I cooldown-suppressed (check-i-2026-06-26.json present). PRIME: interventions=1259, systemic_fixes=72, vp=27, ratio≈17.49, trend=improving. Tier 1, consecutive_clean=0.
 
 
