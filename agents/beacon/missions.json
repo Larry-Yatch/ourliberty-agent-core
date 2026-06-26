@@ -5962,7 +5962,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-26T20:30:15.847444+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-26T20:15:26.737401+00:00"
+      "orphan_last_activity_ts": "2026-06-26T20:15:26.737401+00:00",
+      "briefing": {
+        "what": "The team set up a way to quietly stop a repeating system alert that fires whenever a routine data sync hiccups and fixes itself.",
+        "why": "Those alerts are false alarms that bury the messages that actually need your attention, so silencing them keeps your inbox focused on real issues.",
+        "suggest": "Approve this, but ask the team to confirm a daily summary still tracks these hiccups so a genuine problem can't slip by unnoticed."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-26T20:39:27.576079+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
