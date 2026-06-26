@@ -252,8 +252,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 10:00Z UTC (Iter ~2917, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 10:10Z UTC (Iter ~2918, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2917 summary:** ⚠️ Active — Mirror PID 3308724 at ~3h52m elapsed. 0 new alerts (first zero-alert iter in recent memory). Pipeline stall: 0 (all cooldowns). beacon-pending: 3 unchanged. 8/8 daemons alive. Watchdog healthy (09:55:28Z). Sync at 09:02:20Z (~58 min). Check I cooldown-suppressed. PR #713 revision active (Mirror inbox has rev1 task). PRIME: interventions≈1295+, systemic_fixes=73, vp=27, ratio≈17.7+, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2918 summary:** ⚠️ Active — Mirror PID 3308724 COMPLETED at 10:06:36Z (4h3m session; REVIEW_REVISION round-2: WIP commit `f2d7ac52` reverts manifest fix, `test_committed_manifest_matches_regeneration` fails at HEAD). New Mirror PID 3375805 started 10:06Z doing rev1 re-review. 0 new alerts. Pipeline stall: 0 (all cooldowns). beacon-pending: 3 unchanged. 8/8 daemons alive. Watchdog healthy (10:05:37Z). Sync at 10:02:20Z (~8 min). Check I cooldown-suppressed. Forge inbox EMPTY; revision-2 awaits Mirror rev1 re-review verdict. PRIME: interventions≈1296+, systemic_fixes=73, vp=27, ratio≈17.7, trend=improving. Tier 1, consecutive_clean=0.
 
 
