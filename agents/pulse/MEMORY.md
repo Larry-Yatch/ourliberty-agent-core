@@ -158,7 +158,7 @@ PR #717 (fix: suppress spurious watchdog stale-log WARN during active Mirror rev
 
 ## Completed G-rules — condensed for space (COMPLETE ✅)
 
-`outbox-notifier url-shape-invalid` → PR #493 (2026-06-13). `medic-diagnosis-tier4` → PR #515 (2026-06-15). `heal-pipeline-stall:unrouted-pr` → PR #516 (2026-06-15). `check-i-repeat-dm-fix-001` → PR #674 (2026-06-24). `heal-droplet-git-drift` → PR #586 (2026-06-19). `silence-routine-weekly-alerts` → PR #604 (2026-06-20). `forge-preflight-no-marker` → PR #600 (2026-06-19). `projects-json-healer-path` → PR #603 (2026-06-20). `outbox-notifier-review-pass` → PR #604 scope. `seq-advancer-sequence-stranded` → PR #661 (2026-06-24). `catalog-accuracy-drift` → PR #6 ourliberty-graph (2026-06-22). `doorbell-tier4-pattern` → PR #648 (2026-06-23). `heal-stale-daemon-code-script-service-mismatch` → PR #647 (2026-06-23). `mirror-marker-parse-error` → PR #650 (2026-06-23). `watchdog-watcher-log-stale` → PR #649 (2026-06-23). `watchdog-watcher-log-stale-post-fix` → PR #694 (2026-06-25). `ourliberty-health-notify-script-missing` → PR #696 (2026-06-25). `heal-pipeline-stall-mirror-pass-unmerged-tier4` → PR #695 (2026-06-25). `stale-proposed-mission-pipeline-fp-001` → PR #697 (2026-06-25, sibling_pr_title_shipped suppression). `outbox-notifier-auto-merge-loop-merged-pr-001` → PR #700 (2026-06-25, verified iter ~2713). `forge-built-no-pr-retry1-fp-001` → PR #701 (pattern1) + PR #702 (pattern2, rebase_target_shipped disambiguation, both 2026-06-25, verified iter ~2772). `mirror-marker-severity-blocking-pr711-001` → PR #714 (2026-06-26T06:03:41Z, Mirror REVIEW_PASS + auto-merged). `unrouted-open-pr-active-mirror-session-fp-001` → PR #716 (2026-06-26T14:38:28Z, MIRROR_ACTIVE_SKIP suppression). `forge-built-no-pr-closed-pr-fp-001` → PR #715 (2026-06-26T14:38:35Z, CLOSED-not-merged PR skip in check_forge_built_no_pr). `watchdog-watcher-log-stale-post-pr694` → PR #717 (2026-06-26T16:51:20Z, MIRROR_ACTIVE_SKIP suppression in watchdog stale-log warning path, verified iter ~2973). `medic-dispatcher-delivery-failure-tier4-001` → PR #718 (2026-06-26T16:55Z, Tier-3 translation for medic-dispatcher relay-failure, verified iter ~2974).
+`outbox-notifier url-shape-invalid` → PR #493 (2026-06-13). `medic-diagnosis-tier4` → PR #515 (2026-06-15). `heal-pipeline-stall:unrouted-pr` → PR #516 (2026-06-15). `check-i-repeat-dm-fix-001` → PR #674 (2026-06-24). `heal-droplet-git-drift` → PR #586 (2026-06-19). `silence-routine-weekly-alerts` → PR #604 (2026-06-20). `forge-preflight-no-marker` → PR #600 (2026-06-19). `projects-json-healer-path` → PR #603 (2026-06-20). `outbox-notifier-review-pass` → PR #604 scope. `seq-advancer-sequence-stranded` → PR #661 (2026-06-24). `catalog-accuracy-drift` → PR #6 ourliberty-graph (2026-06-22). `doorbell-tier4-pattern` → PR #648 (2026-06-23). `heal-stale-daemon-code-script-service-mismatch` → PR #647 (2026-06-23). `mirror-marker-parse-error` → PR #650 (2026-06-23). `watchdog-watcher-log-stale` → PR #649 (2026-06-23). `watchdog-watcher-log-stale-post-fix` → PR #694 (2026-06-25). `ourliberty-health-notify-script-missing` → PR #696 (2026-06-25). `heal-pipeline-stall-mirror-pass-unmerged-tier4` → PR #695 (2026-06-25). `stale-proposed-mission-pipeline-fp-001` → PR #697 (2026-06-25, sibling_pr_title_shipped suppression). `outbox-notifier-auto-merge-loop-merged-pr-001` → PR #700 (2026-06-25, verified iter ~2713). `forge-built-no-pr-retry1-fp-001` → PR #701 (pattern1) + PR #702 (pattern2, rebase_target_shipped disambiguation, both 2026-06-25, verified iter ~2772). `mirror-marker-severity-blocking-pr711-001` → PR #714 (2026-06-26T06:03:41Z, Mirror REVIEW_PASS + auto-merged). `unrouted-open-pr-active-mirror-session-fp-001` → PR #716 (2026-06-26T14:38:28Z, MIRROR_ACTIVE_SKIP suppression). `forge-built-no-pr-closed-pr-fp-001` → PR #715 (2026-06-26T14:38:35Z, CLOSED-not-merged PR skip in check_forge_built_no_pr). `watchdog-watcher-log-stale-post-pr694` → PR #717 (2026-06-26T16:51:20Z, MIRROR_ACTIVE_SKIP suppression in watchdog stale-log warning path, verified iter ~2973). `medic-dispatcher-delivery-failure-tier4-001` → PR #718 (2026-06-26T16:55Z, Tier-3 translation for medic-dispatcher relay-failure, verified iter ~2974). `beacon-erofs-concurrent-claude-sessions-001` → PR #720 (2026-06-26T19:42:49Z, auto-rebind dangled ~/.claude.json mount, verified iter ~2990). `forge-built-no-pr-pr-task-id-closed-fp-001` → PR #725 (2026-06-26T19:33:58Z, skip forge_built_no_pr for pr-<repo>-<num> tasks with CLOSED/MERGED PR, stall fix verified iter ~2990).
 
 ---
 
@@ -218,9 +218,9 @@ PR #716 (fix(heal-stall): suppress unrouted_open_pr alert while Mirror is active
 
 ---
 
-## G-rule forge-revision-preamble-missing-pr711-001 — 1/3 (new, iter ~2851)
+## G-rule forge-revision-preamble-missing-pr711-001 — 2/3 (updated iter ~2990)
 
-**Rule:** outbox-notifier fires `forge revision-phase outbox without "Revision N applied:" preamble: pr-ourliberty-agent-core-711.json; treating as marker-error` when Forge submits a revision outbox file lacking the expected "Revision N applied:" preamble. Treated as marker-error by outbox-notifier. Distinct from Mirror's MalformedMirrorMarker severity/findings issues (G-rule `mirror-marker-severity-blocking-pr711-001`). Fix: Forge build-sequence discipline or outbox-notifier tolerance. Dispatch to Beacon at 3/3.
+**Rule:** outbox-notifier fires `forge revision-phase outbox without "Revision N applied:" preamble: <task>.json; treating as marker-error` when Forge submits a revision outbox file lacking the expected "Revision N applied:" preamble. Treated as marker-error; retry fires; review proceeds and PR still merges. Fix: Forge build-sequence discipline or outbox-notifier tolerance. Dispatch to Beacon at 3/3. Occurrences: iter ~2851 (PR #711, 1/3); iter ~2990 (PR #720 rev2 at 13:39:07 MDT, 2/3).
 
 ---
 
@@ -249,15 +249,15 @@ PR #715 (fix(healer): skip forge_built_no_pr stall when task PR is CLOSED) MERGE
 
 ---
 
-## G-rule beacon-erofs-concurrent-claude-sessions-001 → DISPATCHED ✅, vp (iter ~2963)
+## G-rule beacon-erofs-concurrent-claude-sessions-001 → COMPLETE ✅ (iter ~2990)
 
-**Rule:** Beacon's claude subprocess fails with "EROFS: read-only file system, open '/home/larry/.claude.json'" when a concurrent Claude Code session (e.g., Pulse interactive) is active. Occurrences: iter ~2945 (2/3). **Fix:** PR #720 (work/claude-json-erofs-robust, "heal: auto-rebind dangled ~/.claude.json mount") opened 2026-06-26T15:28Z; Mirror review dispatched 15:40Z. Verification pending PR merge + absence of EROFS failures.
+PR #720 (heal: auto-rebind dangled ~/.claude.json mount) MERGED 2026-06-26T19:42:49Z. Fix verified: worktrees torn down cleanly by AUTO_MERGE_WORKTREE_TEARDOWN. Moving to Completed G-rules.
 
 ---
 
-## G-rule forge-built-no-pr-pr-task-id-closed-fp-001 → PR #725 OPEN, verification_pending (updated iter ~2981)
+## G-rule forge-built-no-pr-pr-task-id-closed-fp-001 → COMPLETE ✅ (iter ~2990)
 
-**Rule:** `forge_built_no_pr` stall fires for `pr-<repo>-<num>` task_ids (e.g., `pr-ourliberty-agent-core-712`) when the referenced PR is CLOSED-not-merged. PR #715's CLOSED-PR skip uses `_pr_matches_task` which requires the closed PR's branch to match the task_id pattern — but for `pr-<repo>-<num>` tasks, the task IS named after the PR number, not a Forge-built PR with a matching branch. Fix: stall checker should detect `pr-<repo>-<num>` task_id format and look up PR #{num} directly; if CLOSED or MERGED, skip. Occurrences: idx=1005 07:45Z (1/3); cooldown-expired dry-run 14:53Z (2/3); 3/3 dispatch dead-lettered (timeout=86400 out of bounds), re-dispatched 17:45Z with timeout=14400. **PR #725 opened by Forge ~18:06:41Z (iter ~2981); Mirror review dispatched 12:07:03 MDT.** verification_pending merge.
+PR #725 (fix(healer): skip forge_built_no_pr for pr-<repo>-<num> tasks whose named PR is closed/merged) MERGED 2026-06-26T19:33:58Z. Fix verified: stall dry-run shows `pr-ourliberty-agent-core-712` now FORGE_NO_PR_SKIP reason=pr_task_id_closed_or_merged. "no stalls detected." Moving to Completed G-rules.
 
 ---
 
@@ -267,8 +267,8 @@ PR #715 (fix(healer): skip forge_built_no_pr stall when task PR is CLOSED) MERGE
 
 ---
 
-## Status snapshot — updated 2026-06-26 19:35Z UTC (Iter ~2989, Tier 2, consecutive_clean=1)
+## Status snapshot — updated 2026-06-26 19:49Z UTC (Iter ~2990, Tier 2, consecutive_clean=2)
 
-**Iter ~2989 summary:** ✅ Nominal. 0 new alerts. PR #724 MERGED (1ee1753b). Mirror reviewing PR #725 (~23 min in, PID 3690286). PR #720 rev1 queued in Mirror inbox. All daemons healthy. Check I cooldown-suppressed. Watermark 1039 (no advance). PRIME: iter_clean. Tier 2, consecutive_clean=0→1.
+**Iter ~2990 summary:** ✅ Nominal. 3 new alerts (all Tier-3 silenced). PR #720 MERGED 19:42:49Z (beacon-erofs G-rule COMPLETE ✅). PR #725 MERGED 19:33:58Z (forge-built-no-pr-pr-task-id-closed G-rule COMPLETE ✅, stall fix verified). All inboxes EMPTY. forge-revision-preamble-missing-pr711-001 → 2/3 (PR #720 rev2). Watermark 1039→1042. PRIME: iter_clean. Tier 2, consecutive_clean=1→2.
 
 

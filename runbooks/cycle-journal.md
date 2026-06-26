@@ -5,6 +5,105 @@
 ---
 
 
+## Iteration ~2990 — 2026-06-26T19:49Z UTC (interactive /cycle via chat, Tier 2, clean)
+
+**Trigger:** Larry `/cycle` via chat.
+
+**Health:** ✅ Nominal — 3 new alerts (all Tier-3 silenced). PR #720 MERGED 19:42:49Z (G-rule beacon-erofs COMPLETE ✅). PR #725 MERGED 19:33:58Z (G-rule forge-built-no-pr-pr-task-id-closed COMPLETE ✅, stall fix verified). All inboxes EMPTY. Tier 2, consecutive_clean=1→2.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo (re-verified):** HEAD=5080f0c9=origin/main. On main. Clean. Up to date. ✅
+- **Sync (re-verified):** last_sync=2026-06-26T19:02:49Z (~47 min). Under 2h threshold. ✅
+- **Watchdog (re-verified):** last tick 13:46:20 MDT (19:46:20Z) — healthy 5-min ticks. ✅
+- **Heal-daemon heartbeat (re-verified):** 2026-06-26T19:38:20Z (~11 min). Under 60-min threshold. ✅
+- **PR #720 (RESOLVED):** MERGED 2026-06-26T19:42:49Z. "heal: auto-rebind dangled ~/.claude.json mount (EROFS [claude exit 1])". G-rule `beacon-erofs-concurrent-claude-sessions-001` COMPLETE ✅. Worktrees torn down by outbox-notifier AUTO_MERGE_WORKTREE_TEARDOWN. [resolved]
+- **PR #725 (RESOLVED):** MERGED 2026-06-26T19:33:58Z. "fix(healer): skip forge_built_no_pr for pr-<repo>-<num> tasks whose named PR is closed/merged". G-rule `forge-built-no-pr-pr-task-id-closed-fp-001` COMPLETE ✅. Stall dry-run confirms: `pr-ourliberty-agent-core-712` now FORGE_NO_PR_SKIP reason=pr_task_id_closed_or_merged. [resolved]
+- **All inboxes (re-verified):** Beacon EMPTY, Forge EMPTY, Mirror EMPTY. beacon-pending=0. ✅
+- **outbox-notifier (re-verified):** Last entry 13:42:50 MDT (PR #720 AUTO_MERGE). Idle. No errors. ✅
+- **forge-revision-preamble-missing-pr711-001 (verify):** 13:39:07 MDT outbox-notifier WARN: `forge revision-phase outbox without "Revision N applied:" preamble: pr-ourliberty-agent-core-720.json; treating as marker-error` — G-rule fires again on PR #720 rev2 submission. 2/3 (prior: iter ~2851 PR #711). PR #720 still merged successfully (marker-error retry → re-review → REVIEW_PASS → AUTO_MERGE). [2/3 — dispatch at 3/3]
+- **mirror-runner-missing-worktree-retry-001 (re-verified):** PR #720 rev2 mirror review completed successfully at 13:42:41 MDT. No retry failures observed. 1/3 unchanged. [carry, no new occurrence]
+- **Pipeline stall (re-verified):** `heal_pipeline_stall.py --dry-run` shows "no stalls detected". All prior FP tasks now correctly FORGE_NO_PR_SKIP with `reason=pr_task_id_closed_or_merged`. ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark: {repaired:false, old_watermark=1039, file_length=1042}. 3 new alerts.
+- idx=1039: `source=outbox-notifier, kind=notification, intent=review-pass` (Mirror approved PR #725). → Tier-3 silence. ✅
+- idx=1040: `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#720, route=escalate` — FP. PR #720 was actively being reviewed and merged at 13:42Z; stall fired at 13:38Z in the gap. → Tier-3 silence. ✅
+- idx=1041: `source=medic, kind=notification, intent=medic-diagnosis` — medic correctly diagnosed idx=1040 as FP. → Tier-3 silence. ✅
+- Watermark: 1039→1042. ✅
+
+**Check 1 — Log noise:**
+- watchdog.log: healthy 5-min ticks through 13:46:20 MDT. No WARNs. ✅
+- outbox-notifier.log: PR #720 lifecycle complete (revision-2 dispatched, marker-error/retry, re-review, MIRROR_REVIEW_STATUS, AUTO_MERGE 13:42:50 MDT). Idle since. ✅
+- mirror.log: 2 sessions completed (PR #725 REVIEW_PASS $0.53 at 13:36:35 MDT; PR #720 rev2 REVIEW_PASS $0.53 at 13:42:41 MDT). Idle. ✅
+
+**Check 2 — Telegram sweep:**
+- beacon_telegram_bot.log: last Larry message 13:24:16 MDT (already handled iter ~2989). No new messages. ✅
+
+**Check 3 — Pipeline stall (dry-run):**
+- No stalls detected. ✅
+- `pr-ourliberty-agent-core-712`: FORGE_NO_PR_SKIP reason=pr_task_id_closed_or_merged pr_state=CLOSED — PR #725's fix working. ✅
+
+**Check 4 — Pending directives:**
+- All inboxes EMPTY. beacon-pending=0. ✅
+
+**Check 5 — Stale daemon code:**
+- Heartbeat=2026-06-26T19:38:20Z (~11 min). Under 60-min threshold. ✅
+
+**Check A — Source repo:** HEAD=5080f0c9=origin/main. On main. Clean. Up to date. ✅
+**Check B — Sync health:** last_sync=19:02:49Z (~47 min). Under 2h threshold. ✅
+**Check C — Agent liveness:** Watchdog healthy (19:46:20Z). Heal-daemon fresh (19:38:20Z). outbox-notifier idle (19:42:50Z). beacon-bot running. Mirror: 2 sessions completed cleanly. ✅
+**Check E — PRs:**
+- **PR #720** — MERGED ✅ 19:42:49Z. beacon-erofs G-rule COMPLETE. [resolved]
+- **PR #725** — MERGED ✅ 19:33:58Z. forge-built-no-pr-pr-task-id-closed G-rule COMPLETE. [resolved]
+- [carry] **unreviewed-merge:723** — Larry judgment.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅
+
+**Conditional checks — Friday 2026-06-26 UTC (weekday=4, firing set):**
+- Check I: invoked (no --force). mode=digest, cooldown-suppressed (journal-block for 2026-06-22 already present). ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule assessment:**
+- `beacon-erofs-concurrent-claude-sessions-001` → COMPLETE ✅ (PR #720 MERGED 19:42:49Z).
+- `forge-built-no-pr-pr-task-id-closed-fp-001` → COMPLETE ✅ (PR #725 MERGED 19:33:58Z, stall fix verified).
+- `forge-revision-preamble-missing-pr711-001` → **2/3** (new: PR #720 rev2 13:39:07 MDT without "Revision N applied:" preamble). Dispatch at 3/3.
+- `mirror-runner-missing-worktree-retry-001` → 1/3 unchanged. [carry]
+- All other G-rules: unchanged.
+
+**Actions taken:**
+1. Check 0: triaged 3 alerts (all Tier-3 silence). Watermark 1039→1042. ✅
+2. Check I: invoked no-force, cooldown-suppressed. ✅
+3. §5.0: all no-op. ✅
+4. PRIME ledger: iter_clean appended. ✅
+5. Tier state: consecutive_clean 1→2. De-escalation requires 3; remain Tier 2. ✅
+
+**Escalations:** None.
+
+**Standing findings (carried + verified):**
+- [yellow] **unreviewed-merge:723** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:713** — Larry judgment. [carry]
+- [yellow] **Zombie PID 1834248** — bash poll loop (29d+). Ask-then-do. [carry]
+- [yellow] **6 stale journalctl PIDs (31d+)** — Ask-then-do. [carry]
+- [yellow] **forge-wip-redispatch-digest Forge dispatch** — Beacon fix designed. Trust-policy approval pending. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — approve check-viii-update-2026-06-15. Awaiting Larry. [carry]
+- [yellow] **Check III threshold proposals** — approve threshold-update-2026-06-11. Awaiting Larry. [carry]
+- [yellow] **unreviewed-merge:710/709** — Larry judgment. [carry]
+- [blue] **forge-revision-preamble-missing-pr711-001 — 2/3** — new occurrence on PR #720 rev2. Dispatch at 3/3. [updated]
+- [blue] **heal-stale-daemon-code-auto-restart-failed-self-recovered — 2/3** — dispatch at 3/3. [carry]
+- [blue] **pulse-source-alert-delivery-confirm-tier4-001 — 2/3** — dispatch at 3/3. [carry]
+- [blue] **ourliberty-health-sync-push-failed-tier4-001 — 2/3** — dispatch at 3/3. [carry]
+- [blue] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced. [carry]
+- [blue] **mirror-runner-missing-worktree-retry-001 — 1/3** — dispatch at 3/3. [carry]
+- [blue] **G-rules (unchanged):** sentinel-inflight-stall-mirror-tier4 (2/3), review-duplicate-dispatch-wip-redispatch (vp), check-i-force-bypass-dm-route (2/3), heal-daemon-restart-manifest-drift (2/3), no-session-revision-merged-pr-fp-001 (1/3), unrouted-open-pr-auto-merge-held-fp-001 (1/3), forge-wip-redispatch-digest-tier4-001 (dispatched vp), forge-wip-redispatch-exhausted-pr-exists-fp-001 (2/3), heal-stale-daemon-code-still-stale-after-restart (1/3), outbox-notifier-notification-intent-reject-tier4-001 (2/3), no-session-revision-active-mirror-session-fp-001 (DISPATCHED ✅ vp).
+- [blue] **unreviewed-merge:649/637/655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+
+**PRIME DIRECTIVE:** iter_clean. Trailing-30d: interventions=1327, systemic_fixes=75, vp=28, ratio≈17.69.
+**Tier end-of-iter:** Tier **2**, consecutive_clean=2. Last signal: 2026-06-26T18:56:42Z.
+
+---
+
+
 ## Iteration ~2989 — 2026-06-26T19:33Z UTC (interactive /cycle via chat, Tier 2, clean)
 
 **Trigger:** Larry `/cycle` via chat.
