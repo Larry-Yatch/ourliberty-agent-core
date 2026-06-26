@@ -267,8 +267,8 @@ PR #715 (fix(healer): skip forge_built_no_pr stall when task PR is CLOSED) MERGE
 
 ---
 
-## Status snapshot — updated 2026-06-26 18:56Z UTC (Iter ~2985, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-26 19:02Z UTC (Iter ~2986, Tier 1, consecutive_clean=1)
 
-**Iter ~2985 summary:** ⚠️ Archive action. 2 new alerts (both Tier-3 silenced): pulse check-i delivery confirm + heal-wedged-review-sessions (PR #720 session completed REVIEW_REVISION 59s after alert — not wedged, just slow). PR #720 REVIEW_REVISION issued 12:45 MDT ($1.44); Forge revision-1 dispatched; rev1 re-review in Mirror inbox. Mirror now reviewing PR #724. Archived stale round=0 review-pr-ourliberty-agent-core-720.json from Mirror inbox. PRIME: 1 intervention (archive-duplicate-inbox-task). Tier 2→1, consecutive_clean=0.
+**Iter ~2986 summary:** ✅ Nominal. 0 new alerts. Mirror actively reviewing PR #724 (~17 min). PRs #720 (rev1 queued), #724 (active), #725 (queued) in Mirror inbox. All daemons healthy. §5.0 no-op. Check I cooldown-suppressed. PRIME: iter_clean. Tier 1, consecutive_clean=0→1.
 
 
