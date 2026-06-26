@@ -138,9 +138,9 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## G-rule watchdog-watcher-log-stale-post-pr694 → PR #717 in Mirror review (iter ~2950), vp
+## G-rule watchdog-watcher-log-stale-post-pr694 → COMPLETE ✅ (iter ~2973)
 
-**Rule:** Watchdog fires WARN "Watcher log stale Ns with 1 non-empty inbox(es)" repeatedly while Mirror is actively running. Root cause: inbox-watcher handles Forge tasks only; Mirror sessions triggered via separate mechanism; inbox_watcher.log goes stale during Mirror sessions. PR #694 partial fix. Fix: add MIRROR_ACTIVE_SKIP suppression in watchdog stale-log warning path. Dispatched `direction-ask-watchdog-stale-mirror-session-fix-001.json` to Beacon inbox at iter ~2922. Forge built watchdog-mirror-active-stale-suppression-001 → PR #717 opened 2026-06-26T14:05:34Z (MERGEABLE). In Mirror review (review-watchdog-mirror-active-stale-suppression-001.json). verification_pending.
+PR #717 (fix: suppress spurious watchdog stale-log WARN during active Mirror reviews) MERGED 2026-06-26T16:51:20Z. Fix verified live. Moving to Completed G-rules.
 
 ---
 
@@ -158,7 +158,7 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ## Completed G-rules — condensed for space (COMPLETE ✅)
 
-`outbox-notifier url-shape-invalid` → PR #493 (2026-06-13). `medic-diagnosis-tier4` → PR #515 (2026-06-15). `heal-pipeline-stall:unrouted-pr` → PR #516 (2026-06-15). `check-i-repeat-dm-fix-001` → PR #674 (2026-06-24). `heal-droplet-git-drift` → PR #586 (2026-06-19). `silence-routine-weekly-alerts` → PR #604 (2026-06-20). `forge-preflight-no-marker` → PR #600 (2026-06-19). `projects-json-healer-path` → PR #603 (2026-06-20). `outbox-notifier-review-pass` → PR #604 scope. `seq-advancer-sequence-stranded` → PR #661 (2026-06-24). `catalog-accuracy-drift` → PR #6 ourliberty-graph (2026-06-22). `doorbell-tier4-pattern` → PR #648 (2026-06-23). `heal-stale-daemon-code-script-service-mismatch` → PR #647 (2026-06-23). `mirror-marker-parse-error` → PR #650 (2026-06-23). `watchdog-watcher-log-stale` → PR #649 (2026-06-23). `watchdog-watcher-log-stale-post-fix` → PR #694 (2026-06-25). `ourliberty-health-notify-script-missing` → PR #696 (2026-06-25). `heal-pipeline-stall-mirror-pass-unmerged-tier4` → PR #695 (2026-06-25). `stale-proposed-mission-pipeline-fp-001` → PR #697 (2026-06-25, sibling_pr_title_shipped suppression). `outbox-notifier-auto-merge-loop-merged-pr-001` → PR #700 (2026-06-25, verified iter ~2713). `forge-built-no-pr-retry1-fp-001` → PR #701 (pattern1) + PR #702 (pattern2, rebase_target_shipped disambiguation, both 2026-06-25, verified iter ~2772). `mirror-marker-severity-blocking-pr711-001` → PR #714 (2026-06-26T06:03:41Z, Mirror REVIEW_PASS + auto-merged). `unrouted-open-pr-active-mirror-session-fp-001` → PR #716 (2026-06-26T14:38:28Z, MIRROR_ACTIVE_SKIP suppression). `forge-built-no-pr-closed-pr-fp-001` → PR #715 (2026-06-26T14:38:35Z, CLOSED-not-merged PR skip in check_forge_built_no_pr).
+`outbox-notifier url-shape-invalid` → PR #493 (2026-06-13). `medic-diagnosis-tier4` → PR #515 (2026-06-15). `heal-pipeline-stall:unrouted-pr` → PR #516 (2026-06-15). `check-i-repeat-dm-fix-001` → PR #674 (2026-06-24). `heal-droplet-git-drift` → PR #586 (2026-06-19). `silence-routine-weekly-alerts` → PR #604 (2026-06-20). `forge-preflight-no-marker` → PR #600 (2026-06-19). `projects-json-healer-path` → PR #603 (2026-06-20). `outbox-notifier-review-pass` → PR #604 scope. `seq-advancer-sequence-stranded` → PR #661 (2026-06-24). `catalog-accuracy-drift` → PR #6 ourliberty-graph (2026-06-22). `doorbell-tier4-pattern` → PR #648 (2026-06-23). `heal-stale-daemon-code-script-service-mismatch` → PR #647 (2026-06-23). `mirror-marker-parse-error` → PR #650 (2026-06-23). `watchdog-watcher-log-stale` → PR #649 (2026-06-23). `watchdog-watcher-log-stale-post-fix` → PR #694 (2026-06-25). `ourliberty-health-notify-script-missing` → PR #696 (2026-06-25). `heal-pipeline-stall-mirror-pass-unmerged-tier4` → PR #695 (2026-06-25). `stale-proposed-mission-pipeline-fp-001` → PR #697 (2026-06-25, sibling_pr_title_shipped suppression). `outbox-notifier-auto-merge-loop-merged-pr-001` → PR #700 (2026-06-25, verified iter ~2713). `forge-built-no-pr-retry1-fp-001` → PR #701 (pattern1) + PR #702 (pattern2, rebase_target_shipped disambiguation, both 2026-06-25, verified iter ~2772). `mirror-marker-severity-blocking-pr711-001` → PR #714 (2026-06-26T06:03:41Z, Mirror REVIEW_PASS + auto-merged). `unrouted-open-pr-active-mirror-session-fp-001` → PR #716 (2026-06-26T14:38:28Z, MIRROR_ACTIVE_SKIP suppression). `forge-built-no-pr-closed-pr-fp-001` → PR #715 (2026-06-26T14:38:35Z, CLOSED-not-merged PR skip in check_forge_built_no_pr). `watchdog-watcher-log-stale-post-pr694` → PR #717 (2026-06-26T16:51:20Z, MIRROR_ACTIVE_SKIP suppression in watchdog stale-log warning path, verified iter ~2973).
 
 ---
 
@@ -265,8 +265,8 @@ PR #715 (fix(healer): skip forge_built_no_pr stall when task PR is CLOSED) MERGE
 
 ---
 
-## Status snapshot — updated 2026-06-26 16:50Z UTC (Iter ~2972, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-26 16:57Z UTC (Iter ~2973, Tier 1, consecutive_clean=0)
 
-**Iter ~2972 summary:** ✅ Near-nominal. 0 new alerts (watermark 1022=1022). Mirror PID 3574053 active (~21 min, PR #717, not stuck). PRs #717/#718/#719/#720 OPEN in Mirror review/queue. PRs #721/#722 (new, MERGEABLE) awaiting review dispatch (just opened). Carry FP: forge_built_no_pr:pr-ourliberty-agent-core-712 (G-rule 2/3). Check I: dm_route=digest, cooldown-suppressed. §5.0 all no-op. PRIME: interventions=1321, systemic_fixes=75, vp=27, ratio=17.6, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2973 summary:** ✅ Healthy. PR #717 MERGED 16:51:20Z (G-rule watchdog-watcher-log-stale-post-pr694 COMPLETE ✅). 1 new alert (Tier-3 silenced, watermark 1022→1023). Mirror PID 3595976 reviewing PR #719 (new session, ~4 min, not stuck). PRs #718/#719/#720 in Mirror review/queue. PRs #721/#722 OPEN MERGEABLE awaiting review dispatch. Carry FP: forge_built_no_pr:pr-ourliberty-agent-core-712 (G-rule 2/3). Check I: dm_route=digest, cooldown-suppressed. §5.0 all no-op. PRIME: interventions=1322, systemic_fixes=75, vp=27, ratio=17.6, trend=improving. Tier 1, consecutive_clean=0.
 
 
