@@ -204,8 +204,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-25 22:07Z UTC (Iter ~2828, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 00:13Z UTC (Iter ~2829, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2828 summary:** ✅ Nominal — 1 new alert (outbox-notifier review-pass PR#707, Tier-3 silence). PR #707 spec-in-motion-surface-001 auto-merged at 16:04:36 MDT (Mirror PASS + auto-merge complete). All inboxes empty, no open PRs, pipeline clear (19 FORGE_NO_PR_SKIP, no stalls), 8/8 daemons alive. Standing: zombie PID 1834248 (~28.1d), 6 stale journalctl PIDs (~30-31d), forge-wip-redispatch-digest dispatch pending trust-policy approval. PRIME: interventions=1225, systemic_fixes=71, vp=27, ratio≈17.25, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2829 summary:** ⚠️ 1 new finding — unreviewed-merge:709 (PR #709 fix/cycle: authenticate via active-tier setup-token merged by Larry without Mirror review; DM delivered 00:06:59Z). 10 new alerts: 9 Tier-3 silence (dispatch-branch-cleanup ×2, beacon auth_401, missions-autoregister proposed:needs-decision, 5× heal-stale-daemon-code restarts for beacon/forge/inbox/mirror/pulse after active_tier.py update from PR #709), 1 Tier-4 (unreviewed-merge:709). PR #708 feat(missions): off-board merged-PR board-reconcile backstop — opened 23:56:54Z, Mirror review dispatched 00:10:17Z. Check I fired (Friday, mode=digest, DM queued). Watermark 1009→1019. PRIME: interventions=1226, systemic_fixes=71, vp=27, ratio≈17.27, trend=stable. Tier 1, consecutive_clean=0.
 
 

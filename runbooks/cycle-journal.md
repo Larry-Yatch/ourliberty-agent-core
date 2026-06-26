@@ -5,6 +5,110 @@
 ---
 
 
+## Iteration ~2829 — 2026-06-26T00:13Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/cycle` invocation via chat.
+
+**Health:** ⚠️ 1 new actionable finding — unreviewed-merge:709 (DM delivered). PR #708 in active Mirror review (~3 min since dispatch). 5 daemons auto-restarted by heal-stale-daemon-code (active_tier.py update from PR #709). All inboxes clear of stale work.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo**: On main, clean, HEAD=528f53f4=origin/main. 3 new commits since iter ~2828: c7bf54a6 (projects-store healer delta), 5cacf5b1 (PR #709 fix/cycle auth), 528f53f4 (missions autoregister healer). ✅
+- **Sync**: status=no-change, last_sync=2026-06-26T00:01:29Z (~12 min old). Under 2h. ✅
+- **Daemons**: beacon 3107734 (Ss ~1m), forge 3107855 (Ss ~1m), inbox_watcher 3107973 (Ssl ~1m), mirror 3108060 (Ss ~1m), pulse 3108242 (Ss ~1m), outbox_notifier 3044826 (Ss ~3h53m). All 6 running. ✅
+- **Watchdog**: timer-based, last entry 18:10:49 MDT (00:10:49Z) — overall=healthy. ✅
+- **Open PRs (ourliberty-agent-core)**: PR #708 "feat(missions): off-board merged-PR board-reconcile backstop" — MERGEABLE, no reviewDecision, Mirror review dispatched 00:10:17Z (~3 min in). Not stale. ✅
+- **Open PRs (ourliberty-dashboard)**: NONE. ✅
+- **Forge inbox**: EMPTY. ✅
+- **Mirror inbox**: review-pr-ourliberty-agent-core-708.json (active, ~3 min). ✅
+- **Beacon inbox**: EMPTY. ✅
+- **beacon-pending-approvals**: 0. ✅
+- **heal-stale-daemon-code heartbeat**: 2026-06-26T00:06:55Z (~6 min old). Fresh. ✅
+- **Zombie PID 1834248**: Still alive (Ss, 28-04:52:04). Ask-then-do. [carry]
+- **6 stale journalctl PIDs**: 1101500 still alive (S, 31-05:05:55). Ask-then-do. [carry]
+- **Tier-2 weekly probe auth_401**: PR #709 merged (fix/cycle authenticate via active-tier setup-token). May be resolved on next probe cycle. [carry pending verification]
+
+**Check 0 — Alert triage (10 new: L1010–L1019):**
+- L1010: dispatch-branch-cleanup summary (22:05:59Z) → **Tier 3 silence** ✅
+- L1011: dispatch-branch-cleanup summary (23:06:23Z) → **Tier 3 silence** ✅
+- L1012: beacon-telegram-bot claude_tier1_failed_on_resume_session_bound:auth_401 (23:26:14Z) → **Tier 3 silence** ✅ (beacon restarted with PR #709 code at 00:07:01Z, auth_401 was pre-fix)
+- L1013: missions-autoregister proposed:needs-decision (00:03:57Z) — 9 cards past 14d → **Tier 3 silence** ✅ (route=digest)
+- L1014: heal-unreviewed-merge-detector unreviewed-merge:709 (00:05:15Z) → **Tier 4, decision=ask**. DM already delivered to Larry at 00:06:59Z by Beacon bot. ⚠️
+- L1015: heal-stale-daemon-code auto-restarted:ourliberty-beacon-bot.service → **Tier 3 silence** ✅
+- L1016: heal-stale-daemon-code auto-restarted:ourliberty-forge-bot.service → **Tier 3 silence** ✅
+- L1017: heal-stale-daemon-code auto-restarted:ourliberty-inbox-watcher.service → **Tier 3 silence** ✅
+- L1018: heal-stale-daemon-code auto-restarted:ourliberty-mirror-bot.service → **Tier 3 silence** ✅
+- L1019: heal-stale-daemon-code auto-restarted:ourliberty-pulse-bot.service → **Tier 3 silence** ✅
+- Watermark advanced: 1009 → 1019.
+
+**Check 1 — Log noise:**
+- `journalctl --user -p warning --since "30 minutes ago"` → `-- No entries --`. ✅
+- outbox-notifier.log: Last entry 18:10:17 MDT — Mirror review dispatched for PR #708. All INFO. ✅
+- watchdog.log: 18:10:49 MDT — overall=healthy. ✅
+
+**Check 2 — Telegram sweep:**
+- Beacon bot log (post-restart 18:06:59 MDT): alert idx=1012 (missions-autoregister) → route=digest, no DM ✅; alert idx=1013 (unreviewed-merge:709) → DM delivered to Larry ✅. No new messages from Larry since iter ~2828. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- FORGE_NO_PR_SKIP entries confirmed (board-new-mission, waiting-panel-render, spec-in-motion-surface-001, etc.). **"no stalls detected"**. ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- Forge inbox: EMPTY. Mirror inbox: active review (~3 min, not stale). Beacon inbox: EMPTY. ✅
+- beacon-pending-approvals: 0. ✅ Nominal.
+
+**Check 4.6 — Credential rotation:** Deferred (script gap). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-26T00:06:55Z (~6 min old). Fresh. ✅
+
+**Check A — Source repo:** HEAD=528f53f4=origin/main. On main. Clean. ✅ Nominal.
+**Check B — Sync health:** status=no-change, last_sync=00:01:29Z (~12 min old). Under 2h. ✅ Nominal.
+**Check C — Agent liveness:** 6 procs running. Watchdog healthy (timer). ✅
+- **[yellow] PID 1834248** — zombie bash loop (~28d4h). Ask-then-do: `kill 1834248`. [carry]
+- **[yellow] 6 stale journalctl PIDs (~31d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+
+**Check E — PRs:**
+- ourliberty-agent-core: PR #708 MERGEABLE/no reviewDecision, active Mirror review (~3 min since dispatch). Not stale. ✅ Normal pipeline.
+- ourliberty-dashboard: NO OPEN PRs. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Friday 2026-06-26 UTC (weekday=4, IS in {0,2,4,6} — CHECK I FIRES):**
+- Check I: weekday=4 (Friday) qualifies. See below.
+- Check VIII/IX/X: Not Monday. Skip. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**Check I — Cost/efficiency (Friday firing):**
+- `python3 ~/agent-core/scripts/pulse_check_i.py` (no `--force`, Friday firing day). mode=digest. Journal block for week-of-2026-06-22 already present (no new block written). DM: queued (route=digest). check-i-2026-06-26.json written. Auto-dispatch dedup-skip: key=f8ac2e3afc (prior dispatch 2026-06-22). G-rule check-i-force-bypass-dm-route: 0 new instances. ✅
+
+**G-rule updates:**
+- No new G-rule increments this iter.
+- Completed G-rules: carry unchanged.
+- Active G-rules: carry unchanged (all tracking entries stable).
+
+**Actions taken:**
+1. Alert watermark: 1009 → 1019 (10 new alerts: 9 Tier-3 silence, 1 Tier-4 DM delivered).
+2. PRIME ledger: `intervention` appended (tier=1, template=unreviewed-merge-709, unreviewed-merge:709 DM delivered to Larry at 00:06:59Z).
+3. Tier state: consecutive_clean stays 0 (zombie PID + 6 stale journalctl PIDs carry + new unreviewed-merge:709 finding). Tier remains 1.
+
+**Dispatches:** None needed this iter (DM delivered via Beacon bot auto-delivery).
+
+**Standing findings (carried + verified):**
+- [yellow] **unreviewed-merge:709** — PR #709 (fix/cycle: authenticate via active-tier setup-token) merged by Larry without Mirror review at ~00:05Z. DM delivered to Larry at 00:06:59Z. Same class as unreviewed-merge:649/637. [NEW]
+- [yellow] **PR #708** — feat(missions): off-board merged-PR board-reconcile backstop. Active Mirror review (dispatched 00:10:17Z). Watch for Mirror pass → auto-merge. [NEW]
+- [yellow] **PID 1834248 zombie bash loop** — Still alive (~28d4h). Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **6 stale journalctl PIDs (~31d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+- [yellow] **forge-wip-redispatch-digest Forge dispatch** — Beacon fix designed (iter ~2798). Trust-policy approval from Larry pending. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649/637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — May be resolved by PR #709 (active_tier.py fix). Carry pending next probe. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. [carry]
+
+**PRIME DIRECTIVE:** interventions=1226, systemic_fixes=71, verification_pending=27, ratio≈17.27, trend=stable. Tier 1, consecutive_clean=0.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0 (non-clean: zombie PID + 6 stale journalctl PIDs + new unreviewed-merge:709). Last signal: 2026-06-26T00:13Z.
+
+---
+
+
 ## Iteration ~2828 — 2026-06-25T22:07Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/cycle` invocation via chat.
