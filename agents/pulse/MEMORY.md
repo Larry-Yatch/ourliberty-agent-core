@@ -267,10 +267,16 @@ PR #725 (fix(healer): skip forge_built_no_pr for pr-<repo>-<num> tasks whose nam
 
 ---
 
-## Status snapshot — updated 2026-06-26 21:08Z UTC (Iter ~2995, Tier 2, consecutive_clean=0)
+## G-rule mirror-malformed-verdict-post-restart-001 — 1/3 (new, iter ~2996)
 
-**Iter ~2995 summary:** ✅ Nominal. 1 alert (Tier-3 silence: doorbell for forge-revision-preamble-discipline-001). No stalls. Sync fully resolved. PR #728 Mirror review active (~12 min). PR #729 queued. forge-revision-preamble-discipline-001 PENDING Larry approval (doorbell sent 21:00:18Z). Watermark 1053→1054. PRIME: iter_clean. Tier 1→2 de-escalation (3 consecutive clean). consecutive_clean=0.
+**Rule:** Mirror produces malformed marker outputs after mirror-bot restarts. PR #728 (no canonical verdict marker — prose verdict embedded in response) and PR #729 (REVIEW_PASS delimiter found, no valid JSON body) both failed at 15:15-15:18 MDT after mirror-bot was restarted at 21:10Z (new code from PR #726). Different from PR #711 class (blocking severity — COMPLETE ✅ via PR #714). Retry mechanism handles them (marker-error 1/3 dispatched; Mirror retrying). First occurrence: iter ~2996. Dispatch to Beacon at 3/3.
 
-**Observation:** `pulse-source-alert-delivery-confirm-tier4-001` G-rule (2/3) — triage helper returned Tier-3 last iter for source=pulse alert, contradicting the G-rule claim of no translation match. Translation appears to already exist in alert-translations.json. G-rule may be partially or fully complete. Monitor next source=pulse alert occurrence before deciding to increment to 3/3 or mark complete.
+---
+
+## Status snapshot — updated 2026-06-26 21:25Z UTC (Iter ~2996, Tier 2, consecutive_clean=1)
+
+**Iter ~2996 summary:** ✅ Nominal. 6 alerts all Tier-3 silence (dispatch-branch-cleanup + 5 daemon restarts from agent_runner.py code update post-PR#726). No stalls. Mirror retrying PR #728/#729 malformed markers (retry mechanism working). New G-rule mirror-malformed-verdict-post-restart-001 at 1/3. forge-revision-preamble-discipline-001 still PENDING Larry's "Go". Watermark 1054→1060. PRIME: iter_clean. Tier 2, consecutive_clean=1.
+
+**Observation:** `pulse-source-alert-delivery-confirm-tier4-001` G-rule (2/3) — triage helper returned Tier-3 last 2 iters for source=pulse alerts, contradicting G-rule claim of no translation match. Translation appears to already exist in alert-translations.json. G-rule may be partially or fully complete. Monitor next occurrence before deciding.
 
 
