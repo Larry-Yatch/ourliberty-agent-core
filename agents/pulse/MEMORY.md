@@ -138,9 +138,9 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## G-rule watchdog-watcher-log-stale-post-pr694 → DISPATCHED ✅ (iter ~2922), vp
+## G-rule watchdog-watcher-log-stale-post-pr694 → PR #717 in Mirror review (iter ~2950), vp
 
-**Rule:** Watchdog fires WARN "Watcher log stale Ns with 1 non-empty inbox(es)" repeatedly while Mirror is actively running. Root cause: inbox-watcher handles Forge tasks only; Mirror sessions triggered via separate mechanism; inbox_watcher.log goes stale during Mirror sessions. PR #694 partial fix. Fix: add MIRROR_ACTIVE_SKIP suppression in watchdog stale-log warning path. Dispatched `direction-ask-watchdog-stale-mirror-session-fix-001.json` to Beacon inbox at iter ~2922. verification_pending.
+**Rule:** Watchdog fires WARN "Watcher log stale Ns with 1 non-empty inbox(es)" repeatedly while Mirror is actively running. Root cause: inbox-watcher handles Forge tasks only; Mirror sessions triggered via separate mechanism; inbox_watcher.log goes stale during Mirror sessions. PR #694 partial fix. Fix: add MIRROR_ACTIVE_SKIP suppression in watchdog stale-log warning path. Dispatched `direction-ask-watchdog-stale-mirror-session-fix-001.json` to Beacon inbox at iter ~2922. Forge built watchdog-mirror-active-stale-suppression-001 → PR #717 opened 2026-06-26T14:05:34Z (MERGEABLE). In Mirror review (review-watchdog-mirror-active-stale-suppression-001.json). verification_pending.
 
 ---
 
@@ -259,8 +259,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 14:02Z UTC (Iter ~2949, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 14:10Z UTC (Iter ~2950, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2949 summary:** ✅ Nominal — 0 new alerts. PR #715 + #716 still in Mirror review (MERGEABLE=UNKNOWN). Forge inbox: 2 tasks (build-watchdog-mirror-active-stale-suppression-001 re-queued post-restart, medic-dispatcher-delivery-failure-translation-001 Larry-approved). beacon-pending=0. Repo HEAD=8c149ac3=origin/main (cycle 20260626T135944Z). Watchdog healthy (14:00:20Z). Sync 60 min old (under 2h). Pipeline stall dry-run: 0 alerts. Zombie PID 1834248 still alive (28d18h43m). PRIME: systemic_fixes=75, vp=27, ratio=17.4. Tier 1, consecutive_clean=0. G-rules unchanged from iter ~2948.
+**Iter ~2950 summary:** ✅ Nominal — 0 new alerts. PR #715 + #716 + #717 in Mirror review (#717 NEW: watchdog-mirror-active-stale-suppression-001, MERGEABLE). Forge inbox: 1 task (medic-dispatcher-delivery-failure-translation-001 Larry-approved, queued). beacon-pending=0. Repo HEAD=a9cb7960=origin/main. Watchdog healthy (14:05:20Z). Sync 8 min old. Pipeline stall dry-run: 0 alerts. Zombie PID 1834248 still alive (28d18h49m). PRIME: systemic_fixes=75, vp=27, ratio=17.4. Tier 1, consecutive_clean=0. G-rules unchanged from iter ~2949.
 
 
