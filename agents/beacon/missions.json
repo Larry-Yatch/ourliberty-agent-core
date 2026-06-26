@@ -5900,7 +5900,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-26T20:00:14.675153+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-26T19:55:24.070741+00:00"
+      "orphan_last_activity_ts": "2026-06-26T19:55:24.070741+00:00",
+      "briefing": {
+        "what": "Your team kicked off a piece of work that hasn't been linked to any active initiative yet, and it's now waiting for your sign-off.",
+        "why": "Unassigned work that drifts forward without a clear purpose can quietly eat time and effort that belongs on your real priorities.",
+        "suggest": "Before approving, take a moment to confirm what this is for and which goal it serves \u2014 if it doesn't map to something you care about right now, hold it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-26T20:09:13.876381+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
