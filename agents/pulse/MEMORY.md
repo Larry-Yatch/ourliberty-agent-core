@@ -252,8 +252,10 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 11:53Z UTC (Iter ~2932, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 11:59Z UTC (Iter ~2933, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2932 summary:** ⚠️ Active — PR #713 REVIEW_ESCALATE carry (structural: session-start WIP automation clobbered Forge's manifest fix TWICE; approval_request `mirror-review-pr-ourliberty-agent-core-713` in beacon-pending item 4, plan_summary has full structural diagnosis). 4 new alerts: 2 Tier-3 silenced (heal-pipeline-stall FPs), 2 Tier-4 (medic-dispatcher G-rule DISPATCHED ✅ vp; bot delivered at 05:40 MDT). All inboxes EMPTY. beacon-pending: 5 unchanged. Watchdog healthy (last tick 05:42:35 MDT). 8/8 daemons alive. Pipeline stall: 0. Sync ~51 min. PRIME: systemic_fixes=74, vp=27, ratio=17.61, trend=improving. Tier 1, consecutive_clean=0.
+**MEMORY correction (iter ~2933):** G-rule no-session-revision-active-mirror-session-fp-001 — prior journal standing findings carried "translations.json LIVE" claim. This is WRONG. Direct query of config/alert-translations.json returns [] for "no_session" keys — NO translation entry exists. Alert was delivered to Larry at idx=980,981 (03:44:48 MDT). Stall-checker code fix (MIRROR_ACTIVE_SKIP in heal_pipeline_stall.py) is beacon-pending item 3 (not yet Forge-dispatched). Standing findings corrected forward from iter ~2933.
+
+**Iter ~2933 summary:** ⚠️ Active — PR #713 REVIEW_ESCALATE carry. MERGEABLE transitioned UNKNOWN→MERGEABLE (GitHub computation lag; no substantive change). no_session_revision:713 stall cooldown EXPIRED — live stall will fire recover-then-alert on next cron run; recovery action (re-dispatch Forge) counterproductive given WIP clobber pattern; beacon-pending item 4 is the human gate. 0 new alerts. All inboxes EMPTY. beacon-pending: 5 unchanged. Watchdog healthy (ticks 05:47:58, 05:53:02 MDT). 8/8 daemons alive. Sync ~57 min. PRIME: interventions=1303, systemic_fixes=74, vp=27, ratio=17.61, trend=improving. Tier 1, consecutive_clean=0.
 
 
