@@ -198,9 +198,9 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## G-rule mirror-marker-severity-blocking-pr711-001 — 2/3 (new iter ~2847, updated iter ~2848)
+## G-rule mirror-marker-severity-blocking-pr711-001 → DISPATCHED ✅ (iter ~2852)
 
-**Rule:** Mirror emits REVIEW_REVISION with `severity: "blocking"` (and in one instance, empty `findings` list). Both are invalid. Valid severity values are `low` / `medium`; `blocking` belongs in REVIEW_EMERGENCY_HALT, and `high` in REVIEW_ESCALATE. Root cause: Mirror's review prompt or marker-discipline doc permits `severity: "blocking"` which outbox-notifier rejects with `MalformedMirrorMarker`. Occurrences: retry 1/3 at 20:05:55Z (empty findings), retry 2/3 at 02:10:59Z (severity='blocking') — both for PR #711. Dispatch to Beacon at 3/3 to update Mirror's marker-discipline spec + add `severity` field enumeration enforcement.
+**Rule:** Mirror produced 3 malformed markers on PR #711: (1) REVIEW_REVISION empty findings (iter ~2847), (2) REVIEW_REVISION severity='blocking' (iter ~2848), (3) REVIEW_PASS prose inside JSON block (iter ~2852). Dispatched `mirror-marker-discipline-spec-update-001` to Beacon: update Mirror CLAUDE.md with severity enumeration [low/medium], non-empty findings requirement, JSON-only-inside-delimiters rule. Moving to Completed G-rules on next condense. verification_pending.
 
 ---
 
@@ -228,8 +228,8 @@ PR #700 fix verified live at iter ~2713. `AUTO_MERGE_SKIP_ALREADY_MERGED` entrie
 
 ---
 
-## Status snapshot — updated 2026-06-26 02:47Z UTC (Iter ~2851, Tier 1, consecutive_clean=0→0)
+## Status snapshot — updated 2026-06-26 02:55Z UTC (Iter ~2852, Tier 1, consecutive_clean=0→0)
 
-**Iter ~2851 summary:** ⚠️ Non-nominal (carry) — 2 orphan Larry directives from auth_401 window (17:26/17:28 MDT; Beacon self-healed 19:28 MDT; build shipped PRs #703-#707); new WARN 20:42 MDT forge revision preamble missing (G-rule forge-revision-preamble-missing-pr711-001 new 1/3). 8/8 daemons alive. Stall dry-run clean. Check I Friday cooldown-suppressed. §5.0 all no-op. PRIME: interventions=1229, systemic_fixes=71, vp=27, ratio≈17.31, trend=improving. Tier 1, consecutive_clean=0.
+**Iter ~2852 summary:** ⚠️ Non-nominal — Mirror REVIEW_PASS malformed (prose inside JSON block, 20:47 MDT); G-rule mirror-marker-severity-blocking-pr711-001 → 3/3, dispatched Beacon (mirror-marker-discipline-spec-update-001). Mirror 4th review active (PID 3196288). 8/8 daemons alive. No new alerts (watermark=1031). Stall dry-run clean. Check I Friday cooldown-suppressed. §5.0 all no-op. PRIME: interventions=1230, systemic_fixes=72, vp=27, ratio≈17.08, trend=improving. Tier 1, consecutive_clean=0.
 
 

@@ -5,6 +5,104 @@
 ---
 
 
+## Iteration ~2852 — 2026-06-26T02:55Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry `/cycle` invocation via chat.
+
+**Health:** ⚠️ Non-nominal — Mirror REVIEW_PASS malformed marker (new, 20:47 MDT); G-rule mirror-marker-severity-blocking-pr711-001 reached 3/3, dispatched Beacon. PR #711 pipeline still churning (Mirror 4th review session active). All 8 daemons alive. No new alerts. Stall dry-run clean.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo (re-verified):** On main. HEAD=ded576eb=origin/main (commit: "Pulse cycle 20260626T025015Z"). Clean. ✅
+- **Sync (re-verified):** last_sync=2026-06-26T02:01:40Z (~54 min old). Under 2h. ✅
+- **Daemons (re-verified):** chain_event_shipper=2716672 ✅, dashboard_api=3044417 ✅, outbox_notifier=3044826 ✅, inbox_watcher=3107973 ✅, beacon=3141782 ✅, forge_bot=3141897 ✅, mirror_bot=3142077 ✅, pulse_bot=3142169 ✅. 8/8 alive. Plus Mirror session PID 3196288 (4th PR #711 review, active ~8 min). ✅
+- **Watchdog (re-verified):** last=20:50:10 MDT — overall=healthy. ✅
+- **Open PRs (re-verified):** PR #711 — OPEN, UNKNOWN mergeable, reviewDecision="". Mirror 4th review active (PID 3196288). [monitor]
+- **beacon-pending-approvals (re-verified):** 0 pending, 301 history. ✅
+- **Zombie PID 1834248 (re-verified):** Alive (bash poll loop, ~28d 7h 35m). [carry ask-then-do]
+- **6 stale journalctl PIDs (re-verified):** 1101500, 1107838, 1118830, 1136223, 1161972, 1177335 all alive (~30-31d). [carry ask-then-do]
+- **Orphan directives (re-verified):** Larry last messaged 19:04 MDT (01:04Z), ~1h51m ago. No re-ask. Build sequence shipped (PRs #706-#707). [carry, no DM]
+- **Watermark (re-verified):** 1031=file_length. No new alerts. ✅
+
+**Check 0 — Alert triage:**
+- `repair-watermark` → `{"repaired": false, "old_watermark": 1031, "file_length": 1031}`. No new alerts.
+- Watermark=1031=file_length. ✅ Nominal.
+
+**Check 1 — Log noise (30-min / outbox-notifier / watchdog):**
+- `journalctl --user -p warning --since "30 minutes ago"` → `-- No entries --`. ✅
+- outbox-notifier.log new entries since iter ~2851 (02:47Z):
+  - **NEW 20:47:10 MDT:** `MalformedMirrorMarker: Marker opening delimiter(s) found (['REVIEW_PASS']) but no valid JSON object between them and the closing delimiter. The content INSIDE === XXX === MUST be a single JSON object... NOT prose.` — Mirror sent REVIEW_PASS with prose narrative inside the JSON block. marker-error notify written to mirror (retry 1/3). [tier-reset]
+  - Context: At 20:43:14 MDT, re-review dispatched (round=2, rev2 file). At 20:45:21 MDT, review-request dispatched (original file). Mirror handled original and returned malformed REVIEW_PASS at 20:47:10. New Mirror session (PID 3196288) started at 20:47 to handle marker-error.
+- watchdog.log: last=20:50:10 MDT — overall=healthy. ✅ Nominal.
+
+**Check 2 — Telegram sweep (last 4h):**
+- beacon_telegram_bot.log: No new messages since 19:04 MDT (Larry: 'beacon?'). Auth_401 window closed at 19:28 MDT restart. Bot quiet and healthy. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):**
+- `heal_pipeline_stall --dry-run` → `DRY-RUN: 0 alert(s) would fire` (PR #711 unrouted_open_pr cooldown-suppressed). ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- Beacon inbox: 1 task dispatched THIS iter (mirror-marker-discipline-spec-update-001). Not stale.
+- Mirror inbox: `review-pr-ourliberty-agent-core-711.json` (20:45 MDT) + `marker-error-pr-ourliberty-agent-core-711-1.json` (20:47 MDT). Active session PID 3196288. Not stale.
+- Forge inbox: EMPTY. ✅
+- beacon-pending-approvals: 0 pending. ✅ Nominal.
+
+**Check 5 — Stale daemon code:**
+- Heartbeat=2026-06-26T02:48:30Z (~7 min before scan). Fresh. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=ded576eb=origin/main. On main. Clean. ✅ Nominal.
+**Check B — Sync health:** last_sync=2026-06-26T02:01:40Z (~54 min). Under 2h. ✅ Nominal.
+**Check C — Agent liveness:** 8/8 procs alive (ps-verified). Watchdog healthy (20:50:10 MDT). ✅
+- **[yellow carry] PID 1834248** — bash poll loop (~28d 7h 35m). Ask-then-do: `kill 1834248`.
+- **[yellow carry] 6 stale journalctl PIDs (~30-31d+)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`.
+**Check E — PRs:**
+- **PR #711** (agent-core) — OPEN, UNKNOWN mergeable, reviewDecision="". Mirror 4th review active (PID 3196288). New malformed REVIEW_PASS marker at 20:47:10 MDT. Pipeline self-managing. [monitor, tier-reset]
+- **Dashboard:** 0 open PRs. ✅
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Friday 2026-06-26 UTC (weekday=4, IS in {0,2,4,6}):**
+- Check I: Artifact `check-i-2026-06-26.json` already exists (ran iter ~2849). Cooldown-suppressed. Skip. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule assessment:**
+- **`mirror-marker-severity-blocking-pr711-001` → COMPLETE ✅ (3/3, DISPATCHED):** Third marker formatting failure on PR #711: REVIEW_PASS with prose inside JSON block at 20:47:10 MDT (previous: empty findings, severity='blocking'). Root cause: Mirror's marker-discipline spec underspecifies that content between delimiters must be pure JSON. Dispatched to Beacon: `mirror-marker-discipline-spec-update-001` (targets severity enumeration, non-empty findings requirement, JSON-only-inside-delimiters rule). Moving to Completed G-rules in MEMORY.md.
+- **`forge-revision-preamble-missing-pr711-001`** (1/3): no new occurrence this iter. Count unchanged.
+- All other G-rule counts unchanged from iter ~2851.
+
+**Actions taken:**
+1. Check 0: watermark repair no-op. No new alerts. Nominal.
+2. §5.0: all no-op.
+3. Check I: cooldown-suppressed. Skip.
+4. **Beacon dispatch:** `mirror-marker-discipline-spec-update-001` written to Beacon inbox — G-rule 3/3 fix request for Mirror marker-discipline spec update.
+5. PRIME ledger: `intervention` appended (tier=1, template=check-e-mirror-marker-pr711, detail=G-rule 3/3 REVIEW_PASS malformed dispatched Beacon; ts=2026-06-26T02:55:31Z). `systemic_fix` appended (tier=1, template=mirror-marker-discipline-spec-update-001; ts=2026-06-26T02:55:33Z).
+6. Tier state: `record --checks-clean false` → consecutive_clean=0. Tier remains 1. last_signal_at=2026-06-26T02:55:35Z.
+
+**Dispatches:** `mirror-marker-discipline-spec-update-001` → Beacon inbox.
+
+**Standing findings (carried + verified):**
+- [yellow] **PR #711** — OPEN. Mirror 4th review active (PID 3196288, ~8 min). New malformed REVIEW_PASS at 20:47 MDT. Pipeline self-managing. [monitor]
+- [yellow] **Orphan directives — auth_401 window** — Larry's 17:26/17:28 MDT build-sequence questions; bot self-healed 19:28 MDT, Larry silent since 19:04 MDT, build shipped (PRs #706-#707). [carry, no DM]
+- [yellow] **Zombie PID 1834248** — bash poll loop (~28d 7h 35m). Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **6 stale journalctl PIDs (~30-31d)** — Ask-then-do: `kill 1101500 1107838 1118830 1136223 1161972 1177335`. [carry]
+- [yellow] **unreviewed-merge:710** — PR #710 merged without Mirror review. Larry judgment. [carry]
+- [yellow] **unreviewed-merge:709** — PR #709 merged without Mirror review. Larry judgment. [carry]
+- [yellow] **forge-wip-redispatch-digest Forge dispatch** — Beacon fix designed (iter ~2798). Trust-policy approval from Larry pending. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry decision. [carry]
+- [yellow] **unreviewed-merge:649/637** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Tier-2 weekly probe auth_401** — Session-bound auth_401 pattern; self-healing. PR #709 separate fix. [carry — monitor]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Awaiting Larry. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [blue] **heal-stale-daemon-code-state.json MISSING** — healer heartbeat fresh; informational. [carry]
+- [blue] **G-rules (updated):** heal-daemon-restart-manifest-drift (2/3), watchdog-watcher-log-stale-post-pr694 (2/3), no-session-revision-merged-pr-fp-001 (1/3), unrouted-open-pr-auto-merge-held-fp-001 (1/3), forge-wip-redispatch-digest-tier4-001 (dispatched vp), forge-wip-redispatch-exhausted-pr-exists-fp-001 (2/3), heal-stale-daemon-code-auto-restart-failed-self-recovered (1/3), heal-stale-daemon-code-still-stale-after-restart (1/3), outbox-notifier-notification-intent-reject-tier4-001 (2/3), ourliberty-health-sync-push-failed-tier4-001 (1/3), **mirror-marker-severity-blocking-pr711-001 → DISPATCHED ✅**, unrouted-open-pr-active-mirror-session-fp-001 (1/3), medic-dispatcher-delivery-failure-tier4-001 (1/3), forge-revision-preamble-missing-pr711-001 (1/3).
+- [blue] **unreviewed-merge:655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. [carry]
+
+**PRIME DIRECTIVE:** 2 new rows this iter (intervention + systemic_fix for G-rule 3/3 dispatch). Trailing-30d: interventions=1230, systemic_fixes=72, vp=27, ratio≈17.08, trend=improving.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0 (non-clean: Mirror malformed REVIEW_PASS + PR #711 churning + zombie PID + 6 stale journalctl). Last signal: 2026-06-26T02:55:35Z.
+
+---
+
 ## Iteration ~2851 — 2026-06-26T02:47Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry `/cycle` invocation via chat.
