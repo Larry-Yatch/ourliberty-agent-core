@@ -134,6 +134,8 @@ This applies to all four verdicts: `review_pass`, `review_revision`, `review_esc
 - ✗ **WRONG #2 (inline-prefix, PR #104)** — ``` REVIEW_PASS:\n```json\n{...}\n``` ```. Rationale: parser walks for canonical marker.py output; missing `=== ... ===` delimiters dead-letter silently.
 - ✗ **WRONG #3 (bare keyword, PR #107, 2026-05-26)** — just `REVIEW_PASS` in narrative text, no `===` delimiters, no JSON body. Rationale: parser walks for canonical marker.py output; bare keywords dead-letter silently.
 - ✗ **WRONG #4 (task_id mismatch, PR #109, 2026-05-26)** — full canonical block but the JSON's `task_id` field doesn't match the review-request envelope's task_id. Rationale: parser walks for canonical marker.py output; mismatched task_ids route the DM to the wrong place or don't DM at all.
+- ✗ **WRONG #5 (prose inside the JSON block, PR #711, 2026-06-25)** — review narrative hand-typed BETWEEN `=== REVIEW_PASS ===` and `=== END_REVIEW_PASS ===` instead of the JSON object. Rationale: the content between the delimiters MUST be a single valid JSON object — the parser requires `{...}` there and fires the loose-delimiter diagnostic on prose. Narrative goes ABOVE the block; never hand-edit prose into a rendered block.
+- ✗ **WRONG #6 (out-of-enum severity on REVISION, PR #711, 2026-06-25)** — `"severity": "blocking"` (or any value other than `low`/`medium`) on a REVIEW_REVISION. Rationale: REVISION severity is `low`/`medium` only; `high` belongs in REVIEW_ESCALATE, `critical`/safety in REVIEW_EMERGENCY_HALT. `marker.py render` now rejects this (non-zero exit) before you can paste it.
 
 Construct your payload dict, pipe it to `marker.py render mirror <type>`, and paste the EXACT stdout into your response. Bash is in your allowlist:
 
@@ -186,6 +188,20 @@ Hand-typing is forbidden for ALL four verdicts (per the non-negotiable mandate a
     {"task_id": "abc-123", "pr_url": "https://github.com/...", "summary": "AC coverage clean; one nit-level naming suggestion noted but not blocking."}
     === END_REVIEW_PASS ===
     ```
+- **The content between `=== MARKER ===` and `=== END_MARKER ===` MUST be a single valid JSON object — nothing else.** Review narrative/prose goes ABOVE the marker block (Beacon reads it there), NEVER inside the JSON. A correct REVIEW_PASS is narrative above + clean JSON inside:
+  ```
+  Read the PR diff. Spec/AC coverage clean. Bug-hunt lenses A–H found
+  nothing blocking. Tests pass on the branch. One nit on naming, noted
+  but not worth a revision round.
+
+  === REVIEW_PASS ===
+  {"task_id": "abc-123", "pr_url": "https://github.com/...", "summary": "Spec coverage clean; bug-hunt + tests pass; one non-blocking naming nit noted."}
+  === END_REVIEW_PASS ===
+  ```
+  Prose hand-edited between the delimiters (PR #711) makes the JSON unparseable and dead-letters the review. **Enforcement:** `parse_mirror_marker` (`scripts/mirror_review_handler.py`) requires a single JSON object between the delimiters and raises the loose-delimiter `MalformedMirrorMarker` diagnostic on prose; because render cannot catch prose a human inserts AFTER rendering, the verbatim-paste discipline (paste `marker.py` stdout as-is, never hand-edit the rendered block) is the mechanism for this specific shape.
+- **REVIEW_REVISION top-level `severity` is `low` or `medium` ONLY.** `high` belongs in REVIEW_ESCALATE; `critical`/safety belongs in REVIEW_EMERGENCY_HALT. `"blocking"` and any other value are invalid and rejected (PR #711 emitted `severity: "blocking"`). If a finding is genuinely must-fix-changes-the-plan, that's an ESCALATE, not a high-severity REVISION. **Enforcement:** the shared semantic validator `check_marker_semantics` (`scripts/mirror_review_handler.py`), invoked by BOTH the mandatory `marker.py render mirror review_revision` path (non-zero exit before you can paste) AND `parse_mirror_marker` at notifier ingestion (`MalformedMirrorMarker`), so render-time self-check and parse-time enforcement can never drift.
+- **REVIEW_REVISION `findings` MUST be a non-empty list.** A revision with no findings means there was nothing to fix — that should have been REVIEW_PASS. Don't emit an empty `findings: []` to signal "approve with notes"; put the notes in the PASS `summary` instead. **Enforcement:** the same shared `check_marker_semantics` validator rejects an empty/non-list `findings` at render time (non-zero `marker.py` exit) and at parse time (`MalformedMirrorMarker`), per the single-validator contract above.
+- **A non-zero `marker.py render` exit means your payload is malformed — fix it before pasting.** Because render now applies the semantic checks above (severity enum, non-empty findings, confidence enum), a clean render is a block the notifier will accept; a non-zero exit names the offending field. Never hand-edit the rendered block to "fix" it — re-render from a corrected payload. **Enforcement:** `marker.py render` (`scripts/marker.py` `cmd_render`) converts `render_marker`'s `ValueError` into exit 1 + a stderr diagnostic, the same `check_marker_semantics` gate `parse_mirror_marker` applies downstream.
 - **Marker is the last meaningful thing in your response.** Brief reasoning above it is preserved in the Beacon notify; don't continue narrating after the marker block.
 - **Never include literal marker delimiters inside narrative text** — the parser doesn't unwrap code fences. If you need to discuss markers ("I considered REVIEW_ESCALATE but..."), describe without `=== ... ===` delimiters.
 - **Marker-error retries cap at 3.** If the notifier dead-letters three times in a row, the dispatch closes and goes back to Beacon. Don't waste retries — read the parse error, fix the structural issue.

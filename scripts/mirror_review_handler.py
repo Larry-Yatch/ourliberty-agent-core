@@ -221,6 +221,59 @@ class MultipleMirrorMarkers(ReviewHandlerError):
     """Mirror emitted more than one marker — ambiguous which to act on."""
 
 
+# -------------------- shared semantic validation --------------------
+
+def check_marker_semantics(marker_type: str, payload: dict[str, Any]) -> None:
+    """Apply the per-marker semantic rules that REQUIRED_FIELDS membership can't.
+
+    Single source of truth for the constraints that BOTH the render path
+    (`render_marker`) and the parse path (`parse_mirror_marker`) must agree on,
+    so render-time self-check and parse-time ingestion can never drift:
+
+      - REVIEW_REVISION / REVIEW_ESCALATE: `severity` must be in the
+        per-marker allowed set (ALLOWED_SEVERITY_BY_MARKER) — REVISION is
+        low|medium only (high → ESCALATE, critical → EMERGENCY_HALT); ESCALATE
+        is high only. Values like 'blocking' are rejected.
+      - REVIEW_REVISION / REVIEW_ESCALATE: `confidence` must be in
+        ALLOWED_CONFIDENCE.
+      - REVIEW_REVISION: `findings` must be a non-empty list (an empty list
+        means the marker should have been REVIEW_PASS).
+
+    Raises ValueError on any violation, with a message naming the offending
+    field + the allowed set. Callers translate the exception to their own
+    contract: render_marker lets ValueError propagate (caller programming
+    error); parse_mirror_marker catches it and re-raises MalformedMirrorMarker
+    (runtime parse failure). Markers without these fields (REVIEW_PASS,
+    REVIEW_EMERGENCY_HALT) are no-ops here.
+    """
+    if marker_type in ('review_revision', 'review_escalate'):
+        severity = payload.get('severity')
+        allowed_for_marker = ALLOWED_SEVERITY_BY_MARKER.get(
+            marker_type, ALLOWED_SEVERITY,
+        )
+        if severity not in allowed_for_marker:
+            raise ValueError(
+                f'{marker_type} marker has severity {severity!r}; must be '
+                f'one of {list(allowed_for_marker)} (critical severity '
+                f'belongs in REVIEW_EMERGENCY_HALT, not the severity field; '
+                f'high severity belongs in REVIEW_ESCALATE, not REVISION)'
+            )
+        confidence = payload.get('confidence')
+        if confidence not in ALLOWED_CONFIDENCE:
+            raise ValueError(
+                f'{marker_type} marker has invalid confidence {confidence!r}; '
+                f'must be one of {list(ALLOWED_CONFIDENCE)}'
+            )
+
+    if marker_type == 'review_revision':
+        findings = payload.get('findings')
+        if not isinstance(findings, list) or len(findings) == 0:
+            raise ValueError(
+                'review_revision marker `findings` must be a non-empty list; '
+                'a revision with no findings should have been REVIEW_PASS'
+            )
+
+
 # -------------------- marker rendering --------------------
 
 def render_marker(marker_type: str, **payload: Any) -> str:
@@ -235,6 +288,11 @@ def render_marker(marker_type: str, **payload: Any) -> str:
     caller programming errors, not runtime parse failures) if:
       - marker_type is not in MARKER_TYPES
       - payload is missing any field in REQUIRED_FIELDS[marker_type]
+      - payload violates a per-marker semantic rule (see
+        check_marker_semantics): REVISION/ESCALATE severity outside the
+        per-marker enum, invalid confidence, or REVISION findings that aren't
+        a non-empty list. This is the same check parse_mirror_marker applies,
+        so a block that renders clean is one the notifier will accept.
 
     Extra fields beyond REQUIRED_FIELDS are allowed and preserved (matches
     the existing optional-field pattern — e.g., REVIEW_PASS may carry an
@@ -253,6 +311,9 @@ def render_marker(marker_type: str, **payload: Any) -> str:
             f'render_marker({marker_type!r}): missing required fields: '
             f'{sorted(missing)}. Required: {sorted(required)}'
         )
+    # Same semantic gate parse_mirror_marker applies — render-time and
+    # parse-time enforcement share check_marker_semantics so they can't drift.
+    check_marker_semantics(marker_type, payload)
     keyword = MARKER_KEYWORDS[marker_type]
     json_body = json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=False)
     return f'=== {keyword} ===\n{json_body}\n=== END_{keyword} ===\n'
@@ -368,41 +429,16 @@ def parse_mirror_marker(
             f'{marker_type} marker missing required fields: {sorted(missing)}'
         )
 
-    # Severity validation — only markers that carry a severity field. The
-    # per-marker narrowing (ALLOWED_SEVERITY_BY_MARKER) enforces the routing
-    # contract: REVISION can only be low/medium; ESCALATE only high; critical
-    # severity belongs in EMERGENCY_HALT, not the severity field.
-    if marker_type in ('review_revision', 'review_escalate'):
-        severity = payload.get('severity')
-        allowed_for_marker = ALLOWED_SEVERITY_BY_MARKER.get(
-            marker_type, ALLOWED_SEVERITY,
-        )
-        if severity not in allowed_for_marker:
-            raise MalformedMirrorMarker(
-                f'{marker_type} marker has severity {severity!r}; must be '
-                f'one of {list(allowed_for_marker)} (critical severity '
-                f'belongs in REVIEW_EMERGENCY_HALT, not the severity field; '
-                f'high severity belongs in REVIEW_ESCALATE, not REVISION)'
-            )
-        confidence = payload.get('confidence')
-        if confidence not in ALLOWED_CONFIDENCE:
-            raise MalformedMirrorMarker(
-                f'{marker_type} marker has invalid confidence {confidence!r}; '
-                f'must be one of {list(ALLOWED_CONFIDENCE)}'
-            )
-
-    # REVIEW_REVISION findings: must be a list of dicts. Each finding's
-    # internal structure is documented in CLAUDE.md but we don't validate
-    # individual finding shape here — Mirror owns that contract. We do
-    # require findings be a non-empty list (an empty findings list means
-    # the marker should have been REVIEW_PASS instead).
-    if marker_type == 'review_revision':
-        findings = payload.get('findings')
-        if not isinstance(findings, list) or len(findings) == 0:
-            raise MalformedMirrorMarker(
-                'review_revision marker `findings` must be a non-empty list; '
-                'a revision with no findings should have been REVIEW_PASS'
-            )
+    # Semantic validation — the per-marker severity narrowing
+    # (ALLOWED_SEVERITY_BY_MARKER) + confidence enum + non-empty REVISION
+    # findings. Shared with the render path via check_marker_semantics so
+    # render-time self-check and parse-time ingestion can never diverge. The
+    # helper raises ValueError (its caller-neutral contract); here a violation
+    # is a runtime parse failure, so re-raise as MalformedMirrorMarker.
+    try:
+        check_marker_semantics(marker_type, payload)
+    except ValueError as e:
+        raise MalformedMirrorMarker(str(e)) from e
 
     narrative = (
         mirror_response[: match.start()] + mirror_response[match.end():]
