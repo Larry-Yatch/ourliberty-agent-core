@@ -174,9 +174,9 @@ PR #717 (fix: suppress spurious watchdog stale-log WARN during active Mirror rev
 
 ---
 
-## G-rule forge-wip-redispatch-exhausted-pr-exists-fp-001 — 2/3 (updated iter ~2705)
+## G-rule forge-wip-redispatch-exhausted-pr-exists-fp-001 → 3/3 HOLD-DEFERRED (updated iter ~3124)
 
-**Rule:** `source=forge-wip-redispatch, route=escalate` exhaustion alerts ("WIP-only auto-recovery EXHAUSTED") fire for tasks whose original PRs already exist. FP class: wip-redispatch retried a task whose output already shipped; retry dying WIP-only is expected. Fix: extend wip-redispatch to check PR existence before declaring exhaustion, OR add `source=forge-wip-redispatch, route=escalate, <pr_exists signal>` → Tier-3 entry. Dispatch to Beacon at 3/3. Occurrences: iter ~2702 (L1130 rebase-escalation-feed PR #685 exists; L1131 rebase-forge-post-open-mergeable-687 PR #687 MERGED); iter ~2705 (L1146 reconcile-hardening-mission-shipped-001 PR #699 MERGED).
+**Rule:** `source=forge-wip-redispatch, route=escalate` exhaustion alerts ("WIP-only auto-recovery EXHAUSTED") fire for tasks whose original PRs already exist. FP class: wip-redispatch retried a task whose output already shipped; retry dying WIP-only is expected. Fix: extend wip-redispatch to check PR existence before declaring exhaustion, OR add `source=forge-wip-redispatch, route=escalate, <pr_exists signal>` → Tier-3 entry. **3/3 reached iter ~3124 (L1110, land-pr731-restore-fix-head-001, PR #731 MERGED; outbox-notifier logged BUILD_ALREADY_MERGED + reconciled sequence step). Dispatch to Beacon deferred under HOLD.** Occurrences: iter ~2702 (L1130/1131); iter ~2705 (L1146); iter ~3124 (L1110).
 
 ---
 
@@ -297,8 +297,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T17:23Z UTC (Iter ~3123, Tier 2, consecutive_clean=2)
+## Status snapshot — updated 2026-06-27T17:43Z UTC (Iter ~3124, Tier 3, consecutive_clean=0)
 
-**Iter ~3123 summary:** ✅ Clean (iter_clean). 1 alert triaged (Tier-3 doorbell silence). All inboxes empty. 5 beacon-pending-approvals (HOLD). Repo HEAD=2fc4684e (Pulse cycle 20260627T170747Z), clean, up-to-date. Sync 17:20:52Z (~2 min before checks). Daemons alive (PID 3961026/3961281/17832). Heal-daemon 17:11:58Z. Watchdog healthy 11:21:19 MDT. Pipeline stall 0-would-fire. **Tier 2 (consecutive_clean=2, cadence 15-min)**. PRIME: 0 interventions, ratio≈17.43, trend=improving.
+**Iter ~3124 summary:** ✅ Clean (iter_clean). 1 alert triaged (Tier-4 forge-wip-redispatch-exhausted FP, G-rule 3/3 HOLD-DEFERRED, no action). All inboxes empty. 5 beacon-pending-approvals (HOLD). Repo HEAD=b0afa7b7 (Pulse cycle 20260627T172443Z), clean, up-to-date. Sync 17:20:52Z (~21 min before checks). Daemons alive (PID 3961026/3961281/17832). Heal-daemon 17:32:17Z. Watchdog healthy 11:42 MDT. Pipeline stall 0-would-fire. **Tier 3 (consecutive_clean=0, promoted from Tier 2, cadence 30-min)**. PRIME: 0 interventions, ratio≈17.43, trend=improving.
 
 
