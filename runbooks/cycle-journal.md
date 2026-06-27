@@ -5,6 +5,107 @@
 ---
 
 
+## Iteration ~3012 — 2026-06-27T01:00Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean=0)
+
+**Trigger:** Larry `/cycle` via chat.
+
+**Health:** ⚠️ Signals. 1 Tier-4 alert (ourliberty-health dirty-tree, G-rule 3/3 → dispatched to Beacon). **PR #732 MERGED** (mirror-marker-self-validate-gate-001 fix live ✅). PR #731 pipeline progress: pr731-restore-revision-trap-gate-001 APPROVAL_REQUEST delivered to Larry at 18:55:08 MDT. Local repo 1 commit behind origin/main (PR #732 merge) + dirty tree blocks fast-forward.
+
+**VERIFY-BEFORE-REASSERT:**
+- **PR #732 (re-verified): MERGED ✅** — `80bc08b0 fix(mirror): in-process verdict-marker self-validation gate to kill restart FP round-trip (#732)` merged 00:53:24Z. Mirror REVIEW_PASS on revision-1, AUTO_MERGE at 18:53:24 MDT. Worktrees torn down. Completion DM idx=1086 delivered to Larry 18:55:08 MDT. G-rule `mirror-malformed-verdict-post-restart-001` → **COMPLETE ✅** [major positive]
+- **PR #731 (re-verified): OPEN, MERGEABLE=UNKNOWN, reviewDecision=""** — Pipeline progress: direction-ask-pr731-nextcount-guard-fix-001 ARCHIVED from Beacon inbox (~18:51-18:55 MDT). Beacon created APPROVAL_REQUEST `pr731-restore-revision-trap-gate-001` (chat_id=7998341473), DELIVERED to Larry 18:55:08 MDT (idx=1085). Now awaiting Larry's "Go". [ask-then-do, updated — DM delivered]
+- **direction-ask-pr731-nextcount-guard-fix-001 (re-verified): COMPLETE** — Beacon archived it, created pr731-restore-revision-trap-gate-001 approval, delivered to Larry. ✅
+- **tier3-silence-auto-restart-failed-001 (re-verified):** beacon-pending[1], chat_id=7998341473, still awaiting Larry's "Go". The two "Go" messages at 17:55 MDT were for DIFFERENT approvals (mirror-review-forge-revision-preamble-discipline-001 + mirror-marker-self-validate-gate-001). [carry]
+- **Dirty working tree (re-verified):** M config/alert-translations.json. Now ALSO 1 commit behind origin/main (PR #732 merge `80bc08b0`). Cannot fast-forward — dirty tree rule blocks pull. Sync blocked. [yellow, updated]
+- **Sync (re-verified):** status=error (dirty tree), last_sync=23:51:16Z (~1h6min). Under 2h. ✅ (root cause carry)
+- **Repo (re-verified):** After fetch, HEAD=73542944 is 1 behind origin/main=80bc08b0. On main. Dirty. [yellow, carry — now 1 behind]
+- **Watchdog (re-verified):** last tick 18:48:08 MDT (00:48:08Z) overall=healthy. ~12 min. ✅
+- **Heal-daemon heartbeat (re-verified):** 2026-06-27T00:41:19Z (~19 min). Under 60-min. ✅
+- **Pipeline stall (re-verified):** dry-run → "no stalls detected". forge-revision-preamble-discipline-001 suppressed by cooldown. ✅
+
+**Check 0 — Alert triage (watermark 1082→1085):**
+- **Line 1083** — `source=heal-wedged-review-sessions, subject=wedged-review-silent:wt-mirror-mirror-marker-self-validate-gate-001` (ts 00:48:08Z): **Tier-3 silence** (known-pattern). Mirror review was ~16.5 min idle; it completed at 00:50:52Z (~2.5 min later). FP confirmed in retrospect — auto-resolved. ✅
+- **Line 1084** — `source=ourliberty-health, subject=sync_agent_core: uncommitted changes block sync` (ts 00:51:19Z): **Tier-4** (novel, no translation match). Root cause: dirty tree (M config/alert-translations.json). G-rule `ourliberty-health-clean-tree-dirty-tier4-001` **3/3 → DISPATCHED** direction-ask to Beacon. outbox-notifier delivered to Larry (delivery idx=1083 at 18:55:07 MDT). No duplicate DM from Pulse. [tier-reset]
+- **Line 1085** — `source=sync.service, subject=sync-blocked:uncommitted-changes` (ts 00:51:19Z): **Tier-3 silence** (known-pattern, PR #728 translation entry covers it). ✅
+- Watermark advanced: 1082→1085. ✅
+
+**Check 1 — Log noise (new since iter ~3011, after 00:47Z):**
+- outbox-notifier.log: At 18:50:52-53 MDT — Mirror REVIEW_REVISION for PR #732 → Forge revision-1 dispatched. At 18:51:34 MDT — re-review dispatched to Mirror for PR #732 rev1. At 18:51:54 MDT — direction-ask-pr731 APPROVAL_REQUEST queued for Larry (fallback chat_id). At 18:53:20 MDT — Mirror REVIEW_PASS for PR #732. At 18:53:24 MDT — AUTO_MERGE PR #732. At 18:53:25 MDT — worktrees torn down + completion DM queued. 0 new WARNs in nominal range. ✅ NOMINAL.
+
+**Check 2 — Telegram sweep (new since iter ~3011, after 00:47Z):**
+- idx=1083 (ourliberty-health sync-blocked) delivered 18:55:07 MDT ✅
+- idx=1084 (sync.service blocked) delivered 18:55:07 MDT ✅
+- idx=1085 (approval_request pr731-restore-revision-trap-gate-001) delivered 18:55:08 MDT ✅
+- idx=1086 (review-pass PR #732 completion) delivered 18:55:08 MDT ✅
+- No new Larry messages since 18:19:30 MDT. ✅ NOMINAL.
+
+**Check 3 — Pipeline stall (dry-run):**
+- No stalls detected. All tasks FORGE_NO_PR_SKIP or cooldown-suppressed. ✅
+
+**Check 4 — Pending directives:**
+- beacon-pending-approvals.json: 3 entries:
+  - Entry [0]: id=mirror-review-silence-ourliberty-health-sync-push-failed-001, chat_id=None (stale — PR #728 merged). [carry]
+  - Entry [1]: id=tier3-silence-auto-restart-failed-001 — ACTIVE, chat_id=7998341473. Awaiting Larry "Go". [carry]
+  - Entry [2]: id=pr731-restore-revision-trap-gate-001 — **NEW ✅**, chat_id=7998341473, DELIVERED 18:55:08 MDT. Awaiting Larry "Go".
+- No new unhandled Larry directives. ✅
+
+**Check 5 — Stale daemon code:**
+- Heartbeat: 2026-06-27T00:41:19Z (~19 min). Under 60-min. ✅
+
+**Check A — Source repo:** HEAD=73542944, 1 commit behind origin/main=80bc08b0 (PR #732 merge). On main. M config/alert-translations.json (dirty). Cannot fast-forward (dirty tree). [yellow, updated]
+**Check B — Sync health:** status=error (dirty tree + behind), last_sync=23:51:16Z (~1h6min). Under 2h. [carry]
+**Check C — Agent liveness:** beacon-bot PID 3821234 ✅. inbox-watcher PID 3822087 ✅. outbox-notifier PID 3822088 ✅. Beacon PID 3887302: RUNNING, handling PR #732 review-pass notification (started 18:53 MDT) ✅. Forge: idle (revision-1 of PR #732 complete, submitted for re-review, MERGED). Mirror: idle (AUTO_MERGE executed). Watchdog: last healthy 18:48:08 MDT ✅. Heal-daemon: 00:41:19Z ✅.
+**Check E — PRs:**
+- **PR #732 — MERGED ✅** — `80bc08b0`, AUTO_MERGE 18:53:24 MDT. fix(mirror): in-process verdict-marker self-validation gate. [COMPLETE]
+- **PR #731 — OPEN, MERGEABLE=UNKNOWN, reviewDecision=""** — pr731-restore-revision-trap-gate-001 DELIVERED to Larry 18:55:08 MDT. Awaiting "Go". [ask-then-do, updated]
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Saturday 2026-06-27 UTC (weekday=5):**
+- Check I: Saturday — not in firing set (Mon/Wed/Fri/Sun). Skip. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule assessment:**
+- `mirror-malformed-verdict-post-restart-001` — **COMPLETE ✅** — PR #732 MERGED 00:53:24Z. Moving to Completed G-rules in MEMORY.
+- `ourliberty-health-clean-tree-dirty-tier4-001` — **DISPATCHED ✅** (3/3). direction-ask-ourliberty-health-dirty-tree-tier3-001.json written to Beacon inbox. verification_pending.
+- `decision-needed-approval-forge-dispatch-no-target-repo-001` — **1/3** (carry). Root cause (REVIEW_ESCALATE replan has target_repo=None) still open; pr731-restore-revision-trap-gate-001 used the pulse-auto-dispatch fallback path instead. [carry]
+- All other G-rules: unchanged from iter ~3011.
+
+**Actions taken:**
+1. Check 0: triaged 3 new alerts (1082→1085). Lines 1083+1085 Tier-3 silenced. Line 1084 Tier-4 (G-rule 3/3). Watermark advanced to 1085. ✅
+2. Dispatched `direction-ask-ourliberty-health-dirty-tree-tier3-001.json` to Beacon inbox — ourliberty-health dirty-tree Tier-3 translation (G-rule 3/3). ✅
+3. §5.0: all no-op. ✅
+4. PRIME ledger: intervention appended (tier 1, template=ourliberty-health-dirty-tree-tier4-novel, iter ~3012). ✅
+5. Tier state: record --checks-clean false → Tier 1, consecutive_clean=0, last_signal_at=2026-06-27T00:58:01Z. ✅
+
+**Escalations:** None to Larry directly. PR #732 completion DM delivered by outbox-notifier (idx=1086). pr731-restore-revision-trap-gate-001 APPROVAL_REQUEST delivered by outbox-notifier (idx=1085). G-rule direction-ask dispatched to Beacon. No additional Pulse DMs sent.
+
+**Standing findings (carried + verified):**
+- [yellow] **Local repo behind + dirty** — 1 commit behind origin/main (PR #732 merge `80bc08b0`). M config/alert-translations.json blocks fast-forward AND sync. Self-resolves when tier3-silence-auto-restart-failed-001 approved + committed. [updated from iter ~3011 — was 0 behind, now 1 behind]
+- [yellow] **PR #731 — pipeline progressing** — pr731-restore-revision-trap-gate-001 DELIVERED to Larry 18:55:08 MDT. Awaiting "Go" to unblock Forge revision. [updated]
+- [yellow] **tier3-silence-auto-restart-failed-001 APPROVAL_REQUEST** — Still pending Larry's "Go". chat_id=7998341473, delivered idx=1074 at 17:15:44 MDT. [carry]
+- [yellow] **Stale beacon-pending[0]** — mirror-review-silence-ourliberty-health-sync-push-failed-001, chat_id=None. [carry]
+- [yellow] **unreviewed-merge:723** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:713** — Larry judgment. [carry]
+- [yellow] **Zombie PID 1834248** — bash poll loop (29d+). Ask-then-do. [carry]
+- [yellow] **6 stale journalctl PIDs (31d+)** — Ask-then-do. [carry]
+- [yellow] **forge-wip-redispatch-digest Forge dispatch** — Beacon fix designed. Trust-policy approval pending. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — approve check-viii-update-2026-06-15. Awaiting Larry. [carry]
+- [yellow] **Check III threshold proposals** — approve threshold-update-2026-06-11. Awaiting Larry. [carry]
+- [yellow] **unreviewed-merge:710/709** — Larry judgment. [carry]
+- [blue] **PR #732 — MERGED ✅** — mirror-marker-self-validate-gate-001. AUTO_MERGE 00:53:24Z. G-rule mirror-malformed-verdict-post-restart-001 COMPLETE ✅.
+- [blue] **pr731-restore-revision-trap-gate-001 — DELIVERED** — Larry has the DM (18:55:08 MDT). "Go" unblocks PR #731 revision.
+- [blue] **ourliberty-health-clean-tree-dirty-tier4-001 — DISPATCHED ✅** — direction-ask to Beacon at iter ~3012. verification_pending.
+- [blue] **G-rules (unchanged from iter ~3011 except mirror-malformed → COMPLETE):** sentinel-inflight-stall-mirror-tier4 (2/3), review-duplicate-dispatch-wip-redispatch (vp), check-i-force-bypass-dm-route (2/3), heal-daemon-restart-manifest-drift (2/3), no-session-revision-merged-pr-fp-001 (1/3), unrouted-open-pr-auto-merge-held-fp-001 (1/3), forge-wip-redispatch-digest-tier4-001 (dispatched vp), forge-wip-redispatch-exhausted-pr-exists-fp-001 (2/3), heal-stale-daemon-code-still-stale-after-restart (1/3), outbox-notifier-notification-intent-reject-tier4-001 (2/3), no-session-revision-active-mirror-session-fp-001 (DISPATCHED ✅ vp), mirror-runner-missing-worktree-retry-001 (1/3), forge-revision-preamble-missing-pr711-001 (DISPATCHED ✅ vp), heal-stale-daemon-code-auto-restart-failed-self-recovered (DISPATCHED ✅ vp).
+- [blue] **unreviewed-merge:649/637/655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+
+**PRIME DIRECTIVE:** intervention. Trailing-30d: interventions≈1341, systemic_fixes=79, vp=28+2, ratio≈16.97.
+**Tier end-of-iter:** Tier **1** (non-clean: Tier-4 alert line 1084; consecutive_clean=0; last_signal_at=2026-06-27T00:58:01Z).
+
+---
+
+
 ## Iteration ~3011 — 2026-06-27T00:47Z UTC (interactive /cycle via chat, Tier 2→1, consecutive_clean=0, tier-reset)
 
 **Trigger:** Larry `/cycle` via chat.
