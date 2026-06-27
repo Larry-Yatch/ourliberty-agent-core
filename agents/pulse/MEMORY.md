@@ -297,8 +297,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T08:21Z UTC (Iter ~3071, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T08:32Z UTC (Iter ~3072, Tier 1, consecutive_clean=0)
 
-**Iter ~3071 summary:** ✅ Nominal / iter_clean. 0 new alerts (watermark 1130=file_length). All daemons alive (PIDs 3961026/3961281/3961345). Stall dry-run 0 alerts (forge-revision-preamble-discipline-001 cooldown-suppressed). PR #731 only open PR — pipeline dead, HOLD active [carry]. §5.0 all no-op. PRIME: iter_clean, ratio≈17.42.
+**Iter ~3072 summary:** ✅ Nominal / iter_clean. 0 new alerts (watermark 1130=file_length). All daemons alive (PIDs 3961026/3961281/3961345). Stall dry-run 0 alerts (forge-revision-preamble-discipline-001 cooldown-suppressed). PR #731 only open PR — pipeline dead, HOLD active [carry]. §5.0 all no-op. PRIME: iter_clean, ratio≈17.42.
 
 
