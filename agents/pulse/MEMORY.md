@@ -297,8 +297,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T10:57Z UTC (Iter ~3090, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T11:03Z UTC (Iter ~3091, Tier 1, consecutive_clean=0)
 
-**Iter ~3090 summary:** ✅ Nominal / iter_clean. 0 new alerts (watermark 1085=1085). All daemons alive (PIDs 3961026/3961281/3961345). Watchdog 10:51:49Z healthy. Heal-daemon 10:46:19Z. Pipeline stall dry-run 0 (cooldown-suppressed). PR #736 MERGED 06:30:00Z with Mirror PASS (SEQUENCE_COMPLETE). PR #731 only open PR — pipeline dead, UNKNOWN (oscillating benign), HOLD active [carry]. Stall healer DM-ing Larry autonomously every ~hour (forge-revision-preamble-discipline-001). 5 pending approvals (carry, HOLD). §5.0 all no-op. PRIME: iter_clean, ratio≈17.42, trend=improving.
+**Iter ~3091 summary:** ✅ Nominal / iter_clean. 0 new alerts (watermark 1085=1085). All daemons alive (PIDs 3961026/3961281/3961345). Watchdog 10:56:50Z healthy. Heal-daemon 10:56:29Z. Pipeline stall dry-run 1-would-fire (cooldown expired; healer DM-ing autonomously). PR #731 only open PR — pipeline dead, UNKNOWN (oscillating benign), HOLD active [carry]. New beacon-pending[2]: pr731-restore-revision-trap-gate-001 (restore if next_count >= 2 gate, created 00:51:54Z). 5 pending approvals (carry, HOLD). §5.0 all no-op. PRIME: iter_clean, ratio≈17.42, trend=improving.
 
 
