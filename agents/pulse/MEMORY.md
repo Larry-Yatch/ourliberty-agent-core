@@ -291,8 +291,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T05:35Z UTC (Iter ~3050, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T05:39Z UTC (Iter ~3051, Tier 1, consecutive_clean=0)
 
-**Iter ~3050 summary:** ✅ Nominal (iter_clean). 0 new alerts (watermark 1113, no new). **NEW: Larry clicked Approve on PR #733 via dashboard at 05:26Z — did NOT register (beacon-pending[4] still pending, chat_id=null, G-rule 3/3 DM-drop); Beacon explained at 05:29Z.** Forge building review-ceiling-fit-monitor-build (PID 3976734, ~16 min elapsed, resume=b02d3296). PR #731 pipeline dead (carry). PR #733 REVIEW_ESCALATE + approval non-functional (carry). All daemons alive (PIDs 3961026/3961281/3961345). Watchdog 05:28:56Z healthy. **Larry HOLD directive active.** PRIME: 0 new interventions (iter_clean, ratio≈17.38).
+**Iter ~3051 summary:** ✅ Nominal (iter_clean). 0 new alerts (watermark 1113, no new). **NEW: forge-revision-preamble-discipline-001 stall cooldown EXPIRED** — dry-run would fire `no_session_revision` (PR #731 known dead, already escalated; no new DM). Forge building review-ceiling-fit-monitor-build (PID 3976734, ~21 min elapsed). PR #731 pipeline dead (carry). PR #733 REVIEW_ESCALATE + approval non-functional (carry). All daemons alive (PIDs 3961026/3961281/3961345). Watchdog 05:34:06Z healthy. **Larry HOLD directive active.** PRIME: 0 new interventions (iter_clean, ratio≈17.38).
 
 
