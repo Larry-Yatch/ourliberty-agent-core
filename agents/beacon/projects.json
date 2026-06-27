@@ -939,7 +939,7 @@
       "title": "Forge WIP-only session-death auto-redispatch",
       "north_star_ref": null,
       "repo": "ourliberty-agent-core",
-      "state": "active",
+      "state": "retired",
       "phases": [
         {
           "id": "forge-wip-only-redispatch",
@@ -955,10 +955,17 @@
       ],
       "one_off": true,
       "created_at": "2026-06-25T02:30:10.450012+00:00",
-      "updated_at": "2026-06-26T21:30:16.357322+00:00",
+      "updated_at": "2026-06-27T02:32:17.505321+00:00",
       "promoted_from": {
         "kind": "mission",
         "mission_id": "forge-wip-only-redispatch"
+      },
+      "gc": {
+        "prior_state": "active",
+        "retired_at": "2026-06-27T02:32:17.505321+00:00",
+        "retired_by": "projects-store-gc",
+        "done_at": "2026-06-25T02:30:10.795255+00:00",
+        "window_sec": 172800
       }
     }
   ]
