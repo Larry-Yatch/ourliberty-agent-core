@@ -291,8 +291,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T07:28Z UTC (Iter ~3064, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T07:33Z UTC (Iter ~3065, Tier 1, consecutive_clean=0)
 
-**Iter ~3064 summary:** ✅ Nominal (iter_clean). 0 new alerts (watermark=1127=file_length). All daemons alive (PIDs 3961026/3961281/3961345). Watchdog 07:25:55Z healthy. Heal-daemon 07:24:21Z. PR #731 only open PR — pipeline dead, UNKNOWN (fluctuated from MERGEABLE in iter ~3063; GitHub re-checking), pr731-restore-revision-trap-gate-001 awaiting Larry. HOLD active. PRIME: 0 new interventions (iter_clean), ratio≈17.39.
+**Iter ~3065 summary:** ✅ Nominal (iter_clean). 0 new alerts (watermark=1127=file_length). All daemons alive (PIDs 3961026/3961281/3961345). Watchdog 07:30:58Z healthy. Heal-daemon 07:24:21Z. PR #731 only open PR — pipeline dead, UNKNOWN, pr731-restore-revision-trap-gate-001 awaiting Larry. HOLD active. PRIME: 0 new interventions (iter_clean), ratio≈17.39.
 
 
