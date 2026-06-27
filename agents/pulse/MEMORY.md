@@ -285,8 +285,8 @@ PR #725 (fix(healer): skip forge_built_no_pr for pr-<repo>-<num> tasks whose nam
 
 ---
 
-## Status snapshot — updated 2026-06-27T00:16Z UTC (Iter ~3009, Tier 1, consecutive_clean=2)
+## Status snapshot — updated 2026-06-27T00:22Z UTC (Iter ~3010, Tier 1→2 de-escalated, consecutive_clean=0)
 
-**Iter ~3009 summary:** ✅ Nominal iter. 0 new alerts, 0 new WARNs, 0 new Tier-4. Forge STILL BUILDING mirror-marker-self-validate-gate-001 (PID 3847457, claude-opus-4-8 --resume 8392a999, since 17:57 MDT ~19 min, no output yet). PR #731 pipeline still stuck (G-rule decision-needed-approval-forge-dispatch-no-target-repo-001 1/3). tier3-silence-auto-restart-failed-001 still pending Larry. M config/alert-translations.json dirty (sync blocked). PRIME: intervention (ratio≈16.94). Tier 1 (consecutive_clean=2). Saturday UTC — Check I/III skipped.
+**Iter ~3010 summary:** ✅ Nominal iter. 0 new alerts, 0 new WARNs, 0 new Tier-4. Forge BUILDING mirror-marker-self-validate-gate-001 (PID 3847457, claude-opus-4-8 --resume 8392a999, since 17:57 MDT ~1h23m, no output yet). Larry asked Beacon to write a systemic brief at 18:19 MDT ("Why have we been constantly shipping fixes?") — Beacon actively handling (PID 3861989, --resume 1b5ed242). PR #731 pipeline still stuck (G-rule decision-needed-approval-forge-dispatch-no-target-repo-001 1/3). tier3-silence-auto-restart-failed-001 still pending Larry. M config/alert-translations.json dirty (sync blocked). PRIME: intervention (ratio≈16.94). **Tier 1→2 DE-ESCALATED** (consecutive_clean hit 3). Saturday UTC — Check I/III skipped.
 
 
