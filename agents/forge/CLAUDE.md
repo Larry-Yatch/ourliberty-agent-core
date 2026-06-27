@@ -277,6 +277,8 @@ Where N is the round number from the envelope's `revision_count` (incremented fo
 
 **The preamble is mandatory.** If your response doesn't start with it, the outbox notifier dead-letters back to you via the marker-error cascade (same machinery as preflight). You re-emit with the prefix. Three retries before the dispatch closes.
 
+**Round 2+ trap (the common miss).** On round 2 and later, you're resumed in the SAME conversation that already contains your earlier `Revision N-1 applied:` line. The gate is anchored to the start of *this* response only — that earlier preamble does NOT satisfy it. Your instinct is to open by acknowledging Mirror's new findings conversationally; resist it. The `Revision N applied:` line must be the VERY FIRST characters of THIS response, before any acknowledgement or preface. Apply the findings, then lead your reply with the new preamble.
+
 Why strict (vs build phase's lenient prefix)? Build phase has a documented blocker-paragraph fallback (compile error you can't fix → plain narrative → default routing to Beacon). Revision phase has no equivalent fallback — Mirror's findings are by definition inline-fixable (she'd have used ESCALATE if they weren't), so "I couldn't apply the revision" is itself a structural problem worth catching with the gate. If you genuinely can't apply a finding, say so in the summary text *after* the preamble: `Revision 1 applied: fixed findings 1+2 but flagged finding 3 in narrative — Mirror should re-review and likely escalate.` Mirror's re-review then either accepts the partial fix or escalates.
 
 ### After your revision response
