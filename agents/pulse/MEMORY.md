@@ -291,8 +291,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T05:07Z UTC (Iter ~3046, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T05:16Z UTC (Iter ~3047, Tier 1, consecutive_clean=0)
 
-**Iter ~3046 summary:** ✅ Nominal (iter_clean). 1 new alert: L1109 doorbell (Tier-3 silenced, known-pattern). Watermark 1109. PR #733 Mirror rev-1 in-flight (MIRROR_ACTIVE_SKIP, dispatched 04:51:56Z). PR #731 pipeline dead (carry). All daemons alive (PIDs 3961026/3961281/3961345). Watchdog 05:03:50Z healthy. Heal-daemon 05:03:44Z ✅. **Larry HOLD directive active.** PRIME: 0 new interventions (iter_clean, ratio≈17.38).
+**Iter ~3047 summary:** ✅ Nominal (iter_clean). 4 new alerts (L1110-L1113): all Tier-3 silenced. Watermark 1113. PR #733 Mirror rev-1 completed as REVIEW_ESCALATE (05:06Z) — bwrap unavailable + test timeout (cannot-conclude), code CLEAN. Medic-diagnosis DM delivered to Larry 05:12Z. review-ceiling-fit-monitor sequence active (DAG-PASS 05:07Z; Larry merged #735 spec himself, Forge step dispatch imminent). PR #731 pipeline dead (carry). All daemons alive (PIDs 3961026/3961281/3961345). Watchdog 05:08:50Z healthy. Heal-daemon 05:03:44Z ✅. **Larry HOLD directive active.** PRIME: 0 new interventions (iter_clean, ratio≈17.38).
 
 
