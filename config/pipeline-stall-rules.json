@@ -1,0 +1,10 @@
+{
+  "_comment": "Tunable config for scripts/heal_pipeline_stall.py episode-dedup (spec: agents/beacon/specs/heal-pipeline-stall-noise-reduction.md). re_dm_hours: per-check re-DM backstop window in hours — the minimum interval before the SAME stall key is re-DMed. Episode semantics: the slow-PR checks alert on condition ONSET, then stay silent while the same condition persists for the same PR, re-alerting only after this backstop window. Defaults to 24h for the slow-PR checks (a healthy-but-slow PR traversing the routing/review path legitimately persists for hours; the legacy flat 1h ALERT_DEDUP_HOURS re-DMed once/hour — the dominant heal_pipeline_stall false-alert pattern). Keys are the stall-key prefixes the checks emit; _default covers any unnamed slow-PR check. This file is OPTIONAL — absent file / malformed JSON / bad values fall back to the identical code defaults (heal_pipeline_stall._DEFAULT_RE_DM_HOURS), and tight-loop checks that want the 1h window simply don't appear here. Pulse-Check tunes these values (no hand-picked constants in the healer), same pattern as config/review-reaper-rules.json.",
+  "re_dm_hours": {
+    "_default": 24,
+    "forge_built_no_pr": 24,
+    "pr_no_mirror_dispatch": 24,
+    "mirror_pass_unmerged": 24,
+    "unrouted_open_pr": 24
+  }
+}

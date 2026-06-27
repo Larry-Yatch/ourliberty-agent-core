@@ -351,8 +351,85 @@ def save_state(state: dict) -> None:
         log(f'save_state failed: {e}', 'WARN')
 
 
-def should_alert(state: dict, key: str) -> bool:
-    """True if this stall key hasn't been DMed in the last ALERT_DEDUP_HOURS."""
+# ---------- Episode-dedup: per-check re-DM windows (tunable) ----------
+# A slow-but-healthy per-PR condition (an unrouted PR traversing the review
+# path, a built PR awaiting its review dispatch) legitimately persists for
+# hours. The flat 1h ALERT_DEDUP_HOURS therefore re-DMs once per hour for the
+# whole life of the condition — the dominant heal_pipeline_stall false-alert
+# pattern (PR #86 fired 8x 05:15->12:49 on 2026-06-23, then merged clean). The
+# fix is EPISODE semantics: alert on condition onset, stay silent while the
+# same condition persists for the same PR, and only re-alert after a long
+# backstop window. We implement that by giving the slow-PR checks a per-check
+# re-DM window (default 24h) instead of the 1h flat window. The window is
+# tunable in config/pipeline-stall-rules.json (Pulse-Check can adjust it) over
+# the code defaults below — same optional-config pattern as
+# config/review-reaper-rules.json. A genuinely tight loop keeps 1h simply by
+# not appearing here (its alerts carry no `re_dm_hours`, so `should_alert`
+# falls back to ALERT_DEDUP_HOURS).
+PIPELINE_STALL_RULES_FILE = (
+    _SCRIPTS_DIR.parent / 'config' / 'pipeline-stall-rules.json'
+)
+_DEFAULT_RE_DM_HOURS = {
+    '_default': 24,
+    'forge_built_no_pr': 24,
+    'pr_no_mirror_dispatch': 24,
+    'mirror_pass_unmerged': 24,
+    'unrouted_open_pr': 24,
+}
+
+
+def load_stall_rules() -> dict:
+    """Read config/pipeline-stall-rules.json over the code defaults. Missing
+    file / malformed JSON / wrong types → defaults (never raises), so the
+    healer never crashes on a bad config and criterion-5 (absent file) is the
+    plain default path. Read fresh each call (no cache): the healer is a
+    per-tick oneshot and the file is tiny, so re-reading a handful of times per
+    run is negligible and keeps the loader trivially testable."""
+    rules = {'re_dm_hours': dict(_DEFAULT_RE_DM_HOURS)}
+    try:
+        data = json.loads(PIPELINE_STALL_RULES_FILE.read_text())
+    except OSError:
+        return rules
+    except json.JSONDecodeError as e:
+        log(f'pipeline-stall-rules malformed ({e}); using defaults', 'WARN')
+        return rules
+    if not isinstance(data, dict):
+        log('pipeline-stall-rules top-level not an object; using defaults',
+            'WARN')
+        return rules
+    raw = data.get('re_dm_hours')
+    if isinstance(raw, dict):
+        for check, hours in raw.items():
+            if (isinstance(hours, (int, float)) and not isinstance(hours, bool)
+                    and hours > 0):
+                rules['re_dm_hours'][check] = int(hours)
+            else:
+                log(f'pipeline-stall-rules re_dm_hours[{check!r}]={hours!r} '
+                    f'invalid; keeping default', 'WARN')
+    return rules
+
+
+def re_dm_hours_for(check_name: str) -> int:
+    """Episode-dedup re-DM window (hours) for a slow-PR check. Tunable config
+    over per-check code default over the `_default` entry over
+    ALERT_DEDUP_HOURS."""
+    windows = load_stall_rules().get('re_dm_hours', {})
+    if check_name in windows:
+        return windows[check_name]
+    if '_default' in windows:
+        return windows['_default']
+    return ALERT_DEDUP_HOURS
+
+
+def should_alert(state: dict, key: str,
+                 re_dm_hours: Optional[float] = None) -> bool:
+    """True if this stall key hasn't been DMed within its re-DM window.
+
+    `re_dm_hours` overrides the flat ALERT_DEDUP_HOURS for the slow-PR checks
+    (episode-dedup, default 24h): fire on onset, stay silent while the same key
+    persists, re-alert only after the backstop. `None` keeps the legacy 1h
+    window for tight-loop checks."""
+    window = ALERT_DEDUP_HOURS if re_dm_hours is None else re_dm_hours
     last = state.get(key)
     if not last:
         return True
@@ -360,7 +437,7 @@ def should_alert(state: dict, key: str) -> bool:
         last_dt = datetime.fromisoformat(last.replace('Z', '+00:00'))
     except ValueError:
         return True
-    return (datetime.now(timezone.utc) - last_dt) > timedelta(hours=ALERT_DEDUP_HOURS)
+    return (datetime.now(timezone.utc) - last_dt) > timedelta(hours=window)
 
 
 def record_alert(state: dict, key: str) -> None:
@@ -552,12 +629,37 @@ def _all_closed_prs_recent() -> list[dict]:
 
 
 def _task_id_from_branch(branch: str) -> Optional[str]:
-    """Extract task_id from a `forge/<task_id>` or `larry/<task_id>` branch.
-    Returns None if the branch isn't a recognized chain pattern."""
-    for prefix in ('forge/', 'larry/'):
+    """Extract task_id from a `forge/<task_id>`, `larry/<task_id>`, or
+    `claude/<task_id>` branch. Returns None if the branch isn't a recognized
+    chain pattern.
+
+    `claude/` covers laptop-authored PRs (Claude Code on Larry's machine). A
+    laptop PR's review is dispatched under the synthetic task_id
+    `pr-<repo>-<num>` (see `_pr_dispatch_task_id`) rather than its branch
+    suffix, so recognizing the prefix here lets the branch_task-gated
+    resolution-signal / recovery paths engage for `claude/` PRs the same way
+    they do for `forge/` — while the `pr-<repo>-<num>` form is what the unrouted
+    dispatch-match keys on."""
+    for prefix in ('forge/', 'larry/', 'claude/'):
         if branch.startswith(prefix):
             return branch[len(prefix):]
     return None
+
+
+def _pr_dispatch_task_id(pr: dict) -> Optional[str]:
+    """The synthetic `pr-<repo>-<num>` task_id a laptop-authored PR's review is
+    dispatched under (the form `_PR_TASK_ID_RE` matches and
+    `_mirror_session_active_for_pr` keys on). Derived from the PR's repo +
+    number so the unrouted suppressor can recognize a dispatched-or-in-progress
+    review on a `claude/`-branch (or `fix|feat|chore`-labeled) PR that carries
+    no `forge/<task_id>` branch token. Returns None if repo/number are
+    missing/malformed."""
+    repo = pr.get('_repo')
+    number = pr.get('number')
+    if not repo or number is None:
+        return None
+    repo_short = repo.rsplit('/', 1)[-1]
+    return f'pr-{repo_short}-{number}'
 
 
 # ---------- Shared resolution-signal reconciliation (2026-05-27) ----------
@@ -649,6 +751,26 @@ def _check_pr_closed_via_gh(pr_url: str) -> Optional[str]:
     behavior). Thin wrapper over `_gh_pr_state`."""
     state = _gh_pr_state(pr_url)
     return state if state in ('MERGED', 'CLOSED') else None
+
+
+def _pr_is_terminal(pr_url: str, cache: dict[str, Optional[str]]) -> bool:
+    """Merge-truth gate (spec §2). True iff the PR is gh-confirmed MERGED or
+    CLOSED — i.e. a per-PR stall alert for it should be SUPPRESSED because the
+    PR is already terminal (the "alarmed then merged" tail PR #86 showed).
+
+    `cache` collapses the lookup per pr_url within a tick: if the same PR is
+    about to alert from two checks (e.g. unrouted + no-mirror-dispatch), only
+    ONE `gh pr view` fires. The gate is applied only to alerts that actually
+    pass the cooldown — so the gh fan-out is bounded by the number of FIRING
+    per-PR alerts (small after episode-dedup), never the full open-PR list.
+
+    Degrades safe: `_gh_pr_state` returns None on any transport / non-zero exit
+    / JSON error, and None is NOT in {MERGED, CLOSED}, so an unreadable state is
+    treated as non-terminal = still alertable. A gh outage can never silently
+    drop a real alert (verify-before-alarm)."""
+    if pr_url not in cache:
+        cache[pr_url] = _gh_pr_state(pr_url)
+    return cache[pr_url] in ('MERGED', 'CLOSED')
 
 
 _PR_TASK_ID_RE = re.compile(r'^pr-([a-zA-Z0-9_-]+)-([0-9]+)$')
@@ -1709,6 +1831,10 @@ def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
                 f'Check worktree state: `ssh larry@droplet "ls /home/larry/agent-worktrees/wt-forge-{task[:40]}*"`. '
                 f'Inspect Forge session log + `git -C <worktree> status`. If branch exists locally but PR is missing, '
                 f'run `gh pr create` manually in the worktree.'),
+            # Episode-dedup: a built-but-no-PR condition persists until the PR
+            # opens or the worktree is reconciled — alert once per episode, not
+            # hourly (spec §1).
+            're_dm_hours': re_dm_hours_for('forge_built_no_pr'),
         })
         seen_tasks.add(task)
     return alerts
@@ -1774,6 +1900,13 @@ def check_pr_no_mirror_dispatch(notifier_lines: list[str], open_prs: list[dict],
                 f'`grep "{task}" ~/agents/logs/outbox-notifier.log | tail -20`. '
                 f'If Forge notify never fired or the build-phase dispatch was suppressed, '
                 f'a manual review dispatch via Beacon is the unstick path.'),
+            # Episode-dedup (spec §1): a PR awaiting its review dispatch can sit
+            # for hours while routing settles — alert once per episode, not
+            # hourly.
+            're_dm_hours': re_dm_hours_for('pr_no_mirror_dispatch'),
+            # Merge-truth gate (spec §2): suppress at fire time if the PR has
+            # since merged/closed.
+            'pr_url': pr_url,
             # M4: recoverable — re-dispatch the missing Mirror review before alerting.
             'recovery': functools.partial(
                 _recover_via_mirror_review, task, branch, pr['_repo'],
@@ -1816,6 +1949,8 @@ def check_mirror_pass_unmerged(notifier_lines: list[str], open_prs: list[dict],
             continue
         elapsed_min = int((datetime.now(timezone.utc) - ts).total_seconds() / 60)
         key = f'mirror_pass_unmerged:{task}'
+        pr_url = (pr.get('html_url')
+                  or f'https://github.com/{pr["_repo"]}/pull/{pr["number"]}')
         alerts.append({
             'key': key,
             'message': (f'Mirror PASSED PR #{pr["number"]} ({pr["_repo"]}) for task `{task}` '
@@ -1826,6 +1961,12 @@ def check_mirror_pass_unmerged(notifier_lines: list[str], open_prs: list[dict],
                 f'`grep "AUTO_MERGE.*{task}" ~/agents/logs/outbox-notifier.log`. '
                 f'If outcome=failed, heal_pr_auto_merge.py should retry; if no AUTO_MERGE line at all, '
                 f'manual merge: `gh pr merge {pr["number"]} --repo {pr["_repo"]} --squash --delete-branch`.'),
+            # Episode-dedup (spec §1): a PASS-but-unmerged PR persists until
+            # auto-merge lands — alert once per episode, not hourly.
+            're_dm_hours': re_dm_hours_for('mirror_pass_unmerged'),
+            # Merge-truth gate (spec §2): suppress at fire time if the PR has
+            # since merged/closed (the exact "alarmed then merged" tail).
+            'pr_url': pr_url,
             # M4: recoverable — retry the unfired squash-merge before alerting.
             'recovery': functools.partial(
                 _recover_via_auto_merge, pr['_repo'], pr['number'],
@@ -2474,9 +2615,17 @@ def check_unrouted_open_prs(open_prs: list[dict],
         if elapsed_min < PR_UNROUTED_MIN_AGE_MIN:
             continue
         branch_task = _task_id_from_branch(branch)
+        # A laptop-authored PR (claude/ branch, or fix|feat|chore-labeled) has
+        # its review dispatched under the synthetic `pr-<repo>-<num>` task_id,
+        # not a `forge/<task_id>` branch token — so match against BOTH the
+        # branch task and the pr-<repo>-<num> form. Without the latter, a
+        # dispatched-or-in-progress review on a laptop PR escapes the suppressor
+        # and false-alerts (spec §3).
+        pr_task_id = _pr_dispatch_task_id(pr)
+        candidate_task_ids = [t for t in (branch_task, pr_task_id) if t]
         matched = False
         for task_id in review_dispatch_task_ids:
-            if branch_task and branch_task == task_id:
+            if any(c == task_id for c in candidate_task_ids):
                 matched = True
                 break
             if task_id in branch:
@@ -2487,18 +2636,29 @@ def check_unrouted_open_prs(open_prs: list[dict],
         pr_html_url = pr.get('html_url') or (
             f'https://github.com/{pr["_repo"]}/pull/{pr["number"]}'
         )
-        if branch_task:
+        # Out-of-band resolution: query chain_events under each candidate id
+        # (branch task AND/OR pr-<repo>-<num>). The PR-state (MERGED/CLOSED)
+        # arm is keyed on pr_url, identical across candidates, so run it once
+        # (first candidate) to avoid a duplicate `gh pr view`.
+        resolved = False
+        seen_candidates: set[str] = set()
+        for idx, cand in enumerate(candidate_task_ids):
+            if cand in seen_candidates:
+                continue
+            seen_candidates.add(cand)
             hit, reason = _resolution_signal_present(
-                task_id=branch_task, since_ts=created,
-                check_pr_state=True, pr_url=pr_html_url,
+                task_id=cand, since_ts=created,
+                check_pr_state=(idx == 0), pr_url=pr_html_url,
             )
             if hit:
                 log(
-                    f'UNROUTED_OPEN_PR_SKIP task={branch_task} '
-                    f'reason={reason}',
+                    f'UNROUTED_OPEN_PR_SKIP task={cand} reason={reason}',
                     'INFO',
                 )
-                continue
+                resolved = True
+                break
+        if resolved:
+            continue
         # Active-Mirror suppression (G-rule unrouted-open-pr-active-mirror-
         # session-fp-001): the alert means "no review will happen until Larry
         # routes it", but a live review session (or a freshly dispatched review
@@ -2533,6 +2693,13 @@ def check_unrouted_open_prs(open_prs: list[dict],
                 f'Verify routing fires: '
                 f'`tail -50 ~/agents/logs/routing-events.jsonl | grep "{branch}"`.'
             ),
+            # Episode-dedup (spec §1): the dominant false-alert pattern — a slow
+            # but progressing PR traversing the routing path re-DMed hourly
+            # (PR #86: 8 fires, then merged). Alert once per episode.
+            're_dm_hours': re_dm_hours_for('unrouted_open_pr'),
+            # Merge-truth gate (spec §2): suppress at fire time if the PR has
+            # since merged/closed.
+            'pr_url': pr_html_url,
         }
         # M4: recoverable ONLY when the branch yields a dispatchable task_id —
         # the review-request idempotency key is task-keyed, so a branch with no
@@ -3177,12 +3344,26 @@ def run(dry_run: bool = False) -> int:
     recovered_count = 0
     would_fire = 0
     would_recover = 0
+    # Per-tick cache for the merge-truth gate so a PR that would alert from two
+    # checks costs at most one `gh pr view` (spec §2 batching).
+    gh_state_cache: dict[str, Optional[str]] = {}
     for alert in all_alerts:
         if _alert_is_fixture(alert):
             log(f'suppressed (fixture task): {alert["key"]}', 'INFO')
             continue
-        if not should_alert(state, alert['key']):
+        if not should_alert(state, alert['key'], alert.get('re_dm_hours')):
             log(f'suppressed (cooldown): {alert["key"]}', 'INFO')
+            continue
+        # Merge-truth gate (spec §2): a per-PR alert (one carrying `pr_url`) is
+        # suppressed if the PR is gh-confirmed terminal (MERGED/CLOSED) at fire
+        # time — the "alarmed then merged" tail. Applied after the cooldown
+        # check so only alerts that would actually fire incur a gh call, and
+        # before recovery so we never re-dispatch a review/merge on a terminal
+        # PR. Degrades safe: an unreadable state is non-terminal = still
+        # alertable (`_pr_is_terminal`).
+        pr_url = alert.get('pr_url')
+        if pr_url and _pr_is_terminal(pr_url, gh_state_cache):
+            log(f'suppressed (pr terminal): {alert["key"]}', 'INFO')
             continue
         if dry_run:
             # No writes: log what WOULD happen and move on. A recoverable
