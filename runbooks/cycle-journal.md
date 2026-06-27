@@ -232163,3 +232163,116 @@ Watermark: 1049 → 1050. No tier-reset (Tier-3 silence).
 
 **PRIME DIRECTIVE:** 0 new interventions. Trailing-30d: systemic_fixes=75, vp=28, ratio=17.69, trend=improving.
 **Tier end-of-iter:** DE-ESCALATED Tier **1→2**, consecutive_clean=0. Last signal: 2026-06-26T18:56:42Z.
+
+---
+
+## Iteration ~3055 — 2026-06-27T06:07Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean=0)
+
+**Trigger:** Larry `/cycle` via chat.
+
+**Health:** ⚠️ Near-nominal — 1 Tier-4 alert (unreviewed-merge:733; DM already delivered by outbox-notifier at 06:09:44Z). PR #733 merged by Larry-Yatch at 06:04:49Z without Mirror review — expected after tonight's approval-flow conversation. Mirror actively reviewing PR #736 (regression tests running ~6 min). 2 stale pending approvals (PRs #728/#733 both already merged). HOLD active.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Repo (re-verified):** HEAD=14d34652=origin/main (Pulse cycle 20260627T060651Z). On main. Clean. 0 behind, 0 ahead. ✅
+- **PR #733 (re-verified):** MERGED at 2026-06-27T06:04:49Z by Larry-Yatch. Was "OPEN/UNKNOWN (REVIEW_ESCALATE)" in prior MEMORY snapshot — stale claim corrected. ✅
+- **PR #731 (re-verified):** OPEN, MERGEABLE. Was "OPEN/UNKNOWN (dead)" in prior snapshot — state corrected. No Mirror review queued. 8.3h old. [carry]
+- **PR #736 (re-verified):** OPEN. Mirror session active — PID 4020442 running regression-gate-pr736-v3 (unittest discover) at ~73% CPU. Started 06:11Z. ✅
+- **Daemons (re-verified):** chain_event_shipper=2716672 (Jun25) ✅, dashboard_api=3820986 (Jun26) ✅, beacon_telegram_bot=3961026 (Jun26) ✅, inbox_watcher=3961281 (Jun26) ✅, outbox_notifier=3961345 (Jun26) ✅, agent_telegram_bot×3=3961033/3961289/3961354 (Jun26) ✅. 8/8 alive. Watchdog last tick 06:09:40Z. ✅
+- **heal-daemon heartbeat (re-verified):** 2026-06-27T06:04:17Z (~13 min). Under 60-min threshold. ✅
+- **Sync (re-verified):** last_sync=2026-06-27T06:00:14Z (~7 min). ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark: {repaired:false, old_watermark:1118, file_length:1119→1120}. 2 new alerts (L1119–L1120).
+- **L1119 (06:05:20Z): source=heal-unreviewed-merge-detector, route=escalate, subject=unreviewed-merge:733** — "PR #733 merged without Mirror review (actor=Larry-Yatch)." triage-alert → **Tier-4** (never-silence). tier-reset. outbox-notifier ALREADY delivered this to Larry at 06:09:44Z. Duplicate DM suppressed. Journal-note only.
+- **L1120 (06:09:17Z): source=dispatch-branch-cleanup, route=digest** — "pruned 6 local + remote stale branches." triage-alert → **Tier-3** (known-pattern, silenced). Nominal.
+- Watermark advanced 1118→1120. ✅
+
+**Check 1 — Log noise:** journalctl --user -p warning --since "30 minutes ago" → No entries. ✅ Nominal.
+
+**Check 2 — Telegram sweep:**
+- Most recent Larry messages: "give me a description of the problem" at 00:05 MDT (~06:05 UTC); Beacon responded at 00:06 MDT. Earlier: Larry discussing PR #733 approval flow (23:18–23:29 MDT); resolved when he directly merged #733 at 06:04Z UTC. No orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall (dry-run):** "0 alert(s) would fire." Multiple FORGE_NO_PR_SKIP entries normal. no_session_revision:forge-revision-preamble-discipline-001 suppressed (cooldown). ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- Forge inbox: build-review-ceiling-fit-monitor-build.json (completed build; PR #736 opened 05:42Z). Not a stall. ✅
+- Mirror inbox: review-review-ceiling-fit-monitor-build.json (active, PR #736 regression tests) + review-sequence-dag-review-ceiling-fit-monitor-ret-retry1.json (orphaned; outbox-notifier marked no-op at 23:44Z; stall checker clean; journal-note only — not a dedup_identity collision).
+- Beacon inbox: empty. ✅
+- **beacon-pending-approvals: pending=5** (was 0 at iter ~3054):
+  1. `mirror-review-silence-ourliberty-health-sync-push-failed-001` (21:49Z) — **STALE**: PR #728 merged at 21:50Z.
+  2. `tier3-silence-auto-restart-failed-001` (23:11Z) — legitimate (G-rule heal-stale-daemon-code-auto-restart-failed-self-recovered DISPATCHED vp). Under HOLD.
+  3. `pr731-restore-revision-trap-gate-001` (00:51Z) — legitimate (fix next_count gate on PR #731 resume-path). Under HOLD.
+  4. `silence-ourliberty-health-clean-tree-001` (01:02Z) — legitimate (G-rule ourliberty-health-clean-tree-dirty-tier4-001 DISPATCHED vp). Under HOLD.
+  5. `mirror-review-pr-ourliberty-agent-core-733` (04:41Z) — **STALE**: PR #733 merged at 06:04Z.
+
+**Check 4.6 — Credential rotation:** OK (schema_version=1). ✅ Nominal.
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-06-27T06:04:17Z (~13 min). Under 60-min threshold. ✅ Nominal.
+
+**Check A — Source repo:** HEAD=14d34652=origin/main. On main. Clean. Up to date. ✅
+**Check B — Sync health:** last_sync=06:00:14Z (~7 min). Under 2h threshold. ✅
+**Check C — Agent liveness:** 8/8 daemons alive (ps-verified). Mirror PID 4020442 active (regression-gate-pr736-v3, ~6 min). Watchdog healthy 06:09:40Z. ✅
+**Check E — PRs:**
+- **PR #736** — OPEN. Mirror active review (regression tests, ~6 min in). Expected. ✅
+- **PR #731** — OPEN, MERGEABLE. "fix(notifier): make Forge revision-preamble discipline rev2-proof." 8.3h old. No Mirror review queued. Pending approval #3 (pr731-restore-revision-trap-gate-001) under HOLD would fix revision-trap gate. Under 72h threshold — journal-note only.
+
+**Check H — Forge digest:**
+- Merged today: PR #732 (fix/mirror verdict-marker self-validation gate, 00:53Z) ✅, PR #733 (fix/pulse clean-tree guard, 06:04Z — Larry-merged, unreviewed), PR #734 (fix/mirror hard ceiling per session, 04:46Z) ✅, PR #735 (spec/mirror review-ceiling fit-monitor, 05:00Z) ✅.
+- Open: PR #736 (feat review-ceiling fit-monitor, Mirror reviewing), PR #731 (fix notifier revision-preamble, 8.3h). Both <72h.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. ✅
+
+**Conditional checks — Saturday 2026-06-27 UTC (weekday=5, NOT in firing set {0,2,4,6}):**
+- Check I: Not a firing day. Skip. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule assessment:**
+- **mirror-malformed-verdict-post-restart-001 → COMPLETE ✅** — PR #732 merged 00:53Z. Confirmed (already in MEMORY).
+- **ourliberty-health-clean-tree-dirty-tier4-001 — DISPATCHED ✅ vp** — pending approval #4 under HOLD. [carry vp]
+- **heal-stale-daemon-code-auto-restart-failed-self-recovered — DISPATCHED ✅ vp** — pending approval #2 under HOLD. [carry vp]
+- **sentinel-inflight-stall-mirror-tier4 — 2/3** — PR #734 (hard ceiling) mitigates root cause; PR #736 (fit-monitor healer) in review. No Pulse G-rule dispatch yet; alert-translation entry still missing. Dispatch at 3/3 (post-HOLD). [carry 2/3]
+- **decision-needed-approval-forge-dispatch-no-target-repo-001 — 3/3 HOLD-DEFERRED** — PR #733 merged; triggering PR gone. Underlying bug (no reply_chat_id in no-session REVIEW_ESCALATE) persists for future PRs. [carry]
+- All other G-rule counts unchanged. [carry]
+
+**Actions taken:**
+1. Check 0: L1119 → Tier-4 (unreviewed-merge:733, DM already delivered, suppressed). L1120 → Tier-3 (dispatch-branch-cleanup, silenced). Watermark 1118→1120. ✅
+2. PRIME ledger: intervention appended (tier=1, template=unreviewed-merge-detector-tier4-triage). ✅
+3. Tier state: record --checks-clean false → consecutive_clean=0, last_signal_at=06:17:29Z. ✅
+
+**Dispatches:** None. (HOLD active.)
+
+**Standing findings (carried + verified):**
+- [yellow] **unreviewed-merge:733** — PR #733 merged by Larry-Yatch at 06:04Z without Mirror review. DM delivered 06:09:44Z. [new]
+- [yellow] **2 stale pending approvals** — mirror-review-silence-ourliberty-health-sync-push-failed-001 (PR #728 merged) and mirror-review-pr-ourliberty-agent-core-733 (PR #733 merged). Beacon to clean up. [new]
+- [yellow] **3 legitimate pending approvals under HOLD** — tier3-silence-auto-restart-failed-001, pr731-restore-revision-trap-gate-001, silence-ourliberty-health-clean-tree-001. Gated on HOLD-lift decision. [carry]
+- [yellow] **PR #736 — Mirror active review** — feat: review-ceiling fit-monitor. Regression tests running. [watch vp]
+- [yellow] **PR #731 — OPEN/MERGEABLE, no Mirror review** — fix notifier revision-preamble. 8.3h old. Under HOLD. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry. [carry]
+- [yellow] **unreviewed-merge:649/637/607/709/710/723** — Larry judgment. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — `approve check-viii-update-2026-06-15`. Awaiting Larry. [carry]
+- [yellow] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Awaiting Larry. [carry]
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OURLIBERTY_BOARD_DRAIN_ENABLED** — Tier-3 silenced; underlying still standing. [carry]
+- [blue] **G-rule sentinel-inflight-stall-mirror-tier4 — 2/3** — PR #734 mitigates root cause. Dispatch at 3/3 (post-HOLD). [carry]
+- [blue] **G-rule ourliberty-health-clean-tree-dirty-tier4-001 — DISPATCHED ✅ vp** — pending approval #4. [carry vp]
+- [blue] **G-rule heal-stale-daemon-code-auto-restart-failed-self-recovered — DISPATCHED ✅ vp** — pending approval #2. [carry vp]
+- [blue] **G-rule decision-needed-approval-forge-dispatch-no-target-repo-001 — 3/3 HOLD-DEFERRED** — #733 merged; underlying persists. [carry]
+- [blue] **G-rule heal-daemon-restart-manifest-drift-regenerated-tier4 — 2/3** — dispatch at 3/3 (post-HOLD). [carry]
+- [blue] **G-rule forge-wip-redispatch-exhausted-pr-exists-fp-001 — 2/3** — dispatch at 3/3 (post-HOLD). [carry]
+- [blue] **G-rule outbox-notifier-notification-intent-reject-tier4-001 — 2/3** — dispatch at 3/3 (post-HOLD). [carry]
+- [blue] **G-rule check-i-force-bypass-dm-route — 2/3** — dispatch at 3/3 (post-HOLD). [carry]
+- [blue] **G-rule forge-wip-redispatch-digest-tier4-001 — DISPATCHED ✅ vp** — Forge dispatch pending trust-policy. [carry vp]
+- [blue] **G-rule no-session-revision-active-mirror-session-fp-001 — DISPATCHED ✅ vp** — [carry vp]
+- [blue] **G-rule forge-revision-preamble-missing-pr711-001 — DISPATCHED ✅ vp** — PR #731 open; pending approval #3 (HOLD). [carry vp]
+- [blue] **G-rule mirror-runner-missing-worktree-retry-001 — 1/3** — [carry]
+- [blue] **G-rule review-duplicate-dispatch-wip-redispatch — DISPATCHED ✅ vp** — [carry vp]
+- [blue] **G-rule no-session-revision-merged-pr-fp-001 — 1/3** — [carry]
+- [blue] **G-rule sync-service-deploy-restart-storm-tier4-001 — 1/3** — dispatch at 3/3 (post-HOLD). [carry]
+- [blue] **G-rule unrouted-open-pr-auto-merge-held-fp-001 — 1/3** — [carry]
+- [blue] **orphaned Mirror task review-sequence-dag-review-ceiling-fit-monitor-ret-retry1** — in Mirror inbox, stall checker clean, outbox-notifier marked no-op. Watch. [new]
+- [blue] **Stale worktree wt-mirror-pr-ourliberty-agent-core-713** — PR #713 long merged. [carry]
+- [blue] **daemon-pids.json missing** — PIDs via ps. Daemons alive. [carry]
+- [blue] **unreviewed-merge:655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+- [blue] **Untracked Beacon spec** — agents/beacon/specs/missions-v2-funnel-item-doorbell.md. Larry authoring. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention (unreviewed-merge-detector-tier4-triage). Trailing-30d: interventions=1373, systemic_fixes=79, vp=28, ratio=17.38.
+**Tier end-of-iter:** Tier **1**, consecutive_clean=0. Last signal: 2026-06-27T06:17:29Z.

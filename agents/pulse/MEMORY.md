@@ -291,8 +291,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T06:07Z UTC (Iter ~3054, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T06:17Z UTC (Iter ~3055, Tier 1, consecutive_clean=0)
 
-**Iter ~3054 summary:** ✅ Nominal (iter_clean). 2 new alerts (L1117–L1118): heal-systemd-install-drift auto-installed `ourliberty-heal-claude-json-bind-drift.service/.timer` (PR #720 units, route=digest, Tier-3 silence). Service ran immediately (status=0). Watermark 1116→1118. PR #736 MERGEABLE, Mirror review started 05:55:17Z (~12 min in at check). Forge build PID 3976734 still running (~45 min). PR #731 OPEN/UNKNOWN (dead). PR #733 OPEN/UNKNOWN (REVIEW_ESCALATE). **Larry HOLD directive active.** PRIME: 0 new interventions (iter_clean, ratio≈17.38).
+**Iter ~3055 summary:** ⚠️ Near-nominal. 2 new alerts (L1119–L1120): unreviewed-merge:733 (Tier-4, DM already delivered by outbox-notifier at 06:09:44Z) + dispatch-branch-cleanup (Tier-3, silenced). Watermark 1118→1120. PR #733 MERGED at 06:04:49Z by Larry-Yatch (was OPEN/UNKNOWN — corrected). PR #736 OPEN, Mirror reviewing (regression tests, PID 4020442, ~6 min in). PR #731 OPEN/MERGEABLE (was dead — corrected), no Mirror review queued. 5 pending approvals (2 stale: mirror-review-#728, mirror-review-#733; 3 legitimate under HOLD). Merged today: #732 (mirror verdict gate) ✅, #733 (pulse clean-tree guard, Larry-merged), #734 (mirror hard ceiling) ✅, #735 (spec review-ceiling fit-monitor) ✅. **Larry HOLD directive active.** PRIME: 1 intervention (unreviewed-merge-detector-tier4-triage), ratio=17.38.
 
 
