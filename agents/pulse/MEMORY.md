@@ -291,8 +291,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T06:58Z UTC (Iter ~3060, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T07:12Z UTC (Iter ~3062, Tier 1, consecutive_clean=0)
 
-**Iter ~3060 summary:** ✅ Nominal (iter_clean). 2 new alerts L1125–L1126 (medic-diagnosis PR #731 stall attempt 7 → Tier-3 silence). PR #737 merged unreviewed at 06:56:28Z (fix: cache parent-SHA baseline for review ceiling). All daemons alive. Watchdog 06:55:20Z healthy. Heal-daemon 06:54:20Z. PR #731 only open PR — pipeline dead, pr731-restore-revision-trap-gate-001 awaiting Larry. Larry HOLD directive active. PRIME: 0 new interventions (iter_clean), ratio≈17.39.
+**Iter ~3062 summary:** ✅ Nominal (iter_clean). 1 new alert L1127 (dispatch-branch-cleanup Tier-3 silence: pruned 6 local + 4 remote stale branches). All daemons alive (PIDs 3961026/3961281/3961345). Watchdog 07:10:32Z healthy. Heal-daemon 07:04:20Z. PR #731 only open PR — pipeline dead, pr731-restore-revision-trap-gate-001 awaiting Larry. 6h reminder for silence-ourliberty-health-clean-tree-001 sent 07:06:52Z. Larry HOLD directive active. PRIME: 0 new interventions (iter_clean), ratio≈17.39.
 
 
