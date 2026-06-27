@@ -297,8 +297,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T17:05Z UTC (Iter ~3122, Tier 2, consecutive_clean=1)
+## Status snapshot — updated 2026-06-27T17:23Z UTC (Iter ~3123, Tier 2, consecutive_clean=2)
 
-**Iter ~3122 summary:** ✅ Clean (iter_clean). **PR #731 MERGED** 16:51:31Z (`fix(notifier): make Forge revision-preamble discipline rev2-proof`, commit 9f2541d6). outbox-notifier auto-restarted by heal-stale-daemon-code with new code (PID 17832). 3 alerts triaged (2 Tier-3, 1 Tier-4 G-rule known/no-DM). All inboxes empty. 5 beacon-pending-approvals (HOLD — pending[2] pr731-restore-revision-trap-gate-001 now superseded). Repo HEAD=ee4e7027 (heal_orphan_autoregister mission reconcile), clean, up-to-date. Sync 16:20:49Z (~44 min). Daemons alive (PID 3961026/3961281/17832). Heal-daemon 17:01:29Z. Watchdog healthy 11:00:53 MDT. Pipeline stall 0-would-fire. **Tier 2 (consecutive_clean=1, cadence 15-min)**. PRIME: 0 interventions, ratio≈17.43, trend=improving.
+**Iter ~3123 summary:** ✅ Clean (iter_clean). 1 alert triaged (Tier-3 doorbell silence). All inboxes empty. 5 beacon-pending-approvals (HOLD). Repo HEAD=2fc4684e (Pulse cycle 20260627T170747Z), clean, up-to-date. Sync 17:20:52Z (~2 min before checks). Daemons alive (PID 3961026/3961281/17832). Heal-daemon 17:11:58Z. Watchdog healthy 11:21:19 MDT. Pipeline stall 0-would-fire. **Tier 2 (consecutive_clean=2, cadence 15-min)**. PRIME: 0 interventions, ratio≈17.43, trend=improving.
 
 
