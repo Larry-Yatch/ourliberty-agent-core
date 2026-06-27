@@ -291,8 +291,14 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T07:49Z UTC (Iter ~3067, Tier 1, consecutive_clean=0)
+## G-rule medic-diagnosis-tier4 — re-opened 1/3 (iter ~3068)
 
-**Iter ~3067 summary:** ⚠️ Check 3 non-nominal — `forge-revision-preamble-discipline-001` stall cooldown EXPIRED (previously cooldown-suppressed; healer would now fire live alerts). 0 new alerts (watermark=1127=file_length). All daemons alive (PIDs 3961026/3961281/3961345). Watchdog 07:46:06Z healthy. Heal-daemon 07:44:22Z. PR #731 only open PR — pipeline dead, UNKNOWN, pr731-restore-revision-trap-gate-001 awaiting Larry. HOLD active. PR #737 unreviewed-merge (not yet swept). PRIME: 0 new interventions (iter_clean), ratio≈17.39.
+**Rule:** `source=medic, intent=medic-diagnosis` alerts classify Tier-4 (novel — 0 medic entries in `config/alert-translations.json`). Completed G-rule `medic-diagnosis-tier4` → PR #515 (2026-06-15) is NOT reflected in current config. PR #515's fix is absent from `alert-translations.json` (may have been reverted, applied to a different path, or lost in a config refactor). Dispatch to Beacon at 3/3 (post-HOLD) to re-add `source=medic, intent=medic-diagnosis` → Tier-3 entry. First new occurrence iter ~3068 (medic diagnosis of PR #731 stall, delivered via route=escalate at 01:57:20 MDT; outbox-notifier already DM'd Larry, no secondary Pulse DM).
+
+---
+
+## Status snapshot — updated 2026-06-27T08:01Z UTC (Iter ~3068, Tier 1, consecutive_clean=0)
+
+**Iter ~3068 summary:** ⚠️ Check 0 non-nominal — 2 new alerts (watermark 1127→1129). Alert 1: heal-pipeline-stall stall fired (as predicted) → Tier-3 silence (known-pattern). Alert 2: medic-diagnosis for PR #731 stall → Tier-4 novel (0 medic entries in alert-translations.json; PR #515 fix absent). outbox-notifier delivered both to Larry. No secondary Pulse DM. PR #736 (review-ceiling-fit-monitor-build) merged clean with Mirror PASS at 06:30:01Z — not an unreviewed-merge. PR #731 only open PR — pipeline dead, HOLD active. All daemons alive. PRIME: 1 intervention (medic-diagnosis-tier4-novel), ratio≈17.40.
 
 
