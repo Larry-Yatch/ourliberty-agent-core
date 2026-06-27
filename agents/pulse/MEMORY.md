@@ -297,8 +297,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T08:01Z UTC (Iter ~3068, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T08:05Z UTC (Iter ~3069, Tier 1, consecutive_clean=0)
 
-**Iter ~3068 summary:** ⚠️ Check 0 non-nominal — 2 new alerts (watermark 1127→1129). Alert 1: heal-pipeline-stall stall fired (as predicted) → Tier-3 silence (known-pattern). Alert 2: medic-diagnosis for PR #731 stall → Tier-4 novel (0 medic entries in alert-translations.json; PR #515 fix absent). outbox-notifier delivered both to Larry. No secondary Pulse DM. PR #736 (review-ceiling-fit-monitor-build) merged clean with Mirror PASS at 06:30:01Z — not an unreviewed-merge. PR #731 only open PR — pipeline dead, HOLD active. All daemons alive. PRIME: 1 intervention (medic-diagnosis-tier4-novel), ratio≈17.40.
+**Iter ~3069 summary:** ✅ Nominal / iter_clean. 0 new alerts (watermark=1129=file_length). All daemons alive (PIDs 3961026/3961281/3961345). Stall dry-run 0 alerts (forge-revision-preamble-discipline-001 cooldown-suppressed). PR #731 only open PR — pipeline dead, HOLD active [carry]. §5.0 all no-op. Note: accidental `kind=intervention` ledger row written during syntax test; immediately corrected with iter_clean row; ratio≈17.42 (+1 noise). PRIME: iter_clean, ratio≈17.42.
 
 
