@@ -50,20 +50,27 @@ _SHA_RE = re.compile(r'^[0-9a-f]{40}$')
 # stop being anyone's merge-base). Bounds the dir to a handful of small files.
 DEFAULT_KEEP = 40
 
+# Captured at import — mirrors test_regression_check.REAL_HOME's discipline:
+# anchor the real-tree default to the process's home as of start, not a
+# call-time Path.home() that an in-process HOME mutation could move out from
+# under us. The OL_REGRESSION_BASELINE_DIR override (used by tests) still wins.
+_DEFAULT_BASELINE_DIR = Path.home() / 'agents' / 'blackboard' / 'regression-baselines'
+
 
 def baseline_dir() -> Path:
     """The cache directory on the REAL agents tree.
 
     Resolved from ``OL_REGRESSION_BASELINE_DIR`` when set (tests point this at a
-    tmp dir); otherwise ``~/agents/blackboard/regression-baselines``. Deliberately
-    NOT derived from ``OURLIBERTY_AGENTS_ROOT`` — that env is the gate's per-run
-    sandbox REDIRECT for the suite subprocess, whereas this cache is written by
-    the gate's real parent process and must land on the real tree.
+    tmp dir); otherwise the import-time-captured ``~/agents/blackboard/
+    regression-baselines``. Deliberately NOT derived from
+    ``OURLIBERTY_AGENTS_ROOT`` — that env is the gate's per-run sandbox REDIRECT
+    for the suite subprocess, whereas this cache is written by the gate's real
+    parent process and must land on the real tree.
     """
     override = os.environ.get('OL_REGRESSION_BASELINE_DIR')
     if override:
         return Path(override)
-    return Path.home() / 'agents' / 'blackboard' / 'regression-baselines'
+    return _DEFAULT_BASELINE_DIR
 
 
 def _path_for(sha: str) -> Path:
@@ -130,7 +137,17 @@ def gc(keep: int = DEFAULT_KEEP) -> int:
         return 0
     if len(files) <= keep:
         return 0
-    files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
+
+    def _mtime(f: Path) -> float:
+        # A concurrent gc/warm may unlink a file we just globbed; treat a
+        # vanished/unreadable entry as oldest so the sort never raises (keeps
+        # gc()'s "never raises on a partial dir" contract).
+        try:
+            return f.stat().st_mtime
+        except OSError:
+            return 0.0
+
+    files.sort(key=_mtime, reverse=True)
     removed = 0
     for f in files[keep:]:
         try:

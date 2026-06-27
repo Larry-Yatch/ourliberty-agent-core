@@ -251,6 +251,11 @@ def build_sandbox_env(
     env['OURLIBERTY_WORKTREES_ROOT'] = str(worktrees_root)
     env['OURLIBERTY_LOG_DIR'] = str(log_dir)
     env['OURLIBERTY_DISABLE_LIVE_EMIT'] = '1'
+    # Defense-in-depth: route the regression-baseline cache into the sandbox so
+    # the jailed suite-under-test can never read or write the gate parent's (or
+    # the real tree's) baseline cache. The PARENT process writes/reads the real
+    # cache off its own env before this sandbox env is ever built for a subprocess.
+    env['OL_REGRESSION_BASELINE_DIR'] = str(sandbox_root / 'regression-baselines')
     env['OURLIBERTY_TEST_RUN_SENTINEL'] = (
         _TEST_RUN_SENTINEL_PREFIX + uuid.uuid4().hex
     )
@@ -688,6 +693,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                 if not args.no_baseline_cache:
                     try:
                         baseline_cache.store(parent_canonical, parent_failures)
+                        baseline_cache.gc()  # bound growth on the live path
                     except OSError:
                         pass  # best-effort; never fail the gate on a cache write
             head_failures = collect_failures_at_sha(

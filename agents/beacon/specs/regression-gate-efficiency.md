@@ -10,12 +10,14 @@ The parent baseline is a pure function of the parent SHA, so compute it once and
 - `test_regression_check.py` — before running the parent SHA, reuse the cached baseline if present (skips that full-suite pass); on a miss, run it and warm the cache. `--no-baseline-cache` forces the original two-run behavior. Adds `used_cached_baseline` to the JSON report.
 - **Correctness:** a hit is identical to re-running the same SHA — zero verdict change. The only theoretical drift is a flaky test flipping between the cached and head runs; that same flakiness already produces false regressions in the un-cached two-run path, so caching does not worsen it. `--no-baseline-cache` is the escape hatch.
 - **Why this is enough to unblock:** the demonstrated pain is *repeated* runs against the same parent SHA — gate retries (#736 ran it 3×) and re-review rounds (#733). With the cache, those reuse the parent baseline, so each retry runs the suite ONCE (head only, ~5min) and fits under the 900s step ceiling.
+- **Cache location / HOME note:** the default cache dir is `$HOME/agents/blackboard/regression-baselines`, captured at import (matching the gate's `REAL_HOME` discipline). The gate runs under Mirror's `TIER2_HOME`, so this is consistent across a review's retries/re-reviews (the PR-1 target). For PR 2's warmer to agree with the gate regardless of which HOME it runs under, set `OL_REGRESSION_BASELINE_DIR` to a fixed canonical path (e.g. `/home/larry/agents/blackboard/regression-baselines`) in the gate + warmer environment. Not required for PR 1.
 
 ## PR 2 — Steady-state warmer (deferred; small)
 
 Lazy caching warms on first use, but each PR's parent is often a distinct recent main commit, so the FIRST review of a new parent is still a cold two-run. Close that with a post-merge warmer: run `regression_baseline_cache.py warm` on each new main SHA (off the review critical path), so a PR branching off warmed main hits the cache on its first review.
 - Add `systemd/ourliberty-regression-baseline-warm.{service,timer}` (or fold a `warm` call into the post-merge/sync path). Note: the unit needs the standard manual install (install-drift is alert-only).
-- GC keeps the newest N (`DEFAULT_KEEP=40`).
+- GC keeps the newest N (`DEFAULT_KEEP=40`); PR 1 already calls `gc()` on the live store path so the dir is self-bounding without the timer.
+- `warm()` is NOT idempotent under concurrency: two warmers for the same new main SHA both miss `load()` and both run the full suite (last write wins, identical content, no corruption — `atomic_write_json`). The wasted duplicate run is acceptable; if it matters, add a per-SHA lock.
 
 ## PR 3 — Graph-aware head selection (deferred; needs validation)
 

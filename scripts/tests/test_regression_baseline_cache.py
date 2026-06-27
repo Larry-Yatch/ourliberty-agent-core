@@ -111,6 +111,45 @@ class BaselineCacheTest(unittest.TestCase):
         self.assertEqual(c.gc(keep=10), 0)
         self.assertIsNotNone(c.load(SHA_A))
 
+    def test_baseline_dir_ignores_sandbox_redirect(self):
+        # The most load-bearing claim: the cache lands on the REAL tree, never
+        # the gate's per-run sandbox. With the explicit override removed,
+        # baseline_dir() must NOT incorporate OURLIBERTY_AGENTS_ROOT.
+        sentinel = '/tmp/SANDBOX-SENTINEL-must-not-appear'
+        saved_override = os.environ.pop('OL_REGRESSION_BASELINE_DIR', None)
+        saved_sandbox = os.environ.get('OURLIBERTY_AGENTS_ROOT')
+        os.environ['OURLIBERTY_AGENTS_ROOT'] = sentinel
+        try:
+            d = str(c.baseline_dir())
+            self.assertNotIn(sentinel, d)
+            self.assertTrue(d.endswith('regression-baselines'))
+        finally:
+            if saved_override is not None:
+                os.environ['OL_REGRESSION_BASELINE_DIR'] = saved_override
+            if saved_sandbox is None:
+                os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
+            else:
+                os.environ['OURLIBERTY_AGENTS_ROOT'] = saved_sandbox
+
+    def test_warm_short_circuits_when_already_cached(self):
+        from unittest import mock
+        c.store(SHA_A, {'t'})
+        with mock.patch('test_regression_check.resolve_sha', return_value=SHA_A), \
+             mock.patch('test_regression_check.collect_failures_at_sha') as collect:
+            rc = c.warm(Path('/tmp/fake-repo'), SHA_A, 900)
+        self.assertEqual(rc, 0)
+        collect.assert_not_called()  # already cached → no full-suite run
+
+    def test_warm_runs_and_caches_on_miss(self):
+        from unittest import mock
+        with mock.patch('test_regression_check.resolve_sha', return_value=SHA_B), \
+             mock.patch('test_regression_check.collect_failures_at_sha',
+                        return_value={'x.Y.test_z'}) as collect:
+            rc = c.warm(Path('/tmp/fake-repo'), SHA_B, 900)
+        self.assertEqual(rc, 0)
+        collect.assert_called_once()
+        self.assertEqual(c.load(SHA_B), {'x.Y.test_z'})
+
 
 if __name__ == '__main__':
     unittest.main()
