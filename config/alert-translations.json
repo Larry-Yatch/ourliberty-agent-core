@@ -656,5 +656,13 @@
       "plain_language_summary": "sync_agent_core auto-committed Pulse runtime files but the push to origin/main failed and was rolled back; the working tree is consistent and sync retries the push on the next tick (~5 min). Routine self-healing transient - the companion sync.service digest alert (sync-blocked:auto-commit-push-failed) already covers it, so this escalate-route ourliberty-health duplicate needs no separate action.",
       "recommended_action": "No action - self-heals on the next sync tick. If the failure persists across many ticks, the actionable signal is the sync.service sync-blocked digest, not this one."
     }
+  },
+  "review-ceiling-fit": {
+    "review-ceiling-fit": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "The weekly Mirror review-ceiling fit-monitor digest (scripts/heal_review_ceiling_fit.py). A READ-ONLY reporter that recomputes the Mirror PR-review duration distribution (p50/p90/p95/p99/max), counts review_session_timeout ceiling firings and likely false-kills (fired-then-merged PRs), and reports whether the harness review ceiling (agent_runner.REVIEW_SESSION_CEILING_SECONDS, default 35min) is still right-sized -- with a recommended value. It NEVER mutates the ceiling and NEVER pages: this is a route=digest record surfaced in the CEO digest, not a DM. By-design FYI, not a failure.",
+      "recommended_action": "None by default -- this is an observe-and-report digest. If it recommends RAISING the ceiling (HEADROOM_LOW: p95 creeping into the ceiling, or FALSE_KILL: a fired review whose PR later merged), that is a signal to consider bumping OL_REVIEW_SESSION_CEILING_SECONDS; the monitor does not auto-tune it. Detail: the digest body carries the distribution, headroom, firing count, false-kill count, and the recommendation line."
+    }
   }
 }

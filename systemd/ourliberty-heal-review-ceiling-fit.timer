@@ -1,0 +1,15 @@
+[Unit]
+Description=Weekly review-ceiling fit-monitor — report whether the Mirror review ceiling is still right-sized
+
+[Timer]
+# Weekly, Monday 09:00. OnCalendar (not OnUnitActiveSec) per the
+# OnUnitActiveSec-dies lesson: an absolute wall-clock schedule keeps firing even
+# if a run is missed/slow. The monitor is idempotent (read-only; emits one
+# digest per run) so a Persistent catch-up run after downtime is harmless.
+OnCalendar=Mon 09:00
+Persistent=true
+RandomizedDelaySec=300
+Unit=ourliberty-heal-review-ceiling-fit.service
+
+[Install]
+WantedBy=timers.target
