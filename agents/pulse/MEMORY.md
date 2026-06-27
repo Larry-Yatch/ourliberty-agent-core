@@ -297,8 +297,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T13:24Z UTC (Iter ~3106, Tier 3, consecutive_clean=0 — DE-ESCALATED)
+## Status snapshot — updated 2026-06-27T13:54Z UTC (Iter ~3107, Tier 1, consecutive_clean=0 — RE-ESCALATED via ff-main)
 
-**Iter ~3106 summary:** ✅ Nominal / iter_clean. 2 new alerts (1090/1091: heal-pipeline-stall + medic-diagnosis for PR #731 stall, both Tier-3 silenced). Watermark advanced 1090→1092. All daemons alive (PIDs 3961026/3961281/3961345). Heal-daemon 13:18:35Z. Pipeline stall dry-run 0-would-fire. PR #738 merged unreviewed (spec(stall) noise reduction). Mirror inbox: 1 routing signal for PR #738 (handled by outbox-notifier next run). PR #731 only other open PR — pipeline dead, HOLD active [carry]. 5 pending approvals (carry, HOLD). §5.0 all no-op. **Tier DE-ESCALATED 2→3** (consecutive_clean=2→3 threshold reached; 30-min cadence now active). PRIME: iter_clean, ratio≈17.42, trend=improving.
+**Iter ~3107 summary:** ⚠️ Intervention / ff-main. Repo behind origin by 1 commit; fast-forwarded b16d8986→57904ff2 ("feat(stall): heal_pipeline_stall noise reduction Phase 2 #1 PR #739"). Adds config/pipeline-stall-rules.json + heal_pipeline_stall.py updates. 2 new alerts (1092/1093: mirror-dag-pass + sequence-complete for heal-stall-noise-reduction, both Tier-3 silenced). Watermark advanced 1092→1094. All daemons alive (PIDs 3961026/3961281/3961345). Heal-daemon 13:49:19Z. Pipeline stall dry-run 0-would-fire. PR #731 only open PR — pipeline dead, HOLD active [carry]. 5 pending approvals (carry, HOLD). §5.0 all no-op. **Tier RE-ESCALATED 3→1** (ff-main intervention; 5-min cadence). PRIME: 1 intervention, ratio≈17.43, trend=improving.
 
 
