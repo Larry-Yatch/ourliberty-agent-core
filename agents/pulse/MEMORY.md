@@ -297,8 +297,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T09:47Z UTC (Iter ~3081, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T10:02Z UTC (Iter ~3083, Tier 1, consecutive_clean=0)
 
-**Iter ~3081 summary:** ✅ Nominal / iter_clean. 0 new alerts (watermark 1082; file compacted 1133→1082 between sessions — watermark persistence gap explains stored=1082 not 1133). All daemons alive (PIDs 3961026/3961281/3961345). Watchdog 09:44:20Z healthy. Heal-daemon 09:45:19Z. Pipeline stall dry-run 0 (cooldown-suppressed). PR #731 only open PR — pipeline dead, HOLD active [carry]. PR #736 MERGED 06:30Z (review-ceiling fit-monitor via Mirror sequence). PR #737 MERGED 06:56Z (unreviewed-merge carry). 5 pending approvals (carry, HOLD). §5.0 all no-op. PRIME: iter_clean, ratio≈17.42, trend=improving.
+**Iter ~3083 summary:** ✅ Nominal / iter_clean. 1 new alert (pipeline-stall:no-session-revision:forge-revision-preamble-discipline-001 at 10:00:24Z) — Tier-3 silenced (known-pattern). Watermark 1082→1083. All daemons alive (PIDs 3961026/3961281/3961345). Watchdog 10:00:16Z healthy. Heal-daemon 09:55:56Z. Pipeline stall dry-run 0 (cooldown-suppressed). PR #731 only open PR — pipeline dead, HOLD active [carry]. PR #736 MERGED 06:30Z. PR #737 MERGED 06:56Z (unreviewed-merge). 5 pending approvals (carry, HOLD). §5.0 all no-op. PRIME: iter_clean, ratio≈17.42, trend=improving.
 
 
