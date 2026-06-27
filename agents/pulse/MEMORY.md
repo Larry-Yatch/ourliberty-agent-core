@@ -297,8 +297,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T14:05Z UTC (Iter ~3109, Tier 1, consecutive_clean=2 — clean iter)
+## Status snapshot — updated 2026-06-27T14:12Z UTC (Iter ~3110, Tier 2, consecutive_clean=0 — de-escalated from Tier 1)
 
-**Iter ~3109 summary:** ✅ Nominal / iter_clean. 1 new alert (idx=1094: forge-wip-redispatch-digest, Tier-4, beacon silenced route=digest; no Pulse intervention). Repo on main, clean, up-to-date (HEAD=6166806f). Sync 13:21Z (~44min, success). All daemons alive (PIDs 3961026/3961281/3961345). Heal-daemon 13:59:20Z. Pipeline stall dry-run 0-would-fire. PR #731 only open PR — pipeline dead, HOLD active [carry]. 5 pending approvals (carry, HOLD). §5.0 all no-op. RETRACTED unreviewed-merge:739 — outbox-notifier confirms Mirror reviewed and auto-merged PR #739 at 07:44Z. System quiet post-PR#739-merge. **Tier 1, consecutive_clean=2** (1 more clean needed for de-escalation to Tier 2). PRIME: 0 interventions this iter, ratio≈17.43, trend=improving.
+**Iter ~3110 summary:** ✅ Nominal / iter_clean. 0 new alerts. Repo on main, clean, up-to-date (HEAD=314358e7). Sync 13:21Z (~49min, success). All daemons alive (PIDs 3961026/3961281/3961345). Heal-daemon 13:59:20Z. Pipeline stall dry-run 0-would-fire. PR #731 only open PR — pipeline dead, HOLD active [carry]. PR #736 confirmed Mirror-reviewed and auto-merged cleanly at 00:30:01Z (not an unreviewed-merge). 5 pending approvals (carry, HOLD). §5.0 all no-op. **Tier 1→2 DE-ESCALATION** (consecutive_clean reached 3 at Tier 1; reset to 0; cadence now 15-min). PRIME: 0 interventions this iter, ratio≈17.43, trend=improving.
 
 
