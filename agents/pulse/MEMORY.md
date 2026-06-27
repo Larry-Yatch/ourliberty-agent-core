@@ -291,8 +291,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T04:57Z UTC (Iter ~3044, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T05:02Z UTC (Iter ~3045, Tier 1, consecutive_clean=0)
 
-**Iter ~3044 summary:** ⚠️ Drift. 1 new Tier-4 alert (sync.service deploy-restart-storm from PR #734 deploy) — silenced per route=digest + daemon health; all 6 daemons alive with new PIDs (3961026/3961281/3961345). NEW: PR #734 MERGED (fix(mirror): harness-enforced hard ceiling on every review session). PR #733 pipeline progressed: Forge rev-1 completed (preamble-missing pattern); Mirror re-review dispatched 04:51:56Z. PR #731 pipeline loop dead (carry). HEAD=6bd40b0d=origin/main (clean). Sync: success 04:48:34Z ✅. Watchdog 04:48:30Z overall=healthy ✅. Heal-daemon 04:43:30Z ✅. Alert watermark: 1108. **Larry HOLD directive active.** PRIME: 2 new interventions (ratio≈17.38). New G-rule: sync-service-deploy-restart-storm-tier4-001 (1/3).
+**Iter ~3045 summary:** ⚠️ Drift (carry). iter_clean — no new Pulse actions required. NEW: PR #735 MERGED (spec(mirror): review-ceiling fit-monitor, 4b5f1337, doc-only by Larry, desktop-merged at 04:59:39Z; unreviewed-merge noted). Sync auto-ran 05:00:42Z and fast-forwarded to 4b5f1337. PR #733 Mirror rev-1 in-flight (MIRROR_ACTIVE_SKIP). PR #731 pipeline dead (carry). No new alerts (watermark=1108). All daemons alive. Watchdog 04:58:49Z healthy. Heal-daemon 04:53:40Z ✅. **Larry HOLD directive active.** PRIME: 0 new interventions (iter_clean, ratio≈17.38).
 
 
