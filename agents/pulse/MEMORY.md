@@ -291,8 +291,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T05:28Z UTC (Iter ~3049, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T05:35Z UTC (Iter ~3050, Tier 1, consecutive_clean=0)
 
-**Iter ~3049 summary:** ✅ Nominal (iter_clean). 0 new alerts (watermark 1113, no new). Forge building review-ceiling-fit-monitor-build (PID 3976734, ~10 min elapsed, resume=b02d3296). PR #731 pipeline dead (carry). PR #733 REVIEW_ESCALATE awaiting Larry (carry, DM drop G-rule 3/3 HOLD). All daemons alive (PIDs 3961026/3961281/3961345). Watchdog 05:23:50Z healthy. Heal-daemon 05:23:49Z ✅. **Larry HOLD directive active.** PRIME: 0 new interventions (iter_clean, ratio≈17.38).
+**Iter ~3050 summary:** ✅ Nominal (iter_clean). 0 new alerts (watermark 1113, no new). **NEW: Larry clicked Approve on PR #733 via dashboard at 05:26Z — did NOT register (beacon-pending[4] still pending, chat_id=null, G-rule 3/3 DM-drop); Beacon explained at 05:29Z.** Forge building review-ceiling-fit-monitor-build (PID 3976734, ~16 min elapsed, resume=b02d3296). PR #731 pipeline dead (carry). PR #733 REVIEW_ESCALATE + approval non-functional (carry). All daemons alive (PIDs 3961026/3961281/3961345). Watchdog 05:28:56Z healthy. **Larry HOLD directive active.** PRIME: 0 new interventions (iter_clean, ratio≈17.38).
 
 
