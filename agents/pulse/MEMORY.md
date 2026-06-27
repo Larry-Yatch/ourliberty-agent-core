@@ -291,8 +291,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T07:45Z UTC (Iter ~3066, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T07:49Z UTC (Iter ~3067, Tier 1, consecutive_clean=0)
 
-**Iter ~3066 summary:** ✅ Nominal (iter_clean). 0 new alerts (watermark=1127=file_length). All daemons alive (PIDs 3961026/3961281/3961345). Watchdog 07:36:01Z healthy. Heal-daemon 07:34:21Z. PR #731 only open PR — pipeline dead, UNKNOWN, pr731-restore-revision-trap-gate-001 awaiting Larry. HOLD active. PR #737 unreviewed-merge (06:56:28Z, heal-detector not yet swept). PRIME: 0 new interventions (iter_clean), ratio≈17.39.
+**Iter ~3067 summary:** ⚠️ Check 3 non-nominal — `forge-revision-preamble-discipline-001` stall cooldown EXPIRED (previously cooldown-suppressed; healer would now fire live alerts). 0 new alerts (watermark=1127=file_length). All daemons alive (PIDs 3961026/3961281/3961345). Watchdog 07:46:06Z healthy. Heal-daemon 07:44:22Z. PR #731 only open PR — pipeline dead, UNKNOWN, pr731-restore-revision-trap-gate-001 awaiting Larry. HOLD active. PR #737 unreviewed-merge (not yet swept). PRIME: 0 new interventions (iter_clean), ratio≈17.39.
 
 
