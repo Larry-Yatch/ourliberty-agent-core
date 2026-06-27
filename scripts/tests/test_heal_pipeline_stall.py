@@ -27,7 +27,7 @@ import time
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 _SCRIPTS_DIR = Path(__file__).resolve().parent.parent
 if str(_SCRIPTS_DIR) not in sys.path:
@@ -3629,6 +3629,336 @@ class TestCheckRedMirrorStatusNoArtifact(_TempAgentsRootMixin, unittest.TestCase
         rec = self._fle.get('mirror-review:silent-red')
         self.assertIsInstance(rec, dict)
         self.assertIs(rec['resolved'], False)
+
+
+# ===================================================================
+# Phase 2 #1 — heal_pipeline_stall noise reduction
+# (episode-dedup + merge-truth gate + laptop-PR suppression)
+# Spec: agents/beacon/specs/heal-pipeline-stall-noise-reduction.md
+# ===================================================================
+
+
+class TestEpisodeDedup(_TempAgentsRootMixin, unittest.TestCase):
+    """Spec §1 / acceptance criterion 1. A slow-PR condition that persists
+    across consecutive hourly ticks must alert ONCE per episode (re_dm_hours
+    backstop), not once per legacy ALERT_DEDUP_HOURS — and a second alert only
+    after the backstop elapses. A different PR alerts independently."""
+
+    def _count_fires(self, window, *, n_ticks=8, interval_min=70):
+        """Replay the run()-loop cooldown gate (`should_alert` →
+        `record_alert`) across `n_ticks` ticks spaced `interval_min` apart, with
+        a frozen clock advanced per tick. Returns how many ticks would DM.
+
+        `interval_min=70` (slightly over an hour) mirrors the real cron cadence:
+        under the legacy 1h window every tick clears the cooldown and re-DMs;
+        under the 24h episode window only the onset tick fires."""
+        state: dict = {}
+        key = 'unrouted_open_pr:Larry-Yatch/ourliberty-agent-core:86'
+        base = datetime(2026, 6, 23, 5, 0, tzinfo=timezone.utc)
+        fires = 0
+        fake = MagicMock(wraps=datetime)
+        with patch.object(self.hps, 'datetime', fake):
+            for i in range(n_ticks):
+                fake.now.return_value = base + timedelta(minutes=i * interval_min)
+                if self.hps.should_alert(state, key, window):
+                    fires += 1
+                    self.hps.record_alert(state, key)
+        return fires
+
+    def test_eight_hourly_ticks_episode_window_fires_once(self) -> None:
+        # PR #86's live shape: 8 ticks, ~70 min apart. Episode (24h) → 1 DM.
+        self.assertEqual(self._count_fires(24), 1)
+
+    def test_eight_hourly_ticks_legacy_window_fires_every_tick(self) -> None:
+        # Honesty companion: the SAME cadence under the flat 1h window re-DMs
+        # every tick (the bug we're fixing — PR #86 fired 8x). Proves the test
+        # cadence genuinely clears a 1h cooldown, so the single-fire result
+        # above is the window's doing, not a too-tight cadence.
+        self.assertEqual(self._count_fires(self.hps.ALERT_DEDUP_HOURS), 8)
+
+    def test_second_alert_after_24h_backstop(self) -> None:
+        # Onset fires; a tick just before 24h is silent; a tick past 24h re-DMs.
+        state: dict = {}
+        key = 'unrouted_open_pr:x:1'
+        base = datetime(2026, 6, 23, 5, 0, tzinfo=timezone.utc)
+        fake = MagicMock(wraps=datetime)
+        with patch.object(self.hps, 'datetime', fake):
+            fake.now.return_value = base
+            self.assertTrue(self.hps.should_alert(state, key, 24))
+            self.hps.record_alert(state, key)
+            fake.now.return_value = base + timedelta(hours=23)
+            self.assertFalse(self.hps.should_alert(state, key, 24))
+            fake.now.return_value = base + timedelta(hours=25)
+            self.assertTrue(self.hps.should_alert(state, key, 24))
+
+    def test_different_pr_alerts_independently(self) -> None:
+        # One PR already on cooldown must not suppress a different PR's onset.
+        state = {
+            'unrouted_open_pr:x:86': datetime.now(timezone.utc).isoformat(),
+        }
+        self.assertFalse(
+            self.hps.should_alert(state, 'unrouted_open_pr:x:86', 24))
+        self.assertTrue(
+            self.hps.should_alert(state, 'unrouted_open_pr:x:99', 24))
+
+    def test_slow_pr_checks_stamp_episode_window(self) -> None:
+        # The four slow-PR checks must carry re_dm_hours so the gate applies the
+        # episode window (criterion 1 is meaningless if the alert omits it).
+        lines = [_watcher_forge_done_line('episode-task-001', minutes_ago=180)]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]['re_dm_hours'], 24)
+
+
+class TestMergeTruthGate(_TempAgentsRootMixin, unittest.TestCase):
+    """Spec §2 / acceptance criterion 2. Before emitting a per-PR alert, the
+    run() loop confirms the PR is non-terminal via `gh pr view`; a MERGED/CLOSED
+    PR is suppressed. Degrades safe: an unreadable state stays alertable."""
+
+    def _unrouted_pr(self, number=86, repo='Larry-Yatch/ourliberty-agent-core'):
+        return {
+            'number': number,
+            'headRefName': f'larry/manual-pr-{number}',
+            'title': 'feat: x',
+            'createdAt': (
+                datetime.now(timezone.utc) - timedelta(minutes=180)
+            ).isoformat(),
+            '_repo': repo,
+        }
+
+    # ---- helper-level: _pr_is_terminal truth table + cache ----
+
+    def test_pr_is_terminal_merged_and_closed(self) -> None:
+        for st in ('MERGED', 'CLOSED'):
+            with patch.object(self.hps, '_gh_pr_state', return_value=st):
+                self.assertTrue(self.hps._pr_is_terminal('u', {}))
+
+    def test_pr_is_terminal_open_is_alertable(self) -> None:
+        with patch.object(self.hps, '_gh_pr_state', return_value='OPEN'):
+            self.assertFalse(self.hps._pr_is_terminal('u', {}))
+
+    def test_pr_is_terminal_unreadable_degrades_safe(self) -> None:
+        # gh outage → None → NOT terminal → still alertable (never a silent drop).
+        with patch.object(self.hps, '_gh_pr_state', return_value=None):
+            self.assertFalse(self.hps._pr_is_terminal('u', {}))
+
+    def test_pr_is_terminal_caches_per_url(self) -> None:
+        cache: dict = {}
+        with patch.object(self.hps, '_gh_pr_state',
+                          return_value='MERGED') as mock_gh:
+            self.hps._pr_is_terminal('u', cache)
+            self.hps._pr_is_terminal('u', cache)
+        self.assertEqual(mock_gh.call_count, 1)  # one gh call for two checks
+
+    # ---- run()-level: merged PR produces zero alerts ----
+
+    def test_merged_pr_produces_zero_alerts(self) -> None:
+        pr = self._unrouted_pr()
+        with patch.object(self.hps, '_all_open_prs', return_value=[pr]), \
+             patch.object(self.hps, '_all_merged_prs_recent', return_value=[]), \
+             patch.object(self.hps, '_read_recent_log_lines', return_value=[]), \
+             patch.object(self.hps, '_read_recent_routing_events', return_value=[]), \
+             patch.object(self.hps, '_resolution_signal_present',
+                          return_value=(False, None)), \
+             patch.object(self.hps, '_mirror_session_active_for_pr',
+                          return_value=(False, None)), \
+             patch.object(self.hps, '_gh_pr_state', return_value='MERGED'), \
+             patch.object(self.hps.larry_alerts, 'append_alert',
+                          return_value=True) as mock_alert:
+            self.hps.run()
+        mock_alert.assert_not_called()
+
+    def test_same_fixture_open_pr_still_alerts(self) -> None:
+        # Honesty companion: the SAME unrouted fixture, gh-confirmed OPEN, DOES
+        # alert — so the zero-alert result above is the gate, not a dead fixture.
+        pr = self._unrouted_pr()
+        with patch.object(self.hps, '_all_open_prs', return_value=[pr]), \
+             patch.object(self.hps, '_all_merged_prs_recent', return_value=[]), \
+             patch.object(self.hps, '_read_recent_log_lines', return_value=[]), \
+             patch.object(self.hps, '_read_recent_routing_events', return_value=[]), \
+             patch.object(self.hps, '_resolution_signal_present',
+                          return_value=(False, None)), \
+             patch.object(self.hps, '_mirror_session_active_for_pr',
+                          return_value=(False, None)), \
+             patch.object(self.hps, '_gh_pr_state', return_value='OPEN'), \
+             patch.object(self.hps.larry_alerts, 'append_alert',
+                          return_value=True) as mock_alert:
+            self.hps.run()
+        subjects = [c.kwargs.get('subject') for c in mock_alert.call_args_list]
+        self.assertIn('pipeline-stall:unrouted-pr:PR#86', subjects)
+
+
+class TestLaptopPrSuppression(_TempAgentsRootMixin, unittest.TestCase):
+    """Spec §3 / acceptance criterion 3. A laptop-authored PR (`claude/` branch,
+    or `fix|feat|chore`-shaped) whose review was dispatched under the synthetic
+    `pr-<repo>-<num>` task_id must NOT false-alert as unrouted; the same PR with
+    NO dispatch still alerts once (detection preserved)."""
+
+    _REPO = 'Larry-Yatch/ourliberty-agent-core'
+
+    def _pr(self, number, branch):
+        return {
+            'number': number,
+            'headRefName': branch,
+            'title': 'fix: laptop change',
+            'createdAt': (
+                datetime.now(timezone.utc) - timedelta(minutes=180)
+            ).isoformat(),
+            '_repo': self._REPO,
+        }
+
+    def _pr_dispatch_event(self, number):
+        # The review-request a laptop PR's dispatch logs: task_id is the
+        # synthetic pr-<repo>-<num>, not a forge/<task> branch token.
+        return {
+            'source_agent': 'beacon',
+            'target_agent_final': 'mirror',
+            'phase': 'review',
+            'task_id': f'pr-ourliberty-agent-core-{number}',
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+        }
+
+    def _run_check(self, prs, events):
+        with patch.object(self.hps, '_resolution_signal_present',
+                          return_value=(False, None)), \
+             patch.object(self.hps, '_mirror_session_active_for_pr',
+                          return_value=(False, None)):
+            return self.hps.check_unrouted_open_prs(prs, events, {})
+
+    def test_claude_branch_with_pr_dispatch_suppressed(self) -> None:
+        prs = [self._pr(640, 'claude/some-laptop-task')]
+        alerts = self._run_check(prs, [self._pr_dispatch_event(640)])
+        self.assertEqual(alerts, [])
+
+    def test_fix_labeled_branch_with_pr_dispatch_suppressed(self) -> None:
+        # A `fix/`-prefixed laptop branch yields no branch_task, but its
+        # pr-<repo>-<num> dispatch still suppresses via _pr_dispatch_task_id.
+        prs = [self._pr(641, 'fix/laptop-bug')]
+        alerts = self._run_check(prs, [self._pr_dispatch_event(641)])
+        self.assertEqual(alerts, [])
+
+    def test_claude_branch_no_dispatch_still_alerts(self) -> None:
+        # Detection preserved: no review dispatched → exactly one alert.
+        prs = [self._pr(642, 'claude/undispatched-task')]
+        alerts = self._run_check(prs, [])
+        self.assertEqual(len(alerts), 1)
+        self.assertIn('PR #642', alerts[0]['message'])
+
+    def test_task_id_from_branch_recognizes_claude_prefix(self) -> None:
+        self.assertEqual(
+            self.hps._task_id_from_branch('claude/my-task-001'), 'my-task-001')
+
+    def test_pr_dispatch_task_id_form(self) -> None:
+        self.assertEqual(
+            self.hps._pr_dispatch_task_id(
+                {'_repo': self._REPO, 'number': 642}),
+            'pr-ourliberty-agent-core-642')
+        # Malformed PR → None (no crash).
+        self.assertIsNone(self.hps._pr_dispatch_task_id({'number': 1}))
+        self.assertIsNone(self.hps._pr_dispatch_task_id({'_repo': self._REPO}))
+
+
+class TestNovelStallNoRegression(_TempAgentsRootMixin, unittest.TestCase):
+    """Acceptance criterion 4. A genuinely novel stall — a forge/ PR, open,
+    non-terminal, no dispatch, past the age floor — still alerts EXACTLY once.
+    The noise-reduction changes suppress duplicates/terminals/in-progress, never
+    a first genuine alert."""
+
+    def test_novel_forge_stall_alerts_once(self) -> None:
+        pr = {
+            'number': 314,
+            'headRefName': 'forge/novel-stall-001',
+            'title': 'feat: novel',
+            'createdAt': (
+                datetime.now(timezone.utc) - timedelta(minutes=180)
+            ).isoformat(),
+            '_repo': 'Larry-Yatch/ourliberty-agent-core',
+        }
+        with patch.object(self.hps, '_resolution_signal_present',
+                          return_value=(False, None)), \
+             patch.object(self.hps, '_mirror_session_active_for_pr',
+                          return_value=(False, None)):
+            alerts = self.hps.check_unrouted_open_prs([pr], [], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertIn('PR #314', alerts[0]['message'])
+        # The alert carries the episode window + the gate's pr_url, and stays
+        # retraction-compatible on the stable key.
+        self.assertEqual(alerts[0]['re_dm_hours'], 24)
+        self.assertIn('pr_url', alerts[0])
+        self.assertEqual(
+            alerts[0]['key'],
+            'unrouted_open_pr:Larry-Yatch/ourliberty-agent-core:314')
+
+
+class TestStallRulesConfig(_TempAgentsRootMixin, unittest.TestCase):
+    """Acceptance criterion 5. Config defaults load when the file is absent;
+    per-check overrides are read when present; malformed/bad values fall back to
+    the code defaults without raising."""
+
+    @contextlib.contextmanager
+    def _config_path(self, body=None):
+        """Point PIPELINE_STALL_RULES_FILE at a temp path. `body=None` leaves
+        the path absent; a str is written verbatim (to exercise malformed JSON);
+        a dict is json-dumped."""
+        d = tempfile.TemporaryDirectory()
+        try:
+            path = Path(d.name) / 'pipeline-stall-rules.json'
+            if body is not None:
+                path.write_text(body if isinstance(body, str)
+                                else json.dumps(body))
+            with patch.object(self.hps, 'PIPELINE_STALL_RULES_FILE', path):
+                yield
+        finally:
+            d.cleanup()
+
+    def test_defaults_when_file_absent(self) -> None:
+        with self._config_path(None):
+            self.assertEqual(self.hps.re_dm_hours_for('unrouted_open_pr'), 24)
+            # Unnamed slow-PR check falls back to _default.
+            self.assertEqual(self.hps.re_dm_hours_for('some_other_check'), 24)
+
+    def test_override_when_present(self) -> None:
+        body = {'re_dm_hours': {'_default': 12, 'unrouted_open_pr': 3}}
+        with self._config_path(body):
+            self.assertEqual(self.hps.re_dm_hours_for('unrouted_open_pr'), 3)
+            # _default override applies to unnamed checks.
+            self.assertEqual(self.hps.re_dm_hours_for('unnamed_check'), 12)
+            # A check absent from the file keeps its code default.
+            self.assertEqual(self.hps.re_dm_hours_for('forge_built_no_pr'), 24)
+
+    def test_malformed_json_falls_back_to_defaults(self) -> None:
+        with self._config_path('{not valid json'):
+            self.assertEqual(self.hps.re_dm_hours_for('unrouted_open_pr'), 24)
+
+    def test_non_object_top_level_falls_back(self) -> None:
+        with self._config_path('[1, 2, 3]'):
+            self.assertEqual(self.hps.re_dm_hours_for('unrouted_open_pr'), 24)
+
+    def test_bad_values_keep_per_key_default(self) -> None:
+        # Zero, negative, bool, and non-numeric values are each rejected; the
+        # code default for that key survives, valid siblings still apply.
+        body = {'re_dm_hours': {
+            'unrouted_open_pr': 0,
+            'forge_built_no_pr': -5,
+            'mirror_pass_unmerged': True,
+            'pr_no_mirror_dispatch': 'soon',
+            '_default': 6,
+        }}
+        with self._config_path(body):
+            self.assertEqual(self.hps.re_dm_hours_for('unrouted_open_pr'), 24)
+            self.assertEqual(self.hps.re_dm_hours_for('forge_built_no_pr'), 24)
+            self.assertEqual(self.hps.re_dm_hours_for('mirror_pass_unmerged'), 24)
+            self.assertEqual(
+                self.hps.re_dm_hours_for('pr_no_mirror_dispatch'), 24)
+            # The valid _default override is still honored.
+            self.assertEqual(self.hps.re_dm_hours_for('unnamed'), 6)
+
+    def test_shipped_config_file_loads_cleanly(self) -> None:
+        # The real config/pipeline-stall-rules.json shipped in this PR must parse
+        # and yield the documented 24h windows (no patch — exercises the actual
+        # file the healer reads in production).
+        self.assertEqual(self.hps.re_dm_hours_for('unrouted_open_pr'), 24)
+        self.assertEqual(self.hps.re_dm_hours_for('forge_built_no_pr'), 24)
 
 
 if __name__ == '__main__':
