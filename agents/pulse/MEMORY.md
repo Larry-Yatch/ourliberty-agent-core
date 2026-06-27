@@ -291,8 +291,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T05:21Z UTC (Iter ~3048, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T05:28Z UTC (Iter ~3049, Tier 1, consecutive_clean=0)
 
-**Iter ~3048 summary:** ✅ Nominal (iter_clean). 0 new alerts (watermark 1113, no new). review-ceiling-fit-monitor sequence advancing: headless-approval at 05:14:58Z, Forge ack-proceed at 05:17:08Z, build-phase dispatched at 05:17:09Z — Forge actively building `heal_review_ceiling_fit.py + timer + tests`. G-rule decision-needed-approval-forge-dispatch-no-target-repo-001 reached 3/3 (DM drop 05:14:28Z for PR #733); dispatch deferred under HOLD. Larry asked "what happened to 733?" at 05:17:43Z; Beacon answered at 05:18:45Z. PR #731 pipeline dead (carry). PR #733 REVIEW_ESCALATE awaiting Larry (carry). All daemons alive (PIDs 3961026/3961281/3961345). Watchdog 05:18:50Z healthy. Heal-daemon 05:13:47Z ✅. **Larry HOLD directive active.** PRIME: 0 new interventions (iter_clean, ratio≈17.38).
+**Iter ~3049 summary:** ✅ Nominal (iter_clean). 0 new alerts (watermark 1113, no new). Forge building review-ceiling-fit-monitor-build (PID 3976734, ~10 min elapsed, resume=b02d3296). PR #731 pipeline dead (carry). PR #733 REVIEW_ESCALATE awaiting Larry (carry, DM drop G-rule 3/3 HOLD). All daemons alive (PIDs 3961026/3961281/3961345). Watchdog 05:23:50Z healthy. Heal-daemon 05:23:49Z ✅. **Larry HOLD directive active.** PRIME: 0 new interventions (iter_clean, ratio≈17.38).
 
 
