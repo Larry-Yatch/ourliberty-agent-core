@@ -1054,6 +1054,43 @@ def build_review_bounded_step_system_prompt():
     )
 
 
+# Hard wall-clock ceiling on a SINGLE Mirror review session, enforced by the
+# dispatcher (run_claude) independent of whether the Mirror model obeys the
+# bounded-step instruction. A hung review holds the single-holder `inbox:mirror`
+# lease and starves EVERY queued review until the process dies. The prompt-
+# injected `run_review_step.sh` guidance (build_review_bounded_step_system_prompt)
+# is advisory — the model can ignore it, and has, three times (#101 71m, #334
+# 102m, #717/#720 85-100m, and the laptop-PR jam #713). This ceiling is the
+# MANDATORY backstop: the harness kills the session at the wall clock and (for a
+# review) escalates it as inconclusive, so a wedge starves the queue for at most
+# this long instead of up to the 14400s session default or until a human kills
+# it. Tunable via env for incident response without a code change; <=0 disables.
+REVIEW_SESSION_CEILING_SECONDS = int(
+    os.environ.get('OL_REVIEW_SESSION_CEILING_SECONDS', '2100')  # 35 min
+)
+
+
+def review_session_effective_timeout(timeout, phase, expected_agent):
+    """The wall-clock ceiling run_claude should enforce for this dispatch.
+
+    Returns the caller's timeout (or the 14400s session default when
+    ``timeout <= 0``), except a Mirror review (``phase == 'review'`` AND
+    ``expected_agent == 'mirror'``) is additionally capped at
+    ``REVIEW_SESSION_CEILING_SECONDS`` when that ceiling is enabled (> 0). Pure
+    + centralized so the spawn path and the tests share one source of truth —
+    same gate as review_bounded_step_reminder_args, but this one is the
+    MANDATORY backstop (the reminder is advisory; the model can ignore it).
+    """
+    base = timeout if timeout and timeout > 0 else 14400
+    if (
+        str(phase).strip().lower() == 'review'
+        and str(expected_agent).strip().lower() == 'mirror'
+        and REVIEW_SESSION_CEILING_SECONDS > 0
+    ):
+        return min(base, REVIEW_SESSION_CEILING_SECONDS)
+    return base
+
+
 def review_bounded_step_reminder_args(phase, expected_agent):
     """Return the CLI args that inject the bounded-step reminder.
 
@@ -1378,8 +1415,18 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                 except (BrokenPipeError, OSError):
                     pass
 
-                # Poll for completion + cancel check
-                effective_timeout = timeout if timeout > 0 else 14400
+                # Poll for completion + cancel check. The effective ceiling is
+                # the caller's timeout, except a Mirror review is additionally
+                # capped at the mandatory REVIEW_SESSION_CEILING_SECONDS — see
+                # review_session_effective_timeout. Harness-enforced so it holds
+                # even when the review ignores the (advisory) bounded-step
+                # instruction. Covers EVERY path into Mirror review: both the
+                # Forge-dispatched review and the session-less human/laptop-PR
+                # review go through `_dispatch_mirror_review` (phase='review')
+                # and spawn here, so both inherit the ceiling.
+                effective_timeout = review_session_effective_timeout(
+                    timeout, phase, expected_agent,
+                )
                 elapsed = 0
                 cancelled = False
                 while proc.poll() is None:
@@ -1402,7 +1449,15 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                             break
                     # Timeout check
                     if elapsed >= effective_timeout:
-                        log(agent_id, 'Timeout after ' + str(timeout) + 's', 'ERROR')
+                        log(agent_id, 'Timeout after ' + str(effective_timeout) + 's', 'ERROR')
+                        # Signal the timeout to the caller via out_meta so a
+                        # review dispatch can synthesize a clean REVIEW_ESCALATE
+                        # (inconclusive) instead of stranding as a generic
+                        # non-success that force-merges or burns marker-error
+                        # retries (#713). Set BEFORE the kill so it survives.
+                        if out_meta is not None:
+                            out_meta['timed_out'] = True
+                            out_meta['timeout_seconds'] = effective_timeout
                         proc.terminate()
                         try:
                             proc.wait(timeout=10)

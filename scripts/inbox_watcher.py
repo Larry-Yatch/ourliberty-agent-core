@@ -380,6 +380,12 @@ def _build_outbox(agent: str, task_id: str, task: dict, task_file: Path,
         "claude_session_id": session_id,
         "cost_usd": meta.get("cost_usd"),
         "usage": meta.get("usage"),
+        # Harness-enforced review-ceiling signal (run_claude sets meta['timed_out']
+        # when it kills a session at the wall clock). Surfaced on the outbox so
+        # outbox_notifier can synthesize a clean REVIEW_ESCALATE for a timed-out
+        # phase=review session instead of raising a marker-error.
+        "timed_out": bool(meta.get("timed_out")),
+        "timeout_seconds": meta.get("timeout_seconds"),
     }
     # Phase D3 commit 4a: propagate preflight envelope fields so the notifier
     # can apply marker-driven routing decisions (clarification budget, intent
