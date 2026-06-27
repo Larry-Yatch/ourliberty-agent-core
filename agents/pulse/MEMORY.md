@@ -285,8 +285,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T03:17Z UTC (Iter ~3030, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T03:22Z UTC (Iter ~3031, Tier 1, consecutive_clean=0)
 
-**Iter ~3030 summary:** ⚠️ Drift (carry). 1 new alert L1103 (dispatch-branch-cleanup → Tier-3 silence). All daemons alive (beacon-bot 3821234, inbox-watcher 3891784, outbox-notifier 3822088). HEAD=726abaf3=origin/main (in sync). Still dirty M config/alert-translations.json (blocks sync). PR #731 OPEN — pipeline loop dead. 4 beacon-pending approvals (carries). **Larry HOLD directive active** (21:10 MDT 2026-06-26): "stop posting fixes, drain existing work" — Beacon locked in as standing directive. Alert watermark: 1103. PRIME: intervention (ratio≈17.20).
+**Iter ~3031 summary:** ⚠️ Drift (carry). 0 new alerts. All daemons alive (beacon-bot 3821234, inbox-watcher 3891784, outbox-notifier 3822088). HEAD=e7704596=origin/main (in sync). Still dirty M config/alert-translations.json (blocks sync). PR #731 OPEN — pipeline loop dead. 4 beacon-pending approvals (carries). **Larry HOLD directive active** (21:10 MDT 2026-06-26): "stop posting fixes, drain existing work" — Beacon locked in as standing directive. Larry 21:17 MDT asked about PR #731, Beacon replied (correct answer: not cleanly draining). Alert watermark: 1103. PRIME: intervention (ratio≈17.22).
 
 
