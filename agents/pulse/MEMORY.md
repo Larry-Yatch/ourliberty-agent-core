@@ -285,8 +285,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T01:43Z UTC (Iter ~3019, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T01:53Z UTC (Iter ~3020, Tier 1, consecutive_clean=0)
 
-**Iter ~3019 summary:** ✅ Nominal. 0 new alerts. All daemons alive (beacon-bot 3821234, inbox-watcher 3891784, outbox-notifier 3822088). HEAD=8038a5b1=origin/main (wrapper auto-committed iter ~3018 at 01:40:35Z). Still dirty M config/alert-translations.json (blocks sync). PR #731 still OPEN awaiting Larry "Go" on pr731-restore-revision-trap-gate-001. Pipeline stall cooldown re-engaged after live fire at L1090. 3 active APPROVAL_REQUESTs: tier3-silence-auto-restart-failed-001, pr731-restore-revision-trap-gate-001, silence-ourliberty-health-clean-tree-001. Alert watermark: 1093. PRIME: intervention (ratio≈17.06).
+**Iter ~3020 summary:** ✅ Nominal. 1 new alert L1094 (ourliberty-health clean-tree Tier-4 VP — already DM'd by outbox-notifier; fix silence-ourliberty-health-clean-tree-001 in beacon-pending[3]). All daemons alive (beacon-bot 3821234, inbox-watcher 3891784, outbox-notifier 3822088). HEAD=98babc09=origin/main (in sync). Still dirty M config/alert-translations.json (blocks sync). PR #731 still OPEN awaiting Larry "Go" on pr731-restore-revision-trap-gate-001 (mirror-review check=FAILURE expected). Pipeline stall cooldown active. 3 active APPROVAL_REQUESTs: tier3-silence-auto-restart-failed-001, pr731-restore-revision-trap-gate-001, silence-ourliberty-health-clean-tree-001. Alert watermark: 1094. PRIME: intervention (ratio≈17.06).
 
 
