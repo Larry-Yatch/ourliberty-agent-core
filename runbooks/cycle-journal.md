@@ -5,6 +5,93 @@
 ---
 
 
+## Iteration ~3015 — 2026-06-27T01:17Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean=0)
+
+**Trigger:** Larry `/cycle` via chat.
+
+**Health:** ✅ Nominal. 1 new Tier-3 alert (heal-stale-daemon-code auto-restarted inbox-watcher, expected behavior). All daemons alive after restart. Dirty tree carry continues.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Dirty tree (re-verified): M config/alert-translations.json CARRY** — `git diff` confirms: pending `auto-restart-failed` translation entry written locally by Beacon but not yet committed. Blocked on tier3-silence-auto-restart-failed-001 approval. [yellow, carry]
+- **Sync (re-verified):** status=error "Uncommitted changes in working tree", last_sync=2026-06-27T00:51:19Z (~26 min ago). Under 2h. Root cause: dirty tree. [yellow, carry]
+- **PR #731 (re-verified):** OPEN, mergeable=UNKNOWN, reviewDecision="". pr731-restore-revision-trap-gate-001 beacon-pending[2], chat_id=7998341473. Awaiting Larry "Go". [ask-then-do, carry]
+- **silence-ourliberty-health-clean-tree-001 (re-verified):** beacon-pending[3], chat_id=7998341473. Awaiting Larry "Go". [carry]
+- **tier3-silence-auto-restart-failed-001 (re-verified):** beacon-pending[1], chat_id=7998341473. Awaiting Larry "Go". [carry]
+- **Watchdog (re-verified):** last tick 19:13:15 MDT (01:13:15Z), ~4 min ago. ✅
+- **Heal-daemon heartbeat (re-verified):** 2026-06-27T01:11:47Z (~6 min). Under 60 min. ✅
+- **Pipeline stall (re-verified):** dry-run → "no stalls detected". forge-revision-preamble-discipline-001 cooldown-suppressed. ✅
+
+**Check 0 — Alert triage (watermark 1089→1090):**
+- **Line 1090** — `source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-inbox-watcher.service` (ts 01:11:53Z): **Tier-3 silence** (known-pattern match). heal-stale-daemon-code auto-restarted inbox-watcher because inbox_watcher.py mtime was 140.3 min newer than service active-since (PR #732 code landed). New PID 3891784 confirmed alive. Routine self-heal success. No DM to Larry. ✅
+- Watermark advanced: 1089→1090. No tier-reset (Tier-3). ✅
+
+**Check 1 — Log noise (new since iter ~3014, after 01:12Z):**
+- outbox-notifier.log: Last entries at 19:02:21 MDT (01:02:21Z). No new entries since. 0 new WARNs. ✅ NOMINAL.
+
+**Check 2 — Telegram sweep (new since iter ~3014):**
+- No new Larry messages detected. ✅ NOMINAL.
+
+**Check 3 — Pipeline stall (dry-run):**
+- 0 stalls. forge-revision-preamble-discipline-001 cooldown-suppressed. All others FORGE_NO_PR_SKIP. ✅
+
+**Check 4 — Pending directives:**
+- beacon-pending-approvals.json: 4 entries (unchanged from iter ~3014):
+  - Entry [0]: id=mirror-review-silence-ourliberty-health-sync-push-failed-001, chat_id=None (stale — PR #728 merged). [carry]
+  - Entry [1]: id=tier3-silence-auto-restart-failed-001 — ACTIVE, chat_id=7998341473. Awaiting Larry "Go". [carry]
+  - Entry [2]: id=pr731-restore-revision-trap-gate-001 — ACTIVE, chat_id=7998341473. Awaiting Larry "Go". [carry]
+  - Entry [3]: id=silence-ourliberty-health-clean-tree-001 — ACTIVE, chat_id=7998341473. Awaiting Larry "Go". [carry]
+- No new unhandled Larry directives. ✅
+
+**Check 5 — Stale daemon code:**
+- Heartbeat: 2026-06-27T01:11:47Z (~6 min). Under 60 min. ✅
+
+**Check A — Source repo:** HEAD=1bad204d=origin/main (in sync). On main. M config/alert-translations.json (dirty). [yellow carry — blocks sync]
+**Check B — Sync health:** status=error (dirty tree), last_sync=00:51:19Z (~26 min). Under 2h. [yellow carry]
+**Check C — Agent liveness:** beacon-bot PID 3821234 ✅. outbox-notifier PID 3822088 ✅. inbox-watcher: was PID 3822087 (auto-restarted at 01:11:53Z by heal-stale-daemon-code), now PID 3891784 ✅. Watchdog 01:13:15Z ✅. Heal-daemon 01:11:47Z ✅. **All expected daemons alive.**
+**Check E — PRs:**
+- **PR #731** — OPEN, MERGEABLE=UNKNOWN, reviewDecision="". pr731-restore-revision-trap-gate-001 pending Larry. [ask-then-do, carry]
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Saturday 2026-06-27 UTC (weekday=5):**
+- Check I: Saturday — not in firing set (Mon/Wed/Fri/Sun). Skip. ✅
+- Check III: Not Sunday. Skip. ✅
+
+**G-rule assessment:** No changes from iter ~3014. All carries.
+
+**Actions taken:**
+1. Check 0: triaged 1 new alert (1089→1090). Tier-3 silence. Watermark advanced. ✅
+2. §5.0: all no-op. ✅
+3. PRIME ledger: intervention appended (tier 1, dirty-tree-carry, iter ~3015). ✅
+4. Tier state: record --checks-clean false → Tier 1, consecutive_clean=0, last_signal_at=2026-06-27T01:17:59Z. ✅
+
+**Escalations:** None. All findings are known-pattern or known-standing carries. No new Tier-4 alerts, no new dispatches.
+
+**Standing findings (carried + verified):**
+- [yellow] **Dirty tree** — M config/alert-translations.json (pending auto-restart-failed translation entry). Blocks sync. Self-resolves when Larry approves tier3-silence-auto-restart-failed-001 AND silence-ourliberty-health-clean-tree-001. [carry]
+- [yellow] **PR #731 — pipeline stuck** — Awaiting Larry "Go" on pr731-restore-revision-trap-gate-001. [carry]
+- [yellow] **tier3-silence-auto-restart-failed-001 APPROVAL_REQUEST** — beacon-pending[1], awaiting Larry. [carry]
+- [yellow] **Stale beacon-pending[0]** — mirror-review-silence-ourliberty-health-sync-push-failed-001, PR #728 merged, chat_id=None. [carry]
+- [yellow] **unreviewed-merge:723** — Larry judgment. [carry]
+- [yellow] **unreviewed-merge:713** — Larry judgment. [carry]
+- [yellow] **Zombie PID 1834248** — bash poll loop (29d+). Ask-then-do. [carry]
+- [yellow] **6 stale journalctl PIDs (31d+)** — Ask-then-do. [carry]
+- [yellow] **forge-wip-redispatch-digest Forge dispatch** — Beacon fix designed. Trust-policy approval pending. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — approve check-viii-update-2026-06-15. Awaiting Larry. [carry]
+- [yellow] **Check III threshold proposals** — approve threshold-update-2026-06-11. Awaiting Larry. [carry]
+- [yellow] **unreviewed-merge:710/709** — Larry judgment. [carry]
+- [blue] **silence-ourliberty-health-clean-tree-001 — APPROVAL_REQUEST DELIVERED** — beacon-pending[3], chat_id=7998341473. [carry]
+- [blue] **inbox-watcher PID 3822087 → 3891784** — heal-stale-daemon-code auto-restarted at 01:11:53Z (PR #732 code). PID confirmed alive. ✅
+- [blue] **G-rules (unchanged):** sentinel-inflight-stall-mirror-tier4 (2/3), review-duplicate-dispatch-wip-redispatch (vp), check-i-force-bypass-dm-route (2/3), heal-daemon-restart-manifest-drift (2/3), no-session-revision-merged-pr-fp-001 (1/3), unrouted-open-pr-auto-merge-held-fp-001 (1/3), forge-wip-redispatch-digest-tier4-001 (dispatched vp), forge-wip-redispatch-exhausted-pr-exists-fp-001 (2/3), heal-stale-daemon-code-still-stale-after-restart (1/3), outbox-notifier-notification-intent-reject-tier4-001 (2/3), no-session-revision-active-mirror-session-fp-001 (DISPATCHED ✅ vp), mirror-runner-missing-worktree-retry-001 (1/3), forge-revision-preamble-missing-pr711-001 (DISPATCHED ✅ vp), heal-stale-daemon-code-auto-restart-failed-self-recovered (DISPATCHED ✅ vp), ourliberty-health-clean-tree-dirty-tier4-001 (DISPATCHED ✅ vp), decision-needed-approval-forge-dispatch-no-target-repo-001 (1/3).
+- [blue] **unreviewed-merge:649/637/655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+
+**PRIME DIRECTIVE:** intervention. Trailing-30d: interventions≈1344, systemic_fixes=79, vp=28+2, ratio≈17.01.
+**Tier end-of-iter:** Tier **1** (non-clean: dirty tree carry; consecutive_clean=0; last_signal_at=2026-06-27T01:17:59Z).
+
+---
+
+
 ## Iteration ~3014 — 2026-06-27T01:12Z UTC (interactive /cycle via chat, Tier 1, consecutive_clean=0)
 
 **Trigger:** Larry `/cycle` via chat.
