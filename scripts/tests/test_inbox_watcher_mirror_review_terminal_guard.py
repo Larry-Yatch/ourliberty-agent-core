@@ -47,6 +47,22 @@ import inbox_watcher  # noqa: E402
 
 _PR_URL = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/693'
 
+# A canonical REVIEW_PASS verdict block. The proceed-path tests stub run_claude
+# with this (not bare prose) so the mirror-marker self-validation gate
+# (mirror-marker-self-validate-gate-001) sees a clean marker and no-ops —
+# keeping run_claude.assert_called_once() the true measure of "the guard let the
+# review proceed," not an artifact of an unstubbed marker triggering re-prompts.
+_CLEAN_REVIEW_MARKER = (
+    "Reviewed the PR — looks good.\n\n"
+    "=== REVIEW_PASS ===\n"
+    '{\n'
+    f'  "pr_url": "{_PR_URL}",\n'
+    '  "summary": "ok",\n'
+    '  "task_id": "wip-redispatch-001"\n'
+    '}\n'
+    "=== END_REVIEW_PASS ===\n"
+)
+
 
 class MirrorReviewTerminalGuardTest(unittest.TestCase):
     def setUp(self):
@@ -63,7 +79,8 @@ class MirrorReviewTerminalGuardTest(unittest.TestCase):
 
         # run_claude is the expensive session — a MagicMock so we can both stub
         # the OPEN "proceeds" path and assert call/no-call.
-        self.run_claude = mock.MagicMock(return_value=(True, "ok", "sess-1"))
+        self.run_claude = mock.MagicMock(
+            return_value=(True, _CLEAN_REVIEW_MARKER, "sess-1"))
 
         self._patches = [
             mock.patch.object(inbox_watcher, "INBOXES_ROOT", self.inboxes),

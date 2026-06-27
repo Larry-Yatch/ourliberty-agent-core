@@ -161,6 +161,7 @@
         "scripts/inbox_dispatch_order.py",
         "scripts/inbox_watcher.py",
         "scripts/larry_alerts.py",
+        "scripts/mirror_review_handler.py",
         "scripts/pid_identity.py",
         "scripts/routing_validator.py",
         "scripts/safe_write_inbox.py",

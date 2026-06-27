@@ -45,6 +45,7 @@ import dispatch_validator  # noqa: E402
 import fixture_patterns  # noqa: E402
 from inbox_dispatch_order import order_pending, read_fast_tracked_at  # noqa: E402
 import larry_alerts  # noqa: E402
+import mirror_review_handler  # noqa: E402
 import routing_validator  # noqa: E402
 import safe_write_inbox  # noqa: E402
 import task_terminal_state  # noqa: E402
@@ -489,6 +490,153 @@ def _mirror_review_pr_terminal_state(task: dict):
     return state if state in task_terminal_state.TERMINAL_STATES else None
 
 
+# mirror-marker-self-validate-gate-001: default cap on the in-process verdict-
+# marker self-validation re-prompt loop. Overridable via config/agent-models.json
+# loop_bounds.mirror_marker_self_validate_retries.
+DEFAULT_MIRROR_MARKER_SELF_VALIDATE_RETRIES = 2
+
+
+def _load_marker_self_validate_retries(models_config: dict) -> int:
+    """Cap on in-process mirror verdict-marker self-validation re-prompts.
+
+    Read from config/agent-models.json `loop_bounds.mirror_marker_self_validate_retries`.
+    Falls back to DEFAULT_MIRROR_MARKER_SELF_VALIDATE_RETRIES for a missing key,
+    a non-int, a bool (json `true`/`false`), or a negative value — same defensive
+    shape as outbox_notifier's loop_bounds loaders.
+    """
+    loop_bounds = models_config.get("loop_bounds") if isinstance(models_config, dict) else None
+    if not isinstance(loop_bounds, dict):
+        return DEFAULT_MIRROR_MARKER_SELF_VALIDATE_RETRIES
+    raw = loop_bounds.get("mirror_marker_self_validate_retries")
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw < 0:
+        return DEFAULT_MIRROR_MARKER_SELF_VALIDATE_RETRIES
+    return raw
+
+
+def _mirror_marker_is_clean(output_text: str) -> tuple[bool, str | None]:
+    """True iff `output_text` carries exactly one valid REVIEW_* verdict marker.
+
+    Detection is mirror_review_handler.parse_mirror_marker — no new validation
+    logic. A missing marker (the parser returns marker_type None) OR any parse
+    failure (MalformedMirrorMarker for delimiter-without-JSON / bare-keyword /
+    loose-delimiter, MultipleMirrorMarkers for two-or-more blocks) is treated as
+    "not clean" and carries the parser's own diagnostic as err_msg.
+    """
+    try:
+        marker_type, _payload, _narrative = mirror_review_handler.parse_mirror_marker(
+            output_text
+        )
+    except (
+        mirror_review_handler.MalformedMirrorMarker,
+        mirror_review_handler.MultipleMirrorMarkers,
+    ) as e:
+        return False, str(e)
+    if marker_type is None:
+        return False, (
+            "No canonical verdict marker block found in the review output. A "
+            "review verdict requires one `=== REVIEW_PASS ===` (or REVIEW_REVISION "
+            "/ REVIEW_ESCALATE / REVIEW_EMERGENCY_HALT) block with a JSON body and "
+            "matching `=== END_XXX ===` delimiter."
+        )
+    return True, None
+
+
+def _mirror_marker_self_validate(
+    *,
+    agent: str,
+    task: dict,
+    output_text: str,
+    session_id: str | None,
+    working_dir: str | None,
+    model: str | None,
+    timeout: int,
+    task_id: str,
+    meta: dict,
+    models_config: dict,
+) -> tuple[str, str | None]:
+    """Bounded SAME-PROCESS verdict-marker self-validation for Mirror reviews.
+
+    mirror-marker-self-validate-gate-001. Mirror's first phase=review within
+    ~10-25 min of a mirror-bot restart can end with a malformed verdict marker
+    (prose-no-delimiter, or a `=== REVIEW_PASS ===` delimiter with no JSON body).
+    The existing outbox_notifier marker-error path corrects this, but each round
+    costs a cross-process notify cycle. This gate is a fast loop in FRONT of that
+    slow one: when a malformed/missing marker is detected here, re-invoke
+    run_claude under --resume with a terse correction prompt (capped, config-
+    driven), substituting the corrected output_text/session_id BEFORE the single
+    existing outbox write. On exhaust the best-effort output flows through
+    unchanged and the outbox_notifier net stays as the outer backstop.
+
+    Mirrors the bounded kickback in beacon_telegram_bot.py:750-798. Only fires
+    for agent=="mirror" + phase=="review" (the caller additionally gates on
+    run_claude success). Adds no new outbox; only substitutes output_text and
+    session_id.
+    """
+    if not (agent == "mirror" and task.get("phase") == "review"):
+        return output_text, session_id
+
+    clean, err_msg = _mirror_marker_is_clean(output_text)
+    if clean:
+        return output_text, session_id
+
+    max_retries = _load_marker_self_validate_retries(models_config)
+    attempt = 0
+    while attempt < max_retries:
+        attempt += 1
+        correction = (
+            f"Your previous review output on task `{task_id}` could not be parsed "
+            f"as a valid verdict marker (in-process self-validation retry {attempt} "
+            f"of {max_retries}). Error: {err_msg} Re-read your CLAUDE.md marker-"
+            f"discipline section and re-emit EXACTLY one valid REVIEW_* marker "
+            f"block: `=== REVIEW_PASS ===` (or REVIEW_REVISION / REVIEW_ESCALATE / "
+            f"REVIEW_EMERGENCY_HALT) on its own line, a single JSON object with the "
+            f"required fields, then the matching `=== END_XXX ===` delimiter. Put "
+            f"your narrative ABOVE the block — JSON only INSIDE it. Prefer marker.py "
+            f"to hand-typing the delimiters."
+        )
+        log(f"[{agent}] mirror-marker self-validate retry {attempt}/{max_retries} "
+            f"task={task_id}: {err_msg}")
+        try:
+            ok, new_output, new_session = agent_runner.run_claude(
+                agent_id=agent,
+                prompt=correction,
+                working_dir=working_dir,
+                session_id=session_id,
+                timeout=timeout,
+                context="inbox",
+                model_override=model,
+                task_stem=task_id,
+                out_meta=meta,
+                expected_agent=agent,
+                phase=task.get("phase"),
+            )
+        except Exception as e:
+            log(f"[{agent}] mirror-marker self-validate run_claude raised "
+                f"task={task_id} attempt={attempt}: {e!r}; keeping prior output")
+            break
+        # Carry the latest session id forward so the next --resume continues the
+        # corrected conversation (run_claude may rotate the session id).
+        if new_session:
+            session_id = new_session
+        if not ok:
+            log(f"[{agent}] mirror-marker self-validate run_claude non-success "
+                f"task={task_id} attempt={attempt}; keeping prior output, "
+                f"falling through to notifier net")
+            break
+        output_text = new_output
+        clean, err_msg = _mirror_marker_is_clean(output_text)
+        if clean:
+            log(f"[{agent}] mirror-marker self-validate RESOLVED in-process "
+                f"task={task_id} after {attempt} re-prompt(s) — zero cross-process "
+                f"marker-error round-trips")
+            return output_text, session_id
+
+    log(f"[{agent}] mirror-marker self-validate exhausted task={task_id} "
+        f"({attempt}/{max_retries}); writing best-effort outbox, outbox_notifier "
+        f"marker-error net is the outer backstop")
+    return output_text, session_id
+
+
 def process_task(agent: str, task_file: Path, models_config: dict) -> None:
     try:
         task = json.loads(task_file.read_text())
@@ -752,6 +900,26 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
         except OSError:
             pass
         return
+
+    # mirror-marker-self-validate-gate-001: bounded SAME-PROCESS verdict-marker
+    # self-validation, in FRONT of the outbox_notifier marker-error net. Only on
+    # run_claude success (a non-success is a different class and gets no
+    # re-prompt); the helper further gates on agent=="mirror" + phase=="review".
+    # Substitutes the corrected output_text/session_id before the single outbox
+    # write below; adds no new outbox.
+    if success:
+        output_text, session_id = _mirror_marker_self_validate(
+            agent=agent,
+            task=task,
+            output_text=output_text,
+            session_id=session_id,
+            working_dir=working_dir,
+            model=model,
+            timeout=timeout,
+            task_id=task_id,
+            meta=meta,
+            models_config=models_config,
+        )
 
     outbox = _build_outbox(agent, task_id, task, task_file,
                            success, output_text, session_id, meta,
