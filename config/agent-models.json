@@ -75,7 +75,8 @@
     "max_revisions": 3,
     "max_replans": 2,
     "cost_per_task_usd": 50.0,
-    "_note": "D3.5 loop budgets. max_revisions caps Forge↔Mirror revision cycles (5b). max_replans caps Beacon↔Larry replan cycles after Mirror ESCALATE (5c). cost_per_task_usd is the per-task_id spend cap across all dispatches (preflight + clarifications + build + revisions + reviews + replans). Read by outbox_notifier when classifying Mirror markers. See docs/tunables.md for retune triggers."
+    "mirror_marker_self_validate_retries": 2,
+    "_note": "D3.5 loop budgets. max_revisions caps Forge↔Mirror revision cycles (5b). max_replans caps Beacon↔Larry replan cycles after Mirror ESCALATE (5c). cost_per_task_usd is the per-task_id spend cap across all dispatches (preflight + clarifications + build + revisions + reviews + replans). Read by outbox_notifier when classifying Mirror markers. mirror_marker_self_validate_retries (mirror-marker-self-validate-gate-001) caps the SAME-PROCESS verdict-marker self-validation re-prompt loop in inbox_watcher.process_task: when a phase=review Mirror output ends with a malformed/missing verdict marker (the common first-after-restart case), the worker re-invokes run_claude under --resume with a terse correction up to this many times BEFORE writing the outbox, so the fix lands with zero cross-process marker-error round-trips. On exhaust the best-effort outbox is written and the existing outbox_notifier marker-error path stays as the outer backstop. Default 2; 0 disables the gate. Read by inbox_watcher._load_marker_self_validate_retries. See docs/tunables.md for retune triggers."
   },
   "auto_merge_queue": {
     "watchdog_dm_hours": 24,
@@ -204,6 +205,11 @@
       "date": "2026-06-13",
       "change": "Add ourliberty-graph to forge+mirror allowed_repos AND to repo_paths (-> /home/larry/ourliberty-graph). Commit 52115d0's message claimed this allowlist change but the merge carried only the dashboard-api refactor, so the config was never actually updated; this blocked catalog-drift-facts-sync-001 dispatch 4+ times (routing_validator.check_target_repo rejected the unlisted target_repo). repo_paths also needed the entry: inbox_watcher.py refuses a worktree dispatch when _load_repo_paths().get(target_repo) is None, so the allowlist fix alone would have failed at worktree creation (the 2nd latent blocker).",
       "author": "Beacon (direction-ask)"
+    },
+    {
+      "date": "2026-06-26",
+      "change": "mirror-marker-self-validate-gate-001: add loop_bounds.mirror_marker_self_validate_retries=2. Caps a new SAME-PROCESS verdict-marker self-validation re-prompt loop in inbox_watcher.process_task that detects a malformed/missing Mirror verdict marker (phase=review, run_claude success) via mirror_review_handler.parse_mirror_marker and re-invokes run_claude under --resume with a terse correction BEFORE the outbox is written. Kills the slow cross-process round-trip that fired (via outbox_notifier._notify_mirror_marker_error) on Mirror's first review within ~10-25 min of a mirror-bot restart (G-rule mirror-malformed-verdict-post-restart-001, 3/3: PR #728/#729, #728 retry, #731). The gate is a fast inner loop in FRONT of the existing slow outer net, never a replacement — on exhaust the best-effort outbox is written and outbox_notifier's marker-error path still fires. Default 2; 0 disables. No daemon-behavior change for non-mirror / non-review tasks or run_claude failures.",
+      "author": "Forge (via Beacon D3 dispatch)"
     }
   ]
 }
