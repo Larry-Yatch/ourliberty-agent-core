@@ -297,8 +297,14 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T17:43Z UTC (Iter ~3124, Tier 3, consecutive_clean=0)
+## G-rule check-iii-invoke-gap-sunday-001 — 1/3 (new, iter ~3125)
 
-**Iter ~3124 summary:** ✅ Clean (iter_clean). 1 alert triaged (Tier-4 forge-wip-redispatch-exhausted FP, G-rule 3/3 HOLD-DEFERRED, no action). All inboxes empty. 5 beacon-pending-approvals (HOLD). Repo HEAD=b0afa7b7 (Pulse cycle 20260627T172443Z), clean, up-to-date. Sync 17:20:52Z (~21 min before checks). Daemons alive (PID 3961026/3961281/17832). Heal-daemon 17:32:17Z. Watchdog healthy 11:42 MDT. Pipeline stall 0-would-fire. **Tier 3 (consecutive_clean=0, promoted from Tier 2, cadence 30-min)**. PRIME: 0 interventions, ratio≈17.43, trend=improving.
+**Rule:** Check III missed its Sunday 2026-06-22 gate. heal-pulse-check-staleness fired Tier-4 escalation (387.9h since last run, past 336h+48h=384h grace). Root cause: the Pulse /cycle apparently didn't invoke `pulse_check_iii.py` on Sunday 2026-06-22. Pulse ran Check III off-schedule (Saturday 2026-06-27) to clear staleness. Fix: ensure Sunday cycles reliably invoke Check III when conditions hold; may need explicit gate logging or a staleness pre-check in the cycle invoker. Dispatch to Beacon at 3/3 (post-HOLD). First occurrence iter ~3125. Cannot dispatch under HOLD.
+
+---
+
+## Status snapshot — updated 2026-06-27T18:16Z UTC (Iter ~3125, Tier 3→1, consecutive_clean=0)
+
+**Iter ~3125 summary:** ⚠️ Drift (Check III overdue). Check III ran off-schedule (387.9h stale, past grace window). 4 threshold proposals: beacon 2147s→285s (Δ=87%), forge 3436s→550s (Δ=84%), mirror 488s→861s LOOSEN (Δ=76%, most critical — current threshold below p90 causing false-positive stuck alerts), pulse 262s→139s (Δ=47%). Digest queued L1114 (bot will DM Larry). `approve threshold-update-2026-06-27` needed. 2 Tier-3 silences. Tier-reset 3→1. PRIME: 1 intervention (check-iii-staleness-remediation). Daemons alive (PID 3961026/3961281/17832). Repo fa8b9946, clean. Sync 17:20:52Z. Heal-daemon 18:02:46Z. Watchdog healthy 12:13 MDT. 5 beacon-pending (HOLD).
 
 
