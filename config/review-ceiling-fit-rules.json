@@ -1,0 +1,7 @@
+{
+  "_comment": "Tunable config for scripts/heal_review_ceiling_fit.py — the weekly READ-ONLY Mirror review-ceiling fit-monitor. Pulse-Check can tune these without touching code (same pattern as config/review-reaper-rules.json). window_days: trailing window for the duration distribution + firing/false-kill counts (default 30). headroom_low_ratio: flag HEADROOM_LOW when p95 >= ceiling * this — the ceiling is creeping into the healthy population (default 0.8). recommend_multiplier: headroom factor applied to p99 for the recommended ceiling, round_up_to_5min(p99 * this) (default 1.25). enabled: master switch — when false the monitor exits 0 without emitting. The monitor NEVER mutates the ceiling, costs.jsonl, or chain_events; it only observes and reports a recommendation (no auto-tuning in this build). Defaults are baked into the script, so a missing or malformed file degrades to them rather than crashing.",
+  "enabled": true,
+  "window_days": 30,
+  "headroom_low_ratio": 0.8,
+  "recommend_multiplier": 1.25
+}

@@ -1,0 +1,23 @@
+[Unit]
+Description=Reporter — weekly READ-ONLY digest on whether the Mirror review-session ceiling is still the right length
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/heal_review_ceiling_fit.py
+After=network.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+# Read-only reporter: observes durations + ceiling firings and emits ONE
+# route=digest alert (no DM). It NEVER mutates the ceiling, costs.jsonl, or
+# chain_events. OL_REVIEW_SESSION_CEILING_SECONDS (if set in the EnvironmentFile)
+# is read so the monitor reports headroom against the SAME ceiling the harness
+# enforces; unset -> the agent_runner default (2100s/35min).
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/heal_review_ceiling_fit.py
+TimeoutStartSec=120
+Nice=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-heal-review-ceiling-fit
