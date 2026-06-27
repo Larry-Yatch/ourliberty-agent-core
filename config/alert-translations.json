@@ -173,6 +173,12 @@
       "tier": "FYI",
       "plain_language_summary": "The healer detected a long-running daemon executing older code than its on-disk script (the script's mtime was newer than the unit's active-since), and auto-restarted it so the new code is now live. No action needed — a routine self-heal success surfaced for the record only.",
       "recommended_action": "None -- the daemon was restarted onto the new code and verified live. Self-healed; details appear in the daily digest. Runbook: runbooks/heal-stale-daemon-code.md."
+    },
+    "auto-restart-failed": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "The healer issued `sudo systemctl restart` on a stale daemon, then checked the unit only 3s later and found it still inactive, so it escalated `auto-restart-failed:<service>`. But the 3s check window is shorter than the service's real startup latency — systemd's own restart policy (RestartSec=10 + `After=` ordering deps) brings the unit back within ~90s. In all 3 observed cases (all ourliberty-outbox-notifier.service, iters ~2704/~2947/~3000) the service self-recovered and Medic confirmed it live. A timing-window false alarm, not a genuine restart failure.",
+      "recommended_action": "None — systemd self-heals within ~90s via RestartSec + ordering deps; Medic confirms recovery every time. Surfaced for the digest record only. NOTE: this silences ONLY the `auto-restart-failed:` prefix (a check-timing artifact). The separate `still-stale-after-restart:` subject is a genuine ask-then-do (service running with OLD code after restart) and is intentionally NOT silenced. Runbook: runbooks/heal-stale-daemon-code.md."
     }
   },
   "heal-claude-json-bind-drift": {
