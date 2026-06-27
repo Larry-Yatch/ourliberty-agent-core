@@ -297,8 +297,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T16:12Z UTC (Iter ~3116, Tier 1, consecutive_clean=0→1)
+## Status snapshot — updated 2026-06-27T16:24Z UTC (Iter ~3117, Tier 1, consecutive_clean=1→2)
 
-**Iter ~3116 summary:** ✅ Clean (iter_clean). 0 new alerts. All checks nominal. `land-pr731-restore-fix-head-001` APPROVAL_REQUEST DM sent 16:02Z, still pending Larry tap (~10min). 6 beacon-pending-approvals (unchanged). Repo on main, clean, up-to-date (HEAD=48cecf7c). Sync 15:20:46Z. All daemons alive (PIDs 3961026/3961281/3961345). Heal-daemon 16:10:52Z. Pipeline stall 0-would-fire (cooldown-suppressed). PR #731 OPEN — authorization in flight. HOLD on other dispatches. §5.0 all no-op. Tier 1, consecutive_clean=0→1 (2 more clean iters → Tier 2). PRIME: 0 interventions, ratio≈17.43, trend=improving.
+**Iter ~3117 summary:** ✅ Clean (iter_clean). 0 new alerts. All checks nominal. Larry approved "go" at 16:16Z → Beacon dispatched `land-pr731-restore-fix-head-001` to Forge → Forge started 16:16:39Z (worktree wt-forge-land-pr731-restore-fix-head-001, branch forge/land-pr731-restore-fix-head-001, in-flight). PR #731 OPEN — Forge building fix now. 5 beacon-pending-approvals (was 6, land-pr731 resolved). Repo HEAD=11948c3a, clean, up-to-date. Sync 16:20:49Z. All daemons alive (PIDs 3961026/3961281/3961345). Heal-daemon 16:20:52Z. Pipeline stall 0-would-fire. HOLD on other dispatches. Tier 1, consecutive_clean=1→2 (1 more clean iter → Tier 2). PRIME: 0 interventions, ratio≈17.43, trend=improving.
 
 
