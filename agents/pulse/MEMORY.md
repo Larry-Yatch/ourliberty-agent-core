@@ -273,20 +273,20 @@ PR #725 (fix(healer): skip forge_built_no_pr for pr-<repo>-<num> tasks whose nam
 
 ---
 
-## G-rule ourliberty-health-clean-tree-dirty-tier4-001 — 1/3 (new, iter ~3005)
+## G-rule ourliberty-health-clean-tree-dirty-tier4-001 — 2/3 (updated iter ~3011)
 
-**Rule:** `source=ourliberty-health` alerts with `clean_tree` variant subject classify Tier-4 (novel, no translation match). Fires when heal_droplet_git_drift detects dirty working tree. Only translation in alert-translations.json is `sync_agent_core: auto-commit push failed` (PR #728). Clean-tree variant has no entry. Fix: add `ourliberty-health` clean-tree variant entry to alert-translations.json pointing to pending-approval resolution. Dispatch to Beacon at 3/3 OR self-resolves when dirty tree resolves (tier3-silence-auto-restart-failed-001 approval lands). First occurrence iter ~3005.
+**Rule:** `source=ourliberty-health` alerts with `clean_tree` variant subject classify Tier-4 (novel, no translation match). Fires when heal_droplet_git_drift detects dirty working tree. Only translation in alert-translations.json is `sync_agent_core: auto-commit push failed` (PR #728). Clean-tree variant has no entry. Fix: add `ourliberty-health` clean-tree variant entry to alert-translations.json pointing to pending-approval resolution. Dispatch to Beacon at 3/3 OR self-resolves when dirty tree resolves (tier3-silence-auto-restart-failed-001 approval lands). Occurrences: iter ~3005 (1/3), iter ~3011 (2/3, line 1082 at 00:44Z).
 
 ---
 
 ## G-rule decision-needed-approval-forge-dispatch-no-target-repo-001 — 1/3 (new, iter ~3006)
 
-**Rule:** When outbox-notifier emits an `approval_request` via the "no-session decision-needed" (REVIEW_ESCALATE) path and Larry approves via Telegram, Beacon dispatches a task to Forge inbox — but the envelope has `target_repo=None`. Forge inbox_watcher dead-letters with: `worktree: no canonical path for target_repo=None`. Fix: Beacon's REVIEW_ESCALATE replan dispatch path must carry `target_repo` from original task metadata. First occurrence iter ~3006 (task=mirror-review-forge-revision-preamble-discipline-001, PR #731). Dispatch to Beacon at 3/3.
+**Rule:** When outbox-notifier emits an `approval_request` via the "no-session decision-needed" (REVIEW_ESCALATE) path and Larry approves via Telegram, Beacon dispatches a task to Forge inbox — but the envelope has `target_repo=None`. Forge inbox_watcher dead-letters with: `worktree: no canonical path for target_repo=None`. Fix: Beacon's REVIEW_ESCALATE replan dispatch path must carry `target_repo` from original task metadata. First occurrence iter ~3006 (task=mirror-review-forge-revision-preamble-discipline-001, PR #731). Dispatch to Beacon at 3/3. **Alternate unblock path:** direction-ask-pr731-nextcount-guard-fix-001 dispatched iter ~3011 — Beacon/Forge apply medic's concrete fix directly to PR #731 branch, bypassing the broken approval flow.
 
 ---
 
-## Status snapshot — updated 2026-06-27T00:22Z UTC (Iter ~3010, Tier 1→2 de-escalated, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T00:47Z UTC (Iter ~3011, Tier 2→1 reset, consecutive_clean=0)
 
-**Iter ~3010 summary:** ✅ Nominal iter. 0 new alerts, 0 new WARNs, 0 new Tier-4. Forge BUILDING mirror-marker-self-validate-gate-001 (PID 3847457, claude-opus-4-8 --resume 8392a999, since 17:57 MDT ~1h23m, no output yet). Larry asked Beacon to write a systemic brief at 18:19 MDT ("Why have we been constantly shipping fixes?") — Beacon actively handling (PID 3861989, --resume 1b5ed242). PR #731 pipeline still stuck (G-rule decision-needed-approval-forge-dispatch-no-target-repo-001 1/3). tier3-silence-auto-restart-failed-001 still pending Larry. M config/alert-translations.json dirty (sync blocked). PRIME: intervention (ratio≈16.94). **Tier 1→2 DE-ESCALATED** (consecutive_clean hit 3). Saturday UTC — Check I/III skipped.
+**Iter ~3011 summary:** ⚠️ 3 new alerts (stall+medic Tier-3; ourliberty-health Tier-4 G-rule 2/3). Tier reset 2→1. PR #732 CREATED — mirror-marker-self-validate-gate-001 (fix: in-process verdict-marker self-validation gate), Mirror ACTIVELY REVIEWING since 00:23:10Z. Beacon systemic brief WRITTEN at `/home/larry/agents/blackboard/core-problem-brief-2026-06-26.md` (18:24:48 MDT). direction-ask-pr731-nextcount-guard-fix-001 dispatched to Beacon (medic's fix: restore outbox_notifier.py L4798-L4805 `if next_count >= 2:` guard for PR #731). tier3-silence-auto-restart-failed-001 approval DM confirmed delivered (chat_id=7998341473, idx=1074, 17:15:44 MDT) — Larry awaiting "Go". M config/alert-translations.json still dirty (sync blocked). PRIME: intervention (ratio≈16.95).
 
 
