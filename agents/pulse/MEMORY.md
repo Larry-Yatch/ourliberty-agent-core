@@ -279,8 +279,14 @@ PR #725 (fix(healer): skip forge_built_no_pr for pr-<repo>-<num> tasks whose nam
 
 ---
 
-## Status snapshot — updated 2026-06-26 23:49Z UTC (Iter ~3005, Tier 1, consecutive_clean=0)
+## G-rule decision-needed-approval-forge-dispatch-no-target-repo-001 — 1/3 (new, iter ~3006)
 
-**Iter ~3005 summary:** ⚠️ Check 0 Tier-4 (ourliberty-health clean-tree alert, new G-rule 1/3). Check 1 — 1 new WARN (beacon-replan-no-chatid, null reply_chat_id for notify-forge-revision-preamble-discipline-001). Check 4 — NEW beacon-pending entry [3] (23:35:50Z): mirror-review-forge-revision-preamble-discipline-001 REVIEW_ESCALATE on PR #731 rev2, UNDELIVERABLE (null chatid). PR #731 OPEN MERGEABLE=UNKNOWN stuck pending Larry's call. Escalation written to pulse-escalations.json. 3 active APPROVAL_REQUESTs pending Larry (entries [1][2][3]). M config/alert-translations.json dirty. PRIME: intervention. Tier 1 (consecutive_clean=0).
+**Rule:** When outbox-notifier emits an `approval_request` via the "no-session decision-needed" (REVIEW_ESCALATE) path and Larry approves via Telegram, Beacon dispatches a task to Forge inbox — but the envelope has `target_repo=None`. Forge inbox_watcher dead-letters with: `worktree: no canonical path for target_repo=None`. Fix: Beacon's REVIEW_ESCALATE replan dispatch path must carry `target_repo` from original task metadata. First occurrence iter ~3006 (task=mirror-review-forge-revision-preamble-discipline-001, PR #731). Dispatch to Beacon at 3/3.
+
+---
+
+## Status snapshot — updated 2026-06-27T00:00Z UTC (Iter ~3006, Tier 1, consecutive_clean=0)
+
+**Iter ~3006 summary:** ⚠️ Larry approved both REVIEW_ESCALATE items at 17:55 MDT. `mirror-marker-self-validate-gate-001` dispatched to Forge inbox ✅. `mirror-review-forge-revision-preamble-discipline-001` dead-lettered (target_repo=None) — new G-rule 1/3. Beacon received dead-letter notification; inbox-watcher processing. PR #731 OPEN MERGEABLE=UNKNOWN; resolution path broken pending Beacon retry. 2 active APPROVAL_REQUESTs in beacon-pending (was 4; [2]+[3] resolved). M config/alert-translations.json dirty (tier3-silence-auto-restart-failed-001 pending). PRIME: intervention (ratio≈16.90). Tier 1 (consecutive_clean=0).
 
 
