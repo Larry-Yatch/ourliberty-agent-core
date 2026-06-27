@@ -297,8 +297,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T15:04Z UTC (Iter ~3113, Tier 2→3 DE-ESCALATE, consecutive_clean=3)
+## Status snapshot — updated 2026-06-27T15:33Z UTC (Iter ~3114, Tier 3, consecutive_clean=0→1)
 
-**Iter ~3113 summary:** ✅ Nominal / iter_clean. 0 new alerts. Repo on main, clean, up-to-date (HEAD=ab949992). Sync 14:20:30Z (~44min, no-change). All daemons alive (PIDs 3961026/3961281/3961345). Heal-daemon 14:59:41Z. Pipeline stall dry-run 0-would-fire (cooldown-suppressed). PR #731 OPEN — HOLD active. 5 pending approvals (carry, HOLD). §5.0 all no-op. Tier 2 consecutive_clean=2→3 → **DE-ESCALATE Tier 2→3** (cadence 30-min). PRIME: 0 interventions, ratio≈17.43, trend=improving.
+**Iter ~3114 summary:** ✅ Nominal / iter_clean. 3 new alerts (all Tier-3 silence): dispatch-branch-cleanup digest, pipeline-stall:no-session-revision (forge-revision-preamble-discipline-001), medic-diagnosis. Repo on main, clean, up-to-date (HEAD=29a31ba4). Sync 15:20:46Z (~13min, no-change). All daemons alive (PIDs 3961026/3961281/3961345). Heal-daemon 15:30:16Z. Pipeline stall dry-run 0-would-fire (cooldown-suppressed). PR #731 OPEN — HOLD active. 5 pending approvals (carry, HOLD). §5.0 all no-op. Tier 3, consecutive_clean=0→1. PRIME: 0 interventions, ratio≈17.43, trend=improving.
 
 
