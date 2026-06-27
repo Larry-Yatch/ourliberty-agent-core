@@ -297,8 +297,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T14:28Z UTC (Iter ~3111, Tier 2, consecutive_clean=1)
+## Status snapshot — updated 2026-06-27T14:49Z UTC (Iter ~3112, Tier 2, consecutive_clean=2)
 
-**Iter ~3111 summary:** ✅ Nominal / iter_clean. 3 new alerts (dispatch-branch-cleanup digest, heal-pipeline-stall no-session-revision, medic-diagnosis) — all Tier-3 silenced. Beacon bot DM'd Larry for alerts 1096+1097 at 08:20:46 MDT. Repo on main, clean, up-to-date (HEAD=d81badbd). Sync 14:20:30Z (~8min, success). All daemons alive (PIDs 3961026/3961281/3961345). Heal-daemon 14:19:20Z. Pipeline stall dry-run 0-would-fire (cooldown-suppressed). PR #731 still OPEN — pipeline dead, HOLD active, medic 13th attempt recommends A) restore L4798 guard or B) close #731. 5 pending approvals (carry, HOLD). §5.0 all no-op. Tier 2 consecutive_clean=0→1. PRIME: 0 interventions, ratio≈17.43, trend=improving.
+**Iter ~3112 summary:** ✅ Nominal / iter_clean. 2 new alerts: Tier-3 silence (heal-claude-json-bind-drift probe-blind) + Tier-4 G-rule vp recurrence (forge-wip-redispatch-digest-tier4-001, DISPATCHED ✅ vp, beacon bot correctly digest/no-DM). Repo on main, clean, up-to-date (HEAD=8ff16c91). Sync 14:20:30Z (~29min, no-change). All daemons alive (PIDs 3961026/3961281/3961345, ~10h). Heal-daemon 14:39:25Z. Pipeline stall dry-run 0-would-fire (cooldown-suppressed). PR #731 OPEN — HOLD active. 5 pending approvals (carry, HOLD). §5.0 all no-op. Tier 2 consecutive_clean=1→2. PRIME: 0 interventions, ratio≈17.43, trend=improving.
 
 

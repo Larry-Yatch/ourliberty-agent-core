@@ -5,6 +5,93 @@
 ---
 
 
+## Iteration ~3112 — 2026-06-27T14:49Z UTC (interactive /cycle via chat, Tier 2, consecutive_clean=1→2)
+
+**Trigger:** Larry `/cycle` via chat.
+
+**Health:** ✅ Nominal (iter_clean). 2 new alerts: 1 Tier-3 silence, 1 Tier-4 G-rule vp recurrence (no DM). All checks clean. Tier 2, consecutive_clean=1→2 (1 more clean iter needed for Tier 3).
+
+**VERIFY-BEFORE-REASSERT:**
+- **Source repo (re-verified):** HEAD=8ff16c91=origin/main. On main. Clean. Up to date. ✅
+- **Sync (re-verified):** last_sync=2026-06-27T14:20:30Z (~29min ago). Status=no-change. Under 2h. ✅
+- **PR #731 (re-verified):** Still OPEN (only open PR). Pipeline stall cooldown-suppressed in dry-run. HOLD active. [carry]
+- **Daemon PIDs (re-verified):** PID 3961026 beacon_telegram_bot.py (Ss, ~10h) ✅. PID 3961281 inbox_watcher.py (Ssl, ~10h) ✅. PID 3961345 outbox_notifier.py (Ss, ~10h) ✅.
+- **Heal-daemon heartbeat (re-verified):** 2026-06-27T14:39:25Z (~10min ago). Under 60min. ✅
+- **Pipeline stall (re-verified):** dry-run 0 would-fire. forge-revision-preamble-discipline-001 cooldown-suppressed. All other tasks FORGE_NO_PR_SKIP. ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark: repaired=false, old_watermark=1098, file_length=1100. 2 new alerts.
+- Alert idx=1098 (heal-claude-json-bind-drift/probe-blind:ourliberty-cycle.service/escalate) → Tier-3 silence ✅ (known-pattern match in alert-translations.json). Healer BLIND for this unit since sudo -n / nsenter failed; routine noise pattern.
+- Alert idx=1099 (forge-wip-redispatch/heal-stall-noise-reduction-ret/digest) → Tier-4 (helper: novel, no translation). G-rule `forge-wip-redispatch-digest-tier4-001` DISPATCHED ✅ vp — Beacon designed fix, Forge dispatch pending Larry trust-policy approval (HOLD). Beacon bot already correctly routed as digest/no-DM. Journal-note only; no duplicate DM. [G-rule vp recurrence, carry]
+- Watermark advanced 1098→1100. ✅
+
+**Check 1 — Log noise:**
+- journalctl --user -p warning --since 30min: No entries. ✅ NOMINAL.
+- outbox-notifier.log: Last entry 08:40:53 MDT — MIRROR_DAG_PREFLIGHT already-kicked-off status=complete for heal-stall-noise-reduction-ret-retry1; no-op. System quiet ~6min. ✅
+
+**Check 2 — Telegram sweep:**
+- Beacon bot last delivery: 08:20:46 MDT — alerts 1096+1097 (pipeline stall + medic-diagnosis). No new Larry directives. ✅ NOMINAL.
+
+**Check 3 — Pipeline stall:**
+- dry-run: 0 would-fire. forge-revision-preamble-discipline-001 cooldown-suppressed. All other tasks FORGE_NO_PR_SKIP. ✅ NOMINAL.
+
+**Check 4 — Pending directives:**
+- Beacon inbox: empty ✅. Forge inbox: empty ✅. Mirror inbox: empty ✅.
+- beacon-pending-approvals.json: 5 entries unchanged. HOLD active. [carry — same 5 as iter ~3111]
+
+**Check 5 — Stale daemon code:**
+- Heartbeat: 2026-06-27T14:39:25Z (~10min ago). Under 60min. ✅ NOMINAL.
+
+**Check A — Source repo:** HEAD=8ff16c91=origin/main. On main. Clean. Up to date. ✅
+**Check B — Sync health:** last_sync=14:20:30Z (~29min ago). Status=no-change. Under 2h. ✅
+**Check C — Agent liveness:** PID 3961026 (Ss, ~10h) ✅. PID 3961281 (Ssl, ~10h) ✅. PID 3961345 (Ss, ~10h) ✅. Heal-daemon 14:39:25Z ✅.
+**Check E — PRs:** PR #731 — OPEN only. Pipeline dead. HOLD active. [carry]
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Saturday 2026-06-27 UTC (weekday=5):**
+- Check I: Saturday — not in firing set (Mon/Wed/Fri/Sun). Skip. ✅
+- Check III: Not Sunday. Skip. ✅
+- Check VIII: Not Monday. Skip. ✅
+
+**G-rule assessment:**
+- forge-wip-redispatch-digest-tier4-001: DISPATCHED ✅ vp — recurrence this iter (alert 1099). Beacon bot routed digest/no-DM correctly. Fix blocked under HOLD. [carry, no count increment — already DISPATCHED]
+- All other G-rule counts carry unchanged from iter ~3111.
+
+**Actions taken:**
+1. Check 0: 2 new alerts triaged. Tier-3 silence ✅ + Tier-4 G-rule vp noted. Watermark advanced 1098→1100. ✅
+2. PRIME ledger: `kind=iter_clean` appended (template=iter-3112-clean-t2). ✅
+3. Tier state: consecutive_clean=1→2. Still Tier 2. (1 more clean iter needed for Tier 3 de-escalation.) ✅
+
+**Escalations:** None. HOLD in effect. Beacon bot handling Larry DMs for pipeline stall.
+
+**Standing findings (carried + verified this iter):**
+- [yellow] **PR #731 — pipeline dead, stall firing** — Stall cooldown-suppressed this iter. Medic options A/B still open. Larry decision under HOLD. [carry]
+- [yellow] **beacon-pending[2]: pr731-restore-revision-trap-gate-001** — restore if next_count >= 2 gate on PR #731. HOLD — Larry decision. [carry]
+- [yellow] **unreviewed-merge:738** — PR #738 MERGED, no Mirror PASS confirmed. [Larry judgment; carry]
+- [yellow] **unreviewed-merge:737** — PR #737 MERGED, no Mirror PASS. [Larry judgment; carry]
+- [yellow] **unreviewed-merge:733** — DM delivered 06:09:44Z. [Larry judgment; carry]
+- [yellow] **Stale beacon-pending[0]** — mirror-review-silence-ourliberty-health-sync-push-failed-001 (PR #728 merged). [carry]
+- [yellow] **Stale beacon-pending[1]** — tier3-silence-auto-restart-failed-001 (translation committed). [carry]
+- [yellow] **Stale beacon-pending[4]** — mirror-review-pr-ourliberty-agent-core-733 (PR #733 MERGED). [carry]
+- [yellow] **unreviewed-merge:735/723/713** — Larry judgment. [carry]
+- [yellow] **Zombie PID 1834248** — bash poll loop (~30d). Ask-then-do. [carry]
+- [yellow] **6 stale journalctl PIDs** — 1101500/1107838/1118830/1136223/1161972/1177335 all ~31-32d. Ask-then-do. [carry]
+- [yellow] **forge-wip-redispatch-digest Forge dispatch** — Beacon fix designed. Trust-policy approval pending. Larry HOLD. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — approve check-viii-update-2026-06-15. Awaiting Larry. [carry]
+- [yellow] **Check III threshold proposals** — approve threshold-update-2026-06-11. Awaiting Larry. [carry]
+- [yellow] **unreviewed-merge:710/709** — Larry judgment. [carry]
+- [yellow] **G-rule decision-needed-approval-forge-dispatch-no-target-repo-001** — 3/3, dispatch deferred under HOLD. [carry]
+- [blue] **silence-ourliberty-health-clean-tree-001** — APPROVAL_REQUEST DELIVERED, beacon-pending[3]. [carry]
+- [blue] **G-rules (other, unchanged):** sentinel-inflight-stall-mirror-tier4 (2/3), review-duplicate-dispatch-wip-redispatch (vp), check-i-force-bypass-dm-route (2/3), heal-daemon-restart-manifest-drift (2/3), no-session-revision-merged-pr-fp-001 (1/3), unrouted-open-pr-auto-merge-held-fp-001 (1/3), forge-wip-redispatch-digest-tier4-001 (DISPATCHED ✅ vp), forge-wip-redispatch-exhausted-pr-exists-fp-001 (2/3), heal-stale-daemon-code-still-stale-after-restart (1/3), outbox-notifier-notification-intent-reject-tier4-001 (2/3), no-session-revision-active-mirror-session-fp-001 (DISPATCHED ✅ vp), mirror-runner-missing-worktree-retry-001 (1/3), forge-revision-preamble-missing-pr711-001 (DISPATCHED ✅ vp), heal-stale-daemon-code-auto-restart-failed-self-recovered (DISPATCHED ✅ vp), ourliberty-health-clean-tree-dirty-tier4-001 (DISPATCHED ✅ vp), sync-service-deploy-restart-storm-tier4-001 (1/3), medic-diagnosis-tier4: STALE/CLOSED.
+- [blue] **unreviewed-merge:649/637/655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+
+**PRIME DIRECTIVE:** 0 interventions this iter. Trailing-30d: ratio≈17.43, trend=improving.
+**Tier end-of-iter:** Tier **2** (consecutive_clean=1→2; 1 more clean iter needed for Tier 3 de-escalation; cadence 15-min).
+
+---
+
 ## Iteration ~3111 — 2026-06-27T14:28Z UTC (interactive /cycle via chat, Tier 2, consecutive_clean=0→1)
 
 **Trigger:** Larry `/cycle` via chat.
