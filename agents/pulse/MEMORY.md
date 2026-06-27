@@ -291,8 +291,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T05:52Z UTC (Iter ~3053, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T06:07Z UTC (Iter ~3054, Tier 1, consecutive_clean=0)
 
-**Iter ~3053 summary:** ✅ Nominal (iter_clean). 0 new alerts (watermark 1116, unchanged). Forge build PID 3976734 active (~35 min, PR #736 created mid-build). Mirror DAG controller retry1 in Mirror inbox (23:43Z); actual PR #736 review not yet dispatched. PR #731 OPEN/UNKNOWN (pipeline dead, carry). PR #733 OPEN/UNKNOWN (REVIEW_ESCALATE carry). **Larry HOLD directive active.** PRIME: 0 new interventions (iter_clean, ratio≈17.38).
+**Iter ~3054 summary:** ✅ Nominal (iter_clean). 2 new alerts (L1117–L1118): heal-systemd-install-drift auto-installed `ourliberty-heal-claude-json-bind-drift.service/.timer` (PR #720 units, route=digest, Tier-3 silence). Service ran immediately (status=0). Watermark 1116→1118. PR #736 MERGEABLE, Mirror review started 05:55:17Z (~12 min in at check). Forge build PID 3976734 still running (~45 min). PR #731 OPEN/UNKNOWN (dead). PR #733 OPEN/UNKNOWN (REVIEW_ESCALATE). **Larry HOLD directive active.** PRIME: 0 new interventions (iter_clean, ratio≈17.38).
 
 
