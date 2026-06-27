@@ -297,8 +297,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T11:27Z UTC (Iter ~3095, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T11:38Z UTC (Iter ~3096, Tier 1, consecutive_clean=0)
 
-**Iter ~3095 summary:** ✅ Nominal / iter_clean. 0 new alerts (watermark 1087, file_length 1087). All daemons alive (PIDs 3961026/3961281/3961345). Heal-daemon 11:16:40Z. Pipeline stall dry-run 0-would-fire (cooldown-suppressed). PR #731 only open PR — pipeline dead, UNKNOWN (oscillating benign), HOLD active [carry]. 5 pending approvals (carry, HOLD). §5.0 all no-op. PRIME: iter_clean, ratio≈17.42, trend=improving.
+**Iter ~3096 summary:** ✅ Nominal / iter_clean. 0 new alerts (watermark 1087, file_length 1087). All daemons alive (PIDs 3961026/3961281/3961345). Heal-daemon 11:26:46Z. Pipeline stall dry-run 0-would-fire (cooldown-suppressed). PR #731 only open PR — pipeline dead, UNKNOWN (oscillating benign), HOLD active [carry]. PR #736 MERGED 06:30:01Z UTC with Mirror REVIEW_PASS + AUTO_MERGE (clean, no flag). 5 pending approvals (carry, HOLD). §5.0 all no-op. PRIME: iter_clean, ratio≈17.42, trend=improving.
 
 
