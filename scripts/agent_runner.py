@@ -1054,6 +1054,58 @@ def build_review_bounded_step_system_prompt():
     )
 
 
+# Hard wall-clock ceiling on a SINGLE Mirror review session, enforced by the
+# dispatcher (run_claude) independent of whether the Mirror model obeys the
+# bounded-step instruction. A hung review holds the single-holder `inbox:mirror`
+# lease and starves EVERY queued review until the process dies. The prompt-
+# injected `run_review_step.sh` guidance (build_review_bounded_step_system_prompt)
+# is advisory — the model can ignore it, and has, three times (#101 71m, #334
+# 102m, #717/#720 85-100m, and the laptop-PR jam #713). This ceiling is the
+# MANDATORY backstop: the harness kills the session at the wall clock and (for a
+# review) escalates it as inconclusive, so a wedge starves the queue for at most
+# this long instead of up to the 14400s session default or until a human kills
+# it. Tunable via env for incident response without a code change; <=0 disables.
+REVIEW_SESSION_CEILING_SECONDS = int(
+    os.environ.get('OL_REVIEW_SESSION_CEILING_SECONDS', '2100')  # 35 min
+)
+
+
+def _is_mirror_review_dispatch(phase, expected_agent):
+    """True iff this dispatch is a Mirror PR review: ``phase == 'review'`` AND
+    the dispatched agent is ``mirror`` (case/whitespace-insensitive).
+
+    The SINGLE gate shared by the advisory bounded-step reminder
+    (review_bounded_step_reminder_args) and the MANDATORY review ceiling
+    (review_session_effective_timeout) so the two can never disagree about which
+    dispatches are reviews — a disagreement would let the ceiling stop firing on
+    a path the reminder still targets, reopening the unbounded-wedge class.
+    """
+    return (
+        str(phase).strip().lower() == 'review'
+        and str(expected_agent).strip().lower() == 'mirror'
+    )
+
+
+def review_session_effective_timeout(timeout, phase, expected_agent):
+    """The wall-clock ceiling run_claude should enforce for this dispatch.
+
+    Returns the caller's timeout (or the 14400s session default when
+    ``timeout <= 0``), except a Mirror review (see _is_mirror_review_dispatch)
+    is additionally capped at ``REVIEW_SESSION_CEILING_SECONDS`` when that
+    ceiling is enabled (> 0). Pure + centralized so the spawn path and the tests
+    share one source of truth — same gate as review_bounded_step_reminder_args,
+    but this one is the MANDATORY backstop (the reminder is advisory; the model
+    can ignore it).
+    """
+    base = timeout if timeout and timeout > 0 else 14400
+    if (
+        _is_mirror_review_dispatch(phase, expected_agent)
+        and REVIEW_SESSION_CEILING_SECONDS > 0
+    ):
+        return min(base, REVIEW_SESSION_CEILING_SECONDS)
+    return base
+
+
 def review_bounded_step_reminder_args(phase, expected_agent):
     """Return the CLI args that inject the bounded-step reminder.
 
@@ -1062,9 +1114,7 @@ def review_bounded_step_reminder_args(phase, expected_agent):
     ``mirror``), else ``[]``. Pure and centralized so the spawn path and the
     tests share one source of truth — same gate as the marker reminder.
     """
-    if str(phase).strip().lower() != 'review':
-        return []
-    if str(expected_agent).strip().lower() != 'mirror':
+    if not _is_mirror_review_dispatch(phase, expected_agent):
         return []
     return ['--append-system-prompt', build_review_bounded_step_system_prompt()]
 
@@ -1378,10 +1428,21 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                 except (BrokenPipeError, OSError):
                     pass
 
-                # Poll for completion + cancel check
-                effective_timeout = timeout if timeout > 0 else 14400
+                # Poll for completion + cancel check. The effective ceiling is
+                # the caller's timeout, except a Mirror review is additionally
+                # capped at the mandatory REVIEW_SESSION_CEILING_SECONDS — see
+                # review_session_effective_timeout. Harness-enforced so it holds
+                # even when the review ignores the (advisory) bounded-step
+                # instruction. Covers EVERY path into Mirror review: both the
+                # Forge-dispatched review and the session-less human/laptop-PR
+                # review go through `_dispatch_mirror_review` (phase='review')
+                # and spawn here, so both inherit the ceiling.
+                effective_timeout = review_session_effective_timeout(
+                    timeout, phase, expected_agent,
+                )
                 elapsed = 0
                 cancelled = False
+                timed_out_session = False
                 while proc.poll() is None:
                     time.sleep(CANCEL_POLL_INTERVAL)
                     elapsed += CANCEL_POLL_INTERVAL
@@ -1402,7 +1463,16 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                             break
                     # Timeout check
                     if elapsed >= effective_timeout:
-                        log(agent_id, 'Timeout after ' + str(timeout) + 's', 'ERROR')
+                        log(agent_id, 'Timeout after ' + str(effective_timeout) + 's', 'ERROR')
+                        # Signal the timeout to the caller via out_meta so a
+                        # review dispatch can synthesize a clean REVIEW_ESCALATE
+                        # (inconclusive) instead of stranding as a generic
+                        # non-success that force-merges or burns marker-error
+                        # retries (#713). Set BEFORE the kill so it survives.
+                        if out_meta is not None:
+                            out_meta['timed_out'] = True
+                            out_meta['timeout_seconds'] = effective_timeout
+                        timed_out_session = True
                         proc.terminate()
                         try:
                             proc.wait(timeout=10)
@@ -1421,6 +1491,17 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                 if cancelled:
                     guard.release(agent_id)
                     return False, f'TASK_CANCELLED: {cancel_reason}', None
+
+                # A wall-clock timeout is TERMINAL — never retry it. Retrying a
+                # session that hit the ceiling just re-runs the (likely wedged)
+                # work and re-pays the ceiling each attempt, holding the
+                # inbox:mirror lease for up to MAX_RETRIES × the ceiling — far
+                # worse than the single bound the ceiling promises. Return here,
+                # before the non-zero-exit `continue` retry path. out_meta
+                # already carries timed_out=True so the review escalates clean.
+                if timed_out_session:
+                    guard.release(agent_id)
+                    return False, f'TIMEOUT after {effective_timeout}s', None
 
                 # Build a result-like object for downstream compatibility
                 class _Result:

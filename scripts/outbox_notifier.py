@@ -3121,6 +3121,55 @@ def _recover_full_session_text(session_id: Optional[str]) -> str:
     return '\n'.join(parts)
 
 
+def _maybe_synthesize_timeout_escalate(
+    data: dict[str, Any],
+) -> Optional[tuple[str, dict[str, Any]]]:
+    """Synthesize a REVIEW_ESCALATE for a phase=review session the HARNESS
+    killed at the wall-clock ceiling (agent_runner.REVIEW_SESSION_CEILING_SECONDS).
+
+    A timed-out review emits no canonical verdict marker, so without this it
+    falls into the marker-error net — 3 retries that re-prompt a session which
+    no longer exists, then a dead-letter — or, in the worst case observed, gets
+    force-merged with NO review (#713, 2026-06-26). A wall-clock kill is
+    unambiguous and terminal: route it to Beacon as an INCONCLUSIVE escalate
+    (the safe, recoverable action — escalate auto-routes, never dead-letters to
+    Larry) with the timeout as the reason. Gated strictly on the `timed_out`
+    outbox flag that run_claude sets; absent/false → None and normal marker
+    classification proceeds.
+
+    Returns ``('review_escalate', payload)`` on synthesis, else ``None``.
+    """
+    if not data.get('timed_out'):
+        return None
+    secs = data.get('timeout_seconds')
+    reason = (
+        'Mirror review exceeded the harness wall-clock ceiling'
+        + (f' ({secs}s)' if secs else '')
+        + ' and was killed (review_session_timeout). No verdict marker was '
+        'emitted; routing as an inconclusive escalate so the PR is neither '
+        'force-merged nor left to a marker-error retry on a dead session.'
+    )
+    payload = {
+        'task_id': data.get('task_id'),
+        'pr_url': data.get('pr_url'),
+        'reason': reason,
+        # Stay within the marker contract (mirror_review_handler:
+        # ALLOWED_SEVERITY_BY_MARKER['review_escalate'] == ('high',);
+        # ALLOWED_CONFIDENCE == ('high','medium','low')) so a future
+        # check_marker_semantics on synthesized payloads can't reject this and
+        # re-create the marker-error storm. An unfinished review IS plan-
+        # blocking (severity high); the "inconclusive" nature is in `reason`.
+        'severity': 'high',
+        'confidence': 'low',
+    }
+    log(
+        f'REVIEW_TIMEOUT_ESCALATE_SYNTHESIZED task={data.get("task_id")!r} '
+        f'pr_url={data.get("pr_url")!r} timeout_seconds={secs!r} — review '
+        f'session was harness-killed at the ceiling; synthesized REVIEW_ESCALATE.'
+    )
+    return 'review_escalate', payload
+
+
 def _maybe_synthesize_prose_pass(
     data: dict[str, Any], result_text: str,
 ) -> Optional[tuple[str, dict[str, Any]]]:
@@ -3234,8 +3283,24 @@ def _classify_mirror_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
     # authoritative path; result_text is a fallback for when the session log
     # is unavailable (no session_id, missing file, etc.).
     marker_type, payload, _narrative = (None, None, '')
-    recovered, recovered_by_type = _recover_marker_text_from_session_log(
-        data.get('claude_session_id'),
+
+    # review-timeout-escalate-001 (2026-06-26) — AUTHORITATIVE harness-kill
+    # override, evaluated BEFORE the session-log recovery below. A timed-out
+    # review (the harness hit agent_runner.REVIEW_SESSION_CEILING_SECONDS and
+    # killed the session) did NOT complete, so any marker recoverable from its
+    # PARTIAL transcript — notably an early `=== REVIEW_PASS ===` it printed
+    # before wedging (the documented #101/#334 'Monitor timeout firing after
+    # REVIEW_PASS' shape) — must NOT be trusted for the irreversible auto-merge.
+    # Synthesize an inconclusive REVIEW_ESCALATE and SKIP recovery so a killed
+    # review routes to Beacon instead of force-merging on a stale PASS (#713).
+    if data.get('phase') == 'review':
+        _timeout_escalate = _maybe_synthesize_timeout_escalate(data)
+        if _timeout_escalate is not None:
+            marker_type, payload = _timeout_escalate
+
+    recovered, recovered_by_type = (
+        _recover_marker_text_from_session_log(data.get('claude_session_id'))
+        if marker_type is None else ('', {})
     )
     if recovered:
         # nervous-system-audit #14 (2026-06-05) — conservative-priority
@@ -3318,6 +3383,8 @@ def _classify_mirror_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
             # existing auto-merge path fire and skips the ~$1/~7min
             # marker-error retry. PASS-only + no-contradiction gated; any
             # ambiguity or non-PASS verdict falls through to the raise.
+            # (A harness-timed-out review never reaches here — it is short-
+            # circuited to REVIEW_ESCALATE at the top of this function.)
             synthesized = _maybe_synthesize_prose_pass(data, result_text)
             if synthesized is None:
                 raise mrh.MalformedMirrorMarker(

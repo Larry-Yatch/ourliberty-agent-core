@@ -178,7 +178,14 @@ DEFAULT_CONFIG: dict[str, Any] = {
     'enabled': True,
     'marker_grace_seconds': 300,         # 5 min  — Case 1 post-marker idle floor
     'silent_grace_seconds': 900,         # 15 min — Case 2 no-marker idle floor (alert)
-    'hard_silent_grace_seconds': 3600,   # 60 min — Case 2 deterministic auto-reap backstop
+    # 60 min — Case 2 deterministic auto-reap backstop. Left to Pulse-Check's
+    # self-tuning (config/review-reaper-rules.json is the operative value); NOT
+    # hardcoded down from here. As of the harness review ceiling
+    # (agent_runner.REVIEW_SESSION_CEILING_SECONDS, 35 min) the dispatcher now
+    # wall-clock-kills a phase=review session BEFORE this reaper would fire, so
+    # this backstop only matters for a non-review mirror wedge or when the
+    # ceiling is disabled via env.
+    'hard_silent_grace_seconds': 3600,
     'streak_to_promote': 3,              # consecutive true positives → auto-reap
     # Per-task build-handoff grace, keyed to the build-sequence advancer's
     # cadence (ourliberty-build-sequence-advancer.timer / outbox dispatch runs
