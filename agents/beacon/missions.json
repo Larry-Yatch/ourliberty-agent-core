@@ -6183,6 +6183,75 @@
         "from_state": "proposed"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "notifier-auto-retraction-stale-red-alerts-never-clear",
+      "name": "Notifier auto-retraction (stale red alerts never clear)",
+      "phase": "proposed",
+      "brief": "Pipeline-redesign Phase 2. The resolve_alert primitive EXISTS but only 2 of 104 producers call it, so a cleared condition leaves a red alert lingering up to 14 days; default route is escalate; detector confidence never sets severity. REVISIT WHEN: the stall-dedup (in flight) lands \u2014 this is the next Phase 2 item. WHAT TO DO: generalize the install-drift retraction pattern so every recurring detector retracts its own alert on a cleared condition (keyed on source:subject); thread detector confidence into severity so low-confidence detections route to digest, not an escalate DM.",
+      "spec_docs": [],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-27",
+      "deferred_reason": null,
+      "proposed_by": "beacon",
+      "proposed_at": "2026-06-27T17:56:11.303585+00:00"
+    },
+    {
+      "id": "pr-lifecycle-state-owner-the-surgical-b-phase-3",
+      "name": "pr_lifecycle state owner (the surgical B / Phase 3)",
+      "phase": "proposed",
+      "brief": "The one structural rebuild from the corrected brief: a single authoritative, MUTABLE per-PR lifecycle record + a canonical PR-identity resolver that healers/advancer/dashboard READ, instead of each re-deriving state from logs+gh. Collapses themes c (task_id vs PR identity) and e (no transition owner). REVISIT WHEN: Phase 2 has been live ~2 weeks AND genuine post-dedup state-derivation failures still recur above a threshold (the fit/noise data is the gate). WHAT TO DO: build the thin mutable pr_lifecycle projection (one row per PR, phase enum, single advance() writer fed by the existing chain_event emit sites) + the identity resolver; shadow-write first, migrate readers incrementally. If Phase 2 made it quiet -> we saved the rewrite.",
+      "spec_docs": [],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-27",
+      "deferred_reason": null,
+      "proposed_by": "beacon",
+      "proposed_at": "2026-06-27T17:56:11.496513+00:00"
+    },
+    {
+      "id": "review-gate-pr2-post-merge-baseline-warmer",
+      "name": "Review gate PR2: post-merge baseline warmer",
+      "phase": "proposed",
+      "brief": "Deferred follow-up to the shipped baseline cache (#737). The cache already covers RETRIES and re-reviews (same parent SHA). This adds first-review (cold-parent) speed. REVISIT WHEN: the review-ceiling fit-monitor shows fresh POST-cache code reviews still riding the 35min ceiling on their FIRST run (p95 near ceiling). WHAT TO DO: build a post-merge warmer that runs the suite once per new main SHA and caches it (regression_baseline_cache.warm) + a systemd timer; set OL_REGRESSION_BASELINE_DIR to a fixed canonical path so the warmer and the gate (runs under Mirror TIER2_HOME) agree HOME-independently.",
+      "spec_docs": [
+        "agents/beacon/specs/regression-gate-efficiency.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-27",
+      "deferred_reason": null,
+      "proposed_by": "beacon",
+      "proposed_at": "2026-06-27T17:56:11.105190+00:00"
+    },
+    {
+      "id": "review-gate-pr3-graph-aware-test-selection",
+      "name": "Review gate PR3: graph-aware test selection",
+      "phase": "proposed",
+      "brief": "Deferred \u2014 the further review speedup (full suite ~5min -> ~1min). CORRECTNESS-RISKY, so a separate careful PR. REVISIT WHEN: the fit-monitor shows even single (cached) head runs too slow / near the ceiling after PR1 (+PR2). WHAT TO DO: vendor the reverse-dependency engine (ourliberty-graph pipeline/scan_deps.py scan_python) into agent-core; at head run ONLY the tests transitively depending on the diff changed modules; KEEP a full-suite post-merge backstop + a core-file (outbox_notifier/agent_runner/shared util) full-suite fallback + always run ABSOLUTE_INVARIANT_TESTS and changed test files.",
+      "spec_docs": [
+        "agents/beacon/specs/regression-gate-efficiency.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-27",
+      "deferred_reason": null,
+      "proposed_by": "beacon",
+      "proposed_at": "2026-06-27T17:56:11.202860+00:00"
+    },
+    {
+      "id": "routing-approvals-escalations-on-a-null-chat-id",
+      "name": "Routing: approvals/escalations on a null chat-id",
+      "phase": "proposed",
+      "brief": "Beacon aggravator #3. A null reply_chat_id currently FALLS BACK to Larry default chat (so it reaches the phone) BUT the dashboard needs-you tab can still miss it \u2014 a decision that needs Larry is not reliably visible on the board. REVISIT WHEN: soon, small fix, after the stall-dedup. WHAT TO DO: ensure an approval/escalation with a null or invalid chat-id still surfaces on the dashboard needs-you tab (not only the phone fallback); audit the routing path for any silent drop; add a regression test.",
+      "spec_docs": [],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-27",
+      "deferred_reason": null,
+      "proposed_by": "beacon",
+      "proposed_at": "2026-06-27T17:56:11.405250+00:00"
     }
   ]
 }
