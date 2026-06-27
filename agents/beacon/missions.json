@@ -6195,7 +6195,21 @@
       "created": "2026-06-27",
       "deferred_reason": null,
       "proposed_by": "beacon",
-      "proposed_at": "2026-06-27T17:56:11.303585+00:00"
+      "proposed_at": "2026-06-27T17:56:11.303585+00:00",
+      "briefing": {
+        "what": "A fix so that red warning alerts automatically disappear once the problem behind them is actually resolved, instead of lingering on your screen.",
+        "why": "Stale alerts that never clear erode trust in the warning system \u2014 when everything looks like an emergency, your team starts ignoring the real ones.",
+        "suggest": "Worth doing, but have the team confirm the auto-clear only triggers on genuinely resolved issues before turning it on."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-27T18:02:46.742697+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "pr-lifecycle-state-owner-the-surgical-b-phase-3",
@@ -6208,7 +6222,21 @@
       "created": "2026-06-27",
       "deferred_reason": null,
       "proposed_by": "beacon",
-      "proposed_at": "2026-06-27T17:56:11.496513+00:00"
+      "proposed_at": "2026-06-27T17:56:11.496513+00:00",
+      "briefing": {
+        "what": "A proposal to put one clear owner in charge of tracking how work moves from start to finish.",
+        "why": "Right now no single person or system is responsible for keeping that handoff clean, which is where things quietly slip through the cracks.",
+        "suggest": "Worth doing, but go in carefully \u2014 have the team show you the specific change and the safeguards before giving the green light."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-27T18:02:46.742697+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     },
     {
       "id": "review-gate-pr2-post-merge-baseline-warmer",
@@ -6223,7 +6251,21 @@
       "created": "2026-06-27",
       "deferred_reason": null,
       "proposed_by": "beacon",
-      "proposed_at": "2026-06-27T17:56:11.105190+00:00"
+      "proposed_at": "2026-06-27T17:56:11.105190+00:00",
+      "briefing": {
+        "what": "The team is suggesting a behind-the-scenes improvement that keeps the system primed and ready right after updates, so it responds quickly instead of lagging.",
+        "why": "When the system runs warm and ready, your operation stays fast and responsive for the people relying on it, avoiding sluggish moments that frustrate users.",
+        "suggest": "Worth doing, but let's confirm it's been tried out safely before turning it on for everyone."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-27T18:02:46.742697+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "review-gate-pr3-graph-aware-test-selection",
@@ -6238,7 +6280,21 @@
       "created": "2026-06-27",
       "deferred_reason": null,
       "proposed_by": "beacon",
-      "proposed_at": "2026-06-27T17:56:11.202860+00:00"
+      "proposed_at": "2026-06-27T17:56:11.202860+00:00",
+      "briefing": {
+        "what": "Your team is proposing a smarter way to pick which checks to run before new work goes live, so only the relevant ones fire instead of all of them.",
+        "why": "It can speed up how fast improvements ship and cut wasted effort, but it touches the safety net that catches mistakes before customers see them.",
+        "suggest": "Worth approving, but ask the team to prove the new approach never skips a check that matters before it's switched on fully."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-27T18:02:46.742697+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "routing-approvals-escalations-on-a-null-chat-id",
@@ -6251,7 +6307,21 @@
       "created": "2026-06-27",
       "deferred_reason": null,
       "proposed_by": "beacon",
-      "proposed_at": "2026-06-27T17:56:11.405250+00:00"
+      "proposed_at": "2026-06-27T17:56:11.405250+00:00",
+      "briefing": {
+        "what": "Some approval and escalation messages meant for you can silently vanish before they ever reach you, because they have no valid place to be delivered.",
+        "why": "If requests that need your sign-off disappear without a trace, decisions stall and important calls get made without you \u2014 or never get made at all.",
+        "suggest": "Worth fixing, but go in carefully and confirm exactly which messages are affected before changing anything, so we don't break the alerts that are working today."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-27T18:02:46.742697+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
