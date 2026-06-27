@@ -297,8 +297,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T14:12Z UTC (Iter ~3110, Tier 2, consecutive_clean=0 — de-escalated from Tier 1)
+## Status snapshot — updated 2026-06-27T14:28Z UTC (Iter ~3111, Tier 2, consecutive_clean=1)
 
-**Iter ~3110 summary:** ✅ Nominal / iter_clean. 0 new alerts. Repo on main, clean, up-to-date (HEAD=314358e7). Sync 13:21Z (~49min, success). All daemons alive (PIDs 3961026/3961281/3961345). Heal-daemon 13:59:20Z. Pipeline stall dry-run 0-would-fire. PR #731 only open PR — pipeline dead, HOLD active [carry]. PR #736 confirmed Mirror-reviewed and auto-merged cleanly at 00:30:01Z (not an unreviewed-merge). 5 pending approvals (carry, HOLD). §5.0 all no-op. **Tier 1→2 DE-ESCALATION** (consecutive_clean reached 3 at Tier 1; reset to 0; cadence now 15-min). PRIME: 0 interventions this iter, ratio≈17.43, trend=improving.
+**Iter ~3111 summary:** ✅ Nominal / iter_clean. 3 new alerts (dispatch-branch-cleanup digest, heal-pipeline-stall no-session-revision, medic-diagnosis) — all Tier-3 silenced. Beacon bot DM'd Larry for alerts 1096+1097 at 08:20:46 MDT. Repo on main, clean, up-to-date (HEAD=d81badbd). Sync 14:20:30Z (~8min, success). All daemons alive (PIDs 3961026/3961281/3961345). Heal-daemon 14:19:20Z. Pipeline stall dry-run 0-would-fire (cooldown-suppressed). PR #731 still OPEN — pipeline dead, HOLD active, medic 13th attempt recommends A) restore L4798 guard or B) close #731. 5 pending approvals (carry, HOLD). §5.0 all no-op. Tier 2 consecutive_clean=0→1. PRIME: 0 interventions, ratio≈17.43, trend=improving.
 
 
