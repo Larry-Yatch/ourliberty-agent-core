@@ -285,8 +285,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T04:33Z UTC (Iter ~3041, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T04:40Z UTC (Iter ~3042, Tier 1, consecutive_clean=0)
 
-**Iter ~3041 summary:** ⚠️ Drift. 0 new alerts. All daemons alive (beacon-bot 3821234, inbox-watcher 3891784, outbox-notifier 3822088). HEAD=4cba8fa4=origin/main (clean). Sync: no-change 04:29:09Z ✅. Watchdog 04:28:17Z overall=healthy ✅. Heal-daemon 04:23:20Z ✅. PR #731 OPEN — pipeline loop dead (carry). PR #733: Mirror REVIEW_REVISION at 04:29Z → revision-1 dispatched to Forge (PID 3944035 active). Duplicate Mirror review (revision_count=0) archived via allow-list. Pipeline progressing. **Larry HOLD directive active.** Alert watermark: 1105. PRIME: intervention+auto-fix (ratio≈17.34).
+**Iter ~3042 summary:** ⚠️ Drift (carry). 1 new alert Tier-3 silenced (PR #731 stall repeat). All daemons alive (beacon-bot 3821234, inbox-watcher 3951567, outbox-notifier 3822088). HEAD=280dd445=origin/main (clean). Sync: no-change 04:29:09Z ✅. Watchdog 04:33Z overall=healthy ✅. Heal-daemon 04:33:20Z ✅. PR #731 OPEN — pipeline loop dead (carry). PR #733: Forge revision-1 in-flight PID 3944035, ~8 min. Pipeline progressing. **Larry HOLD directive active.** Alert watermark: 1106. PRIME: no new entries (ratio≈17.34).
 
 
