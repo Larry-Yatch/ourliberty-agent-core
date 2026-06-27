@@ -291,8 +291,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T06:27Z UTC (Iter ~3056, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T06:36Z UTC (Iter ~3057, Tier 1, consecutive_clean=0)
 
-**Iter ~3056 summary:** ✅ Nominal (iter_clean). 1 new alert (L1121): forge-wip-redispatch route=digest (retry1 auto-dispatch for review-sequence-dag-review-ceiling-fit-monitor-ret). Triage Tier-4 by helper, DM suppressed (outbox-notifier route=digest; G-rule forge-wip-redispatch-digest-tier4-001 DISPATCHED ✅ vp). Watermark 1120→1121. PR #736 OPEN, Mirror review active (PID 4008053 claude, ~30 min; worktree wt-mirror-review-ceiling-fit-monitor-build confirmed). PR #731 OPEN/UNKNOWN, no Mirror review. 5 pending approvals unchanged (2 stale: #728/#733 merged; 3 under HOLD). All daemons nominal. **Larry HOLD directive active.** PRIME: 0 new interventions (iter_clean), ratio≈17.39.
+**Iter ~3057 summary:** ✅ Nominal (iter_clean). 2 new alerts (L1122–L1123): both Tier-3 silence (heal-wedged-review-sessions reaped Forge PID 3976734; outbox-notifier sequence-complete:review-ceiling-fit-monitor). Watermark 1121→1123. **PR #736 MERGED** 06:30:00Z ✅ (feat: review-ceiling fit-monitor — sequence complete). **PR #733 MERGED** 06:04:49Z (fix(pulse): clean-tree guard — unreviewed merge; DM delivered to Larry via heal-unreviewed-merge-detector at 06:09:44Z; beacon-pending[4] superseded). PR #731 only remaining open PR — pipeline dead, pr731-restore-revision-trap-gate-001 awaiting Larry. All daemons nominal. **Larry HOLD directive active.** PRIME: 0 new interventions (iter_clean), ratio≈17.39.
 
 
