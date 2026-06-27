@@ -285,8 +285,8 @@ PR #725 (fix(healer): skip forge_built_no_pr for pr-<repo>-<num> tasks whose nam
 
 ---
 
-## Status snapshot — updated 2026-06-27T00:12Z UTC (Iter ~3008, Tier 1, consecutive_clean=1)
+## Status snapshot — updated 2026-06-27T00:16Z UTC (Iter ~3009, Tier 1, consecutive_clean=2)
 
-**Iter ~3008 summary:** ✅ Nominal iter. 0 new alerts, 0 new WARNs, 0 new Tier-4. Forge ACTIVELY BUILDING mirror-marker-self-validate-gate-001 (PID 3847457, claude-opus-4-8, since 17:57 MDT). Beacon inbox empty — dead-letter notification consumed, no Forge re-dispatch for PR #731 (still stuck, G-rule decision-needed-approval-forge-dispatch-no-target-repo-001 1/3). tier3-silence-auto-restart-failed-001 still pending Larry. M config/alert-translations.json dirty (sync blocked). PRIME: intervention (ratio≈16.92). Tier 1 (consecutive_clean=1). Saturday UTC — Check I/III skipped.
+**Iter ~3009 summary:** ✅ Nominal iter. 0 new alerts, 0 new WARNs, 0 new Tier-4. Forge STILL BUILDING mirror-marker-self-validate-gate-001 (PID 3847457, claude-opus-4-8 --resume 8392a999, since 17:57 MDT ~19 min, no output yet). PR #731 pipeline still stuck (G-rule decision-needed-approval-forge-dispatch-no-target-repo-001 1/3). tier3-silence-auto-restart-failed-001 still pending Larry. M config/alert-translations.json dirty (sync blocked). PRIME: intervention (ratio≈16.94). Tier 1 (consecutive_clean=2). Saturday UTC — Check I/III skipped.
 
 
