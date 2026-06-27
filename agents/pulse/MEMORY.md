@@ -303,8 +303,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T18:21Z UTC (Iter ~3126, Tier 1, consecutive_clean=1)
+## Status snapshot — updated 2026-06-27T18:27Z UTC (Iter ~3127, Tier 1, consecutive_clean=2)
 
-**Iter ~3126 summary:** ✅ Nominal. 0 new alerts. All checks clean. consecutive_clean=0→1. PRIME: 0 interventions. HOLD in effect. Daemons alive (PID 3961026/3961281/17832). Repo 3aac437c, clean. Sync 17:20:52Z. Heal-daemon 18:13:10Z. Watchdog healthy 12:18 MDT. 5 beacon-pending (HOLD). Awaiting `approve threshold-update-2026-06-27` (Check III proposals from iter ~3125).
+**Iter ~3127 summary:** ✅ Nominal. 0 new alerts. All checks clean. consecutive_clean=1→2. PRIME: 0 interventions. HOLD in effect. Daemons alive (PID 3961026/3961281/17832). Repo b5407e51, clean. Sync 18:20:52Z. Heal-daemon 18:23:20Z. Watchdog healthy 12:23 MDT. 5 beacon-pending (HOLD). Awaiting `approve threshold-update-2026-06-27` (Check III proposals from iter ~3125). 1 more clean iter → Tier 2.
 
 
