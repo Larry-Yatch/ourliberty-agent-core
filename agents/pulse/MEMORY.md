@@ -285,8 +285,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T02:58Z UTC (Iter ~3028, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T03:07Z UTC (Iter ~3029, Tier 1, consecutive_clean=0)
 
-**Iter ~3028 summary:** ⚠️ Drift. 2 new alerts (watermark 1100→1102): L1101 Tier-4 (ourliberty-health sync_agent_core uncommitted, outbox-notifier already DM'd 20:56:16 MDT), L1102 Tier-3 silence (sync.service sync-blocked). All daemons alive (beacon-bot 3821234, inbox-watcher 3891784, outbox-notifier 3822088). HEAD=b357cbdf=origin/main (in sync). Still dirty M config/alert-translations.json (blocks sync). PR #731 OPEN — pipeline loop dead (medic attempt 3 confirmed). Manual fix: apply Mirror finding to `scripts/outbox_notifier.py L4798-4805` + push + re-trigger Mirror. 3 active APPROVAL_REQUESTs: tier3-silence-auto-restart-failed-001, pr731-restore-revision-trap-gate-001, silence-ourliberty-health-clean-tree-001. Alert watermark: 1102. PRIME: intervention (ratio≈17.16).
+**Iter ~3029 summary:** ⚠️ Drift (carry). 0 new alerts (watermark 1102 unchanged). All daemons alive (beacon-bot 3821234, inbox-watcher 3891784, outbox-notifier 3822088). HEAD=58f10fb6=origin/main (in sync). Still dirty M config/alert-translations.json (blocks sync). PR #731 OPEN — pipeline loop dead (medic attempt 3 confirmed). Manual fix: apply Mirror finding to `scripts/outbox_notifier.py L4798-4805` + push + re-trigger Mirror. 3 active APPROVAL_REQUESTs: tier3-silence-auto-restart-failed-001, pr731-restore-revision-trap-gate-001, silence-ourliberty-health-clean-tree-001. Alert watermark: 1102. PRIME: intervention (ratio≈17.18).
 
 
