@@ -297,8 +297,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T09:00Z UTC (Iter ~3075, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T09:07Z UTC (Iter ~3076, Tier 1, consecutive_clean=0)
 
-**Iter ~3075 summary:** ✅ Nominal / iter_clean. 1 new alert (idx=1130 heal-pipeline-stall no-session-revision Tier-3 silenced; watermark 1130→1131). All daemons alive (PIDs 3961026/3961281/3961345). Watchdog 08:52:39Z healthy. Pipeline stall cooldown reset (dry-run 0). PR #731 only open PR — pipeline dead, HOLD active [carry]. 5 pending approvals (carry, HOLD). §5.0 all no-op. PRIME: iter_clean, ratio≈17.42.
+**Iter ~3076 summary:** ✅ Nominal / iter_clean. 2 new alerts both Tier-3 silenced (idx=1131 medic-diagnosis, idx=1132 doorbell; watermark 1131→1133). All daemons alive (PIDs 3961026/3961281/3961345). Watchdog 09:03:16Z healthy. Pipeline stall cooldown-suppressed (dry-run 0). PR #731 only open PR — pipeline dead, HOLD active [carry]. 5 pending approvals (carry, HOLD). §5.0 all no-op. PRIME: iter_clean, ratio≈17.42.
 
 
