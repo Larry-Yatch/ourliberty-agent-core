@@ -285,8 +285,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T01:00Z UTC (Iter ~3012, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T01:07Z UTC (Iter ~3013, Tier 1, consecutive_clean=0)
 
-**Iter ~3012 summary:** ⚠️ 1 Tier-4 alert (ourliberty-health dirty-tree, G-rule 3/3 → DISPATCHED to Beacon). **PR #732 MERGED** ✅ (80bc08b0, fix: in-process verdict-marker self-validation gate — G-rule mirror-malformed-verdict-post-restart-001 COMPLETE). PR #731: pr731-restore-revision-trap-gate-001 APPROVAL_REQUEST delivered to Larry 18:55:08 MDT — awaiting "Go". Local repo 1 commit behind origin/main (PR #732 merge) + dirty M config/alert-translations.json (blocks fast-forward + sync). tier3-silence-auto-restart-failed-001 approval still pending. PRIME: intervention (ratio≈16.97).
+**Iter ~3013 summary:** ✅ Mostly nominal. 3 new alerts all Tier-3. Repo HEAD=origin/main (missions healer pushed 08404599 at 01:02:53Z — was 1-behind at iter ~3012, now in sync). Still dirty M config/alert-translations.json (blocks sync). PR #731 stuck awaiting Larry "Go" on pr731-restore-revision-trap-gate-001. **NEW:** silence-ourliberty-health-clean-tree-001 APPROVAL_REQUEST in beacon-pending[3] — Beacon turned around G-rule ourliberty-health-clean-tree fix in ~5 min. tier3-silence-auto-restart-failed-001 still pending. PRIME: intervention (ratio≈16.99).
 
 
