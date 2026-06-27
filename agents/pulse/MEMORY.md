@@ -279,9 +279,9 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## G-rule decision-needed-approval-forge-dispatch-no-target-repo-001 — 2/3 (updated iter ~3043)
+## G-rule decision-needed-approval-forge-dispatch-no-target-repo-001 — 3/3 HOLD-DEFERRED (updated iter ~3048)
 
-**Rule:** When outbox-notifier emits an `approval_request` via the "no-session decision-needed" (REVIEW_ESCALATE) path and Larry approves via Telegram, Beacon dispatches a task to Forge inbox — but the envelope has `target_repo=None`. Forge inbox_watcher dead-letters with: `worktree: no canonical path for target_repo=None`. Additionally (iter ~3043): the DM itself drops earlier — `beacon replan APPROVAL_REQUEST cannot route approval DM (reply_chat_id=None), falling through` — so Larry never gets to approve. Both failures stem from the no-session REVIEW_ESCALATE path losing task metadata. Fix: Beacon's REVIEW_ESCALATE replan dispatch path must carry `target_repo` AND `reply_chat_id` from original task metadata. First occurrence iter ~3006 (PR #731, task=mirror-review-forge-revision-preamble-discipline-001). Second occurrence iter ~3043 (PR #733, task=mirror-review-pr-ourliberty-agent-core-733, 04:43:26Z — DM drop + beacon-pending[4] created). Dispatch to Beacon at 3/3. **Alternate unblock path:** direction-ask-pr731-nextcount-guard-fix-001 dispatched iter ~3011 — Beacon/Forge apply medic's concrete fix directly to PR #731 branch, bypassing the broken approval flow.
+**Rule:** When outbox-notifier emits an `approval_request` via the "no-session decision-needed" (REVIEW_ESCALATE) path and Larry approves via Telegram, Beacon dispatches a task to Forge inbox — but the envelope has `target_repo=None`. Forge inbox_watcher dead-letters with: `worktree: no canonical path for target_repo=None`. Additionally: the DM drops earlier — `beacon replan APPROVAL_REQUEST cannot route approval DM (reply_chat_id=None), falling through` — so Larry never gets to approve. Both failures stem from the no-session REVIEW_ESCALATE path losing task metadata. Fix: Beacon's REVIEW_ESCALATE replan dispatch path must carry `target_repo` AND `reply_chat_id` from original task metadata. Occurrences: iter ~3006 (1/3, PR #731); iter ~3043 (2/3, PR #733, 04:43:26Z); iter ~3048 (3/3, PR #733, 05:14:28Z). Dispatch to Beacon deferred under HOLD until strategy decided. **Alternate unblock path:** direction-ask-pr731-nextcount-guard-fix-001 dispatched iter ~3011 — Beacon/Forge apply medic's concrete fix directly to PR #731 branch, bypassing the broken approval flow.
 
 ---
 
@@ -291,8 +291,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T05:16Z UTC (Iter ~3047, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T05:21Z UTC (Iter ~3048, Tier 1, consecutive_clean=0)
 
-**Iter ~3047 summary:** ✅ Nominal (iter_clean). 4 new alerts (L1110-L1113): all Tier-3 silenced. Watermark 1113. PR #733 Mirror rev-1 completed as REVIEW_ESCALATE (05:06Z) — bwrap unavailable + test timeout (cannot-conclude), code CLEAN. Medic-diagnosis DM delivered to Larry 05:12Z. review-ceiling-fit-monitor sequence active (DAG-PASS 05:07Z; Larry merged #735 spec himself, Forge step dispatch imminent). PR #731 pipeline dead (carry). All daemons alive (PIDs 3961026/3961281/3961345). Watchdog 05:08:50Z healthy. Heal-daemon 05:03:44Z ✅. **Larry HOLD directive active.** PRIME: 0 new interventions (iter_clean, ratio≈17.38).
+**Iter ~3048 summary:** ✅ Nominal (iter_clean). 0 new alerts (watermark 1113, no new). review-ceiling-fit-monitor sequence advancing: headless-approval at 05:14:58Z, Forge ack-proceed at 05:17:08Z, build-phase dispatched at 05:17:09Z — Forge actively building `heal_review_ceiling_fit.py + timer + tests`. G-rule decision-needed-approval-forge-dispatch-no-target-repo-001 reached 3/3 (DM drop 05:14:28Z for PR #733); dispatch deferred under HOLD. Larry asked "what happened to 733?" at 05:17:43Z; Beacon answered at 05:18:45Z. PR #731 pipeline dead (carry). PR #733 REVIEW_ESCALATE awaiting Larry (carry). All daemons alive (PIDs 3961026/3961281/3961345). Watchdog 05:18:50Z healthy. Heal-daemon 05:13:47Z ✅. **Larry HOLD directive active.** PRIME: 0 new interventions (iter_clean, ratio≈17.38).
 
 
