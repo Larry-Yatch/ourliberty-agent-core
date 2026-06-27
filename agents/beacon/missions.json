@@ -6143,7 +6143,11 @@
         "at": "2026-06-26T23:40:39.916046+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-27T01:02:43.800579+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-direction-ask-mirror-malformed-post-restart-fix-001",
