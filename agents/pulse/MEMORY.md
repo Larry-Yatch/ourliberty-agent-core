@@ -297,8 +297,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T16:10Z UTC (Iter ~3115, Tier 3→1 RESET, consecutive_clean=1→0)
+## Status snapshot — updated 2026-06-27T16:12Z UTC (Iter ~3116, Tier 1, consecutive_clean=0→1)
 
-**Iter ~3115 summary:** ⚠️ Non-clean / tier-reset. Larry directive at 09:59 MDT: "Let's get 731 through the pipeline" → Beacon sent APPROVAL_REQUEST DM `land-pr731-restore-fix-head-001` at 16:02Z (pending Larry reply). 6 pending approvals (was 5). Repo on main, clean, up-to-date (HEAD=0d08200c). Sync 15:20:46Z (no-change). All daemons alive (PIDs 3961026/3961281/3961345). Heal-daemon 16:00:35Z. Pipeline stall 0-would-fire (cooldown-suppressed). PR #731 OPEN — `land-pr731-restore-fix-head-001` in flight. HOLD on other dispatches. §5.0 all no-op. Tier 3→1 (reset). PRIME: 0 interventions, ratio≈17.43, trend=improving.
+**Iter ~3116 summary:** ✅ Clean (iter_clean). 0 new alerts. All checks nominal. `land-pr731-restore-fix-head-001` APPROVAL_REQUEST DM sent 16:02Z, still pending Larry tap (~10min). 6 beacon-pending-approvals (unchanged). Repo on main, clean, up-to-date (HEAD=48cecf7c). Sync 15:20:46Z. All daemons alive (PIDs 3961026/3961281/3961345). Heal-daemon 16:10:52Z. Pipeline stall 0-would-fire (cooldown-suppressed). PR #731 OPEN — authorization in flight. HOLD on other dispatches. §5.0 all no-op. Tier 1, consecutive_clean=0→1 (2 more clean iters → Tier 2). PRIME: 0 interventions, ratio≈17.43, trend=improving.
 
 
