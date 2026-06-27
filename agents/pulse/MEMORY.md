@@ -297,8 +297,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T13:08Z UTC (Iter ~3105, Tier 2, consecutive_clean=2)
+## Status snapshot — updated 2026-06-27T13:24Z UTC (Iter ~3106, Tier 3, consecutive_clean=0 — DE-ESCALATED)
 
-**Iter ~3105 summary:** ✅ Nominal / iter_clean. 1 new alert (doorbell-1089 Tier-3 silenced), 0 interventions. Watermark advanced 1089→1090. All daemons alive (PIDs 3961026/3961281/3961345). Heal-daemon 12:58:20Z. Pipeline stall dry-run 0-would-fire (cooldown-suppressed). PR #731 only open PR — pipeline dead, UNKNOWN (GitHub oscillation benign), no Mirror PASS, HOLD active [carry]. 5 pending approvals (carry, HOLD). §5.0 all no-op. Tier 2 (consecutive_clean=2, need 1 more for Tier 3 de-escalation). PRIME: iter_clean, ratio≈17.42, trend=improving.
+**Iter ~3106 summary:** ✅ Nominal / iter_clean. 2 new alerts (1090/1091: heal-pipeline-stall + medic-diagnosis for PR #731 stall, both Tier-3 silenced). Watermark advanced 1090→1092. All daemons alive (PIDs 3961026/3961281/3961345). Heal-daemon 13:18:35Z. Pipeline stall dry-run 0-would-fire. PR #738 merged unreviewed (spec(stall) noise reduction). Mirror inbox: 1 routing signal for PR #738 (handled by outbox-notifier next run). PR #731 only other open PR — pipeline dead, HOLD active [carry]. 5 pending approvals (carry, HOLD). §5.0 all no-op. **Tier DE-ESCALATED 2→3** (consecutive_clean=2→3 threshold reached; 30-min cadence now active). PRIME: iter_clean, ratio≈17.42, trend=improving.
 
 
