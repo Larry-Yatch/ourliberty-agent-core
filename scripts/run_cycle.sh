@@ -243,6 +243,49 @@ if [ "$CYCLE_OK" = "1" ] && [ -d "$REPO_DIR/.git" ]; then
     fi
 fi
 
+# --- clean-tree guard: revert stray out-of-contract edits (sync-wedge class) ---
+# The /cycle agent runs INSIDE the live repo, so it can edit a TRACKED file
+# outside Pulse's own write-set (e.g. config/alert-translations.json). The scoped
+# auto-commit above stages only PULSE_RUNTIME_PATHS, so such an edit is orphaned
+# uncommitted — which makes sync_agent_core.sh refuse to swap ("uncommitted
+# changes block sync") and agent_core_health_check.py fail its clean-tree check,
+# paging Larry every ~30 min until cleared (observed 2026-06-26; PR #728 only
+# silenced the alert, it never stopped the stray edit, so it recurred as a hard
+# service failure). The live tree must only ever carry machine-owned runtime
+# dirt — PULSE_RUNTIME_PATHS (committed above) plus the healer-owned files sync
+# tolerates — i.e. SYNC_AUTOCOMMIT_PATHS. Anything else is an out-of-contract
+# stray: a governed config/code change belongs in a Forge PR, NOT hand-applied to
+# live. Revert it (archiving the diff first so nothing is lost) and surface at
+# FYI/digest, never paging. Runs regardless of CYCLE_OK so a stray from a failed
+# cycle is cleaned too; gated to main so a feature-branch checkout is never
+# touched. Scope: tracked modifications (the confirmed class); untracked strays
+# are left for the heal_droplet_git_drift backstop.
+if [ -d "$REPO_DIR/.git" ]; then
+    cd "$REPO_DIR"
+    GUARD_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)
+    if [ "$GUARD_BRANCH" = "main" ]; then
+        STRAY=()
+        while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            _path_in_list "$f" "${SYNC_AUTOCOMMIT_PATHS[@]}" || STRAY+=("$f")
+        done < <({ git diff --name-only HEAD 2>/dev/null; git diff --cached --name-only 2>/dev/null; } | sort -u)
+        if [ "${#STRAY[@]}" -gt 0 ]; then
+            STRAY_TS=$(date -u +%Y%m%dT%H%M%SZ)
+            STRAY_DIFF="${LOG_DIR}/stray-cycle-edits-${STRAY_TS}.diff"
+            git diff HEAD -- "${STRAY[@]}" > "$STRAY_DIFF" 2>/dev/null || true
+            # `git checkout HEAD --` (not bare `--`) so a STAGED stray resets too.
+            git checkout HEAD -- "${STRAY[@]}" 2>>"$LOG_FILE" || true
+            log "clean-tree-guard: reverted ${#STRAY[@]} stray tracked edit(s) outside Pulse write-set: ${STRAY[*]} (diff archived at ${STRAY_DIFF})"
+            timeout 10 python3 "${HOME}/agent-core/scripts/larry_alerts.py" append_alert \
+                --source pulse-cycle \
+                --severity warning \
+                --subject "cycle:stray-tree-edit-reverted" \
+                --message "run_cycle.sh reverted out-of-contract edit(s) the /cycle agent made to tracked file(s) outside Pulse's write-set: ${STRAY[*]}. Left uncommitted these would wedge ourliberty-sync + agent-core-health (the 2026-06-26 config/alert-translations.json class). Diff archived at ${STRAY_DIFF}. If the change was intended, route it through a Forge PR (the governed channel)." \
+                >/dev/null 2>&1 || true
+        fi
+    fi
+fi
+
 if [ "$CYCLE_OK" = "1" ]; then
     exit 0
 else
