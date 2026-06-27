@@ -285,8 +285,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T01:12Z UTC (Iter ~3014, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T01:22Z UTC (Iter ~3016, Tier 1, consecutive_clean=0)
 
-**Iter ~3014 summary:** ✅ Nominal. 1 new alert (dispatch-branch-cleanup L1089, Tier-3 silence). All other finds are carries. Repo HEAD=1bd85af1=origin/main (in sync). Still dirty M config/alert-translations.json (blocks sync). PR #731 stuck awaiting Larry "Go" on pr731-restore-revision-trap-gate-001. 3 active APPROVAL_REQUESTs in beacon-pending (tier3-silence-auto-restart-failed-001, pr731-restore-revision-trap-gate-001, silence-ourliberty-health-clean-tree-001) — all awaiting Larry. Alert watermark: 1089. PRIME: intervention (ratio≈16.99).
+**Iter ~3016 summary:** ✅ Nominal. 0 new alerts. All carries verified. Repo HEAD=c91b6973=origin/main (in sync). Still dirty M config/alert-translations.json (blocks sync). PR #731 stuck awaiting Larry "Go" on pr731-restore-revision-trap-gate-001. 3 active APPROVAL_REQUESTs in beacon-pending (tier3-silence-auto-restart-failed-001, pr731-restore-revision-trap-gate-001, silence-ourliberty-health-clean-tree-001) — all awaiting Larry. Alert watermark: 1090. PRIME: intervention (ratio≈17.02).
 
 
