@@ -291,8 +291,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T05:02Z UTC (Iter ~3045, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T05:07Z UTC (Iter ~3046, Tier 1, consecutive_clean=0)
 
-**Iter ~3045 summary:** ⚠️ Drift (carry). iter_clean — no new Pulse actions required. NEW: PR #735 MERGED (spec(mirror): review-ceiling fit-monitor, 4b5f1337, doc-only by Larry, desktop-merged at 04:59:39Z; unreviewed-merge noted). Sync auto-ran 05:00:42Z and fast-forwarded to 4b5f1337. PR #733 Mirror rev-1 in-flight (MIRROR_ACTIVE_SKIP). PR #731 pipeline dead (carry). No new alerts (watermark=1108). All daemons alive. Watchdog 04:58:49Z healthy. Heal-daemon 04:53:40Z ✅. **Larry HOLD directive active.** PRIME: 0 new interventions (iter_clean, ratio≈17.38).
+**Iter ~3046 summary:** ✅ Nominal (iter_clean). 1 new alert: L1109 doorbell (Tier-3 silenced, known-pattern). Watermark 1109. PR #733 Mirror rev-1 in-flight (MIRROR_ACTIVE_SKIP, dispatched 04:51:56Z). PR #731 pipeline dead (carry). All daemons alive (PIDs 3961026/3961281/3961345). Watchdog 05:03:50Z healthy. Heal-daemon 05:03:44Z ✅. **Larry HOLD directive active.** PRIME: 0 new interventions (iter_clean, ratio≈17.38).
 
 
