@@ -539,6 +539,12 @@
       "plain_language_summary": "A Pulse maintenance cycle was stopped by its branch-guard because ~/agent-core was not on a clean main checkout, so it refused to auto-commit the cycle journal onto the wrong branch. Read the subject to tell the two cases apart: 'dirty-tree-on-<branch>' is expected-by-design and self-resolves once the working tree returns to main (no action needed); 'auto-restore-failed-from-<branch>' means the automatic return-to-main failed and needs a manual fix.",
       "recommended_action": "If the subject is dirty-tree-on-*, no action is required -- the next cycle runs once ~/agent-core is back on a clean main. If it is auto-restore-failed-from-*, ssh ourliberty-vm, cd ~/agent-core, and manually restore a clean main checkout (origin may have diverged); cycles resume on the next tick."
     },
+    "cycle:stray-tree-edit-reverted": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "The Pulse /cycle agent edited a tracked file in the live repo OUTSIDE its own runtime paths (e.g. config/alert-translations.json) -- an out-of-contract change that, left uncommitted, would have wedged ourliberty-sync + agent-core-health and paged you every ~30 min (the 2026-06-26 class). run_cycle.sh's clean-tree guard auto-reverted it (the diff is archived under ~/agents/logs/stray-cycle-edits-*.diff first, so nothing is lost) and surfaced this FYI. The live tree is clean; no action needed. Governed config/code changes are supposed to flow through a Forge PR, not be hand-applied to live.",
+      "recommended_action": "None -- self-healed: the stray edit was reverted and archived. If the change was actually wanted, route it through a Forge PR (the reviewed, approved channel). If this fires repeatedly, the cycle prompt's Check A discipline needs reinforcing -- check the archived diffs to see what Pulse keeps trying to write."
+    },
     "*": {
       "severity": "INFO",
       "tier": "FYI",
