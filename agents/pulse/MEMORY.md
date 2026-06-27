@@ -291,14 +291,14 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## G-rule medic-diagnosis-tier4 — re-opened 1/3 (iter ~3068)
+## G-rule medic-diagnosis-tier4 → STALE/CLOSED ✅ (re-verified iter ~3084)
 
-**Rule:** `source=medic, intent=medic-diagnosis` alerts classify Tier-4 (novel — 0 medic entries in `config/alert-translations.json`). Completed G-rule `medic-diagnosis-tier4` → PR #515 (2026-06-15) is NOT reflected in current config. PR #515's fix is absent from `alert-translations.json` (may have been reverted, applied to a different path, or lost in a config refactor). Dispatch to Beacon at 3/3 (post-HOLD) to re-add `source=medic, intent=medic-diagnosis` → Tier-3 entry. First new occurrence iter ~3068 (medic diagnosis of PR #731 stall, delivered via route=escalate at 01:57:20 MDT; outbox-notifier already DM'd Larry, no secondary Pulse DM).
+**Rule (historical):** Was re-opened at iter ~3068 with claim "0 medic entries in alert-translations.json." Re-verified iter ~3084: `config/alert-translations.json` HAS `medic.medic-diagnosis` entry (severity=INFO, tier=FYI). Triage helper returned Tier-3 for attempt-10 medic-diagnosis alert. Translation IS present and working. G-rule re-open claim was STALE. Closing. No dispatch needed.
 
 ---
 
-## Status snapshot — updated 2026-06-27T10:02Z UTC (Iter ~3083, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T10:14Z UTC (Iter ~3084, Tier 1, consecutive_clean=0)
 
-**Iter ~3083 summary:** ✅ Nominal / iter_clean. 1 new alert (pipeline-stall:no-session-revision:forge-revision-preamble-discipline-001 at 10:00:24Z) — Tier-3 silenced (known-pattern). Watermark 1082→1083. All daemons alive (PIDs 3961026/3961281/3961345). Watchdog 10:00:16Z healthy. Heal-daemon 09:55:56Z. Pipeline stall dry-run 0 (cooldown-suppressed). PR #731 only open PR — pipeline dead, HOLD active [carry]. PR #736 MERGED 06:30Z. PR #737 MERGED 06:56Z (unreviewed-merge). 5 pending approvals (carry, HOLD). §5.0 all no-op. PRIME: iter_clean, ratio≈17.42, trend=improving.
+**Iter ~3084 summary:** ✅ Nominal / iter_clean. 1 new alert (medic-diagnosis attempt 10 for PR #731 stall, ts=10:01:54Z) — Tier-3 silenced (medic.medic-diagnosis in alert-translations.json confirmed present). Watermark 1083→1084. medic-diagnosis-tier4 G-rule re-open (1/3) verified STALE — closed. All daemons alive (PIDs 3961026/3961281/3961345). Watchdog 10:10:19Z healthy. Heal-daemon 10:06:14Z. Pipeline stall dry-run 0 (cooldown-suppressed). PR #731 only open PR — pipeline dead, HOLD active [carry]. 5 pending approvals (carry, HOLD). §5.0 all no-op. PRIME: iter_clean, ratio≈17.42, trend=improving.
 
 
