@@ -5,6 +5,93 @@
 ---
 
 
+## Iteration ~3115 — 2026-06-27T16:10Z UTC (interactive /cycle via chat, Tier 3→1 TIER-RESET, consecutive_clean=1→0)
+
+**Trigger:** Larry `/cycle` via chat.
+
+**Health:** ⚠️ Non-clean (new Larry directive + new pending approval). Tier reset 3→1. No Pulse actions required; Beacon managing PR #731 path.
+
+**VERIFY-BEFORE-REASSERT:**
+- **Source repo (re-verified):** HEAD=0d08200c=origin/main. On main. Clean. Up to date (latest = run_cycle.sh auto-commit for iter ~3114). ✅
+- **Sync (re-verified):** last_sync=2026-06-27T15:20:46Z (~50min ago). Status=no-change. Under 2h. ✅
+- **PR #731 (re-verified):** Still OPEN. mergeable=MERGEABLE, reviewDecision="" (no Mirror PASS). `land-pr731-restore-fix-head-001` approval DM sent 16:02Z, pending Larry response. [active]
+- **Daemon PIDs (re-verified):** PID 3961026 (beacon_telegram_bot, Ss) ✅. PID 3961281 (inbox_watcher, Ssl) ✅. PID 3961345 (outbox_notifier, Ss) ✅. All same PIDs as iter ~3114.
+- **Heal-daemon heartbeat (re-verified):** 2026-06-27T16:00:35Z (~10min before checks). Under 60min. ✅
+- **Pipeline stall (re-verified):** dry-run 0 would-fire. forge-revision-preamble-discipline-001 cooldown-suppressed. All other tasks FORGE_NO_PR_SKIP. ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark: repaired=false, old_watermark=1103, file_length=1103. **0 new alerts.** ✅ NOMINAL.
+
+**Check 1 — Log noise:**
+- journalctl --user -p warning --since 30min: No entries. ✅ NOMINAL.
+- outbox-notifier.log: Last entry 08:40:53 MDT (MIRROR_DAG_PREFLIGHT already-kicked-off no-op for heal-stall-noise-reduction-ret-retry1). System quiet ~1.5h. ✅
+
+**Check 2 — Telegram sweep:**
+- **NEW DIRECTIVE:** Larry → 09:59 MDT: "Let's get 731 through the pipeline".
+- Beacon processed immediately: `land-pr731-restore-fix-head-001` APPROVAL_REQUEST DM sent to Larry at 10:02 MDT (16:02Z). Approval is status=pending in beacon-pending-approvals.json.
+- This constitutes Larry's explicit authorization to unblock PR #731 from the HOLD (narrow PR #731 override; broader HOLD on other dispatches remains in effect per `blackboard/core-problem-brief-2026-06-26.md`).
+- No Larry response visible yet in Telegram log. Beacon managing. ⚠️ Non-nominal.
+
+**Check 3 — Pipeline stall:**
+- dry-run: 0 would-fire. forge-revision-preamble-discipline-001 cooldown-suppressed. All other tasks FORGE_NO_PR_SKIP (PR #739 heal-stall-noise-reduction-build MERGED 13:44Z confirmed). ✅ NOMINAL.
+
+**Check 4 — Pending directives:**
+- Beacon inbox: 0 items ✅. Forge inbox: 0 items ✅. Mirror inbox: 0 items ✅.
+- beacon-pending-approvals.json: **6 entries** (was 5). New entry: `land-pr731-restore-fix-head-001` (created 16:02Z, status=pending, chat_id=7998341473). Awaiting Larry's reply to Beacon's APPROVAL_REQUEST DM. ⚠️ Non-nominal (new pending).
+- Other 5 entries: unchanged (HOLD active). [carry]
+
+**Check 5 — Stale daemon code:**
+- Heartbeat: 2026-06-27T16:00:35Z (~10min before checks). Under 60min. ✅ NOMINAL.
+
+**Check A — Source repo:** HEAD=0d08200c=origin/main. On main. Clean. Up to date. ✅
+**Check B — Sync health:** last_sync=15:20:46Z (~50min ago). Status=no-change. Under 2h. ✅
+**Check C — Agent liveness:** PID 3961026 (Ss) ✅. PID 3961281 (Ssl) ✅. PID 3961345 (Ss) ✅. Heal-daemon 16:00:35Z ✅.
+**Check E — PRs:** PR #731 — OPEN only. `land-pr731-restore-fix-head-001` approval in flight (pending Larry DM reply).
+
+**§5.0 Bug-hunt gate:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Saturday 2026-06-27 UTC (weekday=5):**
+- Check I: Saturday — not in firing set (Mon/Wed/Fri/Sun). Skip. ✅
+- Check III: Not Sunday. Skip. ✅
+- Check VIII: Not Monday. Skip. ✅
+
+**G-rule assessment:**
+- No new G-rule occurrences this iter. All counts carry unchanged from iter ~3114.
+
+**Actions taken:**
+1. Tier state: record non-clean → Tier 3→1 (signal observed). consecutive_clean=1→0. ✅
+
+**Escalations:** None. Beacon managing PR #731 authorization path. HOLD in effect for all other dispatches.
+
+**Standing findings (carried + verified this iter):**
+- [yellow] **PR #731 — authorization in flight** — `land-pr731-restore-fix-head-001` APPROVAL_REQUEST DM sent 16:02Z. Awaiting Larry's tap-to-approve. Once approved, Beacon dispatches to Forge for build. [active]
+- [yellow] **PR #731 — pipeline dead (base)** — Pipeline stall cooldown-suppressed. Medic recommended close or git revert 4a25329d. Larry directive supersedes; proceeding via `land-pr731-restore-fix-head-001` path. [carry]
+- [yellow] **beacon-pending[2]: pr731-restore-revision-trap-gate-001** — Larry decision. HOLD applies until `land-pr731-restore-fix-head-001` path resolves. [carry]
+- [yellow] **unreviewed-merge:738** — PR #738 MERGED, no Mirror PASS. [Larry judgment; carry]
+- [yellow] **unreviewed-merge:737** — PR #737 MERGED, no Mirror PASS. [Larry judgment; carry]
+- [yellow] **unreviewed-merge:733** — DM delivered 06:09:44Z. [Larry judgment; carry]
+- [yellow] **Stale beacon-pending[0]** — mirror-review-silence-ourliberty-health-sync-push-failed-001 (PR #728 merged). [carry]
+- [yellow] **Stale beacon-pending[1]** — tier3-silence-auto-restart-failed-001 (translation committed). [carry]
+- [yellow] **Stale beacon-pending[4]** — mirror-review-pr-ourliberty-agent-core-733 (PR #733 MERGED). [carry]
+- [yellow] **unreviewed-merge:735/723/713** — Larry judgment. [carry]
+- [yellow] **Zombie PID 1834248** — bash poll loop (~30d). Ask-then-do. [carry]
+- [yellow] **6 stale journalctl PIDs** — 1101500/1107838/1118830/1136223/1161972/1177335 all ~31-32d. Ask-then-do. [carry]
+- [yellow] **forge-wip-redispatch-digest Forge dispatch** — Beacon fix designed. Trust-policy approval pending. Larry HOLD. [carry]
+- [yellow] **push-soft-gate-checkin:soft-gate-block-upgrade-decision** — Awaiting Larry. [carry]
+- [yellow] **Check VIII rule=lower (2026-06-15)** — approve check-viii-update-2026-06-15. Awaiting Larry. [carry]
+- [yellow] **Check III threshold proposals** — approve threshold-update-2026-06-11. Awaiting Larry. [carry]
+- [yellow] **unreviewed-merge:710/709** — Larry judgment. [carry]
+- [yellow] **G-rule decision-needed-approval-forge-dispatch-no-target-repo-001** — 3/3, dispatch deferred under HOLD. [carry]
+- [blue] **silence-ourliberty-health-clean-tree-001** — APPROVAL_REQUEST DELIVERED, beacon-pending[3]. [carry]
+- [blue] **G-rules (other, unchanged):** sentinel-inflight-stall-mirror-tier4 (2/3), review-duplicate-dispatch-wip-redispatch (vp), check-i-force-bypass-dm-route (2/3), heal-daemon-restart-manifest-drift (2/3), no-session-revision-merged-pr-fp-001 (1/3), unrouted-open-pr-auto-merge-held-fp-001 (1/3), forge-wip-redispatch-digest-tier4-001 (DISPATCHED ✅ vp), forge-wip-redispatch-exhausted-pr-exists-fp-001 (2/3), heal-stale-daemon-code-still-stale-after-restart (1/3), outbox-notifier-notification-intent-reject-tier4-001 (2/3), no-session-revision-active-mirror-session-fp-001 (DISPATCHED ✅ vp), mirror-runner-missing-worktree-retry-001 (1/3), forge-revision-preamble-missing-pr711-001 (DISPATCHED ✅ vp), heal-stale-daemon-code-auto-restart-failed-self-recovered (DISPATCHED ✅ vp), ourliberty-health-clean-tree-dirty-tier4-001 (DISPATCHED ✅ vp), sync-service-deploy-restart-storm-tier4-001 (1/3), medic-diagnosis-tier4: STALE/CLOSED.
+- [blue] **unreviewed-merge:649/637/655/628/625+627/571/511+499+494+489+518+519+530** — Larry judgment. [carry]
+
+**PRIME DIRECTIVE:** 0 interventions this iter. Trailing-30d: ratio≈17.43, trend=improving.
+**Tier end-of-iter:** Tier **1** (reset from Tier 3 on new directive + pending approval; consecutive_clean=0; cadence 5-min).
+
+---
+
+
 ## Iteration ~3114 — 2026-06-27T15:33Z UTC (interactive /cycle via chat, Tier 3, consecutive_clean=0→1)
 
 **Trigger:** Larry `/cycle` via chat.
