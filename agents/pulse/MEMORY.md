@@ -285,8 +285,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T02:34Z UTC (Iter ~3024, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T02:40Z UTC (Iter ~3025, Tier 1, consecutive_clean=0)
 
-**Iter ~3024 summary:** ⚠️ Drift. 0 new alerts (watermark 1097 unchanged). All daemons alive (beacon-bot 3821234, inbox-watcher 3891784, outbox-notifier 3822088). HEAD=03a6e399=origin/main (in sync). Still dirty M config/alert-translations.json (blocks sync). PR #731 OPEN UNKNOWN awaiting Larry "Go" on pr731-restore-revision-trap-gate-001. **NEW:** no_session_revision cooldown expired for forge-revision-preamble-discipline-001 — stall healer will attempt recover-then-alert on next live run; auto-recovery may dead-letter (target_repo=None bug). [yellow] escalation written to pulse-escalations.json. 3 active APPROVAL_REQUESTs: tier3-silence-auto-restart-failed-001, pr731-restore-revision-trap-gate-001, silence-ourliberty-health-clean-tree-001. Alert watermark: 1097. PRIME: intervention (ratio≈17.11).
+**Iter ~3025 summary:** ⚠️ Drift. 2 new alerts (watermark 1097→1099), both Tier-3 silenced. All daemons alive (beacon-bot 3821234, inbox-watcher 3891784, outbox-notifier 3822088). HEAD=d1e554fa=origin/main (in sync). Still dirty M config/alert-translations.json (blocks sync). PR #731 OPEN MERGEABLE — pipeline loop CONFIRMED DEAD (medic attempt 3): revision-1 archived, Beacon APPROVAL_REQUEST reply_chat_id=None, DM never delivered. Manual fix required: apply Mirror finding to `scripts/outbox_notifier.py L4798-4805` (gate prior-round wording behind next_count >= 2) + push + re-trigger Mirror. Alt: close PR #731 and restart. Larry DM'd at 20:36:04 MDT via outbox-notifier. 3 active APPROVAL_REQUESTs: tier3-silence-auto-restart-failed-001, pr731-restore-revision-trap-gate-001, silence-ourliberty-health-clean-tree-001. Alert watermark: 1099. PRIME: intervention (ratio≈17.14).
 
 
