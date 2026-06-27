@@ -285,8 +285,8 @@ PR #725 (fix(healer): skip forge_built_no_pr for pr-<repo>-<num> tasks whose nam
 
 ---
 
-## Status snapshot — updated 2026-06-27T00:00Z UTC (Iter ~3006, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T00:07Z UTC (Iter ~3007, Tier 1, consecutive_clean=1)
 
-**Iter ~3006 summary:** ⚠️ Larry approved both REVIEW_ESCALATE items at 17:55 MDT. `mirror-marker-self-validate-gate-001` dispatched to Forge inbox ✅. `mirror-review-forge-revision-preamble-discipline-001` dead-lettered (target_repo=None) — new G-rule 1/3. Beacon received dead-letter notification; inbox-watcher processing. PR #731 OPEN MERGEABLE=UNKNOWN; resolution path broken pending Beacon retry. 2 active APPROVAL_REQUESTs in beacon-pending (was 4; [2]+[3] resolved). M config/alert-translations.json dirty (tier3-silence-auto-restart-failed-001 pending). PRIME: intervention (ratio≈16.90). Tier 1 (consecutive_clean=0).
+**Iter ~3007 summary:** ✅ Nominal iter. 0 new WARNs, 0 new Tier-4 alerts. mirror-marker-self-validate-gate-001 now in Forge build phase (build-mirror-*.json in Forge inbox). Dead-letter for mirror-review-forge-revision-preamble-discipline-001 cleared from Beacon inbox — no Forge re-dispatch visible (PR #731 still stuck). tier3-silence-auto-restart-failed-001 still pending Larry approval. M config/alert-translations.json dirty (same root cause). PRIME: intervention (ratio≈16.91). Tier 1 (consecutive_clean=1). Saturday UTC — Check I/III skipped.
 
 
