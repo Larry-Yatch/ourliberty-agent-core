@@ -285,8 +285,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T01:38Z UTC (Iter ~3018, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T01:43Z UTC (Iter ~3019, Tier 1, consecutive_clean=0)
 
-**Iter ~3018 summary:** ✅ Nominal. 3 new Tier-3 alerts — all known-pattern silence, already DM'd to Larry by outbox-notifier. Repo HEAD=1ad66377=origin/main (in sync). Still dirty M config/alert-translations.json (blocks sync). PR #731 stuck: cold-start revision forfeited (exit_code=-3 registry orphan); medic diagnosed and DM'd Larry; awaiting Larry "Go" on pr731-restore-revision-trap-gate-001. 3 active APPROVAL_REQUESTs in beacon-pending (tier3-silence-auto-restart-failed-001, pr731-restore-revision-trap-gate-001, silence-ourliberty-health-clean-tree-001) — all awaiting Larry. Alert watermark: 1093. PRIME: intervention (ratio≈17.05).
+**Iter ~3019 summary:** ✅ Nominal. 0 new alerts. All daemons alive (beacon-bot 3821234, inbox-watcher 3891784, outbox-notifier 3822088). HEAD=8038a5b1=origin/main (wrapper auto-committed iter ~3018 at 01:40:35Z). Still dirty M config/alert-translations.json (blocks sync). PR #731 still OPEN awaiting Larry "Go" on pr731-restore-revision-trap-gate-001. Pipeline stall cooldown re-engaged after live fire at L1090. 3 active APPROVAL_REQUESTs: tier3-silence-auto-restart-failed-001, pr731-restore-revision-trap-gate-001, silence-ourliberty-health-clean-tree-001. Alert watermark: 1093. PRIME: intervention (ratio≈17.06).
 
 
