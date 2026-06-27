@@ -291,8 +291,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T05:39Z UTC (Iter ~3051, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T05:48Z UTC (Iter ~3052, Tier 1, consecutive_clean=0)
 
-**Iter ~3051 summary:** ✅ Nominal (iter_clean). 0 new alerts (watermark 1113, no new). **NEW: forge-revision-preamble-discipline-001 stall cooldown EXPIRED** — dry-run would fire `no_session_revision` (PR #731 known dead, already escalated; no new DM). Forge building review-ceiling-fit-monitor-build (PID 3976734, ~21 min elapsed). PR #731 pipeline dead (carry). PR #733 REVIEW_ESCALATE + approval non-functional (carry). All daemons alive (PIDs 3961026/3961281/3961345). Watchdog 05:34:06Z healthy. **Larry HOLD directive active.** PRIME: 0 new interventions (iter_clean, ratio≈17.38).
+**Iter ~3052 summary:** ✅ Nominal (iter_clean). 3 new alerts (L1114–L1116; watermark 1113→1116). **PR #736 created** (review-ceiling-fit-monitor, Forge PID 3976734 ~31 min, still in-flight). Mirror DAG retry1 completed (23:44:49 MDT, $0.31); PR review pending. heal-pipeline-stall (L1114, PR #731 stall) delivered to Larry 23:44Z. medic-diagnosis (L1116, attempt 6, precise fix: restore `if next_count >= 2:` gate L4798-L4805 outbox_notifier.py) delivered 23:44Z. PR #731 now MERGEABLE (no conflicts). PR #733 REVIEW_ESCALATE non-functional carry. **Larry HOLD directive active.** PRIME: 0 new interventions (iter_clean, ratio≈17.38).
 
 
