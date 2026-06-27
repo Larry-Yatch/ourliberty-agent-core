@@ -303,8 +303,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T18:16Z UTC (Iter ~3125, Tier 3→1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-27T18:21Z UTC (Iter ~3126, Tier 1, consecutive_clean=1)
 
-**Iter ~3125 summary:** ⚠️ Drift (Check III overdue). Check III ran off-schedule (387.9h stale, past grace window). 4 threshold proposals: beacon 2147s→285s (Δ=87%), forge 3436s→550s (Δ=84%), mirror 488s→861s LOOSEN (Δ=76%, most critical — current threshold below p90 causing false-positive stuck alerts), pulse 262s→139s (Δ=47%). Digest queued L1114 (bot will DM Larry). `approve threshold-update-2026-06-27` needed. 2 Tier-3 silences. Tier-reset 3→1. PRIME: 1 intervention (check-iii-staleness-remediation). Daemons alive (PID 3961026/3961281/17832). Repo fa8b9946, clean. Sync 17:20:52Z. Heal-daemon 18:02:46Z. Watchdog healthy 12:13 MDT. 5 beacon-pending (HOLD).
+**Iter ~3126 summary:** ✅ Nominal. 0 new alerts. All checks clean. consecutive_clean=0→1. PRIME: 0 interventions. HOLD in effect. Daemons alive (PID 3961026/3961281/17832). Repo 3aac437c, clean. Sync 17:20:52Z. Heal-daemon 18:13:10Z. Watchdog healthy 12:18 MDT. 5 beacon-pending (HOLD). Awaiting `approve threshold-update-2026-06-27` (Check III proposals from iter ~3125).
 
 
