@@ -285,8 +285,14 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T04:45Z UTC (Iter ~3043, Tier 1, consecutive_clean=0)
+## G-rule sync-service-deploy-restart-storm-tier4-001 — 1/3 (new, iter ~3044)
 
-**Iter ~3043 summary:** ⚠️ Drift. 1 new alert Tier-3 silenced (medic-diagnosis). NEW: PR #733 duplicate Mirror review (revision_count=0) completed REVIEW_ESCALATE at 04:41:15Z; approval_request DM dropped (no reply_chat_id, same null-chat-id strand failure as PR #731); beacon-pending[4] = mirror-review-pr-ourliberty-agent-core-733 created. Forge revision-1 PID 3944035 in-flight (~15 min), pipeline expected to self-heal when revision-1 completes. Inbox-watcher PID corrected to 3891784 (iters ~3041-3042 had wrong PID 3951567). All daemons alive (beacon-bot 3821234, inbox-watcher 3891784, outbox-notifier 3822088). HEAD=53bdf7af=origin/main (clean). Sync: no-change 04:29:09Z ✅. Watchdog 04:43:30Z overall=healthy ✅. Heal-daemon 04:33:20Z ✅. PR #731 OPEN — pipeline loop dead (carry). G-rule decision-needed-approval-forge-dispatch-no-target-repo-001 advanced to 2/3. **Larry HOLD directive active.** Alert watermark: 1107. PRIME: 1 new intervention (ratio≈17.34).
+**Rule:** `source=sync.service, subject=deploy-restart-storm` alerts classify Tier-4 (novel, no translation match). Fire when a PR deploy causes a widely-imported module change and sync.service restarts all 6 daemons. Alert's own `route=digest`; beacon bot correctly silences (no DM). All daemons restart cleanly. Should be Tier-3. Dispatch to Beacon at 3/3 (post-HOLD). First occurrence iter ~3044 (PR #734 deploy, 04:47:02Z).
+
+---
+
+## Status snapshot — updated 2026-06-27T04:57Z UTC (Iter ~3044, Tier 1, consecutive_clean=0)
+
+**Iter ~3044 summary:** ⚠️ Drift. 1 new Tier-4 alert (sync.service deploy-restart-storm from PR #734 deploy) — silenced per route=digest + daemon health; all 6 daemons alive with new PIDs (3961026/3961281/3961345). NEW: PR #734 MERGED (fix(mirror): harness-enforced hard ceiling on every review session). PR #733 pipeline progressed: Forge rev-1 completed (preamble-missing pattern); Mirror re-review dispatched 04:51:56Z. PR #731 pipeline loop dead (carry). HEAD=6bd40b0d=origin/main (clean). Sync: success 04:48:34Z ✅. Watchdog 04:48:30Z overall=healthy ✅. Heal-daemon 04:43:30Z ✅. Alert watermark: 1108. **Larry HOLD directive active.** PRIME: 2 new interventions (ratio≈17.38). New G-rule: sync-service-deploy-restart-storm-tier4-001 (1/3).
 
 
