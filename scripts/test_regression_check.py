@@ -68,6 +68,8 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
+import regression_baseline_cache as baseline_cache
+
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
 
 DEFAULT_TIMEOUT_PER_SHA_S = 300
@@ -640,6 +642,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         help=f'Per-SHA test-suite timeout in seconds (default: {DEFAULT_TIMEOUT_PER_SHA_S}).',
     )
     parser.add_argument('--output', choices=('json', 'text'), default='json')
+    parser.add_argument(
+        '--no-baseline-cache', action='store_true',
+        help='Force a fresh parent-SHA suite run instead of reusing the cached '
+             'baseline (the default always-two-runs behavior).',
+    )
     args = parser.parse_args(argv)
 
     repo_root = Path(args.repo_root).resolve()
@@ -651,12 +658,38 @@ def main(argv: Optional[list[str]] = None) -> int:
         print(f'test_regression_check: {exc}', file=sys.stderr)
         return EXIT_ANALYSIS_FAIL
 
+    used_cached_baseline = False
     with tempfile.TemporaryDirectory(prefix='test-regression-check-') as tmp:
         tmp_parent = Path(tmp)
         try:
-            parent_failures = collect_failures_at_sha(
-                parent_canonical, repo_root, args.timeout_per_sha, tmp_parent,
-            )
+            # Parent baseline: reuse the per-SHA cache when present. The baseline
+            # is a pure function of the parent SHA, so a hit is IDENTICAL to
+            # re-running it — but skips a full-suite pass, which is what keeps a
+            # retried/re-reviewed gate under the bounded-step ceiling. A miss runs
+            # it and warms the cache for the next attempt. Cache writes are
+            # best-effort: a cache failure never fails the gate. --no-baseline-cache
+            # forces the original always-two-runs behavior.
+            parent_failures: Optional[set[str]] = None
+            if not args.no_baseline_cache:
+                cached = baseline_cache.load(parent_canonical)
+                if cached is not None:
+                    parent_failures = cached
+                    used_cached_baseline = True
+                    print(
+                        'test_regression_check: using cached parent baseline for '
+                        f'{parent_canonical[:12]} ({len(cached)} failing) — '
+                        'skipping the parent suite run',
+                        file=sys.stderr,
+                    )
+            if parent_failures is None:
+                parent_failures = collect_failures_at_sha(
+                    parent_canonical, repo_root, args.timeout_per_sha, tmp_parent,
+                )
+                if not args.no_baseline_cache:
+                    try:
+                        baseline_cache.store(parent_canonical, parent_failures)
+                    except OSError:
+                        pass  # best-effort; never fail the gate on a cache write
             head_failures = collect_failures_at_sha(
                 head_canonical, repo_root, args.timeout_per_sha, tmp_parent,
             )
@@ -670,6 +703,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         'head_sha': head_canonical,
         'parent_failures': sorted(parent_failures),
         'head_failures': sorted(head_failures),
+        'used_cached_baseline': used_cached_baseline,
         **verdict_block,
     }
 

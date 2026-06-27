@@ -40,6 +40,7 @@ if str(_REPO_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_REPO_SCRIPTS))
 
 import test_regression_check as trc  # noqa: E402
+import regression_baseline_cache as baseline_cache  # noqa: E402
 
 
 class _IsolatedAgentsRoot(unittest.TestCase):
@@ -57,6 +58,16 @@ class _IsolatedAgentsRoot(unittest.TestCase):
             os.makedirs(os.path.join(self._isolated_tmp, sub), exist_ok=True)
         self._isolated_env_orig = os.environ.get('OURLIBERTY_AGENTS_ROOT')
         os.environ['OURLIBERTY_AGENTS_ROOT'] = self._isolated_tmp
+        # The regression-baseline cache deliberately does NOT use
+        # OURLIBERTY_AGENTS_ROOT (that's the gate's per-run sandbox redirect for
+        # the suite subprocess) — it writes to the REAL tree via
+        # OL_REGRESSION_BASELINE_DIR / $HOME. Isolate it per-test too, else
+        # main()'s cache writes would pollute the real home AND leak a baseline
+        # across tests that share a parent SHA.
+        self._baseline_env_orig = os.environ.get('OL_REGRESSION_BASELINE_DIR')
+        os.environ['OL_REGRESSION_BASELINE_DIR'] = os.path.join(
+            self._isolated_tmp, 'regression-baselines',
+        )
         importlib.reload(trc)
 
     def tearDown(self):
@@ -64,6 +75,10 @@ class _IsolatedAgentsRoot(unittest.TestCase):
             os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
         else:
             os.environ['OURLIBERTY_AGENTS_ROOT'] = self._isolated_env_orig
+        if self._baseline_env_orig is None:
+            os.environ.pop('OL_REGRESSION_BASELINE_DIR', None)
+        else:
+            os.environ['OL_REGRESSION_BASELINE_DIR'] = self._baseline_env_orig
         importlib.reload(trc)
         shutil.rmtree(self._isolated_tmp, ignore_errors=True)
         super().tearDown()
@@ -376,6 +391,77 @@ class MainCliVerdictTest(_MainHarness):
         # text mode should NOT be valid JSON
         with self.assertRaises(json.JSONDecodeError):
             json.loads(out)
+
+
+class MainBaselineCacheTest(_MainHarness):
+    """Parent-SHA baseline cache: a hit skips the parent suite run, a miss runs
+    it and warms the cache, and --no-baseline-cache forces the original
+    always-two-runs behavior. Verdict math is unchanged either way."""
+
+    PARENT = 'aaaabbbb' * 5
+    HEAD = 'ccccdddd' * 5
+
+    def _invoke_counting(self, parent_failures, head_failures, extra_argv=None):
+        """Like _invoke_main but records which SHAs collect_failures ran for,
+        so we can prove the parent run was (or wasn't) skipped."""
+        argv = ['--parent-sha', 'aaaabbbb', '--head-sha', 'ccccdddd',
+                '--repo-root', '/tmp/fake-repo'] + (extra_argv or [])
+        sha_map = {'aaaabbbb': self.PARENT, 'ccccdddd': self.HEAD}
+        cf = {self.PARENT: parent_failures, self.HEAD: head_failures}
+        ran = []
+
+        def fake_collect(sha, repo_root, timeout, tmp_parent):
+            ran.append(sha)
+            return cf[sha]
+
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with patch.object(trc, 'resolve_sha',
+                          side_effect=lambda s, r: sha_map[s]), \
+             patch.object(trc, 'collect_failures_at_sha',
+                          side_effect=fake_collect):
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                code = trc.main(argv)
+        return code, json.loads(stdout.getvalue()), ran
+
+    def test_cache_miss_runs_both_and_warms(self):
+        code, report, ran = self._invoke_counting(
+            {'a.B.test_old'}, {'a.B.test_old'},
+        )
+        self.assertEqual(code, trc.EXIT_PASS)
+        self.assertEqual(ran, [self.PARENT, self.HEAD])  # both ran (cold)
+        self.assertFalse(report['used_cached_baseline'])
+        # the parent baseline is now warmed for next time
+        self.assertEqual(baseline_cache.load(self.PARENT), {'a.B.test_old'})
+
+    def test_cache_hit_skips_parent_run(self):
+        baseline_cache.store(self.PARENT, {'a.B.test_old'})
+        # The parent_failures wired here is deliberately WRONG: if the gate ran
+        # the parent instead of using the cache, the verdict would differ.
+        code, report, ran = self._invoke_counting(
+            {'WRONG.should.not.appear'}, {'a.B.test_old'},
+        )
+        self.assertEqual(ran, [self.HEAD])  # parent run SKIPPED
+        self.assertTrue(report['used_cached_baseline'])
+        self.assertEqual(report['parent_failures'], ['a.B.test_old'])  # from cache
+        self.assertEqual(report['verdict'], 'PASS')  # head == cached parent
+
+    def test_cache_hit_still_detects_a_real_regression(self):
+        baseline_cache.store(self.PARENT, {'a.B.test_old'})
+        code, report, ran = self._invoke_counting(
+            {'unused'}, {'a.B.test_old', 'a.B.test_new'},
+        )
+        self.assertEqual(ran, [self.HEAD])
+        self.assertEqual(code, trc.EXIT_BLOCK)
+        self.assertEqual(report['regressions'], ['a.B.test_new'])
+
+    def test_no_cache_flag_forces_both_runs(self):
+        baseline_cache.store(self.PARENT, {'a.B.test_old'})
+        code, report, ran = self._invoke_counting(
+            {'a.B.test_old'}, {'a.B.test_old'},
+            extra_argv=['--no-baseline-cache'],
+        )
+        self.assertEqual(ran, [self.PARENT, self.HEAD])  # cache ignored
+        self.assertFalse(report['used_cached_baseline'])
 
     def test_invariant_pre_existing_exits_block_end_to_end(self):
         """A PR whose HEAD still fails an absolute-invariant test exits BLOCK
