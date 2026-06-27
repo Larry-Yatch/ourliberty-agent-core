@@ -3153,8 +3153,14 @@ def _maybe_synthesize_timeout_escalate(
         'task_id': data.get('task_id'),
         'pr_url': data.get('pr_url'),
         'reason': reason,
-        'severity': 'inconclusive',
-        'confidence': 'n/a',
+        # Stay within the marker contract (mirror_review_handler:
+        # ALLOWED_SEVERITY_BY_MARKER['review_escalate'] == ('high',);
+        # ALLOWED_CONFIDENCE == ('high','medium','low')) so a future
+        # check_marker_semantics on synthesized payloads can't reject this and
+        # re-create the marker-error storm. An unfinished review IS plan-
+        # blocking (severity high); the "inconclusive" nature is in `reason`.
+        'severity': 'high',
+        'confidence': 'low',
     }
     log(
         f'REVIEW_TIMEOUT_ESCALATE_SYNTHESIZED task={data.get("task_id")!r} '
@@ -3277,8 +3283,24 @@ def _classify_mirror_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
     # authoritative path; result_text is a fallback for when the session log
     # is unavailable (no session_id, missing file, etc.).
     marker_type, payload, _narrative = (None, None, '')
-    recovered, recovered_by_type = _recover_marker_text_from_session_log(
-        data.get('claude_session_id'),
+
+    # review-timeout-escalate-001 (2026-06-26) — AUTHORITATIVE harness-kill
+    # override, evaluated BEFORE the session-log recovery below. A timed-out
+    # review (the harness hit agent_runner.REVIEW_SESSION_CEILING_SECONDS and
+    # killed the session) did NOT complete, so any marker recoverable from its
+    # PARTIAL transcript — notably an early `=== REVIEW_PASS ===` it printed
+    # before wedging (the documented #101/#334 'Monitor timeout firing after
+    # REVIEW_PASS' shape) — must NOT be trusted for the irreversible auto-merge.
+    # Synthesize an inconclusive REVIEW_ESCALATE and SKIP recovery so a killed
+    # review routes to Beacon instead of force-merging on a stale PASS (#713).
+    if data.get('phase') == 'review':
+        _timeout_escalate = _maybe_synthesize_timeout_escalate(data)
+        if _timeout_escalate is not None:
+            marker_type, payload = _timeout_escalate
+
+    recovered, recovered_by_type = (
+        _recover_marker_text_from_session_log(data.get('claude_session_id'))
+        if marker_type is None else ('', {})
     )
     if recovered:
         # nervous-system-audit #14 (2026-06-05) — conservative-priority
@@ -3354,37 +3376,26 @@ def _classify_mirror_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
         # _handle_mirror_dag_preflight_result before we get here. Mirror's
         # chat-mode outputs (no phase=review) also keep returning None.
         if data.get('phase') == 'review':
-            # review-timeout-escalate-001 (2026-06-26). A review the harness
-            # killed at the wall-clock ceiling carries no verdict marker.
-            # Synthesize a clean REVIEW_ESCALATE from the envelope FIRST — before
-            # the prose-pass recovery or the marker-error raise — so a wedged-
-            # then-killed review routes to Beacon as inconclusive instead of
-            # force-merging (#713) or storming marker-error retries on a dead
-            # session. A real marker (found above) always wins; this only fires
-            # when classification reached here with no verdict AND timed_out.
-            timeout_escalate = _maybe_synthesize_timeout_escalate(data)
-            if timeout_escalate is not None:
-                marker_type, payload = timeout_escalate
-            else:
-                # mirror-prose-verdict-fallback-001 (2026-06-17). Before the
-                # retry-triggering raise, try to RECOVER an unambiguous prose
-                # PASS. When Mirror states `**Verdict: PASS.**` (no canonical
-                # marker), synthesizing REVIEW_PASS from the envelope lets the
-                # existing auto-merge path fire and skips the ~$1/~7min
-                # marker-error retry. PASS-only + no-contradiction gated; any
-                # ambiguity or non-PASS verdict falls through to the raise.
-                synthesized = _maybe_synthesize_prose_pass(data, result_text)
-                if synthesized is None:
-                    raise mrh.MalformedMirrorMarker(
-                        'phase=review requires ONE canonical verdict marker at '
-                        'end of response (=== REVIEW_PASS === / REVIEW_REVISION '
-                        '/ REVIEW_ESCALATE / REVIEW_EMERGENCY_HALT) — none '
-                        'found. A PROSE verdict (e.g. "Verdict: PASS") is '
-                        'silently invisible to auto-merge and leaves the PR '
-                        'stuck. Re-emit via marker.py (see agents/mirror/'
-                        "CLAUDE.md 'Marker formats')."
-                    )
-                marker_type, payload = synthesized
+            # mirror-prose-verdict-fallback-001 (2026-06-17). Before the
+            # retry-triggering raise, try to RECOVER an unambiguous prose
+            # PASS. When Mirror states `**Verdict: PASS.**` (no canonical
+            # marker), synthesizing REVIEW_PASS from the envelope lets the
+            # existing auto-merge path fire and skips the ~$1/~7min
+            # marker-error retry. PASS-only + no-contradiction gated; any
+            # ambiguity or non-PASS verdict falls through to the raise.
+            # (A harness-timed-out review never reaches here — it is short-
+            # circuited to REVIEW_ESCALATE at the top of this function.)
+            synthesized = _maybe_synthesize_prose_pass(data, result_text)
+            if synthesized is None:
+                raise mrh.MalformedMirrorMarker(
+                    'phase=review requires ONE canonical verdict marker at end '
+                    'of response (=== REVIEW_PASS === / REVIEW_REVISION / '
+                    'REVIEW_ESCALATE / REVIEW_EMERGENCY_HALT) — none found. A '
+                    'PROSE verdict (e.g. "Verdict: PASS") is silently invisible '
+                    'to auto-merge and leaves the PR stuck. Re-emit via marker.py '
+                    "(see agents/mirror/CLAUDE.md 'Marker formats')."
+                )
+            marker_type, payload = synthesized
         else:
             return None
 

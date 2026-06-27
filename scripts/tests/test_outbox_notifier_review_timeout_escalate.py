@@ -52,11 +52,23 @@ class SynthesizeTimeoutEscalateHelperTest(unittest.TestCase):
         self.assertEqual(marker_type, 'review_escalate')
         self.assertEqual(payload['task_id'], 'pr-ourliberty-agent-core-999')
         self.assertEqual(payload['pr_url'], 'https://github.com/x/y/pull/999')
-        # The escalate handler reads severity/confidence/reason with defaults;
-        # we supply explicit inconclusive values + a reason that names the cause.
-        self.assertEqual(payload['severity'], 'inconclusive')
+        # Severity/confidence MUST stay within the marker contract (an
+        # unfinished review is plan-blocking → severity high); "inconclusive"
+        # is conveyed in the reason, not via an out-of-enum severity value.
+        self.assertEqual(payload['severity'], 'high')
+        self.assertEqual(payload['confidence'], 'low')
         self.assertIn('review_session_timeout', payload['reason'])
         self.assertIn('2100s', payload['reason'])
+
+    def test_synthesized_payload_satisfies_marker_contract(self):
+        # Regression: the payload must pass the same semantic validator the
+        # real markers do, so a future hardening that validates synthesized
+        # payloads can't reject it and re-create the marker-error storm.
+        import mirror_review_handler as mrh  # noqa: E402
+        _marker, payload = on._maybe_synthesize_timeout_escalate(
+            {'timed_out': True, 'task_id': 't', 'pr_url': 'u'}
+        )
+        mrh.check_marker_semantics('review_escalate', payload)  # must not raise
 
     def test_none_when_not_timed_out(self):
         self.assertIsNone(on._maybe_synthesize_timeout_escalate({}))
@@ -100,6 +112,35 @@ class ClassifyMirrorMarkerWiringTest(unittest.TestCase):
         self.assertEqual(decision['marker_type'], 'review_escalate')
         self.assertIn('review_session_timeout',
                       decision['intent_kwargs']['reason'])
+
+    def test_timed_out_overrides_recovered_pass_marker(self):
+        # The #713 guard: a harness-killed review must escalate even when an
+        # early `=== REVIEW_PASS ===` is recoverable from its partial transcript
+        # (the documented 'Monitor timeout firing after REVIEW_PASS' wedge).
+        # The kill is authoritative; the stale PASS must NOT auto-merge.
+        data = {
+            'phase': 'review',
+            'timed_out': True,
+            'timeout_seconds': 2100,
+            'task_id': 'pr-ourliberty-agent-core-999',
+            'pr_url': 'https://github.com/x/y/pull/999',
+            'agent': 'mirror',
+            'result': 'partial output',
+        }
+        pass_text = (
+            '=== REVIEW_PASS ===\n'
+            '{"task_id": "pr-ourliberty-agent-core-999", '
+            '"pr_url": "https://github.com/x/y/pull/999", "summary": "ok"}'
+        )
+        # Even if recovery WOULD surface a PASS, the timed_out override fires
+        # first and recovery is skipped — assert escalate wins regardless.
+        with mock.patch.object(
+            on, '_recover_marker_text_from_session_log',
+            return_value=(pass_text, {'review_pass': pass_text}),
+        ):
+            decision = on._classify_mirror_marker(data)
+        self.assertIsNotNone(decision)
+        self.assertEqual(decision['marker_type'], 'review_escalate')
 
     def test_non_timed_out_no_marker_still_raises(self):
         # Guard: a genuine missing-marker review (not a timeout) must keep its

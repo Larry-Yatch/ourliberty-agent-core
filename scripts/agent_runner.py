@@ -1070,21 +1070,36 @@ REVIEW_SESSION_CEILING_SECONDS = int(
 )
 
 
+def _is_mirror_review_dispatch(phase, expected_agent):
+    """True iff this dispatch is a Mirror PR review: ``phase == 'review'`` AND
+    the dispatched agent is ``mirror`` (case/whitespace-insensitive).
+
+    The SINGLE gate shared by the advisory bounded-step reminder
+    (review_bounded_step_reminder_args) and the MANDATORY review ceiling
+    (review_session_effective_timeout) so the two can never disagree about which
+    dispatches are reviews — a disagreement would let the ceiling stop firing on
+    a path the reminder still targets, reopening the unbounded-wedge class.
+    """
+    return (
+        str(phase).strip().lower() == 'review'
+        and str(expected_agent).strip().lower() == 'mirror'
+    )
+
+
 def review_session_effective_timeout(timeout, phase, expected_agent):
     """The wall-clock ceiling run_claude should enforce for this dispatch.
 
     Returns the caller's timeout (or the 14400s session default when
-    ``timeout <= 0``), except a Mirror review (``phase == 'review'`` AND
-    ``expected_agent == 'mirror'``) is additionally capped at
-    ``REVIEW_SESSION_CEILING_SECONDS`` when that ceiling is enabled (> 0). Pure
-    + centralized so the spawn path and the tests share one source of truth —
-    same gate as review_bounded_step_reminder_args, but this one is the
-    MANDATORY backstop (the reminder is advisory; the model can ignore it).
+    ``timeout <= 0``), except a Mirror review (see _is_mirror_review_dispatch)
+    is additionally capped at ``REVIEW_SESSION_CEILING_SECONDS`` when that
+    ceiling is enabled (> 0). Pure + centralized so the spawn path and the tests
+    share one source of truth — same gate as review_bounded_step_reminder_args,
+    but this one is the MANDATORY backstop (the reminder is advisory; the model
+    can ignore it).
     """
     base = timeout if timeout and timeout > 0 else 14400
     if (
-        str(phase).strip().lower() == 'review'
-        and str(expected_agent).strip().lower() == 'mirror'
+        _is_mirror_review_dispatch(phase, expected_agent)
         and REVIEW_SESSION_CEILING_SECONDS > 0
     ):
         return min(base, REVIEW_SESSION_CEILING_SECONDS)
@@ -1099,9 +1114,7 @@ def review_bounded_step_reminder_args(phase, expected_agent):
     ``mirror``), else ``[]``. Pure and centralized so the spawn path and the
     tests share one source of truth — same gate as the marker reminder.
     """
-    if str(phase).strip().lower() != 'review':
-        return []
-    if str(expected_agent).strip().lower() != 'mirror':
+    if not _is_mirror_review_dispatch(phase, expected_agent):
         return []
     return ['--append-system-prompt', build_review_bounded_step_system_prompt()]
 
@@ -1429,6 +1442,7 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                 )
                 elapsed = 0
                 cancelled = False
+                timed_out_session = False
                 while proc.poll() is None:
                     time.sleep(CANCEL_POLL_INTERVAL)
                     elapsed += CANCEL_POLL_INTERVAL
@@ -1458,6 +1472,7 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                         if out_meta is not None:
                             out_meta['timed_out'] = True
                             out_meta['timeout_seconds'] = effective_timeout
+                        timed_out_session = True
                         proc.terminate()
                         try:
                             proc.wait(timeout=10)
@@ -1476,6 +1491,17 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                 if cancelled:
                     guard.release(agent_id)
                     return False, f'TASK_CANCELLED: {cancel_reason}', None
+
+                # A wall-clock timeout is TERMINAL — never retry it. Retrying a
+                # session that hit the ceiling just re-runs the (likely wedged)
+                # work and re-pays the ceiling each attempt, holding the
+                # inbox:mirror lease for up to MAX_RETRIES × the ceiling — far
+                # worse than the single bound the ceiling promises. Return here,
+                # before the non-zero-exit `continue` retry path. out_meta
+                # already carries timed_out=True so the review escalates clean.
+                if timed_out_session:
+                    guard.release(agent_id)
+                    return False, f'TIMEOUT after {effective_timeout}s', None
 
                 # Build a result-like object for downstream compatibility
                 class _Result:
