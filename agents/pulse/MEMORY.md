@@ -297,8 +297,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-27T16:36Z UTC (Iter ~3119, Tier 1, consecutive_clean=0→1)
+## Status snapshot — updated 2026-06-27T16:41Z UTC (Iter ~3120, Tier 1, consecutive_clean=1→2)
 
-**Iter ~3119 summary:** ✅ Clean (iter_clean). 2 new alerts (heal-pipeline-stall + medic, both Tier-3 silenced). Mirror reviewing `land-pr731-restore-fix-head-001` for PR #731 (dispatched 10:24 MDT, worktree wt-mirror-land-pr731-restore-fix-head-001 active). PR #731 OPEN — awaiting Mirror PASS → auto-merge. 5 beacon-pending-approvals unchanged (HOLD). Repo HEAD=938b6000, clean, up-to-date. Sync 16:20:49Z. All daemons alive (PIDs 3961026/3961281/3961345). Heal-daemon 16:30:52Z. Pipeline stall 0-would-fire. HOLD on other dispatches. Tier 1, consecutive_clean=0→1 (2 more clean iters → Tier 2). PRIME: 0 interventions, ratio≈17.43, trend=improving.
+**Iter ~3120 summary:** ✅ Clean (iter_clean). 0 new alerts. Mirror reviewing `land-pr731-restore-fix-head-001` for PR #731 (started 16:24:28Z UTC, regression check subprocess active PID 4192115 ~600s). PR #731 OPEN — awaiting Mirror PASS → auto-merge. PR #736 + #739 auto-merged cleanly overnight/morning (proper Mirror REVIEW_PASS). 5 beacon-pending-approvals unchanged (HOLD). Repo HEAD=39f608db, clean, up-to-date. Sync 16:20:49Z. All daemons alive (PIDs 3961026/3961281/3961345). Heal-daemon 16:30:52Z. Pipeline stall 0-would-fire. HOLD on other dispatches. Tier 1, consecutive_clean=1→2 (1 more clean iter → Tier 2). PRIME: 0 interventions, ratio≈17.43, trend=improving.
 
 
