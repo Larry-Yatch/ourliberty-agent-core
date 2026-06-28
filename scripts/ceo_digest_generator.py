@@ -641,12 +641,19 @@ def write_digest(
             'self_healed_count': len(activity.get('self_healed', [])),
         },
     }
+    # NB: cost_usd stays None. activity['spend_usd'] is the window's *reported
+    # rollup* (the sum of everyone else's session spend over the digest window),
+    # not cost newly incurred by this digest — it lives in payload.metrics.
+    # spend_usd above. Writing it into chain_events.cost_usd double-counted it
+    # in any SUM(cost_usd) consumer (e.g. the dashboard's day-over-day spend
+    # panel), which only expects per-session incurred cost. The digest's own
+    # LLM cost is tracked separately via append_cost_row -> costs.jsonl.
     return cee.emit_event(
         event_type='ceo_digest',
         agent='ceo-digest',
         task_id=f'ceo-digest-{period}-{start_utc.date().isoformat()}',
         payload=payload,
-        cost_usd=activity['spend_usd'],
+        cost_usd=None,
         client=client,
     )
 

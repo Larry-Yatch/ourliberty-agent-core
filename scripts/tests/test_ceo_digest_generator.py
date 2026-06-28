@@ -411,6 +411,11 @@ class WriteDigestTest(unittest.TestCase):
         self.assertFalse(row['payload']['used_fallback'])
         self.assertIn('raw', row['payload'])
         self.assertEqual(row['payload']['metrics']['spend_usd'], 2.5)
+        # The window's reported spend rollup belongs in payload.metrics only.
+        # cost_usd must stay null so SUM(cost_usd) consumers (e.g. the
+        # dashboard day-over-day spend panel) don't double-count it as
+        # newly-incurred spend.
+        self.assertIsNone(row.get('cost_usd'))
 
 
 class RunEndToEndTest(unittest.TestCase):
