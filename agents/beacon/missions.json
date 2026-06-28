@@ -6353,6 +6353,19 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "dashboard-decline-does-not-clear-the-approval-backend",
+      "name": "Dashboard decline does not clear the approval backend",
+      "phase": "proposed",
+      "brief": "BUG confirmed live 2026-06-28: declining an approval on the dashboard Approvals tab clears the TAB but does NOT persist to the canonical store (~/agents/state/beacon-pending-approvals.json). The decline fires a larry-reject-<hash> inbox task, Beacon processes it (archived), but the pending entry is never removed -> it stays status=pending. Where-We-Are reads the store pending count, so it keeps showing a stale N-decisions-needed after the operator already declined. heal_stale_approvals does NOT clear them (no recognized resolved event). REPRO: 4 approvals declined 2026-06-28 stayed pending until manually cleared via beacon_approval_handler.resolve(id, rejected). WHAT TO DO: make the decline path actually resolve the store entry -- either the dashboard reject endpoint calls beacon_approval_handler.resolve(id, rejected) directly, or the larry-reject task processing must call it. VERIFY: decline on dashboard -> beacon-pending-approvals.json pending drops AND Where-We-Are count drops with no manual reconcile. REVISIT WHEN: soon -- operator-facing, recurs on every decline.",
+      "spec_docs": [],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-28",
+      "deferred_reason": null,
+      "proposed_by": "beacon",
+      "proposed_at": "2026-06-28T22:39:06.049625+00:00"
     }
   ]
 }
