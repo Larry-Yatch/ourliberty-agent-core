@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-28T21:41Z UTC (Iter ~3179, Tier 3, consecutive_clean=47)
+## Status snapshot — updated 2026-06-28T22:13Z UTC (Iter ~3180, Tier 3, consecutive_clean=48)
 
-**Iter ~3179 summary:** ✅ Nominal (iter_clean). 2 new alerts both Tier 3 (doorbell + dispatch-branch-cleanup). consecutive_clean=46→47. Check 1: watchdog overall=healthy (log_growth cleared — inbox_watcher.log written at 21:19:58Z by beacon-pipeline-fixes-briefing, G-rule watchdog-log-growth-idle-overnight-001 overnight-idle window closed, stays 1/3). PR #740 "fix(worktree): make session-start checkpoint provably empty" created 21:26:58Z (auto-review, 10 min old, watch item, under 30-min threshold). Pipeline activity since ~3178: 4 Beacon tasks (3 larry-reject + briefing), 2 missions commits (e610ca23, 8391ee7b). beacon-pending 5→4 (ourliberty-health-clean-tree-001 resolved). Larry messaged 21:09Z, Beacon responded. HOLD posture unchanged. Daemons alive (PID 3961026/3961281/17832). All 4 bots alive. Repo 8391ee7b, clean. Sync 21:25:15Z. Heal-daemon 21:27:19Z. Awaiting `approve threshold-update-2026-06-27`. Cadence 30-min (Tier 3).
+**Iter ~3180 summary:** ✅ Nominal (iter_clean). 0 new alerts. consecutive_clean=47→48. **PR #740 "fix(worktree): make session-start checkpoint provably empty (ends WIP-clobber loop)" AUTO_MERGED at 21:59:20Z** (Mirror REVIEW_PASS, worktree torn down, HEAD=fc1fa8eb). 0 open PRs. All daemons alive (PID 3961026/3961281/17832). All 4 bots healthy. Repo fc1fa8eb, clean, origin/main. Heal-daemon 22:07:32Z. Sync 21:25:15Z (pre-merge; under 2h). HOLD on dispatches unchanged (no explicit Larry lift). Approval-resume confirmed at 21:08:42Z (backlog=0) — missed by iter ~3179 tail. Cadence 30-min (Tier 3). Awaiting `approve threshold-update-2026-06-27`.
 
 
