@@ -6365,7 +6365,21 @@
       "created": "2026-06-28",
       "deferred_reason": null,
       "proposed_by": "beacon",
-      "proposed_at": "2026-06-28T22:39:06.049625+00:00"
+      "proposed_at": "2026-06-28T22:39:06.049625+00:00",
+      "briefing": {
+        "what": "When you tap \"decline\" on a request in your dashboard, the system doesn't actually record the rejection, so the item stays stuck waiting for a decision.",
+        "why": "You think you've handled something and moved on, but it quietly lingers in the queue \u2014 meaning decisions you've already made don't stick, and the backlog looks busier than it really is.",
+        "suggest": "Worth fixing, but have the team confirm the change works cleanly before rolling it out, since it touches how your decisions get saved."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-28T22:48:15.934095+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
