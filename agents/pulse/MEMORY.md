@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-28T22:13Z UTC (Iter ~3180, Tier 3, consecutive_clean=48)
+## Status snapshot — updated 2026-06-28T22:45Z UTC (Iter ~3181, Tier 1, consecutive_clean=0)
 
-**Iter ~3180 summary:** ✅ Nominal (iter_clean). 0 new alerts. consecutive_clean=47→48. **PR #740 "fix(worktree): make session-start checkpoint provably empty (ends WIP-clobber loop)" AUTO_MERGED at 21:59:20Z** (Mirror REVIEW_PASS, worktree torn down, HEAD=fc1fa8eb). 0 open PRs. All daemons alive (PID 3961026/3961281/17832). All 4 bots healthy. Repo fc1fa8eb, clean, origin/main. Heal-daemon 22:07:32Z. Sync 21:25:15Z (pre-merge; under 2h). HOLD on dispatches unchanged (no explicit Larry lift). Approval-resume confirmed at 21:08:42Z (backlog=0) — missed by iter ~3179 tail. Cadence 30-min (Tier 3). Awaiting `approve threshold-update-2026-06-27`.
+**Iter ~3181 summary:** ⚠️ Signal. 8 new alerts (1 Tier-4 unreviewed-merge:741, 7 Tier-3 silenced). heal-stale-daemon-code auto-restarted all 6 daemons at 22:17-22:18Z (agent_runner.py changed by PR #740 ~41h prior). New PIDs: beacon 339608 / inbox_watcher 340023 / outbox_notifier 340432. PR #741 (fix(ceo-digest)) merged by Larry without Mirror review → standing [yellow]. beacon-pending cleared 4→0 (all stale). 0 open PRs. Repo HEAD=b7e87082=origin/main, clean. Heal-daemon 22:37:55Z. Sync 22:25:16Z (under 2h). HOLD on dispatches unchanged. Tier reset 3→1 (Tier-4 alert). Awaiting `approve threshold-update-2026-06-27`.
 
 
