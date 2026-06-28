@@ -303,8 +303,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-28T02:41Z UTC (Iter ~3144, Tier 3, consecutive_clean=13)
+## Status snapshot — updated 2026-06-28T03:13Z UTC (Iter ~3145, Tier 3, consecutive_clean=13)
 
-**Iter ~3144 summary:** ✅ Nominal. 0 new alerts. consecutive_clean=12→13 (Tier 3 steady-state). Check I: artifact check-i-2026-06-28.json already current (iter ~3141); same-week dedup skip. Check III last run 2026-06-27; next due 2026-07-11. PRIME: 0 interventions. HOLD in effect. Daemons alive (PID 3961026/3961281/17832). Repo 43151b57, clean. Sync 02:22:15Z. Heal-daemon 02:31:20Z. Watchdog healthy 20:36 MDT. 5 beacon-pending (unchanged). 0 open PRs. Awaiting `approve threshold-update-2026-06-27`. Cadence 30-min (Tier 3).
+**Iter ~3145 summary:** ✅ Nominal. 0 new alerts. consecutive_clean=12→13 (actual advance; iter ~3144 journaled 12→13 but cycle_tier_state.py record was not called in that interactive session — state file was at 12 at start of this iter; corrected). Check I: same-week dedup skip (artifact already current). Check III next due 2026-07-11. PRIME: 0 interventions. HOLD in effect. Daemons alive (PID 3961026/3961281/17832). Repo ae7aa00d, clean. Sync 02:22:15Z (~51m). Heal-daemon 03:01:49Z. Watchdog healthy 21:07 MDT. 5 beacon-pending (unchanged). 0 open PRs. Awaiting `approve threshold-update-2026-06-27`. Cadence 30-min (Tier 3). **Tier-state gap pattern:** interactive sessions consistently miss calling cycle_tier_state.py record (no run_cycle.sh wrapper). Fixed this iter; pattern candidate for systemic fix post-HOLD.
 
 
