@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-28T21:02Z UTC (Iter ~3178, Tier 3, consecutive_clean=46)
+## Status snapshot — updated 2026-06-28T21:41Z UTC (Iter ~3179, Tier 3, consecutive_clean=47)
 
-**Iter ~3178 summary:** ✅ Nominal (iter_clean). 0 new alerts. consecutive_clean=45→46. Check 1: watchdog overall=warning (log_growth idle, seconds_since_write≈101256 ~28.1h, same continuous overnight-idle window from iters ~3148+, INFO-level, G-rule 1/3). Check I: same-week dedup skip (artifact from iter ~3141). Check III next due 2026-07-11. PRIME: 0 interventions, ratio≈17.44, trend=improving. HOLD in effect. Larry /pause active. Daemons alive (PID 3961026/3961281/17832). All 4 bots alive (beacon/forge/mirror/pulse). Repo 36b25950, clean. Sync 20:24:59Z. Heal-daemon 20:56:49Z. 5 beacon-pending (confirmed). 0 open PRs. Awaiting `approve threshold-update-2026-06-27`. Cadence 30-min (Tier 3).
+**Iter ~3179 summary:** ✅ Nominal (iter_clean). 2 new alerts both Tier 3 (doorbell + dispatch-branch-cleanup). consecutive_clean=46→47. Check 1: watchdog overall=healthy (log_growth cleared — inbox_watcher.log written at 21:19:58Z by beacon-pipeline-fixes-briefing, G-rule watchdog-log-growth-idle-overnight-001 overnight-idle window closed, stays 1/3). PR #740 "fix(worktree): make session-start checkpoint provably empty" created 21:26:58Z (auto-review, 10 min old, watch item, under 30-min threshold). Pipeline activity since ~3178: 4 Beacon tasks (3 larry-reject + briefing), 2 missions commits (e610ca23, 8391ee7b). beacon-pending 5→4 (ourliberty-health-clean-tree-001 resolved). Larry messaged 21:09Z, Beacon responded. HOLD posture unchanged. Daemons alive (PID 3961026/3961281/17832). All 4 bots alive. Repo 8391ee7b, clean. Sync 21:25:15Z. Heal-daemon 21:27:19Z. Awaiting `approve threshold-update-2026-06-27`. Cadence 30-min (Tier 3).
 
 
