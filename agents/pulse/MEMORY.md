@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-28T22:45Z UTC (Iter ~3181, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-28T22:49Z UTC (Iter ~3182, Tier 1, consecutive_clean=1)
 
-**Iter ~3181 summary:** ⚠️ Signal. 8 new alerts (1 Tier-4 unreviewed-merge:741, 7 Tier-3 silenced). heal-stale-daemon-code auto-restarted all 6 daemons at 22:17-22:18Z (agent_runner.py changed by PR #740 ~41h prior). New PIDs: beacon 339608 / inbox_watcher 340023 / outbox_notifier 340432. PR #741 (fix(ceo-digest)) merged by Larry without Mirror review → standing [yellow]. beacon-pending cleared 4→0 (all stale). 0 open PRs. Repo HEAD=b7e87082=origin/main, clean. Heal-daemon 22:37:55Z. Sync 22:25:16Z (under 2h). HOLD on dispatches unchanged. Tier reset 3→1 (Tier-4 alert). Awaiting `approve threshold-update-2026-06-27`.
+**Iter ~3182 summary:** ✅ Nominal. 0 new alerts. All checks green. Watchdog healthy (all 4 bots alive). Pipeline clean. 0 open PRs. Repo HEAD=0b549c50=origin/main, clean. Heal-daemon 22:48:15Z. Sync 22:25:16Z (under 2h). HOLD on dispatches unchanged. Tier 1 consecutive_clean=1. Awaiting `approve threshold-update-2026-06-27`.
 
 
