@@ -303,8 +303,14 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-28T04:22Z UTC (Iter ~3147, Tier 3, consecutive_clean=15)
+## G-rule watchdog-log-growth-idle-overnight-001 — 1/3 (new, iter ~3148)
 
-**Iter ~3147 summary:** ✅ Nominal. 0 new alerts. consecutive_clean=14→15. Check I: same-week dedup skip (artifact check-i-2026-06-28.json current). Check III next due 2026-07-11. PRIME: 0 interventions, ratio≈17.44, trend=improving. HOLD in effect. Larry activated approval pause (/pause) at 21:52 MDT. Daemons alive (PID 3961026/3961281/17832). Repo b73462df, clean. Sync 03:22:16Z (~60m). Heal-daemon 04:13:19Z. Watchdog healthy 22:19 MDT. 5 beacon-pending (unchanged). 0 open PRs. Awaiting `approve threshold-update-2026-06-27`. Cadence 30-min (Tier 3).
+**Rule:** Watchdog `log_growth: idle >12h` fires when outbox-notifier.log is quiet overnight with no pipeline activity. Root: outbox-notifier IS running but writes nothing when the pipeline is genuinely idle. Prior fixes (PR #649, PR #694, PR #717) addressed stale-log during Mirror reviews; pure overnight-idle path is not suppressed. Per WARN-vs-INFO calibration this is an idle-state INFO observation — system not worse off. Dispatch to Beacon at 3/3 (post-HOLD) to add Tier-3 translation or raise watchdog log_growth threshold for extended idle state. First occurrence iter ~3148 (seconds_since_write=43316, outbox-notifier last wrote 17:01:33 UTC 2026-06-27).
+
+---
+
+## Status snapshot — updated 2026-06-28T05:00Z UTC (Iter ~3148, Tier 3, consecutive_clean=16)
+
+**Iter ~3148 summary:** ✅ Nominal (iter_clean). 0 new alerts. consecutive_clean=15→16. Check 1: watchdog overall=warning (log_growth idle >12h, overnight quiet, INFO-level, new G-rule 1/3). Check I: same-week dedup skip (artifact check-i-2026-06-28.json current). Check III next due 2026-07-11. PRIME: 0 interventions, ratio≈17.44, trend=improving. HOLD in effect. Larry /pause active (21:52 MDT). Daemons alive (PID 3961026/3961281/17832). Repo f234c7f7, clean. Sync 04:22:19Z (~33m). Heal-daemon 04:54:01Z. 5 beacon-pending (unchanged). 0 open PRs. Awaiting `approve threshold-update-2026-06-27`. Cadence 30-min (Tier 3).
 
 
