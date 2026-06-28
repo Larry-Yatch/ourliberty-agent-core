@@ -6338,7 +6338,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-28T21:23:54.319435+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-28T21:18:38.149747+00:00"
+      "orphan_last_activity_ts": "2026-06-28T21:18:38.149747+00:00",
+      "briefing": {
+        "what": "Your team has started some behind-the-scenes fixes that aren't yet attached to any official project or goal.",
+        "why": "Unplanned work can quietly eat time and money, and right now there's nothing tying it to a business outcome you care about.",
+        "suggest": "Before it goes further, have the team tell you in one line what problem this solves so you can decide whether it's worth continuing \u2014 hold off on more until then."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-28T21:27:20.071411+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
