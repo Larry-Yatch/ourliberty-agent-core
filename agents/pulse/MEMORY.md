@@ -303,8 +303,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-28T03:47Z UTC (Iter ~3146, Tier 3, consecutive_clean=14)
+## Status snapshot — updated 2026-06-28T04:22Z UTC (Iter ~3147, Tier 3, consecutive_clean=15)
 
-**Iter ~3146 summary:** ✅ Nominal. 0 new alerts. consecutive_clean=13→14. Check I: same-week dedup skip (artifact check-i-2026-06-28.json current). Check III next due 2026-07-11. PRIME: 0 interventions, ratio≈17.44, trend=improving. HOLD in effect. Daemons alive (PID 3961026/3961281/17832). Repo 7ba98048, clean. Sync 03:22:16Z (~25m). Heal-daemon 03:42:17Z. Watchdog healthy 21:43 MDT. 5 beacon-pending (unchanged). 0 open PRs. Awaiting `approve threshold-update-2026-06-27`. Cadence 30-min (Tier 3).
+**Iter ~3147 summary:** ✅ Nominal. 0 new alerts. consecutive_clean=14→15. Check I: same-week dedup skip (artifact check-i-2026-06-28.json current). Check III next due 2026-07-11. PRIME: 0 interventions, ratio≈17.44, trend=improving. HOLD in effect. Larry activated approval pause (/pause) at 21:52 MDT. Daemons alive (PID 3961026/3961281/17832). Repo b73462df, clean. Sync 03:22:16Z (~60m). Heal-daemon 04:13:19Z. Watchdog healthy 22:19 MDT. 5 beacon-pending (unchanged). 0 open PRs. Awaiting `approve threshold-update-2026-06-27`. Cadence 30-min (Tier 3).
 
 
