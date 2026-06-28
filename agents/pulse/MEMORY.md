@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-28T22:49Z UTC (Iter ~3182, Tier 1, consecutive_clean=1)
+## Status snapshot — updated 2026-06-28T22:56Z UTC (Iter ~3183, Tier 1, consecutive_clean=2)
 
-**Iter ~3182 summary:** ✅ Nominal. 0 new alerts. All checks green. Watchdog healthy (all 4 bots alive). Pipeline clean. 0 open PRs. Repo HEAD=0b549c50=origin/main, clean. Heal-daemon 22:48:15Z. Sync 22:25:16Z (under 2h). HOLD on dispatches unchanged. Tier 1 consecutive_clean=1. Awaiting `approve threshold-update-2026-06-27`.
+**Iter ~3183 summary:** ✅ Nominal. 0 new alerts. All checks green. Watchdog healthy (all 4 bots alive). Pipeline clean. 0 open PRs. Repo HEAD=292712b1=origin/main, clean. Heal-daemon 22:48:15Z. Sync 22:25:16Z (under 2h). HOLD on dispatches unchanged. Tier 1 consecutive_clean=2. Awaiting `approve threshold-update-2026-06-27`.
 
 
