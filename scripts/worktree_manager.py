@@ -452,6 +452,32 @@ def setup_branch_checkpoint(
                 )
             return None
 
+        # Guarantee the session-start checkpoint commits NO content. The
+        # worktree may be REUSED across rounds (create_or_reuse_worktree_for_task
+        # returns it unchanged, no reset) and `git checkout -B` PRESERVES
+        # non-conflicting local modifications — so a stale working tree (e.g. an
+        # old pre-fix copy of a file left by a prior session) survives into the
+        # `git commit --allow-empty` below. `--allow-empty` commits a DIRTY index,
+        # not just an empty tree, so that snapshot silently REVERTS the branch tip
+        # and clobbers mid-review work — the #731 revision-loop class. Hard-reset
+        # to the checkout target so index+worktree exactly match it; safe because
+        # this runs at session START (before any work) and the round's prior work
+        # is already committed on origin/<branch>.
+        reset_target = f'origin/{branch}' if branch_exists_on_origin else 'HEAD'
+        r_reset = subprocess.run(
+            ['git', 'reset', '--hard', reset_target],
+            cwd=str(worktree_path),
+            capture_output=True, text=True,
+            timeout=WORKTREE_OP_TIMEOUT_SEC,
+        )
+        if r_reset.returncode != 0:
+            if log_fn:
+                log_fn(
+                    f'setup_branch_checkpoint: reset --hard {reset_target} '
+                    f'failed: {r_reset.stderr[:200]}'
+                )
+            return None
+
         # 4b review fix: skip the empty WIP commit when HEAD is already a
         # WIP checkpoint for this task. Without this gate, each re-dispatch
         # of the same task (preflight → CLARIFY → build) stacks another
@@ -483,6 +509,32 @@ def setup_branch_checkpoint(
                         f'setup_branch_checkpoint: empty commit warn: '
                         f'{r2.stderr[:200]}'
                     )
+            elif r2.returncode == 0:
+                # Defense in depth: a session-start checkpoint MUST be empty
+                # (tree == parent). The reset above guarantees this; if it ever
+                # didn't and `--allow-empty` captured a dirty index, pushing the
+                # commit would REVERT the branch tip. Drop it locally and refuse
+                # to push rather than clobber.
+                r_verify = subprocess.run(
+                    ['git', 'diff', '--quiet', 'HEAD~1', 'HEAD'],
+                    cwd=str(worktree_path),
+                    capture_output=True, text=True,
+                    timeout=WORKTREE_OP_TIMEOUT_SEC,
+                )
+                if r_verify.returncode != 0:
+                    if log_fn:
+                        log_fn(
+                            'setup_branch_checkpoint: REFUSING to push a '
+                            'non-empty [WIP][session-start] checkpoint (would '
+                            'revert branch tip); dropped it locally'
+                        )
+                    subprocess.run(
+                        ['git', 'reset', '--hard', 'HEAD~1'],
+                        cwd=str(worktree_path),
+                        capture_output=True, text=True,
+                        timeout=WORKTREE_OP_TIMEOUT_SEC,
+                    )
+                    return None
 
         r3 = subprocess.run(
             ['git', 'push', '-u', 'origin', branch],

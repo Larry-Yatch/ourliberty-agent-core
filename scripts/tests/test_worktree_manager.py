@@ -306,6 +306,66 @@ class WorktreeLifecycleTest(unittest.TestCase):
         ).stdout.strip()
         self.assertIn('[WIP][session-start]', head_subject)
 
+    def test_setup_branch_checkpoint_empty_despite_stale_reused_worktree(self):
+        """Regression (#731 revision-loop class): a REUSED worktree can carry a
+        STALE working tree — an old pre-fix copy of a file, staged — into the
+        next round. `git commit --allow-empty` commits a DIRTY index (the flag
+        only suppresses the empty-tree error), so without the pre-commit
+        hard-reset the [WIP][session-start] snapshot captures that stale content
+        and REVERTS the branch tip, clobbering mid-review work and forcing Forge
+        to redo the fix every round (the ~18h non-converging loop). The
+        checkpoint must be EMPTY and the fix on origin/<branch> must survive.
+        """
+        _git('config', 'receive.denyCurrentBranch', 'updateInstead', cwd=self.origin)
+        # origin/forge/task-x: round-1 baseline (target.py="OLD") then the fix
+        # (target.py="FIXED"). HEAD of the branch on origin = the fix.
+        _git('checkout', '-b', 'forge/task-x', cwd=self.origin)
+        (self.origin / 'target.py').write_text('OLD\n')
+        _git('add', 'target.py', cwd=self.origin)
+        _git('commit', '-q', '-m', 'round-1 baseline', cwd=self.origin)
+        (self.origin / 'target.py').write_text('FIXED\n')
+        _git('add', 'target.py', cwd=self.origin)
+        _git('commit', '-q', '-m', 'fix: the gating', cwd=self.origin)
+        fix_commit = _git('rev-parse', 'HEAD', cwd=self.origin).stdout.strip()
+        _git('checkout', 'main', cwd=self.origin)  # leave the protected branch
+
+        # Make the worktree look like a REUSED one already on the branch with
+        # stale staged pre-fix content (the dirtying condition the checkpoint
+        # must absorb without clobbering).
+        path = worktree_manager.create_or_reuse_worktree_for_task(
+            'forge', 'task-x', self.canonical, log_fn=self._log_fn,
+        )
+        self.assertIsNotNone(path)
+        _git('fetch', 'origin', 'forge/task-x', cwd=path)
+        _git('checkout', '-B', 'forge/task-x', 'origin/forge/task-x', cwd=path)
+        self.assertEqual((path / 'target.py').read_text(), 'FIXED\n')
+        (path / 'target.py').write_text('OLD\n')      # revert the fix...
+        _git('add', 'target.py', cwd=path)            # ...and stage the stale copy
+
+        branch = worktree_manager.setup_branch_checkpoint(
+            path, 'forge/task-x', 'task-x', log_fn=self._log_fn,
+        )
+        self.assertEqual(branch, 'forge/task-x')
+
+        # The fix must survive on origin — the checkpoint did NOT revert it.
+        show = _git('show', 'forge/task-x:target.py', cwd=self.origin).stdout
+        self.assertEqual(
+            show, 'FIXED\n',
+            'session-start checkpoint reverted the fix (the #731 clobber)',
+        )
+        # Fix commit still reachable; the WIP checkpoint is the new HEAD and is
+        # EMPTY (its tree equals its parent, the fix commit).
+        log = _git('log', '--format=%H %s', 'forge/task-x', cwd=self.origin).stdout
+        self.assertIn(fix_commit, log)
+        head_subject = _git(
+            'log', '-1', '--pretty=%s', 'forge/task-x', cwd=self.origin,
+        ).stdout.strip()
+        self.assertIn('[WIP][session-start]', head_subject)
+        diff = _git(
+            'diff', 'forge/task-x~1', 'forge/task-x', cwd=self.origin, check=False,
+        ).stdout
+        self.assertEqual(diff.strip(), '', 'checkpoint commit must carry no content')
+
     def test_setup_branch_checkpoint_fresh_branch_still_works(self):
         """Backward compat: when origin/<branch> doesn't exist, fall
         through to the legacy 'create from current HEAD' behavior."""
