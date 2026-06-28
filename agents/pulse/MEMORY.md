@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-28T10:46Z UTC (Iter ~3159, Tier 3, consecutive_clean=27)
+## Status snapshot — updated 2026-06-28T11:22Z UTC (Iter ~3160, Tier 3, consecutive_clean=28)
 
-**Iter ~3159 summary:** ✅ Nominal (iter_clean). 0 new alerts (watermark=1061). consecutive_clean=26→27. Check 1: watchdog overall=warning (log_growth idle, seconds_since_write=64343 ~17.9h, same continuous overnight-idle window from iters ~3148+, INFO-level, G-rule 1/3). Check I: same-week dedup skip (artifact from iter ~3141). Check III next due 2026-07-11. PRIME: 0 interventions, ratio≈17.44, trend=improving. HOLD in effect. Larry /pause active. Daemons alive (PID 3961026/3961281/17832). Repo af1b2f79, clean. Sync 10:23:52Z. Heal-daemon 10:38:20Z. 5 beacon-pending (unchanged). 0 open PRs. Awaiting `approve threshold-update-2026-06-27`. Cadence 30-min (Tier 3).
+**Iter ~3160 summary:** ✅ Nominal (iter_clean). 0 new alerts (watermark=1061). consecutive_clean=27→28. Check 1: watchdog overall=warning (log_growth idle, seconds_since_write=66439 ~18.5h, same continuous overnight-idle window from iters ~3148+, INFO-level, G-rule 1/3). Check I: same-week dedup skip (artifact from iter ~3141). Check III next due 2026-07-11. PRIME: 0 interventions, ratio≈17.44, trend=improving. HOLD in effect. Larry /pause active. Daemons alive (PID 3961026/3961281/17832). Repo e32ffd19, clean. Sync 10:23:52Z. Heal-daemon 11:19:19Z. 5 beacon-pending (unchanged). 0 open PRs. Awaiting `approve threshold-update-2026-06-27`. Cadence 30-min (Tier 3).
 
 
