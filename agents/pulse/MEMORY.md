@@ -303,8 +303,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-28T01:34Z UTC (Iter ~3142, Tier 3, consecutive_clean=11)
+## Status snapshot — updated 2026-06-28T02:08Z UTC (Iter ~3143, Tier 3, consecutive_clean=12)
 
-**Iter ~3142 summary:** ✅ Nominal. 3 new alerts L1118-L1120 all Tier-3 silenced (ledger weekly, check-i digest, doorbell). consecutive_clean=10→11 (Tier 3 steady-state). Check I: artifact check-i-2026-06-28.json already current from iter ~3141 + ledger weekly run; skip re-run. Check III last run 2026-06-27; next due 2026-07-11. PRIME: 0 interventions. HOLD in effect. Daemons alive (PID 3961026/3961281/17832). Repo 41d0bf38, clean. Sync 01:21:43Z. Heal-daemon 01:30:16Z. Watchdog healthy 19:30 MDT. 5 beacon-pending (unchanged). 0 open PRs. Awaiting `approve threshold-update-2026-06-27`. Cadence 30-min (Tier 3).
+**Iter ~3143 summary:** ✅ Nominal. 0 new alerts. consecutive_clean=11→12 (Tier 3 steady-state). VERIFY-BEFORE-REASSERT: PRs #739 (merged 13:44Z 2026-06-27) and #736 (merged 06:30Z 2026-06-27) confirmed MERGED — dropped from yellow standings; moved to blue historical unreviewed-merge list. Check I: artifact check-i-2026-06-28.json already current (iter ~3141); skip. Check III last run 2026-06-27; next due 2026-07-11. PRIME: 0 interventions. HOLD in effect. Daemons alive (PID 3961026/3961281/17832). Repo 9cede534, clean. Sync 01:21:43Z. Heal-daemon 02:00:36Z. Watchdog healthy 20:06 MDT. 5 beacon-pending (unchanged). 0 open PRs. Awaiting `approve threshold-update-2026-06-27`. Cadence 30-min (Tier 3).
 
 
