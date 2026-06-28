@@ -2006,88 +2006,14 @@ def create_worktree_for_task(agent_id, task_stem):
 # preamble. Kept short and unique so we can search with `in` cheaply.
 WORKTREE_PREAMBLE_MARKER = "WORKTREE ISOLATION (READ THIS FIRST)"
 
-# ============================================================================
-# LAYER 4 ARCHITECTURAL ENFORCEMENT (iter 26 — Larry directive 2026-05-01):
-# Before spawning Luma's claude, pre-create the branch on origin so that:
-#  - If Luma's session times out at 50 min before committing, the branch + WIP
-#    checkpoint already exist on origin = next dispatch resumes from there
-#  - Prompt-level "FIRST ACTION" instructions to Luma (iter 21 strengthening)
-#    are no longer the only enforcement — orchestrator does it before claude
-#    even starts. Architectural >> prompt-begging.
-# Failure is non-fatal (warns + continues) so a transient git error never
-# blocks a dispatch.
-# ============================================================================
-
-def setup_branch_checkpoint(worktree_path, agent_id, prompt, task_stem):
-    """Pre-create the branch on origin with an empty WIP commit.
-
-    Extracts `Branch hint: \`<branch>\`` from the prompt. If found, runs in
-    the worktree: checkout -b <branch>; commit --allow-empty; push -u origin.
-    Returns the branch name on success, None on no-hint or failure.
-
-    Never raises — failures log WARN and return None so the spawn proceeds.
-    """
-    import re
-    import subprocess as _sp
-
-    if not worktree_path:
-        return None
-
-    m = re.search(r"Branch hint:\s*`([^`]+)`", prompt or "")
-    if not m:
-        log(agent_id, 'setup_branch_checkpoint: no Branch hint in prompt — skipping', 'INFO')
-        return None
-    branch = m.group(1).strip()
-    if not branch or len(branch) > 200:
-        log(agent_id, f'setup_branch_checkpoint: bad branch name {branch!r}', 'WARN')
-        return None
-
-    safe_stem = (task_stem or 'task')[:60]
-    commit_msg = f'[WIP][session-start] {safe_stem}'
-
-    try:
-        # 1. Create + switch to branch (or switch if already exists locally)
-        r1 = _sp.run(
-            ['git', 'checkout', '-B', branch],
-            cwd=worktree_path, capture_output=True, text=True, timeout=60,
-        )
-        if r1.returncode != 0:
-            log(agent_id, f'setup_branch_checkpoint: checkout -B failed: {r1.stderr[:200]}', 'WARN')
-            return None
-
-        # 2. Empty WIP commit — checkpoint exists even if claude exits early
-        r2 = _sp.run(
-            ['git', 'commit', '--allow-empty', '-m', commit_msg],
-            cwd=worktree_path, capture_output=True, text=True, timeout=60,
-        )
-        # Non-fatal if "nothing to commit" (branch existed and was clean)
-        if r2.returncode != 0 and 'nothing to commit' not in (r2.stdout + r2.stderr).lower():
-            log(agent_id, f'setup_branch_checkpoint: empty commit failed: {r2.stderr[:200]}', 'WARN')
-
-        # 3. Push to origin — establishes branch on remote (force needed if
-        #    branch existed remotely from a prior dispatch; our WIP commit
-        #    is at the head of origin/main + 1 so push should be fast-forward
-        #    in clean cases, but use -u and accept failure non-fatally).
-        r3 = _sp.run(
-            ['git', 'push', '-u', 'origin', branch],
-            cwd=worktree_path, capture_output=True, text=True, timeout=120,
-        )
-        if r3.returncode != 0:
-            # Try with --force-with-lease as a fallback for branches that
-            # diverged from prior dispatches (safer than --force).
-            r3b = _sp.run(
-                ['git', 'push', '-u', '--force-with-lease', 'origin', branch],
-                cwd=worktree_path, capture_output=True, text=True, timeout=120,
-            )
-            if r3b.returncode != 0:
-                log(agent_id, f'setup_branch_checkpoint: push failed: {r3.stderr[:200]} | force-with-lease: {r3b.stderr[:200]}', 'WARN')
-                return None
-
-        log(agent_id, f'setup_branch_checkpoint: pushed {branch} with WIP checkpoint')
-        return branch
-    except Exception as e:
-        log(agent_id, f'setup_branch_checkpoint: exception {e}', 'WARN')
-        return None
+# Branch-checkpoint logic (pre-create the branch on origin with an EMPTY
+# [WIP][session-start] commit before claude starts, so a timed-out session
+# resumes from a real checkpoint) lives in the single source of truth
+# worktree_manager.setup_branch_checkpoint, invoked via ensure_worktree_for_task
+# on the dispatch path. A duplicate copy used to live here but was unsafe (it
+# never fetched origin/<branch>, based `checkout -B` on origin/main, and
+# force-with-leased a stale ref — the branch-wipe class) AND dead (no callers).
+# Removed so it can't be wired back up; extend worktree_manager's copy instead.
 
 
 # Defensive cap on total prompt size (preamble + task body) before the task
