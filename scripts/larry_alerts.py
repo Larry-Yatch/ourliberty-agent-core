@@ -36,7 +36,7 @@ import atomic_io
 import file_lock
 from test_isolation_guard import refuse_under_test
 
-AGENTS_ROOT = Path.home() / 'agents'
+AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT') or Path.home() / 'agents')
 ALERTS_FILE = AGENTS_ROOT / 'blackboard' / 'larry-alerts.jsonl'
 COOLDOWN_ROOT = AGENTS_ROOT / 'state' / 'alert-cooldown'
 OFFSET_FILE = AGENTS_ROOT / 'state' / 'beacon-alerts-offset.txt'

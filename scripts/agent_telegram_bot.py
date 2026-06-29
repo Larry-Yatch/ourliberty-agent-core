@@ -61,8 +61,9 @@ AGENT_DIR = Path.home() / "agent-core" / "agents" / AGENT
 if not AGENT_DIR.is_dir():
     sys.exit(f"ERROR: agent dir not found: {AGENT_DIR}")
 
-LOG_DIR = Path.home() / "agents" / "logs"
-STATE_DIR = Path.home() / "agents" / "state"
+_AGENTS_ROOT = Path(os.environ.get("OURLIBERTY_AGENTS_ROOT") or Path.home() / "agents")
+LOG_DIR = _AGENTS_ROOT / "logs"
+STATE_DIR = _AGENTS_ROOT / "state"
 SESSION_FILE = STATE_DIR / f"{AGENT}_telegram_sessions.json"
 
 LOG_DIR.mkdir(parents=True, exist_ok=True)

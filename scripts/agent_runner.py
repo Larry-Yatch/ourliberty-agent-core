@@ -41,7 +41,7 @@ import active_tier
 from atomic_io import atomic_write_json  # noqa: E402  (shared durable atomic write, PR-E #366)
 from test_isolation_guard import refuse_under_test  # noqa: E402
 
-AGENTS_ROOT = Path.home() / 'agents'
+AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT') or Path.home() / 'agents')
 
 
 def resolve_log_dir():
@@ -1322,6 +1322,15 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
             env.setdefault('GH_CONFIG_DIR', os.path.join(_real_home, '.config', 'gh'))
             env.setdefault('GIT_CONFIG_GLOBAL', os.path.join(_real_home, '.gitconfig'))
             env['HOME'] = active_tier.current_home()
+            # Decouple app-state resolution from the per-tier auth HOME
+            # swap above: the swap points the Claude CLI at the active
+            # tier's OAuth, but agents/ state always lives under the real
+            # account home. Pin OURLIBERTY_AGENTS_ROOT so child sessions
+            # (and any module that honors it) resolve state to the real
+            # tree even when HOME is swapped to TIER2_HOME. No-op on
+            # tier1 (real home) and preserves any externally-set value.
+            env.setdefault('OURLIBERTY_AGENTS_ROOT',
+                           str(Path(active_tier.TIER1_HOME) / 'agents'))
             active_tier_name = active_tier.read()['tier']
             auth_source = _apply_tier_auth(env, active_tier_name, token)
 

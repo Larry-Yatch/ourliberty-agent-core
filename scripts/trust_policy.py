@@ -44,10 +44,11 @@ import json
 import re
 import sys
 from pathlib import Path
+import os
 from typing import Any, Optional
 
 HOME = Path.home()
-AGENTS_ROOT = HOME / 'agents'
+AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT') or HOME / 'agents')
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Runtime policy lives at ~/agents/config/trust-policy.json (the snapshot

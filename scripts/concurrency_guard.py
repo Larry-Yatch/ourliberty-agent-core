@@ -23,7 +23,7 @@ if str(Path(__file__).resolve().parent) not in sys.path:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_isolation_guard import refuse_under_test
 
-AGENTS_ROOT = Path.home() / 'agents'
+AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT') or Path.home() / 'agents')
 GUARD_FILE = AGENTS_ROOT / 'config' / '.concurrency-guard.json'
 
 # Safe limit defaults to 6 (see module docstring for the RAM math: 6×400MB +

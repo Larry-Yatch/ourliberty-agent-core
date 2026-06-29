@@ -24,12 +24,13 @@ import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+import os
 
 if str(Path(__file__).resolve().parent) not in sys.path:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_isolation_guard import refuse_under_test
 
-AGENTS_ROOT = Path.home() / 'agents'
+AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT') or Path.home() / 'agents')
 BLACKBOARD = AGENTS_ROOT / 'blackboard'
 HALT_FILE = BLACKBOARD / 'EMERGENCY_HALT'
 LOG_DIR = AGENTS_ROOT / 'logs'

@@ -38,9 +38,10 @@ import re
 import subprocess
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+import os
 from typing import Optional
 
-AGENTS_ROOT = Path.home() / "agents"
+AGENTS_ROOT = Path(os.environ.get("OURLIBERTY_AGENTS_ROOT") or Path.home() / "agents")
 CHECKPOINT_FILE = AGENTS_ROOT / "state" / "beacon-catch-me-up-checkpoint.json"
 APPROVALS_FILE = AGENTS_ROOT / "state" / "beacon-pending-approvals.json"
 ALERTS_FILE = AGENTS_ROOT / "blackboard" / "larry-alerts.jsonl"
