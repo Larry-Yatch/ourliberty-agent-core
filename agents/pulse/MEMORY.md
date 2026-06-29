@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T11:12Z UTC (Iter ~3222, Tier 3, consecutive_clean=4)
+## Status snapshot — updated 2026-06-29T11:48Z UTC (Iter ~3223, Tier 3, consecutive_clean=5)
 
-**Iter ~3222 summary:** ✅ Nominal (iter_clean). Tier 3, consecutive_clean=3→4. No new alerts. All checks clean. PR #749 (p3b-retro-author) STRANDED — mergeable=UNKNOWN (reverted from MERGEABLE in iter ~3221; GitHub eventual consistency). APPROVAL_REQUEST DM dropped (reply_chat_id=None). Larry must manually handle PR #749. All daemons alive. HOLD in effect.
+**Iter ~3223 summary:** ✅ Nominal (iter_clean). Tier 3, consecutive_clean=4→5. No new alerts. All checks clean. PR #749 (p3b-retro-author) STRANDED — mergeable=MERGEABLE (GitHub resolved from UNKNOWN), mergeStateStatus=UNSTABLE (CI failure). APPROVAL_REQUEST DM dropped (reply_chat_id=None). Larry must manually handle PR #749. All daemons alive. HOLD in effect.
 
 
