@@ -662,6 +662,20 @@ class FlagStuckProposalsTest(unittest.TestCase):
             h.flag_stuck_proposals(reg, self.now, terminal_gate=self._keep_gate),
             ['closeout-note'])
 
+    def test_skips_retrospective_author_owned(self):
+        # The weekly retrospective author manages its own re-proposal/dismiss
+        # lifecycle, so its standing proposals (empty task_ids by design) must
+        # NOT get the 14d stuck flag — that would re-clutter the needs-you lane
+        # this alert-pipeline-rework declutters (review #749 finding 2).
+        reg = {'schema_version': 1, 'missions': [
+            {'id': 'retrospective-sig-2026-06-15', 'phase': 'proposed',
+             'task_ids': [], 'proposed_by': 'retrospective-author',
+             'created': '2026-06-01'},
+        ]}
+        self.assertEqual(
+            h.flag_stuck_proposals(reg, self.now, terminal_gate=self._keep_gate), [])
+        self.assertNotIn('needs_decision', reg['missions'][0])
+
     def test_idempotent_already_flagged(self):
         reg = {'schema_version': 1, 'missions': [
             self._proposed('proposed-stuck', '2026-06-01', needs_decision=True),

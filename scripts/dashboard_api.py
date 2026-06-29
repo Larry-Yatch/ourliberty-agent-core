@@ -3787,9 +3787,22 @@ def _handle_new_mission(
     # Stamp the proposal provenance only for proposed cards so a drafting
     # mission's shape is byte-for-byte what it was before this field existed.
     if phase == 'proposed':
-        new_entry['proposed_by'] = body.proposed_by or 'unknown'
+        # `proposed_by` and `predraft` land verbatim in the auto-committed
+        # missions.json registry, so bound both: cap the provenance string and
+        # reject an oversized pre-draft that would bloat every registry read
+        # (review #749 finding 5). Stage B's own fields are ≤800 chars, so 8 KB
+        # is generous headroom for a well-formed predraft.
+        new_entry['proposed_by'] = (body.proposed_by or 'unknown')[:64]
         new_entry['proposed_at'] = now.isoformat()
         if body.predraft is not None:
+            if len(json.dumps(body.predraft, default=str)) > 8192:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        'error': 'predraft too large',
+                        'detail': 'predraft must serialize to <= 8192 bytes',
+                    },
+                )
             new_entry['predraft'] = body.predraft
 
     with _NEW_MISSION_LOCK:
@@ -4663,9 +4676,16 @@ def _fetch_recent_chain_events(
 # non-agent source (projects-v3 P4): the phase-closeout pass drops loose ends it
 # finds into the suggested lane, tagged `proposed_by='closeout'`.
 _SUGGESTED_AGENTS: tuple[str, ...] = ('beacon', 'medic', 'pulse', 'closeout')
-# Capture `label` provenance → canonical suggesting agent. 'pulse-check-i' is the
-# recurring Pulse proposal parked in the Missions lane (see CAPTURE_ALLOWED_LABELS).
-_CAPTURE_LABEL_SUGGESTED_SOURCE: dict[str, str] = {'pulse-check-i': 'pulse'}
+# Provenance hint → canonical suggesting agent. 'pulse-check-i' is the recurring
+# Pulse proposal parked in the Missions lane (see CAPTURE_ALLOWED_LABELS);
+# 'retrospective-author' is the weekly Pulse retrospective (P3b). Both are
+# Pulse-family suggestions, so they belong in the PRIMARY suggested lane — without
+# this mapping a retrospective card's proposed_by normalizes to None and falls into
+# the secondary orphan-clutter lane, defeating the feature (review #749 finding 1).
+_CAPTURE_LABEL_SUGGESTED_SOURCE: dict[str, str] = {
+    'pulse-check-i': 'pulse',
+    'retrospective-author': 'pulse',
+}
 
 
 def _normalize_suggested_source(*candidates: Any) -> Optional[str]:
