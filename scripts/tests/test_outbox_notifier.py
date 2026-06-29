@@ -13405,5 +13405,143 @@ class ClarifyExhaustedSignalTest(unittest.TestCase):
         self.assertIn('no question text recorded', rec['suggested_action'])
 
 
+class PostMergeBaselineWarmTest(unittest.TestCase):
+    """regression-gate-steady-state-warmer (spec PR 2) — the post-merge warmer.
+
+    Asserts the warm hook (a) fires from BOTH auto-merge success branches with
+    the correct FETCH_HEAD/repo-root argv + canonical OL_REGRESSION_BASELINE_DIR
+    env, (b) is non-blocking + detached, (c) isolates any spawn error from the
+    merge outcome, and (d) does NOT fire when the merge failed.
+    """
+
+    PR_URL = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/77'
+    TASK_ID = 'warmer-fixture-001'
+
+    def _mock_proc(self, *, returncode=0, stdout='', stderr=''):
+        class _R:
+            pass
+        r = _R()
+        r.returncode = returncode
+        r.stdout = stdout
+        r.stderr = stderr
+        return r
+
+    # --- _spawn_post_merge_baseline_warm in isolation -----------------------
+
+    def test_spawn_command_and_canonical_env(self):
+        with mock.patch.object(on.subprocess, 'Popen') as m_popen:
+            on._spawn_post_merge_baseline_warm(self.TASK_ID, self.PR_URL)
+        m_popen.assert_called_once()
+        args, kwargs = m_popen.call_args
+        argv = args[0]
+        self.assertEqual(argv[:2], ['bash', '-c'])
+        shell = argv[2]
+        # Fetch precedes warm (the new HEAD must be a local object first).
+        self.assertIn('fetch --quiet origin main', shell)
+        self.assertIn('regression_baseline_cache.py', shell)
+        self.assertIn('warm', shell)
+        self.assertIn('--sha FETCH_HEAD', shell)
+        self.assertIn(f'--repo-root {on._WARM_REPO_ROOT}', shell)
+        self.assertIn(f'--timeout-per-sha {on._WARM_TIMEOUT_PER_SHA_S}', shell)
+        self.assertLess(
+            shell.index('fetch'), shell.index('warm'),
+            'fetch must run before warm in the detached child',
+        )
+        env = kwargs['env']
+        self.assertEqual(
+            env['OL_REGRESSION_BASELINE_DIR'],
+            on.REGRESSION_BASELINE_CANONICAL_DIR,
+        )
+
+    def test_spawn_is_detached_and_nonblocking(self):
+        with mock.patch.object(on.subprocess, 'Popen') as m_popen:
+            on._spawn_post_merge_baseline_warm(self.TASK_ID, self.PR_URL)
+        _, kwargs = m_popen.call_args
+        self.assertTrue(kwargs['start_new_session'])
+        self.assertEqual(kwargs['stdout'], on.subprocess.DEVNULL)
+        self.assertEqual(kwargs['stderr'], on.subprocess.DEVNULL)
+        self.assertEqual(kwargs['stdin'], on.subprocess.DEVNULL)
+
+    def test_spawn_error_is_swallowed(self):
+        with mock.patch.object(on.subprocess, 'Popen',
+                               side_effect=OSError('cannot fork')):
+            # Must not raise — a warmer error can never touch the merge path.
+            on._spawn_post_merge_baseline_warm(self.TASK_ID, self.PR_URL)
+
+    # --- integration with _auto_merge_pr success branches -------------------
+
+    def test_merged_branch_fires_warm(self):
+        with mock.patch.object(on.subprocess, 'run') as m_run, \
+                mock.patch.object(on, '_spawn_post_merge_baseline_warm') as m_warm:
+            m_run.return_value = self._mock_proc(returncode=0)
+            result = on._auto_merge_pr(self.PR_URL, self.TASK_ID)
+        self.assertEqual(result['merge_outcome'], 'merged')
+        m_warm.assert_called_once_with(self.TASK_ID, self.PR_URL)
+
+    def test_already_merged_branch_fires_warm(self):
+        merge_proc = self._mock_proc(returncode=1, stderr='already merged')
+        view_proc = self._mock_proc(
+            returncode=0, stdout=json.dumps({'state': 'MERGED'}),
+        )
+        with mock.patch.object(on.subprocess, 'run') as m_run, \
+                mock.patch.object(on, '_spawn_post_merge_baseline_warm') as m_warm:
+            m_run.side_effect = [merge_proc, view_proc]
+            result = on._auto_merge_pr(self.PR_URL, self.TASK_ID)
+        self.assertEqual(result['merge_outcome'], 'already_merged')
+        m_warm.assert_called_once_with(self.TASK_ID, self.PR_URL)
+
+    def test_failed_merge_does_not_fire_warm(self):
+        merge_proc = self._mock_proc(returncode=1, stderr='not mergeable')
+        view_proc = self._mock_proc(
+            returncode=0, stdout=json.dumps({'state': 'OPEN'}),
+        )
+        with mock.patch.object(on.subprocess, 'run') as m_run, \
+                mock.patch.object(on, '_spawn_post_merge_baseline_warm') as m_warm:
+            m_run.side_effect = [merge_proc, view_proc]
+            result = on._auto_merge_pr(self.PR_URL, self.TASK_ID)
+        self.assertEqual(result['merge_outcome'], 'failed')
+        m_warm.assert_not_called()
+
+    def test_warmer_spawn_failure_leaves_merge_merged(self):
+        """End-to-end: a real warm whose Popen raises must not change the
+        merge outcome — the swallow happens inside the warm helper."""
+        with mock.patch.object(on.subprocess, 'run') as m_run, \
+                mock.patch.object(on.subprocess, 'Popen',
+                                  side_effect=OSError('cannot fork')):
+            m_run.return_value = self._mock_proc(returncode=0)
+            result = on._auto_merge_pr(self.PR_URL, self.TASK_ID)
+        self.assertEqual(result['merge_outcome'], 'merged')
+
+
+class CanonicalBaselineDirAgreementTest(unittest.TestCase):
+    """The warmer and the Mirror review gate MUST resolve the SAME cache dir —
+    the fix is inert otherwise (spec PR 2 correctness lever)."""
+
+    def test_warmer_and_gate_constants_match(self):
+        import agent_runner
+        self.assertEqual(
+            on.REGRESSION_BASELINE_CANONICAL_DIR,
+            agent_runner.REGRESSION_BASELINE_CANONICAL_DIR,
+        )
+
+    def test_cache_module_resolves_canonical_dir(self):
+        import regression_baseline_cache as rbc
+        with mock.patch.dict(
+            os.environ,
+            {'OL_REGRESSION_BASELINE_DIR': on.REGRESSION_BASELINE_CANONICAL_DIR},
+        ):
+            self.assertEqual(
+                str(rbc.baseline_dir()),
+                on.REGRESSION_BASELINE_CANONICAL_DIR,
+            )
+
+    def test_gate_pin_only_for_mirror_review(self):
+        import agent_runner
+        self.assertTrue(agent_runner._is_mirror_review_dispatch('review', 'mirror'))
+        self.assertFalse(agent_runner._is_mirror_review_dispatch('build', 'forge'))
+        self.assertFalse(agent_runner._is_mirror_review_dispatch('review', 'forge'))
+        self.assertFalse(agent_runner._is_mirror_review_dispatch('preflight', 'mirror'))
+
+
 if __name__ == '__main__':
     unittest.main()
