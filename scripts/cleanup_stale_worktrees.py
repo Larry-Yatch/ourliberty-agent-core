@@ -340,6 +340,133 @@ def sweep_orphan_dirs(
     return removed, kept
 
 
+def _worktrees_metadata_dir(canonical_repo: Path) -> Path | None:
+    """Return the canonical repo's ``.git/worktrees`` dir, or None if unresolvable.
+
+    Resolved via ``git rev-parse --git-common-dir`` so it is correct whether the
+    repo's ``.git`` is a directory (a normal checkout) or a file (the repo is
+    itself a worktree). ``--git-common-dir`` does NOT load refs, so it succeeds
+    even when a leaked zero-HEAD entry has corrupted the ref machinery (that
+    corruption is exactly what this reaper exists to remove).
+    """
+    try:
+        result = subprocess.run(
+            ['git', 'rev-parse', '--git-common-dir'],
+            cwd=str(canonical_repo),
+            capture_output=True, text=True, check=True,
+            timeout=GIT_TIMEOUT_SEC,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
+        log(f'git rev-parse --git-common-dir failed for {canonical_repo}: {str(e)[:200]}')
+        return None
+    common = Path(result.stdout.strip())
+    if not common.is_absolute():
+        common = (canonical_repo / common).resolve()
+    return common / 'worktrees'
+
+
+def _orphan_working_dir(entry: Path) -> Path | None:
+    """Return the entry's recorded working dir IFF it no longer exists on disk.
+
+    Each ``.git/worktrees/<name>/gitdir`` file records the absolute path of the
+    worktree's ``.git`` file (e.g. ``/tmp/test-regression-check-X/gate-wt-Y/.git``);
+    the working dir is its parent. Returns that path only when it is absent (the
+    orphan signal). Returns None when the working dir still exists (a LIVE run —
+    never reap) or when the gitdir file can't be read (fail-safe: an entry we
+    can't characterize is left alone, never reaped).
+    """
+    try:
+        gitdir = (entry / 'gitdir').read_text().strip()
+    except OSError:
+        return None
+    if not gitdir:
+        return None
+    working_dir = Path(gitdir).parent
+    if working_dir.exists():
+        return None
+    return working_dir
+
+
+def sweep_orphan_locked_worktrees(canonical_repo: Path) -> tuple[int, int]:
+    """Reap leaked ``.git/worktrees/*`` entries whose working dir is gone.
+
+    The regression gate / baseline warmer create detached worktrees under /tmp via
+    ``git worktree add``, which writes a ``locked`` file (reason 'initializing')
+    for the duration of the add and removes it only on success. If the process is
+    SIGKILLed mid-init (OOM, per-SHA timeout, the zombie/wedged-session healer) the
+    lock survives. ``git worktree prune`` SKIPS locked entries, and the in-process
+    teardown never runs on a kill — so the metadata accumulates forever. An entry
+    killed early enough to leave an all-zero HEAD corrupts ``git fetch``
+    (``fatal: bad object worktrees/<name>/HEAD``), blocking every push to
+    origin/main. This is the load-bearing reaper for that kill-mid-init case: no
+    in-process ``finally`` can cover a SIGKILL.
+
+    For each entry whose recorded working dir (from its ``gitdir`` file) no longer
+    exists, clear any stale ``locked`` file then ``git worktree prune`` to drop the
+    entry; if prune leaves the entry (e.g. a git version that loads the corrupt
+    HEAD while pruning), rmtree the metadata dir directly as the backstop that
+    guarantees the corrupting entry is gone.
+
+    SAFETY INVARIANT (non-negotiable): an entry whose working dir STILL EXISTS is
+    NEVER touched. A live gate run under /tmp/test-regression-check-* legitimately
+    holds an 'initializing' lock during checkout; clearing that lock or pruning the
+    entry would corrupt the in-flight run. Scope is strictly orphans (working dir
+    absent) — the enforcement of that rule is _orphan_working_dir returning None
+    for any live or unreadable entry, plus the live-dir test fixture that proves a
+    present working dir is left intact. Returns ``(reaped, kept)``.
+    """
+    meta_dir = _worktrees_metadata_dir(canonical_repo)
+    if meta_dir is None or not meta_dir.exists():
+        return 0, 0
+
+    reaped = 0
+    kept = 0
+    orphan_entries: list[Path] = []
+    for entry in sorted(meta_dir.iterdir()):
+        if not entry.is_dir():
+            continue
+        working_dir = _orphan_working_dir(entry)
+        if working_dir is None:
+            # Live run (working dir present) or unreadable metadata — leave it.
+            kept += 1
+            continue
+        locked_file = entry / 'locked'
+        if locked_file.exists():
+            try:
+                locked_file.unlink()
+            except OSError as e:
+                log(f'Could not clear stale lock for orphan worktree '
+                    f'{entry.name}: {str(e)[:200]} — leaving entry in place')
+                kept += 1
+                continue
+        log(f'Reaping orphaned worktree metadata {entry.name} '
+            f'(working dir {working_dir} absent)')
+        orphan_entries.append(entry)
+        reaped += 1
+
+    if orphan_entries:
+        try:
+            subprocess.run(
+                ['git', 'worktree', 'prune'],
+                cwd=str(canonical_repo),
+                capture_output=True, text=True,
+                timeout=GIT_TIMEOUT_SEC,
+            )
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
+            log(f'git worktree prune (orphan reaper) failed for '
+                f'{canonical_repo}: {str(e)[:200]}')
+        # Backstop: ensure each reaped entry's metadata is actually gone. If
+        # prune choked on a corrupt HEAD, rmtree removes the offending dir
+        # directly — safe because we already confirmed the working dir is absent.
+        for entry in orphan_entries:
+            if entry.exists():
+                shutil.rmtree(entry, ignore_errors=True)
+                log(f'Force-removed leftover worktree metadata {entry.name} '
+                    f'(prune did not clear it)')
+
+    return reaped, kept
+
+
 def main() -> int:
     log('Starting worktree cleanup scan')
     active_stems = load_active_task_stems()
@@ -353,6 +480,13 @@ def main() -> int:
         total_removed += removed
         total_kept += kept
         registered_paths |= repo_registered
+
+        # Reap leaked .git/worktrees/* entries (gate/warmer kill-mid-init orphans)
+        # whose working dir is gone. Scoped strictly to orphans, so a live gate
+        # run holding an 'initializing' lock is never disturbed.
+        locked_reaped, locked_kept = sweep_orphan_locked_worktrees(canonical)
+        total_removed += locked_reaped
+        total_kept += locked_kept
 
     orphan_removed, orphan_kept = sweep_orphan_dirs(registered_paths, active_stems)
     total_removed += orphan_removed

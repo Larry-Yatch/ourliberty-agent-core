@@ -775,5 +775,60 @@ class ResolveShaTest(_IsolatedAgentsRoot):
                 trc.resolve_sha('nope', Path('/tmp/repo'))
 
 
+# -------------------- remove_worktree (double-force) --------------------
+
+
+def _git_live(*args, cwd=None, check=True):
+    return subprocess.run(
+        ['git', *args],
+        cwd=str(cwd) if cwd else None,
+        capture_output=True, text=True, check=check, timeout=60,
+    )
+
+
+class RemoveWorktreeDoubleForceTest(unittest.TestCase):
+    """remove_worktree() must override git's 'initializing' lock.
+
+    A single `git worktree remove --force` REFUSES a locked worktree; only
+    `--force --force` (double force) overrides it. This is a live-git test —
+    the mocked-subprocess suite above can't catch the single-vs-double-force
+    behavior because it never runs real git.
+    """
+
+    def setUp(self):
+        self.tmpdir = Path(tempfile.mkdtemp(prefix='remove-wt-doubleforce-'))
+        self.repo = self.tmpdir / 'repo'
+        self.repo.mkdir()
+        _git_live('init', '-q', '--initial-branch=main', cwd=self.repo)
+        _git_live('config', 'user.email', 'test@example.com', cwd=self.repo)
+        _git_live('config', 'user.name', 'Test', cwd=self.repo)
+        (self.repo / 'README.md').write_text('initial\n')
+        _git_live('add', 'README.md', cwd=self.repo)
+        _git_live('commit', '-q', '-m', 'initial commit', cwd=self.repo)
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_removes_worktree_carrying_initializing_lock(self):
+        workdir = self.tmpdir / 'gate-wt-locked'
+        _git_live('worktree', 'add', '--detach', str(workdir), 'HEAD',
+                  cwd=self.repo)
+        meta = self.repo / '.git' / 'worktrees' / 'gate-wt-locked'
+        self.assertTrue(meta.is_dir())
+        # Simulate the add being SIGKILLed mid-init with the lock still held.
+        (meta / 'locked').write_text('initializing\n')
+
+        trc.remove_worktree(self.repo, workdir)
+
+        self.assertFalse(
+            workdir.exists(),
+            'double-force remove should delete the locked worktree dir',
+        )
+        self.assertFalse(
+            meta.exists(),
+            'double-force remove should drop the locked .git/worktrees entry',
+        )
+
+
 if __name__ == '__main__':
     unittest.main()
