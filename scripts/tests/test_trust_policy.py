@@ -280,17 +280,21 @@ class ShippedDefaultPolicyTest(unittest.TestCase):
         policy = tp.load_policy(repo_default)
         self.assertEqual(policy['default_action'], 'force_ask')
 
-        # Three rules, first-match-wins order:
-        #   0: pulse-auto-dispatch                       -> auto_approve (2026-06-22)
-        #   1: beacon->forge agent-core sensitive paths  -> force_ask (carve-out)
-        #   2: beacon->forge agent-core                  -> auto_approve (gate)
-        # The carve-out MUST stay ordered before the broad auto_approve.
-        self.assertEqual(len(policy['rules']), 3)
+        # Four rules, first-match-wins order. Each force_ask carve-out MUST stay
+        # ordered before its broad auto_approve sibling:
+        #   0: pulse-auto-dispatch sensitive-intent carve-out -> force_ask (#658, 2026-06-23)
+        #   1: pulse-auto-dispatch                            -> auto_approve (2026-06-22)
+        #   2: beacon->forge agent-core sensitive paths       -> force_ask (carve-out)
+        #   3: beacon->forge agent-core                       -> auto_approve (gate)
+        self.assertEqual(len(policy['rules']), 4)
         self.assertEqual(policy['rules'][0]['source'], 'pulse-auto-dispatch')
-        self.assertEqual(policy['rules'][0]['action'], 'auto_approve')
-        self.assertEqual(policy['rules'][1]['action'], 'force_ask')
+        self.assertEqual(policy['rules'][0]['action'], 'force_ask')
+        self.assertEqual(policy['rules'][1]['source'], 'pulse-auto-dispatch')
+        self.assertEqual(policy['rules'][1]['action'], 'auto_approve')
         self.assertEqual(policy['rules'][2]['source'], 'beacon')
-        self.assertEqual(policy['rules'][2]['action'], 'auto_approve')
+        self.assertEqual(policy['rules'][2]['action'], 'force_ask')
+        self.assertEqual(policy['rules'][3]['source'], 'beacon')
+        self.assertEqual(policy['rules'][3]['action'], 'auto_approve')
 
         def ev(**task):
             action, _ = tp.evaluate(task, policy)
