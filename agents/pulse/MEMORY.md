@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T05:44Z UTC (Iter ~3204, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-29T05:51Z UTC (Iter ~3205, Tier 1, consecutive_clean=1)
 
-**Iter ~3204 summary:** ⚠️ Auto-fix (ff-main-when-behind, consecutive_clean=1→0). PR #745 (p2a-medic) MERGED at 05:42:05Z — SEQUENCE_STEP_MERGED seq=alert-pipeline-rework. 1 new alert (L1100 Tier-3 silence: heal-wedged-review-sessions wedged-review-reaped:wt-forge-p2a-medic, auto-resolved by merge teardown). p2b-machinery Forge build still in progress (~62 min, no stall). Check VIII: Beacon holding under HOLD.
+**Iter ~3205 summary:** ✅ Nominal (iter_clean). 0 new alerts. All checks clean. p2b-machinery Forge build in progress (~68 min, no stall). Check VIII: Beacon holding under HOLD. forge-wip-redispatch EXHAUSTED for review-sequence-dag-alert-pipeline-rework carrying (DM'd Larry at 05:28:12Z, HOLD). consecutive_clean=0→1.
 
 
