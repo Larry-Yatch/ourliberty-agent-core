@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T05:26Z UTC (Iter ~3201, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-29T05:31Z UTC (Iter ~3202, Tier 1, consecutive_clean=0)
 
-**Iter ~3201 summary:** ⚠️ Signal (Tier 3→1). forge-wip-redispatch (L1097, review-sequence-dag-alert-pipeline-rework retry1) Tier-4 alert — G-rule vp, no DM, HOLD. dispatch-branch-cleanup Tier-3 silence. Pipeline: PR #745 (p2a-medic) open, Mirror reviewing; p2b-machinery Forge build in progress. Check VIII: Beacon holding for Larry's explicit dispatch direction after "Deprecate, delete the field" at 04:48Z. HOLD unchanged.
+**Iter ~3202 summary:** ⚠️ Signal (Tier 1). L1099 forge-wip-redispatch EXHAUSTED (route=escalate, severity=critical): review-sequence-dag-alert-pipeline-rework-retry1 died WIP-only. Outbox-notifier DM'd Larry at 05:28Z. Tier-4, no dispatch under HOLD. Pipeline: PR #745 (p2a-medic, MERGEABLE) Mirror reviewing (05:15:57Z); p2b-machinery Forge build in progress (no stalls). Check VIII: Beacon holding for Larry's direction post "Deprecate, delete the field." HOLD unchanged.
 
 
