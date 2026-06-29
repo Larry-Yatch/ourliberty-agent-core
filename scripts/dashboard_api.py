@@ -787,6 +787,16 @@ class NewMissionRequest(BaseModel):
     brief: str = Field(..., min_length=1)
     repo: str = Field(..., min_length=1)
     spec_docs: list[str] = Field(default_factory=list)
+    # alert-pipeline-rework P3b: the retrospective Stage B author posts cards as
+    # `phase: 'proposed'` (a suggestion awaiting accept/dismiss) rather than the
+    # default `'drafting'`. Both fields are optional + backward-compatible: an
+    # unset phase keeps the legacy drafting behavior, so existing +New callers
+    # are unchanged. `proposed_by` records the author (e.g. the check id) and
+    # `predraft` carries the structured pre-draft (template/file-key/value/diff
+    # sketch + root_signature) the author attaches for a one-click accept.
+    phase: Optional[str] = None
+    proposed_by: Optional[str] = None
+    predraft: Optional[dict[str, Any]] = None
 
 
 class NewMissionResponse(BaseModel):
@@ -3749,11 +3759,24 @@ def _handle_new_mission(
             },
         )
 
+    # Default to the legacy 'drafting' phase; the only other accepted value is
+    # 'proposed' (P3b retrospective author). Anything else is a 400 so a typo'd
+    # phase can't smuggle an unknown lifecycle state onto the board.
+    phase = body.phase or 'drafting'
+    if phase not in ('drafting', 'proposed'):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                'error': 'invalid phase',
+                'detail': f"phase must be 'drafting' or 'proposed', got {phase!r}",
+            },
+        )
+
     now = now or datetime.now(timezone.utc)
     new_entry: dict[str, Any] = {
         'id': mission_id,
         'name': body.name,
-        'phase': 'drafting',
+        'phase': phase,
         'brief': body.brief,
         'spec_docs': list(body.spec_docs),
         'task_ids': [],
@@ -3761,6 +3784,13 @@ def _handle_new_mission(
         'created': now.date().isoformat(),
         'deferred_reason': None,
     }
+    # Stamp the proposal provenance only for proposed cards so a drafting
+    # mission's shape is byte-for-byte what it was before this field existed.
+    if phase == 'proposed':
+        new_entry['proposed_by'] = body.proposed_by or 'unknown'
+        new_entry['proposed_at'] = now.isoformat()
+        if body.predraft is not None:
+            new_entry['predraft'] = body.predraft
 
     with _NEW_MISSION_LOCK:
         registry = _read_missions_registry(missions_path)

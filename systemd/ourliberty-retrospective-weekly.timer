@@ -1,0 +1,16 @@
+[Unit]
+Description=Weekly elevation retrospective — Monday 7:00am Larry-local (Stage A → Stage B)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/agents/beacon/specs/alert-pipeline-rework.md
+
+[Timer]
+# Monday 7:00am America/Denver — one hour after the CEO digest so the week's
+# elevations are settled before the retrospective mines them. Persistent so a
+# missed firing (host down) runs on next boot; RandomizedDelaySec smooths the
+# Monday-morning timer cluster. MT matches the spec (Mon AM MT).
+OnCalendar=Mon *-*-* 07:00:00 America/Denver
+Persistent=true
+RandomizedDelaySec=180
+Unit=ourliberty-retrospective-weekly.service
+
+[Install]
+WantedBy=timers.target
