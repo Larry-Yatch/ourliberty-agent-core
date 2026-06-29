@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T12:52Z UTC (Iter ~3225, Tier 3, consecutive_clean=7)
+## Status snapshot — updated 2026-06-29T13:25Z UTC (Iter ~3226, Tier 3, consecutive_clean=8)
 
-**Iter ~3225 summary:** ✅ Nominal (iter_clean). Tier 3, consecutive_clean=6→7. No new alerts. PR #749 (p3b-retro-author) STRANDED — mergeable=UNKNOWN (GitHub oscillation continues). APPROVAL_REQUEST DM dropped (reply_chat_id=None). Larry must manually handle PR #749. All daemons alive. HOLD in effect.
+**Iter ~3226 summary:** ✅ Nominal (iter_clean). Tier 3, consecutive_clean=7→8. No new alerts. PR #749 (p3b-retro-author) STRANDED — mergeable=UNKNOWN (GitHub oscillation continues). APPROVAL_REQUEST DM dropped (reply_chat_id=None). Larry must manually handle PR #749. All daemons alive. HOLD in effect. NEW: gh GraphQL 401 (first occurrence) in heal_pipeline_stall.py scan — stall fallback via Supabase succeeded; REST API works. Watching.
 
 
