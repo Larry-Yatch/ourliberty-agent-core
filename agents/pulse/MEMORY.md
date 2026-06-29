@@ -285,9 +285,9 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## G-rule sync-service-deploy-restart-storm-tier4-001 — 1/3 (new, iter ~3044)
+## G-rule sync-service-deploy-restart-storm-tier4-001 — 2/3 (updated iter ~3216)
 
-**Rule:** `source=sync.service, subject=deploy-restart-storm` alerts classify Tier-4 (novel, no translation match). Fire when a PR deploy causes a widely-imported module change and sync.service restarts all 6 daemons. Alert's own `route=digest`; beacon bot correctly silences (no DM). All daemons restart cleanly. Should be Tier-3. Dispatch to Beacon at 3/3 (post-HOLD). First occurrence iter ~3044 (PR #734 deploy, 04:47:02Z).
+**Rule:** `source=sync.service, subject=deploy-restart-storm` alerts classify Tier-4 (novel, no translation match). Fire when a PR deploy causes a widely-imported module change and sync.service restarts all daemons. Alert's own `route=digest`; beacon bot correctly silences (no DM). All daemons restart cleanly. Should be Tier-3. Dispatch to Beacon at 3/3 (post-HOLD). Occurrences: iter ~3044 (1/3, PR #734 deploy, 04:47:02Z); iter ~3216 (2/3, PR #748 deploy, 08:27:16Z, 8 daemons).
 
 ---
 
@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T08:18Z UTC (Iter ~3215, Tier 2, consecutive_clean=0)
+## Status snapshot — updated 2026-06-29T08:34Z UTC (Iter ~3216, Tier 2, consecutive_clean=1)
 
-**Iter ~3215 summary:** ✅ Nominal (iter_clean). Tier 1→2 de-escalation (3 consecutive clean iters). 1 new alert (L1103, doorbell stale p3a-retro-prep approval, Tier-3 silence). PR #748 (p2b-migrate) OPEN — Mirror PID 571806 active (~23 min in, 1500s timeout, ETA ~08:36Z). Forge p3b-retro-author PID 576584 active (build-phase, ~17 min in). beacon-pending stale (mirror-review-p3a-retro-prep, PR #747 merged). HOLD in effect. No new G-rule triggers.
+**Iter ~3216 summary:** ✅ Nominal (iter_clean). Tier 2, consecutive_clean=0→1. 1 new alert (L1104, sync.service deploy-restart-storm, Tier-4 helper / known G-rule 2/3, route=digest, no DM). PR #748 (p2b-migrate) MERGED (fdb31fc9). PR #747 (p3a-retro-prep) confirmed MERGED 07:53:48Z. PR #749 (p3b-retro-author) OPEN, Mirror review queued. Beacon PID 598219 / inbox_watcher PID 598496 / outbox_notifier PID 598531 (new PIDs after restart storm). HOLD in effect. G-rule sync-service-deploy-restart-storm updated 1/3→2/3.
 
 
