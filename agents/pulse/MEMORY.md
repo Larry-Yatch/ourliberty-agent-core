@@ -316,8 +316,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T18:43Z UTC (Iter ~3253, Tier 1)
+## Status snapshot — updated 2026-06-29T18:49Z UTC (Iter ~3254, Tier 1)
 
-**Iter ~3253 summary (2026-06-29T18:43Z):** Two new findings this iter. (1) Larry sent "where are we with prs 751 and 752?" at 12:40 MDT; tier-2 fallback responded at 12:41 but deferred (sandbox limit); directive unhandled at primary Beacon level. (2) PR #752 brand-new open at 18:31Z ("fix(retrospective): post-merge review fixes for #749 (P3b)", Larry-authored); Mirror inbox EMPTY, Forge outbox archived — no auto-dispatch; needs Beacon to dispatch Mirror review post rate-limit; 12 min old, not a stall yet. PR #751 OPEN (UNSTABLE, review-escalated). Beacon rate-limited until 8am MDT 2026-06-30 (14:00Z). Two APPROVAL_REQUEST gaps + "resume sequence" directive still unprocessed. PRIME ratio ~17.08, trend improving. Tier 1, consecutive_clean=0.
+**Iter ~3254 summary (2026-06-29T18:49Z):** PR #752 Mirror review dispatched at 12:45:29 MDT (review-pr-ourliberty-agent-core-752.json in mirror inbox; inbox-watcher running) — prior "no review" finding resolved. PR #753 brand new (18:42Z): "beacon: honor the active-tier pin for the primary call (stop draining Tier 1)", Larry-authored, CLEAN/MERGEABLE, no Mirror review yet (7 min old, below 2h stall threshold; outbox-notifier will dispatch on next scan). PR #751 OPEN (UNSTABLE, review-escalated). Beacon rate-limited until 8am MDT 2026-06-30. Two APPROVAL_REQUEST gaps + "resume sequence" + "where are we with 751/752?" directives still unprocessed at primary Beacon level. PRIME ratio ~17.08, trend improving. Tier 1, consecutive_clean=0.
 
 
