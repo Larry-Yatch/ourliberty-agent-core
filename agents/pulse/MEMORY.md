@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T13:58Z UTC (Iter ~3227, Tier 3, consecutive_clean=9)
+## Status snapshot — updated 2026-06-29T14:27Z UTC (Iter ~3228, Tier 3, consecutive_clean=10)
 
-**Iter ~3227 summary:** ✅ Nominal (iter_clean). Tier 3, consecutive_clean=8→9. No new alerts. PR #749 (p3b-retro-author) STRANDED — mergeable=UNKNOWN (GitHub oscillation continues). All daemons alive. HOLD in effect. gh GraphQL 401 (1st occurrence, iter ~3226) noted — stall fallback succeeded each time, watching for recurrence.
+**Iter ~3228 summary:** ✅ Nominal (iter_clean). Tier 3, consecutive_clean=9→10. 1 Tier-3 alert silenced (dispatch-branch-cleanup: pruned 3 local + 2 remote stale branches, known-pattern). PR #749 (p3b-retro-author) STRANDED — mergeable=UNKNOWN (GitHub oscillation continues). PR #747 MERGED confirmed (07:53:48Z). All daemons alive. HOLD in effect.
 
 
