@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T03:12Z UTC (Iter ~3197, Tier 3, consecutive_clean=0)
+## Status snapshot — updated 2026-06-29T03:42Z UTC (Iter ~3198, Tier 3, consecutive_clean=1)
 
-**Iter ~3197 summary:** ✅ Nominal (iter_clean). **Tier 2→3 DE-ESCALATION** (consecutive_clean=3). 0 new alerts. 0 open PRs. Sync fresh (02:25Z, ~47min, no-change). Daemons healthy (watchdog 03:07:20Z). Pipeline clean. No Telegram activity since 01:14Z. HOLD unchanged. Now in Tier 3 (30-min cadence). 3 clean Tier-3 iters to next de-escalation milestone.
+**Iter ~3198 summary:** ✅ Nominal (iter_clean). Tier 3, consecutive_clean 0→1. 0 new alerts. 0 open PRs. Sync fresh (03:25Z, ~17min, no-change). Daemons healthy (watchdog 03:37:34Z). Pipeline clean. No Telegram activity since 01:14Z. HOLD unchanged. 2 more clean Tier-3 iters to next de-escalation reset.
 
 
