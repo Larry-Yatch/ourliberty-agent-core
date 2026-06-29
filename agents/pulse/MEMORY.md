@@ -322,8 +322,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-29T22:55Z UTC (Iter ~3281, Tier 1)
+## Status snapshot — updated 2026-06-29T23:06Z UTC (Iter ~3282, Tier 1)
 
-**Iter ~3281 summary (2026-06-29T22:55Z):** ⚠️ git worktree proliferation: 102 worktrees (was 106; -4), 91 locked; **15 commits ahead** (was 14); sync ~3h stale. **Mirror IS active** (PID 1101079, reviewing PR #759 rev1 since 22:47Z). **PR #760 stall** — review wedged, session reaped (22:45Z), marker-error retry 1/3 in Mirror inbox. PR #761 queued in Mirror (after #759). 3 new alerts: Tier 4 (ourliberty-health fetch-fail; DM suppressed — dup-delivered + vp translation); Tier 3 × 2 (heal-wedged-review-sessions; doorbell). Watermark=1082. 3 pending approvals. Trailing-30d ratio≈17.11 (trend: improving). Tier 1, consecutive_clean=0.
+**Iter ~3282 summary (2026-06-29T23:06Z):** ⚠️ DIVERGED — git fetch UNBLOCKED (f0d7bcdc5cc24 bad-object worktrees gone), but after fetch: **18 ahead AND 4 behind** origin/main. PRs #753+#756+#757+#758 merged to origin. Needs `git pull --rebase origin/main` (never-auto). Worktrees: 72 total (10 locked/52 prunable) for NEW sha `9dbac304`; proliferation ongoing. Mirror PID 1115568 actively reviewing PR #759 rev1 (fresh regression gate, no-baseline-cache, ~22:59Z). PR #760 DEAD-LETTERED (SIGTERM memory pressure 22:45Z, all retries exhausted; needs fresh review). PR #761 queued in Mirror. 4 new alerts all Tier 3 (heal-pipeline-stall x2, medic x2; all bot-delivered at 22:57Z). Watermark=1086. 3 pending approvals. Trailing-30d ratio≈17.09 (improving). Tier 1, consecutive_clean=0.
 
 
