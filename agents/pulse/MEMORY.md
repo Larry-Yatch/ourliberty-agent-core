@@ -315,8 +315,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T16:29Z UTC (Iter ~3235, Tier 1)
+## Status snapshot — updated 2026-06-29T16:34Z UTC (Iter ~3236, Tier 1)
 
-**Iter ~3235 summary (2026-06-29T16:29Z):** ✅ All mandatory checks (0–5) nominal. No new findings. Source repo clean+up-to-date (HEAD=750cf429). PR #751 still OPEN (mergeStateStatus=UNKNOWN, transient), review-escalated, awaiting Larry decision when Beacon rate-limit clears (8am MDT 2026-06-30). Sequence alert-pipeline-rework PAUSED. Sync showing error (~1h 2min) but under 2h threshold; self-heal pending. All inboxes empty. All Monday sentinels (VIII/IX/X) confirmed exist. PR #747 merge CONFIRMED (07:53:48Z UTC). PRIME ratio ~17.08, trend improving. Tier 1, consecutive_clean=0.
+**Iter ~3236 summary (2026-06-29T16:34Z):** ✅ All mandatory checks (0–5) nominal. No new findings. Sync carry RESOLVED (status=no-change, last_sync=16:27Z). Source repo clean+up-to-date (HEAD=c3876a5d). PR #751 still OPEN (mergeStateStatus=UNKNOWN, transient), review-escalated, awaiting Larry decision when Beacon rate-limit clears (8am MDT 2026-06-30). Sequence alert-pipeline-rework PAUSED. All inboxes empty. All Monday sentinels (VIII/IX/X) confirmed exist. PRIME ratio ~17.08, trend improving. Tier 1, consecutive_clean=0.
 
 
