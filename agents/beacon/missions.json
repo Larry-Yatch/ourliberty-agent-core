@@ -6414,6 +6414,23 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-heal-wip-redispatch-already-merged-suppress-001",
+      "name": "Heal WIP Redispatch Already Merged Suppress 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `heal-wip-redispatch-already-merged-suppress-001`. Last activity 2026-06-29T22:36:17.909085+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "heal-wip-redispatch-already-merged-suppress-001"
+      ],
+      "repo": null,
+      "created": "2026-06-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-29T22:50:20.286254+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-29T22:36:17.909085+00:00"
     }
   ]
 }
