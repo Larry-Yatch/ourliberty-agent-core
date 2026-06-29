@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T00:58Z UTC (Iter ~3189, Tier 3, consecutive_clean=2)
+## Status snapshot — updated 2026-06-29T01:30Z UTC (Iter ~3190, Tier 3, consecutive_clean=3)
 
-**Iter ~3189 summary:** ✅ Nominal (iter_clean). Tier 3, consecutive_clean 1→2. 5 Tier-3 silences (ledger-weekly + check-i + check-viii + 2x sync-push-failed — all from iter ~3188 Monday checks written after iter ~3188's Check 0 ran). Mirror reviewing PR #742 (`docs(spec): alert pipeline rework — 4-phase plan`, dispatched 00:45Z). No stalls. No new directives. Sync push-failed self-healed. Repo HEAD=8a368b88=origin/main, clean. Heal-daemon 00:50:06Z. Monday conditional checks skip (all fired iter ~3188). HOLD unchanged.
+**Iter ~3190 summary:** ✅ Nominal (iter_clean). Tier 3, consecutive_clean 2→3. PR #742 (`docs(spec): alert pipeline rework — 4-phase plan`) auto-merged 01:12:31Z. 1 Tier-4 alert (ourliberty-health sync_freshness post-merge, stale/self-resolved, bot already DM'd Larry at 19:14:27-0600). 1 Tier-3 silence (dispatch-branch-cleanup). PR #743 new (Larry-authored `docs(spec): expand alert-pipeline-rework — Phase 2+3`, < 30 min, pipeline entry pending). Repo HEAD=7aaefc42=origin/main, clean. Heal-daemon 01:20:11Z. HOLD unchanged.
 
 
