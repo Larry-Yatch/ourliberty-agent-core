@@ -174,9 +174,9 @@ PR #717 (fix: suppress spurious watchdog stale-log WARN during active Mirror rev
 
 ---
 
-## G-rule forge-wip-redispatch-exhausted-pr-exists-fp-001 → 3/3 HOLD-DEFERRED (updated iter ~3124)
+## G-rule forge-wip-redispatch-exhausted-pr-exists-fp-001 → DISPATCHED ✅ (iter ~3229), vp
 
-**Rule:** `source=forge-wip-redispatch, route=escalate` exhaustion alerts ("WIP-only auto-recovery EXHAUSTED") fire for tasks whose original PRs already exist. FP class: wip-redispatch retried a task whose output already shipped; retry dying WIP-only is expected. Fix: extend wip-redispatch to check PR existence before declaring exhaustion, OR add `source=forge-wip-redispatch, route=escalate, <pr_exists signal>` → Tier-3 entry. **3/3 reached iter ~3124 (L1110, land-pr731-restore-fix-head-001, PR #731 MERGED; outbox-notifier logged BUILD_ALREADY_MERGED + reconciled sequence step). Dispatch to Beacon deferred under HOLD.** Occurrences: iter ~2702 (L1130/1131); iter ~2705 (L1146); iter ~3124 (L1110).
+**Rule:** `source=forge-wip-redispatch, route=escalate` exhaustion alerts ("WIP-only auto-recovery EXHAUSTED") fire for tasks whose original PRs already exist. FP class: wip-redispatch retried a task whose output already shipped; retry dying WIP-only is expected. Fix: extend wip-redispatch to check PR existence before declaring exhaustion. 3/3 reached iter ~3124; HOLD-DEFERRED until iter ~3229. HOLD lifted 2026-06-29; direction-ask-forge-wip-redispatch-exhausted-pr-exists-fp-001.json dispatched to Beacon inbox at iter ~3229. verification_pending. Occurrences: iter ~2702 (L1130/1131); iter ~2705 (L1146); iter ~3124 (L1110).
 
 ---
 
@@ -279,9 +279,9 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## G-rule decision-needed-approval-forge-dispatch-no-target-repo-001 — 3/3 HOLD-DEFERRED (updated iter ~3048)
+## G-rule decision-needed-approval-forge-dispatch-no-target-repo-001 → DISPATCHED ✅ (iter ~3229), vp
 
-**Rule:** When outbox-notifier emits an `approval_request` via the "no-session decision-needed" (REVIEW_ESCALATE) path and Larry approves via Telegram, Beacon dispatches a task to Forge inbox — but the envelope has `target_repo=None`. Forge inbox_watcher dead-letters with: `worktree: no canonical path for target_repo=None`. Additionally: the DM drops earlier — `beacon replan APPROVAL_REQUEST cannot route approval DM (reply_chat_id=None), falling through` — so Larry never gets to approve. Both failures stem from the no-session REVIEW_ESCALATE path losing task metadata. Fix: Beacon's REVIEW_ESCALATE replan dispatch path must carry `target_repo` AND `reply_chat_id` from original task metadata. Occurrences: iter ~3006 (1/3, PR #731); iter ~3043 (2/3, PR #733, 04:43:26Z); iter ~3048 (3/3, PR #733, 05:14:28Z). Dispatch to Beacon deferred under HOLD until strategy decided. **Alternate unblock path:** direction-ask-pr731-nextcount-guard-fix-001 dispatched iter ~3011 — Beacon/Forge apply medic's concrete fix directly to PR #731 branch, bypassing the broken approval flow.
+**Rule:** When outbox-notifier emits an `approval_request` via the "no-session decision-needed" (REVIEW_ESCALATE) path, the Forge dispatch envelope has `target_repo=None` AND DM drops (`reply_chat_id=None`). Both failures stem from the no-session REVIEW_ESCALATE path not carrying task metadata through the replan. Fix: Beacon's REVIEW_ESCALATE replan dispatch path must preserve `target_repo` and `reply_chat_id` from original task metadata. 3/3 reached iter ~3048; HOLD-DEFERRED until iter ~3229. HOLD lifted 2026-06-29; direction-ask-no-session-review-escalate-metadata-001.json dispatched to Beacon inbox at iter ~3229. verification_pending. Occurrences: iter ~3006 (1/3, PR #731); iter ~3043 (2/3, PR #733); iter ~3048 (3/3, PR #733).
 
 ---
 
@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T14:27Z UTC (Iter ~3228, Tier 3, consecutive_clean=10)
+## Status snapshot — updated 2026-06-29T15:09Z UTC (Iter ~3229, Tier 3, consecutive_clean=11)
 
-**Iter ~3228 summary:** ✅ Nominal (iter_clean). Tier 3, consecutive_clean=9→10. 1 Tier-3 alert silenced (dispatch-branch-cleanup: pruned 3 local + 2 remote stale branches, known-pattern). PR #749 (p3b-retro-author) STRANDED — mergeable=UNKNOWN (GitHub oscillation continues). PR #747 MERGED confirmed (07:53:48Z). All daemons alive. HOLD in effect.
+**Iter ~3229 summary:** ✅ Nominal. Tier 3, consecutive_clean=10→11. 2 Tier-3 alerts silenced (doorbell, review-ceiling-fit). PR #749 (p3b-retro-author): Mirror actively reviewing (~4 min in), MERGEABLE. PR #750 (deprecate-burn-rate-gate-checkviii-001): Mirror review queued; Forge build complete. HOLD LIFTED. 2 HOLD-DEFERRED G-rules dispatched to Beacon: forge-wip-redispatch-exhausted-pr-exists-fp-001 + decision-needed-approval-forge-dispatch-no-target-repo-001. 1 stale pending approval: mirror-review-p3a-retro-prep (PR #747 MERGED, Beacon to GC). All daemons alive. Check I already fired today (dm_route suppressed repeat). PRIME ratio 17.07, trend improving.
 
 
