@@ -316,8 +316,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T18:04Z UTC (Iter ~3248, Tier 1)
+## Status snapshot — updated 2026-06-29T18:08Z UTC (Iter ~3249, Tier 1)
 
-**Iter ~3248 summary (2026-06-29T18:00Z):** ⚠️ Carries. Source repo HEAD=4d16c994=origin/main. Sync no-change (17:27Z). Daemons healthy (watchdog 12:00 MDT). Heartbeat 17:53Z. PR #747 MERGED, PR #750 MERGED (prior). PR #751 OPEN, review-escalated, no Approvals tab gate. Beacon rate-limited until 8am MDT 2026-06-30. Sequence alert-pipeline-rework PAUSED. Larry directive "resume sequence" unprocessed (rate-limit). Pipeline stall: 9 tasks FORGE_NO_PR_SKIP'd (no stalls). Inboxes empty. **NEW [blue]:** heal-systemd-install-drift auto-installed 6 new systemd units (held-alert-backstop.{service,timer}, held-alert-persistence.{service,timer}, retrospective-weekly.{service,timer}) from A-vs-B PR merges — healer working correctly. Two APPROVAL_REQUEST gaps (forge-wip-redispatch-exhausted + decision-needed-approval) still lost; re-dispatch to Beacon pending rate-limit clear. PRIME ratio ~17.08, trend improving. Tier 1, consecutive_clean=0.
+**Iter ~3249 summary (2026-06-29T18:08Z):** ✅ Nominal checks. Source repo HEAD=0e6b8758=origin/main. Sync no-change (17:27Z). Daemons healthy (watchdog 12:05 MDT). Heartbeat 18:04Z. PR #751 OPEN, review-escalated, awaiting Beacon rate-limit clear (8am MDT 2026-06-30). 0 new alerts, inboxes empty, pipeline stall no stalls. All carry signals unchanged from iter ~3248: Beacon rate-limited, Larry directive "resume sequence" unprocessed, two APPROVAL_REQUEST gaps (forge-wip-redispatch-exhausted + decision-needed-approval) pending re-dispatch post rate-limit. PRIME ratio ~17.08, trend improving. Tier 1, consecutive_clean=0.
 
 
