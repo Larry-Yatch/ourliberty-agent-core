@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T12:18Z UTC (Iter ~3224, Tier 3, consecutive_clean=6)
+## Status snapshot — updated 2026-06-29T12:52Z UTC (Iter ~3225, Tier 3, consecutive_clean=7)
 
-**Iter ~3224 summary:** ✅ Nominal (iter_clean). Tier 3, consecutive_clean=5→6. 1 new alert (L1030 doorbell Tier-3 silenced). PR #749 (p3b-retro-author) STRANDED — mergeable=UNKNOWN (oscillating between UNKNOWN/MERGEABLE, GitHub eventual-consistency churn). APPROVAL_REQUEST DM dropped (reply_chat_id=None). Larry must manually handle PR #749. All daemons alive. HOLD in effect.
+**Iter ~3225 summary:** ✅ Nominal (iter_clean). Tier 3, consecutive_clean=6→7. No new alerts. PR #749 (p3b-retro-author) STRANDED — mergeable=UNKNOWN (GitHub oscillation continues). APPROVAL_REQUEST DM dropped (reply_chat_id=None). Larry must manually handle PR #749. All daemons alive. HOLD in effect.
 
 
