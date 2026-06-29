@@ -316,8 +316,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T19:10Z UTC (Iter ~3257, Tier 1)
+## Status snapshot — updated 2026-06-29T19:46Z UTC (Iter ~3260, Tier 1)
 
-**Iter ~3257 summary (2026-06-29T19:10Z):** G-rule sync-service-deploy-restart-storm direction-ask CONFIRMED processed by Beacon at 19:05:08Z ($0.45); APPROVAL_REQUEST `alert-translation-sync-deploy-restart-storm-001` delivered to Larry at 13:07:05 MDT — Larry needs to reply "approve" to trigger Forge config-only PR. PR #755 new (19:05:23Z, "fix: decouple agents/ state-root from per-tier auth HOME swap", CLEAN/MERGEABLE, below 2h threshold). Mirror review #752 re-started post-storm (18:58:04Z); reviews #753/#754 queued. Beacon rate-limited until 8am MDT 2026-06-30; subprocess functional. beacon-pending: 2 items (1 stale p3a-retro-prep + 1 valid alert-translation). PRIME ratio ~17.10, trend improving. Tier 1, consecutive_clean=0.
+**Iter ~3260 summary (2026-06-29T19:43Z):** All mandatory checks clean. Mirror PID 870322 actively reviewing PR #757 (alert-translation-sync-deploy-restart-storm-001, 25 min in); regression-check subprocess running normally under 1500s limit. 7 PRs open in Mirror queue (#753–#759). PR #752 MERGED (be5263ef). 0 new alerts (watermark=1068). Beacon rate-limited until 8am MDT 2026-06-30. PRIME ratio 17.10, trend improving. Tier 1, consecutive_clean=0. Stale worktrees for regression-gate-steady-state-warmer-001 (PR #751 MERGED) noted (blue, watchdog healthy).
 
 
