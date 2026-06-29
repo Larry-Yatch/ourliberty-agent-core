@@ -316,8 +316,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T20:23Z UTC (Iter ~3264, Tier 2)
+## Status snapshot — updated 2026-06-29T20:41Z UTC (Iter ~3265, Tier 2)
 
-**Iter ~3264 summary (2026-06-29T20:23Z):** All mandatory checks clean. PR #760 Mirror review dispatched at 14:10:29 MDT (review-pr-ourliberty-agent-core-760.json). Mirror attempt 2 on PR #757 still active (~24 min, watchdog=healthy, no wedge). 8 PRs open (#753–#760). 0 new alerts (watermark=1068). Beacon rate-limited until 8am MDT 2026-06-30 (14:00Z). PRIME ratio 17.10, trend improving. Tier 2, consecutive_clean=1.
+**Iter ~3265 summary (2026-06-29T20:41Z):** All mandatory checks clean. PR #757 Mirror REVIEW_PASS at 14:30Z MDT; AUTO_MERGE_HELD behind #759 (alert-translations.json overlap). PR #755 REVIEW_PASS, held behind #753. PR #754 REVIEW_PASS, held behind #757. Mirror queue 6 tasks: #756 active (regression check PID 933585), #758/#759/#753-rev1/#754/#760 queued. Beacon bot restarted 19:45Z (409 burst self-resolved), now PID 890722, healthy. gh 401 WARN at 20:37Z (sub-threshold, watch). 1 new alert (L1069 review-pass Tier-3 silenced, watermark=1069). Beacon rate-limited until 8am MDT 2026-06-30 (14:00Z). G-rule sync-service-deploy-restart-storm-tier4-001 vp — PR #757 merge pending. Tier 2, consecutive_clean=2.
 
 
