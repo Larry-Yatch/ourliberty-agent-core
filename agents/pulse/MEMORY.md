@@ -316,8 +316,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T18:08Z UTC (Iter ~3249, Tier 1)
+## Status snapshot — updated 2026-06-29T18:25Z UTC (Iter ~3250, Tier 1)
 
-**Iter ~3249 summary (2026-06-29T18:08Z):** ✅ Nominal checks. Source repo HEAD=0e6b8758=origin/main. Sync no-change (17:27Z). Daemons healthy (watchdog 12:05 MDT). Heartbeat 18:04Z. PR #751 OPEN, review-escalated, awaiting Beacon rate-limit clear (8am MDT 2026-06-30). 0 new alerts, inboxes empty, pipeline stall no stalls. All carry signals unchanged from iter ~3248: Beacon rate-limited, Larry directive "resume sequence" unprocessed, two APPROVAL_REQUEST gaps (forge-wip-redispatch-exhausted + decision-needed-approval) pending re-dispatch post rate-limit. PRIME ratio ~17.08, trend improving. Tier 1, consecutive_clean=0.
+**Iter ~3250 summary (2026-06-29T18:25Z):** ⚠️ EROFS bind-drift event (18:15–18:20Z): 13 alerts from `heal-claude-json-bind-drift` — all Tier-3 silenced. Root cause: interactive Claude Code session replacing `~/.claude.json`. Healer auto-repaired 6 services; cycle repair-failed initially but self-recovered (PID 828241). 6 services still-dangled (healer suppressed restarts). All services alive per ps. Post-session: `sudo systemctl restart` needed for 6 still-dangled services. PR #751 OPEN (review-escalated, Beacon rate-limited until 8am MDT 2026-06-30 = 14:00Z). Larry directive "resume sequence" unprocessed. Two APPROVAL_REQUEST gaps pending re-dispatch post rate-limit. PRIME ratio ~17.08, trend improving. Tier 1, consecutive_clean=0.
 
 
