@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T06:54Z UTC (Iter ~3210, Tier 3, consecutive_clean=0)
+## Status snapshot — updated 2026-06-29T07:30Z UTC (Iter ~3211, Tier 3, consecutive_clean=1)
 
-**Iter ~3210 summary:** ✅ Nominal (iter_clean). **Tier 2→3 de-escalation** (consecutive_clean=3 reached; reset to 0 at Tier 3). 0 new alerts. All checks clean. **PR #746 (p2b-machinery) MERGED** (b966e8af). p3a-retro-prep Forge building (PID 530136, ~6 min); p2b-migrate queued in inbox. Check VIII: Beacon holding under HOLD. forge-wip-redispatch EXHAUSTED for review-sequence-dag-alert-pipeline-rework (HOLD).
+**Iter ~3211 summary:** ✅ Nominal (iter_clean). Tier 3, consecutive_clean=0→1. 1 new alert (L1101 ledger weekly $1184.79 +37.9%, Tier-3 silence). PR #747 (p3a-retro-prep) OPEN — Mirror regression check running (PID 545155, ~8 min into 900s timeout). Forge PID 530136 (resume=52f7ee12) alive post-PR-open. p2b-migrate queued. Check VIII: Beacon holding under HOLD. forge-wip-redispatch EXHAUSTED (HOLD). No new G-rule triggers.
 
 
