@@ -71,6 +71,13 @@ TRANSLATIONS_FILE = Path(__file__).resolve().parent.parent / 'config' / 'alert-t
 # `digest` (routine). Subject-prefix keyed; default = routine. Pulse-tunable.
 SIGNIFICANCE_FILE = Path(__file__).resolve().parent.parent / 'config' / 'alert-significance.json'
 
+# Graduation registry (alert-pipeline-rework B4). The incremental-migration
+# control surface for the hybrid DM gate: a source listed in `migrated_sources`
+# has its routine (non-critical) alerts defaulted to its migrated route (`hold`)
+# instead of the global escalate default. Only `outbox-notifier` is migrated
+# initially (S1); P3 names the rest. Source-keyed exact match; Pulse-tunable.
+GRADUATION_FILE = Path(__file__).resolve().parent.parent / 'config' / 'alert-graduation-registry.json'
+
 CRITICAL_COOLDOWN_SEC = 10 * 60       # 10 min — terse and load-bearing
 WARNING_COOLDOWN_SEC = 60 * 60        # 60 min — Larry's Dial 3 pick
 INFO_COOLDOWN_SEC = 6 * 60 * 60       # 6 hr — routine housekeeping; longest window
@@ -347,8 +354,18 @@ def append_alert(
     # lane (no DM); everything else defaults to escalate (fail-loud). A caller
     # that passes an explicit route overrides this — an info emitter that wants
     # a DM passes route='escalate' itself.
+    #
+    # B4 (alert-pipeline-rework): a GRADUATED source's routine alerts default to
+    # its migrated route (`hold`) instead — the incremental-migration control
+    # surface. This applies only to the default (route is None); an explicit
+    # caller route still wins, and the critical-forces-escalate guard below (B2)
+    # still fires, so a migrated source's `critical` alerts always DM.
     if route is None:
-        route = 'digest' if severity == 'info' else DEFAULT_ROUTE
+        graduated = graduated_route(source)
+        if graduated is not None:
+            route = graduated
+        else:
+            route = 'digest' if severity == 'info' else DEFAULT_ROUTE
     # B2 (alert-pipeline-rework): a `critical` alert ALWAYS DMs. Force escalate
     # regardless of any caller-supplied route, so a caller can never accidentally
     # `hold` or `digest` a critical and silence it. This is the emit-time half of
@@ -681,6 +698,65 @@ def classify_route(source: str, subject: Optional[str], healed: bool) -> str:
     if not healed:
         return 'escalate'
     return 'closure' if is_significant(source, subject) else 'digest'
+
+
+# ---------- graduation registry (alert-pipeline-rework B4: incremental migration) ----------
+
+
+_GRADUATION_CACHE: Optional[dict] = None
+_GRADUATION_MTIME: Optional[float] = None
+
+
+def _load_graduation() -> dict:
+    """Read config/alert-graduation-registry.json, reloading on mtime change
+    (same long-running-process rationale as the significance/translation caches).
+    Returns the parsed dict, or {} if the file is missing/malformed — in which
+    case every source is treated as un-migrated (the conservative default: an
+    un-migrated source keeps its DM-by-default escalate behavior, so a missing
+    or broken registry fails loud, never silently holding an alert)."""
+    global _GRADUATION_CACHE, _GRADUATION_MTIME
+    try:
+        mtime: Optional[float] = GRADUATION_FILE.stat().st_mtime
+    except OSError:
+        mtime = None
+    if _GRADUATION_CACHE is not None and mtime == _GRADUATION_MTIME:
+        return _GRADUATION_CACHE
+    try:
+        with open(GRADUATION_FILE, encoding='utf-8') as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            data = {}
+    except (OSError, json.JSONDecodeError):
+        data = {}
+    _GRADUATION_CACHE = data
+    _GRADUATION_MTIME = mtime
+    return data
+
+
+def graduated_route(source: str) -> Optional[str]:
+    """Return the migrated default route for `source`, or None if un-migrated.
+
+    The graduation registry (config/alert-graduation-registry.json) is the
+    incremental-migration control surface (alert-pipeline-rework B4): only the
+    sources listed under `migrated_sources` have their routine (non-critical)
+    alerts defaulted into the hybrid DM gate (`hold`) instead of the global
+    escalate default. A source absent from the registry is un-migrated and keeps
+    the severity-based default.
+
+    The registry's mapped value must be a recognized route (VALID_ROUTES) —
+    typically `hold`; an unrecognized value (a typo) returns None so the source
+    falls back to its DM-by-default behavior rather than silently mis-routing.
+    `append_alert` consults this only when the caller passes no explicit route,
+    and the critical-forces-escalate guard still fires afterward, so a migrated
+    source's critical alerts always DM."""
+    data = _load_graduation()
+    migrated = data.get('migrated_sources')
+    if not isinstance(migrated, dict):
+        return None
+    route = migrated.get(source)
+    if isinstance(route, str) and route in VALID_ROUTES:
+        return route
+    return None
 
 
 # ---------- notification writer (D3.5 5a-followup: chain-completion DMs) ----------
