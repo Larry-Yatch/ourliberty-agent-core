@@ -322,8 +322,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-29T22:13Z UTC (Iter ~3276, Tier 1)
+## Status snapshot — updated 2026-06-29T22:21Z UTC (Iter ~3277, Tier 1)
 
-**Iter ~3276 summary (2026-06-29T22:13Z):** ⚠️ git worktree proliferation: 106 worktrees; **8 commits ahead** (compounding); sync 2h15m stale. **KEY POSITIVE: Larry approved 'Go' at 22:10Z — `regression-warmer-worktree-leak-cleanup-001` dispatched to Forge inbox. Root cause fix now in pipeline.** Forge active on PR #759 revision-1 (regression tests ~18 min); worktree cleanup queued after. beacon-pending-approvals: 1 item (mirror-review-p3a-retro-prep, 14.6h stale, chat_id=None). Check 0 clean (0 new alerts, watermark=1075). No stalls. Watchdog healthy 22:09Z. Trailing-30d ratio≈17.02 (trend: improving). Tier 1, consecutive_clean=0. Beacon rate-limited until 14:00Z 2026-06-30. G-rule APPROVAL_REQUEST_LOST re-dispatches deferred until rate-limit lifts.
+**Iter ~3277 summary (2026-06-29T22:21Z):** ⚠️ git worktree proliferation: 106 worktrees, 91 locked; **9 commits ahead** (compounding); sync 2h22m stale. **ACTIVE REMEDIATION: Forge IN PREFLIGHT for `regression-warmer-worktree-leak-cleanup-001` (PID 1059036). Beacon session ACTIVE (PID 1058962, processing notify-pr-754 Mirror PASS). Beacon "rate-limited until 14:00Z 2026-06-30" carry from ~3276 appears WRONG or lifted early — Beacon ran a new session at 22:17Z.** PR #754 Mirror PASSED (AUTO_MERGE_HELD blocker=#759). PR #756 merged (15:31Z) + BASELINE_WARM spawned (proliferation continues until cleanup PRs merge). beacon-pending-approvals: 1 (mirror-review-p3a-retro-prep, 14.7h+, chat_id=None). G-rule APPROVAL_REQUEST_LOST re-dispatches may be feasible now (Beacon active). Check 0: 0 new alerts, watermark=1075. No stalls. Watchdog healthy 22:14Z. Trailing-30d ratio≈17.04 (trend: improving). Tier 1, consecutive_clean=0.
 
 
