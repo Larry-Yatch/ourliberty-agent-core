@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T10:14Z UTC (Iter ~3220, Tier 3, consecutive_clean=2)
+## Status snapshot — updated 2026-06-29T10:44Z UTC (Iter ~3221, Tier 3, consecutive_clean=3)
 
-**Iter ~3220 summary:** ✅ Nominal (iter_clean). Tier 3, consecutive_clean=1→2. No new alerts (larry-alerts.jsonl compacted 1105→1028 lines, watermark correctly adjusted). All checks clean. PR #749 (p3b-retro-author) STRANDED — Beacon processed REVIEW_ESCALATE (02:48:53Z–02:54:58Z, $0.88) but APPROVAL_REQUEST DM dropped (reply_chat_id=None, G-rule decision-needed-approval-forge-dispatch-no-target-repo-001). Larry must manually approve or PR #749 stays blocked. All daemons alive. HOLD in effect.
+**Iter ~3221 summary:** ✅ Nominal (iter_clean). Tier 3, consecutive_clean=2→3. 1 new alert (L1029 catalog-accuracy-drift Tier-3 silenced). All checks clean. PR #749 (p3b-retro-author) STRANDED — mergeable=MERGEABLE (resolved from UNKNOWN) but mergeStateStatus=UNSTABLE (mirror-review CI=FAILURE at 08:48:48Z). APPROVAL_REQUEST DM still dropped (reply_chat_id=None). Larry must manually handle PR #749. All daemons alive. HOLD in effect.
 
 
