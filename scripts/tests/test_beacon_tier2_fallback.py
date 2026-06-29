@@ -615,6 +615,29 @@ class WeeklyProbeTest(_TempDirBase):
         self.healer.HEARTBEAT_FILE = self.tmp / 'blackboard' / 'probe.heartbeat'
         self.healer.STATE_FILE = self.tmp / 'state' / 'probe.json'
         self.healer.KILL_SWITCH = self.tmp / 'healers.disabled'
+        # Isolate the OAuth-probe DM assertions from the parity check that
+        # run() now performs unconditionally: point TIER2_HOME / REPO_SYSTEMD /
+        # TIER1_HOME at parity-clean tmp fixtures so check_provisioning_parity
+        # finds no drift and never fires its own append_alert. Mirrors
+        # test_tier2_provisioning_parity.py's setUp.
+        t1 = self.tmp / 'tier1'
+        t2 = self.tmp / 'tier2'
+        for h in (t1, t2):
+            (h / '.claude').mkdir(parents=True)
+            (h / '.claude.json').write_text(
+                json.dumps({'mcpServers': {'workspace-mcp': {}}}))
+        (t2 / '.claude' / '.credentials.json').write_text('{}')
+        sysd = self.tmp / 'systemd'
+        sysd.mkdir()
+        for unit in self.healer.SESSION_UNITS:
+            (sysd / unit).write_text(
+                f'[Service]\nReadWritePaths=/home/larry/agents {t2}\n')
+        self.healer.TIER2_HOME = str(t2)
+        self.healer.REPO_SYSTEMD = sysd
+        _saved_t1 = self.healer.active_tier.TIER1_HOME
+        self.healer.active_tier.TIER1_HOME = str(t1)
+        self.addCleanup(
+            setattr, self.healer.active_tier, 'TIER1_HOME', _saved_t1)
 
     def _mock_subprocess(self, stdout: str, stderr: str = '',
                          returncode: int = 0):

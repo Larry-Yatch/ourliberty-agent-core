@@ -389,6 +389,12 @@
     }
   },
   "heal-tier2-weekly-probe": {
+      "tier2_provisioning_drift": {
+        "severity": "WARNING",
+        "tier": "SOON",
+        "plain_language_summary": "Tier 2 (the fallback Claude account) is not at capability parity with Tier 1, so if work rotates to Tier 2 the agent runs degraded. Authentication is fine -- this is about the surrounding provisioning: a missing MCP server (the agent silently loses those tools), or a session-running systemd unit that no longer carves the Tier-2 home into ReadWritePaths (Tier-2 transcripts hit EROFS and --resume fails, silently losing the session). The weekly Tier-2 probe now checks this; the raw alert lists exactly which facet drifted.",
+        "recommended_action": "Read the drift list in the raw message and bring Tier 2 to parity per docs/runbooks/tier1-tier2-switch-capability-audit.md. MCP gap: define the server in a project .mcp.json (tier-proof) or authenticate it under TIER2_HOME. ReadWritePaths gap: add TIER2_HOME to the unit ReadWritePaths and reinstall via the install-drift healer. This is SOON not NOW -- Tier 1 is healthy; the risk only materializes on a rotation to Tier 2."
+      },
     "tier2_weekly_probe_failed": {
       "severity": "WARNING",
       "tier": "SOON",
