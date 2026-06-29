@@ -322,8 +322,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-29T23:23Z UTC (Iter ~3283, Tier 1)
+## Status snapshot — updated 2026-06-29T23:31Z UTC (Iter ~3284, Tier 1)
 
-**Iter ~3283 summary (2026-06-29T23:23Z):** ✅ Source repo CLEAN (divergence from ~3282 resolved; wrapper rebased+pushed at 23:10:48Z). PR #753 MERGED (21:09:28Z). Mirror review PID 1127525 ACTIVE (23:13Z, PR #759 rev1). PR #762 opened (23:14:36Z, "fix heal-pipeline-stall stop paging on cold starts"). ⚠️ Inbox-watcher Tasks 500/512, 3.7G memory, 6 D-state test subprocesses (I/O wait). Beacon RATE-LIMITED until 14:00 UTC June 30. Worktrees 81 total/20 locked (proliferating). 3 pending approvals blocked. Watermark=1087. Trailing-30d ratio≈17.06 (improving). Tier 1, consecutive_clean=0.
+**Iter ~3284 summary (2026-06-29T23:31Z):** ✅ All mandatory checks CLEAN. Source repo up-to-date (HEAD=b613de33). Sync nominal (23:19Z). Mirror review ACTIVE (PIDs 1134511/1140235, PR #759 rev1 WeeklyProbeTest step). PR #762 Mirror review dispatched 23:25Z. Inbox-watcher memory normalized (548MB). ⚠️ Worktrees 108/53 locked (was 81/20 — proliferating rapidly; PR #761 fix queued in Mirror behind #759). Beacon RATE-LIMITED until ~14:00 UTC June 30. 3 pending approvals blocked. Watermark=1088. Trailing-30d ratio≈17.07 (improving). Tier 1, consecutive_clean=1.
 
 
