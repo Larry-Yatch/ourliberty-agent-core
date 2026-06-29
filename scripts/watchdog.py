@@ -281,7 +281,7 @@ def _check_auto_restart(service_name: str, friendly: str) -> dict:
         # Surface the recovery event so Larry knows watchdog acted.
         larry_alerts.append_alert(
             source='watchdog',
-            severity='warning',
+            severity='info',
             subject=service_name,
             message=f'{friendly} was down; watchdog auto-restarted it.',
         )

@@ -82,7 +82,7 @@ class AppendAlertTest(_IsolatedQueueTest):
 
     def test_invalid_severity_rejected(self):
         result = larry_alerts.append_alert(
-            source='watchdog', severity='info', message='x',
+            source='watchdog', severity='bogus', message='x',
         )
         self.assertFalse(result)
         self.assertFalse(larry_alerts.ALERTS_FILE.exists())
@@ -162,6 +162,63 @@ class CooldownTest(_IsolatedQueueTest):
                 source='watchdog', severity='critical',
                 subject='disk', message='second',
             ))
+
+
+class InfoSeverityTest(_IsolatedQueueTest):
+    """Phase 1b (alert-pipeline-rework): the `info` severity below `warning`."""
+
+    def test_info_is_valid_severity(self):
+        self.assertIn('info', larry_alerts.VALID_SEVERITIES)
+
+    def test_info_appends_and_defaults_to_digest(self):
+        ok = larry_alerts.append_alert(
+            source='watchdog', severity='info',
+            subject='ourliberty-mirror-bot', message='auto-restarted',
+        )
+        self.assertTrue(ok)
+        record = json.loads(larry_alerts.ALERTS_FILE.read_text().strip())
+        self.assertEqual(record['severity'], 'info')
+        # No DM: an info alert with no explicit route lands on the digest lane.
+        self.assertEqual(record['route'], 'digest')
+
+    def test_info_respects_explicit_route(self):
+        # An info emitter that explicitly wants a DM can still pass escalate.
+        ok = larry_alerts.append_alert(
+            source='watchdog', severity='info',
+            subject='disk', message='loud info', route='escalate',
+        )
+        self.assertTrue(ok)
+        record = json.loads(larry_alerts.ALERTS_FILE.read_text().strip())
+        self.assertEqual(record['route'], 'escalate')
+
+    def test_info_cooldown_window_is_longest(self):
+        self.assertEqual(
+            larry_alerts._cooldown_window('info'), larry_alerts.INFO_COOLDOWN_SEC)
+        self.assertGreater(
+            larry_alerts.INFO_COOLDOWN_SEC, larry_alerts.WARNING_COOLDOWN_SEC)
+        self.assertGreater(
+            larry_alerts.WARNING_COOLDOWN_SEC, larry_alerts.CRITICAL_COOLDOWN_SEC)
+
+    def test_info_and_warning_independent_buckets(self):
+        a = larry_alerts.append_alert(
+            source='watchdog', severity='info',
+            subject='disk', message='i', route='escalate',
+        )
+        b = larry_alerts.append_alert(
+            source='watchdog', severity='warning',
+            subject='disk', message='w',
+        )
+        self.assertTrue(a)
+        self.assertTrue(b)
+
+    def test_info_glyph_in_raw_body(self):
+        text = larry_alerts._render_raw_alert_body({
+            'source': 'watchdog', 'severity': 'info',
+            'subject': 'disk', 'message': 'routine',
+        })
+        self.assertIn('ℹ', text)
+        self.assertNotIn('⚠', text)
+        self.assertNotIn('🚨', text)
 
 
 class ReadPendingTest(_IsolatedQueueTest):

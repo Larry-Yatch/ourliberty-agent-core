@@ -1197,7 +1197,7 @@ def _emit_summary(res: ProposeResult, commit_status: str, dry_run: bool) -> None
     # set (idempotent flagging means a quiet lane re-alerts nothing next tick).
     if res.flagged_stuck:
         larry_alerts.append_alert(
-            source='missions-autoregister', severity='warning',
+            source='missions-autoregister', severity='info',
             message=(f'{len(res.flagged_stuck)} proposed card(s) have sat past '
                      f'{STUCK_PROPOSAL_TTL_DAYS}d with no shipped-PR match and need a '
                      f'keep/drop decision: {res.flagged_stuck}'),

@@ -73,8 +73,9 @@ SIGNIFICANCE_FILE = Path(__file__).resolve().parent.parent / 'config' / 'alert-s
 
 CRITICAL_COOLDOWN_SEC = 10 * 60       # 10 min — terse and load-bearing
 WARNING_COOLDOWN_SEC = 60 * 60        # 60 min — Larry's Dial 3 pick
+INFO_COOLDOWN_SEC = 6 * 60 * 60       # 6 hr — routine housekeeping; longest window
 
-VALID_SEVERITIES = ('warning', 'critical')
+VALID_SEVERITIES = ('info', 'warning', 'critical')
 
 # Routing destinations (fix-first / notify-on-outcome, 2026-06-03). Orthogonal
 # to severity (severity still buckets cooldown; route decides destination):
@@ -125,7 +126,11 @@ def _cooldown_path(severity: str, key: str) -> Path:
 
 
 def _cooldown_window(severity: str) -> int:
-    return CRITICAL_COOLDOWN_SEC if severity == 'critical' else WARNING_COOLDOWN_SEC
+    if severity == 'critical':
+        return CRITICAL_COOLDOWN_SEC
+    if severity == 'info':
+        return INFO_COOLDOWN_SEC
+    return WARNING_COOLDOWN_SEC
 
 
 def in_cooldown(severity: str, key: str, now: Optional[float] = None) -> bool:
@@ -292,7 +297,7 @@ def append_alert(
     message: str,
     subject: Optional[str] = None,
     suggested_action: Optional[str] = None,
-    route: str = DEFAULT_ROUTE,
+    route: Optional[str] = None,
 ) -> bool:
     """Append one alert if not in cooldown.
 
@@ -301,15 +306,17 @@ def append_alert(
 
     Args:
         source: usually 'watchdog' or 'sentinel'.
-        severity: 'warning' or 'critical'.
+        severity: 'info', 'warning', or 'critical'. An 'info' alert defaults to
+            the digest lane (no DM) unless route is given explicitly.
         message: short human-readable description for the DM body.
         subject: optional dedup-key suffix. Recommended — without it, all
             alerts from one source share a single cooldown bucket.
         suggested_action: optional shell command the operator can run.
-        route: 'escalate' (DM now — DEFAULT), 'closure' (DM a one-line
-            self-healed confirmation), or 'digest' (no DM; surfaced in the
-            daily CEO digest). An unknown value falls back to 'escalate' so a
-            mistake over-notifies rather than silently drops.
+        route: 'escalate' (DM now), 'closure' (DM a one-line self-healed
+            confirmation), or 'digest' (no DM; surfaced in the daily CEO
+            digest). Defaults to 'digest' for severity=='info' and 'escalate'
+            otherwise. An unknown value falls back to 'escalate' so a mistake
+            over-notifies rather than silently drops.
     """
     refuse_under_test('larry-alerts')
     if severity not in VALID_SEVERITIES:
@@ -322,6 +329,12 @@ def append_alert(
         except Exception:
             pass
         return False
+    # Route default depends on severity: routine `info` defaults to the digest
+    # lane (no DM); everything else defaults to escalate (fail-loud). A caller
+    # that passes an explicit route overrides this — an info emitter that wants
+    # a DM passes route='escalate' itself.
+    if route is None:
+        route = 'digest' if severity == 'info' else DEFAULT_ROUTE
     if route not in VALID_ROUTES:
         # Fail-loud: an invalid route degrades to escalate (a DM), never to a
         # silent drop.
@@ -901,7 +914,12 @@ def _render_raw_alert_body(record: dict) -> str:
     detail footer of matched alerts AND for the fallback render of unmatched
     alerts."""
     severity = record.get('severity', 'warning')
-    emoji = '🚨' if severity == 'critical' else '⚠'
+    if severity == 'critical':
+        emoji = '🚨'
+    elif severity == 'info':
+        emoji = 'ℹ'
+    else:
+        emoji = '⚠'
     source = record.get('source', '?')
     subject = record.get('subject')
     header = f'{emoji} {source}'
@@ -1062,9 +1080,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     aa.add_argument('--subject', default=None)
     aa.add_argument('--suggested-action', dest='suggested_action', default=None)
     aa.add_argument(
-        '--route', default=DEFAULT_ROUTE, choices=list(VALID_ROUTES),
-        help='escalate (DM now — default), closure (one-line self-healed DM), '
-             'or digest (no DM; surfaced in the daily digest).',
+        '--route', default=None, choices=list(VALID_ROUTES),
+        help='escalate (DM now — default for warning/critical), closure '
+             '(one-line self-healed DM), or digest (no DM; surfaced in the '
+             'daily digest — the default for info severity).',
     )
 
     # Notification + approval-request subcommands let the Medic operator

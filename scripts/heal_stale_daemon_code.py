@@ -852,7 +852,7 @@ def dm_larry_auto_restarted(
         route = la.classify_route('heal-stale-daemon-code', subject, healed=True)
         return la.append_alert(
             source='heal-stale-daemon-code',
-            severity='warning',
+            severity='info',
             subject=subject,
             message=body,
             route=route,

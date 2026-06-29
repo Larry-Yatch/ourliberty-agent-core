@@ -464,7 +464,7 @@ def _do_redispatch(cand: Candidate, ledger: dict) -> bool:
     }
     log('HEALED', f'{cand.branch}: re-dispatched as {cand.agent}/{retry_task_id} '
                   f'(attempt {attempts + 1}/{MAX_AUTO_RETRIES})')
-    _emit_alert('digest', 'warning',
+    _emit_alert('digest', 'info',
                 f'Auto-re-dispatched WIP-only abandoned {cand.agent} build '
                 f'{cand.branch} as {retry_task_id} '
                 f'(attempt {attempts + 1}/{MAX_AUTO_RETRIES}).',

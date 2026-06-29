@@ -124,10 +124,12 @@ class CheckAutoRestartTest(_IsolatedRootsTest):
             with mock.patch.object(watchdog, '_attempt_start', return_value=True):
                 result = watchdog._check_auto_restart('ourliberty-x', 'x')
         self.assertEqual(result['status'], 'recovered')
-        # Recovered alert should land in queue (warning severity).
+        # Recovered alert should land in queue as routine info (digest lane,
+        # no DM) per alert-pipeline-rework P1b.
         contents = larry_alerts.ALERTS_FILE.read_text().strip()
         self.assertIn('auto-restarted', contents)
-        self.assertIn('"warning"', contents)
+        self.assertIn('"info"', contents)
+        self.assertIn('"digest"', contents)
 
     def test_dead_service_start_fails_appends_critical(self):
         with mock.patch.object(watchdog, '_systemctl_states',
