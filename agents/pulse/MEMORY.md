@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T05:37Z UTC (Iter ~3203, Tier 1, consecutive_clean=1)
+## Status snapshot — updated 2026-06-29T05:44Z UTC (Iter ~3204, Tier 1, consecutive_clean=0)
 
-**Iter ~3203 summary:** ✅ Nominal (Tier 1, consecutive_clean=1). 0 new alerts. Pipeline: Mirror reviewing p2a-medic (PR #745, ~21 min in); p2b-machinery Forge build in progress (no stalls). Check VIII: Beacon holding for Larry's direction post "Deprecate, delete the field." HOLD unchanged.
+**Iter ~3204 summary:** ⚠️ Auto-fix (ff-main-when-behind, consecutive_clean=1→0). PR #745 (p2a-medic) MERGED at 05:42:05Z — SEQUENCE_STEP_MERGED seq=alert-pipeline-rework. 1 new alert (L1100 Tier-3 silence: heal-wedged-review-sessions wedged-review-reaped:wt-forge-p2a-medic, auto-resolved by merge teardown). p2b-machinery Forge build still in progress (~62 min, no stall). Check VIII: Beacon holding under HOLD.
 
 
