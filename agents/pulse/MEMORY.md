@@ -316,8 +316,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T17:42Z UTC (Iter ~3245, Tier 1)
+## Status snapshot — updated 2026-06-29T18:04Z UTC (Iter ~3248, Tier 1)
 
-**Iter ~3245 summary (2026-06-29T17:42Z):** ⚠️ New sub-findings confirmed. Source repo HEAD=cf7e7938=origin/main. Sync no-change (17:27Z). Daemons healthy (watchdog 11:34 MDT). Heartbeat 17:33Z. PR #747 MERGED (07:53Z). PR #750 MERGED (09:10 MDT). PR #751 OPEN, review-escalated, no Approvals tab gate (G-rule review-escalate-approval-dedup-by-old-build-approval-001 2/3). Beacon rate-limited until 8am MDT 2026-06-30. Sequence alert-pipeline-rework PAUSED. Pipeline stall: 9 tasks FORGE_NO_PR_SKIP'd (no stalls). Inboxes empty. **KEY NEW FINDING:** Two G-rule APPROVAL_REQUESTs (forge-wip-redispatch-exhausted + decision-needed-approval) claimed by Beacon direction-ask sessions (09:13/09:22 MDT) but NOT found in beacon-pending-approvals.json — markers lost in direction-ask pipeline; re-dispatch needed post rate-limit. PRIME ratio ~17.08, trend improving. Tier 1, consecutive_clean=0.
+**Iter ~3248 summary (2026-06-29T18:00Z):** ⚠️ Carries. Source repo HEAD=4d16c994=origin/main. Sync no-change (17:27Z). Daemons healthy (watchdog 12:00 MDT). Heartbeat 17:53Z. PR #747 MERGED, PR #750 MERGED (prior). PR #751 OPEN, review-escalated, no Approvals tab gate. Beacon rate-limited until 8am MDT 2026-06-30. Sequence alert-pipeline-rework PAUSED. Larry directive "resume sequence" unprocessed (rate-limit). Pipeline stall: 9 tasks FORGE_NO_PR_SKIP'd (no stalls). Inboxes empty. **NEW [blue]:** heal-systemd-install-drift auto-installed 6 new systemd units (held-alert-backstop.{service,timer}, held-alert-persistence.{service,timer}, retrospective-weekly.{service,timer}) from A-vs-B PR merges — healer working correctly. Two APPROVAL_REQUEST gaps (forge-wip-redispatch-exhausted + decision-needed-approval) still lost; re-dispatch to Beacon pending rate-limit clear. PRIME ratio ~17.08, trend improving. Tier 1, consecutive_clean=0.
 
 
