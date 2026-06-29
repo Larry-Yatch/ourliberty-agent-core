@@ -316,8 +316,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T20:41Z UTC (Iter ~3265, Tier 2)
+## Status snapshot — updated 2026-06-29T20:58Z UTC (Iter ~3266, Tier 1)
 
-**Iter ~3265 summary (2026-06-29T20:41Z):** All mandatory checks clean. PR #757 Mirror REVIEW_PASS at 14:30Z MDT; AUTO_MERGE_HELD behind #759 (alert-translations.json overlap). PR #755 REVIEW_PASS, held behind #753. PR #754 REVIEW_PASS, held behind #757. Mirror queue 6 tasks: #756 active (regression check PID 933585), #758/#759/#753-rev1/#754/#760 queued. Beacon bot restarted 19:45Z (409 burst self-resolved), now PID 890722, healthy. gh 401 WARN at 20:37Z (sub-threshold, watch). 1 new alert (L1069 review-pass Tier-3 silenced, watermark=1069). Beacon rate-limited until 8am MDT 2026-06-30 (14:00Z). G-rule sync-service-deploy-restart-storm-tier4-001 vp — PR #757 merge pending. Tier 2, consecutive_clean=2.
+**Iter ~3266 summary (2026-06-29T20:58Z):** Tier-4 alert: ourliberty-health origin_sync fetch-failed (L1071) + gh 401 WARNs in outbox-notifier at 14:37/14:44 MDT → tier-reset to Tier 1. PR #757 Mirror REVIEW_PASS (14:30 MDT), AUTO_MERGE_HELD behind #759. PR #755 REVIEW_PASS (14:35 MDT), AUTO_MERGE_HELD behind #753. Mirror active (14:35:46 MDT run, ~22 min in, likely PR #753-rev1). Medic diagnosed PR #753 stall as premature (Mirror was busy; Forge fix fa508baf on branch). L1070 (heal-pipeline-stall PR #753) Tier-3 silence, L1072 (medic-diagnosis) Tier-3 silence. Larry DM'd both L1071 and L1072 via bot. Beacon bot PID 890722 healthy; rate-limited until 14:00Z 2026-06-30. Watermark 1072. Tier 1, consecutive_clean=0.
 
 
