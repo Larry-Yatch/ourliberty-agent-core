@@ -315,8 +315,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T16:47Z UTC (Iter ~3238, Tier 1)
+## Status snapshot — updated 2026-06-29T17:07Z UTC (Iter ~3241, Tier 1)
 
-**Iter ~3238 summary (2026-06-29T16:47Z):** ✅ All mandatory checks (0–5) nominal. No new findings. Source repo HEAD=260aaab3=origin/main. Sync no-change (16:27Z). Daemons healthy (watchdog 10:43 MDT). Heartbeat 16:43Z. PR #751 OPEN, mergeState=UNKNOWN (transient oscillation; was UNSTABLE in ~3237). Review-escalated; awaiting Larry when Beacon rate-limit clears 8am MDT 2026-06-30. Sequence alert-pipeline-rework PAUSED. Pipeline stall now shows 8 tasks (deprecate-burn-rate-gate-checkviii-001/#750 added; PR merged 09:10Z, correctly FORGE_NO_PR_SKIP'd). All inboxes empty. PRIME ratio ~17.08, trend improving. Tier 1, consecutive_clean=0.
+**Iter ~3241 summary (2026-06-29T17:07Z):** ✅ All mandatory checks (0–5) nominal. No new findings. Source repo HEAD=79286931=origin/main. Sync no-change (16:27Z). Daemons healthy (watchdog 11:03 MDT). Heartbeat 17:03Z. PR #751 OPEN, mergeState=UNKNOWN (transient oscillation continues). Review-escalated; awaiting Larry when Beacon rate-limit clears 8am MDT 2026-06-30. Sequence alert-pipeline-rework PAUSED. Pipeline stall shows 9 tasks all FORGE_NO_PR_SKIP'd (no stalls detected). All inboxes empty. PRIME ratio ~17.08, trend improving. Tier 1, consecutive_clean=0.
 
 
