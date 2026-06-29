@@ -316,8 +316,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T20:00Z UTC (Iter ~3262, Tier 1)
+## Status snapshot — updated 2026-06-29T20:10Z UTC (Iter ~3263, Tier 2)
 
-**Iter ~3262 summary (2026-06-29T20:00Z):** All mandatory checks clean. PR #754 REVIEW_PASS (13:51:01 MDT, $0.8857) + AUTO_MERGE_HELD (blocker=#757, config/alert-translations.json overlap) — new since iter ~3261. Beacon re-queued PR #754 re-review at 13:55:10. Mirror Running since 13:51:04 MDT, likely reviewing PR #757 (G-rule sync-service-deploy-restart-storm vp step). 7 PRs open in queue (#753–#759, #754 re-review added). 0 new alerts (watermark=1068). Beacon rate-limited until 8am MDT 2026-06-30 (14:00Z). PRIME ratio 17.10, trend improving. Tier 1, consecutive_clean=2 (1 more clean iter to Tier 2).
+**Iter ~3263 summary (2026-06-29T20:10Z):** All mandatory checks clean. Tier 1 → Tier 2 promoted (3 consecutive clean iters). NEW: PR #760 opened at 13:59:06 MDT ("feat(tier): decouple app HOME from the auth tier"); Mirror review not yet dispatched. Mirror attempt 1 crashed exit(-6) at 13:58:45 MDT on PR #757 review; attempt 2 started 13:58:55 MDT (11 min in, watchdog=healthy, no completion logged yet). 8 PRs open (#753–#760). 0 new alerts (watermark=1068). Beacon rate-limited until 8am MDT 2026-06-30 (14:00Z). PRIME ratio 17.10, trend improving. Tier 2, consecutive_clean=0.
 
 
