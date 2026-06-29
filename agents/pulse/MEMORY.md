@@ -316,8 +316,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T20:58Z UTC (Iter ~3266, Tier 1)
+## Status snapshot — updated 2026-06-29T21:03Z UTC (Iter ~3267, Tier 1)
 
-**Iter ~3266 summary (2026-06-29T20:58Z):** Tier-4 alert: ourliberty-health origin_sync fetch-failed (L1071) + gh 401 WARNs in outbox-notifier at 14:37/14:44 MDT → tier-reset to Tier 1. PR #757 Mirror REVIEW_PASS (14:30 MDT), AUTO_MERGE_HELD behind #759. PR #755 REVIEW_PASS (14:35 MDT), AUTO_MERGE_HELD behind #753. Mirror active (14:35:46 MDT run, ~22 min in, likely PR #753-rev1). Medic diagnosed PR #753 stall as premature (Mirror was busy; Forge fix fa508baf on branch). L1070 (heal-pipeline-stall PR #753) Tier-3 silence, L1072 (medic-diagnosis) Tier-3 silence. Larry DM'd both L1071 and L1072 via bot. Beacon bot PID 890722 healthy; rate-limited until 14:00Z 2026-06-30. Watermark 1072. Tier 1, consecutive_clean=0.
+**Iter ~3267 summary (2026-06-29T21:03Z):** 0 new alerts. All mandatory checks clean. Mirror active on PR #753-rev1 (started 14:35:46 MDT, ~27 min, watchdog=healthy). gh 401 WARNs ongoing in outbox-notifier (4 WARNs since 14:37 MDT; Larry DM'd via L1071 carry). PR #757 REVIEW_PASS AUTO_MERGE_HELD behind #759 (G-rule sync-service-deploy-restart-storm vp). PR #755 REVIEW_PASS AUTO_MERGE_HELD behind #753. Stall checker would fire mirror_pass_unmerged:PR#757 on cooldown expiry — FP candidate (PR legitimately held by AUTO_MERGE_HELD; same class as completed G-rule unrouted-open-pr-auto-merge-held-fp-001 but for mirror_pass_unmerged rule; first live alert not yet seen). Beacon rate-limited until 14:00Z 2026-06-30. Watermark 1072. Tier 1, consecutive_clean=1.
 
 
