@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T05:55Z UTC (Iter ~3206, Tier 1, consecutive_clean=2)
+## Status snapshot — updated 2026-06-29T06:02Z UTC (Iter ~3207, Tier 2, consecutive_clean=0)
 
-**Iter ~3206 summary:** ✅ Nominal (iter_clean). 0 new alerts. All checks clean. p2b-machinery Forge build still in progress (PID 487990, resumed 05:42Z after p2a-medic teardown, no PR yet, no stall). Check VIII: Beacon holding under HOLD. forge-wip-redispatch EXHAUSTED for review-sequence-dag-alert-pipeline-rework (DM'd Larry at 05:28:12Z, HOLD). consecutive_clean=1→2; 1 more clean iter to Tier 2.
+**Iter ~3207 summary:** ✅ Nominal (iter_clean). **Tier 1→2 de-escalation** (consecutive_clean=3 reached). 0 new alerts. All checks clean. p2b-machinery Forge build in progress (PID 487990, resumed 05:42Z, ~20 min, no stall, no PR yet). Check VIII: Beacon holding under HOLD. forge-wip-redispatch EXHAUSTED for review-sequence-dag-alert-pipeline-rework (DM'd Larry at 05:28:12Z, HOLD). Tier 2 cadence now active (15-min; need 3 clean iters to reach Tier 3).
 
 
