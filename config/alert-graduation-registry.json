@@ -1,0 +1,13 @@
+{
+  "_schema": {
+    "version": 1,
+    "purpose": "Incremental-migration control surface for the hybrid DM gate (alert-pipeline-rework B4). Lists the alert sources that have GRADUATED into the gate: their routine (non-critical) alerts default to a non-DM route (`hold`) instead of the global default (`escalate`), so they no longer DM Larry at emit time and are instead promoted later by Pulse (B3), the persistence rule (B5), or the 30-min backstop (B6). Un-migrated sources keep the severity-based default — escalate for warning/critical, digest for info.",
+    "match_rule": "Exact match on the alert's `source` against a key in `migrated_sources`. The mapped value is the migrated default route and must be one of larry_alerts.VALID_ROUTES (typically 'hold'); an unrecognized value is ignored (source treated as un-migrated). This default applies ONLY when the emitter passes no explicit route — an explicit caller route still wins, and a `critical` severity still forces 'escalate' (B2), so a migrated source's critical alerts always DM.",
+    "default": "un-migrated (severity-based default route)",
+    "tunable_note": "Migration is intentionally incremental (S1): only `outbox-notifier` is migrated initially; P3's weekly retrospective names the rest. Add a source here (value 'hold') to graduate it into the gate without a code change. Remove a source to revert it to the DM-by-default behavior.",
+    "consumed_by": "scripts/larry_alerts.py graduated_route() / append_alert()"
+  },
+  "migrated_sources": {
+    "outbox-notifier": "hold"
+  }
+}

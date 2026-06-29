@@ -209,6 +209,119 @@ class AppendAlertRouteTest(unittest.TestCase):
         self.assertEqual(self._last()['route'], 'hold')
 
 
+class GraduationRegistryTest(unittest.TestCase):
+    """B4: the graduation registry is the incremental-migration control surface.
+
+    A migrated source's routine (non-critical) alerts default to its migrated
+    route (`hold`) instead of escalate; an un-migrated source is untouched; a
+    migrated source's critical still forces escalate; an explicit caller route
+    still wins; and a malformed/missing registry fails loud (un-migrated)."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        root = Path(self._tmp.name)
+        self._reg = root / 'alert-graduation-registry.json'
+        self._reg.write_text(json.dumps({
+            'migrated_sources': {'outbox-notifier': 'hold'},
+        }))
+        self._patches = [
+            mock.patch.object(larry_alerts, 'ALERTS_FILE',
+                              root / 'larry-alerts.jsonl'),
+            mock.patch.object(larry_alerts, 'COOLDOWN_ROOT',
+                              root / 'alert-cooldown'),
+            mock.patch.object(larry_alerts, 'GRADUATION_FILE', self._reg),
+        ]
+        for p in self._patches:
+            p.start()
+        larry_alerts._GRADUATION_CACHE = None  # noqa: SLF001
+        larry_alerts._GRADUATION_MTIME = None  # noqa: SLF001
+
+    def tearDown(self):
+        for p in self._patches:
+            p.stop()
+        larry_alerts._GRADUATION_CACHE = None  # noqa: SLF001
+        larry_alerts._GRADUATION_MTIME = None  # noqa: SLF001
+        self._tmp.cleanup()
+
+    def _last(self) -> dict:
+        return json.loads(
+            larry_alerts.ALERTS_FILE.read_text().strip().splitlines()[-1])
+
+    def test_graduated_route_lookup(self):
+        self.assertEqual(
+            larry_alerts.graduated_route('outbox-notifier'), 'hold')
+        self.assertIsNone(larry_alerts.graduated_route('watchdog'))
+
+    def test_migrated_source_warning_defaults_to_hold(self):
+        # Acceptance: a migrated-source warning does NOT DM next sweep (hold),
+        # instead of the escalate default an un-migrated source would get.
+        larry_alerts.append_alert(
+            source='outbox-notifier', severity='warning', message='m',
+            subject='mirror-dag-malformed-result:seq')
+        self.assertEqual(self._last()['route'], 'hold')
+
+    def test_migrated_source_info_defaults_to_hold(self):
+        # A migrated source holds its routine info too (would otherwise digest).
+        larry_alerts.append_alert(
+            source='outbox-notifier', severity='info', message='m',
+            subject='routine')
+        self.assertEqual(self._last()['route'], 'hold')
+
+    def test_migrated_source_critical_still_escalates(self):
+        # Acceptance: critical DMs next sweep regardless of route — the B2
+        # force fires after the graduation default is applied.
+        larry_alerts.append_alert(
+            source='outbox-notifier', severity='critical', message='m',
+            subject='crit')
+        self.assertEqual(self._last()['route'], 'escalate')
+
+    def test_unmigrated_source_untouched(self):
+        # An un-migrated source keeps the severity-based default (escalate).
+        larry_alerts.append_alert(
+            source='watchdog', severity='warning', message='m', subject='w')
+        self.assertEqual(self._last()['route'], 'escalate')
+
+    def test_explicit_route_wins_over_graduation(self):
+        # Graduation only sets the DEFAULT; an explicit caller route is honored.
+        larry_alerts.append_alert(
+            source='outbox-notifier', severity='warning', message='m',
+            subject='explicit', route='escalate')
+        self.assertEqual(self._last()['route'], 'escalate')
+
+    def test_missing_registry_treats_source_as_unmigrated(self):
+        with mock.patch.object(larry_alerts, 'GRADUATION_FILE',
+                               Path('/nonexistent/grad.json')):
+            larry_alerts._GRADUATION_CACHE = None  # noqa: SLF001
+            larry_alerts._GRADUATION_MTIME = None  # noqa: SLF001
+            larry_alerts.append_alert(
+                source='outbox-notifier', severity='warning', message='m',
+                subject='nofile')
+            self.assertEqual(self._last()['route'], 'escalate')
+
+    def test_malformed_registry_treats_source_as_unmigrated(self):
+        self._reg.write_text('{ not valid json')
+        os.utime(self._reg, (9000, 9000))
+        larry_alerts._GRADUATION_CACHE = None  # noqa: SLF001
+        larry_alerts._GRADUATION_MTIME = None  # noqa: SLF001
+        larry_alerts.append_alert(
+            source='outbox-notifier', severity='warning', message='m',
+            subject='bad')
+        self.assertEqual(self._last()['route'], 'escalate')
+
+    def test_unrecognized_route_value_ignored(self):
+        self._reg.write_text(json.dumps({
+            'migrated_sources': {'outbox-notifier': 'banana'},
+        }))
+        os.utime(self._reg, (9001, 9001))
+        larry_alerts._GRADUATION_CACHE = None  # noqa: SLF001
+        larry_alerts._GRADUATION_MTIME = None  # noqa: SLF001
+        self.assertIsNone(larry_alerts.graduated_route('outbox-notifier'))
+        larry_alerts.append_alert(
+            source='outbox-notifier', severity='warning', message='m',
+            subject='typo')
+        self.assertEqual(self._last()['route'], 'escalate')
+
+
 class AppendPromotionTest(unittest.TestCase):
     """B3: append_promotion writes a fresh escalate line with a distinct
     ::promoted subject marker + promoted_from fingerprint, bypassing cooldown."""
