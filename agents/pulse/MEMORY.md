@@ -322,8 +322,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-29T21:47Z UTC (Iter ~3272, Tier 1)
+## Status snapshot — updated 2026-06-29T21:55Z UTC (Iter ~3273, Tier 1)
 
-**Iter ~3272 summary (2026-06-29T21:47Z):** ⚠️ git worktree proliferation: 101 worktrees; fetch still blocked by locked gate-wt-f0d7bcdc5cc24. Repo ahead origin/main by 4 commits (was 3; compounding each cycle). G-rule 3/3 DISPATCHED to Beacon (direction-ask-regression-baseline-warm-worktree-cleanup-001; queued in inbox). Check 3 non-clean: stall healer would re-fire `no_session_revision:pr-753` even though PR #753 MERGED 21:09:28Z — FP; G-rule no-session-revision-merged-pr-fp-001 → 2/3. PR #754 in Mirror review (~12 min, watchdog=healthy). PRs #755 AUTO_MERGE_HELD (#760). PRs #759/#760 Mirror queue. gh 401 WARNs: last 14:57 MDT (unchanged). Beacon rate-limited until 14:00Z 2026-06-30. Watermark 1073. Trailing-30d ratio≈16.94 (trend: improving). Tier 1, consecutive_clean=0.
+**Iter ~3273 summary (2026-06-29T21:55Z):** ⚠️ git worktree proliferation: 100 worktrees; fetch still blocked by locked gate-wt-f0d7bcdc5cc24. Repo ahead origin/main by 5 commits (was 4; compounding). KEY POSITIVE: Beacon processed direction-ask → `regression-warmer-worktree-leak-cleanup-001` APPROVAL_REQUEST delivered to Larry (Telegram idx=1074, 15:51 MDT). Larry needs to approve in Telegram. Also: `mirror-review-p3a-retro-prep` stale pending approval (07:38Z, 14+ hrs) for PR #747 — DM likely dropped, surfaced to Larry this cycle. Check 3 clean. Mirror active PR #754 (~24 min, healthy). Watermark 1075. Trailing-30d ratio≈16.96 (trend: improving). Tier 1, consecutive_clean=0. Beacon rate-limited until 14:00Z 2026-06-30.
 
 
