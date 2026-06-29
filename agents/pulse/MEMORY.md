@@ -316,8 +316,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T21:03Z UTC (Iter ~3267, Tier 1)
+## Status snapshot — updated 2026-06-29T21:13Z UTC (Iter ~3268, Tier 1)
 
-**Iter ~3267 summary (2026-06-29T21:03Z):** 0 new alerts. All mandatory checks clean. Mirror active on PR #753-rev1 (started 14:35:46 MDT, ~27 min, watchdog=healthy). gh 401 WARNs ongoing in outbox-notifier (4 WARNs since 14:37 MDT; Larry DM'd via L1071 carry). PR #757 REVIEW_PASS AUTO_MERGE_HELD behind #759 (G-rule sync-service-deploy-restart-storm vp). PR #755 REVIEW_PASS AUTO_MERGE_HELD behind #753. Stall checker would fire mirror_pass_unmerged:PR#757 on cooldown expiry — FP candidate (PR legitimately held by AUTO_MERGE_HELD; same class as completed G-rule unrouted-open-pr-auto-merge-held-fp-001 but for mirror_pass_unmerged rule; first live alert not yet seen). Beacon rate-limited until 14:00Z 2026-06-30. Watermark 1072. Tier 1, consecutive_clean=1.
+**Iter ~3268 summary (2026-06-29T21:13Z):** 0 new alerts. All mandatory checks clean. PR #753 blocker released 15:09 MDT (merged externally — gh auth likely recovered; Mirror's PR #753-rev1 review still running ~11 min, watchdog=healthy). PR #755 now AUTO_MERGE_HELD behind #760 (was #753). PR #756 NEW REVIEW_PASS AUTO_MERGE_HELD behind #758. PR #757 REVIEW_PASS AUTO_MERGE_HELD behind #759 (G-rule sync-service-deploy-restart-storm vp). PR #754 AUTO_MERGE_HELD behind #757. PRs #758, #759, #760 in Mirror queue. Mirror inbox 5 items. gh 401 WARNs paused after 14:57 MDT (Larry informed L1071). Beacon rate-limited until 14:00Z 2026-06-30 (re-dispatch G-rule APPROVAL_REQUEST_LOST gaps post rate-limit). Watermark 1072. Tier 1, consecutive_clean=2.
 
 
