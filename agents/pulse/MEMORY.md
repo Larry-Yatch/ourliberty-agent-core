@@ -322,8 +322,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-29T23:41Z UTC (Iter ~3285, Tier 1)
+## Status snapshot — updated 2026-06-29T23:44Z UTC (Iter ~3286, Tier 1)
 
-**Iter ~3285 summary (2026-06-29T23:38Z):** ⚠️ Check A drift. ✅ PRs #759+#754 MERGED at 23:33Z (Mirror REVIEW_PASS+AUTO_MERGE; AUTO_MERGE_RELEASE_FRESH). Source repo 1 ahead (HEAD=62c8ef8d), git fetch BLOCKED by gate-wt-ec6def99d39d69 bad-object; likely diverged (origin moved after merges). Worktrees 62/53 locked (prunable reduced from 108; locked stable at 53). BASELINE_WARM running for #759+#754 (PIDs 1145289/1145299). Pipeline stall clean. No new alerts (watermark=1088). Beacon RATE-LIMITED until 14:00 UTC June 30. 3 pending approvals blocked. Mirror queue: review-762 + review-761 (no active session running). Trailing-30d ratio≈17.06 (stable). Tier 1, consecutive_clean=0.
+**Iter ~3286 summary (2026-06-29T23:44Z):** ⚠️ Check A drift. Source repo 2 ahead (HEAD=d7ebac93), DIVERGED — git fetch BLOCKED by gate-wt-ec6def99d39d69 bad-object (same); origin moved ahead with #759+#754 merge commits. Worktrees 63/53 locked (was 62; +1 from BASELINE_WARM). BASELINE_WARM PID 1145289 still running (9 min). Pipeline stall clean. No new alerts (watermark=1088). Beacon RATE-LIMITED until 14:00 UTC June 30 (~13h55m remaining). 3 pending approvals blocked. Larry dashboard-approve attempt at 22:53-22:57Z unprocessed (Beacon hit permission boundary, restarted at 23:16Z, still rate-limited). Mirror queue: review-762 (next) + review-761 (after) — no active session. PR #761 (worktree fix) queued. Trailing-30d ratio≈17.07 (stable). Tier 1, consecutive_clean=0.
 
 
