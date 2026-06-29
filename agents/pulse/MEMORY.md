@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T08:54Z UTC (Iter ~3217, Tier 2, consecutive_clean=2)
+## Status snapshot — updated 2026-06-29T09:14Z UTC (Iter ~3218, Tier 3, consecutive_clean=0)
 
-**Iter ~3217 summary:** ✅ Nominal (iter_clean). Tier 2, consecutive_clean=1→2. No new alerts. Mirror REVIEW_ESCALATE on PR #749 (p3b-retro-author) — test regression gate timed out (exit 124, REVIEW_STEP_TIMED_OUT); diff review clean. Beacon PID 611852 processing auto-replan (started 08:48:53Z). All daemons alive. HOLD in effect. 1 more clean iter needed for Tier 3 de-escalation.
+**Iter ~3218 summary:** ✅ Nominal (iter_clean). Tier 2→3 de-escalation (3 consecutive clean at Tier 2). No new alerts. PR #749 (p3b-retro-author) STRANDED — Beacon processed REVIEW_ESCALATE at 02:48:53Z–02:54:58Z ($0.88) but APPROVAL_REQUEST DM dropped (reply_chat_id=None, G-rule decision-needed-approval-forge-dispatch-no-target-repo-001). Larry must manually approve or PR #749 stays blocked. All daemons alive. HOLD in effect.
 
 
