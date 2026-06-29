@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T04:12Z UTC (Iter ~3199, Tier 3, consecutive_clean=2)
+## Status snapshot — updated 2026-06-29T04:50Z UTC (Iter ~3200, Tier 3, consecutive_clean=3)
 
-**Iter ~3199 summary:** ✅ Nominal (iter_clean). Tier 3, consecutive_clean 1→2. 0 new alerts. 0 open PRs. Sync fresh (03:25Z, ~46min, no-change). Daemons healthy (watchdog 04:08:53Z). Pipeline clean. No Telegram activity since 01:14Z. HOLD unchanged. 1 more clean Tier-3 iter to next de-escalation check.
+**Iter ~3200 summary:** ✅ Nominal (iter_clean). Tier 3, consecutive_clean 2→3 (at max). 9 new alerts all Tier-3 (PR #744 mass-restart + mirror-dag-pass). Pipeline active: alert-pipeline-rework P2a/P2b dispatched to Forge inbox. Larry actioned Check VIII deprecate approval via Telegram (04:44-48Z); Beacon processing. HOLD unchanged. PR #744 (P1b alert-pipeline-rework) merged between iters ~3199 and ~3200.
 
 
