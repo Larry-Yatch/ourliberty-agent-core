@@ -18,6 +18,14 @@
     "stopgap_note": "Translation layer is a stopgap until the Pulse cycle upgrade (follow-up to PR #108) ships healer-alert triage as a core Pulse responsibility. Once Pulse triages, this table can retire; the CI gate that enforces every healer has an entry stays useful as an ergonomics review trigger.",
     "never_silence_note": "Optional per-entry boolean. By default a (source, subject) present in this table is a known pattern that Check 0 (alert_triage_state.classify) Tier-3-silences to digest. Set never_silence: true on an entry to keep its plain-language translation but force it to surface (Tier 4, route=escalate) instead of being muted — for detections like a dark pulse check, where the translation makes the alert clearer but silencing it would defeat the watcher's whole purpose."
   },
+  "build-sequence-advancer": {
+    "sequence-paused": {
+      "severity": "WARNING",
+      "tier": "NOW",
+      "plain_language_summary": "A build-sequence stopped itself because two records disagreed and it refused to guess. The most common cause is a gate-mismatch: a step PR merged on GitHub (the work is done) but the chain pipeline never recorded the merge event -- usually a merge that bypassed the auto-merge / REVIEW_PASS path, or a dropped chain-event. The pause is the safety brake: the advancer will not re-dispatch already-merged work, nor advance downstream steps on an unconfirmed merge. The exact pause reason (gate-mismatch, stranded step, or schema-validation) is in the technical-detail footer below.",
+      "recommended_action": "Read the pause reason in the raw message. For a gate-mismatch (chain_merged=False, gh_merged=True): verify the step PR actually merged (gh pr view <#>), then reconcile and resume -- `skip sequence <seq_id> step <step-id>` marks the step merged without forcing the chain to re-observe it, then `resume sequence <seq_id>`. Do NOT `retry` (rebuilds already-merged work) or `cancel` (discards a healthy sequence). For a stranded-step or schema-validation pause, fix the underlying issue named in the reason, then `resume`. Producer: scripts/build_sequence_advancer.py."
+    }
+  },
   "doorbell": {
     "doorbell": {
       "severity": "INFO",
