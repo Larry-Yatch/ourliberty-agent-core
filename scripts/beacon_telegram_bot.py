@@ -179,7 +179,7 @@ def classify_tier1_failure(stdout: str, stderr: str) -> Optional[str]:
     return None
 
 
-def tier2_available(home: str = TIER2_HOME) -> bool:
+def tier2_available(home: Optional[str] = None) -> bool:
     """True iff the fallback tier's OAuth credentials file exists.
 
     Checked BEFORE the HOME-swap so a missing fallback dir DMs Larry instead
@@ -189,8 +189,12 @@ def tier2_available(home: str = TIER2_HOME) -> bool:
     ``home`` defaults to TIER2_HOME (the historical Tier 1 → Tier 2 fallback)
     but is parameterized so the check targets whichever tier is the *opposite*
     of the active pin (active_tier.other_home()). When the team is pinned to
-    Tier 2, the fallback — and thus this credentials check — is Tier 1.
+    Tier 2, the fallback — and thus this credentials check — is Tier 1. The
+    default is resolved at CALL time (sentinel ``None``) rather than bound at
+    import time, so tests that patch ``bot.TIER2_HOME`` reach the no-arg path.
     """
+    if home is None:
+        home = TIER2_HOME
     return Path(home, ".claude", ".credentials.json").exists()
 
 
