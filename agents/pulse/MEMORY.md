@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T04:50Z UTC (Iter ~3200, Tier 3, consecutive_clean=3)
+## Status snapshot — updated 2026-06-29T05:26Z UTC (Iter ~3201, Tier 1, consecutive_clean=0)
 
-**Iter ~3200 summary:** ✅ Nominal (iter_clean). Tier 3, consecutive_clean 2→3 (at max). 9 new alerts all Tier-3 (PR #744 mass-restart + mirror-dag-pass). Pipeline active: alert-pipeline-rework P2a/P2b dispatched to Forge inbox. Larry actioned Check VIII deprecate approval via Telegram (04:44-48Z); Beacon processing. HOLD unchanged. PR #744 (P1b alert-pipeline-rework) merged between iters ~3199 and ~3200.
+**Iter ~3201 summary:** ⚠️ Signal (Tier 3→1). forge-wip-redispatch (L1097, review-sequence-dag-alert-pipeline-rework retry1) Tier-4 alert — G-rule vp, no DM, HOLD. dispatch-branch-cleanup Tier-3 silence. Pipeline: PR #745 (p2a-medic) open, Mirror reviewing; p2b-machinery Forge build in progress. Check VIII: Beacon holding for Larry's explicit dispatch direction after "Deprecate, delete the field" at 04:48Z. HOLD unchanged.
 
 
