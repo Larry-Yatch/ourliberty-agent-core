@@ -179,53 +179,70 @@ def classify_tier1_failure(stdout: str, stderr: str) -> Optional[str]:
     return None
 
 
-def tier2_available() -> bool:
-    """True iff the Tier 2 OAuth credentials file exists.
+def tier2_available(home: Optional[str] = None) -> bool:
+    """True iff the fallback tier's OAuth credentials file exists.
 
-    Checked BEFORE the HOME-swap so a missing Tier 2 dir DMs Larry instead
+    Checked BEFORE the HOME-swap so a missing fallback dir DMs Larry instead
     of producing a confusing 'claude: command not found' or empty-credentials
     error inside the subprocess.
+
+    ``home`` defaults to TIER2_HOME (the historical Tier 1 → Tier 2 fallback)
+    but is parameterized so the check targets whichever tier is the *opposite*
+    of the active pin (active_tier.other_home()). When the team is pinned to
+    Tier 2, the fallback — and thus this credentials check — is Tier 1. The
+    default is resolved at CALL time (sentinel ``None``) rather than bound at
+    import time, so tests that patch ``bot.TIER2_HOME`` reach the no-arg path.
     """
-    return Path(TIER2_HOME, ".claude", ".credentials.json").exists()
+    if home is None:
+        home = TIER2_HOME
+    return Path(home, ".claude", ".credentials.json").exists()
 
 
 def _tier2_failure_dm(
     failure_type: str,
     tier2_stdout: Optional[str] = None,
     tier2_stderr: Optional[str] = None,
+    active_label: str = "Tier 1",
+    other_label: str = "Tier 2",
 ) -> None:
-    """DM Larry that Tier 1 failed and Tier 2 was unavailable / also failed.
+    """DM Larry that the active tier failed and the fallback was unavailable /
+    also failed.
 
     Uses larry_alerts.append_alert with the existing 'warning' severity; the
     intent ('claude_tier1_failed_tier2_unavailable') is in the subject for
-    cooldown bucketing.
+    cooldown bucketing (kept stable so existing dedup buckets carry over).
 
-    When the Tier 2 subprocess actually ran, the caller passes its stdout/
+    When the fallback subprocess actually ran, the caller passes its stdout/
     stderr — both are surfaced in the DM body so Larry can distinguish
-    'Tier 2 missing' vs 'Tier 2 auth-401' vs 'Tier 2 also rate-limited' from
-    a single DM. Without this, both failure modes looked identical.
+    'missing' vs 'auth-401' vs 'also rate-limited' from a single DM. Without
+    this, both failure modes looked identical.
+
+    ``active_label`` / ``other_label`` name the live active and fallback tiers
+    (the pin can put either tier in either role); defaults preserve the
+    historical Tier 1 → Tier 2 wording.
     """
     if failure_type == "rate_limit":
         recovery = (
-            "Tier 1 rate-limit: wait for reset (~5h) OR provision Tier 2 "
-            "per docs/runbooks/restore-larry-personal-claude-oauth-tier2.md."
+            f"{active_label} rate-limit: wait for reset (~5h) OR provision "
+            f"{other_label} per "
+            "docs/runbooks/restore-larry-personal-claude-oauth-tier2.md."
         )
     else:
         recovery = (
-            "Tier 1 auth-401: run scripts/auth_orchestrator.py from chat to "
-            "headless-re-auth Tier 1; runbook "
+            f"{active_label} auth-401: run scripts/auth_orchestrator.py from "
+            f"chat to headless-re-auth {active_label}; runbook "
             "docs/runbooks/restore-larry-personal-claude-oauth-tier2.md "
-            "for Tier 2 provisioning."
+            f"for {other_label} provisioning."
         )
     body = (
-        f"Beacon bot subprocess hit Tier 1 {failure_type} and Tier 2 "
-        f"fallback was unavailable or also failed. Beacon will not "
-        f"reply to chat until manual recovery."
+        f"Beacon bot subprocess hit {active_label} {failure_type} and "
+        f"{other_label} fallback was unavailable or also failed. Beacon will "
+        f"not reply to chat until manual recovery."
     )
     if tier2_stdout or tier2_stderr:
         body += (
-            f"\nTier 2 stdout: {(tier2_stdout or '')[:300]!r}"
-            f"\nTier 2 stderr: {(tier2_stderr or '')[:300]!r}"
+            f"\n{other_label} stdout: {(tier2_stdout or '')[:300]!r}"
+            f"\n{other_label} stderr: {(tier2_stderr or '')[:300]!r}"
         )
     try:
         larry_alerts.append_alert(
@@ -239,35 +256,45 @@ def _tier2_failure_dm(
         pass
 
 
-def _tier2_refuse_on_resume_dm(failure_type: str) -> None:
-    """DM Larry that Tier 1 failed mid-resume and Tier 2 retry was REFUSED.
+def _tier2_refuse_on_resume_dm(
+    failure_type: str,
+    active_label: str = "Tier 1",
+    other_label: str = "Tier 2",
+) -> None:
+    """DM Larry that the active tier failed mid-resume and the fallback retry
+    was REFUSED.
 
     Mirrors the refuse-on-resume discipline in agent_runner.py:822-828 — a
-    session_id from Tier 1 is account-bound and CANNOT be replayed against
-    Tier 2's account (HOME=TIER2_HOME points at a different ~/.claude
-    credentials and a different Anthropic identity). Retrying with --resume
-    would fail with 'session not found' AND would orphan the original
-    session's context. Skipping is the correct outcome; we surface it to
-    Larry so the manual-recovery path (wait for Tier 1 reset OR drop
-    --resume and retry on Tier 2 fresh) is visible.
+    session_id from the active tier is account-bound and CANNOT be replayed
+    against the fallback tier's account (a different ~/.claude credentials root
+    and a different Anthropic identity). Retrying with --resume would fail with
+    'session not found' AND would orphan the original session's context.
+    Skipping is the correct outcome; we surface it to Larry so the manual-
+    recovery path (wait for the active tier's reset OR drop --resume and start
+    a fresh chat on the fallback tier) is visible.
+
+    ``active_label`` / ``other_label`` name the live tiers (defaults preserve
+    the historical Tier 1 → Tier 2 wording). The subject string is kept stable
+    ('claude_tier1_failed_on_resume_session_bound') so existing alert dedup
+    buckets carry over regardless of which tier is active.
     """
     try:
         larry_alerts.append_alert(
             source="beacon-telegram-bot",
             severity="warning",
             message=(
-                f"beacon-bot Tier 1 failed mid-resume (session-bound); "
-                f"manual recovery: wait for Tier 1 reset OR clear --resume "
-                f"and retry on Tier 2 fresh."
+                f"beacon-bot {active_label} failed mid-resume (session-bound); "
+                f"manual recovery: wait for {active_label} reset OR clear "
+                f"--resume and retry on {other_label} fresh."
             ),
             subject=f"claude_tier1_failed_on_resume_session_bound:{failure_type}",
             suggested_action=(
-                "Tier 1 hit "
+                f"{active_label} hit "
                 f"{failure_type} on a --resume session. Session IDs are "
-                "account-bound — Tier 2 retry would fail with 'session not "
-                "found'. Wait for the Tier 1 5h window to clear, or start a "
-                "fresh Beacon chat (no --resume) which will route through "
-                "Tier 2."
+                f"account-bound — a {other_label} retry would fail with "
+                "'session not found'. Wait for the active tier's 5h window to "
+                "clear, or start a fresh Beacon chat (no --resume) which will "
+                f"route through {other_label}."
             ),
         )
     except Exception:
@@ -421,45 +448,72 @@ def _run_claude_once(
 def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[str]]:
     """Run claude in Beacon's directory; return (reply_text, new_session_id).
 
-    On non-zero exit: log BOTH stdout and stderr (today's incident — 2026-05-26
-    — surfaced because only stderr was logged and the rate-limit/auth-401
+    Tier selection honors the team-wide pin (active_tier.read()['tier']):
+    the PRIMARY attempt authenticates against the ACTIVE tier — HOME =
+    active_tier.current_home(), token = that tier's long-lived setup-token —
+    mirroring agent_runner (scripts/agent_runner.py:1305). The bot's systemd
+    HOME=/home/larry only sets the tier1 default; before this the primary was
+    hardwired to Tier 1 and silently drained it even while the rest of the
+    team was pinned to Tier 2, so Tier 1 usage climbed until it capped
+    (2026-06-29 incident). The fallback targets the OPPOSITE tier
+    (active_tier.other_home()).
+
+    On non-zero exit: log BOTH stdout and stderr (the 2026-05-26 incident
+    surfaced because only stderr was logged and the rate-limit/auth-401
     message lives on stdout). Detect rate-limit or auth-401 from the combined
-    output and, if detected, retry once with HOME=TIER2_HOME (Larry's personal
-    Claude Max) before falling back to the error response.
+    output and, if detected, retry once on the fallback tier's HOME before
+    falling back to the error response.
 
     Resume-discipline rule (mirrors agent_runner.py:822-828): `--resume`
-    session IDs are NOT portable between accounts. A Tier 2 retry on a
-    --resume session would fail with 'session not found' AND would orphan
-    the original session's context. When Tier 1 fails (rate-limit or
+    session IDs are NOT portable between accounts. A fallback-tier retry on a
+    --resume session would fail with 'session not found' AND would orphan the
+    original session's context. When the active tier fails (rate-limit or
     auth-401) on a request that carries `--resume`, we DM Larry with the
-    session-bound recovery instructions and return early — no Tier 2
-    subprocess invocation. When the request has NO `--resume` (fresh
-    session), the Tier 2 fallback proceeds as normal. The earlier design
-    here (Tier 2 cold-start acceptable for chat sessions) was retired
-    after the 2026-05-26/27 incident — the cross-account session failure
-    mode is real and identical to the agent_runner.py case.
+    session-bound recovery instructions and return early — no fallback
+    subprocess invocation. When the request has NO `--resume` (fresh session),
+    the fallback proceeds as normal. The earlier design here (fallback
+    cold-start acceptable for chat sessions) was retired after the
+    2026-05-26/27 incident — the cross-account session failure mode is real
+    and identical to the agent_runner.py case.
+
+    A stale cross-tier session (e.g. a session created on Tier 1 before the
+    pin moved to Tier 2) self-heals: --resume of an unknown session under the
+    active tier's HOME errors with 'session not found' (NOT a rate-limit/
+    auth-401), which trips the retry-without-resume path below — a fresh
+    session is started on the active tier.
     """
+    # Resolve the active (pinned) tier and its opposite (the fallback target).
+    active_name = active_tier.read()['tier']
+    other_name = 'tier2' if active_name == 'tier1' else 'tier1'
+    active_home = active_tier.current_home()
+    fallback_home = active_tier.other_home()
+    _TIER_LABEL = {'tier1': 'Tier 1', 'tier2': 'Tier 2'}
+    active_label = _TIER_LABEL[active_name]
+    other_label = _TIER_LABEL[other_name]
+
     cmd = [CLAUDE_BIN, "--print", "--output-format", "json", "--model", _beacon_telegram_model()]
     if session_id:
         cmd += ["--resume", session_id]
     cmd += [prompt]
 
-    # Primary attempt authenticates via Tier 1's long-lived setup-token — the
-    # account this bot's HOME=/home/larry (active_tier.TIER1_HOME) is bound to —
-    # mirroring agent_runner._apply_tier_auth. Without it the primary fell back
-    # to HOME's ~/.claude/.credentials.json, which rots silently on an OAuth
-    # refresh failure and then 401s every message; on a --resume session the
-    # Tier 2 fallback below is refused (session-bound), leaving Beacon dead to
-    # Larry. The token matches the session's bound account, so --resume
-    # continuity is preserved. None (token unconfigured) => prior behavior.
-    # Log the auth source (NOT the token) so a future auth regression is
-    # visible in the log — the 2026-06-25 incident was invisible precisely
-    # because the bot's primary auth path emitted no signal. Mirrors the
-    # tier2-fallback auth= log below and agent_runner's attribution.
-    _t1_token = active_tier._setup_token_for_tier('tier1')
+    # Primary attempt authenticates via the ACTIVE tier's long-lived setup-
+    # token — the account active_tier.current_home() is bound to — mirroring
+    # agent_runner._apply_tier_auth. Without it the primary fell back to HOME's
+    # ~/.claude/.credentials.json, which rots silently on an OAuth refresh
+    # failure and then 401s every message; on a --resume session the fallback
+    # below is refused (session-bound), leaving Beacon dead to Larry. The token
+    # matches the session's bound account, so --resume continuity is preserved.
+    # None (token unconfigured) => HOME's credentials.json (prior behavior).
+    # Log the auth source + tier (NOT the token) so a future auth/routing
+    # regression is visible in the log — the 2026-06-25 incident was invisible
+    # precisely because the bot's primary auth path emitted no signal.
+    _primary_token = active_tier._setup_token_for_tier(active_name)
     log(f"call_beacon: primary auth="
-        f"{'setup_token' if _t1_token else 'credentials_json'} (tier1)")
-    result = _run_claude_once(cmd, oauth_token=_t1_token)
+        f"{'setup_token' if _primary_token else 'credentials_json'} "
+        f"({active_name}) home={active_home}")
+    result = _run_claude_once(
+        cmd, home_override=active_home, oauth_token=_primary_token,
+    )
     if result is None:
         return ("[Beacon timed out or claude binary missing — please retry]", session_id)
 
@@ -472,61 +526,71 @@ def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[s
             f"stderr={(result.stderr or '')[:500]!r}"
         )
 
-        # Tier 2 detection: classify from the combined output.
+        # Fallback detection: classify from the combined output.
         failure_type = classify_tier1_failure(result.stdout, result.stderr)
         if failure_type:
-            # Step C: record the Tier 1 failure (rate_limit OR auth_401) to
-            # the shared anthropic-quota-events ledger before any retry/DM
+            # Step C: record the active-tier failure (rate_limit OR auth_401)
+            # to the shared anthropic-quota-events ledger before any retry/DM
             # path runs. Pre-Step-C this bot only DMed and the dominant
             # auth_401 class never reached the ledger Check VIII relies on.
             _append_bot_quota_event(
                 failure_type=failure_type,
                 stdout=result.stdout,
                 stderr=result.stderr,
-                account='tier1',
+                account=active_name,
             )
-            # Refuse-on-resume (mirrors agent_runner.py:822-828). A Tier 2
-            # retry on a --resume session would fail with 'session not found'
-            # AND orphan the original session's context — session IDs are
-            # account-bound. DM Larry the recovery hint and return early; no
-            # Tier 2 subprocess invocation.
+            # Refuse-on-resume (mirrors agent_runner.py:822-828). A fallback-
+            # tier retry on a --resume session would fail with 'session not
+            # found' AND orphan the original session's context — session IDs
+            # are account-bound. DM Larry the recovery hint and return early;
+            # no fallback subprocess invocation. (Log marker stays the literal
+            # TIER2_FALLBACK_SKIPPED — heal_pipeline_stall greps it by name.)
             if session_id:
                 log(
                     f"TIER2_FALLBACK_SKIPPED reason={failure_type} "
-                    f"cause=resume_session_account_bound"
+                    f"cause=resume_session_account_bound "
+                    f"active={active_name} fallback={other_name}"
                 )
-                _tier2_refuse_on_resume_dm(failure_type)
+                _tier2_refuse_on_resume_dm(
+                    failure_type,
+                    active_label=active_label,
+                    other_label=other_label,
+                )
                 return (
                     f"[claude {failure_type} on --resume session — "
-                    f"Tier 2 retry refused (session-bound); DM sent]\n"
+                    f"{other_label} retry refused (session-bound); DM sent]\n"
                     f"{(result.stdout or '')[:1500]}",
                     session_id,
                 )
             # Setup-token precedence (mirrors agent_runner._apply_tier_auth):
-            # when the Tier 2 long-lived setup-token is configured, the
+            # when the fallback tier's long-lived setup-token is configured, the
             # fallback authenticates via it and does NOT depend on the
-            # .credentials.json under TIER2_HOME. In that case the existence
-            # gate below must NOT short-circuit the retry — the creds.json may
-            # be absent/lapsed (intentionally unrefreshed) while dispatch auth
-            # via the token is healthy. The token value is never logged.
-            t2_setup_token = active_tier._setup_token_for_tier('tier2')
-            if not t2_setup_token and not tier2_available():
+            # .credentials.json under the fallback HOME. In that case the
+            # existence gate below must NOT short-circuit the retry — the
+            # creds.json may be absent/lapsed (intentionally unrefreshed) while
+            # dispatch auth via the token is healthy. The token is never logged.
+            t2_setup_token = active_tier._setup_token_for_tier(other_name)
+            if not t2_setup_token and not tier2_available(fallback_home):
                 log(
                     f"TIER2_FALLBACK_UNAVAILABLE reason={failure_type} "
-                    f"home={TIER2_HOME} (missing credentials file)"
+                    f"home={fallback_home} (missing credentials file)"
                 )
-                _tier2_failure_dm(failure_type)
+                _tier2_failure_dm(
+                    failure_type,
+                    active_label=active_label,
+                    other_label=other_label,
+                )
                 return (
-                    f"[claude {failure_type} — Tier 2 unavailable; DM sent]\n"
+                    f"[claude {failure_type} — {other_label} unavailable; DM sent]\n"
                     f"{(result.stdout or '')[:1500]}",
                     session_id,
                 )
             log(
-                f"TIER2_FALLBACK_ATTEMPT reason={failure_type} home={TIER2_HOME} "
+                f"TIER2_FALLBACK_ATTEMPT reason={failure_type} home={fallback_home} "
                 f"auth={'setup_token' if t2_setup_token else 'credentials_json'}"
             )
             t2 = _run_claude_once(
-                cmd, home_override=TIER2_HOME, oauth_token=t2_setup_token,
+                cmd, home_override=fallback_home, oauth_token=t2_setup_token,
             )
             if t2 is not None and t2.returncode == 0:
                 log(f"TIER2_FALLBACK_USED reason={failure_type}")
@@ -545,8 +609,8 @@ def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[s
                 f"stdout={(t2_stdout or '')[:300]!r} "
                 f"stderr={(t2_stderr or '')[:300]!r}"
             )
-            # Step C: also capture the Tier 2 failure as a ledger event so
-            # the both-tiers-walled-at-once class is visible to Check VIII.
+            # Step C: also capture the fallback-tier failure as a ledger event
+            # so the both-tiers-walled-at-once class is visible to Check VIII.
             t2_failure = (
                 classify_tier1_failure(t2_stdout or '', t2_stderr or '')
                 or failure_type
@@ -555,21 +619,32 @@ def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[s
                 failure_type=t2_failure,
                 stdout=t2_stdout,
                 stderr=t2_stderr,
-                account='tier2',
+                account=other_name,
             )
-            _tier2_failure_dm(failure_type, t2_stdout, t2_stderr)
-            # Echo Tier 2's stdout (not Tier 1's) in the chat reply so the
-            # error body distinguishes 'Tier 2 missing' vs 'Tier 2 auth-401'
-            # vs 'Tier 2 also rate-limited'. Before this fix the body was
-            # result.stdout (Tier 1's), masking the real Tier 2 failure mode.
+            # Keep the (failure_type, t2_stdout, t2_stderr) POSITIONAL trio the
+            # test asserts on; tier labels ride as kwargs.
+            _tier2_failure_dm(
+                failure_type, t2_stdout, t2_stderr,
+                active_label=active_label, other_label=other_label,
+            )
+            # Echo the fallback tier's stdout (not the active tier's) in the
+            # chat reply so the error body distinguishes 'missing' vs 'auth-401'
+            # vs 'also rate-limited'. Before this fix the body was result.stdout
+            # (the active tier's), masking the real fallback failure mode.
             return (
-                f"[claude {failure_type} — Tier 2 retry also failed; DM sent]\n"
+                f"[claude {failure_type} — {other_label} retry also failed; DM sent]\n"
                 f"{(t2_stdout or '')[:1500]}",
                 session_id,
             )
 
-        # If --resume failed (stale session), retry once without it
-        if session_id and "session" in (result.stderr or "").lower():
+        # If --resume failed (stale session), retry once without it. Check the
+        # COMBINED streams: a cross-tier stale session (Tier 1 session resumed
+        # under the Tier 2 HOME after a pin move) reports 'No conversation found
+        # with session ID' on stdout, not stderr — stderr-only missed it and
+        # dead-ended the chat. Broadening to stdout+stderr makes the stale
+        # cross-tier session self-heal into a fresh session on the active tier.
+        _resume_err = ((result.stdout or "") + "\n" + (result.stderr or "")).lower()
+        if session_id and "session" in _resume_err:
             log("retrying without --resume after session error")
             return call_beacon(prompt, None)
         return (
