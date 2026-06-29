@@ -120,9 +120,9 @@
 
 ---
 
-## G-rule no-session-revision-merged-pr-fp-001 — 1/3 (new, iter ~2676)
+## G-rule no-session-revision-merged-pr-fp-001 — 2/3 (updated iter ~3272)
 
-**Rule:** `heal_pipeline_stall.py` dry-run fires `no_session_revision:forge-wip-only-auto-redispatch-001` even though PR #693 (the task's output) is MERGED. Root cause: the `no_session_revision` stall check doesn't verify whether the task's corresponding PR is already merged before alerting. The `forge_built_no_pr` rule has FORGE_NO_PR_SKIP logic for this; `no_session_revision` does not. Same class as the reconcile-001 FP but for a different stall rule. First occurrence iter ~2676. Dispatch to Beacon at 3/3.
+**Rule:** `heal_pipeline_stall.py` dry-run fires `no_session_revision` for tasks whose corresponding PR is already MERGED. Root cause: `no_session_revision` stall check doesn't verify PR merge state before alerting. `forge_built_no_pr` has FORGE_NO_PR_SKIP logic for this; `no_session_revision` does not. Fix: add skip-on-merged check to `check_revision_dispatched_with_no_session`. Dispatch to Beacon at 3/3. Occurrences: iter ~2676 (PR #693, 1/3); iter ~3272 (PR #753 merged 21:09:28Z, cooldown expired, healer would re-fire as FP, 2/3).
 
 ---
 
@@ -322,8 +322,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-29T21:40Z UTC (Iter ~3271, Tier 1)
+## Status snapshot — updated 2026-06-29T21:47Z UTC (Iter ~3272, Tier 1)
 
-**Iter ~3271 summary (2026-06-29T21:40Z):** ⚠️ git worktree proliferation: 101 worktrees; 3 locked gate-wt-f0d7bcdc5cc24 in /tmp/regbaseline-warm-{0ge61bfy,9th6uvte,k3yvl__k}/ still block fetch/push. Repo ahead origin/main by 3 commits (compounding). G-rule 3/3 → DISPATCHED to Beacon (direction-ask-regression-baseline-warm-worktree-cleanup-001). PRs #758+#756 MERGED at 21:31Z. Mirror running 3rd review (PR #754, ~9 min, watchdog=healthy). PRs #755 REVIEW_PASS AUTO_MERGE_HELD (#760). PRs #759/#760 in Mirror queue. Check 3 CLEAN. gh 401 WARNs: last 14:57 MDT (unchanged). Beacon rate-limited until 14:00Z 2026-06-30. Watermark 1073. Trailing-30d ratio=16.94 (trend: improving). Tier 1, consecutive_clean=0.
+**Iter ~3272 summary (2026-06-29T21:47Z):** ⚠️ git worktree proliferation: 101 worktrees; fetch still blocked by locked gate-wt-f0d7bcdc5cc24. Repo ahead origin/main by 4 commits (was 3; compounding each cycle). G-rule 3/3 DISPATCHED to Beacon (direction-ask-regression-baseline-warm-worktree-cleanup-001; queued in inbox). Check 3 non-clean: stall healer would re-fire `no_session_revision:pr-753` even though PR #753 MERGED 21:09:28Z — FP; G-rule no-session-revision-merged-pr-fp-001 → 2/3. PR #754 in Mirror review (~12 min, watchdog=healthy). PRs #755 AUTO_MERGE_HELD (#760). PRs #759/#760 Mirror queue. gh 401 WARNs: last 14:57 MDT (unchanged). Beacon rate-limited until 14:00Z 2026-06-30. Watermark 1073. Trailing-30d ratio≈16.94 (trend: improving). Tier 1, consecutive_clean=0.
 
 
