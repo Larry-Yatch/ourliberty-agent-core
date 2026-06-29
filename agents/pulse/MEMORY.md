@@ -316,8 +316,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T19:03Z UTC (Iter ~3256, Tier 1)
+## Status snapshot — updated 2026-06-29T19:10Z UTC (Iter ~3257, Tier 1)
 
-**Iter ~3256 summary (2026-06-29T19:03Z):** PR #751 MERGED at 18:55:57Z ("feat(gate): steady-state regression-baseline warmer"). All 3 open PRs (#752/#753/#754) have Mirror reviews queued (dispatched 12:45/12:55/13:00 MDT). Larry messaged "there are no pending approvals" at 12:56 MDT — stale beacon-pending entry (mirror-review-p3a-retro-prep, PR #747 MERGED) confirmed; cleanup pending Beacon rate-limit clear. G-rule sync-service-deploy-restart-storm-tier4-001 hit 3/3 → DISPATCHED to Beacon. Beacon rate-limited until 8am MDT 2026-06-30. PRIME ratio ~17.08, trend improving. Tier 1, consecutive_clean=0.
+**Iter ~3257 summary (2026-06-29T19:10Z):** G-rule sync-service-deploy-restart-storm direction-ask CONFIRMED processed by Beacon at 19:05:08Z ($0.45); APPROVAL_REQUEST `alert-translation-sync-deploy-restart-storm-001` delivered to Larry at 13:07:05 MDT — Larry needs to reply "approve" to trigger Forge config-only PR. PR #755 new (19:05:23Z, "fix: decouple agents/ state-root from per-tier auth HOME swap", CLEAN/MERGEABLE, below 2h threshold). Mirror review #752 re-started post-storm (18:58:04Z); reviews #753/#754 queued. Beacon rate-limited until 8am MDT 2026-06-30; subprocess functional. beacon-pending: 2 items (1 stale p3a-retro-prep + 1 valid alert-translation). PRIME ratio ~17.10, trend improving. Tier 1, consecutive_clean=0.
 
 
