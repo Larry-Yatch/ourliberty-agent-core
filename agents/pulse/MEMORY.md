@@ -310,9 +310,9 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 ---
 
 
-## regression-baseline-warm worktree proliferation — 1/3 (new, iter ~3269)
+## regression-baseline-warm worktree proliferation — 2/3 (updated iter ~3270)
 
-**Rule:** Regression baseline warmer (PR #751) creates git worktrees in /tmp/regbaseline-warm-*/ without cleanup. 139 worktrees accumulated in .git/worktrees/ (91 locked + 39 prunable), causing git fetch/push to fail with "fatal: bad object worktrees/gate-wt-*/HEAD". `git worktree prune` removes 39 prunable; locked worktrees need lock-file removal before pruning. The worktree causing the specific error (gate-wt-f0d7bcdc5cc24) is locked in /tmp/regbaseline-warm-0ge61bfy/. Ask-then-do: Larry approves `git worktree prune` + investigation; permanent fix: regression baseline warmer must clean up its own worktrees on completion. First occurrence iter ~3269.
+**Rule:** Regression baseline warmer (PR #751) creates git worktrees in /tmp/regbaseline-warm-*/ without cleanup. 139 worktrees accumulated in .git/worktrees/ (91 locked + 39 prunable) in iter ~3269; count fell to 102 in iter ~3270 (prunable entries reclaimed) but locked worktree gate-wt-f0d7bcdc5cc24 (in /tmp/regbaseline-warm-0ge61bfy/) continues to block git fetch/push. Repo now ahead of origin/main by 2 commits (compounding: each cycle auto-commits but push fails). Ask-then-do: Larry approves `git worktree prune` + locked worktree investigation; permanent fix: regression baseline warmer must clean up its own worktrees on completion. Dispatch to Beacon at 3/3. Occurrences: iter ~3269 (1/3, 139 worktrees); iter ~3270 (2/3, 102 worktrees, blocker persists).
 
 ---
 
@@ -322,8 +322,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-29T21:22Z UTC (Iter ~3269, Tier 1)
+## Status snapshot — updated 2026-06-29T21:32Z UTC (Iter ~3270, Tier 1)
 
-**Iter ~3269 summary (2026-06-29T21:22Z):** ⚠️ git worktree proliferation: 139 worktrees (91 locked + 39 prunable from /tmp/regbaseline-warm-*/ regression baseline warmer PR #751) blocking git fetch/push. Repo ahead origin/main by 1 commit (run_cycle.sh push from iter ~3268 failed silently). larry-alerts [warning] queued for post rate-limit delivery. Check 3 CLEAN (0 stalls). PR #757 MERGED (15:15 MDT) → G-rule sync-service-deploy-restart-storm COMPLETE ✅. PR #754 now held behind #759. PRs #755/#756 REVIEW_PASS held (#760/#758). PRs #758/#759/#760 in Mirror queue. Mirror active on #753-rev1 (~20 min, watchdog=healthy). gh 401 WARNs: 4 total, last 14:57 MDT. Beacon rate-limited until 14:00Z 2026-06-30. Watermark 1072. Tier 1, consecutive_clean=0.
+**Iter ~3270 summary (2026-06-29T21:32Z):** ⚠️ git worktree proliferation persists: 102 worktrees (down from 139 in iter ~3269); locked gate-wt-f0d7bcdc5cc24 still blocks git fetch/push. Repo ahead origin/main by 2 commits (compounding). G-rule 2/3. PR #757 confirmed MERGED. Check 3 CLEAN (0 stalls). Mirror active on PR #753-rev1 (~30 min, watchdog=healthy). PRs #754/#755/#756 REVIEW_PASS AUTO_MERGE_HELD. PRs #758/#759/#760 in Mirror queue. gh 401 WARNs: 4 total, last 14:57 MDT. Beacon rate-limited until 14:00Z 2026-06-30. Watermark 1073. Tier 1, consecutive_clean=0.
 
 
