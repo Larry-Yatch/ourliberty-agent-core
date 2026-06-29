@@ -66,6 +66,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 import medic_ledger  # noqa: E402
 import larry_alerts  # noqa: E402
+import marker_paths  # noqa: E402  # shared restart-coordination marker paths (watchdog parity)
 
 HOME = Path.home()
 REPO_DIR = Path(os.environ.get('OURLIBERTY_REPO_DIR', str(HOME / 'agent-core')))
@@ -191,16 +192,15 @@ def _load_reversible_targets() -> dict:
 # markers below and refuses+escalates (diagnose-only) when a peer is already
 # managing the unit's restart.
 #
-# These path/window conventions MIRROR scripts/watchdog.py so the two agree.
-# They are REPLICATED rather than imported because watchdog.py hardcodes
-# AGENTS_ROOT = ~/agents and would not honor medic's OURLIBERTY_AGENTS_ROOT
-# override (which the env contract and test isolation depend on). Keep them in
-# sync with watchdog.py if its markers ever move.
+# These marker PATHS are now built by the shared scripts/marker_paths.py module
+# imported by BOTH watchdog.py and this file, so the path shape lives in exactly
+# one place and the two agents cannot silently drift. The builders take an
+# agents_root argument rather than importing watchdog's hardcoded AGENTS_ROOT,
+# precisely so medic's OURLIBERTY_AGENTS_ROOT override (which the env contract
+# and test isolation depend on) is honored -- we pass our own AGENTS_ROOT.
+# The fresh/cooldown WINDOWS below are medic-local read-side thresholds (how
+# long a marker is treated as live); they remain here.
 
-# watchdog.py _FLAP_STREAK_DIR -- per-service consecutive-auto-restart counter.
-# Keyed by the service name WITHOUT '.service' but WITH the 'ourliberty-' prefix
-# (the AUTO_RESTART_SERVICES entries), e.g. 'ourliberty-inbox-watcher'.
-_FLAP_STREAK_DIR = AGENTS_ROOT / 'state' / 'auto-restart-flap'
 # A flap marker is only treated as an ACTIVE flap if touched within this window;
 # an older marker is considered stale (watchdog stopped updating it) so a
 # forgotten marker can never permanently wedge a legitimate restart. Generously
@@ -221,23 +221,10 @@ REASON_FLAPPING = 'flapping-defer-to-systemd'
 REASON_RECENTLY_RESTARTED = 'recently-restarted'
 
 
-def _flap_marker_name(unit: str) -> str:
-    """watchdog keys the flap marker by the service name without the '.service'
-    suffix but keeping the 'ourliberty-' prefix (AUTO_RESTART_SERVICES), e.g.
-    ourliberty-inbox-watcher.service -> ourliberty-inbox-watcher."""
-    return unit[:-len('.service')] if unit.endswith('.service') else unit
-
-
-def _unit_short_name(unit: str) -> str:
-    """Map a unit to the short name watchdog uses for its cooldown markers:
-    strip the 'ourliberty-' prefix AND the '.service' suffix
-    (ourliberty-inbox-watcher.service -> inbox-watcher). Mirrors the literal
-    'inbox-watcher-mem-restart-cooldown' marker and the policy short keys used
-    for '<short>-reconcile-cooldown'."""
-    name = _flap_marker_name(unit)  # strips the '.service' suffix
-    if name.startswith('ourliberty-'):
-        name = name[len('ourliberty-'):]
-    return name
+# Name transforms are delegated to the shared module so watchdog and medic
+# derive the same marker keys from a unit name.
+_flap_marker_name = marker_paths.flap_marker_name
+_unit_short_name = marker_paths.unit_short_name
 
 
 def _recent_peer_restart(unit: str) -> tuple[bool, str, str]:
@@ -261,7 +248,7 @@ def _recent_peer_restart(unit: str) -> tuple[bool, str, str]:
     #    (it never actuates during auto-restart). A freshly-touched marker =>
     #    a flap is in progress; restarting now would reset systemd's backoff.
     try:
-        flap = _FLAP_STREAK_DIR / _flap_marker_name(unit)
+        flap = marker_paths.flap_streak_path(AGENTS_ROOT, _flap_marker_name(unit))
         if flap.exists() and (now - flap.stat().st_mtime) < _FLAP_FRESH_WINDOW_SEC:
             try:
                 streak = flap.read_text().strip() or '?'
@@ -279,7 +266,7 @@ def _recent_peer_restart(unit: str) -> tuple[bool, str, str]:
     # 2a. V2 process-memory restart cooldown. watchdog touches this marker on a
     #     mem-restart (15-min window); a peer just restarted the unit.
     try:
-        mem = AGENTS_ROOT / 'state' / f'{short}-mem-restart-cooldown'
+        mem = marker_paths.mem_restart_cooldown_path(AGENTS_ROOT, short)
         if mem.exists():
             age = now - mem.stat().st_mtime
             if age < _MEM_RESTART_COOLDOWN_SEC:
@@ -294,7 +281,7 @@ def _recent_peer_restart(unit: str) -> tuple[bool, str, str]:
     #     {window_start, count, paged}; a recent reconcile restart means a peer
     #     is managing recovery within the rolling window.
     try:
-        rec = AGENTS_ROOT / 'state' / f'{short}-reconcile-cooldown'
+        rec = marker_paths.reconcile_marker_path(AGENTS_ROOT, short)
         if rec.exists():
             data = json.loads(rec.read_text())
             window_start = float(data['window_start'])

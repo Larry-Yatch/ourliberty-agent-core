@@ -63,6 +63,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 import bot_liveness_policy  # noqa: E402
 import dispatch_lease  # noqa: E402  # TTL constant for the dispatch-lease suppressor
 import larry_alerts  # noqa: E402
+import marker_paths  # noqa: E402  # shared restart-coordination marker paths (Medic parity)
 from atomic_io import atomic_write_json  # noqa: E402
 
 AGENTS_ROOT = Path.home() / 'agents'
@@ -105,7 +106,9 @@ ALIVE_ACTIVE_STATES = ('active', 'activating', 'deactivating', 'reloading')
 # >=2 consecutive checks (watchdog cadence is minutes apart) means it is not a
 # transient restart.
 AUTO_RESTART_FLAP_TICKS = 2
-_FLAP_STREAK_DIR = AGENTS_ROOT / 'state' / 'auto-restart-flap'
+# Per-service consecutive-auto-restart counter dir. Path shape is owned by the
+# shared marker_paths module (Medic reads these same markers -- parity).
+_FLAP_STREAK_DIR = marker_paths.flap_streak_dir(AGENTS_ROOT)
 
 # inbox-watcher RSS threshold for V2 process-memory check. Restart above
 # this. Q2-Dial: 1.5 GB (was 1 GB on upstream's orchestrator; we have
@@ -478,7 +481,7 @@ def check_inbox_watcher_memory() -> dict:
     if rss_bytes is None:
         return {'status': 'unavailable', 'reason': f'VmRSS unreadable for pid {main_pid}'}
 
-    cooldown_marker = AGENTS_ROOT / 'state' / 'inbox-watcher-mem-restart-cooldown'
+    cooldown_marker = marker_paths.mem_restart_cooldown_path(AGENTS_ROOT, 'inbox-watcher')
     try:
         cooldown_marker.parent.mkdir(parents=True, exist_ok=True)
     except OSError:
@@ -780,7 +783,7 @@ def check_log_growth() -> dict:
 
 
 def _reconcile_marker_path(short: str) -> Path:
-    return AGENTS_ROOT / 'state' / f'{short}-reconcile-cooldown'
+    return marker_paths.reconcile_marker_path(AGENTS_ROOT, short)
 
 
 def _read_reconcile_marker(short: str, now: float) -> dict:
