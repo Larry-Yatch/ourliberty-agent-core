@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T07:57Z UTC (Iter ~3212, Tier 1, reset from fast-forward)
+## Status snapshot — updated 2026-06-29T08:04Z UTC (Iter ~3213, Tier 1, consecutive_clean=1)
 
-**Iter ~3212 summary:** ⚠️ Drift — fast-forward action (a79fc2fd→e69a0686, PR #747 p3a-retro-prep merge). Tier 3→1 reset. 1 new alert (L1102 heal-wedged-review-sessions, Tier-3 silence). PR #747 MERGED ✅ (07:53:48Z). PR #748 (p2b-migrate) OPEN — Mirror regression check PID 572924 running (parent=e69a0686, head=bf6efe74, 900s timeout). p3b-retro-author: Forge preflight PID 573069 running (~2 min). beacon-pending has stale `mirror-review-p3a-retro-prep` entry (PR already merged, cleanup pending). HOLD in effect. No new G-rule triggers.
+**Iter ~3213 summary:** ✅ Nominal (iter_clean). Tier 1, consecutive_clean=1. 0 new alerts. PR #748 (p2b-migrate) OPEN — Mirror regression check PID 572924 running (~10 min in, 900s timeout). p3b-retro-author: Forge build PID 576584 active (build-phase started 07:59:42Z, resume=68238886). beacon-pending stale entry (mirror-review-p3a-retro-prep, PR #747 merged, cleanup pending). HOLD in effect. No new G-rule triggers.
 
 
