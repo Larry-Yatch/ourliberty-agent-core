@@ -432,6 +432,12 @@
       "tier": "SOON",
       "plain_language_summary": "ourliberty-sync ran with REQUIRE_QUIESCENCE=1 and the strict-quiescence wait exceeded its timeout; sync rolled back. A non-quiescent agent kept the tree from being safely swapped.",
       "recommended_action": "ssh ourliberty-vm, `cd ~/agent-core && python3 scripts/await_quiescence.py` to identify the busy agent(s). Resolve before the next sync tick (or let sync run without REQUIRE_QUIESCENCE if soft-quiescence is acceptable)."
+    },
+    "deploy-restart-storm": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "ourliberty-sync.service detected a widely-imported module change after a PR merge and restarted the dependent daemons (typically 6-8) so they pick up the new code. This restart storm is the expected, self-healing deploy mechanism — it is how a code change propagates to running daemons, not a fault. route=digest confirms the system is healthy.",
+      "recommended_action": "None — the multi-daemon restart is the deploy completing successfully. If individual daemons fail to come back healthy AFTER a restart storm (distinct from the storm itself), the per-daemon healer alerts surface that separately. Producer: ourliberty-sync.service post-merge deploy hook."
     }
   },
   "cycle-tier-state": {
