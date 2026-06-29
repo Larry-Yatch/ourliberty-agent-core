@@ -322,8 +322,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-29T22:38Z UTC (Iter ~3279, Tier 1)
+## Status snapshot — updated 2026-06-29T22:46Z UTC (Iter ~3280, Tier 1)
 
-**Iter ~3279 summary (2026-06-29T22:38Z):** ⚠️ git worktree proliferation: 107 worktrees, 91 locked; **13 commits ahead** (compounding; was 11 in ~3278); sync 2h38m stale. **Forge PID 1060133 building cleanup-001 (~15 min running). Beacon session PID 1091313 active at 22:36Z — picked up direction-ask-forge-wip-redispatch-exhausted-pr-guard-002 and queued APPROVAL_REQUEST for Larry at 22:36:17Z (G-rule forge-wip-redispatch-exhausted-pr-guard-002 moving forward).** PR #754 AUTO_MERGE_HELD blocker=#759. PR #759 rev1 still in Mirror inbox (no Mirror session active). beacon-pending-approvals: 1 (mirror-review-p3a-retro-prep, ~15h, chat_id=None). Check 0: 1 new alert (missions-card-gc push-failed → Tier 3 silence), watermark=1077. 2 new gh 401/502 WARNs in outbox-notifier at 22:28Z. No stalls. Watchdog healthy 22:34Z. Trailing-30d ratio≈17.07 (trend: improving). Tier 1, consecutive_clean=0.
+**Iter ~3280 summary (2026-06-29T22:46Z):** ⚠️ git worktree proliferation: 106 worktrees, 91 locked; **14 commits ahead** (compounding; was 13 in ~3279); sync 2h47m stale. **KEY: Forge COMPLETED regression-warmer-worktree-leak-cleanup-001 at ~22:42Z — PR #761 OPEN, Mirror review queued.** Two APPROVAL_REQUESTs delivered to Larry in Telegram: (1) heal-wip-redispatch-already-merged-suppress-001 (22:36Z); (2) heal-no-session-escalate-preserve-target-repo-001 (22:40Z). beacon-pending-approvals now 3 pending. NEW stall: `no_session_revision:pr-ourliberty-agent-core-759` cooldown expired; Mirror inbox has 3 queued reviews (759-rev1, 760, 761), no Mirror session running. Check 0: 2 new alerts (both approval_request delivery confirmations → Tier 3 silence), watermark=1079. Watchdog healthy 22:40Z. Trailing-30d ratio≈17.09 (trend: improving). Tier 1, consecutive_clean=0.
 
 
