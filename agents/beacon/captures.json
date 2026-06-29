@@ -693,7 +693,8 @@
         "kind": "delegate",
         "task_id": "delegate-cap-pipeline-empty-state-hint-a62a",
         "stamped_at": "2026-06-25T17:05:25.638820+00:00"
-      }
+      },
+      "aging": true
     },
     {
       "id": "cap-p5-dag-status-on-cards-a822",
@@ -763,7 +764,8 @@
         "kind": "delegate",
         "task_id": "delegate-cap-board-new-mission-has-no-confirmation-drain-lag-5dbc",
         "stamped_at": "2026-06-25T17:05:59.478837+00:00"
-      }
+      },
+      "aging": true
     },
     {
       "id": "cap-board-launch-build-has-no-spec-select-spec-docs-fc93",
@@ -793,7 +795,8 @@
         "at": "2026-06-20T00:34:09.968534+00:00",
         "from_state": "parked"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "aging": true
     },
     {
       "id": "cap-board-card-doesn-t-reflect-a-successful-launch-d-4c0e",
@@ -823,7 +826,8 @@
         "at": "2026-06-20T01:14:19.913222+00:00",
         "from_state": "parked"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "aging": true
     },
     {
       "id": "cap-board-add-abort-for-a-dispatched-build-no-way-to-c22d",
@@ -853,7 +857,8 @@
         "at": "2026-06-20T02:04:48.404818+00:00",
         "from_state": "parked"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "aging": true
     },
     {
       "id": "cap-abort-gate-fast-follow-close-heal-pr-auto-merge-609e",
@@ -883,7 +888,8 @@
         "at": "2026-06-21T19:57:18.762273+00:00",
         "from_state": "parked"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "aging": true
     },
     {
       "id": "cap-state-log-active-missions-panel-shows-stale-phas-3740",
@@ -913,7 +919,8 @@
         "at": "2026-06-21T21:49:00.461836+00:00",
         "from_state": "parked"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "aging": true
     },
     {
       "id": "cap-p6-verify-brainstorm-card-render-check-c7cc",
@@ -943,7 +950,8 @@
         "from_state": "parked"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
-      "updated_at": "2026-06-22T05:14:33.765405+00:00"
+      "updated_at": "2026-06-22T05:14:33.765405+00:00",
+      "aging": true
     },
     {
       "id": "cap-auto-retire-done-pipeline-cards-follow-up-to-pha-be83",
