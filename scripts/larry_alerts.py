@@ -85,7 +85,17 @@ VALID_SEVERITIES = ('info', 'warning', 'critical')
 #              SIGNIFICANT successful heals.
 #   digest   — NOT DM'd; the daily CEO digest surfaces it as a self-healed line.
 #              Routine successful heals.
-VALID_ROUTES = ('escalate', 'closure', 'digest')
+#   hold     — NOT DM'd at read-time (the bot skips it, same as digest), but UNLIKE
+#              digest it is NOT a closed/self-healed line — it is a pending judgment
+#              the hybrid DM gate (alert-pipeline-rework B1) is deliberately holding
+#              back from Larry's phone. It still lands on the dashboard via the
+#              shipper. A held line is promoted into a DM by APPENDING a fresh
+#              escalate line (B3) — either by Pulse Check 0, the persistence rule
+#              (B5, after N cycles), or the Pulse-independent backstop (B6, after
+#              30 min). A `critical` alert is NEVER held: append_alert forces
+#              escalate for critical (B2), and the bot re-checks severity at read
+#              time so a mis-routed critical hold still DMs.
+VALID_ROUTES = ('escalate', 'closure', 'digest', 'hold')
 DEFAULT_ROUTE = 'escalate'
 
 
@@ -313,10 +323,14 @@ def append_alert(
             alerts from one source share a single cooldown bucket.
         suggested_action: optional shell command the operator can run.
         route: 'escalate' (DM now), 'closure' (DM a one-line self-healed
-            confirmation), or 'digest' (no DM; surfaced in the daily CEO
-            digest). Defaults to 'digest' for severity=='info' and 'escalate'
-            otherwise. An unknown value falls back to 'escalate' so a mistake
-            over-notifies rather than silently drops.
+            confirmation), 'digest' (no DM; surfaced in the daily CEO digest),
+            or 'hold' (no DM at read-time, but a pending judgment the hybrid DM
+            gate is holding back — promoted to a DM later by an appended escalate
+            line; see B1/B3). Defaults to 'digest' for severity=='info' and
+            'escalate' otherwise. A 'critical' severity FORCES 'escalate' (B2),
+            overriding any supplied route — a critical can never be held/digested.
+            An unknown value falls back to 'escalate' so a mistake over-notifies
+            rather than silently drops.
     """
     refuse_under_test('larry-alerts')
     if severity not in VALID_SEVERITIES:
@@ -335,6 +349,13 @@ def append_alert(
     # a DM passes route='escalate' itself.
     if route is None:
         route = 'digest' if severity == 'info' else DEFAULT_ROUTE
+    # B2 (alert-pipeline-rework): a `critical` alert ALWAYS DMs. Force escalate
+    # regardless of any caller-supplied route, so a caller can never accidentally
+    # `hold` or `digest` a critical and silence it. This is the emit-time half of
+    # the guarantee; the bot's read-time `severity != 'critical'` check in the
+    # hold/digest skip branch is the second line of defense.
+    if severity == 'critical':
+        route = 'escalate'
     if route not in VALID_ROUTES:
         # Fail-loud: an invalid route degrades to escalate (a DM), never to a
         # silent drop.
@@ -364,6 +385,61 @@ def append_alert(
         return False
     _mark_cooldown(severity, key)
     return True
+
+
+# ---------- held-alert promotion (alert-pipeline-rework B3) ----------
+
+# Subject marker appended to a promoted held alert's subject. The promotion line
+# MUST land in a distinct cooldown bucket from the original held line (whose key
+# is `source:subject`), or the original line's cooldown would swallow it and the
+# promotion would never DM. The marker also makes promotions visually distinct on
+# the dashboard / in the queue.
+PROMOTION_SUBJECT_SUFFIX = '::promoted'
+
+
+def append_promotion(
+    source: str,
+    severity: str,
+    message: str,
+    subject: str,
+    suggested_action: Optional[str] = None,
+    reason: str = 'promoted',
+) -> bool:
+    """Append a fresh ``route='escalate'`` line that promotes a previously-held
+    alert into a DM (alert-pipeline-rework B3).
+
+    Promotion is APPEND-only: the bot's offset cursor is forward-only, so the
+    only way to turn a ``hold`` line into a DM is to append a NEW escalate line —
+    rewriting the held line in place is invisible to the bot. The promotion line
+    carries a DISTINCT subject marker (``<subject>::promoted``) so it lands in
+    its own cooldown bucket and is never swallowed by the original held line's
+    cooldown, plus ``promotion: True`` and ``promoted_from`` (the original
+    ``source:subject`` fingerprint) so the promote-once machinery (B5/B6) can
+    detect from the queue that this fingerprint was already promoted.
+
+    Cooldown and silence gates are intentionally bypassed (a direct locked
+    append, not ``append_alert``): the caller — the persistence rule (B5) or the
+    Pulse-independent backstop (B6) — has already confirmed the hold is unresolved
+    (not silenced, not already promoted), and a promotion must always reach Larry.
+
+    Never raises — returns True on success, False on a write failure, so callers
+    can treat a False as "leave un-promoted, retry next cycle".
+    """
+    refuse_under_test('larry-alerts')
+    record = {
+        'ts': datetime.now(timezone.utc).isoformat(),
+        'source': source,
+        'severity': severity,
+        'message': message,
+        'route': 'escalate',
+        'subject': f'{subject}{PROMOTION_SUBJECT_SUFFIX}',
+        'promotion': True,
+        'promoted_from': f'{source}:{subject}',
+        'promotion_reason': reason,
+    }
+    if suggested_action:
+        record['suggested_action'] = suggested_action
+    return _locked_append(json.dumps(record, ensure_ascii=False) + '\n')
 
 
 # ---------- alert retraction (resolve a stale escalate after out-of-band fix) ----------

@@ -383,6 +383,42 @@ Both are auto-covered by the `systemd-install-drift` healer (it discovers every 
 |---|---|---|
 | `heal-projects-store` (projects-v3 P3) | 10 min | An on-disk delta on `agents/beacon/projects.json` (from a dashboard promote / advance / attach-spec / archive / launch write) → normalize + commit it to `main`. The single committer of the projects store; needs `EnvironmentFile=.env.larry` for git push. |
 
+### Held-alert escalation (alert-pipeline-rework B5 + B6)
+
+Two timer-driven oneshots that promote stale `hold` alerts into DMs. A `hold`
+(alert-pipeline-rework B1) lands on the dashboard but is NOT DM'd; these jobs
+decide a held line has sat unresolved long enough and APPEND a fresh `escalate`
+line (B3) to surface it. Two deliberately-redundant paths:
+
+- `ourliberty-held-alert-persistence.{service,timer}` — B5 persistence rule
+  (every 10 min, aligns with the Pulse cycle). Promotes a fingerprint open ≥ 3
+  consecutive cycles (~30 min), tracked in `~/agents/state/held-alert-probation.json`.
+- `ourliberty-held-alert-backstop.{service,timer}` — B6 Pulse-independent
+  backstop (every 15 min). Stateless: promotes any hold whose own `ts` is older
+  than 30 min, so it fires even if the persistence timer or Pulse itself is dead.
+
+Promote-once is queue-authoritative (a promotion line marks its fingerprint
+resolved on the next scan), so the two paths never double-promote across cycles.
+
+```bash
+sudo cp ~/agent-core/systemd/ourliberty-held-alert-persistence.service /etc/systemd/system/
+sudo cp ~/agent-core/systemd/ourliberty-held-alert-persistence.timer /etc/systemd/system/
+sudo cp ~/agent-core/systemd/ourliberty-held-alert-backstop.service /etc/systemd/system/
+sudo cp ~/agent-core/systemd/ourliberty-held-alert-backstop.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now ourliberty-held-alert-persistence.timer
+sudo systemctl enable --now ourliberty-held-alert-backstop.timer
+
+# Verify install landed AND the timers are active (merged != installed).
+systemctl is-active ourliberty-held-alert-persistence.timer
+systemctl is-active ourliberty-held-alert-backstop.timer
+systemctl list-timers 'ourliberty-held-alert-*'
+```
+
+Both are auto-covered by the `systemd-install-drift` healer. Full ops detail
+(the open-hold + promote-once model, tuning, kill switches) is at
+`runbooks/held-alert-escalation.md`.
+
 ## Checking state
 
 ```bash

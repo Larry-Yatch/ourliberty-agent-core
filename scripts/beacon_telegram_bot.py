@@ -993,8 +993,18 @@ def _check_pending_alerts() -> None:
         # escalate fall through and DM as before. This is the ONLY no-DM
         # advance besides malformed; the non-digest failed-DM path below still
         # does NOT advance the offset (M2 per-line-ack invariant intact).
-        if alert.get('route') == 'digest':
-            log(f"alert idx={idx} route=digest; skipping DM "
+        #
+        # B1 (alert-pipeline-rework): `hold` joins `digest` as a no-DM route.
+        # A held line lands on the dashboard (via the shipper) but does NOT DM
+        # Larry; it is later promoted to a DM only by appending a fresh
+        # escalate line (held_alert_escalation / append_promotion). The
+        # `severity != 'critical'` guard is the read-time half of the
+        # critical-always-DMs guarantee (the emit-time half is append_alert
+        # forcing route='escalate' for critical): even if a critical somehow
+        # carries route=hold/digest, the bot still DMs it.
+        if alert.get('route') in ('digest', 'hold') and \
+                alert.get('severity') != 'critical':
+            log(f"alert idx={idx} route={alert.get('route')}; skipping DM "
                 f"(source={alert.get('source')}, subject={alert.get('subject', '-')})")
             larry_alerts.write_offset(idx + 1)
             continue
