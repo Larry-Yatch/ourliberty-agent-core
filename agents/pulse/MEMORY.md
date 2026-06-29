@@ -309,8 +309,14 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T15:46Z UTC (Iter ~3230, Tier 3→1 reset)
+## G-rule review-escalate-approval-dedup-by-old-build-approval-001 — 1/3 (new, iter ~3232)
 
-**Iter ~3230 summary (2026-06-29T15:46Z):** ⚠️ Signal. Tier reset 3→1 (sync push failed + unreviewed-merge:749). HOLD LIFTED confirmed. PR #749 MERGED (Larry direct, no Mirror review). PR #750 MERGED (Check VIII deprecated). PR #751 OPEN — Mirror actively reviewing. Beacon bot rate-limited until 8am MDT 2026-06-30. Sync push failed (non-FF reject: PR #749 merge landed on origin before local push); self-heal on next sync tick. 2 APPROVAL_REQUESTs pending Larry: forge-wip-redispatch-exhausted + decision-needed-no-target-repo (visible Approvals tab). Larry said "I believe that it is already approved, correct?" at 09:25 MDT — bot couldn't respond (rate-limited). PRIME ratio ~17.07, trend improving.
+**Rule:** When outbox-notifier tries to create an APPROVAL_REQUEST via the "beacon replan" path after a Mirror REVIEW_ESCALATE, it finds an existing `beacon-pending-approvals.json` entry with the SAME task_id (the original Forge build-approval) and skips the new create. Result: DM is delivered to Larry but no Approvals tab entry exists for the review-escalate decision. Larry sees the DM but has no structured approval gate to respond to; must reply via Telegram message instead. First occurrence: iter ~3232, PR #751 (regression-gate-steady-state-warmer-001). The original build-approval entry was created at 14:56:31Z UTC (before Mirror even ran); the review-escalate attempted create at 16:02Z UTC. Fix: outbox-notifier's beacon-replan dedup logic should differentiate approval purpose (build-approval vs. review-escalate decision) before skipping the create. Dispatch to Beacon at 3/3.
+
+---
+
+## Status snapshot — updated 2026-06-29T16:06Z UTC (Iter ~3232, Tier 1)
+
+**Iter ~3232 summary (2026-06-29T16:06Z):** ⚠️ Signal. PR #751 (regression-gate-steady-state-warmer-001) Mirror review timed out at 2100s ceiling. DM delivered to Larry 09:58 MDT. APPROVAL_REQUEST blocked by dedup bug (1/3 for new G-rule above). Awaiting Larry decision via Telegram when Beacon rate-limit clears (8am MDT 2026-06-30). Sequence alert-pipeline-rework still PAUSED. Sync still error (self-heal pending). All inboxes empty. PRIME ratio ~17.07, trend improving. Tier 1, consecutive_clean=0.
 
 
