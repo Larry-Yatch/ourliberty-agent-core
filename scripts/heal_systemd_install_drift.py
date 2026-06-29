@@ -1197,7 +1197,7 @@ def run_once(
                 msg, subj, sug = _render_install_healed(unit, next_fire)
                 route = _classify_route(subj, healed=True)
                 ok = dm_larry(message=msg, subject=subj, suggested_action=sug,
-                              route=route)
+                              severity='info', route=route)
                 if ok:
                     counts['dm_sent'] += 1
                     _record_dm(state, unit, now=now)

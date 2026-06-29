@@ -721,7 +721,7 @@ def _emit_summary(results: list[SweepResult], dry_run: bool) -> None:
             message=summary, subject='gh-unavailable', route='escalate')
     elif local_pruned or remote_pruned or capped:
         larry_alerts.append_alert(
-            source='dispatch-branch-cleanup', severity='warning',
+            source='dispatch-branch-cleanup', severity='info',
             message=summary, subject='summary', route='digest')
 
 
