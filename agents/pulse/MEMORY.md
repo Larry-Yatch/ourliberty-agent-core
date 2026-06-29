@@ -285,9 +285,9 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## G-rule sync-service-deploy-restart-storm-tier4-001 — 2/3 (updated iter ~3216)
+## G-rule sync-service-deploy-restart-storm-tier4-001 → DISPATCHED ✅ (iter ~3256)
 
-**Rule:** `source=sync.service, subject=deploy-restart-storm` alerts classify Tier-4 (novel, no translation match). Fire when a PR deploy causes a widely-imported module change and sync.service restarts all daemons. Alert's own `route=digest`; beacon bot correctly silences (no DM). All daemons restart cleanly. Should be Tier-3. Dispatch to Beacon at 3/3 (post-HOLD). Occurrences: iter ~3044 (1/3, PR #734 deploy, 04:47:02Z); iter ~3216 (2/3, PR #748 deploy, 08:27:16Z, 8 daemons).
+**Rule:** `source=sync.service, subject=deploy-restart-storm` alerts classify Tier-4 (novel, no translation match). Fire when a PR deploy causes a widely-imported module change and sync.service restarts all daemons. Alert's own `route=digest`; beacon bot correctly silences (no DM). All daemons restart cleanly. Should be Tier-3. Dispatched `direction-ask-sync-service-deploy-restart-storm-tier3-translation-001.json` to Beacon inbox at iter ~3256. Fix: add Tier-3 silence entry for source=sync.service subject=deploy-restart-storm to config/alert-translations.json. Occurrences: iter ~3044 (1/3, PR #734 deploy, 04:47:02Z); iter ~3216 (2/3, PR #748 deploy, 08:27:16Z, 8 daemons); iter ~3256 (3/3, PR #751 deploy, 18:56:33Z, 6 daemons). verification_pending.
 
 ---
 
@@ -316,8 +316,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T18:49Z UTC (Iter ~3254, Tier 1)
+## Status snapshot — updated 2026-06-29T19:03Z UTC (Iter ~3256, Tier 1)
 
-**Iter ~3254 summary (2026-06-29T18:49Z):** PR #752 Mirror review dispatched at 12:45:29 MDT (review-pr-ourliberty-agent-core-752.json in mirror inbox; inbox-watcher running) — prior "no review" finding resolved. PR #753 brand new (18:42Z): "beacon: honor the active-tier pin for the primary call (stop draining Tier 1)", Larry-authored, CLEAN/MERGEABLE, no Mirror review yet (7 min old, below 2h stall threshold; outbox-notifier will dispatch on next scan). PR #751 OPEN (UNSTABLE, review-escalated). Beacon rate-limited until 8am MDT 2026-06-30. Two APPROVAL_REQUEST gaps + "resume sequence" + "where are we with 751/752?" directives still unprocessed at primary Beacon level. PRIME ratio ~17.08, trend improving. Tier 1, consecutive_clean=0.
+**Iter ~3256 summary (2026-06-29T19:03Z):** PR #751 MERGED at 18:55:57Z ("feat(gate): steady-state regression-baseline warmer"). All 3 open PRs (#752/#753/#754) have Mirror reviews queued (dispatched 12:45/12:55/13:00 MDT). Larry messaged "there are no pending approvals" at 12:56 MDT — stale beacon-pending entry (mirror-review-p3a-retro-prep, PR #747 MERGED) confirmed; cleanup pending Beacon rate-limit clear. G-rule sync-service-deploy-restart-storm-tier4-001 hit 3/3 → DISPATCHED to Beacon. Beacon rate-limited until 8am MDT 2026-06-30. PRIME ratio ~17.08, trend improving. Tier 1, consecutive_clean=0.
 
 
