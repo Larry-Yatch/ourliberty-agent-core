@@ -1,0 +1,20 @@
+[Unit]
+Description=Run the held-alert backstop every 15 minutes (Pulse-independent 30-min safety net; B6)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/runbooks/held-alert-escalation.md
+
+[Timer]
+# Deliberately on a SEPARATE timer from persistence (B5): this is the safety net
+# that must fire even if the persistence timer or Pulse itself is dead. Every
+# 15 min catches any hold past its 30-min wall-clock age within ~15 min of the
+# threshold. First fire 5 min after boot so a stale hold from before a reboot is
+# re-evaluated promptly.
+OnBootSec=5min
+OnUnitActiveSec=15min
+# Jitter so it doesn't lock-step with the 10-min persistence timer / healers.
+RandomizedDelaySec=2min
+AccuracySec=30s
+
+Unit=ourliberty-held-alert-backstop.service
+
+[Install]
+WantedBy=timers.target

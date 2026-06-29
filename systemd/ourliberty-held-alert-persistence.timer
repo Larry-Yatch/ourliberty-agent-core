@@ -1,0 +1,17 @@
+[Unit]
+Description=Run the held-alert persistence rule every 10 minutes (aligns with the Pulse cycle; B5)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/runbooks/held-alert-escalation.md
+
+[Timer]
+# First fire 10 min after boot (let the queue settle), then every 10 min so a
+# held line that stays open crosses the N-cycle bar within ~3 cycles (~30 min).
+OnBootSec=10min
+OnUnitActiveSec=10min
+# Up to 2 min of random jitter so we don't lock-step with promote-alerts / healers.
+RandomizedDelaySec=2min
+AccuracySec=30s
+
+Unit=ourliberty-held-alert-persistence.service
+
+[Install]
+WantedBy=timers.target

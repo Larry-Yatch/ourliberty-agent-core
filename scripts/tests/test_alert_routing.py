@@ -170,7 +170,8 @@ class AppendAlertRouteTest(unittest.TestCase):
             larry_alerts.ALERTS_FILE.read_text().strip().splitlines()[-1])
 
     def test_route_round_trips(self):
-        for route in ('escalate', 'closure', 'digest'):
+        # B1: 'hold' is a valid route alongside the existing three.
+        for route in ('escalate', 'closure', 'digest', 'hold'):
             larry_alerts.append_alert(
                 source='heal-x', severity='warning', message='m',
                 subject=f'subj-{route}', route=route)
@@ -186,6 +187,71 @@ class AppendAlertRouteTest(unittest.TestCase):
             source='heal-x', severity='warning', message='m', subject='u',
             route='banana')
         self.assertEqual(self._last()['route'], 'escalate')
+
+    def test_critical_forces_escalate_even_when_held(self):
+        # B2: a critical can never be held/digested — emit-time guarantee.
+        for route in ('hold', 'digest', 'closure'):
+            larry_alerts.append_alert(
+                source='heal-x', severity='critical', message='m',
+                subject=f'crit-{route}', route=route)
+            self.assertEqual(self._last()['route'], 'escalate')
+
+    def test_critical_default_is_escalate(self):
+        larry_alerts.append_alert(
+            source='heal-x', severity='critical', message='m', subject='cd')
+        self.assertEqual(self._last()['route'], 'escalate')
+
+    def test_warning_hold_is_preserved(self):
+        # The B2 force is critical-only; a warning may legitimately be held.
+        larry_alerts.append_alert(
+            source='heal-x', severity='warning', message='m', subject='wh',
+            route='hold')
+        self.assertEqual(self._last()['route'], 'hold')
+
+
+class AppendPromotionTest(unittest.TestCase):
+    """B3: append_promotion writes a fresh escalate line with a distinct
+    ::promoted subject marker + promoted_from fingerprint, bypassing cooldown."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        root = Path(self._tmp.name)
+        self._patches = [
+            mock.patch.object(larry_alerts, 'ALERTS_FILE',
+                              root / 'larry-alerts.jsonl'),
+            mock.patch.object(larry_alerts, 'COOLDOWN_ROOT',
+                              root / 'alert-cooldown'),
+        ]
+        for p in self._patches:
+            p.start()
+
+    def tearDown(self):
+        for p in self._patches:
+            p.stop()
+        self._tmp.cleanup()
+
+    def _last(self) -> dict:
+        return json.loads(
+            larry_alerts.ALERTS_FILE.read_text().strip().splitlines()[-1])
+
+    def test_promotion_is_escalate_with_marker(self):
+        ok = larry_alerts.append_promotion(
+            source='heal-x', severity='warning', message='m', subject='stuck')
+        self.assertTrue(ok)
+        rec = self._last()
+        self.assertEqual(rec['route'], 'escalate')
+        self.assertEqual(rec['subject'], 'stuck' + larry_alerts.PROMOTION_SUBJECT_SUFFIX)
+        self.assertEqual(rec['promoted_from'], 'heal-x:stuck')
+        self.assertTrue(rec['promotion'])
+
+    def test_promotion_bypasses_cooldown(self):
+        # Mark the original fingerprint's cooldown, then promote: the distinct
+        # ::promoted bucket means the promotion is never swallowed.
+        larry_alerts._mark_cooldown('warning', 'heal-x:stuck')
+        ok = larry_alerts.append_promotion(
+            source='heal-x', severity='warning', message='m', subject='stuck')
+        self.assertTrue(ok)
+        self.assertEqual(self._last()['promoted_from'], 'heal-x:stuck')
 
 
 class OutcomeRenderTest(unittest.TestCase):
@@ -340,11 +406,41 @@ class BotLoopRoutingTest(unittest.TestCase):
             subject=subject, route=route)
         self.assertTrue(ok, f'append for {subject} was suppressed')
 
+    def _append_raw(self, record: dict):
+        # Bypass append_alert (e.g. to forge a critical+hold line append_alert
+        # would never let exist) and write a literal queue line.
+        with open(self._alerts, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(record) + '\n')
+
     def _capture_send(self, ok=True):
         def _fake(chat_id, text):
             self.sent.append((chat_id, text))
             return ok
         return _fake
+
+    def test_hold_skipped_no_dm_but_offset_advances(self):
+        # B1: a held warning is skip-advanced like digest — no DM, offset moves.
+        self._append('hold', 'pending-judgment')
+        with mock.patch.object(self.bot, '_send_alert_dm',
+                               side_effect=self._capture_send(True)):
+            self.bot._check_pending_alerts()
+        self.assertEqual(self.sent, [])
+        self.assertEqual(larry_alerts.read_offset(), 1)
+
+    def test_critical_hold_still_dms(self):
+        # B1 read-time guard: even a (mis-routed) critical hold DMs — the bot
+        # re-checks severity before skipping.
+        self._append_raw({
+            'ts': '2026-06-28T00:00:00+00:00', 'source': 'heal-x',
+            'severity': 'critical', 'message': 'critical held by mistake',
+            'route': 'hold', 'subject': 'oops',
+        })
+        with mock.patch.object(self.bot, '_send_alert_dm',
+                               side_effect=self._capture_send(True)):
+            self.bot._check_pending_alerts()
+        self.assertEqual(len(self.sent), 1)
+        self.assertIn('critical held by mistake', self.sent[0][1])
+        self.assertEqual(larry_alerts.read_offset(), 1)
 
     def test_digest_skipped_no_dm_but_offset_advances(self):
         self._append('digest', 'auto-restarted:foo')
