@@ -6430,7 +6430,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-29T22:50:20.286254+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-29T22:36:17.909085+00:00"
+      "orphan_last_activity_ts": "2026-06-29T22:36:17.909085+00:00",
+      "briefing": {
+        "what": "A fix that stops the system from sending false 'we couldn't finish this work' panic alerts in cases where the work had actually already been completed successfully through another route.",
+        "why": "These false alarms waste your attention and erode trust in the alerts that genuinely need you, so silencing them keeps the warning system credible.",
+        "suggest": "Approve it, but ask for a quick confirmation afterward that real failure alerts still come through untouched."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-29T22:56:32.070404+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
