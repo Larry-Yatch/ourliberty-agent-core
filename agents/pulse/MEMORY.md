@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T01:57Z UTC (Iter ~3191, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-06-29T02:07Z UTC (Iter ~3192, Tier 1, consecutive_clean=1)
 
-**Iter ~3191 summary:** ⚠️ Drift (ff-main-when-behind). PR #743 (`docs(spec): expand alert-pipeline-rework — detailed Phase 2 + Phase 3`) auto-merged 01:54:42Z as fd8d1658. Local main was 1 commit behind; fast-forwarded f35663dd→fd8d1658. Tier reset 3→1. 0 new alerts. All inboxes clear. Pipeline nominal. HOLD unchanged.
+**Iter ~3192 summary:** ✅ Nominal (iter_clean). 0 new alerts. 0 open PRs. Sync fresh (01:25Z, ~41min). Daemons healthy (watchdog 02:06Z). Pipeline clean. No Telegram activity since 21:09Z. HOLD unchanged. Monday conditional checks all fired iter ~3188; all sentinels confirmed. consecutive_clean 0→1 (need 2 more for Tier 2 de-escalation).
 
 
