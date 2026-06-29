@@ -422,6 +422,25 @@ class MissionIdentityTest(unittest.TestCase):
                          f'retrospective-medic-build-failed-{WEEK}')
 
 
+class ReproposeClearsDismissedTest(unittest.TestCase):
+    def test_mark_proposed_clears_stale_dismissed_baseline(self):
+        # A signature dismissed at an earlier count, then re-proposed after it
+        # re-crosses the reissue margin, must start a CLEAN baseline — else a
+        # later dip re-suppresses against the stale count, or it re-proposes
+        # every week, eroding "declining prevents re-proposal" (review #749
+        # finding 3).
+        now = datetime(2026, 6, 22, 12, 0, tzinfo=timezone.utc)
+        ledger: dict = {'medic::x': {
+            'dismissed': True, 'dismissed_at_count': 4,
+            'dismissed_ts': '2026-06-01T00:00:00+00:00'}}
+        rb.mark_ledger_proposed(ledger, 'medic::x', now=now)
+        e = ledger['medic::x']
+        self.assertIs(e['proposed'], True)
+        self.assertNotIn('dismissed', e)
+        self.assertNotIn('dismissed_at_count', e)
+        self.assertNotIn('dismissed_ts', e)
+
+
 # ==================== poster error handling ====================
 
 

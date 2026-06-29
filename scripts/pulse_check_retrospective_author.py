@@ -637,6 +637,15 @@ def mark_ledger_proposed(
     entry = ledger.setdefault(signature, {})
     entry['proposed'] = True
     entry['proposed_ts'] = now.isoformat()
+    # Re-proposing supersedes any prior dismissal: clear the stale dismissed
+    # baseline so future suppression is measured against THIS proposal, not the
+    # pre-dismissal count. Otherwise a signature dismissed at count 4 that later
+    # re-crosses the reissue margin and is re-proposed keeps dismissed_at_count=4,
+    # so a later dip re-suppresses against the stale baseline (or it re-proposes
+    # every week) — eroding "declining prevents re-proposal" (review #749 finding 3).
+    entry.pop('dismissed', None)
+    entry.pop('dismissed_at_count', None)
+    entry.pop('dismissed_ts', None)
 
 
 # -------------------- orchestration --------------------
@@ -956,10 +965,24 @@ def main(argv: Optional[list[str]] = None) -> int:
         print(json.dumps(out, indent=2))
         return 0
 
-    write_author_artifact(out)
     stage_a.write_ledger(new_ledger)
     append_cost_row(week_anchor, result.llm_cost_usd, success=not result.llm_unavailable)
     s = out['summary']
+    # Only stamp the week sentinel on a clean run. If some cards failed to POST
+    # (e.g. dashboard-api flapped mid-run), writing the sentinel would mark the
+    # week done and the un-posted signatures would be silently dropped until the
+    # next weekly run. Instead write only the canonical-latest (for visibility),
+    # leave the sentinel unwritten so the run isn't marked complete, and return
+    # non-zero so the heartbeat surfaces it for a --force retry (review #749 finding 4).
+    if result.errors:
+        atomic_write_json(AUTHOR_CANONICAL, out, indent=2)
+        log(
+            f'Retrospective author PARTIAL ({week_anchor}): posted={s["posted"]} '
+            f'errors={s["errors"]} — sentinel NOT written; week not marked complete '
+            f'so failed cards retry on a --force/next run.', 'WARNING'
+        )
+        return 1
+    write_author_artifact(out)
     log(
         f'Retrospective author complete ({week_anchor}): '
         f'automate-now={s["automate_now"]} fix-permanently={s["fix_permanently"]} '

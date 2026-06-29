@@ -783,6 +783,14 @@ def flag_stuck_proposals(
             continue
         if entry.get('phase') != PROPOSED_PHASE or entry.get('acknowledged'):
             continue
+        if entry.get('proposed_by') == 'retrospective-author':
+            # The weekly retrospective author owns its own re-proposal/dismiss
+            # lifecycle (it re-evaluates each week and reconciles the dismissed
+            # flag from the board). The orphan-healer's 14d "keep or drop" nudge
+            # would double-surface its standing suggestions onto the very needs-you
+            # lane this alert-pipeline-rework is meant to declutter (review #749
+            # finding 2). These have empty task_ids by design and never had a PR.
+            continue
         if entry.get('needs_decision'):
             continue  # already surfaced — idempotent
         created = _parse_date(entry.get('created'))
