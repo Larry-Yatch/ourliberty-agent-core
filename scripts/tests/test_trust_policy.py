@@ -184,12 +184,23 @@ class LoadPolicyTest(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self._root = Path(self._tmp.name)
+        self._original_override = tp.OVERRIDE_POLICY_PATH
         self._original_runtime = tp.RUNTIME_POLICY_PATH
         self._original_repo = tp.REPO_POLICY_PATH
+        # Stub ALL THREE resolution layers into the tmpdir. The override layer
+        # (~/agents/trust-policy.override.json, added after this suite) is checked
+        # FIRST by _resolve_policy_path. Left unstubbed it resolves to the real
+        # dial file on any machine where the dial has been used (e.g. the droplet),
+        # so load_policy() reads that instead of the per-test tmp files and every
+        # runtime>repo>default-deny assertion below fails. None of these tests
+        # write an override, so pointing it at a non-existent tmp path keeps the
+        # resolver on the runtime>repo>default-deny chain they exercise.
+        tp.OVERRIDE_POLICY_PATH = self._root / 'agents' / 'trust-policy.override.json'
         tp.RUNTIME_POLICY_PATH = self._root / 'agents' / 'config' / 'trust-policy.json'
         tp.REPO_POLICY_PATH = self._root / 'repo' / 'config' / 'trust-policy.json'
 
     def tearDown(self):
+        tp.OVERRIDE_POLICY_PATH = self._original_override
         tp.RUNTIME_POLICY_PATH = self._original_runtime
         tp.REPO_POLICY_PATH = self._original_repo
         self._tmp.cleanup()
