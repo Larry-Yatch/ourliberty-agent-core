@@ -322,8 +322,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-29T21:55Z UTC (Iter ~3273, Tier 1)
+## Status snapshot — updated 2026-06-29T22:03Z UTC (Iter ~3274, Tier 1)
 
-**Iter ~3273 summary (2026-06-29T21:55Z):** ⚠️ git worktree proliferation: 100 worktrees; fetch still blocked by locked gate-wt-f0d7bcdc5cc24. Repo ahead origin/main by 5 commits (was 4; compounding). KEY POSITIVE: Beacon processed direction-ask → `regression-warmer-worktree-leak-cleanup-001` APPROVAL_REQUEST delivered to Larry (Telegram idx=1074, 15:51 MDT). Larry needs to approve in Telegram. Also: `mirror-review-p3a-retro-prep` stale pending approval (07:38Z, 14+ hrs) for PR #747 — DM likely dropped, surfaced to Larry this cycle. Check 3 clean. Mirror active PR #754 (~24 min, healthy). Watermark 1075. Trailing-30d ratio≈16.96 (trend: improving). Tier 1, consecutive_clean=0. Beacon rate-limited until 14:00Z 2026-06-30.
+**Iter ~3274 summary (2026-06-29T22:02Z):** ⚠️ git worktree proliferation WORSENING: 105 worktrees (was 100); **4 distinct locked SHA leaks** (was 1); repo ahead 6 commits (was 5); sync now stale >2h (secondary symptom of fetch block). NEW: PR #759 got Mirror REVIEW_REVISION at 15:53Z; Forge has revision-1 in inbox. Mirror active on next PR (~8 min). Pipeline check clean (no stalls). Check 0 clean (0 new alerts). APPROVAL_REQUEST `regression-warmer-worktree-leak-cleanup-001` in Telegram awaiting Larry. `mirror-review-p3a-retro-prep` still stale (chat_id=None, DM dropped, 14+ hrs). Watermark 1075. Trailing-30d ratio≈17.0 (trend: improving). Tier 1, consecutive_clean=0. Beacon rate-limited until 14:00Z 2026-06-30. G-rule re-dispatches (APPROVAL_REQUEST_LOST × 2) deferred until rate-limit lifts.
 
 
