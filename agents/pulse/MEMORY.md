@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T01:30Z UTC (Iter ~3190, Tier 3, consecutive_clean=3)
+## Status snapshot — updated 2026-06-29T01:57Z UTC (Iter ~3191, Tier 1, consecutive_clean=0)
 
-**Iter ~3190 summary:** ✅ Nominal (iter_clean). Tier 3, consecutive_clean 2→3. PR #742 (`docs(spec): alert pipeline rework — 4-phase plan`) auto-merged 01:12:31Z. 1 Tier-4 alert (ourliberty-health sync_freshness post-merge, stale/self-resolved, bot already DM'd Larry at 19:14:27-0600). 1 Tier-3 silence (dispatch-branch-cleanup). PR #743 new (Larry-authored `docs(spec): expand alert-pipeline-rework — Phase 2+3`, < 30 min, pipeline entry pending). Repo HEAD=7aaefc42=origin/main, clean. Heal-daemon 01:20:11Z. HOLD unchanged.
+**Iter ~3191 summary:** ⚠️ Drift (ff-main-when-behind). PR #743 (`docs(spec): expand alert-pipeline-rework — detailed Phase 2 + Phase 3`) auto-merged 01:54:42Z as fd8d1658. Local main was 1 commit behind; fast-forwarded f35663dd→fd8d1658. Tier reset 3→1. 0 new alerts. All inboxes clear. Pipeline nominal. HOLD unchanged.
 
 
