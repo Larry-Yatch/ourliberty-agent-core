@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T00:25Z UTC (Iter ~3188, Tier 3, consecutive_clean=1)
+## Status snapshot — updated 2026-06-29T00:58Z UTC (Iter ~3189, Tier 3, consecutive_clean=2)
 
-**Iter ~3188 summary:** ✅ Nominal (iter_clean). Tier 3, consecutive_clean 0→1. 2 Tier-3 silences (missions-autoregister + dispatch-branch-cleanup). Monday checks: Check I auto-dispatched reconcile-675-sigma-review to Beacon (36.2σ, $1.58 task, effort=small; HOLD context noted). Check VIII rule=**deprecate** (prior `lower` from 2026-06-15 superseded; TP=0/FP=4/FN=3359; `approve check-viii-update-2026-06-29`). Check IX deduped (0 new missions). Check X outcome=none. 0 open PRs. Repo HEAD=9c34a423=origin/main, clean. Heal-daemon 00:19:20Z. Sync 23:25:19Z. HOLD on dispatches unchanged.
+**Iter ~3189 summary:** ✅ Nominal (iter_clean). Tier 3, consecutive_clean 1→2. 5 Tier-3 silences (ledger-weekly + check-i + check-viii + 2x sync-push-failed — all from iter ~3188 Monday checks written after iter ~3188's Check 0 ran). Mirror reviewing PR #742 (`docs(spec): alert pipeline rework — 4-phase plan`, dispatched 00:45Z). No stalls. No new directives. Sync push-failed self-healed. Repo HEAD=8a368b88=origin/main, clean. Heal-daemon 00:50:06Z. Monday conditional checks skip (all fired iter ~3188). HOLD unchanged.
 
 
