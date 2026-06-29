@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-28T23:53Z UTC (Iter ~3187, Tier 3, consecutive_clean=0)
+## Status snapshot — updated 2026-06-29T00:25Z UTC (Iter ~3188, Tier 3, consecutive_clean=1)
 
-**Iter ~3187 summary:** ✅ Nominal. **Tier promoted 2→3** (consecutive_clean reached 3). 0 new alerts. All checks green. Watchdog healthy (all bots alive). Pipeline clean. 0 open PRs. Repo HEAD=e919ea3e=origin/main, clean. Heal-daemon 23:49:13Z. Sync 23:25:19Z (under 2h). HOLD on dispatches unchanged. Awaiting `approve threshold-update-2026-06-27`.
+**Iter ~3188 summary:** ✅ Nominal (iter_clean). Tier 3, consecutive_clean 0→1. 2 Tier-3 silences (missions-autoregister + dispatch-branch-cleanup). Monday checks: Check I auto-dispatched reconcile-675-sigma-review to Beacon (36.2σ, $1.58 task, effort=small; HOLD context noted). Check VIII rule=**deprecate** (prior `lower` from 2026-06-15 superseded; TP=0/FP=4/FN=3359; `approve check-viii-update-2026-06-29`). Check IX deduped (0 new missions). Check X outcome=none. 0 open PRs. Repo HEAD=9c34a423=origin/main, clean. Heal-daemon 00:19:20Z. Sync 23:25:19Z. HOLD on dispatches unchanged.
 
 
