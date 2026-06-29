@@ -239,6 +239,9 @@ class RunClaudeTranscriptCheckIntegrationTest(unittest.TestCase):
             # looks for the transcript somewhere the test controls.
             mock.patch.object(active_tier, 'current_home',
                               return_value=str(self.home)),
+            # Root fix reads TIER1_HOME directly on the setup-token path —
+            # patch it to the same temp home so the check targets it.
+            mock.patch.object(active_tier, 'TIER1_HOME', str(self.home)),
             mock.patch.object(ar, 'quarantine_parent_claude_md_poison'),
             mock.patch.object(ar, 'scrub_tmp_identity_landmines'),
             mock.patch('agent_runner.time.sleep'),
