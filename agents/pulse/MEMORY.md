@@ -316,8 +316,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T20:10Z UTC (Iter ~3263, Tier 2)
+## Status snapshot — updated 2026-06-29T20:23Z UTC (Iter ~3264, Tier 2)
 
-**Iter ~3263 summary (2026-06-29T20:10Z):** All mandatory checks clean. Tier 1 → Tier 2 promoted (3 consecutive clean iters). NEW: PR #760 opened at 13:59:06 MDT ("feat(tier): decouple app HOME from the auth tier"); Mirror review not yet dispatched. Mirror attempt 1 crashed exit(-6) at 13:58:45 MDT on PR #757 review; attempt 2 started 13:58:55 MDT (11 min in, watchdog=healthy, no completion logged yet). 8 PRs open (#753–#760). 0 new alerts (watermark=1068). Beacon rate-limited until 8am MDT 2026-06-30 (14:00Z). PRIME ratio 17.10, trend improving. Tier 2, consecutive_clean=0.
+**Iter ~3264 summary (2026-06-29T20:23Z):** All mandatory checks clean. PR #760 Mirror review dispatched at 14:10:29 MDT (review-pr-ourliberty-agent-core-760.json). Mirror attempt 2 on PR #757 still active (~24 min, watchdog=healthy, no wedge). 8 PRs open (#753–#760). 0 new alerts (watermark=1068). Beacon rate-limited until 8am MDT 2026-06-30 (14:00Z). PRIME ratio 17.10, trend improving. Tier 2, consecutive_clean=1.
 
 
