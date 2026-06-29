@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T08:34Z UTC (Iter ~3216, Tier 2, consecutive_clean=1)
+## Status snapshot — updated 2026-06-29T08:54Z UTC (Iter ~3217, Tier 2, consecutive_clean=2)
 
-**Iter ~3216 summary:** ✅ Nominal (iter_clean). Tier 2, consecutive_clean=0→1. 1 new alert (L1104, sync.service deploy-restart-storm, Tier-4 helper / known G-rule 2/3, route=digest, no DM). PR #748 (p2b-migrate) MERGED (fdb31fc9). PR #747 (p3a-retro-prep) confirmed MERGED 07:53:48Z. PR #749 (p3b-retro-author) OPEN, Mirror review queued. Beacon PID 598219 / inbox_watcher PID 598496 / outbox_notifier PID 598531 (new PIDs after restart storm). HOLD in effect. G-rule sync-service-deploy-restart-storm updated 1/3→2/3.
+**Iter ~3217 summary:** ✅ Nominal (iter_clean). Tier 2, consecutive_clean=1→2. No new alerts. Mirror REVIEW_ESCALATE on PR #749 (p3b-retro-author) — test regression gate timed out (exit 124, REVIEW_STEP_TIMED_OUT); diff review clean. Beacon PID 611852 processing auto-replan (started 08:48:53Z). All daemons alive. HOLD in effect. 1 more clean iter needed for Tier 3 de-escalation.
 
 
