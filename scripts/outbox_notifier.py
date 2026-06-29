@@ -50,6 +50,7 @@ import glob
 import json
 import os
 import re
+import shlex
 import shutil
 import signal
 import subprocess
@@ -329,6 +330,25 @@ DEFAULT_COST_PER_TASK_USD_CAP = 5.0
 # allows for slow GitHub API + auth-token refresh; longer would risk the
 # notifier blocking past its 5s poll cadence on degraded gh CLI behavior.
 _AUTO_MERGE_TIMEOUT_S = 30
+
+# regression-gate-steady-state-warmer (spec PR 2). The canonical regression-
+# baseline cache dir. The post-merge warmer (here) and the Mirror review gate
+# (agent_runner pins the SAME value for phase=review dispatches) MUST agree on
+# this path or the cache never hits: `regression_baseline_cache.baseline_dir()`
+# otherwise defaults to ``$HOME/agents/blackboard/regression-baselines``, and
+# the warmer (notifier HOME=/home/larry) and the gate (Mirror's tier HOME)
+# resolve different dirs. Pinning both sides here closes that gap.
+REGRESSION_BASELINE_CANONICAL_DIR = (
+    '/home/larry/agents/blackboard/regression-baselines'
+)
+
+# Repo checkout the warm CLI operates against (the notifier's real tree). The
+# detached child fetches origin/main into this checkout, then warms FETCH_HEAD.
+_WARM_REPO_ROOT = os.environ.get('OURLIBERTY_REPO_ROOT', '/home/larry/agent-core')
+
+# Full-suite per-SHA budget for the warm run — fits under Mirror's 900s ceiling
+# so a warmed parent lets a first review run ONE suite pass (head only).
+_WARM_TIMEOUT_PER_SHA_S = 900
 
 # D3.5 commit 5d — test-mode override for `_auto_merge_pr`. Set by unit
 # tests (via monkey-patch) to a callable matching `_auto_merge_pr`'s
@@ -6319,6 +6339,67 @@ def _emit_auto_merge_chain_event(
         )
 
 
+def _spawn_post_merge_baseline_warm(task_id: str, pr_url: str) -> None:
+    """Fire-and-forget: warm the regression baseline for the new main HEAD.
+
+    regression-gate-steady-state-warmer (spec PR 2). Called right after a
+    confirmed auto-merge. The squash-merge just advanced main, so the commit a
+    *future* PR will fork from (its ``baseRefOid``, the gate's ``--parent-sha``)
+    now exists on origin/main. We precompute + cache that parent baseline here,
+    OFF the review critical path, so the next PR's FIRST review HITS the cache
+    and the gate runs ONE suite pass (head only) — concluding under the 900s
+    bounded-step ceiling instead of timing out on a cold two-run (#733/#736/#749).
+
+    The detached child does the network + CPU work (``git fetch`` then the full
+    suite via ``regression_baseline_cache.py warm``), so the notifier's poll
+    loop never blocks. ``OL_REGRESSION_BASELINE_DIR`` is pinned to the canonical
+    dir the Mirror gate reads, so the warmed files are the ones the gate looks
+    up. NEVER blocks, delays, or fails the merge: the whole body is wrapped so
+    any spawn error is swallowed + logged, never propagated into the merge path.
+    ``warm`` is idempotent (no-op on a cache hit), so a duplicate or a killed
+    run self-heals on the next merge — and PR 1's lazy warm-on-miss remains the
+    backstop if the warm never lands.
+    """
+    try:
+        repo_root = _WARM_REPO_ROOT
+        warm_py = str(_SCRIPT_DIR / 'regression_baseline_cache.py')
+        # Shell string contains ONLY internal constants (no task_id/pr_url, no
+        # external input) — the two steps must run sequentially in the detached
+        # child so the fetch (which makes the new HEAD a local object) precedes
+        # the worktree-based warm. FETCH_HEAD is the just-fetched origin/main tip
+        # = the squash-merge commit = the future PR's parent SHA.
+        warm_cmd = (
+            f'git -C {shlex.quote(repo_root)} fetch --quiet origin main && '
+            f'{shlex.quote(sys.executable)} {shlex.quote(warm_py)} warm '
+            f'--sha FETCH_HEAD --repo-root {shlex.quote(repo_root)} '
+            f'--timeout-per-sha {_WARM_TIMEOUT_PER_SHA_S}'
+        )
+        env = os.environ.copy()
+        env['OL_REGRESSION_BASELINE_DIR'] = REGRESSION_BASELINE_CANONICAL_DIR
+        # start_new_session detaches the child into its own process group so it
+        # outlives this notifier turn; output is discarded (warm logs its own
+        # outcome, and a regression-gate timeout self-heals on the next merge).
+        subprocess.Popen(
+            ['bash', '-c', warm_cmd],
+            env=env,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        log(
+            f'BASELINE_WARM task={task_id} pr={pr_url} outcome=spawned '
+            f'(detached warm of post-merge origin/main; dir='
+            f'{REGRESSION_BASELINE_CANONICAL_DIR}) agent=forge',
+        )
+    except Exception as exc:  # never let a warmer error touch the merge outcome
+        log(
+            f'BASELINE_WARM task={task_id} pr={pr_url} outcome=spawn_failed '
+            f'({type(exc).__name__}: {exc}) agent=forge',
+            'WARN',
+        )
+
+
 def _auto_merge_pr(pr_url: str, task_id: str) -> dict[str, Any]:
     """Fire `gh pr merge <N> --squash --delete-branch` for a Mirror-PASSed PR.
 
@@ -6436,6 +6517,9 @@ def _auto_merge_pr(pr_url: str, task_id: str) -> dict[str, Any]:
             task_id=task_id, pr_url=pr_url, outcome='merged',
             log_msg=merge_msg, log_ts=merge_ts,
         )
+        # Off-path: warm the new main HEAD's regression baseline so the next
+        # PR's first review hits the cache (spec PR 2). Fire-and-forget.
+        _spawn_post_merge_baseline_warm(task_id, pr_url)
         return {
             'merge_outcome': 'merged',
             'merge_reason': 'squash-merged + branch deleted',
@@ -6460,6 +6544,9 @@ def _auto_merge_pr(pr_url: str, task_id: str) -> dict[str, Any]:
             task_id=task_id, pr_url=pr_url, outcome='already_merged',
             log_msg=already_msg, log_ts=already_ts,
         )
+        # Same off-path warm as the merged branch — idempotent, so warming
+        # again on a resume-after-crash is a cheap no-op if already cached.
+        _spawn_post_merge_baseline_warm(task_id, pr_url)
         return {
             'merge_outcome': 'already_merged',
             'merge_reason': 'PR was already merged (resume from prior dispatch)',

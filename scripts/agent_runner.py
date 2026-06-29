@@ -103,6 +103,14 @@ RETRY_DELAY = RETRY_BASE_DELAY
 # silent Tier 2 retry that would fail with 'session not found'.
 TIER2_HOME = '/home/larry/.claude-larry-personal'
 
+# regression-gate-steady-state-warmer (spec PR 2). The canonical regression-
+# baseline cache dir, pinned into the env of Mirror review dispatches so the
+# gate reads the SAME files the post-merge warmer writes. MUST stay identical
+# to outbox_notifier.REGRESSION_BASELINE_CANONICAL_DIR (the warmer side).
+REGRESSION_BASELINE_CANONICAL_DIR = (
+    '/home/larry/agents/blackboard/regression-baselines'
+)
+
 # Long-lived setup-token wiring (2026-05-30, auth_401-storm fix).
 # Each tier has a NON-refreshing `claude setup-token` (valid ~1 yr) stored in
 # the process env as CLAUDE_CODE_OAUTH_TOKEN_TIER{1,2}. When configured, we
@@ -1281,6 +1289,17 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
 
             env = os.environ.copy()
             env['CLAUDE_CODE_EFFORT_LEVEL'] = effort
+            # regression-gate-steady-state-warmer (spec PR 2). Pin the
+            # regression-baseline cache dir for Mirror review dispatches so the
+            # gate (scripts/test_regression_check.py, via
+            # regression_baseline_cache.baseline_dir()) reads the SAME dir the
+            # post-merge warmer writes (outbox_notifier pins the identical path).
+            # Without this both sides default to $HOME/agents/blackboard/
+            # regression-baselines, and because the review runs under Mirror's
+            # tier HOME while the warmer runs under /home/larry, the dirs diverge
+            # and the warmed baseline never hits — leaving the fix inert.
+            if _is_mirror_review_dispatch(phase, expected_agent):
+                env['OL_REGRESSION_BASELINE_DIR'] = REGRESSION_BASELINE_CANONICAL_DIR
             # Account-rotation plumbing (spec § 6.2): drive the primary
             # subprocess HOME off blackboard/active-tier.json instead of
             # inheriting from the orchestrator. Default state ships tier1,
