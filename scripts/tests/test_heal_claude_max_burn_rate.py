@@ -63,6 +63,17 @@ class _IsolatedAgentsRoot(unittest.TestCase):
         shutil.rmtree(self._tmp, ignore_errors=True)
         super().tearDown()
 
+    def _write_config(self, data):
+        """Point the healer's _CONFIG_FILE at a tmp config carrying `data`
+        (any JSON-serialisable object). Mutating the reloaded module's
+        attribute is isolated per test — setUp reloads fresh, tearDown
+        reloads again. Returns the path."""
+        cfg_path = os.path.join(self._tmp, 'agent-models.json')
+        with open(cfg_path, 'w') as f:
+            json.dump(data, f)
+        self.h._CONFIG_FILE = Path(cfg_path)
+        return cfg_path
+
     def _write_costs(self, entries):
         with open(self.h.COSTS_FILE, 'w') as f:
             for e in entries:
@@ -165,6 +176,121 @@ class LoadThresholdTest(_IsolatedAgentsRoot):
     def test_default_threshold_constant(self):
         self.assertEqual(self.h.DEFAULT_MAX_5H_TOKEN_THRESHOLD, 10_000_000)
 
+    def test_valid_threshold_is_read(self):
+        self._write_config({'tier1_quota': {'max_5h_token_threshold': 12_345_678}})
+        self.assertEqual(self.h.load_threshold(), 12_345_678)
+
+    def test_fail_safe_on_missing_block(self):
+        # gate is deprecated (enabled=false) but the block carries no
+        # threshold field — load_threshold must still fall back to default.
+        self._write_config({'tier1_quota': {'enabled': False}})
+        self.assertEqual(self.h.load_threshold(),
+                         self.h.DEFAULT_MAX_5H_TOKEN_THRESHOLD)
+
+    def test_fail_safe_on_absent_tier1_block(self):
+        self._write_config({'something_else': {}})
+        self.assertEqual(self.h.load_threshold(),
+                         self.h.DEFAULT_MAX_5H_TOKEN_THRESHOLD)
+
+    def test_fail_safe_on_invalid_threshold(self):
+        self._write_config({'tier1_quota': {'max_5h_token_threshold': 'nope'}})
+        self.assertEqual(self.h.load_threshold(),
+                         self.h.DEFAULT_MAX_5H_TOKEN_THRESHOLD)
+
+    def test_fail_safe_on_unreadable_config(self):
+        self.h._CONFIG_FILE = Path(self._tmp) / 'does-not-exist.json'
+        self.assertEqual(self.h.load_threshold(),
+                         self.h.DEFAULT_MAX_5H_TOKEN_THRESHOLD)
+
+
+class GateEnabledTest(_IsolatedAgentsRoot):
+    """The deprecation flag: gate_enabled() reads tier1_quota.enabled with an
+    enabled-by-default (back-compat) bias, and run() short-circuits — emitting
+    NO alert — when the gate is disabled."""
+
+    def test_explicit_false_disables(self):
+        self._write_config({'tier1_quota': {'enabled': False,
+                                             'max_5h_token_threshold': 10_000_000}})
+        self.assertFalse(self.h.gate_enabled())
+
+    def test_explicit_true_enables(self):
+        self._write_config({'tier1_quota': {'enabled': True}})
+        self.assertTrue(self.h.gate_enabled())
+
+    def test_absent_enabled_key_defaults_enabled(self):
+        # Back-compat: an accidentally-deleted field must NOT blind monitoring.
+        self._write_config({'tier1_quota': {'max_5h_token_threshold': 10_000_000}})
+        self.assertTrue(self.h.gate_enabled())
+
+    def test_absent_tier1_block_defaults_enabled(self):
+        self._write_config({'something_else': {}})
+        self.assertTrue(self.h.gate_enabled())
+
+    def test_non_bool_enabled_defaults_enabled(self):
+        # Only an explicit `false` deprecates; junk fails safe to enabled.
+        self._write_config({'tier1_quota': {'enabled': 'no'}})
+        self.assertTrue(self.h.gate_enabled())
+
+    def test_unreadable_config_defaults_enabled(self):
+        self.h._CONFIG_FILE = Path(self._tmp) / 'does-not-exist.json'
+        self.assertTrue(self.h.gate_enabled())
+
+    def _run_at_high_usage_with_config(self, config):
+        """Write a config + a high-burn (95% of 10M) cost record and run the
+        healer, capturing any append_alert call. load_threshold is left REAL
+        so the config's threshold (or its fail-safe) is exercised end-to-end."""
+        self._write_config(config)
+        now = datetime.now(timezone.utc)
+        self._write_costs([
+            {'ts': (now - timedelta(minutes=5)).isoformat(),
+             'agent': 'forge',
+             'input_tokens': 4_750_000, 'output_tokens': 4_750_000,
+             'cache_creation': 0, 'cache_read': 999_999_999,
+             'cost_usd': 0.0},
+        ])
+        captured = {}
+
+        def fake_append_alert(**kwargs):
+            captured.update(kwargs)
+            return True
+
+        with mock.patch('larry_alerts.append_alert',
+                        side_effect=fake_append_alert):
+            rc = self.h.run()
+        return rc, captured
+
+    def test_run_short_circuits_and_emits_no_alert_when_disabled(self):
+        rc, captured = self._run_at_high_usage_with_config(
+            {'tier1_quota': {'enabled': False,
+                             'max_5h_token_threshold': 10_000_000}})
+        self.assertEqual(rc, 0)
+        self.assertEqual(captured, {},
+                         'disabled gate must not DM even at 95% burn')
+
+    def test_run_does_not_touch_append_alert_when_disabled(self):
+        self._write_config({'tier1_quota': {'enabled': False}})
+        now = datetime.now(timezone.utc)
+        self._write_costs([
+            {'ts': (now - timedelta(minutes=5)).isoformat(),
+             'agent': 'forge', 'input_tokens': 9_999_999,
+             'output_tokens': 9_999_999, 'cache_creation': 0,
+             'cache_read': 0, 'cost_usd': 0.0},
+        ])
+        with mock.patch('larry_alerts.append_alert') as m:
+            rc = self.h.run()
+        self.assertEqual(rc, 0)
+        m.assert_not_called()
+
+    def test_run_fires_when_enabled_key_absent(self):
+        # Back-compat path: absent `enabled` -> gate active -> DM at high burn.
+        rc, captured = self._run_at_high_usage_with_config(
+            {'tier1_quota': {'max_5h_token_threshold': 10_000_000}})
+        self.assertEqual(rc, 0)
+        self.assertNotEqual(captured, {},
+                            'absent enabled key must preserve pre-deprecation '
+                            'firing behavior')
+        self.assertEqual(captured.get('severity'), 'warning')
+
 
 class DmBodyTest(_IsolatedAgentsRoot):
     """Verify the new DM body template + ledger-count integration end-to-end
@@ -196,7 +322,8 @@ class DmBodyTest(_IsolatedAgentsRoot):
             captured.update(kwargs)
             return True
 
-        with mock.patch.object(self.h, 'load_threshold',
+        with mock.patch.object(self.h, 'gate_enabled', return_value=True), \
+             mock.patch.object(self.h, 'load_threshold',
                                return_value=threshold), \
              mock.patch('larry_alerts.append_alert',
                         side_effect=fake_append_alert):
@@ -267,7 +394,8 @@ class LeadingWarningTest(_IsolatedAgentsRoot):
             captured.update(kwargs)
             return True
 
-        with mock.patch.object(self.h, 'load_threshold',
+        with mock.patch.object(self.h, 'gate_enabled', return_value=True), \
+             mock.patch.object(self.h, 'load_threshold',
                                return_value=threshold), \
              mock.patch('larry_alerts.append_alert',
                         side_effect=fake_append_alert):
@@ -322,7 +450,8 @@ class LeadingWarningTest(_IsolatedAgentsRoot):
             captured.update(kwargs)
             return True
 
-        with mock.patch.object(self.h, 'load_threshold',
+        with mock.patch.object(self.h, 'gate_enabled', return_value=True), \
+             mock.patch.object(self.h, 'load_threshold',
                                return_value=10_000_000), \
              mock.patch('larry_alerts.append_alert',
                         side_effect=fake_append_alert):

@@ -163,6 +163,24 @@ def load_threshold() -> int:
     return int(raw)
 
 
+def gate_enabled() -> bool:
+    """Whether the burn-rate gate is active. Reads tier1_quota.enabled from
+    config/agent-models.json. ABSENT key -> True (enabled) for back-compat: an
+    accidentally-deleted field must NOT silently blind monitoring. Only an
+    EXPLICIT `false` deprecates the gate (Check VIII 2026-06-29: zero
+    predictive value). Unreadable config / non-bool value -> True (fail safe,
+    same intent as load_threshold)."""
+    try:
+        with open(_CONFIG_FILE) as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return True
+    block = data.get('tier1_quota')
+    if not isinstance(block, dict):
+        return True
+    return block.get('enabled', True) is not False
+
+
 def _parse_ts(ts_str: str) -> Optional[datetime]:
     """Parse the costs.jsonl ts shape — ISO 8601 with optional Z/tz."""
     if not isinstance(ts_str, str):
@@ -309,6 +327,10 @@ def run() -> int:
         log('kill switch present — exiting', 'INFO')
         return 0
     heartbeat()
+    if not gate_enabled():
+        log('burn-rate gate disabled via config '
+            '(tier1_quota.enabled=false) — skipping', 'INFO')
+        return 0
     now = datetime.now(timezone.utc)
     threshold = load_threshold()
     usage = rolling_5h_token_volume(now=now)

@@ -425,7 +425,8 @@ class BurnRateMonitorTest(_TempDirBase):
     def test_below_threshold_no_dm(self):
         # Threshold 10M * 0.80 = 8M. 7.8M is 78% → no DM.
         self._write_costs(7_800_000)
-        with mock.patch.object(self.healer, 'load_threshold',
+        with mock.patch.object(self.healer, 'gate_enabled', return_value=True), \
+             mock.patch.object(self.healer, 'load_threshold',
                                return_value=10_000_000), \
              mock.patch.object(self.healer.larry_alerts, 'append_alert') as dm:
             rc = self.healer.run()
@@ -435,7 +436,8 @@ class BurnRateMonitorTest(_TempDirBase):
     def test_at_threshold_fires_dm_once(self):
         # 8.3M / 10M = 83% → fires
         self._write_costs(8_300_000)
-        with mock.patch.object(self.healer, 'load_threshold',
+        with mock.patch.object(self.healer, 'gate_enabled', return_value=True), \
+             mock.patch.object(self.healer, 'load_threshold',
                                return_value=10_000_000), \
              mock.patch.object(self.healer.larry_alerts, 'append_alert',
                                return_value=True) as dm:
@@ -445,14 +447,16 @@ class BurnRateMonitorTest(_TempDirBase):
     def test_dm_window_dedup_on_next_tick(self):
         # First tick: fires
         self._write_costs(8_300_000)
-        with mock.patch.object(self.healer, 'load_threshold',
+        with mock.patch.object(self.healer, 'gate_enabled', return_value=True), \
+             mock.patch.object(self.healer, 'load_threshold',
                                return_value=10_000_000), \
              mock.patch.object(self.healer.larry_alerts, 'append_alert',
                                return_value=True) as dm1:
             self.healer.run()
         self.assertEqual(dm1.call_count, 1)
         # Second tick — same conditions, still high — must NOT fire again
-        with mock.patch.object(self.healer, 'load_threshold',
+        with mock.patch.object(self.healer, 'gate_enabled', return_value=True), \
+             mock.patch.object(self.healer, 'load_threshold',
                                return_value=10_000_000), \
              mock.patch.object(self.healer.larry_alerts, 'append_alert',
                                return_value=True) as dm2:
