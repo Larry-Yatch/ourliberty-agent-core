@@ -22,6 +22,8 @@
     "viii": {"cadence_hours": 168, "grace_hours": 36, "label": "Burn-rate signal validity",   "firing": "Weekly (Monday)"},
     "ix":   {"cadence_hours": 168, "grace_hours": 36, "label": "Operator-friction signals",   "firing": "Weekly (Monday)"},
     "x":    {"cadence_hours": 168, "grace_hours": 36, "label": "Chain-quality regression",    "firing": "Weekly (Monday)"},
-    "xi":   {"cadence_hours": 24,  "grace_hours": 12, "label": "Catalog accuracy meter",      "firing": "Daily (systemd timer: ourliberty-pulse-check-xi)"}
+    "xi":   {"cadence_hours": 24,  "grace_hours": 12, "label": "Catalog accuracy meter",      "firing": "Daily (systemd timer: ourliberty-pulse-check-xi)"},
+    "retrospective":        {"cadence_hours": 168, "grace_hours": 48, "label": "Elevation retrospective (Stage A)",  "firing": "Weekly Monday (systemd timer: ourliberty-retrospective-weekly)"},
+    "retrospective-author": {"cadence_hours": 168, "grace_hours": 48, "label": "Elevation retrospective author (Stage B)", "firing": "Weekly Monday (systemd timer: ourliberty-retrospective-weekly)"}
   }
 }

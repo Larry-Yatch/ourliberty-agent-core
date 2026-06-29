@@ -559,6 +559,25 @@ journalctl -u ourliberty-ceo-digest-daily.service -n 50
 
 The `run_ceo_digest.sh` wrapper handles the concurrency lock (`.ceo-digest-{daily,weekly}.lock`), the `EMERGENCY_HALT` gate, and logging — same pattern as `run_ledger.sh`. Each run push-emits exactly one `ceo_digest` chain_event row.
 
+### Weekly elevation retrospective (alert-pipeline-rework Phase 3)
+
+The two-stage weekly retrospective. **Stage A** (`scripts/pulse_check_retrospective.py`, deterministic/LLM-free) mines the week's elevations + resolutions, buckets them by root signature with a resolution histogram + recurrence + probation dedup, and writes `~/agents/blackboard/retrospective-candidates.json` + the ledger. **Stage B** (`scripts/pulse_check_retrospective_author.py`, bounded `claude --print`) classifies each fresh bucket (automate-now / fix-permanently / keep-elevating), pre-drafts automate-now fixes from 6 allowed templates, and posts `phase:'proposed'` missions via `POST /api/system/missions/new`. The `run_retrospective.sh` wrapper runs Stage A then Stage B in order (Stage B reads Stage A's artifact + ledger) under the same lock + `EMERGENCY_HALT` gate pattern. Both stages emit a liveness heartbeat (`pulse-check-{retrospective,retrospective-author}.heartbeat`); the cadence is registered in `config/pulse-check-cadence.json`. One **weekly** timer (Monday 07:00 Larry-local — one hour after the CEO digest). The first live run doubles as Phase-4 verification (heal-pipeline-stall + medic-echo volume should have dropped).
+
+> **⚠️ Timezone not yet Larry-DM-confirmed.** Same `America/Denver` caveat as the CEO digest timers above — verify the Monday-morning boundary before relying on it.
+
+```bash
+sudo cp ~/agent-core/systemd/ourliberty-retrospective-weekly.service /etc/systemd/system/
+sudo cp ~/agent-core/systemd/ourliberty-retrospective-weekly.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now ourliberty-retrospective-weekly.timer
+systemctl list-timers 'ourliberty-retrospective-*'
+
+# Manual smoke (Stage A always runs; Stage B needs DASHBOARD_API_TOKEN + a
+# reachable dashboard-api to post — without them it classifies + logs only):
+sudo systemctl start ourliberty-retrospective-weekly.service
+journalctl -u ourliberty-retrospective-weekly.service -n 80
+```
+
 ### Parked-&-aging digest (Missions v2 Phase 2 — dashboard catch-me-up card)
 
 `scripts/parked_aging_digest_generator.py` reads `agents/beacon/captures.json`, selects the `state == "parked"` captures the GC healer already flagged `aging: true` (it does **not** recompute aging — one definition lives in `heal_missions_card_gc.py`, `AGING_BUSINESS_DAYS = 5`), and writes a structured artifact to `~/agents/blackboard/parked-aging-digest.json` (parked count, aging count, the aging items with title + origin repo + calendar age). Stdlib-only, no LLM. The dashboard renders it as a read-only "what's parked & aging?" card (Phase 2 §6; promote/drop/snooze actions are Phase 3). One **daily** timer (06:15 Larry-local) regenerates it; the same wrapper run on demand (`run_parked_aging_digest.sh on-demand`) refreshes it without waiting for the cycle.

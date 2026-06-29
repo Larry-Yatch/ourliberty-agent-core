@@ -399,6 +399,71 @@ class PostMissionsQueueWriteFailureTest(_MissionsTestBase):
         self.assertNotIn('\n', r.json()['detail']['detail'])
 
 
+# ==================== proposed-phase extension (alert-pipeline-rework P3b) ====================
+
+
+class PostMissionsProposedPhaseTest(_MissionsTestBase):
+    """The optional phase/proposed_by/predraft fields (Stage B retrospective
+    author posts `phase:'proposed'` cards). Backward-compatible: an unset phase
+    keeps the legacy `drafting` shape byte-for-byte."""
+
+    def test_proposed_phase_queues_with_provenance(self):
+        predraft = {
+            'classification': 'automate-now',
+            'root_signature': 'medic::build-failed',
+            'template_id': '2',
+            'count_at_proposal': 4,
+        }
+        r = self.client.post(POST_ENDPOINT, headers=AUTH, json={
+            'name': 'retrospective medic build-failed 2026-06-29',
+            'brief': 'recurring benign medic line',
+            'repo': 'ourliberty-agent-core',
+            'phase': 'proposed',
+            'proposed_by': 'retrospective-author',
+            'predraft': predraft,
+        })
+        self.assertEqual(r.status_code, 200, r.text)
+        mid = r.json()['mission_id']
+        entry = json.loads((self.queue_dir / f'{mid}.json').read_text())
+        self.assertEqual(entry['phase'], 'proposed')
+        self.assertEqual(entry['proposed_by'], 'retrospective-author')
+        self.assertIn('proposed_at', entry)
+        self.assertEqual(entry['predraft'], predraft)
+        self.assertEqual(self.gh.calls, [])
+
+    def test_unset_phase_is_drafting_without_proposed_keys(self):
+        # Backward compatibility: the legacy +New flow shape is unchanged — no
+        # proposed_by/proposed_at/predraft keys leak onto a drafting entry.
+        r = self.client.post(POST_ENDPOINT, headers=AUTH, json={
+            'name': 'Legacy Mission', 'brief': 'b', 'repo': 'r',
+        })
+        self.assertEqual(r.status_code, 200, r.text)
+        entry = json.loads((self.queue_dir / 'legacy-mission.json').read_text())
+        self.assertEqual(entry['phase'], 'drafting')
+        self.assertNotIn('proposed_by', entry)
+        self.assertNotIn('proposed_at', entry)
+        self.assertNotIn('predraft', entry)
+
+    def test_invalid_phase_returns_400_no_queue_write(self):
+        r = self.client.post(POST_ENDPOINT, headers=AUTH, json={
+            'name': 'Bad Phase', 'brief': 'b', 'repo': 'r',
+            'phase': 'shipped',
+        })
+        self.assertEqual(r.status_code, 400, r.text)
+        self.assertEqual(r.json()['detail']['error'], 'invalid phase')
+        self.assertEqual(self._queued_ids(), set())
+
+    def test_proposed_without_proposed_by_defaults_unknown(self):
+        r = self.client.post(POST_ENDPOINT, headers=AUTH, json={
+            'name': 'Anon Proposed', 'brief': 'b', 'repo': 'r',
+            'phase': 'proposed',
+        })
+        self.assertEqual(r.status_code, 200, r.text)
+        entry = json.loads((self.queue_dir / 'anon-proposed.json').read_text())
+        self.assertEqual(entry['proposed_by'], 'unknown')
+        self.assertNotIn('predraft', entry)  # predraft omitted when not sent
+
+
 # ==================== kebab helper ====================
 
 

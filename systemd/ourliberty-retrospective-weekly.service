@@ -1,0 +1,40 @@
+[Unit]
+Description=Ourliberty weekly elevation retrospective — Stage A (gather/bucket/join) → Stage B (bounded-LLM author posts proposed missions)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/agents/beacon/specs/alert-pipeline-rework.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# Wrapper handles concurrency lock + EMERGENCY_HALT gate + logging, and runs
+# Stage A then Stage B in order (Stage B reads Stage A's artifact + ledger).
+ExecStart=/usr/bin/bash /home/larry/agent-core/scripts/run_retrospective.sh
+
+# Stage B's bounded LLM call is capped at 180s inside the module; allow margin
+# for Supabase gather (Stage A) + the author call + posting.
+TimeoutStartSec=900
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-retrospective-weekly
+
+# Hardening (matches ourliberty-ceo-digest-weekly.service). ReadWritePaths
+# includes ~/.claude /.cache /.local so the `claude` CLI can authenticate +
+# cache for Stage B's author call.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /home/larry/agent-core /home/larry/credentials /home/larry/.claude /home/larry/.claude.json /home/larry/.local /home/larry/.cache /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+Nice=10
