@@ -322,8 +322,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-29T23:31Z UTC (Iter ~3284, Tier 1)
+## Status snapshot — updated 2026-06-29T23:41Z UTC (Iter ~3285, Tier 1)
 
-**Iter ~3284 summary (2026-06-29T23:31Z):** ✅ All mandatory checks CLEAN. Source repo up-to-date (HEAD=b613de33). Sync nominal (23:19Z). Mirror review ACTIVE (PIDs 1134511/1140235, PR #759 rev1 WeeklyProbeTest step). PR #762 Mirror review dispatched 23:25Z. Inbox-watcher memory normalized (548MB). ⚠️ Worktrees 108/53 locked (was 81/20 — proliferating rapidly; PR #761 fix queued in Mirror behind #759). Beacon RATE-LIMITED until ~14:00 UTC June 30. 3 pending approvals blocked. Watermark=1088. Trailing-30d ratio≈17.07 (improving). Tier 1, consecutive_clean=1.
+**Iter ~3285 summary (2026-06-29T23:38Z):** ⚠️ Check A drift. ✅ PRs #759+#754 MERGED at 23:33Z (Mirror REVIEW_PASS+AUTO_MERGE; AUTO_MERGE_RELEASE_FRESH). Source repo 1 ahead (HEAD=62c8ef8d), git fetch BLOCKED by gate-wt-ec6def99d39d69 bad-object; likely diverged (origin moved after merges). Worktrees 62/53 locked (prunable reduced from 108; locked stable at 53). BASELINE_WARM running for #759+#754 (PIDs 1145289/1145299). Pipeline stall clean. No new alerts (watermark=1088). Beacon RATE-LIMITED until 14:00 UTC June 30. 3 pending approvals blocked. Mirror queue: review-762 + review-761 (no active session running). Trailing-30d ratio≈17.06 (stable). Tier 1, consecutive_clean=0.
 
 
