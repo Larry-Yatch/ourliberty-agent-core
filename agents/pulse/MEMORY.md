@@ -315,8 +315,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T16:06Z UTC (Iter ~3232, Tier 1)
+## Status snapshot — updated 2026-06-29T16:15Z UTC (Iter ~3233, Tier 1)
 
-**Iter ~3232 summary (2026-06-29T16:06Z):** ⚠️ Signal. PR #751 (regression-gate-steady-state-warmer-001) Mirror review timed out at 2100s ceiling. DM delivered to Larry 09:58 MDT. APPROVAL_REQUEST blocked by dedup bug (1/3 for new G-rule above). Awaiting Larry decision via Telegram when Beacon rate-limit clears (8am MDT 2026-06-30). Sequence alert-pipeline-rework still PAUSED. Sync still error (self-heal pending). All inboxes empty. PRIME ratio ~17.07, trend improving. Tier 1, consecutive_clean=0.
+**Iter ~3233 summary (2026-06-29T16:15Z):** ⚠️ Carries only — no new findings. Source repo RESOLVED (now HEAD=fd3aee5c=origin/main, clean). PR #751 still OPEN (mergeState updated UNKNOWN→UNSTABLE), review-escalated, awaiting Larry decision (Beacon rate-limit clears 8am MDT 2026-06-30). "2 APPROVAL_REQUESTs pending" carry from iter ~3232 CORRECTED — not found in beacon-pending-approvals.json; direction-asks processed by Beacon 09:07 MDT but APPROVAL_REQUEST outcome unclear. Sequence alert-pipeline-rework PAUSED. Sync stale error (self-heal pending). All inboxes empty. PRIME ratio ~17.08, trend improving. Tier 1, consecutive_clean=0.
 
 
