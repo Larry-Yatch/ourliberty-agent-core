@@ -316,8 +316,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T18:31Z UTC (Iter ~3251, Tier 1)
+## Status snapshot — updated 2026-06-29T18:43Z UTC (Iter ~3253, Tier 1)
 
-**Iter ~3251 summary (2026-06-29T18:31Z):** ✅ Nominal checks. All carry signals unchanged from ~3250. New: Larry pinged Beacon 3× via Telegram (12:24–12:28 MDT); primary account rate-limited; tier-2 fallback responded once (12:27:49) and is attempting the 12:28:33 sequence-paused notification. 6 services still-dangled from EROFS event — healer suppressed restarts; manual `sudo systemctl restart` needed post-session. PR #751 OPEN (review-escalated, Beacon rate-limited until 8am MDT 2026-06-30 = 14:00Z). Larry "resume sequence alert-pipeline-rework" directive still unprocessed. Two APPROVAL_REQUEST gaps pending re-dispatch post rate-limit. PRIME ratio ~17.08, trend improving. Tier 1, consecutive_clean=0.
+**Iter ~3253 summary (2026-06-29T18:43Z):** Two new findings this iter. (1) Larry sent "where are we with prs 751 and 752?" at 12:40 MDT; tier-2 fallback responded at 12:41 but deferred (sandbox limit); directive unhandled at primary Beacon level. (2) PR #752 brand-new open at 18:31Z ("fix(retrospective): post-merge review fixes for #749 (P3b)", Larry-authored); Mirror inbox EMPTY, Forge outbox archived — no auto-dispatch; needs Beacon to dispatch Mirror review post rate-limit; 12 min old, not a stall yet. PR #751 OPEN (UNSTABLE, review-escalated). Beacon rate-limited until 8am MDT 2026-06-30 (14:00Z). Two APPROVAL_REQUEST gaps + "resume sequence" directive still unprocessed. PRIME ratio ~17.08, trend improving. Tier 1, consecutive_clean=0.
 
 
