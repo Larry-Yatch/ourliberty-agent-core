@@ -309,8 +309,8 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## Status snapshot — updated 2026-06-29T08:04Z UTC (Iter ~3213, Tier 1, consecutive_clean=1)
+## Status snapshot — updated 2026-06-29T08:18Z UTC (Iter ~3215, Tier 2, consecutive_clean=0)
 
-**Iter ~3213 summary:** ✅ Nominal (iter_clean). Tier 1, consecutive_clean=1. 0 new alerts. PR #748 (p2b-migrate) OPEN — Mirror regression check PID 572924 running (~10 min in, 900s timeout). p3b-retro-author: Forge build PID 576584 active (build-phase started 07:59:42Z, resume=68238886). beacon-pending stale entry (mirror-review-p3a-retro-prep, PR #747 merged, cleanup pending). HOLD in effect. No new G-rule triggers.
+**Iter ~3215 summary:** ✅ Nominal (iter_clean). Tier 1→2 de-escalation (3 consecutive clean iters). 1 new alert (L1103, doorbell stale p3a-retro-prep approval, Tier-3 silence). PR #748 (p2b-migrate) OPEN — Mirror PID 571806 active (~23 min in, 1500s timeout, ETA ~08:36Z). Forge p3b-retro-author PID 576584 active (build-phase, ~17 min in). beacon-pending stale (mirror-review-p3a-retro-prep, PR #747 merged). HOLD in effect. No new G-rule triggers.
 
 
