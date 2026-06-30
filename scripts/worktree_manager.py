@@ -196,8 +196,13 @@ def _remove_worktree(
     ``git worktree add`` will surface any persistent problem).
     """
     try:
+        # DOUBLE --force: a single --force refuses a worktree carrying git's
+        # 'initializing' lock (written during `git worktree add`, cleared only on
+        # success); --force --force overrides it. Without this a still-locked
+        # worktree silently survives the remove and leaks its .git/worktrees
+        # metadata. See test_regression_check.remove_worktree for the same fix.
         subprocess.run(
-            ['git', 'worktree', 'remove', '--force', str(wt_path)],
+            ['git', 'worktree', 'remove', '--force', '--force', str(wt_path)],
             cwd=str(canonical_repo),
             capture_output=True, text=True, check=True,
             timeout=WORKTREE_OP_TIMEOUT_SEC,

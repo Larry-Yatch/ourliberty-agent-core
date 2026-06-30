@@ -416,10 +416,20 @@ def add_worktree(repo_root: Path, sha: str, dest: Path) -> None:
 
 
 def remove_worktree(repo_root: Path, dest: Path) -> None:
-    """Best-effort cleanup. Never raises — cleanup must not mask a real error."""
+    """Best-effort cleanup. Never raises — cleanup must not mask a real error.
+
+    Uses DOUBLE ``--force``. During ``git worktree add`` git writes a ``locked``
+    file with reason 'initializing' and removes it only on successful completion;
+    a single ``--force`` REFUSES a locked worktree, so on any path where the lock
+    survived (a SIGKILL mid-init, or even a slow-completing add) the single-force
+    remove silently no-ops and the worktree metadata leaks. ``--force --force``
+    overrides the lock. The orphan reaper in cleanup_stale_worktrees.py is the
+    backstop for the kill-mid-init case where this teardown never runs at all.
+    """
     try:
         subprocess.run(
-            ['git', '-C', str(repo_root), 'worktree', 'remove', '--force', str(dest)],
+            ['git', '-C', str(repo_root), 'worktree', 'remove',
+             '--force', '--force', str(dest)],
             capture_output=True, text=True, timeout=30,
         )
     except (subprocess.SubprocessError, OSError):

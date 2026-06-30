@@ -170,6 +170,20 @@ def warm(repo_root: Path, sha: Optional[str], timeout_s: int) -> int:
     """
     import test_regression_check as trc  # lazy: trc imports this module
 
+    # Defensive pre-sweep: the warmer is the most frequent creator of the
+    # gate/warmer worktree leak (a SIGKILL mid `git worktree add` leaves a locked,
+    # un-prunable .git/worktrees entry). Reap any such orphans from prior killed
+    # runs before adding a fresh worktree, so the warmer self-heals on its own
+    # cadence instead of waiting for the hourly cleanup timer. Best-effort and
+    # strictly scoped to orphans (working dir absent), so it can never disturb a
+    # live run; any failure is swallowed so it never blocks a warm.
+    try:
+        import cleanup_stale_worktrees as csw  # lazy: avoid config read at import
+        csw.sweep_orphan_locked_worktrees(repo_root)
+    except Exception as exc:  # pre-sweep must never fail the warm
+        print(f'regression_baseline_cache: orphan pre-sweep skipped: {exc}',
+              file=sys.stderr)
+
     try:
         canonical = trc.resolve_sha(sha or 'HEAD', repo_root)
     except trc.AnalysisError as exc:
