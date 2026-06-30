@@ -358,8 +358,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T16:33Z UTC (Iter ~3356, Tier 3)
+## Status snapshot — updated 2026-06-30T17:08Z UTC (Iter ~3357, Tier 3)
 
-**Iter ~3356 summary (2026-06-30T16:33Z):** 1 new alert (doorbell) → Tier 3 silenced. Watermark=1015. All 3/3 main daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254). Watchdog=healthy (16:29:35Z UTC). Heal-daemon heartbeat 16:24:29Z. No stalls. Pipeline idle. Outbox-notifier carry: 4× HTTP 500 (07:33-07:50Z) + 1× HTTP 401 (03:38Z), all self-healed. 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals unchanged. **Worktrees 1/0 (main only).** **Tier 3, consecutive_clean=14.**
+**Iter ~3357 summary (2026-06-30T17:08Z):** 0 new alerts. Watermark=1015. All 3/3 main daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254). Watchdog=healthy (17:04:54Z UTC). Heal-daemon heartbeat 17:04:55Z. No stalls. Pipeline idle. Outbox-notifier carry: 4× HTTP 500 (07:33-07:50Z) + 1× HTTP 401 (03:38Z), all self-healed. 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals unchanged. **Worktrees 1/0 (main only).** **Tier 3, consecutive_clean=15.**
 
 
