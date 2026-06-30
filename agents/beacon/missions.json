@@ -6413,7 +6413,12 @@
         "at": "2026-06-29T22:26:20.021618+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-30T02:50:39.828701+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#761"
     },
     {
       "id": "proposed-heal-wip-redispatch-already-merged-suppress-001",
@@ -6445,6 +6450,147 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-telegram-409-burst-guard-001",
+      "name": "Telegram 409 Burst Guard 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `telegram-409-burst-guard-001`. Last activity 2026-06-30T02:04:31.044474+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "telegram-409-burst-guard-001"
+      ],
+      "repo": null,
+      "created": "2026-06-30",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-30T02:05:36.111586+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-30T02:04:31.044474+00:00",
+      "briefing": {
+        "what": "A fix to stop the messaging system from accidentally running two copies at once, which has been causing repeated connection errors.",
+        "why": "Those errors can interrupt the assistant's ability to send and receive your messages reliably, so stamping them out keeps your main line of communication dependable.",
+        "suggest": "Give it a quick review and approve it, but confirm it's been tested so the fix doesn't disturb normal messaging before it goes live."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-30T02:07:30.302320+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-mirror-review-pr-ourliberty-agent-core-763",
+      "name": "Mirror Review PR Ourliberty Agent Core 763",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `mirror-review-pr-ourliberty-agent-core-763`. Last activity 2026-06-30T02:12:24.691011+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "mirror-review-pr-ourliberty-agent-core-763"
+      ],
+      "repo": null,
+      "created": "2026-06-30",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-30T02:20:37.763674+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-30T02:12:24.691011+00:00",
+      "briefing": {
+        "what": "A piece of work the team kicked off on its own that hasn't been tied to any project yet, and it's now waiting for your go-ahead.",
+        "why": "Unattached work can either be a useful head start or effort drifting in a direction you didn't ask for, so a quick decision keeps the team focused on what actually matters to the business.",
+        "suggest": "Take a moment to confirm this fits your priorities before approving it; if it's not clearly worth the team's time right now, hold off until it's tied to a real goal."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-30T02:27:57.267636+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-mirror-review-pr-ourliberty-agent-core-765",
+      "name": "Mirror Review PR Ourliberty Agent Core 765",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `mirror-review-pr-ourliberty-agent-core-765`. Last activity 2026-06-30T02:37:27.058282+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "mirror-review-pr-ourliberty-agent-core-765"
+      ],
+      "repo": null,
+      "created": "2026-06-30",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-30T02:50:39.828701+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-30T02:37:27.058282+00:00",
+      "briefing": {
+        "what": "Some work the team kicked off on its own that isn't attached to any active project yet, and it's now waiting on your sign-off.",
+        "why": "Loose, unassigned work can quietly pull time away from your real priorities or slip through without anyone owning it.",
+        "suggest": "Take a quick look before approving \u2014 confirm it actually fits your current goals, since the details here are thin."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-30T02:57:49.643251+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-pr-ourliberty-agent-core-765",
+      "name": "PR Ourliberty Agent Core 765",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-ourliberty-agent-core-765`. Last activity 2026-06-30T02:37:24.276075+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-ourliberty-agent-core-765"
+      ],
+      "repo": null,
+      "created": "2026-06-30",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-30T02:50:39.828701+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-30T02:37:24.276075+00:00",
+      "briefing": {
+        "what": "A piece of work the team kicked off on its own that isn't yet attached to any of your active priorities.",
+        "why": "It's been bounced up for your sign-off and is sitting idle, so without a decision it either stalls or moves ahead without a clear business reason behind it.",
+        "suggest": "Take a quick look and decide whether it ladders up to a current priority before greenlighting it \u2014 if it doesn't, park it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-30T02:57:49.643251+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-resolve-pr764-regbaseline-forkbomb-conflict-001",
+      "name": "Resolve Pr764 Regbaseline Forkbomb Conflict 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `resolve-pr764-regbaseline-forkbomb-conflict-001`. Last activity 2026-06-30T03:41:22.242681+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "resolve-pr764-regbaseline-forkbomb-conflict-001"
+      ],
+      "repo": null,
+      "created": "2026-06-30",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-30T03:50:43.287081+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-30T03:41:22.242681+00:00"
     }
   ]
 }
