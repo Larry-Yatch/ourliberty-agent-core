@@ -358,8 +358,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T06:39Z UTC (Iter ~3326, Tier 1)
+## Status snapshot — updated 2026-06-30T06:45Z UTC (Iter ~3327, Tier 1)
 
-**Iter ~3326 summary (2026-06-30T06:39Z):** 0 new alerts. All daemons healthy. No stalls. **ourliberty-cycle.timer BROKEN** — `NextElapseUSecRealtime=` empty; automated cycles will not fire; carry from ~3325, escalation written (pulse-escalations.json 06:31:00Z). Self-caused 409 burst (Pulse called `get-pending-approvals` violating G-rule; background task stopped; resolved). 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals (unchanged). Worktrees 11/0-gate-wt. Watermark=1120. Ratio=17.36. Tier 1 (cycle timer broken).
+**Iter ~3327 summary (2026-06-30T06:45Z):** 0 new alerts. All daemons healthy (beacon bot 1200723, inbox-watcher, outbox-notifier, heal-daemon 06:38:39Z). No stalls. **ourliberty-cycle.timer BROKEN (3rd consecutive iter)** — `NextElapseUSecRealtime=` empty; escalation in pulse-escalations.json 06:31:00Z. Pipeline idle (outbox-notifier last entry 05:11:25Z UTC). 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals (unchanged since ~3324). Worktrees 11/0-gate-wt. Watermark=1120. Ratio=17.375. Tier 1.
 
 
