@@ -105,6 +105,25 @@
       "notes": "Tier 2 fallback to the Tier 1 setup-token. NON-refreshing — same expiry profile as Tier 1; re-mint via `claude setup-token` on Larry's personal Claude Max account per the shared runbook. credentials.json (LARRY_PERSONAL_CLAUDE_MAX_OAUTH_TIER2) remains the further fallback when this env var is unset. calendar_event_url is null at PR time — Beacon will create the annual rotation reminder event post-merge and a follow-up small commit will paste the URL here."
     },
     {
+      "name": "CLAUDE_CODE_OAUTH_TOKEN_TIER3",
+      "storage_location": "env_file:/home/larry/credentials/.env.larry",
+      "credential_type": "oauth_setup_token",
+      "purpose": "PRIMARY-pool dispatch auth (Tier 3 - dedicated Claude Max account, separate quota bucket). Load-balanced with Tier 1 for droplet system dispatches under the capacity-pool router (docs/specs/tier-capacity-pool.md); Tier 2 (personal) is reserved for the laptop + emergency fallback. Read by scripts/agent_runner.py _apply_tier_auth and exported as CLAUDE_CODE_OAUTH_TOKEN per dispatch.",
+      "rotation_type": "scheduled",
+      "cadence_days": 365,
+      "created_at": "2026-06-29",
+      "last_rotated_at": "2026-06-29",
+      "next_rotation_due": "2027-06-29",
+      "calendar_event_url": null,
+      "runbook_path": "docs/runbooks/rotate-claude-setup-tokens.md",
+      "severity_if_lapsed": "high",
+      "owner_role": "larry",
+      "scopes": [
+        "claude-code-setup-token"
+      ],
+      "notes": "Tier 3 dedicated Max account added 2026-06-29 for capacity (Rocket Station build week) - verified minted against the new dedicated account (not personal), so separate quota. NON-refreshing setup-token (`claude setup-token`); expires ~1 year, re-mint per the shared runbook before next_rotation_due. Under the shared-config (tier=token) model there is NO credentials.json home for tier3 - this env var is the sole auth source. Inert until the capacity-pool router wires tier3 into the primary pool (Phase 0b, stacked on #760). account email/org_id TBD - fill on first registry audit. calendar_event_url null at PR time; Beacon will create the annual reminder post-merge."
+    },
+    {
       "name": "GOOGLE_OAUTH_REFRESH_TOKEN",
       "storage_location": "workspace_mcp:/home/larry/.google_workspace_mcp/credentials/agent.beacon.ourliberty@gmail.com.json",
       "credential_type": "oauth_refresh_token",
