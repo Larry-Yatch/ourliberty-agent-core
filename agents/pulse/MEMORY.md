@@ -352,8 +352,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T03:28Z UTC (Iter ~3312, Tier 1)
+## Status snapshot — updated 2026-06-30T03:34Z UTC (Iter ~3313, Tier 1)
 
-**Iter ~3312 summary (2026-06-30T03:28Z):** ⚠️ Drift. Worktrees RE-ESCALATED to 75 (was 56 at ~3311, 66 at ~3310). git fetch FAILING again on HEAD fbf33b0e. Per-commit burst pattern confirmed: each Pulse wrapper commit triggers new warmer burst. git worktree prune TIMING OUT at 60s (new companion symptom). Beacon processing warmer-burst direction-ask (03:18:15Z, in-flight). Mirror active on PR #766 regression check (14400s session, expires ~06:49Z). Sync error carry/transient. 5 pending approvals unchanged. Watermark=1108. Ratio=17.45 (trend=improving). Tier 1, consecutive_clean=0.
+**Iter ~3313 summary (2026-06-30T03:34Z):** ✅ Nominal. git fetch CLEAN (improvement from ~3312 bad-object failure). Worktrees 85 (↑10 from ~3312's 75, gate-wt=77) — still growing but git ops not degraded. git prune timeouts did not recur this cycle. Beacon in-flight on warmer dedup direction-ask (03:18:15Z, 14400s). Mirror active on PR #766 telegram-409 (14400s session 02:49:24Z, expires ~06:49Z). No new alerts. 5 pending approvals unchanged. Sync error carry. Watermark=1108. Ratio=17.45. Tier 1, consecutive_clean=1.
 
 
