@@ -58,9 +58,11 @@ Key design points (follows the heal_* conventions):
     module's executable code is under `if __name__ == '__main__'`). Reusing the
     real builder is deliberate — a hand-rolled copy of the review-task envelope is
     exactly the drift class that produced the sibling dropped-marker bug.
-  - Age grace: only PRs open longer than DISPATCH_GRACE_MINUTES are considered, so
-    the normal inline path gets first crack on a freshly opened PR and this healer
-    only fills genuine gaps.
+  - Grace, per class: a Forge PR waits DISPATCH_GRACE_MINUTES from its open time so
+    the normal inline path gets first crack on a freshly opened PR. A hand/claude
+    PR has no inline path, so it waits only HAND_PR_GRACE_MINUTES and gates on its
+    LAST COMMIT — a short debounce against the author still pushing, not dead
+    latency. This healer only fills genuine gaps either way.
   - Idempotent: the dispatch's own presence check dedups; a per-PR failure ledger
     in the state file dedups the (rare) dispatch-FAILED escalation so one stuck PR
     pages Larry once, not every tick.
@@ -164,6 +166,15 @@ _OPEN_PR_FETCH_LIMIT = 200
 # unreviewed for ~30min; 10min is well inside that and well past the seconds the
 # happy path needs.
 DISPATCH_GRACE_MINUTES = 10
+# Grace for hand-spun PRs (class 2/3: `claude/*` and `auto-review`-labeled). These
+# have NO inline dispatch path — this backstop is their ONLY route — so the long
+# DISPATCH_GRACE_MINUTES (which exists purely to let inline dispatch win the race
+# on a Forge PR) buys them nothing but latency. They need only a short debounce
+# against the author still pushing, gated on the LAST COMMIT rather than PR-open
+# time (see select_orphaned_prs). A re-push past this window is re-reviewed anyway
+# (the dedup is head-SHA-aware), so the downside of being slightly eager is one
+# re-review cycle, not a wrong merge.
+HAND_PR_GRACE_MINUTES = 3
 # Keep the failure ledger from growing without bound.
 MAX_FAILED_LEDGER = 200
 
@@ -272,26 +283,40 @@ def _repo_segment(repo_coords: str) -> str:
 
 def _fetch_repo_prs(repo: str) -> Optional[list[dict[str, Any]]]:
     """List open PRs for ONE repo via gh. Returns parsed rows (each tagged with its
-    `_repo`), or None on a gh failure for that repo (already logged)."""
-    cmd = [
-        'gh', 'pr', 'list',
-        '--repo', repo,
-        '--state', 'open',
-        '--limit', str(_OPEN_PR_FETCH_LIMIT),
-        '--json', 'number,url,headRefName,createdAt,title,headRefOid,isDraft,labels',
-    ]
-    try:
-        proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=GH_TIMEOUT_S,
-        )
-    except (subprocess.TimeoutExpired, OSError) as e:
-        log(f'gh pr list ({repo}) failed: {type(e).__name__}: {e}', 'WARN')
-        return None
-    if proc.returncode != 0:
-        log(f'gh pr list ({repo}) returned {proc.returncode}: '
-            f'{proc.stderr.strip()[:300]}', 'WARN')
-        return None
-    return parse_open_prs(proc.stdout, repo)
+    `_repo`), or None on a gh failure for that repo (already logged).
+
+    `commits` (→ `lastCommitAt`, the hand-PR debounce signal) is fetched as an
+    OPTIONAL extra field. gh rejects an unknown `--json` field with a non-zero
+    exit, which would blind the WHOLE sweep — so a failed call is retried once
+    WITHOUT `commits`. On a gh too old to know the field, we therefore degrade to
+    no `lastCommitAt` (selection falls back to `createdAt`) instead of going dark;
+    on a genuine gh outage both attempts fail and we return None as before."""
+    base_fields = (
+        'number,url,headRefName,createdAt,title,headRefOid,isDraft,labels'
+    )
+    last_err = ''
+    # Preferred projection first; the no-commits fallback handles field-unsupported.
+    for fields in (base_fields + ',commits', base_fields):
+        cmd = [
+            'gh', 'pr', 'list',
+            '--repo', repo,
+            '--state', 'open',
+            '--limit', str(_OPEN_PR_FETCH_LIMIT),
+            '--json', fields,
+        ]
+        try:
+            proc = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=GH_TIMEOUT_S,
+            )
+        except (subprocess.TimeoutExpired, OSError) as e:
+            log(f'gh pr list ({repo}) failed: {type(e).__name__}: {e}', 'WARN')
+            return None
+        if proc.returncode == 0:
+            return parse_open_prs(proc.stdout, repo)
+        last_err = proc.stderr.strip()[:300]
+        # Non-zero: fall through to the no-commits projection once, then give up.
+    log(f'gh pr list ({repo}) returned nonzero: {last_err}', 'WARN')
+    return None
 
 
 def fetch_open_prs() -> Optional[list[dict[str, Any]]]:
@@ -299,8 +324,8 @@ def fetch_open_prs() -> Optional[list[dict[str, Any]]]:
     (each tagged with `_repo`), or None ONLY when every repo's gh call failed — a
     single-repo gh hiccup must not blind the sweep to the other repo, and a healer
     must never crash the timer. A repo with no open PRs contributes [] (still a
-    success). Each row carries number, url, headRefName, createdAt, title,
-    headRefOid, isDraft, labels, _repo."""
+    success). Each row carries number, url, headRefName, createdAt, lastCommitAt,
+    title, headRefOid, isDraft, labels, _repo."""
     combined: list[dict[str, Any]] = []
     any_ok = False
     for repo in REPOS:
@@ -332,11 +357,27 @@ def parse_open_prs(raw_json: str, repo: Optional[str] = None) -> list[dict[str, 
         created = r.get('createdAt')
         if number is None or not url or not head or not created:
             continue
+        # Reduce the commits array to the newest committedDate. ISO-8601 UTC
+        # strings (…Z) compare lexicographically in chronological order, so max()
+        # is the last commit. Absent/empty/malformed → None (selection falls back
+        # to createdAt for the grace check).
+        commits = r.get('commits')
+        last_commit_at = None
+        if isinstance(commits, list):
+            dates = [
+                c.get('committedDate') for c in commits
+                if isinstance(c, dict) and c.get('committedDate')
+            ]
+            if dates:
+                last_commit_at = max(dates)
         out.append({
             'number': number,
             'url': url,
             'headRefName': head,
             'createdAt': created,
+            # Newest commit's timestamp (ISO-8601), or None. Gates the hand-PR
+            # grace so the debounce tracks the last push, not PR-open time.
+            'lastCommitAt': last_commit_at,
             'title': r.get('title') or '',
             # head commit SHA — lets the dedup distinguish "this PR's CURRENT
             # head was reviewed" from "an EARLIER head was reviewed". Tolerated
@@ -421,11 +462,21 @@ def select_orphaned_prs(
     now: datetime,
     already_dispatched: Any,
     grace_minutes: int = DISPATCH_GRACE_MINUTES,
+    hand_grace_minutes: int = HAND_PR_GRACE_MINUTES,
 ) -> list[dict[str, Any]]:
     """Pure selection step. From the open-PR rows, return those that are
     reviewable (Forge build PRs + non-draft `auto-review`-labeled PRs — see
-    `_is_reviewable_pr`), older than the grace window, and have NO Mirror review
+    `_is_reviewable_pr`), past their grace window, and have NO Mirror review
     task yet.
+
+    Grace is PER CLASS, because the window's only purpose is to let the inline
+    Forge→Mirror dispatch win the race before this backstop fires:
+      - Forge PR (`forge/*`): HAS an inline path, so wait `grace_minutes` from
+        the PR's OPEN time (`createdAt`) — unchanged.
+      - hand/claude PR (the opt-in path): has NO inline dispatch, so the long
+        grace buys nothing. Wait only `hand_grace_minutes` and gate on the LAST
+        COMMIT (`lastCommitAt`, fallback `createdAt`) — a short debounce against
+        the author still pushing, not a stale PR-open-age proxy.
 
     `already_dispatched(task_id, head_sha) -> bool` is injected (the production
     caller passes a thin wrapper over
@@ -435,15 +486,21 @@ def select_orphaned_prs(
     as not-yet-dispatched, so a PR updated after its first review is re-reviewed.
     Each returned row is the input row augmented with its derived `task_id`.
     """
-    cutoff = now - timedelta(minutes=grace_minutes)
+    forge_cutoff = now - timedelta(minutes=grace_minutes)
+    hand_cutoff = now - timedelta(minutes=hand_grace_minutes)
     out: list[dict[str, Any]] = []
     for pr in open_prs:
         head = str(pr.get('headRefName') or '')
         if not _is_reviewable_pr(head, bool(pr.get('isDraft')), pr.get('labels')):
             continue  # not Forge, and not a non-draft auto-review-labeled PR
-        created = _parse_iso(pr.get('createdAt'))
-        if created is None or created > cutoff:
-            continue  # too fresh — let the normal inline dispatch fire first
+        if head.startswith(FORGE_BRANCH_PREFIX):
+            ts, cutoff = _parse_iso(pr.get('createdAt')), forge_cutoff
+        else:
+            # Last push if known, else PR-open time; debounced on the short grace.
+            ts = _parse_iso(pr.get('lastCommitAt') or pr.get('createdAt'))
+            cutoff = hand_cutoff
+        if ts is None or ts > cutoff:
+            continue  # too fresh — forge: let inline fire; hand: still pushing
         task_id = task_id_for_branch(head, pr.get('number'), pr.get('_repo'))
         if not task_id:
             continue  # degenerate branch → no dispatchable task_id

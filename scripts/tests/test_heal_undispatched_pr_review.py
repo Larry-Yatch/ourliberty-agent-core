@@ -34,10 +34,11 @@ import heal_undispatched_pr_review as h  # noqa: E402
 NOW = datetime(2026, 6, 10, 12, 0, 0, tzinfo=timezone.utc)
 
 
-def _pr(number, branch, *, age_minutes=60, url=None, title='t', is_draft=False,
-        labels=(), repo='Larry-Yatch/ourliberty-agent-core'):
+def _pr(number, branch, *, age_minutes=60, last_commit_minutes=None, url=None,
+        title='t', is_draft=False, labels=(),
+        repo='Larry-Yatch/ourliberty-agent-core'):
     created = (NOW - timedelta(minutes=age_minutes)).strftime('%Y-%m-%dT%H:%M:%SZ')
-    return {
+    row = {
         'number': number,
         'url': url or f'https://github.com/{repo}/pull/{number}',
         'headRefName': branch,
@@ -47,6 +48,12 @@ def _pr(number, branch, *, age_minutes=60, url=None, title='t', is_draft=False,
         'labels': list(labels),
         '_repo': repo,
     }
+    # When set, the newest-commit timestamp the hand-PR grace debounces on.
+    if last_commit_minutes is not None:
+        row['lastCommitAt'] = (
+            NOW - timedelta(minutes=last_commit_minutes)
+        ).strftime('%Y-%m-%dT%H:%M:%SZ')
+    return row
 
 
 class TestParseOpenPrs(unittest.TestCase):
@@ -81,6 +88,41 @@ class TestParseOpenPrs(unittest.TestCase):
         raw = ('[{"number":1,"url":"https://x/1","headRefName":"fix/a",'
                '"createdAt":"2026-06-10T00:00:00Z","title":"hi"}]')
         self.assertFalse(h.parse_open_prs(raw)[0]['isDraft'])
+
+    def test_reduces_commits_to_newest_last_commit_at(self):
+        raw = ('[{"number":1,"url":"https://x/1","headRefName":"forge/a",'
+               '"createdAt":"2026-06-10T00:00:00Z","title":"hi","commits":['
+               '{"committedDate":"2026-06-10T01:00:00Z"},'
+               '{"committedDate":"2026-06-10T03:00:00Z"},'
+               '{"committedDate":"2026-06-10T02:00:00Z"}]}]')
+        self.assertEqual(
+            h.parse_open_prs(raw)[0]['lastCommitAt'], '2026-06-10T03:00:00Z')
+
+    def test_last_commit_at_none_when_commits_absent_or_empty(self):
+        raw = ('[{"number":1,"url":"https://x/1","headRefName":"forge/a",'
+               '"createdAt":"2026-06-10T00:00:00Z","title":"hi"},'
+               '{"number":2,"url":"https://x/2","headRefName":"forge/b",'
+               '"createdAt":"2026-06-10T00:00:00Z","title":"hi","commits":[]}]')
+        rows = h.parse_open_prs(raw)
+        self.assertIsNone(rows[0]['lastCommitAt'])
+        self.assertIsNone(rows[1]['lastCommitAt'])
+
+    def test_malformed_commits_do_not_crash_row_survives(self):
+        # commits with non-dicts / dicts lacking committedDate must not crash the
+        # parser; the row survives with lastCommitAt None (createdAt fallback).
+        raw = ('[{"number":1,"url":"https://x/1","headRefName":"forge/a",'
+               '"createdAt":"2026-06-10T00:00:00Z","title":"hi",'
+               '"commits":[{"foo":1},"notadict",null]}]')
+        rows = h.parse_open_prs(raw)
+        self.assertEqual(len(rows), 1)
+        self.assertIsNone(rows[0]['lastCommitAt'])
+
+    def test_commits_not_a_list_is_tolerated(self):
+        raw = ('[{"number":1,"url":"https://x/1","headRefName":"forge/a",'
+               '"createdAt":"2026-06-10T00:00:00Z","title":"hi","commits":"oops"}]')
+        rows = h.parse_open_prs(raw)
+        self.assertEqual(len(rows), 1)
+        self.assertIsNone(rows[0]['lastCommitAt'])
 
     def test_carries_label_names(self):
         # gh returns labels as [{name,color,...}]; we flatten to names.
@@ -288,6 +330,53 @@ class TestSelectOrphanedPrs(unittest.TestCase):
         self.assertEqual(
             h.select_orphaned_prs(prs, NOW, self._none_dispatched, grace_minutes=30), [])
 
+    # ---- per-class grace: hand/claude PRs debounce on last commit ----
+
+    def test_hand_pr_dispatched_fast_when_last_commit_is_old(self):
+        # The fix: a just-OPENED auto-review PR whose last commit is well past the
+        # short hand grace dispatches now — it no longer eats the full 10-min Forge
+        # grace (which only exists to let inline dispatch win, and hand PRs have no
+        # inline path).
+        prs = [_pr(50, 'work/handspun', age_minutes=0, last_commit_minutes=10,
+                   labels=[h.AUTO_REVIEW_LABEL])]
+        sel = h.select_orphaned_prs(prs, NOW, self._none_dispatched)
+        self.assertEqual([p['number'] for p in sel], [50])
+
+    def test_hand_pr_within_last_commit_grace_skipped(self):
+        # Still pushing: last commit 1 min ago (< HAND_PR_GRACE_MINUTES) → debounced
+        # even though the PR itself was opened an hour ago.
+        prs = [_pr(51, 'work/handspun', age_minutes=60, last_commit_minutes=1,
+                   labels=[h.AUTO_REVIEW_LABEL])]
+        self.assertEqual(h.select_orphaned_prs(prs, NOW, self._none_dispatched), [])
+
+    def test_hand_pr_falls_back_to_created_at_without_commit_data(self):
+        # No lastCommitAt (older gh / mock) → gate on createdAt with the SHORT
+        # hand grace, not the long Forge one.
+        fresh = _pr(52, 'work/handspun', age_minutes=1, labels=[h.AUTO_REVIEW_LABEL])
+        self.assertEqual(h.select_orphaned_prs([fresh], NOW, self._none_dispatched), [])
+        settled = _pr(53, 'work/handspun', age_minutes=5, labels=[h.AUTO_REVIEW_LABEL])
+        self.assertEqual([p['number'] for p in
+                          h.select_orphaned_prs([settled], NOW, self._none_dispatched)],
+                         [53])
+
+    def test_forge_pr_ignores_last_commit_and_uses_long_open_grace(self):
+        # Regression: Forge PRs are UNCHANGED — gated on createdAt with the full
+        # grace, ignoring lastCommitAt. A fresh commit neither makes a 15-min-old
+        # forge PR wait nor dispatches a 5-min-old one early.
+        old = _pr(54, 'forge/x', age_minutes=15, last_commit_minutes=0)
+        self.assertEqual([p['number'] for p in
+                          h.select_orphaned_prs([old], NOW, self._none_dispatched)], [54])
+        fresh = _pr(55, 'forge/x', age_minutes=5, last_commit_minutes=0)
+        self.assertEqual(h.select_orphaned_prs([fresh], NOW, self._none_dispatched), [])
+
+    def test_custom_hand_grace_minutes(self):
+        # 4-min-old last commit is within a 5-min hand grace → still debounced.
+        prs = [_pr(56, 'work/handspun', age_minutes=60, last_commit_minutes=4,
+                   labels=[h.AUTO_REVIEW_LABEL])]
+        self.assertEqual(
+            h.select_orphaned_prs(prs, NOW, self._none_dispatched,
+                                  hand_grace_minutes=5), [])
+
 
 class TestSynthesizeBuildData(unittest.TestCase):
     def test_envelope_shape(self):
@@ -367,6 +456,61 @@ class TestFetchOpenPrs(unittest.TestCase):
             'Larry-Yatch/ourliberty-dashboard': [],
         })
         self.assertEqual(out, [])
+
+
+class TestFetchRepoPrsCommitsFallback(unittest.TestCase):
+    """_fetch_repo_prs retries WITHOUT `commits` when gh rejects the field, so a gh
+    too old to know it degrades to no lastCommitAt instead of blinding the sweep."""
+
+    def _proc(self, returncode, stdout='', stderr=''):
+        from types import SimpleNamespace
+        return SimpleNamespace(returncode=returncode, stdout=stdout, stderr=stderr)
+
+    def test_retries_without_commits_on_field_error(self):
+        from unittest import mock
+        good = ('[{"number":1,"url":"https://x/1","headRefName":"forge/a",'
+                '"createdAt":"2026-06-10T00:00:00Z","title":"hi"}]')
+        calls = []
+
+        def fake_run(cmd, **kw):
+            fields = cmd[cmd.index('--json') + 1]
+            calls.append(fields)
+            if 'commits' in fields:
+                return self._proc(1, stderr='Unknown JSON field: "commits"')
+            return self._proc(0, stdout=good)
+
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run):
+            rows = h._fetch_repo_prs('Larry-Yatch/ourliberty-agent-core')
+        self.assertEqual([r['number'] for r in rows], [1])
+        self.assertIsNone(rows[0]['lastCommitAt'])  # degraded, not dark
+        self.assertEqual(len(calls), 2)
+        self.assertIn('commits', calls[0])
+        self.assertNotIn('commits', calls[1])
+
+    def test_uses_commits_with_no_retry_when_supported(self):
+        from unittest import mock
+        good = ('[{"number":1,"url":"https://x/1","headRefName":"forge/a",'
+                '"createdAt":"2026-06-10T00:00:00Z","title":"hi",'
+                '"commits":[{"committedDate":"2026-06-10T05:00:00Z"}]}]')
+        calls = []
+
+        def fake_run(cmd, **kw):
+            calls.append(cmd[cmd.index('--json') + 1])
+            return self._proc(0, stdout=good)
+
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run):
+            rows = h._fetch_repo_prs('Larry-Yatch/ourliberty-agent-core')
+        self.assertEqual(rows[0]['lastCommitAt'], '2026-06-10T05:00:00Z')
+        self.assertEqual(len(calls), 1)  # supported → no retry
+
+    def test_returns_none_when_both_attempts_fail(self):
+        from unittest import mock
+        with mock.patch.object(
+                h.subprocess, 'run',
+                side_effect=lambda cmd, **kw: self._proc(
+                    1, stderr='gh: not authenticated')):
+            self.assertIsNone(
+                h._fetch_repo_prs('Larry-Yatch/ourliberty-agent-core'))
 
 
 class TestHealerEnabled(unittest.TestCase):
