@@ -310,9 +310,9 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 ---
 
 
-## regression-baseline-warm worktree proliferation → DISPATCHED ✅ (iter ~3271), vp
+## regression-baseline-warm worktree proliferation → PR #761 MERGED ✅ (iter ~3307), verify-next-cycle
 
-**Rule:** Regression baseline warmer (PR #751) creates git worktrees via `git worktree add gate-wt-<sha>` in /tmp/regbaseline-warm-*/ without cleanup. Each merge of origin/main spawns a new /tmp dir with a new locked worktree of the same hash. 3 locked gate-wt-f0d7bcdc5cc24 entries across /tmp/regbaseline-warm-{0ge61bfy,9th6uvte,k3yvl__k}/ block git fetch/push. Repo 3 commits ahead of origin (compounding; run_cycle.sh push fails silently). Dispatched `direction-ask-regression-baseline-warm-worktree-cleanup-001` to Beacon inbox at iter ~3271 (3/3). Immediate ask-then-do (Larry approval needed): manually remove 3 locked /tmp dirs then `git worktree prune` to unblock fetch/push. verification_pending. Occurrences: iter ~3269 (1/3, 139 worktrees); iter ~3270 (2/3, 102 worktrees); iter ~3271 (3/3, 101 worktrees, dispatched).
+**Rule:** Regression baseline warmer (PR #751) creates git worktrees via `git worktree add gate-wt-<sha>` in /tmp/regbaseline-warm-*/ without cleanup. PR #761 (fix: reap orphaned locked gate/warmer worktrees blocking git fetch) MERGED at 2026-06-30T02:36:02Z. Brings in cleanup_stale_worktrees.py (new 134-line reaper script) + regression_baseline_cache.py updates + tests. Verify next cycle: worktree count should decline from 154 baseline (iter ~3306). G-rule verification_pending — confirm fix is live and count drops. Occurrences: iter ~3269 (1/3, 139 worktrees); iter ~3270 (2/3, 102 worktrees); iter ~3271 (3/3, 101 worktrees, dispatched); PR #761 MERGED iter ~3307.
 
 ---
 
@@ -334,8 +334,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T02:21Z UTC (Iter ~3304, Tier 1)
+## Status snapshot — updated 2026-06-30T02:41Z UTC (Iter ~3307, Tier 1)
 
-**Iter ~3304 summary (2026-06-30T02:21Z):** ✅ **Git fetch RESOLVED** — bad object gate-wt-8c04f0c237bf84/HEAD gone (cleared when Larry merged PR #762 at 02:15:57Z). Repo ff'd cd1c76a6→7850c79f. **PR #762 MERGED** by Larry (fix: no_session_revision human-PR FPs in heal_pipeline_stall.py). 2 alerts: 1 Tier-3 silenced, 1 Tier-4 (ourliberty-health origin_sync, bot DM'd Larry, root cause resolved). **PR #763 REVIEW_ESCALATE** → new pending approval mirror-review-pr-ourliberty-agent-core-763 (Larry decision in Approvals tab; no-session DM dropped, G-rule vp). PR #767 NEW (fix: reap mid-flight Mirror reviews). Mirror queue: 3 items (#764/#765/telegram-409). Pipeline stalls: 0. Worktrees: 154 (improving). 4 pending approvals. Trailing-30d ratio≈17.30 (trend=improving). Tier 1, consecutive_clean=0. PRs #761/#764 still pending (reaper + fork-bomb — needed to prevent worktree recurrence).
+**Iter ~3307 summary (2026-06-30T02:41Z):** ✅ **PR #761 MERGED 02:36:02Z** — worktree reaper (cleanup_stale_worktrees.py) live. ff-main fc47df01→3a88f55f. **PR #765 → REVIEW_ESCALATE** (new) + pending approval mirror-review-pr-ourliberty-agent-core-765. 5 pending approvals total. PR #764 now CONFLICTING after PR #761 merge (overlapping files; Mirror will detect + Forge will rebase — pipeline self-handles). PR #755 stale queue entry (already merged; self-resolving). 0 new alerts. Mirror queue: 3 items (#764-rev1, #767, telegram-409). Pipeline stalls: 0. Trailing-30d ratio≈17.26 (trend=improving). Tier 1, consecutive_clean=0.
 
 
