@@ -34,10 +34,12 @@ agents/beacon/specs/regression-gate-efficiency.md).
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 import re
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Optional
@@ -170,6 +172,18 @@ def warm(repo_root: Path, sha: Optional[str], timeout_s: int) -> int:
     """
     import test_regression_check as trc  # lazy: trc imports this module
 
+    # Re-entrancy guard (regbaseline fork-bomb, 2026-06-29): warm() computes the
+    # baseline by running the FULL `unittest discover -s scripts/tests` suite in
+    # a worktree. build_sandbox_env copies this process env (minus credentials)
+    # into that jailed suite, so REGBASELINE_WARMING reaches every test. If any
+    # suite path reaches the post-merge warm spawn it would fork ANOTHER real
+    # `warm --sha FETCH_HEAD --repo-root <real repo>`, which runs the suite again
+    # -> unbounded. A nested warm CLI inherits the flag and refuses right here.
+    if os.environ.get('REGBASELINE_WARMING') == '1':
+        print('regression_baseline_cache: already warming in this process tree; '
+              'refusing to nest (re-entrancy guard)')
+        return 0
+
     # Defensive pre-sweep: the warmer is the most frequent creator of the
     # gate/warmer worktree leak (a SIGKILL mid `git worktree add` leaves a locked,
     # un-prunable .git/worktrees entry). Reap any such orphans from prior killed
@@ -192,20 +206,50 @@ def warm(repo_root: Path, sha: Optional[str], timeout_s: int) -> int:
     if load(canonical) is not None:
         print(f'baseline already cached for {canonical[:12]}; nothing to do')
         return 0
-    import tempfile
-    with tempfile.TemporaryDirectory(prefix='regbaseline-warm-') as tmp:
+
+    # Single-flight (regbaseline fork-bomb, 2026-06-29): Pulse merges fire a
+    # post-merge warm every ~7-9 min, but a cold full-suite warm can run longer,
+    # so overlapping warms used to stack N concurrent suite runs and OOM a live
+    # agent (the droplet has no swap). warm is idempotent + off the review
+    # critical path, so a warm that cannot take the host lock simply skips; the
+    # holder populates the cache for everyone. OL_REGBASELINE_LOCK_PATH lets
+    # tests point the lock at a scratch file.
+    lock_path = Path(
+        os.environ.get('OL_REGBASELINE_LOCK_PATH')
+        or (Path(tempfile.gettempdir()) / 'ol-regbaseline-warm.lock')
+    )
+    lock_fh = open(lock_path, 'w')
+    try:
         try:
-            failures = trc.collect_failures_at_sha(
-                canonical, repo_root, timeout_s, Path(tmp),
-            )
-        except trc.AnalysisError as exc:
-            print(f'regression_baseline_cache: warm failed: {exc}',
-                  file=sys.stderr)
-            return 2
-    store(canonical, failures)
-    gc()
-    print(f'cached baseline for {canonical[:12]} ({len(failures)} failing)')
-    return 0
+            fcntl.flock(lock_fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            print('regression_baseline_cache: another warm holds the host lock; '
+                  'skipping (single-flight)')
+            return 0
+        # Re-check under the lock: the prior holder may have just cached this SHA.
+        if load(canonical) is not None:
+            print(f'baseline already cached for {canonical[:12]}; nothing to do')
+            return 0
+        os.environ['REGBASELINE_WARMING'] = '1'
+        try:
+            with tempfile.TemporaryDirectory(prefix='regbaseline-warm-') as tmp:
+                try:
+                    failures = trc.collect_failures_at_sha(
+                        canonical, repo_root, timeout_s, Path(tmp),
+                    )
+                except trc.AnalysisError as exc:
+                    print(f'regression_baseline_cache: warm failed: {exc}',
+                          file=sys.stderr)
+                    return 2
+            store(canonical, failures)
+            gc()
+            print(f'cached baseline for {canonical[:12]} '
+                  f'({len(failures)} failing)')
+            return 0
+        finally:
+            os.environ.pop('REGBASELINE_WARMING', None)
+    finally:
+        lock_fh.close()
 
 
 def main(argv: Optional[list[str]] = None) -> int:

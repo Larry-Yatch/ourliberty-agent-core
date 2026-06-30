@@ -13417,6 +13417,17 @@ class PostMergeBaselineWarmTest(unittest.TestCase):
     PR_URL = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/77'
     TASK_ID = 'warmer-fixture-001'
 
+    def setUp(self):
+        # The post-merge warm spawn no-ops when REGBASELINE_WARMING=1 (the
+        # re-entrancy guard). These fixtures assert the REAL spawn-command
+        # construction, so clear the flag in case this suite is itself running
+        # inside a warm's discover pass (which exports it).
+        self._saved_warming = os.environ.pop('REGBASELINE_WARMING', None)
+
+    def tearDown(self):
+        if self._saved_warming is not None:
+            os.environ['REGBASELINE_WARMING'] = self._saved_warming
+
     def _mock_proc(self, *, returncode=0, stdout='', stderr=''):
         class _R:
             pass
@@ -13467,6 +13478,17 @@ class PostMergeBaselineWarmTest(unittest.TestCase):
                                side_effect=OSError('cannot fork')):
             # Must not raise — a warmer error can never touch the merge path.
             on._spawn_post_merge_baseline_warm(self.TASK_ID, self.PR_URL)
+
+    def test_spawn_skips_when_reentrant(self):
+        # Guard against the regbaseline fork-bomb: when already warming, the
+        # post-merge spawn must NOT fork another production warm.
+        os.environ['REGBASELINE_WARMING'] = '1'
+        try:
+            with mock.patch.object(on.subprocess, 'Popen') as m_popen:
+                on._spawn_post_merge_baseline_warm(self.TASK_ID, self.PR_URL)
+            m_popen.assert_not_called()
+        finally:
+            os.environ.pop('REGBASELINE_WARMING', None)
 
     # --- integration with _auto_merge_pr success branches -------------------
 
