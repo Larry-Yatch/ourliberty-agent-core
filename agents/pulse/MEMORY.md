@@ -80,7 +80,7 @@
 
 ## beacon_telegram_bot.py get-messages / get-last-messages MUST NEVER BE CALLED (learned iter ~1876, escalated iter ~1943, 3/3 dispatched iter ~3297)
 
-**Rule:** NEVER call `beacon_telegram_bot.py get-messages` OR `get-last-messages` or ANY subcommand that triggers getUpdates. Competing getUpdates loop causes HTTP 409 conflicts with production bot. For Telegram sweeps (Check 2), use ONLY: `tail -N /home/larry/agents/logs/beacon_telegram_bot.log` (NOT beacon-telegram-bot.log) + `ps -p <PID> -o stat` for bot health. G-rule telegram-409-burst **3/3 DISPATCHED** iter ~3297 (direction-ask-telegram-409-get-last-messages-001.json in Beacon inbox). verification_pending.
+**Rule:** NEVER call `beacon_telegram_bot.py get-messages` OR `get-last-messages` OR `get-pending-approvals` or ANY subcommand that triggers getUpdates. Competing getUpdates loop causes HTTP 409 conflicts with production bot. `get-pending-approvals` was confirmed to trigger getUpdates (violated iter ~3326 — caused 409 burst at 06:35-06:38Z UTC). For Telegram sweeps (Check 2), use ONLY: `tail -N /home/larry/agents/logs/beacon_telegram_bot.log` (NOT beacon-telegram-bot.log) + `ps -p <PID> -o stat` for bot health. For pending approvals, use `cat /home/larry/agents/state/beacon-pending-approvals.json` directly. G-rule telegram-409-burst **3/3 DISPATCHED** iter ~3297 (direction-ask-telegram-409-get-last-messages-001.json in Beacon inbox). verification_pending.
 
 ---
 
@@ -358,8 +358,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T05:27Z UTC (Iter ~3323, Tier 3)
+## Status snapshot — updated 2026-06-30T06:39Z UTC (Iter ~3326, Tier 1)
 
-**Iter ~3323 summary (2026-06-30T05:27Z):** Clean iter. 0 new alerts. All daemons healthy. No stalls. **New occurrence:** Larry's "Go" for PR #765 at 05:11:21Z dead-lettered to Forge .invalid/ (target_repo=None, G-rule `decision-needed-approval-forge-dispatch-no-target-repo-001` 4th+ occurrence). Approval removed from pending (now 4 pending, was 5). Fix approval `heal-no-session-escalate-preserve-target-repo-001` pending. 4 open PRs (#768 new, #763/#765/#766 REVIEW_ESCALATE carries). Worktrees 12/1-gate-wt (prunable, reaper handles). Watermark=1116. Ratio=17.4. **Tier de-escalated 2→3** (3 consecutive clean iters at Tier 2).
+**Iter ~3326 summary (2026-06-30T06:39Z):** 0 new alerts. All daemons healthy. No stalls. **ourliberty-cycle.timer BROKEN** — `NextElapseUSecRealtime=` empty; automated cycles will not fire; carry from ~3325, escalation written (pulse-escalations.json 06:31:00Z). Self-caused 409 burst (Pulse called `get-pending-approvals` violating G-rule; background task stopped; resolved). 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals (unchanged). Worktrees 11/0-gate-wt. Watermark=1120. Ratio=17.36. Tier 1 (cycle timer broken).
 
 
