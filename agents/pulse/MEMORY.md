@@ -358,8 +358,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T07:43Z UTC (Iter ~3335, Tier 1)
+## Status snapshot — updated 2026-06-30T07:47Z UTC (Iter ~3336, Tier 1)
 
-**Iter ~3335 summary (2026-06-30T07:43Z):** 0 new alerts. All daemons healthy (beacon bot 1200723, inbox-watcher 1286943, outbox-notifier 1340254, heal-daemon 07:39:07Z, watchdog healthy). No stalls. **ourliberty-cycle.timer BROKEN (11th consecutive iter)** — Trigger=n/a confirmed; escalation in pulse-escalations.json 06:31:00Z. Pipeline idle (outbox-notifier last entry 23:11:25Z UTC 2026-06-29, ~8.5h). 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals (unchanged). Worktrees 5/0-gate-wt — all 4 non-main STALE (PR #768 + PR #767 merged, wt-forge-resolve ×2 BUILD_ALREADY_MERGED). Watermark=1120. Ratio=17.45. Tier 1.
+**Iter ~3336 summary (2026-06-30T07:47Z):** 0 new alerts. All daemons healthy (beacon bot 1200723, inbox-watcher 1286943, outbox-notifier 1340254, heal-daemon 07:39:07Z, watchdog healthy 07:42:35Z). No stalls. **ourliberty-cycle.timer BROKEN (12th consecutive iter)** — Trigger=n/a confirmed; escalation in pulse-escalations.json 06:31:00Z. Pipeline idle (outbox-notifier last entry 23:11:25Z UTC 2026-06-29, ~8h36m). 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals (unchanged). Worktrees 5/0-gate-wt — all 4 non-main STALE (PR #768 + PR #767 merged, wt-forge-resolve ×2 BUILD_ALREADY_MERGED). Watermark=1120. Ratio=17.4625. Tier 1.
 
 
