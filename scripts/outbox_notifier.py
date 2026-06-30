@@ -6360,6 +6360,18 @@ def _spawn_post_merge_baseline_warm(task_id: str, pr_url: str) -> None:
     run self-heals on the next merge — and PR 1's lazy warm-on-miss remains the
     backstop if the warm never lands.
     """
+    # Re-entrancy guard (regbaseline fork-bomb, 2026-06-29): never spawn a warm
+    # from inside a warm's own suite run. warm() exports REGBASELINE_WARMING=1
+    # around its discover pass and build_sandbox_env propagates it into the
+    # jailed suite; a warmer-fixture (or any merge-path) test that reaches this
+    # real detached Popen during that pass would fork ANOTHER production warm
+    # -> unbounded recursion. Skip when already warming.
+    if os.environ.get('REGBASELINE_WARMING') == '1':
+        log(
+            f'BASELINE_WARM task={task_id} pr={pr_url} '
+            f'outcome=skipped_reentrant (already warming) agent=forge',
+        )
+        return
     try:
         repo_root = _WARM_REPO_ROOT
         warm_py = str(_SCRIPT_DIR / 'regression_baseline_cache.py')

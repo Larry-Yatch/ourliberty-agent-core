@@ -35,12 +35,21 @@ class BaselineCacheTest(unittest.TestCase):
         self._tmp = tempfile.mkdtemp(prefix='regbaseline-test-')
         self._orig = os.environ.get('OL_REGRESSION_BASELINE_DIR')
         os.environ['OL_REGRESSION_BASELINE_DIR'] = self._tmp
+        # Isolate the single-flight host lock from the live warmer and from
+        # other tests (this suite also runs inside the gate's discover pass).
+        self._orig_lock = os.environ.get('OL_REGBASELINE_LOCK_PATH')
+        os.environ['OL_REGBASELINE_LOCK_PATH'] = str(
+            Path(self._tmp) / 'warm.lock')
 
     def tearDown(self):
         if self._orig is None:
             os.environ.pop('OL_REGRESSION_BASELINE_DIR', None)
         else:
             os.environ['OL_REGRESSION_BASELINE_DIR'] = self._orig
+        if self._orig_lock is None:
+            os.environ.pop('OL_REGBASELINE_LOCK_PATH', None)
+        else:
+            os.environ['OL_REGBASELINE_LOCK_PATH'] = self._orig_lock
         import shutil
         shutil.rmtree(self._tmp, ignore_errors=True)
 
@@ -149,6 +158,43 @@ class BaselineCacheTest(unittest.TestCase):
         self.assertEqual(rc, 0)
         collect.assert_called_once()
         self.assertEqual(c.load(SHA_B), {'x.Y.test_z'})
+
+    def test_warm_refuses_to_nest_when_already_warming(self):
+        from unittest import mock
+        saved = os.environ.get('REGBASELINE_WARMING')
+        os.environ['REGBASELINE_WARMING'] = '1'
+        try:
+            with mock.patch('test_regression_check.resolve_sha',
+                            return_value=SHA_B), \
+                 mock.patch('test_regression_check.collect_failures_at_sha') \
+                    as collect:
+                rc = c.warm(Path('/tmp/fake-repo'), SHA_B, 900)
+            self.assertEqual(rc, 0)
+            collect.assert_not_called()  # re-entrancy guard -> no nested suite
+        finally:
+            if saved is None:
+                os.environ.pop('REGBASELINE_WARMING', None)
+            else:
+                os.environ['REGBASELINE_WARMING'] = saved
+
+    def test_warm_single_flights_when_host_lock_held(self):
+        import fcntl
+        from unittest import mock
+        lock_path = Path(os.environ['OL_REGBASELINE_LOCK_PATH'])
+        held = open(lock_path, 'w')
+        fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        try:
+            with mock.patch('test_regression_check.resolve_sha',
+                            return_value=SHA_B), \
+                 mock.patch.object(c, 'load', return_value=None), \
+                 mock.patch('test_regression_check.collect_failures_at_sha') \
+                    as collect:
+                rc = c.warm(Path('/tmp/fake-repo'), SHA_B, 900)
+            self.assertEqual(rc, 0)
+            collect.assert_not_called()  # lock held -> single-flight skip
+        finally:
+            fcntl.flock(held, fcntl.LOCK_UN)
+            held.close()
 
 
 if __name__ == '__main__':
