@@ -340,9 +340,9 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## G-rule regbaseline-warmer-burst-git-contention-001 — 1/3, DISPATCHED (new, iter ~3310)
+## G-rule regbaseline-warmer-burst-git-contention-001 — 1/3, DISPATCHED (new, iter ~3310; updated ~3312)
 
-**Rule:** PR #751 (regression-gate-steady-state-warmer-001) merged 2026-06-29T18:55Z. Warmer creates `gate-wt-<sha>` worktrees without deduplication or rate-limiting. Multiple parallel warmer runs create dozens of worktrees for the same HEAD SHA (numbered gate-wt-cb86751e2b6e through gate-wt-cb86751e2b6e53+). Impact: EAGAIN lock contention in worktree-cleanup.log, `git fetch` failing (bad object gate-wt-<sha>/HEAD), sync push-failed. Distinct from completed G-rule `regression-baseline-warm worktree proliferation` (that was OLD stale buildup; this is the warmer's burst-creation rate). Fix: deduplicate (skip if gate-wt-<sha> already exists), rate-limit (serial with file lock), or per-SHA cap of 1. Direction-ask dispatched to Beacon at iter ~3310 (1/3, early dispatch due to active git degradation). verification_pending. First occurrence iter ~3310 (.git/worktrees grew 28→66+ in 8 min).
+**Rule:** PR #751 (regression-gate-steady-state-warmer-001) merged 2026-06-29T18:55Z. Warmer creates `gate-wt-<sha>` worktrees without deduplication or rate-limiting. Per-commit burst pattern: **each new wrapper commit triggers a new burst** — warmer runs per HEAD SHA with no dedup, so each ~8-min cycle commit generates 60+ gate-wt entries for the NEW HEAD. Confirmed at ~3312: worktrees 56→75 in 3 min (burst on HEAD fbf33b0e "Pulse cycle 20260630T032401Z"), git fetch failing with bad object gate-wt-fbf33b0e.../HEAD. Companion symptom (new iter ~3312): `git worktree prune` TIMING OUT at 60s under 75-worktree load. Reaper (PR #761) running but outpaced. Fix: deduplicate (skip if gate-wt-<sha> already exists), rate-limit (serial with file lock), or per-SHA cap of 1. Direction-ask dispatched to Beacon at iter ~3310 (1/3, early dispatch due to active git degradation); Beacon in-flight 03:18:15Z as of ~3312. verification_pending. First occurrence iter ~3310 (.git/worktrees grew 28→66+ in 8 min).
 
 ---
 
@@ -352,8 +352,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T03:22Z UTC (Iter ~3311, Tier 1)
+## Status snapshot — updated 2026-06-30T03:28Z UTC (Iter ~3312, Tier 1)
 
-**Iter ~3311 summary (2026-06-30T03:22Z):** ✅ Nominal. Worktrees 56 (↓ from 66). git fetch clean — bad-object degradation from ~3310 RESOLVED. Beacon processing warmer-burst direction-ask (started 03:18:15Z). Both larry-approval Beacon tasks failed success=False (~11 min each). Pending=5 unchanged. Mirror active on telegram-409 (31 min into 14400s). Sync error carry/transient. 5 pending approvals. Watermark=1108. Trailing-30d ratio≈17.46 (trend=improving). Tier 1, consecutive_clean=0.
+**Iter ~3312 summary (2026-06-30T03:28Z):** ⚠️ Drift. Worktrees RE-ESCALATED to 75 (was 56 at ~3311, 66 at ~3310). git fetch FAILING again on HEAD fbf33b0e. Per-commit burst pattern confirmed: each Pulse wrapper commit triggers new warmer burst. git worktree prune TIMING OUT at 60s (new companion symptom). Beacon processing warmer-burst direction-ask (03:18:15Z, in-flight). Mirror active on PR #766 regression check (14400s session, expires ~06:49Z). Sync error carry/transient. 5 pending approvals unchanged. Watermark=1108. Ratio=17.45 (trend=improving). Tier 1, consecutive_clean=0.
 
 
