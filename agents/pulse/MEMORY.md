@@ -368,9 +368,11 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## G-rule unreviewed-merge-larry-authored-pr-001 — DISPATCHED ✅ (iter ~3372)
+## G-rule unreviewed-merge-larry-authored-pr-001 — DISPATCHED ✅ (iter ~3372), Beacon assessed
 
-**Rule:** Larry-Yatch merges his own docs/spec/fix PRs before Mirror has reviewed them. Root cause: outbox-notifier defers Mirror dispatch when PR mergeable=UNKNOWN; short-lived PRs reach MERGEABLE and get merged before notifier re-sweeps. Three occurrences: PR #766 (2026-06-30 13:43 MDT, idx=1017), PR #768 (~06:00Z 2026-06-30, escalation #13), PR #772 (2026-06-30T20:48:27Z, idx=1024). Dispatched `direction-ask-unreviewed-merge-larry-prs-3of3-001.json` to Beacon inbox at iter ~3372. Proposed fixes: (1) branch protection require Mirror check [PRIMARY], (2) optimistic Mirror dispatch on UNKNOWN mergeable [SECONDARY]. verification_pending.
+**Rule:** Larry-Yatch merges his own docs/spec/fix PRs before Mirror has reviewed them. Root causes: (1) outbox-notifier defers Mirror dispatch when PR mergeable=UNKNOWN (PR #772 class), (2) PR has NO `auto-review` label at all, never dispatch-eligible (PR #766, #768 class — Option 2/optimistic dispatch would NOT fix these). Three occurrences: PR #766 (no label), PR #768 (no label), PR #772 (UNKNOWN mergeable). Dispatched `direction-ask-unreviewed-merge-larry-prs-3of3-001.json` to Beacon inbox at iter ~3372.
+
+**Beacon recommendation (returned ~2026-06-30T21:00Z):** Phased path — (1) extend `merge_reviewed_pr.sh` to POST mirror-review state=success (pure upside, prevents deadlock when required check exists); (2) default desktop PR-open to `open_pr_for_team.sh` so unlabeled PRs always get `auto-review` label; (3) flip `enforce_admins=true` — operator's call only (adds ~3-5 min Mirror wait on EVERY PR). Awaiting Larry's response on whether to spec + dispatch Steps 1-2 now. Option 2 (optimistic UNKNOWN dispatch) dropped — branch protection makes timing race moot once gate is live. verification_pending (Larry response).
 
 ---
 
