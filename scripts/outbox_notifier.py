@@ -7958,6 +7958,49 @@ def _mirror_review_target_is_terminal(pr_url: Optional[str]) -> bool:
     return _gh_pr_is_open(repo_coords, pr_number) is False
 
 
+def _review_revision_pr_is_merged(
+    data: dict[str, Any], marker_decision: dict[str, Any],
+) -> bool:
+    """Result-time half of the merged/closed-PR Mirror-review guard (the #764
+    race, 2026-06-30). True only when a REVIEW_REVISION's PR is positively
+    MERGED/CLOSED on GitHub.
+
+    Complements the dispatch-time `_mirror_review_target_is_terminal`: that one
+    skips QUEUING a review for an already-terminal PR, but cannot help when a
+    review was dispatched while the PR was still OPEN and only RAN after a
+    desktop `merge_reviewed_pr.sh` merge (the queue-backed-up #764 shape) — by
+    then the review exists and its REVIEW_REVISION is in hand. This is the guard
+    for that window: query GitHub before escalating to Larry or dispatching a
+    Forge revision.
+
+    Resolves the PR from the envelope's `pr_url` (or the marker payload's), and
+    — for a heal-rebuilt / off-chain envelope carrying none — best-effort derives
+    it from chain_events via `backfill_pr_url`, the same path the revision
+    dispatch uses. Repo-agnostic: the PR coordinates come from the URL, never a
+    hardcoded repo, so it covers ourliberty-agent-core AND ourliberty-dashboard.
+
+    Fail-OPEN by construction (delegates to `_mirror_review_target_is_terminal`,
+    which returns False for a missing/unparseable url or any gh error): only a
+    positively observed terminal state returns True, so a transient gh failure
+    never silently drops a legitimate revision/escalation."""
+    payload = marker_decision.get('payload') or {}
+    pr_url = data.get('pr_url') or (
+        payload.get('pr_url') if isinstance(payload, dict) else None
+    )
+    if not pr_url:
+        task_id = data.get('task_id')
+        if task_id:
+            try:
+                pr_url = backfill_pr_url(
+                    task_id,
+                    target_repo=data.get('target_repo'),
+                    branch=data.get('branch'),
+                )
+            except Exception:  # noqa: BLE001 — backfill is best-effort; fail open
+                pr_url = None
+    return _mirror_review_target_is_terminal(pr_url)
+
+
 def _find_overlap_blocker(
     self_pr_number: int,
     repo_coords: str,
@@ -11333,6 +11376,52 @@ def process_outbox(outbox_file: Path) -> str:
             # findings as a durable PR comment so they're visible session-or-not
             # (mirror-review-visibility.md § 4). Idempotent; best-effort.
             _post_mirror_findings_comment(data, marker_decision)
+
+        # merged-PR REVIEW_REVISION guard (the #764 desktop-merge race,
+        # 2026-06-30). A REVIEW_REVISION whose PR was MERGED/CLOSED between the
+        # review's dispatch and its (queue-delayed) run is moot: escalating it
+        # pages Larry for a decision that's already settled (the live incident:
+        # "Session-less PR … needs your decision"), and dispatching a Forge
+        # revision is wasted work on a merged branch. The dispatch-time
+        # `_mirror_review_target_is_terminal` guard can't catch this — the review
+        # was QUEUED while the PR was still OPEN and only RAN after a desktop
+        # `merge_reviewed_pr.sh` merge. Terminally reconcile (resolve any open
+        # no-session obligation + clear any stale for-Larry record) and skip ALL
+        # routing below — the no-session escalate, the Forge revision dispatch,
+        # AND the (now-misleading) Beacon back-leg notify.
+        #
+        # Fail-OPEN: `_review_revision_pr_is_merged` is True ONLY on a positively
+        # observed MERGED/CLOSED; a gh error or missing pr_url returns False and
+        # falls through to the existing escalate/dispatch path, so a flaky probe
+        # never silently swallows a real revision. Multi-repo: the PR identity is
+        # taken from the task's pr_url/target_repo, never a hardcoded repo.
+        if (
+            marker_decision is not None
+            and marker_decision.get('marker_type') == 'review_revision'
+            and _review_revision_pr_is_merged(data, marker_decision)
+        ):
+            _merged_task_id = data.get('task_id') or 'unknown'
+            _merged_payload = marker_decision.get('payload') or {}
+            _merged_pr_url = data.get('pr_url') or (
+                _merged_payload.get('pr_url')
+                if isinstance(_merged_payload, dict) else None
+            )
+            log(
+                f'REVIEW_REVISION_ALREADY_MERGED_SKIP task={_merged_task_id} '
+                f'pr={_merged_pr_url} — PR is MERGED/CLOSED on GitHub; not '
+                f'escalating to Larry and not dispatching a Forge revision (the '
+                f'#764 queue-delayed-review-after-desktop-merge race). '
+                f'Reconciling the review task: resolving any open no-session '
+                f'obligation + clearing any stale for-Larry record.',
+            )
+            # Both idempotent no-ops when nothing is open; neither raises (mirror
+            # of the terminal-verdict reconcile path further below).
+            no_session_ledger.resolve_obligation(
+                _merged_task_id, resolution='already-merged',
+            )
+            for_larry_escalations.clear(_no_session_record_id(_merged_task_id))
+            _archive_outbox(outbox_file)
+            return 'review-revision-already-merged'
 
     if marker_decision is not None:
         # Marker-driven routing. Always targets the original dispatcher
