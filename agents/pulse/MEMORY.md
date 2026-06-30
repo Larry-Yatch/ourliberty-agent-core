@@ -362,8 +362,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T19:25Z UTC (Iter ~3365, Tier 1)
+## Status snapshot — updated 2026-06-30T19:30Z UTC (Iter ~3366, Tier 1→2 de-escalate)
 
-**Iter ~3365 summary (2026-06-30T19:25Z):** 0 new alerts. Watermark=1017 (no change). All 5/5 core daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254, dashboard=1200736, chain_event_shipper=1200730). Watchdog last fired 19:17:01Z UTC (normal). Heal-daemon heartbeat 19:17:00Z. No stalls. Pipeline idle. **4 open PRs: #769 (NEW, Larry-authored fix PR created 19:12Z, no Mirror review yet), #763/#765/#766 (REVIEW_ESCALATE carry)**. 4 pending approvals unchanged (chat_id correct: (2)=7998341473, (3)=7998341473). **Tier 1, consecutive_clean=2**. Carry: PR #768 unreviewed-merge (pulse-escalations.json #13).
+**Iter ~3366 summary (2026-06-30T19:30Z):** 0 new alerts. Watermark=1017 (no change). All 5/5 core daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254, dashboard=1200736, chain_event_shipper=1200730). Watchdog=**healthy** (19:27:07Z UTC — idle period resolved, outbox-notifier dispatched Mirror review for PR #769 at 19:25:19Z). Heal-daemon heartbeat 19:27:00Z. No stalls. **PR #769 Mirror review in progress** (dispatched 19:25:19Z, confirmed in Mirror inbox). 4 open PRs: #769 (Mirror review in progress), #763/#765/#766 (REVIEW_ESCALATE carry). 4 pending approvals unchanged (chat_id correct: (2)=7998341473, (3)=7998341473). **Tier 1→2 de-escalated (consecutive_clean 2→3). Tier 2, consecutive_clean=0.** Carry: PR #768 unreviewed-merge (pulse-escalations.json #13). G-rule `watchdog-log-growth-idle-overnight-001` 2/3 (idle event resolved; need 3rd distinct event for Beacon dispatch).
 
 
