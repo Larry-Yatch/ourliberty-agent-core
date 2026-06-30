@@ -352,8 +352,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T03:53Z UTC (Iter ~3315, Tier 1)
+## Status snapshot — updated 2026-06-30T04:02Z UTC (Iter ~3316, Tier 1)
 
-**Iter ~3315 summary (2026-06-30T03:50Z):** ⚠️ Drift — 1 Tier-4 alert (L1112 ourliberty-health sync_freshness, route=escalate). KEY MILESTONE: Beacon direction-ask-regbaseline-warmer-worktree-burst-001 COMPLETED 03:41:17Z ($0.697) — warmer dedup spec done, Forge build pending Larry approval. Worktrees **51/41-gate-wt** (↑24 from ~3314's 27/18; burst still active). Mirror active on PR #767 (fix/mirror-reap-merged-pr-midflight, started 03:40:32Z). Beacon in-flight on notify-telegram-409-burst-guard-001 (03:41:22Z). Watermark=1112. Ratio=17.45 (improving). Tier 1, consecutive_clean=0. 6 pending approvals (same as ~3314).
+**Iter ~3316 summary (2026-06-30T04:00Z):** ⚠️ Drift — PR #767 REVIEW_ESCALATE at 03:58:26Z (Mirror completed, no-session approval_request queued, DM NOT delivered — G-rule vp). Worktrees **69/59-gate-wt** (↑18 from ~3315's 51/41; burst re-escalating on HEAD 787aab48). git fetch still failing (bad object gate-wt-787aab48.../HEAD). KEY MILESTONE: Larry approved resolve-pr764 at 03:53:24Z; Forge PID 1327838 ACTIVELY REBASING PR #764 fork-bomb fix. Forge progress: git commit observed in wt-forge-pr-ourliberty-agent-core-764. Beacon completed notify-pr-ourliberty-agent-core-764 at 03:57:37Z. Watermark=1112. Ratio=17.44. Tier 1, consecutive_clean=0. 6 pending approvals (mirror-review-p3a-retro-prep, heal-wip-redispatch-already-merged-suppress-001, heal-no-session-escalate-preserve-target-repo-001, mirror-review-pr-ourliberty-agent-core-763, mirror-review-pr-ourliberty-agent-core-765, mirror-review-pr-ourliberty-agent-core-767 new). PR #755 AUTO_MERGE_HELD blocker=#764 (releases on merge).
 
 
