@@ -376,8 +376,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T23:05Z UTC (Iter ~3385, Tier 1)
+## Status snapshot — updated 2026-06-30T23:11Z UTC (Iter ~3386, Tier 1→2)
 
-**Iter ~3385 summary (2026-06-30T23:05Z):** Clean iter. 0 new alerts. All 8 services alive. Watchdog=healthy 23:01:16Z. Pipeline active: 3 Mirror reviews queued — PR #779 in progress (~28 min), PR #781 (approval-sync Phase 2, Forge-built) queued, PR #782 (dep-ordering G-rule fix, Forge-built) queued. PR #780 (W3 tier-pool, no auto-review, Larry-authored) still open — watch. Pending approvals=0. Tier 1 (consecutive_clean=2).
+**Iter ~3386 summary (2026-06-30T23:11Z):** Clean iter. 0 new alerts. All 8 services alive. Watchdog=healthy 23:06:16Z. Pipeline active: 3 Mirror reviews in-flight — PR #779 (~36 min in), PR #781 (~12 min), PR #782 (~8 min). PR #780 (W3 tier-pool, no auto-review, Larry-authored) still open — watch. Pending approvals=0. **Tier 1→2 de-escalated** (consecutive_clean=3→0, now Tier 2).
 
 
