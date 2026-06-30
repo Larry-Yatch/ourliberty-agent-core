@@ -149,28 +149,27 @@ def _append_bot_quota_event(
     failure_type: str,
     stdout: Optional[str],
     stderr: Optional[str],
+    account: str,
 ) -> None:
     """Best-effort append to anthropic-quota-events.jsonl for a bot-wrapper
     Claude failure. Mirrors the helper in beacon_telegram_bot.py; lives here
     so forge/mirror's generic bot path also writes the ledger. Failures are
-    swallowed — the ledger is observation-only and must never block reply."""
+    swallowed — the ledger is observation-only and must never block reply.
+
+    ``account`` is the tier this message actually dispatched on (spec § 6
+    effective-tier discipline) — the failing account, not the global active
+    tier."""
     combined = (stdout or '') + '\n' + (stderr or '')
     try:
         retry_after = agent_runner._derive_retry_after_sec(combined)
     except Exception:
         retry_after = None
     try:
-        # active_tier is the source of truth for which account just failed.
-        # Fall back to 'tier1' (the historical default) if the read errors.
-        tier_now = agent_runner.active_tier.read().get('tier') or 'tier1'
-    except Exception:
-        tier_now = 'tier1'
-    try:
         agent_runner.append_rate_limit_event(
             agent=f'{AGENT}-telegram-bot',
             task_id='',
             model='',
-            account=tier_now,
+            account=account,
             stderr=combined,
             retry_after_sec=retry_after,
             failure_class=failure_type,
@@ -180,26 +179,64 @@ def _append_bot_quota_event(
 
 
 def call_agent(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[str]]:
+    # Per-task tier dispatch (spec docs/specs/tier-dispatch-spec.md §4/§10-W2):
+    # choose the tier for THIS message instead of hardcoding tier1. A resume
+    # (session_id present) is bound to the tier its session was created on
+    # (I2 — never cross-tier migrate); a new message round-robins the healthy
+    # primary pool. active_tier is reachable via the already-imported
+    # agent_runner (which `import active_tier`).
+    at = agent_runner.active_tier
+    session_tier = at.lookup_session_tier(session_id) if session_id else None
+    if session_id and session_tier is None:
+        # Spec §5: a resume with no recorded binding (pre-existing/pruned
+        # session). Select fresh; the no-resume retry below still won't cross
+        # accounts because a benched bound tier never reaches here.
+        log(f"call_agent: resume session {session_id[:12]}... has no tier "
+            f"binding (selecting fresh)")
+    tier = at.select_dispatch_tier(session_tier=session_tier)
+    if tier is None:
+        # All tiers unavailable. A chat bot can't hold silently — tell the user
+        # to retry; the chat keeps its session_id so continuity survives.
+        log("call_agent: TIER_HOLD no dispatch tier available (all benched)")
+        return ("[All accounts are rate-limited right now — please retry in a "
+                "few minutes.]", session_id)
+
     cmd = [CLAUDE_BIN, "--print", "--output-format", "json"]
     if session_id:
         cmd += ["--resume", session_id]
     cmd += [prompt]
 
-    # Authenticate via Tier 1's long-lived setup-token — the account this bot's
-    # HOME=/home/larry (active_tier.TIER1_HOME) is bound to — reusing the same
-    # resolver agent_runner uses for a dispatch. Without it claude fell back to
-    # HOME's ~/.claude/.credentials.json, which rots silently on an OAuth refresh
-    # failure and then 401s every message; this bespoke chat bridge never picked
-    # up the setup-token path that dispatches use. The token matches the
-    # session's bound account, so --resume continuity holds.
+    # Authenticate via the SELECTED tier's long-lived setup-token (the resolver
+    # agent_runner uses for a dispatch). Without it claude fell back to HOME's
+    # ~/.claude/.credentials.json, which rots silently and then 401s every
+    # message. HOME discipline mirrors run_claude: setup-token auth is
+    # HOME-independent (keep the real home; tier3 shares it); only a creds.json
+    # fallback swaps HOME to the tier home. The token matches the session's
+    # bound account, so --resume continuity holds.
     env = {**os.environ}
-    _auth_source = agent_runner._apply_tier_auth(
-        env, 'tier1', os.environ.get('CLAUDE_CODE_OAUTH_TOKEN', ''),
+    auth_source = agent_runner._apply_tier_auth(
+        env, tier, os.environ.get('CLAUDE_CODE_OAUTH_TOKEN', ''),
     )
-    # Log the auth source (NOT the token) so a future auth regression is visible
-    # — this bridge's silent auth path is why the 2026-06-25 incident took hours
-    # to pin down. Mirrors agent_runner's auth= attribution.
-    log(f"call_agent: primary auth={_auth_source} (tier1)")
+    if auth_source == 'setup_token':
+        env['HOME'] = at.TIER1_HOME
+    else:
+        # Creds.json HOME swap: pin agents-root + gh/git config to the REAL
+        # home (I10/I11) so the child resolves ~/agents state (session-tier
+        # map, costs) and git/gh credentials under the real home, not the
+        # swapped tier home — mirrors run_claude. (Dormant while setup-tokens
+        # are configured for all pool tiers; correct defense for the fallback.)
+        env['HOME'] = at.home_for_tier(tier)
+        env.setdefault('OURLIBERTY_AGENTS_ROOT',
+                       str(Path(at.TIER1_HOME) / 'agents'))
+        env.setdefault('GH_CONFIG_DIR',
+                       os.path.join(at.TIER1_HOME, '.config', 'gh'))
+        env.setdefault('GIT_CONFIG_GLOBAL',
+                       os.path.join(at.TIER1_HOME, '.gitconfig'))
+    # Log the dispatch tier + auth source (NOT the token) so a future auth
+    # regression is visible — this bridge's silent auth path is why the
+    # 2026-06-25 incident took hours to pin down.
+    log(f"call_agent: dispatch_tier={tier} auth={auth_source}")
+    _t0 = time.time()
     try:
         result = subprocess.run(
             cmd,
@@ -221,14 +258,14 @@ def call_agent(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[st
         # Step C: classify and ledger rate_limit / auth_401 failures before
         # any --resume retry or chat reply path. Resume-class is the dominant
         # auth_401 carrier through this bot wrapper (session_id present + 401
-        # because the underlying account's OAuth expired). Pre-Step-C the
-        # operator got a DM via the chat reply, but the ledger Check VIII
-        # reads stayed empty.
+        # because the underlying account's OAuth expired). The ledger event is
+        # attributed to the tier that actually ran (§6).
         failure_type = agent_runner.classify_tier1_failure(
             result.stdout, result.stderr,
         )
         if failure_type:
-            _append_bot_quota_event(failure_type, result.stdout, result.stderr)
+            _append_bot_quota_event(
+                failure_type, result.stdout, result.stderr, tier)
         if session_id and "session" in result.stderr.lower():
             log("retrying without --resume after session error")
             return call_agent(prompt, None)
@@ -238,6 +275,28 @@ def call_agent(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[st
         data = json.loads(result.stdout)
         reply = data.get("result") or data.get("text") or result.stdout
         new_session = data.get("session_id") or session_id
+        # §5: bind the (new) session to the tier it ran on so the next message's
+        # --resume stays on the same account (I2). Idempotent on a resume.
+        if new_session:
+            try:
+                at.record_session_tier(new_session, tier)
+            except Exception:
+                pass
+        # §8/§10-W2: stamp an account-tagged cost row so this bot's burn is
+        # visible to the per-tier rolling-5h reader (this path does NOT route
+        # through inbox_watcher, which is the only writer today).
+        try:
+            at.append_cost_row(
+                tier,
+                model=(data.get('model') or ''),
+                cost_usd=data.get('total_cost_usd'),
+                usage=data.get('usage'),
+                agent=f'{AGENT}-telegram-bot',
+                source=f'{AGENT}-telegram-bot',
+                duration_sec=round(time.time() - _t0, 2),
+            )
+        except Exception:
+            pass
         return (reply.strip(), new_session)
     except json.JSONDecodeError:
         return (result.stdout.strip() or "[empty response]", session_id)

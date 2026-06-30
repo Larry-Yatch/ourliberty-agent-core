@@ -845,6 +845,51 @@ def rolling_5h_token_volume(account=None, now=None):
     return total
 
 
+def append_cost_row(account, *, model='', cost_usd=None, usage=None,
+                    agent='', task_id='', task_type='', source='',
+                    duration_sec=None, now=None):
+    """Append one account-stamped row to blackboard/costs.jsonl (spec § 8/§10).
+
+    Used by the dispatch paths that do NOT route through
+    inbox_watcher.process_task (the telegram bots W2/W3 and the
+    durable_claude_env generators W4) so their burn is visible to the per-tier
+    rolling-5h reader. Matches the canonical row shape inbox_watcher writes:
+    the ``account`` field is what ``rolling_5h_token_volume(account=...)``
+    filters on. ``usage`` is the Claude CLI ``usage`` dict (input_tokens /
+    output_tokens / cache_read_input_tokens / cache_creation_input_tokens).
+
+    Best-effort: never raises (a cost-ledger write must not break a reply or a
+    generator run). A blank/None account is written through as-is — callers
+    pass the effective dispatch tier."""
+    usage = usage or {}
+    if now is None:
+        now = datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    row = {
+        'ts': now.isoformat(),
+        'agent': agent,
+        'task_id': task_id,
+        'task_type': task_type,
+        'model': model,
+        'account': account,
+        'cost_usd': cost_usd,
+        'input_tokens': usage.get('input_tokens'),
+        'output_tokens': usage.get('output_tokens'),
+        'cache_read': usage.get('cache_read_input_tokens'),
+        'cache_creation': usage.get('cache_creation_input_tokens'),
+        'duration_sec': duration_sec,
+        'source': source,
+    }
+    try:
+        path = _costs_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, 'a') as f:
+            f.write(json.dumps(row) + '\n')
+    except OSError:
+        pass
+
+
 # ---- self-tuning budget calibration override (spec § 12b) -----------------
 
 _CALIBRATION_REL = ('state', 'tier-budget-calibration.json')
