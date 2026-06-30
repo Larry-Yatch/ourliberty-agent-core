@@ -164,6 +164,45 @@ def fetch_clarify_response_ts(client) -> dict[str, list[str]]:
     return out
 
 
+# Larry resolved an approval on the DASHBOARD when a `larry_action` audit row
+# (written by _handle_larry_action) exists for its task_id. Only the binary
+# decision actions count — comment/mark_done are not approval resolutions.
+_DECISION_ACTIONS = {'approve', 'reject'}
+_ACTION_TO_STATUS = {'approve': 'approved', 'reject': 'rejected'}
+
+
+def fetch_larry_actions(client, task_ids: set[str]) -> dict[str, str]:
+    """task_id -> latest dashboard decision action ('approve'|'reject'), scoped
+    to `task_ids`. Reads `larry_action` audit rows (written by the dashboard
+    approve/reject handler with task_id = the source approval_request's task_id).
+    Chunks the `.in_()` filter so a large pending set never builds an oversized
+    query. Rows with a non-decision action or missing task_id are ignored."""
+    wanted = sorted({t for t in (task_ids or set()) if t})
+    if not wanted:
+        return {}
+    latest: dict[str, tuple[str, str]] = {}  # task_id -> (ts, action)
+    chunk = 200
+    for i in range(0, len(wanted), chunk):
+        resp = (
+            client.table('chain_events')
+            .select('task_id,ts,payload')
+            .eq('event_type', 'larry_action')
+            .in_('task_id', wanted[i:i + chunk])
+            .execute()
+        )
+        for r in (getattr(resp, 'data', None) or []):
+            tid = r.get('task_id')
+            payload = r.get('payload')
+            action = payload.get('action') if isinstance(payload, dict) else None
+            if not tid or action not in _DECISION_ACTIONS:
+                continue
+            ts = r.get('ts') or ''
+            prev = latest.get(tid)
+            if prev is None or ts >= prev[0]:
+                latest[tid] = (ts, action)
+    return {tid: act for tid, (_ts, act) in latest.items()}
+
+
 def load_beacon_approvals(
     path: Path = PENDING_APPROVALS,
 ) -> tuple[set[str], set[str], dict[str, str]]:
@@ -419,6 +458,94 @@ def reconcile_terminal_approvals(
     return counts
 
 
+# -------------------- resolved-in-supabase reconciliation (approval-sync §3.2) --
+
+def reconcile_resolved_in_supabase(
+    client,
+    *,
+    beacon_state: Optional[dict[str, Any]] = None,
+    now: Optional[datetime] = None,
+    dry_run: bool = False,
+) -> dict[str, int]:
+    """Pop `pending[]` entries Larry already resolved on the DASHBOARD.
+
+    The dashboard approve/reject path (_handle_larry_action) sets read_at on the
+    approval_request row, writes a dispatch envelope, and emits a `larry_action`
+    audit row — but it never pops beacon-pending-approvals.json `pending[]`. That
+    pop relied on a best-effort Beacon LLM session, so a missed session left the
+    entry pending forever; the State Log / doorbell then re-nagged Larry about a
+    decision he'd already made (the 2026-06-30 "4 items need your call" phantoms).
+
+    This closes that gap deterministically: for each pending entry whose task_id
+    carries a terminal `larry_action` (approve/reject) in chain_events, resolve()
+    it to history with the matching status. It is ADDITIVE to the Telegram
+    self-pop (which never writes a larry_action) and the terminal-state retire,
+    and idempotent — resolve() returns None if the entry is already gone.
+
+    `client` / `beacon_state` / `now` are injectable for tests. Returns counts."""
+    now = now or datetime.now(timezone.utc)
+    counts = {'pending': 0, 'resolved': 0, 'kept': 0}
+
+    state = beacon_state if beacon_state is not None else approval.load_state()
+    pending = state.get('pending', []) if isinstance(state, dict) else []
+    counts['pending'] = len(pending)
+
+    # Map each pending entry's id -> its work task_id (the larry_action join key).
+    id_to_tid: dict[str, str] = {}
+    for entry in pending:
+        if not isinstance(entry, dict):
+            continue
+        approval_id = entry.get('id')
+        tid = _entry_task_id(entry)
+        if isinstance(approval_id, str) and approval_id and tid:
+            id_to_tid[approval_id] = tid
+    if not id_to_tid:
+        log('resolved-in-supabase reconcile: no pending entries to check')
+        return counts
+
+    decided = fetch_larry_actions(client, set(id_to_tid.values()))
+
+    to_resolve: list[tuple[str, str]] = []  # (approval_id, new_status)
+    for approval_id, tid in id_to_tid.items():
+        action = decided.get(tid)
+        if action in _ACTION_TO_STATUS:
+            to_resolve.append((approval_id, _ACTION_TO_STATUS[action]))
+        else:
+            counts['kept'] += 1
+
+    for approval_id, new_status in to_resolve:
+        if dry_run:
+            counts['resolved'] += 1
+            log(f'DRY-RUN would pop pending approval {approval_id} '
+                f'(dashboard larry_action={new_status} in chain_events)')
+            continue
+        try:
+            # state=None: resolve self-locks + self-saves + best-effort clears the
+            # dashboard row. Re-loads fresh under the lock, so a concurrent Beacon
+            # write can't be clobbered by a stale snapshot read above.
+            resolved = approval.resolve(
+                approval_id, new_status,
+                note=('auto-popped by heal-stale-approvals (resolved-in-supabase): '
+                      'dashboard larry_action found in chain_events; the '
+                      'dashboard-approve path never popped pending[]'),
+            )
+        except Exception as e:  # noqa: BLE001
+            log(f'resolved-in-supabase pop failed for {approval_id}: '
+                f'{type(e).__name__}: {e}', 'ERROR')
+            continue
+        if resolved is None:
+            # Already gone (Beacon session or a prior tick popped it). Not an
+            # error — the phantom is cleared either way.
+            log(f'resolved-in-supabase: {approval_id} no longer pending')
+        counts['resolved'] += 1
+        log(f'popped pending approval {approval_id} -> {new_status} '
+            f'(dashboard larry_action in chain_events)')
+
+    log('resolved-in-supabase reconcile: ' + ('DRY-RUN ' if dry_run else '')
+        + ' '.join(f'{k}={v}' for k, v in counts.items()))
+    return counts
+
+
 # -------------------- orchestration --------------------
 
 def run_once(
@@ -519,8 +646,18 @@ def main() -> int:
     try:
         run_once(client, dry_run=args.dry_run)
     except Exception as e:  # noqa: BLE001
-        log(f'FATAL: {type(e).__name__}: {e}', 'ERROR')
-        return 1
+        log(f'run_once FAILED: {type(e).__name__}: {e}', 'ERROR')
+        rc = 1
+
+    # § 3.2: pop pending[] entries Larry already resolved on the dashboard
+    # (larry_action in chain_events but no pending pop). Independent of run_once
+    # so a failure there still lets already-approved phantoms clear.
+    try:
+        reconcile_resolved_in_supabase(client, dry_run=args.dry_run)
+    except Exception as e:  # noqa: BLE001
+        log(f'resolved-in-supabase reconcile FAILED: {type(e).__name__}: {e}',
+            'ERROR')
+        rc = 1
     return rc
 
 

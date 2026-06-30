@@ -159,10 +159,24 @@ def classify_state(raw: Any) -> str:
 
 # -------------------- variant expansion + matching --------------------
 
+# Wrapper prefixes a task_id can carry while the actual work ships under a PR
+# whose branch/title hold only the *stem* — e.g. `mirror-review-p3a-retro-prep`
+# wraps work on branch `forge/p3a-retro-prep`, and healer-minted `heal-<stem>` /
+# `fix-<stem>` ids wrap a stem the PR carries. Without stripping these, the probe
+# never matches such an id to its own merged/closed PR, so terminal-reconcile
+# KEEPS the phantom approval forever (the prefix-blindness behind merged PR #747
+# nagging Larry 24h+). Order-independent; boundary matching + `min_len` in
+# `id_matches` guard against a short stem false-matching, and the conservative
+# `_combine` (OPEN wins → KEEP) means a wrong match can never falsely retire
+# live work — at worst it leaves a phantom one more cycle.
+_STRIP_PREFIXES = ('mirror-review-', 'heal-', 'fix-')
+
+
 def expand_variants(task_id: str, variants: Iterable[str] = ()) -> list[str]:
     """Return the candidate id-strings a task_id's PR may carry in its branch or
     title: the task_id itself, the standard re-dispatch variant shapes
-    (`<id>-001`, `<id>-002`, `fix-<id>-revisions`, `<id>-redispatch`), and any
+    (`<id>-001`, `<id>-002`, `fix-<id>-revisions`, `<id>-redispatch`), the
+    wrapper-prefix-stripped stem (`mirror-review-<stem>` → `<stem>`), and any
     caller-supplied `variants`. Deduplicated, order-preserving.
 
     The variant shapes are prefixes — boundary matching (`id_matches`) catches
@@ -177,6 +191,14 @@ def expand_variants(task_id: str, variants: Iterable[str] = ()) -> list[str]:
         f'fix-{task_id}-revisions',
         f'{task_id}-redispatch',
     ]
+    # Strip a known wrapper prefix so the underlying work's PR (which carries only
+    # the stem) is matchable. Conditional on a non-empty stem so a bare prefix
+    # (e.g. the literal `heal-`) never collapses to an empty, over-matching ''.
+    for prefix in _STRIP_PREFIXES:
+        if task_id.startswith(prefix):
+            stem = task_id[len(prefix):]
+            if stem:
+                base.append(stem)
     base.extend(v for v in (variants or ()) if isinstance(v, str) and v)
     seen: set[str] = set()
     out: list[str] = []
