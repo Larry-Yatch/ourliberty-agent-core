@@ -74,19 +74,20 @@ class BaselineCacheTest(unittest.TestCase):
         c.store(SHA_A, {'t'})
         self.assertIsNone(c.load(SHA_B))
 
-    def test_load_rejects_inner_sha_mismatch(self):
-        # A file whose key SHA and inner sha disagree must be treated as a miss
-        # (defensive against a corrupted/renamed cache file).
+    def test_load_rejects_inner_key_mismatch(self):
+        # A file whose filename key and inner key disagree must be treated as a
+        # miss (defensive against a corrupted/renamed cache file).
         p = Path(self._tmp) / f'{SHA_A}.json'
         p.write_text(json.dumps(
-            {'schema': c.SCHEMA_VERSION, 'sha': SHA_B, 'failing_tests': ['t']}
+            {'schema': c.SCHEMA_VERSION, 'key': SHA_B, 'failing_tests': ['t']}
         ))
         self.assertIsNone(c.load(SHA_A))
 
     def test_load_rejects_wrong_schema(self):
+        # A v1 (SHA-keyed) entry must read as a clean miss after the v2 bump.
         p = Path(self._tmp) / f'{SHA_A}.json'
         p.write_text(json.dumps(
-            {'schema': 999, 'sha': SHA_A, 'failing_tests': ['t']}
+            {'schema': 1, 'sha': SHA_A, 'failing_tests': ['t']}
         ))
         self.assertIsNone(c.load(SHA_A))
 
@@ -203,6 +204,140 @@ class BaselineCacheTest(unittest.TestCase):
         finally:
             fcntl.flock(held, fcntl.LOCK_UN)
             held.close()
+
+
+class ContentKeyTest(unittest.TestCase):
+    """content_key() keys on the journal-stripped tree, so a Pulse journal-only
+    commit reuses a warmed baseline while a real code change does not."""
+
+    def setUp(self):
+        import subprocess
+        self._sp = subprocess
+        self._tmp = tempfile.mkdtemp(prefix='regbaseline-ckey-')
+        self.repo = Path(self._tmp)
+        self._git('init', '-q')
+        self._git('config', 'user.email', 't@t')
+        self._git('config', 'user.name', 't')
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self._tmp, ignore_errors=True)
+
+    def _git(self, *args) -> str:
+        return self._sp.run(
+            ['git', '-C', str(self.repo), *args],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+
+    def _write(self, rel: str, body: str) -> None:
+        p = self.repo / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(body)
+
+    def _commit(self, msg: str) -> str:
+        self._git('add', '-A')
+        self._git('commit', '-q', '-m', msg)
+        return self._git('rev-parse', 'HEAD')
+
+    def test_journal_only_change_yields_same_key(self):
+        # Base commit: a code file + every journal path populated.
+        self._write('scripts/foo.py', 'x = 1\n')
+        self._write('runbooks/cycle-journal.md', 'cycle 1\n')
+        self._write('runbooks/cycle-actions.jsonl', '{}\n')
+        self._write('agents/pulse/MEMORY.md', 'mem 1\n')
+        self._write('agents/pulse/memory/note.md', 'note 1\n')
+        self._write('agents/pulse/.claude/settings.json', '{"a":1}\n')
+        sha1 = self._commit('base')
+        # A Pulse-style commit that rewrites EVERY journal path, no code change.
+        self._write('runbooks/cycle-journal.md', 'cycle 2 — totally different\n')
+        self._write('runbooks/cycle-actions.jsonl', '{"x":2}\n')
+        self._write('agents/pulse/MEMORY.md', 'mem 2 — changed\n')
+        self._write('agents/pulse/memory/note.md', 'note 2\n')
+        self._write('agents/pulse/.claude/settings.json', '{"a":2}\n')
+        sha2 = self._commit('pulse cycle')
+        self.assertNotEqual(sha1, sha2)  # distinct commits
+        k1 = c.content_key(sha1, self.repo)
+        k2 = c.content_key(sha2, self.repo)
+        self.assertIsNotNone(k1)
+        self.assertEqual(k1, k2)  # journal churn → identical key → cache reuse
+
+    def test_code_change_yields_different_key(self):
+        self._write('scripts/foo.py', 'x = 1\n')
+        self._write('runbooks/cycle-journal.md', 'cycle 1\n')
+        sha1 = self._commit('base')
+        self._write('scripts/foo.py', 'x = 2\n')  # real code change
+        sha2 = self._commit('code change')
+        self.assertNotEqual(
+            c.content_key(sha1, self.repo), c.content_key(sha2, self.repo),
+        )
+
+    def test_non_pulse_doc_change_yields_different_key(self):
+        # Only Pulse's OWN journal paths are excluded; a docs/spec or any other
+        # file change still invalidates (allowlist-of-scripts would wrongly skip).
+        self._write('scripts/foo.py', 'x = 1\n')
+        self._write('docs/specs/thing.md', 'v1\n')
+        sha1 = self._commit('base')
+        self._write('docs/specs/thing.md', 'v2 — changed\n')
+        sha2 = self._commit('spec change')
+        self.assertNotEqual(
+            c.content_key(sha1, self.repo), c.content_key(sha2, self.repo),
+        )
+
+    def test_git_failure_returns_none(self):
+        # Non-git dir → None, so the caller falls back to the raw SHA key.
+        bad = Path(self._tmp) / 'not-a-repo'
+        bad.mkdir()
+        self.assertIsNone(c.content_key('a' * 40, bad))
+
+    def test_end_to_end_journal_commit_hits_warmed_baseline(self):
+        # The whole point: warm at the base commit, then a journal-only commit
+        # loads that baseline via its content key (no recompute).
+        self._write('scripts/foo.py', 'x = 1\n')
+        self._write('runbooks/cycle-journal.md', 'cycle 1\n')
+        sha1 = self._commit('base')
+        self._write('runbooks/cycle-journal.md', 'cycle 2\n')
+        sha2 = self._commit('pulse cycle')
+
+        baseline_dir = Path(self._tmp) / 'baselines'
+        baseline_dir.mkdir()
+        prev = os.environ.get('OL_REGRESSION_BASELINE_DIR')
+        os.environ['OL_REGRESSION_BASELINE_DIR'] = str(baseline_dir)
+        try:
+            k1 = c.content_key(sha1, self.repo)
+            c.store(k1, {'scripts.tests.test_x.T.test_a'}, source_commit=sha1)
+            # The later journal-only commit resolves to the SAME key → hit.
+            k2 = c.content_key(sha2, self.repo)
+            self.assertEqual(c.load(k2), {'scripts.tests.test_x.T.test_a'})
+        finally:
+            if prev is None:
+                os.environ.pop('OL_REGRESSION_BASELINE_DIR', None)
+            else:
+                os.environ['OL_REGRESSION_BASELINE_DIR'] = prev
+
+
+class PulseDenylistSyncTest(unittest.TestCase):
+    """The content-key denylist must stay in lockstep with PULSE_RUNTIME_PATHS
+    in scripts/_lib_pulse_runtime.sh (the canonical set Pulse auto-commits each
+    cycle). If someone adds a per-cycle journal path there, this fails so they
+    extend the denylist too — otherwise the new churn would defeat the cache."""
+
+    def test_denylist_matches_pulse_runtime_paths(self):
+        import re as _re
+        lib = _REPO_SCRIPTS / '_lib_pulse_runtime.sh'
+        text = lib.read_text()
+        # Match up to the array's closing paren on its OWN line (`\n)`), not the
+        # first `)` — a comment inside the array ("(allow/deny tool perms)")
+        # contains a paren that a naive non-greedy match would stop at.
+        m = _re.search(r'PULSE_RUNTIME_PATHS=\((.*?)\n\)', text, _re.DOTALL)
+        self.assertIsNotNone(m, 'PULSE_RUNTIME_PATHS array not found')
+        shell_paths = set(_re.findall(r'"([^"]+)"', m.group(1)))
+        denylist = set(c._PULSE_JOURNAL_FILES) | set(c._PULSE_JOURNAL_DIRS)
+        self.assertEqual(
+            shell_paths, denylist,
+            'content-key denylist drifted from PULSE_RUNTIME_PATHS — update '
+            '_PULSE_JOURNAL_FILES / _PULSE_JOURNAL_DIRS in '
+            'regression_baseline_cache.py to match _lib_pulse_runtime.sh',
+        )
 
 
 if __name__ == '__main__':

@@ -35,9 +35,11 @@ from __future__ import annotations
 
 import argparse
 import fcntl
+import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 import tempfile
 import time
@@ -46,8 +48,35 @@ from typing import Optional
 
 import atomic_io
 
-SCHEMA_VERSION = 1
-_SHA_RE = re.compile(r'^[0-9a-f]{40}$')
+# v2 (tree-content key, 2026-06-30): the cache key is no longer the raw commit
+# SHA but a digest of the commit's TREE with the per-cycle Pulse journal paths
+# removed (see content_key + _PULSE_JOURNAL_*). Bumping the schema makes every
+# pre-existing v1 (SHA-keyed) entry a clean miss, so a stale SHA-keyed file can
+# never be mistaken for a content-keyed one. WHY this matters: Pulse rewrites
+# runbooks/cycle-journal.md + agents/pulse/MEMORY.md every ~5 min, so the parent
+# SHA of almost every PR review was a brand-new commit the warmer had never seen
+# — the SHA cache hit ~0% in practice (verified across every recent review), the
+# gate fell back to the full two-run path, and the second run blew the 900s
+# bounded-step ceiling. Keying on code-bearing tree content instead means a
+# journal-only Pulse commit reuses the warmed baseline.
+SCHEMA_VERSION = 2
+_KEY_RE = re.compile(r'^[0-9a-f]{40}$')
+
+# Per-cycle machine-journal paths excluded from the content key: a change to ANY
+# of these cannot change a test outcome, so two commits that differ only here
+# share a baseline. SOURCE OF TRUTH: PULSE_RUNTIME_PATHS in
+# scripts/_lib_pulse_runtime.sh (the set Pulse auto-commits each cycle). Kept in
+# lockstep by test_regression_baseline_cache.PulseDenylistSyncTest, which parses
+# that shell array and fails if it drifts from this list. Verified test-safe: of
+# the 10 test files that reference these paths, none assert on their churning
+# CONTENT (all use tmp-dir fixtures or reference the paths as strings).
+_PULSE_JOURNAL_FILES = frozenset({
+    'runbooks/cycle-journal.md',
+    'runbooks/cycle-actions.jsonl',
+    'agents/pulse/MEMORY.md',
+    'agents/pulse/.claude/settings.json',
+})
+_PULSE_JOURNAL_DIRS = ('agents/pulse/memory/',)
 # Keep the newest N baselines; older ones GC away (main advances, old parents
 # stop being anyone's merge-base). Bounds the dir to a handful of small files.
 DEFAULT_KEEP = 40
@@ -78,20 +107,77 @@ def baseline_dir() -> Path:
     return _DEFAULT_BASELINE_DIR
 
 
-def _path_for(sha: str) -> Path:
-    return baseline_dir() / f'{sha}.json'
+def _is_journal_path(path: str) -> bool:
+    """True iff ``path`` is a per-cycle Pulse machine-journal (excluded from the
+    content key). Matches an exact file or anything under a journal directory."""
+    if path in _PULSE_JOURNAL_FILES:
+        return True
+    return any(path.startswith(d) for d in _PULSE_JOURNAL_DIRS)
 
 
-def load(sha: str) -> Optional[set[str]]:
-    """Return the cached failing-test-id set for ``sha``, or None on any miss.
+def content_key(sha: str, repo_root: Path) -> Optional[str]:
+    """Digest of ``sha``'s tree with the Pulse journal paths removed — the cache
+    key. Two commits with identical code-bearing trees (differing only in the
+    per-cycle journals) map to the SAME key, so a journal-only Pulse commit
+    reuses a warmed baseline instead of missing.
 
-    A miss (absent file, unreadable, malformed, schema/sha mismatch) is always
-    None so the caller transparently falls back to computing it — the cache can
-    never wedge or corrupt a verdict, only speed it up.
+    Built from ``git ls-tree -r -z <sha>`` (one NUL-terminated record per blob:
+    ``<mode> <type> <objectsha>\\t<path>``), dropping journal paths, then SHA-1
+    over the remaining records joined by NUL. The object SHA in each record makes
+    the digest content-sensitive: any real edit (or mode change) to a non-journal
+    file changes the key and correctly invalidates the cache.
+
+    ``-z`` (vs the default newline output) is what makes the digest STABLE ACROSS
+    MACHINES: it emits paths verbatim — no ``core.quotepath`` octal-escaping of
+    non-ASCII, and no ambiguity from paths containing newlines/tabs/quotes — so
+    two checkouts with different git config still produce the same key for the
+    same tree. ``git ls-tree`` output is already path-sorted and deterministic.
+
+    Returns a 40-char hex digest, or None on ANY git failure — the caller then
+    falls back to keying on the raw commit SHA (today's behavior), so a git
+    hiccup degrades to "no extra hits", never to a wrong baseline.
     """
-    if not _SHA_RE.match(sha or ''):
+    if not _KEY_RE.match(sha or ''):
         return None
-    p = _path_for(sha)
+    try:
+        proc = subprocess.run(
+            ['git', '-C', str(repo_root), 'ls-tree', '-r', '-z', sha],
+            capture_output=True, text=True, timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    kept: list[str] = []
+    # `-z` separates records with NUL; the trailing NUL yields an empty tail we
+    # skip. A path may now contain any byte except NUL (incl. tab/newline), so we
+    # split off the path on the FIRST tab only and never rely on line breaks.
+    for rec in proc.stdout.split('\0'):
+        if not rec or '\t' not in rec:
+            continue
+        path = rec.split('\t', 1)[1]
+        if _is_journal_path(path):
+            continue
+        kept.append(rec)
+    digest = hashlib.sha1('\0'.join(kept).encode('utf-8')).hexdigest()
+    return digest
+
+
+def _path_for(key: str) -> Path:
+    return baseline_dir() / f'{key}.json'
+
+
+def load(key: str) -> Optional[set[str]]:
+    """Return the cached failing-test-id set for ``key``, or None on any miss.
+
+    A miss (absent file, unreadable, malformed, schema/key mismatch) is always
+    None so the caller transparently falls back to computing it — the cache can
+    never wedge or corrupt a verdict, only speed it up. ``key`` is a content_key
+    digest (or, on the git-failure fallback, a raw commit SHA); both are 40-hex.
+    """
+    if not _KEY_RE.match(key or ''):
+        return None
+    p = _path_for(key)
     try:
         raw = p.read_text()
     except (FileNotFoundError, OSError):
@@ -102,7 +188,7 @@ def load(sha: str) -> Optional[set[str]]:
         return None
     if not isinstance(obj, dict):
         return None
-    if obj.get('schema') != SCHEMA_VERSION or obj.get('sha') != sha:
+    if obj.get('schema') != SCHEMA_VERSION or obj.get('key') != key:
         return None
     tests = obj.get('failing_tests')
     if not isinstance(tests, list) or not all(isinstance(t, str) for t in tests):
@@ -110,19 +196,25 @@ def load(sha: str) -> Optional[set[str]]:
     return set(tests)
 
 
-def store(sha: str, failing_tests: set[str]) -> Optional[Path]:
-    """Atomically cache ``failing_tests`` as the baseline for ``sha``.
+def store(
+    key: str, failing_tests: set[str], source_commit: Optional[str] = None,
+) -> Optional[Path]:
+    """Atomically cache ``failing_tests`` under ``key`` (a content_key digest).
 
-    Returns the written path, or None if ``sha`` is not a canonical 40-char SHA
-    (we never cache an abbreviated/symbolic ref — the key must be exact).
+    ``source_commit`` is the commit SHA the baseline was computed from, recorded
+    for human debugging only (the key is the tree digest, so many commits can
+    share one entry). Returns the written path, or None if ``key`` is not a
+    canonical 40-char hex digest (we never cache under an abbreviated/symbolic
+    key — it must be exact).
     """
-    if not _SHA_RE.match(sha or ''):
+    if not _KEY_RE.match(key or ''):
         return None
-    p = _path_for(sha)
+    p = _path_for(key)
     p.parent.mkdir(parents=True, exist_ok=True)
     obj = {
         'schema': SCHEMA_VERSION,
-        'sha': sha,
+        'key': key,
+        'source_commit': source_commit,
         'failing_tests': sorted(failing_tests),
         'computed_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
     }
@@ -203,8 +295,14 @@ def warm(repo_root: Path, sha: Optional[str], timeout_s: int) -> int:
     except trc.AnalysisError as exc:
         print(f'regression_baseline_cache: {exc}', file=sys.stderr)
         return 2
-    if load(canonical) is not None:
-        print(f'baseline already cached for {canonical[:12]}; nothing to do')
+    # Key on the journal-stripped tree content, not the raw SHA, so the baseline
+    # we warm here is reused by every later PR whose parent shares this code tree
+    # (the Pulse-commit-churn that defeated the SHA key). Fall back to the SHA on
+    # a git failure so a hiccup degrades to today's behavior, never a wrong key.
+    key = content_key(canonical, repo_root) or canonical
+    if load(key) is not None:
+        print(f'baseline already cached for {canonical[:12]} '
+              f'(key {key[:12]}); nothing to do')
         return 0
 
     # Single-flight (regbaseline fork-bomb, 2026-06-29): Pulse merges fire a
@@ -226,9 +324,10 @@ def warm(repo_root: Path, sha: Optional[str], timeout_s: int) -> int:
             print('regression_baseline_cache: another warm holds the host lock; '
                   'skipping (single-flight)')
             return 0
-        # Re-check under the lock: the prior holder may have just cached this SHA.
-        if load(canonical) is not None:
-            print(f'baseline already cached for {canonical[:12]}; nothing to do')
+        # Re-check under the lock: the prior holder may have just cached this key.
+        if load(key) is not None:
+            print(f'baseline already cached for {canonical[:12]} '
+                  f'(key {key[:12]}); nothing to do')
             return 0
         os.environ['REGBASELINE_WARMING'] = '1'
         try:
@@ -241,10 +340,10 @@ def warm(repo_root: Path, sha: Optional[str], timeout_s: int) -> int:
                     print(f'regression_baseline_cache: warm failed: {exc}',
                           file=sys.stderr)
                     return 2
-            store(canonical, failures)
+            store(key, failures, source_commit=canonical)
             gc()
-            print(f'cached baseline for {canonical[:12]} '
-                  f'({len(failures)} failing)')
+            print(f'cached baseline for {canonical[:12]} (key {key[:12]}, '
+                  f'{len(failures)} failing)')
             return 0
         finally:
             os.environ.pop('REGBASELINE_WARMING', None)
@@ -278,16 +377,18 @@ def main(argv: Optional[list[str]] = None) -> int:
         return 0
     if args.cmd == 'show':
         import test_regression_check as trc
+        repo_root = Path(args.repo_root).resolve()
         try:
-            canonical = trc.resolve_sha(args.sha, Path(args.repo_root).resolve())
+            canonical = trc.resolve_sha(args.sha, repo_root)
         except trc.AnalysisError as exc:
             print(f'regression_baseline_cache: {exc}', file=sys.stderr)
             return 2
-        hit = load(canonical)
+        key = content_key(canonical, repo_root) or canonical
+        hit = load(key)
         if hit is None:
-            print(f'no cached baseline for {canonical[:12]}')
+            print(f'no cached baseline for {canonical[:12]} (key {key[:12]})')
             return 1
-        print(f'{canonical[:12]}: {len(hit)} failing test(s)')
+        print(f'{canonical[:12]} (key {key[:12]}): {len(hit)} failing test(s)')
         for t in sorted(hit):
             print(f'  {t}')
         return 0
