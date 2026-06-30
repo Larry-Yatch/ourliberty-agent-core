@@ -376,8 +376,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T21:34Z UTC (Iter ~3375, Tier 1)
+## Status snapshot — updated 2026-06-30T21:40Z UTC (Iter ~3376, Tier 1)
 
-**Iter ~3375 summary (2026-06-30T21:34Z):** Signal iter. Always-fix: fast-forward c007dc7b→c78da8b0 (PR #775 feat:tier-pool dispatch selector engine). PR #773 MERGED 15:32:49 MDT (docs:approval-sync Phase 2, Mirror REVIEW_PASS + AUTO_MERGE). PR #774 MERGED 21:22:15Z by Larry (no unreviewed alert). PR #775 MERGED 21:23:12Z by Larry WITHOUT Mirror review (4th unreviewed-merge). heal-stale-daemon-code restart wave (PR #775 active_tier.py change): all daemons restarted — Beacon=1735618, dashboard-api=1735904, inbox-watcher=1737091, outbox-notifier=1737092, chain-event-shipper=1200730. outbox-notifier auto-restart-failed (L1028) then self-recovered (systemd, 83s). Medic diagnosis (L1031, prior_attempts=6) points to StartLimitBurst throttle + healer 3s verification gap → G-rule heal-stale-daemon-code-dependency-ordering-001 now 2/3. Pending approvals=0. Watchdog healthy. Tier 2→1 (signal).
+**Iter ~3376 summary (2026-06-30T21:40Z):** Clean iter. 0 new alerts. All 5 daemons alive (same PIDs as iter ~3375: Beacon=1735618, dashboard-api=1735904, inbox-watcher=1737091, outbox-notifier=1737092, chain-event-shipper=1200730). Heal-daemon heartbeat 21:38:37Z (fresh). Watchdog overall=healthy at 21:39:59Z. Pipeline stall: "no stalls detected." Pending approvals=0. Dashboard PR #98 (feat:Mirror Queue panel on System tab) opened 21:29:09Z by Larry, Mirror review dispatched 21:40:37Z — in active review. Stale review-pr-ourliberty-agent-core-774.json (noted in iter ~3375) resolved — no longer in Mirror inbox. Tier 1, consecutive_clean 0→1.
 
 
