@@ -358,8 +358,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T08:09Z UTC (Iter ~3338, Tier 1)
+## Status snapshot — updated 2026-06-30T08:16Z UTC (Iter ~3339, Tier 2)
 
-**Iter ~3338 summary (2026-06-30T08:09Z):** 0 new alerts. All 3/3 main daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254). Watchdog=healthy (last 08:03:19Z UTC). Heal-daemon heartbeat 07:59:13Z. No stalls. **ourliberty-cycle.timer ambiguous-but-firing** — `Trigger: n/a`; healer-driven cadence keeps cycles alive; escalation in pulse-escalations.json (iter ~3325 06:31Z); no new escalation. Pipeline idle (outbox-notifier last entry 23:11:25Z 2026-06-29, ~9h). 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals (unchanged: mirror-review-p3a-retro-prep ~25h+; heal-wip-redispatch-already-merged-suppress-001; heal-no-session-escalate-preserve-target-repo-001; mirror-review-pr-763). Worktrees 4/0-gate-wt (wt-mirror-767 reaped since ~3336). Watermark=1121. Tier 1, consecutive_clean=2.
+**Iter ~3339 summary (2026-06-30T08:16Z):** 0 new alerts. All 3/3 main daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254). Watchdog=healthy (last 08:13:29Z UTC). Heal-daemon heartbeat 08:09:15Z. No stalls. **ourliberty-cycle.timer CONFIRMED FIXED** — heal-systemd-install-drift healer ran daemon-reload+restart at 06:00:05Z; timer fired at 08:11:09Z (5s after prior /cycle commit f07a4b33); SubState=running. 13-iter carry RESOLVED. Pipeline idle (outbox-notifier last entry 23:11:25Z 2026-06-29, ~9h). 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals (unchanged: mirror-review-p3a-retro-prep ~28.5h+; heal-wip-redispatch-already-merged-suppress-001; heal-no-session-escalate-preserve-target-repo-001; mirror-review-pr-763). Worktrees 4/0-gate-wt. Watermark=1121. Tier 2 (de-escalated from 1 this iter, consecutive_clean=0).
 
 
