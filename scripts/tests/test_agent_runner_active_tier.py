@@ -193,6 +193,11 @@ class RunClaudeActiveTierEnvTest(unittest.TestCase):
                        side_effect=fake_run),
             # filesystem probes the fallback path needs to evaluate True
             mock.patch.object(ar, 'tier2_available', return_value=True),
+            # pr765 generalized the fallback-availability gate from
+            # tier2_available() to _fallback_available(tier); mock the new seam
+            # too so the on-disk creds check for the fallback tier (absent in
+            # the test env) can't bypass the mock and skip the fallback.
+            mock.patch.object(ar, '_fallback_available', return_value=True),
             # Control the per-tier setup-token deterministically — the real
             # _setup_token_for_tier falls back to the on-disk credentials
             # file, which would otherwise leak ambient state into HOME logic.
@@ -370,6 +375,11 @@ class ResumeNoFallbackRefusalTest(unittest.TestCase):
             mock.patch('agent_runner.subprocess.run',
                        side_effect=run_called),
             mock.patch.object(ar, 'tier2_available', return_value=True),
+            # pr765 generalized the fallback-availability gate from
+            # tier2_available() to _fallback_available(tier); mock the new seam
+            # too so the on-disk creds check for the fallback tier (absent in
+            # the test env) can't bypass the mock and skip the fallback.
+            mock.patch.object(ar, '_fallback_available', return_value=True),
             mock.patch.object(ar, '_dm_tier2_unavailable'),
             mock.patch.object(ar, '_mark_paused_on_tier1'),
             mock.patch.object(ar, 'append_rate_limit_event'),
@@ -468,6 +478,11 @@ class AuthCircuitBreakerTest(unittest.TestCase):
             mock.patch('agent_runner.subprocess.run',
                        side_effect=fake_run),
             mock.patch.object(ar, 'tier2_available', return_value=True),
+            # pr765 generalized the fallback-availability gate from
+            # tier2_available() to _fallback_available(tier); mock the new seam
+            # too so the on-disk creds check for the fallback tier (absent in
+            # the test env) can't bypass the mock and skip the fallback.
+            mock.patch.object(ar, '_fallback_available', return_value=True),
             mock.patch.object(ar, '_dm_tier2_unavailable'),
             mock.patch.object(ar, '_mark_paused_on_tier1'),
             mock.patch.object(ar, 'append_rate_limit_event'),
@@ -533,6 +548,11 @@ class AuthCircuitBreakerTest(unittest.TestCase):
             mock.patch('agent_runner.subprocess.run',
                        side_effect=fake_run),
             mock.patch.object(ar, 'tier2_available', return_value=True),
+            # pr765 generalized the fallback-availability gate from
+            # tier2_available() to _fallback_available(tier); mock the new seam
+            # too so the on-disk creds check for the fallback tier (absent in
+            # the test env) can't bypass the mock and skip the fallback.
+            mock.patch.object(ar, '_fallback_available', return_value=True),
             mock.patch.object(ar, '_dm_tier2_unavailable'),
             mock.patch.object(ar, '_mark_paused_on_tier1'),
             mock.patch.object(ar, 'append_rate_limit_event'),
@@ -598,6 +618,11 @@ class AuthCircuitBreakerTest(unittest.TestCase):
             mock.patch('agent_runner.subprocess.run',
                        side_effect=fake_run),
             mock.patch.object(ar, 'tier2_available', return_value=True),
+            # pr765 generalized the fallback-availability gate from
+            # tier2_available() to _fallback_available(tier); mock the new seam
+            # too so the on-disk creds check for the fallback tier (absent in
+            # the test env) can't bypass the mock and skip the fallback.
+            mock.patch.object(ar, '_fallback_available', return_value=True),
             mock.patch.object(ar, '_dm_tier2_unavailable'),
             mock.patch.object(ar, '_mark_paused_on_tier1'),
             mock.patch.object(ar, 'append_rate_limit_event'),
@@ -687,6 +712,11 @@ class TierFailureLogTaggingTest(unittest.TestCase):
             mock.patch('agent_runner.subprocess.run',
                        side_effect=fake_run),
             mock.patch.object(ar, 'tier2_available', return_value=True),
+            # pr765 generalized the fallback-availability gate from
+            # tier2_available() to _fallback_available(tier); mock the new seam
+            # too so the on-disk creds check for the fallback tier (absent in
+            # the test env) can't bypass the mock and skip the fallback.
+            mock.patch.object(ar, '_fallback_available', return_value=True),
             mock.patch.object(ar, '_dm_tier2_unavailable'),
             mock.patch.object(ar, '_mark_paused_on_tier1'),
             mock.patch.object(ar, 'append_rate_limit_event'),

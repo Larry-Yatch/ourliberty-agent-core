@@ -199,6 +199,11 @@ class _RunClaudeHarness(unittest.TestCase):
             mock.patch('agent_runner.subprocess.run',
                        side_effect=fake_run),
             mock.patch.object(ar, 'tier2_available', return_value=True),
+            # pr765 generalized the fallback-availability gate from
+            # tier2_available() to _fallback_available(tier); mock the new seam
+            # too so the on-disk creds check for the fallback tier (absent in
+            # the test env) can't bypass the mock and skip the fallback.
+            mock.patch.object(ar, '_fallback_available', return_value=True),
             mock.patch.object(ar, '_dm_tier2_unavailable'),
             mock.patch.object(ar, '_mark_paused_on_tier1'),
             mock.patch.object(ar, 'append_rate_limit_event'),
@@ -413,6 +418,11 @@ class ResumeNoFallbackRefusalStaysIntactTest(_RunClaudeHarness):
             mock.patch('agent_runner.subprocess.run',
                        side_effect=t2_called),
             mock.patch.object(ar, 'tier2_available', return_value=True),
+            # pr765 generalized the fallback-availability gate from
+            # tier2_available() to _fallback_available(tier); mock the new seam
+            # too so the on-disk creds check for the fallback tier (absent in
+            # the test env) can't bypass the mock and skip the fallback.
+            mock.patch.object(ar, '_fallback_available', return_value=True),
             mock.patch.object(ar, '_dm_tier2_unavailable'),
             mock.patch.object(ar, '_mark_paused_on_tier1'),
             mock.patch.object(ar, 'append_rate_limit_event'),
