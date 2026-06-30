@@ -334,8 +334,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T02:05Z UTC (Iter ~3302, Tier 1)
+## Status snapshot — updated 2026-06-30T02:12Z UTC (Iter ~3303, Tier 1)
 
-**Iter ~3302 summary (2026-06-30T02:05Z):** ⚠️ Drift — git fetch FAILING: `fatal: bad object worktrees/gate-wt-8c04f0c237bf84/HEAD` (same bad-object; carry). **WINS:** PR #761 Mirror PASS ✅ (worktree reaper) — auto-merge HELD behind PR #764 (file overlap). Beacon telegram-409 direction-ask COMPLETE ✅ (direction-ask archived; `telegram-409-burst-guard-001` pending Larry approval). Mirror reviewing PR #762 rev1 (PID 1242198, regression check). Worktrees 164 (was 229). 4 new alerts: 1 Tier-4 (credential-drift-healer origin/main unreachable, secondary of fetch failure, bot DM'd Larry at 01:57Z), 3 Tier-3 silenced. 4 pending approvals (mirror-review-p3a-retro-prep, heal-wip-redispatch-already-merged-suppress-001, heal-no-session-escalate-preserve-target-repo-001, telegram-409-burst-guard-001). Trailing-30d ratio≈17.28 (1402/81, trend=improving). Tier 1, consecutive_clean=0. Critical path: PR #764 merge → PR #761 auto-merge → reaper runs → fetch fixed.
+**Iter ~3303 summary (2026-06-30T02:09Z):** ⚠️ Drift — git fetch FAILING: `fatal: bad object worktrees/gate-wt-8c04f0c237bf84/HEAD` (same bad-object; carry). **BIG WIN:** telegram-409-burst-guard-001 → Larry approved "Go" at 20:03 MDT → Forge built PR #766 (fix(beacon-bot): prevent competing getUpdates loops) → Mirror review dispatched at 20:06 MDT. 1 new alert: Tier-3 silenced (pipeline-stall:no-session-revision PR #762 — known FP, Mirror active). Mirror reviewing PR #762 rev1 (PID 1242198, ~10 min). Worktrees 156 (was 164 iter ~3302, improving). 3 pending approvals (mirror-review-p3a-retro-prep, heal-wip-redispatch-already-merged-suppress-001, heal-no-session-escalate-preserve-target-repo-001; telegram-409-burst-guard-001 removed ✅). Mirror queue: 5 items (#762 active, #763/#764/#765/#766 queued). Trailing-30d ratio≈17.31 (1403/81, trend=improving). Tier 1, consecutive_clean=0. Critical path: PR #764 → PR #761 auto-merge → reaper runs → fetch fixed.
 
 
