@@ -108,6 +108,19 @@ Each replaces `active_tier.read()['tier']` (the dispatch-tier source) with `sele
 ```
 Selector reads with **fail-safe defaults** if missing/malformed (default to `primary=[tier1]`, no near_cap, so a config error degrades to "use tier1," never crashes).
 
+## 12b. Calibration — self-tuning `max_5h_budget_tokens` from real wall-hits (CONFIRMED)
+
+The cap/reserve thresholds key off `max_5h_budget_tokens`, which is unknown and plan-dependent. It MUST self-tune from reality, not be a hand-set constant:
+- A periodic job (a healer/timer, or a Pulse check — same shape as the existing Pulse threshold-tuning loop) runs per primary tier.
+- For each tier, scan recent **rate-limit wall events** (the rate-limit / anthropic-quota ledger, which records tier + parsed reset) over a rolling window (default 14 days).
+- For each wall, compute that account's **5h burn at wall-time** from costs.jsonl (`account==t`-filtered) — that burn ≈ the account's true 5h ceiling at that moment.
+- Set `max_5h_budget_tokens[t]` = **0.90 × the lowest observed wall-burn** in the window (conservative, so `near_cap` trips before the real ceiling). **Per-tier** (accounts/plans differ).
+- Write tuned values to a **runtime override** `~/agents/state/tier-budget-calibration.json` (atomic) that the selector reads at call time — so it adapts **without a code/config deploy**.
+- **Bootstrap:** until enough wall data exists, use the conservative config default. Tighten when walls occur below the current estimate; loosen slowly when no near-cap walls occur over the window.
+- Surface the current calibrated values (dashboard/log) for visibility.
+
+This makes the pool self-correct from real usage. It is the durable answer to "tune from real-world hits" — no recurring manual tuning.
+
 ## 13. Deploy
 
 1. Land #765 (+#763), then the selector PR (this spec).
@@ -153,9 +166,9 @@ Selector reads with **fail-safe defaults** if missing/malformed (default to `pri
 - Cold-start tie / counter init / corrupt burn → §7 (cold-start=0) + §8 (fail-open).
 - TOCTOU select→spawn → §4 re-verify before spawn.
 
-## 18. Open parameters for Larry (defaults chosen; not blockers)
+## 18. Parameters — DECISIONS LOCKED (Larry, 2026-06-30)
 
-- **v1 = round-robin** among healthy primaries (robust); burn-weighted = v2. (Confirm acceptable vs wanting burn-weighted now.)
-- `t2_reserve_fraction` = 0.25 (system uses ≤25% of the laptop account before holding).
-- `proactive_cap_fraction`/`release` = 0.85/0.70; `max_5h_budget_tokens` = calibrate from observed wall-hits (start conservative).
-- `hold_alert_minutes` = 10.
+- **v1 = round-robin** among healthy primaries — **CONFIRMED.** Burn-weighted precise selection = v2.
+- **`t2_reserve_fraction` = 0.25** (system uses ≤25% of the laptop account before holding) — **CONFIRMED.**
+- **Self-tuning calibration from real wall-hits — CONFIRMED + specified in §12b.** `max_5h_budget_tokens` is auto-calibrated per tier from observed walls (runtime override), not a hand-set constant. This is a build requirement, not optional.
+- `proactive_cap_fraction`/`release` = 0.85/0.70 (initial; the calibration in §12b drives the budget they apply to). `hold_alert_minutes` = 10.
