@@ -396,11 +396,13 @@ class AuthCooldownTest(unittest.TestCase):
                                  now=now, kind='auth_401')
         self.assertEqual(active_tier.read()['cooldown_backoff']['tier2'], 2)
 
-    def test_auth_401_overwrites_existing_rate_limit_cooldown(self):
-        # If a tier was rate-limited and now also fails auth, the auth
-        # cooldown overwrites (last writer wins). This is intentional:
-        # auth_401 means the operator must re-auth; the rate-limit timer
-        # is moot until that happens.
+    def test_auth_401_does_not_shorten_longer_rate_limit_cooldown(self):
+        # MONOTONIC (spec § 7): a cooldown is extend-only — it is never
+        # shortened. A tier rate-limited until 3pm (+3h) that then also fails
+        # auth (+30m) stays benched until 3pm: it is unusable for the rate
+        # limit regardless of auth, and a fresh shorter event must not
+        # prematurely un-bench a still-walled tier. (Pre-§7 this overwrote to
+        # 30m — the REQUIRED-FIX bug.)
         from datetime import datetime, timezone
         now = datetime(2026, 5, 28, 12, 0, 0, tzinfo=timezone.utc)
         active_tier.set_cooldown('tier2', raw_excerpt='resets 3pm', now=now)
@@ -409,7 +411,7 @@ class AuthCooldownTest(unittest.TestCase):
         state = active_tier.read()
         from datetime import datetime as _dt, timedelta
         until_dt = _dt.fromisoformat(state['cooldowns']['tier2'])
-        self.assertEqual(until_dt - now, timedelta(minutes=30))
+        self.assertEqual(until_dt - now, timedelta(hours=3))
 
     def test_auth_401_rejects_invalid_tier(self):
         with self.assertRaises(ValueError):
