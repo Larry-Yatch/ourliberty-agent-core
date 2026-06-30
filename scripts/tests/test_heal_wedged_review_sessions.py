@@ -99,7 +99,9 @@ class _Recorder:
         self.escalations.append((message, subject, action))
 
 
-def _run(rec, candidates, state, cfg=CFG, verify_pid_fn=None):
+def _run(rec, candidates, state, cfg=CFG, verify_pid_fn=None,
+         mirror_verdict_already_delivered_fn=None,
+         mirror_verdict_deliver_fn=None):
     # By default the pre-kill identity recheck must SUCCEED for the synthetic
     # candidates (their pids aren't real, so the production proc_cwd would abort
     # every kill). Map each candidate's pid back to its cwd so the recheck
@@ -107,12 +109,26 @@ def _run(rec, candidates, state, cfg=CFG, verify_pid_fn=None):
     if verify_pid_fn is None:
         _cwd_by_pid = {c.pid: c.cwd for c in (candidates or [])}
         verify_pid_fn = lambda pid: _cwd_by_pid.get(pid)  # noqa: E731
+    # Default the harvest-before-reap seams to "already delivered" so the
+    # common-path tests (the 47/49 case) reap + remove exactly as before this
+    # fix, without touching the real outbox dir. Tests of the undelivered/
+    # fail-safe paths override these.
+    if mirror_verdict_already_delivered_fn is None:
+        mirror_verdict_already_delivered_fn = lambda sid: True  # noqa: E731
+    if mirror_verdict_deliver_fn is None:
+        mirror_verdict_deliver_fn = lambda c, t, **kw: True  # noqa: E731
     return h.run_cycle(
         candidates=candidates, state=state, cfg=cfg, now=NOW,
         reaper=rec.reaper, worktree_remover=rec.remover,
         closure_notify=rec.closure, escalate_notify=rec.escalate,
         event_emitter=lambda **kw: None,  # never touch the live chain_events table
         verify_pid_fn=verify_pid_fn,
+        # Disable the #767 mid-flight pr-terminal fast-path here so a PR-keyed
+        # mirror cwd doesn't trigger a real gh probe; these tests exercise the
+        # marker/harvest path, not pr-terminal (covered by TestPrTerminalMidflightReap).
+        pr_terminal_state_fn=lambda c: None,
+        mirror_verdict_already_delivered_fn=mirror_verdict_already_delivered_fn,
+        mirror_verdict_deliver_fn=mirror_verdict_deliver_fn,
         persist=False,
     )
 
@@ -1526,6 +1542,249 @@ class TestPrTerminalMidflightReap(unittest.TestCase):
         with mock.patch.object(
                 h.task_terminal_state, 'gh_json', return_value=None):
             self.assertIsNone(h._mirror_pr_terminal_state(cand))
+
+
+def _mirror_pass_marker_block(
+    *, task_id='pr-ourliberty-agent-core-760',
+    pr_url='https://github.com/Larry-Yatch/ourliberty-agent-core/pull/760',
+    summary='LGTM') -> str:
+    body = json.dumps({'task_id': task_id, 'pr_url': pr_url, 'summary': summary})
+    return f'=== REVIEW_PASS ===\n{body}\n=== END_REVIEW_PASS ===\n'
+
+
+def _write_session_jsonl(path: Path, assistant_text: str,
+                         *, user_contamination: str | None = None) -> None:
+    """Write a minimal Claude Code session JSONL: an optional user line (e.g.
+    the agent reading its own CLAUDE.md, which contains the literal marker
+    delimiters) followed by an assistant turn carrying `assistant_text`."""
+    lines = []
+    if user_contamination is not None:
+        lines.append(json.dumps({
+            'type': 'user',
+            'message': {'role': 'user', 'content': user_contamination},
+        }))
+    lines.append(json.dumps({
+        'type': 'assistant',
+        'message': {'role': 'assistant',
+                    'content': [{'type': 'text', 'text': assistant_text}]},
+    }))
+    path.write_text('\n'.join(lines) + '\n')
+
+
+class TestHarvestVerdictBeforeReap(unittest.TestCase):
+    """harvest-verdict-before-reap-001: a Mirror review that FINISHED (valid
+    verdict marker on disk) then HUNG without exiting never had its verdict
+    delivered. Case-1 used to remove the worktree and DESTROY that verdict
+    (PR 760 / 720). Now the verdict is delivered to the mirror outbox BEFORE the
+    reap; on failure the worktree is preserved + alerted instead of destroyed.
+
+    All filesystem/process side-effects are stubbed via injected seams and the
+    recorder — no real outbox write, gh, or kill."""
+
+    PR_CWD = '/home/larry/agent-worktrees/wt-mirror-pr-ourliberty-agent-core-760'
+
+    def _pr_cand(self, **kw):
+        kw.setdefault('cwd', self.PR_CWD)
+        kw.setdefault('tier', 'mirror')
+        kw.setdefault('marker', True)
+        kw.setdefault('idle', 600.0)  # past marker_grace -> REAP_CASE1
+        return _cand(**kw)
+
+    # ---- (a) marker present + NOT yet delivered -> harvest, then reap+remove ----
+    def test_undelivered_verdict_is_harvested_before_reap(self):
+        rec = _Recorder()
+        cand = self._pr_cand(pid=8001)
+        delivered = []
+        # The session JSONL carries a clean REVIEW_PASS (the extractor finds it).
+        with mock.patch.object(h, '_latest_mirror_marker_text_from_jsonl',
+                               return_value=_mirror_pass_marker_block()):
+            summary = _run(
+                rec, [cand], h.ConfidenceState(),
+                mirror_verdict_already_delivered_fn=lambda sid: False,
+                mirror_verdict_deliver_fn=(
+                    lambda c, t, **kw: (delivered.append((c.session_id, t)) or True)),
+            )
+        # Delivery happened BEFORE the kill, and exactly once.
+        self.assertEqual(len(delivered), 1)
+        self.assertIn('REVIEW_PASS', delivered[0][1])
+        # Then reaped normally: killed + worktree removed.
+        self.assertEqual(summary['case1_reaped'], 1)
+        self.assertEqual(rec.killed, [8001])
+        self.assertEqual(rec.removed, [cand.cwd])
+        # No undelivered-fail-safe path taken.
+        self.assertEqual(summary['case1_verdict_undelivered'], 0)
+        self.assertEqual(rec.escalations, [])
+
+    # ---- (b) marker present + ALREADY delivered -> no double-delivery ----
+    def test_already_delivered_reaps_exactly_as_today(self):
+        rec = _Recorder()
+        cand = self._pr_cand(pid=8002)
+        delivered = []
+        summary = _run(
+            rec, [cand], h.ConfidenceState(),
+            mirror_verdict_already_delivered_fn=lambda sid: True,
+            mirror_verdict_deliver_fn=(
+                lambda c, t, **kw: (delivered.append(1) or True)),
+        )
+        # The common 47/49 path: NO delivery attempted, behaves exactly as today.
+        self.assertEqual(delivered, [])
+        self.assertEqual(summary['case1_reaped'], 1)
+        self.assertEqual(rec.killed, [8002])
+        self.assertEqual(rec.removed, [cand.cwd])
+        self.assertEqual(summary['case1_verdict_undelivered'], 0)
+
+    # ---- (c) extraction/delivery FAILS -> kill but PRESERVE worktree + alert ----
+    def test_delivery_failure_preserves_worktree_and_alerts(self):
+        rec = _Recorder()
+        cand = self._pr_cand(pid=8003)
+        with mock.patch.object(h, '_latest_mirror_marker_text_from_jsonl',
+                               return_value=_mirror_pass_marker_block()):
+            summary = _run(
+                rec, [cand], h.ConfidenceState(),
+                mirror_verdict_already_delivered_fn=lambda sid: False,
+                mirror_verdict_deliver_fn=lambda c, t, **kw: False,  # delivery fails
+            )
+        # Killed (it IS wedged) ...
+        self.assertEqual(rec.killed, [8003])
+        # ... but the worktree is PRESERVED (NOT removed) and an alert fired.
+        self.assertEqual(rec.removed, [])
+        self.assertEqual(summary['case1_reaped'], 1)
+        self.assertEqual(summary['case1_verdict_undelivered'], 1)
+        self.assertEqual(summary['worktree_preserved'], 1)
+        self.assertEqual(len(rec.escalations), 1)
+        self.assertIn('undelivered', rec.escalations[0][1])
+
+    def test_no_extractable_verdict_preserves_worktree(self):
+        # _harvest_then_decide... with a None marker_text (e.g. unreadable jsonl)
+        # must also fail-safe: kill but preserve + alert.
+        rec = _Recorder()
+        cand = self._pr_cand(pid=8004, has_jsonl=False)  # jsonl None -> no extract
+        # marker_present is forced True via _cand(marker=...) only affecting the
+        # Candidate field; with jsonl None the extractor returns None.
+        cand = h.Candidate(
+            pid=8004, cwd=self.PR_CWD, tier='mirror', jsonl=None,
+            session_id=None, idle_secs=600.0, marker_present=True,
+        )
+        # jsonl None means run_cycle's top guard skips it — so to exercise the
+        # extractor-None branch we call the decision helper directly with a
+        # jsonl that yields no marker.
+        escals = []
+        safe = h._harvest_then_decide_worktree_removal(
+            cand, now_iso=NOW.isoformat(),
+            already_delivered_fn=lambda sid: False,
+            deliver_fn=lambda c, t, **kw: True,
+            escalate_notify=lambda m, s, a: escals.append((m, s, a)),
+        )
+        self.assertFalse(safe)  # not safe to remove
+        self.assertEqual(len(escals), 1)
+
+    # ---- (d) common benign path / Forge / Case-2 unchanged (no delivery) ----
+    def test_forge_case1_never_attempts_mirror_delivery(self):
+        rec = _Recorder()
+        # A Forge marker-present session reaped via Case-1: the harvest path is
+        # mirror-only, so no delivery seam is ever consulted.
+        cand = _cand(pid=8005, tier='forge', name='t-001', marker=True, idle=900)
+        delivered = []
+        # No forge spare condition (stub it off so the test never shells to gh).
+        with mock.patch.object(h, '_forge_spare_reason', return_value=None):
+            summary = _run(
+                rec, [cand], h.ConfidenceState(),
+                mirror_verdict_already_delivered_fn=(
+                    lambda sid: (delivered.append('checked') or False)),
+                mirror_verdict_deliver_fn=lambda c, t, **kw: True,
+            )
+        self.assertEqual(delivered, [])  # mirror-only gate: never consulted for forge
+        # Forge still reaps + removes as before (no spare condition here).
+        self.assertEqual(summary['case1_reaped'], 1)
+        self.assertEqual(rec.removed, [cand.cwd])
+
+    def test_silent_case2_never_attempts_delivery(self):
+        rec = _Recorder()
+        # No marker -> SILENT_CASE2 alert-only path; harvest never runs.
+        cand = self._pr_cand(pid=8006, marker=False, idle=1200.0)
+        delivered = []
+        summary = _run(
+            rec, [cand], h.ConfidenceState(),
+            mirror_verdict_already_delivered_fn=(
+                lambda sid: (delivered.append('x') or False)),
+            mirror_verdict_deliver_fn=lambda c, t, **kw: True,
+        )
+        self.assertEqual(delivered, [])
+        self.assertEqual(summary['case1_reaped'], 0)
+        self.assertEqual(summary['case2_alerted'], 1)
+        self.assertEqual(rec.killed, [])
+
+    # ---- the harvest helpers themselves ----
+    def test_extractor_pulls_latest_assistant_marker(self):
+        with tempfile.TemporaryDirectory() as d:
+            jsonl = Path(d) / 'sess.jsonl'
+            _write_session_jsonl(
+                jsonl,
+                'Review complete.\n' + _mirror_pass_marker_block(),
+                # CLAUDE.md read back as a USER line carries the literal
+                # delimiters — must be IGNORED (only assistant turns count).
+                user_contamination='Example: === REVIEW_PASS === ... === END_REVIEW_PASS ===',
+            )
+            text = h._latest_mirror_marker_text_from_jsonl(jsonl)
+            self.assertIsNotNone(text)
+            mt, _pl, _n = h.mirror_review_handler.parse_mirror_marker(text)
+            self.assertEqual(mt, 'review_pass')
+
+    def test_extractor_returns_none_when_no_marker(self):
+        with tempfile.TemporaryDirectory() as d:
+            jsonl = Path(d) / 'sess.jsonl'
+            _write_session_jsonl(jsonl, 'Still thinking about the diff...')
+            self.assertIsNone(h._latest_mirror_marker_text_from_jsonl(jsonl))
+
+    def test_extractor_returns_none_on_unreadable(self):
+        self.assertIsNone(
+            h._latest_mirror_marker_text_from_jsonl(Path('/no/such/file.jsonl')))
+
+    def test_already_delivered_matches_on_session_id(self):
+        with tempfile.TemporaryDirectory() as d:
+            mirror_dir = Path(d) / 'mirror'
+            (mirror_dir / '.archive').mkdir(parents=True)
+            (mirror_dir / '.archive' / 'pr-x-1.json').write_text(json.dumps({
+                'task_id': 'pr-x-1', 'agent': 'mirror',
+                'claude_session_id': 'sess-DELIVERED',
+            }))
+            with mock.patch.object(h, '_mirror_outbox_dir', return_value=mirror_dir):
+                self.assertTrue(h._mirror_verdict_already_delivered('sess-DELIVERED'))
+                self.assertFalse(h._mirror_verdict_already_delivered('sess-OTHER'))
+                self.assertFalse(h._mirror_verdict_already_delivered(None))
+
+    def test_deliver_writes_outbox_in_notifier_shape(self):
+        with tempfile.TemporaryDirectory() as d:
+            mirror_dir = Path(d) / 'mirror'
+            cand = h.Candidate(
+                pid=9, cwd=self.PR_CWD, tier='mirror', jsonl=Path('/tmp/x.jsonl'),
+                session_id='sess-9', idle_secs=600.0, marker_present=True)
+            marker = _mirror_pass_marker_block()
+            with mock.patch.object(h, '_mirror_outbox_dir', return_value=mirror_dir):
+                ok = h._deliver_mirror_verdict(cand, marker, now_iso=NOW.isoformat())
+            self.assertTrue(ok)
+            written = list(mirror_dir.glob('*.json'))
+            self.assertEqual(len(written), 1)
+            data = json.loads(written[0].read_text())
+            # The shape outbox_notifier consumes for a Mirror review verdict.
+            self.assertEqual(data['agent'], 'mirror')
+            self.assertEqual(data['phase'], 'review')
+            self.assertEqual(data['task_id'], 'pr-ourliberty-agent-core-760')
+            self.assertEqual(data['claude_session_id'], 'sess-9')
+            self.assertIn('REVIEW_PASS', data['result'])
+            self.assertEqual(data['exit_code'], 0)
+
+    def test_deliver_fails_on_non_pr_mirror_cwd(self):
+        # A non-PR Mirror worktree can't reconstruct the task_id -> delivery
+        # returns False (caller then fail-safes to preserve+alert).
+        cand = h.Candidate(
+            pid=9, cwd='/home/larry/agent-worktrees/wt-mirror-some-slug-001',
+            tier='mirror', jsonl=Path('/tmp/x.jsonl'),
+            session_id='sess-9', idle_secs=600.0, marker_present=True)
+        with mock.patch.object(h, 'log'):
+            self.assertFalse(
+                h._deliver_mirror_verdict(cand, _mirror_pass_marker_block(),
+                                          now_iso=NOW.isoformat()))
 
 
 if __name__ == '__main__':
