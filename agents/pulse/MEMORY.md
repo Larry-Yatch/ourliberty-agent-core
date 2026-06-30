@@ -358,8 +358,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T10:47Z UTC (Iter ~3345, Tier 3)
+## Status snapshot — updated 2026-06-30T11:17Z UTC (Iter ~3346, Tier 3)
 
-**Iter ~3345 summary (2026-06-30T10:47Z):** 1 new alert (catalog-accuracy-drift, Tier-3 digest, no DM). Watermark=1010 (after compaction 1122→1009 + 1 new). All 3/3 main daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254). Watchdog=healthy (10:41:34Z UTC). Heal-daemon heartbeat 10:40:56Z. No stalls. Pipeline idle (outbox-notifier current instance quiet since 23:11:25Z 2026-06-29, ~11.5h). 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals (mirror-review-p3a-retro-prep ~27.2h no chat_id; heal-wip-redispatch-already-merged-suppress-001; heal-no-session-escalate-preserve-target-repo-001; mirror-review-pr-763). **Worktrees 1/0 (main only).** **Tier 3, consecutive_clean=3** (at ceiling — no further de-escalation). Outbox-notifier GitHub 401 carry (prior dead instance, self-healed — 1/3 G-rule candidate). Fire cadence: 30 min (every 6th 5-min fire).
+**Iter ~3346 summary (2026-06-30T11:17Z):** 0 new alerts. Watermark=1010=file_length. All 3/3 main daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254). Watchdog=healthy (11:17:19Z UTC). Heal-daemon heartbeat 11:11:00Z. No stalls. Pipeline idle (outbox-notifier current instance quiet since 23:11:25Z 2026-06-29, ~12h). 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals (mirror-review-p3a-retro-prep ~27.7h no chat_id; heal-wip-redispatch-already-merged-suppress-001; heal-no-session-escalate-preserve-target-repo-001; mirror-review-pr-763). **Worktrees 1/0 (main only).** **Tier 3, consecutive_clean=4** (at ceiling — no further de-escalation). Outbox-notifier GitHub 401 carry (prior dead instance, self-healed — 1/3 G-rule candidate). Fire cadence: 30 min (every 6th 5-min fire).
 
 
