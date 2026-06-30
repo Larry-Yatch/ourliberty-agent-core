@@ -322,8 +322,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-29T23:44Z UTC (Iter ~3286, Tier 1)
+## Status snapshot — updated 2026-06-30T00:09Z UTC (Iter ~3289, Tier 1)
 
-**Iter ~3286 summary (2026-06-29T23:44Z):** ⚠️ Check A drift. Source repo 2 ahead (HEAD=d7ebac93), DIVERGED — git fetch BLOCKED by gate-wt-ec6def99d39d69 bad-object (same); origin moved ahead with #759+#754 merge commits. Worktrees 63/53 locked (was 62; +1 from BASELINE_WARM). BASELINE_WARM PID 1145289 still running (9 min). Pipeline stall clean. No new alerts (watermark=1088). Beacon RATE-LIMITED until 14:00 UTC June 30 (~13h55m remaining). 3 pending approvals blocked. Larry dashboard-approve attempt at 22:53-22:57Z unprocessed (Beacon hit permission boundary, restarted at 23:16Z, still rate-limited). Mirror queue: review-762 (next) + review-761 (after) — no active session. PR #761 (worktree fix) queued. Trailing-30d ratio≈17.07 (stable). Tier 1, consecutive_clean=0.
+**Iter ~3289 summary (2026-06-30T00:09Z):** ⚠️ Check A drift. Source repo DIVERGED 5 ahead + 2 behind origin/main. git fetch RE-BLOCKED by gate-wt-28500ca6a3f362 bad-object (created by PR #761 regression check running; transient). Worktrees 72/26 locked (re-proliferated from 29/2 during regression check — expected; will clear on PR #761 merge). Mirror rev1 ACTIVE for PR #761 (PIDs 1167891/1167893, ~10 min, D-state IO cleanup phase). Pipeline stall clean. 0 new alerts (watermark=1088). Beacon RATE-LIMITED until 14:00 UTC June 30 (~13h51m remaining). 3 pending approvals blocked. Mirror queue: review-762 queued (behind active rev1). PR #760 dead-lettered. PR #755 AUTO_MERGE_HELD blocker=#760. Trailing-30d ratio≈17.09 (stable, trend=improving). Tier 1, consecutive_clean=0.
 
 
