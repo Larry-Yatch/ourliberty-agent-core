@@ -26,6 +26,7 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -1370,6 +1371,161 @@ class TestSessionJsonlTier2Discovery(unittest.TestCase):
         self._write_jsonl(self.tier2_root, 'sess-tier2.jsonl', 1000.0)
         self.assertIsNone(
             h.session_jsonl_for_cwd(self.CWD, projects_dir=self.login_root))
+
+
+
+
+# ---------------------- mid-flight PR-terminal reap (#698 follow-up) ----------------------
+
+class TestPrTerminalMidflightReap(unittest.TestCase):
+    """The mid-flight extension of the #698 launch-time merged/closed guard: a
+    live Mirror review whose PR has gone MERGED/CLOSED *while the review is in
+    flight* is reaped deterministically (no confidence streak), the worktree is
+    removed, and a CLOSURE notify fires. Any undeterminable state fails OPEN.
+
+    All `gh` / process side-effects are stubbed: the probe seam
+    (`pr_terminal_state_fn`) and the reaper/remover/notify recorder mean no test
+    here shells to gh or kills anything."""
+
+    PR_CWD = '/home/larry/agent-worktrees/wt-mirror-pr-ourliberty-agent-core-760'
+
+    def _pr_cand(self, **kw):
+        # A live, idle-but-fresh, NO-marker Mirror review session keyed on a PR
+        # worktree. Without the PR-terminal path this would be a plain SKIP
+        # (fresh, no marker), so any reap MUST come from the new fast-path.
+        kw.setdefault('cwd', self.PR_CWD)
+        kw.setdefault('tier', 'mirror')
+        kw.setdefault('idle', 30.0)
+        kw.setdefault('marker', False)
+        return _cand(**kw)
+
+    def test_merged_pr_midflight_is_reaped_as_pr_terminal(self):
+        rec = _Recorder()
+        cand = self._pr_cand(pid=7760)
+        summary = h.run_cycle(
+            candidates=[cand], state=h.ConfidenceState(), cfg=CFG, now=NOW,
+            reaper=rec.reaper, worktree_remover=rec.remover,
+            closure_notify=rec.closure, escalate_notify=rec.escalate,
+            event_emitter=lambda **kw: None,
+            verify_pid_fn=lambda pid: cand.cwd,  # identity recheck passes
+            pr_terminal_state_fn=lambda c: 'MERGED',  # stub: PR merged mid-flight
+            persist=False,
+        )
+        self.assertEqual(summary['pr_terminal_reaped'], 1)
+        self.assertEqual(rec.killed, [7760])
+        self.assertEqual(rec.removed, [cand.cwd])      # worktree removed
+        self.assertEqual(len(rec.closures), 1)         # CLOSURE notify
+        # Reaped on the fast-path, so the marker/confidence ladder never fires.
+        self.assertEqual(summary['case1_reaped'], 0)
+        self.assertEqual(summary['case2_alerted'], 0)
+
+    def test_closed_pr_midflight_is_also_reaped(self):
+        rec = _Recorder()
+        cand = self._pr_cand(pid=7761)
+        summary = h.run_cycle(
+            candidates=[cand], state=h.ConfidenceState(), cfg=CFG, now=NOW,
+            reaper=rec.reaper, worktree_remover=rec.remover,
+            closure_notify=rec.closure, escalate_notify=rec.escalate,
+            event_emitter=lambda **kw: None,
+            verify_pid_fn=lambda pid: cand.cwd,
+            pr_terminal_state_fn=lambda c: 'CLOSED',
+            persist=False,
+        )
+        self.assertEqual(summary['pr_terminal_reaped'], 1)
+        self.assertEqual(rec.killed, [7761])
+
+    def test_open_pr_is_not_reaped_by_this_path(self):
+        # PR still OPEN -> probe returns None (its real contract maps OPEN -> None);
+        # the fresh, no-marker session falls through to SKIP. NOT reaped.
+        rec = _Recorder()
+        cand = self._pr_cand(pid=7762)
+        summary = h.run_cycle(
+            candidates=[cand], state=h.ConfidenceState(), cfg=CFG, now=NOW,
+            reaper=rec.reaper, worktree_remover=rec.remover,
+            closure_notify=rec.closure, escalate_notify=rec.escalate,
+            event_emitter=lambda **kw: None,
+            verify_pid_fn=lambda pid: cand.cwd,
+            pr_terminal_state_fn=lambda c: None,  # OPEN/unknown -> fail open
+            persist=False,
+        )
+        self.assertEqual(summary['pr_terminal_reaped'], 0)
+        self.assertEqual(rec.killed, [])
+        self.assertEqual(rec.removed, [])
+
+    def test_gh_hiccup_fails_open_not_reaped(self):
+        # A gh error inside the probe raises; the fast-path catches it, treats it
+        # as None (fail OPEN), and falls through. A transient gh blip must NEVER
+        # reap a legitimate live review.
+        rec = _Recorder()
+        cand = self._pr_cand(pid=7763)
+        def boom(c):
+            raise RuntimeError('gh: 401 / network hiccup')
+        with mock.patch.object(h, 'log'):  # silence the WARN log line
+            summary = h.run_cycle(
+                candidates=[cand], state=h.ConfidenceState(), cfg=CFG, now=NOW,
+                reaper=rec.reaper, worktree_remover=rec.remover,
+                closure_notify=rec.closure, escalate_notify=rec.escalate,
+                event_emitter=lambda **kw: None,
+                verify_pid_fn=lambda pid: cand.cwd,
+                pr_terminal_state_fn=boom,
+                persist=False,
+            )
+        self.assertEqual(summary['pr_terminal_reaped'], 0)
+        self.assertEqual(rec.killed, [])
+        self.assertEqual(rec.removed, [])
+
+    # ---- the probe + parser themselves (no run_cycle) ----
+
+    def test_probe_skips_non_mirror_tier(self):
+        # A forge session is never a single-PR-gated review -> probe returns None
+        # WITHOUT touching gh (tier short-circuit before any cwd parse).
+        cand = _cand(tier='forge', cwd='/home/larry/agent-worktrees/wt-forge-t-001')
+        self.assertIsNone(h._mirror_pr_terminal_state(cand))
+
+    def test_probe_skips_non_pr_mirror_worktree(self):
+        # A non-PR Mirror worktree (direct review dispatch, not keyed on a single
+        # PR number) doesn't parse -> None (conservative skip), no gh call.
+        cand = _cand(
+            tier='mirror',
+            cwd='/home/larry/agent-worktrees/wt-mirror-some-task-slug-001',
+        )
+        self.assertIsNone(h._mirror_pr_terminal_state(cand))
+
+    def test_coords_parser_strips_rev_suffix_and_deleted_marker(self):
+        self.assertEqual(
+            h._mirror_review_pr_coords(
+                '/home/larry/agent-worktrees/wt-mirror-pr-ourliberty-agent-core-760'),
+            ('Larry-Yatch/ourliberty-agent-core', '760'))
+        self.assertEqual(
+            h._mirror_review_pr_coords(
+                '/home/larry/agent-worktrees/wt-mirror-pr-ourliberty-agent-core-762-rev1'),
+            ('Larry-Yatch/ourliberty-agent-core', '762'))
+        self.assertEqual(
+            h._mirror_review_pr_coords(
+                '/home/larry/agent-worktrees/wt-mirror-pr-ourliberty-agent-core-760 (deleted)'),
+            ('Larry-Yatch/ourliberty-agent-core', '760'))
+        self.assertIsNone(
+            h._mirror_review_pr_coords(
+                '/home/larry/agent-worktrees/wt-mirror-regression-warmer-001'))
+
+    def test_probe_returns_none_on_open_state(self):
+        # End-to-end probe with gh_json stubbed: an OPEN PR -> None (fail open),
+        # a MERGED PR -> 'MERGED'. No real gh subprocess.
+        cand = self._pr_cand()
+        with mock.patch.object(
+                h.task_terminal_state, 'gh_json', return_value={'state': 'OPEN'}):
+            self.assertIsNone(h._mirror_pr_terminal_state(cand))
+        with mock.patch.object(
+                h.task_terminal_state, 'gh_json', return_value={'state': 'MERGED'}):
+            self.assertEqual(h._mirror_pr_terminal_state(cand), 'MERGED')
+
+    def test_probe_returns_none_when_gh_json_returns_none(self):
+        # gh_json returns None on any gh failure (its UNKNOWN-on-error kernel) ->
+        # probe fails open.
+        cand = self._pr_cand()
+        with mock.patch.object(
+                h.task_terminal_state, 'gh_json', return_value=None):
+            self.assertIsNone(h._mirror_pr_terminal_state(cand))
 
 
 if __name__ == '__main__':

@@ -137,6 +137,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 import forge_preflight_handler  # noqa: E402
 import mirror_review_handler  # noqa: E402
+import task_terminal_state  # noqa: E402
 
 HOME = Path.home()
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', str(HOME / 'agents')))
@@ -1239,6 +1240,101 @@ def _escalate_notify(message: str, subject: str, suggested_action: str) -> None:
         log(f'escalate notify failed: {type(e).__name__}: {e}', 'WARN')
 
 
+# --- mid-flight PR-terminal reap (extends the #698 launch-time guard) ---
+#
+# #698 (`outbox_notifier` dispatch pre-check + `inbox_watcher`
+# `_mirror_review_pr_terminal_state` launch pre-check) only inspects the PR's
+# state at the moment the review is DISPATCHED / LAUNCHED. If the PR is merged
+# (or closed) AFTER the Opus review is already in flight, nothing re-checks: the
+# review keeps burning until the wall-clock/marker ladder below finally fires
+# (observed: PR 760 reviewed ~51 min after a human hand-merge before a manual
+# kill). A terminal PR means the review gates NOTHING, so this is a
+# deterministic, zero-confidence-streak reap — analogous to the hard backstop,
+# but it can act on the FIRST sweep instead of waiting out the silent grace.
+#
+# Scope: MIRROR `phase=review` sessions only. A Forge build session isn't gated
+# on a single PR's open-state the same way, so it is deliberately skipped here
+# (it keeps its own `_forge_spare_reason` guards). The whole path FAILS OPEN by
+# construction: any cwd that doesn't parse to a PR number, any OPEN/UNKNOWN
+# state, or any `gh` hiccup returns None and falls through to the existing
+# marker/confidence logic — a transient gh error must NEVER reap a live review.
+
+# The remainder of a Mirror review worktree name AFTER `wt-mirror-pr-<repo_short>-`
+# is stripped: a leading integer PR number, optionally a single `-rev<N>` /
+# `-replan<N>` revision suffix and nothing else. Anchored both ends so `713`
+# never matches a `7130` PR — the same boundary discipline pipeline_live_state
+# uses for the live-review check.
+_MIRROR_WT_PR_RE = re.compile(
+    r'^wt-mirror-pr-(?P<repo_short>.+?)-(?P<num>\d+)(?:-(?:rev|replan)\d+)?$'
+)
+
+
+def _mirror_review_pr_coords(cwd: str) -> Optional[tuple[str, str]]:
+    """Parse a Mirror review worktree cwd into ``(repo_coords, pr_number)`` —
+    e.g. ``.../wt-mirror-pr-ourliberty-agent-core-760`` -> ``('Larry-Yatch/
+    ourliberty-agent-core', '760')`` — or None for any cwd that isn't a
+    conventional Mirror PR-review worktree.
+
+    The repo-short embedded in the name is qualified to OWNER/REPO via the shared
+    ``task_terminal_state._qualify_repo`` resolver (no hardcoded owner). A
+    trailing kernel ``(deleted)`` suffix is stripped first so a torn-down cwd
+    still resolves. Returns None (never raises) on anything non-conventional, so
+    the caller fails open.
+
+    Note: a non-PR Mirror worktree (e.g. ``wt-mirror-<task-slug>`` from a direct
+    review dispatch that isn't keyed on a single PR number) does NOT match the
+    `wt-mirror-pr-` prefix and returns None — exactly the conservative skip the
+    spec wants for any session we can't tie to one PR's open-state."""
+    name = Path(cwd).name
+    if name.endswith(_DELETED_CWD_SUFFIX):
+        name = name[: -len(_DELETED_CWD_SUFFIX)].rstrip()
+    m = _MIRROR_WT_PR_RE.match(name)
+    if not m:
+        return None
+    repo_short = m.group('repo_short')
+    if not repo_short:
+        return None
+    try:
+        repo_coords = task_terminal_state._qualify_repo(repo_short)
+    except Exception:  # noqa: BLE001 — never let qualify failure crash the probe
+        return None
+    if not repo_coords:
+        return None
+    return repo_coords, m.group('num')
+
+
+def _mirror_pr_terminal_state(cand: Candidate) -> Optional[str]:
+    """For a live Mirror review Candidate, return the PR's terminal state
+    (``'MERGED'`` / ``'CLOSED'``) when the PR under review has already left OPEN,
+    else None.
+
+    Mirrors ``inbox_watcher._mirror_review_pr_terminal_state`` exactly — same
+    REUSED kernel (`task_terminal_state.gh_json` + `classify_state` +
+    `TERMINAL_STATES`), same fail-open contract — but resolves the PR from the
+    session's WORKTREE cwd (the in-flight signal) rather than a task dict. A
+    non-None return means the review is pure waste: the PR is decided, so reap.
+
+    None means "let the review proceed" and covers EVERY uncertain path — a
+    non-mirror tier, a cwd that doesn't parse to a PR, an OPEN/UNKNOWN state, or
+    any `gh` hiccup (non-zero / timeout / unparseable). Fail-OPEN by construction
+    so a `gh` blip never reaps a legitimate review."""
+    if cand.tier != 'mirror':
+        return None
+    coords = _mirror_review_pr_coords(cand.cwd)
+    if coords is None:
+        return None
+    repo_coords, pr_number = coords
+    raw = task_terminal_state.gh_json(
+        ['gh', 'pr', 'view', pr_number,
+         '--repo', repo_coords, '--json', 'state'],
+        timeout=GH_TIMEOUT_SEC,
+    )
+    if not isinstance(raw, dict):
+        return None
+    state = task_terminal_state.classify_state(raw.get('state'))
+    return state if state in task_terminal_state.TERMINAL_STATES else None
+
+
 # ==================== orchestration ====================
 
 @dataclass
@@ -1440,6 +1536,7 @@ def run_cycle(
     escalate_notify: Callable[[str, str, str], None] = _escalate_notify,
     event_emitter: Callable[..., None] = _emit_healed_event,
     verify_pid_fn: Callable[[int], Optional[str]] = proc_cwd,
+    pr_terminal_state_fn: Callable[[Candidate], Optional[str]] = _mirror_pr_terminal_state,
     persist: bool = True,
 ) -> dict[str, Any]:
     """One sweep. All IO seams are injectable so the whole flow is unit-
@@ -1459,6 +1556,7 @@ def run_cycle(
         'scanned': len(candidates), 'case1_reaped': 0, 'case2_alerted': 0,
         'case2_auto_reaped': 0, 'case2_hard_reaped': 0, 'case2_demoted_at_gate': 0,
         'true_positives': 0, 'false_positives': 0, 'forge_spared': 0,
+        'pr_terminal_reaped': 0,
         'worktree_preserved': 0, 'mode_before': state.mode,
     }
 
@@ -1487,6 +1585,31 @@ def run_cycle(
     for cand in candidates:
         if cand.jsonl is None:
             continue  # no activity log → cannot assess
+        # Fast-path (BEFORE the marker/confidence ladder): a Mirror review whose
+        # PR has gone MERGED/CLOSED mid-flight gates nothing — reap it
+        # deterministically (no streak needed, analogous to the hard backstop),
+        # extending the #698 launch-only guard to the in-flight window. Fail-open:
+        # pr_terminal_state_fn returns None for a non-mirror tier, an unparseable
+        # PR, an OPEN/UNKNOWN state, or any gh hiccup, so a transient error simply
+        # falls through to the existing logic below — it never reaps a live review.
+        if pr_terminal_state_fn is not None:
+            try:
+                pr_state = pr_terminal_state_fn(cand)
+            except Exception as e:  # noqa: BLE001 — fail OPEN on any probe error
+                log(f'pr-terminal probe failed for {Path(cand.cwd).name}: '
+                    f'{type(e).__name__}: {e}; falling through', 'WARN')
+                pr_state = None
+            if pr_state in task_terminal_state.TERMINAL_STATES:
+                if reap(cand, case='pr-terminal',
+                        reason=(f'PR under review went {pr_state} mid-flight — the '
+                                f'review gates nothing (extends the #698 launch-time '
+                                f'guard to the in-flight window)'),
+                        remove_worktree_after_kill=True,
+                        reaper=reaper, worktree_remover=worktree_remover,
+                        closure_notify=closure_notify, event_emitter=event_emitter,
+                        verify_pid_fn=verify_pid_fn):
+                    summary['pr_terminal_reaped'] += 1
+                continue
         verdict = classify(
             marker_present=cand.marker_present, idle_secs=cand.idle_secs, cfg=cfg)
         # Forge build-sequence spare guard: never destroy (or alert on) a Forge
@@ -1616,6 +1739,7 @@ def main() -> int:
     log('HEARTBEAT scanned={scanned} case1_reaped={case1_reaped} '
         'case2_alerted={case2_alerted} case2_auto_reaped={case2_auto_reaped} '
         'case2_hard_reaped={case2_hard_reaped} forge_spared={forge_spared} '
+        'pr_terminal_reaped={pr_terminal_reaped} '
         'worktree_preserved={worktree_preserved} '
         'tp={true_positives} fp={false_positives} mode={mode_after} '
         'streak={streak}'.format(**summary))
