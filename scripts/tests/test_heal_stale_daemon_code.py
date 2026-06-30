@@ -1516,6 +1516,56 @@ class AutoRestartUnitDaemonReloadTests(_IsolatedAgentsRoot):
         self.assertNotEqual(rc, 0)
         self.assertIn('failed', stderr)
 
+    def test_queued_job_pending_ordering_treated_as_success_no_dm(self):
+        # The ordering fix (2026-06-30): a dependent unit ordered After= a
+        # still-draining predecessor reports is-active='inactive' after the
+        # settle because its restart job is still enqueued. `systemctl show
+        # --property=Job` carries a non-empty job id → the restart is
+        # in-progress, so return success with an INFO log and NO failure.
+        def fake_run(cmd, **kwargs):
+            verb = self._verb(cmd)
+            if verb == 'is-active':
+                return self._make_completed(rc=3, stdout='inactive\n')
+            if verb == 'show':
+                return self._make_completed(rc=0, stdout='Job=12345\n')
+            return self._make_completed(rc=0, stderr='')
+
+        log_lines: list[tuple[str, str]] = []
+
+        def fake_log(msg, level='INFO'):
+            log_lines.append((level, msg))
+
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run), \
+                mock.patch.object(h, 'log', side_effect=fake_log):
+            rc, stderr = h.auto_restart_unit(
+                'ourliberty-outbox-notifier.service')
+
+        self.assertEqual((rc, stderr), (0, ''))
+        info_lines = [m for lvl, m in log_lines if lvl == 'INFO']
+        self.assertTrue(
+            any('RESTART_QUEUED_PENDING_ORDERING' in m for m in info_lines),
+            f'expected a RESTART_QUEUED_PENDING_ORDERING INFO log, got '
+            f'{log_lines!r}',
+        )
+
+    def test_unhealthy_with_empty_job_still_fails_and_dms(self):
+        # Genuine failure preserved: is-active is unhealthy AND `systemctl show
+        # --property=Job` is empty (`Job=`) → no restart is queued, the unit
+        # really didn't come up. Return a failure indicator so the caller DMs.
+        def fake_run(cmd, **kwargs):
+            verb = self._verb(cmd)
+            if verb == 'is-active':
+                return self._make_completed(rc=3, stdout='inactive\n')
+            if verb == 'show':
+                return self._make_completed(rc=0, stdout='Job=\n')
+            return self._make_completed(rc=0, stderr='')
+
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run):
+            rc, stderr = h.auto_restart_unit('ourliberty-bogus.service')
+
+        self.assertNotEqual(rc, 0)
+        self.assertIn('inactive', stderr)
+
     def test_restart_job_rejected_returns_failure(self):
         # The restart job itself is rejected up front (rc != 0, e.g. unit not
         # found). That's a drain-independent failure: return it directly,

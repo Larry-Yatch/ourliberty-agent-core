@@ -736,7 +736,25 @@ def auto_restart_unit(unit: str) -> tuple[int, str]:
         )
         return 0, ''
 
-    # Not active/activating after the settle → genuine failure. Surface the
+    # Not in a healthy state after the settle — but before declaring failure,
+    # check whether systemd still has a restart job enqueued for this unit. A
+    # non-empty `Job=` means the restart hasn't run yet: it's typically held
+    # behind an After= ordering dependency that is still draining (e.g.
+    # outbox-notifier ordered After= inbox-watcher, whose Claude loop takes
+    # ~90s to SIGTERM-drain). The restart is in-progress and WILL complete
+    # once the predecessor is up, so this is a slow start, not a failure.
+    job = _unit_pending_job(unit)
+    if job:
+        log(
+            f'RESTART_QUEUED_PENDING_ORDERING: {unit} is {state!r} after '
+            f'{RESTART_SETTLE_S}s settle but systemd still has restart job '
+            f'{job!r} enqueued (held behind an After= ordering dependency '
+            f'still draining) — treating as in-progress success',
+            'INFO',
+        )
+        return 0, ''
+
+    # Unhealthy state AND no pending job → genuine failure. Surface the
     # observed state so the failure DM is actionable.
     return -1, (
         f'restart issued but unit is {state!r} after {RESTART_SETTLE_S}s '
@@ -761,6 +779,29 @@ def _unit_active_state(unit: str) -> str:
         return (result.stdout or '').strip() or 'unknown'
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return 'unknown'
+
+
+def _unit_pending_job(unit: str) -> str:
+    """Return the unit's enqueued systemd job id, or '' if none.
+
+    `systemctl show <unit> --property=Job` prints `Job=` (empty) for a settled
+    unit and `Job=<id> <...>` while a job (e.g. a restart) is enqueued and
+    waiting — typically held behind an After= ordering dependency that is still
+    draining. We parse the value after `Job=`. Returns '' on empty / timeout /
+    missing binary so the caller only treats a CONFIRMED pending job as
+    in-progress (and an unhealthy unit with no pending job as a real failure).
+    """
+    try:
+        result = subprocess.run(
+            ['systemctl', 'show', unit, '--property=Job'],
+            capture_output=True, text=True, timeout=SYSTEMCTL_TIMEOUT_S,
+        )
+        line = (result.stdout or '').strip()
+        if line.startswith('Job='):
+            return line[len('Job='):].strip()
+        return ''
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return ''
 
 
 def infer_recent_prs(script_path: Path, since_iso: str) -> list[str]:
