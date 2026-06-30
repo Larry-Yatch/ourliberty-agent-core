@@ -334,8 +334,14 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T02:52Z UTC (Iter ~3308, Tier 1)
+## G-rule heal-stale-daemon-code-dependency-ordering-001 — 1/3 (new, iter ~3309)
 
-**Iter ~3308 summary (2026-06-30T02:52Z):** ⚠️ Drift. **TWO G-RULES COMPLETE:** `regression-baseline-warm worktree proliferation` (worktrees 154→76 ✅) + `heal-stale-daemon-code-auto-restart-failed-self-recovered` (Tier-3 translation live ✅). **archive-duplicate-inbox-task:** review-pr-765.json archived (Beacon re-dispatched revision_count=0 after REVIEW_ESCALATE — G-rule review-duplicate-dispatch-wip-redispatch mitigation). **Outbox-notifier self-recovered:** SIGTERM at 02:47:56Z, new PID 1286944 since 02:49:22Z. 2 new alerts — both Tier-3 (auto-restart-failed + doorbell). Watermark=1104. 5 pending approvals (carry). Mirror: 3 items queued (#764-rev1, #767, telegram-409 ACTIVE). Pipeline stalls: 0. Trailing-30d ratio≈17.27 (trend=improving). Tier 1, consecutive_clean=0.
+**Rule:** Stale-daemon healer restarts outbox-notifier and inbox-watcher independently without honoring the systemd `After=ourliberty-inbox-watcher.service` dependency. When inbox-watcher restarts first (or is transitioning), outbox-notifier's restart fails (rc=-1, inactive after 3s) — then systemd auto-starts outbox-notifier moments later when inbox-watcher comes up. Result: transient auto-restart-failed alert that self-heals in ~90s. Medic's prior_attempts=5 (recurring). Fix: `heal_stale_daemon_code.py` should restart inbox-watcher before outbox-notifier, or use `systemctl restart --with-dependencies`. NOT a silence candidate (the root cause remains). Distinct from now-COMPLETE G-rule `heal-stale-daemon-code-auto-restart-failed-self-recovered` (which fixed the alert TRIAGE). This G-rule tracks the CODE FIX. First occurrence iter ~3309. Dispatch to Beacon at 3/3.
+
+---
+
+## Status snapshot — updated 2026-06-30T03:02Z UTC (Iter ~3309, Tier 1)
+
+**Iter ~3309 summary (2026-06-30T03:02Z):** ✅ Nominal. 3 new alerts — all Tier-3 silenced (medic-diagnosis + 2 sync-push-failed). Sync error at 02:56Z transient (non-FF push collision, repo up to date, self-heals). **Worktrees: 28** (was 76 at ~3308 — PR #761 reaper continues cleaning). Larry approved 2 items via dashboard (larry-approval envelopes in Beacon inbox, Beacon will process). Mirror active on PR #766 (telegram-409 regression check, new session post-900s-timeout). No always-fix actions. Watermark=1107. 5 pending approvals (carry). Trailing-30d ratio≈17.26 (trend=improving). Tier 1, consecutive_clean=1. **New G-rule:** heal-stale-daemon-code-dependency-ordering-001 (1/3) — healer ignores After= ordering when restarting inbox-watcher+outbox-notifier.
 
 
