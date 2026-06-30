@@ -33,6 +33,10 @@ AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT') or Path.home() / 'ag
 # isolated home dir.
 TIER1_HOME = '/home/larry'
 TIER2_HOME = '/home/larry/.claude-larry-personal'
+# Tier 3: a dedicated Max account. Under the shared-config model it is a
+# setup-token-only tier with NO own home — it runs with the real account
+# home (TIER1_HOME), inheriting Tier 1's MCP/settings/projects.
+TIER3_HOME = '/home/larry'
 
 STATE_REL = 'blackboard/active-tier.json'
 
@@ -50,7 +54,21 @@ _DEFAULT_STATE = {
     'cooldown_backoff': {},
 }
 
-_VALID_TIERS = ('tier1', 'tier2')
+_VALID_TIERS = ('tier1', 'tier2', 'tier3')
+# tier -> account home (credentials.json root). tier3 shares the real home.
+# Resolved at CALL time so tests that monkeypatch TIER*_HOME take effect
+# (a module-level dict would freeze the values at import).
+def home_for_tier(tier):
+    return {'tier1': TIER1_HOME, 'tier2': TIER2_HOME,
+            'tier3': TIER3_HOME}.get(tier, TIER1_HOME)
+# Per-tier fallback priority. Preserves the historical binary behavior
+# (tier1<->tier2) and adds tier3 (primary) -> tier2 (laptop/emergency) ->
+# tier1. fallback_tier() walks this, skipping any benched (cooled-down) tier.
+_FALLBACK_ORDER = {
+    'tier1': ('tier2', 'tier3'),
+    'tier2': ('tier1', 'tier3'),
+    'tier3': ('tier2', 'tier1'),
+}
 
 # Long-lived setup-token env-var mapping (single source of truth shared with
 # agent_runner._apply_tier_auth). Each tier has a NON-refreshing
@@ -62,6 +80,7 @@ _VALID_TIERS = ('tier1', 'tier2')
 _SETUP_TOKEN_ENV_BY_TIER = {
     'tier1': 'CLAUDE_CODE_OAUTH_TOKEN_TIER1',
     'tier2': 'CLAUDE_CODE_OAUTH_TOKEN_TIER2',
+    'tier3': 'CLAUDE_CODE_OAUTH_TOKEN_TIER3',
 }
 
 # Canonical on-disk home of the durable setup-tokens: the systemd
@@ -266,7 +285,20 @@ def read():
 
 def current_home():
     """Return the HOME directory for the currently active tier."""
-    return TIER1_HOME if read()['tier'] == 'tier1' else TIER2_HOME
+    return home_for_tier(read()['tier'])
+
+
+def fallback_tier(active=None):
+    """Return the highest-priority fallback tier for ``active`` that is NOT
+    currently benched (no active cooldown), or None if every candidate is
+    benched. Generalizes the old binary 'the other tier' to the N-tier pool
+    via _FALLBACK_ORDER."""
+    if active is None:
+        active = read()['tier']
+    for t in _FALLBACK_ORDER.get(active, ()):
+        if cooldown_until(t) is None:
+            return t
+    return None
 
 
 def other_home():
@@ -275,7 +307,8 @@ def other_home():
     With state=tier1 (today's default), this returns the Tier 2 personal
     home, preserving the existing Tier 1 → Tier 2 fallback behavior.
     """
-    return TIER2_HOME if read()['tier'] == 'tier1' else TIER1_HOME
+    t = fallback_tier()
+    return home_for_tier(t) if t else TIER1_HOME
 
 
 def set_tier(tier):
@@ -417,7 +450,7 @@ def set_cooldown(tier, raw_excerpt='', now=None, kind='rate_limit'):
 def _credentials_path(tier):
     """Path to the OAuth credentials file for a tier. Reads the home dirs
     at call time so tests can monkey-patch ``TIER1_HOME`` / ``TIER2_HOME``."""
-    home = TIER1_HOME if tier == 'tier1' else TIER2_HOME
+    home = home_for_tier(tier)
     return Path(home, '.claude', '.credentials.json')
 
 

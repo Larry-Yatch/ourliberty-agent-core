@@ -92,7 +92,7 @@ OVERRIDE_DISABLE_FILE_NAME = 'rotation.disabled'
 # `touch` the pre-pin dashboard Off control wrote) or unrecognized contents map
 # to tier1 — identical to the original force-tier1 Off semantics, so a file
 # written by an older dashboard build still pins tier1.
-_OVERRIDE_VALID_TIERS = ('tier1', 'tier2')
+_OVERRIDE_VALID_TIERS = ('tier1', 'tier2', 'tier3')
 _OVERRIDE_DEFAULT_TIER = 'tier1'
 
 # Spec §§ 6.3 + 6.4 default config values; only used when the rotation block

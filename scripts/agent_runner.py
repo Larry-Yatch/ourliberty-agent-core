@@ -306,6 +306,19 @@ def tier2_available():
     return Path(TIER2_HOME, '.claude', '.credentials.json').exists()
 
 
+def _fallback_available(tier):
+    """True iff ``tier`` can authenticate a fallback dispatch: a setup-token
+    (preferred) or a credentials.json on disk. Generalizes
+    _tier2_fallback_available to any tier."""
+    if not tier:
+        return False
+    if active_tier._setup_token_for_tier(tier):
+        return True
+    from pathlib import Path as _P
+    return _P(active_tier.home_for_tier(tier),
+              '.claude', '.credentials.json').exists()
+
+
 def _tier2_fallback_available():
     """Tier 2 can serve a fallback iff it can AUTHENTICATE — a valid
     setup-token (preferred; survives an expired/removed credentials.json)
@@ -1705,11 +1718,15 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                                     'to Tier 2 (session is account-bound). '
                                     'DM sent.',
                                     None)
-                        if not _tier2_fallback_available():
+                        other_tier_name = active_tier.fallback_tier(
+                            active_tier_name)
+                        if not other_tier_name or not _fallback_available(
+                                other_tier_name):
                             log(agent_id,
-                                'TIER2_FALLBACK_UNAVAILABLE reason=' +
-                                failure_type + ' home=' + TIER2_HOME +
-                                ' (missing credentials file)',
+                                'TIER_FALLBACK_UNAVAILABLE reason=' +
+                                failure_type + ' fallback=' +
+                                str(other_tier_name) +
+                                ' (no authenticable fallback tier)',
                                 'WARN')
                             _dm_tier2_unavailable(
                                 failure_type, task_stem, agent_id, None,
@@ -1719,15 +1736,11 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                             # transient rate-limit might clear on its own,
                             # though auth-401 will keep failing the same way.
                         else:
-                            # The failure-fallback retry targets the OTHER
-                            # tier (spec § 6.2). With state=tier1, this is
-                            # /home/larry/.claude-larry-personal — the
-                            # historical TIER2_HOME path.
-                            fallback_home = active_tier.other_home()
-                            other_tier_name = (
-                                'tier2' if active_tier_name == 'tier1'
-                                else 'tier1'
-                            )
+                            # The failure-fallback retry targets the next
+                            # available tier in the pool priority
+                            # (active_tier.fallback_tier, benched tiers skipped).
+                            fallback_home = active_tier.home_for_tier(
+                                other_tier_name)
                             t2_env = dict(env)
                             # Re-pick auth for the fallback tier: if the
                             # other tier has a setup-token configured, use
@@ -1812,9 +1825,8 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                                         t2_retry_after = None
                                     try:
                                         other_tier_name = (
-                                            'tier2'
-                                            if tier_now == 'tier1' else 'tier1'
-                                        )
+                                            active_tier.fallback_tier(
+                                                tier_now) or other_tier_name)
                                         append_rate_limit_event(
                                             agent=agent_id,
                                             task_id=task_stem or '',

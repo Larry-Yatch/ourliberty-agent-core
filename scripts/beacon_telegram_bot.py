@@ -485,12 +485,13 @@ def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[s
     """
     # Resolve the active (pinned) tier and its opposite (the fallback target).
     active_name = active_tier.read()['tier']
-    other_name = 'tier2' if active_name == 'tier1' else 'tier1'
+    other_name = active_tier.fallback_tier(active_name)
     active_home = active_tier.current_home()
-    fallback_home = active_tier.other_home()
-    _TIER_LABEL = {'tier1': 'Tier 1', 'tier2': 'Tier 2'}
-    active_label = _TIER_LABEL[active_name]
-    other_label = _TIER_LABEL[other_name]
+    fallback_home = (active_tier.home_for_tier(other_name)
+                     if other_name else active_tier.current_home())
+    _TIER_LABEL = {'tier1': 'Tier 1', 'tier2': 'Tier 2', 'tier3': 'Tier 3'}
+    active_label = _TIER_LABEL.get(active_name, active_name)
+    other_label = _TIER_LABEL.get(other_name, str(other_name))
 
     cmd = [CLAUDE_BIN, "--print", "--output-format", "json", "--model", _beacon_telegram_model()]
     if session_id:
