@@ -6413,7 +6413,12 @@
         "at": "2026-06-29T22:26:20.021618+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-06-30T02:50:39.828701+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#761"
     },
     {
       "id": "proposed-heal-wip-redispatch-already-merged-suppress-001",
@@ -6507,6 +6512,40 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-mirror-review-pr-ourliberty-agent-core-765",
+      "name": "Mirror Review PR Ourliberty Agent Core 765",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `mirror-review-pr-ourliberty-agent-core-765`. Last activity 2026-06-30T02:37:27.058282+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "mirror-review-pr-ourliberty-agent-core-765"
+      ],
+      "repo": null,
+      "created": "2026-06-30",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-30T02:50:39.828701+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-30T02:37:27.058282+00:00"
+    },
+    {
+      "id": "proposed-pr-ourliberty-agent-core-765",
+      "name": "PR Ourliberty Agent Core 765",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-ourliberty-agent-core-765`. Last activity 2026-06-30T02:37:24.276075+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-ourliberty-agent-core-765"
+      ],
+      "repo": null,
+      "created": "2026-06-30",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-30T02:50:39.828701+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-30T02:37:24.276075+00:00"
     }
   ]
 }
