@@ -40,8 +40,16 @@ class BaselineCacheTest(unittest.TestCase):
         self._orig_lock = os.environ.get('OL_REGBASELINE_LOCK_PATH')
         os.environ['OL_REGBASELINE_LOCK_PATH'] = str(
             Path(self._tmp) / 'warm.lock')
+        # warm() exports REGBASELINE_WARMING=1 around its discover pass and
+        # build_sandbox_env copies os.environ into the jailed suite, so this
+        # suite can itself run with the flag set inside a host warm. The
+        # re-entrancy guard would then short-circuit the warm-executing tests
+        # (phantom baseline failures). Clear it so they exercise the real path.
+        self._saved_warming = os.environ.pop('REGBASELINE_WARMING', None)
 
     def tearDown(self):
+        if self._saved_warming is not None:
+            os.environ['REGBASELINE_WARMING'] = self._saved_warming
         if self._orig is None:
             os.environ.pop('OL_REGRESSION_BASELINE_DIR', None)
         else:
