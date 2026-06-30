@@ -358,8 +358,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T15:32Z UTC (Iter ~3354, Tier 3)
+## Status snapshot — updated 2026-06-30T16:02Z UTC (Iter ~3355, Tier 3)
 
-**Iter ~3354 summary (2026-06-30T15:32Z):** 0 new alerts. Watermark=1013. All 3/3 main daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254). Watchdog=healthy (15:27:35Z UTC). Heal-daemon heartbeat 15:24:11Z. No stalls. Pipeline idle. Outbox-notifier 4× HTTP 500 (07:33-07:50Z UTC, carry) + 1× HTTP 401 (03:38:32Z, carry) all self-healed. 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals unchanged. **Worktrees 1/0 (main only).** **Tier 3, consecutive_clean=12.**
+**Iter ~3355 summary (2026-06-30T16:02Z):** 1 new alert (heal-claude-json-bind-drift probe-blind:ourliberty-cycle.service) → Tier 3 silenced. Watermark=1014. All 3/3 main daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254). Watchdog=healthy (15:58:15Z UTC). Heal-daemon heartbeat 15:54:19Z. No stalls. Pipeline idle. Outbox-notifier carry: 4× HTTP 500 (07:33-07:50Z) + 1× HTTP 401 (03:38Z), all self-healed. PR #767 merged (04:24Z). 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals unchanged. **Worktrees 1/0 (main only).** **Tier 3, consecutive_clean=13.**
 
 
