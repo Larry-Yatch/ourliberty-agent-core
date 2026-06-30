@@ -368,8 +368,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T20:04Z UTC (Iter ~3369, Tier 1 clean)
+## Status snapshot — updated 2026-06-30T20:15Z UTC (Iter ~3370, Tier 2 de-escalate)
 
-**Iter ~3369 summary (2026-06-30T20:04Z):** All checks nominal. 1 new alert (Tier-3 silence: heal-stale-daemon-code auto-restarted outbox-notifier with PR #769 code live; PID 1340254→1685873). PR #765 only open PR (REVIEW_ESCALATE; heal-no-session-escalate approval resolved; Forge build expected). Pending approvals=0. Watchdog=healthy 13:57:30 MDT. Beacon bot PID=1658372. Outbox-notifier PID=1685873 (new). Tier 1 consecutive_clean=2. Carry: PR #768 unreviewed-merge (#13), PR #766 unreviewed-merge (DM'd Larry). G-rule `watchdog-log-growth-idle-overnight-001` 2/3 unchanged.
+**Iter ~3370 summary (2026-06-30T20:15Z):** All checks nominal. 1 new alert (Tier-3 silence: sync.service deploy-restart-storm after PR #765 merge). **PR #765 MERGED** (feat(tier): make Tier 3 dispatchable + N-tier fallback routing, Phase 0b) — 0 open PRs. Deploy-restart-storm at 14:11 MDT relaunched 7 services; all daemons healthy: Beacon=1690551, inbox-watcher=1690570, outbox-notifier=1690588, dashboard-api=1690555, chain-event-shipper=1200730. Pending approvals=0. Watchdog=healthy 14:07:56 MDT. Tier 1→**2 de-escalate** (consecutive_clean 2→3). Carry: PR #768 unreviewed-merge (esc #13), PR #766 unreviewed-merge (DM'd Larry), heal-no-session-escalate Forge build pending (approval resolved 19:30Z, Forge inbox empty — monitor). G-rule `watchdog-log-growth-idle-overnight-001` 2/3 unchanged.
 
 
