@@ -36,7 +36,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pid_identity  # noqa: E402  # PID-reuse guard before reclaim-kill
 from test_isolation_guard import refuse_under_test  # noqa: E402
 
-AGENTS_ROOT = Path.home() / 'agents'
+AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT') or Path.home() / 'agents')
 LEASES_DIR = AGENTS_ROOT / 'state' / 'dispatch-leases'
 DIVERGENCE_LOG = AGENTS_ROOT / 'logs' / 'lease-divergences.log'
 LEASE_LOG = AGENTS_ROOT / 'logs' / 'lease-operations.log'

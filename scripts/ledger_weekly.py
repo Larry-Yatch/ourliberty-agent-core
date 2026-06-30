@@ -46,10 +46,11 @@ BASELINE_WEEKS = 4
 RAMP_UP_WEEKS = 4  # σ-flagging suspended until ≥ this many prior sidecars exist
 
 HOME = Path(os.environ.get("HOME", "/home/larry"))
-DEFAULT_COSTS_FILE = HOME / "agents" / "blackboard" / "costs.jsonl"
-DEFAULT_OUTBOX_ROOT = HOME / "agents" / "outboxes"
-DEFAULT_OUTPUT_DIR = HOME / "agents" / "blackboard" / "ledger"
-DEFAULT_HALT_FLAG = HOME / "agents" / "blackboard" / "EMERGENCY_HALT"
+_AGENTS = Path(os.environ.get("OURLIBERTY_AGENTS_ROOT") or HOME / "agents")
+DEFAULT_COSTS_FILE = _AGENTS / "blackboard" / "costs.jsonl"
+DEFAULT_OUTBOX_ROOT = _AGENTS / "outboxes"
+DEFAULT_OUTPUT_DIR = _AGENTS / "blackboard" / "ledger"
+DEFAULT_HALT_FLAG = _AGENTS / "blackboard" / "EMERGENCY_HALT"
 
 
 # --- data types ---

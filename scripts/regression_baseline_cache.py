@@ -54,7 +54,10 @@ DEFAULT_KEEP = 40
 # anchor the real-tree default to the process's home as of start, not a
 # call-time Path.home() that an in-process HOME mutation could move out from
 # under us. The OL_REGRESSION_BASELINE_DIR override (used by tests) still wins.
-_DEFAULT_BASELINE_DIR = Path.home() / 'agents' / 'blackboard' / 'regression-baselines'
+_DEFAULT_BASELINE_DIR = (
+    Path(os.environ.get('OURLIBERTY_AGENTS_ROOT') or Path.home() / 'agents')
+    / 'blackboard' / 'regression-baselines'
+)
 
 
 def baseline_dir() -> Path:

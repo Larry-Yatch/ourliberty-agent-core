@@ -110,7 +110,7 @@ def resolve_log_dir() -> Path:
 
 
 LOG_DIR = resolve_log_dir()
-STATE_DIR = Path.home() / "agents" / "state"
+STATE_DIR = Path(os.environ.get("OURLIBERTY_AGENTS_ROOT") or Path.home() / "agents") / "state"
 SESSION_FILE = STATE_DIR / "beacon_telegram_sessions.json"
 
 LOG_DIR.mkdir(parents=True, exist_ok=True)

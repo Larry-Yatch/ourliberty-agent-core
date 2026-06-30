@@ -26,7 +26,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-AGENTS_ROOT = Path.home() / 'agents'
+AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT') or Path.home() / 'agents')
 
 # Tier homes — the two OAuth credential roots. Tier 1 is Larry's system
 # account home (today's default); Tier 2 is the personal account's

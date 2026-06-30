@@ -66,7 +66,7 @@ import larry_alerts  # noqa: E402
 import marker_paths  # noqa: E402  # shared restart-coordination marker paths (Medic parity)
 from atomic_io import atomic_write_json  # noqa: E402
 
-AGENTS_ROOT = Path.home() / 'agents'
+AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT') or Path.home() / 'agents')
 BLACKBOARD = AGENTS_ROOT / 'blackboard'
 LOG_DIR = AGENTS_ROOT / 'logs'
 HEALTH_FILE = BLACKBOARD / 'system-health.json'

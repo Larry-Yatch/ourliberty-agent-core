@@ -41,7 +41,7 @@ import active_tier
 from atomic_io import atomic_write_json  # noqa: E402  (shared durable atomic write, PR-E #366)
 from test_isolation_guard import refuse_under_test  # noqa: E402
 
-AGENTS_ROOT = Path.home() / 'agents'
+AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT') or Path.home() / 'agents')
 
 
 def resolve_log_dir():
@@ -1335,6 +1335,13 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                 env['HOME'] = active_tier.TIER1_HOME
             else:
                 env['HOME'] = active_tier.current_home()
+            # Pin OURLIBERTY_AGENTS_ROOT so child sessions (and any module
+            # that honors it) resolve agents/ state to the real account home
+            # even on the no-setup-token fallback path where HOME still swaps
+            # to a tier home. No-op on the setup-token path (HOME already real)
+            # and preserves any externally-set value.
+            env.setdefault('OURLIBERTY_AGENTS_ROOT',
+                           str(Path(active_tier.TIER1_HOME) / 'agents'))
 
             # Track the HOME/tier that actually produces the successful result,
             # for the post-run transcript-persistence check. Defaults to the

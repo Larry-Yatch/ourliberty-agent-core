@@ -94,10 +94,11 @@ MARKER_DISCIPLINE_SIGMA = 2.0  # current misses ≥ mean + σ·stdev ⇒ statist
 MARKER_DISCIPLINE_MAX_DEPTH = 3  # MAX_MARKER_ERROR_RETRIES — cascade caps here
 
 HOME = Path(os.environ.get("HOME", "/home/larry"))
-DEFAULT_SIDECAR_DIR = HOME / "agents" / "blackboard" / "ledger"
-DEFAULT_OUTBOX_ROOT = HOME / "agents" / "outboxes"
-DEFAULT_OUTPUT_DIR = HOME / "agents" / "blackboard" / "pulse-check-i"
-DEFAULT_HALT_FLAG = HOME / "agents" / "blackboard" / "EMERGENCY_HALT"
+_AGENTS = Path(os.environ.get("OURLIBERTY_AGENTS_ROOT") or HOME / "agents")
+DEFAULT_SIDECAR_DIR = _AGENTS / "blackboard" / "ledger"
+DEFAULT_OUTBOX_ROOT = _AGENTS / "outboxes"
+DEFAULT_OUTPUT_DIR = _AGENTS / "blackboard" / "pulse-check-i"
+DEFAULT_HALT_FLAG = _AGENTS / "blackboard" / "EMERGENCY_HALT"
 DEFAULT_JOURNAL = (
     Path(__file__).resolve().parents[1] / "runbooks" / "cycle-journal.md"
 )
@@ -111,11 +112,11 @@ DEFAULT_JOURNAL = (
 # per window. 7 days lines up with the weekly Ledger cadence — a recurring
 # σ-anomaly that survives a week is genuinely new evidence.
 AUTO_DISPATCH_DEDUP_WINDOW_DAYS = 7
-DEFAULT_DISPATCH_STATE_FILE = HOME / "agents" / "state" / "pulse-check-i-dispatched.json"
+DEFAULT_DISPATCH_STATE_FILE = _AGENTS / "state" / "pulse-check-i-dispatched.json"
 # Contract B (park-the-nudge §5.2) — emitter-side dedup for parked proposals,
 # mirroring DEFAULT_DISPATCH_STATE_FILE. Keys on _proposal_dedup_key; records
 # the returned capture_id so DM suppression is earned by durable capture.
-DEFAULT_PARKED_STATE_FILE = HOME / "agents" / "state" / "pulse-check-i-parked.json"
+DEFAULT_PARKED_STATE_FILE = _AGENTS / "state" / "pulse-check-i-parked.json"
 
 
 # --- IO helpers ---
