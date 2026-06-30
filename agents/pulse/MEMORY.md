@@ -338,9 +338,9 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## G-rule heal-stale-daemon-code-dependency-ordering-001 → DISPATCHED ✅ (iter ~3383), vp
+## G-rule heal-stale-daemon-code-dependency-ordering-001 → LARRY APPROVED ✅ (iter ~3384), Forge building
 
-**Rule:** Stale-daemon healer restarts outbox-notifier and inbox-watcher independently without honoring the systemd `After=ourliberty-inbox-watcher.service` dependency. When inbox-watcher restarts first (or is transitioning), outbox-notifier's restart fails (rc=-1, inactive after 3s) — then systemd auto-starts outbox-notifier moments later when inbox-watcher comes up. Result: transient auto-restart-failed alert that self-heals in ~90s. Occurrences: iter ~3309 (1/3), iter ~3375 (2/3, L1028 — PR #775 deploy wave), iter ~3383 (3/3, L1036 2026-06-30T22:39:52Z — PR #775/#778 restart wave). Direction-ask dispatched to Beacon inbox: `direction-ask-stale-daemon-dependency-ordering-001.json`. Fix: restart inbox-watcher before outbox-notifier, or use `systemctl restart --with-dependencies`. NOT a silence candidate. verification_pending.
+**Rule:** Stale-daemon healer restarts outbox-notifier and inbox-watcher independently without honoring the systemd `After=ourliberty-inbox-watcher.service` dependency. When inbox-watcher restarts first (or is transitioning), outbox-notifier's restart fails (rc=-1, inactive after 3s) — then systemd auto-starts outbox-notifier moments later when inbox-watcher comes up. Result: transient auto-restart-failed alert that self-heals in ~90s. Occurrences: iter ~3309 (1/3), iter ~3375 (2/3, L1028 — PR #775 deploy wave), iter ~3383 (3/3, L1036 2026-06-30T22:39:52Z — PR #775/#778 restart wave). Direction-ask dispatched iter ~3383 → Beacon processed → plan `heal-stale-daemon-restart-ordering-001` generated → L1039 approval_request delivered 22:53:12Z → Larry approved "Go" 22:54:58Z → `heal-stale-daemon-restart-ordering-001.json` dispatched to Forge inbox 22:55Z (iter ~3384). Fix: restart inbox-watcher before outbox-notifier, or use `systemctl restart --with-dependencies`. NOT a silence candidate. verification_pending (Forge build).
 
 ---
 
@@ -376,8 +376,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T22:50Z UTC (Iter ~3383, Tier 1)
+## Status snapshot — updated 2026-06-30T22:59Z UTC (Iter ~3384, Tier 1)
 
-**Iter ~3383 summary (2026-06-30T22:50Z):** Alert triage iter. 5 new alerts (L1033–L1037): 3x `still-stale-after-restart` (forge/mirror/pulse-bot, Tier-4/self-corrected at 22:39Z), 1x `auto-restart-failed:outbox-notifier` (Tier-3, watchdog recovered at 22:41Z), 1x `unreviewed-merge:778` (Tier-4/never-silence, 6th G-rule occurrence). All 8 services alive with new PIDs (heal-daemon restart wave from PR #775/#778 deploy). Watchdog=healthy 22:45:56Z. `heal-stale-daemon-code-dependency-ordering-001` G-rule hit 3/3 → dispatched direction-ask to Beacon inbox. `still-stale-after-restart` G-rule updated 1/3→2/3 (carry). PR #779 in active Mirror review. Forge build approval-sync-phase2-build still in Forge inbox (no stalls). Pending approvals=0. Tier 1 (consecutive_clean=0).
+**Iter ~3384 summary (2026-06-30T22:59Z):** Clean iter. 3 new alerts (L1038–L1040): 2x medic-diagnosis (Tier-3), 1x outbox-notifier approval_request (Tier-3, already delivered+Larry approved "Go" at 22:54:58Z). All 8 services alive (stable from 22:39Z restart wave). Watchdog=healthy 22:56:04Z. `heal-stale-daemon-restart-ordering-001.json` dispatched to Forge inbox (Larry approved fix for dependency-ordering G-rule). PR #779 in active Mirror review (~23 min). PR #780 (W3 tier-pool, Larry-authored, no `auto-review` label) opened — same at-risk class as unreviewed-merge G-rule. Pending approvals=0. Tier 1 (consecutive_clean=1).
 
 
