@@ -6688,7 +6688,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-30T21:59:50.159464+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-30T21:55:20.446416+00:00"
+      "orphan_last_activity_ts": "2026-06-30T21:55:20.446416+00:00",
+      "briefing": {
+        "what": "Your team has started building the next phase of a system that keeps approvals in sync, but it isn't yet attached to a formal project.",
+        "why": "Work moving ahead without a clear project home can drift, duplicate effort, or miss the outcome you actually want.",
+        "suggest": "Take a quick look and confirm what this should deliver before it goes further, so the effort stays pointed at a real goal."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-30T22:09:16.094924+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
