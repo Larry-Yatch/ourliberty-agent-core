@@ -358,8 +358,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T05:09Z UTC (Iter ~3322, Tier 2)
+## Status snapshot — updated 2026-06-30T05:27Z UTC (Iter ~3323, Tier 3)
 
-**Iter ~3322 summary (2026-06-30T05:09Z):** Clean iter. 1 alert (L1116 forge-wip-redispatch `-re-retry1` digest, bot already silenced, G-rule doctrine applied — no tier-reset). **New positive: Beacon inbox empty** (BUILD_ALREADY_MERGED handled `resolve-pr764-regbaseline-forkbomb-conflict-001-re-retry1` at 04:59:24Z — full sequence reconciled). 4 open PRs (#768 new pipeline, #763/#765/#766 REVIEW_ESCALATE carries). 5 pending approvals (unchanged). Worktrees 11/0-gate-wt. Watermark=1116. Ratio=17.4 (improving). Tier 2, consecutive_clean=2.
+**Iter ~3323 summary (2026-06-30T05:27Z):** Clean iter. 0 new alerts. All daemons healthy. No stalls. **New occurrence:** Larry's "Go" for PR #765 at 05:11:21Z dead-lettered to Forge .invalid/ (target_repo=None, G-rule `decision-needed-approval-forge-dispatch-no-target-repo-001` 4th+ occurrence). Approval removed from pending (now 4 pending, was 5). Fix approval `heal-no-session-escalate-preserve-target-repo-001` pending. 4 open PRs (#768 new, #763/#765/#766 REVIEW_ESCALATE carries). Worktrees 12/1-gate-wt (prunable, reaper handles). Watermark=1116. Ratio=17.4. **Tier de-escalated 2→3** (3 consecutive clean iters at Tier 2).
 
 
