@@ -358,8 +358,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T07:47Z UTC (Iter ~3336, Tier 1)
+## Status snapshot — updated 2026-06-30T08:03Z UTC (Iter ~3337, Tier 1)
 
-**Iter ~3336 summary (2026-06-30T07:47Z):** 0 new alerts. All daemons healthy (beacon bot 1200723, inbox-watcher 1286943, outbox-notifier 1340254, heal-daemon 07:39:07Z, watchdog healthy 07:42:35Z). No stalls. **ourliberty-cycle.timer BROKEN (12th consecutive iter)** — Trigger=n/a confirmed; escalation in pulse-escalations.json 06:31:00Z. Pipeline idle (outbox-notifier last entry 23:11:25Z UTC 2026-06-29, ~8h36m). 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals (unchanged). Worktrees 5/0-gate-wt — all 4 non-main STALE (PR #768 + PR #767 merged, wt-forge-resolve ×2 BUILD_ALREADY_MERGED). Watermark=1120. Ratio=17.4625. Tier 1.
+**Iter ~3337 summary (2026-06-30T08:03Z):** 1 new alert (L1121 credential-drift:CLAUDE_CODE_OAUTH_TOKEN_TIER3) Tier-3 silenced. All 5/5 daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254, dashboard=1200736, chain=1200730). Watchdog=healthy. Heal-daemon 07:49:12Z. No stalls. **ourliberty-cycle.timer ambiguous-but-firing** — NextElapseUSecMonotonic=infinity, LastTriggerUSec=07:55:15Z UTC (fires once per healer restart); recent 5-commit cadence at ~5-10 min confirms healer keeping it alive; escalation sent 06:31:00Z (don't re-escalate). Pipeline idle (outbox-notifier last entry 23:11:25Z 2026-06-29). 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals (1 stale: mirror-review-p3a-retro-prep; 3 legitimate). 3 stale non-main worktrees (reaper handles). Watermark=1121. Ratio=17.4625. Tier 1, consecutive_clean=1.
 
 
