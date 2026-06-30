@@ -358,8 +358,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T04:48Z UTC (Iter ~3321, Tier 2)
+## Status snapshot — updated 2026-06-30T05:09Z UTC (Iter ~3322, Tier 2)
 
-**Iter ~3321 summary (2026-06-30T04:48Z):** Clean iter. 0 new alerts. **New positive: Beacon inbox empty** (BUILD_ALREADY_MERGED notify for PR #764 retry1 processed — sequence complete). **PR #768 opened** (fix(healer): harvest the Mirror verdict before a Case-1 reap removes its worktree, 04:41:08Z, Mirror review pending). 4 open PRs (#768 new, #763/#765/#766 REVIEW_ESCALATE carries). 5 pending approvals (unchanged). Watermark=1115. Ratio=17.4125. Tier 2, consecutive_clean=1.
+**Iter ~3322 summary (2026-06-30T05:09Z):** Clean iter. 1 alert (L1116 forge-wip-redispatch `-re-retry1` digest, bot already silenced, G-rule doctrine applied — no tier-reset). **New positive: Beacon inbox empty** (BUILD_ALREADY_MERGED handled `resolve-pr764-regbaseline-forkbomb-conflict-001-re-retry1` at 04:59:24Z — full sequence reconciled). 4 open PRs (#768 new pipeline, #763/#765/#766 REVIEW_ESCALATE carries). 5 pending approvals (unchanged). Worktrees 11/0-gate-wt. Watermark=1116. Ratio=17.4 (improving). Tier 2, consecutive_clean=2.
 
 
