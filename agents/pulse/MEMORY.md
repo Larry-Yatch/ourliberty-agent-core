@@ -376,8 +376,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T23:28Z UTC (Iter ~3387, Tier 2)
+## Status snapshot — updated 2026-06-30T23:46Z UTC (Iter ~3388, Tier 2→1)
 
-**Iter ~3387 summary (2026-06-30T23:28Z):** Clean iter. 1 new alert (doorbell PR #779 decision-needed → Tier-3 silence). All 8 daemons alive. Watchdog=healthy 23:21:37Z UTC. **PR #779 Mirror review timed out (2100s wall-clock), fresh review auto-dispatched 23:20Z.** Pending approval for PR #779 session-less decision (doorbell DM delivered to Larry). PR #781 + #782 Mirror reviews active. PR #780 (W3, no label, Larry-authored) still open — watch. **Tier 2** (consecutive_clean=1). G-rule `heal-stale-daemon-code-dependency-ordering-001` verification_pending (PR #782 review active).
+**Iter ~3388 summary (2026-06-30T23:42Z):** 2 new alerts (Tier-3 silence, sync push conflict). All 8 daemons alive. Watchdog=healthy 23:42:20Z UTC. **PR #779 MERGED at 23:29:44Z UTC** (heal-undispatched-pr-review grace fix). Archived 2 stale Mirror inbox files (779 review + v0 dup for 781). PR #780 (W3, no label) still open — watch. PR #781 Mirror rev1 review active. PR #782 Mirror review active (~40 min). Stale pending approval (mirror-review-779) is MOOT — PR merged. **Tier 2→1** (signal: archive actions). G-rule `heal-stale-daemon-code-dependency-ordering-001` verification_pending (PR #782 review active).
 
 
