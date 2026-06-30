@@ -120,6 +120,16 @@ def setUpModule():  # noqa: N802 — unittest hook name
     # during process_outbox integration so non-PASS verdicts never shell out
     # to `gh` for a PR comment. MirrorFindingsCommentTest restores it to None.
     on._POST_FINDINGS_FN_OVERRIDE = _inert_mirror_findings_comment
+    # merged-PR REVIEW_REVISION guard (the #764 race): every review_revision
+    # routed through process_outbox now calls `_gh_pr_is_open`. Default it to
+    # None (state-unknown → fail-open → the pre-guard "proceed" behavior) so
+    # routing tests stay deterministic and never shell out to real `gh`. This is
+    # behavior-identical to the status quo — real `_gh_pr_is_open('x/y', N)`
+    # already returns None in the sandbox (the fixture repo doesn't exist) — it
+    # just removes the nondeterministic subprocess. Classes asserting a specific
+    # state override it per-test (MergedPrReviewRevisionGuardTest sets MERGED;
+    # MirrorReviewDispatchTest sets OPEN).
+    on._gh_pr_is_open = lambda *a, **k: None
 
 
 def tearDownModule():  # noqa: N802 — unittest hook name
@@ -5359,6 +5369,121 @@ class RevisionLoopTest(unittest.TestCase):
         rows = pending if isinstance(pending, list) else pending.get('pending', [])
         approval_ids = [r.get('id') for r in rows]
         self.assertIn('mirror-review-offchain-esc-feedface', approval_ids)
+
+
+class MergedPrReviewRevisionGuardTest(RevisionLoopTest):
+    """Result-time merged/closed-PR guard for a Mirror REVIEW_REVISION (the #764
+    desktop-merge race). A review QUEUED while the PR was OPEN but RUN after a
+    desktop `merge_reviewed_pr.sh` merge must NOT escalate to Larry or dispatch a
+    Forge revision — both are moot on a merged branch. Reuses RevisionLoopTest's
+    sandbox; the module-level `_gh_pr_is_open` default is None (fail-open), and
+    each test pins the GitHub state it asserts against.
+
+    `runTest = None` keeps unittest from re-collecting the parent's test_* methods
+    under this subclass — we only want the parent's setUp/tearDown/helpers."""
+
+    # Suppress inherited parent test methods so they don't run twice (once per
+    # class). unittest collects any attribute starting with `test`; rebinding
+    # each parent test to None on the subclass de-registers it here while leaving
+    # RevisionLoopTest itself untouched.
+    for _name in list(vars(RevisionLoopTest)):
+        if _name.startswith('test'):
+            locals()[_name] = None
+    del _name
+
+    # ---- (b) Forge-revision dispatch guard: clean revision, session present ----
+
+    def test_merged_pr_skips_forge_revision_dispatch(self):
+        # The genuine in-loop revision (high confidence + forge_build_session_id)
+        # would normally dispatch a Forge revision. On a MERGED PR it must not.
+        body = self._mirror_revision_outbox()
+        f = self._write_outbox('mirror', 'prod-loop.json', body)
+        with mock.patch.object(on, '_gh_pr_is_open', return_value=False) as g:
+            result = on.process_outbox(f)
+        g.assert_called()  # the guard queried GitHub before dispatching
+        self.assertEqual(result, 'review-revision-already-merged')
+        # No Forge revision dispatched, and no Beacon back-leg notify.
+        self.assertEqual(
+            list((on.INBOXES_ROOT / 'forge').glob('revision-*.json')), [],
+        )
+        self.assertEqual(
+            list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json')), [],
+        )
+
+    def test_open_pr_still_dispatches_forge_revision(self):
+        # Fail-closed regression guard: an OPEN PR must still dispatch as before.
+        body = self._mirror_revision_outbox()
+        f = self._write_outbox('mirror', 'prod-loop.json', body)
+        with mock.patch.object(on, '_gh_pr_is_open', return_value=True):
+            result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-marker')
+        self.assertEqual(
+            len(list((on.INBOXES_ROOT / 'forge').glob('revision-prod-loop-*.json'))),
+            1,
+        )
+
+    def test_unknown_state_fails_open_and_dispatches(self):
+        # gh hiccup → None → proceed (never silently drop a real revision).
+        body = self._mirror_revision_outbox()
+        f = self._write_outbox('mirror', 'prod-loop.json', body)
+        with mock.patch.object(on, '_gh_pr_is_open', return_value=None):
+            result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-marker')
+        self.assertEqual(
+            len(list((on.INBOXES_ROOT / 'forge').glob('revision-prod-loop-*.json'))),
+            1,
+        )
+
+    # ---- (a) Larry-escalation guard: low-confidence revision, no session ----
+
+    def _no_session_low_confidence_outbox(self):
+        """The #764 shape: a session-less REVIEW_REVISION with confidence=low
+        (auto-promoted), which normally surfaces a binary 'needs your decision'
+        approval_request to Larry."""
+        marker = _mirror_revision_marker(
+            task_id='merged-764', severity='medium', confidence='low',
+        )
+        body = _good_outbox(
+            agent='mirror', source='beacon', task_id='merged-764',
+            phase='review', target_repo='ourliberty-agent-core',
+            result=f'Maybe a nit?\n\n{marker}',
+        )
+        body['pr_url'] = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/764'
+        body['head_sha'] = 'd31c24c80000'
+        body.pop('forge_build_session_id', None)
+        return body
+
+    def test_merged_pr_skips_larry_escalation(self):
+        self._sandbox_no_session_surfaces()
+        f = self._write_outbox(
+            'mirror', 'merged-764.json', self._no_session_low_confidence_outbox(),
+        )
+        with mock.patch.object(on, '_gh_pr_is_open', return_value=False):
+            result = on.process_outbox(f)
+        self.assertEqual(result, 'review-revision-already-merged')
+        # No binary approval_request emitted (the moot "needs your decision").
+        self.assertFalse(on.approval.PENDING_APPROVALS_PATH.exists())
+        # No for-Larry action record either.
+        self.assertEqual(on.for_larry_escalations.list_open(), [])
+        # And no Beacon back-leg escalate notify.
+        self.assertEqual(
+            list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json')), [],
+        )
+
+    def test_open_pr_still_escalates_to_larry(self):
+        # Fail-closed regression guard: an OPEN session-less low-confidence
+        # revision still surfaces the binary approval_request to Larry.
+        self._sandbox_no_session_surfaces()
+        f = self._write_outbox(
+            'mirror', 'merged-764.json', self._no_session_low_confidence_outbox(),
+        )
+        with mock.patch.object(on, '_gh_pr_is_open', return_value=True):
+            on.process_outbox(f)
+        self.assertTrue(on.approval.PENDING_APPROVALS_PATH.exists())
+        pending = json.loads(on.approval.PENDING_APPROVALS_PATH.read_text())
+        rows = pending if isinstance(pending, list) else pending.get('pending', [])
+        ids = [r.get('id') for r in rows]
+        self.assertIn('mirror-review-merged-764-d31c24c8', ids)
 
 
 class ExtractRevisionSummaryTest(unittest.TestCase):
