@@ -1488,7 +1488,12 @@ def _deliver_mirror_verdict(cand: Candidate, marker_text: str,
         log(f'harvest: cannot reconstruct task_id from cwd {cand.cwd!r} '
             f'(not a conventional wt-mirror-pr-* worktree); cannot deliver', 'WARN')
         return False
-    repo_short, pr_number = _mirror_review_pr_coords_raw(cand.cwd)
+    raw = _mirror_review_pr_coords_raw(cand.cwd)
+    if raw is None:
+        log(f'harvest: cannot reconstruct task_id from cwd {cand.cwd!r} '
+            f'(name did not parse to PR coords); cannot deliver', 'WARN')
+        return False
+    repo_short, pr_number = raw
     task_id = f'pr-{repo_short}-{pr_number}'
     outbox = {
         'task_id': task_id,
@@ -1516,17 +1521,19 @@ def _deliver_mirror_verdict(cand: Candidate, marker_text: str,
     return True
 
 
-def _mirror_review_pr_coords_raw(cwd: str) -> tuple[str, str]:
+def _mirror_review_pr_coords_raw(cwd: str) -> Optional[tuple[str, str]]:
     """The (repo_short, pr_number) tokens straight off the worktree NAME — the
     repo_short kept UNQUALIFIED so the reconstructed task_id matches the canonical
     `pr-<repo_short>-<num>` review-request key (NOT the owner/repo coords that
-    `_mirror_review_pr_coords` returns for a gh call). Caller guarantees the cwd
-    already parsed via `_mirror_review_pr_coords`, so the regex matches here."""
+    `_mirror_review_pr_coords` returns for a gh call). Returns None if the name
+    does not parse (defensive: no longer guaranteed by the caller, so a parse
+    miss flows into the harvest fail-safe instead of raising mid-reap)."""
     name = Path(cwd).name
     if name.endswith(_DELETED_CWD_SUFFIX):
         name = name[: -len(_DELETED_CWD_SUFFIX)].rstrip()
     m = _MIRROR_WT_PR_RE.match(name)
-    assert m is not None  # caller pre-validated via _mirror_review_pr_coords
+    if m is None:
+        return None
     return m.group('repo_short'), m.group('num')
 
 
