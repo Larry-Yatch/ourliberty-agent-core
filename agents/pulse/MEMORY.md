@@ -346,8 +346,14 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T03:13Z UTC (Iter ~3310, Tier 1)
+## G-rule larry-approval-beacon-hash-mismatch — 1/2 (new, iter ~3311)
 
-**Iter ~3310 summary (2026-06-30T03:13Z):** ⚠️ Drift. **NEW: regbaseline-warmer-burst-git-contention-001** — PR #751 warmer causing worktree burst (28→66+ in 8 min). Git lock contention (EAGAIN), git fetch failing (bad object gate-wt-cb86751e2b6e), sync push-failed 02:56Z not self-healed. [yellow] alert L1108 sent. Direction-ask dispatched to Beacon. Mirror active on telegram-409 (14400s session). Beacon processing larry-approval-42aa10c8 (ade207fd timed out 21:06:44Z). 5 pending approvals (carry). Watermark=1108. Trailing-30d ratio≈17.25 (trend=improving). Tier 1, consecutive_clean=0.
+**Rule:** Two consecutive `source=dashboard` larry-approval tasks (ade207fd, 42aa10c8 — both "Larry approved the pending proposal via dashboard") ran ~11 min and returned `success=False, duration=None`. Pending approvals unchanged at 5. Root cause: Beacon's larry-approval handler likely failed to find a matching pending entry for the approval hash, OR hit a Beacon session error during processing. NOT a silence candidate (dashboard approvals failing to process means Larry's intent isn't actioned). Watch for recurrence; dispatch Beacon direction-ask at 3/3 to diagnose larry-approval handler hash-matching logic. First occurrence iter ~3311 (both tasks from ~3309/~3310 dashboard interaction).
+
+---
+
+## Status snapshot — updated 2026-06-30T03:22Z UTC (Iter ~3311, Tier 1)
+
+**Iter ~3311 summary (2026-06-30T03:22Z):** ✅ Nominal. Worktrees 56 (↓ from 66). git fetch clean — bad-object degradation from ~3310 RESOLVED. Beacon processing warmer-burst direction-ask (started 03:18:15Z). Both larry-approval Beacon tasks failed success=False (~11 min each). Pending=5 unchanged. Mirror active on telegram-409 (31 min into 14400s). Sync error carry/transient. 5 pending approvals. Watermark=1108. Trailing-30d ratio≈17.46 (trend=improving). Tier 1, consecutive_clean=0.
 
 
