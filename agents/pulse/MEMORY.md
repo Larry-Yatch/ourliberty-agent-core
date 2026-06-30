@@ -303,9 +303,9 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## G-rule watchdog-log-growth-idle-overnight-001 — 1/3 (new, iter ~3148)
+## G-rule watchdog-log-growth-idle-overnight-001 — 2/3 (updated iter ~3358)
 
-**Rule:** Watchdog `log_growth: idle >12h` fires when outbox-notifier.log is quiet overnight with no pipeline activity. Root: outbox-notifier IS running but writes nothing when the pipeline is genuinely idle. Prior fixes (PR #649, PR #694, PR #717) addressed stale-log during Mirror reviews; pure overnight-idle path is not suppressed. Per WARN-vs-INFO calibration this is an idle-state INFO observation — system not worse off. Dispatch to Beacon at 3/3 (post-HOLD) to add Tier-3 translation or raise watchdog log_growth threshold for extended idle state. First occurrence iter ~3148 (seconds_since_write=43316, outbox-notifier last wrote 17:01:33 UTC 2026-06-27).
+**Rule:** Watchdog `log_growth` fires when outbox-notifier.log is quiet with no pipeline activity. Root: outbox-notifier IS running but writes nothing when the pipeline is genuinely idle. Prior fixes (PR #649, PR #694, PR #717) addressed stale-log during Mirror reviews; pure pipeline-idle path is not suppressed. Per WARN-vs-INFO calibration this is an idle-state INFO observation — system not worse off. Dispatch to Beacon at 3/3 to add Tier-3 translation or raise watchdog log_growth threshold for extended idle state. Occurrences: iter ~3148 (seconds_since_write=43316, outbox-notifier last wrote 17:01:33 UTC 2026-06-27, 1/3); iter ~3358 (seconds_since_write=13611, idle since 07:50:22 MDT 2026-06-30, watchdog overall=warning, 2/3).
 
 ---
 
@@ -358,8 +358,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T17:08Z UTC (Iter ~3357, Tier 3)
+## Status snapshot — updated 2026-06-30T17:38Z UTC (Iter ~3358, Tier 3)
 
-**Iter ~3357 summary (2026-06-30T17:08Z):** 0 new alerts. Watermark=1015. All 3/3 main daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254). Watchdog=healthy (17:04:54Z UTC). Heal-daemon heartbeat 17:04:55Z. No stalls. Pipeline idle. Outbox-notifier carry: 4× HTTP 500 (07:33-07:50Z) + 1× HTTP 401 (03:38Z), all self-healed. 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals unchanged. **Worktrees 1/0 (main only).** **Tier 3, consecutive_clean=15.**
+**Iter ~3358 summary (2026-06-30T17:38Z):** 0 new alerts. Watermark=1015. All 3/3 main daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254). Watchdog=overall=warning (log_growth — outbox-notifier idle 13,611s, G-rule 2/3, idle-state INFO). Heal-daemon heartbeat 17:35:20Z. No stalls. Pipeline idle. Outbox-notifier carry: 4× HTTP 500 (07:33-07:50Z) + 1× HTTP 401 (03:38Z), all self-healed. 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals unchanged. **Worktrees 1/0 (main only).** **Tier 3, consecutive_clean=16.**
 
 
