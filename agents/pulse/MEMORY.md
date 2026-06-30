@@ -322,8 +322,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T00:32Z UTC (Iter ~3291, Tier 1)
+## Status snapshot — updated 2026-06-30T00:40Z UTC (Iter ~3292, Tier 1)
 
-**Iter ~3291 summary (2026-06-30T00:32Z):** ✅ Source repo NOMINAL — on main, clean, synced. 0 new alerts (watermark=1088). Always-fix: archived rev0 dup for review-regression-warmer-worktree-leak-cleanup-001 (4th dispatch today; G-rule dispatch to Beacon blocked by rate-limit). PR #763 review dispatched by outbox-notifier at 18:25 MDT. Mirror inbox: 4 items (rev1 for 761 unprocessed, review-762, review-763 new, marker-error-760 dead-end). Worktrees 70/37. Beacon RATE-LIMITED until 14:00 UTC June 30 (~13.5h remaining). 3 pending approvals blocked. Pipeline stall: 0 stalls. PR #760 dead-lettered. PR #755 AUTO_MERGE_HELD. gh 401 on graphql merge-state rechecks: 1/3 sub-threshold new pattern. Trailing-30d ratio≈17.10 (stable, trend=improving). Tier 1, consecutive_clean=0.
+**Iter ~3292 summary (2026-06-30T00:40Z):** ⚠️ Drift — regbaseline warmer PROCESS EXPLOSION: 112 regression_baseline_cache.py warm processes running (orphaned from multiple Mirror sessions), 136 worktrees (71 locked), new worktrees still being created. Memory OK (3GB avail), agents alive, git clean. [yellow] escalation written to pulse-escalations.json + larry-alerts.jsonl. Always-fix: archived 5th rev0 dup for regression-warmer-worktree-leak-cleanup-001 (18:35 MDT). 0 new alerts (watermark=1088). Mirror inbox: 4 items post-archive. Beacon RATE-LIMITED until 14:00 UTC June 30 (~13.5h). Pipeline stall: 0. Trailing-30d ratio≈17.09 (1401/82). Tier 1, consecutive_clean=0.
 
 
