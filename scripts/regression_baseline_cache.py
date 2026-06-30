@@ -121,12 +121,17 @@ def content_key(sha: str, repo_root: Path) -> Optional[str]:
     per-cycle journals) map to the SAME key, so a journal-only Pulse commit
     reuses a warmed baseline instead of missing.
 
-    Built from ``git ls-tree -r <sha>`` (one line per blob: ``<mode> <type>
-    <objectsha>\\t<path>``), dropping journal paths, then SHA-1 over the sorted
-    remaining lines. The object SHA in each line makes the digest content-
-    sensitive: any real edit (or mode change) to a non-journal file changes the
-    key and correctly invalidates the cache. ``git ls-tree`` output is already
-    path-sorted and deterministic, so the digest is stable across machines.
+    Built from ``git ls-tree -r -z <sha>`` (one NUL-terminated record per blob:
+    ``<mode> <type> <objectsha>\\t<path>``), dropping journal paths, then SHA-1
+    over the remaining records joined by NUL. The object SHA in each record makes
+    the digest content-sensitive: any real edit (or mode change) to a non-journal
+    file changes the key and correctly invalidates the cache.
+
+    ``-z`` (vs the default newline output) is what makes the digest STABLE ACROSS
+    MACHINES: it emits paths verbatim — no ``core.quotepath`` octal-escaping of
+    non-ASCII, and no ambiguity from paths containing newlines/tabs/quotes — so
+    two checkouts with different git config still produce the same key for the
+    same tree. ``git ls-tree`` output is already path-sorted and deterministic.
 
     Returns a 40-char hex digest, or None on ANY git failure — the caller then
     falls back to keying on the raw commit SHA (today's behavior), so a git
@@ -136,7 +141,7 @@ def content_key(sha: str, repo_root: Path) -> Optional[str]:
         return None
     try:
         proc = subprocess.run(
-            ['git', '-C', str(repo_root), 'ls-tree', '-r', sha],
+            ['git', '-C', str(repo_root), 'ls-tree', '-r', '-z', sha],
             capture_output=True, text=True, timeout=30,
         )
     except (OSError, subprocess.SubprocessError):
@@ -144,15 +149,17 @@ def content_key(sha: str, repo_root: Path) -> Optional[str]:
     if proc.returncode != 0:
         return None
     kept: list[str] = []
-    for line in proc.stdout.splitlines():
-        # "<mode> <type> <objectsha>\t<path>" — split off the path after the tab.
-        if '\t' not in line:
+    # `-z` separates records with NUL; the trailing NUL yields an empty tail we
+    # skip. A path may now contain any byte except NUL (incl. tab/newline), so we
+    # split off the path on the FIRST tab only and never rely on line breaks.
+    for rec in proc.stdout.split('\0'):
+        if not rec or '\t' not in rec:
             continue
-        path = line.split('\t', 1)[1]
+        path = rec.split('\t', 1)[1]
         if _is_journal_path(path):
             continue
-        kept.append(line)
-    digest = hashlib.sha1('\n'.join(kept).encode('utf-8')).hexdigest()
+        kept.append(rec)
+    digest = hashlib.sha1('\0'.join(kept).encode('utf-8')).hexdigest()
     return digest
 
 
