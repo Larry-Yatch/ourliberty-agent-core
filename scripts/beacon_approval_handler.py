@@ -70,6 +70,7 @@ import chain_event_shipper as _ces  # noqa: E402  # imported read-only for compu
 import file_lock         # noqa: E402  # shared advisory flock (PR-E2 #48)
 import safe_write_inbox  # noqa: E402
 import trust_policy      # noqa: E402
+from decision_identity import canonical_decision_key  # noqa: E402
 
 HOME = Path.home()
 # Single source of truth for the approval-state root. Honor
@@ -529,6 +530,14 @@ def add_pending(
             'reminders_sent': [],
             'queued_during_pause': queued_during_pause,
         }
+        # Change A: stamp the canonical cross-store join key so the resolve
+        # fan-out (decision_resolve.resolve_decision) can match this pending
+        # entry against the C/E/A stores by key. Derived from the task_id (and
+        # pr_url when the payload carries one); readers fall back to the same
+        # pure helper, so an unstamped legacy entry still resolves.
+        _dk = canonical_decision_key(entry['id'], payload.get('pr_url'))
+        if _dk:
+            entry['decision_key'] = _dk
         # D3.5 5c — system-controlled replan counter. Only attach when this is
         # a replan (count > 0). Fresh approvals don't carry the field at all,
         # so dispatch_approved doesn't write replan_count=0 to the envelope

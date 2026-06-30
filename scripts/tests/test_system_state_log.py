@@ -479,7 +479,9 @@ class WaitingSourceReadersTest(unittest.TestCase):
                  'resolved': True, 'ts': '2026-06-19T09:00:00+00:00'},
             ]))
             with mock.patch.dict(os.environ,
-                                 {'OURLIBERTY_ESCALATIONS_FILE': str(p)}):
+                                 {'OURLIBERTY_ESCALATIONS_FILE': str(p),
+                                  'OURLIBERTY_FOR_LARRY_FEED_FILE':
+                                      '/no/such/feed.json'}):
                 items = ssl.load_for_larry_escalations()
         # Only the unresolved, explicitly-flagged entry folds in.
         self.assertEqual([i['id'] for i in items], ['needs you'])
@@ -489,7 +491,8 @@ class WaitingSourceReadersTest(unittest.TestCase):
     def test_escalations_missing_file_fails_open(self):
         with mock.patch.dict(
                 os.environ,
-                {'OURLIBERTY_ESCALATIONS_FILE': '/no/such/esc.json'}):
+                {'OURLIBERTY_ESCALATIONS_FILE': '/no/such/esc.json',
+                 'OURLIBERTY_FOR_LARRY_FEED_FILE': '/no/such/feed.json'}):
             self.assertEqual(ssl.load_for_larry_escalations(), [])
 
     def test_one_bad_source_does_not_break_the_others(self):
@@ -504,6 +507,7 @@ class WaitingSourceReadersTest(unittest.TestCase):
             env = {
                 'OURLIBERTY_PENDING_APPROVALS': '/no/such/pending.json',
                 'OURLIBERTY_ESCALATIONS_FILE': str(good_esc),
+                'OURLIBERTY_FOR_LARRY_FEED_FILE': '/no/such/feed.json',
             }
             with mock.patch.dict(os.environ, env):
                 pending = ssl.load_pending_approvals()
@@ -511,33 +515,32 @@ class WaitingSourceReadersTest(unittest.TestCase):
         self.assertEqual(pending, [])
         self.assertEqual(len(escalations), 1)
 
-    def test_signal_file_entries_fold_in(self):
-        # Source 1: the canonical durable for-Larry signal file (§5.1 decision c).
-        import for_larry_signal as fls
+    def test_feed_records_fold_in(self):
+        # Source 1 (Phase 2 Change C): the durable for-Larry escalations feed
+        # (`for_larry_escalations.list_open`) — the actual mirror-review producer.
+        import for_larry_escalations as fle
         with tempfile.TemporaryDirectory() as d:
-            sig = Path(d) / 'for-larry-escalations.json'
+            feed = Path(d) / 'for-larry-escalations.json'
             with mock.patch.dict(
                     os.environ,
-                    {'OURLIBERTY_FOR_LARRY_SIGNAL_FILE': str(sig),
+                    {'OURLIBERTY_FOR_LARRY_FEED_FILE': str(feed),
                      'OURLIBERTY_ESCALATIONS_FILE': '/no/such/esc.json'}):
-                fls.upsert_record(
-                    fls.ESCALATION_KEY_PREFIX + 'zz-fixture-a',
-                    {'id': 'zz-fixture-a', 'headline': 'critical unhandled',
-                     'severity': 'critical', 'context': 'crossed the bar'})
-                fls.upsert_record(
-                    fls.CLARIFY_EXHAUSTED_KEY_PREFIX + 'zz-fixture-b',
-                    {'id': 'zz-fixture-b', 'headline': 'Forge is stuck',
-                     'severity': 'warning'})
-                fls.resolve_record(fls.CLARIFY_EXHAUSTED_KEY_PREFIX + 'zz-fixture-b')
+                fle.upsert(
+                    'zz-fixture-a', headline='critical unhandled',
+                    context='crossed the bar', severity='critical')
+                fle.upsert(
+                    'zz-fixture-b', headline='Forge is stuck',
+                    context='clarify exhausted', severity='warning')
+                fle.clear('zz-fixture-b')
                 items = ssl.load_for_larry_escalations()
-        # Only the unresolved record folds in; the resolved one self-cleared.
+        # Only the unresolved record folds in; the cleared one is filtered out.
         self.assertEqual([i['id'] for i in items], ['zz-fixture-a'])
         self.assertEqual(items[0]['source'], 'escalation')
         self.assertEqual(items[0]['severity'], 'critical')
 
-    def test_signal_read_failure_does_not_break_legacy_source(self):
+    def test_feed_read_failure_does_not_break_legacy_source(self):
         # Source 1 failing open must still let Source 2 (legacy) aggregate.
-        import for_larry_signal as fls
+        import for_larry_escalations as fle
         with tempfile.TemporaryDirectory() as d:
             legacy = Path(d) / 'esc.json'
             legacy.write_text(json.dumps([
@@ -545,9 +548,10 @@ class WaitingSourceReadersTest(unittest.TestCase):
                  'for_larry': True, 'ts': '2026-06-19T10:00:00+00:00'}]))
             with mock.patch.dict(
                     os.environ,
-                    {'OURLIBERTY_ESCALATIONS_FILE': str(legacy)}), \
+                    {'OURLIBERTY_ESCALATIONS_FILE': str(legacy),
+                     'OURLIBERTY_FOR_LARRY_FEED_FILE': '/no/such/feed.json'}), \
                     mock.patch.object(
-                        fls, 'active_entries', side_effect=RuntimeError('boom')):
+                        fle, 'list_open', side_effect=RuntimeError('boom')):
                 items = ssl.load_for_larry_escalations()
         self.assertEqual([i['id'] for i in items], ['needs you'])
 

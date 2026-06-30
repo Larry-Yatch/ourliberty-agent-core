@@ -8684,6 +8684,39 @@ def _handle_larry_action(
             source_event_id, action, actor, envelope_written, target_agent,
         )
 
+    # Phase 2 Change B: fan the resolution out to the OTHER needs-Larry stores
+    # (pending-approvals / escalations / alerts) so a dashboard approve/reject/
+    # mark_done clears the same decision everywhere at once, instead of leaving
+    # the Telegram queue + escalation feed + alert line reading "still waiting"
+    # until heal_stale_approvals reconciles. The dashboard already cleared its
+    # OWN chain_events row via the atomic claim above, so the C-leg is a harmless
+    # idempotent no-op here. Best-effort: a fan-out failure NEVER fails the
+    # action (which already committed) — the healer backstops it. `comment` does
+    # NOT fan out (it is not a resolution).
+    _LARRY_ACTION_TO_OUTCOME = {
+        'approve': 'approved', 'reject': 'rejected', 'mark_done': 'approved',
+    }
+    fan_outcome = _LARRY_ACTION_TO_OUTCOME.get(action)
+    if fan_outcome is not None:
+        try:
+            import decision_resolve
+            payload = source.get('payload') if isinstance(
+                source.get('payload'), dict) else {}
+            decision_key = payload.get('decision_key') or \
+                decision_resolve.canonical_decision_key(
+                    source_task_id, source.get('pr_url'))
+            if decision_key:
+                decision_resolve.resolve_decision(
+                    decision_key, fan_outcome, actor=actor,
+                    note=comment or '', chain_client=supabase_client,
+                )
+        except Exception:  # noqa: BLE001 — fan-out is best-effort; healer backstops
+            logger.exception(
+                'larry_action cross-store fan-out failed for source event %s '
+                '(action=%s); heal_stale_approvals will reconcile',
+                source_event_id, action,
+            )
+
     result = {
         'action_event_id': action_event_id,
         'envelope_written': envelope_written,

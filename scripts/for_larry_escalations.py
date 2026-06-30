@@ -64,6 +64,18 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 import atomic_io  # noqa: E402
 
+
+def _decision_key_for(record_id: Optional[str], pr_url: Optional[str]) -> Optional[str]:
+    """Compute the canonical cross-store join key for this record (Phase 2
+    Change A). Imported lazily + fail-safe: decision_identity is pure, but a
+    stamp must never turn a routing-site upsert into an exception."""
+    try:
+        from decision_identity import canonical_decision_key
+        return canonical_decision_key(record_id, pr_url)
+    except Exception:  # noqa: BLE001 — stamping is best-effort, never fatal
+        return None
+
+
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
 
 # Retain resolved rows this long for audit, then prune on the next write.
@@ -161,9 +173,17 @@ def upsert(
     pr_url: Optional[str] = None,
     head_sha: Optional[str] = None,
     dedup_identity: Optional[str] = None,
+    decision_key: Optional[str] = None,
     now: Optional[datetime] = None,
 ) -> Optional[dict[str, Any]]:
     """Create or refresh an OPEN for-Larry record keyed by ``record_id``.
+
+    ``decision_key`` (Phase 2 Change A) is the canonical cross-store join key
+    stamped at rest so the resolve fan-out (decision_resolve.resolve_decision)
+    can match this record against the P/C/A stores without recomputing on every
+    read. When the caller omits it, it is derived from ``record_id``/``pr_url``
+    via the same pure helper readers fall back to — so the field is always
+    present and consistent whether stamped by the producer or defaulted here.
 
     Contract D idempotency: if an OPEN row already exists for this id with the
     SAME ``dedup_identity`` (PR + head SHA), this is a no-op and returns None —
@@ -196,6 +216,7 @@ def upsert(
             'pr_url': pr_url,
             'head_sha': head_sha,
             'dedup_identity': dedup_identity,
+            'decision_key': decision_key or _decision_key_for(record_id, pr_url),
             'for_larry': True,
             'resolved': False,
             'resolved_at': None,

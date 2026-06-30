@@ -66,10 +66,22 @@ if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
 import chain_event_shipper as ces  # noqa: E402
+from decision_identity import canonical_decision_key  # noqa: E402
 
 _LOGGER = logging.getLogger('chain_event_emit')
 
 _CLIENT = None  # process-scope supabase client (lazy)
+
+# Event types that represent a "needs-Larry" item on the dashboard's read model.
+# Change A stamps the canonical decision key onto these at emit time, and the
+# resolve fan-out's C-leg (clear_decision) retires all of them by that key.
+_LARRY_FACING_DECISION_TYPES = (
+    'approval_request',
+    'clarify_request',
+    'needs_attention',
+    'larry_alert',
+    'escalation',
+)
 
 
 def _get_client():
@@ -168,12 +180,20 @@ def emit_event(
         return False
     use_ts = ts or ces.datetime.now(ces.timezone.utc).isoformat()
     event_id = ces.compute_event_id(task_id, event_type, use_ts, extra=id_extra)
+    # Change A: stamp the canonical decision key onto Larry-facing rows so the
+    # resolve fan-out's C-leg can clear them by key. Copy first so we never
+    # mutate the caller's dict; derive from task_id+pr_url when not preset.
+    payload = dict(payload or {})
+    if event_type in _LARRY_FACING_DECISION_TYPES and not payload.get('decision_key'):
+        _dk = canonical_decision_key(task_id, pr_url)
+        if _dk:
+            payload['decision_key'] = _dk
     row: dict[str, Any] = {
         'event_id': event_id,
         'ts': use_ts,
         'agent': agent,
         'event_type': event_type,
-        'payload': ces.sanitize_payload(payload or {}),
+        'payload': ces.sanitize_payload(payload),
     }
     if task_id:
         row['task_id'] = task_id
@@ -266,3 +286,74 @@ def clear_approval_request(
             task_id, type(e).__name__, e,
         )
         return False
+
+
+def clear_decision(
+    key: str,
+    *,
+    event_types: tuple[str, ...] = _LARRY_FACING_DECISION_TYPES,
+    ts: Optional[str] = None,
+    client: Optional[Any] = None,
+    logger: Optional[logging.Logger] = None,
+) -> int:
+    """Retire EVERY unread Larry-facing chain_event row for one decision `key`.
+
+    The C-leg of the resolve fan-out (decision_resolve.resolve_decision, spec
+    §2 Change B step 2). Generalizes `clear_approval_request` from "by task_id,
+    approval_request only" to "by canonical decision key, across all
+    Larry-facing types" — so resolving an item also clears its already-shipped
+    `larry_alert`/`escalation`/`clarify_request` rows, not just the
+    `approval_request` (closes North Star §5 gap 6).
+
+    A stamped row carries the key in `payload->>'decision_key'`; a pre-Change-A
+    row does not, but its `task_id` (after the same normalization the key uses)
+    may equal `key`. So two narrow keyed UPDATEs are issued — one matching the
+    `decision_key` payload field, one matching the `task_id` column — both
+    guarded by `read_at IS NULL` (idempotent: a re-resolve clears nothing). The
+    `task_id`-match leg uses the key verbatim, which is correct for the common
+    case where the key IS the (normalized) task_id; a PR-coordinate key only
+    matches task_id rows already shaped `pr-<repo>-<num>`, never a mis-join onto
+    an unrelated row (spec §6 — a mis-join is worse than a missed join).
+
+    Best-effort, fire-and-forget — same contract as `emit_event`: returns the
+    count of rows cleared (0 on no-match, missing client, or any error); never
+    raises. `heal_stale_approvals` remains the backstop for the dropped-write
+    case. `client`/`ts` are for tests; production callers omit them.
+    """
+    log = logger or _LOGGER
+    if not key:
+        return 0
+    cli = client if client is not None else _get_client()
+    if cli is None:
+        log.debug(
+            'clear_decision: Supabase client unavailable (creds unset / '
+            'supabase-py missing / test mode); leaving key=%s for '
+            'heal_stale_approvals to reconcile', key,
+        )
+        return 0
+    use_ts = ts or ces.datetime.now(ces.timezone.utc).isoformat()
+    types = list(event_types)
+    total = 0
+    for column, is_json in (('decision_key', True), ('task_id', False)):
+        try:
+            q = (
+                cli.table('chain_events')
+                .update({'read_at': use_ts}, count='exact')
+                .in_('event_type', types)
+                .is_('read_at', 'null')
+            )
+            if is_json:
+                q = q.eq('payload->>decision_key', key)
+            else:
+                q = q.eq('task_id', key)
+            resp = q.execute()
+            rows = getattr(resp, 'data', None) or []
+            count = getattr(resp, 'count', None)
+            total += count if isinstance(count, int) else len(rows)
+        except Exception as e:  # noqa: BLE001 — push writer must not crash producer
+            log.warning(
+                'clear_decision %s-match failed (key=%s): %s: %s — '
+                'heal_stale_approvals will reconcile on its next tick',
+                column, key, type(e).__name__, e,
+            )
+    return total
