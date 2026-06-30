@@ -368,8 +368,14 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T20:35Z UTC (Iter ~3371, Tier 2)
+## G-rule unreviewed-merge-larry-authored-pr-001 — DISPATCHED ✅ (iter ~3372)
 
-**Iter ~3371 summary (2026-06-30T20:35Z):** All checks nominal. 0 new alerts. All 5 daemons healthy (PIDs 1690551/1690570/1690588/1690555/1200730). Pipeline clear. **PR #771 OPENED** (fix(approval-sync): clear dashboard-approved phantoms from Beacon's queue, Phase 1) by Larry at 20:26:08Z — within 30-min normal window, monitoring for Mirror review dispatch. Pending approvals=0. Watchdog=healthy 14:23:19 MDT. Tier 2, consecutive_clean 0→1. Carry: PR #768/#766 unreviewed-merges, heal-no-session-escalate Forge build pending (likely blocked by dashboard-approve phantom bug PR #771 is fixing). G-rule `watchdog-log-growth-idle-overnight-001` 2/3 unchanged.
+**Rule:** Larry-Yatch merges his own docs/spec/fix PRs before Mirror has reviewed them. Root cause: outbox-notifier defers Mirror dispatch when PR mergeable=UNKNOWN; short-lived PRs reach MERGEABLE and get merged before notifier re-sweeps. Three occurrences: PR #766 (2026-06-30 13:43 MDT, idx=1017), PR #768 (~06:00Z 2026-06-30, escalation #13), PR #772 (2026-06-30T20:48:27Z, idx=1024). Dispatched `direction-ask-unreviewed-merge-larry-prs-3of3-001.json` to Beacon inbox at iter ~3372. Proposed fixes: (1) branch protection require Mirror check [PRIMARY], (2) optimistic Mirror dispatch on UNKNOWN mergeable [SECONDARY]. verification_pending.
+
+---
+
+## Status snapshot — updated 2026-06-30T20:51Z UTC (Iter ~3372, Tier 1)
+
+**Iter ~3372 summary (2026-06-30T20:51Z):** Signal iter. Always-fix: fast-forward d2e50500→0bb0c7e3 (PR #771 code pulled in). PR #771 MERGED 14:44:25 MDT (fix(approval-sync): clear dashboard-approved phantoms, Phase 1 — heal_stale_approvals.py live). PR #772 MERGED 20:48:27Z by Larry WITHOUT Mirror review (3rd unreviewed-merge; G-rule dispatched). heal-stale-daemon-code triggered PR #771 code deploy: beacon-bot/dashboard-api/inbox-watcher/outbox-notifier restarted, new PIDs 1702377/1702585/1702680/1702768/1200730. Pending approvals=0. Watchdog=healthy 14:44:16 MDT. Tier 2→1 (signal). G-rule `unreviewed-merge-larry-authored-pr-001` 3/3 DISPATCHED.
 
 
