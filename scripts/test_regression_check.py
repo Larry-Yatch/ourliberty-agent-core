@@ -674,11 +674,23 @@ def main(argv: Optional[list[str]] = None) -> int:
         return EXIT_ANALYSIS_FAIL
 
     used_cached_baseline = False
+    parent_run_secs: Optional[float] = None
+    head_run_secs: Optional[float] = None
+    # Key the parent baseline on the journal-stripped TREE content, not the raw
+    # SHA. Pulse rewrites the cycle journals every ~5 min, so a SHA key made the
+    # parent of nearly every review a never-warmed commit (≈0% hit rate observed)
+    # — the gate then ran the full suite twice and the second run blew the 900s
+    # bounded-step ceiling. The content key lets a journal-only parent reuse the
+    # warmed baseline. Fall back to the SHA on a git failure (today's behavior).
+    parent_key = (
+        baseline_cache.content_key(parent_canonical, repo_root)
+        or parent_canonical
+    )
     with tempfile.TemporaryDirectory(prefix='test-regression-check-') as tmp:
         tmp_parent = Path(tmp)
         try:
-            # Parent baseline: reuse the per-SHA cache when present. The baseline
-            # is a pure function of the parent SHA, so a hit is IDENTICAL to
+            # Parent baseline: reuse the cache when present. The baseline is a
+            # pure function of the parent tree, so a hit is IDENTICAL to
             # re-running it — but skips a full-suite pass, which is what keeps a
             # retried/re-reviewed gate under the bounded-step ceiling. A miss runs
             # it and warms the cache for the next attempt. Cache writes are
@@ -686,40 +698,60 @@ def main(argv: Optional[list[str]] = None) -> int:
             # forces the original always-two-runs behavior.
             parent_failures: Optional[set[str]] = None
             if not args.no_baseline_cache:
-                cached = baseline_cache.load(parent_canonical)
+                cached = baseline_cache.load(parent_key)
                 if cached is not None:
                     parent_failures = cached
                     used_cached_baseline = True
                     print(
                         'test_regression_check: using cached parent baseline for '
-                        f'{parent_canonical[:12]} ({len(cached)} failing) — '
-                        'skipping the parent suite run',
+                        f'{parent_canonical[:12]} (key {parent_key[:12]}, '
+                        f'{len(cached)} failing) — skipping the parent suite run',
                         file=sys.stderr,
                     )
             if parent_failures is None:
+                _t0 = time.time()
                 parent_failures = collect_failures_at_sha(
                     parent_canonical, repo_root, args.timeout_per_sha, tmp_parent,
                 )
+                parent_run_secs = round(time.time() - _t0, 1)
                 if not args.no_baseline_cache:
                     try:
-                        baseline_cache.store(parent_canonical, parent_failures)
+                        baseline_cache.store(
+                            parent_key, parent_failures,
+                            source_commit=parent_canonical,
+                        )
                         baseline_cache.gc()  # bound growth on the live path
                     except OSError:
                         pass  # best-effort; never fail the gate on a cache write
+            _t1 = time.time()
             head_failures = collect_failures_at_sha(
                 head_canonical, repo_root, args.timeout_per_sha, tmp_parent,
             )
+            head_run_secs = round(time.time() - _t1, 1)
         except AnalysisError as exc:
             print(f'test_regression_check: {exc}', file=sys.stderr)
             return EXIT_ANALYSIS_FAIL
 
+    # Cost telemetry (regression-gate-cant-conclude): surface the real per-run
+    # suite duration + whether the content key hit, so the cache hit-rate and the
+    # single-run margin under the bounded-step ceiling are measurable from the
+    # gate output instead of guessed.
+    print(
+        f'test_regression_check: baseline_key={parent_key[:12]} '
+        f'cache_hit={used_cached_baseline} '
+        f'parent_run_secs={parent_run_secs} head_run_secs={head_run_secs}',
+        file=sys.stderr,
+    )
     verdict_block = compute_verdict(parent_failures, head_failures)
     report = {
         'parent_sha': parent_canonical,
         'head_sha': head_canonical,
+        'baseline_key': parent_key,
         'parent_failures': sorted(parent_failures),
         'head_failures': sorted(head_failures),
         'used_cached_baseline': used_cached_baseline,
+        'parent_run_secs': parent_run_secs,
+        'head_run_secs': head_run_secs,
         **verdict_block,
     }
 
