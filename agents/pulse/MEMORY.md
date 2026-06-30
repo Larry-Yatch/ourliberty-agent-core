@@ -362,8 +362,14 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T19:30Z UTC (Iter ~3366, Tier 1→2 de-escalate)
+## heal-stale-daemon-code-state.json does NOT exist (confirmed iter ~3367)
 
-**Iter ~3366 summary (2026-06-30T19:30Z):** 0 new alerts. Watermark=1017 (no change). All 5/5 core daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254, dashboard=1200736, chain_event_shipper=1200730). Watchdog=**healthy** (19:27:07Z UTC — idle period resolved, outbox-notifier dispatched Mirror review for PR #769 at 19:25:19Z). Heal-daemon heartbeat 19:27:00Z. No stalls. **PR #769 Mirror review in progress** (dispatched 19:25:19Z, confirmed in Mirror inbox). 4 open PRs: #769 (Mirror review in progress), #763/#765/#766 (REVIEW_ESCALATE carry). 4 pending approvals unchanged (chat_id correct: (2)=7998341473, (3)=7998341473). **Tier 1→2 de-escalated (consecutive_clean 2→3). Tier 2, consecutive_clean=0.** Carry: PR #768 unreviewed-merge (pulse-escalations.json #13). G-rule `watchdog-log-growth-idle-overnight-001` 2/3 (idle event resolved; need 3rd distinct event for Beacon dispatch).
+**Rule:** `~/agents/blackboard/heal-stale-daemon-code-state.json` does not exist — the healer writes only the heartbeat (`heal-stale-daemon-code.heartbeat`) and cooldowns (`~/agents/state/heal-stale-daemon-code-cooldowns.json`). The state-file path in cycle-prompt / TOOLS.md is aspirational. For Check 5, use the heartbeat as the primary liveness signal. A missing state file is NOT a Check 5 finding on its own — rely on heartbeat freshness.
+
+---
+
+## Status snapshot — updated 2026-06-30T19:53Z UTC (Iter ~3367, Tier 2→1 signal)
+
+**Iter ~3367 summary (2026-06-30T19:53Z):** 1 new alert — `unreviewed-merge:766` (PR #766 merged by Larry without Mirror review; DM delivered by outbox-notifier at idx=1017 13:43 MDT). Watermark=1018. Beacon bot restarted → PID 1658372 (PID 1200723 dead; restart expected after PR #766 code fix landed). Outbox-notifier 401 burst at 13:39-40 MDT (PR #765 recheck) → **self-healed** by 13:50:31 MDT (PR #770 review dispatched). Mirror actively reviewing PR #769 (PID 1649599, regression check). PR #770 Mirror review queued. PRs #763 (merged 19:38:27Z) + #766 (merged, unreviewed) resolved. Pending approvals 4→0 (all resolved 19:30:14Z). Watchdog=healthy 13:42:12 MDT. No stalls. **Tier 2→1 reset (unreviewed-merge:766 Tier-4 signal).** Carry: PR #768 unreviewed-merge (pulse-escalations.json #13). PR #765 REVIEW_ESCALATE. G-rule `watchdog-log-growth-idle-overnight-001` 2/3 unchanged.
 
 
