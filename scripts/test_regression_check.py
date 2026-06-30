@@ -543,6 +543,74 @@ def collect_failures_at_sha(
     return failures
 
 
+# ---- diff-scoped skip: a non-code change cannot introduce a test regression --
+#
+# WHY: the gate runs the FULL suite at parent+head for EVERY review — even a
+# pure-docs PR that changes zero importable code and zero file any test reads.
+# That's wasted work that thrashes the bounded-step ceiling (the #770-#773 docs/
+# spec PRs each burned a full double-run for nothing). If every changed file is
+# provably unable to affect a test outcome, the head failure-set EQUALS the
+# parent set, so the verdict is trivially PASS and we skip both suite runs.
+#
+# SAFETY — the inert set is tightly scoped by an empirical audit of what the
+# suite actually reads off the real repo tree (REPO_ROOT-anchored reads + globs):
+# the only real-tree inputs are scripts/, config/, agents/, runbooks/, systemd/.
+# `docs/**` has ZERO real-tree reads (the docs paths that appear in tests are all
+# fixture/mock string data, e.g. a changed_files list). The ONE carve-out is
+# `docs/runbooks/**`: a config-validation test could assert a runbook_path
+# exists, and that read is config-derived (not a literal the audit grep catches),
+# so we treat it as non-inert out of caution. Net inert set = `docs/` minus
+# `docs/runbooks/`. Conservative by construction: anything NOT proven inert runs
+# the full gate. Guarded by DiffInertSkipTest + a comment pointer so the audit
+# basis is re-checkable. Escape hatch: --no-skip-inert forces the full run.
+
+_INERT_PREFIX = 'docs/'
+# Subtrees UNDER docs/ that a test may existence-check via a config-derived path
+# (so the read-audit grep can't see them) — treated as non-inert.
+_NON_INERT_UNDER_DOCS = ('docs/runbooks/',)
+
+
+def _is_test_inert_path(path: str) -> bool:
+    """True iff a change to ``path`` cannot alter any test outcome (pure docs,
+    excluding the existence-validated docs/runbooks/ subtree)."""
+    if not path.startswith(_INERT_PREFIX):
+        return False
+    return not any(path.startswith(p) for p in _NON_INERT_UNDER_DOCS)
+
+
+def diff_changed_files(
+    parent: str, head: str, repo_root: Path,
+) -> Optional[list[str]]:
+    """Paths changed between ``parent`` and ``head``, or None on any git failure.
+
+    None is the FAIL-SAFE signal: the caller then runs the full gate (never skips
+    on uncertainty). Uses the two-dot range so only commits reachable from head
+    but not parent are diffed — the PR's own changes.
+    """
+    try:
+        proc = subprocess.run(
+            ['git', '-C', str(repo_root), 'diff', '--name-only',
+             f'{parent}..{head}'],
+            capture_output=True, text=True, timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    return [ln for ln in proc.stdout.splitlines() if ln.strip()]
+
+
+def diff_is_test_inert(changed_files: list[str]) -> bool:
+    """True iff EVERY changed file is test-inert (so the suite can be skipped).
+
+    An EMPTY diff returns False — there is nothing to safely skip on (and an
+    empty parent..head usually means a degenerate/identical pair we'd rather run
+    the gate on than silently pass)."""
+    return bool(changed_files) and all(
+        _is_test_inert_path(p) for p in changed_files
+    )
+
+
 def compute_verdict(parent: set[str], head: set[str]) -> dict:
     regressions = sorted(head - parent)
     fixed = sorted(parent - head)
@@ -662,6 +730,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         help='Force a fresh parent-SHA suite run instead of reusing the cached '
              'baseline (the default always-two-runs behavior).',
     )
+    parser.add_argument(
+        '--no-skip-inert', action='store_true',
+        help='Force the full suite even when the diff touches only test-inert '
+             'paths (docs/). The default short-circuits to PASS for such diffs.',
+    )
     args = parser.parse_args(argv)
 
     repo_root = Path(args.repo_root).resolve()
@@ -672,6 +745,45 @@ def main(argv: Optional[list[str]] = None) -> int:
     except AnalysisError as exc:
         print(f'test_regression_check: {exc}', file=sys.stderr)
         return EXIT_ANALYSIS_FAIL
+
+    # Diff-scoped skip: if every changed file is test-inert (pure docs/, excl
+    # docs/runbooks/), the head failure-set is identical to the parent's, so the
+    # verdict is trivially PASS — no need to run the suite at all (the #770-#773
+    # docs-PR thrash). Fail-safe: a git error (changed is None) falls through to
+    # the full gate; --no-skip-inert disables the short-circuit entirely.
+    if not args.no_skip_inert:
+        changed = diff_changed_files(parent_canonical, head_canonical, repo_root)
+        if changed is not None and diff_is_test_inert(changed):
+            report = {
+                'parent_sha': parent_canonical,
+                'head_sha': head_canonical,
+                'baseline_key': None,
+                'gate_skipped': True,
+                'skip_reason': (
+                    'diff touches only test-inert paths (docs/, excl '
+                    'docs/runbooks/); a non-code change cannot introduce a test '
+                    'regression — skipped both suite runs'
+                ),
+                'changed_files': sorted(changed),
+                'parent_failures': [],
+                'head_failures': [],
+                'used_cached_baseline': False,
+                'parent_run_secs': None,
+                'head_run_secs': None,
+                # Synthesize a clean PASS verdict block (no parent/head failures).
+                **compute_verdict(set(), set()),
+            }
+            print(
+                f'test_regression_check: GATE_SKIPPED inert diff '
+                f'({len(changed)} file(s): {", ".join(sorted(changed)[:5])}'
+                f'{" …" if len(changed) > 5 else ""}) — verdict PASS, no suite run',
+                file=sys.stderr,
+            )
+            if args.output == 'json':
+                print(json.dumps(report, indent=2))
+            else:
+                print(render_text(report), end='')
+            return EXIT_PASS
 
     used_cached_baseline = False
     parent_run_secs: Optional[float] = None

@@ -830,5 +830,101 @@ class RemoveWorktreeDoubleForceTest(unittest.TestCase):
         )
 
 
+class DiffInertSkipTest(_IsolatedAgentsRoot):
+    """Diff-scoped skip: a pure-docs PR cannot regress a test, so the gate
+    short-circuits to PASS without running the suite (the #770-#773 thrash)."""
+
+    # ---- pure path classification ----
+
+    def test_is_test_inert_path(self):
+        for p in ('docs/spec.md', 'docs/specs/tier.md',
+                  'docs/approval-sync-north-star.md'):
+            self.assertTrue(trc._is_test_inert_path(p), p)
+        # Non-inert: docs/runbooks (existence-validated via config), code,
+        # config, agents, top-level runbooks (read by the pulse-fixture test),
+        # and repo-root files outside docs/.
+        for p in ('docs/runbooks/rotate.md', 'scripts/foo.py',
+                  'scripts/tests/test_foo.py', 'config/agent-models.json',
+                  'agents/pulse/CLAUDE.md', 'runbooks/cycle-prompt.md',
+                  'README.md'):
+            self.assertFalse(trc._is_test_inert_path(p), p)
+
+    def test_diff_is_test_inert(self):
+        self.assertTrue(trc.diff_is_test_inert(['docs/a.md', 'docs/specs/b.md']))
+        self.assertFalse(trc.diff_is_test_inert([]))               # empty → run gate
+        self.assertFalse(trc.diff_is_test_inert(['docs/a.md', 'scripts/x.py']))
+        self.assertFalse(trc.diff_is_test_inert(['docs/runbooks/r.md']))
+
+    # ---- diff_changed_files against a real tmp git repo ----
+
+    def test_diff_changed_files_real_repo(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+
+            def g(*a):
+                return subprocess.run(
+                    ['git', '-C', str(repo), *a],
+                    capture_output=True, text=True, check=True,
+                ).stdout.strip()
+
+            g('init', '-q'); g('config', 'user.email', 't@t')
+            g('config', 'user.name', 't')
+            (repo / 'scripts').mkdir(); (repo / 'scripts' / 'foo.py').write_text('x=1\n')
+            (repo / 'docs').mkdir(); (repo / 'docs' / 'spec.md').write_text('v1\n')
+            g('add', '-A'); g('commit', '-q', '-m', 'base')
+            parent = g('rev-parse', 'HEAD')
+            (repo / 'docs' / 'spec.md').write_text('v2 — changed\n')  # docs-only
+            g('add', '-A'); g('commit', '-q', '-m', 'docs')
+            head = g('rev-parse', 'HEAD')
+
+            changed = trc.diff_changed_files(parent, head, repo)
+            self.assertEqual(changed, ['docs/spec.md'])
+            self.assertTrue(trc.diff_is_test_inert(changed))
+            # Unknown SHAs → git error → None (fail-safe: caller runs the gate).
+            self.assertIsNone(
+                trc.diff_changed_files('dead' * 10, 'beef' * 10, repo))
+
+    # ---- main() short-circuit ----
+
+    def _run_main_with_diff(self, changed, extra=()):
+        argv = ['--parent-sha', 'aaaa', '--head-sha', 'bbbb',
+                '--repo-root', '/tmp/fake-repo', *extra]
+        sha_map = {'aaaa': 'a' * 40, 'bbbb': 'b' * 40}
+        out = io.StringIO()
+        with patch.object(trc, 'resolve_sha', side_effect=lambda s, r: sha_map[s]), \
+             patch.object(trc, 'diff_changed_files', return_value=changed), \
+             patch.object(trc, 'collect_failures_at_sha',
+                          return_value=set()) as collect:
+            with redirect_stdout(out), redirect_stderr(io.StringIO()):
+                code = trc.main(argv)
+        return code, json.loads(out.getvalue()), collect
+
+    def test_inert_diff_skips_suite(self):
+        code, report, collect = self._run_main_with_diff(['docs/x.md'])
+        self.assertEqual(code, trc.EXIT_PASS)
+        self.assertTrue(report.get('gate_skipped'))
+        self.assertEqual(report['verdict'], 'PASS')
+        self.assertEqual(report['regressions'], [])
+        collect.assert_not_called()  # the whole point: no suite run
+
+    def test_code_diff_runs_suite(self):
+        code, report, collect = self._run_main_with_diff(['scripts/x.py'])
+        self.assertEqual(code, trc.EXIT_PASS)
+        self.assertNotIn('gate_skipped', report)
+        self.assertTrue(collect.called)  # suite ran (non-inert change)
+
+    def test_git_failure_runs_suite_failsafe(self):
+        # diff_changed_files → None (git error) must NOT skip — run the gate.
+        code, report, collect = self._run_main_with_diff(None)
+        self.assertNotIn('gate_skipped', report)
+        self.assertTrue(collect.called)
+
+    def test_no_skip_inert_flag_forces_suite(self):
+        code, report, collect = self._run_main_with_diff(
+            ['docs/x.md'], extra=('--no-skip-inert',))
+        self.assertNotIn('gate_skipped', report)
+        self.assertTrue(collect.called)
+
+
 if __name__ == '__main__':
     unittest.main()
