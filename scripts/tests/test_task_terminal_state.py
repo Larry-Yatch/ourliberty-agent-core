@@ -220,6 +220,36 @@ class ExpandVariantsTest(unittest.TestCase):
         self.assertIn('extra', out)
         self.assertEqual(out.count('foo-task'), 1)
 
+    def test_strips_known_wrapper_prefixes(self):
+        # The prefix-blindness fix: a wrapped id yields the bare stem so the
+        # underlying work's PR (which carries only the stem) is matchable.
+        self.assertIn('p3a-retro-prep',
+                      tts.expand_variants('mirror-review-p3a-retro-prep'))
+        self.assertIn('the-stem', tts.expand_variants('heal-the-stem'))
+        self.assertIn('the-stem', tts.expand_variants('fix-the-stem'))
+        # original id is always kept too
+        self.assertIn('mirror-review-p3a-retro-prep',
+                      tts.expand_variants('mirror-review-p3a-retro-prep'))
+
+    def test_unprefixed_id_gets_no_bare_stem(self):
+        self.assertNotIn('task-id', tts.expand_variants('plain-task-id'))
+
+    def test_bare_prefix_does_not_add_empty_candidate(self):
+        self.assertNotIn('', tts.expand_variants('heal-'))
+
+
+class WrapperPrefixMatchTest(unittest.TestCase):
+    """End-to-end: the live #747 shape — a `mirror-review-<stem>` approval id
+    must classify MERGED off the PR that carries only `<stem>` on its branch."""
+
+    def test_mirror_review_id_matches_merged_pr_by_stem(self):
+        prs = [_pr('MERGED', branch='forge/p3a-retro-prep',
+                   title='feat: P3a retrospective Stage A')]
+        with mock.patch.object(tts, 'gh_json', return_value=prs):
+            state = tts.task_terminal_state(
+                'mirror-review-p3a-retro-prep', repos=['x'])
+        self.assertEqual(state, tts.MERGED)
+
 
 class DefaultReposTest(unittest.TestCase):
     def test_env_override(self):

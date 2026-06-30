@@ -553,5 +553,97 @@ class TestReconcileTerminalApprovals(_TerminalBase):
         self.assertEqual(counts2['kept'], 1)
 
 
+# -------- resolved-in-supabase reconciliation (approval-sync §3.2) --------
+
+def _action_row(task_id, action, ts=OLD_TS):
+    """A `larry_action` audit row as the dashboard approve/reject handler writes
+    it: top-level task_id = the source approval_request's task_id, payload.action
+    the decision."""
+    return {
+        'event_id': f'la-{task_id}-{action}',
+        'event_type': 'larry_action',
+        'agent': 'dashboard',
+        'task_id': task_id,
+        'ts': ts,
+        'read_at': None,
+        'payload': {'action': action, 'source_event_id': f'ev-{task_id}'},
+    }
+
+
+class TestFetchLarryActions(_Base):
+    def test_returns_decision_actions_only(self):
+        store = [
+            _action_row('A', 'approve'),
+            _action_row('B', 'reject'),
+            _action_row('C', 'comment'),                  # not a decision
+            _row('x', 'approval_request', 'A', OLD_TS),   # wrong event_type
+        ]
+        got = self.mod.fetch_larry_actions(_FakeClient(store), {'A', 'B', 'C'})
+        self.assertEqual(got, {'A': 'approve', 'B': 'reject'})
+
+    def test_empty_taskids_short_circuits(self):
+        self.assertEqual(self.mod.fetch_larry_actions(_FakeClient([]), set()), {})
+
+    def test_latest_ts_wins(self):
+        store = [
+            _action_row('A', 'reject', ts=OLD_TS),
+            _action_row('A', 'approve', ts=FRESH_TS),     # later -> wins
+        ]
+        self.assertEqual(
+            self.mod.fetch_larry_actions(_FakeClient(store), {'A'}),
+            {'A': 'approve'})
+
+
+class TestReconcileResolvedInSupabase(_TerminalBase):
+    def _pending(self):
+        return [
+            _entry('A', OLD_TS, task_id='A'),
+            _entry('B', OLD_TS, task_id='B'),
+            _entry('C', OLD_TS, task_id='C'),
+        ]
+
+    def _store(self):
+        return [
+            _action_row('A', 'approve'),
+            _action_row('B', 'reject'),
+            _action_row('C', 'comment'),    # non-decision -> C kept pending
+            _action_row('ZZ', 'approve'),   # not pending -> ignored
+        ]
+
+    def test_pops_dashboard_resolved_keeps_undecided(self):
+        self._write_state(self._pending())
+        counts = self.mod.reconcile_resolved_in_supabase(
+            _FakeClient(self._store()), now=NOW)
+        self.assertEqual(counts, {'pending': 3, 'resolved': 2, 'kept': 1})
+        state = self._load()
+        self.assertEqual([e['id'] for e in state['pending']], ['C'])
+        self.assertEqual(
+            {e['id']: e['status'] for e in state['history']},
+            {'A': 'approved', 'B': 'rejected'})
+
+    def test_idempotent_second_run_pops_nothing(self):
+        self._write_state(self._pending())
+        client = _FakeClient(self._store())
+        self.mod.reconcile_resolved_in_supabase(client, now=NOW)
+        counts2 = self.mod.reconcile_resolved_in_supabase(client, now=NOW)
+        self.assertEqual(counts2['resolved'], 0)
+        self.assertEqual(counts2['kept'], 1)   # only C remains pending
+
+    def test_dry_run_writes_nothing(self):
+        self._write_state(self._pending())
+        counts = self.mod.reconcile_resolved_in_supabase(
+            _FakeClient(self._store()), now=NOW, dry_run=True)
+        self.assertEqual(counts['resolved'], 2)
+        state = self._load()
+        self.assertEqual(len(state['pending']), 3)   # untouched
+        self.assertEqual(state['history'], [])
+
+    def test_no_pending_is_noop(self):
+        self._write_state([])
+        counts = self.mod.reconcile_resolved_in_supabase(
+            _FakeClient(self._store()), now=NOW)
+        self.assertEqual(counts, {'pending': 0, 'resolved': 0, 'kept': 0})
+
+
 if __name__ == '__main__':
     unittest.main()
