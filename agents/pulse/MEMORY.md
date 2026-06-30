@@ -186,9 +186,9 @@ Triage helper returned Tier-3 for source=heal-stale-daemon-code subject^=auto-re
 
 ---
 
-## G-rule heal-stale-daemon-code-still-stale-after-restart — 1/3 (new, iter ~2712)
+## G-rule heal-stale-daemon-code-still-stale-after-restart — 2/3 (updated iter ~3383)
 
-**Rule:** `source=heal-stale-daemon-code, subject^=still-stale-after-restart:` alerts fire when the healer attempted a restart but the service's ActiveEnterTimestamp is STILL older than the script file (healer won't retry). Different from `auto-restart-failed` (where systemd self-heals) — here the service IS running, just with old code. Genuine ask-then-do. Remediation: `bash ~/agent-core/scripts/sync_agent_core.sh && sudo systemctl restart <service>`. NOT a silence candidate. First occurrence iter ~2712 (outbox-notifier running pre-PR700 code). Dispatch to Beacon at 3/3 only if healer needs retry-more-aggressively behavior; otherwise leave as ask-then-do.
+**Rule:** `source=heal-stale-daemon-code, subject^=still-stale-after-restart:` alerts fire when the healer attempted a restart but the service's ActiveEnterTimestamp is STILL older than the script file (healer won't retry). Different from `auto-restart-failed` (where systemd self-heals) — here the service IS running, just with old code. Genuine ask-then-do in general; but in both observed cases the service self-corrected via a subsequent healer run or watchdog restart within ~30 min. NOT a silence candidate. Remediation when NOT self-correcting: `bash ~/agent-core/scripts/sync_agent_core.sh && sudo systemctl restart <service>`. Dispatch to Beacon at 3/3 only if healer needs retry-more-aggressively behavior. Occurrences: iter ~2712 (1/3, outbox-notifier pre-PR700); iter ~3383 (2/3, forge-bot + mirror-bot + pulse-bot after PR #775 active_tier.py deploy — all 3 self-corrected at 22:39Z UTC).
 
 ---
 
@@ -338,9 +338,9 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## G-rule heal-stale-daemon-code-dependency-ordering-001 — 2/3 (updated iter ~3375)
+## G-rule heal-stale-daemon-code-dependency-ordering-001 → DISPATCHED ✅ (iter ~3383), vp
 
-**Rule:** Stale-daemon healer restarts outbox-notifier and inbox-watcher independently without honoring the systemd `After=ourliberty-inbox-watcher.service` dependency. When inbox-watcher restarts first (or is transitioning), outbox-notifier's restart fails (rc=-1, inactive after 3s) — then systemd auto-starts outbox-notifier moments later when inbox-watcher comes up. Result: transient auto-restart-failed alert that self-heals in ~90s. Medic confirmed (prior_attempts=6): healer fires SIGTERM, checks after 3s, sees inactive (systemd throttle/StartLimitBurst after 4 rapid restarts today), declares failed; systemd restarts at ~83s later. Fix: `heal_stale_daemon_code.py` should restart inbox-watcher before outbox-notifier, or use `systemctl restart --with-dependencies`. NOT a silence candidate (the root cause remains). Dispatch to Beacon at 3/3. Occurrences: iter ~3309 (1/3), iter ~3375 (2/3, L1028 — PR #775 deploy wave).
+**Rule:** Stale-daemon healer restarts outbox-notifier and inbox-watcher independently without honoring the systemd `After=ourliberty-inbox-watcher.service` dependency. When inbox-watcher restarts first (or is transitioning), outbox-notifier's restart fails (rc=-1, inactive after 3s) — then systemd auto-starts outbox-notifier moments later when inbox-watcher comes up. Result: transient auto-restart-failed alert that self-heals in ~90s. Occurrences: iter ~3309 (1/3), iter ~3375 (2/3, L1028 — PR #775 deploy wave), iter ~3383 (3/3, L1036 2026-06-30T22:39:52Z — PR #775/#778 restart wave). Direction-ask dispatched to Beacon inbox: `direction-ask-stale-daemon-dependency-ordering-001.json`. Fix: restart inbox-watcher before outbox-notifier, or use `systemctl restart --with-dependencies`. NOT a silence candidate. verification_pending.
 
 ---
 
@@ -376,8 +376,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T22:39Z UTC (Iter ~3382, Tier 1)
+## Status snapshot — updated 2026-06-30T22:50Z UTC (Iter ~3383, Tier 1)
 
-**Iter ~3382 summary (2026-06-30T22:39Z):** Auto-fix iter (ff-main). Repo was behind by 1 commit; fast-forwarded to 8e6af9cb. 0 new alerts. All 5 daemons alive (PIDs unchanged: Beacon=1758487, inbox-watcher=1759486, outbox-notifier=1737092, dashboard-api=1735904, chain-event-shipper=1200730). Watchdog=healthy 22:35:54Z. Heal-daemon heartbeat 22:29:26Z. Pipeline stall: "no stalls detected." Pending approvals=0. PR #777 MERGED (commit 44f925b0). PR #778 (tier-pool W2) MERGED by Larry 22:35:59Z without Mirror review — 6th `unreviewed-merge-larry-authored-pr-001` occurrence. PR #779 (heal-undispatched-pr-review) in active Mirror review (dispatched 22:35:10Z). Forge build approval-sync-phase2-build still in Forge inbox. Unreviewed-merge G-rule: Beacon phased design awaiting Larry response (Steps 1-2). Tier 1 (consecutive_clean=0).
+**Iter ~3383 summary (2026-06-30T22:50Z):** Alert triage iter. 5 new alerts (L1033–L1037): 3x `still-stale-after-restart` (forge/mirror/pulse-bot, Tier-4/self-corrected at 22:39Z), 1x `auto-restart-failed:outbox-notifier` (Tier-3, watchdog recovered at 22:41Z), 1x `unreviewed-merge:778` (Tier-4/never-silence, 6th G-rule occurrence). All 8 services alive with new PIDs (heal-daemon restart wave from PR #775/#778 deploy). Watchdog=healthy 22:45:56Z. `heal-stale-daemon-code-dependency-ordering-001` G-rule hit 3/3 → dispatched direction-ask to Beacon inbox. `still-stale-after-restart` G-rule updated 1/3→2/3 (carry). PR #779 in active Mirror review. Forge build approval-sync-phase2-build still in Forge inbox (no stalls). Pending approvals=0. Tier 1 (consecutive_clean=0).
 
 
