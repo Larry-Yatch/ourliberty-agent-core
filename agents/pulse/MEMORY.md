@@ -358,8 +358,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T17:38Z UTC (Iter ~3358, Tier 3)
+## Status snapshot — updated 2026-06-30T18:08Z UTC (Iter ~3359, Tier 3)
 
-**Iter ~3358 summary (2026-06-30T17:38Z):** 0 new alerts. Watermark=1015. All 3/3 main daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254). Watchdog=overall=warning (log_growth — outbox-notifier idle 13,611s, G-rule 2/3, idle-state INFO). Heal-daemon heartbeat 17:35:20Z. No stalls. Pipeline idle. Outbox-notifier carry: 4× HTTP 500 (07:33-07:50Z) + 1× HTTP 401 (03:38Z), all self-healed. 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals unchanged. **Worktrees 1/0 (main only).** **Tier 3, consecutive_clean=16.**
+**Iter ~3359 summary (2026-06-30T18:08Z):** 1 new alert (line 1016 — heal-tier2-weekly-probe tier2_provisioning_drift, Tier-3 silenced). Watermark=1016. All 3/3 main daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254). Watchdog=overall=warning (log_growth — outbox-notifier idle 46,268s same period from ~3358, G-rule 2/3, idle-state INFO). Heal-daemon heartbeat 18:05:50Z. No stalls. Pipeline idle. Outbox-notifier carry: 4× HTTP 500 (07:33-07:50Z) + 1× HTTP 401 (03:38Z), all self-healed. 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals unchanged. **Worktrees 1/0 (main only).** **Tier 3, consecutive_clean=17.**
 
 
