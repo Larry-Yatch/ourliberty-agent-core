@@ -161,9 +161,15 @@ class _RunClaudeHarness(unittest.TestCase):
         self.tmp.cleanup()
 
     def _write_state(self, tier):
+        # Under per-task dispatch (docs/specs/tier-dispatch-spec.md) the tier is
+        # chosen by select_dispatch_tier, not by active-tier state. Pin the tier
+        # under test via the operator override so the primary dispatch lands on
+        # it deterministically (these tests assert the SELECTED tier's auth/HOME
+        # path); the legacy active-tier.json write is kept harmless.
         path = self.root / 'blackboard' / 'active-tier.json'
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps({'tier': tier}))
+        (self.root / 'rotation.disabled').write_text(tier)
 
     def _drive(self, popen_proc, t2_result=None, session_id=None):
         """Run run_claude with the given fake processes; return

@@ -202,10 +202,14 @@ class RunClaudeTranscriptCheckIntegrationTest(unittest.TestCase):
         # instead of the real /home/larry.
         self.home = self.root / 'home'
         self.home.mkdir(parents=True, exist_ok=True)
-        # active-tier state = tier1 so effective_tier resolves to 'tier1'.
+        # Per-task dispatch: the SELECTOR (not active-tier state) chooses the
+        # tier, so pin tier1 via the operator override so effective_tier
+        # resolves to 'tier1' deterministically (the transcript check + alert
+        # subject key off it). Legacy active-tier.json write kept harmless.
         state = self.root / 'blackboard' / 'active-tier.json'
         state.parent.mkdir(parents=True, exist_ok=True)
         state.write_text(json.dumps({'tier': 'tier1'}))
+        (self.root / 'rotation.disabled').write_text('tier1')
         # This class drives run_claude without mocking ar.log.
         _pin_log_dir(self, self.root)
 

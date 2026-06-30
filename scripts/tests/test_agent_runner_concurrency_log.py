@@ -161,6 +161,11 @@ class ConcurrencyRunningLogTest(unittest.TestCase):
         os.environ['OURLIBERTY_AGENTS_ROOT'] = str(self.root)
         self.workdir = self.root / 'work'
         self.workdir.mkdir(parents=True, exist_ok=True)
+        # Per-task dispatch: pin a tier via the operator override so
+        # select_dispatch_tier returns a tier and run_claude actually spawns
+        # (emitting the 'Running (...)' line under test) instead of TIER_HOLDing
+        # because no tier is usable in the bare test env.
+        (self.root / 'rotation.disabled').write_text('tier1')
         # Defense-in-depth: ar.log is mocked in today's tests, but a future
         # test that drives run_claude without the mock must not write the
         # real ~/agents/logs/forge.log.
