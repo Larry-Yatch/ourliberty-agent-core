@@ -358,8 +358,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T08:03Z UTC (Iter ~3337, Tier 1)
+## Status snapshot — updated 2026-06-30T08:09Z UTC (Iter ~3338, Tier 1)
 
-**Iter ~3337 summary (2026-06-30T08:03Z):** 1 new alert (L1121 credential-drift:CLAUDE_CODE_OAUTH_TOKEN_TIER3) Tier-3 silenced. All 5/5 daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254, dashboard=1200736, chain=1200730). Watchdog=healthy. Heal-daemon 07:49:12Z. No stalls. **ourliberty-cycle.timer ambiguous-but-firing** — NextElapseUSecMonotonic=infinity, LastTriggerUSec=07:55:15Z UTC (fires once per healer restart); recent 5-commit cadence at ~5-10 min confirms healer keeping it alive; escalation sent 06:31:00Z (don't re-escalate). Pipeline idle (outbox-notifier last entry 23:11:25Z 2026-06-29). 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals (1 stale: mirror-review-p3a-retro-prep; 3 legitimate). 3 stale non-main worktrees (reaper handles). Watermark=1121. Ratio=17.4625. Tier 1, consecutive_clean=1.
+**Iter ~3338 summary (2026-06-30T08:09Z):** 0 new alerts. All 3/3 main daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254). Watchdog=healthy (last 08:03:19Z UTC). Heal-daemon heartbeat 07:59:13Z. No stalls. **ourliberty-cycle.timer ambiguous-but-firing** — `Trigger: n/a`; healer-driven cadence keeps cycles alive; escalation in pulse-escalations.json (iter ~3325 06:31Z); no new escalation. Pipeline idle (outbox-notifier last entry 23:11:25Z 2026-06-29, ~9h). 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals (unchanged: mirror-review-p3a-retro-prep ~25h+; heal-wip-redispatch-already-merged-suppress-001; heal-no-session-escalate-preserve-target-repo-001; mirror-review-pr-763). Worktrees 4/0-gate-wt (wt-mirror-767 reaped since ~3336). Watermark=1121. Tier 1, consecutive_clean=2.
 
 
