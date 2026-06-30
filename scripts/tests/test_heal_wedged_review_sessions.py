@@ -1760,7 +1760,8 @@ class TestHarvestVerdictBeforeReap(unittest.TestCase):
                 pid=9, cwd=self.PR_CWD, tier='mirror', jsonl=Path('/tmp/x.jsonl'),
                 session_id='sess-9', idle_secs=600.0, marker_present=True)
             marker = _mirror_pass_marker_block()
-            with mock.patch.object(h, '_mirror_outbox_dir', return_value=mirror_dir):
+            with mock.patch.object(h, '_mirror_outbox_dir', return_value=mirror_dir), \
+                    mock.patch.object(h, '_larry_primary_chat_id', return_value=12345):
                 ok = h._deliver_mirror_verdict(cand, marker, now_iso=NOW.isoformat())
             self.assertTrue(ok)
             written = list(mirror_dir.glob('*.json'))
@@ -1773,6 +1774,35 @@ class TestHarvestVerdictBeforeReap(unittest.TestCase):
             self.assertEqual(data['claude_session_id'], 'sess-9')
             self.assertIn('REVIEW_PASS', data['result'])
             self.assertEqual(data['exit_code'], 0)
+            # harvest-verdict-routing-fix (B1): the envelope MUST be shaped for
+            # the larry-direct path (source='larry' + int reply_chat_id) so
+            # process_outbox reaches _run_review_pass_auto_merge instead of the
+            # archive-no-notify early return. Harvest provenance moves to
+            # `harvested_by` (process_outbox ignores unknown keys).
+            self.assertEqual(data['source'], 'larry')
+            self.assertEqual(data['reply_chat_id'], 12345)
+            self.assertEqual(
+                data['harvested_by'],
+                'heal-wedged-review-sessions:harvest-before-reap')
+
+    def test_deliver_declines_when_no_larry_chat_id(self):
+        # No resolvable Larry chat id => we cannot write a routable larry-direct
+        # outbox (process_outbox would archive-no-notify). Decline the harvest
+        # (return False) so the caller takes the fail-safe (preserve worktree +
+        # alert) rather than writing a verdict that gets silently archived.
+        with tempfile.TemporaryDirectory() as d:
+            mirror_dir = Path(d) / 'mirror'
+            cand = h.Candidate(
+                pid=9, cwd=self.PR_CWD, tier='mirror', jsonl=Path('/tmp/x.jsonl'),
+                session_id='sess-9', idle_secs=600.0, marker_present=True)
+            with mock.patch.object(h, '_mirror_outbox_dir', return_value=mirror_dir), \
+                    mock.patch.object(h, '_larry_primary_chat_id', return_value=None), \
+                    mock.patch.object(h, 'log'):
+                ok = h._deliver_mirror_verdict(
+                    cand, _mirror_pass_marker_block(), now_iso=NOW.isoformat())
+            self.assertFalse(ok)
+            # Nothing written (no un-routable outbox left behind).
+            self.assertFalse(mirror_dir.exists() and list(mirror_dir.glob('*.json')))
 
     def test_deliver_fails_on_non_pr_mirror_cwd(self):
         # A non-PR Mirror worktree can't reconstruct the task_id -> delivery

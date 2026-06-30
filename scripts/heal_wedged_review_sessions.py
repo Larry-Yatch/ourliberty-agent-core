@@ -1463,6 +1463,28 @@ def _unique_mirror_outbox_dest(name: str) -> Path:
         counter += 1
 
 
+def _larry_primary_chat_id() -> Optional[int]:
+    """Larry's primary Telegram chat id, sourced from the SAME place
+    ``outbox_notifier.process_outbox`` resolves it for daemon-originated
+    dispatches (``_primary_chat_id`` -> lowest id in TELEGRAM_ALLOWED_CHAT_IDS).
+    We reuse that helper rather than re-reading the env so the harvested
+    larry-direct envelope can't drift from the canonical resolution. Returns
+    None when the env is unset (test rigs, mis-provisioned hosts); the caller
+    then declines the larry-direct routing and takes the fail-safe instead of
+    writing an un-routable outbox."""
+    try:
+        import outbox_notifier as notifier
+    except Exception as e:  # noqa: BLE001
+        log(f'harvest: cannot import outbox_notifier to resolve Larry chat id: '
+            f'{type(e).__name__}: {e}', 'WARN')
+        return None
+    try:
+        return notifier._primary_chat_id()
+    except Exception as e:  # noqa: BLE001
+        log(f'harvest: _primary_chat_id() raised: {type(e).__name__}: {e}', 'WARN')
+        return None
+
+
 def _deliver_mirror_verdict(cand: Candidate, marker_text: str,
                             *, now_iso: str) -> bool:
     """Write the harvested verdict to the mirror outbox in the shape
@@ -1495,11 +1517,42 @@ def _deliver_mirror_verdict(cand: Candidate, marker_text: str,
         return False
     repo_short, pr_number = raw
     task_id = f'pr-{repo_short}-{pr_number}'
+    # harvest-verdict-routing-fix: the synthesized outbox MUST travel the
+    # larry-direct path in outbox_notifier.process_outbox. That path is the
+    # ONLY one that reaches _run_review_pass_auto_merge for an envelope whose
+    # source is not a bare agent id: process_outbox computes
+    # target_agent=_primary_agent_id(source) (None for any non-agent source)
+    # and, unless larry_direct is True, takes the
+    # `(target_agent is None ...) and not larry_direct` archive-no-notify early
+    # return — BEFORE auto-merge — silently discarding the verdict (the 760/720
+    # loss this whole healer exists to prevent). larry_direct is True iff
+    # routing_source == 'larry' AND reply_chat_id is an int, so we set both,
+    # mirroring the PR #45 / source='larry' precedent. Under that path every
+    # verdict type is still surfaced (the commit status + findings comment +
+    # verdict chain-event + emergency-halt trip all fire in process_outbox's
+    # pre-routing `if marker_decision:` block); only REVIEW_PASS auto-merges,
+    # a clean REVIEW_REVISION DMs Larry the findings (cold-start, no
+    # forge_build_session_id), and ESCALATE/auto-promoted-REVISION/HALT
+    # terminal-DM him. We do NOT set original_source, so routing_source falls
+    # back to source='larry'.
+    chat_id = _larry_primary_chat_id()
+    if not isinstance(chat_id, int):
+        log(f'harvest: no resolvable Larry chat id (TELEGRAM_ALLOWED_CHAT_IDS '
+            f'unset?) for task {task_id}; cannot write a routable larry-direct '
+            f'outbox -> declining harvest so the caller preserves the worktree '
+            f'+ alerts rather than writing a verdict that process_outbox would '
+            f'archive-no-notify', 'WARN')
+        return False
     outbox = {
         'task_id': task_id,
         'agent': 'mirror',
         'phase': 'review',
-        'source': 'heal-wedged-review-sessions:harvest-before-reap',
+        # source='larry' + int reply_chat_id => larry_direct path => auto-merge.
+        # The harvest provenance is retained in `harvested_by` for the audit
+        # trail (process_outbox ignores unknown keys).
+        'source': 'larry',
+        'reply_chat_id': chat_id,
+        'harvested_by': 'heal-wedged-review-sessions:harvest-before-reap',
         'started_at': now_iso,
         'completed_at': now_iso,
         'exit_code': 0,
