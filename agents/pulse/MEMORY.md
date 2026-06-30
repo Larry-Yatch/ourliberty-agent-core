@@ -352,8 +352,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T03:44Z UTC (Iter ~3314, Tier 1)
+## Status snapshot — updated 2026-06-30T03:53Z UTC (Iter ~3315, Tier 1)
 
-**Iter ~3314 summary (2026-06-30T03:44Z):** ⚠️ Drift — 2 Tier-4 alerts (already DM'd by outbox-notifier). KEY IMPROVEMENT: Worktrees **27/18-gate-wt** (was 86/77 at ~3313) — reaper (PR #761) caught up; git fetch CLEAN; git prune no new timeouts. Mirror FAILED on PR #766 telegram-409 (review_session_timeout 2100s, REVIEW_ESCALATE, Larry DM sent). Mirror PASSED PR #764 rev1 (REVIEW_PASS) but merge conflicts block auto-merge — approval_request `resolve-pr764-regbaseline-forkbomb-conflict-001` sent. Beacon in-flight on warmer dedup fix (03:18:15Z). 6 pending approvals (was 5). Bot briefly had second instance PID 1320917 (409 cascade 03:37Z–03:41Z, now self-resolved). Watermark=1111. Ratio=17.44. Tier 1, consecutive_clean=0.
+**Iter ~3315 summary (2026-06-30T03:50Z):** ⚠️ Drift — 1 Tier-4 alert (L1112 ourliberty-health sync_freshness, route=escalate). KEY MILESTONE: Beacon direction-ask-regbaseline-warmer-worktree-burst-001 COMPLETED 03:41:17Z ($0.697) — warmer dedup spec done, Forge build pending Larry approval. Worktrees **51/41-gate-wt** (↑24 from ~3314's 27/18; burst still active). Mirror active on PR #767 (fix/mirror-reap-merged-pr-midflight, started 03:40:32Z). Beacon in-flight on notify-telegram-409-burst-guard-001 (03:41:22Z). Watermark=1112. Ratio=17.45 (improving). Tier 1, consecutive_clean=0. 6 pending approvals (same as ~3314).
 
 
