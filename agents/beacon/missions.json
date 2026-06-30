@@ -6672,6 +6672,23 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-approval-sync-phase2-build",
+      "name": "Approval Sync Phase2 Build",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `approval-sync-phase2-build`. Last activity 2026-06-30T21:55:20.446416+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "approval-sync-phase2-build"
+      ],
+      "repo": null,
+      "created": "2026-06-30",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-30T21:59:50.159464+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-30T21:55:20.446416+00:00"
     }
   ]
 }
