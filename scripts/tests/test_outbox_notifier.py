@@ -10975,6 +10975,223 @@ class LarryDirectDispatchTest(unittest.TestCase):
         self.assertEqual(self._auto_merge_calls, [])
 
 
+class HarvestedVerdictCrossModuleTest(unittest.TestCase):
+    """Cross-module contract for harvest-verdict-before-reap (PR #768 / B1).
+
+    heal_wedged_review_sessions._deliver_mirror_verdict writes a SYNTHESIZED
+    mirror outbox before Case-1 reaps a hung-but-finished Mirror review. The
+    healer's own tests mock the deliver fn, so they prove the healer's
+    branching but NOT that the outbox it writes is actually CONSUMED by
+    outbox_notifier.process_outbox -> auto-merge. The pre-fix synthesized
+    envelope used source='heal-wedged-review-sessions:harvest-before-reap',
+    which _primary_agent_id() maps to None and which is not larry_direct, so
+    process_outbox took the `(target_agent is None ...) and not larry_direct`
+    archive-no-notify early return BEFORE _run_review_pass_auto_merge — the PR
+    never merged and the worktree was still removed (the 760/720 loss).
+
+    These tests run the REAL _deliver_mirror_verdict (to build the exact dict
+    it ships) and the REAL process_outbox on its output, mocking only the true
+    external boundaries: the merge subprocess (via _AUTO_MERGE_FN_OVERRIDE),
+    the commit-status / findings-comment gh POSTs (module-level inert
+    overrides), and the healer's outbox-dir + Larry-chat-id resolvers.
+    """
+
+    PR_CWD = '/home/larry/agent-worktrees/wt-mirror-pr-ourliberty-agent-core-760'
+    # The task_id _deliver_mirror_verdict reconstructs from PR_CWD, and the PR
+    # url that worktree maps to. The marker payload must carry these so the
+    # classifier's marker-vs-envelope task_id check passes and auto-merge has
+    # a pr_url.
+    HARVEST_TASK_ID = 'pr-ourliberty-agent-core-760'
+    HARVEST_PR_URL = (
+        'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/760'
+    )
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',
+            'BLACKBOARD', 'LOG_FILE', 'DEAD_LETTER_STATE',
+            'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        self._auto_merge_calls: list[tuple[str, str]] = []
+
+        def _default_auto_merge(pr_url, task_id):
+            self._auto_merge_calls.append((pr_url, task_id))
+            return {
+                'merge_outcome': 'merged',
+                'merge_reason': 'squash-merged (test override)',
+                'pr_number': 760,
+                'repo_coords': 'Larry-Yatch/ourliberty-agent-core',
+            }
+
+        self._original_auto_merge_override = on._AUTO_MERGE_FN_OVERRIDE
+        on._AUTO_MERGE_FN_OVERRIDE = _default_auto_merge
+        self._original_skip_serializer = on._AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST
+        on._AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST = True
+        import larry_alerts as la
+        self._la_originals = {
+            'AGENTS_ROOT': la.AGENTS_ROOT,
+            'ALERTS_FILE': la.ALERTS_FILE,
+            'COOLDOWN_ROOT': la.COOLDOWN_ROOT,
+            'OFFSET_FILE': la.OFFSET_FILE,
+        }
+        la.AGENTS_ROOT = self._root
+        la.ALERTS_FILE = self._root / 'blackboard' / 'larry-alerts.jsonl'
+        la.COOLDOWN_ROOT = self._root / 'state' / 'alert-cooldown'
+        la.OFFSET_FILE = self._root / 'state' / 'beacon-alerts-offset.txt'
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+        self._rv_root = rv.REPO_ROOT
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.invalidate_cache()
+        on.ensure_dirs()
+        self._mirror_outbox_dir = on.OUTBOXES_ROOT / 'mirror'
+        self._mirror_outbox_dir.mkdir(parents=True, exist_ok=True)
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        import larry_alerts as la
+        for name, value in self._la_originals.items():
+            setattr(la, name, value)
+        on._AUTO_MERGE_FN_OVERRIDE = self._original_auto_merge_override
+        on._AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST = self._original_skip_serializer
+        rv.REPO_ROOT = self._rv_root
+        rv.invalidate_cache()
+        self._tmp.cleanup()
+
+    def _marker(self, kind):
+        """Build a canonical Mirror verdict marker block whose task_id +
+        pr_url match what _deliver_mirror_verdict reconstructs from PR_CWD."""
+        if kind == 'pass':
+            payload = json.dumps({
+                'task_id': self.HARVEST_TASK_ID, 'pr_url': self.HARVEST_PR_URL,
+                'summary': 'LGTM',
+            })
+            return (
+                f'=== REVIEW_PASS ===\n{payload}\n=== END_REVIEW_PASS ==='
+            )
+        if kind == 'revision':
+            payload = json.dumps({
+                'task_id': self.HARVEST_TASK_ID, 'pr_url': self.HARVEST_PR_URL,
+                'findings': [{
+                    'file': 'scripts/foo.py', 'line_range': 'L1-L3',
+                    'severity': 'medium', 'description': 'Missing validation.',
+                }],
+                'severity': 'medium', 'confidence': 'high',
+            })
+            return (
+                f'=== REVIEW_REVISION ===\n{payload}\n'
+                f'=== END_REVIEW_REVISION ==='
+            )
+        if kind == 'escalate':
+            payload = json.dumps({
+                'task_id': self.HARVEST_TASK_ID, 'pr_url': self.HARVEST_PR_URL,
+                'reason': 'Spec mismatch; needs replan.',
+                'severity': 'high', 'confidence': 'high',
+            })
+            return (
+                f'=== REVIEW_ESCALATE ===\n{payload}\n'
+                f'=== END_REVIEW_ESCALATE ==='
+            )
+        raise ValueError(kind)
+
+    def _harvest_and_process(self, kind, *, chat_id=12345):
+        """Run the REAL healer deliver fn to write the synthesized outbox,
+        then the REAL process_outbox on it. Returns (process_result,
+        written_envelope_dict)."""
+        import heal_wedged_review_sessions as h
+        cand = h.Candidate(
+            pid=9, cwd=self.PR_CWD, tier='mirror', jsonl=Path('/tmp/x.jsonl'),
+            session_id='sess-harvest-9', idle_secs=600.0, marker_present=True,
+        )
+        with mock.patch.object(
+            h, '_mirror_outbox_dir', return_value=self._mirror_outbox_dir,
+        ), mock.patch.object(
+            h, '_larry_primary_chat_id', return_value=chat_id,
+        ):
+            ok = h._deliver_mirror_verdict(
+                cand, self._marker(kind), now_iso='2026-06-30T05:00:00+00:00',
+            )
+        self.assertTrue(ok, 'healer should report a successful harvest write')
+        written = list(self._mirror_outbox_dir.glob('*.json'))
+        self.assertEqual(len(written), 1, 'exactly one synthesized outbox')
+        envelope = json.loads(written[0].read_text())
+        result = on.process_outbox(written[0])
+        return result, envelope
+
+    def _read_alerts(self):
+        path = self._root / 'blackboard' / 'larry-alerts.jsonl'
+        if not path.exists():
+            return []
+        return [json.loads(l) for l in path.read_text().splitlines() if l.strip()]
+
+    def test_harvested_pass_reaches_auto_merge(self):
+        # B1 regression: the synthesized PASS outbox must travel the
+        # larry-direct path -> _run_review_pass_auto_merge, NOT the
+        # archive-no-notify early return. FAILS on pre-fix code (source was
+        # 'heal-wedged-review-sessions:harvest-before-reap' -> archived,
+        # auto-merge never called).
+        result, envelope = self._harvest_and_process('pass')
+        # The synthesized envelope is shaped for larry_direct routing.
+        self.assertEqual(envelope['source'], 'larry')
+        self.assertIsInstance(envelope['reply_chat_id'], int)
+        # Harvest provenance retained for the audit trail.
+        self.assertEqual(
+            envelope['harvested_by'],
+            'heal-wedged-review-sessions:harvest-before-reap',
+        )
+        # Routed larry-direct (NOT archived-no-notify).
+        self.assertEqual(result, 'larry-direct-marker')
+        # Auto-merge actually fired against the harvested PR.
+        self.assertEqual(len(self._auto_merge_calls), 1)
+        self.assertEqual(self._auto_merge_calls[0][0], self.HARVEST_PR_URL)
+        # Larry got the review-pass DM.
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]['intent'], 'review-pass')
+
+    def test_harvested_revision_surfaces_without_merge(self):
+        # A harvested clean REVISION must be SURFACED (status+findings posted
+        # by process_outbox's pre-routing block; Larry DM'd the findings via
+        # the cold-start no-session-revision path) and MUST NOT merge — no
+        # forge_build_session_id on a synthesized envelope -> cold start, and
+        # source='larry'+chat_id -> _dm_larry_no_session_revision.
+        result, envelope = self._harvest_and_process('revision')
+        self.assertEqual(result, 'larry-direct-marker')
+        self.assertEqual(self._auto_merge_calls, [])
+        # Surfaced to Larry (cold-start no-session revision DM), not dropped.
+        alerts = self._read_alerts()
+        self.assertGreaterEqual(len(alerts), 1)
+
+    def test_harvested_escalate_surfaces_without_merge(self):
+        # A harvested ESCALATE must DM Larry and NOT merge.
+        result, envelope = self._harvest_and_process('escalate')
+        self.assertEqual(result, 'larry-direct-marker')
+        self.assertEqual(self._auto_merge_calls, [])
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]['intent'], 'review-escalate')
+
+
 class LarryDirectDispatchNarrowingTest(unittest.TestCase):
     """task-19 (2026-05-19) — PR #46's source-routing fix was too broad.
 

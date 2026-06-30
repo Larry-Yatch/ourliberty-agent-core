@@ -148,6 +148,15 @@ HEARTBEAT_FILE = AGENTS_ROOT / 'blackboard' / 'heal-wedged-review-sessions.heart
 # promote_alerts' promotion-probation.json + pulse_check_v's clean_streak
 # registry: a JSON doc holding a tail-read execution streak + mode.
 STATE_FILE = AGENTS_ROOT / 'state' / 'review-reaper-confidence.json'
+# Agent outbox root. A Mirror review's verdict is delivered downstream as a JSON
+# outbox under `outboxes/mirror/<task_id>.json` (written by inbox_watcher on a
+# clean exit, consumed by outbox_notifier to post the MIRROR_REVIEW_STATUS commit
+# status + run auto-merge). Case-1 harvest-before-reap (harvest-verdict-before-reap-001)
+# writes the SAME artifact when it is about to reap a completed-but-undelivered
+# review, so the verdict is never destroyed with the worktree. We write the JSON
+# directly (a plain file op, in keeping with this module's zero-heavy-import
+# discipline) rather than importing inbox_watcher (which pulls supabase et al.).
+OUTBOXES_ROOT = AGENTS_ROOT / 'outboxes'
 CLAUDE_PROJECTS_DIR = HOME / '.claude' / 'projects'
 # Tier2 sessions (Mirror, and Forge under the auth HOME-swap) run with
 # HOME=/home/larry/.claude-larry-personal (agent_runner.TIER2_HOME), so their
@@ -1335,6 +1344,302 @@ def _mirror_pr_terminal_state(cand: Candidate) -> Optional[str]:
     return state if state in task_terminal_state.TERMINAL_STATES else None
 
 
+# --- Case-1 harvest-before-reap (harvest-verdict-before-reap-001) -----------
+#
+# Case-1 reaps a Mirror review on the strength of a terminal verdict marker in
+# the session JSONL — assuming the verdict was already harvested + delivered, so
+# killing the process and force-removing its worktree is harmless cleanup. That
+# holds for ~47/49 observed marker-present reaps. But when a review FINISHED
+# (emitted a valid REVIEW_PASS/etc. marker) and then HUNG without exiting,
+# agent_runner never returned, inbox_watcher never wrote the outbox, and the
+# verdict was NEVER delivered. Case-1 then removed the worktree and DESTROYED the
+# on-disk verdict (observed: PR 760, PR 720 — a valid REVIEW_PASS thrown away,
+# the retry loop hit `[Errno 2]` "All retries exhausted", and the PR stalled into
+# a hand-merge).
+#
+# The fix: before a marker-present Mirror reap, deliver the detected verdict to
+# the mirror outbox in the SAME shape inbox_watcher would have written on a clean
+# exit, so outbox_notifier picks it up and posts the MIRROR_REVIEW_STATUS commit
+# status + runs auto-merge. Re-delivery is idempotent at the GitHub layer (the
+# status POST keeps the latest per-context; auto-merge handles already_merged),
+# so a redundant delivery is benign — but we still skip it on the common 47/49
+# path by first checking whether a mirror outbox already carries this session id.
+# If the verdict can't be extracted or the write fails, we kill the (genuinely
+# wedged) PID but PRESERVE the worktree + alert, converting silent loss into a
+# recoverable preserved-and-flagged state. Forge and the no-marker paths are
+# untouched.
+
+
+def _latest_mirror_marker_text_from_jsonl(jsonl: Path) -> Optional[str]:
+    """Return the text of the LATEST assistant turn in the session JSONL that
+    parses as a canonical Mirror verdict marker, or None.
+
+    Reuses ``mirror_review_handler.parse_mirror_marker`` (the SAME parser the
+    outbox notifier uses) rather than hand-rolling a marker parser — a verdict
+    that parses here parses identically downstream. Iterates assistant turns
+    via the existing ``_assistant_text_from_jsonl_line`` role filter (a marker
+    echoed in a startup CLAUDE.md Read is a user/tool_result line and is
+    ignored). 'Latest' (last assistant turn that parsed) matches the notifier's
+    last-wins recovery (`_recover_marker_text_from_session_log`). A turn whose
+    marker is malformed / multiple raises in the parser and is skipped (it was
+    not a clean verdict). On read failure returns None (no harvestable verdict →
+    the caller fails safe: preserve the worktree, don't destroy it)."""
+    latest: Optional[str] = None
+    try:
+        with jsonl.open('r', errors='replace') as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except (ValueError, TypeError):
+                    continue
+                text = _assistant_text_from_jsonl_line(obj)
+                if not text:
+                    continue
+                try:
+                    marker_type, _payload, _narr = mirror_review_handler.parse_mirror_marker(text)
+                except Exception:  # noqa: BLE001 — malformed/multiple → not a clean verdict
+                    continue
+                if marker_type is not None:
+                    latest = text
+    except OSError:
+        return None
+    return latest
+
+
+def _mirror_outbox_dir() -> Path:
+    return OUTBOXES_ROOT / 'mirror'
+
+
+def _mirror_verdict_already_delivered(session_id: Optional[str]) -> bool:
+    """True iff a mirror outbox carrying this ``claude_session_id`` already
+    exists (live dir OR ``.archive/``) — proof the verdict was harvested +
+    delivered normally, so a reap is the ordinary idempotent cleanup (the
+    common 47/49 path).
+
+    Keyed on the SESSION id (the JSONL stem the scan already resolved), not the
+    task_id, so it is robust to task-id reconstruction: every cleanly-delivered
+    Mirror verdict produced an inbox_watcher outbox carrying this exact
+    ``claude_session_id`` (see inbox_watcher._build_outbox), archived under
+    ``.archive/`` after the notifier consumed it. Read-only; any IO/parse error
+    returns False (treat as NOT delivered → the caller attempts a harvest, the
+    safe direction: re-delivery is idempotent, but DESTROYING an undelivered
+    verdict is not)."""
+    if not session_id:
+        return False
+    mirror_dir = _mirror_outbox_dir()
+    for root in (mirror_dir, mirror_dir / '.archive'):
+        try:
+            files = list(root.glob('*.json'))
+        except OSError:
+            continue
+        for f in files:
+            try:
+                data = json.loads(f.read_text())
+            except (OSError, ValueError, TypeError):
+                continue
+            if isinstance(data, dict) and data.get('claude_session_id') == session_id:
+                return True
+    return False
+
+
+def _unique_mirror_outbox_dest(name: str) -> Path:
+    """Collision-free destination under the mirror outbox dir, matching
+    inbox_watcher._unique_dest's `<stem>.<counter><suffix>` shape so a second
+    delivery for the same task can't clobber a prior outbox."""
+    dest_dir = _mirror_outbox_dir()
+    dest = dest_dir / name
+    if not dest.exists():
+        return dest
+    stem = dest.stem
+    suffix = dest.suffix
+    counter = 1
+    while True:
+        cand = dest_dir / f'{stem}.{counter}{suffix}'
+        if not cand.exists():
+            return cand
+        counter += 1
+
+
+def _larry_primary_chat_id() -> Optional[int]:
+    """Larry's primary Telegram chat id, sourced from the SAME place
+    ``outbox_notifier.process_outbox`` resolves it for daemon-originated
+    dispatches (``_primary_chat_id`` -> lowest id in TELEGRAM_ALLOWED_CHAT_IDS).
+    We reuse that helper rather than re-reading the env so the harvested
+    larry-direct envelope can't drift from the canonical resolution. Returns
+    None when the env is unset (test rigs, mis-provisioned hosts); the caller
+    then declines the larry-direct routing and takes the fail-safe instead of
+    writing an un-routable outbox."""
+    try:
+        import outbox_notifier as notifier
+    except Exception as e:  # noqa: BLE001
+        log(f'harvest: cannot import outbox_notifier to resolve Larry chat id: '
+            f'{type(e).__name__}: {e}', 'WARN')
+        return None
+    try:
+        return notifier._primary_chat_id()
+    except Exception as e:  # noqa: BLE001
+        log(f'harvest: _primary_chat_id() raised: {type(e).__name__}: {e}', 'WARN')
+        return None
+
+
+def _deliver_mirror_verdict(cand: Candidate, marker_text: str,
+                            *, now_iso: str) -> bool:
+    """Write the harvested verdict to the mirror outbox in the shape
+    inbox_watcher._build_outbox produces on a clean exit, so outbox_notifier
+    picks it up and posts the commit status + runs auto-merge.
+
+    The task_id is reconstructed from the Mirror PR-review worktree cwd via the
+    same ``_mirror_review_pr_coords`` parser #767 uses (`pr-<repo_short>-<num>`,
+    the canonical form `heal_undispatched_pr_review.task_id_for_branch` and the
+    review-request dedup use). The notifier recovers the verdict primarily from
+    the session log (we set ``claude_session_id``) and falls back to the
+    ``result`` text (we set the marker block) — both point at this same verdict,
+    so the dual source is self-consistent. ``phase='review'`` routes it through
+    the Mirror verdict classifier; ``pr_url`` is parsed by the notifier from the
+    marker payload itself.
+
+    Returns True on a successful write; False if the cwd doesn't parse to a PR
+    task_id (can't form a safe outbox filename) or the write fails — the caller
+    then takes the fail-safe (preserve worktree + alert) rather than destroying
+    the verdict."""
+    coords = _mirror_review_pr_coords(cand.cwd)
+    if coords is None:
+        log(f'harvest: cannot reconstruct task_id from cwd {cand.cwd!r} '
+            f'(not a conventional wt-mirror-pr-* worktree); cannot deliver', 'WARN')
+        return False
+    raw = _mirror_review_pr_coords_raw(cand.cwd)
+    if raw is None:
+        log(f'harvest: cannot reconstruct task_id from cwd {cand.cwd!r} '
+            f'(name did not parse to PR coords); cannot deliver', 'WARN')
+        return False
+    repo_short, pr_number = raw
+    task_id = f'pr-{repo_short}-{pr_number}'
+    # harvest-verdict-routing-fix: the synthesized outbox MUST travel the
+    # larry-direct path in outbox_notifier.process_outbox. That path is the
+    # ONLY one that reaches _run_review_pass_auto_merge for an envelope whose
+    # source is not a bare agent id: process_outbox computes
+    # target_agent=_primary_agent_id(source) (None for any non-agent source)
+    # and, unless larry_direct is True, takes the
+    # `(target_agent is None ...) and not larry_direct` archive-no-notify early
+    # return — BEFORE auto-merge — silently discarding the verdict (the 760/720
+    # loss this whole healer exists to prevent). larry_direct is True iff
+    # routing_source == 'larry' AND reply_chat_id is an int, so we set both,
+    # mirroring the PR #45 / source='larry' precedent. Under that path every
+    # verdict type is still surfaced (the commit status + findings comment +
+    # verdict chain-event + emergency-halt trip all fire in process_outbox's
+    # pre-routing `if marker_decision:` block); only REVIEW_PASS auto-merges,
+    # a clean REVIEW_REVISION DMs Larry the findings (cold-start, no
+    # forge_build_session_id), and ESCALATE/auto-promoted-REVISION/HALT
+    # terminal-DM him. We do NOT set original_source, so routing_source falls
+    # back to source='larry'.
+    chat_id = _larry_primary_chat_id()
+    if not isinstance(chat_id, int):
+        log(f'harvest: no resolvable Larry chat id (TELEGRAM_ALLOWED_CHAT_IDS '
+            f'unset?) for task {task_id}; cannot write a routable larry-direct '
+            f'outbox -> declining harvest so the caller preserves the worktree '
+            f'+ alerts rather than writing a verdict that process_outbox would '
+            f'archive-no-notify', 'WARN')
+        return False
+    outbox = {
+        'task_id': task_id,
+        'agent': 'mirror',
+        'phase': 'review',
+        # source='larry' + int reply_chat_id => larry_direct path => auto-merge.
+        # The harvest provenance is retained in `harvested_by` for the audit
+        # trail (process_outbox ignores unknown keys).
+        'source': 'larry',
+        'reply_chat_id': chat_id,
+        'harvested_by': 'heal-wedged-review-sessions:harvest-before-reap',
+        'started_at': now_iso,
+        'completed_at': now_iso,
+        'exit_code': 0,
+        'result': marker_text,
+        'claude_session_id': cand.session_id,
+    }
+    try:
+        dest_dir = _mirror_outbox_dir()
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = _unique_mirror_outbox_dest(f'{task_id}.json')
+        dest.write_text(json.dumps(outbox, indent=2))
+    except OSError as e:
+        log(f'harvest: mirror outbox write failed for task {task_id}: '
+            f'{type(e).__name__}: {e}', 'WARN')
+        return False
+    log(f'HARVESTED verdict for {task_id} before reap -> {dest.name} '
+        f'(session={(cand.session_id or "")[:12]}...); outbox_notifier will '
+        f'post the commit status + run auto-merge')
+    return True
+
+
+def _mirror_review_pr_coords_raw(cwd: str) -> Optional[tuple[str, str]]:
+    """The (repo_short, pr_number) tokens straight off the worktree NAME — the
+    repo_short kept UNQUALIFIED so the reconstructed task_id matches the canonical
+    `pr-<repo_short>-<num>` review-request key (NOT the owner/repo coords that
+    `_mirror_review_pr_coords` returns for a gh call). Returns None if the name
+    does not parse (defensive: no longer guaranteed by the caller, so a parse
+    miss flows into the harvest fail-safe instead of raising mid-reap)."""
+    name = Path(cwd).name
+    if name.endswith(_DELETED_CWD_SUFFIX):
+        name = name[: -len(_DELETED_CWD_SUFFIX)].rstrip()
+    m = _MIRROR_WT_PR_RE.match(name)
+    if m is None:
+        return None
+    return m.group('repo_short'), m.group('num')
+
+
+def _harvest_then_decide_worktree_removal(
+    cand: Candidate, *, now_iso: str,
+    already_delivered_fn: Callable[[Optional[str]], bool],
+    deliver_fn: Callable[..., bool],
+    escalate_notify: Callable[[str, str, str], None],
+) -> bool:
+    """For a marker-present Mirror Case-1 reap, ensure the verdict is delivered
+    before the worktree is removed. Returns whether it is SAFE to remove the
+    worktree on the reap:
+
+      - already delivered (the common 47/49 path) -> True (idempotent cleanup,
+        behaviorally identical to before this fix).
+      - not delivered, verdict harvested + delivered now -> True.
+      - not delivered AND (no extractable verdict OR delivery failed) -> False:
+        the FAIL-SAFE. The PID is still killed by the reap (it IS wedged), but
+        the worktree is PRESERVED and an alert is emitted so the verdict can be
+        recovered by hand — never make the lost-verdict outcome worse.
+
+    Mirror-only; the caller gates on tier == 'mirror'. Forge / no-marker paths
+    never reach here."""
+    if already_delivered_fn(cand.session_id):
+        return True
+    marker_text = (
+        _latest_mirror_marker_text_from_jsonl(cand.jsonl)
+        if cand.jsonl is not None else None
+    )
+    if marker_text and deliver_fn(cand, marker_text, now_iso=now_iso):
+        return True
+    # FAIL-SAFE: could not extract or could not deliver. Kill the wedged PID
+    # (the reap proceeds) but PRESERVE the worktree + alert, instead of
+    # force-removing it and destroying the undelivered verdict.
+    name = Path(cand.cwd).name
+    reason = ('no extractable verdict' if not marker_text
+              else 'verdict delivery write failed')
+    log(f'DELIVERY_FAILED — worktree preserved for {name} ({reason}); '
+        f'killing the wedged pid {cand.pid} but NOT removing the worktree so '
+        f'the verdict can be recovered by hand', 'WARN')
+    escalate_notify(
+        (f'Wedged Mirror review {name} (pid {cand.pid}) finished with a terminal '
+         f'marker that was NEVER delivered, and the reaper could not auto-deliver '
+         f'it ({reason}). Killed the wedged process but PRESERVED the worktree so '
+         f'the verdict is not lost.'),
+        f'wedged-review-verdict-undelivered:{name}',
+        (f'Inspect the session log + worktree at {cand.cwd}; recover the Mirror '
+         f'verdict and re-post the PR review / merge by hand. Session log: '
+         f'{cand.jsonl}.'),
+    )
+    return False
+
+
 # ==================== orchestration ====================
 
 @dataclass
@@ -1537,6 +1842,10 @@ def run_cycle(
     event_emitter: Callable[..., None] = _emit_healed_event,
     verify_pid_fn: Callable[[int], Optional[str]] = proc_cwd,
     pr_terminal_state_fn: Callable[[Candidate], Optional[str]] = _mirror_pr_terminal_state,
+    # Harvest-before-reap seams (Case-1 Mirror). Injectable so the whole flow is
+    # unit-testable without touching the real outbox dir.
+    mirror_verdict_already_delivered_fn: Callable[[Optional[str]], bool] = _mirror_verdict_already_delivered,
+    mirror_verdict_deliver_fn: Callable[..., bool] = _deliver_mirror_verdict,
     persist: bool = True,
 ) -> dict[str, Any]:
     """One sweep. All IO seams are injectable so the whole flow is unit-
@@ -1557,6 +1866,9 @@ def run_cycle(
         'case2_auto_reaped': 0, 'case2_hard_reaped': 0, 'case2_demoted_at_gate': 0,
         'true_positives': 0, 'false_positives': 0, 'forge_spared': 0,
         'pr_terminal_reaped': 0,
+        # Case-1 Mirror reaps where the verdict could NOT be auto-delivered, so
+        # the worktree was PRESERVED + alerted instead of force-removed.
+        'case1_verdict_undelivered': 0,
         'worktree_preserved': 0, 'mode_before': state.mode,
     }
 
@@ -1635,16 +1947,39 @@ def run_cycle(
         # (Mirror tier / unreadable commit age → False → remove as before.)
         keep_worktree = cand.tier == 'forge' and _session_progress_stale(cand, cfg)
         if verdict == REAP_CASE1:
+            # Harvest-before-reap (harvest-verdict-before-reap-001): a Mirror
+            # review can FINISH (valid verdict marker on disk) then HANG without
+            # exiting, so its verdict was never harvested/delivered. Removing the
+            # worktree here would DESTROY that verdict (PR 760 / 720). Before the
+            # reap, deliver the detected verdict to the mirror outbox (so
+            # outbox_notifier posts the status + auto-merges); on the common
+            # already-delivered path this is a no-op and behavior is identical. If
+            # the verdict can't be extracted/delivered, PRESERVE the worktree +
+            # alert instead of force-removing it (fail-safe). Forge tier keeps its
+            # own keep_worktree (progress-stale) semantics, unchanged.
+            remove_after = not keep_worktree
+            if cand.tier == 'mirror':
+                safe_to_remove = _harvest_then_decide_worktree_removal(
+                    cand, now_iso=now_iso,
+                    already_delivered_fn=mirror_verdict_already_delivered_fn,
+                    deliver_fn=mirror_verdict_deliver_fn,
+                    escalate_notify=escalate_notify,
+                )
+                remove_after = remove_after and safe_to_remove
             if reap(cand, case='case1',
                     reason=(f'terminal marker present, idle {int(cand.idle_secs)}s '
                             f'> grace {cfg["marker_grace_seconds"]}s'),
-                    remove_worktree_after_kill=not keep_worktree,
+                    remove_worktree_after_kill=remove_after,
                     reaper=reaper, worktree_remover=worktree_remover,
                     closure_notify=closure_notify, event_emitter=event_emitter,
                     verify_pid_fn=verify_pid_fn):
                 summary['case1_reaped'] += 1
                 if keep_worktree:
                     summary['worktree_preserved'] += 1
+                elif cand.tier == 'mirror' and not remove_after:
+                    # Harvest fail-safe: killed but worktree preserved for hand recovery.
+                    summary['worktree_preserved'] += 1
+                    summary['case1_verdict_undelivered'] += 1
         elif verdict == REAP_CASE2_HARD:
             # Deterministic backstop: silent far longer than any legitimate
             # review operation could run, so reap regardless of the confidence
@@ -1740,6 +2075,7 @@ def main() -> int:
         'case2_alerted={case2_alerted} case2_auto_reaped={case2_auto_reaped} '
         'case2_hard_reaped={case2_hard_reaped} forge_spared={forge_spared} '
         'pr_terminal_reaped={pr_terminal_reaped} '
+        'case1_verdict_undelivered={case1_verdict_undelivered} '
         'worktree_preserved={worktree_preserved} '
         'tp={true_positives} fp={false_positives} mode={mode_after} '
         'streak={streak}'.format(**summary))
