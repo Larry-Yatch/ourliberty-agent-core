@@ -80,7 +80,7 @@ Per the parent principle, all projections read the **same substrate**, and the *
 
 - **Phase 0 — stop the bleeding** *(DONE 2026-06-30)*: popped the 4 already-approved phantoms from P → doorbell quiet. Backup `/tmp/beacon-pending-approvals.backup.20260630T192847Z.json`.
 - **Phase 1 — close the load-bearing gap** *(BUILT — this PR)*: (a) `heal_stale_approvals.reconcile_resolved_in_supabase` — pops a pending entry when a `larry_action` approve/reject exists in `chain_events` for its task_id (deterministic, idempotent, additive to Telegram self-pop); (b) `task_terminal_state.expand_variants` strips the `mirror-review-`/`heal-`/`fix-` wrapper prefixes so terminal-reconcile matches a wrapped id to its merged PR. Healer-side only — no change to the live dashboard approve/dispatch path. *Outcome: dashboard approvals clear Beacon's queue within one 10-min tick.*
-- **Phase 2 — converge the stores under one decision key** *(team spec)*: canonical key across P/C/E/A; one `resolve_decision(key, outcome)` fan-out called by both surfaces; fix the State Log escalations-bucket undercount.
+- **Phase 2 — converge the stores under one decision key** *(spec written → [approval-sync-phase2-spec.md](approval-sync-phase2-spec.md))*: canonical key across P/C/E/A; one `resolve_decision(key, outcome)` fan-out called by both surfaces; fix the State Log escalations-bucket undercount.
 - **Phase 3 — make the Approvals tab the one surface** *(team spec)*: fold the dormant Operator Action Queue's 6-source sourcing into the Approvals tab; split decisions vs parked; add a single global "N need you" nav counter; point Live System / Where-are-we / Operations at it via links instead of independent counts.
 - **Phase 4 — Beacon sees the truth** *(team spec)*: scoped read-only query for Beacon against the unified substrate (not a login).
 
@@ -99,7 +99,7 @@ Per the parent principle, all projections read the **same substrate**, and the *
 ## 9. Tracker
 - [x] Phase 0 — phantom cleanup (2026-06-30)
 - [x] Phase 1 — deterministic C-resolved→P-pop reconciler + prefix-strip (this PR)
-- [ ] Phase 2 — canonical key + resolve fan-out + escalations-bucket fix *(team spec)*
+- [ ] Phase 2 — canonical key + resolve fan-out + escalations-bucket fix *(spec written 2026-06-30 → [approval-sync-phase2-spec.md](approval-sync-phase2-spec.md); awaiting build)*
 - [ ] Phase 3 — Approvals tab as the one surface + decisions/parked split + nav counter *(team spec)*
 - [ ] Phase 4 — Beacon scoped read *(team spec)*
 - [x] UI/UX assessment appended (§10) — live dive 2026-06-30
