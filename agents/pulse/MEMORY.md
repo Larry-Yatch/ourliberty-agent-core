@@ -358,8 +358,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T06:50Z UTC (Iter ~3328, Tier 1)
+## Status snapshot — updated 2026-06-30T06:55Z UTC (Iter ~3329, Tier 1)
 
-**Iter ~3328 summary (2026-06-30T06:50Z):** 0 new alerts. All daemons healthy (beacon bot 1200723, inbox-watcher 1286943, outbox-notifier 1340254, heal-daemon 06:38:39Z). No stalls. **ourliberty-cycle.timer BROKEN (4th consecutive iter)** — last automated cycle 06:01Z (commit 31a07d4f); escalation in pulse-escalations.json 06:31:00Z. Pipeline idle (outbox-notifier last entry 23:11:25Z from 2026-06-29). 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals (unchanged since ~3324). Worktrees 11/0-gate-wt. Watermark=1120. Ratio=17.3875. Tier 1.
+**Iter ~3329 summary (2026-06-30T06:55Z):** 0 new alerts. All daemons healthy (beacon bot 1200723, inbox-watcher 1286943, outbox-notifier 1340254, heal-daemon 06:48:40Z). No stalls. **ourliberty-cycle.timer BROKEN (5th consecutive iter)** — escalation in pulse-escalations.json 06:31:00Z. Pipeline idle (outbox-notifier last entry 23:11:25Z from 2026-06-29). **PR #767 MERGED** ("fix(healer): reap mid-flight Mirror reviews when PR goes terminal"). 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals (unchanged). Worktrees 5/0-gate-wt (down from 11 in ~3328 — reaper working). Active Forge worktree: wt-fix-harvest-verdict [fix/reaper-harvest-verdict-before-reap]. Watermark=1120. Ratio=17.4. Tier 1.
 
 
