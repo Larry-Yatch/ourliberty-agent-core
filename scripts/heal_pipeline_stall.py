@@ -254,19 +254,21 @@ _AUTO_MERGE_MERGED_RE = re.compile(
 # else fire one loud, non-suppressed alert).
 NO_SESSION_STUCK_MIN = 45  # grace before a stuck cold-start obligation alerts
 
-# Branch prefixes an agent (Forge / the build path) produces. A cold-start
+# Branch prefixes that carried a resumable Forge build session. A cold-start
 # no-session obligation only exists for a session-less revision, and that shape
 # has two very different roots:
-#   - an AGENT-built branch (forge/|larry/|claude/) whose build session got
-#     DROPPED in the chain — the genuine #412 regression: Forge has context it
-#     can no longer `--resume`. Worth a loud page.
-#   - any OTHER branch (feat/|fix/|work/...) — a PR Larry opened by hand and
-#     routed through the auto-review label handoff. Forge NEVER built it, so
-#     there is no build session to carry; the cold-start re-brief is the
-#     DESIGNED path, not a stall. Expected for every hand-opened PR Mirror wants
-#     revised — paging Larry for it is pure alert toil.
-# Same prefix set the task-id extractor already trusts as agent-produced.
-AGENT_BUILT_BRANCH_PREFIXES = ('forge/', 'larry/', 'claude/')
+#   - a `forge/` branch whose build session got DROPPED in the chain — the
+#     genuine #412 regression: Forge has context it can no longer `--resume`.
+#     Worth a loud page.
+#   - any OTHER branch (feat/|fix/|work/|larry/|claude/...) — a PR opened by
+#     hand or on the laptop and routed through the auto-review label handoff.
+#     Forge NEVER built it, so there is no build session to carry; the
+#     cold-start re-brief is the DESIGNED path, not a stall. Expected for every
+#     hand-opened PR Mirror wants revised — paging Larry for it is pure alert
+#     toil. (larry/ and claude/ DO appear in the task-id extractor's prefix set,
+#     but an extractable task_id is not a resumable build session — only
+#     forge/ branches are built by the Forge build path.)
+AGENT_BUILT_BRANCH_PREFIXES = ('forge/',)
 
 
 def _is_agent_built_branch(branch: Optional[str]) -> bool:
