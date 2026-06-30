@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""Tests for the active-tier HOME plumbing in ``agent_runner.run_claude``
-(spec § 6.2).
+"""Tests for the active-tier HOME plumbing in ``agent_runner.run_claude``.
 
-We exercise the Popen / subprocess.run call sites with mocks and assert
-the ``env['HOME']`` value tracks ``active_tier.current_home()`` for the
-primary subprocess and ``active_tier.other_home()`` for the
-failure-fallback retry. The fallback's existing ``--resume`` refusal must
-keep working unchanged when the active state flips.
+We exercise the Popen / subprocess.run call sites with mocks and assert the
+``env['HOME']`` value tracks the DISPATCHED tier's home for the primary
+subprocess and the fallback tier's home for the failure-fallback retry.
+
+Under per-task dispatch (docs/specs/tier-dispatch-spec.md) the tier is chosen
+by ``active_tier.select_dispatch_tier`` rather than the global active-tier
+state, so each test pins the tier it intends to exercise via the operator
+override (``rotation.disabled``); ``_write_state`` writes both. The fallback's
+existing account-bound ``--resume`` refusal must keep working unchanged.
 
 Run:
     cd ~/agent-core && python3 -m unittest \\
@@ -149,9 +152,15 @@ class RunClaudeActiveTierEnvTest(unittest.TestCase):
         self.tmp.cleanup()
 
     def _write_state(self, tier):
+        # Under per-task dispatch the SELECTOR (not active-tier state) chooses
+        # the dispatch tier, so pin it via the operator override
+        # (rotation.disabled) to make THIS test's dispatch land deterministically
+        # on `tier` — select_dispatch_tier step 0 returns the pin. The legacy
+        # active-tier.json write is kept (harmless; some readers still consult it).
         path = self.root / 'blackboard' / 'active-tier.json'
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps({'tier': tier}))
+        (self.root / 'rotation.disabled').write_text(tier)
 
     def _run(self, popen_proc, t2_result=None, setup_token='setup-tok'):
         """Drive run_claude with the supplied Popen result + optional
@@ -392,6 +401,11 @@ class ResumeNoFallbackRefusalTest(unittest.TestCase):
             p.start()
         self.addCleanup(lambda: [p.stop() for p in patches])
 
+        # Pin tier1 so the per-task selector dispatches (otherwise, with no
+        # setup-token mocked, no tier is usable and run_claude would TIER_HOLD
+        # before ever exercising the account-bound --resume refusal under test).
+        (self.root / 'rotation.disabled').write_text('tier1')
+
         success, output, _ = ar.run_claude(
             agent_id='forge',
             prompt='hello',
@@ -433,9 +447,15 @@ class AuthCircuitBreakerTest(unittest.TestCase):
         self.tmp.cleanup()
 
     def _write_state(self, tier):
+        # Under per-task dispatch the SELECTOR (not active-tier state) chooses
+        # the dispatch tier, so pin it via the operator override
+        # (rotation.disabled) to make THIS test's dispatch land deterministically
+        # on `tier` — select_dispatch_tier step 0 returns the pin. The legacy
+        # active-tier.json write is kept (harmless; some readers still consult it).
         path = self.root / 'blackboard' / 'active-tier.json'
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps({'tier': tier}))
+        (self.root / 'rotation.disabled').write_text(tier)
 
     def test_auth_401_on_primary_sets_cooldown_on_active_tier(self):
         # State is tier1; the primary subprocess returns an auth_401.
@@ -673,9 +693,15 @@ class TierFailureLogTaggingTest(unittest.TestCase):
         self.tmp.cleanup()
 
     def _write_state(self, tier):
+        # Under per-task dispatch the SELECTOR (not active-tier state) chooses
+        # the dispatch tier, so pin it via the operator override
+        # (rotation.disabled) to make THIS test's dispatch land deterministically
+        # on `tier` — select_dispatch_tier step 0 returns the pin. The legacy
+        # active-tier.json write is kept (harmless; some readers still consult it).
         path = self.root / 'blackboard' / 'active-tier.json'
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps({'tier': tier}))
+        (self.root / 'rotation.disabled').write_text(tier)
 
     def _run_with_failure(self, active_tier_name):
         self._write_state(active_tier_name)
@@ -759,6 +785,138 @@ class TierFailureLogTaggingTest(unittest.TestCase):
         ]
         self.assertEqual(len(detection_lines), 1)
         self.assertIn('tier=tier2', detection_lines[0]['message'])
+
+
+class RunClaudePerTaskDispatchTest(unittest.TestCase):
+    """W1: run_claude chooses the tier per-task via select_dispatch_tier,
+    threads the effective tier through ledger/cooldown/account stamping, and
+    records the session->tier binding (spec §4/§5/§6)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self._prev_root = os.environ.get('OURLIBERTY_AGENTS_ROOT')
+        os.environ['OURLIBERTY_AGENTS_ROOT'] = str(self.root)
+        # No credentials env-file so tier_auth keys only on the mocked token.
+        self._prev_credenv = os.environ.get('OURLIBERTY_CREDENTIALS_ENV_FILE')
+        os.environ['OURLIBERTY_CREDENTIALS_ENV_FILE'] = str(self.root / 'noenv')
+        self.workdir = self.root / 'work'
+        self.workdir.mkdir(parents=True, exist_ok=True)
+        _pin_log_dir(self, self.root)
+
+    def tearDown(self):
+        for k, prev in (('OURLIBERTY_AGENTS_ROOT', self._prev_root),
+                        ('OURLIBERTY_CREDENTIALS_ENV_FILE', self._prev_credenv)):
+            if prev is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = prev
+        self.tmp.cleanup()
+
+    def _run(self, proc, session_id=None, tokens=('setup-tok'),
+             t2_result=None, out_meta=None, task_stem=None):
+        """Drive run_claude. `tokens` controls _setup_token_for_tier: pass a
+        string (all tiers usable), None (none usable -> hold), or a dict
+        {tier: tok}. Returns the run_claude result tuple."""
+        if isinstance(tokens, dict):
+            tok_fn = lambda tier: tokens.get(tier)
+        else:
+            tok_fn = lambda tier: tokens
+
+        def fake_run(cmd, **kwargs):
+            return t2_result if t2_result else mock.Mock(
+                returncode=0, stdout=_ok_response(), stderr='')
+
+        patches = [
+            mock.patch.object(ar, 'get_manager', return_value=mock.Mock(
+                get_token=lambda: ('tok', 'acct1'),
+                check_for_rate_limit=lambda _o: False,
+                detect_cap_in_output=lambda _o: False,
+                report_rate_limit=lambda *a, **k: None,
+                report_success=lambda *a, **k: None)),
+            mock.patch.object(ar, 'get_guard', return_value=_NoopGuard()),
+            mock.patch('agent_runner.subprocess.Popen',
+                       side_effect=lambda cmd, **kw: proc),
+            mock.patch('agent_runner.subprocess.run', side_effect=fake_run),
+            mock.patch.object(ar, 'tier2_available', return_value=True),
+            mock.patch.object(ar, '_fallback_available', return_value=True),
+            mock.patch.object(ar.active_tier, '_setup_token_for_tier',
+                              side_effect=tok_fn),
+            mock.patch.object(ar, '_dm_tier2_unavailable'),
+            mock.patch.object(ar, '_mark_paused_on_tier1'),
+            mock.patch.object(ar, 'append_rate_limit_event'),
+            mock.patch.object(larry_alerts, 'append_alert'),
+            mock.patch.object(ar, 'quarantine_parent_claude_md_poison'),
+            mock.patch.object(ar, 'scrub_tmp_identity_landmines'),
+            mock.patch('agent_runner.time.sleep'),
+        ]
+        for p in patches:
+            p.start()
+        self.addCleanup(lambda: [p.stop() for p in patches])
+        return ar.run_claude(agent_id='forge', prompt='hi',
+                             working_dir=str(self.workdir),
+                             session_id=session_id, timeout=60,
+                             out_meta=out_meta, task_stem=task_stem)
+
+    def test_new_dispatch_records_session_tier(self):
+        meta = {}
+        ok, _out, sid = self._run(_FakeProc(0, stdout=_ok_response()),
+                                  out_meta=meta)
+        self.assertTrue(ok)
+        # The binding was persisted for the new session under the chosen tier.
+        bound = active_tier.lookup_session_tier(sid)
+        self.assertIn(bound, {'tier1', 'tier3'})
+        self.assertEqual(meta['account_tier'], bound)  # §6 attribution
+
+    def test_resume_dispatches_on_bound_tier(self):
+        active_tier.record_session_tier('sess-bound', 'tier3')
+        meta = {}
+        ok, _out, _sid = self._run(_FakeProc(0, stdout=_ok_response()),
+                                   session_id='sess-bound', out_meta=meta)
+        self.assertTrue(ok)
+        self.assertEqual(meta['account_tier'], 'tier3')  # bound tier honored
+
+    def test_no_usable_tier_holds(self):
+        # No setup token for any tier and no pin -> nothing usable -> HOLD.
+        ok, out, sid = self._run(_FakeProc(0, stdout=_ok_response()),
+                                 tokens=None)
+        self.assertFalse(ok)
+        self.assertTrue(out.startswith('TIER_HOLD:'))
+        self.assertIsNone(sid)
+
+    def test_resume_bound_tier_benched_pauses_for_autoresume(self):
+        # Spec §5: a resume whose bound tier is benched at selection must NOT
+        # be silently held — it pauses (mark_paused) on the SAME tier for
+        # heal_resume_paused_on_tier1 to auto-resume, and returns a descriptive
+        # failure (so process_task archives the envelope the healer needs),
+        # NOT the TIER_HOLD sentinel.
+        active_tier.record_session_tier('sess-x', 'tier3')
+        active_tier.set_cooldown('tier3', raw_excerpt='resets 3pm')
+        ok, out, sid = self._run(_FakeProc(0, stdout=_ok_response()),
+                                 session_id='sess-x', task_stem='held-resume')
+        # Routed into the resume-discipline pause path (which calls
+        # _mark_paused_on_tier1 immediately before this return), NOT the
+        # inbox-held TIER_HOLD path. The marker SHAPE is covered separately by
+        # test_heal_resume_paused_on_tier1.AgentRunnerMarkerShapeTest; here we
+        # verify run_claude's routing DECISION for a benched bound resume.
+        self.assertFalse(ok)
+        self.assertNotIn('TIER_HOLD', out)
+        self.assertIn('paused for auto-resume', out)
+        self.assertIn('tier3', out)  # bound tier named; no cross-tier migration
+        self.assertIsNone(sid)
+
+    def test_account_tier_follows_fallback(self):
+        # Primary (pinned tier1) rate-limits; fallback to tier3 succeeds ->
+        # the cost row must attribute to tier3 (the tier that ran), §6.
+        (self.root / 'rotation.disabled').write_text('tier1')
+        # Bench tier2 so fallback_tier(tier1) -> tier3.
+        active_tier.set_cooldown('tier2', raw_excerpt='resets 3pm')
+        meta = {}
+        proc = _FakeProc(1, stdout="You've hit your limit · resets 11:30am")
+        t2 = mock.Mock(returncode=0, stdout=_ok_response(), stderr='')
+        ok, _out, _sid = self._run(proc, t2_result=t2, out_meta=meta)
+        self.assertTrue(ok)
+        self.assertEqual(meta['account_tier'], 'tier3')
 
 
 if __name__ == '__main__':

@@ -907,6 +907,19 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
             pass
         return
 
+    # TIER_HOLD (spec §4 caller contract): run_claude could not pick a dispatch
+    # tier — a TOCTOU after the gate (a tier benched between gate and spawn) or
+    # a resume whose bound tier benched mid-flight. NO LLM spend happened
+    # (run_claude returned before spawning), so HOLD like the rotation gate:
+    # leave the task in the inbox, no outbox, no archive, no requeue-bump; the
+    # next poll re-evaluates when a tier frees (the §9 all-held alert makes a
+    # persistent hold visible). NEVER drop held work.
+    if not success and isinstance(output_text, str) \
+            and output_text.startswith('TIER_HOLD:'):
+        log(f"[{agent}] TIER_HOLD task={task_id} held in inbox "
+            f"({output_text}); next poll re-evaluates")
+        return
+
     # mirror-marker-self-validate-gate-001: bounded SAME-PROCESS verdict-marker
     # self-validation, in FRONT of the outbox_notifier marker-error net. Only on
     # run_claude success (a non-success is a different class and gets no

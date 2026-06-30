@@ -1339,15 +1339,72 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
             _real_home = env.get('HOME') or os.path.expanduser('~')
             env.setdefault('GH_CONFIG_DIR', os.path.join(_real_home, '.config', 'gh'))
             env.setdefault('GIT_CONFIG_GLOBAL', os.path.join(_real_home, '.gitconfig'))
-            active_tier_name = active_tier.read()['tier']
+            # Per-task tier dispatch (spec docs/specs/tier-dispatch-spec.md
+            # §4/§6): choose the tier for THIS task instead of the single
+            # global active tier. A resume (session_id present) is bound to the
+            # tier its session was created on (I2 — never cross-tier migrate); a
+            # new task round-robins the healthy primary pool.
+            session_tier = (active_tier.lookup_session_tier(session_id)
+                            if session_id else None)
+            if session_id and session_tier is None:
+                # Spec §5: a resume with NO recorded binding (a pre-existing or
+                # 14d-pruned session). WARN so the historical no-session-revision
+                # strand is observable; the selector still refuses cross-tier
+                # fallback (session_tier stays None → fresh pool selection, and
+                # the resume-discipline below never spills a --resume to another
+                # account).
+                log(agent_id,
+                    'RESUME_NO_TIER_BINDING session=' + session_id[:12] +
+                    '... (selecting fresh; no cross-tier fallback)', 'WARN')
+            active_tier_name = active_tier.select_dispatch_tier(
+                session_tier=session_tier)
+            if active_tier_name is None:
+                # Spec §4 caller contract: None => MUST NOT dispatch.
+                if session_tier is not None:
+                    # Spec §5: a RESUME whose bound tier is benched at selection
+                    # time. We can't cross-tier migrate (I2) and can't spawn on
+                    # the benched tier — but we must NOT silently hold it in the
+                    # inbox forever. Follow the resume-discipline: mark paused so
+                    # `heal_resume_paused_on_tier1` AUTO-RESUMES it on the SAME
+                    # tier once that tier's cooldown clears (the marker carries
+                    # agent_id + tier; the healer reconstructs session_id from
+                    # the archived envelope), and return a descriptive failure —
+                    # NOT the TIER_HOLD sentinel — so process_task ARCHIVES the
+                    # envelope the healer needs (a TIER_HOLD would hold it in the
+                    # inbox with no archive, starving the healer). No fresh DM:
+                    # the auto-resume self-heals and heal_pipeline_stall's
+                    # Check-8 surfaces a pause that persists abnormally — this
+                    # keeps a recoverable, self-healing event off Larry's phone.
+                    log(agent_id,
+                        'RESUME_TIER_BENCHED session=' +
+                        (session_id or '')[:12] + '... tier=' + session_tier +
+                        ' -> paused for auto-resume', 'WARN')
+                    _mark_paused_on_tier1(
+                        task_stem, 'rate_limit',
+                        agent_id=agent_id, tier=session_tier,
+                    )
+                    return (False,
+                            'Resume tier ' + session_tier + ' benched at '
+                            'dispatch; paused for auto-resume when its cooldown '
+                            'clears (no cross-tier migration).',
+                            None)
+                # NEW task (or an unbound resume): no tier available at all. The
+                # inbox gate (§G) holds NEW tasks before run_claude, so reaching
+                # None here is a TOCTOU (a tier benched between gate and spawn).
+                # HOLD in the inbox — NOT a hard failure that drops the task;
+                # the §9 all-held alert surfaces a persistent hold.
+                log(agent_id,
+                    'TIER_HOLD no dispatch tier available '
+                    '(all primaries benched/near-cap, fallback held)', 'WARN')
+                return False, 'TIER_HOLD: no dispatch tier available', None
             auth_source = _apply_tier_auth(env, active_tier_name, token)
             # Decouple app HOME from the auth tier: keep the real home when
             # auth came from the setup-token (HOME-independent); only swap to
-            # the tier's home when falling back to its creds.json.
+            # the SELECTED tier's home when falling back to its creds.json.
             if auth_source == 'setup_token':
                 env['HOME'] = active_tier.TIER1_HOME
             else:
-                env['HOME'] = active_tier.current_home()
+                env['HOME'] = active_tier.home_for_tier(active_tier_name)
             # Pin OURLIBERTY_AGENTS_ROOT so child sessions (and any module
             # that honors it) resolve agents/ state to the real account home
             # even on the no-setup-token fallback path where HOME still swaps
@@ -1435,7 +1492,7 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
 
             log(agent_id, 'Running (model=' + model +
                 ', account=' + account_id +
-                ', tier=' + active_tier_name +
+                ', dispatch_tier=' + active_tier_name +
                 ', auth=' + auth_source +
                 ', attempt=' + str(attempt+1) + '/' + str(MAX_RETRIES) +
                 ', active=' + str(guard.active_count()) + '/' + str(MAX_CONCURRENT) +
@@ -1573,21 +1630,16 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                         result.stdout, result.stderr,
                     )
                     if failure_type:
-                        # Resolve the actual failing tier from active-tier
-                        # state — the legacy log token hardcoded "tier1" but
-                        # under rotation the primary subprocess could be on
-                        # either tier, and incident triage needs the real
-                        # account. Falls back to 'tier1' on any read error
-                        # (same posture as the ledger account field below).
-                        try:
-                            active_tier_name = (
-                                active_tier.read().get('tier') or 'tier1'
-                            )
-                        except Exception:
-                            active_tier_name = 'tier1'
+                        # §6 effective-tier discipline: the failing tier is the
+                        # one THIS task actually dispatched on (effective_tier),
+                        # not the global active tier — under per-task dispatch
+                        # they differ, and benching/ledgering the wrong tier is
+                        # the exact bug §6 fixes. effective_tier == the selected
+                        # primary here (the tier2-fallback branch below updates
+                        # it only on a fallback SUCCESS).
                         log(agent_id,
                             'TIER_FAILURE_DETECTED tier=' +
-                            active_tier_name +
+                            effective_tier +
                             ' type=' + failure_type +
                             ' stdout=' + repr((result.stdout or '')[:300]) +
                             ' stderr=' + repr((result.stderr or '')[:300]),
@@ -1611,10 +1663,8 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                             )
                         except Exception:
                             retry_after = None
-                        try:
-                            tier_now = active_tier.read().get('tier') or 'tier1'
-                        except Exception:
-                            tier_now = 'tier1'
+                        # §6: attribute the ledger event to the tier that ran.
+                        tier_now = effective_tier
                         try:
                             append_rate_limit_event(
                                 agent=agent_id,
@@ -1639,7 +1689,7 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                             # task can still take its retry path.
                             try:
                                 active_tier.set_cooldown(
-                                    active_tier.read()['tier'],
+                                    effective_tier,
                                     raw_excerpt=(result.stdout or '') +
                                     '\n' + (result.stderr or ''),
                                 )
@@ -1658,7 +1708,7 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                             # the operator re-auths.
                             try:
                                 active_tier.set_cooldown(
-                                    active_tier.read()['tier'],
+                                    effective_tier,
                                     raw_excerpt=(result.stdout or '') +
                                     '\n' + (result.stderr or ''),
                                     kind='auth_401',
@@ -1848,13 +1898,13 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                                         t2.stdout, t2.stderr,
                                     ) == 'rate_limit':
                                         try:
-                                            other_tier = (
-                                                'tier2'
-                                                if active_tier.read()['tier']
-                                                == 'tier1' else 'tier1'
-                                            )
+                                            # §6 pool-aware: cool down the
+                                            # fallback tier that just walled
+                                            # (the one we actually attempted),
+                                            # not a binary tier1/tier2 guess —
+                                            # the fallback may be tier3.
                                             active_tier.set_cooldown(
-                                                other_tier,
+                                                other_tier_name,
                                                 raw_excerpt=(t2.stdout or '') +
                                                 '\n' + (t2.stderr or ''),
                                             )
@@ -1913,6 +1963,17 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                                 agent_id, effective_home, effective_tier,
                                 cwd, new_session_id, task_stem=task_stem,
                             )
+                            # §5 durable session->tier binding: record the tier
+                            # this session ran on so a later --resume (here or
+                            # in either telegram bot) stays on the SAME account
+                            # (I2 — no cross-tier migration). Idempotent on a
+                            # resume; self-heals a binding that was missing
+                            # (the RESUME_NO_TIER_BINDING case above).
+                            try:
+                                active_tier.record_session_tier(
+                                    new_session_id, effective_tier)
+                            except Exception:
+                                pass
                         cost = response.get('total_cost_usd')
                         cost_str = ', $' + f'{cost:.4f}' if cost else ''
                         log(agent_id, 'Completed successfully (account=' + account_id +
@@ -1929,20 +1990,15 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                             }
                             out_meta['model'] = model
                             out_meta['account_id'] = account_id
-                            # Step C: surface the active-tier identity on the
-                            # outbox so costs.jsonl can carry a per-account
-                            # field. Distinct from `account_id` (the OAuth pool
-                            # identity, today always 'oauth' on the stub): this
-                            # is tier1/tier2 from blackboard/active-tier.json.
-                            # Future rolling-5h math is account-scoped on this
-                            # field. Absent => caller treats as 'tier1' for
-                            # historical-record backward compatibility.
-                            try:
-                                out_meta['account_tier'] = (
-                                    active_tier.read().get('tier') or 'tier1'
-                                )
-                            except Exception:
-                                out_meta['account_tier'] = 'tier1'
+                            # §6 effective-tier discipline: attribute the cost
+                            # row to the tier that ACTUALLY ran this task
+                            # (effective_tier — updated above if a tier2
+                            # fallback produced the result), not the global
+                            # active tier. inbox_watcher copies this to
+                            # costs.jsonl as the `account` field that §8's
+                            # per-tier rolling-5h burn filters on. Distinct from
+                            # `account_id` (the OAuth pool identity).
+                            out_meta['account_tier'] = effective_tier
                             out_meta['attempts'] = attempt + 1
                             out_meta['started_at'] = _meta_started_at
                             out_meta['completed_at'] = datetime.now(timezone.utc).isoformat()
