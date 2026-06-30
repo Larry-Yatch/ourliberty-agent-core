@@ -235,7 +235,7 @@ class PrimaryDispatchTokenSelectionTest(_RunClaudeHarness):
         os.environ['CLAUDE_CODE_OAUTH_TOKEN_TIER2'] = _TIER2_TOKEN
         proc = _FakeProc(0, stdout=_ok_response())
         (_result, popen_env, _t2_env) = self._drive(proc)
-        # Setup-token won; HOME-swap remained intact for session storage.
+        # Setup-token won; real home retained (token auth is HOME-independent).
         self.assertEqual(popen_env['CLAUDE_CODE_OAUTH_TOKEN'], _TIER1_TOKEN)
         self.assertEqual(popen_env['HOME'], '/home/larry')
 
@@ -246,9 +246,8 @@ class PrimaryDispatchTokenSelectionTest(_RunClaudeHarness):
         proc = _FakeProc(0, stdout=_ok_response())
         (_result, popen_env, _t2_env) = self._drive(proc)
         self.assertEqual(popen_env['CLAUDE_CODE_OAUTH_TOKEN'], _TIER2_TOKEN)
-        self.assertEqual(
-            popen_env['HOME'], '/home/larry/.claude-larry-personal',
-        )
+        # Root fix: token auth is HOME-independent, so the real home stays.
+        self.assertEqual(popen_env['HOME'], '/home/larry')
 
     def test_tier1_default_when_active_tier_token_unset(self):
         # Active=tier1 but only TIER2 token configured → primary dispatch
@@ -333,9 +332,8 @@ class FallbackTierTokenSelectionTest(_RunClaudeHarness):
         # Primary used Tier1's token; fallback used Tier2's token.
         self.assertEqual(popen_env['CLAUDE_CODE_OAUTH_TOKEN'], _TIER1_TOKEN)
         self.assertEqual(t2_env['CLAUDE_CODE_OAUTH_TOKEN'], _TIER2_TOKEN)
-        self.assertEqual(
-            t2_env['HOME'], '/home/larry/.claude-larry-personal',
-        )
+        # Root fix: setup-token path keeps the real home for the fallback too.
+        self.assertEqual(t2_env['HOME'], '/home/larry')
 
     def test_fallback_reverts_to_default_when_other_tier_token_missing(self):
         # Active tier has a setup-token; the OTHER tier doesn't. The

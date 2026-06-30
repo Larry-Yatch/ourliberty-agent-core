@@ -159,6 +159,86 @@ class BeaconBotPrimaryUsesTier1SetupTokenTest(_TempDirBase):
         self.assertEqual(sess, 'sess-x')
 
 
+class BeaconBotHonorsTierPinTest(_TempDirBase):
+    """Regression guard for the 2026-06-29 incident: with the team pinned to
+    Tier 2 (active_tier.read()['tier'] == 'tier2'), the PRIMARY call_beacon
+    attempt must route to Tier 2 (HOME = active_tier.current_home() =
+    TIER2_HOME, token = the Tier 2 setup-token) — NOT hardwired Tier 1. Before
+    the fix the bot always started on Tier 1 and silently drained it even while
+    the rest of the team was on Tier 2."""
+
+    def setUp(self):
+        super().setUp()
+        self.bot = importlib.import_module('beacon_telegram_bot')
+        _p = mock.patch.object(self.bot, '_append_bot_quota_event')
+        self.quota_mock = _p.start()
+        self.addCleanup(_p.stop)
+
+    def test_primary_routes_to_pinned_tier2(self):
+        ok = mock.Mock(
+            returncode=0,
+            stdout=json.dumps({'result': 'pong', 'session_id': 's2'}),
+            stderr='',
+        )
+        run_mock = mock.Mock(return_value=ok)
+        tok_map = {'tier1': 'tier1-tok', 'tier2': 'tier2-tok'}
+        with mock.patch.object(self.bot.active_tier, 'read',
+                               return_value={'tier': 'tier2'}), \
+             mock.patch.object(self.bot.active_tier, '_setup_token_for_tier',
+                               side_effect=lambda t: tok_map[t]) as tok_mock, \
+             mock.patch.object(self.bot, '_run_claude_once', run_mock):
+            reply, sess = self.bot.call_beacon('ping', 'sess-prev')
+        # Single primary call — no fallback.
+        self.assertEqual(run_mock.call_count, 1)
+        kwargs = run_mock.call_args_list[0].kwargs
+        # Primary HOME swapped to the PINNED tier (Tier 2), token is Tier 2's.
+        self.assertEqual(kwargs.get('home_override'), self.bot.active_tier.TIER2_HOME)
+        self.assertEqual(kwargs.get('oauth_token'), 'tier2-tok')
+        # The active tier's token was requested (not hardwired 'tier1').
+        tok_mock.assert_any_call('tier2')
+        self.assertEqual(reply, 'pong')
+        self.assertEqual(sess, 's2')
+
+
+class BeaconBotStaleCrossTierSessionSelfHealsTest(_TempDirBase):
+    """A session created on the old tier and resumed under the now-pinned
+    tier's HOME errors with 'No conversation found with session ID' — emitted
+    on STDOUT, not stderr. The retry-without-resume guard must read the
+    COMBINED streams so this self-heals into a fresh session instead of
+    dead-ending the chat (the 2026-06-29 stuck-session symptom)."""
+
+    def setUp(self):
+        super().setUp()
+        self.bot = importlib.import_module('beacon_telegram_bot')
+        _p = mock.patch.object(self.bot, '_append_bot_quota_event')
+        self.quota_mock = _p.start()
+        self.addCleanup(_p.stop)
+
+    def test_stdout_session_error_retries_without_resume(self):
+        # Stale-session error on STDOUT (not a rate-limit/auth-401), nonzero.
+        stale = mock.Mock(
+            returncode=1,
+            stdout='No conversation found with session ID: 1b5ed242',
+            stderr='',
+        )
+        fresh = mock.Mock(
+            returncode=0,
+            stdout=json.dumps({'result': 'recovered', 'session_id': 'new-sess'}),
+            stderr='',
+        )
+        run_mock = mock.Mock(side_effect=[stale, fresh])
+        with mock.patch.object(self.bot, '_run_claude_once', run_mock):
+            reply, sess = self.bot.call_beacon('hi', 'stale-sess')
+        # Two calls: the stale --resume attempt, then a fresh retry.
+        self.assertEqual(run_mock.call_count, 2)
+        first_cmd = run_mock.call_args_list[0].args[0]
+        second_cmd = run_mock.call_args_list[1].args[0]
+        self.assertIn('--resume', first_cmd)
+        self.assertNotIn('--resume', second_cmd)
+        self.assertEqual(reply, 'recovered')
+        self.assertEqual(sess, 'new-sess')
+
+
 class BeaconBotT2StdoutReturnedTest(_TempDirBase):
     """Verify the t2.stdout fix at the former line 338. Mock Tier 1 and
     Tier 2 with DISTINCT stdouts; assert the returned body contains Tier
@@ -535,6 +615,29 @@ class WeeklyProbeTest(_TempDirBase):
         self.healer.HEARTBEAT_FILE = self.tmp / 'blackboard' / 'probe.heartbeat'
         self.healer.STATE_FILE = self.tmp / 'state' / 'probe.json'
         self.healer.KILL_SWITCH = self.tmp / 'healers.disabled'
+        # Isolate the OAuth-probe DM assertions from the parity check that
+        # run() now performs unconditionally: point TIER2_HOME / REPO_SYSTEMD /
+        # TIER1_HOME at parity-clean tmp fixtures so check_provisioning_parity
+        # finds no drift and never fires its own append_alert. Mirrors
+        # test_tier2_provisioning_parity.py's setUp.
+        t1 = self.tmp / 'tier1'
+        t2 = self.tmp / 'tier2'
+        for h in (t1, t2):
+            (h / '.claude').mkdir(parents=True)
+            (h / '.claude.json').write_text(
+                json.dumps({'mcpServers': {'workspace-mcp': {}}}))
+        (t2 / '.claude' / '.credentials.json').write_text('{}')
+        sysd = self.tmp / 'systemd'
+        sysd.mkdir()
+        for unit in self.healer.SESSION_UNITS:
+            (sysd / unit).write_text(
+                f'[Service]\nReadWritePaths=/home/larry/agents {t2}\n')
+        self.healer.TIER2_HOME = str(t2)
+        self.healer.REPO_SYSTEMD = sysd
+        _saved_t1 = self.healer.active_tier.TIER1_HOME
+        self.healer.active_tier.TIER1_HOME = str(t1)
+        self.addCleanup(
+            setattr, self.healer.active_tier, 'TIER1_HOME', _saved_t1)
 
     def _mock_subprocess(self, stdout: str, stderr: str = '',
                          returncode: int = 0):

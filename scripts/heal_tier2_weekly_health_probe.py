@@ -305,11 +305,112 @@ def run_probe(model_id: str) -> tuple[bool, str, str, int]:
     return False, stdout, stderr, proc.returncode
 
 
+# -------------------- Tier-2 provisioning parity --------------------
+# The OAuth probe above proves Tier-2 can authenticate. These read-only
+# checks prove a Tier-2 *session* would have the same CAPABILITY surface as
+# Tier-1 — the gap class that #755 (path resolution) and the 2026-06
+# ReadWritePaths fix each closed one facet of. Silent drift here means a
+# rotation to Tier-2 leaves an agent degraded (missing MCP tools, or
+# transcripts hitting EROFS). See docs/runbooks/
+# tier1-tier2-switch-capability-audit.md for the full surface map.
+SESSION_UNITS = (
+    'ourliberty-beacon-bot.service',
+    'ourliberty-forge-bot.service',
+    'ourliberty-mirror-bot.service',
+    'ourliberty-pulse-bot.service',
+    'ourliberty-inbox-watcher.service',
+)
+REPO_SYSTEMD = Path(__file__).resolve().parent.parent / 'systemd'
+
+
+def _mcp_servers(home: str) -> set:
+    """MCP server names defined in <home>/.claude.json. Best-effort: an
+    unreadable/absent file yields an empty set (a false negative, never a
+    false drift alarm)."""
+    try:
+        data = json.loads((Path(home) / '.claude.json').read_text())
+        return set(data.get('mcpServers', {}).keys())
+    except Exception:
+        return set()
+
+
+def check_provisioning_parity() -> list:
+    """Return a list of human-readable Tier-2 capability-drift findings
+    (empty list == at parity). Never raises — pure read-only inspection so a
+    bug here can never break the OAuth probe."""
+    drift = []
+    # 1. Tier-2 OAuth credentials present at all.
+    cred = Path(TIER2_HOME) / '.claude' / '.credentials.json'
+    if not cred.exists():
+        drift.append(f'Tier-2 OAuth credentials missing at {cred}')
+    # 2. MCP parity — every Tier-1 MCP server must also be defined for Tier-2,
+    #    else a Tier-2 session silently loses those tools (e.g. workspace-mcp).
+    t1 = _mcp_servers(active_tier.TIER1_HOME)
+    t2 = _mcp_servers(TIER2_HOME)
+    missing = sorted(t1 - t2)
+    if missing:
+        drift.append(
+            f'Tier-2 ~/.claude.json is missing MCP server(s) present on '
+            f'Tier-1: {missing} — a Tier-2 session loses those tools')
+    # 3. Sandbox regression guard — every session-running unit must keep
+    #    TIER2_HOME in ReadWritePaths, or Tier-2 transcripts hit EROFS and
+    #    --resume silently fails (the 2026-06 session-loss root cause).
+    for unit in SESSION_UNITS:
+        f = REPO_SYSTEMD / unit
+        try:
+            text = f.read_text()
+        except Exception:
+            drift.append(f'{unit}: unreadable in repo systemd/ ({f})')
+            continue
+        rwp = [ln for ln in text.splitlines()
+               if ln.strip().startswith('ReadWritePaths=')]
+        if not any(TIER2_HOME in ln for ln in rwp):
+            drift.append(
+                f'{unit}: TIER2_HOME not in ReadWritePaths — Tier-2 '
+                f'transcripts would hit EROFS and --resume would fail')
+    return drift
+
+
+def alert_parity_drift(drift: list) -> None:
+    """Emit a single deduped alert (own subject -> own cooldown) when Tier-2
+    has drifted from Tier-1 capability parity."""
+    larry_alerts.append_alert(
+        source='heal-tier2-weekly-probe',
+        severity='warning',
+        message=(
+            'Tier-2 is not at capability parity with Tier-1 — a session that '
+            'rotates to Tier-2 would be degraded:\n- ' + '\n- '.join(drift)
+        ),
+        subject='tier2_provisioning_drift',
+        suggested_action=(
+            'Bring Tier-2 to parity (runbook: docs/runbooks/'
+            'tier1-tier2-switch-capability-audit.md). MCP gap: define the '
+            'server in a project .mcp.json or authenticate it under '
+            'TIER2_HOME. ReadWritePaths gap: add TIER2_HOME to the unit and '
+            'reinstall via the install-drift healer.'
+        ),
+    )
+
+
 def run() -> int:
     if KILL_SWITCH.exists():
         log('kill switch present — exiting', 'INFO')
         return 0
     heartbeat()
+    # Capability-parity check (cheap, read-only) runs every invocation,
+    # independent of the OAuth probe's cooldown. Isolated so a bug here can
+    # never break the OAuth probe.
+    try:
+        drift = check_provisioning_parity()
+    except Exception as e:  # noqa: BLE001 — must never break the OAuth probe
+        drift = []
+        log(f'parity check errored (non-fatal): {type(e).__name__}: {e}',
+            'WARN')
+    if drift:
+        log('TIER2_PROVISIONING_DRIFT: ' + ' | '.join(drift), 'WARN')
+        alert_parity_drift(drift)
+    else:
+        log('TIER2_PROVISIONING_PARITY_OK', 'INFO')
     model_id = load_haiku_model_id()
     log(f'starting probe model={model_id} home={TIER2_HOME}', 'INFO')
     ok, stdout, stderr, exit_code = run_probe(model_id)

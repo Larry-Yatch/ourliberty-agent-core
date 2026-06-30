@@ -6383,6 +6383,68 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-regression-warmer-worktree-leak-cleanup-001",
+      "name": "Regression Warmer Worktree Leak Cleanup 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `regression-warmer-worktree-leak-cleanup-001`. Last activity 2026-06-29T22:19:15.98507+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "regression-warmer-worktree-leak-cleanup-001"
+      ],
+      "repo": null,
+      "created": "2026-06-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-29T22:20:16.926541+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-29T22:19:15.98507+00:00",
+      "briefing": {
+        "what": "A cleanup job that clears out leftover files left behind when an automated test run gets killed partway through.",
+        "why": "Those leftovers can quietly corrupt the team's code storage, which would stall work and risk losing progress until someone untangles it.",
+        "suggest": "Let it proceed, but have someone confirm it only removes the abandoned leftovers and nothing still in use before it runs."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-29T22:26:20.021618+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-heal-wip-redispatch-already-merged-suppress-001",
+      "name": "Heal WIP Redispatch Already Merged Suppress 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `heal-wip-redispatch-already-merged-suppress-001`. Last activity 2026-06-29T22:36:17.909085+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "heal-wip-redispatch-already-merged-suppress-001"
+      ],
+      "repo": null,
+      "created": "2026-06-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-06-29T22:50:20.286254+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-29T22:36:17.909085+00:00",
+      "briefing": {
+        "what": "A fix that stops the system from sending false 'we couldn't finish this work' panic alerts in cases where the work had actually already been completed successfully through another route.",
+        "why": "These false alarms waste your attention and erode trust in the alerts that genuinely need you, so silencing them keeps the warning system credible.",
+        "suggest": "Approve it, but ask for a quick confirmation afterward that real failure alerts still come through untouched."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-29T22:56:32.070404+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }

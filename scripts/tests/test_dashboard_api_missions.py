@@ -315,6 +315,39 @@ class PostMissionsHappyPathTest(_MissionsTestBase):
         self.assertEqual(before, after)
 
 
+class PostMissionsProposedTest(_MissionsTestBase):
+    def test_proposed_card_stamps_provenance_and_keeps_predraft(self):
+        r = self.client.post(POST_ENDPOINT, headers=AUTH, json={
+            'name': 'Retro Bucket', 'brief': 'b', 'repo': 'r',
+            'phase': 'proposed', 'proposed_by': 'retrospective-author',
+            'predraft': {'template': 'route-to-hold', 'root_signature': 'medic::x'},
+        })
+        self.assertEqual(r.status_code, 200, r.text)
+        entry = json.loads((self.queue_dir / 'retro-bucket.json').read_text())
+        self.assertEqual(entry['phase'], 'proposed')
+        self.assertEqual(entry['proposed_by'], 'retrospective-author')
+        self.assertEqual(entry['predraft']['template'], 'route-to-hold')
+
+    def test_oversized_predraft_rejected_400(self):
+        # predraft lands verbatim in the auto-committed registry → bound it so a
+        # buggy/compromised caller can't bloat missions.json (review #749 finding 5).
+        r = self.client.post(POST_ENDPOINT, headers=AUTH, json={
+            'name': 'Big Predraft', 'brief': 'b', 'repo': 'r',
+            'phase': 'proposed', 'proposed_by': 'retrospective-author',
+            'predraft': {'blob': 'x' * 9000},
+        })
+        self.assertEqual(r.status_code, 400, r.text)
+        self.assertFalse((self.queue_dir / 'big-predraft.json').exists())
+
+
+class NormalizeSuggestedSourceTest(unittest.TestCase):
+    def test_retrospective_author_maps_to_pulse_lane(self):
+        # Without this mapping the retrospective's curated cards normalize to None
+        # and fall into the secondary orphan-clutter lane (review #749 finding 1).
+        self.assertEqual(
+            da._normalize_suggested_source('retrospective-author'), 'pulse')
+
+
 class PostMissionsDupIdTest(_MissionsTestBase):
     def test_local_dup_id_returns_409_no_queue_write(self):
         _seed_two_missions(self.missions_path)

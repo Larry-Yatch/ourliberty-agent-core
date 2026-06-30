@@ -1305,9 +1305,14 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
             # inheriting from the orchestrator. Default state ships tier1,
             # so this resolves to /home/larry today — identical to the
             # inherited HOME — until the rotation scheduler (PR 6.3) flips
-            # the state file. HOME-swap stays even on the setup-token path
-            # because --resume session files live under
-            # ``HOME/.claude/projects/`` and are account-bound.
+            # the state file. On the setup-token path (the normal case)
+            # HOME stays at the real, fully-provisioned home (TIER1_HOME):
+            # token auth is HOME-independent (proven 2026-06-29), so the
+            # session keeps Tier-1's MCP/settings/projects AND all transcripts
+            # share one ``HOME/.claude/projects/`` tree so --resume is always
+            # findable regardless of the active tier. Only the no-setup-token
+            # fallback still swaps HOME, to reach that tier's
+            # ~/.claude/.credentials.json.
             #
             # GitHub auth, however, is account-INDEPENDENT: the ``gh`` OAuth
             # token (~/.config/gh) and git's credential helper (~/.gitconfig)
@@ -1321,18 +1326,22 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
             _real_home = env.get('HOME') or os.path.expanduser('~')
             env.setdefault('GH_CONFIG_DIR', os.path.join(_real_home, '.config', 'gh'))
             env.setdefault('GIT_CONFIG_GLOBAL', os.path.join(_real_home, '.gitconfig'))
-            env['HOME'] = active_tier.current_home()
-            # Decouple app-state resolution from the per-tier auth HOME
-            # swap above: the swap points the Claude CLI at the active
-            # tier's OAuth, but agents/ state always lives under the real
-            # account home. Pin OURLIBERTY_AGENTS_ROOT so child sessions
-            # (and any module that honors it) resolve state to the real
-            # tree even when HOME is swapped to TIER2_HOME. No-op on
-            # tier1 (real home) and preserves any externally-set value.
-            env.setdefault('OURLIBERTY_AGENTS_ROOT',
-                           str(Path(active_tier.TIER1_HOME) / 'agents'))
             active_tier_name = active_tier.read()['tier']
             auth_source = _apply_tier_auth(env, active_tier_name, token)
+            # Decouple app HOME from the auth tier: keep the real home when
+            # auth came from the setup-token (HOME-independent); only swap to
+            # the tier's home when falling back to its creds.json.
+            if auth_source == 'setup_token':
+                env['HOME'] = active_tier.TIER1_HOME
+            else:
+                env['HOME'] = active_tier.current_home()
+            # Pin OURLIBERTY_AGENTS_ROOT so child sessions (and any module
+            # that honors it) resolve agents/ state to the real account home
+            # even on the no-setup-token fallback path where HOME still swaps
+            # to a tier home. No-op on the setup-token path (HOME already real)
+            # and preserves any externally-set value.
+            env.setdefault('OURLIBERTY_AGENTS_ROOT',
+                           str(Path(active_tier.TIER1_HOME) / 'agents'))
 
             # Track the HOME/tier that actually produces the successful result,
             # for the post-run transcript-persistence check. Defaults to the
@@ -1720,7 +1729,6 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                                 else 'tier1'
                             )
                             t2_env = dict(env)
-                            t2_env['HOME'] = fallback_home
                             # Re-pick auth for the fallback tier: if the
                             # other tier has a setup-token configured, use
                             # it (race-free); otherwise revert to the
@@ -1729,9 +1737,18 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                             t2_auth_source = _apply_tier_auth(
                                 t2_env, other_tier_name, token,
                             )
+                            # Same root-fix rule as the primary path: keep the
+                            # real home on the setup-token path; only swap to
+                            # the other tier's home for the creds.json fallback.
+                            t2_home = (
+                                active_tier.TIER1_HOME
+                                if t2_auth_source == 'setup_token'
+                                else fallback_home
+                            )
+                            t2_env['HOME'] = t2_home
                             log(agent_id,
                                 'TIER2_FALLBACK_ATTEMPT reason=' +
-                                failure_type + ' home=' + fallback_home +
+                                failure_type + ' home=' + t2_home +
                                 ' tier=' + other_tier_name +
                                 ' auth=' + t2_auth_source,
                                 'INFO')
@@ -1763,7 +1780,7 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                                     # The fallback retry's transcript lands
                                     # under the fallback HOME/tier, so the
                                     # persistence check must target those.
-                                    effective_home = fallback_home
+                                    effective_home = t2_home
                                     effective_tier = other_tier_name
                                 else:
                                     log(agent_id,

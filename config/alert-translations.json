@@ -18,6 +18,14 @@
     "stopgap_note": "Translation layer is a stopgap until the Pulse cycle upgrade (follow-up to PR #108) ships healer-alert triage as a core Pulse responsibility. Once Pulse triages, this table can retire; the CI gate that enforces every healer has an entry stays useful as an ergonomics review trigger.",
     "never_silence_note": "Optional per-entry boolean. By default a (source, subject) present in this table is a known pattern that Check 0 (alert_triage_state.classify) Tier-3-silences to digest. Set never_silence: true on an entry to keep its plain-language translation but force it to surface (Tier 4, route=escalate) instead of being muted — for detections like a dark pulse check, where the translation makes the alert clearer but silencing it would defeat the watcher's whole purpose."
   },
+  "build-sequence-advancer": {
+    "sequence-paused": {
+      "severity": "WARNING",
+      "tier": "NOW",
+      "plain_language_summary": "A build-sequence stopped itself because two records disagreed and it refused to guess. The most common cause is a gate-mismatch: a step PR merged on GitHub (the work is done) but the chain pipeline never recorded the merge event -- usually a merge that bypassed the auto-merge / REVIEW_PASS path, or a dropped chain-event. The pause is the safety brake: the advancer will not re-dispatch already-merged work, nor advance downstream steps on an unconfirmed merge. The exact pause reason (gate-mismatch, stranded step, or schema-validation) is in the technical-detail footer below.",
+      "recommended_action": "Read the pause reason in the raw message. For a gate-mismatch (chain_merged=False, gh_merged=True): verify the step PR actually merged (gh pr view <#>), then reconcile and resume -- `skip sequence <seq_id> step <step-id>` marks the step merged without forcing the chain to re-observe it, then `resume sequence <seq_id>`. Do NOT `retry` (rebuilds already-merged work) or `cancel` (discards a healthy sequence). For a stranded-step or schema-validation pause, fix the underlying issue named in the reason, then `resume`. Producer: scripts/build_sequence_advancer.py."
+    }
+  },
   "doorbell": {
     "doorbell": {
       "severity": "INFO",
@@ -389,6 +397,12 @@
     }
   },
   "heal-tier2-weekly-probe": {
+      "tier2_provisioning_drift": {
+        "severity": "WARNING",
+        "tier": "SOON",
+        "plain_language_summary": "Tier 2 (the fallback Claude account) is not at capability parity with Tier 1, so if work rotates to Tier 2 the agent runs degraded. Authentication is fine -- this is about the surrounding provisioning: a missing MCP server (the agent silently loses those tools), or a session-running systemd unit that no longer carves the Tier-2 home into ReadWritePaths (Tier-2 transcripts hit EROFS and --resume fails, silently losing the session). The weekly Tier-2 probe now checks this; the raw alert lists exactly which facet drifted.",
+        "recommended_action": "Read the drift list in the raw message and bring Tier 2 to parity per docs/runbooks/tier1-tier2-switch-capability-audit.md. MCP gap: define the server in a project .mcp.json (tier-proof) or authenticate it under TIER2_HOME. ReadWritePaths gap: add TIER2_HOME to the unit ReadWritePaths and reinstall via the install-drift healer. This is SOON not NOW -- Tier 1 is healthy; the risk only materializes on a rotation to Tier 2."
+      },
     "tier2_weekly_probe_failed": {
       "severity": "WARNING",
       "tier": "SOON",
@@ -432,6 +446,12 @@
       "tier": "SOON",
       "plain_language_summary": "ourliberty-sync ran with REQUIRE_QUIESCENCE=1 and the strict-quiescence wait exceeded its timeout; sync rolled back. A non-quiescent agent kept the tree from being safely swapped.",
       "recommended_action": "ssh ourliberty-vm, `cd ~/agent-core && python3 scripts/await_quiescence.py` to identify the busy agent(s). Resolve before the next sync tick (or let sync run without REQUIRE_QUIESCENCE if soft-quiescence is acceptable)."
+    },
+    "deploy-restart-storm": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "ourliberty-sync.service detected a widely-imported module change after a PR merge and restarted the dependent daemons (typically 6-8) so they pick up the new code. This restart storm is the expected, self-healing deploy mechanism — it is how a code change propagates to running daemons, not a fault. route=digest confirms the system is healthy.",
+      "recommended_action": "None — the multi-daemon restart is the deploy completing successfully. If individual daemons fail to come back healthy AFTER a restart storm (distinct from the storm itself), the per-daemon healer alerts surface that separately. Producer: ourliberty-sync.service post-merge deploy hook."
     }
   },
   "cycle-tier-state": {

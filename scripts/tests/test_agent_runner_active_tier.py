@@ -153,7 +153,7 @@ class RunClaudeActiveTierEnvTest(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps({'tier': tier}))
 
-    def _run(self, popen_proc, t2_result=None):
+    def _run(self, popen_proc, t2_result=None, setup_token='setup-tok'):
         """Drive run_claude with the supplied Popen result + optional
         Tier 2 ``subprocess.run`` result. Returns the captured env dicts
         ``(popen_env, run_env)`` (run_env is None if no Tier 2 retry
@@ -193,6 +193,11 @@ class RunClaudeActiveTierEnvTest(unittest.TestCase):
                        side_effect=fake_run),
             # filesystem probes the fallback path needs to evaluate True
             mock.patch.object(ar, 'tier2_available', return_value=True),
+            # Control the per-tier setup-token deterministically — the real
+            # _setup_token_for_tier falls back to the on-disk credentials
+            # file, which would otherwise leak ambient state into HOME logic.
+            mock.patch.object(ar.active_tier, '_setup_token_for_tier',
+                              side_effect=lambda tier: setup_token),
             # Tier-2 unavailable DM + paused marker must not fire in
             # tests; if they do, surface the call so the test fails loud
             mock.patch.object(ar, '_dm_tier2_unavailable'),
@@ -235,18 +240,29 @@ class RunClaudeActiveTierEnvTest(unittest.TestCase):
         (_result, popen_env, _run_env) = self._run(proc)
         self.assertEqual(popen_env['HOME'], '/home/larry')
 
-    def test_primary_home_tier2_when_state_tier2(self):
+    def test_primary_home_tier2_with_setup_token_keeps_real_home(self):
+        # Root fix: token auth is HOME-independent, so a tier2 dispatch keeps
+        # the fully-provisioned real home (MCP/settings/projects/transcripts).
         self._write_state('tier2')
         proc = _FakeProc(0, stdout=_ok_response())
         (_result, popen_env, _run_env) = self._run(proc)
+        self.assertEqual(popen_env['HOME'], '/home/larry')
+
+    def test_primary_home_tier2_without_setup_token_swaps(self):
+        # Legacy fallback preserved: with NO setup-token, auth must come from
+        # the tier's creds.json, so HOME still swaps to the tier home.
+        self._write_state('tier2')
+        proc = _FakeProc(0, stdout=_ok_response())
+        (_result, popen_env, _run_env) = self._run(proc, setup_token=None)
         self.assertEqual(
             popen_env['HOME'], '/home/larry/.claude-larry-personal',
         )
 
     # ---- fallback HOME ------------------------------------------------
 
-    def test_fallback_targets_tier2_when_state_tier1(self):
-        # Tier 1 rate-limit → fallback subprocess gets HOME=tier2 home.
+    def test_fallback_from_tier1_with_setup_token_keeps_real_home(self):
+        # Tier 1 rate-limit → fallback to tier2 token, but with a setup-token
+        # HOME stays real for the fallback subprocess too.
         self._write_state('tier1')
         proc = _FakeProc(
             1,
@@ -256,14 +272,27 @@ class RunClaudeActiveTierEnvTest(unittest.TestCase):
         t2 = mock.Mock(returncode=0, stdout=_ok_response(), stderr='')
         (_result, popen_env, run_env) = self._run(proc, t2_result=t2)
         self.assertEqual(popen_env['HOME'], '/home/larry')
+        self.assertEqual(run_env['HOME'], '/home/larry')
+
+    def test_fallback_from_tier1_without_setup_token_swaps(self):
+        # No setup-token → fallback subprocess swaps to the tier2 home.
+        self._write_state('tier1')
+        proc = _FakeProc(
+            1,
+            stdout="You've hit your limit · resets 11:30am",
+            stderr='',
+        )
+        t2 = mock.Mock(returncode=0, stdout=_ok_response(), stderr='')
+        (_result, popen_env, run_env) = self._run(
+            proc, t2_result=t2, setup_token=None)
+        self.assertEqual(popen_env['HOME'], '/home/larry')
         self.assertEqual(
             run_env['HOME'], '/home/larry/.claude-larry-personal',
         )
 
-    def test_fallback_targets_tier1_when_state_tier2(self):
-        # Mirror direction: with state=tier2, the fallback target flips
-        # back to /home/larry — the OTHER home — instead of the
-        # historical hardcoded TIER2_HOME constant.
+    def test_fallback_from_tier2_with_setup_token_keeps_real_home(self):
+        # state=tier2 primary fails → fallback to tier1 token. With a
+        # setup-token both subprocesses keep the real home.
         self._write_state('tier2')
         proc = _FakeProc(
             1,
@@ -272,6 +301,20 @@ class RunClaudeActiveTierEnvTest(unittest.TestCase):
         )
         t2 = mock.Mock(returncode=0, stdout=_ok_response(), stderr='')
         (_result, popen_env, run_env) = self._run(proc, t2_result=t2)
+        self.assertEqual(popen_env['HOME'], '/home/larry')
+        self.assertEqual(run_env['HOME'], '/home/larry')
+
+    def test_fallback_from_tier2_without_setup_token_swaps(self):
+        # No setup-token → primary swaps to tier2 home, fallback to tier1 home.
+        self._write_state('tier2')
+        proc = _FakeProc(
+            1,
+            stdout='Invalid authentication credentials',
+            stderr='',
+        )
+        t2 = mock.Mock(returncode=0, stdout=_ok_response(), stderr='')
+        (_result, popen_env, run_env) = self._run(
+            proc, t2_result=t2, setup_token=None)
         self.assertEqual(
             popen_env['HOME'], '/home/larry/.claude-larry-personal',
         )
