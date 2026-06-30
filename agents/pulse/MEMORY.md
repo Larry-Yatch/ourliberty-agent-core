@@ -322,8 +322,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T00:55Z UTC (Iter ~3294, Tier 1)
+## Status snapshot — updated 2026-06-30T01:14Z UTC (Iter ~3296, Tier 1)
 
-**Iter ~3294 summary (2026-06-30T00:55Z):** ⚠️ Drift — PR #760 MERGED at 00:48Z (auth HOME decoupling live; Beacon now responds via tier2 auth). regbaseline warmers: 81 (was 67 at ~3293 ~8 min earlier — INCREASING again, new Mirror sessions for #762/#763 spawning fresh batches). Worktrees: 106/101 locked (was 142/77 — total down 36, but locked proportion higher). PR #755 blocker changed from #760→#761. Rev0 dup archive BLOCKED again (session working-dir constraint; 7th total). Beacon main LLM rate-limited until 14:00 UTC June 30; 3 pending approvals blocked. 4 open PRs (#763, #762, #761, #755). Pipeline stall: 0. Watermark=1089. Trailing-30d ratio≈17.10 (1401/82, trend=improving). Tier 1, consecutive_clean=0.
+**Iter ~3296 summary (2026-06-30T01:14Z):** ✅ Improving — Pipeline actively moving. Mirror reviewing PR #761 rev1 (PID 1205384, started 01:02:58Z). PR #762 Mirror rev0 done + Forge revision done ($0.24) → rev1 queued. PR #759 MERGED (23:33:08Z). PR #764 NEW (regbaseline fork-bomb fix, OPEN MERGEABLE, needs review dispatch). 4 open PRs (#764, #763, #762, #761). 0 new alerts (watermark=1095). Warmers: 44 (decreasing). Worktrees: 146/101 locked (temp increase from PR #762 session; will decrease). Rev0 dup archive BLOCKED (9th). Beacon rate-limited until 14:00 UTC June 30; 3 pending approvals blocked. Pipeline stall: 0. Trailing-30d ratio≈17.09 (1402/82, trend=improving). Tier 1, consecutive_clean=0.
 
 
