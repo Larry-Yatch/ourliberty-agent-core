@@ -78,9 +78,9 @@
 
 ---
 
-## beacon_telegram_bot.py get-messages MUST NEVER BE CALLED (learned iter ~1876, escalated iter ~1943)
+## beacon_telegram_bot.py get-messages / get-last-messages MUST NEVER BE CALLED (learned iter ~1876, escalated iter ~1943, 3/3 dispatched iter ~3297)
 
-**Rule:** NEVER call `beacon_telegram_bot.py get-messages` in ANY form. Competing getUpdates loop causes HTTP 409 conflicts with production bot. For Telegram sweeps (Check 2), use ONLY: `tail -N /home/larry/agents/logs/beacon_telegram_bot.log` (NOT beacon-telegram-bot.log) + `ps -p <PID> -o stat` for bot health. G-rule telegram-409-burst at **2/3** as of iter ~1943.
+**Rule:** NEVER call `beacon_telegram_bot.py get-messages` OR `get-last-messages` or ANY subcommand that triggers getUpdates. Competing getUpdates loop causes HTTP 409 conflicts with production bot. For Telegram sweeps (Check 2), use ONLY: `tail -N /home/larry/agents/logs/beacon_telegram_bot.log` (NOT beacon-telegram-bot.log) + `ps -p <PID> -o stat` for bot health. G-rule telegram-409-burst **3/3 DISPATCHED** iter ~3297 (direction-ask-telegram-409-get-last-messages-001.json in Beacon inbox). verification_pending.
 
 ---
 
@@ -322,8 +322,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T01:14Z UTC (Iter ~3296, Tier 1)
+## Status snapshot — updated 2026-06-30T01:27Z UTC (Iter ~3297, Tier 1)
 
-**Iter ~3296 summary (2026-06-30T01:14Z):** ✅ Improving — Pipeline actively moving. Mirror reviewing PR #761 rev1 (PID 1205384, started 01:02:58Z). PR #762 Mirror rev0 done + Forge revision done ($0.24) → rev1 queued. PR #759 MERGED (23:33:08Z). PR #764 NEW (regbaseline fork-bomb fix, OPEN MERGEABLE, needs review dispatch). 4 open PRs (#764, #763, #762, #761). 0 new alerts (watermark=1095). Warmers: 44 (decreasing). Worktrees: 146/101 locked (temp increase from PR #762 session; will decrease). Rev0 dup archive BLOCKED (9th). Beacon rate-limited until 14:00 UTC June 30; 3 pending approvals blocked. Pipeline stall: 0. Trailing-30d ratio≈17.09 (1402/82, trend=improving). Tier 1, consecutive_clean=0.
+**Iter ~3297 summary (2026-06-30T01:25Z):** ⚠️ Drift — git fetch failing (108 locked gate-wt worktrees; fatal: bad object worktrees/gate-wt-69eb92cee68923/HEAD). Self-inflicted 409 storm from Pulse calling `get-last-messages` — background task killed, resolved. Mirror reviewing PR #761 rev1 (PID 1216866, active ~22 min). PR #765 NEW (feat/tier3-live-n-tier-routing, created 01:13Z by Forge). PRs #764 and #765 dispatched to Mirror this cycle (01:20Z, 01:26Z). 5 open PRs (#765, #764, #763, #762, #761). 0 new alerts (watermark=1095). Worktrees: 151/106 locked (108 gate-wt). Rev0 dup archive BLOCKED (10th). Beacon rate-limited until 14:00 UTC June 30; 3 pending approvals blocked. Pipeline stall: 0. Trailing-30d ratio≈17.07 (1404/82, trend=improving). Tier 1, consecutive_clean=0. telegram-409-burst G-rule 3/3 DISPATCHED to Beacon.
 
 
