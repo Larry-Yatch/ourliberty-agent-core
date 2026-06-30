@@ -307,9 +307,9 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 **Rule:** Watchdog `log_growth` fires when outbox-notifier.log is quiet with no pipeline activity. Root: outbox-notifier IS running but writes nothing when the pipeline is genuinely idle. Prior fixes (PR #649, PR #694, PR #717) addressed stale-log during Mirror reviews; pure pipeline-idle path is not suppressed. Per WARN-vs-INFO calibration this is an idle-state INFO observation — system not worse off. Dispatch to Beacon at 3/3 to add Tier-3 translation or raise watchdog log_growth threshold for extended idle state. Occurrences: iter ~3148 (seconds_since_write=43316, outbox-notifier last wrote 17:01:33 UTC 2026-06-27, 1/3); iter ~3358 (seconds_since_write=13611, idle since 07:50:22 MDT 2026-06-30, watchdog overall=warning, 2/3).
 
-## Watchdog timer stopped (iter ~3363, 2026-06-30)
+## Watchdog timer stopped (iter ~3363, 2026-06-30) → MOOT ✅ (iter ~3364)
 
-**Observed:** watchdog.log last entry 2026-06-30T13:01:40Z UTC; timer went silent ~6h before iter ~3363 at 19:06Z UTC. Pattern mirrors ourliberty-cycle.timer "NextElapseUScMonotonic=infinity" issue (escalation #12, 06:31Z 2026-06-30). Both are OnCalendar=*:0/5 timers that fail to self-schedule next fire. Escalated to pulse-escalations.json #14. Suggested fix: `sudo systemctl restart <ourliberty-watchdog-timer>`. Distinct from G-rule watchdog-log-growth-idle-overnight-001 (which tracks the watchdog DETECTING outbox-notifier idle; this is the watchdog timer itself stopping).
+**Observed at iter ~3363:** watchdog timer escalated to pulse-escalations.json #14. CORRECTED at iter ~3364: the "6h gap" was a timezone error. Watchdog log uses MDT local time; "13:01:40 MDT" = 19:01:40Z UTC (only 4.3 min before iter ~3363 at 19:06Z UTC), NOT 13:01:40Z UTC as MEMORY stored. Timer was never stopped for 6h — it was within normal 5-min cadence. Watchdog log confirmed firing at 13:07:01 MDT (19:07Z) and 13:12:01 MDT (19:12Z UTC). Escalation #14 is MOOT. **Log timezone rule: watchdog.log entries are MDT (UTC-6); always add 6h when comparing to UTC timestamps.**
 
 ---
 
@@ -362,8 +362,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T19:06Z UTC (Iter ~3363, Tier 1)
+## Status snapshot — updated 2026-06-30T19:16Z UTC (Iter ~3364, Tier 1)
 
-**Iter ~3363 summary (2026-06-30T19:06Z):** 0 new alerts. Watermark=1017 (no change). All 5/5 core daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254, dashboard=1200736, chain_event_shipper=1200730). **Watchdog timer SILENT 6h** (last 13:01:40Z UTC) — timer stopped, same pattern as cycle-timer issue; escalated pulse-escalations.json #14. Heal-daemon heartbeat 18:56:30Z. No stalls. Pipeline idle. ourliberty-cycle.timer confirmed-firing at ~30-min Tier 3 cadence (healer-kept-alive). 3 open PRs (#763/#765/#766, REVIEW_ESCALATE). 4 pending approvals unchanged. **Tier 1, consecutive_clean=0** (signal: watchdog-timer-silent). Carry: PR #768 unreviewed-merge (pulse-escalations.json #13).
+**Iter ~3364 summary (2026-06-30T19:16Z):** 0 new alerts. Watermark=1017 (no change). All 5/5 core daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254, dashboard=1200736, chain_event_shipper=1200730). **Watchdog timer HEALTHY** — log entries at 19:07Z and 19:12Z UTC; prior escalation #14 was timezone error (MOOT). Heal-daemon heartbeat 19:07:00Z. No stalls. Pipeline idle. 3 open PRs (#763/#765/#766, REVIEW_ESCALATE). 4 pending approvals unchanged. **Tier 1, consecutive_clean=1**. Carry: PR #768 unreviewed-merge (pulse-escalations.json #13).
 
 
