@@ -376,8 +376,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T21:40Z UTC (Iter ~3376, Tier 1)
+## Status snapshot — updated 2026-06-30T21:52Z UTC (Iter ~3378, Tier 1→2)
 
-**Iter ~3376 summary (2026-06-30T21:40Z):** Clean iter. 0 new alerts. All 5 daemons alive (same PIDs as iter ~3375: Beacon=1735618, dashboard-api=1735904, inbox-watcher=1737091, outbox-notifier=1737092, chain-event-shipper=1200730). Heal-daemon heartbeat 21:38:37Z (fresh). Watchdog overall=healthy at 21:39:59Z. Pipeline stall: "no stalls detected." Pending approvals=0. Dashboard PR #98 (feat:Mirror Queue panel on System tab) opened 21:29:09Z by Larry, Mirror review dispatched 21:40:37Z — in active review. Stale review-pr-ourliberty-agent-core-774.json (noted in iter ~3375) resolved — no longer in Mirror inbox. Tier 1, consecutive_clean 0→1.
+**Iter ~3378 summary (2026-06-30T21:52Z):** Clean iter. 0 new alerts. All 5 daemons alive (Beacon=1735618, dashboard-api=1735904, inbox-watcher=1737091, outbox-notifier=1737092, chain-event-shipper=1200730). Heal-daemon heartbeat 21:48:48Z (fresh). Watchdog overall=healthy at 21:50:16Z. Pipeline stall: "no stalls detected." Pending approvals=0. PR #98 (dashboard: Mirror Queue panel) MERGED via Mirror gate at 21:49:47Z UTC — all PRs resolved. Mirror inbox empty. Tier 1→2 (de-escalate; consecutive_clean 2→3). Next tier de-escalate to Tier 3 after 3 more clean Tier-2 iters.
 
 
