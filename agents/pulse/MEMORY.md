@@ -376,8 +376,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T21:52Z UTC (Iter ~3378, Tier 1→2)
+## Status snapshot — updated 2026-06-30T22:15Z UTC (Iter ~3379, Tier 2→1)
 
-**Iter ~3378 summary (2026-06-30T21:52Z):** Clean iter. 0 new alerts. All 5 daemons alive (Beacon=1735618, dashboard-api=1735904, inbox-watcher=1737091, outbox-notifier=1737092, chain-event-shipper=1200730). Heal-daemon heartbeat 21:48:48Z (fresh). Watchdog overall=healthy at 21:50:16Z. Pipeline stall: "no stalls detected." Pending approvals=0. PR #98 (dashboard: Mirror Queue panel) MERGED via Mirror gate at 21:49:47Z UTC — all PRs resolved. Mirror inbox empty. Tier 1→2 (de-escalate; consecutive_clean 2→3). Next tier de-escalate to Tier 3 after 3 more clean Tier-2 iters.
+**Iter ~3379 summary (2026-06-30T22:15Z):** Signal iter. 1 new alert (unreviewed-merge:776, Tier 4 — PR #776 feat:tier-pool W1 merged by Larry without Mirror review, 5th G-rule occurrence; outbox-notifier DM'd Larry at 22:04Z). Beacon/inbox-watcher restarted (PIDs Beacon=1758487, inbox-watcher=1759486) due to PR #776 code deploy; outbox-notifier/dashboard-api/chain-event-shipper unchanged. Heal-daemon heartbeat 22:09:15Z. Watchdog=healthy at 22:10Z. Pipeline stall: "no stalls detected." Pending approvals=0. PR #777 (skip suite for test-inert diffs) in active Mirror review (dispatched 22:10:28Z). PR #778 (tier-pool W2) newly opened with NO auto-review label (same risk class). Forge build in progress: approval-sync-phase2-build (dispatched 21:58:42Z). Tier 2→1 (tier-reset; consecutive_clean=0).
 
 
