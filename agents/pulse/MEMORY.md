@@ -358,8 +358,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T04:21Z UTC (Iter ~3318, Tier 1)
+## Status snapshot — updated 2026-06-30T04:32Z UTC (Iter ~3320, Tier 2)
 
-**Iter ~3318 summary (2026-06-30T04:21Z):** Clean iter. No new alerts (watermark=1113, file_length=1113). All daemons healthy. Worktrees 10/0-gate-wt (fork-bomb fix holding). Git fetch CLEAN. Sync success. **New positive: PR #755 MERGED** (decouple agents/ state-root — stale AUTO_MERGE_HELD carry resolved). Beacon session PID 1360974 processing notify-pr-ourliberty-agent-core-767. 7 pending approvals (unchanged). 4 open REVIEW_ESCALATE PRs (#763/#765/#766/#767). Watermark=1113. Ratio=17.425. Tier 1, consecutive_clean=1.
+**Iter ~3320 summary (2026-06-30T04:32Z):** Clean iter. 1 new alert (L1115 forge-wip-redispatch digest, auto-remediated, no DM per G-rule doctrine). **New positives: PR #767 MERGED** (fix(healer): reap mid-flight Mirror reviews when the PR goes terminal); **BUILD_ALREADY_MERGED guard correctly handled retry1 for PR #764**; 409 burst fully confirmed resolved; **pending approvals 5↓2 from 7** (Larry rejected 2 via dashboard). 3 open PRs (all REVIEW_ESCALATE: #763/#765/#766). Beacon inbox has notify-retry1 (inbox-watcher will dispatch). Watermark=1115. Ratio=17.425. **Tier de-escalated 1→2** (3 consecutive clean iters), consecutive_clean=0.
 
 
