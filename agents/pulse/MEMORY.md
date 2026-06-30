@@ -368,8 +368,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T19:53Z UTC (Iter ~3367, Tier 2→1 signal)
+## Status snapshot — updated 2026-06-30T19:59Z UTC (Iter ~3368, Tier 1 clean)
 
-**Iter ~3367 summary (2026-06-30T19:53Z):** 1 new alert — `unreviewed-merge:766` (PR #766 merged by Larry without Mirror review; DM delivered by outbox-notifier at idx=1017 13:43 MDT). Watermark=1018. Beacon bot restarted → PID 1658372 (PID 1200723 dead; restart expected after PR #766 code fix landed). Outbox-notifier 401 burst at 13:39-40 MDT (PR #765 recheck) → **self-healed** by 13:50:31 MDT (PR #770 review dispatched). Mirror actively reviewing PR #769 (PID 1649599, regression check). PR #770 Mirror review queued. PRs #763 (merged 19:38:27Z) + #766 (merged, unreviewed) resolved. Pending approvals 4→0 (all resolved 19:30:14Z). Watchdog=healthy 13:42:12 MDT. No stalls. **Tier 2→1 reset (unreviewed-merge:766 Tier-4 signal).** Carry: PR #768 unreviewed-merge (pulse-escalations.json #13). PR #765 REVIEW_ESCALATE. G-rule `watchdog-log-growth-idle-overnight-001` 2/3 unchanged.
+**Iter ~3368 summary (2026-06-30T19:59Z):** All checks nominal. 0 new alerts. PR #769 (fix(outbox-notifier): skip merged-PR REVIEW_REVISION escalation) MERGED 19:52:56Z via auto-merge after Mirror pass. PR #770 (docs(spec): capacity pool) MERGED 19:56:54Z. Only PR #765 open (REVIEW_ESCALATE carry; heal-no-session-escalate-preserve-target-repo-001 approval resolved at 19:30Z — Forge build may be inbound). Pending approvals=0. Watchdog=healthy 13:57:30 MDT. Beacon bot PID=1658372. Tier 1 consecutive_clean=1. Carry: PR #768 unreviewed-merge (pulse-escalations.json #13), PR #766 unreviewed-merge (DM'd Larry). G-rule `watchdog-log-growth-idle-overnight-001` 2/3 unchanged.
 
 
