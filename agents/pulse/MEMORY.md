@@ -352,8 +352,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T03:34Z UTC (Iter ~3313, Tier 1)
+## Status snapshot — updated 2026-06-30T03:44Z UTC (Iter ~3314, Tier 1)
 
-**Iter ~3313 summary (2026-06-30T03:34Z):** ✅ Nominal. git fetch CLEAN (improvement from ~3312 bad-object failure). Worktrees 85 (↑10 from ~3312's 75, gate-wt=77) — still growing but git ops not degraded. git prune timeouts did not recur this cycle. Beacon in-flight on warmer dedup direction-ask (03:18:15Z, 14400s). Mirror active on PR #766 telegram-409 (14400s session 02:49:24Z, expires ~06:49Z). No new alerts. 5 pending approvals unchanged. Sync error carry. Watermark=1108. Ratio=17.45. Tier 1, consecutive_clean=1.
+**Iter ~3314 summary (2026-06-30T03:44Z):** ⚠️ Drift — 2 Tier-4 alerts (already DM'd by outbox-notifier). KEY IMPROVEMENT: Worktrees **27/18-gate-wt** (was 86/77 at ~3313) — reaper (PR #761) caught up; git fetch CLEAN; git prune no new timeouts. Mirror FAILED on PR #766 telegram-409 (review_session_timeout 2100s, REVIEW_ESCALATE, Larry DM sent). Mirror PASSED PR #764 rev1 (REVIEW_PASS) but merge conflicts block auto-merge — approval_request `resolve-pr764-regbaseline-forkbomb-conflict-001` sent. Beacon in-flight on warmer dedup fix (03:18:15Z). 6 pending approvals (was 5). Bot briefly had second instance PID 1320917 (409 cascade 03:37Z–03:41Z, now self-resolved). Watermark=1111. Ratio=17.44. Tier 1, consecutive_clean=0.
 
 
