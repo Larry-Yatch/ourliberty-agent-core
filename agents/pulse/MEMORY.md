@@ -358,8 +358,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T12:21Z UTC (Iter ~3348, Tier 3)
+## Status snapshot — updated 2026-06-30T12:54Z UTC (Iter ~3349, Tier 3)
 
-**Iter ~3348 summary (2026-06-30T12:21Z):** 2 new alerts (both Tier-3 silence: tier2_provisioning_drift, doorbell). Watermark=1012. All 3/3 main daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254). Watchdog=healthy (~12:18Z UTC). Heal-daemon heartbeat 12:11:39Z. No stalls. Pipeline idle (outbox-notifier current PID 1340254 quiet since start ~04:03Z UTC). 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). PR #767 MERGED (fix(healer): reap mid-flight Mirror reviews when PR goes terminal). 4 pending approvals (mirror-review-p3a-retro-prep ~28.7h no chat_id; heal-wip-redispatch-already-merged-suppress-001; heal-no-session-escalate-preserve-target-repo-001; mirror-review-pr-763). **Worktrees 1/0 (main only).** **Tier 3, consecutive_clean=6** (at ceiling — no further de-escalation). Outbox-notifier GitHub 401 carry (prior dead instance, self-healed — 1/3 G-rule candidate).
+**Iter ~3349 summary (2026-06-30T12:54Z):** 0 new alerts. Watermark=1012. All 3/3 main daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254). Watchdog=healthy (12:49:20Z UTC). Heal-daemon heartbeat 12:42:12Z. No stalls. Pipeline idle (outbox-notifier PID 1340254 WARN at 03:38:32Z UTC — 401 on gh pr view 765, carry). 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals (mirror-review-p3a-retro-prep ~29.3h no chat_id; heal-wip-redispatch-already-merged-suppress-001; heal-no-session-escalate-preserve-target-repo-001; mirror-review-pr-763). **Worktrees 1/0 (main only).** **Tier 3, consecutive_clean=7** (at ceiling — no further de-escalation). Outbox-notifier GitHub 401 carry (1/3 G-rule candidate).
 
 
