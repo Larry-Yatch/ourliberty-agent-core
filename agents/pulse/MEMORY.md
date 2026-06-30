@@ -358,8 +358,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T13:25Z UTC (Iter ~3350, Tier 3)
+## Status snapshot — updated 2026-06-30T14:00Z UTC (Iter ~3351, Tier 3)
 
-**Iter ~3350 summary (2026-06-30T13:25Z):** 0 new alerts. Watermark=1012. All 3/3 main daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254). Watchdog=healthy (13:20:16Z UTC). Heal-daemon heartbeat 13:13:19Z. No stalls. Pipeline idle (outbox-notifier PID 1340254 WARN at 03:38:32Z UTC — 401 on gh pr view 765, carry). 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals (mirror-review-p3a-retro-prep ~30.3h no chat_id; heal-wip-redispatch-already-merged-suppress-001; heal-no-session-escalate-preserve-target-repo-001; mirror-review-pr-763). **Worktrees 1/0 (main only).** **Tier 3, consecutive_clean=8** (at ceiling — no further de-escalation). Outbox-notifier GitHub 401 carry (1/3 G-rule candidate).
+**Iter ~3351 summary (2026-06-30T14:00Z):** 1 new alert mid-cycle (credential-drift:MISSING_REGISTRY_ENTRY:CLAUDE_CODE_OAUTH_TOKEN_TIER3 at 13:56:21Z) → Tier 3 silenced. Watermark=1013. All 3/3 main daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254). Watchdog=healthy (13:55:30Z UTC). Heal-daemon heartbeat 13:53:43Z. No stalls. Pipeline idle. Updated finding: outbox-notifier hit 4× HTTP 500 at 07:33-07:50Z UTC on PR #765 merge-state recheck (transient GitHub API blip, self-healed) in addition to prior HTTP 401 at 03:38:32Z. 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals unchanged. **Worktrees 1/0 (main only).** **Tier 3, consecutive_clean=9.** Outbox-notifier GitHub 401 carry (1/3 G-rule candidate); HTTP 500 cluster (4×, 1 cluster, not yet candidate).
 
 
