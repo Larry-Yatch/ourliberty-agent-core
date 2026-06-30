@@ -322,8 +322,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T00:24Z UTC (Iter ~3290, Tier 1)
+## Status snapshot — updated 2026-06-30T00:32Z UTC (Iter ~3291, Tier 1)
 
-**Iter ~3290 summary (2026-06-30T00:24Z):** ✅ Source repo RESOLVED — on main, clean, synced to origin/main (was diverged 5+2/fetch-blocked in iter ~3289; gate-wt-28500ca6a3f362 cleared by Mirror regression gate subprocess). ⚠️ Mirror rev1 session for PR #761 (PIDs 1167891/1167893) DIED without verdict — outbox empty, rev1 inbox file unprocessed; inbox-watcher expected to re-trigger. Rev0 dup archived this iter. 0 new alerts (watermark=1088). PR #763 NEW (`feat(tier): Phase 0a — register Tier 3 + capacity-pool design spec`, created 00:11Z, no Mirror review yet). Worktrees 66/33 locked (improved from 72/26). Beacon RATE-LIMITED until 14:00 UTC June 30 (~13h36m remaining). 3 pending approvals blocked. Pipeline stall: 0 stalls. PR #762 queued in Mirror. PR #760 dead-lettered. PR #755 AUTO_MERGE_HELD blocker=#760. Trailing-30d ratio≈17.10 (stable, trend=improving). Tier 1, consecutive_clean=0.
+**Iter ~3291 summary (2026-06-30T00:32Z):** ✅ Source repo NOMINAL — on main, clean, synced. 0 new alerts (watermark=1088). Always-fix: archived rev0 dup for review-regression-warmer-worktree-leak-cleanup-001 (4th dispatch today; G-rule dispatch to Beacon blocked by rate-limit). PR #763 review dispatched by outbox-notifier at 18:25 MDT. Mirror inbox: 4 items (rev1 for 761 unprocessed, review-762, review-763 new, marker-error-760 dead-end). Worktrees 70/37. Beacon RATE-LIMITED until 14:00 UTC June 30 (~13.5h remaining). 3 pending approvals blocked. Pipeline stall: 0 stalls. PR #760 dead-lettered. PR #755 AUTO_MERGE_HELD. gh 401 on graphql merge-state rechecks: 1/3 sub-threshold new pattern. Trailing-30d ratio≈17.10 (stable, trend=improving). Tier 1, consecutive_clean=0.
 
 
