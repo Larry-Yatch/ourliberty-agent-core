@@ -6621,7 +6621,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-30T04:05:47.590170+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-30T03:58:42.209479+00:00"
+      "orphan_last_activity_ts": "2026-06-30T03:58:42.209479+00:00",
+      "briefing": {
+        "what": "A piece of work the team kicked off on its own that isn't yet attached to any active project, and it's waiting for your go-ahead.",
+        "why": "Unplanned work can quietly pull time and attention away from the priorities you've already set, so it's worth a deliberate yes or no before it grows.",
+        "suggest": "Hold off on a blanket approval \u2014 ask what goal this serves and confirm it fits current priorities before letting it move forward."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-30T04:07:49.480807+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
