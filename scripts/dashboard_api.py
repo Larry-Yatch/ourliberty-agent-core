@@ -356,7 +356,7 @@ ROTATION_VALID_MODES: frozenset[str] = frozenset({'auto', 'off'})
 # pinned_tier) honors it every tick. An empty file maps to tier1 — the
 # historical Off behavior — so older clients that just touched the file still
 # pin tier1.
-ROTATION_VALID_TIERS: frozenset[str] = frozenset({'tier1', 'tier2'})
+ROTATION_VALID_TIERS: frozenset[str] = frozenset({'tier1', 'tier2', 'tier3'})
 ROTATION_DEFAULT_PINNED_TIER = 'tier1'
 # Live tier the load-gated scheduler is CURRENTLY running on, read from the
 # state file rotate_active_tier maintains via the active_tier helpers (mirrors
