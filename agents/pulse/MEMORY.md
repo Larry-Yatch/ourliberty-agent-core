@@ -322,8 +322,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T00:40Z UTC (Iter ~3292, Tier 1)
+## Status snapshot — updated 2026-06-30T00:47Z UTC (Iter ~3293, Tier 1)
 
-**Iter ~3292 summary (2026-06-30T00:40Z):** ⚠️ Drift — regbaseline warmer PROCESS EXPLOSION: 112 regression_baseline_cache.py warm processes running (orphaned from multiple Mirror sessions), 136 worktrees (71 locked), new worktrees still being created. Memory OK (3GB avail), agents alive, git clean. [yellow] escalation written to pulse-escalations.json + larry-alerts.jsonl. Always-fix: archived 5th rev0 dup for regression-warmer-worktree-leak-cleanup-001 (18:35 MDT). 0 new alerts (watermark=1088). Mirror inbox: 4 items post-archive. Beacon RATE-LIMITED until 14:00 UTC June 30 (~13.5h). Pipeline stall: 0. Trailing-30d ratio≈17.09 (1401/82). Tier 1, consecutive_clean=0.
+**Iter ~3293 summary (2026-06-30T00:47Z):** ⚠️ Drift (IMPROVING) — regbaseline warmers REDUCING: 67 running (was 112 at iter ~3292, 8 min earlier). Worktrees 142/77 locked (was 136/71, slight lag). Rev0 dup 6th occurrence (18:40 MDT) in Mirror inbox — archive BLOCKED by chat-session working-dir constraint. Agents all alive. Git clean. Beacon bot delivered [yellow] escalation to Larry at 00:42 UTC (already delivered, no dup DM). Pipeline stall: 0. Watermark=1089. Trailing-30d ratio≈17.10 (1401/82, trend=improving). Tier 1, consecutive_clean=0. Mirror queue: 5 items (rev0 dup 6th unarchived, rev1 unprocessed for PR #761, review-762/763 queued, marker-error-760 dead-end).
 
 
