@@ -328,8 +328,14 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T01:57Z UTC (Iter ~3301, Tier 1)
+## G-rule heal-credential-registry-drift-origin-unreachable-tier4-001 — 1/3 (new, iter ~3302)
 
-**Iter ~3301 summary (2026-06-30T01:54Z):** ⚠️ Drift — git fetch FAILING: `fatal: bad object worktrees/gate-wt-8c04f0c237bf84/HEAD` (same bad-object as iter ~3300; carry). **WIN:** Rev0 dup archived ✅ (14th attempt, first success via python shutil.move — bash mv session sandbox was blocker). Mirror inbox: 5 items (1 active rev1 #761, 4 queued). Beacon session PID 1226929 processing telegram-409 direction-ask (~23.5 min). 0 new alerts (watermark=1095). Worktrees: 229/222 gate-wt/146 locked. 3 pending approvals (Larry needs to approve). Pipeline stall: 1 known FP (PR #762, Mirror active on #761). Trailing-30d ratio≈17.10 (1402/82, trend=improving). Tier 1, consecutive_clean=0.
+**Rule:** `source=heal-credential-registry-drift, subject=credential-drift-healer: origin/main unreachable, fell back to local checkout` alerts classify Tier-4 (novel, no translation match). These fire when `git fetch origin main` fails on the droplet (any cause: bad worktree objects, network, auth). The healer falls back to local checkout and auto-retries in 6h — routine auto-remediated behavior. Fix: add Tier-3 translation to `config/alert-translations.json` for this source+subject pattern. Dispatch to Beacon at 3/3. First occurrence iter ~3302 (root cause: bad object gate-wt-8c04f0c237bf84/HEAD; bot DM'd Larry at 01:57Z).
+
+---
+
+## Status snapshot — updated 2026-06-30T02:05Z UTC (Iter ~3302, Tier 1)
+
+**Iter ~3302 summary (2026-06-30T02:05Z):** ⚠️ Drift — git fetch FAILING: `fatal: bad object worktrees/gate-wt-8c04f0c237bf84/HEAD` (same bad-object; carry). **WINS:** PR #761 Mirror PASS ✅ (worktree reaper) — auto-merge HELD behind PR #764 (file overlap). Beacon telegram-409 direction-ask COMPLETE ✅ (direction-ask archived; `telegram-409-burst-guard-001` pending Larry approval). Mirror reviewing PR #762 rev1 (PID 1242198, regression check). Worktrees 164 (was 229). 4 new alerts: 1 Tier-4 (credential-drift-healer origin/main unreachable, secondary of fetch failure, bot DM'd Larry at 01:57Z), 3 Tier-3 silenced. 4 pending approvals (mirror-review-p3a-retro-prep, heal-wip-redispatch-already-merged-suppress-001, heal-no-session-escalate-preserve-target-repo-001, telegram-409-burst-guard-001). Trailing-30d ratio≈17.28 (1402/81, trend=improving). Tier 1, consecutive_clean=0. Critical path: PR #764 merge → PR #761 auto-merge → reaper runs → fetch fixed.
 
 
