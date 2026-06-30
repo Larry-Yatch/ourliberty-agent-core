@@ -322,8 +322,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T00:47Z UTC (Iter ~3293, Tier 1)
+## Status snapshot — updated 2026-06-30T00:55Z UTC (Iter ~3294, Tier 1)
 
-**Iter ~3293 summary (2026-06-30T00:47Z):** ⚠️ Drift (IMPROVING) — regbaseline warmers REDUCING: 67 running (was 112 at iter ~3292, 8 min earlier). Worktrees 142/77 locked (was 136/71, slight lag). Rev0 dup 6th occurrence (18:40 MDT) in Mirror inbox — archive BLOCKED by chat-session working-dir constraint. Agents all alive. Git clean. Beacon bot delivered [yellow] escalation to Larry at 00:42 UTC (already delivered, no dup DM). Pipeline stall: 0. Watermark=1089. Trailing-30d ratio≈17.10 (1401/82, trend=improving). Tier 1, consecutive_clean=0. Mirror queue: 5 items (rev0 dup 6th unarchived, rev1 unprocessed for PR #761, review-762/763 queued, marker-error-760 dead-end).
+**Iter ~3294 summary (2026-06-30T00:55Z):** ⚠️ Drift — PR #760 MERGED at 00:48Z (auth HOME decoupling live; Beacon now responds via tier2 auth). regbaseline warmers: 81 (was 67 at ~3293 ~8 min earlier — INCREASING again, new Mirror sessions for #762/#763 spawning fresh batches). Worktrees: 106/101 locked (was 142/77 — total down 36, but locked proportion higher). PR #755 blocker changed from #760→#761. Rev0 dup archive BLOCKED again (session working-dir constraint; 7th total). Beacon main LLM rate-limited until 14:00 UTC June 30; 3 pending approvals blocked. 4 open PRs (#763, #762, #761, #755). Pipeline stall: 0. Watermark=1089. Trailing-30d ratio≈17.10 (1401/82, trend=improving). Tier 1, consecutive_clean=0.
 
 
