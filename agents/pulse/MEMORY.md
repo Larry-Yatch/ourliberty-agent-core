@@ -340,8 +340,14 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T03:02Z UTC (Iter ~3309, Tier 1)
+## G-rule regbaseline-warmer-burst-git-contention-001 — 1/3, DISPATCHED (new, iter ~3310)
 
-**Iter ~3309 summary (2026-06-30T03:02Z):** ✅ Nominal. 3 new alerts — all Tier-3 silenced (medic-diagnosis + 2 sync-push-failed). Sync error at 02:56Z transient (non-FF push collision, repo up to date, self-heals). **Worktrees: 28** (was 76 at ~3308 — PR #761 reaper continues cleaning). Larry approved 2 items via dashboard (larry-approval envelopes in Beacon inbox, Beacon will process). Mirror active on PR #766 (telegram-409 regression check, new session post-900s-timeout). No always-fix actions. Watermark=1107. 5 pending approvals (carry). Trailing-30d ratio≈17.26 (trend=improving). Tier 1, consecutive_clean=1. **New G-rule:** heal-stale-daemon-code-dependency-ordering-001 (1/3) — healer ignores After= ordering when restarting inbox-watcher+outbox-notifier.
+**Rule:** PR #751 (regression-gate-steady-state-warmer-001) merged 2026-06-29T18:55Z. Warmer creates `gate-wt-<sha>` worktrees without deduplication or rate-limiting. Multiple parallel warmer runs create dozens of worktrees for the same HEAD SHA (numbered gate-wt-cb86751e2b6e through gate-wt-cb86751e2b6e53+). Impact: EAGAIN lock contention in worktree-cleanup.log, `git fetch` failing (bad object gate-wt-<sha>/HEAD), sync push-failed. Distinct from completed G-rule `regression-baseline-warm worktree proliferation` (that was OLD stale buildup; this is the warmer's burst-creation rate). Fix: deduplicate (skip if gate-wt-<sha> already exists), rate-limit (serial with file lock), or per-SHA cap of 1. Direction-ask dispatched to Beacon at iter ~3310 (1/3, early dispatch due to active git degradation). verification_pending. First occurrence iter ~3310 (.git/worktrees grew 28→66+ in 8 min).
+
+---
+
+## Status snapshot — updated 2026-06-30T03:13Z UTC (Iter ~3310, Tier 1)
+
+**Iter ~3310 summary (2026-06-30T03:13Z):** ⚠️ Drift. **NEW: regbaseline-warmer-burst-git-contention-001** — PR #751 warmer causing worktree burst (28→66+ in 8 min). Git lock contention (EAGAIN), git fetch failing (bad object gate-wt-cb86751e2b6e), sync push-failed 02:56Z not self-healed. [yellow] alert L1108 sent. Direction-ask dispatched to Beacon. Mirror active on telegram-409 (14400s session). Beacon processing larry-approval-42aa10c8 (ade207fd timed out 21:06:44Z). 5 pending approvals (carry). Watermark=1108. Trailing-30d ratio≈17.25 (trend=improving). Tier 1, consecutive_clean=0.
 
 
