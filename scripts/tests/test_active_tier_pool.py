@@ -257,6 +257,37 @@ class NearCapReserveTest(_PoolBase):
         self.assertFalse(active_tier.fallback_reserve_ok('tier2', now=_NOW))
 
 
+class AppendCostRowTest(_PoolBase):
+    def test_row_is_account_stamped_and_burn_readable(self):
+        active_tier.append_cost_row(
+            'tier3', model='claude-opus-4-8', cost_usd=0.5,
+            usage={'input_tokens': 100, 'output_tokens': 20,
+                   'cache_creation_input_tokens': 5,
+                   'cache_read_input_tokens': 999},
+            agent='forge-telegram-bot', source='forge-telegram-bot',
+            duration_sec=1.2, now=_NOW)
+        rows = [json.loads(ln) for ln in
+                (self.root / 'blackboard' / 'costs.jsonl').read_text().splitlines()
+                if ln.strip()]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['account'], 'tier3')
+        self.assertEqual(rows[0]['cost_usd'], 0.5)
+        # The per-tier burn reader counts it (input+output+cache_creation;
+        # cache_read excluded).
+        self.assertEqual(
+            active_tier.rolling_5h_token_volume(account='tier3', now=_NOW), 125)
+        self.assertEqual(
+            active_tier.rolling_5h_token_volume(account='tier1', now=_NOW), 0)
+
+    def test_append_is_additive_and_failopen(self):
+        active_tier.append_cost_row('tier1', now=_NOW)
+        active_tier.append_cost_row('tier1', now=_NOW)
+        rows = (self.root / 'blackboard' / 'costs.jsonl').read_text().splitlines()
+        self.assertEqual(len([r for r in rows if r.strip()]), 2)
+        # Missing usage/cost must not raise.
+        active_tier.append_cost_row('tier1', usage=None, cost_usd=None)
+
+
 class SessionMapTest(_PoolBase):
     def test_record_and_lookup(self):
         active_tier.record_session_tier('sess-A', 'tier3', now=_NOW)
