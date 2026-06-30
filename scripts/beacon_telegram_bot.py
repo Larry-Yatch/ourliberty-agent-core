@@ -35,6 +35,7 @@ Stdlib only — no pip dependencies.
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import re
@@ -1239,7 +1240,32 @@ def _process_update(update: dict) -> None:
 _bot_state: dict = {'sessions': {}}
 
 
+# Single-instance lock. Held open for the process lifetime — never closed —
+# so the exclusive flock persists. Module-global keeps the fd from being
+# garbage-collected, which would release the lock.
+_LOCK_PATH = Path.home() / "agents" / "state" / "beacon-telegram-bot.lock"
+_lock_fd = None
+
+
+def _acquire_singleton_lock() -> bool:
+    """Take an exclusive non-blocking lock. Return True if acquired, False if
+    another instance (the production daemon) already holds it. Defense in depth
+    so even a no-arg second invocation cannot start a competing getUpdates loop."""
+    global _lock_fd
+    _LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _lock_fd = open(_LOCK_PATH, "w")
+    try:
+        fcntl.flock(_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return True
+    except OSError:
+        return False
+
+
 def main() -> None:
+    if not _acquire_singleton_lock():
+        log(f"another instance already holds {_LOCK_PATH}; exiting without "
+            f"polling to avoid a competing getUpdates loop (Telegram 409 burst)")
+        return
     log(f"Beacon bot starting (cwd={BEACON_DIR}, allowed={sorted(ALLOWED)})")
     _bot_state['sessions'] = load_sessions()
     offset = 0
@@ -1286,6 +1312,19 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    # This script is the production daemon entrypoint and takes NO subcommands.
+    # systemd starts it with zero arguments. Any extra argv means an errant
+    # invocation (e.g. `beacon_telegram_bot.py get-last-messages`) which would
+    # otherwise start a second getUpdates long-poll and trigger a Telegram 409
+    # burst against the daemon. Reject before any Telegram API call.
+    if len(sys.argv) > 1:
+        sys.stderr.write(
+            "beacon_telegram_bot.py is the Beacon daemon entrypoint and takes "
+            "no subcommands; it is started by systemd (ourliberty-beacon-bot."
+            "service) with no arguments. To read recent Telegram activity use "
+            "`tail -N /home/larry/agents/logs/beacon_telegram_bot.log` instead "
+            "of invoking this script.\n")
+        sys.exit(2)
     try:
         main()
     except KeyboardInterrupt:
