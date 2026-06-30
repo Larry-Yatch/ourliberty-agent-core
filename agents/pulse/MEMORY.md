@@ -358,8 +358,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T08:48Z UTC (Iter ~3341, Tier 2)
+## Status snapshot — updated 2026-06-30T09:08Z UTC (Iter ~3342, Tier 3)
 
-**Iter ~3341 summary (2026-06-30T08:48Z):** 0 new alerts. Watermark=1122. All 3/3 main daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254). Watchdog=healthy (08:44:17Z UTC). Heal-daemon heartbeat 08:39:31Z. No stalls. **ourliberty-cycle.timer CONFIRMED STILL WORKING** — new fire at 08:45:15Z UTC (PID 1460689, run_cycle.sh), Tier-2 cadence (every 3rd 5-min fire). 13-iter carry still resolved. Pipeline idle (outbox-notifier last entry 23:11:25Z 2026-06-29, ~9.6h). 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals (mirror-review-p3a-retro-prep ~33h+; heal-wip-redispatch-already-merged-suppress-001; heal-no-session-escalate-preserve-target-repo-001; mirror-review-pr-763). Worktrees 4/0-gate-wt. Tier 2, consecutive_clean=2 (1 more clean Tier-2 iter → Tier 3).
+**Iter ~3342 summary (2026-06-30T09:08Z):** 0 new alerts. Watermark=1122. All 3/3 main daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254). Watchdog=healthy (09:05:03Z UTC). Heal-daemon heartbeat 09:00:02Z. No stalls. **ourliberty-cycle.timer WORKING** — service fired 09:05:01Z UTC (PID 1465807), ~15-min Tier-2 cadence confirmed. Pipeline idle (outbox-notifier last entry 23:11:25Z 2026-06-29, ~10h). 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals (mirror-review-p3a-retro-prep ~25.5h+; heal-wip-redispatch-already-merged-suppress-001; heal-no-session-escalate-preserve-target-repo-001; mirror-review-pr-763). **Worktrees 1/0 (main only — all 3 stale non-main reaped).** **Tier de-escalated 2→3** (consecutive_clean 2→3→de-escalated; reset to 0). Next systemd fire cadence: 30 min (every 6th 5-min fire).
 
 
