@@ -2159,6 +2159,72 @@ class TestCheckRevisionDispatchedWithNoSession(_TempAgentsRootMixin, unittest.Te
         alerts = self.hps.check_revision_dispatched_with_no_session({})
         self.assertEqual(alerts, [])
 
+    def test_human_authored_branch_suppresses_page(self):
+        # A hand-opened PR (feat/* via the auto-review handoff) is session-less
+        # BY DESIGN — Forge never built it, so the cold-start re-brief is the
+        # expected path, not a stall. The stuck obligation must NOT page, but
+        # the verify-only recovery still runs so the row can clear on merge.
+        self._open('human-1', minutes_ago=90,
+                   branch='feat/tier2-parity-monitor-and-audit')
+        with patch.object(self.hps, '_gh_pr_state', return_value='OPEN') as gh:
+            alerts = self.hps.check_revision_dispatched_with_no_session({})
+        self.assertEqual(alerts, [])           # no loud page for the human case
+        gh.assert_called()                     # recovery still verified PR state
+        # PR still open → obligation stays OPEN for a later merge/PASS resolve.
+        self.assertEqual(
+            self._nsl.get_obligation('human-1')['status'], self._nsl.OPEN,
+        )
+
+    def test_human_branch_recovery_resolves_on_merge(self):
+        # Same human branch, but the PR merged out-of-band: the inline
+        # verify-only recovery clears the ledger row (no lingering obligation).
+        self._open('human-merged-1', minutes_ago=90, branch='fix/manual-doc')
+        with patch.object(self.hps, '_gh_pr_state', return_value='MERGED'):
+            alerts = self.hps.check_revision_dispatched_with_no_session({})
+        self.assertEqual(alerts, [])
+        self.assertEqual(
+            self._nsl.get_obligation('human-merged-1')['status'],
+            self._nsl.RESOLVED,
+        )
+
+    def test_forge_branch_still_fires(self):
+        # A `forge/` branch DID have a build session; a session-less cold start
+        # on it is the genuine #412 regression and must still page loudly.
+        self._open('forge-lost-1', minutes_ago=60,
+                   branch='forge/some-build-task-001')
+        alerts = self.hps.check_revision_dispatched_with_no_session({})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(
+            alerts[0]['subject'],
+            'pipeline-stall:no-session-revision:forge-lost-1',
+        )
+
+    def test_larry_branch_suppresses_page(self):
+        # A `larry/` branch is hand-authored, NOT built by the Forge build path
+        # (an extractable task_id != a resumable build session). A session-less
+        # cold start on it is the expected re-brief, not the #412 regression —
+        # it must NOT page, but the verify-only recovery still runs.
+        self._open('larry-1', minutes_ago=90, branch='larry/some-hand-task')
+        with patch.object(self.hps, '_gh_pr_state', return_value='OPEN') as gh:
+            alerts = self.hps.check_revision_dispatched_with_no_session({})
+        self.assertEqual(alerts, [])           # no loud page for the human case
+        gh.assert_called()                     # recovery still verified PR state
+        self.assertEqual(
+            self._nsl.get_obligation('larry-1')['status'], self._nsl.OPEN,
+        )
+
+    def test_claude_branch_suppresses_page(self):
+        # A `claude/` branch is laptop-authored, NOT built by the Forge build
+        # path — same reasoning as larry/: suppress the page, run recovery only.
+        self._open('claude-1', minutes_ago=90, branch='claude/laptop-task')
+        with patch.object(self.hps, '_gh_pr_state', return_value='OPEN') as gh:
+            alerts = self.hps.check_revision_dispatched_with_no_session({})
+        self.assertEqual(alerts, [])           # no loud page for the laptop case
+        gh.assert_called()                     # recovery still verified PR state
+        self.assertEqual(
+            self._nsl.get_obligation('claude-1')['status'], self._nsl.OPEN,
+        )
+
     def test_resolved_obligation_no_alert(self):
         self._open('done-1', minutes_ago=60)
         self._nsl.resolve_obligation('done-1', resolution='review-pass')

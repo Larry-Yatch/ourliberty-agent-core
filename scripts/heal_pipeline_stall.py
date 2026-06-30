@@ -254,6 +254,30 @@ _AUTO_MERGE_MERGED_RE = re.compile(
 # else fire one loud, non-suppressed alert).
 NO_SESSION_STUCK_MIN = 45  # grace before a stuck cold-start obligation alerts
 
+# Branch prefixes that carried a resumable Forge build session. A cold-start
+# no-session obligation only exists for a session-less revision, and that shape
+# has two very different roots:
+#   - a `forge/` branch whose build session got DROPPED in the chain — the
+#     genuine #412 regression: Forge has context it can no longer `--resume`.
+#     Worth a loud page.
+#   - any OTHER branch (feat/|fix/|work/|larry/|claude/...) — a PR opened by
+#     hand or on the laptop and routed through the auto-review label handoff.
+#     Forge NEVER built it, so there is no build session to carry; the
+#     cold-start re-brief is the DESIGNED path, not a stall. Expected for every
+#     hand-opened PR Mirror wants revised — paging Larry for it is pure alert
+#     toil. (larry/ and claude/ DO appear in the task-id extractor's prefix set,
+#     but an extractable task_id is not a resumable build session — only
+#     forge/ branches are built by the Forge build path.)
+AGENT_BUILT_BRANCH_PREFIXES = ('forge/',)
+
+
+def _is_agent_built_branch(branch: Optional[str]) -> bool:
+    """True iff ``branch`` was produced by the agent build path (and so a
+    missing build session is a real fault, not the expected human-PR cold
+    start). An empty/None branch returns False *here* but is handled
+    conservatively at the call site — see ``check_revision_dispatched_with_no_session``."""
+    return bool(branch) and branch.startswith(AGENT_BUILT_BRANCH_PREFIXES)
+
 # Check 10 (forge-post-open-mergeable-rebase-001). The post-open auto-rebase
 # backstop reads the SIBLING `rebase_obligation_ledger`: the notifier OPENS an
 # obligation when it dispatches a phase=rebase to Forge (PR opened CONFLICTING
@@ -2177,6 +2201,22 @@ def check_revision_dispatched_with_no_session(state: dict) -> list[dict]:
         if not task:
             continue
         pr_url = ob.get('pr_url') or ''
+        branch = ob.get('branch') or ''
+        # Human-authored PR (feat/|fix/|work/...) routed through the auto-review
+        # handoff: Forge never built it, so a session-less revision is the
+        # DESIGNED cold-start path, not a stall — do NOT page (alert toil). We
+        # still run the verify-only recovery so the ledger row clears on a
+        # merge / Mirror PASS instead of lingering open. Only a positively
+        # AGENT-built branch that lost its session is the #412 bug worth a loud
+        # alert; an empty/unknown branch falls through to the alert below
+        # (verify-before-alarm — never silently swallow a possible real fault).
+        if branch and not _is_agent_built_branch(branch):
+            _recover_no_session_revision(task, pr_url)  # resolve-on-merge only; never alerts
+            log(f'NO_SESSION_REVISION task={task} branch={branch!r} is '
+                f'human-authored (non-agent branch); cold-start revision is '
+                f'expected, suppressing page (obligation stays open for '
+                f'merge/PASS auto-resolve)', 'INFO')
+            continue
         last = _parse_ts(ob.get('last_dispatch_at') or ob.get('opened_at'))
         elapsed_min = int((now - last).total_seconds() / 60) if last else 0
         round_num = ob.get('round', 1)
