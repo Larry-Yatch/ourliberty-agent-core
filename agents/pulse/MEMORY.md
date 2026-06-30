@@ -18,9 +18,9 @@
 
 ---
 
-## beacon-pending-approvals.json correct path and structure (learned 2026-06-12)
+## beacon-pending-approvals.json correct path and structure (learned 2026-06-12, corrected 2026-06-30)
 
-**Rule:** Lives at `~/agents/state/beacon-pending-approvals.json`. NOT `~/agents/blackboard/`. Structure: `{"version": 1, "pending": [...], "history": [...]}` — NOT a dict keyed by approval ID. Check for pending items via `d["pending"]` list length.
+**Rule:** Lives at `~/agents/state/beacon-pending-approvals.json`. NOT `~/agents/blackboard/`. Structure: `{"version": 1, "pending": [...], "history": [...]}` — NOT a dict keyed by approval ID. Check for pending items via `d["pending"]` list length. **The DM-delivery field is `chat_id` (integer), NOT `reply_chat_id`.** Querying `p.get("reply_chat_id")` always returns None even when the DM path is intact; always use `p.get("chat_id")`.
 
 ---
 
@@ -362,8 +362,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T19:16Z UTC (Iter ~3364, Tier 1)
+## Status snapshot — updated 2026-06-30T19:25Z UTC (Iter ~3365, Tier 1)
 
-**Iter ~3364 summary (2026-06-30T19:16Z):** 0 new alerts. Watermark=1017 (no change). All 5/5 core daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254, dashboard=1200736, chain_event_shipper=1200730). **Watchdog timer HEALTHY** — log entries at 19:07Z and 19:12Z UTC; prior escalation #14 was timezone error (MOOT). Heal-daemon heartbeat 19:07:00Z. No stalls. Pipeline idle. 3 open PRs (#763/#765/#766, REVIEW_ESCALATE). 4 pending approvals unchanged. **Tier 1, consecutive_clean=1**. Carry: PR #768 unreviewed-merge (pulse-escalations.json #13).
+**Iter ~3365 summary (2026-06-30T19:25Z):** 0 new alerts. Watermark=1017 (no change). All 5/5 core daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254, dashboard=1200736, chain_event_shipper=1200730). Watchdog last fired 19:17:01Z UTC (normal). Heal-daemon heartbeat 19:17:00Z. No stalls. Pipeline idle. **4 open PRs: #769 (NEW, Larry-authored fix PR created 19:12Z, no Mirror review yet), #763/#765/#766 (REVIEW_ESCALATE carry)**. 4 pending approvals unchanged (chat_id correct: (2)=7998341473, (3)=7998341473). **Tier 1, consecutive_clean=2**. Carry: PR #768 unreviewed-merge (pulse-escalations.json #13).
 
 
