@@ -338,9 +338,9 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## G-rule heal-stale-daemon-code-dependency-ordering-001 — 1/3 (new, iter ~3309)
+## G-rule heal-stale-daemon-code-dependency-ordering-001 — 2/3 (updated iter ~3375)
 
-**Rule:** Stale-daemon healer restarts outbox-notifier and inbox-watcher independently without honoring the systemd `After=ourliberty-inbox-watcher.service` dependency. When inbox-watcher restarts first (or is transitioning), outbox-notifier's restart fails (rc=-1, inactive after 3s) — then systemd auto-starts outbox-notifier moments later when inbox-watcher comes up. Result: transient auto-restart-failed alert that self-heals in ~90s. Medic's prior_attempts=5 (recurring). Fix: `heal_stale_daemon_code.py` should restart inbox-watcher before outbox-notifier, or use `systemctl restart --with-dependencies`. NOT a silence candidate (the root cause remains). Distinct from now-COMPLETE G-rule `heal-stale-daemon-code-auto-restart-failed-self-recovered` (which fixed the alert TRIAGE). This G-rule tracks the CODE FIX. First occurrence iter ~3309. Dispatch to Beacon at 3/3.
+**Rule:** Stale-daemon healer restarts outbox-notifier and inbox-watcher independently without honoring the systemd `After=ourliberty-inbox-watcher.service` dependency. When inbox-watcher restarts first (or is transitioning), outbox-notifier's restart fails (rc=-1, inactive after 3s) — then systemd auto-starts outbox-notifier moments later when inbox-watcher comes up. Result: transient auto-restart-failed alert that self-heals in ~90s. Medic confirmed (prior_attempts=6): healer fires SIGTERM, checks after 3s, sees inactive (systemd throttle/StartLimitBurst after 4 rapid restarts today), declares failed; systemd restarts at ~83s later. Fix: `heal_stale_daemon_code.py` should restart inbox-watcher before outbox-notifier, or use `systemctl restart --with-dependencies`. NOT a silence candidate (the root cause remains). Dispatch to Beacon at 3/3. Occurrences: iter ~3309 (1/3), iter ~3375 (2/3, L1028 — PR #775 deploy wave).
 
 ---
 
@@ -376,8 +376,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T20:51Z UTC (Iter ~3372, Tier 1)
+## Status snapshot — updated 2026-06-30T21:34Z UTC (Iter ~3375, Tier 1)
 
-**Iter ~3372 summary (2026-06-30T20:51Z):** Signal iter. Always-fix: fast-forward d2e50500→0bb0c7e3 (PR #771 code pulled in). PR #771 MERGED 14:44:25 MDT (fix(approval-sync): clear dashboard-approved phantoms, Phase 1 — heal_stale_approvals.py live). PR #772 MERGED 20:48:27Z by Larry WITHOUT Mirror review (3rd unreviewed-merge; G-rule dispatched). heal-stale-daemon-code triggered PR #771 code deploy: beacon-bot/dashboard-api/inbox-watcher/outbox-notifier restarted, new PIDs 1702377/1702585/1702680/1702768/1200730. Pending approvals=0. Watchdog=healthy 14:44:16 MDT. Tier 2→1 (signal). G-rule `unreviewed-merge-larry-authored-pr-001` 3/3 DISPATCHED.
+**Iter ~3375 summary (2026-06-30T21:34Z):** Signal iter. Always-fix: fast-forward c007dc7b→c78da8b0 (PR #775 feat:tier-pool dispatch selector engine). PR #773 MERGED 15:32:49 MDT (docs:approval-sync Phase 2, Mirror REVIEW_PASS + AUTO_MERGE). PR #774 MERGED 21:22:15Z by Larry (no unreviewed alert). PR #775 MERGED 21:23:12Z by Larry WITHOUT Mirror review (4th unreviewed-merge). heal-stale-daemon-code restart wave (PR #775 active_tier.py change): all daemons restarted — Beacon=1735618, dashboard-api=1735904, inbox-watcher=1737091, outbox-notifier=1737092, chain-event-shipper=1200730. outbox-notifier auto-restart-failed (L1028) then self-recovered (systemd, 83s). Medic diagnosis (L1031, prior_attempts=6) points to StartLimitBurst throttle + healer 3s verification gap → G-rule heal-stale-daemon-code-dependency-ordering-001 now 2/3. Pending approvals=0. Watchdog healthy. Tier 2→1 (signal).
 
 
