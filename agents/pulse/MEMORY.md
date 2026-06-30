@@ -358,8 +358,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T12:54Z UTC (Iter ~3349, Tier 3)
+## Status snapshot — updated 2026-06-30T13:25Z UTC (Iter ~3350, Tier 3)
 
-**Iter ~3349 summary (2026-06-30T12:54Z):** 0 new alerts. Watermark=1012. All 3/3 main daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254). Watchdog=healthy (12:49:20Z UTC). Heal-daemon heartbeat 12:42:12Z. No stalls. Pipeline idle (outbox-notifier PID 1340254 WARN at 03:38:32Z UTC — 401 on gh pr view 765, carry). 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals (mirror-review-p3a-retro-prep ~29.3h no chat_id; heal-wip-redispatch-already-merged-suppress-001; heal-no-session-escalate-preserve-target-repo-001; mirror-review-pr-763). **Worktrees 1/0 (main only).** **Tier 3, consecutive_clean=7** (at ceiling — no further de-escalation). Outbox-notifier GitHub 401 carry (1/3 G-rule candidate).
+**Iter ~3350 summary (2026-06-30T13:25Z):** 0 new alerts. Watermark=1012. All 3/3 main daemons healthy (beacon=1200723, inbox=1286943, outbox=1340254). Watchdog=healthy (13:20:16Z UTC). Heal-daemon heartbeat 13:13:19Z. No stalls. Pipeline idle (outbox-notifier PID 1340254 WARN at 03:38:32Z UTC — 401 on gh pr view 765, carry). 3 open PRs (#766/#765/#763, all REVIEW_ESCALATE). 4 pending approvals (mirror-review-p3a-retro-prep ~30.3h no chat_id; heal-wip-redispatch-already-merged-suppress-001; heal-no-session-escalate-preserve-target-repo-001; mirror-review-pr-763). **Worktrees 1/0 (main only).** **Tier 3, consecutive_clean=8** (at ceiling — no further de-escalation). Outbox-notifier GitHub 401 carry (1/3 G-rule candidate).
 
 
