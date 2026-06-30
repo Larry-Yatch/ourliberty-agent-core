@@ -358,8 +358,8 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## Status snapshot — updated 2026-06-30T04:15Z UTC (Iter ~3317, Tier 1)
+## Status snapshot — updated 2026-06-30T04:21Z UTC (Iter ~3318, Tier 1)
 
-**Iter ~3317 summary (2026-06-30T04:06Z):** BREAKTHROUGH — PR #764 fork-bomb fix merged; worktrees 10/0-gate-wt (complete elimination); git fetch CLEAN; sync success. 1 new Tier-4 alert (L1113 stale promoted auto-merge-conflict for merged PR #764). 7 pending approvals (+1 phantom mirror-review-pr-ourliberty-agent-core-764 for merged PR). 4 open REVIEW_ESCALATE PRs (#763/#765/#766/#767). Mirror reviewed merged PR #764 → REVIEW_ESCALATE → phantom approval. PR #755 AUTO_MERGE_HELD blocker=#765. Watermark=1113. Ratio=17.43. Tier 1, consecutive_clean=0.
+**Iter ~3318 summary (2026-06-30T04:21Z):** Clean iter. No new alerts (watermark=1113, file_length=1113). All daemons healthy. Worktrees 10/0-gate-wt (fork-bomb fix holding). Git fetch CLEAN. Sync success. **New positive: PR #755 MERGED** (decouple agents/ state-root — stale AUTO_MERGE_HELD carry resolved). Beacon session PID 1360974 processing notify-pr-ourliberty-agent-core-767. 7 pending approvals (unchanged). 4 open REVIEW_ESCALATE PRs (#763/#765/#766/#767). Watermark=1113. Ratio=17.425. Tier 1, consecutive_clean=1.
 
 
