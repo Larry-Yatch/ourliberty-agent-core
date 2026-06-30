@@ -6719,7 +6719,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-06-30T23:15:16.061331+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-30T23:01:30.632431+00:00"
+      "orphan_last_activity_ts": "2026-06-30T23:01:30.632431+00:00",
+      "briefing": {
+        "what": "Our system's self-repair tool was crying wolf \u2014 flagging a routine background restart as a failure and pinging you, when it had actually finished fine a minute later.",
+        "why": "These false alarms erode your trust in the alerts that matter and waste your attention on problems that don't exist.",
+        "suggest": "Approve the fix so the checker waits for in-progress restarts to settle before declaring failure \u2014 but verify it clears the false alarms without hiding real ones before considering it done."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-06-30T23:20:17.162411+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
