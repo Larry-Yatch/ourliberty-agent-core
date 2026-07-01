@@ -382,8 +382,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T18:53Z UTC (Iter ~3444, Tier 2)
+## Status snapshot — updated 2026-07-01T19:10Z UTC (Iter ~3445, Tier 2)
 
-**Iter ~3444 summary (2026-07-01T18:53Z):** All checks nominal. No new alerts (watermark=1068=file_length). Mirror REVIEW_REVISION on PR #795 at 12:51 MDT ($0.78, session 38748cfd) — revision-1 dispatched to Forge 12:51:09 MDT. PR #796 under Mirror review (started 12:51:11 MDT). PR #797 created by Larry 12:48:38 MDT (MERGEABLE, pending outbox-notifier pickup — unreviewed-merge risk if Larry merges before Mirror dispatch). Daemons self-healed 18:42Z (beacon-bot PID 2422699, outbox-notifier PID 2423016 — heal-stale-daemon-code healer restarted after 30-min cooldown expired; running current code). Sync 18:32Z (~21 min). Watchdog 18:48Z healthy. Heartbeat 18:42Z. Pipeline 0 stalls. **Tier 2** (consecutive_clean=0; cadence 15 min). APPROVAL_REQUEST `heal-stale-daemon-fresh-deploy-retry-001` pending with Larry. PRIME DIRECTIVE ratio: 14.85, trend=flat.
+**Iter ~3445 summary (2026-07-01T19:10Z):** All checks nominal. 1 Tier-3 doorbell silenced (watermark 1068→1069). Mirror reviewing PR #796 attempt=2 (PID 2437085, regression check started 13:07 MDT, 1500s timeout). Mirror queue: 4 items (PR #796 active, PR #795-rev1/PR #798/PR #799 queued). PR #795-rev1 in Forge inbox (~19 min, pickup pending). PR #797 (fix(tier-pool)) OPEN without auto-review label — G-rule unreviewed-merge risk (carry). PRs #798 (Approval-Sync Phase 3 spec) and #799 (fix(tests)) dispatched to Mirror 12:55/13:05 MDT. Zombie bash PID 1834248 (since May 28, Check VIII poll loop, 0% CPU) — first noted, ask-then-do, low urgency. APPROVAL_REQUEST `heal-stale-daemon-fresh-deploy-retry-001` pending Larry. Sync 18:32Z (~37 min). Watchdog 19:03Z healthy. Heartbeat 19:12Z. Pipeline 0 stalls. **Tier 2** (consecutive_clean=1; cadence 15 min). PRIME DIRECTIVE ratio: 14.825, trend=flat.
 
 
