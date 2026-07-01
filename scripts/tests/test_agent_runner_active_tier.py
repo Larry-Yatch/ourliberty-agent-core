@@ -289,8 +289,13 @@ class RunClaudeActiveTierEnvTest(unittest.TestCase):
         self.assertEqual(run_env['HOME'], '/home/larry')
 
     def test_fallback_from_tier1_without_setup_token_swaps(self):
-        # No setup-token → fallback subprocess swaps to the tier2 home.
+        # No setup-token → fallback subprocess swaps to the tier2 (laptop) home.
+        # Under the hardened pool-aware fallback, tier1's FIRST fallback is the
+        # sibling primary tier3 (shared home, no swap) — so to exercise the
+        # tier2 creds.json HOME-swap we bench tier3, forcing the fallback down
+        # to the reserve-guarded laptop tier.
         self._write_state('tier1')
+        active_tier.set_cooldown('tier3', raw_excerpt='resets 11:30am')
         proc = _FakeProc(
             1,
             stdout="You've hit your limit · resets 11:30am",
@@ -883,6 +888,44 @@ class RunClaudePerTaskDispatchTest(unittest.TestCase):
         self.assertFalse(ok)
         self.assertTrue(out.startswith('TIER_HOLD:'))
         self.assertIsNone(sid)
+
+    def test_toctou_holds_when_tier_benched_before_spawn(self):
+        # V3/I14: if the selected tier is benched between select and spawn, HOLD
+        # rather than spawn on a benched account. Simulate by returning a tier
+        # from select but reporting it unusable at the pre-spawn re-verify (no
+        # operator pin, so the re-verify runs).
+        with mock.patch.object(ar.active_tier, 'select_dispatch_tier',
+                               return_value='tier1'), \
+             mock.patch.object(ar.active_tier, 'read_operator_pin',
+                               return_value=None), \
+             mock.patch.object(ar.active_tier, 'usable', return_value=False):
+            ok, out, sid = self._run(_FakeProc(0, stdout=_ok_response()))
+        self.assertFalse(ok)
+        self.assertTrue(out.startswith('TIER_HOLD:'))
+        self.assertIsNone(sid)
+
+    def test_toctou_resume_auth_caused_benches_then_pauses(self):
+        # F4: a RESUME whose bound tier is unusable due to AUTH (no cooldown)
+        # before spawn must stamp an auth_401 cooldown (so the resume healer has
+        # a cooldown to wait on) and pause — else the healer sees no cooldown,
+        # resumes, and loops forever.
+        kinds = []
+        with mock.patch.object(ar.active_tier, 'select_dispatch_tier',
+                               return_value='tier1'), \
+             mock.patch.object(ar.active_tier, 'read_operator_pin',
+                               return_value=None), \
+             mock.patch.object(ar.active_tier, 'usable', return_value=False), \
+             mock.patch.object(ar.active_tier, 'cooldown_until',
+                               return_value=None), \
+             mock.patch.object(ar.active_tier, 'set_cooldown',
+                               side_effect=lambda *a, **k: kinds.append(
+                                   k.get('kind'))):
+            ok, out, _sid = self._run(_FakeProc(0, stdout=_ok_response()),
+                                      session_id='sess-x')
+        self.assertFalse(ok)
+        self.assertIn('auth_401', kinds)           # benched so healer waits
+        self.assertIn('paused for auto-resume', out)
+        self.assertNotIn('TIER_HOLD', out)
 
     def test_resume_bound_tier_benched_pauses_for_autoresume(self):
         # Spec §5: a resume whose bound tier is benched at selection must NOT

@@ -25,6 +25,7 @@ import os
 import random
 import re
 import sys
+import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -73,9 +74,12 @@ _VALID_TIERS = ('tier1', 'tier2', 'tier3')
 def home_for_tier(tier):
     return {'tier1': TIER1_HOME, 'tier2': TIER2_HOME,
             'tier3': TIER3_HOME}.get(tier, TIER1_HOME)
-# Per-tier fallback priority. Preserves the historical binary behavior
-# (tier1<->tier2) and adds tier3 (primary) -> tier2 (laptop/emergency) ->
-# tier1. fallback_tier() walks this, skipping any benched (cooled-down) tier.
+# Per-tier fallback priority for the LEGACY rotation scheduler (retiring at
+# cutover). Preserves the historical binary behavior (tier1<->tier2).
+# fallback_tier() walks this, skipping any benched tier. The NEW per-task
+# dispatch paths use fallback_tier_pool_aware() instead, which derives a
+# primary-first, reserve-guarded order from the pool config (never drains the
+# laptop before trying the sibling primary).
 _FALLBACK_ORDER = {
     'tier1': ('tier2', 'tier3'),
     'tier2': ('tier1', 'tier3'),
@@ -363,6 +367,51 @@ def fallback_tier(active=None):
     return None
 
 
+def fallback_tier_pool_aware(from_tier, now=None):
+    """Pool-aware, reserve-guarded fallback for a DISPATCHER's failure retry
+    (spec §6 fallback + §8 reserve). Derives its order from the pool config:
+    first a usable OTHER PRIMARY (tier1<->tier3), then a usable fallback tier
+    (tier2, the laptop) — and the laptop ONLY when ``fallback_reserve_ok`` still
+    holds. So a primary wall spills to the sibling primary first and reaches the
+    laptop last, never past its 25% reserve. ``usable`` = no cooldown AND auth
+    ok. Returns None when no eligible fallback exists (caller holds / DMs).
+
+    Candidates must be not-benched (cooldown) AND have a real per-account auth
+    SOURCE (``_has_dispatch_auth_source`` — excludes a shared-home tokenless
+    tier like tier3, which would otherwise 'auth' by borrowing tier1's
+    creds.json and run cross-account while the ledger stamps the wrong tier,
+    the V6 gap). The caller still verifies the actual credential downstream
+    (run_claude's ``_fallback_available`` / beacon's setup-token+creds check).
+    What's new vs ``fallback_tier``: primary-first ORDER and the reserve GUARD
+    on the laptop tier. run_claude and the beacon bot's failure-fallback use
+    THIS one so their retry can never drain Larry's laptop past the reserve nor
+    misattribute a tokenless shared-home tier."""
+    cfg = _tier_pool_config()
+    for t in cfg['primary']:
+        if (t != from_tier and cooldown_until(t, now=now) is None
+                and _has_dispatch_auth_source(t)):
+            return t
+    for t in cfg['fallback']:
+        if (t != from_tier and cooldown_until(t, now=now) is None
+                and _has_dispatch_auth_source(t)
+                and fallback_reserve_ok(t, now=now)):
+            return t
+    return None
+
+
+def _has_dispatch_auth_source(tier):
+    """True unless ``tier`` could only authenticate by BORROWING another
+    account's credentials.json — i.e. a shared-home tier (home == tier1's real
+    home, e.g. tier3) with NO setup token (the V6 cross-account case). tier1
+    (the home owner) and own-home tiers (tier2) pass; a real credential is
+    still verified downstream. This is ``tier_auth_ok`` minus the creds.json
+    *validity* read, so fallback selection excludes the misattribution case
+    without requiring the callers' creds check to move here."""
+    if _setup_token_for_tier(tier):
+        return True
+    return not (tier != 'tier1' and home_for_tier(tier) == TIER1_HOME)
+
+
 def other_home():
     """Return the HOME of the OPPOSITE tier — the failure-fallback target.
 
@@ -373,6 +422,40 @@ def other_home():
     return home_for_tier(t) if t else TIER1_HOME
 
 
+def _warn_lock_degrade(op):
+    """Emit ONE stderr line when a state-lock write degrades to an unlocked
+    read-modify-write on lock timeout (F5). active_tier stays logger-free by
+    design (imported everywhere), so this is a best-effort stderr write —
+    systemd journals it — giving an operator a signal that the serialization
+    guarantee momentarily degraded under contention instead of failing
+    silently. Rare (only on > _STATE_LOCK_TIMEOUT contention)."""
+    try:
+        sys.stderr.write(
+            f'[active_tier] WARN lock-degrade: {op} took the unlocked RMW path '
+            f'after a {_STATE_LOCK_TIMEOUT}s lock timeout (contention)\n')
+    except Exception:  # noqa: BLE001 — a warning must never break the write
+        pass
+
+
+def _locked_state_write(mutate):
+    """Run ``mutate(state)`` then ``_write`` under the SAME state-file lock
+    ``set_cooldown`` uses, so the rotation scheduler's tier/draining writes
+    can't clobber a concurrent per-task cooldown write (both RMW the one
+    active-tier.json). Degrades to an unlocked RMW on lock timeout (best-effort;
+    never fails the caller) — but logs the degrade (F5)."""
+    def _do():
+        state = read()
+        mutate(state)
+        _write(state)
+    try:
+        with file_lock.exclusive_lock(_state_lock_path(),
+                                      timeout=_STATE_LOCK_TIMEOUT):
+            _do()
+    except file_lock.LockTimeout:
+        _warn_lock_degrade('set_tier/draining')
+        _do()
+
+
 def set_tier(tier):
     """Persist a new active tier. Stamps ``since`` with the current UTC
     time; leaves ``next_switch_due`` and ``draining`` alone so the
@@ -380,30 +463,24 @@ def set_tier(tier):
     independently."""
     if tier not in _VALID_TIERS:
         raise ValueError('invalid tier: ' + repr(tier))
-    state = read()
-    state['tier'] = tier
-    state['since'] = datetime.now(timezone.utc).isoformat()
-    _write(state)
+    def _m(state):
+        state['tier'] = tier
+        state['since'] = datetime.now(timezone.utc).isoformat()
+    _locked_state_write(_m)
 
 
 def set_draining(draining):
     """Update the ``draining`` flag without touching tier/since."""
-    state = read()
-    state['draining'] = bool(draining)
-    _write(state)
+    _locked_state_write(lambda state: state.__setitem__('draining', bool(draining)))
 
 
 def set_next_switch_due(when):
     """Persist the next switch deadline. Accepts a datetime (will be
     serialized to ISO8601 UTC) or None (clears the deadline)."""
-    state = read()
-    if when is None:
-        state['next_switch_due'] = None
-    else:
-        if when.tzinfo is None:
-            when = when.replace(tzinfo=timezone.utc)
-        state['next_switch_due'] = when.astimezone(timezone.utc).isoformat()
-    _write(state)
+    if when is not None and when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    iso = None if when is None else when.astimezone(timezone.utc).isoformat()
+    _locked_state_write(lambda state: state.__setitem__('next_switch_due', iso))
 
 
 def parse_reset_time(raw, now=None):
@@ -492,6 +569,7 @@ def set_cooldown(tier, raw_excerpt='', now=None, kind='rate_limit'):
                                       timeout=_STATE_LOCK_TIMEOUT):
             return _set_cooldown_locked(tier, raw_excerpt, now, kind)
     except file_lock.LockTimeout:
+        _warn_lock_degrade('set_cooldown')
         return _set_cooldown_locked(tier, raw_excerpt, now, kind)
 
 
@@ -590,6 +668,16 @@ def tier_auth_ok(tier, now=None):
         return False
     if _setup_token_for_tier(tier):
         return True
+    # SETUP-TOKEN-ONLY shared-home tier (e.g. tier3, whose home IS tier1's real
+    # home, spec §11): with NO setup token there is NO own credentials.json —
+    # falling through to _credentials_path(tier) would read tier1's creds and
+    # wrongly report this tier auth-ok, so a dispatch would run under tier1's
+    # OAuth while the ledger stamps this tier (silent cross-account
+    # misattribution that poisons per-tier burn + calibration). Treat a missing
+    # token as NOT auth-ok for such tiers. tier1 itself (the real home owner)
+    # still validates against its own creds.json below.
+    if tier != 'tier1' and home_for_tier(tier) == TIER1_HOME:
+        return False
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
@@ -653,6 +741,7 @@ def clear_cooldown(tier):
                                       timeout=_STATE_LOCK_TIMEOUT):
             _clear_cooldown_locked(tier)
     except file_lock.LockTimeout:
+        _warn_lock_degrade('clear_cooldown')
         _clear_cooldown_locked(tier)
 
 
@@ -670,7 +759,10 @@ def _clear_cooldown_locked(tier):
 def _write(state):
     path = _state_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + '.tmp')
+    # Per-writer-unique temp (pid+thread) so a locked writer and an unlocked-
+    # degrade writer never share a temp path -> no torn file (see
+    # _atomic_write_json).
+    tmp = path.with_name(f'{path.name}.{os.getpid()}.{threading.get_native_id()}.tmp')
     tmp.write_text(json.dumps(state, indent=2))
     tmp.replace(path)
 
@@ -704,13 +796,15 @@ def _state_lock_path():
 
 
 def _atomic_write_json(path, obj, indent=None):
-    """Atomic JSON write via a PER-PROCESS-UNIQUE temp file + os.replace. The
-    unique suffix (pid) means two writers never clobber each other's temp file
-    even on a lock-degraded path — the worst case is a benign last-writer-wins
-    on the final replace, never a corrupt/truncated file."""
+    """Atomic JSON write via a PER-WRITER-UNIQUE temp file + os.replace. The
+    suffix carries BOTH pid and thread-id, so two concurrent writers — even two
+    THREADS in the same process on a lock-degraded path (inbox_watcher runs one
+    agent_loop thread per agent) — never write the same temp file and produce a
+    torn/garbled file after replace. Worst case is a benign last-writer-wins on
+    the final replace, never corruption."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f'{path.name}.{os.getpid()}.tmp')
+    tmp = path.with_name(f'{path.name}.{os.getpid()}.{threading.get_native_id()}.tmp')
     tmp.write_text(json.dumps(obj, indent=indent))
     tmp.replace(path)
 
@@ -858,6 +952,13 @@ def rolling_5h_token_volume(account=None, now=None):
     ``account`` equals it are counted (per-tier burn, spec § 8); rows with a
     sentinel/blank account ({None,'','fixture','skipped'}) are always ignored.
 
+    The window is the CLOSED interval [now-5h, now]: rows AFTER ``now`` are
+    excluded, so reconstructing a PAST burn (``now=<wall_ts>`` for § 12b
+    calibration) measures only what had been spent BY that moment — not
+    activity that happened afterwards. (For a live near_cap read now=present,
+    so the upper bound is a no-op.) Without it, calibration folded post-wall
+    rows into the wall-burn and inflated the inferred 5h ceiling.
+
     Fail-open: a missing or unreadable costs file, or a malformed line, yields
     0 / skips the line — burn reading must NEVER crash a dispatch (spec § 8)."""
     path = _costs_path()
@@ -887,7 +988,7 @@ def rolling_5h_token_volume(account=None, now=None):
                 if account is not None and acct != account:
                     continue
                 ts = _parse_cost_ts(rec.get('ts', ''))
-                if ts is None or ts < cutoff:
+                if ts is None or ts < cutoff or ts > now:
                     continue
                 total += _record_quota_tokens(rec)
     except OSError:
@@ -1155,6 +1256,7 @@ def record_session_tier(session_id, tier, now=None):
                                       timeout=_STATE_LOCK_TIMEOUT):
             _record_session_tier_locked(path, session_id, tier, now)
     except file_lock.LockTimeout:
+        _warn_lock_degrade('record_session_tier')
         _record_session_tier_locked(path, session_id, tier, now)
 
 
