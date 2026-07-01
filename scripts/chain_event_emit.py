@@ -416,3 +416,143 @@ def clear_decision(
                 column, key, type(e).__name__, e,
             )
     return total
+
+
+# ---------- projection reconcile (approval-sync Phase 3a §3a.1, PR-2) ----------
+#
+# The two "needs-you stragglers" (`parked_capture`, `sequence_needs_you`) aren't
+# push-emitted at a single transition — their producers (heal_missions_card_gc's
+# capture sweep, build_sequence_advancer's tick) already iterate the full
+# desired set each cycle. So rather than diff transitions, they hand that set to
+# `reconcile_open_events`, which makes chain_events match it: emit rows that are
+# newly-desired, clear rows that are no longer desired. Emit is idempotent (a
+# still-desired row is already open, so it is skipped), so re-running each tick
+# is cheap and self-healing. This is the read-model twin of the resolve fan-out.
+
+
+def list_open_event_task_ids(
+    event_type: str,
+    *,
+    client: Optional[Any] = None,
+    logger: Optional[logging.Logger] = None,
+) -> Optional[set]:
+    """The task_ids of every UNREAD (`read_at IS NULL`) row of `event_type`.
+
+    The read half of `reconcile_open_events`. Returns None (not an empty set)
+    when the set can't be determined — no client, or a Supabase error — so the
+    caller can SKIP the reconcile rather than treat "unknown" as "nothing open"
+    and blind-emit duplicates / clear nothing. Best-effort; never raises."""
+    log = logger or _LOGGER
+    cli = client if client is not None else _get_client()
+    if cli is None:
+        return None
+    try:
+        resp = (
+            cli.table('chain_events')
+            .select('task_id')
+            .eq('event_type', event_type)
+            .is_('read_at', 'null')
+            .execute()
+        )
+        rows = getattr(resp, 'data', None) or []
+        return {r.get('task_id') for r in rows
+                if isinstance(r, dict) and r.get('task_id')}
+    except Exception as e:  # noqa: BLE001 — push reader must not crash producer
+        log.warning(
+            'list_open_event_task_ids failed (event_type=%s): %s: %s',
+            event_type, type(e).__name__, e,
+        )
+        return None
+
+
+def clear_event_by_task_id(
+    task_id: str,
+    *,
+    event_type: str,
+    ts: Optional[str] = None,
+    client: Optional[Any] = None,
+    logger: Optional[logging.Logger] = None,
+) -> int:
+    """Clear (`read_at`) the pending row(s) for ONE task_id of ONE event_type.
+
+    A SINGLE keyed UPDATE scoped to `event_type` + `task_id` + `read_at IS NULL`
+    — the same narrow, single-column, no-mis-join shape as `clear_larry_alert`,
+    generalized to any projected event_type (`parked_capture`,
+    `sequence_needs_you`). Best-effort; returns rows cleared (0 on
+    no-match/no-client/error); never raises. `client`/`ts` are for tests."""
+    log = logger or _LOGGER
+    if not task_id or not event_type:
+        return 0
+    cli = client if client is not None else _get_client()
+    if cli is None:
+        return 0
+    use_ts = ts or ces.datetime.now(ces.timezone.utc).isoformat()
+    try:
+        resp = (
+            cli.table('chain_events')
+            .update({'read_at': use_ts}, count='exact')
+            .eq('event_type', event_type)
+            .eq('task_id', task_id)
+            .is_('read_at', 'null')
+            .execute()
+        )
+        rows = getattr(resp, 'data', None) or []
+        count = getattr(resp, 'count', None)
+        return count if isinstance(count, int) else len(rows)
+    except Exception as e:  # noqa: BLE001 — push writer must not crash producer
+        log.warning(
+            'clear_event_by_task_id failed (event_type=%s task_id=%s): %s: %s',
+            event_type, task_id, type(e).__name__, e,
+        )
+        return 0
+
+
+def reconcile_open_events(
+    event_type: str,
+    desired: dict,
+    *,
+    agent: str,
+    client: Optional[Any] = None,
+    logger: Optional[logging.Logger] = None,
+) -> dict:
+    """Make the open `event_type` rows match `desired` — emit new, clear gone.
+
+    `desired` maps task_id -> {'ts': <stable iso or None>, 'payload': {...}}. The
+    stable ts (a paused-at / captured-at timestamp) keeps the deterministic
+    event_id fixed across ticks so a re-emit is absorbed by the PK; the
+    open-set skip below is the primary dedup and the stable ts is the backstop.
+
+    Fetches the currently-open task_ids ONCE, then:
+      * emits every desired task_id NOT already open (idempotent: a still-open
+        one is skipped, so steady state issues zero writes);
+      * clears every open task_id NOT in `desired` (the item resolved).
+
+    If the open set can't be read (no client / Supabase error) the whole
+    reconcile is SKIPPED — never blind-emit against an unknown open set, which
+    would duplicate rows. Best-effort; never raises. Returns a
+    {emitted, cleared, skipped} summary. `client` is shared across the fetch,
+    emits, and clears (one connection); tests pass a fake."""
+    log = logger or _LOGGER
+    cli = client if client is not None else _get_client()
+    if cli is None:
+        return {'emitted': 0, 'cleared': 0, 'skipped': True}
+    open_ids = list_open_event_task_ids(event_type, client=cli, logger=logger)
+    if open_ids is None:
+        return {'emitted': 0, 'cleared': 0, 'skipped': True}
+    desired = desired or {}
+    emitted = 0
+    for tid, spec in desired.items():
+        if not tid or tid in open_ids:
+            continue
+        spec = spec or {}
+        if emit_event(
+            event_type=event_type, agent=agent, task_id=tid,
+            payload=spec.get('payload') or {}, ts=spec.get('ts'),
+            client=cli, logger=log,
+        ):
+            emitted += 1
+    cleared = 0
+    for tid in open_ids - set(desired):
+        cleared += clear_event_by_task_id(
+            tid, event_type=event_type, client=cli, logger=log)
+    return {'emitted': emitted, 'cleared': cleared, 'skipped': False}

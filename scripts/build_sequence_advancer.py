@@ -1992,6 +1992,80 @@ def _signal_launch_phase_done(seq_id: Any, logger: logging.Logger) -> None:
 # -------------------- tick --------------------
 
 
+def _needs_you_task_id(item: dict[str, Any]) -> Optional[str]:
+    """The chain_events task_id a waiting-sequence item projects under:
+    `seq-<seq_id>` for a paused sequence, `seq-<seq_id>-step-<step_id>` for a
+    stuck step. None if the item has no seq_id."""
+    seq_id = item.get('seq_id')
+    if not seq_id:
+        return None
+    step_id = item.get('step_id')
+    return f'seq-{seq_id}-step-{step_id}' if step_id else f'seq-{seq_id}'
+
+
+def _reconcile_sequence_needs_you(
+    now: datetime, logger: logging.Logger,
+) -> None:
+    """Project the `sequence_needs_you` read-model rows (approval-sync Phase 3a
+    §3a.1). Reuses `system_state_log.load_waiting_sequences` — the SAME logic the
+    dashboard's waiting-on-you view derives — but at emit-time, so the dashboard
+    reads one substrate (chain_events) instead of re-deriving from the sequence
+    files. `reconcile_open_events` emits a row for each paused/stuck item and
+    clears any row whose sequence resumed or whose step un-stuck.
+
+    Runs every tick, flag-INDEPENDENT (like the terminal-state reconcile): the
+    needs-you projection is a read-model concern, not forward-dispatch, and a
+    paused sequence still needs its row cleared when resumed even while
+    auto-dispatch is gated off. Best-effort — a projection failure never fails
+    the tick. lane='steer' / needs_larry=False: a paused sequence is a
+    reversible nudge, not a badge-driving decision."""
+    try:
+        import system_state_log as ssl  # noqa: PLC0415 — lazy, optional dep
+        import chain_event_emit as cee  # noqa: PLC0415
+    except Exception as e:  # noqa: BLE001 — projection is optional
+        logger.warning(
+            'sequence_needs_you: seam unavailable: %s: %s',
+            type(e).__name__, e)
+        return
+    try:
+        waiting = ssl.load_waiting_sequences(now)
+    except Exception as e:  # noqa: BLE001 — fail-safe: skip projection this tick
+        logger.warning(
+            'sequence_needs_you: load_waiting_sequences raised: %s: %s',
+            type(e).__name__, e)
+        return
+    desired: dict[str, Any] = {}
+    for item in waiting:
+        if not isinstance(item, dict):
+            continue
+        tid = _needs_you_task_id(item)
+        if not tid:
+            continue
+        desired[tid] = {
+            'ts': item.get('_ts') or now.isoformat(),
+            'payload': {
+                'seq_id': item.get('seq_id'),
+                'step_id': item.get('step_id'),
+                'why': item.get('why'),
+                'actions': item.get('actions'),
+                'lane': 'steer',
+                'needs_larry': False,
+            },
+        }
+    try:
+        summary = cee.reconcile_open_events(
+            'sequence_needs_you', desired, agent='build_sequence_advancer',
+            logger=logger)
+        if summary.get('emitted') or summary.get('cleared'):
+            logger.info(
+                'sequence_needs_you: emitted=%s cleared=%s',
+                summary.get('emitted'), summary.get('cleared'))
+    except Exception as e:  # noqa: BLE001 — projection must never fail the tick
+        logger.warning(
+            'sequence_needs_you: reconcile raised: %s: %s',
+            type(e).__name__, e)
+
+
 def tick(now: Optional[datetime] = None) -> int:
     """One advancer tick. Returns 0 on completion (always — failures are
     surfaced via DM, not via exit code, so systemd doesn't restart-loop
@@ -2159,6 +2233,10 @@ def tick(now: Optional[datetime] = None) -> int:
         f'tick: files={seen_files} processed={processed} '
         f'reconciled_steps={reconciled_total} escalated_seqs={escalated_total}'
     )
+    # Project the sequence_needs_you read-model rows (approval-sync Phase 3a).
+    # Flag-independent + best-effort: runs after the sequence walk so this tick's
+    # pauses/resumes are reflected, and never fails the tick.
+    _reconcile_sequence_needs_you(now, logger)
     return 0
 
 
