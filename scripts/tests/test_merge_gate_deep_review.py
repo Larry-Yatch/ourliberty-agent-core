@@ -78,6 +78,7 @@ def tearDownModule():  # noqa: N802
 
 
 REPO = 'Larry-Yatch/ourliberty-agent-core'
+DASHBOARD_REPO = 'Larry-Yatch/ourliberty-dashboard'
 
 
 def _pr_url(repo: str, n: int) -> str:
@@ -105,6 +106,7 @@ class _GhRouter:
         self.open_prs: dict[str, list[dict]] = {}
         self.merge_calls: list[tuple[str, int]] = []
         self.labels_fail = False
+        self.files_fail = False
 
     def __call__(self, cmd, capture_output=True, text=True, timeout=None,
                  **kwargs):
@@ -115,6 +117,9 @@ class _GhRouter:
             repo = cmd[cmd.index('--repo') + 1]
             fields = cmd[cmd.index('--json') + 1].split(',')
             if 'labels' in fields and self.labels_fail:
+                return _CompletedProc(stdout='', stderr='api boom',
+                                      returncode=1)
+            if 'files' in fields and self.files_fail:
                 return _CompletedProc(stdout='', stderr='api boom',
                                       returncode=1)
             payload: dict = {}
@@ -269,6 +274,42 @@ class HoldTest(_GateTestBase):
         self.assertEqual(r['merge_outcome'], 'held_deep_review')
         self.assertEqual(self.gh.merge_calls, [])
 
+    def test_files_fetch_failure_holds_conservatively(self):
+        # The durable fileset trigger must fail CLOSED: if changed_files is
+        # empty (coalesced from a gh files-fetch failure) AND the re-fetch also
+        # fails, the PR is held rather than silently merged unreviewed.
+        self.gh.files_fail = True
+        r = self._attempt(53, changed_files=[])
+        self.assertEqual(r['merge_outcome'], 'held_deep_review')
+        self.assertEqual(self.gh.merge_calls, [])
+
+    def test_files_fetch_failure_but_stamped_merges(self):
+        # ...but a stamped PR still flows even when files are unresolvable —
+        # the human review already happened.
+        self.gh.files_fail = True
+        self.gh.pr_labels[(REPO, 54)] = ['deep-review-passed']
+        r = self._attempt(54, changed_files=[])
+        self.assertEqual(r['merge_outcome'], 'merged')
+
+    def test_conflicting_critical_pr_is_held_conflict_not_deep_review(self):
+        # Ordering: the deep-review gate sits AFTER the mergeable gate, so a
+        # CONFLICTING critical-path PR surfaces as held_conflict (rebase DM),
+        # not held_deep_review — Larry gets the right instruction.
+        self.gh.pr_mergeable[(REPO, 55)] = 'CONFLICTING'
+        r = self._attempt(55, changed_files=['scripts/decision_resolve.py'])
+        self.assertEqual(r['merge_outcome'], 'held_conflict')
+        self.assertEqual(self.gh.merge_calls, [])
+
+    def test_dashboard_repo_label_only_hold(self):
+        # The fileset globs are agent-core paths, so a dashboard-repo PR can
+        # only be held via the explicit label. Verify that path works cross-repo.
+        self.gh.pr_labels[(DASHBOARD_REPO, 56)] = [
+            'auto-review', 'deep-review-required']
+        r = self._attempt(56, repo=DASHBOARD_REPO,
+                          changed_files=['app/api/larry/route.ts'])
+        self.assertEqual(r['merge_outcome'], 'held_deep_review')
+        self.assertEqual(self.gh.merge_calls, [])
+
 
 class PassThroughTest(_GateTestBase):
     def test_non_fileset_unlabeled_pr_merges(self):
@@ -321,6 +362,21 @@ class ConfigTest(_GateTestBase):
         r = self._attempt(74, changed_files=['scripts/decision_resolve.py'])
         self.assertEqual(r['merge_outcome'], 'held_deep_review')
 
+    def test_missing_enabled_key_honors_paths(self):
+        # A config that supplies `paths` but omits `enabled` must be HONORED
+        # (enabled defaults True) — else a Pulse-Check edit silently no-ops.
+        self._cfg.write_text(json.dumps(
+            {'paths': ['scripts/only_this_one.py']}), encoding='utf-8')
+        self.on._invalidate_deep_review_paths_cache()
+        self.assertEqual(self.on._load_deep_review_paths(),
+                         ('scripts/only_this_one.py',))
+        # And it takes effect: a former-default path now merges...
+        r = self._attempt(75, changed_files=['scripts/larry_alerts.py'])
+        self.assertEqual(r['merge_outcome'], 'merged')
+        # ...while the configured path holds.
+        r2 = self._attempt(76, changed_files=['scripts/only_this_one.py'])
+        self.assertEqual(r2['merge_outcome'], 'held_deep_review')
+
 
 class RenderInvariantTest(_GateTestBase):
     def test_status_line_never_says_merged(self):
@@ -371,6 +427,21 @@ class PredicateUnitTest(_GateTestBase):
         self.on._invalidate_deep_review_paths_cache()
         self.assertEqual(self.on._load_deep_review_paths(),
                          self.on._DEFAULT_DEEP_REVIEW_PATHS)
+
+
+class ConfigConstantSyncTest(unittest.TestCase):
+    """The shipped config/deep-review-paths.json and the code-default constant
+    are maintained by hand ("the config file IS this list"). Pin them together
+    so a one-sided edit can't silently let the fallback default drift from the
+    active config."""
+
+    def test_default_constant_matches_shipped_config(self):
+        import outbox_notifier as on
+        cfg_path = (Path(__file__).resolve().parent.parent.parent
+                    / 'config' / 'deep-review-paths.json')
+        data = json.loads(cfg_path.read_text(encoding='utf-8'))
+        self.assertEqual(data.get('paths'),
+                         list(on._DEFAULT_DEEP_REVIEW_PATHS))
 
 
 if __name__ == '__main__':

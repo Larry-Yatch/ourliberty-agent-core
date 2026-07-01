@@ -286,11 +286,16 @@ _DEEP_REVIEW_PATHS_CONFIG_PATH = (
     Path(__file__).resolve().parent.parent / 'config' / 'deep-review-paths.json'
 )
 # The stamp Claude's pre-handoff `/code-review high` applies to mark a
-# critical-path PR as deep-reviewed. v1 form is a PR label (checked with the
-# same `gh pr view --json labels` read used for the `deep-review-required`
-# trigger, so it costs no extra gh call). A SHA-bound comment marker
-# (`=== DEEP_REVIEW_PASS sha=<head> ===`, mirroring merge_reviewed_pr.sh's
-# LOCAL_REVIEW_PASS so it self-invalidates on a new push) is a noted follow-up.
+# critical-path PR as deep-reviewed. v1 form is a PR label; the stamp check
+# reuses the SAME `gh pr view --json labels` read as the `deep-review-required`
+# trigger, so the stamp costs no gh call beyond that one labels read.
+# KNOWN LIMITATION (follow-up): a label is not SHA-bound, so it persists across
+# a force-push — a stamped PR re-pushed with new commits before auto-merge would
+# pass the gate on the unreviewed head. The robust form is a SHA-bound comment
+# marker (`=== DEEP_REVIEW_PASS sha=<head> ===`, mirroring merge_reviewed_pr.sh's
+# LOCAL_REVIEW_PASS so it self-invalidates on a new push). Deferred per spec
+# (§0 "the simplest form is a PR label"); low real risk since in this pipeline
+# the stamp is applied immediately before hand-off with no third-party push.
 _DEEP_REVIEW_REQUIRED_LABEL = 'deep-review-required'
 _DEEP_REVIEW_PASSED_LABEL = 'deep-review-passed'
 
@@ -559,11 +564,18 @@ def _load_deep_review_paths() -> tuple[str, ...]:
 
     merge-gate-deep-review-hold. Reads `config/deep-review-paths.json`
     ({"enabled": bool, "paths": [glob, ...]}). Returns `paths` when the file
-    exists, is well-formed, and `enabled` is true; otherwise falls back to
-    `_DEFAULT_DEEP_REVIEW_PATHS`. Same graceful-degradation shape as the other
-    `_load_*_from_config` helpers: a missing/malformed file, a non-list `paths`,
-    or `enabled` false all yield the code default so the fileset trigger keeps
-    working even if the config is deleted or Pulse-Check writes a bad edit.
+    exists, is well-formed, and is not explicitly disabled; otherwise falls
+    back to `_DEFAULT_DEEP_REVIEW_PATHS`. Same graceful-degradation shape as the
+    other `_load_*_from_config` helpers: a missing/malformed file, a non-list
+    `paths`, or `"enabled": false` all yield the code default so the fileset
+    trigger keeps working even if the config is deleted or Pulse-Check writes a
+    bad edit.
+
+    `enabled` DEFAULTS TO TRUE: a config that supplies `paths` but omits
+    `enabled` is honored (only an explicit `"enabled": false` disables the
+    override). Requiring the key would silently no-op an operator's edit — the
+    exact foot-gun for the Pulse-Check tuner this file exists for.
+
     Cached at module level (fires on every merge attempt); tests reset via
     `_invalidate_deep_review_paths_cache`.
     """
@@ -573,7 +585,7 @@ def _load_deep_review_paths() -> tuple[str, ...]:
         except (OSError, json.JSONDecodeError):
             cfg = None
         resolved: tuple[str, ...] = _DEFAULT_DEEP_REVIEW_PATHS
-        if isinstance(cfg, dict) and cfg.get('enabled') is True:
+        if isinstance(cfg, dict) and cfg.get('enabled', True) is not False:
             raw = cfg.get('paths')
             if isinstance(raw, list):
                 globs = tuple(p for p in raw if isinstance(p, str) and p)
@@ -7897,24 +7909,45 @@ def _deep_review_required(
     stamp — a false hold costs one manual merge; a false merge is the whole
     thing this gate prevents). A PR that is critical ONLY via the manual label
     degrades to non-critical on a labels-fetch blip — the durable fileset
-    trigger is the guarantee; the manual override is best-effort. Mirror has
-    already PASS'd in every case here.
+    trigger is the guarantee; the manual override is best-effort.
+
+    The FILESET side fails closed too: `changed_files` reaches the gate as
+    `_gh_pr_changed_files(...) or []`, so a files-fetch failure upstream is
+    indistinguishable from a (never-real) empty PR. Gate 1 tolerates that
+    fail-OPEN (misses an overlap), but this gate must NOT — a critical-path PR
+    silently reading as "no files → not critical" would merge unreviewed on a
+    gh blip. So an empty `changed_files` is re-fetched here; if the re-fetch
+    also can't resolve the fileset, the PR is HELD unless already stamped.
+    Mirror has already PASS'd in every case here.
     """
     if labels is None:
         labels = _gh_pr_labels(repo_coords, pr_number)
     # None (gh failure) → empty for trigger/stamp reads (conservative: absent).
     label_names = labels or []
+    label_critical = _DEEP_REVIEW_REQUIRED_LABEL in label_names
+    stamped = _DEEP_REVIEW_PASSED_LABEL in label_names
+
+    files = changed_files
+    if not files:
+        # Empty is ambiguous (a mergeable PR always changes ≥1 file), so almost
+        # always means the upstream files fetch failed and was coalesced to [].
+        # Re-fetch to disambiguate; a confirmed-unresolvable fileset must fail
+        # CLOSED (hold) rather than degrade the durable trigger to fail-open.
+        files = _gh_pr_changed_files(repo_coords, pr_number)
+        if files is None:
+            log(
+                f'DEEP_REVIEW files unresolved for pr={pr_number} '
+                f'({repo_coords}); holding conservatively unless stamped',
+                'WARN',
+            )
+            return not stamped
 
     paths = _load_deep_review_paths()
-    files = changed_files or []
     file_critical = any(
         fnmatch.fnmatch(f, glob) for f in files for glob in paths
     )
-    label_critical = _DEEP_REVIEW_REQUIRED_LABEL in label_names
     if not (file_critical or label_critical):
         return False
-
-    stamped = _DEEP_REVIEW_PASSED_LABEL in label_names
     return not stamped
 
 
@@ -9157,6 +9190,13 @@ def _attempt_auto_merge_with_gates(
     # only on `outcome=failed`) leaves the held PR alone — it mirrors the
     # held_conflict seam exactly (surface to Larry, no auto-retry, no reap).
     if _deep_review_required(repo_coords, pr_number, changed_files):
+        # Defensively clear any queue entry (mirrors the held_conflict seam at
+        # gate 2). Both re-attempt callers (_queue_release, the UNKNOWN-retry
+        # sweep) already remove the entry before invoking this fn, so today this
+        # is a no-op on those paths — but it guarantees a held_deep_review PR
+        # can never be left queued (which would re-fire the gate + DM every
+        # sweep) regardless of caller, exactly as held_conflict does.
+        _queue_remove_pr(pr_number, repo_coords)
         _dm_larry_deep_review_hold(
             pr_url, pr_number, repo_coords, task_id, chat_id, summary,
         )

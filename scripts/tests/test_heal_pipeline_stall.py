@@ -1611,6 +1611,29 @@ class TestCheckMirrorPassUnmerged(_TempAgentsRootMixin, unittest.TestCase):
         alerts = self.hps.check_mirror_pass_unmerged(lines, [pr], {})
         self.assertEqual(alerts, [])
 
+    def test_skips_deep_review_held_pr(self) -> None:
+        """merge-gate-deep-review-hold: a PASS'd PR that the notifier
+        INTENTIONALLY held for a human /code-review high must NOT be flagged
+        as a stall — and (critically) must not be auto-merged out from under
+        the review by this check's recovery. The held PR is mergeable, so
+        without an exemption the recovery `gh pr merge` would succeed and
+        defeat the gate."""
+        lines = [
+            f'[{_ts(45)}] [notifier] [INFO] marker-notified beacon <- mirror '
+            f'(mirror-result, intent=review-pass, file=notify-crit-hold-001.json)',
+            f'[{_ts(44)}] [notifier] [WARN] AUTO_MERGE_HELD_DEEP_REVIEW '
+            f'task=crit-hold-001 pr=https://github.com/o/r/pull/303 '
+            f'(critical-path change with no deep-review stamp; held for '
+            f'/code-review high) agent=forge',
+        ]
+        pr = {
+            'number': 303, 'headRefName': 'forge/crit-hold-001',
+            'title': 'harden trust policy',
+            '_repo': 'Larry-Yatch/ourliberty-agent-core',
+        }
+        alerts = self.hps.check_mirror_pass_unmerged(lines, [pr], {})
+        self.assertEqual(alerts, [])
+
 
 class TestCheckMirrorMarkerInvisible(_TempAgentsRootMixin, unittest.TestCase):
 
