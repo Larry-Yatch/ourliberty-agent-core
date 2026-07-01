@@ -193,6 +193,20 @@ KNOWN_EVENT_TYPES: frozenset[str] = frozenset({
     # these rows; listing the type here admits it to the weekly chain-event-type
     # audit (heal_chain_event_type_audit.py).
     'autonomy_decision',
+    # approval-sync Phase 3a (approval-sync-phase3-spec.md §3a.1): the two
+    # "needs-you" stragglers that weren't yet projected into chain_events, so
+    # the dashboard can read ONE substrate. `parked_capture` is push-emitted
+    # when a capture enters the parked backlog (agent='dashboard', task_id=
+    # `capture-<id>`, needs_larry=False — calm backlog, lane='parked'), and
+    # cleared when it leaves parked. `sequence_needs_you` is push-emitted by
+    # build_sequence_advancer when a sequence is paused or a step is stuck
+    # (agent='build_sequence_advancer', task_id=`seq-<id>`, lane='steer'),
+    # and cleared when it resumes/clears. Both are event-driven (emitted at the
+    # state transition, not on a poll tick). The shipper never produces these
+    # rows; listing them here admits them to the weekly chain-event-type audit
+    # (heal_chain_event_type_audit.py).
+    'parked_capture',
+    'sequence_needs_you',
 })
 
 # PII / credential redaction. Any payload field key matching one of these

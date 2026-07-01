@@ -107,10 +107,16 @@ def _normalize_record(key: str, record: Optional[dict[str, Any]]) -> dict[str, A
     A producer writes an ACTIVE record, so ``for_larry`` is always True and
     ``resolved`` defaults False — re-upserting a previously-resolved key (its
     trigger re-appeared) flips it back to active.
+
+    ``needs_larry`` (approval-sync Phase 3a §3a.2) is the producer-side
+    "only Larry can act on this" classification, normalized to an explicit bool
+    (default False) so every record carries it uniformly and the "Needs You"
+    read model can gate the DECIDE lane on it without re-deriving from severity.
     """
     rec = dict(record) if isinstance(record, dict) else {}
     rec['for_larry'] = True
     rec['resolved'] = bool(rec.get('resolved', False))
+    rec['needs_larry'] = bool(rec.get('needs_larry', False))
     rec.setdefault('key', key)
     rec.setdefault('ts', _now_iso())
     return rec
