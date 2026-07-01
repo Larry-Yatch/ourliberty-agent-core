@@ -376,8 +376,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T00:03Z UTC (Iter ~3390, Tier 1)
+## Status snapshot — updated 2026-07-01T00:13Z UTC (Iter ~3392, Tier 2)
 
-**Iter ~3390 summary (2026-07-01T00:03Z):** 3 new alerts all Tier-3 silenced (heal-pipeline-stall PR#780 unrouted, medic-diagnosis, tier2-provisioning-drift). All 8 daemons alive. Watchdog=healthy 23:57:40Z UTC. **PR #781 Mirror REVIEW_PASS (23:54:44Z) but AUTO_MERGE_HELD — blocker=#780** (overlap on daemon-restart-manifest.json, beacon_approval_handler.py, beacon_telegram_bot.py, chain_event_emit.py, dashboard_api.py). PR #780 (W3, no label, Larry-authored) must merge or close before PR #781 auto-merges. G-rule `unreviewed-merge-larry-authored-pr-001` carry — Beacon phased design awaiting Larry. **Tier 1** (consecutive_clean=1).
+**Iter ~3392 summary (2026-07-01T00:13Z):** 0 new alerts. All 8 daemons alive. Watchdog=healthy 00:07:47Z UTC. Heal-daemon heartbeat 00:10:18Z (fresh). Pipeline stall dry-run 0 alerts. Mirror inbox empty. **PR #781 AUTO_MERGE_HELD — blocker=#780** (overlap on config/daemon-restart-manifest.json + 4 scripts). PR #780 (W3, no label, Larry-authored) must merge or close before PR #781 auto-merges. G-rule `unreviewed-merge-larry-authored-pr-001` carry — Beacon phased design awaiting Larry. **Tier promoted 1→2** (3 consecutive clean iters; consecutive_clean=0).
 
 
