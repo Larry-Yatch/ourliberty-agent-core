@@ -62,6 +62,22 @@ class BuildReviewBoundedStepSystemPromptTest(unittest.TestCase):
         # ... and explicitly forbids a PASS on an incomplete step.
         self.assertIn('REVIEW_PASS', text)
 
+    def test_pins_regression_check_ceilings(self):
+        # regression-gate-cant-conclude: the reminder must PIN the regression
+        # check's ceilings so Mirror stops improvising a sub-run --timeout that
+        # kills a healthy ~540s suite pass mid-flight (the #747/#763/#790 false
+        # ESCALATE). Assert the exact outer wrapper + the "don't lower it" guard.
+        text = ar.build_review_bounded_step_system_prompt()
+        self.assertIn('--timeout 1500', text)
+        self.assertIn('test_regression_check.py', text)
+        self.assertIn('timeout-per-sha', text)   # names the inner cap it forbids lowering
+        self.assertIn('do NOT lower', text)
+
+    def test_regression_ceilings_fit_the_session_ceiling(self):
+        # The pinned outer wrapper must stay strictly under the mandatory review-
+        # session ceiling, or the wrapper could outlive the session that hosts it.
+        self.assertLess(1500, ar.REVIEW_SESSION_CEILING_SECONDS)
+
     def test_deterministic(self):
         self.assertEqual(
             ar.build_review_bounded_step_system_prompt(),

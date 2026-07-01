@@ -153,6 +153,16 @@ class ParseUnittestFailuresTest(_IsolatedAgentsRoot):
         )
 
 
+class DefaultPerShaTimeoutTest(_IsolatedAgentsRoot):
+    def test_default_per_sha_timeout_exceeds_a_measured_run(self):
+        # regression-gate-cant-conclude: a full suite pass MEASURES ~537s wall.
+        # The default per-SHA cap must sit comfortably ABOVE that or it kills a
+        # healthy run mid-suite (the old 300s default → EXIT_ANALYSIS_FAIL →
+        # false "inconclusive" ESCALATE on clean code). Guard against a revert
+        # to a sub-run value.
+        self.assertGreaterEqual(trc.DEFAULT_TIMEOUT_PER_SHA_S, 700)
+
+
 class ComputeVerdictTest(_IsolatedAgentsRoot):
     def test_both_empty_is_pass(self):
         v = trc.compute_verdict(set(), set())
