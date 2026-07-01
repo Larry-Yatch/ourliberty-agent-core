@@ -382,8 +382,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T19:32Z UTC (Iter ~3446, Tier 1)
+## Status snapshot — updated 2026-07-01T19:41Z UTC (Iter ~3447, Tier 1)
 
-**Iter ~3446 summary (2026-07-01T19:32Z):** Check A always-fix: fast-forwarded c8459658→59e2d93f (PR #798 Approval-Sync Phase 3 spec auto-merged). PR #796 REVIEW_PASS (13:27:41 MDT) but AUTO_MERGE_HELD blocker=#797 (overlap: agents/mirror/CLAUDE.md, scripts/agent_runner.py, test_regression_check.py). PR #797 no auto-review label — blocking PR #796 merge (G-rule unreviewed-merge-larry-authored 5th-level, Beacon Steps 1-2 awaiting Larry). PR #798 MERGED ✅ (13:29:38 MDT, Approval-Sync Phase 3 spec). PR #799 under Mirror review (13:29:31 MDT). PR #795-rev1 queued in Mirror. Forge idle. Sync 18:32Z (~1h old). Watchdog 19:24Z healthy. Heartbeat 19:22Z. Pipeline 0 stalls. Zombie bash PID 1834248 (34d+, Check VIII poll loop, ask-then-do carry). APPROVAL_REQUEST `heal-stale-daemon-fresh-deploy-retry-001` pending Larry. **Tier 1** (consecutive_clean=0; Check A fast-forward reset tier; cadence 5 min). PRIME DIRECTIVE ratio: 14.7875, trend=flat.
+**Iter ~3447 summary (2026-07-01T19:41Z):** All checks nominal. PR #795 MERGED ✅ (13:32:31 MDT, post-iter-~3446). Daemons restarted 13:33 MDT (heal-stale-daemon-code cycle, new PIDs 2495925/2495938, watchdog healthy 13:34Z). Mirror actively reviewing PR #799 (claude PID 2494411 started 13:32:23 MDT; regression check subprocess 13:39 MDT, 900s timeout). Mirror inbox: 799 (active) + 796 re-dispatch (13:30 MDT, known duplicate-dispatch G-rule vp). PR #796 REVIEW_PASS, AUTO_MERGE_HELD blocker=#797. PR #797 still no auto-review label (G-rule unreviewed-merge-larry-authored 5th-level elevated watch, Beacon Steps 1-2 awaiting Larry). Zombie bash PID 1834248 (34d+, Check VIII poll loop, 0% CPU, ask-then-do carry). APPROVAL_REQUEST `heal-stale-daemon-fresh-deploy-retry-001` pending Larry. Sync 19:33Z. Pipeline 0 stalls. **Tier 1** (consecutive_clean=1; 2 more clean iters → Tier 2; cadence 5 min).
 
 
