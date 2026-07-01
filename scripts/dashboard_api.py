@@ -2496,6 +2496,17 @@ def _reader_agent_queue_building(
 # falls out of the lane after this many days instead of ghosting forever.
 _QUEUE_EVENTS_WINDOW_DAYS = 14
 
+# PostgREST caps a single response at its default max-rows (1000). Page in
+# 1000s under a stable (ts, event_id) order and loop until a short page proves
+# the tail, so the FULL window is always returned. Without this the fetch
+# silently truncated to an arbitrary, unordered 1000 once an agent exceeded
+# 1000 events in the window (forge was at ~1178), so the in_review/done_today
+# derivations dropped closing events (phantom cards) or review_requests
+# (missing cards) nondeterministically. The MAX_PAGES backstop caps a
+# pathological run at 50k rows/agent.
+_QUEUE_EVENTS_PAGE_SIZE = 1000
+_QUEUE_EVENTS_MAX_PAGES = 50
+
 
 def _fetch_chain_events_for_agent(
     supabase_client: Any, agent: str,
@@ -2518,17 +2529,43 @@ def _fetch_chain_events_for_agent(
         datetime.now(timezone.utc)
         - timedelta(days=_QUEUE_EVENTS_WINDOW_DAYS)
     ).isoformat()
+    out: list[dict[str, Any]] = []
+    page = 0
     try:
-        resp = (
-            supabase_client.table('chain_events')
-            .select('agent,event_type,task_id,pr_url,ts,payload')
-            .eq('agent', agent)
-            .gte('ts', cutoff)
-            .execute()
-        )
+        while True:
+            lo = page * _QUEUE_EVENTS_PAGE_SIZE
+            resp = (
+                supabase_client.table('chain_events')
+                .select('agent,event_type,task_id,pr_url,ts,payload')
+                .eq('agent', agent)
+                .gte('ts', cutoff)
+                # (ts, event_id) is a total order (event_id is the PK), so page
+                # boundaries are stable — no row skipped or double-counted.
+                .order('ts', desc=False)
+                .order('event_id', desc=False)
+                .range(lo, lo + _QUEUE_EVENTS_PAGE_SIZE - 1)
+                .execute()
+            )
+            rows = list(getattr(resp, 'data', None) or [])
+            out.extend(rows)
+            if len(rows) < _QUEUE_EVENTS_PAGE_SIZE:
+                break  # short page => tail reached
+            page += 1
+            if page >= _QUEUE_EVENTS_MAX_PAGES:
+                # Hard ceiling reached — the window is now INCOMPLETE. Never
+                # silently truncate (the exact bug this fetch was fixed for):
+                # log loudly so a genuine volume spike is visible, not masked.
+                logger.warning(
+                    'chain_events fetch for agent=%s hit MAX_PAGES=%d '
+                    '(>=%d rows in %dd window) — result TRUNCATED',
+                    agent, _QUEUE_EVENTS_MAX_PAGES,
+                    _QUEUE_EVENTS_MAX_PAGES * _QUEUE_EVENTS_PAGE_SIZE,
+                    _QUEUE_EVENTS_WINDOW_DAYS,
+                )
+                break
     except Exception:  # noqa: BLE001 — never 500 on a read-only dashboard lane
         return None
-    return list(getattr(resp, 'data', None) or [])
+    return out
 
 
 # ---- /api/system/automated-work reader (the "Automated Work" feed) ----
