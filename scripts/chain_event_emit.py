@@ -72,6 +72,14 @@ _LOGGER = logging.getLogger('chain_event_emit')
 
 _CLIENT = None  # process-scope supabase client (lazy)
 
+# Pagination bounds for list_open_event_task_ids (projection reconcile, §3a.1).
+# PostgREST caps a single select at ~1000 rows, so the open-set scan pages. The
+# needs-you event types are low-volume (a handful of paused sequences / a parked
+# backlog), so the cap is generous: hitting it signals runaway rows, not normal
+# load, and the reader refuses (returns None) rather than truncate.
+_OPEN_EVENT_PAGE = 1000
+_OPEN_EVENT_SCAN_CAP = 10000
+
 # Event types that represent a "needs-Larry" item on the dashboard's read model.
 # Change A stamps the canonical decision key onto these at emit time, and the
 # resolve fan-out's C-leg (clear_decision) retires all of them by that key.
@@ -439,24 +447,49 @@ def list_open_event_task_ids(
     """The task_ids of every UNREAD (`read_at IS NULL`) row of `event_type`.
 
     The read half of `reconcile_open_events`. Returns None (not an empty set)
-    when the set can't be determined — no client, or a Supabase error — so the
-    caller can SKIP the reconcile rather than treat "unknown" as "nothing open"
-    and blind-emit duplicates / clear nothing. Best-effort; never raises."""
+    when the set can't be determined — no client, a Supabase error, OR an
+    open set so large it exceeds the scan cap — so the caller SKIPS the
+    reconcile rather than treat "unknown" as "nothing open" and blind-emit
+    duplicates / wrongly clear the rows it couldn't see. Best-effort; never
+    raises.
+
+    PAGINATED (PostgREST caps a single select at ~1000 rows): an unpaginated
+    read feeding a clear-derivation would silently truncate and strand every
+    open row beyond the cap — the repo's known unpaginated-select class. Pages
+    through the full open set; if it exceeds `_OPEN_EVENT_SCAN_CAP` (itself an
+    anomaly for these low-volume needs-you types), that's surfaced as None +
+    a WARN, never a silent truncation."""
     log = logger or _LOGGER
     cli = client if client is not None else _get_client()
     if cli is None:
         return None
+    task_ids: set = set()
+    start = 0
     try:
-        resp = (
-            cli.table('chain_events')
-            .select('task_id')
-            .eq('event_type', event_type)
-            .is_('read_at', 'null')
-            .execute()
+        while start < _OPEN_EVENT_SCAN_CAP:
+            end = min(start + _OPEN_EVENT_PAGE - 1, _OPEN_EVENT_SCAN_CAP - 1)
+            resp = (
+                cli.table('chain_events')
+                .select('task_id')
+                .eq('event_type', event_type)
+                .is_('read_at', 'null')
+                .range(start, end)
+                .execute()
+            )
+            rows = getattr(resp, 'data', None) or []
+            task_ids |= {r.get('task_id') for r in rows
+                         if isinstance(r, dict) and r.get('task_id')}
+            if len(rows) <= (end - start):  # short page → last page reached
+                return task_ids
+            start = end + 1
+        # Fell out of the loop without a short page → the open set is at/over
+        # the cap. A truncated set can't safely drive clears, so refuse.
+        log.warning(
+            'list_open_event_task_ids: open %s set exceeds scan cap %d — '
+            'skipping reconcile this cycle (investigate runaway open rows)',
+            event_type, _OPEN_EVENT_SCAN_CAP,
         )
-        rows = getattr(resp, 'data', None) or []
-        return {r.get('task_id') for r in rows
-                if isinstance(r, dict) and r.get('task_id')}
+        return None
     except Exception as e:  # noqa: BLE001 — push reader must not crash producer
         log.warning(
             'list_open_event_task_ids failed (event_type=%s): %s: %s',

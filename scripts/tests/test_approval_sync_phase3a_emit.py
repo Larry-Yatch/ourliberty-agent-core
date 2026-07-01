@@ -56,6 +56,11 @@ class _FakeReconcileClient:
 
     def select(self, cols):
         self._mode = 'select'
+        self._cur['range'] = None
+        return self
+
+    def range(self, start, end):  # noqa: A003 — mirrors supabase-py
+        self._cur['range'] = (start, end)
         return self
 
     def update(self, values, **kw):
@@ -80,7 +85,10 @@ class _FakeReconcileClient:
         if self._mode == 'select':
             if self.select_raises:
                 raise RuntimeError('supabase select down')
-            data = [{'task_id': t} for t in self.open]
+            rng = self._cur.get('range')
+            page = (self.open[rng[0]:rng[1] + 1] if rng is not None
+                    else self.open)
+            data = [{'task_id': t} for t in page]
             return _Resp(data, len(data))
         if self._mode == 'upsert':
             self.upserts.append(self._cur['rows'])
@@ -177,6 +185,27 @@ class ClearAndListPrimitivesTest(unittest.TestCase):
         client = _FakeReconcileClient(select_raises=True)
         self.assertIsNone(
             cee.list_open_event_task_ids('parked_capture', client=client))
+
+    def test_list_open_paginates_across_pages(self):
+        # More rows than one page → the reader pages until a short page and
+        # returns the UNION, never truncates at the cap.
+        ids = [f'seq-{i}' for i in range(2500)]
+        client = _FakeReconcileClient(open_task_ids=ids)
+        with mock.patch.object(cee, '_OPEN_EVENT_PAGE', 1000), \
+             mock.patch.object(cee, '_OPEN_EVENT_SCAN_CAP', 10000):
+            got = cee.list_open_event_task_ids('sequence_needs_you',
+                                               client=client)
+        self.assertEqual(got, set(ids))
+
+    def test_list_open_refuses_when_over_cap(self):
+        # Open set at/over the cap → None (skip), never a silently truncated set
+        # that would wrongly clear the rows it couldn't see.
+        ids = [f'seq-{i}' for i in range(30)]
+        client = _FakeReconcileClient(open_task_ids=ids)
+        with mock.patch.object(cee, '_OPEN_EVENT_PAGE', 10), \
+             mock.patch.object(cee, '_OPEN_EVENT_SCAN_CAP', 20):
+            self.assertIsNone(
+                cee.list_open_event_task_ids('parked_capture', client=client))
 
 
 class SequenceNeedsYouProjectionTest(unittest.TestCase):
