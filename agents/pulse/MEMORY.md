@@ -376,8 +376,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T05:13Z UTC (Iter ~3408, Tier 1)
+## Status snapshot — updated 2026-07-01T05:23Z UTC (Iter ~3409, Tier 1)
 
-**Iter ~3408 summary (2026-07-01T05:13Z):** 0 new alerts (watermark=1067). All 8 daemons alive. Watchdog healthy 05:10Z. Sync 04:31Z (~42 min old). Pipeline stall 0. 0 pending approvals. PR #785/#786 Mirror review in progress (inbox confirmed). captures.json dirty (GC healer pattern, sync grace active, not escalating). **Tier 1** (consecutive_clean=1). PRIME DIRECTIVE ratio 16.15 improving.
+**Iter ~3409 summary (2026-07-01T05:23Z):** 0 new alerts (watermark=1067). All 8 daemons alive. Watchdog healthy 05:15Z. Sync 04:31Z (~52 min old). Pipeline stall 0. 0 pending approvals. PR #785/#786 Mirror review in progress; PR #787 (Larry-authored fix, auto-review label) just opened, outbox-notifier review dispatch pending. captures.json CLEAN (GC healer committed 12e90f29). **Tier 1** (consecutive_clean=2). PRIME DIRECTIVE ratio 16.15 improving.
 
 
