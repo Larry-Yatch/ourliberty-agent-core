@@ -382,8 +382,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T18:45Z UTC (Iter ~3443, Tier 1)
+## Status snapshot — updated 2026-07-01T18:53Z UTC (Iter ~3444, Tier 2)
 
-**Iter ~3443 summary (2026-07-01T18:45Z):** All checks nominal. 1 Tier-3 alert silenced (line 1068: approval_request delivery confirm). Mirror review for PR #795 active — regression check subprocess PID 2422105 started 18:40Z, 880s timeout. PR #796 queued in Mirror inbox. Watchdog healthy 18:38Z. Sync 18:32Z (~13 min old). Pipeline 0 stalls. Heal-daemon heartbeat 18:32Z. **Tier 1** (consecutive_clean=2; 1 more clean iter → Tier 2; cadence 5 min). APPROVAL_REQUEST `heal-stale-daemon-fresh-deploy-retry-001` queued with Larry (chat_id=7998341473, DM delivered idx=1067). unreviewed-merge-larry-authored-pr-001 5 occurrences; awaiting Larry response. decision-needed-approval-forge-dispatch-no-target-repo-001 7th occurrence (carry, vp). gate-parallelism-monitor 1/3 (carry). watchdog-log-growth-idle-overnight-001 2/3 (carry). heal-credential-registry-drift-origin-unreachable-tier4-001 1/3 (carry). PRIME DIRECTIVE ratio: 14.89, trend=flat.
+**Iter ~3444 summary (2026-07-01T18:53Z):** All checks nominal. No new alerts (watermark=1068=file_length). Mirror REVIEW_REVISION on PR #795 at 12:51 MDT ($0.78, session 38748cfd) — revision-1 dispatched to Forge 12:51:09 MDT. PR #796 under Mirror review (started 12:51:11 MDT). PR #797 created by Larry 12:48:38 MDT (MERGEABLE, pending outbox-notifier pickup — unreviewed-merge risk if Larry merges before Mirror dispatch). Daemons self-healed 18:42Z (beacon-bot PID 2422699, outbox-notifier PID 2423016 — heal-stale-daemon-code healer restarted after 30-min cooldown expired; running current code). Sync 18:32Z (~21 min). Watchdog 18:48Z healthy. Heartbeat 18:42Z. Pipeline 0 stalls. **Tier 2** (consecutive_clean=0; cadence 15 min). APPROVAL_REQUEST `heal-stale-daemon-fresh-deploy-retry-001` pending with Larry. PRIME DIRECTIVE ratio: 14.85, trend=flat.
 
 
