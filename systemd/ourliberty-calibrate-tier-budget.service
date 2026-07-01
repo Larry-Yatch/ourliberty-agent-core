@@ -1,0 +1,40 @@
+[Unit]
+Description=Ourliberty Tier-Budget Calibration — self-tune per-tier max_5h_budget_tokens from real rate-limit walls (tier-dispatch-spec.md § 12b)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/calibrate_tier_budget.py
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/calibrate_tier_budget.py
+
+TimeoutStartSec=60
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-calibrate-tier-budget
+
+# Memory cap: pure-arithmetic read of two jsonl ledgers, never needs more than 128M.
+MemoryMax=128M
+MemoryHigh=64M
+
+# Hardening — matches heal-claude-max-burn-rate pattern.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /home/larry/agent-core /home/larry/.claude /home/larry/.claude.json /home/larry/.local /home/larry/.cache /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target
