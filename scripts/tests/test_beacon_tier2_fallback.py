@@ -33,6 +33,7 @@ except ImportError:  # discover loads this module top-level (no package parent)
 
 import importlib
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -85,6 +86,8 @@ class BeaconBotRefuseOnResumeTest(_TempDirBase):
         run_mock = mock.Mock(return_value=tier1)
         dm_mock = mock.Mock()
         with mock.patch.object(self.bot, '_run_claude_once', run_mock), \
+             mock.patch.object(self.bot.active_tier, 'select_dispatch_tier',
+                               return_value='tier1'), \
              mock.patch.object(self.bot, '_tier2_refuse_on_resume_dm', dm_mock), \
              mock.patch.object(self.bot, '_tier2_failure_dm') as failure_dm_mock, \
              mock.patch.object(self.bot, 'tier2_available', return_value=True):
@@ -110,6 +113,8 @@ class BeaconBotRefuseOnResumeTest(_TempDirBase):
                           stderr='')
         run_mock = mock.Mock(side_effect=[tier1, tier2])
         with mock.patch.object(self.bot, '_run_claude_once', run_mock), \
+             mock.patch.object(self.bot.active_tier, 'select_dispatch_tier',
+                               return_value='tier1'), \
              mock.patch.object(self.bot, 'tier2_available', return_value=True), \
              mock.patch.object(self.bot, '_tier2_refuse_on_resume_dm') as refuse_dm:
             reply, sess = self.bot.call_beacon('hello', None)
@@ -160,12 +165,11 @@ class BeaconBotPrimaryUsesTier1SetupTokenTest(_TempDirBase):
 
 
 class BeaconBotHonorsTierPinTest(_TempDirBase):
-    """Regression guard for the 2026-06-29 incident: with the team pinned to
-    Tier 2 (active_tier.read()['tier'] == 'tier2'), the PRIMARY call_beacon
-    attempt must route to Tier 2 (HOME = active_tier.current_home() =
-    TIER2_HOME, token = the Tier 2 setup-token) — NOT hardwired Tier 1. Before
-    the fix the bot always started on Tier 1 and silently drained it even while
-    the rest of the team was on Tier 2."""
+    """Per-task dispatch (spec §4): the PRIMARY call_beacon attempt routes to
+    the SELECTED tier (here tier2) and authenticates via that tier's
+    setup-token — NOT hardwired Tier 1. Under the decoupled model, setup-token
+    auth is HOME-independent, so HOME stays the real account home (mirrors
+    run_claude / W1/W2) rather than swapping to TIER2_HOME."""
 
     def setUp(self):
         super().setUp()
@@ -174,27 +178,26 @@ class BeaconBotHonorsTierPinTest(_TempDirBase):
         self.quota_mock = _p.start()
         self.addCleanup(_p.stop)
 
-    def test_primary_routes_to_pinned_tier2(self):
+    def test_primary_routes_to_selected_tier2(self):
         ok = mock.Mock(
             returncode=0,
             stdout=json.dumps({'result': 'pong', 'session_id': 's2'}),
             stderr='',
         )
         run_mock = mock.Mock(return_value=ok)
-        tok_map = {'tier1': 'tier1-tok', 'tier2': 'tier2-tok'}
-        with mock.patch.object(self.bot.active_tier, 'read',
-                               return_value={'tier': 'tier2'}), \
+        with mock.patch.object(self.bot.active_tier, 'select_dispatch_tier',
+                               return_value='tier2'), \
              mock.patch.object(self.bot.active_tier, '_setup_token_for_tier',
-                               side_effect=lambda t: tok_map[t]) as tok_mock, \
+                               side_effect=lambda t: f'{t}-tok') as tok_mock, \
              mock.patch.object(self.bot, '_run_claude_once', run_mock):
             reply, sess = self.bot.call_beacon('ping', 'sess-prev')
         # Single primary call — no fallback.
         self.assertEqual(run_mock.call_count, 1)
         kwargs = run_mock.call_args_list[0].kwargs
-        # Primary HOME swapped to the PINNED tier (Tier 2), token is Tier 2's.
-        self.assertEqual(kwargs.get('home_override'), self.bot.active_tier.TIER2_HOME)
+        # Authenticated via the SELECTED tier's token; HOME stays real (the
+        # decoupled setup-token path), not swapped to TIER2_HOME.
         self.assertEqual(kwargs.get('oauth_token'), 'tier2-tok')
-        # The active tier's token was requested (not hardwired 'tier1').
+        self.assertEqual(kwargs.get('home_override'), self.bot.active_tier.TIER1_HOME)
         tok_mock.assert_any_call('tier2')
         self.assertEqual(reply, 'pong')
         self.assertEqual(sess, 's2')
@@ -227,7 +230,9 @@ class BeaconBotStaleCrossTierSessionSelfHealsTest(_TempDirBase):
             stderr='',
         )
         run_mock = mock.Mock(side_effect=[stale, fresh])
-        with mock.patch.object(self.bot, '_run_claude_once', run_mock):
+        with mock.patch.object(self.bot, '_run_claude_once', run_mock), \
+             mock.patch.object(self.bot.active_tier, 'select_dispatch_tier',
+                               return_value='tier1'):
             reply, sess = self.bot.call_beacon('hi', 'stale-sess')
         # Two calls: the stale --resume attempt, then a fresh retry.
         self.assertEqual(run_mock.call_count, 2)
@@ -266,6 +271,8 @@ class BeaconBotT2StdoutReturnedTest(_TempDirBase):
                           stderr='tier2 stderr distinct token')
         run_mock = mock.Mock(side_effect=[tier1, tier2])
         with mock.patch.object(self.bot, '_run_claude_once', run_mock), \
+             mock.patch.object(self.bot.active_tier, 'select_dispatch_tier',
+                               return_value='tier1'), \
              mock.patch.object(self.bot, 'tier2_available', return_value=True), \
              mock.patch.object(self.bot, '_tier2_failure_dm') as dm_mock:
             reply, _ = self.bot.call_beacon('hello', None)
@@ -281,6 +288,126 @@ class BeaconBotT2StdoutReturnedTest(_TempDirBase):
         self.assertEqual(len(call_args.args), 3)
         self.assertIn('TIER 2 distinct', call_args.args[1])
         self.assertIn('tier2 stderr distinct', call_args.args[2])
+
+
+class BeaconBotPerTaskDispatchTest(_TempDirBase):
+    """W3 (spec §4/§5/§6/§8/§10-W3): call_beacon selects the tier per message,
+    binds new sessions to their tier, stamps an account-tagged costs.jsonl row,
+    holds gracefully when no tier is available, and pins git/agents config on a
+    creds.json HOME swap (I10/I11)."""
+
+    def setUp(self):
+        super().setUp()
+        self.bot = importlib.import_module('beacon_telegram_bot')
+        self.at = self.bot.active_tier
+        # Route all tier state (pin, cooldowns, session-map, costs) into the
+        # per-test tmp; make tier1/tier3 usable via setup-tokens, tier2 not.
+        self._env = {}
+        for k, v in (
+            ('OURLIBERTY_AGENTS_ROOT', str(self.tmp)),
+            ('OURLIBERTY_CREDENTIALS_ENV_FILE', str(self.tmp / 'no.env')),
+            ('CLAUDE_CODE_OAUTH_TOKEN_TIER1', 'sk-ant-oat01-t1'),
+            ('CLAUDE_CODE_OAUTH_TOKEN_TIER3', 'sk-ant-oat01-t3'),
+            ('CLAUDE_CODE_OAUTH_TOKEN_TIER2', None),
+        ):
+            self._env[k] = os.environ.get(k)
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        self.addCleanup(self._restore_env)
+        (self.tmp / 'blackboard').mkdir(parents=True, exist_ok=True)
+
+    def _restore_env(self):
+        for k, prev in self._env.items():
+            if prev is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = prev
+
+    def _cost_rows(self):
+        p = self.tmp / 'blackboard' / 'costs.jsonl'
+        if not p.exists():
+            return []
+        return [json.loads(ln) for ln in p.read_text().splitlines() if ln.strip()]
+
+    def _ok(self, session_id='sess-new'):
+        return mock.Mock(returncode=0, stdout=json.dumps(
+            {'result': 'pong', 'session_id': session_id,
+             'model': 'claude-opus-4-8', 'total_cost_usd': 0.4,
+             'usage': {'input_tokens': 10, 'output_tokens': 3,
+                       'cache_creation_input_tokens': 2}}), stderr='')
+
+    def test_new_message_selects_binds_and_stamps(self):
+        with mock.patch.object(self.bot, '_run_claude_once',
+                               return_value=self._ok()):
+            reply, sess = self.bot.call_beacon('hi', None)
+        self.assertEqual(reply, 'pong')
+        self.assertEqual(sess, 'sess-new')
+        bound = self.at.lookup_session_tier('sess-new')
+        self.assertIn(bound, {'tier1', 'tier3'})
+        rows = self._cost_rows()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['account'], bound)
+        self.assertEqual(rows[0]['cost_usd'], 0.4)
+
+    def test_resume_dispatches_on_bound_tier(self):
+        self.at.record_session_tier('sess-bound', 'tier3')
+        run_mock = mock.Mock(return_value=self._ok(session_id='sess-bound'))
+        with mock.patch.object(self.bot, '_run_claude_once', run_mock):
+            reply, _ = self.bot.call_beacon('again', 'sess-bound')
+        self.assertEqual(reply, 'pong')
+        # Authenticated with tier3's setup-token; cost attributed to tier3.
+        self.assertEqual(
+            run_mock.call_args_list[0].kwargs.get('oauth_token'), 'sk-ant-oat01-t3')
+        self.assertEqual(self._cost_rows()[0]['account'], 'tier3')
+
+    def test_all_benched_returns_capacity_message(self):
+        self.at.set_cooldown('tier1', raw_excerpt='resets 3pm')
+        self.at.set_cooldown('tier3', raw_excerpt='resets 3pm')
+        run_mock = mock.Mock()
+        with mock.patch.object(self.bot, '_run_claude_once', run_mock):
+            reply, sess = self.bot.call_beacon('hi', None)
+        run_mock.assert_not_called()
+        self.assertIn('rate-limited', reply)
+        self.assertIn('All accounts', reply)
+        self.assertEqual(self._cost_rows(), [])
+
+    def test_resume_bound_tier_benched_distinct_message(self):
+        # A resume whose BOUND tier is benched must NOT claim "all accounts"
+        # down (tier3 here is healthy); it explains the conversation is stuck on
+        # its account and keeps session_id for auto-resume. No cross-tier spill.
+        self.at.record_session_tier('sess-x', 'tier1')
+        self.at.set_cooldown('tier1', raw_excerpt='resets 3pm')
+        run_mock = mock.Mock()
+        with mock.patch.object(self.bot, '_run_claude_once', run_mock):
+            reply, sess = self.bot.call_beacon('hi', 'sess-x')
+        run_mock.assert_not_called()
+        self.assertNotIn('All accounts', reply)
+        self.assertIn("conversation's account", reply)
+        self.assertEqual(sess, 'sess-x')  # binding kept for retry
+        self.assertEqual(self._cost_rows(), [])
+
+    def test_creds_fallback_home_swap_pins_git_config(self):
+        # _run_claude_once must pin gh/git + agents-root to the real home when
+        # HOME swaps off it (I10/I11), so a push survives the swap.
+        captured = {}
+
+        def fake_run(cmd, **kwargs):
+            captured['env'] = kwargs.get('env', {})
+            return mock.Mock(returncode=0, stdout='{}', stderr='')
+
+        with mock.patch.object(self.bot.subprocess, 'run', side_effect=fake_run), \
+             mock.patch.object(self.bot, 'refuse_under_test'):
+            self.bot._run_claude_once(['claude'],
+                                      home_override=self.at.TIER2_HOME,
+                                      oauth_token=None)
+        env = captured['env']
+        self.assertEqual(env['HOME'], self.at.TIER2_HOME)
+        self.assertEqual(env['GH_CONFIG_DIR'],
+                         os.path.join(self.at.TIER1_HOME, '.config', 'gh'))
+        self.assertEqual(env['GIT_CONFIG_GLOBAL'],
+                         os.path.join(self.at.TIER1_HOME, '.gitconfig'))
 
 
 class BeaconBotPatternMatchTest(_TempDirBase):
