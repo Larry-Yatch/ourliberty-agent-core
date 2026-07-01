@@ -29,6 +29,7 @@ import json
 import os
 import subprocess
 import sys
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -127,6 +128,18 @@ def emit_capture(
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
             payload = json.loads(resp.read().decode('utf-8') or '{}')
+    except urllib.error.HTTPError as exc:
+        # Surface the response BODY, not just "HTTP Error 400: Bad Request".
+        # The ingest endpoint returns an actionable detail (e.g.
+        # {"detail":"invalid origin.source='x'"}) that bare str(exc) drops —
+        # without it a rejected capture gives no clue what to fix.
+        detail = ''
+        try:
+            detail = exc.read().decode('utf-8', 'replace').strip()
+        except Exception:  # noqa: BLE001 — body read is best-effort
+            pass
+        _err(f'POST failed: {exc}' + (f' — {detail[:500]}' if detail else ''))
+        return None
     except Exception as exc:  # noqa: BLE001
         _err(f'POST failed: {exc}')
         return None
