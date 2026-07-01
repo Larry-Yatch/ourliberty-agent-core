@@ -206,15 +206,65 @@ def durable_claude_env(env=None):
     Fail-safe + no-op: when no setup-token is configured (or resolution raises),
     the env is returned unchanged and ``claude`` uses the default credential
     exactly as before — so this is harmless where setup-tokens aren't provisioned
-    (e.g. desktop). The token value is NEVER logged."""
-    out = dict(env) if env is not None else os.environ.copy()
+    (e.g. desktop). The token value is NEVER logged.
+
+    Back-compat wrapper over ``select_durable_claude_env`` (spec §10-W4): it
+    now round-robins a per-task tier instead of pinning to the single active
+    tier. When no tier is available it returns the base env UNCHANGED (the
+    historical no-op), so a caller that hasn't adopted the ``(env, tier)`` API
+    still gets a usable env. W4 callers should use ``select_durable_claude_env``
+    to skip the run on None and to get the selected tier for cost stamping."""
+    out, _tier = select_durable_claude_env(env=env)
+    if out is not None:
+        return out
+    return dict(env) if env is not None else os.environ.copy()
+
+
+def select_durable_claude_env(env=None, now=None):
+    """Per-task tier-selected process env for a DIRECT ``claude`` inference
+    spawn (spec §10-W4 — the digest/narrator/retrospective generators).
+
+    Returns ``(env, tier)``:
+      - ``env``: a copy of the base env with ``CLAUDE_CODE_OAUTH_TOKEN`` (and
+        ``HOME``, plus the I10/I11 agents-root/git pins on a creds.json
+        fallback) set for the round-robin-selected tier.
+      - ``tier``: the selected tier name — the caller stamps its costs.jsonl
+        row with this (``append_cost_row(account=tier)``) so the generator's
+        burn is attributed to the tier that actually ran.
+
+    Returns ``(None, None)`` when no tier is available — the caller MUST SKIP
+    the run (do not spawn; there is nothing usable to spawn on). Generators
+    start a FRESH session each run, so selection is session-less round-robin.
+    The token value is NEVER logged.
+
+    **NEVER RAISES:** any error resolving the tier/token (e.g. a malformed
+    tier-pool config surfacing through ``select_dispatch_tier``) degrades to
+    ``(None, None)`` so the caller takes its graceful fallback (raw digest /
+    raw briefing / skip / keep-rows) — NOT a crash and NOT a spawn on the
+    401-prone default credential. This preserves the callers' own "never
+    raises" contracts even though they invoke selection unguarded."""
+    base = dict(env) if env is not None else os.environ.copy()
     try:
-        token = active_setup_token()
-    except Exception:  # noqa: BLE001 — auth resolution must never break a spawn
-        token = None
-    if token:
-        out['CLAUDE_CODE_OAUTH_TOKEN'] = token
-    return out
+        tier = select_dispatch_tier(now=now)
+        if tier is None:
+            return None, None
+        out = dict(base)
+        token = _setup_token_for_tier(tier)
+        if token:
+            out['CLAUDE_CODE_OAUTH_TOKEN'] = token
+            out['HOME'] = TIER1_HOME              # setup-token = HOME-independent
+        else:
+            out['HOME'] = home_for_tier(tier)     # creds.json fallback: swap HOME
+            if out['HOME'] != TIER1_HOME:
+                out.setdefault('OURLIBERTY_AGENTS_ROOT',
+                               str(Path(TIER1_HOME) / 'agents'))
+                out.setdefault('GH_CONFIG_DIR',
+                               os.path.join(TIER1_HOME, '.config', 'gh'))
+                out.setdefault('GIT_CONFIG_GLOBAL',
+                               os.path.join(TIER1_HOME, '.gitconfig'))
+        return out, tier
+    except Exception:  # noqa: BLE001 — never crash a generator; skip instead
+        return None, None
 
 # Max backoff when the "resets <time>" message is unparseable. Spec § 6.3.
 _COOLDOWN_BACKOFF_CAP = timedelta(minutes=30)

@@ -9226,12 +9226,18 @@ def _cleanup_review_verify_uncertain(
     from test_isolation_guard import refuse_under_test  # noqa: PLC0415
     import active_tier  # noqa: PLC0415 — durable per-tier setup-token bridge
     refuse_under_test('claude-spawn')
+    # Per-task tier dispatch (spec §10-W4): round-robin a tier; skip cleanly
+    # when none is available (return {} = keep every uncertain row, the
+    # fail-safe posture this helper already uses).
+    env, tier = active_tier.select_durable_claude_env()
+    if env is None:
+        return {}
     try:
         proc = subprocess.run(
             ['claude', '--print', '--model', CLEANUP_REVIEW_VERIFY_MODEL,
              '--output-format', 'json', prompt],
             capture_output=True, text=True,
-            env=active_tier.durable_claude_env(), timeout=timeout, check=False,
+            env=env, timeout=timeout, check=False,
         )
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         return {}
@@ -9241,6 +9247,17 @@ def _cleanup_review_verify_uncertain(
         data = json.loads(proc.stdout or '{}')
     except json.JSONDecodeError:
         return {}
+    # §8/§10-W4: stamp an account-tagged cost row so this dispatch's burn is
+    # visible per-tier (this path does not route through inbox_watcher).
+    if isinstance(data, dict):
+        try:
+            active_tier.append_cost_row(
+                tier, model=CLEANUP_REVIEW_VERIFY_MODEL,
+                cost_usd=data.get('total_cost_usd'), usage=data.get('usage'),
+                agent='dashboard-cleanup-verify',
+                source='dashboard-cleanup-verify')
+        except Exception:  # noqa: BLE001 — cost ledger must never break the API
+            pass
     result = data.get('result') if isinstance(data, dict) else None
     return _parse_verifier_verdicts(result)
 

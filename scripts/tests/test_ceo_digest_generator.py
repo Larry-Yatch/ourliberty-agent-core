@@ -358,6 +358,15 @@ class PromptTest(unittest.TestCase):
 
 
 class GenerateCeoVoiceTest(unittest.TestCase):
+    def setUp(self):
+        # W4: generate_ceo_voice now selects a tier via select_durable_claude_env
+        # before spawning; provide a usable (env, tier) so these tests exercise
+        # the subprocess path rather than short-circuiting on "no tier".
+        p = mock.patch.object(cdg.active_tier, 'select_durable_claude_env',
+                              return_value=({}, 'tier1'))
+        p.start()
+        self.addCleanup(p.stop)
+
     def test_success_returns_text_and_cost(self):
         out = json.dumps({'result': 'We shipped a faster checkout.', 'total_cost_usd': 0.03})
         with mock.patch.object(cdg.subprocess, 'run',
@@ -365,6 +374,26 @@ class GenerateCeoVoiceTest(unittest.TestCase):
             text, cost = cdg.generate_ceo_voice('prompt')
         self.assertEqual(text, 'We shipped a faster checkout.')
         self.assertEqual(cost, 0.03)
+
+    def test_no_tier_skips_run(self):
+        # W4 None-safe: no dispatch tier -> skip the spawn, fall through to raw.
+        with mock.patch.object(cdg.active_tier, 'select_durable_claude_env',
+                               return_value=(None, None)), \
+             mock.patch.object(cdg.subprocess, 'run') as run:
+            result = cdg.generate_ceo_voice('p')
+        run.assert_not_called()
+        self.assertEqual(result, (None, None))
+
+    def test_cost_attributed_to_selected_tier(self):
+        # §6: the cost row's account is the tier THIS run selected, not the
+        # global active tier.
+        out = json.dumps({'result': 'x', 'total_cost_usd': 0.01})
+        with mock.patch.object(cdg.active_tier, 'select_durable_claude_env',
+                               return_value=({}, 'tier3')), \
+             mock.patch.object(cdg.subprocess, 'run',
+                               return_value=SimpleNamespace(returncode=0, stdout=out, stderr='')):
+            cdg.generate_ceo_voice('p')
+        self.assertEqual(cdg._account_tier(), 'tier3')
 
     def test_nonzero_exit_falls_through(self):
         with mock.patch.object(cdg.subprocess, 'run',
