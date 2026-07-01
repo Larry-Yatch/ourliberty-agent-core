@@ -136,6 +136,48 @@ class EmitCaptureFailureTests(unittest.TestCase):
                  mock.patch.object(eci.urllib.request, "urlopen", fake_urlopen):
                 self.assertIsNone(eci.emit_capture(title="t"))
 
+    def test_http_error_surfaces_response_body(self):
+        # A 4xx must report the response BODY (the endpoint's actionable
+        # detail), not just "HTTP Error 400: Bad Request" — the whole point of
+        # this fix. e.g. the ingest endpoint allow-lists origin.source.
+        import io as _io
+
+        def raise_http_error(req, timeout=None):
+            raise eci.urllib.error.HTTPError(
+                url="http://x/api/ingest/capture", code=400, msg="Bad Request",
+                hdrs=None,
+                fp=_io.BytesIO(b'{"detail":"invalid origin.source=\'x\'"}'),
+            )
+
+        with tempfile.TemporaryDirectory() as d:
+            with mock.patch.dict(os.environ, _token_env(d), clear=False), \
+                 mock.patch.object(eci.urllib.request, "urlopen",
+                                   raise_http_error), \
+                 mock.patch.object(eci, "_err") as err:
+                self.assertIsNone(eci.emit_capture(title="t"))
+        msgs = " ".join(str(c.args[0]) for c in err.call_args_list if c.args)
+        self.assertIn("invalid origin.source", msgs)  # body surfaced
+        self.assertIn("400", msgs)                     # status still shown
+
+    def test_http_error_body_read_failure_still_reports(self):
+        # If the body can't be read, we still report the status (never crash).
+        class _BadFp:
+            def read(self):
+                raise OSError("body unreadable")
+
+        def raise_http_error(req, timeout=None):
+            raise eci.urllib.error.HTTPError(
+                url="http://x", code=500, msg="err", hdrs=None, fp=_BadFp())
+
+        with tempfile.TemporaryDirectory() as d:
+            with mock.patch.dict(os.environ, _token_env(d), clear=False), \
+                 mock.patch.object(eci.urllib.request, "urlopen",
+                                   raise_http_error), \
+                 mock.patch.object(eci, "_err") as err:
+                self.assertIsNone(eci.emit_capture(title="t"))
+        msgs = " ".join(str(c.args[0]) for c in err.call_args_list if c.args)
+        self.assertIn("500", msgs)
+
 
 class CliWrapperTests(unittest.TestCase):
     def test_main_no_title_returns_2(self):
