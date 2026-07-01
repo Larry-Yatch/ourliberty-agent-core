@@ -3,7 +3,7 @@
 **Status:** Spec for the team to build — 2026-07-01.
 **Parent:** [approval-sync-north-star.md](approval-sync-north-star.md); follows Phase 2 ([approval-sync-phase2-spec.md](approval-sync-phase2-spec.md), merged #781).
 **Born from:** a post-merge `/code-review high` on #781 (5 finder angles + adversarial verify). Phase 2's core (canonical key + one fan-out) is sound; this phase closes the correctness holes the review confirmed. Findings recorded in the review; the two load-bearing ones were code-verified.
-**Risk tier:** HIGH — resolve path. This PR is itself a "deep-review" mission: it must NOT auto-merge ahead of a human `/code-review high` (see the companion [merge-gate-deep-review-spec.md](merge-gate-deep-review-spec.md)); until that gate exists, hold this PR manually for review.
+**Risk tier:** HIGH — resolve path. This document is a docs-only spec and may merge normally; the deep-review hold applies to the **downstream build PR that implements this spec**, not to this spec PR. That build PR is the "deep-review" mission: it must NOT auto-merge ahead of a human `/code-review high` (see the companion [mirror-review-merge-gate-brief.md](mirror-review-merge-gate-brief.md)); until that gate exists, hold the build PR manually for review.
 
 ---
 
