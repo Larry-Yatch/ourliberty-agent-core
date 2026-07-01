@@ -376,8 +376,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T01:14Z UTC (Iter ~3397, Tier 2)
+## Status snapshot — updated 2026-07-01T01:30Z UTC (Iter ~3398, Tier 2)
 
-**Iter ~3397 summary (2026-07-01T01:14Z):** 3 new alerts — all Tier-3 silenced (doorbell, ledger weekly, Check I digest). All 8 daemons alive (PIDs stable). Watchdog healthy 19:10 MDT. Sync success. Pipeline stall 0. Check I re-invoked (Wednesday) → self-dedup, no dispatches. PR #780 (W3, no label) still open — cooldown-suppressed. G-rule `unreviewed-merge-larry-authored-pr-001` carry — Beacon phased design awaiting Larry. **Tier 2** (consecutive_clean=1). PRIME DIRECTIVE ratio=16.36 improving.
+**Iter ~3398 summary (2026-07-01T01:30Z):** 0 new alerts. 8/8 daemons alive. Watchdog healthy 19:25 MDT. Sync success (~1h old). Pipeline stall 0. Check I re-invoked (Wednesday) → self-dedup, no dispatches. PR #780 (W3, no label) still open, ~2.7h old, under 72h — awaiting Larry response on Beacon phased fix. Stale orphan approval `mirror-review-pr-ourliberty-agent-core-779` (PR #779 merged) — Beacon to GC. **Tier 2** (consecutive_clean=2). 1 more clean iter → Tier 3. PRIME DIRECTIVE ratio ~16.36 improving.
 
 
