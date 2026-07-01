@@ -1,0 +1,16 @@
+[Unit]
+Description=Reconcile phantom Forge in_review cards — close ones whose PR merged/closed out of band
+
+[Timer]
+# OnCalendar (not OnUnitActiveSec) per the OnUnitActiveSec-dies lesson: an
+# absolute wall-clock schedule keeps firing even if a run is missed/slow. Every
+# 30 min — the phantoms are cosmetic (nothing waits on them) and the emit is
+# idempotent (ts = PR terminal timestamp), so a leisurely cadence is fine. The
+# :17 offset avoids colliding with the :0/5 and :07/:22 heal-timer slots.
+OnCalendar=*-*-* *:17/30:00
+Persistent=true
+RandomizedDelaySec=45
+Unit=ourliberty-heal-stale-in-review-reconcile.service
+
+[Install]
+WantedBy=timers.target

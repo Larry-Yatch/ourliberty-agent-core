@@ -132,6 +132,12 @@ KNOWN_EVENT_TYPES: frozenset[str] = frozenset({
     'review_pass',
     'review_revision',
     'review_escalate',
+    # skip-mirror-review / out-of-band-merge reconcile: emitted by
+    # heal_stale_in_review_reconcile.py to close a phantom in_review card
+    # whose PR merged/closed out of band with no verdict recorded. Push-only
+    # (the shipper never produces it); listed here so emit_event admits it and
+    # the audit healer does not flag it as unknown.
+    'review_obsolete',
     # N4 promotion rule (approvals-queue-rework.md L6): scripts/promote_alerts.py
     # push-emits one of these for each escalation that crosses the needs-CEO-
     # attention bar. The dashboard's NeedsAttentionCard on /live queries this

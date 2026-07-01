@@ -2302,6 +2302,10 @@ def _reader_system_worktrees(
 _QUEUE_TERMINAL_EVENT_TYPES = (
     'auto_merge', 'marker_error', 'preflight_reject',
     'cost_budget', 'review_escalate',
+    # review_obsolete closes a card whose PR merged/closed out of band with
+    # no verdict (heal_stale_in_review_reconcile). Not a done_today input, so
+    # the phantom silently leaves In-Review without a false 'merged today'.
+    'review_obsolete',
 )
 
 # Mirror's review verdicts also close an in_review entry. Mirror — NOT the
