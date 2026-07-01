@@ -244,6 +244,16 @@ _AUTO_MERGE_MERGED_RE = re.compile(
     r'\[(?P<ts>\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:?\d{2}|Z)?)\]'
     r'.*AUTO_MERGE task=(?P<task>\S+).*outcome=merged'
 )
+# merge-gate-deep-review-hold. A critical-path PR that PASS'd Mirror but reached
+# auto-merge WITHOUT a deep-review stamp is INTENTIONALLY held OPEN for a human
+# `/code-review high` + manual merge (outbox_notifier logs this). Such a PR is
+# mergeable, so Check 3's `_recover_via_auto_merge` (a raw `gh pr merge`) would
+# SUCCEED and silently defeat the hold — unlike held_conflict, which is spared
+# only because a conflicting PR can't be merged. Check 3 must therefore skip any
+# task with this line: the hold is intentional and already surfaced its own DM.
+_AUTO_MERGE_HELD_DEEP_REVIEW_RE = re.compile(
+    r'AUTO_MERGE_HELD_DEEP_REVIEW task=(?P<task>\S+)'
+)
 # Check 6 (forge-cold-start-revision S3). The session-less REVISION backstop no
 # longer scrapes the notifier log — the message text drifted and the regex went
 # dead (the #645 / #653 stalls; S0 was the interim regex fix this supersedes).
@@ -1949,7 +1959,14 @@ def check_mirror_pass_unmerged(notifier_lines: list[str], open_prs: list[dict],
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=MIRROR_PASS_UNMERGED_MIN)
     # Build map task_id -> latest PASS timestamp.
     pass_times: dict[str, datetime] = {}
+    # merge-gate-deep-review-hold: tasks the notifier INTENTIONALLY held open for
+    # a human /code-review high. These are mergeable, so the recovery merge would
+    # succeed and defeat the hold — skip them (the hold DM already surfaced them).
+    deep_review_held: set[str] = set()
     for line in notifier_lines:
+        held = _AUTO_MERGE_HELD_DEEP_REVIEW_RE.search(line)
+        if held:
+            deep_review_held.add(held.group('task'))
         m = _MARKER_NOTIFIED_MIRROR_RE.search(line)
         if not m or m.group('intent') != 'review-pass':
             continue
@@ -1967,6 +1984,15 @@ def check_mirror_pass_unmerged(notifier_lines: list[str], open_prs: list[dict],
     for pr in open_prs:
         task = _task_id_from_branch(pr.get('headRefName', ''))
         if not task or task not in pass_times:
+            continue
+        if task in deep_review_held:
+            # Held for deep review on purpose — not a stall. Don't alert and
+            # (critically) don't auto-merge it out from under Larry's review.
+            log(
+                f'MIRROR_PASS_UNMERGED_SKIP task={task} '
+                f'reason=held_deep_review (intentional /code-review high hold)',
+                'INFO',
+            )
             continue
         ts = pass_times[task]
         if ts > cutoff:

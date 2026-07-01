@@ -1211,6 +1211,12 @@ _NOTIFICATION_INTENT_EMOJI = {
     'review-emergency-halt': '🛑',
     'reject': '✗',
     'clarification-exhausted': '✗',
+    # Auto-merge holds that need a manual step from Larry — action items, so ⚠
+    # rather than the neutral 📬 fallback. `merge_held_deep_review` is the
+    # deep-review hold (run /code-review high, then merge_reviewed_pr.sh);
+    # `merge_conflict_manual_rebase` is its older twin (rebase then it retries).
+    'merge_held_deep_review': '⚠',
+    'merge_conflict_manual_rebase': '⚠',
     # System self-awareness: the doorbell nudge (scripts/doorbell_notifier.py) —
     # a calm "N items need your call — check the board", deliberately NOT a ⚠
     # alert (it's a reminder, not an infra failure).
