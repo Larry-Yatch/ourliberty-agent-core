@@ -376,8 +376,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T00:40Z UTC (Iter ~3394, Tier 1)
+## Status snapshot — updated 2026-07-01T00:47Z UTC (Iter ~3395, Tier 1)
 
-**Iter ~3394 summary (2026-07-01T00:40Z):** 0 new alerts. All 8 daemons alive (new PIDs post-restart-storm, PR #781). Watchdog healthy 18:39 MDT. Sync success. Pipeline stall 0. PR #780 (W3, no label, Larry-authored) still open — stall healer cooldown-suppressed. G-rule `unreviewed-merge-larry-authored-pr-001` carry — Beacon phased design awaiting Larry. **Tier 1** (consecutive_clean=1). PRIME DIRECTIVE ratio=16.41 improving.
+**Iter ~3395 summary (2026-07-01T00:47Z):** 0 new alerts. All 8 daemons alive (PIDs stable). Watchdog healthy 18:44 MDT. Sync success. Pipeline stall 0. PR #779 MERGED ✅. PR #780 (W3, no label, Larry-authored) still open — cooldown-suppressed. G-rule `unreviewed-merge-larry-authored-pr-001` carry — Beacon phased design awaiting Larry. **Tier 1** (consecutive_clean=2). PRIME DIRECTIVE ratio=16.39 improving.
 
 
