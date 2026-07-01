@@ -104,6 +104,20 @@ class ForLarryCoexistenceTest(unittest.TestCase):
         self.assertIn('escalation-side needs you', titles)  # 1a
         self.assertEqual(len(items), 2)
 
+    def test_two_distinct_signal_records_same_task_both_surface(self):
+        # Phase 2.1 review Finding 1: two DIFFERENT for_larry_signal signals about
+        # one task (same pr_url → same derived decision_key) must BOTH surface. 1b
+        # must not dedup against itself, or a real needs-you row is dropped.
+        pr = 'https://github.com/o/r/pull/9'
+        self.fls.upsert_record('escalation:pr9',
+                               {'pr_url': pr, 'headline': 'critical-unhandled'})
+        self.fls.upsert_record('clarify-exhausted:pr9',
+                               {'pr_url': pr, 'headline': 'forge-stuck'})
+        ssl = importlib.import_module('system_state_log')
+        titles = {it['title'] for it in ssl.load_for_larry_escalations()}
+        self.assertIn('critical-unhandled', titles)
+        self.assertIn('forge-stuck', titles)
+
     def test_clear_many_one_pass(self):
         self.fle.upsert('e1', headline='h1', context='c')
         self.fle.upsert('e2', headline='h2', context='c')

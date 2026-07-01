@@ -8647,13 +8647,21 @@ def _handle_larry_action(
     decision_key: Optional[str] = None
     try:
         import decision_resolve as _decision_resolve  # noqa: F811
-        _src_payload = source.get('payload') if isinstance(
-            source.get('payload'), dict) else {}
-        decision_key = _src_payload.get('decision_key') or \
-            _decision_resolve.canonical_decision_key(
-                source_task_id, source.get('pr_url'))
-    except Exception:  # noqa: BLE001 — key derivation is best-effort; healer backstops
+    except Exception:  # noqa: BLE001 — no module → no fan-out; healer backstops
         _decision_resolve = None
+    if _decision_resolve is not None:
+        # Key derivation is isolated from the import: a derivation error (e.g. a
+        # malformed source row with a non-string task_id) must NOT disable the
+        # whole fan-out. With the module in hand, the P-leg can still pop the
+        # acted-on entry by entry_id even when the cross-store key is underivable.
+        try:
+            _src_payload = source.get('payload') if isinstance(
+                source.get('payload'), dict) else {}
+            decision_key = _src_payload.get('decision_key') or \
+                _decision_resolve.canonical_decision_key(
+                    source_task_id, source.get('pr_url'))
+        except Exception:  # noqa: BLE001 — key derivation is best-effort
+            decision_key = None
     fan_entry_id = (
         source_task_id if source.get('event_type') in _DECISION_EVENT_TYPES
         else None

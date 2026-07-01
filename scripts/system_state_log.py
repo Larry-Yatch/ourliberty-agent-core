@@ -555,7 +555,13 @@ def load_for_larry_escalations() -> list[dict[str, Any]]:
     #       (outbox_notifier mirror-review routing site).
     #   1b. for_larry_signal.active_entries()  → `{'records': {...}}`
     #       (promote_alerts critical-unhandled + outbox_notifier CLARIFY-exhausted).
-    seen_keys: set[str] = set()
+    # `seen_1a_keys` is the ONLY set 1b dedups against — the same decision living
+    # in BOTH stores should surface once. Crucially, 1b records are NOT deduped
+    # against each OTHER: two distinct for-Larry signals about one task (e.g.
+    # promote_alerts critical-unhandled + outbox_notifier clarify-exhausted can
+    # derive the same task-based key) must BOTH surface. Dropping a real needs-you
+    # row is worse than a rare duplicate, so we never let 1b suppress 1b.
+    seen_1a_keys: set[str] = set()
     try:
         import for_larry_escalations  # local import keeps the cold path cheap
         for e in for_larry_escalations.list_open():
@@ -563,7 +569,7 @@ def load_for_larry_escalations() -> list[dict[str, Any]]:
                 items.append(_escalation_to_waiting_item(e))
                 k = _escalation_decision_key(e)
                 if k:
-                    seen_keys.add(k)
+                    seen_1a_keys.add(k)
     except Exception as exc:  # noqa: BLE001 — never abort the State Log tick
         log(f'state-log: for-larry escalations read failed: '
             f'{type(exc).__name__}: {exc}')
@@ -577,10 +583,8 @@ def load_for_larry_escalations() -> list[dict[str, Any]]:
             e = dict(rec)
             e.setdefault('id', rec.get('key'))
             k = _escalation_decision_key(e)
-            if k and k in seen_keys:
+            if k and k in seen_1a_keys:
                 continue  # same decision already surfaced from 1a — don't double-count
-            if k:
-                seen_keys.add(k)
             items.append(_escalation_to_waiting_item(e))
     except Exception as exc:  # noqa: BLE001 — never abort the State Log tick
         log(f'state-log: for-larry signal read failed: '
