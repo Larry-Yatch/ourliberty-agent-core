@@ -376,8 +376,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T04:59Z UTC (Iter ~3406, Tier 1)
+## Status snapshot — updated 2026-07-01T05:07Z UTC (Iter ~3407, Tier 1)
 
-**Iter ~3406 summary (2026-07-01T04:59Z):** 1 Tier-3 alert silenced (doorbell/dashboard). PR #784 MERGED 04:55:37Z without Mirror review — **5th occurrence** G-rule `unreviewed-merge-larry-authored-pr-001`; heal-unreviewed-merge-detector will DM Larry on next sweep; no new Pulse dispatch. PR #785 OPEN Mirror review in progress (dispatched 04:55Z). PR #786 NEW OPEN auto-review label, Mirror dispatch pending. All 8 daemons alive. Watchdog healthy 04:55Z. Sync 04:31Z. Pipeline stall 0. 0 pending approvals. **Tier 1** (consecutive_clean 2→0, signal). PRIME DIRECTIVE ratio 16.16 improving.
+**Iter ~3407 summary (2026-07-01T05:07Z):** L1060 Tier-4 (heal-unreviewed-merge-detector, unreviewed-merge:784, DM already delivered 23:01:57Z, no duplicate Pulse DM). L1061-L1067 Tier-3 silenced (heal-stale-daemon-code auto-restarted 7 daemons for PR #784 code deploy). All daemons alive with new PIDs. PR #785 Mirror review in progress (dispatched 04:55Z). PR #786 Mirror review in progress (dispatched 05:00Z). Watchdog healthy 05:00Z. Sync 04:31Z. Pipeline stall 0. 0 pending approvals. **Tier 1** (consecutive_clean=0, signal: Tier-4 alert). PRIME DIRECTIVE ratio 16.15 improving.
 
 
