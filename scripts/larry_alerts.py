@@ -746,26 +746,39 @@ def _retract_shipped_alert_events(removed_recs: list, *, clear_fn=None) -> int:
     """Clear the shipped `larry_alert` chain_event rows for retracted lines.
 
     The chain_event_shipper polls larry-alerts.jsonl and ships each line as a
-    `larry_alert` row, keyed `task_id = rec['task_id'] or rec['subject'] or
-    rec['intent']`. When `resolve_alert` removes a line — e.g. a healer auto-fix
-    resolving drift out-of-band — that already-shipped row otherwise keeps
-    reading as unread (`read_at IS NULL`) FOREVER: the shipper only re-ships the
-    surviving lines and never emits a retraction, so the alert feed and the
-    chain_events read model silently drift apart (§3a.2 retraction gap — the bug
-    that made auto-fixed alerts render live on the dashboard). This mirrors the
-    removal into Supabase by clearing (setting `read_at` on) the correlated
-    row(s), using the SAME task_id the shipper stamped so the keyed clear hits
-    the same row.
+    `larry_alert` row, keyed by `chain_event_shipper.alert_event_task_id(rec)`.
+    When `resolve_alert` removes a line — e.g. a healer auto-fix resolving drift
+    out-of-band — that already-shipped row otherwise keeps reading as unread
+    (`read_at IS NULL`) FOREVER: the shipper only re-ships the surviving lines
+    and never emits a retraction, so the alert feed and the chain_events read
+    model silently drift apart (§3a.2 retraction gap — the bug that made
+    auto-fixed alerts render live on the dashboard). This mirrors the removal
+    into Supabase by clearing the correlated row via the SHARED shipper-key
+    helper, so the clear can never drift from the stamp.
 
-    Scoped to `larry_alert` on purpose: an alert and a still-pending
-    `approval_request`/`escalation` can share a decision_key, so a broader clear
-    could wrongly retire a live decision. Resolving THIS alert only authorizes
-    clearing ITS own row; the decision fan-out's C-leg owns the cross-type clear.
+    Correlation + column are kept strictly aligned with how the row was stamped:
+    a line the shipper keyed by task_id/subject is cleared on the `task_id`
+    column; the degenerate line the shipper keyed by nothing (no
+    task_id/subject/intent) but that still carries a `decision_key` in its
+    payload is cleared on the `decision_key` column only. `clear_larry_alert`
+    matches ONE column, so we never fire a task_id match on a decision_key value
+    (a PR-coordinate key is reused as both, and that cross-match would wrongly
+    clear an unrelated live alert — worse than a missed join).
+
+    Caveats this does NOT cover (documented, low-risk, both strictly better than
+    the pre-fix always-live state): (1) a clear that fails on a Supabase blip is
+    swallowed and the row stays live — there is NO larry_alert-specific healer
+    backstop (heal_stale_approvals only reconciles approval_request/clarify), so
+    the miss persists until the same key is resolved again; (2) a resolve that
+    races AHEAD of the shipper's first ship of that line clears nothing (no row
+    yet) and the shipper then strands the row — negligible in practice because a
+    retraction fires when drift resolves out-of-band, long after the line was
+    DMed and thus shipped.
 
     Best-effort, fire-and-forget — never raises. Its callers release the alerts
     flock first, so this network write can't serialize appenders. Under test or
-    without Supabase creds, `clear_decision` degrades to a no-op. Returns the
-    total rows cleared. `clear_fn` is a test seam (defaults to the real clear)."""
+    without Supabase creds, the clear degrades to a no-op. Returns the total
+    rows cleared. `clear_fn` is a test seam (defaults to the real clear)."""
     if not removed_recs:
         return 0
     if clear_fn is None:
@@ -773,29 +786,36 @@ def _retract_shipped_alert_events(removed_recs: list, *, clear_fn=None) -> int:
             import chain_event_emit
         except Exception:  # noqa: BLE001 — retraction must not crash the resolve
             return 0
-        clear_fn = chain_event_emit.clear_decision
-    # Correlate each removed line to the exact task_id the shipper stamped and
-    # dedup, so N lines sharing a subject issue ONE clear. Fall back to the
-    # stamped decision_key only for a degenerate line the shipper keyed by
-    # nothing (no task_id/subject/intent) — clear_decision's decision_key leg
-    # still catches that row.
-    keys: list = []
+        clear_fn = chain_event_emit.clear_larry_alert
+    try:
+        import chain_event_shipper
+    except Exception:  # noqa: BLE001 — retraction must not crash the resolve
+        return 0
+    # Build the (key, column) targets, deduped so N lines sharing a key issue
+    # ONE clear. Prefer the shipper's task_id; fall back to the payload
+    # decision_key only when the shipper had no task_id to stamp.
+    targets: list = []
     seen: set = set()
     for rec in removed_recs:
         if not isinstance(rec, dict):
             continue
-        subject = rec.get('subject') or rec.get('intent') or ''
-        corr = rec.get('task_id') or subject or rec.get('decision_key')
-        if not corr or corr in seen:
+        tid = chain_event_shipper.alert_event_task_id(rec)
+        if tid:
+            target = (tid, 'task_id')
+        elif rec.get('decision_key'):
+            target = (rec['decision_key'], 'decision_key')
+        else:
             continue
-        seen.add(corr)
-        keys.append(corr)
+        if target in seen:
+            continue
+        seen.add(target)
+        targets.append(target)
     total = 0
-    for corr in keys:
+    for key, by in targets:
         try:
-            total += int(clear_fn(corr, event_types=('larry_alert',)) or 0)
-        except Exception:  # noqa: BLE001 — a failed clear self-heals via backstop
-            pass
+            total += int(clear_fn(key, by=by) or 0)
+        except Exception:  # noqa: BLE001 — a failed clear leaves the row for a
+            pass           # future resolve of the same key (no crash into caller)
     return total
 
 

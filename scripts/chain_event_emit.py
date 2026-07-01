@@ -288,6 +288,65 @@ def clear_approval_request(
         return False
 
 
+def clear_larry_alert(
+    key: str,
+    *,
+    by: str = 'task_id',
+    ts: Optional[str] = None,
+    client: Optional[Any] = None,
+    logger: Optional[logging.Logger] = None,
+) -> int:
+    """Clear the pending `larry_alert` row(s) for ONE shipped alert line.
+
+    The retraction counterpart to `larry_alerts.resolve_alert` (approval-sync
+    §3a.2). A SINGLE keyed `read_at` UPDATE scoped to `event_type='larry_alert'`,
+    matching exactly ONE column — `task_id` (the shipper's key, via
+    `chain_event_shipper.alert_event_task_id`) OR `payload->>decision_key` —
+    never both.
+
+    Deliberately narrower than `clear_decision`'s dual-leg, decision-oriented
+    clear: resolving one alert authorizes clearing only ITS shipped row. Firing
+    the task_id leg on a decision_key value (or vice-versa) could mis-join onto
+    an unrelated row whose `task_id` happens to equal that key — PR-coordinate
+    keys are reused as both task_ids and decision_keys — a mis-join the codebase
+    treats as worse than a missed join, so the two are kept strictly separate.
+
+    `by` picks the column: 'task_id' (default) or 'decision_key'. Best-effort,
+    fire-and-forget — returns the rows cleared (0 on no-match / no-client /
+    error), never raises. `read_at IS NULL` makes it idempotent. `client`/`ts`
+    are for tests; production callers omit them."""
+    log = logger or _LOGGER
+    if not key:
+        return 0
+    column = 'payload->>decision_key' if by == 'decision_key' else 'task_id'
+    cli = client if client is not None else _get_client()
+    if cli is None:
+        log.debug(
+            'clear_larry_alert: Supabase client unavailable (creds unset / '
+            'supabase-py missing / test mode); leaving %s=%s uncleared', by, key,
+        )
+        return 0
+    use_ts = ts or ces.datetime.now(ces.timezone.utc).isoformat()
+    try:
+        resp = (
+            cli.table('chain_events')
+            .update({'read_at': use_ts}, count='exact')
+            .eq('event_type', 'larry_alert')
+            .eq(column, key)
+            .is_('read_at', 'null')
+            .execute()
+        )
+        rows = getattr(resp, 'data', None) or []
+        count = getattr(resp, 'count', None)
+        return count if isinstance(count, int) else len(rows)
+    except Exception as e:  # noqa: BLE001 — push writer must not crash producer
+        log.warning(
+            'clear_larry_alert failed (%s=%s): %s: %s', by, key,
+            type(e).__name__, e,
+        )
+        return 0
+
+
 def clear_decision(
     key: str,
     *,
