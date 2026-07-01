@@ -91,37 +91,37 @@ def _escalation_row_key(row: dict[str, Any]) -> Optional[str]:
 
 # -------------------- the four legs --------------------
 
-def _resolve_pending(key: str, outcome: str, note: str, log: logging.Logger) -> int:
-    """P — beacon-pending-approvals.json. Resolve every pending entry whose
-    canonical key matches, via the existing `bah.resolve` primitive (so the
-    move-to-history + dashboard-pending clear + audit all happen the one
-    blessed way). Returns the count resolved."""
+def _resolve_pending(entry_id: Optional[str], outcome: str, note: str,
+                     log: logging.Logger) -> int:
+    """P — beacon-pending-approvals.json. Resolve ONLY the specific pending entry
+    the operator acted on, addressed by its own `id`, via the existing
+    `bah.resolve` primitive (so the move-to-history + dashboard-pending clear +
+    audit all happen the one blessed way). Returns 1 if resolved, else 0.
+
+    Phase 2.1 FIX 1: this leg is keyed on the exact `entry_id`, NOT on the
+    canonical decision key. The Phase 2 version scanned `pending[]` and resolved
+    EVERY entry whose key matched — but the key is non-injective (pr_url takes
+    precedence, so two distinct pending approvals for the SAME PR collapse to one
+    key), so approving one silently retired the sibling and moved it to history
+    as 'approved' WITHOUT ever dispatching it. Popping exactly the acted-on entry
+    restores the pre-Phase-2 `resolve(entry['id'])` semantics while the C/E/A
+    legs keep using the shared key for cross-surface clear. `entry_id=None` (a
+    pure escalation/alert resolve with no acted-on approval) is a no-op — it must
+    never touch a pending approval that merely shares a key."""
+    if not entry_id:
+        return 0
     try:
         import beacon_approval_handler as bah
     except Exception as e:  # noqa: BLE001
-        log.warning('resolve_decision P-leg import failed (key=%s): %s: %s',
-                    key, type(e).__name__, e)
+        log.warning('resolve_decision P-leg import failed (entry_id=%s): %s: %s',
+                    entry_id, type(e).__name__, e)
         return 0
     try:
-        state = bah.load_state()
-        ids = [
-            entry.get('id')
-            for entry in state.get('pending', [])
-            if _pending_entry_key(entry) == key and entry.get('id')
-        ]
+        return 1 if bah.resolve(entry_id, outcome, note=note) is not None else 0
     except Exception as e:  # noqa: BLE001
-        log.warning('resolve_decision P-leg load failed (key=%s): %s: %s',
-                    key, type(e).__name__, e)
+        log.warning('resolve_decision P-leg resolve(%s) failed: %s: %s',
+                    entry_id, type(e).__name__, e)
         return 0
-    resolved = 0
-    for approval_id in ids:
-        try:
-            if bah.resolve(approval_id, outcome, note=note) is not None:
-                resolved += 1
-        except Exception as e:  # noqa: BLE001
-            log.warning('resolve_decision P-leg resolve(%s) failed: %s: %s',
-                        approval_id, type(e).__name__, e)
-    return resolved
 
 
 def _resolve_chain_events(key: str, client: Any, log: logging.Logger) -> int:
@@ -187,20 +187,29 @@ def resolve_decision(
     key: Optional[str],
     outcome: str,
     *,
+    entry_id: Optional[str] = None,
     actor: Optional[str] = None,
     note: str = '',
     chain_client: Optional[Any] = None,
     logger: Optional[logging.Logger] = None,
 ) -> dict[str, Any]:
-    """Resolve one decision across all four needs-Larry stores (P/C/E/A).
+    """Resolve one decision across the needs-Larry stores.
 
-    `key` is a `canonical_decision_key` value. `outcome` ∈ VALID_OUTCOMES.
-    `actor`/`note` annotate the resolution (note is threaded into the P-leg's
-    `bah.resolve`). `chain_client` is a test seam for the Supabase C-leg;
-    production callers omit it and `chain_event_emit` builds its own.
+    `key` is a `canonical_decision_key` value used to clear the CROSS-STORE legs
+    (C chain_events / E escalations / A alerts). `entry_id`, when given, is the
+    exact beacon-pending-approvals entry the operator acted on — the P-leg pops
+    ONLY that entry (Phase 2.1 FIX 1), never siblings that merely share `key`.
+    `outcome` ∈ VALID_OUTCOMES. `actor`/`note` annotate the resolution.
+    `chain_client` is a test seam for the Supabase C-leg.
 
     Each leg is best-effort and isolated — one failing never aborts the others
     (spec §6). Idempotent: a second call clears nothing. Never raises.
+
+    Leg order (Phase 2.1 FIX 6): the cross-store legs (C/E/A) run FIRST and the
+    P-leg runs LAST, so a hard crash mid-fan-out leaves the pending P entry
+    intact — `heal_stale_approvals` keys its reconcile off pending entries, so it
+    re-drives the whole fan-out on its next tick. P-first + crash would instead
+    strand C/E/A with no pending entry to reconcile against.
 
     Returns a result dict::
 
@@ -208,9 +217,10 @@ def resolve_decision(
          'pending': n, 'chain_events': n, 'escalations': n, 'alerts': n,
          'total': n}
 
-    A `None`/empty `key` is the underivable case (spec §1.1): no cross-store
-    join is attempted — returns an all-zero result. A missed join here is the
-    safe direction; the Phase 1 healer backstops it.
+    A `None`/empty `key` skips the cross-store legs (the underivable case, spec
+    §1.1 — a missed join is the safe direction, backstopped by the Phase 1
+    healer); the P-leg still pops `entry_id` if given, so an acted-on approval is
+    never left pending just because its cross-store key is underivable.
     """
     log = logger or _LOGGER
     result = {
@@ -218,33 +228,62 @@ def resolve_decision(
         'pending': 0, 'chain_events': 0, 'escalations': 0, 'alerts': 0,
         'total': 0,
     }
-    if not key:
-        log.debug('resolve_decision: no key — skipping cross-store fan-out')
-        return result
     if outcome not in VALID_OUTCOMES:
-        log.warning('resolve_decision: invalid outcome=%r for key=%s — '
-                    'skipping', outcome, key)
+        log.warning('resolve_decision: invalid outcome=%r (key=%s entry_id=%s) '
+                    '— skipping', outcome, key, entry_id)
         return result
-    result['pending'] = _resolve_pending(key, outcome, note, log)
-    result['chain_events'] = _resolve_chain_events(key, chain_client, log)
-    result['escalations'] = _resolve_escalations(key, log)
-    result['alerts'] = _resolve_alerts(key, log)
+    if not key and not entry_id:
+        log.debug('resolve_decision: no key and no entry_id — nothing to do')
+        return result
+    # Cross-store legs FIRST (FIX 6), matched by the shared canonical key.
+    if key:
+        result['chain_events'] = _resolve_chain_events(key, chain_client, log)
+        result['escalations'] = _resolve_escalations(key, log)
+        result['alerts'] = _resolve_alerts(key, log)
+    else:
+        log.debug('resolve_decision: no cross-store key for entry_id=%s — '
+                  'P-leg only', entry_id)
+    # P-leg LAST — pops ONLY the acted-on entry (FIX 1), independent of key.
+    result['pending'] = _resolve_pending(entry_id, outcome, note, log)
     result['total'] = (
         result['pending'] + result['chain_events']
         + result['escalations'] + result['alerts']
     )
     log.info(
-        'resolve_decision key=%s outcome=%s actor=%s cleared P=%d C=%d E=%d A=%d',
-        key, outcome, actor, result['pending'], result['chain_events'],
-        result['escalations'], result['alerts'],
+        'resolve_decision key=%s entry_id=%s outcome=%s actor=%s '
+        'cleared P=%d C=%d E=%d A=%d',
+        key, entry_id, outcome, actor, result['pending'],
+        result['chain_events'], result['escalations'], result['alerts'],
     )
     return result
+
+
+def resolve_decision_for_pending_entry(
+    entry: dict[str, Any],
+    outcome: str,
+    *,
+    actor: Optional[str] = None,
+    note: str = '',
+    chain_client: Optional[Any] = None,
+    logger: Optional[logging.Logger] = None,
+) -> dict[str, Any]:
+    """Resolve a specific beacon-pending-approvals `entry`: pop ONLY this entry
+    (by its `id`) and clear the OTHER stores by its canonical key. This is the
+    one call the Telegram approve/reject and dashboard `/api/larry/action` paths
+    use, so the FIX-1 discipline (act on exactly the acted-on entry; use the key
+    only for cross-surface clear) lives in one place."""
+    key = _pending_entry_key(entry)
+    return resolve_decision(
+        key, outcome, entry_id=entry.get('id'), actor=actor, note=note,
+        chain_client=chain_client, logger=logger,
+    )
 
 
 def resolve_decision_for_entry(
     *,
     task_id: Optional[str] = None,
     pr_url: Optional[str] = None,
+    entry_id: Optional[str] = None,
     outcome: str,
     actor: Optional[str] = None,
     note: str = '',
@@ -252,10 +291,12 @@ def resolve_decision_for_entry(
     logger: Optional[logging.Logger] = None,
 ) -> dict[str, Any]:
     """Convenience wrapper for callers that hold a `task_id`/`pr_url` rather than
-    a precomputed key — derives the canonical key, then fans out. Used by the
-    Telegram/dashboard call sites that resolve by the raw approval id."""
+    a full entry — derives the canonical key, then fans out. Pass `entry_id` when
+    a specific pending approval is being acted on (so the P-leg pops it); omit it
+    for a pure-coordinate resolve (e.g. a bare escalation clear) so no pending
+    approval is touched (FIX 1)."""
     key = canonical_decision_key(task_id, pr_url)
     return resolve_decision(
-        key, outcome, actor=actor, note=note,
+        key, outcome, entry_id=entry_id, actor=actor, note=note,
         chain_client=chain_client, logger=logger,
     )
