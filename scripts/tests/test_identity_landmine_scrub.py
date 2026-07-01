@@ -303,6 +303,8 @@ class RunClaudeInvokesScrub(unittest.TestCase):
                                side_effect=fake_popen), \
              mock.patch.object(agent_runner.active_tier, 'select_dispatch_tier',
                                return_value='tier1'), \
+             mock.patch.object(agent_runner.active_tier, 'usable',
+                               return_value=True), \
              mock.patch.object(agent_runner, 'get_manager',
                                return_value=fake_tm, create=True), \
              mock.patch.object(agent_runner, 'get_guard',

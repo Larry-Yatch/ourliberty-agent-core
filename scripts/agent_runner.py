@@ -1505,6 +1505,63 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
             # poison more than one task even between cron runs.
             scrub_tmp_identity_landmines()
 
+            # §4 TOCTOU re-verify (I14): select_dispatch_tier ran ~150 lines
+            # back; a concurrent dispatcher may have benched effective_tier
+            # since (rate_limit/auth_401 cooldown). Spawning on a just-benched
+            # account is a guaranteed 429 + a duplicate ledger event. If it
+            # flipped unusable, HOLD instead — process_task requeues the task to
+            # re-select a healthy tier next poll. Skip under an operator pin (a
+            # pin forces its tier regardless of usable(), per §16 rollback).
+            try:
+                _pin_now = active_tier.read_operator_pin()
+            except Exception:
+                _pin_now = None
+            if not _pin_now:
+                try:
+                    _still_usable = active_tier.usable(effective_tier)
+                except Exception:
+                    _still_usable = True  # fail-open: don't block on a probe error
+                if not _still_usable:
+                    if session_id:
+                        # A RESUME whose bound tier flipped unusable between
+                        # select and spawn: follow resume-discipline (spec §5) —
+                        # pause for heal_resume_paused_on_tier1 to auto-resume on
+                        # the SAME tier + return a descriptive failure so
+                        # process_task ARCHIVES the envelope (NOT the TIER_HOLD
+                        # sentinel). The healer auto-resumes when the tier's
+                        # COOLDOWN clears — so if the unusability is AUTH-caused
+                        # (no cooldown, e.g. a token got revoked), we must stamp
+                        # an auth_401 cooldown first, else the healer sees no
+                        # cooldown, treats the marker as clearable, and resumes
+                        # into the same TOCTOU fail forever (infinite loop).
+                        _toctou_kind = 'rate_limit'
+                        try:
+                            if active_tier.cooldown_until(effective_tier) is None:
+                                _toctou_kind = 'auth_401'
+                                active_tier.set_cooldown(
+                                    effective_tier, kind='auth_401')
+                        except Exception:
+                            pass
+                        log(agent_id,
+                            'RESUME_TIER_BENCHED (toctou) tier=' + effective_tier +
+                            ' reason=' + _toctou_kind +
+                            ' -> paused for auto-resume', 'WARN')
+                        _mark_paused_on_tier1(
+                            task_stem, _toctou_kind,
+                            agent_id=agent_id, tier=effective_tier)
+                        return (False,
+                                'Resume tier ' + effective_tier + ' unusable '
+                                'before spawn; paused for auto-resume when its '
+                                'cooldown clears.',
+                                None)
+                    log(agent_id,
+                        'TIER_TOCTOU effective_tier=' + effective_tier +
+                        ' benched between select and spawn; holding to re-select',
+                        'WARN')
+                    return (False,
+                            'TIER_HOLD: dispatch tier benched before spawn',
+                            None)
+
             try:
                 # Use Popen + polling for cancel-marker support.
                 # If task_stem is set, we check for a cancel file every
@@ -1768,8 +1825,12 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                                     'to Tier 2 (session is account-bound). '
                                     'DM sent.',
                                     None)
-                        other_tier_name = active_tier.fallback_tier(
-                            active_tier_name)
+                        # §6/§8: pool-aware, reserve-guarded fallback — prefer
+                        # the sibling primary, reach tier2 (laptop) only under
+                        # its 25% reserve. (Was fallback_tier(): laptop-first,
+                        # no reserve check — the "drain Larry's laptop" gap.)
+                        other_tier_name = active_tier.fallback_tier_pool_aware(
+                            effective_tier)
                         if not other_tier_name or not _fallback_available(
                                 other_tier_name):
                             log(agent_id,
@@ -1809,6 +1870,25 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                                 else fallback_home
                             )
                             t2_env['HOME'] = t2_home
+                            # §4 TOCTOU: the fallback tier was chosen before this
+                            # attempt; a concurrent worker may have BENCHED it
+                            # since (rate_limit/auth_401 cooldown). Re-verify it
+                            # isn't cooling down before spawning — else this is a
+                            # guaranteed 429 on a benched account. (Cooldown-only
+                            # check: auth was already vetted at selection +
+                            # _fallback_available.) If benched, skip + DM.
+                            if active_tier.cooldown_until(other_tier_name) is not None:
+                                log(agent_id,
+                                    'TIER_FALLBACK_TOCTOU tier=' + other_tier_name +
+                                    ' benched before fallback spawn; skipping',
+                                    'WARN')
+                                _dm_tier2_unavailable(
+                                    failure_type, task_stem, agent_id, None,
+                                    tier=other_tier_name)
+                                return (False,
+                                        'Fallback tier ' + other_tier_name +
+                                        ' benched before spawn; no dispatch.',
+                                        None)
                             log(agent_id,
                                 'TIER2_FALLBACK_ATTEMPT reason=' +
                                 failure_type + ' home=' + t2_home +
@@ -1874,9 +1954,14 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                                     except Exception:
                                         t2_retry_after = None
                                     try:
-                                        other_tier_name = (
-                                            active_tier.fallback_tier(
-                                                tier_now) or other_tier_name)
+                                        # Attribute to the tier we ACTUALLY
+                                        # attempted (other_tier_name from the
+                                        # fallback selection above). Do NOT
+                                        # re-derive via fallback_tier() here — a
+                                        # concurrent bench could return a
+                                        # different tier, misattributing the
+                                        # ledger event AND cooling down a tier
+                                        # that never ran this task (§6).
                                         append_rate_limit_event(
                                             agent=agent_id,
                                             task_id=task_stem or '',
@@ -1888,15 +1973,16 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                                         )
                                     except Exception:
                                         pass
-                                    # Spec § 6.3: when the fallback tier ALSO
-                                    # rate-limited (both tiers walled at once),
-                                    # cool down the other tier too so the
-                                    # watcher gate doesn't keep poking it. We
-                                    # detect by re-running the rate-limit
-                                    # classifier on the Tier 2 output.
-                                    if classify_tier1_failure(
-                                        t2.stdout, t2.stderr,
-                                    ) == 'rate_limit':
+                                    # §6.3/§7: when the fallback tier ALSO walled
+                                    # (both tiers walled at once), cool it down so
+                                    # the next dispatch's fallback_tier_pool_aware
+                                    # doesn't immediately re-pick it. Bench on
+                                    # rate_limit AND auth_401 (t2_failure already
+                                    # classified both) — matching the bot fix;
+                                    # leaving auth_401 unbenched here was the
+                                    # asymmetry the bots closed but this path did
+                                    # not.
+                                    if t2_failure in ('rate_limit', 'auth_401'):
                                         try:
                                             # §6 pool-aware: cool down the
                                             # fallback tier that just walled
@@ -1907,9 +1993,14 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                                                 other_tier_name,
                                                 raw_excerpt=(t2.stdout or '') +
                                                 '\n' + (t2.stderr or ''),
+                                                kind=('auth_401'
+                                                      if t2_failure == 'auth_401'
+                                                      else 'rate_limit'),
                                             )
-                                        except Exception:
-                                            pass
+                                        except Exception as _cd_exc:
+                                            log(agent_id,
+                                                'fallback set_cooldown failed: '
+                                                + repr(_cd_exc), 'WARN')
                             except (subprocess.TimeoutExpired,
                                     FileNotFoundError, OSError) as t2_exc:
                                 log(agent_id,

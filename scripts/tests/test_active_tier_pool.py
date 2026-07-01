@@ -368,6 +368,70 @@ class SelectDispatchTierTest(_PoolBase):
         self.assertIn(pick, {'tier1', 'tier3'})
 
 
+class FallbackPoolAwareTest(_PoolBase):
+    def test_prefers_sibling_primary_over_laptop(self):
+        # tier1 wall -> tier3 (sibling primary), NOT tier2 (laptop).
+        self.assertEqual(
+            active_tier.fallback_tier_pool_aware('tier1', now=_NOW), 'tier3')
+
+    def test_falls_to_laptop_only_when_sibling_benched_and_reserve_ok(self):
+        active_tier.set_cooldown('tier3', raw_excerpt='resets 3pm', now=_NOW)
+        # No tier2 burn -> reserve ok -> laptop is the fallback.
+        self.assertEqual(
+            active_tier.fallback_tier_pool_aware('tier1', now=_NOW), 'tier2')
+
+    def test_no_laptop_spill_past_reserve(self):
+        active_tier.set_cooldown('tier3', raw_excerpt='resets 3pm', now=_NOW)
+        self._write_costs([self._cost_row('tier2', 3_000_000)])  # > 2.5M reserve
+        self.assertIsNone(
+            active_tier.fallback_tier_pool_aware('tier1', now=_NOW))
+
+    def test_skips_tokenless_shared_home_tier(self):
+        # V6-on-fallback: a tokenless tier3 that SHARES tier1's home must NOT be
+        # a fallback (it would borrow tier1's creds and misattribute) — fall to
+        # tier2 instead. Patch the production shared-home reality.
+        os.environ.pop('CLAUDE_CODE_OAUTH_TOKEN_TIER3', None)
+        with mock.patch.object(active_tier, 'TIER3_HOME',
+                               active_tier.TIER1_HOME):
+            self.assertEqual(
+                active_tier.fallback_tier_pool_aware('tier1', now=_NOW), 'tier2')
+
+
+class TierAuthSetupTokenOnlyTest(_PoolBase):
+    def test_tier3_without_token_is_not_auth_ok(self):
+        # tier3 shares tier1's REAL home; with NO tier3 setup token it must NOT
+        # validate against tier1's creds.json (V6 silent cross-account). Set up
+        # the shared home + a VALID tier1 creds.json so the GUARD is what
+        # prevents the false pass (without it, tier_auth_ok would read tier1's
+        # creds and return True).
+        os.environ.pop('CLAUDE_CODE_OAUTH_TOKEN_TIER3', None)
+        creds = Path(active_tier.TIER1_HOME) / '.claude' / '.credentials.json'
+        creds.parent.mkdir(parents=True, exist_ok=True)
+        future_ms = int((_NOW.timestamp() + 3600) * 1000)
+        creds.write_text(json.dumps(
+            {'claudeAiOauth': {'expiresAt': future_ms}}))
+        with mock.patch.object(active_tier, 'TIER3_HOME',
+                               active_tier.TIER1_HOME):
+            self.assertFalse(active_tier.tier_auth_ok('tier3', now=_NOW))
+            self.assertFalse(active_tier.usable('tier3', now=_NOW))
+
+    def test_tier3_with_token_is_auth_ok(self):
+        self.assertTrue(active_tier.tier_auth_ok('tier3', now=_NOW))
+
+
+class BurnUpperBoundTest(_PoolBase):
+    def test_rows_after_now_excluded(self):
+        # Reconstructing a PAST burn must not fold in later activity (V13).
+        wall = _NOW - timedelta(hours=2)
+        self._write_costs([
+            self._cost_row('tier1', 3_000_000, when=wall - timedelta(hours=1)),
+            self._cost_row('tier1', 9_000_000, when=_NOW),  # AFTER the wall
+        ])
+        self.assertEqual(
+            active_tier.rolling_5h_token_volume(account='tier1', now=wall),
+            3_000_000)
+
+
 class HasUsableDispatchTierTest(_PoolBase):
     def test_true_when_primary_usable(self):
         self.assertTrue(active_tier.has_usable_dispatch_tier(now=_NOW))

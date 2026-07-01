@@ -274,6 +274,25 @@ def call_agent(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[st
         if failure_type:
             _append_bot_quota_event(
                 failure_type, result.stdout, result.stderr, tier)
+            # §7/§16: BENCH the tier that just walled so the next dispatch (from
+            # ANY path) doesn't immediately re-pick it via round-robin. Without
+            # this, only agent_runner benched — a bot-driven rate_limit left the
+            # tier 'usable' and it got slammed again on the very next message.
+            # rate_limit parses "resets <time>"; auth_401 gets the fixed window.
+            if failure_type in ('rate_limit', 'auth_401'):
+                try:
+                    at.set_cooldown(
+                        tier,
+                        raw_excerpt=(result.stdout or '') + '\n'
+                        + (result.stderr or ''),
+                        kind=('auth_401' if failure_type == 'auth_401'
+                              else 'rate_limit'))
+                except Exception as _cd_exc:
+                    # Don't swallow silently: if the bench write fails the tier
+                    # stays 'usable' and the next dispatch re-picks it — log so
+                    # the failure is visible (F3).
+                    log(f"set_cooldown({tier}) failed after {failure_type}: "
+                        f"{_cd_exc!r}")
         if session_id and "session" in result.stderr.lower():
             log("retrying without --resume after session error")
             return call_agent(prompt, None)

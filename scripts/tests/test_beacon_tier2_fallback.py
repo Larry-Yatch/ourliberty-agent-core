@@ -101,8 +101,10 @@ class BeaconBotRefuseOnResumeTest(_TempDirBase):
         # Refuse-on-resume DM fires; the generic failure DM does NOT
         dm_mock.assert_called_once()
         failure_dm_mock.assert_not_called()
-        # Reply body mentions refused / session-bound
-        self.assertIn('Tier 2 retry refused', reply)
+        # Reply body mentions the refused fallback (the sibling fallback tier is
+        # now tier3 under the pool-aware order, so assert label-agnostically).
+        self.assertIn('retry refused', reply)
+        self.assertIn('session-bound', reply)
         self.assertEqual(sess, 'sess-abc')
 
     def test_no_resume_falls_through_to_tier2_attempt(self):

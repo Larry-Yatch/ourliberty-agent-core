@@ -303,8 +303,11 @@ class AbsentTokenIsByteForByteLegacyTest(_RunClaudeHarness):
     def test_no_setup_tokens_preserves_legacy_fallback_env(self):
         # Tier 1 fails; Tier 2 fallback fires. Without setup-tokens, the
         # fallback subprocess must look exactly like the historical path:
-        # HOME swapped to the other tier, token = default.
+        # HOME swapped to the other tier, token = default. Bench tier3 so the
+        # pool-aware fallback reaches the laptop tier2 (its FIRST fallback is now
+        # the sibling primary tier3).
         self._write_state('tier1')
+        ar.active_tier.set_cooldown('tier3', raw_excerpt='resets 3pm')
         proc = _FakeProc(
             1,
             stdout='Invalid authentication credentials',
@@ -331,6 +334,7 @@ class FallbackTierTokenSelectionTest(_RunClaudeHarness):
 
     def test_fallback_uses_other_tier_setup_token(self):
         self._write_state('tier1')
+        ar.active_tier.set_cooldown('tier3', raw_excerpt='resets 3pm')
         os.environ['CLAUDE_CODE_OAUTH_TOKEN_TIER1'] = _TIER1_TOKEN
         os.environ['CLAUDE_CODE_OAUTH_TOKEN_TIER2'] = _TIER2_TOKEN
         proc = _FakeProc(
@@ -352,6 +356,7 @@ class FallbackTierTokenSelectionTest(_RunClaudeHarness):
         # authenticate as the wrong account); it must revert to the
         # legacy default + HOME-swap path.
         self._write_state('tier1')
+        ar.active_tier.set_cooldown('tier3', raw_excerpt='resets 3pm')
         os.environ['CLAUDE_CODE_OAUTH_TOKEN_TIER1'] = _TIER1_TOKEN
         # No CLAUDE_CODE_OAUTH_TOKEN_TIER2 set.
         proc = _FakeProc(

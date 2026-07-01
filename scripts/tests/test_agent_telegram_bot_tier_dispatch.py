@@ -143,6 +143,16 @@ class CallAgentDispatchTest(_BotBase):
                          'sk-ant-oat01-t3')
         self.assertEqual(self._cost_rows()[0]['account'], 'tier3')
 
+    def test_rate_limit_benches_the_tier(self):
+        # V16: a bot-driven rate_limit must bench the tier so round-robin can't
+        # immediately re-pick it. Pin tier1 so the dispatch is deterministic.
+        (_ROOT / 'agents' / 'rotation.disabled').write_text('tier1')
+        wall = _fake_completed(
+            1, "You've hit your limit · resets 11:30am", '')
+        with mock.patch.object(bot.subprocess, 'run', return_value=wall):
+            bot.call_agent('hello', None)
+        self.assertIsNotNone(active_tier.cooldown_until('tier1'))
+
     def test_creds_fallback_pins_agents_root_and_git_config(self):
         # Force the creds.json path: pin tier2 (no setup-token) so auth_source
         # is credentials_json and HOME swaps -> the I10/I11 pins must fire.

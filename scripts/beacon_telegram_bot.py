@@ -561,7 +561,10 @@ def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[s
         log("call_beacon: TIER_HOLD no dispatch tier available (all benched)")
         return ("[All accounts are rate-limited right now — please retry in a "
                 "few minutes.]", session_id)
-    other_name = active_tier.fallback_tier(active_name)
+    # §6/§8: pool-aware, reserve-guarded fallback — sibling primary first, the
+    # laptop (tier2) only under its 25% reserve (was fallback_tier(): laptop-
+    # first, no reserve check).
+    other_name = active_tier.fallback_tier_pool_aware(active_name)
     # HOME discipline mirrors run_claude: setup-token auth is HOME-independent
     # (keep the real home; tier3 shares it); only a creds.json fallback swaps to
     # the tier home. Resolved per attempt below from the auth source.
@@ -620,6 +623,21 @@ def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[s
                 stderr=result.stderr,
                 account=active_name,
             )
+            # §7/§16: BENCH the primary tier that walled so the next dispatch
+            # (any path) doesn't immediately re-pick it. Without this only
+            # agent_runner benched — a beacon-driven wall left the tier usable
+            # and it got slammed again on the next message.
+            if failure_type in ('rate_limit', 'auth_401'):
+                try:
+                    active_tier.set_cooldown(
+                        active_name,
+                        raw_excerpt=(result.stdout or '') + '\n'
+                        + (result.stderr or ''),
+                        kind=('auth_401' if failure_type == 'auth_401'
+                              else 'rate_limit'))
+                except Exception as _cd_exc:
+                    log(f"set_cooldown({active_name}) failed after "
+                        f"{failure_type}: {_cd_exc!r}")  # F3: don't swallow
             # Refuse-on-resume (mirrors agent_runner.py:822-828). A fallback-
             # tier retry on a --resume session would fail with 'session not
             # found' AND orphan the original session's context — session IDs
@@ -657,6 +675,25 @@ def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[s
                     f"DM sent]\n{(result.stdout or '')[:1500]}",
                     session_id,
                 )
+            # §4 TOCTOU (F7): other_name was chosen at message ENTRY, before the
+            # primary Claude call which can run 30-300s. Re-derive it now so a
+            # sibling that benched during that call isn't spawned on. If nothing
+            # usable remains, DM unavailable and stop.
+            if active_tier.cooldown_until(other_name) is not None:
+                other_name = active_tier.fallback_tier_pool_aware(active_name)
+                other_label = _TIER_LABEL.get(other_name, str(other_name))
+                if not other_name:
+                    log(f"TIER2_FALLBACK_UNAVAILABLE reason={failure_type} "
+                        f"(fallback tier benched during the primary call)")
+                    _tier2_failure_dm(
+                        failure_type,
+                        active_label=active_label, other_label=other_label)
+                    return (
+                        f"[claude {failure_type} — no fallback tier available "
+                        f"(benched mid-call); DM sent]\n"
+                        f"{(result.stdout or '')[:1500]}",
+                        session_id,
+                    )
             # Setup-token precedence (mirrors agent_runner._apply_tier_auth):
             # when the fallback tier's long-lived setup-token is configured, the
             # fallback authenticates via it and does NOT depend on the
@@ -721,6 +758,18 @@ def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[s
                 stderr=t2_stderr,
                 account=other_name,
             )
+            # §7/§16: bench the fallback tier that ALSO walled (both-tiers-
+            # walled), attributed to the tier we actually attempted (other_name).
+            if t2_failure in ('rate_limit', 'auth_401'):
+                try:
+                    active_tier.set_cooldown(
+                        other_name,
+                        raw_excerpt=(t2_stdout or '') + '\n' + (t2_stderr or ''),
+                        kind=('auth_401' if t2_failure == 'auth_401'
+                              else 'rate_limit'))
+                except Exception as _cd_exc:
+                    log(f"set_cooldown({other_name}) failed after "
+                        f"{t2_failure}: {_cd_exc!r}")  # F3: don't swallow
             # Keep the (failure_type, t2_stdout, t2_stderr) POSITIONAL trio the
             # test asserts on; tier labels ride as kwargs.
             _tier2_failure_dm(
