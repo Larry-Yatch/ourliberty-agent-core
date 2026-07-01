@@ -388,8 +388,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T23:19Z UTC (Iter ~3466, Tier 3, clean)
+## Status snapshot — updated 2026-07-01T23:49Z UTC (Iter ~3467, Tier 1, ff-main-fix)
 
-**Iter ~3466 summary (2026-07-01T23:19Z):** ✅ Nominal. 1 new alert (Tier-4 bot-delivered: gate-ceiling-fix-monitor FIX CONFIRMED — PR #796 regression-gate ceiling fix verified, sentinel set, won't repeat; Pulse journal-note only). PR #804 (`fix(heal-bind-drift)`) under active Mirror review (started 23:11:52Z). 0 stalls. pending=0. All daemons healthy. **Tier 3, consecutive_clean=0→1.** Next iter at 30-min cadence.
+**Iter ~3467 summary (2026-07-01T23:49Z):** ✅ Nominal (1 always-fix). PR #804 (`fix(heal-bind-drift)`) MERGED 23:43:30Z (Mirror REVIEW_PASS, auto-merged). Repo was 1 behind — fast-forwarded 5815c01d→333376a4. Dashboard PR #100 (`approval-sync Phase 3b PR-2: Needs-You UI`) under active Mirror review. 0 stalls. pending=0. All daemons healthy. **Tier 3→1 (ff-main always-fix; consecutive_clean=0).** Next iter at 5-min cadence.
 
 
