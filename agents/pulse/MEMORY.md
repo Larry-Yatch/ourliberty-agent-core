@@ -376,8 +376,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T01:48Z UTC (Iter ~3398, Tier 3)
+## Status snapshot — updated 2026-07-01T02:23Z UTC (Iter ~3399, Tier 3)
 
-**Iter ~3398 summary (2026-07-01T01:48Z):** 0 new alerts. 8/8 daemons alive. Watchdog healthy 19:46 MDT. Sync no-change (~18 min old). Pipeline stall 0. Check I re-invoked (Wednesday) → self-dedup, no dispatches. PR #780 (W3, no label) still open — awaiting Larry response on Beacon phased fix. Stale orphan approval `mirror-review-pr-ourliberty-agent-core-779` (PR #779 merged) — MOOT. **Tier 2→3 promoted** (consecutive_clean 2→3). PRIME DIRECTIVE ratio 16.3 improving.
+**Iter ~3399 summary (2026-07-01T02:23Z):** 0 new alerts. 8/8 daemons alive. Watchdog healthy 20:17 MDT. Sync no-change (~51 min old). Pipeline stall 0. Check I self-dedup (week 27, no dispatches). PR #780 (W3, no label) now **MERGEABLE** (was UNKNOWN) — awaiting Larry response on Beacon phased fix. Transient Telegram bot 502 errors at 19:12–19:13 MDT — self-resolved, watchdog healthy post-blip. **Tier 3** (consecutive_clean=1). PRIME DIRECTIVE ratio 16.24 improving.
 
 
