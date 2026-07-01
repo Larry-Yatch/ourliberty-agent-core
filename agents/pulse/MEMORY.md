@@ -382,8 +382,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T19:41Z UTC (Iter ~3447, Tier 1)
+## Status snapshot — updated 2026-07-01T19:46Z UTC (Iter ~3448, Tier 1)
 
-**Iter ~3447 summary (2026-07-01T19:41Z):** All checks nominal. PR #795 MERGED ✅ (13:32:31 MDT, post-iter-~3446). Daemons restarted 13:33 MDT (heal-stale-daemon-code cycle, new PIDs 2495925/2495938, watchdog healthy 13:34Z). Mirror actively reviewing PR #799 (claude PID 2494411 started 13:32:23 MDT; regression check subprocess 13:39 MDT, 900s timeout). Mirror inbox: 799 (active) + 796 re-dispatch (13:30 MDT, known duplicate-dispatch G-rule vp). PR #796 REVIEW_PASS, AUTO_MERGE_HELD blocker=#797. PR #797 still no auto-review label (G-rule unreviewed-merge-larry-authored 5th-level elevated watch, Beacon Steps 1-2 awaiting Larry). Zombie bash PID 1834248 (34d+, Check VIII poll loop, 0% CPU, ask-then-do carry). APPROVAL_REQUEST `heal-stale-daemon-fresh-deploy-retry-001` pending Larry. Sync 19:33Z. Pipeline 0 stalls. **Tier 1** (consecutive_clean=1; 2 more clean iters → Tier 2; cadence 5 min).
+**Iter ~3448 summary (2026-07-01T19:46Z):** All checks nominal. Mirror actively reviewing PR #799 (claude PID 2494411, 13+ min in; regression check subprocess PID 2503301 started 13:39 MDT, 900s timeout). PR #796 REVIEW_PASS, AUTO_MERGE_HELD blocker=#797. PR #797 no auto-review label (G-rule unreviewed-merge-larry-authored 5th-level, Beacon Steps 1-2 awaiting Larry). Zombie bash PID 1834248 (34d+, Check VIII poll loop, 0% CPU, ask-then-do carry). APPROVAL_REQUEST `heal-stale-daemon-fresh-deploy-retry-001` pending Larry (chat_id=7998341473). Sync 19:33Z. Pipeline 0 stalls. **Tier 1** (consecutive_clean=2; 1 more clean iter → Tier 2; cadence 5 min).
 
 
