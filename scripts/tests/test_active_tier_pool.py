@@ -368,6 +368,35 @@ class SelectDispatchTierTest(_PoolBase):
         self.assertIn(pick, {'tier1', 'tier3'})
 
 
+class HasUsableDispatchTierTest(_PoolBase):
+    def test_true_when_primary_usable(self):
+        self.assertTrue(active_tier.has_usable_dispatch_tier(now=_NOW))
+
+    def test_pin_forces_true(self):
+        active_tier.set_cooldown('tier1', raw_excerpt='resets 3pm', now=_NOW)
+        active_tier.set_cooldown('tier3', raw_excerpt='resets 3pm', now=_NOW)
+        (self.root / 'rotation.disabled').write_text('tier1')
+        self.assertTrue(active_tier.has_usable_dispatch_tier(now=_NOW))
+
+    def test_false_when_all_benched_no_fallback(self):
+        active_tier.set_cooldown('tier1', raw_excerpt='resets 3pm', now=_NOW)
+        active_tier.set_cooldown('tier3', raw_excerpt='resets 3pm', now=_NOW)
+        # tier2 has no token -> unusable.
+        self.assertFalse(active_tier.has_usable_dispatch_tier(now=_NOW))
+
+    def test_true_via_fallback_under_reserve(self):
+        os.environ['CLAUDE_CODE_OAUTH_TOKEN_TIER2'] = 'sk-ant-oat01-t2'
+        active_tier.set_cooldown('tier1', raw_excerpt='resets 3pm', now=_NOW)
+        active_tier.set_cooldown('tier3', raw_excerpt='resets 3pm', now=_NOW)
+        self.assertTrue(active_tier.has_usable_dispatch_tier(now=_NOW))
+
+    def test_no_round_robin_side_effect(self):
+        # The probe must NOT bump the rr counter (would skew tier1/tier3).
+        for _ in range(5):
+            self.assertTrue(active_tier.has_usable_dispatch_tier(now=_NOW))
+        self.assertFalse((self.root / 'state' / 'tier-rr-counter').exists())
+
+
 class TierPoolStatusTest(_PoolBase):
     def test_status_snapshot(self):
         st = active_tier.tier_pool_status(now=_NOW)

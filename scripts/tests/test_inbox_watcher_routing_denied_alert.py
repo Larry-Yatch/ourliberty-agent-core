@@ -56,6 +56,11 @@ class RoutingDeniedAlertTest(unittest.TestCase):
                 inbox_watcher.agent_runner, "run_claude",
                 side_effect=AssertionError("run_claude must not run for a denied route"),
             ),
+            # Open the tier-pool gate: these tests exercise the ROUTING check,
+            # which sits after the gate. Without a usable tier the gate would
+            # hold the task before routing runs (§ 10-G).
+            mock.patch.object(
+                inbox_watcher, "_rotation_gate_block_reason", return_value=None),
         ]
         for p in self._patches:
             p.start()
