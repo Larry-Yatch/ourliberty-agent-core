@@ -298,9 +298,11 @@ Each failure hangs the entire Mirror review and, because your session keeps hold
 **Generalize this to EVERY long step of a review** — the regression check, a subagent task, any slow command. The deterministic primitive is `scripts/run_review_step.sh`: it runs the command in the foreground under a hard wall-clock ceiling, kills the whole process group on timeout, and returns ONE unambiguous result — so there is never anything to background or poll.
 
 ```bash
-bash scripts/run_review_step.sh --timeout 900 --label 'regression check' -- \
+bash scripts/run_review_step.sh --timeout 1500 --label 'regression check' -- \
   python3 scripts/test_regression_check.py --parent-sha <base> --head-sha <head> --output json
 ```
+
+**Use those EXACT regression-check ceilings — do NOT lower them and do NOT pass a smaller `--timeout-per-sha`.** A full suite pass MEASURES ~540s (it is wait/IO-bound, not slow-because-loaded), so a smaller ceiling kills a healthy run mid-suite and forces a FALSE `REVIEW_ESCALATE` on clean code (the #747/#763/#790 class). `--timeout 1500` fits both a cache-hit (one ~540s head run) and the rarer cache-miss (parent+head, ~1080s) inside the 2100s review-session ceiling; the gate's own per-SHA cap defaults to 800s — leave it there. If it still exits 124 at 1500s, that is a *real* inconclusive — escalate; do not retry with an ad-hoc larger number.
 
 - It exits with the command's OWN exit code when the step completes in budget — read it exactly as you would a plain foreground run (exit 0 = PASS, 1 = BLOCK, 2 = analysis-failed for the regression check).
 - On timeout it prints a `=== REVIEW_STEP_TIMED_OUT ===` banner and exits **124**. A timed-out step is **INCONCLUSIVE** — emit `REVIEW_ESCALATE` with the timeout as the reason. Never keep waiting, and never emit `REVIEW_PASS` on a step that did not finish.

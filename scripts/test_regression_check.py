@@ -72,7 +72,16 @@ import regression_baseline_cache as baseline_cache
 
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
 
-DEFAULT_TIMEOUT_PER_SHA_S = 300
+# Per-SHA suite-run cap. Raised 300→800 (2026-07-01): a full `unittest discover`
+# pass was MEASURED at ~537s wall (one real sandboxed run; the suite is
+# wait/IO-bound — CPU/wall ≈0.40 — not slow-because-loaded), so the old 300s
+# default KILLED a healthy run mid-suite whenever the caller passed no explicit
+# --timeout-per-sha. That mid-run kill surfaced as EXIT_ANALYSIS_FAIL → a false
+# "regression gate inconclusive" ESCALATE on CLEAN code PRs (#747/#763/#790).
+# 800s = the measured ~537s + ~50% margin for a slow/overlapped run, still well
+# inside the run_review_step wrapper and the 2100s review-session ceiling. See
+# memory regression-gate-cant-conclude (contention-hypothesis-refuted entry).
+DEFAULT_TIMEOUT_PER_SHA_S = 800
 TEST_DISCOVERY_TARGET = 'scripts.tests'
 
 # Real (non-jailed) tree paths, captured from the gate's OWN process at module
