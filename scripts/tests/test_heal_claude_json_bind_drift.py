@@ -138,13 +138,17 @@ class ProbeMappingTests(unittest.TestCase):
             self.assertEqual(h.probe_namespace_writable(123), h._PROBE_EROFS)
 
     def test_rc3_is_other(self):
-        with mock.patch.object(h.subprocess, 'run', self._mock_run(3, stderr='2:No such file')):
+        # Process alive (real in-namespace OSError) → genuine probe-error.
+        with mock.patch.object(h.subprocess, 'run', self._mock_run(3, stderr='2:No such file')), \
+             mock.patch.object(h, '_process_alive', return_value=True):
             self.assertEqual(h.probe_namespace_writable(123), h._PROBE_OTHER)
 
     def test_sudo_rejection_rc1_is_other_never_erofs(self):
-        # sudo -n failing (NOPASSWD revoked) must NOT read as a dangle.
+        # sudo -n failing (NOPASSWD revoked) with the process alive must NOT read
+        # as a dangle — and must not read as a benign mid-probe exit either.
         with mock.patch.object(h.subprocess, 'run',
-                               self._mock_run(1, stderr='sudo: a password is required')):
+                               self._mock_run(1, stderr='sudo: a password is required')), \
+             mock.patch.object(h, '_process_alive', return_value=True):
             self.assertEqual(h.probe_namespace_writable(123), h._PROBE_OTHER)
 
     def test_timeout_is_other(self):
@@ -157,6 +161,43 @@ class ProbeMappingTests(unittest.TestCase):
         with mock.patch.object(h.subprocess, 'run',
                                self._mock_run(0, raises=FileNotFoundError())):
             self.assertEqual(h.probe_namespace_writable(123), h._PROBE_OTHER)
+
+    def test_ns_mnt_enoent_with_process_gone_is_probe_gone(self):
+        # Arm (a): short-lived unit exited mid-probe. nsenter fails ENOENT on
+        # /proc/<pid>/ns/mnt AND the process is no longer alive → benign skip.
+        stderr = ('nsenter: cannot open /proc/123/ns/mnt: '
+                  'No such file or directory')
+        with mock.patch.object(h.subprocess, 'run',
+                               self._mock_run(1, stderr=stderr)), \
+             mock.patch.object(h, '_process_alive', return_value=False):
+            self.assertEqual(h.probe_namespace_writable(123), h._PROBE_GONE)
+
+    def test_ns_mnt_enoent_with_process_alive_is_other(self):
+        # Arm (b): same nsenter ENOENT stderr, but the process is STILL alive →
+        # genuine probe-blind (_PROBE_OTHER). Liveness, not stderr text, decides.
+        stderr = ('nsenter: cannot open /proc/123/ns/mnt: '
+                  'No such file or directory')
+        with mock.patch.object(h.subprocess, 'run',
+                               self._mock_run(1, stderr=stderr)), \
+             mock.patch.object(h, '_process_alive', return_value=True):
+            self.assertEqual(h.probe_namespace_writable(123), h._PROBE_OTHER)
+
+    def test_sudo_rejection_process_alive_is_other(self):
+        # Arm (b), sudo-revoked variant: process alive, sudo -n rejected.
+        with mock.patch.object(
+                h.subprocess, 'run',
+                self._mock_run(1, stderr='sudo: a password is required')), \
+             mock.patch.object(h, '_process_alive', return_value=True):
+            self.assertEqual(h.probe_namespace_writable(123), h._PROBE_OTHER)
+
+
+class ProcessAliveTests(unittest.TestCase):
+    def test_current_process_is_alive(self):
+        self.assertTrue(h._process_alive(os.getpid()))
+
+    def test_pid_1_over_9_digits_is_gone(self):
+        # A pid far above the kernel's pid_max has no /proc entry.
+        self.assertFalse(h._process_alive(2_000_000_123))
 
 
 # -------------------- carveout_present + target filtering --------------------
@@ -239,6 +280,16 @@ class CheckUnitTests(_IsolatedAgentsRoot):
              mock.patch.object(h, 'probe_namespace_writable', return_value=h._PROBE_OTHER):
             self.assertEqual(h.check_unit(self.UNIT, state), 'probe-error')
         self._m_dm_probe_blind.assert_called_once()
+
+    def test_process_gone_is_benign_skip_no_dm(self):
+        # Arm (a) at the routing level: _PROBE_GONE → 'skip', no probe-blind DM,
+        # no escalation-cooldown state write (so a later real fault still alerts).
+        state = h.load_state()
+        with mock.patch.object(h, 'target_main_pid', return_value=111), \
+             mock.patch.object(h, 'probe_namespace_writable', return_value=h._PROBE_GONE):
+            self.assertEqual(h.check_unit(self.UNIT, state), 'skip')
+        self._m_dm_probe_blind.assert_not_called()
+        self.assertFalse(h.in_alert_cooldown(state, self.UNIT))
 
     def test_rebound_on_erofs_then_successful_restart(self):
         state = h.load_state()
