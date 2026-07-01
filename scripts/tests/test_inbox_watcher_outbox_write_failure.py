@@ -132,5 +132,65 @@ class OutboxWriteFailureArchivesTest(unittest.TestCase):
         self.assertEqual(rows[0]['cost_usd'], 0.05)
 
 
+class ProcessTaskTierHoldTest(unittest.TestCase):
+    """W1 (spec §4): when run_claude returns TIER_HOLD (no dispatch tier
+    available — a TOCTOU after the gate, or a resume whose bound tier benched),
+    process_task must HOLD the task in the inbox — no outbox, no archive, no
+    requeue-bump — so the next poll re-evaluates. NEVER drop held work."""
+
+    AGENT = 'forge'
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self._orig = {k: getattr(iw, k) for k in
+                      ('INBOXES_ROOT', 'OUTBOXES_ROOT', 'BLACKBOARD',
+                       'COSTS_FILE', 'LOG_FILE')}
+        iw.INBOXES_ROOT = self.root / 'inboxes'
+        iw.OUTBOXES_ROOT = self.root / 'outboxes'
+        iw.BLACKBOARD = self.root / 'blackboard'
+        iw.COSTS_FILE = iw.BLACKBOARD / 'costs.jsonl'
+        iw.LOG_FILE = self.root / 'logs' / 'inbox_watcher.log'
+        (iw.INBOXES_ROOT / self.AGENT).mkdir(parents=True, exist_ok=True)
+        (iw.INBOXES_ROOT / self.AGENT / '.archive').mkdir(
+            parents=True, exist_ok=True)
+        (iw.OUTBOXES_ROOT / self.AGENT).mkdir(parents=True, exist_ok=True)
+
+    def tearDown(self):
+        for k, v in self._orig.items():
+            setattr(iw, k, v)
+        self.tmp.cleanup()
+
+    def test_tier_hold_keeps_task_in_inbox(self):
+        task = {'task_id': 'held-001', 'prompt': 'work', 'source': 'forge'}
+        task_file = iw.INBOXES_ROOT / self.AGENT / 'held-001.json'
+        task_file.write_text(json.dumps(task))
+        models_config = {'agents': {self.AGENT: {'inbox_model': 'claude-sonnet-4-6'}}}
+
+        def fake_run_claude(**kwargs):
+            return (False, 'TIER_HOLD: no dispatch tier available', None)
+
+        with mock.patch.object(
+            iw.agent_runner, 'run_claude', side_effect=fake_run_claude,
+        ), mock.patch.object(iw, 'dispatch_validator') as dv, \
+                mock.patch.object(iw, 'routing_validator') as rvm, \
+                mock.patch.object(iw, '_rotation_gate_block_reason',
+                                  return_value=None), \
+                mock.patch.object(iw, 'bump_requeue') as bump:
+            dv.validate_task.return_value = (True, '')
+            rvm.check_hard_topology.return_value = (True, '')
+            rvm.check_target_repo.return_value = (True, '')
+            iw.process_task(self.AGENT, task_file, models_config)
+
+        # Held, not dropped: still in the live inbox, not archived.
+        self.assertTrue(task_file.exists())
+        self.assertEqual(
+            list((iw.INBOXES_ROOT / self.AGENT / '.archive').glob('*.json')), [])
+        # No outbox written, no requeue-bump (a hold is not a failure).
+        self.assertEqual(
+            list((iw.OUTBOXES_ROOT / self.AGENT).glob('*.json')), [])
+        bump.assert_not_called()
+
+
 if __name__ == '__main__':
     unittest.main()

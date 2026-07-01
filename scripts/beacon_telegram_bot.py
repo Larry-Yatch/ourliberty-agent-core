@@ -59,6 +59,7 @@ import agent_runner  # noqa: E402  # shared rate-limit ledger writer (Step C)
 import beacon_approval_handler as approval  # noqa: E402
 import catch_me_up  # noqa: E402  # operator-UX shortcut synthesizer
 import chain_event_emit  # noqa: E402  # E4.4e PR-A: approval_request push writer
+import decision_resolve  # noqa: E402  # Phase 2: four-store resolve fan-out
 import larry_alerts  # noqa: E402
 import safe_write_inbox  # noqa: E402
 import state_log_query  # noqa: E402  # work-in-flight State Log reader (Slice 1 D4)
@@ -430,6 +431,20 @@ def _run_claude_once(
         env = {**os.environ}
     if home_override:
         env["HOME"] = home_override
+        # Spec §10-W3 (I10/I11): when HOME swaps OFF the real account home (the
+        # creds.json fallback path), pin the agents-root + gh/git config to the
+        # real home so the child resolves ~/agents state and git/gh credentials
+        # there, not under the swapped tier home — otherwise `git push` dies
+        # with "could not read Username" and child agent-state lands in the
+        # wrong tree. No-op when HOME is already the real home (setup-token
+        # path). Mirrors agent_runner.run_claude.
+        if home_override != active_tier.TIER1_HOME:
+            env.setdefault('OURLIBERTY_AGENTS_ROOT',
+                           str(Path(active_tier.TIER1_HOME) / 'agents'))
+            env.setdefault('GH_CONFIG_DIR',
+                           os.path.join(active_tier.TIER1_HOME, '.config', 'gh'))
+            env.setdefault('GIT_CONFIG_GLOBAL',
+                           os.path.join(active_tier.TIER1_HOME, '.gitconfig'))
     if oauth_token:
         env["CLAUDE_CODE_OAUTH_TOKEN"] = oauth_token
     refuse_under_test('claude-spawn')
@@ -446,18 +461,41 @@ def _run_claude_once(
         return None
 
 
+def _record_and_stamp(new_session, tier, data, t0):
+    """§5/§8/§10-W3: bind the (new) session to the tier it ran on (so the next
+    --resume stays on the same account, I2) and stamp an account-tagged
+    costs.jsonl row so beacon's burn is visible to the per-tier rolling-5h
+    reader (this path does not route through inbox_watcher). Both best-effort;
+    never raise into the reply path."""
+    if new_session:
+        try:
+            active_tier.record_session_tier(new_session, tier)
+        except Exception:
+            pass
+    try:
+        active_tier.append_cost_row(
+            tier,
+            model=(data.get('model') or ''),
+            cost_usd=data.get('total_cost_usd'),
+            usage=data.get('usage'),
+            agent='beacon-telegram-bot',
+            source='beacon-telegram-bot',
+            duration_sec=round(time.time() - t0, 2),
+        )
+    except Exception:
+        pass
+
+
 def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[str]]:
     """Run claude in Beacon's directory; return (reply_text, new_session_id).
 
-    Tier selection honors the team-wide pin (active_tier.read()['tier']):
-    the PRIMARY attempt authenticates against the ACTIVE tier — HOME =
-    active_tier.current_home(), token = that tier's long-lived setup-token —
-    mirroring agent_runner (scripts/agent_runner.py:1305). The bot's systemd
-    HOME=/home/larry only sets the tier1 default; before this the primary was
-    hardwired to Tier 1 and silently drained it even while the rest of the
-    team was pinned to Tier 2, so Tier 1 usage climbed until it capped
-    (2026-06-29 incident). The fallback targets the OPPOSITE tier
-    (active_tier.other_home()).
+    Tier selection is PER-TASK (spec docs/specs/tier-dispatch-spec.md §4):
+    active_tier.select_dispatch_tier(session_tier) chooses the tier for this
+    message — a resume stays on its session's bound tier (I2), a new message
+    round-robins the healthy primary pool. The PRIMARY attempt authenticates
+    against the SELECTED tier via its long-lived setup-token (HOME stays real on
+    the token path; mirrors agent_runner). The fallback targets the next pool
+    tier (active_tier.fallback_tier), skipping benched tiers.
 
     On non-zero exit: log BOTH stdout and stderr (the 2026-05-26 incident
     surfaced because only stderr was logged and the rate-limit/auth-401
@@ -483,12 +521,41 @@ def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[s
     auth-401), which trips the retry-without-resume path below — a fresh
     session is started on the active tier.
     """
-    # Resolve the active (pinned) tier and its opposite (the fallback target).
-    active_name = active_tier.read()['tier']
+    # Per-task tier dispatch (spec docs/specs/tier-dispatch-spec.md §4/§10-W3):
+    # choose the tier for THIS message instead of the single global active tier.
+    # A resume (session_id present) is bound to the tier its session was created
+    # on (I2 — never cross-tier migrate); a new message round-robins the healthy
+    # primary pool.
+    session_tier = (active_tier.lookup_session_tier(session_id)
+                    if session_id else None)
+    if session_id and session_tier is None:
+        log(f"call_beacon: resume session {session_id[:12]}... has no tier "
+            f"binding (selecting fresh)")
+    active_name = active_tier.select_dispatch_tier(session_tier=session_tier)
+    if active_name is None:
+        # A chat bot can't hold silently. Keep the chat's session_id so it
+        # auto-resumes on the next message once the tier frees. Distinguish the
+        # two None cases so the reply is accurate (not a blanket "all accounts
+        # down" when only ONE is):
+        if session_tier is not None:
+            # Resume whose BOUND tier is benched. We can't cross tiers for a
+            # --resume (I2), so this conversation is stuck on its account until
+            # that account's cooldown clears — even if other tiers are healthy.
+            log(f"call_beacon: RESUME_TIER_BENCHED tier={session_tier} "
+                f"session={(session_id or '')[:12]}...")
+            return (f"[This conversation's account is rate-limited right now — "
+                    f"please retry in a few minutes (it can't move to another "
+                    f"account mid-conversation, and resumes automatically once "
+                    f"the limit resets).]", session_id)
+        # NEW message and NO tier available at all (every primary benched and
+        # the fallback held under its reserve).
+        log("call_beacon: TIER_HOLD no dispatch tier available (all benched)")
+        return ("[All accounts are rate-limited right now — please retry in a "
+                "few minutes.]", session_id)
     other_name = active_tier.fallback_tier(active_name)
-    active_home = active_tier.current_home()
-    fallback_home = (active_tier.home_for_tier(other_name)
-                     if other_name else active_tier.current_home())
+    # HOME discipline mirrors run_claude: setup-token auth is HOME-independent
+    # (keep the real home; tier3 shares it); only a creds.json fallback swaps to
+    # the tier home. Resolved per attempt below from the auth source.
     _TIER_LABEL = {'tier1': 'Tier 1', 'tier2': 'Tier 2', 'tier3': 'Tier 3'}
     active_label = _TIER_LABEL.get(active_name, active_name)
     other_label = _TIER_LABEL.get(other_name, str(other_name))
@@ -510,9 +577,12 @@ def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[s
     # regression is visible in the log — the 2026-06-25 incident was invisible
     # precisely because the bot's primary auth path emitted no signal.
     _primary_token = active_tier._setup_token_for_tier(active_name)
-    log(f"call_beacon: primary auth="
+    active_home = (active_tier.TIER1_HOME if _primary_token
+                   else active_tier.home_for_tier(active_name))
+    log(f"call_beacon: dispatch_tier={active_name} auth="
         f"{'setup_token' if _primary_token else 'credentials_json'} "
-        f"({active_name}) home={active_home}")
+        f"home={active_home}")
+    _t0 = time.time()
     result = _run_claude_once(
         cmd, home_override=active_home, oauth_token=_primary_token,
     )
@@ -564,6 +634,20 @@ def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[s
                     f"{(result.stdout or '')[:1500]}",
                     session_id,
                 )
+            # No usable fallback tier (every candidate benched) -> cannot retry.
+            if not other_name:
+                log(f"TIER2_FALLBACK_UNAVAILABLE reason={failure_type} "
+                    f"(no usable fallback tier)")
+                _tier2_failure_dm(
+                    failure_type,
+                    active_label=active_label,
+                    other_label=other_label,
+                )
+                return (
+                    f"[claude {failure_type} — no fallback tier available; "
+                    f"DM sent]\n{(result.stdout or '')[:1500]}",
+                    session_id,
+                )
             # Setup-token precedence (mirrors agent_runner._apply_tier_auth):
             # when the fallback tier's long-lived setup-token is configured, the
             # fallback authenticates via it and does NOT depend on the
@@ -571,7 +655,10 @@ def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[s
             # existence gate below must NOT short-circuit the retry — the
             # creds.json may be absent/lapsed (intentionally unrefreshed) while
             # dispatch auth via the token is healthy. The token is never logged.
+            # HOME stays real on the setup-token path (decoupled), else swaps.
             t2_setup_token = active_tier._setup_token_for_tier(other_name)
+            fallback_home = (active_tier.TIER1_HOME if t2_setup_token
+                             else active_tier.home_for_tier(other_name))
             if not t2_setup_token and not tier2_available(fallback_home):
                 log(
                     f"TIER2_FALLBACK_UNAVAILABLE reason={failure_type} "
@@ -600,6 +687,8 @@ def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[s
                     data = json.loads(t2.stdout)
                     reply = data.get("result") or data.get("text") or t2.stdout
                     new_session = data.get("session_id") or session_id
+                    # §5/§8: the fallback ran on other_name — bind + stamp it.
+                    _record_and_stamp(new_session, other_name, data, _t0)
                     return (reply.strip(), new_session)
                 except json.JSONDecodeError:
                     return (t2.stdout.strip() or "[empty response]", session_id)
@@ -659,13 +748,37 @@ def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[s
         data = json.loads(result.stdout)
         reply = data.get("result") or data.get("text") or result.stdout
         new_session = data.get("session_id") or session_id
+        # §5/§8: the primary ran on active_name — bind the session + stamp burn.
+        _record_and_stamp(new_session, active_name, data, _t0)
         return (reply.strip(), new_session)
     except json.JSONDecodeError:
-        # Fallback: assume plaintext output
+        # Fallback: assume plaintext output. We deliberately do NOT stamp a
+        # cost row here (spec §8 "all paths stamp account"): non-JSON output
+        # carries no usage/session_id, so the row would be all-null — it adds
+        # zero to rolling_5h_token_volume and no binding. Rare under
+        # --output-format json; the unmeasured burn is bounded and accepted.
         return (result.stdout.strip() or "[empty response]", session_id)
 
 
 # ---------- D3 approval gate ----------
+
+def _resolve_pending_entry(entry: dict, outcome: str, note: str = '') -> None:
+    """Resolve a pending-approval `entry` through the Phase 2 four-store fan-out
+    (decision_resolve.resolve_decision) so a Telegram approve/reject/modify clears
+    the same decision from the pending queue AND the chain_events / escalations /
+    alerts stores in one synchronous call — instead of leaving the other three
+    reading "still waiting" until heal_stale_approvals reconciles.
+
+    Phase 2.1 FIX 1: routes through `resolve_decision_for_pending_entry`, which
+    pops ONLY this entry (by its `id`) and clears the OTHER stores by its
+    canonical key — so approving one of two same-PR pending approvals no longer
+    silently retires the sibling. The P-leg still pops this entry even when the
+    cross-store key is underivable (the fan-out handles that internally), so the
+    old `approval.resolve` fallback is no longer needed. `resolve_decision`
+    wraps `approval.resolve` as the P-leg primitive, so there is no recursion."""
+    decision_resolve.resolve_decision_for_pending_entry(
+        entry, outcome, actor='telegram', note=note)
+
 
 def handle_user_command(chat_id: int, action: dict) -> bool:
     """Handle a recognized user approval command. Returns True if handled
@@ -696,7 +809,7 @@ def handle_user_command(chat_id: int, action: dict) -> bool:
             return True
         try:
             dest = approval.dispatch_approved(entry)
-            approval.resolve(entry['id'], 'approved')
+            _resolve_pending_entry(entry, 'approved')
             telegram_send(chat_id, approval.format_dispatch_confirmation(entry))
             log(f"approved {entry['id']} -> dispatched to {dest}")
         except (safe_write_inbox.DispatchRejected,
@@ -716,7 +829,7 @@ def handle_user_command(chat_id: int, action: dict) -> bool:
             return True
         try:
             dest = approval.dispatch_approved(entry)
-            approval.resolve(entry['id'], 'approved')
+            _resolve_pending_entry(entry, 'approved')
             telegram_send(chat_id,
                           f"✅ Graduation approved: {template} is now auto-fix. "
                           f"Config PR dispatched to {entry.get('target_agent', 'forge')}.")
@@ -743,7 +856,7 @@ def handle_user_command(chat_id: int, action: dict) -> bool:
         # replan_count=0 and the loop becomes unbounded.
         prior_replan_count = entry.get('_replan_count', 0)
         prior_max_replans = entry.get('_max_replans')
-        approval.resolve(entry['id'], 'modified', note=reason)
+        _resolve_pending_entry(entry, 'modified', note=reason)
         # Forward a structured note to Beacon so she can re-plan.
         relay = (
             f"[D3 approval gate] Larry asked to MODIFY plan {entry['id']}. "
@@ -775,7 +888,7 @@ def handle_user_command(chat_id: int, action: dict) -> bool:
         # capture, the new entry would lose replan_count tracking.
         prior_replan_count = entry.get('_replan_count', 0)
         prior_max_replans = entry.get('_max_replans')
-        approval.resolve(entry['id'], 'rejected', note=reason)
+        _resolve_pending_entry(entry, 'rejected', note=reason)
         telegram_send(chat_id, f"❌ Rejected: {entry['id']}. Beacon notified.")
         relay = (
             f"[D3 approval gate] Larry REJECTED plan {entry['id']}. "
@@ -964,8 +1077,8 @@ def _send_beacon_response(
         )
         try:
             approval.dispatch_approved(entry)
-            approval.resolve(entry['id'], 'approved',
-                             note=f'auto_approved by rule: {rule}')
+            _resolve_pending_entry(entry, 'approved',
+                                   note=f'auto_approved by rule: {rule}')
             telegram_send(chat_id,
                           approval.format_auto_approve_confirmation(entry, rule or {}))
             log(f"auto_approved + dispatched: {payload.get('task_id')}")

@@ -396,11 +396,13 @@ class AuthCooldownTest(unittest.TestCase):
                                  now=now, kind='auth_401')
         self.assertEqual(active_tier.read()['cooldown_backoff']['tier2'], 2)
 
-    def test_auth_401_overwrites_existing_rate_limit_cooldown(self):
-        # If a tier was rate-limited and now also fails auth, the auth
-        # cooldown overwrites (last writer wins). This is intentional:
-        # auth_401 means the operator must re-auth; the rate-limit timer
-        # is moot until that happens.
+    def test_auth_401_does_not_shorten_longer_rate_limit_cooldown(self):
+        # MONOTONIC (spec § 7): a cooldown is extend-only — it is never
+        # shortened. A tier rate-limited until 3pm (+3h) that then also fails
+        # auth (+30m) stays benched until 3pm: it is unusable for the rate
+        # limit regardless of auth, and a fresh shorter event must not
+        # prematurely un-bench a still-walled tier. (Pre-§7 this overwrote to
+        # 30m — the REQUIRED-FIX bug.)
         from datetime import datetime, timezone
         now = datetime(2026, 5, 28, 12, 0, 0, tzinfo=timezone.utc)
         active_tier.set_cooldown('tier2', raw_excerpt='resets 3pm', now=now)
@@ -409,7 +411,7 @@ class AuthCooldownTest(unittest.TestCase):
         state = active_tier.read()
         from datetime import datetime as _dt, timedelta
         until_dt = _dt.fromisoformat(state['cooldowns']['tier2'])
-        self.assertEqual(until_dt - now, timedelta(minutes=30))
+        self.assertEqual(until_dt - now, timedelta(hours=3))
 
     def test_auth_401_rejects_invalid_tier(self):
         with self.assertRaises(ValueError):
@@ -769,36 +771,82 @@ class ActiveSetupTokenTest(unittest.TestCase):
 
 
 class DurableClaudeEnvTest(unittest.TestCase):
-    """durable_claude_env() bridges the bare CLAUDE_CODE_OAUTH_TOKEN from the
-    active tier's setup-token; fail-safe no-op when none is configured. Patches
-    active_setup_token directly so it's isolated from tier/env state."""
+    """W4 (spec §10-W4): select_durable_claude_env round-robins a tier per run
+    and returns (env, tier); durable_claude_env is the back-compat wrapper.
+    Patches select_dispatch_tier / _setup_token_for_tier so it's isolated from
+    tier/env state."""
 
-    def test_sets_bare_token_from_active_setup_token(self):
-        with mock.patch.object(
-                active_tier, 'active_setup_token', return_value='sk-durable'):
-            env = active_tier.durable_claude_env({'PATH': '/bin'})
+    def test_select_returns_env_and_tier_with_token(self):
+        with mock.patch.object(active_tier, 'select_dispatch_tier',
+                               return_value='tier3'), \
+             mock.patch.object(active_tier, '_setup_token_for_tier',
+                               return_value='sk-durable'):
+            env, tier = active_tier.select_durable_claude_env({'PATH': '/bin'})
+        self.assertEqual(tier, 'tier3')
         self.assertEqual(env['CLAUDE_CODE_OAUTH_TOKEN'], 'sk-durable')
+        self.assertEqual(env['HOME'], active_tier.TIER1_HOME)  # token = real home
         self.assertEqual(env['PATH'], '/bin')  # base preserved
 
-    def test_no_token_is_noop(self):
-        with mock.patch.object(
-                active_tier, 'active_setup_token', return_value=None):
+    def test_none_when_no_tier_available(self):
+        with mock.patch.object(active_tier, 'select_dispatch_tier',
+                               return_value=None):
+            env, tier = active_tier.select_durable_claude_env({'PATH': '/bin'})
+        self.assertIsNone(env)   # caller MUST skip the run
+        self.assertIsNone(tier)
+
+    def test_never_raises_degrades_to_none(self):
+        # A resolution error (e.g. malformed config surfacing through the
+        # selector) must degrade to (None, None) so the generator takes its
+        # graceful fallback, never crashes.
+        with mock.patch.object(active_tier, 'select_dispatch_tier',
+                               side_effect=RuntimeError('boom')):
+            env, tier = active_tier.select_durable_claude_env({'PATH': '/bin'})
+        self.assertIsNone(env)
+        self.assertIsNone(tier)
+        # The wrapper is likewise fail-safe (base env unchanged).
+        with mock.patch.object(active_tier, 'select_dispatch_tier',
+                               side_effect=RuntimeError('boom')):
+            wrapped = active_tier.durable_claude_env({'PATH': '/bin'})
+        self.assertEqual(wrapped['PATH'], '/bin')
+        self.assertNotIn('CLAUDE_CODE_OAUTH_TOKEN', wrapped)
+
+    def test_creds_fallback_swaps_home_and_pins_git(self):
+        with mock.patch.object(active_tier, 'select_dispatch_tier',
+                               return_value='tier2'), \
+             mock.patch.object(active_tier, '_setup_token_for_tier',
+                               return_value=None):
+            env, tier = active_tier.select_durable_claude_env({'PATH': '/bin'})
+        self.assertEqual(tier, 'tier2')
+        self.assertNotIn('CLAUDE_CODE_OAUTH_TOKEN', env)
+        self.assertEqual(env['HOME'], active_tier.home_for_tier('tier2'))
+        self.assertIn('GH_CONFIG_DIR', env)
+        self.assertIn('GIT_CONFIG_GLOBAL', env)
+
+    def test_wrapper_sets_token_from_selected_tier(self):
+        with mock.patch.object(active_tier, 'select_dispatch_tier',
+                               return_value='tier1'), \
+             mock.patch.object(active_tier, '_setup_token_for_tier',
+                               return_value='sk-durable'):
+            env = active_tier.durable_claude_env({'PATH': '/bin'})
+        self.assertEqual(env['CLAUDE_CODE_OAUTH_TOKEN'], 'sk-durable')
+        self.assertEqual(env['PATH'], '/bin')
+
+    def test_wrapper_noop_when_no_tier(self):
+        # Back-compat: wrapper returns the base env unchanged (no token) so a
+        # non-adopting caller still gets a usable env.
+        with mock.patch.object(active_tier, 'select_dispatch_tier',
+                               return_value=None):
             env = active_tier.durable_claude_env({'PATH': '/bin'})
         self.assertNotIn('CLAUDE_CODE_OAUTH_TOKEN', env)
         self.assertEqual(env['PATH'], '/bin')
 
-    def test_resolution_error_is_fail_safe(self):
-        with mock.patch.object(
-                active_tier, 'active_setup_token',
-                side_effect=RuntimeError('boom')):
-            env = active_tier.durable_claude_env({'PATH': '/bin'})  # must not raise
-        self.assertNotIn('CLAUDE_CODE_OAUTH_TOKEN', env)
-
     def test_defaults_to_os_environ_copy(self):
         os.environ['OL_MARKER_DCE'] = '1'
         try:
-            with mock.patch.object(
-                    active_tier, 'active_setup_token', return_value='tok'):
+            with mock.patch.object(active_tier, 'select_dispatch_tier',
+                                   return_value='tier1'), \
+                 mock.patch.object(active_tier, '_setup_token_for_tier',
+                                   return_value='tok'):
                 env = active_tier.durable_claude_env()
             self.assertEqual(env.get('OL_MARKER_DCE'), '1')
             env['OL_MARKER_DCE'] = '2'  # mutating the copy must not touch os.environ

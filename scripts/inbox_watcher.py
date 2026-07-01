@@ -30,7 +30,7 @@ import signal
 import sys
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from task_type_inference import infer_task_type
@@ -907,6 +907,19 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
             pass
         return
 
+    # TIER_HOLD (spec §4 caller contract): run_claude could not pick a dispatch
+    # tier — a TOCTOU after the gate (a tier benched between gate and spawn) or
+    # a resume whose bound tier benched mid-flight. NO LLM spend happened
+    # (run_claude returned before spawning), so HOLD like the rotation gate:
+    # leave the task in the inbox, no outbox, no archive, no requeue-bump; the
+    # next poll re-evaluates when a tier frees (the §9 all-held alert makes a
+    # persistent hold visible). NEVER drop held work.
+    if not success and isinstance(output_text, str) \
+            and output_text.startswith('TIER_HOLD:'):
+        log(f"[{agent}] TIER_HOLD task={task_id} held in inbox "
+            f"({output_text}); next poll re-evaluates")
+        return
+
     # mirror-marker-self-validate-gate-001: bounded SAME-PROCESS verdict-marker
     # self-validation, in FRONT of the outbox_notifier marker-error net. Only on
     # run_claude success (a non-success is a different class and gets no
@@ -1003,33 +1016,142 @@ def _is_continuation_task(task: dict) -> bool:
     return False
 
 
-def _rotation_gate_block_reason(task: dict) -> str | None:
-    """Return a short reason string if the rotation state should block
-    dispatching THIS task, else None. Reasons: ``draining`` (a tier flip is
-    pending; new top-level dispatches must wait) or ``cooldown`` (the
-    active tier has a per-account rate-limit cooldown). Continuations are
-    never blocked — they pass through so in-flight work can finish on its
-    original account.
+def _tier_pool_hold_file() -> Path:
+    """State file recording when the tier pool first went all-unavailable, so
+    the § 9 escalation only fires after a PERSISTENT hold (not a transient
+    blip). Resolved at CALL time to honor the OURLIBERTY_AGENTS_ROOT sandbox
+    redirect (AGENTS_ROOT is frozen at import)."""
+    root = os.environ.get("OURLIBERTY_AGENTS_ROOT")
+    base = Path(root) if root else AGENTS_ROOT
+    return base / "state" / "tier-pool-hold.json"
 
-    Defense-in-depth: any error reading rotation state is treated as
-    open-gate (return None). The gate is an additive guard, not the
-    primary correctness mechanism for the runner."""
+
+def _clear_tier_pool_hold() -> None:
+    """Reset the all-held clock — the pool can serve a dispatch again."""
+    try:
+        _tier_pool_hold_file().unlink()
+    except OSError:
+        pass
+
+
+def _tier_pool_hold_reasons() -> str:
+    """One-line per-tier reason string (usable / cooldown / auth / near-cap)
+    from active_tier.tier_pool_status, for the § 9 alert body. Best-effort;
+    never raises."""
+    try:
+        st = active_tier.tier_pool_status()
+    except Exception:
+        return "status unavailable"
+    parts = []
+    for tier, info in (st.get("tiers") or {}).items():
+        if not isinstance(info, dict):
+            continue
+        if info.get("usable"):
+            why = "usable"
+        elif info.get("cooldown_until"):
+            why = f"cooldown until {info['cooldown_until']}"
+        elif not info.get("auth_ok", True):
+            why = "auth down"
+        elif info.get("near_cap"):
+            why = "near cap"
+        else:
+            why = "unavailable"
+        parts.append(f"{tier}={why}")
+    return "; ".join(parts) if parts else "no tiers"
+
+
+def _escalate_tier_pool_held_if_persistent(now=None) -> None:
+    """Spec § 9: when the pool has been unable to serve ANY new dispatch for
+    longer than ``tier_pool.hold_alert_minutes``, fire ONE deduped
+    ``larry_alert`` naming each tier's reason. ``append_alert`` supplies the
+    dedup/cooldown (so it never spams and re-arms per window); the hold file
+    only enforces the initial delay so a transient blip does not page. Never
+    raises."""
+    now = now or datetime.now(timezone.utc)
+    path = _tier_pool_hold_file()
+    held_since = None
+    try:
+        raw = json.loads(path.read_text()).get("held_since")
+        held_since = datetime.fromisoformat(raw) if raw else None
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        held_since = None
+    if held_since is None:
+        # First blocked poll of this episode — start the clock, don't page yet.
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps({"held_since": now.isoformat()}))
+        except OSError:
+            pass
+        return
+    if held_since.tzinfo is None:
+        held_since = held_since.replace(tzinfo=timezone.utc)
+    try:
+        threshold_min = float(
+            active_tier._tier_pool_config().get("hold_alert_minutes", 10))
+    except Exception:
+        threshold_min = 10.0
+    if (now - held_since) < timedelta(minutes=threshold_min):
+        return
+    larry_alerts.append_alert(
+        source="inbox-watcher",
+        severity="warning",
+        subject="tier-pool-all-unavailable",
+        message=(
+            "No dispatch tier is available — new work is holding in the inbox. "
+            "Per-tier: " + _tier_pool_hold_reasons() + ". New dispatches resume "
+            "automatically when a tier frees; no action needed unless this "
+            "persists."
+        ),
+        suggested_action=(
+            "cat ~/agents/blackboard/active-tier.json  # inspect cooldowns; "
+            "`echo tier1 > ~/agents/rotation.disabled` force-pins a tier"
+        ),
+        route="escalate",
+    )
+
+
+def _rotation_gate_block_reason(task: dict) -> str | None:
+    """Block a NEW top-level dispatch iff the tier pool has NOTHING to dispatch
+    on (spec § 10-G): ``active_tier.select_dispatch_tier(None) is None`` — every
+    primary benched/near-cap AND the fallback held under its reserve.
+    Continuations (``--resume`` / ``phase=build|revision``) ALWAYS pass so
+    in-flight work finishes on its bound account (session IDs are not portable
+    across tiers). On a persistent all-held state this also escalates via § 9.
+
+    Replaces the old drain/active-tier-cooldown gate: under per-task dispatch
+    a cooldown on ONE tier no longer blocks new work — the selector routes to a
+    healthy tier. (While an operator pin is set, the selector returns the pin
+    UNCONDITIONALLY — the § 16 rollback contract requires it, so the gate is
+    pass-through and § 9 pool-exhaustion escalation is bypassed until the pin is
+    removed at cutover. That is by design: under a pin the operator has taken
+    manual control, and a pinned tier that walls is still surfaced by the
+    per-failure rate-limit ledger + DMs from run_claude.)
+
+    Defense-in-depth: any error reading the pool is treated as open-gate
+    (return None). The gate is an additive guard; run_claude re-selects and
+    holds/pauses per-task if the pool truly cannot serve."""
+    # Probe pool health with a SIDE-EFFECT-FREE check (no round-robin bump)
+    # BEFORE the continuation early-return, so the all-held debounce clock is
+    # cleared on EVERY healthy poll — incl. continuation-only or idle recovery.
+    # Otherwise the clock, cleared only on a fresh-top-level open, goes stale
+    # and the next unrelated all-held blip pages instantly (defeating § 9's
+    # 10-min debounce).
+    try:
+        available = active_tier.has_usable_dispatch_tier()
+    except Exception:
+        return None
+    if available:
+        _clear_tier_pool_hold()
+        return None
+    # Pool has NOTHING to dispatch on. Continuations still pass so in-flight
+    # work finishes on its bound account; only NEW top-level dispatches are held.
     if _is_continuation_task(task):
         return None
     try:
-        state = active_tier.read()
+        _escalate_tier_pool_held_if_persistent()
     except Exception:
-        return None
-    if state.get("draining"):
-        return "draining"
-    tier = state.get("tier")
-    if tier:
-        try:
-            if active_tier.cooldown_until(tier):
-                return "cooldown"
-        except Exception:
-            return None
-    return None
+        pass
+    return "tier-pool-unavailable"
 
 
 def agent_loop(agent: str, models_config: dict) -> None:
@@ -1047,6 +1169,14 @@ def agent_loop(agent: str, models_config: dict) -> None:
             tasks = []
 
         if not tasks:
+            # Idle poll: if the pool has recovered, clear any stale all-held
+            # debounce clock even though no task is here to open the gate — the
+            # held tasks may already have drained (§ 9; side-effect-free probe).
+            try:
+                if active_tier.has_usable_dispatch_tier():
+                    _clear_tier_pool_hold()
+            except Exception:
+                pass
             _shutdown.wait(POLL_INTERVAL_SEC)
             continue
 

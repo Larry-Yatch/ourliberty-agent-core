@@ -1,0 +1,11 @@
+[Unit]
+Description=Run calibrate_tier_budget every 6h (self-tuning per-tier 5h budget, tier-dispatch-spec.md § 12b)
+
+[Timer]
+OnBootSec=8min
+OnUnitActiveSec=6h
+Unit=ourliberty-calibrate-tier-budget.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

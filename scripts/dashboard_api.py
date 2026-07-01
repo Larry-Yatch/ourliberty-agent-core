@@ -8634,6 +8634,38 @@ def _handle_larry_action(
     # happened — is reported as such rather than surfacing an opaque 500 that
     # would 409 on retry with no record of what landed).
     source_task_id = source.get('task_id')
+    # Phase 2.1 FIX 1 + FIX 3: derive the canonical decision key ONCE, up front.
+    # FIX 3 — stamp it into the larry_action audit row (below) so
+    # heal_stale_approvals can reconcile a PR-coordinate pending entry when the
+    # live fan-out is skipped/failed (the dashboard larry_action row otherwise
+    # carries no pr_url/decision_key, so the backstop couldn't match it).
+    # FIX 1 — set `fan_entry_id` ONLY for decision-type source rows, so a
+    # mark_done on a bare escalation/alert never pops a pending approval that
+    # merely shares a canonical key.
+    _DECISION_EVENT_TYPES = {'approval_request', 'clarify_request'}
+    _decision_resolve = None
+    decision_key: Optional[str] = None
+    try:
+        import decision_resolve as _decision_resolve  # noqa: F811
+    except Exception:  # noqa: BLE001 — no module → no fan-out; healer backstops
+        _decision_resolve = None
+    if _decision_resolve is not None:
+        # Key derivation is isolated from the import: a derivation error (e.g. a
+        # malformed source row with a non-string task_id) must NOT disable the
+        # whole fan-out. With the module in hand, the P-leg can still pop the
+        # acted-on entry by entry_id even when the cross-store key is underivable.
+        try:
+            _src_payload = source.get('payload') if isinstance(
+                source.get('payload'), dict) else {}
+            decision_key = _src_payload.get('decision_key') or \
+                _decision_resolve.canonical_decision_key(
+                    source_task_id, source.get('pr_url'))
+        except Exception:  # noqa: BLE001 — key derivation is best-effort
+            decision_key = None
+    fan_entry_id = (
+        source_task_id if source.get('event_type') in _DECISION_EVENT_TYPES
+        else None
+    )
     audit_persisted = True
     audit_error: Optional[str] = None
     action_event_id: Optional[str] = None
@@ -8642,6 +8674,7 @@ def _handle_larry_action(
         action_payload = {
             'source_event_id': source_event_id,
             'source_event_type': source.get('event_type'),
+            'decision_key': decision_key,
             'action': action,
             'comment': comment,
             'envelope_written': envelope_written,
@@ -8683,6 +8716,37 @@ def _handle_larry_action(
             'audit row.',
             source_event_id, action, actor, envelope_written, target_agent,
         )
+
+    # Phase 2 Change B: fan the resolution out to the OTHER needs-Larry stores
+    # (pending-approvals / escalations / alerts) so a dashboard approve/reject/
+    # mark_done clears the same decision everywhere at once, instead of leaving
+    # the Telegram queue + escalation feed + alert line reading "still waiting"
+    # until heal_stale_approvals reconciles. The dashboard already cleared its
+    # OWN chain_events row via the atomic claim above, so the C-leg is a harmless
+    # idempotent no-op here. Best-effort: a fan-out failure NEVER fails the
+    # action (which already committed) — the healer backstops it. `comment` does
+    # NOT fan out (it is not a resolution).
+    _LARRY_ACTION_TO_OUTCOME = {
+        'approve': 'approved', 'reject': 'rejected', 'mark_done': 'approved',
+    }
+    fan_outcome = _LARRY_ACTION_TO_OUTCOME.get(action)
+    if fan_outcome is not None and _decision_resolve is not None \
+            and (decision_key or fan_entry_id):
+        try:
+            # Phase 2.1 FIX 1: pass entry_id so the P-leg pops ONLY the acted-on
+            # pending approval (decision-type rows), never a key-colliding
+            # sibling; the key clears the C/E/A stores. Key + entry_id were
+            # derived up front.
+            _decision_resolve.resolve_decision(
+                decision_key, fan_outcome, entry_id=fan_entry_id, actor=actor,
+                note=comment or '', chain_client=supabase_client,
+            )
+        except Exception:  # noqa: BLE001 — fan-out is best-effort; healer backstops
+            logger.exception(
+                'larry_action cross-store fan-out failed for source event %s '
+                '(action=%s); heal_stale_approvals will reconcile',
+                source_event_id, action,
+            )
 
     result = {
         'action_event_id': action_event_id,
@@ -9193,12 +9257,18 @@ def _cleanup_review_verify_uncertain(
     from test_isolation_guard import refuse_under_test  # noqa: PLC0415
     import active_tier  # noqa: PLC0415 — durable per-tier setup-token bridge
     refuse_under_test('claude-spawn')
+    # Per-task tier dispatch (spec §10-W4): round-robin a tier; skip cleanly
+    # when none is available (return {} = keep every uncertain row, the
+    # fail-safe posture this helper already uses).
+    env, tier = active_tier.select_durable_claude_env()
+    if env is None:
+        return {}
     try:
         proc = subprocess.run(
             ['claude', '--print', '--model', CLEANUP_REVIEW_VERIFY_MODEL,
              '--output-format', 'json', prompt],
             capture_output=True, text=True,
-            env=active_tier.durable_claude_env(), timeout=timeout, check=False,
+            env=env, timeout=timeout, check=False,
         )
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         return {}
@@ -9208,6 +9278,17 @@ def _cleanup_review_verify_uncertain(
         data = json.loads(proc.stdout or '{}')
     except json.JSONDecodeError:
         return {}
+    # §8/§10-W4: stamp an account-tagged cost row so this dispatch's burn is
+    # visible per-tier (this path does not route through inbox_watcher).
+    if isinstance(data, dict):
+        try:
+            active_tier.append_cost_row(
+                tier, model=CLEANUP_REVIEW_VERIFY_MODEL,
+                cost_usd=data.get('total_cost_usd'), usage=data.get('usage'),
+                agent='dashboard-cleanup-verify',
+                source='dashboard-cleanup-verify')
+        except Exception:  # noqa: BLE001 — cost ledger must never break the API
+            pass
     result = data.get('result') if isinstance(data, dict) else None
     return _parse_verifier_verdicts(result)
 
