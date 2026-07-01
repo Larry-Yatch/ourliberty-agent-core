@@ -382,8 +382,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T19:10Z UTC (Iter ~3445, Tier 2)
+## Status snapshot — updated 2026-07-01T19:32Z UTC (Iter ~3446, Tier 1)
 
-**Iter ~3445 summary (2026-07-01T19:10Z):** All checks nominal. 1 Tier-3 doorbell silenced (watermark 1068→1069). Mirror reviewing PR #796 attempt=2 (PID 2437085, regression check started 13:07 MDT, 1500s timeout). Mirror queue: 4 items (PR #796 active, PR #795-rev1/PR #798/PR #799 queued). PR #795-rev1 in Forge inbox (~19 min, pickup pending). PR #797 (fix(tier-pool)) OPEN without auto-review label — G-rule unreviewed-merge risk (carry). PRs #798 (Approval-Sync Phase 3 spec) and #799 (fix(tests)) dispatched to Mirror 12:55/13:05 MDT. Zombie bash PID 1834248 (since May 28, Check VIII poll loop, 0% CPU) — first noted, ask-then-do, low urgency. APPROVAL_REQUEST `heal-stale-daemon-fresh-deploy-retry-001` pending Larry. Sync 18:32Z (~37 min). Watchdog 19:03Z healthy. Heartbeat 19:12Z. Pipeline 0 stalls. **Tier 2** (consecutive_clean=1; cadence 15 min). PRIME DIRECTIVE ratio: 14.825, trend=flat.
+**Iter ~3446 summary (2026-07-01T19:32Z):** Check A always-fix: fast-forwarded c8459658→59e2d93f (PR #798 Approval-Sync Phase 3 spec auto-merged). PR #796 REVIEW_PASS (13:27:41 MDT) but AUTO_MERGE_HELD blocker=#797 (overlap: agents/mirror/CLAUDE.md, scripts/agent_runner.py, test_regression_check.py). PR #797 no auto-review label — blocking PR #796 merge (G-rule unreviewed-merge-larry-authored 5th-level, Beacon Steps 1-2 awaiting Larry). PR #798 MERGED ✅ (13:29:38 MDT, Approval-Sync Phase 3 spec). PR #799 under Mirror review (13:29:31 MDT). PR #795-rev1 queued in Mirror. Forge idle. Sync 18:32Z (~1h old). Watchdog 19:24Z healthy. Heartbeat 19:22Z. Pipeline 0 stalls. Zombie bash PID 1834248 (34d+, Check VIII poll loop, ask-then-do carry). APPROVAL_REQUEST `heal-stale-daemon-fresh-deploy-retry-001` pending Larry. **Tier 1** (consecutive_clean=0; Check A fast-forward reset tier; cadence 5 min). PRIME DIRECTIVE ratio: 14.7875, trend=flat.
 
 
