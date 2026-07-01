@@ -769,17 +769,15 @@ def _resolve_pending_entry(entry: dict, outcome: str, note: str = '') -> None:
     alerts stores in one synchronous call — instead of leaving the other three
     reading "still waiting" until heal_stale_approvals reconciles.
 
-    Falls back to the single-store `approval.resolve` primitive when no canonical
-    key is derivable (the underivable case, spec §1.1): the P store still clears,
-    the healer backstops the rest. Both paths route through `approval.resolve` as
-    the P-leg primitive, so there is no recursion (the fan-out wraps it)."""
-    pr_url = (entry.get('dispatch_payload') or {}).get('pr_url')
-    key = entry.get('decision_key') or decision_resolve.canonical_decision_key(
-        entry.get('id'), pr_url)
-    if key:
-        decision_resolve.resolve_decision(key, outcome, actor='telegram', note=note)
-    else:
-        approval.resolve(entry['id'], outcome, note=note)
+    Phase 2.1 FIX 1: routes through `resolve_decision_for_pending_entry`, which
+    pops ONLY this entry (by its `id`) and clears the OTHER stores by its
+    canonical key — so approving one of two same-PR pending approvals no longer
+    silently retires the sibling. The P-leg still pops this entry even when the
+    cross-store key is underivable (the fan-out handles that internally), so the
+    old `approval.resolve` fallback is no longer needed. `resolve_decision`
+    wraps `approval.resolve` as the P-leg primitive, so there is no recursion."""
+    decision_resolve.resolve_decision_for_pending_entry(
+        entry, outcome, actor='telegram', note=note)
 
 
 def handle_user_command(chat_id: int, action: dict) -> bool:

@@ -8634,6 +8634,38 @@ def _handle_larry_action(
     # happened — is reported as such rather than surfacing an opaque 500 that
     # would 409 on retry with no record of what landed).
     source_task_id = source.get('task_id')
+    # Phase 2.1 FIX 1 + FIX 3: derive the canonical decision key ONCE, up front.
+    # FIX 3 — stamp it into the larry_action audit row (below) so
+    # heal_stale_approvals can reconcile a PR-coordinate pending entry when the
+    # live fan-out is skipped/failed (the dashboard larry_action row otherwise
+    # carries no pr_url/decision_key, so the backstop couldn't match it).
+    # FIX 1 — set `fan_entry_id` ONLY for decision-type source rows, so a
+    # mark_done on a bare escalation/alert never pops a pending approval that
+    # merely shares a canonical key.
+    _DECISION_EVENT_TYPES = {'approval_request', 'clarify_request'}
+    _decision_resolve = None
+    decision_key: Optional[str] = None
+    try:
+        import decision_resolve as _decision_resolve  # noqa: F811
+    except Exception:  # noqa: BLE001 — no module → no fan-out; healer backstops
+        _decision_resolve = None
+    if _decision_resolve is not None:
+        # Key derivation is isolated from the import: a derivation error (e.g. a
+        # malformed source row with a non-string task_id) must NOT disable the
+        # whole fan-out. With the module in hand, the P-leg can still pop the
+        # acted-on entry by entry_id even when the cross-store key is underivable.
+        try:
+            _src_payload = source.get('payload') if isinstance(
+                source.get('payload'), dict) else {}
+            decision_key = _src_payload.get('decision_key') or \
+                _decision_resolve.canonical_decision_key(
+                    source_task_id, source.get('pr_url'))
+        except Exception:  # noqa: BLE001 — key derivation is best-effort
+            decision_key = None
+    fan_entry_id = (
+        source_task_id if source.get('event_type') in _DECISION_EVENT_TYPES
+        else None
+    )
     audit_persisted = True
     audit_error: Optional[str] = None
     action_event_id: Optional[str] = None
@@ -8642,6 +8674,7 @@ def _handle_larry_action(
         action_payload = {
             'source_event_id': source_event_id,
             'source_event_type': source.get('event_type'),
+            'decision_key': decision_key,
             'action': action,
             'comment': comment,
             'envelope_written': envelope_written,
@@ -8697,19 +8730,17 @@ def _handle_larry_action(
         'approve': 'approved', 'reject': 'rejected', 'mark_done': 'approved',
     }
     fan_outcome = _LARRY_ACTION_TO_OUTCOME.get(action)
-    if fan_outcome is not None:
+    if fan_outcome is not None and _decision_resolve is not None \
+            and (decision_key or fan_entry_id):
         try:
-            import decision_resolve
-            payload = source.get('payload') if isinstance(
-                source.get('payload'), dict) else {}
-            decision_key = payload.get('decision_key') or \
-                decision_resolve.canonical_decision_key(
-                    source_task_id, source.get('pr_url'))
-            if decision_key:
-                decision_resolve.resolve_decision(
-                    decision_key, fan_outcome, actor=actor,
-                    note=comment or '', chain_client=supabase_client,
-                )
+            # Phase 2.1 FIX 1: pass entry_id so the P-leg pops ONLY the acted-on
+            # pending approval (decision-type rows), never a key-colliding
+            # sibling; the key clears the C/E/A stores. Key + entry_id were
+            # derived up front.
+            _decision_resolve.resolve_decision(
+                decision_key, fan_outcome, entry_id=fan_entry_id, actor=actor,
+                note=comment or '', chain_client=supabase_client,
+            )
         except Exception:  # noqa: BLE001 — fan-out is best-effort; healer backstops
             logger.exception(
                 'larry_action cross-store fan-out failed for source event %s '

@@ -230,8 +230,8 @@ class FourStoreFanOutTest(unittest.TestCase):
         self._seed_all()
 
         result = decision_resolve.resolve_decision(
-            self.KEY, 'approved', actor='telegram', note='lgtm',
-            chain_client=self._chain_client,
+            self.KEY, 'approved', entry_id=self.TASK_ID, actor='telegram',
+            note='lgtm', chain_client=self._chain_client,
         )
 
         self.assertEqual(result['pending'], 1)
@@ -258,11 +258,13 @@ class FourStoreFanOutTest(unittest.TestCase):
     def test_second_call_is_noop_idempotent(self):
         self._seed_all()
         first = decision_resolve.resolve_decision(
-            self.KEY, 'approved', chain_client=self._chain_client)
+            self.KEY, 'approved', entry_id=self.TASK_ID,
+            chain_client=self._chain_client)
         self.assertEqual(first['total'], 4)
 
         second = decision_resolve.resolve_decision(
-            self.KEY, 'approved', chain_client=self._chain_client)
+            self.KEY, 'approved', entry_id=self.TASK_ID,
+            chain_client=self._chain_client)
         self.assertEqual(second['pending'], 0)
         self.assertEqual(second['chain_events'], 0)
         self.assertEqual(second['escalations'], 0)
@@ -273,8 +275,8 @@ class FourStoreFanOutTest(unittest.TestCase):
         # The convenience wrapper that derives the key from task_id/pr_url.
         self._seed_all()
         result = decision_resolve.resolve_decision_for_entry(
-            task_id=self.TASK_ID, pr_url=self.PR_URL, outcome='rejected',
-            chain_client=self._chain_client,
+            task_id=self.TASK_ID, pr_url=self.PR_URL, entry_id=self.TASK_ID,
+            outcome='rejected', chain_client=self._chain_client,
         )
         self.assertEqual(result['key'], self.KEY)
         self.assertEqual(result['total'], 4)
@@ -302,13 +304,54 @@ class FourStoreFanOutTest(unittest.TestCase):
                 raise RuntimeError('supabase down')
 
         result = decision_resolve.resolve_decision(
-            self.KEY, 'approved', chain_client=_BoomClient())
+            self.KEY, 'approved', entry_id=self.TASK_ID,
+            chain_client=_BoomClient())
 
         self.assertEqual(result['chain_events'], 0)   # the failed leg
         self.assertEqual(result['pending'], 1)        # the other three cleared
         self.assertEqual(result['escalations'], 1)
         self.assertEqual(result['alerts'], 1)
         self.assertEqual(result['total'], 3)
+
+    def test_resolves_only_acted_on_entry_not_sibling(self):
+        # Phase 2.1 FIX 1: two DISTINCT pending approvals for the SAME PR collapse
+        # to one canonical key (pr_url precedence). Resolving one must pop ONLY
+        # that entry; the sibling stays pending (Phase 2 wrongly retired both,
+        # silently moving the undispatched sibling to history as 'approved').
+        id_a = 'mirror-review:agent-core-777-passA'
+        id_b = 'mirror-review:agent-core-777-passB'
+        bah.add_pending({'task_id': id_a, 'pr_url': self.PR_URL, 'summary': 'A'},
+                        chat_id=1)
+        bah.add_pending({'task_id': id_b, 'pr_url': self.PR_URL, 'summary': 'B'},
+                        chat_id=2)
+        entry_a = bah.find_pending_by_id(id_a)
+        entry_b = bah.find_pending_by_id(id_b)
+        # Both derive the SAME cross-store key — the collision that caused the bug.
+        self.assertEqual(entry_a.get('decision_key'), self.KEY)
+        self.assertEqual(entry_b.get('decision_key'), self.KEY)
+
+        result = decision_resolve.resolve_decision_for_pending_entry(
+            entry_a, 'approved', chain_client=self._chain_client)
+
+        # Exactly ONE pending entry resolved (entry A), not both.
+        self.assertEqual(result['pending'], 1)
+        self.assertIsNone(bah.find_pending_by_id(id_a))         # acted-on: gone
+        self.assertIsNotNone(bah.find_pending_by_id(id_b))      # sibling: STILL pending
+        self.assertEqual(bah.find_by_id_any_state(id_a)['status'], 'approved')
+
+    def test_mark_done_on_escalation_does_not_pop_pending(self):
+        # Phase 2.1 FIX 1: a resolve that acts on a non-approval surface (entry_id
+        # absent) must clear C/E/A by key but NEVER pop a pending approval that
+        # merely shares that key — the dashboard mark_done-on-escalation case.
+        self._seed_pending()                       # a genuine pending approval
+        self.assertEqual(
+            bah.find_pending_by_id(self.TASK_ID).get('decision_key'), self.KEY)
+
+        result = decision_resolve.resolve_decision(
+            self.KEY, 'approved', entry_id=None, chain_client=self._chain_client)
+
+        self.assertEqual(result['pending'], 0)                  # P untouched
+        self.assertIsNotNone(bah.find_pending_by_id(self.TASK_ID))  # still pending
 
 
 if __name__ == '__main__':
