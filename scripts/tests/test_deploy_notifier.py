@@ -590,18 +590,15 @@ class PathIsolationTest(unittest.TestCase):
     """
 
     def test_agents_root_inside_tmpdir(self):
-        # The module-level fixture monkeypatched OURLIBERTY_AGENTS_ROOT
-        # to a tmpdir BEFORE import. The module's AGENTS_ROOT must match.
-        self.assertEqual(
-            str(dn.AGENTS_ROOT),
-            os.environ['OURLIBERTY_AGENTS_ROOT'],
-        )
-        self.assertTrue(str(dn.LOG_FILE).startswith(
-            os.environ['OURLIBERTY_AGENTS_ROOT']
-        ))
-        self.assertTrue(str(dn.STATE_FILE).startswith(
-            os.environ['OURLIBERTY_AGENTS_ROOT']
-        ))
+        # The module-level fixture set OURLIBERTY_AGENTS_ROOT to _TMP_AGENTS_ROOT BEFORE
+        # import; dn.AGENTS_ROOT is FROZEN to that value. Compare against the fixture value
+        # we control — NOT live os.environ, which a sibling test module can mutate after our
+        # import under `discover` (a leaked write flipped this test by discovery order). See
+        # [[test-isolation-hygiene-debt]].
+        expected = _TMP_AGENTS_ROOT.name
+        self.assertEqual(str(dn.AGENTS_ROOT), expected)
+        self.assertTrue(str(dn.LOG_FILE).startswith(expected))
+        self.assertTrue(str(dn.STATE_FILE).startswith(expected))
 
 
 if __name__ == '__main__':

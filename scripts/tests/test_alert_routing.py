@@ -476,7 +476,9 @@ class ReadDigestWindowTest(unittest.TestCase):
 
 
 class _BotImporter:
-    """beacon_telegram_bot sys.exit()s at import without these env vars."""
+    """beacon_telegram_bot validates TOKEN/ALLOWED at RUN (in main()), not import, so it
+    imports cleanly now; we still set placeholders so the module's env-derived constants
+    (API, ALLOWED) resolve to test values."""
 
     @staticmethod
     def load_with_env():

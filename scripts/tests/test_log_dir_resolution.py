@@ -75,11 +75,10 @@ class AgentRunnerResolveLogDirTest(unittest.TestCase):
 class BeaconBotResolveLogDirTest(unittest.TestCase):
     """beacon_telegram_bot.resolve_log_dir() — same invariant.
 
-    beacon_telegram_bot has env-required imports at module load
-    (TELEGRAM_BOT_TOKEN_BEACON, TELEGRAM_ALLOWED_CHAT_IDS) — supply test
-    placeholders so the import doesn't sys.exit. Force a clean re-import
-    so the module-level LOG_DIR is re-evaluated against the env state we
-    want for the specific test.
+    beacon_telegram_bot validates TOKEN/ALLOWED at RUN (in main()), not import, so it
+    imports cleanly now; we still supply placeholders so the module's env-derived
+    constants resolve to test values. Force a clean re-import so the module-level LOG_DIR
+    is re-evaluated against the env state we want for the specific test.
     """
 
     def _import_bot_with_env(self, override_value=None):

@@ -68,14 +68,23 @@ from test_isolation_guard import refuse_under_test  # noqa: E402
 
 # ---------- config ----------
 
+# These constants are derived at import (harmless — pure env reads). The FATAL validation
+# is deferred to _require_runtime_env(), called from main(), so the module stays importable
+# without a live bot environment: tests import this file for its pure helpers, and a
+# sys.exit at import scope crashes every importer (which made test verdicts depend on which
+# sibling test happened to leak a token first), not just the one misconfigured bot process.
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN_BEACON", "").strip()
-if not TOKEN:
-    sys.exit("ERROR: TELEGRAM_BOT_TOKEN_BEACON not set. Source ~/credentials/.env.larry first.")
-
 ALLOWED_RAW = os.environ.get("TELEGRAM_ALLOWED_CHAT_IDS", "")
 ALLOWED: set[int] = {int(x) for x in re.split(r"[,\s]+", ALLOWED_RAW) if x.strip()}
-if not ALLOWED:
-    sys.exit("ERROR: TELEGRAM_ALLOWED_CHAT_IDS empty — refusing to run a bot anyone can talk to.")
+
+
+def _require_runtime_env() -> None:
+    """Fail-fast validation of the live-bot environment. Called from main() (i.e. only when
+    the bot is actually RUN), never at import. Messages unchanged from prior behavior."""
+    if not TOKEN:
+        sys.exit("ERROR: TELEGRAM_BOT_TOKEN_BEACON not set. Source ~/credentials/.env.larry first.")
+    if not ALLOWED:
+        sys.exit("ERROR: TELEGRAM_ALLOWED_CHAT_IDS empty — refusing to run a bot anyone can talk to.")
 
 BEACON_DIR = Path.home() / "agent-core" / "agents" / "beacon"
 
@@ -1376,6 +1385,7 @@ def _acquire_singleton_lock() -> bool:
 
 
 def main() -> None:
+    _require_runtime_env()   # fail-fast on a misconfigured live env (deferred from import)
     if not _acquire_singleton_lock():
         log(f"another instance already holds {_LOCK_PATH}; exiting without "
             f"polling to avoid a competing getUpdates loop (Telegram 409 burst)")
