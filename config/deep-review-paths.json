@@ -1,0 +1,15 @@
+{
+  "_comment": "PRs touching these paths pass Mirror review but are HELD for a human /code-review high + manual merge (deep-review hold) instead of auto-merging. Optional + graceful: a missing/malformed file, a non-list `paths`, or `enabled`:false all fall back to the code default in outbox_notifier._DEFAULT_DEEP_REVIEW_PATHS. Tuned by Pulse-Check. Globs are fnmatch'd against `gh pr view --json files` paths. A PR carrying the `deep-review-required` label also holds even if it touches none of these. A critical-path PR that Claude already /code-review high'd carries the `deep-review-passed` label and flows through Mirror to auto-merge normally.",
+  "enabled": true,
+  "paths": [
+    "scripts/beacon_approval_handler.py",
+    "scripts/decision_*.py",
+    "scripts/resolve*.py",
+    "scripts/for_larry_*.py",
+    "scripts/larry_alerts.py",
+    "scripts/chain_event_emit.py",
+    "scripts/trust_policy.py",
+    "scripts/outbox_notifier.py",
+    "config/trust-policy.json"
+  ]
+}

@@ -46,6 +46,7 @@ both daemons cleanly.
 
 from __future__ import annotations
 
+import fnmatch
 import glob
 import json
 import os
@@ -263,6 +264,35 @@ _REVISION_APPLIED_RE = re.compile(
 # Tests reset the cache via _invalidate_loop_bounds_cache.
 _MODELS_CONFIG_PATH = Path(__file__).resolve().parent.parent / 'config' / 'agent-models.json'
 _LOOP_BOUNDS_CACHE: dict[str, Any] = {}
+
+# merge-gate-deep-review-hold — PRs touching these paths (or carrying a
+# `deep-review-required` label) pass Mirror review but are HELD for a human
+# `/code-review high` + manual merge instead of auto-merging. This is the code
+# default; `config/deep-review-paths.json` (when present + enabled) overrides
+# it. Globs are fnmatch'd against `gh pr view --json files` paths. Kept in sync
+# with config/deep-review-paths.json — the config file IS this list.
+_DEFAULT_DEEP_REVIEW_PATHS: tuple[str, ...] = (
+    'scripts/beacon_approval_handler.py',
+    'scripts/decision_*.py',
+    'scripts/resolve*.py',
+    'scripts/for_larry_*.py',
+    'scripts/larry_alerts.py',
+    'scripts/chain_event_emit.py',
+    'scripts/trust_policy.py',
+    'scripts/outbox_notifier.py',
+    'config/trust-policy.json',
+)
+_DEEP_REVIEW_PATHS_CONFIG_PATH = (
+    Path(__file__).resolve().parent.parent / 'config' / 'deep-review-paths.json'
+)
+# The stamp Claude's pre-handoff `/code-review high` applies to mark a
+# critical-path PR as deep-reviewed. v1 form is a PR label (checked with the
+# same `gh pr view --json labels` read used for the `deep-review-required`
+# trigger, so it costs no extra gh call). A SHA-bound comment marker
+# (`=== DEEP_REVIEW_PASS sha=<head> ===`, mirroring merge_reviewed_pr.sh's
+# LOCAL_REVIEW_PASS so it self-invalidates on a new push) is a noted follow-up.
+_DEEP_REVIEW_REQUIRED_LABEL = 'deep-review-required'
+_DEEP_REVIEW_PASSED_LABEL = 'deep-review-passed'
 
 # D3.5 commit 5d — extract repo coords + PR number from a github.com PR URL.
 # Mirror's REVIEW_PASS marker carries `pr_url`; auto-merge needs the
@@ -513,6 +543,44 @@ def _load_max_replans_from_config() -> int:
     if not isinstance(raw, int) or raw < 0:
         return approval.DEFAULT_MAX_REPLANS
     return raw
+
+
+_DEEP_REVIEW_PATHS_CACHE: dict[str, Any] = {}
+
+
+def _invalidate_deep_review_paths_cache() -> None:
+    """Test hook — drop the cached deep-review-paths config so a test that
+    writes a fresh config file sees it on the next `_load_deep_review_paths`."""
+    _DEEP_REVIEW_PATHS_CACHE.clear()
+
+
+def _load_deep_review_paths() -> tuple[str, ...]:
+    """Return the critical-path glob list for the deep-review merge hold.
+
+    merge-gate-deep-review-hold. Reads `config/deep-review-paths.json`
+    ({"enabled": bool, "paths": [glob, ...]}). Returns `paths` when the file
+    exists, is well-formed, and `enabled` is true; otherwise falls back to
+    `_DEFAULT_DEEP_REVIEW_PATHS`. Same graceful-degradation shape as the other
+    `_load_*_from_config` helpers: a missing/malformed file, a non-list `paths`,
+    or `enabled` false all yield the code default so the fileset trigger keeps
+    working even if the config is deleted or Pulse-Check writes a bad edit.
+    Cached at module level (fires on every merge attempt); tests reset via
+    `_invalidate_deep_review_paths_cache`.
+    """
+    if 'paths' not in _DEEP_REVIEW_PATHS_CACHE:
+        try:
+            cfg = json.loads(_DEEP_REVIEW_PATHS_CONFIG_PATH.read_text())
+        except (OSError, json.JSONDecodeError):
+            cfg = None
+        resolved: tuple[str, ...] = _DEFAULT_DEEP_REVIEW_PATHS
+        if isinstance(cfg, dict) and cfg.get('enabled') is True:
+            raw = cfg.get('paths')
+            if isinstance(raw, list):
+                globs = tuple(p for p in raw if isinstance(p, str) and p)
+                if globs:
+                    resolved = globs
+        _DEEP_REVIEW_PATHS_CACHE['paths'] = resolved
+    return _DEEP_REVIEW_PATHS_CACHE['paths']
 
 
 def _load_auto_merge_watchdog_hours_from_config() -> int:
@@ -1104,6 +1172,20 @@ _REVIEW_PASS_DM_VARIANTS: dict[str, str] = {
         'git fetch origin && git rebase origin/main && git push '
         '--force-with-lease'
     ),
+    # merge-gate-deep-review-hold — a critical-path PR (approval/resolve
+    # fan-out or the trust/merge machinery) PASS'd Mirror but reached
+    # auto-merge WITHOUT a `deep-review-passed` stamp, so the `/code-review
+    # high` step was skipped. NOT merged. The canonical closing DM is
+    # `_dm_larry_deep_review_hold` (fired in the gate) and `_maybe_dm_larry`
+    # is suppressed for this outcome; this variant is the render-pipeline
+    # fallback so the body never degrades to a misleading "auto-merged".
+    'held_deep_review': (
+        'Mirror approved PR {pr_url} on task `{task_id}`.\n'
+        'Summary: {summary}\n'
+        'Auto-merge HELD: critical-path change with no deep-review stamp — '
+        'needs a `/code-review high` first.\n'
+        'Review, then merge: scripts/merge_reviewed_pr.sh {pr_number}'
+    ),
 }
 
 
@@ -1146,6 +1228,11 @@ def _render_review_pass_merge_status_line(
         return (
             'Auto-merge is BLOCKED — the PR conflicts with main and needs a '
             'manual rebase. The PR is NOT merged.'
+        )
+    if outcome == 'held_deep_review':
+        return (
+            'Auto-merge is HELD — this is a critical-path change and needs a '
+            '`/code-review high` before it can merge. The PR is NOT merged.'
         )
     if outcome == 'held_fail_closed':
         return (
@@ -1307,9 +1394,13 @@ def _maybe_dm_larry(
         #     released PR was ALREADY merged/closed, so Larry already got the
         #     `merged` closing DM when it actually merged; a second DM on this
         #     skip path would be duplicate noise (actionable-only discipline).
+        #   * held_deep_review — merge-gate-deep-review-hold: the canonical
+        #     closing DM is `_dm_larry_deep_review_hold` (fired in the gate);
+        #     a second DM here would duplicate it (same pairing as
+        #     held_conflict / `_dm_larry_rebase_needed`).
         if merge_outcome in (
             'deferred_unknown', 'held_conflict', 'held_stale_regression',
-            'release_already_merged',
+            'release_already_merged', 'held_deep_review',
         ):
             log(
                 f'review-pass closing DM suppressed (outcome='
@@ -7736,6 +7827,97 @@ def _gh_pr_changed_files(repo_coords: str, pr_number: int) -> Optional[list[str]
     return out
 
 
+def _gh_pr_labels(repo_coords: str, pr_number: int) -> Optional[list[str]]:
+    """Fetch the PR's label names via `gh pr view --json labels`.
+
+    merge-gate-deep-review-hold. Returns the label-name list on success, None
+    on any error (gh missing, timeout, non-zero exit, parse fail). Distinct
+    from `[]` (PR genuinely has no labels): the deep-review gate treats None as
+    "couldn't read labels" and, per conservative-fail doctrine, a file-critical
+    PR with unreadable labels is HELD (stamp can't be confirmed).
+    """
+    try:
+        proc = subprocess.run(
+            ['gh', 'pr', 'view', str(pr_number),
+             '--repo', repo_coords, '--json', 'labels'],
+            capture_output=True, text=True, timeout=_AUTO_MERGE_TIMEOUT_S,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        log(
+            f'gh pr view {pr_number} ({repo_coords}) --json labels failed: '
+            f'{type(e).__name__}: {e}',
+            'WARN',
+        )
+        return None
+    if proc.returncode != 0:
+        log(
+            f'gh pr view {pr_number} ({repo_coords}) --json labels exit='
+            f'{proc.returncode}: {(proc.stderr or "").strip()[:200]}',
+            'WARN',
+        )
+        return None
+    try:
+        data = json.loads(proc.stdout or '{}')
+    except (ValueError, json.JSONDecodeError):
+        return None
+    labels = data.get('labels')
+    if not isinstance(labels, list):
+        return None
+    out = []
+    for lbl in labels:
+        if isinstance(lbl, dict):
+            name = lbl.get('name')
+            if isinstance(name, str):
+                out.append(name)
+    return out
+
+
+def _deep_review_required(
+    repo_coords: str,
+    pr_number: int,
+    changed_files: Optional[list[str]],
+    labels: Optional[list[str]] = None,
+) -> bool:
+    """Return True (→ HOLD the auto-merge for a human `/code-review high`) when
+    a PASS'd PR is a critical-path change that has NOT been deep-reviewed.
+
+    merge-gate-deep-review-hold. Two OR'd triggers make a PR critical:
+      (a) any changed file matches a glob from `_load_deep_review_paths()`
+          (the durable default — no one has to remember to label);
+      (b) the PR carries the `deep-review-required` label (a manual override
+          for a risky change outside the fileset).
+    A critical PR is HELD unless it carries the `deep-review-passed` stamp
+    (Claude's pre-handoff `/code-review high` applies it). A stamped critical
+    PR returns False → flows through Mirror to auto-merge normally; a
+    non-critical PR always returns False.
+
+    Conservative-fail (doctrine): if `labels` can't be read (gh failure →
+    None), the label trigger and the stamp both read as ABSENT. So a
+    FILE-critical PR with unreadable labels is still HELD (we can't confirm the
+    stamp — a false hold costs one manual merge; a false merge is the whole
+    thing this gate prevents). A PR that is critical ONLY via the manual label
+    degrades to non-critical on a labels-fetch blip — the durable fileset
+    trigger is the guarantee; the manual override is best-effort. Mirror has
+    already PASS'd in every case here.
+    """
+    if labels is None:
+        labels = _gh_pr_labels(repo_coords, pr_number)
+    # None (gh failure) → empty for trigger/stamp reads (conservative: absent).
+    label_names = labels or []
+
+    paths = _load_deep_review_paths()
+    files = changed_files or []
+    file_critical = any(
+        fnmatch.fnmatch(f, glob) for f in files for glob in paths
+    )
+    label_critical = _DEEP_REVIEW_REQUIRED_LABEL in label_names
+    if not (file_critical or label_critical):
+        return False
+
+    stamped = _DEEP_REVIEW_PASSED_LABEL in label_names
+    return not stamped
+
+
 def _gh_pr_mergeable_status(repo_coords: str, pr_number: int) -> str:
     """Return 'mergeable' / 'conflicting' / 'unknown'.
 
@@ -8178,6 +8360,63 @@ def _dm_larry_rebase_needed(
             severity='warning',
             message=body,
             subject=f'auto-merge-conflict:{repo_coords}:{pr_number}',
+        )
+    except Exception:  # noqa: BLE001 — daemon-never-wedge
+        pass
+
+
+def _dm_larry_deep_review_hold(
+    pr_url: str,
+    pr_number: int,
+    repo_coords: str,
+    task_id: str,
+    chat_id: Optional[int],
+    summary: str = '',
+) -> None:
+    """Closing DM for the `held_deep_review` outcome.
+
+    merge-gate-deep-review-hold. A critical-path PR (approval/resolve fan-out
+    or the trust/merge machinery itself) PASS'd Mirror but reached auto-merge
+    WITHOUT the `deep-review-passed` stamp — meaning the pre-handoff
+    `/code-review high` was skipped. We DID NOT merge; this DM routes Larry to
+    run that deep review and merge via `merge_reviewed_pr.sh <PR>` (which
+    stamps LOCAL_REVIEW_PASS so `heal_unreviewed_merge_detector` stays quiet).
+
+    Canonical closing DM for this outcome; `_maybe_dm_larry` is suppressed for
+    `held_deep_review` to avoid a duplicate (same pairing as the
+    `held_conflict` / `_dm_larry_rebase_needed` seam). Uses
+    `append_notification` when a reply chat is known (closes the chain in the
+    originating thread), `append_alert` as a broadcast fallback. Best-effort +
+    never raises into the caller (daemon-never-wedge).
+    """
+    merge_cmd = f'scripts/merge_reviewed_pr.sh {pr_number}'
+    summary_line = f'Summary: {summary}\n' if summary else ''
+    body = (
+        f'Mirror approved PR {pr_url} on task `{task_id}`.\n'
+        f'{summary_line}'
+        f'Auto-merge HELD: this is a critical-path change (approval/merge '
+        f'machinery) that reached merge WITHOUT a deep-review stamp — the '
+        f'`/code-review high` step was skipped.\n'
+        f'Run `/code-review high` on it, then merge: {merge_cmd}'
+    )
+    if isinstance(chat_id, int):
+        try:
+            larry_alerts.append_notification(
+                source='outbox-notifier',
+                intent='merge_held_deep_review',
+                message=body,
+                chat_id=chat_id,
+                task_id=task_id,
+            )
+            return
+        except Exception:  # noqa: BLE001 — daemon-never-wedge on DM failure
+            pass
+    try:
+        larry_alerts.append_alert(
+            source='outbox-notifier',
+            severity='warning',
+            message=body,
+            subject=f'auto-merge-deep-review-hold:{repo_coords}:{pr_number}',
         )
     except Exception:  # noqa: BLE001 — daemon-never-wedge
         pass
@@ -8678,6 +8917,8 @@ def _attempt_auto_merge_with_gates(
       - 'merged' / 'already_merged' / 'failed'  (from _auto_merge_pr)
       - 'held_for_blocker'  (gate 1 hit, entry pushed to queue)
       - 'held_conflict'     (gate 2 hit, DM fired, NOT queued)
+      - 'held_deep_review'  (critical-path change lacking a deep-review stamp;
+        DM fired, NOT queued, NOT retried — merge-gate-deep-review-hold)
       - 'deferred_unknown'  (gate 2 = UNKNOWN, first attempt; queued for retry)
       - 'held_fail_closed'  (queue file corrupt; never call _auto_merge_pr)
       - 'held_stale_regression'  (release-path freshness gate hit: a held
@@ -8904,6 +9145,35 @@ def _attempt_auto_merge_with_gates(
             # Block (DM already fired) or defer (entry re-queued) — either
             # way, do NOT fire the merge on the stale approval.
             return revalidation
+
+    # Deep-review hold (merge-gate-deep-review-hold). Placed here — after every
+    # mergeability/freshness gate and just before the merge fires — so it is the
+    # single chokepoint every merge-fire caller passes through (first-attempt,
+    # held-blocker release, second-UNKNOWN sweep-retry). A critical-path change
+    # (approval/resolve fan-out or the trust/merge machinery itself) that PASS'd
+    # Mirror but lacks a `deep-review-passed` stamp is HELD for a human
+    # `/code-review high` + manual merge instead of auto-merging. The WARN log
+    # deliberately AVOIDS `outcome=failed` so `heal_pr_auto_merge` (which retries
+    # only on `outcome=failed`) leaves the held PR alone — it mirrors the
+    # held_conflict seam exactly (surface to Larry, no auto-retry, no reap).
+    if _deep_review_required(repo_coords, pr_number, changed_files):
+        _dm_larry_deep_review_hold(
+            pr_url, pr_number, repo_coords, task_id, chat_id, summary,
+        )
+        log(
+            f'AUTO_MERGE_HELD_DEEP_REVIEW task={task_id} pr={pr_url} '
+            f'(critical-path change with no deep-review stamp; held for '
+            f'/code-review high) agent=forge',
+            'WARN',
+        )
+        return {
+            'merge_outcome': 'held_deep_review',
+            'merge_reason': (
+                'critical-path change; held for /code-review high before merge'
+            ),
+            'pr_number': pr_number,
+            'repo_coords': repo_coords,
+        }
 
     # Both gates pass (or second UNKNOWN attempt) — fire the merge.
     _queue_remove_pr(pr_number, repo_coords)  # clear queue if retrying
