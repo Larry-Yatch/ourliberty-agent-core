@@ -70,7 +70,11 @@ set -u
 
 TIMEOUT_SECONDS=900     # 15 min hard ceiling — a review step must never outlive this.
 INTERVAL_SECONDS=2
-KILL_GRACE_SECONDS=5    # grace between SIGTERM and SIGKILL on a timed-out step.
+# Grace between SIGTERM and SIGKILL on a timed-out step. Env-overridable so the
+# TERM-ignoring test can escalate on a short grace instead of paying the full 5s
+# per run; production leaves it unset → 5s. A malformed override falls back to 5.
+KILL_GRACE_SECONDS="${OL_REVIEW_STEP_KILL_GRACE_SECONDS:-5}"
+case "$KILL_GRACE_SECONDS" in ''|*[!0-9]*) KILL_GRACE_SECONDS=5 ;; esac
 LABEL=""
 
 usage() {

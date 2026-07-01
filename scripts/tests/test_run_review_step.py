@@ -37,6 +37,7 @@ import subprocess
 import time
 import unittest
 from pathlib import Path
+from typing import Optional
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 _RUN_REVIEW_STEP = _REPO_ROOT / 'scripts' / 'run_review_step.sh'
@@ -47,14 +48,19 @@ EXIT_TIMEOUT = 124
 EXIT_USAGE = 2
 
 
-def _run(*args: str, hard_timeout: float = 30.0) -> subprocess.CompletedProcess:
+def _run(
+    *args: str, hard_timeout: float = 30.0, env: Optional[dict] = None,
+) -> subprocess.CompletedProcess:
     """Invoke run_review_step.sh with args. `hard_timeout` is a test-harness
     safety net (NOT the script's --timeout): if the script itself ever wedged —
     the exact failure this helper exists to prevent — this raises rather than
-    hanging the suite."""
+    hanging the suite. `env`, when given, is merged over the current environment
+    (used to set OL_REVIEW_STEP_KILL_GRACE_SECONDS so the TERM-ignoring test
+    escalates on a short grace instead of the 5s production default)."""
     return subprocess.run(
         ['bash', str(_RUN_REVIEW_STEP), *args],
         capture_output=True, text=True, timeout=hard_timeout,
+        env={**os.environ, **env} if env else None,
     )
 
 
@@ -112,7 +118,7 @@ class RunReviewStepTimeoutTest(unittest.TestCase):
         # Ceiling 2s, command sleeps far longer. Must return 124 well within the
         # harness safety net, with the human-readable banner + ESCALATE steer.
         start = time.monotonic()
-        r = _run('--timeout', '2', '--interval', '1', '--label', 'regression check',
+        r = _run('--timeout', '1', '--interval', '1', '--label', 'regression check',
                  '--', 'bash', '-c', 'sleep 30', hard_timeout=20.0)
         elapsed = time.monotonic() - start
         self.assertEqual(r.returncode, EXIT_TIMEOUT)
@@ -125,14 +131,14 @@ class RunReviewStepTimeoutTest(unittest.TestCase):
     def test_timeout_no_terminated_job_noise_on_stdout(self):
         # The banner (stdout) is what Mirror keys off; it must be clean — no
         # bash job-control "Terminated" line bleeding into the verdict surface.
-        r = _run('--timeout', '2', '--interval', '1',
+        r = _run('--timeout', '1', '--interval', '1',
                  '--', 'bash', '-c', 'sleep 30', hard_timeout=20.0)
         self.assertEqual(r.returncode, EXIT_TIMEOUT)
         self.assertNotIn('Terminated', r.stdout)
 
     def test_timeout_kills_the_child(self):
         # On timeout the step process itself must be dead, not orphaned.
-        r = _run('--timeout', '2', '--interval', '1',
+        r = _run('--timeout', '1', '--interval', '1',
                  '--', 'bash', '-c', 'echo CHILD=$$; sleep 30', hard_timeout=20.0)
         self.assertEqual(r.returncode, EXIT_TIMEOUT)
         child_pid = None
@@ -141,14 +147,14 @@ class RunReviewStepTimeoutTest(unittest.TestCase):
                 child_pid = int(line.split('=', 1)[1])
                 break
         self.assertIsNotNone(child_pid, 'did not capture child pid from output')
-        time.sleep(1.0)  # allow the SIGTERM/SIGKILL to take effect
+        time.sleep(0.3)  # allow the SIGTERM/SIGKILL to take effect
         self.assertFalse(_pid_alive(child_pid), f'child {child_pid} lingered after timeout')
 
     def test_timeout_kills_the_process_group(self):
         # A timed-out step's descendants (e.g. pytest workers) must die too —
         # the group kill, not just the direct child. The command spawns a
         # detached-looking sleeper and prints its pid.
-        r = _run('--timeout', '2', '--interval', '1',
+        r = _run('--timeout', '1', '--interval', '1',
                  '--', 'bash', '-c', 'sleep 40 & echo GRANDCHILD=$!; wait',
                  hard_timeout=20.0)
         self.assertEqual(r.returncode, EXIT_TIMEOUT)
@@ -158,7 +164,7 @@ class RunReviewStepTimeoutTest(unittest.TestCase):
                 gc_pid = int(line.split('=', 1)[1])
                 break
         self.assertIsNotNone(gc_pid, 'did not capture grandchild pid from output')
-        time.sleep(1.0)
+        time.sleep(0.3)
         alive = _pid_alive(gc_pid)
         if alive:  # don't leak a 40s sleeper if the assertion is about to fail
             try:
@@ -170,12 +176,16 @@ class RunReviewStepTimeoutTest(unittest.TestCase):
     def test_term_ignoring_step_still_killed_within_grace(self):
         # A step that traps SIGTERM must still die at the SIGKILL escalation —
         # the wait stays bounded by ceiling + grace, never the command runtime.
+        # Use a short grace (via env) so the escalation still runs but the test
+        # doesn't pay the full 5s production grace on every suite run.
         start = time.monotonic()
-        r = _run('--timeout', '2', '--interval', '1',
-                 '--', 'bash', '-c', 'trap "" TERM; sleep 60', hard_timeout=25.0)
+        r = _run('--timeout', '1', '--interval', '1',
+                 '--', 'bash', '-c', 'trap "" TERM; sleep 60', hard_timeout=25.0,
+                 env={'OL_REVIEW_STEP_KILL_GRACE_SECONDS': '2'})
         elapsed = time.monotonic() - start
         self.assertEqual(r.returncode, EXIT_TIMEOUT)
-        # 2s ceiling + 5s grace + slack; nowhere near the 60s the step wanted.
+        # 1s ceiling + 2s grace + slack; nowhere near the 60s the step wanted.
+        # (Still exercises the full SIGTERM-ignored → SIGKILL escalation path.)
         self.assertLess(elapsed, 20.0)
 
 
