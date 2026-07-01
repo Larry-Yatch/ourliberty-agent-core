@@ -376,8 +376,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-06-30T23:55Z UTC (Iter ~3389, Tier 1)
+## Status snapshot — updated 2026-07-01T00:03Z UTC (Iter ~3390, Tier 1)
 
-**Iter ~3389 summary (2026-06-30T23:55Z):** 1 new alert (Tier-3 silence: outbox-notifier review-pass PR #782). All 8 daemons alive. Watchdog=healthy 23:47:20Z UTC. **PR #782 MERGED 23:51:50Z** (G-rule `heal-stale-daemon-code-dependency-ordering-001` → COMPLETE ✅). Archived Mirror rev0 dup for PR #781 (review-duplicate-dispatch-wip-redispatch mitigation). PR #780 (W3, no label) open ~65 min — stall healer would alert (G-rule carry, Beacon phased design awaiting Larry). PR #781 Mirror rev1 active. Stale pending approval (mirror-review-779) MOOT. **Tier 1** (consecutive_clean=0, signal: Check 3 stall + archive).
+**Iter ~3390 summary (2026-07-01T00:03Z):** 3 new alerts all Tier-3 silenced (heal-pipeline-stall PR#780 unrouted, medic-diagnosis, tier2-provisioning-drift). All 8 daemons alive. Watchdog=healthy 23:57:40Z UTC. **PR #781 Mirror REVIEW_PASS (23:54:44Z) but AUTO_MERGE_HELD — blocker=#780** (overlap on daemon-restart-manifest.json, beacon_approval_handler.py, beacon_telegram_bot.py, chain_event_emit.py, dashboard_api.py). PR #780 (W3, no label, Larry-authored) must merge or close before PR #781 auto-merges. G-rule `unreviewed-merge-larry-authored-pr-001` carry — Beacon phased design awaiting Larry. **Tier 1** (consecutive_clean=1).
 
 
