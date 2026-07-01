@@ -376,8 +376,14 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T05:57Z UTC (Iter ~3413, Tier 1)
+## G-rule gate-parallelism-monitor-regression-data-001 — 1/3 (new, iter ~3414)
 
-**Iter ~3413 summary (2026-07-01T05:57Z):** 0 new alerts (watermark 1068). PR #785 MERGED 05:55Z (Mirror PASS -> AUTO_MERGE; pipeline fully complete). PR #780 MERGED 04:26Z. 0 open PRs. 8/8 daemons alive. Watchdog healthy 05:56:50Z. Sync 05:30Z. Pipeline stall 0. Check I Wednesday: digest, 1 proposal (reconcile-675-contract-c-promote-alerts-001, 36.2-sigma, effort=small), no DM (dm_route dedup). Pending approval mirror-review-pr-ourliberty-agent-core-785 STALE ORPHAN (PR merged; Beacon to GC). Tier 1 (consecutive_clean=1). unreviewed-merge-larry-authored-pr-001 DISPATCHED, awaiting Larry response on Beacon Steps 1-2.
+**Rule:** `source=gate-parallelism-monitor, subject=regression-gate parallelism data ready` alert classifies Tier-4 (novel, no translation match). Fires when enough post-fix regression-gate data has accumulated for a suite-parallelism decision (code_pr_reviews=8, hit=3/8, retries≥2=6/8). outbox-notifier routes as `route=escalate` (DM delivered to Larry). Pulse journals only, no duplicate DM. May be a one-time data-accumulation signal rather than recurring. Watch for recurrence before dispatching to Beacon at 3/3. First occurrence iter ~3414.
+
+---
+
+## Status snapshot — updated 2026-07-01T06:12Z UTC (Iter ~3414, Tier 1)
+
+**Iter ~3414 summary (2026-07-01T06:12Z):** 7 new alerts (6 Tier-3 silenced, 1 Tier-4 — gate-parallelism-monitor novel, outbox-notifier DM'd Larry 06:03Z). watermark 1068→1075. 0 open PRs. PR #785 MERGED 05:55Z confirmed. 8/8 daemons alive. Watchdog healthy 06:02Z. Sync 05:30Z. Pipeline stall 0. ourliberty-cycle.timer was stuck; healed 06:00Z; fired 06:05Z, SubState=running. New service ourliberty-heal-stale-pr-escalations installed. stale orphan approval PR #785 (Beacon to GC). Tier 1 (consecutive_clean=0, reset on Tier-4). unreviewed-merge-larry-authored-pr-001 awaiting Larry response on Beacon Steps 1-2.
 
 
