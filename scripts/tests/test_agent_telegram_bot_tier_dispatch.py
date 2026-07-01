@@ -52,12 +52,21 @@ os.environ.pop('CLAUDE_CODE_OAUTH_TOKEN_TIER2', None)
 import agent_telegram_bot as bot  # noqa: E402
 import active_tier  # noqa: E402
 
-# Restore HOME immediately — AGENT_DIR is already frozen at bot import; leaving
-# HOME swapped would leak into sibling test modules under `discover`.
-if _SAVED_ENV['HOME'] is None:
-    os.environ.pop('HOME', None)
-else:
-    os.environ['HOME'] = _SAVED_ENV['HOME']
+# Restore the FULL import-time env immediately: `bot` and `active_tier` have already frozen
+# what they read at import (AGENT_DIR, tokens, AGENTS_ROOT), so these module-scope writes
+# must not outlive this import — or they leak into sibling modules that freeze paths at THEIR
+# import during `unittest discover` COLLECTION (which runs before any test), flipping
+# test_deploy_notifier + test_heal_orphan_autoregister by discovery order. Per-test env is
+# re-established in setUp below, so restoring here is safe. See [[test-isolation-hygiene-debt]].
+def _restore_import_env():
+    for _k, _v in _SAVED_ENV.items():
+        if _v is None:
+            os.environ.pop(_k, None)
+        else:
+            os.environ[_k] = _v
+
+
+_restore_import_env()
 
 _COSTS = _ROOT / 'agents' / 'blackboard' / 'costs.jsonl'
 

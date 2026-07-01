@@ -43,23 +43,31 @@ from test_isolation_guard import refuse_under_test  # noqa: E402
 
 # ---------- config ----------
 
+# These constants are derived at import (harmless — pure env reads / path building). The
+# FATAL validation is deferred to _require_runtime_env(), called from main(), so the module
+# stays importable without a live bot environment: tests import this file for its pure
+# helpers, and a sys.exit at import scope crashes every importer (which made test verdicts
+# depend on which sibling test happened to leak a token first), not just the one
+# misconfigured bot process.
 AGENT = os.environ.get("AGENT", "").strip().lower()
-if not AGENT or not re.match(r"^[a-z][a-z0-9_-]*$", AGENT):
-    sys.exit("ERROR: AGENT env var must be set to a valid agent slug (e.g. AGENT=forge)")
-
 TOKEN_VAR = f"TELEGRAM_BOT_TOKEN_{AGENT.upper()}"
 TOKEN = os.environ.get(TOKEN_VAR, "").strip()
-if not TOKEN:
-    sys.exit(f"ERROR: {TOKEN_VAR} not set in environment.")
-
 ALLOWED_RAW = os.environ.get("TELEGRAM_ALLOWED_CHAT_IDS", "")
 ALLOWED: set[int] = {int(x) for x in re.split(r"[,\s]+", ALLOWED_RAW) if x.strip()}
-if not ALLOWED:
-    sys.exit("ERROR: TELEGRAM_ALLOWED_CHAT_IDS empty — refusing to run a bot anyone can talk to.")
-
 AGENT_DIR = Path.home() / "agent-core" / "agents" / AGENT
-if not AGENT_DIR.is_dir():
-    sys.exit(f"ERROR: agent dir not found: {AGENT_DIR}")
+
+
+def _require_runtime_env() -> None:
+    """Fail-fast validation of the live-bot environment. Called from main() (i.e. only when
+    the bot is actually RUN), never at import. Messages unchanged from prior behavior."""
+    if not AGENT or not re.match(r"^[a-z][a-z0-9_-]*$", AGENT):
+        sys.exit("ERROR: AGENT env var must be set to a valid agent slug (e.g. AGENT=forge)")
+    if not TOKEN:
+        sys.exit(f"ERROR: {TOKEN_VAR} not set in environment.")
+    if not ALLOWED:
+        sys.exit("ERROR: TELEGRAM_ALLOWED_CHAT_IDS empty — refusing to run a bot anyone can talk to.")
+    if not AGENT_DIR.is_dir():
+        sys.exit(f"ERROR: agent dir not found: {AGENT_DIR}")
 
 _AGENTS_ROOT = Path(os.environ.get("OURLIBERTY_AGENTS_ROOT") or Path.home() / "agents")
 LOG_DIR = _AGENTS_ROOT / "logs"
@@ -305,6 +313,7 @@ def call_agent(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[st
 # ---------- main loop ----------
 
 def main() -> None:
+    _require_runtime_env()   # fail-fast on a misconfigured live env (deferred from import)
     log(f"{AGENT.title()} bot starting (cwd={AGENT_DIR}, allowed={sorted(ALLOWED)})")
     sessions = load_sessions()
     offset = 0
