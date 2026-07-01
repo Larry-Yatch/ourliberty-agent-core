@@ -121,6 +121,16 @@ PER_SERVICE_COOLDOWN_SEC = 6 * 60 * 60
 # investigation DM instead of hammering the unit.
 RESTART_COOLDOWN_SEC = 30 * 60
 
+# Grace window distinguishing a failed prior restart from a NEW deploy that
+# landed after the last restart, while still inside the 30-min restart
+# cooldown. If a script's mtime is newer than last_restart_ts by more than
+# this many seconds, it's a fresh post-restart deploy the running process
+# hasn't picked up yet → re-restart immediately instead of escalating to a
+# false "still stale after restart" DM. The ~30s grace absorbs sync/restart
+# timing races so the very deploy that triggered the restart (whose mtime
+# can land a few seconds after last_restart_ts) is NOT misread as a new one.
+FRESH_DEPLOY_GRACE_SEC = 30
+
 # Subprocess timeout for `sudo -n systemctl daemon-reload`. daemon-reload
 # is fast (re-parses unit files); 30s is comfortably above realistic
 # duration and bounds the healer tick time.
@@ -1070,25 +1080,43 @@ def check_unit(
     # vs (b) outside cooldown → attempt restart.
     if in_restart_cooldown(state, unit, now=now):
         last_restart_ts = state['services'].get(unit, {}).get('last_restart_ts')
-        # Unit was restarted recently AND is still stale — escalate to a
-        # manual-investigation DM (gated by the existing 6h subject cooldown
-        # so a chronically broken unit doesn't DM every tick).
-        if in_cooldown(state, unit, now=now):
-            log(f'{unit}: still stale after restart at '
-                f'{last_restart_ts}; in 6h DM cooldown — suppressing '
-                f'escalation DM', 'INFO')
-            return 'restart-cooldown'
-        sent = dm_larry_still_stale_after_restart(unit, last_restart_ts or 0.0)
-        # Mark the alert regardless of larry_alerts internal-cooldown outcome
-        # so the healer's own 6h gate is the binding constraint.
-        mark_alerted(state, unit, now=now)
-        save_state(state)
-        if sent:
-            log(f'{unit}: STILL STALE AFTER RESTART — escalation DM sent', 'WARN')
-        else:
-            log(f'{unit}: still-stale escalation DM suppressed by '
-                f'larry_alerts internal cooldown or write error', 'WARN')
-        return 'still-stale-after-restart'
+        # A NEW deploy landing AFTER the last restart is a distinct staleness
+        # event, not a failed restart: the running process is on the old code
+        # because it was restarted BEFORE this deploy, so re-restart instead
+        # of escalating. A genuinely-broken unit had its code on disk before
+        # the restart (script_mtime <= last_restart_ts) → fresh_deploy False →
+        # escalation path below, no re-restart, so no restart loop is possible.
+        fresh_deploy = (
+            isinstance(last_restart_ts, (int, float))
+            and script_mtime > last_restart_ts + FRESH_DEPLOY_GRACE_SEC
+        )
+        if not fresh_deploy:
+            # Unit was restarted recently AND is still stale — escalate to a
+            # manual-investigation DM (gated by the existing 6h subject cooldown
+            # so a chronically broken unit doesn't DM every tick).
+            if in_cooldown(state, unit, now=now):
+                log(f'{unit}: still stale after restart at '
+                    f'{last_restart_ts}; in 6h DM cooldown — suppressing '
+                    f'escalation DM', 'INFO')
+                return 'restart-cooldown'
+            sent = dm_larry_still_stale_after_restart(unit, last_restart_ts or 0.0)
+            # Mark the alert regardless of larry_alerts internal-cooldown outcome
+            # so the healer's own 6h gate is the binding constraint.
+            mark_alerted(state, unit, now=now)
+            save_state(state)
+            if sent:
+                log(f'{unit}: STILL STALE AFTER RESTART — escalation DM sent',
+                    'WARN')
+            else:
+                log(f'{unit}: still-stale escalation DM suppressed by '
+                    f'larry_alerts internal cooldown or write error', 'WARN')
+            return 'still-stale-after-restart'
+        # fresh_deploy → fall through to the restart path below, which
+        # re-restarts, re-marks last_restart_ts, and returns 'auto-restarted'.
+        log(f'{unit}: FRESH_DEPLOY_AFTER_RESTART — script {script_path} '
+            f'mtime is {(script_mtime - last_restart_ts):.0f}s newer than '
+            f'last_restart_ts ({last_restart_ts}); re-restarting to pick '
+            f'up the new deploy despite the restart cooldown', 'INFO')
 
     # Outside restart cooldown — attempt restart now.
     pre_restart_iso = datetime.fromtimestamp(
@@ -1183,12 +1211,31 @@ def _check_watchlist_pair(
         return 'fresh'
 
     if in_restart_cooldown(state, unit, now=now):
+        last_restart_ts = state['services'].get(unit, {}).get('last_restart_ts')
+        # Same fresh-deploy override as check_unit(), keyed on the shared lib's
+        # mtime: a shared-lib deploy landing after the last restart is a new
+        # staleness event → re-restart instead of silently suppressing. A unit
+        # that can't pick up the lib had it on disk before the restart
+        # (lib_mtime <= last_restart_ts) → fresh_deploy False → suppress, so no
+        # restart loop. Shared last_restart_ts state, same grace window.
+        fresh_deploy = (
+            isinstance(last_restart_ts, (int, float))
+            and lib_mtime > last_restart_ts + FRESH_DEPLOY_GRACE_SEC
+        )
+        if not fresh_deploy:
+            log(
+                f'watchlist: {unit} stale vs {lib_path.name} but in 30-min '
+                f'restart cooldown — suppressing duplicate restart',
+                'INFO',
+            )
+            return 'restart-cooldown'
         log(
-            f'watchlist: {unit} stale vs {lib_path.name} but in 30-min '
-            f'restart cooldown — suppressing duplicate restart',
+            f'watchlist: FRESH_DEPLOY_AFTER_RESTART {unit} — shared lib '
+            f'{lib_path.name} mtime is {(lib_mtime - last_restart_ts):.0f}s '
+            f'newer than last_restart_ts ({last_restart_ts}); re-restarting '
+            f'despite the restart cooldown',
             'INFO',
         )
-        return 'restart-cooldown'
 
     rc, stderr = auto_restart_unit(unit)
     mark_restarted(state, unit, now=now)

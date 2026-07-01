@@ -603,6 +603,123 @@ class CheckUnitTests(_IsolatedAgentsRoot):
             self.assertEqual(m_restart.call_count, 0)
             self.assertEqual(m_s.call_count, 0)
 
+    def test_fresh_deploy_inside_cooldown_re_restarts(self):
+        # A NEW deploy landing after the last restart, still inside the 30-min
+        # restart cooldown, is a fresh staleness event → re-restart, NOT an
+        # escalation DM. Reproduces the 2026-07-01 incident (PRs #792/#794
+        # wrote bot scripts 14 min after an 18:02 healer restart; the 18:22
+        # tick falsely escalated instead of picking up the 18:16 code).
+        with tempfile.TemporaryDirectory() as td:
+            script = Path(td) / 'foo.py'
+            script.write_text('# code')
+            svc = self._make_service_file(td, script)
+            now = time.time()
+            service_start = now - (60 * 60)
+            last_restart_ts = now - (20 * 60)          # 20 min ago, in cooldown
+            # Deploy landed 4 min AFTER the last restart — well past the grace.
+            script_mtime = last_restart_ts + (4 * 60)
+            os.utime(script, (script_mtime, script_mtime))
+            state = {'services': {
+                'ourliberty-foo.service': {
+                    'last_restart_ts': last_restart_ts,
+                },
+            }}
+            dms = self._stub_dms()
+            with self._stub_systemctl({
+                'ActiveEnterTimestamp':
+                    time.strftime('%Y-%m-%d %H:%M:%S',
+                                  time.localtime(service_start)),
+                'FragmentPath': str(svc),
+            }), self._stub_restart(rc=0) as m_restart, self._stub_prs(), \
+                    dms['restarted'] as m_r, dms['failed'] as m_f, \
+                    dms['still_stale'] as m_s:
+                outcome = h.check_unit('ourliberty-foo.service', state, now=now)
+            self.assertEqual(outcome, 'auto-restarted')
+            self.assertEqual(m_restart.call_count, 1)
+            self.assertEqual(m_r.call_count, 1)
+            self.assertEqual(m_f.call_count, 0)
+            # No false escalation.
+            self.assertEqual(m_s.call_count, 0)
+            # last_restart_ts advanced to the re-restart.
+            self.assertEqual(
+                state['services']['ourliberty-foo.service']['last_restart_ts'],
+                now,
+            )
+
+    def test_genuine_still_stale_inside_cooldown_still_escalates(self):
+        # Loop-safety invariant: a genuinely-broken unit had its code on disk
+        # BEFORE the restart (script_mtime <= last_restart_ts), so the
+        # fresh-deploy override must NOT fire — escalation still happens, no
+        # re-restart, no loop.
+        with tempfile.TemporaryDirectory() as td:
+            script = Path(td) / 'foo.py'
+            script.write_text('# code')
+            svc = self._make_service_file(td, script)
+            now = time.time()
+            service_start = now - (60 * 60)
+            last_restart_ts = now - (10 * 60)          # 10 min ago, in cooldown
+            # Code was on disk before the restart.
+            script_mtime = last_restart_ts - (5 * 60)
+            os.utime(script, (script_mtime, script_mtime))
+            state = {'services': {
+                'ourliberty-foo.service': {
+                    'last_restart_ts': last_restart_ts,
+                },
+            }}
+            dms = self._stub_dms()
+            with self._stub_systemctl({
+                'ActiveEnterTimestamp':
+                    time.strftime('%Y-%m-%d %H:%M:%S',
+                                  time.localtime(service_start)),
+                'FragmentPath': str(svc),
+            }), self._stub_restart(rc=0) as m_restart, self._stub_prs(), \
+                    dms['restarted'] as m_r, dms['failed'] as m_f, \
+                    dms['still_stale'] as m_s:
+                outcome = h.check_unit('ourliberty-foo.service', state, now=now)
+            self.assertEqual(outcome, 'still-stale-after-restart')
+            self.assertEqual(m_restart.call_count, 0)   # NO re-restart
+            self.assertEqual(m_s.call_count, 1)
+            self.assertEqual(m_r.call_count, 0)
+            self.assertEqual(m_f.call_count, 0)
+
+    def test_fresh_deploy_grace_boundary_is_strict(self):
+        # Boundary: script_mtime == last_restart_ts + FRESH_DEPLOY_GRACE_SEC is
+        # NOT a fresh deploy (strict >) → escalation, no re-restart. One second
+        # past the grace IS a fresh deploy → re-restart.
+        def _run(mtime_offset):
+            with tempfile.TemporaryDirectory() as td:
+                script = Path(td) / 'foo.py'
+                script.write_text('# code')
+                svc = self._make_service_file(td, script)
+                now = time.time()
+                service_start = now - (60 * 60)
+                last_restart_ts = now - (10 * 60)
+                script_mtime = last_restart_ts + mtime_offset
+                os.utime(script, (script_mtime, script_mtime))
+                state = {'services': {
+                    'ourliberty-foo.service': {
+                        'last_restart_ts': last_restart_ts,
+                    },
+                }}
+                dms = self._stub_dms()
+                with self._stub_systemctl({
+                    'ActiveEnterTimestamp':
+                        time.strftime('%Y-%m-%d %H:%M:%S',
+                                      time.localtime(service_start)),
+                    'FragmentPath': str(svc),
+                }), self._stub_restart(rc=0), self._stub_prs(), \
+                        dms['restarted'], dms['failed'], dms['still_stale']:
+                    return h.check_unit('ourliberty-foo.service', state, now=now)
+
+        # Exactly at the boundary → not fresh.
+        self.assertEqual(
+            _run(h.FRESH_DEPLOY_GRACE_SEC), 'still-stale-after-restart',
+        )
+        # One second past the boundary → fresh.
+        self.assertEqual(
+            _run(h.FRESH_DEPLOY_GRACE_SEC + 1), 'auto-restarted',
+        )
+
     def test_pr_list_omitted_when_git_log_empty(self):
         # Empty PR list flows through to the DM call cleanly.
         with tempfile.TemporaryDirectory() as td:
@@ -1259,6 +1376,80 @@ class SharedLibWatchlistTests(_IsolatedAgentsRoot):
                     },
                 },
             }
+            watchlist = {lib: {'ourliberty-foo.service'}}
+            ts_str = time.strftime(
+                '%Y-%m-%d %H:%M:%S', time.localtime(service_start),
+            )
+            dms = self._stub_dms()
+            with self._patch_watchlist(watchlist), \
+                    self._stub_systemctl({
+                        'ourliberty-foo.service': {
+                            'ActiveEnterTimestamp': ts_str,
+                        },
+                    }), self._stub_restart() as m_restart, \
+                    dms['restarted'] as m_r:
+                counts = h.check_shared_lib_watchlist(state, now=now)
+            self.assertEqual(counts.get('restart-cooldown'), 1)
+            self.assertEqual(m_restart.call_count, 0)
+            self.assertEqual(m_r.call_count, 0)
+
+    def test_fresh_lib_deploy_inside_cooldown_re_restarts(self):
+        # Watchlist analogue of the fresh-deploy override: a shared-lib deploy
+        # landing after the last restart, still inside the 30-min cooldown, is
+        # a new staleness event → re-restart instead of silently suppressing.
+        with tempfile.TemporaryDirectory() as td:
+            lib = Path(td) / 'lib.py'
+            lib.write_text('')
+            now = time.time()
+            service_start = now - (60 * 60)
+            last_restart_ts = now - (20 * 60)          # 20 min ago, in cooldown
+            lib_mtime = last_restart_ts + (4 * 60)     # deploy after the restart
+            os.utime(lib, (lib_mtime, lib_mtime))
+            state = {'services': {
+                'ourliberty-foo.service': {
+                    'last_restart_ts': last_restart_ts,
+                },
+            }}
+            watchlist = {lib: {'ourliberty-foo.service'}}
+            ts_str = time.strftime(
+                '%Y-%m-%d %H:%M:%S', time.localtime(service_start),
+            )
+            dms = self._stub_dms()
+            with self._patch_watchlist(watchlist), \
+                    self._stub_systemctl({
+                        'ourliberty-foo.service': {
+                            'ActiveEnterTimestamp': ts_str,
+                        },
+                    }), self._stub_restart(rc=0) as m_restart, \
+                    self._stub_prs(), \
+                    dms['restarted'] as m_r, dms['failed'] as m_f:
+                counts = h.check_shared_lib_watchlist(state, now=now)
+            self.assertEqual(counts.get('auto-restarted'), 1)
+            self.assertEqual(m_restart.call_count, 1)
+            self.assertEqual(m_r.call_count, 1)
+            self.assertEqual(m_f.call_count, 0)
+            self.assertEqual(
+                state['services']['ourliberty-foo.service']['last_restart_ts'],
+                now,
+            )
+
+    def test_stale_lib_on_disk_before_restart_stays_suppressed(self):
+        # Loop-safety analogue: a lib that was on disk before the restart
+        # (lib_mtime <= last_restart_ts) must NOT trigger the override — stays
+        # 'restart-cooldown', no re-restart.
+        with tempfile.TemporaryDirectory() as td:
+            lib = Path(td) / 'lib.py'
+            lib.write_text('')
+            now = time.time()
+            service_start = now - (60 * 60)
+            last_restart_ts = now - (10 * 60)          # 10 min ago, in cooldown
+            lib_mtime = last_restart_ts - (5 * 60)     # before the restart
+            os.utime(lib, (lib_mtime, lib_mtime))
+            state = {'services': {
+                'ourliberty-foo.service': {
+                    'last_restart_ts': last_restart_ts,
+                },
+            }}
             watchlist = {lib: {'ourliberty-foo.service'}}
             ts_str = time.strftime(
                 '%Y-%m-%d %H:%M:%S', time.localtime(service_start),
