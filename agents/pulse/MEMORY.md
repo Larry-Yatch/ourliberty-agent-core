@@ -376,8 +376,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T00:36Z UTC (Iter ~3393, Tier 1)
+## Status snapshot — updated 2026-07-01T00:40Z UTC (Iter ~3394, Tier 1)
 
-**Iter ~3393 summary (2026-07-01T00:36Z):** 3 alerts: 2 Tier-3 silenced (heal-stale-daemon auto-restarted chain_event_shipper, sync.service deploy-restart-storm). 1 Tier-4 (ourliberty-health sync_freshness error at 00:20:18Z) — self-healed (sync success 00:30:38Z); no DM per actionable-only. All 8 daemons restarted at 00:30Z (deploy-restart-storm, PR #781 merged). **PR #781 MERGED** at 00:28:15Z (2c5a7449 feat(approval-sync): Phase 2 — canonical decision key + resolve fan-out). PR #780 (W3, no label, Larry-authored) still OPEN. G-rule `unreviewed-merge-larry-authored-pr-001` carry — Beacon phased design awaiting Larry. **Tier reset 2→1** (Tier-4 signal, consecutive_clean=0).
+**Iter ~3394 summary (2026-07-01T00:40Z):** 0 new alerts. All 8 daemons alive (new PIDs post-restart-storm, PR #781). Watchdog healthy 18:39 MDT. Sync success. Pipeline stall 0. PR #780 (W3, no label, Larry-authored) still open — stall healer cooldown-suppressed. G-rule `unreviewed-merge-larry-authored-pr-001` carry — Beacon phased design awaiting Larry. **Tier 1** (consecutive_clean=1). PRIME DIRECTIVE ratio=16.41 improving.
 
 
