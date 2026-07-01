@@ -376,8 +376,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T04:39Z UTC (Iter ~3403, Tier 1)
+## Status snapshot — updated 2026-07-01T04:47Z UTC (Iter ~3404, Tier 1)
 
-**Iter ~3403 summary (2026-07-01T04:39Z):** 2 new alerts: L1056 Tier-3 (dispatch-branch-cleanup), L1057 Tier-4 (unreviewed-merge:780, DM delivered 04:31Z). Source repo fast-forwarded 7533d9c9→dfba1349 (PR#783 run_review_step.sh). PR #783 auto-merged 04:31Z. PR #780 confirmed merged without Mirror review (4th G-rule occurrence, Beacon phased fix awaiting Larry). 8/8 daemons alive (beacon restarted PID 1989134). Watchdog healthy 04:35Z. Sync 04:31Z. Pipeline stall 0. No open PRs. Check I self-dedup week 27. **Tier 1** (reset from Tier 3, consecutive_clean=0). PRIME DIRECTIVE ratio 16.20 improving.
+**Iter ~3404 summary (2026-07-01T04:47Z):** 1 new alert: L1058 Tier-3 silence (pulse/check-i-2026-06-29 digest). All 8 daemons alive. Watchdog healthy 04:40Z. Sync 04:31Z. Pipeline stall 0. 0 pending approvals (stale mirror-review-pr-779 self-resolved). PR #783 auto-merged 04:31Z (Mirror REVIEW_PASS). PR #784 NEW OPEN no-label Larry W4 (created 04:41Z) — G-rule `unreviewed-merge-larry-authored-pr-001` carry risk (potential 5th occurrence). Check I self-dedup week 27. **Tier 1** (consecutive_clean 0→1). PRIME DIRECTIVE ratio 16.19 improving.
 
 
