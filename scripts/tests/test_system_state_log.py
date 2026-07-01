@@ -658,6 +658,27 @@ class WaitingSequencesReaderTest(unittest.TestCase):
                 {'OURLIBERTY_BUILD_SEQUENCES_DIR': '/no/such/build-seqs'}):
             self.assertEqual(ssl.load_waiting_sequences(_NOW), [])
 
+    def test_read_failure_strict_raises_default_soft_empty(self):
+        # A transient per-file read hiccup: strict=False degrades to [] (the
+        # dashboard read model's fail-safe), but strict=True RAISES so the
+        # emit-time projection can skip instead of blind-clearing still-open rows.
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp) / 'build-sequences'
+            self._write_seq(d, 'seq-1', {
+                'seq_id': 'seq-1', 'status': 'paused', 'steps': [],
+                'audit_log': [
+                    {'ts': '2026-06-19T11:00:00+00:00', 'event': 'paused'},
+                ],
+            })
+            with mock.patch.dict(
+                    os.environ,
+                    {'OURLIBERTY_BUILD_SEQUENCES_DIR': str(d)}), \
+                 mock.patch.object(
+                    Path, 'read_text', side_effect=OSError('transient read')):
+                self.assertEqual(ssl.load_waiting_sequences(_NOW), [])
+                with self.assertRaises(OSError):
+                    ssl.load_waiting_sequences(_NOW, strict=True)
+
     def test_terminal_sequence_with_stuck_step_yields_nothing(self):
         # An archived/complete/failed/retired sequence whose leftover step is
         # still `dispatched` with no PR (real case: orchestrator-bootstrap-001,

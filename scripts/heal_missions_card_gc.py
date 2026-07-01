@@ -581,6 +581,48 @@ def age_parked_captures(registry: dict[str, Any], now: datetime,
     return newly
 
 
+def project_parked_captures(
+    registry: dict[str, Any], now: datetime, *, reconcile_fn=None,
+) -> dict:
+    """Project the `parked_capture` read-model rows (approval-sync Phase 3a
+    §3a.1). This healer is the sole captures.json committer and already holds the
+    full parked set each tick, so it is the natural emit-time source: hand the
+    parked captures to `reconcile_open_events`, which emits a row for each and
+    clears the row of any capture that has since left `parked` (promoted /
+    dropped / delegated). One chain_events substrate, no dashboard re-derive.
+
+    lane='parked' / needs_larry=False: the parked backlog is a calm lane that
+    never drives the Needs-You badge. Best-effort — never raises; returns the
+    reconcile summary (or a skipped stub if the chain_events seam is absent).
+    `reconcile_fn` is a test seam (defaults to the real reconcile)."""
+    if reconcile_fn is None:
+        try:
+            import chain_event_emit as cee  # noqa: PLC0415 — lazy, optional dep
+        except Exception:  # noqa: BLE001 — projection is optional
+            return {'emitted': 0, 'cleared': 0, 'skipped': True}
+        reconcile_fn = cee.reconcile_open_events
+    desired: dict[str, Any] = {}
+    for cap in registry.get('captures', []):
+        if not isinstance(cap, dict) or cap.get('state') != 'parked':
+            continue
+        cid = cap.get('id')
+        if not isinstance(cid, str) or not cid:
+            continue
+        origin = cap.get('origin') if isinstance(cap.get('origin'), dict) else {}
+        desired[f'capture-{cid}'] = {
+            'ts': cap.get('last_touched') or origin.get('captured_at'),
+            'payload': {
+                'capture_id': cid,
+                'title': cap.get('title'),
+                'lane': 'parked',
+                'needs_larry': False,
+                'aging': bool(cap.get('aging')),
+            },
+        }
+    return reconcile_fn(
+        'parked_capture', desired, agent='heal_missions_card_gc')
+
+
 def _atomic_write_json(path: Path, data: dict[str, Any]) -> None:
     """tmp-in-same-dir + os.replace. Mirrors dashboard_api._atomic_write_captures
     so a reader never sees a partial file."""
@@ -1662,6 +1704,22 @@ def run_once(*, dry_run: bool,
                             'onto a fresh re-read (lost-update guard)')
                 except Exception as e:  # noqa: BLE001 — fail-safe
                     log(f'captures.json write raised: {type(e).__name__}: {e}')
+            # Project the parked_capture read-model rows (approval-sync Phase 3a).
+            # Runs every LIVE tick (independent of whether a captures.json write
+            # happened this tick — a capture can leave `parked` via a phase
+            # reconcile that also triggers the write, but the clear must fire even
+            # on ticks with no aging/brief delta). Uses the post-reconcile
+            # in-memory registry so this tick's state changes are reflected.
+            if not dry_run:
+                try:
+                    summary = project_parked_captures(registry, now)
+                    if summary.get('emitted') or summary.get('cleared'):
+                        log(f'parked_capture projection: '
+                            f'emitted={summary.get("emitted")} '
+                            f'cleared={summary.get("cleared")}')
+                except Exception as e:  # noqa: BLE001 — never abort the tick
+                    log(f'parked_capture projection raised: '
+                        f'{type(e).__name__}: {e}')
             if not dry_run:
                 core = repo_paths.get('ourliberty-agent-core')
                 if core:
