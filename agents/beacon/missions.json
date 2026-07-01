@@ -6702,7 +6702,12 @@
         "at": "2026-06-30T22:09:16.094924+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-01T00:30:20.624922+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#781"
     },
     {
       "id": "proposed-heal-stale-daemon-restart-ordering-001",
