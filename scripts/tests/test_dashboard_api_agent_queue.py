@@ -94,12 +94,16 @@ class _ChainEventsClient:
         self._filters: dict[str, Any] = {}
         self._gte: dict[str, Any] = {}
         self._cols: str = '*'
+        self._order: list[tuple[str, bool]] = []
+        self._range: Optional[tuple[int, int]] = None
 
     def table(self, name: str):
         self._table = name
         self._filters = {}
         self._gte = {}
         self._cols = '*'
+        self._order = []
+        self._range = None
         return self
 
     def select(self, cols: str = '*'):
@@ -114,12 +118,34 @@ class _ChainEventsClient:
         self._gte[col] = val
         return self
 
+    def order(self, col: str, desc: bool = False):
+        self._order.append((col, desc))
+        return self
+
+    def range(self, lo: int, hi: int):
+        # PostgREST .range is an inclusive [lo, hi] window.
+        self._range = (lo, hi)
+        return self
+
     def execute(self):
         agent = self._filters.get('agent')
         data = [r for r in self.rows if r.get('agent') == agent]
         for col, val in self._gte.items():
             data = [r for r in data
                     if r.get(col) is not None and r.get(col) >= val]
+        # Apply the (ts, event_id) total order the paginated fetch relies on.
+        # Sort on FULL rows before projection (event_id is not selected) and
+        # apply the least-significant key first so stable sort composes them.
+        # The key puts None last so a column absent from the fixtures (e.g.
+        # event_id) never trips a None-vs-value comparison.
+        for col, desc in reversed(self._order):
+            data.sort(
+                key=lambda r, c=col: (r.get(c) is None, r.get(c)),
+                reverse=desc,
+            )
+        if self._range is not None:
+            lo, hi = self._range
+            data = data[lo:hi + 1]
         if self._cols != '*':
             keep = [c.strip() for c in self._cols.split(',')]
             data = [{k: r.get(k) for k in keep} for r in data]
