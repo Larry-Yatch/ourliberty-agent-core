@@ -376,8 +376,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T05:45Z UTC (Iter ~3411, Tier 1)
+## Status snapshot — updated 2026-07-01T05:51Z UTC (Iter ~3412, Tier 1)
 
-**Iter ~3411 summary (2026-07-01T05:45Z):** 1 new alert (watermark 1067→1068, Tier-3 silenced: heal-claude-json-bind-drift probe-blind). All 8 daemons alive. Watchdog healthy 05:41Z. Sync 05:30Z (~15 min old). Pipeline stall 0. 1 pending approval: `mirror-review-pr-ourliberty-agent-core-785` (PR #785 Mirror timeout, chat_id=None — DM NOT delivered). Retry dispatched 05:40Z UTC. PRs #786/#787/#788 Mirror review in progress. Tree CLEAN. **ESCALATED Tier 2→1** (signal: PR #785 timeout APPROVAL_REQUEST gap). Escalation #15 written to pulse-escalations.json. PRIME DIRECTIVE ratio 16.10 improving.
+**Iter ~3412 summary (2026-07-01T05:51Z):** 0 new alerts (watermark 1068). ff-main auto-fix applied (0f770174→dc1c8d34; PR #788 heal_stale_pr_escalations merged at 05:48Z). PRs #786/#787/#788 all MERGED since iter ~3411. PR #785 OPEN, Mirror retry review in progress (chat_id=None pending approval carry). All 8 daemons alive. Watchdog healthy 05:46Z. Sync 05:30Z (~21 min old). Pipeline stall 0. Tier 1 (consecutive_clean=0). Escalation #15 (PR #785 APPROVAL_REQUEST undelivered) standing carry.
 
 
