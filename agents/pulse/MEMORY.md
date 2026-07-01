@@ -186,9 +186,9 @@ Triage helper returned Tier-3 for source=heal-stale-daemon-code subject^=auto-re
 
 ---
 
-## G-rule heal-stale-daemon-code-still-stale-after-restart → DISPATCHED ✅ (iter ~3441), vp
+## G-rule heal-stale-daemon-code-still-stale-after-restart → FORGE BUILD DISPATCHED ✅ (iter ~3449), vp
 
-**Rule:** `source=heal-stale-daemon-code, subject^=still-stale-after-restart:` alerts fire when the healer attempted a restart but the service's ActiveEnterTimestamp is STILL older than the script file (healer won't retry). Root cause (iter ~3441): healer's "no further attempts" doesn't distinguish (a) restart didn't pick up code vs (b) NEW code deployed after restart — case (b) should reset the retry counter. Fix dispatched: `direction-ask-heal-stale-post-deploy-retry-001.json` to Beacon inbox — check if `script_mtime > (restart_attempt_ts + grace_period_s)` and if so treat as fresh staleness event. Remediation until fix lands: `sudo systemctl restart <service>`. NOT a silence candidate. Occurrences: iter ~2712 (1/3, outbox-notifier pre-PR700); iter ~3383 (2/3, forge-bot + mirror-bot + pulse-bot after PR #775 — all self-corrected); iter ~3441 (3/3, beacon-bot + outbox-notifier after PRs #792/#794 — healer refuses retry, services stayed stale). verification_pending.
+**Rule:** `source=heal-stale-daemon-code, subject^=still-stale-after-restart:` alerts fire when the healer attempted a restart but the service's ActiveEnterTimestamp is STILL older than the script file (healer won't retry). Root cause (iter ~3441): healer's "no further attempts" doesn't distinguish (a) restart didn't pick up code vs (b) NEW code deployed after restart — case (b) should reset the retry counter. Fix dispatched: `direction-ask-heal-stale-post-deploy-retry-001.json` to Beacon inbox — check if `script_mtime > (restart_attempt_ts + grace_period_s)` and if so treat as fresh staleness event. Remediation until fix lands: `sudo systemctl restart <service>`. NOT a silence candidate. Occurrences: iter ~2712 (1/3, outbox-notifier pre-PR700); iter ~3383 (2/3, forge-bot + mirror-bot + pulse-bot after PR #775 — all self-corrected); iter ~3441 (3/3, beacon-bot + outbox-notifier after PRs #792/#794 — healer refuses retry, services stayed stale). **Iter ~3449: Larry approved APPROVAL_REQUEST `heal-stale-daemon-fresh-deploy-retry-001` via dashboard 13:48 MDT → Beacon processed → Forge `build-heal-stale-daemon-fresh-deploy-retry-001.json` dispatched 13:53 MDT. Forge build active.** verification_pending (Forge PR → Mirror → merge).
 
 ---
 
@@ -382,8 +382,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T19:46Z UTC (Iter ~3448, Tier 1)
+## Status snapshot — updated 2026-07-01T19:54Z UTC (Iter ~3449, Tier 1)
 
-**Iter ~3448 summary (2026-07-01T19:46Z):** All checks nominal. Mirror actively reviewing PR #799 (claude PID 2494411, 13+ min in; regression check subprocess PID 2503301 started 13:39 MDT, 900s timeout). PR #796 REVIEW_PASS, AUTO_MERGE_HELD blocker=#797. PR #797 no auto-review label (G-rule unreviewed-merge-larry-authored 5th-level, Beacon Steps 1-2 awaiting Larry). Zombie bash PID 1834248 (34d+, Check VIII poll loop, 0% CPU, ask-then-do carry). APPROVAL_REQUEST `heal-stale-daemon-fresh-deploy-retry-001` pending Larry (chat_id=7998341473). Sync 19:33Z. Pipeline 0 stalls. **Tier 1** (consecutive_clean=2; 1 more clean iter → Tier 2; cadence 5 min).
+**Iter ~3449 summary (2026-07-01T19:54Z):** Always-fix: fast-forward 35261f01→6307d1c3 (PR #799 merged 19:48:56Z, Mirror REVIEW_PASS + AUTO_MERGE). Check 0: watermark rotation-gap auto-repaired 1069→1068. **G-rule `heal-stale-daemon-code-still-stale-after-restart` PIPELINE PROGRESSED**: Larry approved APPROVAL_REQUEST via dashboard 13:48 MDT → Beacon processed → Forge `build-heal-stale-daemon-fresh-deploy-retry-001.json` dispatched 13:53 MDT — Forge build active. Mirror reviewing PR #796 (regression check 13:50 MDT, 1500s timeout). PR #797 open, no label, blocking PR #796 (G-rule carry). Zombie bash PID 1834248 (34d+, ask-then-do carry) + 6 orphaned journalctl PIDs from May 25-26 (0% CPU, ask-then-do carry). Sync 19:33Z. Pipeline 0 real stalls. Beacon processed inbox + cleared. **Tier 1** (consecutive_clean=0; cadence 5 min).
 
 
