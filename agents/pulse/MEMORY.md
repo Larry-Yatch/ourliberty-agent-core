@@ -376,8 +376,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T02:23Z UTC (Iter ~3399, Tier 3)
+## Status snapshot — updated 2026-07-01T02:51Z UTC (Iter ~3400, Tier 3)
 
-**Iter ~3399 summary (2026-07-01T02:23Z):** 0 new alerts. 8/8 daemons alive. Watchdog healthy 20:17 MDT. Sync no-change (~51 min old). Pipeline stall 0. Check I self-dedup (week 27, no dispatches). PR #780 (W3, no label) now **MERGEABLE** (was UNKNOWN) — awaiting Larry response on Beacon phased fix. Transient Telegram bot 502 errors at 19:12–19:13 MDT — self-resolved, watchdog healthy post-blip. **Tier 3** (consecutive_clean=1). PRIME DIRECTIVE ratio 16.24 improving.
+**Iter ~3400 summary (2026-07-01T02:51Z):** 1 alert Tier-3 silence (pulse/check-i-2026-06-29 digest). 8/8 daemons alive. Watchdog healthy 20:47 MDT (02:47Z). Sync no-change (~21 min old). Pipeline stall 0. Check I self-dedup (week 27, no dispatches). PR #780 (W3, no label, MERGEABLE) — awaiting Larry response on Beacon phased fix. **Tier 3** (consecutive_clean=2). PRIME DIRECTIVE ratio 16.175 improving.
 
 
