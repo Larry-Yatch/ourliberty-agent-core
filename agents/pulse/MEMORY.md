@@ -382,8 +382,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T12:17Z UTC (Iter ~3429, Tier 3)
+## Status snapshot — updated 2026-07-01T12:47Z UTC (Iter ~3430, Tier 3)
 
-**Iter ~3429 summary (2026-07-01T12:17Z):** 1 new alert idx=1045 (heal-tier2-weekly-probe/tier2_provisioning_drift, Tier-3 silenced; outbox-notifier already DM'd Larry at 12:01Z). Watermark=1046. 0 open PRs. Daemons: beacon_telegram_bot PID 2013734 + outbox_notifier PID 2015271 confirmed alive; watchdog overall=healthy 12:15Z UTC. Sync 11:31Z (~45 min old). Pipeline stall 0. Heal-daemon heartbeat fresh (12:08Z). Worktrees: 0. Stale orphan approval PR #785 (chat_id=None, PR MERGED 05:55Z, Beacon to GC, carry moot). **Tier 3** (consecutive_clean=7; cadence 30 min). unreviewed-merge-larry-authored-pr-001 awaiting Larry response on Beacon Steps 1-2. gate-parallelism-monitor Tier-4 (1/3, carry). heal-stale-daemon-code-still-stale-after-restart 2/3 (carry). watchdog-log-growth-idle-overnight-001 2/3 (carry). heal-credential-registry-drift-origin-unreachable-tier4-001 1/3 (carry). PRIME DIRECTIVE ratio: 15.32, trend=improving.
+**Iter ~3430 summary (2026-07-01T12:47Z):** 0 new alerts. Watermark=1046. 0 open PRs. Daemons: beacon_telegram_bot PID 2013734 + outbox_notifier PID 2015271 confirmed alive; watchdog overall=healthy 12:41Z UTC. Sync 12:31Z (~14 min old). Pipeline stall 0. Heal-daemon heartbeat fresh (12:38Z). Worktrees: 0. Stale orphan approval PR #785 (chat_id=None, PR MERGED 05:55Z, Beacon to GC, carry moot). **Tier 3** (consecutive_clean=8; cadence 30 min). unreviewed-merge-larry-authored-pr-001 awaiting Larry response on Beacon Steps 1-2. gate-parallelism-monitor Tier-4 (1/3, carry). heal-stale-daemon-code-still-stale-after-restart 2/3 (carry). watchdog-log-growth-idle-overnight-001 2/3 (carry). heal-credential-registry-drift-origin-unreachable-tier4-001 1/3 (carry). PRIME DIRECTIVE ratio: 15.27, trend=flat.
 
 
