@@ -376,8 +376,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T02:51Z UTC (Iter ~3400, Tier 3)
+## Status snapshot — updated 2026-07-01T03:28Z UTC (Iter ~3401, Tier 3)
 
-**Iter ~3400 summary (2026-07-01T02:51Z):** 1 alert Tier-3 silence (pulse/check-i-2026-06-29 digest). 8/8 daemons alive. Watchdog healthy 20:47 MDT (02:47Z). Sync no-change (~21 min old). Pipeline stall 0. Check I self-dedup (week 27, no dispatches). PR #780 (W3, no label, MERGEABLE) — awaiting Larry response on Beacon phased fix. **Tier 3** (consecutive_clean=2). PRIME DIRECTIVE ratio 16.175 improving.
+**Iter ~3401 summary (2026-07-01T03:28Z):** 0 new alerts. 8/8 daemons alive. Watchdog healthy 21:23 MDT (03:23Z). Sync no-change (~58 min old). Pipeline stall 0. Check I self-dedup (week 27, no dispatches). PR #780 (W3, no label, MERGEABLE) — awaiting Larry response on Beacon phased fix. **Tier 3** (consecutive_clean=3). PRIME DIRECTIVE ratio 16.1 improving.
 
 
