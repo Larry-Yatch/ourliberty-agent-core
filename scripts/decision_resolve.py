@@ -151,17 +151,17 @@ def _resolve_escalations(key: str, log: logging.Logger) -> int:
         log.warning('resolve_decision E-leg import failed (key=%s): %s: %s',
                     key, type(e).__name__, e)
         return 0
-    cleared = 0
     try:
-        for row in fle.list_open():
-            if _escalation_row_key(row) == key:
-                rid = row.get('id')
-                if rid and fle.clear(rid):
-                    cleared += 1
+        ids = [
+            row.get('id') for row in fle.list_open()
+            if _escalation_row_key(row) == key and row.get('id')
+        ]
+        # Phase 2.1 FIX 2: one locked batch clear, not N unlocked per-row clears.
+        return fle.clear_many(ids) if ids else 0
     except Exception as e:  # noqa: BLE001
         log.warning('resolve_decision E-leg failed (key=%s): %s: %s',
                     key, type(e).__name__, e)
-    return cleared
+        return 0
 
 
 def _resolve_alerts(key: str, log: logging.Logger) -> int:

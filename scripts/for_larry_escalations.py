@@ -63,6 +63,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 import atomic_io  # noqa: E402
+import file_lock  # noqa: E402
 
 
 def _decision_key_for(record_id: Optional[str], pr_url: Optional[str]) -> Optional[str]:
@@ -153,12 +154,28 @@ def _prune(rows: list[dict[str, Any]], now: datetime) -> list[dict[str, Any]]:
     return open_rows + resolved[len(resolved) - slots:]
 
 
+def _feed_lock():
+    """The SAME sidecar lock `for_larry_signal` takes on this file, so the two
+    producers of `for-larry-escalations.json` mutually exclude (Phase 2.1 FIX 2).
+    Every load-modify-save below holds it across the whole envelope."""
+    return file_lock.exclusive_lock(file_lock.sidecar_lock_path(feed_path()))
+
+
 def _save(rows: list[dict[str, Any]], now: datetime) -> None:
+    """Write the `escalations` list back WITHOUT dropping any sibling top-level
+    key (Phase 2.1 FIX 2). The Phase 2 version wrote `{'escalations': ...}` from
+    scratch, which clobbered `for_larry_signal`'s `records` key on the shared
+    file. Read the current full doc under the caller's lock, replace only our
+    key, and rewrite — so the two schemas coexist on one file."""
     path = feed_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    atomic_io.atomic_write_json(
-        path, {'escalations': _prune(rows, now)}, sort_keys=True,
-    )
+    try:
+        existing = json.loads(path.read_text())
+        doc = existing if isinstance(existing, dict) else {}
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        doc = {}
+    doc['escalations'] = _prune(rows, now)
+    atomic_io.atomic_write_json(path, doc, sort_keys=True)
 
 
 # -------------------- lifecycle --------------------
@@ -196,37 +213,38 @@ def upsert(
         return None
     n = _now(now)
     try:
-        rows = _load()
-        existing = next((r for r in rows if r.get('id') == record_id), None)
-        if (
-            isinstance(existing, dict)
-            and existing.get('resolved') is not True
-            and existing.get('dedup_identity') == dedup_identity
-        ):
-            return None  # already surfaced for this exact PR+head SHA
-        created = (existing or {}).get('ts') if isinstance(existing, dict) else None
-        if not isinstance(created, str) or not created:
-            created = _iso(n)
-        row = {
-            'id': record_id,
-            'source': source,
-            'headline': headline,
-            'context': context,
-            'severity': severity,
-            'pr_url': pr_url,
-            'head_sha': head_sha,
-            'dedup_identity': dedup_identity,
-            'decision_key': decision_key or _decision_key_for(record_id, pr_url),
-            'for_larry': True,
-            'resolved': False,
-            'resolved_at': None,
-            'ts': created,
-            'updated_at': _iso(n),
-        }
-        rows = [r for r in rows if r.get('id') != record_id]
-        rows.append(row)
-        _save(rows, n)
-        return row
+        with _feed_lock():  # FIX 2: serialize the load→save envelope
+            rows = _load()
+            existing = next((r for r in rows if r.get('id') == record_id), None)
+            if (
+                isinstance(existing, dict)
+                and existing.get('resolved') is not True
+                and existing.get('dedup_identity') == dedup_identity
+            ):
+                return None  # already surfaced for this exact PR+head SHA
+            created = (existing or {}).get('ts') if isinstance(existing, dict) else None
+            if not isinstance(created, str) or not created:
+                created = _iso(n)
+            row = {
+                'id': record_id,
+                'source': source,
+                'headline': headline,
+                'context': context,
+                'severity': severity,
+                'pr_url': pr_url,
+                'head_sha': head_sha,
+                'dedup_identity': dedup_identity,
+                'decision_key': decision_key or _decision_key_for(record_id, pr_url),
+                'for_larry': True,
+                'resolved': False,
+                'resolved_at': None,
+                'ts': created,
+                'updated_at': _iso(n),
+            }
+            rows = [r for r in rows if r.get('id') != record_id]
+            rows.append(row)
+            _save(rows, n)
+            return row
     except OSError:
         return None
 
@@ -237,21 +255,33 @@ def clear(record_id: str, *, now: Optional[datetime] = None) -> bool:
     Never raises."""
     if not record_id:
         return False
+    return clear_many([record_id], now=now) > 0
+
+
+def clear_many(record_ids, *, now: Optional[datetime] = None) -> int:
+    """Mark several ids RESOLVED in ONE locked load-modify-save (Phase 2.1 FIX 2).
+    The resolve fan-out's E-leg used to call `clear` per matching row — N unlocked
+    read-modify-writes of the same file, each racing a concurrent producer upsert.
+    This does one locked pass. Returns the count newly cleared. Never raises."""
+    ids = {r for r in record_ids if r}
+    if not ids:
+        return 0
     n = _now(now)
     try:
-        rows = _load()
-        changed = False
-        for row in rows:
-            if row.get('id') == record_id and row.get('resolved') is not True:
-                row['resolved'] = True
-                row['resolved_at'] = _iso(n)
-                row['updated_at'] = _iso(n)
-                changed = True
-        if changed:
-            _save(rows, n)
-        return changed
+        with _feed_lock():
+            rows = _load()
+            cleared = 0
+            for row in rows:
+                if row.get('id') in ids and row.get('resolved') is not True:
+                    row['resolved'] = True
+                    row['resolved_at'] = _iso(n)
+                    row['updated_at'] = _iso(n)
+                    cleared += 1
+            if cleared:
+                _save(rows, n)
+            return cleared
     except OSError:
-        return False
+        return 0
 
 
 def get(record_id: str) -> Optional[dict[str, Any]]:

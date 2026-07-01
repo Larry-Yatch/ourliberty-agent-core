@@ -546,17 +546,44 @@ def load_for_larry_escalations() -> list[dict[str, Any]]:
 
     items: list[dict[str, Any]] = []
 
-    # Source 1: the durable for-Larry escalations feed. `list_open()` already
-    # filters to unresolved rows; the explicit `for_larry is True` guard keeps
-    # the conservative "flagged-for-Larry only" discipline. Fail-open — a read
-    # error degrades to none.
+    # Source 1: the durable for-Larry feed. Phase 2.1 FIX 2 — the two producers
+    # coexist on one file under two top-level keys (the writers are schema-
+    # preserving + share a lock now), so read BOTH and UNION them (deduped by
+    # canonical key). Change C had repointed this to 1a only, which went blind to
+    # the 1b producers — undercounting for-Larry escalations.
+    #   1a. for_larry_escalations.list_open()  → `{'escalations': [...]}`
+    #       (outbox_notifier mirror-review routing site).
+    #   1b. for_larry_signal.active_entries()  → `{'records': {...}}`
+    #       (promote_alerts critical-unhandled + outbox_notifier CLARIFY-exhausted).
+    seen_keys: set[str] = set()
     try:
         import for_larry_escalations  # local import keeps the cold path cheap
         for e in for_larry_escalations.list_open():
             if isinstance(e, dict) and e.get('for_larry') is True:
                 items.append(_escalation_to_waiting_item(e))
+                k = _escalation_decision_key(e)
+                if k:
+                    seen_keys.add(k)
     except Exception as exc:  # noqa: BLE001 — never abort the State Log tick
         log(f'state-log: for-larry escalations read failed: '
+            f'{type(exc).__name__}: {exc}')
+    try:
+        import for_larry_signal  # local import keeps the cold path cheap
+        for rec in for_larry_signal.active_entries():
+            if not isinstance(rec, dict) or rec.get('for_larry') is not True:
+                continue
+            # for_larry_signal keys records by `key`, not `id`; surface it so the
+            # waiting-item + decision-key derivation have an identity to use.
+            e = dict(rec)
+            e.setdefault('id', rec.get('key'))
+            k = _escalation_decision_key(e)
+            if k and k in seen_keys:
+                continue  # same decision already surfaced from 1a — don't double-count
+            if k:
+                seen_keys.add(k)
+            items.append(_escalation_to_waiting_item(e))
+    except Exception as exc:  # noqa: BLE001 — never abort the State Log tick
+        log(f'state-log: for-larry signal read failed: '
             f'{type(exc).__name__}: {exc}')
 
     # Source 2: the legacy pulse-escalations.json for-Larry path (back-compat).
