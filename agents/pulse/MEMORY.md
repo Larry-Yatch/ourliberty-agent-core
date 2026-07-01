@@ -388,8 +388,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T21:35Z UTC (Iter ~3461, Tier 1, clean)
+## Status snapshot — updated 2026-07-01T21:43Z UTC (Iter ~3462, Tier 2, clean)
 
-**Iter ~3461 summary (2026-07-01T21:35Z):** ✅ Nominal. 1 alert (line 1077: stale doorbell for PR#801, Tier-3 silenced, wm→1077). Mirror reviewing PR #803 (approval-sync Phase 3a PR-2, ~10 min in). 0 stalls. All daemons healthy. Pending=1 (stale PR#801 entry, self-resolving). Tier 1, consecutive_clean=2 (1 more clean iter → Tier 2 de-escalation).
+**Iter ~3462 summary (2026-07-01T21:43Z):** ✅ Nominal. No new alerts (wm=1077=file_length). Mirror reviewing PR #803 (approval-sync Phase 3a PR-2, regression check running, ~16 min in). 0 stalls. All daemons healthy. Pending=1 (stale PR#801 entry, self-resolving). **Tier 1 → Tier 2 de-escalated** (consecutive_clean=3, reset to 0). Next iter at 15-min cadence.
 
 
