@@ -376,8 +376,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T00:13Z UTC (Iter ~3392, Tier 2)
+## Status snapshot — updated 2026-07-01T00:36Z UTC (Iter ~3393, Tier 1)
 
-**Iter ~3392 summary (2026-07-01T00:13Z):** 0 new alerts. All 8 daemons alive. Watchdog=healthy 00:07:47Z UTC. Heal-daemon heartbeat 00:10:18Z (fresh). Pipeline stall dry-run 0 alerts. Mirror inbox empty. **PR #781 AUTO_MERGE_HELD — blocker=#780** (overlap on config/daemon-restart-manifest.json + 4 scripts). PR #780 (W3, no label, Larry-authored) must merge or close before PR #781 auto-merges. G-rule `unreviewed-merge-larry-authored-pr-001` carry — Beacon phased design awaiting Larry. **Tier promoted 1→2** (3 consecutive clean iters; consecutive_clean=0).
+**Iter ~3393 summary (2026-07-01T00:36Z):** 3 alerts: 2 Tier-3 silenced (heal-stale-daemon auto-restarted chain_event_shipper, sync.service deploy-restart-storm). 1 Tier-4 (ourliberty-health sync_freshness error at 00:20:18Z) — self-healed (sync success 00:30:38Z); no DM per actionable-only. All 8 daemons restarted at 00:30Z (deploy-restart-storm, PR #781 merged). **PR #781 MERGED** at 00:28:15Z (2c5a7449 feat(approval-sync): Phase 2 — canonical decision key + resolve fan-out). PR #780 (W3, no label, Larry-authored) still OPEN. G-rule `unreviewed-merge-larry-authored-pr-001` carry — Beacon phased design awaiting Larry. **Tier reset 2→1** (Tier-4 signal, consecutive_clean=0).
 
 
