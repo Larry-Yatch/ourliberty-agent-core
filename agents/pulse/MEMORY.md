@@ -388,8 +388,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T22:47Z UTC (Iter ~3465, Tier 3, clean)
+## Status snapshot — updated 2026-07-01T23:19Z UTC (Iter ~3466, Tier 3, clean)
 
-**Iter ~3465 summary (2026-07-01T22:47Z):** ✅ Nominal. 1 new alert (Tier-3: heal-claude-json-bind-drift probe-blind:ourliberty-cycle.service — bot DM'd Larry, Pulse silenced). Dashboard PR #99 ("approval-sync Phase 3b PR-1: the Needs-You read API") MERGED at 22:43:53Z UTC. 0 open PRs (agent-core + dashboard). 0 stalls. pending=0. All daemons healthy. **Tier 2 → Tier 3 de-escalation (consecutive_clean=3).** Next iter at 30-min cadence.
+**Iter ~3466 summary (2026-07-01T23:19Z):** ✅ Nominal. 1 new alert (Tier-4 bot-delivered: gate-ceiling-fix-monitor FIX CONFIRMED — PR #796 regression-gate ceiling fix verified, sentinel set, won't repeat; Pulse journal-note only). PR #804 (`fix(heal-bind-drift)`) under active Mirror review (started 23:11:52Z). 0 stalls. pending=0. All daemons healthy. **Tier 3, consecutive_clean=0→1.** Next iter at 30-min cadence.
 
 
