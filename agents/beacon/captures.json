@@ -1228,6 +1228,94 @@
         "from_state": "parked"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "cap-ping-a935",
+      "title": "ping",
+      "note": "n",
+      "state": "dropped",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "x",
+        "captured_at": "2026-07-01T05:03:29.300060+00:00"
+      },
+      "last_touched": "2026-07-01T05:03:29.300060+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A quick idea someone jotted down under the name \"ping\" \u2014 but there's no real description attached to it yet.",
+        "why": "Right now there's nothing to act on; without a clear description we can't tell if it's worth your time or just a placeholder someone forgot to fill in.",
+        "suggest": "Let's set this one aside and ask the person who logged it to add a sentence on what they meant \u2014 no need to spend your attention on it until then."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-01T05:12:49.475001+00:00",
+        "from_state": "dropped"
+      }
+    },
+    {
+      "id": "cap-diag-e084",
+      "title": "diag",
+      "note": "n",
+      "state": "dropped",
+      "label": null,
+      "origin": {
+        "source": "agent",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-01T05:04:13.886763+00:00"
+      },
+      "last_touched": "2026-07-01T05:04:13.886763+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A small diagnostic idea we jotted down but never fleshed out \u2014 right now it's just a placeholder with no real detail attached.",
+        "why": "Until someone explains what it's actually for, there's nothing here that moves the business one way or the other.",
+        "suggest": "Leave it parked for now and take 30 seconds to add a real description next time it comes up, or clear it out if it was never meant to stick around."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-01T05:12:49.475001+00:00",
+        "from_state": "dropped"
+      }
+    },
+    {
+      "id": "cap-graph-select-run-only-diff-affected-mirror-tests-3715",
+      "title": "Graph-select: run only diff-affected Mirror tests (BLOCKED on graph extension)",
+      "note": "Last lever to make Mirror reviews clean-first-try (kill residual timeout-retries/queue-wedge; e.g. PR #779 hit the cache but still logged 10 REVIEW_STEP_TIMED_OUT over ~70min and wedged the Mirror lease). Idea: run ONLY the tests a diff affects + a full-suite post-merge backstop, instead of the full ~580-test suite on every review. STATUS: NO-GO as-is. Verified 2026-07-01 that ~/ourliberty-graph scan_deps.py is Python-IMPORT-ONLY -- blind to shell-script edges, subprocess-to-script edges, and config-file reads (~45/257 test files rely on these). Skipping tests on it would ship bugs under a green check (false green). UNBLOCKS WHEN the graph is extended to capture those edges (sequence: agent routing/message-passing first, then subprocess/shell, then config). SAFE DESIGN when built: conservative fallback = run FULL suite whenever a diff touches anything outside the graph proven-complete zone; post-merge full-suite backstop bounds any missed edge to one merge cycle. DO NOT re-propose shard-parallelism (combatively reviewed 3 ways + rejected: Amdahl floor ~1.3x, OOM on 4-core/0-swap kills live agents, unittest<list> drops a shard on one import error -> false PASS). Full context: /Users/Larry/dev/ol-work/mirror-efficiency-handoff.md + memory regression-gate-cant-conclude + test-selection-graph-blocked.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-01T05:05:13.018819+00:00"
+      },
+      "last_touched": "2026-07-01T05:05:13.018819+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A smarter way to run only the checks that a given change actually affects, so reviews finish clean on the first try instead of stalling and retrying for over an hour.",
+        "why": "Review slowdowns and jams tie up the system and delay getting work out the door, and this is the last remaining lever to make those reviews fast and reliable.",
+        "suggest": "Keep it parked for now \u2014 it can't be turned on safely until an underlying capability is extended, so hold it until that groundwork is done rather than rushing it."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-01T05:12:49.475001+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
