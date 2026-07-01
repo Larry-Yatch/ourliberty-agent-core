@@ -59,6 +59,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from supabase_chunk import chunked_clear, ChunkedClearError  # noqa: E402
 import beacon_approval_handler as approval  # noqa: E402
 import task_terminal_state as tts  # noqa: E402 — shared terminal-state probe
+from decision_identity import canonical_decision_key  # noqa: E402
 
 # Resolve the approval-state root identically to the other two modules in the
 # pending-approvals trio (beacon_approval_handler, heal_unregistered_approval):
@@ -180,12 +181,19 @@ def fetch_larry_actions(client, task_ids: set[str]) -> dict[str, str]:
     wanted = sorted({t for t in (task_ids or set()) if t})
     if not wanted:
         return {}
-    latest: dict[str, tuple[str, str]] = {}  # task_id -> (ts, action)
+    # Phase 2 re-key: the returned dict is keyed by the CANONICAL decision key
+    # (stamped `payload.decision_key`, else derived from task_id+pr_url), not the
+    # raw task_id — so a dashboard larry_action stamped with a PR coordinate joins
+    # a pending entry whose id is the wrapped `mirror-review:…` form. `wanted` may
+    # carry both raw task_ids and canonical keys (the caller adds both) so the
+    # task_id-column filter still catches the row whichever shape it was written
+    # under.
+    latest: dict[str, tuple[str, str]] = {}  # decision_key -> (ts, action)
     chunk = 200
     for i in range(0, len(wanted), chunk):
         resp = (
             client.table('chain_events')
-            .select('task_id,ts,payload')
+            .select('task_id,ts,payload,pr_url')
             .eq('event_type', 'larry_action')
             .in_('task_id', wanted[i:i + chunk])
             .execute()
@@ -196,11 +204,15 @@ def fetch_larry_actions(client, task_ids: set[str]) -> dict[str, str]:
             action = payload.get('action') if isinstance(payload, dict) else None
             if not tid or action not in _DECISION_ACTIONS:
                 continue
+            stamped = payload.get('decision_key') if isinstance(payload, dict) else None
+            key = stamped or canonical_decision_key(tid, r.get('pr_url'))
+            if not key:
+                continue
             ts = r.get('ts') or ''
-            prev = latest.get(tid)
+            prev = latest.get(key)
             if prev is None or ts >= prev[0]:
-                latest[tid] = (ts, action)
-    return {tid: act for tid, (_ts, act) in latest.items()}
+                latest[key] = (ts, action)
+    return {key: act for key, (_ts, act) in latest.items()}
 
 
 def load_beacon_approvals(
@@ -348,6 +360,19 @@ def _entry_task_id(entry: dict[str, Any]) -> Optional[str]:
     return eid if isinstance(eid, str) and eid else None
 
 
+def _entry_decision_key(entry: dict[str, Any]) -> Optional[str]:
+    """The canonical decision key for a pending entry: the stamped
+    `decision_key` if present (Phase 2 emit-time stamp), else derived from the
+    entry's task_id + dispatch_payload pr_url. This is the join key against the
+    re-keyed `fetch_larry_actions` map."""
+    stamped = entry.get('decision_key')
+    if isinstance(stamped, str) and stamped:
+        return stamped
+    payload = entry.get('dispatch_payload')
+    pr_url = payload.get('pr_url') if isinstance(payload, dict) else None
+    return canonical_decision_key(_entry_task_id(entry), pr_url)
+
+
 def _approval_age_hours(entry: dict[str, Any], now: datetime) -> Optional[float]:
     """Hours since the entry was created, or None if created_at is missing or
     unparseable (which the caller treats as KEEP — never retire on a bad ts)."""
@@ -490,24 +515,36 @@ def reconcile_resolved_in_supabase(
     pending = state.get('pending', []) if isinstance(state, dict) else []
     counts['pending'] = len(pending)
 
-    # Map each pending entry's id -> its work task_id (the larry_action join key).
-    id_to_tid: dict[str, str] = {}
+    # Map each pending entry's id -> its CANONICAL decision key (the re-keyed
+    # larry_action join key). `query_tids` carries both the raw task_id AND the
+    # canonical key for every entry, because the chain_events `task_id` column is
+    # filtered server-side — the row may have been written under either shape, so
+    # we must query for both to be sure the larry_action is fetched.
+    id_to_key: dict[str, str] = {}
+    query_tids: set[str] = set()
     for entry in pending:
         if not isinstance(entry, dict):
             continue
         approval_id = entry.get('id')
+        if not (isinstance(approval_id, str) and approval_id):
+            continue
+        key = _entry_decision_key(entry)
+        if not key:
+            continue
+        id_to_key[approval_id] = key
+        query_tids.add(key)
         tid = _entry_task_id(entry)
-        if isinstance(approval_id, str) and approval_id and tid:
-            id_to_tid[approval_id] = tid
-    if not id_to_tid:
+        if tid:
+            query_tids.add(tid)
+    if not id_to_key:
         log('resolved-in-supabase reconcile: no pending entries to check')
         return counts
 
-    decided = fetch_larry_actions(client, set(id_to_tid.values()))
+    decided = fetch_larry_actions(client, query_tids)
 
     to_resolve: list[tuple[str, str]] = []  # (approval_id, new_status)
-    for approval_id, tid in id_to_tid.items():
-        action = decided.get(tid)
+    for approval_id, key in id_to_key.items():
+        action = decided.get(key)
         if action in _ACTION_TO_STATUS:
             to_resolve.append((approval_id, _ACTION_TO_STATUS[action]))
         else:

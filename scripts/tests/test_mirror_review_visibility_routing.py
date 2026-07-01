@@ -112,14 +112,19 @@ class ForLarryEscalationsTest(unittest.TestCase):
 
     def test_forward_compat_with_waiting_on_you_reader(self):
         # The record schema is exactly what system_state_log's Waiting-on-You
-        # reader consumes; pointing the reader at our file surfaces the record
-        # with no schema change (operator-needs-you-feed §5.1 fold-in).
+        # reader consumes. Since Phase 2 Change C, the reader's Source 1 reads
+        # this feed natively (for_larry_escalations.list_open, honoring
+        # OURLIBERTY_FOR_LARRY_FEED_FILE — set to self._feed in setUp), so the
+        # record surfaces with no schema change (operator-needs-you-feed §5.1).
+        # The legacy Source 2 (OURLIBERTY_ESCALATIONS_FILE) is isolated to a
+        # nonexistent path so it contributes none and the single seeded record
+        # yields exactly one item.
         import system_state_log as ssl
         fle.upsert('mirror-review:t1', headline='Session-less PR needs you',
                    context='go unstick', severity='warning',
                    pr_url='https://gh/o/r/pull/9', dedup_identity='pr9@abc')
         orig = os.environ.get('OURLIBERTY_ESCALATIONS_FILE')
-        os.environ['OURLIBERTY_ESCALATIONS_FILE'] = str(self._feed)
+        os.environ['OURLIBERTY_ESCALATIONS_FILE'] = '/no/such/legacy-esc.json'
         try:
             items = ssl.load_for_larry_escalations()
         finally:
@@ -132,7 +137,7 @@ class ForLarryEscalationsTest(unittest.TestCase):
         self.assertEqual(items[0]['source'], 'escalation')
         # A resolved record drops out of the feed.
         fle.clear('mirror-review:t1')
-        os.environ['OURLIBERTY_ESCALATIONS_FILE'] = str(self._feed)
+        os.environ['OURLIBERTY_ESCALATIONS_FILE'] = '/no/such/legacy-esc.json'
         try:
             self.assertEqual(ssl.load_for_larry_escalations(), [])
         finally:

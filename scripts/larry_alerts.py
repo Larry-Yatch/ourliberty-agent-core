@@ -36,6 +36,18 @@ import atomic_io
 import file_lock
 from test_isolation_guard import refuse_under_test
 
+
+def _decision_key_for(task_id: Optional[str], pr_url: Optional[str]) -> Optional[str]:
+    """Canonical cross-store join key for an alert (Phase 2 Change A). Lazy +
+    fail-safe import — decision_identity is pure, but stamping must never turn a
+    fire-and-forget alert append into an exception."""
+    try:
+        from decision_identity import canonical_decision_key
+        return canonical_decision_key(task_id, pr_url)
+    except Exception:  # noqa: BLE001 — stamping is best-effort, never fatal
+        return None
+
+
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT') or Path.home() / 'agents')
 ALERTS_FILE = AGENTS_ROOT / 'blackboard' / 'larry-alerts.jsonl'
 COOLDOWN_ROOT = AGENTS_ROOT / 'state' / 'alert-cooldown'
@@ -315,6 +327,9 @@ def append_alert(
     subject: Optional[str] = None,
     suggested_action: Optional[str] = None,
     route: Optional[str] = None,
+    decision_key: Optional[str] = None,
+    task_id: Optional[str] = None,
+    pr_url: Optional[str] = None,
 ) -> bool:
     """Append one alert if not in cooldown.
 
@@ -395,6 +410,16 @@ def append_alert(
         record['subject'] = subject
     if suggested_action:
         record['suggested_action'] = suggested_action
+    # Change A: stamp the canonical decision key onto escalate lines so the
+    # resolve fan-out can retract this alert by key (resolve_alert_by_decision_key)
+    # when its decision resolves elsewhere — keeping the alert feed and its
+    # already-shipped chain_event row in agreement (spec §2 Change B step 4).
+    # Only escalate lines are retractable, so only they need the key. The caller
+    # may pass `decision_key` directly, or `task_id`/`pr_url` to derive it.
+    if route == 'escalate':
+        dk = decision_key or _decision_key_for(task_id, pr_url)
+        if dk:
+            record['decision_key'] = dk
     # O_APPEND is atomic for writes <= PIPE_BUF (4096 on Linux) so the line
     # itself never tears; the shared flock (see _locked_append) additionally
     # excludes the retention rewrite so the line is never lost.
@@ -485,6 +510,18 @@ def _line_matches_resolution(rec: dict, key: str) -> bool:
     return rec_key == key
 
 
+def _line_matches_decision_key(rec: dict, key: str) -> bool:
+    """True iff `rec` carries a stamped `decision_key` == `key` (exact match).
+
+    The A-leg predicate for resolve_alert_by_decision_key. Retracts both escalate
+    alert lines and `approval_request` records stamped with the key — anything
+    whose decision resolved elsewhere. Exact-key only: a mis-join would silently
+    drop an unrelated decision's alert (spec §6)."""
+    if not isinstance(rec, dict) or not key:
+        return False
+    return rec.get('decision_key') == key
+
+
 def _read_line_offset(path: Path) -> int:
     """Read an absolute line-index offset (next-to-deliver). 0 if missing /
     unreadable — mirrors read_offset but for an arbitrary consumer file."""
@@ -541,7 +578,10 @@ def resolve_alert(
             with file_lock.exclusive_lock(
                 lock_path, timeout=_APPEND_LOCK_TIMEOUT_SEC,
             ):
-                return _resolve_alert_locked(key, af, consumer_offset_files)
+                return _resolve_alert_locked(
+                    lambda rec: _line_matches_resolution(rec, key),
+                    af, consumer_offset_files,
+                )
         except file_lock.LockTimeout:
             # A wedged lock holder must not strand the retraction forever, but
             # rewriting the file unlocked could race a concurrent append. The
@@ -552,11 +592,50 @@ def resolve_alert(
         return 0
 
 
+def resolve_alert_by_decision_key(
+    key: str,
+    consumer_offset_files: Optional[list] = None,
+    alerts_file: Optional[Path] = None,
+) -> int:
+    """Retract alert line(s) whose stamped `decision_key` == `key` (the A-leg of
+    decision_resolve.resolve_decision, spec §2 Change B step 4).
+
+    Identical cursor/backup/locking machinery to `resolve_alert` — only the
+    match predicate differs (`_line_matches_decision_key` instead of the
+    `source:subject` matcher). Retracts both escalate alert lines and
+    `approval_request` records that carry the key, so the alert feed agrees with
+    the already-shipped chain_event row once a decision resolves. Exact-key
+    only; never raises (returns 0 on no-match / lock-timeout / error)."""
+    refuse_under_test('larry-alerts')
+    if not key:
+        return 0
+    af = alerts_file if alerts_file is not None else ALERTS_FILE
+    if consumer_offset_files is None:
+        consumer_offset_files = [OFFSET_FILE, MEDIC_OFFSET_FILE]
+    try:
+        if not af.exists():
+            return 0
+        lock_path = file_lock.sidecar_lock_path(af)
+        try:
+            with file_lock.exclusive_lock(
+                lock_path, timeout=_APPEND_LOCK_TIMEOUT_SEC,
+            ):
+                return _resolve_alert_locked(
+                    lambda rec: _line_matches_decision_key(rec, key),
+                    af, consumer_offset_files,
+                )
+        except file_lock.LockTimeout:
+            return 0
+    except OSError:
+        return 0
+
+
 def _resolve_alert_locked(
-    key: str, af: Path, consumer_offset_files: list,
+    match_fn, af: Path, consumer_offset_files: list,
 ) -> int:
     """The locked body of resolve_alert (see its docstring). MUST run under the
-    alerts-file sidecar flock."""
+    alerts-file sidecar flock. `match_fn(rec) -> bool` selects the lines to
+    retract."""
     with open(af, encoding='utf-8') as f:
         lines = f.readlines()
 
@@ -570,7 +649,7 @@ def _resolve_alert_locked(
                 rec = json.loads(stripped)
             except json.JSONDecodeError:
                 rec = None
-            if rec is not None and _line_matches_resolution(rec, key):
+            if rec is not None and match_fn(rec):
                 matched = True
         if matched:
             removed_indices.append(idx)
@@ -813,6 +892,8 @@ def append_approval_request(
     approval_id: str,
     body: str,
     source: str = 'outbox-notifier',
+    decision_key: Optional[str] = None,
+    pr_url: Optional[str] = None,
 ) -> bool:
     """Append one approval-request record (Beacon-replan path).
 
@@ -849,6 +930,12 @@ def append_approval_request(
         'chat_id': chat_id,
         'body': body,
     }
+    # Change A: an approval_request record is a needs-Larry item, so always stamp
+    # the canonical key (derived from approval_id+pr_url when not passed) — the
+    # resolve fan-out's A-leg retracts it by key when the decision resolves.
+    dk = decision_key or _decision_key_for(approval_id, pr_url)
+    if dk:
+        record['decision_key'] = dk
     return _locked_append(json.dumps(record, ensure_ascii=False) + '\n')
 
 

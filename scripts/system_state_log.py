@@ -472,6 +472,21 @@ def load_pending_approvals() -> list[dict[str, Any]]:
     return items
 
 
+def _escalation_decision_key(e: dict[str, Any]) -> Optional[str]:
+    """Canonical cross-store key for an escalation record (Phase 2 Change A):
+    the stamped `decision_key` if present, else computed on the fly from
+    `id`/`task_id` + `pr_url` (read-time backfill for pre-stamp records). Lazy +
+    fail-safe import — the State Log tick must never abort on a key derivation."""
+    stamped = e.get('decision_key')
+    if isinstance(stamped, str) and stamped:
+        return stamped
+    try:
+        from decision_identity import canonical_decision_key
+        return canonical_decision_key(e.get('id') or e.get('task_id'), e.get('pr_url'))
+    except Exception:  # noqa: BLE001 — derivation is best-effort, never fatal
+        return None
+
+
 def _escalation_to_waiting_item(e: dict[str, Any]) -> dict[str, Any]:
     """Normalize one for-Larry escalation record into a waiting-item.
 
@@ -489,6 +504,7 @@ def _escalation_to_waiting_item(e: dict[str, Any]) -> dict[str, Any]:
         'why': str(e.get('context') or e.get('suggested_action') or ''),
         'severity': _normalize_severity(e.get('severity')),
         'action_hint': 'review escalation',
+        'decision_key': _escalation_decision_key(e),
         '_ts': e.get('ts') or e.get('created_at'),
     }
     mission_id = e.get('mission_id')
@@ -506,10 +522,20 @@ def load_for_larry_escalations() -> list[dict[str, Any]]:
 
     Two sources fold in here (operator-needs-you-feed spec §5.1, decision c):
 
-      1. The canonical durable for-Larry signal file
-         (`for_larry_signal.active_entries`) — the substrate the promote_alerts
-         gate (critical-unhandled) and the outbox_notifier CLARIFY-exhausted
-         handler write to. This is the live producer of "needs you" rows.
+      1. The durable for-Larry escalations feed
+         (`for_larry_escalations.list_open`) — the `{'escalations': [...]}` store
+         the outbox_notifier mirror-review routing site writes to. This is the
+         live producer of the "needs you" rows the doorbell counts.
+
+         Phase 2 Change C fix: this previously read `for_larry_signal.active_entries`
+         (a DIFFERENT module that writes a `{'records': {...}}` shape to the SAME
+         file path). The two writers collide on one file: whichever wrote last
+         wins, and `for_larry_signal` could not see the `for_larry_escalations`
+         records — so 3 unresolved records read as `escalations == 0` (live
+         2026-06-30: #749/#751/#766). Reading the actual producer's `list_open()`
+         closes that undercount. (The `for_larry_signal`⇄`for_larry_escalations`
+         dual-writer-on-one-path collision is flagged for the Phase 3 cleanup
+         brief; this phase only repoints the reader, not the writers.)
       2. The ops-internal pulse-escalations.json — carries no for-Larry flag in
          production today (so it contributes NONE), but kept so a future
          for-Larry-flagged entry there appears with no schema change.
@@ -520,15 +546,17 @@ def load_for_larry_escalations() -> list[dict[str, Any]]:
 
     items: list[dict[str, Any]] = []
 
-    # Source 1: the canonical durable for-Larry signal (already filtered to
-    # unresolved, for_larry records). Fail-open — a read error degrades to none.
+    # Source 1: the durable for-Larry escalations feed. `list_open()` already
+    # filters to unresolved rows; the explicit `for_larry is True` guard keeps
+    # the conservative "flagged-for-Larry only" discipline. Fail-open — a read
+    # error degrades to none.
     try:
-        import for_larry_signal  # local import keeps the cold path cheap
-        for e in for_larry_signal.active_entries():
-            if isinstance(e, dict):
+        import for_larry_escalations  # local import keeps the cold path cheap
+        for e in for_larry_escalations.list_open():
+            if isinstance(e, dict) and e.get('for_larry') is True:
                 items.append(_escalation_to_waiting_item(e))
     except Exception as exc:  # noqa: BLE001 — never abort the State Log tick
-        log(f'state-log: for-larry signal read failed: '
+        log(f'state-log: for-larry escalations read failed: '
             f'{type(exc).__name__}: {exc}')
 
     # Source 2: the legacy pulse-escalations.json for-Larry path (back-compat).

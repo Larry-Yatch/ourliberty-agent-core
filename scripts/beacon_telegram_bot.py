@@ -59,6 +59,7 @@ import agent_runner  # noqa: E402  # shared rate-limit ledger writer (Step C)
 import beacon_approval_handler as approval  # noqa: E402
 import catch_me_up  # noqa: E402  # operator-UX shortcut synthesizer
 import chain_event_emit  # noqa: E402  # E4.4e PR-A: approval_request push writer
+import decision_resolve  # noqa: E402  # Phase 2: four-store resolve fan-out
 import larry_alerts  # noqa: E402
 import safe_write_inbox  # noqa: E402
 import state_log_query  # noqa: E402  # work-in-flight State Log reader (Slice 1 D4)
@@ -667,6 +668,26 @@ def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[s
 
 # ---------- D3 approval gate ----------
 
+def _resolve_pending_entry(entry: dict, outcome: str, note: str = '') -> None:
+    """Resolve a pending-approval `entry` through the Phase 2 four-store fan-out
+    (decision_resolve.resolve_decision) so a Telegram approve/reject/modify clears
+    the same decision from the pending queue AND the chain_events / escalations /
+    alerts stores in one synchronous call — instead of leaving the other three
+    reading "still waiting" until heal_stale_approvals reconciles.
+
+    Falls back to the single-store `approval.resolve` primitive when no canonical
+    key is derivable (the underivable case, spec §1.1): the P store still clears,
+    the healer backstops the rest. Both paths route through `approval.resolve` as
+    the P-leg primitive, so there is no recursion (the fan-out wraps it)."""
+    pr_url = (entry.get('dispatch_payload') or {}).get('pr_url')
+    key = entry.get('decision_key') or decision_resolve.canonical_decision_key(
+        entry.get('id'), pr_url)
+    if key:
+        decision_resolve.resolve_decision(key, outcome, actor='telegram', note=note)
+    else:
+        approval.resolve(entry['id'], outcome, note=note)
+
+
 def handle_user_command(chat_id: int, action: dict) -> bool:
     """Handle a recognized user approval command. Returns True if handled
     (caller should NOT forward to Beacon)."""
@@ -696,7 +717,7 @@ def handle_user_command(chat_id: int, action: dict) -> bool:
             return True
         try:
             dest = approval.dispatch_approved(entry)
-            approval.resolve(entry['id'], 'approved')
+            _resolve_pending_entry(entry, 'approved')
             telegram_send(chat_id, approval.format_dispatch_confirmation(entry))
             log(f"approved {entry['id']} -> dispatched to {dest}")
         except (safe_write_inbox.DispatchRejected,
@@ -716,7 +737,7 @@ def handle_user_command(chat_id: int, action: dict) -> bool:
             return True
         try:
             dest = approval.dispatch_approved(entry)
-            approval.resolve(entry['id'], 'approved')
+            _resolve_pending_entry(entry, 'approved')
             telegram_send(chat_id,
                           f"✅ Graduation approved: {template} is now auto-fix. "
                           f"Config PR dispatched to {entry.get('target_agent', 'forge')}.")
@@ -743,7 +764,7 @@ def handle_user_command(chat_id: int, action: dict) -> bool:
         # replan_count=0 and the loop becomes unbounded.
         prior_replan_count = entry.get('_replan_count', 0)
         prior_max_replans = entry.get('_max_replans')
-        approval.resolve(entry['id'], 'modified', note=reason)
+        _resolve_pending_entry(entry, 'modified', note=reason)
         # Forward a structured note to Beacon so she can re-plan.
         relay = (
             f"[D3 approval gate] Larry asked to MODIFY plan {entry['id']}. "
@@ -775,7 +796,7 @@ def handle_user_command(chat_id: int, action: dict) -> bool:
         # capture, the new entry would lose replan_count tracking.
         prior_replan_count = entry.get('_replan_count', 0)
         prior_max_replans = entry.get('_max_replans')
-        approval.resolve(entry['id'], 'rejected', note=reason)
+        _resolve_pending_entry(entry, 'rejected', note=reason)
         telegram_send(chat_id, f"❌ Rejected: {entry['id']}. Beacon notified.")
         relay = (
             f"[D3 approval gate] Larry REJECTED plan {entry['id']}. "
@@ -964,8 +985,8 @@ def _send_beacon_response(
         )
         try:
             approval.dispatch_approved(entry)
-            approval.resolve(entry['id'], 'approved',
-                             note=f'auto_approved by rule: {rule}')
+            _resolve_pending_entry(entry, 'approved',
+                                   note=f'auto_approved by rule: {rule}')
             telegram_send(chat_id,
                           approval.format_auto_approve_confirmation(entry, rule or {}))
             log(f"auto_approved + dispatched: {payload.get('task_id')}")
