@@ -382,8 +382,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T06:22Z UTC (Iter ~3416, Tier 1)
+## Status snapshot — updated 2026-07-01T06:32Z UTC (Iter ~3417, Tier 2)
 
-**Iter ~3416 summary (2026-07-01T06:22Z):** 0 new alerts. 0 open PRs. 8/8 daemons alive. Watchdog healthy 06:17Z. Sync 05:30Z (~51 min old). Pipeline stall 0. Heal-daemon heartbeat fresh. Stale orphan approval PR #785 (chat_id=None, PR MERGED 05:55Z, Beacon to GC, carry moot). Tier 1 (consecutive_clean=2, 1 more clean iter → Tier 2 de-escalation). unreviewed-merge-larry-authored-pr-001 awaiting Larry response on Beacon Steps 1-2. gate-parallelism-monitor Tier-4 (1/3, outbox-notifier DM'd Larry 06:03Z).
+**Iter ~3417 summary (2026-07-01T06:32Z):** 0 new alerts. 0 open PRs. 8/8 daemons alive. Watchdog healthy 06:27Z. Sync 06:30Z (fresh). Pipeline stall 0. Heal-daemon heartbeat fresh. Stale orphan approval PR #785 (chat_id=None, PR MERGED 05:55Z, Beacon to GC, carry moot). **Tier promoted 1→2** (consecutive_clean=3 de-escalation; cadence now 15 min; consecutive_clean reset to 0). unreviewed-merge-larry-authored-pr-001 awaiting Larry response on Beacon Steps 1-2. gate-parallelism-monitor Tier-4 (1/3, outbox-notifier DM'd Larry 06:03Z). heal-stale-daemon-code-still-stale-after-restart 2/3 (carry). watchdog-log-growth-idle-overnight-001 2/3 (carry). heal-credential-registry-drift-origin-unreachable-tier4-001 1/3 (carry).
 
 
