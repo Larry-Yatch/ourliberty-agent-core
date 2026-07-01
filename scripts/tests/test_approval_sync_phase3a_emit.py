@@ -262,6 +262,22 @@ class SequenceNeedsYouProjectionTest(unittest.TestCase):
                 datetime(2026, 7, 1, tzinfo=timezone.utc), logger)
         rec.assert_not_called()  # never reconcile against an unknown set
 
+    def test_read_failure_does_not_blind_clear_open_rows(self):
+        # A transient read hiccup must NOT reach reconcile with an empty desired
+        # set — that would clear every still-open sequence_needs_you row, and the
+        # stable event_id makes the re-emit a no-op, permanently suppressing the
+        # item. The advancer requests strict=True so the seam RAISES instead of
+        # degrading to a soft-[] the reconcile would treat as "clear everything".
+        logger = mock.Mock()
+        with mock.patch('system_state_log.load_waiting_sequences',
+                        side_effect=OSError('transient read')) as load, \
+             mock.patch('chain_event_emit.reconcile_open_events') as rec:
+            self.bsa._reconcile_sequence_needs_you(
+                datetime(2026, 7, 1, tzinfo=timezone.utc), logger)
+        # Wired strict so an unconfirmed-empty read signals rather than hides.
+        self.assertTrue(load.call_args.kwargs.get('strict'))
+        rec.assert_not_called()  # no reconcile → no blind clear of open rows
+
 
 class ParkedCaptureProjectionTest(unittest.TestCase):
     def setUp(self):

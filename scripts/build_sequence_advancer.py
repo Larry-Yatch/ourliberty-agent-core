@@ -2028,7 +2028,12 @@ def _reconcile_sequence_needs_you(
             type(e).__name__, e)
         return
     try:
-        waiting = ssl.load_waiting_sequences(now)
+        # strict=True: a transient read failure RAISES (not fail-safe-to-[]) so
+        # an unconfirmed-empty desired set never drives reconcile_open_events to
+        # clear every still-open sequence_needs_you row. Because emit uses a
+        # stable event_id, such a blind clear would be permanent — the re-emit is
+        # absorbed by the PK. Skipping the tick leaves the open rows intact.
+        waiting = ssl.load_waiting_sequences(now, strict=True)
     except Exception as e:  # noqa: BLE001 — fail-safe: skip projection this tick
         logger.warning(
             'sequence_needs_you: load_waiting_sequences raised: %s: %s',

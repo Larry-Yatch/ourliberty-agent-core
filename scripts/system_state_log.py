@@ -309,7 +309,9 @@ def _last_audit_ts(seq: dict[str, Any], event: Optional[str] = None) -> Any:
     return last
 
 
-def load_waiting_sequences(now: datetime) -> list[dict[str, Any]]:
+def load_waiting_sequences(
+    now: datetime, *, strict: bool = False,
+) -> list[dict[str, Any]]:
     """Build-sequence rows that need Larry, as waiting-items (operator-needs-you-
     feed spec §5.3 + §5.4). Two producers, both `source='sequence'`:
 
@@ -321,7 +323,19 @@ def load_waiting_sequences(now: datetime) -> list[dict[str, Any]]:
     `seq_id` (and `step_id` for step rows) the steering endpoint needs, an
     `actions` allowlist the render uses for buttons, and a private `_ts` that
     build_snapshot turns into `age_seconds`. `now` is injected (not read inline)
-    so the >15-min threshold and the displayed age share one clock."""
+    so the >15-min threshold and the displayed age share one clock.
+
+    `strict` distinguishes "read could not be confirmed" from "genuinely nothing
+    waiting". By default (the dashboard read model) a transient read failure
+    degrades to [] — a stale-but-safe empty view. When `strict=True` (the
+    emit-time `sequence_needs_you` projection) a transient read failure RAISES
+    instead: the projection reconcile treats an empty desired set as "clear every
+    open row", so a soft-empty from a read hiccup would blind-clear still-paused
+    sequences whose stable event_id then makes the re-emit a no-op — permanently
+    suppressing the needs-you item. Raising lets the caller skip the reconcile,
+    the same None-to-skip contract `list_open_event_task_ids` uses. A malformed
+    (unparseable) sequence file is a persistent data problem, not a transient
+    read failure, so it is skipped under either mode."""
     import json  # local import; sequence read is a cold path
     d = build_sequences_dir()
     out: list[dict[str, Any]] = []
@@ -331,7 +345,16 @@ def load_waiting_sequences(now: datetime) -> list[dict[str, Any]]:
         for p in sorted(d.glob('*.json')):
             try:
                 seq = json.loads(p.read_text())
-            except (OSError, ValueError):
+            except OSError:
+                # Transient per-file read hiccup. Under strict, signal it so the
+                # emit-time caller skips rather than emit a desired set silently
+                # missing this item — which would clear its still-open row.
+                if strict:
+                    raise
+                continue
+            except ValueError:
+                # Malformed JSON is a persistent data problem, not a transient
+                # read failure — skip this file the same way under either mode.
                 continue
             if not isinstance(seq, dict):
                 continue
@@ -387,6 +410,12 @@ def load_waiting_sequences(now: datetime) -> list[dict[str, Any]]:
                     '_ts': step.get('dispatched_at'),
                 })
     except OSError as e:
+        # Directory-level read failure. Under strict, surface it so the emit-time
+        # projection caller skips the reconcile instead of treating an
+        # unconfirmed-empty result as "nothing waiting" and clearing every
+        # still-open sequence_needs_you row.
+        if strict:
+            raise
         log(f'state-log: waiting-sequences read failed: {type(e).__name__}: {e}')
         return []
     return out
