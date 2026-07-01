@@ -382,8 +382,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T06:12Z UTC (Iter ~3414, Tier 1)
+## Status snapshot — updated 2026-07-01T06:22Z UTC (Iter ~3416, Tier 1)
 
-**Iter ~3414 summary (2026-07-01T06:12Z):** 7 new alerts (6 Tier-3 silenced, 1 Tier-4 — gate-parallelism-monitor novel, outbox-notifier DM'd Larry 06:03Z). watermark 1068→1075. 0 open PRs. PR #785 MERGED 05:55Z confirmed. 8/8 daemons alive. Watchdog healthy 06:02Z. Sync 05:30Z. Pipeline stall 0. ourliberty-cycle.timer was stuck; healed 06:00Z; fired 06:05Z, SubState=running. New service ourliberty-heal-stale-pr-escalations installed. stale orphan approval PR #785 (Beacon to GC). Tier 1 (consecutive_clean=0, reset on Tier-4). unreviewed-merge-larry-authored-pr-001 awaiting Larry response on Beacon Steps 1-2.
+**Iter ~3416 summary (2026-07-01T06:22Z):** 0 new alerts. 0 open PRs. 8/8 daemons alive. Watchdog healthy 06:17Z. Sync 05:30Z (~51 min old). Pipeline stall 0. Heal-daemon heartbeat fresh. Stale orphan approval PR #785 (chat_id=None, PR MERGED 05:55Z, Beacon to GC, carry moot). Tier 1 (consecutive_clean=2, 1 more clean iter → Tier 2 de-escalation). unreviewed-merge-larry-authored-pr-001 awaiting Larry response on Beacon Steps 1-2. gate-parallelism-monitor Tier-4 (1/3, outbox-notifier DM'd Larry 06:03Z).
 
 
