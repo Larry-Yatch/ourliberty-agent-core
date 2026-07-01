@@ -376,8 +376,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T05:51Z UTC (Iter ~3412, Tier 1)
+## Status snapshot — updated 2026-07-01T05:57Z UTC (Iter ~3413, Tier 1)
 
-**Iter ~3412 summary (2026-07-01T05:51Z):** 0 new alerts (watermark 1068). ff-main auto-fix applied (0f770174→dc1c8d34; PR #788 heal_stale_pr_escalations merged at 05:48Z). PRs #786/#787/#788 all MERGED since iter ~3411. PR #785 OPEN, Mirror retry review in progress (chat_id=None pending approval carry). All 8 daemons alive. Watchdog healthy 05:46Z. Sync 05:30Z (~21 min old). Pipeline stall 0. Tier 1 (consecutive_clean=0). Escalation #15 (PR #785 APPROVAL_REQUEST undelivered) standing carry.
+**Iter ~3413 summary (2026-07-01T05:57Z):** 0 new alerts (watermark 1068). PR #785 MERGED 05:55Z (Mirror PASS -> AUTO_MERGE; pipeline fully complete). PR #780 MERGED 04:26Z. 0 open PRs. 8/8 daemons alive. Watchdog healthy 05:56:50Z. Sync 05:30Z. Pipeline stall 0. Check I Wednesday: digest, 1 proposal (reconcile-675-contract-c-promote-alerts-001, 36.2-sigma, effort=small), no DM (dm_route dedup). Pending approval mirror-review-pr-ourliberty-agent-core-785 STALE ORPHAN (PR merged; Beacon to GC). Tier 1 (consecutive_clean=1). unreviewed-merge-larry-authored-pr-001 DISPATCHED, awaiting Larry response on Beacon Steps 1-2.
 
 
