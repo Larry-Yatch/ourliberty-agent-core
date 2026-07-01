@@ -388,8 +388,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T20:48Z UTC (Iter ~3456, Tier 1)
+## Status snapshot — updated 2026-07-01T20:55Z UTC (Iter ~3457, Tier 2)
 
-**Iter ~3456 summary (2026-07-01T20:48Z):** ✅ Nominal. No new alerts (wm=1075=file_length). PR #801 (approval-sync Phase 3a) Mirror review in progress (started 20:29:20Z, ~19 min in). Pipeline 0 stalls. Watermark 1075. `unreviewed-merge-larry-authored-pr-001` 6th occurrence carry (Beacon Steps 1-2 pending Larry response). **Tier 1** (consecutive_clean=2; 1 more clean for Tier 2 de-escalation).
+**Iter ~3457 summary (2026-07-01T20:55Z):** ✅ Nominal. No new alerts (wm=1075=file_length). Mirror REVIEW_REVISION on PR #801 at 14:51 MDT; Forge revision-1 active (PID 2614453). Pipeline 0 stalls. Watermark 1075. `unreviewed-merge-larry-authored-pr-001` 6th occurrence carry (Beacon Steps 1-2 pending Larry response). **Tier 1 → Tier 2 DE-ESCALATED** (3 consecutive clean iters). Tier 2 consecutive_clean=0; 3 more clean for Tier 3.
 
 
