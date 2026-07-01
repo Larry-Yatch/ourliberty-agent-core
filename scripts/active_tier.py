@@ -1227,6 +1227,24 @@ def select_dispatch_tier(session_tier=None, now=None):
     return None
 
 
+def has_usable_dispatch_tier(now=None):
+    """True iff ``select_dispatch_tier()`` would return a tier — but WITHOUT
+    the round-robin counter side effect. For the inbox gate's hold-clock probe
+    (§ 9): the gate must decide "is the pool serving?" on every poll (incl.
+    continuation-only and idle polls) to clear a stale all-held debounce clock,
+    and it must NOT bump the round-robin counter while doing so (that would skew
+    the tier1/tier3 alternation). Equivalent to select returning non-None: an
+    operator pin, OR any usable primary (near_cap primaries still dispatch via
+    path 3), OR a usable fallback under its reserve."""
+    if read_operator_pin():
+        return True
+    cfg = _tier_pool_config()
+    if any(usable(t, now=now) for t in cfg['primary']):
+        return True
+    return any(usable(t, now=now) and fallback_reserve_ok(t, now=now)
+               for t in cfg['fallback'])
+
+
 def tier_pool_status(now=None):
     """Snapshot of the pool for observability (spec § 15): per-tier
     {usable, cooldown_until, near_cap, burn_5h} plus the resolved pool config
