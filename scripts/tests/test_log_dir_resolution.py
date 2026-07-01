@@ -52,9 +52,16 @@ class AgentRunnerResolveLogDirTest(unittest.TestCase):
     def test_default_is_home_agents_logs_when_env_unset(self):
         with mock.patch.dict(os.environ, {}, clear=False):
             os.environ.pop('OURLIBERTY_LOG_DIR', None)
+            # The unset-override default derives from the module's AGENTS_ROOT
+            # (OURLIBERTY_AGENTS_ROOT, or ~/agents in production) — NOT a hardcoded
+            # home path. The _bootstrap sandbox redirects AGENTS_ROOT, so pinning the
+            # literal production path fails under isolation; deriving from AGENTS_ROOT
+            # verifies the same invariant (unset -> AGENTS_ROOT/logs) in both. In
+            # production AGENTS_ROOT defaults to ~/agents, so this is ~/agents/logs.
+            # See [[test-isolation-hygiene-debt]].
             self.assertEqual(
                 self.ar.resolve_log_dir(),
-                Path.home() / 'agents' / 'logs',
+                self.ar.AGENTS_ROOT / 'logs',
             )
 
     def test_override_is_used_when_env_set(self):
@@ -68,7 +75,7 @@ class AgentRunnerResolveLogDirTest(unittest.TestCase):
         with mock.patch.dict(os.environ, {'OURLIBERTY_LOG_DIR': ''}):
             self.assertEqual(
                 self.ar.resolve_log_dir(),
-                Path.home() / 'agents' / 'logs',
+                self.ar.AGENTS_ROOT / 'logs',
             )
 
 
