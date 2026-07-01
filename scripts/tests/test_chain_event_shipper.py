@@ -876,6 +876,10 @@ class TestKnownEventTypesContract(unittest.TestCase):
             'card_message',
             'sequence_complete',
             'autonomy_decision',
+            # added by heal_stale_in_review_reconcile to close phantom
+            # in_review cards whose PR merged/closed out of band with no
+            # verdict recorded (push-only; honored as a queue-terminal closer).
+            'review_obsolete',
         }
         self.assertEqual(ces.KNOWN_EVENT_TYPES, frozenset(spec_listed))
 

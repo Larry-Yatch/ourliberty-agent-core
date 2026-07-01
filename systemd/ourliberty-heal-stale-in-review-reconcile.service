@@ -1,0 +1,23 @@
+[Unit]
+Description=Healer — close phantom Forge in_review cards whose PR merged/closed out of band
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/heal_stale_in_review_reconcile.py
+After=network.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+# Same creds source as the dashboard-api: SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY
+# feed _get_larry_action_supabase_client (chain_events read + review_obsolete write).
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/heal_stale_in_review_reconcile.py --apply
+TimeoutStartSec=300
+Nice=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-heal-stale-in-review-reconcile
+
+[Install]
+WantedBy=multi-user.target
