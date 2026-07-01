@@ -388,8 +388,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T20:33Z UTC (Iter ~3454, Tier 1)
+## Status snapshot — updated 2026-07-01T20:48Z UTC (Iter ~3456, Tier 1)
 
-**Iter ~3454 summary (2026-07-01T20:33Z):** Always-fix: fast-forward to b0a789a1 (PR #800 code). **G-rule `heal-stale-daemon-code-still-stale-after-restart` COMPLETE ✅** (PR #800 MERGED 20:29:29Z, fix live). 1 new alert (line 1075, outbox-notifier review-pass Tier-3 silence). PR #801 (approval-sync Phase 3a) Mirror review queued. Pipeline 0 stalls. Watermark 1075. `unreviewed-merge-larry-authored-pr-001` 6th occurrence carry (Beacon Steps 1-2 pending Larry response). **Tier 1** (consecutive_clean=0; cadence 5 min).
+**Iter ~3456 summary (2026-07-01T20:48Z):** ✅ Nominal. No new alerts (wm=1075=file_length). PR #801 (approval-sync Phase 3a) Mirror review in progress (started 20:29:20Z, ~19 min in). Pipeline 0 stalls. Watermark 1075. `unreviewed-merge-larry-authored-pr-001` 6th occurrence carry (Beacon Steps 1-2 pending Larry response). **Tier 1** (consecutive_clean=2; 1 more clean for Tier 2 de-escalation).
 
 
