@@ -880,6 +880,16 @@ class TestKnownEventTypesContract(unittest.TestCase):
             # in_review cards whose PR merged/closed out of band with no
             # verdict recorded (push-only; honored as a queue-terminal closer).
             'review_obsolete',
+            # added by approval-sync Phase 3a (approval-sync-phase3-spec.md
+            # §3a.1) — the two "needs-you" stragglers projected into
+            # chain_events so the dashboard reads ONE substrate. parked_capture
+            # is push-emitted when a capture enters the parked backlog;
+            # sequence_needs_you when a build-sequence is paused / a step is
+            # stuck. Both event-driven (PR-2 wires the emit sites); registered
+            # here in PR-1 so emit_event admits them and the audit gate doesn't
+            # flag them as unknown.
+            'parked_capture',
+            'sequence_needs_you',
         }
         self.assertEqual(ces.KNOWN_EVENT_TYPES, frozenset(spec_listed))
 

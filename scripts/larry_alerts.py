@@ -330,6 +330,7 @@ def append_alert(
     decision_key: Optional[str] = None,
     task_id: Optional[str] = None,
     pr_url: Optional[str] = None,
+    needs_larry: bool = False,
 ) -> bool:
     """Append one alert if not in cooldown.
 
@@ -353,6 +354,16 @@ def append_alert(
             overriding any supplied route — a critical can never be held/digested.
             An unknown value falls back to 'escalate' so a mistake over-notifies
             rather than silently drops.
+        needs_larry: producer-side "needs-you" classification (approval-sync
+            Phase 3a §3a.2). Default FALSE. Only a genuinely irreversible /
+            ambiguous emitter — one whose alert Larry alone must act on — sets
+            this True; the ~150 healer alerts leave it False so they never reach
+            the "Needs You" surface (they stay healer-owned in the Healers tab).
+            This is the producer-side anti-toil gate: a read-time "has an action"
+            filter is a no-op because the benign healer alerts all carry a
+            `suggested_action`, so the discriminator must be stamped where the
+            meaning is known — here. Only stamped onto the record when True (an
+            absent field reads as False downstream), keeping the queue lean.
     """
     refuse_under_test('larry-alerts')
     if severity not in VALID_SEVERITIES:
@@ -410,6 +421,11 @@ def append_alert(
         record['subject'] = subject
     if suggested_action:
         record['suggested_action'] = suggested_action
+    # Phase 3a §3a.2: stamp the producer-side needs-you classification. Only
+    # when True (absent == False downstream) so the queue and the shipped
+    # chain_event payload stay lean; the "Needs You" read query gates on this.
+    if needs_larry:
+        record['needs_larry'] = True
     # Change A: stamp the canonical decision key onto escalate lines so the
     # resolve fan-out can retract this alert by key (resolve_alert_by_decision_key)
     # when its decision resolves elsewhere — keeping the alert feed and its
@@ -570,6 +586,7 @@ def resolve_alert(
     af = alerts_file if alerts_file is not None else ALERTS_FILE
     if consumer_offset_files is None:
         consumer_offset_files = [OFFSET_FILE, MEDIC_OFFSET_FILE]
+    removed: list = []
     try:
         if not af.exists():
             return 0
@@ -578,7 +595,7 @@ def resolve_alert(
             with file_lock.exclusive_lock(
                 lock_path, timeout=_APPEND_LOCK_TIMEOUT_SEC,
             ):
-                return _resolve_alert_locked(
+                removed = _resolve_alert_locked(
                     lambda rec: _line_matches_resolution(rec, key),
                     af, consumer_offset_files,
                 )
@@ -590,6 +607,11 @@ def resolve_alert(
             return 0
     except OSError:
         return 0
+    # §3a.2 retraction gap: clear the already-shipped chain_event rows for the
+    # lines we just removed. Runs OUTSIDE the flock — a Supabase stall must never
+    # serialize every appender behind this best-effort network write.
+    _retract_shipped_alert_events(removed)
+    return len(removed)
 
 
 def resolve_alert_by_decision_key(
@@ -612,6 +634,7 @@ def resolve_alert_by_decision_key(
     af = alerts_file if alerts_file is not None else ALERTS_FILE
     if consumer_offset_files is None:
         consumer_offset_files = [OFFSET_FILE, MEDIC_OFFSET_FILE]
+    removed: list = []
     try:
         if not af.exists():
             return 0
@@ -620,7 +643,7 @@ def resolve_alert_by_decision_key(
             with file_lock.exclusive_lock(
                 lock_path, timeout=_APPEND_LOCK_TIMEOUT_SEC,
             ):
-                return _resolve_alert_locked(
+                removed = _resolve_alert_locked(
                     lambda rec: _line_matches_decision_key(rec, key),
                     af, consumer_offset_files,
                 )
@@ -628,22 +651,36 @@ def resolve_alert_by_decision_key(
             return 0
     except OSError:
         return 0
+    # §3a.2 retraction gap (also idempotent with decision_resolve's C-leg
+    # clear_decision): clear the shipped chain_event rows for the removed lines,
+    # OUTSIDE the flock. Harmless if the fan-out already cleared them by key.
+    _retract_shipped_alert_events(removed)
+    return len(removed)
 
 
 def _resolve_alert_locked(
     match_fn, af: Path, consumer_offset_files: list,
-) -> int:
+) -> list:
     """The locked body of resolve_alert (see its docstring). MUST run under the
     alerts-file sidecar flock. `match_fn(rec) -> bool` selects the lines to
-    retract."""
+    retract.
+
+    Returns the list of removed record dicts (the parsed matched lines). The
+    public callers use `len(...)` for the removed count AND hand the records to
+    `_retract_shipped_alert_events` — OUTSIDE the flock — to clear the matching
+    already-shipped chain_event rows (§3a.2 retraction gap). Returning the
+    records (not just a count) is what lets the caller correlate each removed
+    line to its shipped row without re-reading the rewritten file."""
     with open(af, encoding='utf-8') as f:
         lines = f.readlines()
 
     removed_indices: list = []
+    removed_recs: list = []
     survivors: list = []
     for idx, raw in enumerate(lines):
         stripped = raw.strip()
         matched = False
+        rec = None
         if stripped:
             try:
                 rec = json.loads(stripped)
@@ -653,11 +690,12 @@ def _resolve_alert_locked(
                 matched = True
         if matched:
             removed_indices.append(idx)
+            removed_recs.append(rec)
         else:
             survivors.append(raw)
 
     if not removed_indices:
-        return 0
+        return []
 
     # Backup the pre-rewrite file first (recoverable) — same backup-before-
     # rewrite shape as retention's archive step.
@@ -701,7 +739,84 @@ def _resolve_alert_locked(
     # needs no explicit cursor adjustment here.
     atomic_io.atomic_write_text(af, ''.join(survivors))
 
-    return len(removed_indices)
+    return removed_recs
+
+
+def _retract_shipped_alert_events(removed_recs: list, *, clear_fn=None) -> int:
+    """Clear the shipped `larry_alert` chain_event rows for retracted lines.
+
+    The chain_event_shipper polls larry-alerts.jsonl and ships each line as a
+    `larry_alert` row, keyed by `chain_event_shipper.alert_event_task_id(rec)`.
+    When `resolve_alert` removes a line — e.g. a healer auto-fix resolving drift
+    out-of-band — that already-shipped row otherwise keeps reading as unread
+    (`read_at IS NULL`) FOREVER: the shipper only re-ships the surviving lines
+    and never emits a retraction, so the alert feed and the chain_events read
+    model silently drift apart (§3a.2 retraction gap — the bug that made
+    auto-fixed alerts render live on the dashboard). This mirrors the removal
+    into Supabase by clearing the correlated row via the SHARED shipper-key
+    helper, so the clear can never drift from the stamp.
+
+    Correlation + column are kept strictly aligned with how the row was stamped:
+    a line the shipper keyed by task_id/subject is cleared on the `task_id`
+    column; the degenerate line the shipper keyed by nothing (no
+    task_id/subject/intent) but that still carries a `decision_key` in its
+    payload is cleared on the `decision_key` column only. `clear_larry_alert`
+    matches ONE column, so we never fire a task_id match on a decision_key value
+    (a PR-coordinate key is reused as both, and that cross-match would wrongly
+    clear an unrelated live alert — worse than a missed join).
+
+    Caveats this does NOT cover (documented, low-risk, both strictly better than
+    the pre-fix always-live state): (1) a clear that fails on a Supabase blip is
+    swallowed and the row stays live — there is NO larry_alert-specific healer
+    backstop (heal_stale_approvals only reconciles approval_request/clarify), so
+    the miss persists until the same key is resolved again; (2) a resolve that
+    races AHEAD of the shipper's first ship of that line clears nothing (no row
+    yet) and the shipper then strands the row — negligible in practice because a
+    retraction fires when drift resolves out-of-band, long after the line was
+    DMed and thus shipped.
+
+    Best-effort, fire-and-forget — never raises. Its callers release the alerts
+    flock first, so this network write can't serialize appenders. Under test or
+    without Supabase creds, the clear degrades to a no-op. Returns the total
+    rows cleared. `clear_fn` is a test seam (defaults to the real clear)."""
+    if not removed_recs:
+        return 0
+    if clear_fn is None:
+        try:
+            import chain_event_emit
+        except Exception:  # noqa: BLE001 — retraction must not crash the resolve
+            return 0
+        clear_fn = chain_event_emit.clear_larry_alert
+    try:
+        import chain_event_shipper
+    except Exception:  # noqa: BLE001 — retraction must not crash the resolve
+        return 0
+    # Build the (key, column) targets, deduped so N lines sharing a key issue
+    # ONE clear. Prefer the shipper's task_id; fall back to the payload
+    # decision_key only when the shipper had no task_id to stamp.
+    targets: list = []
+    seen: set = set()
+    for rec in removed_recs:
+        if not isinstance(rec, dict):
+            continue
+        tid = chain_event_shipper.alert_event_task_id(rec)
+        if tid:
+            target = (tid, 'task_id')
+        elif rec.get('decision_key'):
+            target = (rec['decision_key'], 'decision_key')
+        else:
+            continue
+        if target in seen:
+            continue
+        seen.add(target)
+        targets.append(target)
+    total = 0
+    for key, by in targets:
+        try:
+            total += int(clear_fn(key, by=by) or 0)
+        except Exception:  # noqa: BLE001 — a failed clear leaves the row for a
+            pass           # future resolve of the same key (no crash into caller)
+    return total
 
 
 # ---------- significance gate + route classification (fix-first routing) ----------

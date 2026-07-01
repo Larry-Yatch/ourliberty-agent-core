@@ -193,6 +193,20 @@ KNOWN_EVENT_TYPES: frozenset[str] = frozenset({
     # these rows; listing the type here admits it to the weekly chain-event-type
     # audit (heal_chain_event_type_audit.py).
     'autonomy_decision',
+    # approval-sync Phase 3a (approval-sync-phase3-spec.md §3a.1): the two
+    # "needs-you" stragglers that weren't yet projected into chain_events, so
+    # the dashboard can read ONE substrate. `parked_capture` is push-emitted
+    # when a capture enters the parked backlog (agent='dashboard', task_id=
+    # `capture-<id>`, needs_larry=False — calm backlog, lane='parked'), and
+    # cleared when it leaves parked. `sequence_needs_you` is push-emitted by
+    # build_sequence_advancer when a sequence is paused or a step is stuck
+    # (agent='build_sequence_advancer', task_id=`seq-<id>`, lane='steer'),
+    # and cleared when it resumes/clears. Both are event-driven (emitted at the
+    # state transition, not on a poll tick). The shipper never produces these
+    # rows; listing them here admits them to the weekly chain-event-type audit
+    # (heal_chain_event_type_audit.py).
+    'parked_capture',
+    'sequence_needs_you',
 })
 
 # PII / credential redaction. Any payload field key matching one of these
@@ -790,6 +804,24 @@ def parse_pulse_escalations(content: str) -> list[ChainEvent]:
     return out
 
 
+def alert_event_task_id(rec: dict) -> Optional[str]:
+    """The task_id an alert/sentinel jsonl record is shipped under.
+
+    THE single source of truth for the larry-alerts/sentinel-alerts keying:
+    the explicit `task_id`, else the `subject` (or `intent`), else None. Shared
+    by `parse_jsonl_line` (the poll shipper that STAMPS the row) and
+    `larry_alerts._retract_shipped_alert_events` (which must CLEAR that same row
+    by the identical key). Keeping the derivation in one place is load-bearing:
+    if the two ever diverged, the retraction would clear a key the shipper never
+    used, the read_at UPDATE would hit 0 rows, and auto-resolved alerts would
+    render live on the dashboard forever — the exact §3a.2 bug the clear closes.
+    """
+    if not isinstance(rec, dict):
+        return None
+    subject = rec.get('subject') or rec.get('intent') or ''
+    return rec.get('task_id') or subject or None
+
+
 def parse_jsonl_line(line: str, *, source: str) -> Optional[ChainEvent]:
     """Parse one larry-alerts.jsonl or sentinel-alerts.jsonl entry."""
     try:
@@ -807,8 +839,7 @@ def parse_jsonl_line(line: str, *, source: str) -> Optional[ChainEvent]:
         agent = rec.get('source') or 'sentinel'
     else:
         return None
-    subject = rec.get('subject') or rec.get('intent') or ''
-    task_id = rec.get('task_id') or subject or None
+    task_id = alert_event_task_id(rec)
     payload = {k: v for k, v in rec.items()
                if k not in ('ts', 'source', 'task_id')}
     # Author-at-emit (#5): bake the deterministic plain-language meaning layer
