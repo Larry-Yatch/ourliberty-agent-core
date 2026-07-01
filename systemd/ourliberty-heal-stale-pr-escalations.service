@@ -1,0 +1,43 @@
+[Unit]
+Description=Clear for-Larry 'Session-less PR needs you' records whose PR is terminal (MERGED/CLOSED) or synthetic — the merged-PR straggler backstop for the escalation queue
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/heal_stale_pr_escalations.py
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/heal_stale_pr_escalations.py --apply
+
+TimeoutStartSec=300
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-heal-stale-pr-escalations
+
+# Reads the for-Larry feed under ~/agents/blackboard + probes PR state via gh.
+# Tiny.
+MemoryMax=256M
+MemoryHigh=128M
+
+# Hardening — matches the merged-pr-board-reconcile pattern. Writes: the for-Larry
+# feed under ~/agents only. agent-core is read-only (no repo write). ~/.cache is
+# writable so gh's update-check cache write never EROFS-fails the probe.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /home/larry/.cache /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target
