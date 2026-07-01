@@ -388,8 +388,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T21:25Z UTC (Iter ~3459, Tier 1, always-fix)
+## Status snapshot — updated 2026-07-01T21:30Z UTC (Iter ~3460, Tier 1, clean)
 
-**Iter ~3459 summary (2026-07-01T21:25Z):** ⚠️ Drift+always-fix. Check A: repo 1 commit behind (f908b1ac = PR #801 `approval-sync Phase 3a PR-1`, merged auto-merge 15:19 MDT). Fast-forward applied. PR #801 SIGNAL from iter ~3458 FULLY RESOLVED: Mirror round 2 REVIEW_PASS (regression-gate flake cleared with fresh baseline), auto-merged, worktrees torn down, BASELINE_WARM spawned. PR #803 (`approval-sync Phase 3a PR-2`) now OPEN/MERGEABLE, labels=auto-review+deep-review-passed, reviews=[], awaiting outbox-notifier Mirror dispatch. All daemons healthy. 0 stalls. Tier 1, consecutive_clean=0. Watermark 1076=file_length.
+**Iter ~3460 summary (2026-07-01T21:30Z):** ✅ Nominal. All checks clean. Mirror reviewing PR #803 (`approval-sync Phase 3a PR-2`, dispatch_tier=tier1, started 15:25:22 MDT=21:25:22Z). Outbox-notifier routine restart at 15:24:47 MDT post-PR#801-merge (heal-stale-daemon); dispatched PR#803 Mirror review on restart. 0 stalls. All daemons healthy. Pending=1 (stale PR#801 entry, self-resolving). Tier 1, consecutive_clean=1. Watermark 1076=file_length.
 
 
