@@ -388,8 +388,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T22:29Z UTC (Iter ~3464, Tier 2, clean)
+## Status snapshot — updated 2026-07-01T22:47Z UTC (Iter ~3465, Tier 3, clean)
 
-**Iter ~3464 summary (2026-07-01T22:27Z):** ✅ Nominal. 8 new alerts (all Tier-3: 1 doorbell + 7 heal-stale-daemon-code auto-restarts post-PR#803-merge). PR #803 MERGED at 22:13:43Z UTC (Forge revision-1 fix for `_reconcile_sequence_needs_you` fail-safe-to-empty hazard; Mirror REVIEW_PASS; auto-merged). 0 open PRs. Pending=0 (Beacon cleaned stale entries). All daemons restarted 22:25Z (heal-stale-daemon-code, PR#803 shared library change). 0 stalls. **Tier 2, consecutive_clean=1→2 (1 more clean iter for de-escalation to Tier 3).** Next iter at 15-min cadence.
+**Iter ~3465 summary (2026-07-01T22:47Z):** ✅ Nominal. 1 new alert (Tier-3: heal-claude-json-bind-drift probe-blind:ourliberty-cycle.service — bot DM'd Larry, Pulse silenced). Dashboard PR #99 ("approval-sync Phase 3b PR-1: the Needs-You read API") MERGED at 22:43:53Z UTC. 0 open PRs (agent-core + dashboard). 0 stalls. pending=0. All daemons healthy. **Tier 2 → Tier 3 de-escalation (consecutive_clean=3).** Next iter at 30-min cadence.
 
 
