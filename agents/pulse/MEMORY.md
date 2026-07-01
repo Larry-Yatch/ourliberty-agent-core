@@ -388,8 +388,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T21:15Z UTC (Iter ~3458, Tier 2→1 re-escalation)
+## Status snapshot — updated 2026-07-01T21:25Z UTC (Iter ~3459, Tier 1, always-fix)
 
-**Iter ~3458 summary (2026-07-01T21:12Z):** ⚠️ Signal. Check 4: pending=1. APPROVAL_REQUEST `mirror-review-pr-ourliberty-agent-core-801` with chat_id=null (DM not delivered). Mirror escalated PR #801 rev1 at 15:05 MDT — regression gate flake (`test_spec_doc_not_authored_fails_kickoff_with_genuine_message`, passes in isolation, NOT in diff). Mirror round 2 dispatched 15:05:41 MDT (running at iter time). Escalation written to pulse-escalations.json #16 + larry_alerts warning sent (route=escalate). `decision-needed-approval-forge-dispatch-no-target-repo-001` 5th occurrence. **Tier 2 → Tier 1 RE-ESCALATED** (signal on Check 4). Watermark 1075=file_length.
+**Iter ~3459 summary (2026-07-01T21:25Z):** ⚠️ Drift+always-fix. Check A: repo 1 commit behind (f908b1ac = PR #801 `approval-sync Phase 3a PR-1`, merged auto-merge 15:19 MDT). Fast-forward applied. PR #801 SIGNAL from iter ~3458 FULLY RESOLVED: Mirror round 2 REVIEW_PASS (regression-gate flake cleared with fresh baseline), auto-merged, worktrees torn down, BASELINE_WARM spawned. PR #803 (`approval-sync Phase 3a PR-2`) now OPEN/MERGEABLE, labels=auto-review+deep-review-passed, reviews=[], awaiting outbox-notifier Mirror dispatch. All daemons healthy. 0 stalls. Tier 1, consecutive_clean=0. Watermark 1076=file_length.
 
 
