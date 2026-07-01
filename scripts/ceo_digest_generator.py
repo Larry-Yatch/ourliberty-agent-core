@@ -543,12 +543,21 @@ def generate_ceo_voice(prompt: str) -> tuple[Optional[str], Optional[float]]:
     through to the raw rendering. Never raises.
     """
     refuse_under_test('claude-spawn')
+    # Per-task tier dispatch (spec §10-W4): round-robin a tier for this run and
+    # skip cleanly when none is available (fall through to the raw digest).
+    env, tier = active_tier.select_durable_claude_env()
+    if env is None:
+        log('no dispatch tier available; skipping digest LLM run (raw fallback)',
+            'WARN')
+        return None, None
+    global _last_dispatch_tier
+    _last_dispatch_tier = tier
     try:
         proc = subprocess.run(
             ['claude', '--print', '--model', DIGEST_MODEL,
              '--output-format', 'json', prompt],
             capture_output=True, text=True,
-            env=active_tier.durable_claude_env(),
+            env=env,
             timeout=CLAUDE_TIMEOUT_SEC, check=False,
         )
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
@@ -580,7 +589,16 @@ def generate_ceo_voice(prompt: str) -> tuple[Optional[str], Optional[float]]:
 # -------------------- cost capture + write --------------------
 
 
+# Set by the LLM call to the tier select_durable_claude_env chose for THIS run
+# (spec §6 effective-tier discipline), so the cost row is attributed to the
+# tier that actually ran — not the global active tier.
+_last_dispatch_tier: Optional[str] = None
+
+
 def _account_tier() -> str:
+    if _last_dispatch_tier:
+        return _last_dispatch_tier
+    # Fallback (LLM run skipped / not yet dispatched): the active-tier file.
     try:
         with open(ACTIVE_TIER_FILE, encoding='utf-8') as f:
             return str(json.load(f).get('tier') or 'tier1')

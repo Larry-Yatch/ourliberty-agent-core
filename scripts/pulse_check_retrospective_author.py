@@ -336,12 +336,21 @@ def _claude_classify(prompt: str) -> tuple[Optional[str], Optional[float]]:
     On ANY failure (timeout, non-zero exit, parse failure, empty) returns
     (None, None) so the caller skips posting this cycle. Never raises."""
     refuse_under_test('claude-spawn')
+    # Per-task tier dispatch (spec §10-W4): round-robin a tier for this run.
     env = None
+    tier = None
     if active_tier is not None:
         try:
-            env = active_tier.durable_claude_env()
-        except Exception:  # noqa: BLE001 — fall back to inherited env
-            env = None
+            env, tier = active_tier.select_durable_claude_env()
+        except Exception:  # noqa: BLE001 — resolution error: run on inherited env
+            env, tier = None, None
+        else:
+            if env is None:
+                # Clean 'no usable tier' -> skip posting this cycle.
+                log('no dispatch tier available; skipping retrospective LLM run')
+                return None, None
+    global _last_dispatch_tier
+    _last_dispatch_tier = tier
     try:
         proc = subprocess.run(
             ['claude', '--print', '--model', AUTHOR_MODEL,
@@ -871,7 +880,14 @@ def _artifact_is_valid_sentinel(path: Path) -> bool:
 # -------------------- cost capture (modeled on ceo_digest_generator) --------------------
 
 
+# Set by the LLM call to the tier select_durable_claude_env chose for THIS run
+# (spec §6), so the cost row attributes to the tier that actually ran.
+_last_dispatch_tier: Optional[str] = None
+
+
 def _account_tier() -> str:
+    if _last_dispatch_tier:
+        return _last_dispatch_tier
     try:
         with open(ACTIVE_TIER_FILE, encoding='utf-8') as f:
             return str(json.load(f).get('tier') or 'tier1')

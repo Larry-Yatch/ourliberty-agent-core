@@ -370,12 +370,18 @@ def claude_json_roundtrip(
     caller pick its own model (e.g. the closeout author's ``CLOSEOUT_MODEL``)
     while reusing this one chokepoint sink."""
     refuse_under_test('claude-spawn')
+    # Per-task tier dispatch (spec §10-W4): round-robin a tier for this run and
+    # skip cleanly when none is available (fall through to the raw briefing).
+    env, tier = active_tier.select_durable_claude_env()
+    if env is None:
+        log('narrator: no dispatch tier available; using raw briefing')
+        return None
     try:
         proc = subprocess.run(
             ['claude', '--print', '--model', model,
              '--output-format', 'json', prompt],
             capture_output=True, text=True,
-            env=active_tier.durable_claude_env(),
+            env=env,
             timeout=CLAUDE_TIMEOUT_SEC, check=False,
         )
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
@@ -392,6 +398,17 @@ def claude_json_roundtrip(
     text = (envelope.get('result') or '').strip() if isinstance(envelope, dict) else ''
     if not text:
         return None
+    # §8/§10-W4: stamp an account-tagged cost row so the narrator's burn is
+    # visible per-tier (this path does not route through inbox_watcher).
+    if isinstance(envelope, dict):
+        try:
+            active_tier.append_cost_row(
+                tier, model=model,
+                cost_usd=envelope.get('total_cost_usd'),
+                usage=envelope.get('usage'),
+                agent='missions-narrator', source='missions-narrator')
+        except Exception:  # noqa: BLE001 — cost ledger must never break a run
+            pass
     return parse_briefing_json(text)
 
 
