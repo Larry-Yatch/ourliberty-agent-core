@@ -86,7 +86,7 @@ def _write_costs(tmp: Path, rows: list[dict]) -> None:
     p.write_text('\n'.join(json.dumps(r) for r in rows) + '\n')
 
 
-def _client(tmp: Path) -> TestClient:
+def _client(tmp: Path, testcase: unittest.TestCase) -> TestClient:
     """Build a TestClient with AGENTS_ROOT pointed at `tmp`.
 
     We monkeypatch `da._agents_root` rather than mutating the global env,
@@ -94,8 +94,16 @@ def _client(tmp: Path) -> TestClient:
     `OURLIBERTY_AGENTS_ROOT` at their import time and assert it stays
     stable. Each TestClient gets its own AGENTS_ROOT closure-bound to the
     tmpdir the test is using.
+
+    The rebind is scoped to the calling test: `mock.patch.object` restores
+    the original `da._agents_root` at teardown via `addCleanup`, so no
+    dashboard test leaks a tmpdir-bound `_agents_root` into sibling test
+    modules run in the same process (e.g. test_heal_orphan_autoregister's
+    queue-dir parity check).
     """
-    da._agents_root = lambda: tmp  # type: ignore[assignment]
+    p = mock.patch.object(da, '_agents_root', lambda: tmp)
+    p.start()
+    testcase.addCleanup(p.stop)
     return TestClient(da.app)
 
 
@@ -105,7 +113,7 @@ class AuthTest(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix='dash-auth-'))
         _fresh_root(self.tmp)
-        self.c = _client(self.tmp)
+        self.c = _client(self.tmp, self)
 
     def test_health_missing_token_401(self):
         r = self.c.get('/health')
@@ -156,7 +164,7 @@ class CorsTest(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix='dash-cors-'))
         _fresh_root(self.tmp)
-        self.c = _client(self.tmp)
+        self.c = _client(self.tmp, self)
 
     def test_cors_preflight_allowed_origin(self):
         r = self.c.options('/agents/status', headers={
@@ -198,7 +206,7 @@ class HealthTest(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix='dash-h-'))
         _fresh_root(self.tmp)
-        self.c = _client(self.tmp)
+        self.c = _client(self.tmp, self)
 
     def test_shape(self):
         r = self.c.get('/health', headers=AUTH)
@@ -233,7 +241,7 @@ class AgentsStatusTest(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix='dash-a-'))
         _fresh_root(self.tmp)
-        self.c = _client(self.tmp)
+        self.c = _client(self.tmp, self)
 
     def test_empty_root_returns_four_agents(self):
         with mock.patch.object(da, '_systemctl_is_active', return_value=None):
@@ -305,7 +313,7 @@ class TasksRecentTest(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix='dash-t-'))
         _fresh_root(self.tmp)
-        self.c = _client(self.tmp)
+        self.c = _client(self.tmp, self)
 
     def test_empty_costs_returns_empty(self):
         r = self.c.get('/tasks/recent', headers=AUTH)
@@ -391,7 +399,7 @@ class CostsTodayTest(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix='dash-ct-'))
         _fresh_root(self.tmp)
-        self.c = _client(self.tmp)
+        self.c = _client(self.tmp, self)
 
     def test_empty_costs(self):
         r = self.c.get('/costs/today', headers=AUTH)
@@ -429,7 +437,7 @@ class CostsWeekTest(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix='dash-cw-'))
         _fresh_root(self.tmp)
-        self.c = _client(self.tmp)
+        self.c = _client(self.tmp, self)
 
     def test_returns_7_days(self):
         r = self.c.get('/costs/week', headers=AUTH)
@@ -472,7 +480,7 @@ class CycleJournalTest(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix='dash-cj-'))
         _fresh_root(self.tmp)
-        self.c = _client(self.tmp)
+        self.c = _client(self.tmp, self)
 
     def _patch_journal(self, text: str):
         path = self.tmp / 'cycle-journal.md'
@@ -531,7 +539,7 @@ class HealersStatusTest(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix='dash-he-'))
         _fresh_root(self.tmp)
-        self.c = _client(self.tmp)
+        self.c = _client(self.tmp, self)
 
     def test_empty_blackboard_returns_empty(self):
         r = self.c.get('/healers/status', headers=AUTH)
@@ -591,7 +599,7 @@ class PathIsolationTest(unittest.TestCase):
         before_mtime = prod.stat().st_mtime
         tmp = Path(tempfile.mkdtemp(prefix='dash-iso-'))
         _fresh_root(tmp)
-        c = _client(tmp)
+        c = _client(tmp, self)
         for path in ('/health', '/agents/status', '/tasks/recent', '/costs/today'):
             with mock.patch.object(da, '_systemctl_is_active', return_value=None), \
                  mock.patch.object(da, '_list_timer_next', return_value=None):
@@ -605,7 +613,7 @@ class DocsGatingTest(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix='dash-d-'))
         _fresh_root(self.tmp)
-        self.c = _client(self.tmp)
+        self.c = _client(self.tmp, self)
 
     def test_docs_requires_auth(self):
         r = self.c.get('/docs')
