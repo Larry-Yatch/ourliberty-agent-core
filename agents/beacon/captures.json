@@ -1047,7 +1047,8 @@
         "at": "2026-06-24T23:27:54.414271+00:00",
         "from_state": "parked"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "aging": true
     },
     {
       "id": "cap-kick-off-missions-phase-4-phase-s-two-way-board-6c6d",
@@ -1077,7 +1078,8 @@
         "at": "2026-06-24T23:27:54.414271+00:00",
         "from_state": "parked"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "aging": true
     },
     {
       "id": "cap-decide-medic-stage-2-auto-restart-leave-fenced-o-9c51",
@@ -1107,7 +1109,8 @@
         "at": "2026-06-24T23:27:54.414271+00:00",
         "from_state": "parked"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "aging": true
     },
     {
       "id": "cap-wire-a-self-firing-freshness-reconcile-tech-debt-c8c7",
@@ -1137,7 +1140,8 @@
         "at": "2026-06-24T23:27:54.414271+00:00",
         "from_state": "parked"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "aging": true
     },
     {
       "id": "cap-migrate-watchdog-717-probe-to-pipeline-live-stat-b7bb",
