@@ -400,8 +400,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-02T07:42Z UTC (Iter ~3495, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-02T07:47Z UTC (Iter ~3496, Tier 1, consecutive_clean=0)
 
-**Iter ~3495 summary (2026-07-02T07:42Z):** ⚠️ Action needed. No new alerts (wm=1109=file_length). PR #813 MERGED 07:36:21Z UTC (AUTO_MERGE; commit 7b637610) — was "[monitor]" in iter ~3494, completed just after checks ran. PR #812 still HELD (5th Mirror REVIEW_PASS at 01:24:50Z); review-dispatch loop paused since 01:24:53Z (~18 min quiet). No new stalls. All daemons healthy. Larry still needs `/code-review high` + `scripts/merge_reviewed_pr.sh 812`. review-dispatch-post-auto-merge-held-001 G-rule stays at 2/3 (no new occurrence this iter).
+**Iter ~3496 summary (2026-07-02T07:47Z):** ⚠️ Action needed. 1 new alert L1110 (Tier-4: outbox-notifier promoted hold persistence:3-cycles for PR #812; bot delivered DM at 01:45:16 MDT; no Pulse DM added). PR #812 still HELD (5th Mirror REVIEW_PASS; review-dispatch loop paused since 01:24:53Z, ~23 min quiet). PR #813 MERGED confirmed. No new stalls. All daemons healthy. Larry needs `/code-review high` + `scripts/merge_reviewed_pr.sh 812`.
 
 
