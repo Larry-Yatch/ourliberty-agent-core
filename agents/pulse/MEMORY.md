@@ -400,8 +400,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-02T02:59Z UTC (Iter ~3483, Tier 2, consecutive_clean=1)
+## Status snapshot — updated 2026-07-02T03:18Z UTC (Iter ~3484, Tier 2, consecutive_clean=2)
 
-**Iter ~3483 summary (2026-07-02T02:59Z):** ✅ Nominal. 0 new alerts. PR #805 MERGED 02:41:49Z (2nd Mirror REVIEW_PASS + auto-merge). PR #809 2nd Mirror REVIEW_PASS (02:44Z), AUTO_MERGE_HELD blocker=#806 (test file overlap). PR #806 OPEN, no auto-review label, stall cooldown active. All inboxes empty. 8/8 daemons healthy. Tier 2 consecutive_clean 0→1. Next clean iter needed: 2 more for Tier 3 de-escalation.
+**Iter ~3484 summary (2026-07-02T03:18Z):** ✅ Nominal. 0 new alerts. PR #806 now MERGEABLE (was UNKNOWN) — still no auto-review label, still blocking PR #809 auto-merge. PR #809 2nd Mirror REVIEW_PASS (02:44Z), AUTO_MERGE_HELD. All inboxes empty. 8/8 daemons healthy. Beacon bot restarted cleanly at 02:57:54Z (no alert). Tier 2 consecutive_clean 1→2. Next clean iter: 1 more for Tier 3 de-escalation.
 
 
