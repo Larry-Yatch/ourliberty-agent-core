@@ -1415,7 +1415,7 @@ _bot_state: dict = {'sessions': {}}
 # Single-instance lock. Held open for the process lifetime — never closed —
 # so the exclusive flock persists. Module-global keeps the fd from being
 # garbage-collected, which would release the lock.
-_LOCK_PATH = Path.home() / "agents" / "state" / "beacon-telegram-bot.lock"
+_LOCK_PATH = STATE_DIR / "beacon-telegram-bot.lock"
 _lock_fd = None
 
 
