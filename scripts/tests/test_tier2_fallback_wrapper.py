@@ -371,6 +371,27 @@ class CallBeaconTier2Test(unittest.TestCase):
         _p = mock.patch.object(self.bot, '_append_bot_quota_event')
         self.quota_mock = _p.start()
         self.addCleanup(_p.stop)
+        # #780 added a pre-flight tier gate to call_beacon: it calls
+        # active_tier.select_dispatch_tier(...) and returns a canned
+        # "All accounts are rate-limited" reply when that yields None — which
+        # it does under the sandbox (no live tier state), short-circuiting
+        # before the tier1->tier2 fallback branch these tests exercise. Pin a
+        # healthy primary so call_beacon reaches the fallback path.
+        _pt = mock.patch.object(self.bot.active_tier, 'select_dispatch_tier',
+                                return_value='tier1')
+        _pt.start()
+        self.addCleanup(_pt.stop)
+        # The §6/§8 pool-aware fallback (fallback_tier_pool_aware) now picks the
+        # SIBLING primary first — on the live pool that resolves to tier3, not
+        # tier2. These tests are specifically about the tier1->TIER2 (laptop
+        # HOME-swap) fallback: they assert home_override==TIER2_HOME and a
+        # "Tier 2 ..." reply. Pin the fallback to tier2 so the branch under test
+        # is the one exercised. (Also covers the §4 TOCTOU re-derivation, which
+        # calls the same fn.)
+        _pf = mock.patch.object(self.bot.active_tier,
+                                'fallback_tier_pool_aware', return_value='tier2')
+        _pf.start()
+        self.addCleanup(_pf.stop)
 
     def tearDown(self):
         if self._prev_t2 is None:
@@ -492,6 +513,19 @@ class CallBeaconTier2SetupTokenTest(unittest.TestCase):
         _p = mock.patch.object(self.bot, '_append_bot_quota_event')
         self.quota_mock = _p.start()
         self.addCleanup(_p.stop)
+        # See CallBeaconTier2Test.setUp — #780 pre-flight tier gate. Pin a
+        # healthy primary so call_beacon reaches the tier1->tier2 fallback.
+        _pt = mock.patch.object(self.bot.active_tier, 'select_dispatch_tier',
+                                return_value='tier1')
+        _pt.start()
+        self.addCleanup(_pt.stop)
+        # See CallBeaconTier2Test.setUp — the pool-aware fallback picks tier3 on
+        # the live pool; pin tier2 so _setup_token_for_tier reads the TIER2 env
+        # (the fake token this class sets) and the retry HOME is TIER2_HOME.
+        _pf = mock.patch.object(self.bot.active_tier,
+                                'fallback_tier_pool_aware', return_value='tier2')
+        _pf.start()
+        self.addCleanup(_pf.stop)
 
     def tearDown(self):
         if self._prev_t2 is None:
@@ -513,10 +547,15 @@ class CallBeaconTier2SetupTokenTest(unittest.TestCase):
             reply, sid = self.bot.call_beacon('hello', None)
         self.assertEqual(reply, 'recovered')
         self.assertEqual(sid, 'sid2')
-        # The Tier 2 call carried the setup-token AND kept the HOME-swap.
+        # The Tier 2 call carried the setup-token. On the setup-token path HOME
+        # is intentionally DECOUPLED from the tier (auth rides on the token, not
+        # on the tier HOME's credentials.json), so call_beacon keeps the real
+        # HOME (TIER1_HOME) rather than swapping to TIER2_HOME — mirroring
+        # agent_runner._apply_tier_auth. (The HOME-swap is only used on the
+        # no-token creds.json fallback, covered by CallBeaconTier2Test.)
         tier2_kwargs = run_mock.call_args_list[1].kwargs
         self.assertEqual(tier2_kwargs.get('oauth_token'), self._TIER2_TOKEN)
-        self.assertEqual(tier2_kwargs.get('home_override'), self.bot.TIER2_HOME)
+        self.assertEqual(tier2_kwargs.get('home_override'), self.bot.active_tier.TIER1_HOME)
 
     def test_token_present_skips_unavailable_gate(self):
         # creds.json missing (tier2_available False) must NOT short-circuit

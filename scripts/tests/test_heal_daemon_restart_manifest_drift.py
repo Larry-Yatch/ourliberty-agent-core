@@ -118,7 +118,14 @@ class CommitAndPushTest(unittest.TestCase):
         self.tmp = tempfile.mkdtemp(prefix='manifest-drift-git-')
         self.base = Path(self.tmp)
         self.origin = self.base / 'origin.git'
-        subprocess.run(['git', 'init', '--bare', '-q', str(self.origin)], check=True,
+        # Pin the bare origin's default branch to main. Without this the origin
+        # HEAD defaults to the host's init.defaultBranch (often `master` on the
+        # droplet, which has no global override), so a later `git clone` checks
+        # out that empty branch instead of the seeded `main` — the clone then has
+        # no working tree and writing config/<manifest> hits FileNotFoundError.
+        # --initial-branch needs git >= 2.28 (present on the droplet).
+        subprocess.run(['git', 'init', '--bare', '--initial-branch=main', '-q',
+                        str(self.origin)], check=True,
                        capture_output=True, text=True)
         self.repo = self.base / 'repo'
         self.repo.mkdir()

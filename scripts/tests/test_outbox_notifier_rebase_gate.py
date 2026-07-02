@@ -306,7 +306,13 @@ class ProcessOutboxRebaseIntegrationTest(unittest.TestCase):
 
     def test_mergeable_build_dispatches_mirror_no_rebase(self):
         f = self._write_outbox(_build_outbox())
+        # The fixture PR url (.../pull/777) is a real MERGED PR; on the droplet
+        # `gh` is installed, so the dispatch-time terminal guard would see
+        # MERGED and skip the Mirror dispatch this test asserts. Force the
+        # target non-terminal so the intended (open-PR) dispatch path runs.
         with mock.patch.object(on, '_poll_pr_mergeable', return_value='mergeable'), \
+             mock.patch.object(on, '_mirror_review_target_is_terminal',
+                                return_value=False), \
              mock.patch.object(on, '_enforce_cost_budget', return_value=True), \
              mock.patch.object(on, '_signal_sequence_step_pr_opened'):
             on.process_outbox(f)
@@ -321,7 +327,12 @@ class ProcessOutboxRebaseIntegrationTest(unittest.TestCase):
         rol.open_obligation('rebase-task-1', pr_url=PR, round_num=1)
         body = _build_outbox(phase='rebase', result=f'PR updated: {PR}')
         f = self._write_outbox(body)
+        # See test_mergeable_build_dispatches_mirror_no_rebase: PR 777 is a real
+        # MERGED PR, so the terminal guard would skip the Mirror dispatch this
+        # test asserts. Force non-terminal to reach the intended dispatch path.
         with mock.patch.object(on, '_poll_pr_mergeable', return_value='mergeable'), \
+             mock.patch.object(on, '_mirror_review_target_is_terminal',
+                                return_value=False), \
              mock.patch.object(on, '_enforce_cost_budget', return_value=True), \
              mock.patch.object(on, '_signal_sequence_step_pr_opened'):
             on.process_outbox(f)
