@@ -17,6 +17,7 @@ except ImportError:  # discover loads this module top-level (no package parent)
     import _bootstrap  # noqa: F401
 
 import json
+import signal
 import sys
 import tempfile
 import unittest
@@ -857,11 +858,12 @@ class RunAllChecksTest(_IsolatedRootsTest):
             check_disk=mock.MagicMock(return_value=ok_result),
             check_memory=mock.MagicMock(return_value=ok_result),
             check_log_growth=mock.MagicMock(return_value=ok_result),
+            check_orphaned_journalctl_followers=mock.MagicMock(return_value=ok_result),
             reconcile_bot_desired_state=mock.MagicMock(return_value=ok_result),
         ):
             results = watchdog.run_all_checks()
         self.assertEqual(results['overall'], 'healthy')
-        self.assertEqual(len(results['checks']), 8)
+        self.assertEqual(len(results['checks']), 9)
 
     def test_warning_when_any_check_warning(self):
         ok = {'status': 'ok'}
@@ -875,6 +877,7 @@ class RunAllChecksTest(_IsolatedRootsTest):
             check_disk=mock.MagicMock(return_value=ok),
             check_memory=mock.MagicMock(return_value=ok),
             check_log_growth=mock.MagicMock(return_value=ok),
+            check_orphaned_journalctl_followers=mock.MagicMock(return_value=ok),
             reconcile_bot_desired_state=mock.MagicMock(return_value=ok),
         ):
             results = watchdog.run_all_checks()
@@ -892,6 +895,7 @@ class RunAllChecksTest(_IsolatedRootsTest):
             check_disk=mock.MagicMock(return_value=crit),
             check_memory=mock.MagicMock(return_value=ok),
             check_log_growth=mock.MagicMock(return_value=ok),
+            check_orphaned_journalctl_followers=mock.MagicMock(return_value=ok),
             reconcile_bot_desired_state=mock.MagicMock(return_value=ok),
         ):
             results = watchdog.run_all_checks()
@@ -908,12 +912,164 @@ class RunAllChecksTest(_IsolatedRootsTest):
             check_disk=mock.MagicMock(return_value=ok),
             check_memory=mock.MagicMock(return_value=ok),
             check_log_growth=mock.MagicMock(return_value=ok),
+            check_orphaned_journalctl_followers=mock.MagicMock(return_value=ok),
             reconcile_bot_desired_state=mock.MagicMock(return_value=ok),
         ):
             watchdog.run_all_checks()
         self.assertTrue(watchdog.HEALTH_FILE.exists())
         data = json.loads(watchdog.HEALTH_FILE.read_text())
         self.assertEqual(data['overall'], 'healthy')
+
+
+def _proc(pid: int, ppid: int, etimes: int, args: str) -> dict:
+    return {'pid': pid, 'ppid': ppid, 'etimes': etimes, 'args': args}
+
+
+class OrphanedJournalctlReaperTest(_IsolatedRootsTest):
+    """check_orphaned_journalctl_followers — reap init-reparented follow leaks."""
+
+    AGED = watchdog.ORPHAN_FOLLOWER_MIN_AGE_SEC + 3600
+    YOUNG = watchdog.ORPHAN_FOLLOWER_MIN_AGE_SEC - 3600
+
+    _WRAPPER_ARGS = (
+        "bash -c journalctl -fu ourliberty-inbox-watcher.service "
+        "--since '1 minute ago' --no-pager 2>&1 | grep --line-buffered -E pr-104"
+    )
+    _CHILD_ARGS = (
+        "journalctl -fu ourliberty-inbox-watcher.service "
+        "--since 1 minute ago --no-pager"
+    )
+
+    def _run(self, procs):
+        """Run the reaper over a fake process table; return (result, kill_calls)."""
+        with mock.patch.object(watchdog, '_enumerate_processes',
+                               return_value=procs), \
+             mock.patch.object(watchdog.os, 'kill') as mkill, \
+             mock.patch.object(watchdog.larry_alerts, 'append_alert') as malert:
+            result = watchdog.check_orphaned_journalctl_followers()
+        pids = sorted(c.args[0] for c in mkill.call_args_list)
+        # Every kill must be SIGTERM.
+        for c in mkill.call_args_list:
+            self.assertEqual(c.args[1], signal.SIGTERM)
+        # Benign self-heal never pages Larry.
+        malert.assert_not_called()
+        return result, pids
+
+    def test_reaps_wrapper_and_child(self):
+        procs = [
+            _proc(100, 1, self.AGED, self._WRAPPER_ARGS),
+            _proc(101, 100, self.AGED, self._CHILD_ARGS),
+            _proc(9999, 1234, 50, 'some-unrelated-process'),
+        ]
+        result, pids = self._run(procs)
+        self.assertEqual(pids, [100, 101])       # whole subtree reaped
+        self.assertEqual(result['status'], 'recovered')
+        self.assertEqual(result['reaped'], 2)
+        self.assertEqual(result['roots'], 1)
+
+    def test_ignores_daemon_owned_follower(self):
+        # chain_event_shipper (alive, pid 200) owns its journalctl child (201).
+        procs = [
+            _proc(200, 1, self.AGED,
+                  '/usr/bin/python3 scripts/chain_event_shipper.py'),
+            _proc(201, 200, self.AGED,
+                  'journalctl -fu ourliberty-inbox-watcher.service --output=json'),
+        ]
+        result, pids = self._run(procs)
+        self.assertEqual(pids, [])               # child's parent is alive, not init
+        self.assertEqual(result['reaped'], 0)
+        self.assertEqual(result['status'], 'ok')
+
+    def test_ignores_young_orphan(self):
+        procs = [_proc(100, 1, self.YOUNG, self._WRAPPER_ARGS)]
+        result, pids = self._run(procs)
+        self.assertEqual(pids, [])
+        self.assertEqual(result['reaped'], 0)
+
+    def test_ignores_non_follow_journalctl(self):
+        # Orphaned + aged, but no follow flag → not a leak this reaper owns.
+        procs = [_proc(100, 1, self.AGED,
+                       'journalctl -u ourliberty-inbox-watcher.service -n 50')]
+        result, pids = self._run(procs)
+        self.assertEqual(pids, [])
+        self.assertEqual(result['reaped'], 0)
+
+    def test_grep_f_after_pipe_does_not_false_match(self):
+        # journalctl has NO follow flag; the `-f` belongs to grep past the pipe.
+        args = "bash -c journalctl -u foo.service --no-pager | grep -f /tmp/patterns"
+        procs = [_proc(100, 1, self.AGED, args)]
+        result, pids = self._run(procs)
+        self.assertEqual(pids, [])
+        self.assertEqual(result['reaped'], 0)
+
+    def test_chained_command_f_flag_does_not_false_match(self):
+        # A non-follow journalctl chained (via ; && &) to a *different* command
+        # whose own -f flag must NOT be misattributed to journalctl. Guards the
+        # shell-separator boundary in _JOURNALCTL_FOLLOW_RE.
+        for args in (
+            "bash -c journalctl -u foo -n5 ; tail -f /var/log/x",
+            "bash -c journalctl -u foo && tail -f /var/log/x",
+            "bash -c journalctl -u foo; grep -f pat file",
+            "journalctl -u foo -o cat -n 200 && systemctl -f restart x",
+        ):
+            with self.subTest(args=args):
+                result, pids = self._run([_proc(100, 1, self.AGED, args)])
+                self.assertEqual(pids, [])
+                self.assertEqual(result['reaped'], 0)
+
+    def test_real_leaked_wrapper_with_redirect_still_matches(self):
+        # The actual observed leak has `2>&1` (contains &) before the pipe; the
+        # follow flag precedes it, so the lazy scan must still match.
+        args = (
+            "bash -c journalctl -fu ourliberty-inbox-watcher.service "
+            "--since '1 minute ago' --no-pager 2>&1 | grep --line-buffered -E pr-104"
+        )
+        result, pids = self._run([_proc(100, 1, self.AGED, args)])
+        self.assertEqual(pids, [100])
+        self.assertEqual(result['reaped'], 1)
+
+    def test_reaps_bare_backgrounded_follower(self):
+        procs = [_proc(300, 1, self.AGED,
+                       'journalctl --follow -u ourliberty-inbox-watcher.service')]
+        result, pids = self._run(procs)
+        self.assertEqual(pids, [300])
+        self.assertEqual(result['roots'], 1)
+        self.assertEqual(result['reaped'], 1)
+
+    def test_process_lookup_error_is_tolerated(self):
+        procs = [
+            _proc(100, 1, self.AGED, self._WRAPPER_ARGS),
+            _proc(101, 100, self.AGED, self._CHILD_ARGS),
+        ]
+        with mock.patch.object(watchdog, '_enumerate_processes',
+                               return_value=procs), \
+             mock.patch.object(watchdog.os, 'kill',
+                               side_effect=[ProcessLookupError(), None]), \
+             mock.patch.object(watchdog.larry_alerts, 'append_alert'):
+            result = watchdog.check_orphaned_journalctl_followers()
+        # One pid vanished mid-reap; the run still succeeds and counts the rest.
+        self.assertEqual(result['status'], 'recovered')
+        self.assertEqual(result['reaped'], 1)
+
+    def test_empty_process_table_is_noop(self):
+        result, pids = self._run([])
+        self.assertEqual(pids, [])
+        self.assertEqual(result, {'status': 'ok', 'reaped': 0})
+
+    def test_enumerate_processes_parses_ps_output(self):
+        sample = (
+            "  100     1  86400 bash -c journalctl -fu unit | grep x\n"
+            "  101   100  86400 journalctl -fu unit\n"
+            "bad line without enough fields\n"
+        )
+        with mock.patch.object(watchdog.subprocess, 'run',
+                               return_value=mock.MagicMock(stdout=sample)):
+            procs = watchdog._enumerate_processes()
+        self.assertEqual(len(procs), 2)
+        self.assertEqual(procs[0]['pid'], 100)
+        self.assertEqual(procs[0]['ppid'], 1)
+        self.assertEqual(procs[0]['etimes'], 86400)
+        self.assertTrue(procs[1]['args'].startswith('journalctl -fu unit'))
 
 
 # ---------- constants sanity ----------
