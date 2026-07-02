@@ -394,8 +394,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-02T02:07Z UTC (Iter ~3478, Tier 1, consecutive_clean=1)
+## Status snapshot — updated 2026-07-02T02:14Z UTC (Iter ~3479, Tier 1, consecutive_clean=0)
 
-**Iter ~3478 summary (2026-07-02T02:07Z):** ✅ Nominal. 1 doorbell alert Tier-3 silenced. 8/8 daemons healthy. No stalls. Mirror pipeline active: wt-pr-805 (2nd review) + wt-dashboard-101 in progress; #808/#809 queued. PR #806 open, no label (G-rule carry). pending=1 (PR #805, chat_id=None, already escalated idx=1091). consecutive_clean 0→1. Tier 1.
+**Iter ~3479 summary (2026-07-02T02:14Z):** ⚠️ Signal. Check 3: PR #806 unrouted_open_pr stall cooldown expired (no auto-review label). Dashboard PR #101 MERGED 02:07Z ✅. Mirror pipeline: wt-805 (2nd review in progress), wt-808 (started), #809 queued. 8/8 daemons healthy. PR #806 stall will Tier-3 silence (PR #516 translation); G-rule `unreviewed-merge-larry-authored-pr-001` dispatched awaiting Larry. pending=1 (PR #805, chat_id=None, escalated idx=1091). consecutive_clean 1→0. Tier 1.
 
 
