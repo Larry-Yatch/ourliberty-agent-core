@@ -400,8 +400,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-02T07:29Z UTC (Iter ~3493, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-02T07:36Z UTC (Iter ~3494, Tier 1, consecutive_clean=0)
 
-**Iter ~3493 summary (2026-07-02T07:25-29Z):** ⚠️ Action needed. 2 new alerts: L1107 beacon/pr-810-reject-moot (Tier-4, bot DM'd Larry, informational — reject was moot, PR #810 already merged), L1108 pulse/pr-812-deep-review-hold (Tier-4, Pulse's own carry, no new DM). PR #812 still HELD; Mirror reviewed it a 4th time (01:24:50Z REVIEW_PASS), notifier HELD again — review-dispatch loop G-rule advanced to 2/3. PR #813 review still in progress (dispatched 01:05Z). No new stalls. All daemons healthy. Larry still needs `/code-review high` + `scripts/merge_reviewed_pr.sh 812`.
+**Iter ~3494 summary (2026-07-02T07:33-36Z):** ⚠️ Action needed. 1 new alert: L1109 outbox-notifier/merge_held_deep_review (Tier-4, bot ALREADY DM'd Larry as notification idx=1108 at 01:25:05 MDT, no new Pulse DM). PR #812 still HELD (5th Mirror REVIEW_PASS at 01:24:50Z); review-dispatch loop paused since 01:24:53Z (~10 min quiet). PR #813 Mirror review ~30 min in progress (dispatched 01:05Z). No new stalls. All daemons healthy. Larry still needs `/code-review high` + `scripts/merge_reviewed_pr.sh 812`. review-dispatch-post-auto-merge-held-001 G-rule stays at 2/3 (no new occurrence this iter).
 
 
