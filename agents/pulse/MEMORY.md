@@ -394,8 +394,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-02T02:18Z UTC (Iter ~3480, Tier 1, consecutive_clean=1)
+## Status snapshot — updated 2026-07-02T02:28Z UTC (Iter ~3481, Tier 1, consecutive_clean=2)
 
-**Iter ~3480 summary (2026-07-02T02:18Z):** ✅ Nominal. 2 new alerts (heal-pipeline-stall + medic: PR #806 unrouted) both Tier-3 silenced. Pipeline stall dry-run: 0 alerts (PR #806 stall in cooldown post-02:13:29Z fire). 8/8 daemons healthy. Mirror pipeline: wt-805 (2nd review active), wt-808 (started), #809 queued. pending=1 (PR #805, chat_id=None, escalated idx=1091). consecutive_clean 0→1. Tier 1.
+**Iter ~3481 summary (2026-07-02T02:28Z):** ✅ Nominal. 0 new alerts. PR #808 MERGED (02:19:36Z UTC). PR #809 Mirror review started (wt-809 active). 8/8 daemons healthy (watchdog overall=healthy 02:22Z). No stalls. pending=1 (PR #805, chat_id=None, escalated idx=1091). consecutive_clean 1→2 (need 3 for Tier 2). Mirror pipeline: wt-805 (2nd review) + wt-809 (new). Queue clear.
 
 
