@@ -430,6 +430,18 @@ _COST_BUDGET_DMED_TASKS: set[str] = set()
 AUTO_MERGE_QUEUE_FILE = AGENTS_ROOT / 'state' / 'auto-merge-queue.json'
 AUTO_MERGE_QUEUE_VERSION = 1
 
+# review-dispatch-post-auto-merge-held — a PR parked in AUTO_MERGE_HELD_DEEP_REVIEW
+# (PASS'd Mirror, critical-path, awaiting a human `/code-review high`) is pulled
+# from the auto-merge queue, so nothing records that it's held. Without a record,
+# every review-dispatch path re-reviews it → Mirror re-PASSes → the merge gate
+# re-holds → Larry is re-DMed, burning an Opus session per cycle with zero merge
+# progress (PR #812: 6 REVIEW_PASS, 0 merge). This state file persists the held
+# state, keyed by (repo_coords, pr_number, head_sha), so review dispatch can be
+# suppressed for the UNCHANGED held head. It self-heals: a new head (genuine
+# revision) clears the entry and is re-reviewed; a merged/closed PR clears too.
+DEEP_REVIEW_HELD_FILE = AGENTS_ROOT / 'state' / 'deep-review-held-prs.json'
+DEEP_REVIEW_HELD_VERSION = 1
+
 # Fallback when config/agent-models.json doesn't specify
 # auto_merge_queue.watchdog_dm_hours. 24h is Larry's default; raise via
 # config if he's away for a known-long stretch.
@@ -4416,6 +4428,19 @@ def _dispatch_mirror_review(
             review_head_sha = _gh_pr_head_sha(_pr_coords[0], _pr_coords[1])
     if review_head_sha:
         review_base['head_sha'] = review_head_sha
+    # Deep-review-hold suppression (review-dispatch-post-auto-merge-held). If
+    # this PR is parked in AUTO_MERGE_HELD_DEEP_REVIEW at this SAME head, a new
+    # review would only re-PASS and re-arm the merge gate — the wasteful loop.
+    # Skip it. The guard self-heals: a merged/closed PR or an advanced head
+    # clears the stale record and lets the review through (see the helper).
+    if _deep_review_hold_suppresses_dispatch(pr_url, review_head_sha):
+        log(
+            f'MIRROR_REVIEW_SUPPRESSED_DEEP_REVIEW_HELD task={task_id} '
+            f'pr={pr_url} head={review_head_sha} — PR is held for '
+            f'/code-review high at this head; not re-dispatching a review',
+            'INFO',
+        )
+        return
     # Chain context (M1). pr_url/target_repo are the PR under review; first
     # review starts the revision budget at 0. forge_build_session_id threads
     # Forge's build session (D3.5 5b) so a downstream REVIEW_REVISION can
@@ -5711,6 +5736,28 @@ def _dispatch_mirror_review_rerun(
             f'on envelope and none derivable via gh; cannot dispatch '
             f're-review — skipping. Larry should manually re-dispatch.',
             'WARN',
+        )
+        return
+
+    # Deep-review-hold suppression (review-dispatch-post-auto-merge-held) — the
+    # re-review sibling of the guard in `_dispatch_mirror_review`. If this PR is
+    # parked in AUTO_MERGE_HELD_DEEP_REVIEW at this SAME head, a re-review only
+    # re-PASSes and re-arms the merge gate. Unlike the first-review path, this
+    # fn doesn't already carry the head — prefer one on the envelope, else
+    # resolve it via gh (best-effort; None simply won't suppress, fail-OPEN).
+    _rerun_head = data.get('head_sha')
+    if not (isinstance(_rerun_head, str) and _rerun_head):
+        _rerun_coords = _parse_pr_url(pr_url)
+        _rerun_head = (
+            _gh_pr_head_sha(_rerun_coords[0], _rerun_coords[1])
+            if _rerun_coords is not None else None
+        )
+    if _deep_review_hold_suppresses_dispatch(pr_url, _rerun_head):
+        log(
+            f'MIRROR_REVIEW_SUPPRESSED_DEEP_REVIEW_HELD task={task_id} '
+            f'pr={pr_url} head={_rerun_head} round={round_num} — PR is held '
+            f'for /code-review high at this head; not re-dispatching a review',
+            'INFO',
         )
         return
 
@@ -7779,6 +7826,161 @@ def _queue_remove_pr(pr_number: int, repo_coords: str) -> Optional[dict[str, Any
     return removed
 
 
+def _load_deep_review_held() -> list[dict[str, Any]]:
+    """Read the deep-review-held records. Returns [] on missing/corrupt file.
+
+    Mirrors `_load_auto_merge_queue`'s versioned-dict shape but is
+    fail-OPEN on a parse error (returns []) rather than fail-closed: this
+    file only SUPPRESSES redundant re-reviews, so losing it degrades to the
+    prior (pre-fix) behavior — an extra review — never to a wrong merge. A
+    corrupt file is logged once at WARN and treated as empty.
+    """
+    if not DEEP_REVIEW_HELD_FILE.exists():
+        return []
+    try:
+        data = json.loads(DEEP_REVIEW_HELD_FILE.read_text(encoding='utf-8'))
+    except (OSError, ValueError, json.JSONDecodeError) as e:
+        log(
+            f'DEEP_REVIEW_HELD_CORRUPT at {DEEP_REVIEW_HELD_FILE}: '
+            f'{type(e).__name__}: {e}; treating as empty (re-review not '
+            f'suppressed until the file is repaired)',
+            'WARN',
+        )
+        return []
+    if not isinstance(data, dict):
+        return []
+    held = data.get('held')
+    if not isinstance(held, list):
+        return []
+    return [e for e in held if isinstance(e, dict)]
+
+
+def _save_deep_review_held(entries: list[dict[str, Any]]) -> None:
+    """Atomically persist the held records. Caller passes the full list."""
+    payload = {
+        'version': DEEP_REVIEW_HELD_VERSION,
+        'held': entries,
+    }
+    _atomic_write_json(DEEP_REVIEW_HELD_FILE, payload)
+
+
+def _find_deep_review_held(
+    repo_coords: str, pr_number: int,
+) -> Optional[dict[str, Any]]:
+    """Return the held record for (repo, pr), or None if not held."""
+    for e in _load_deep_review_held():
+        if e.get('repo') == repo_coords and e.get('pr_number') == pr_number:
+            return e
+    return None
+
+
+def _record_deep_review_held(
+    repo_coords: str,
+    pr_number: int,
+    pr_url: str,
+    task_id: str,
+    head_sha: Optional[str],
+) -> bool:
+    """Record/refresh the held entry for (repo, pr) at `head_sha`.
+
+    Returns True when this is the FIRST hold for this exact (repo, pr,
+    head) — i.e. no prior entry, or a prior entry recorded a DIFFERENT
+    head (a genuine new push that will legitimately re-hold). Returns
+    False when an entry for this same head already exists (a repeat hold
+    of the unchanged head). Callers gate the Larry-DM on the True return
+    so a re-hold of the same head never re-notifies.
+    """
+    entries = _load_deep_review_held()
+    kept: list[dict[str, Any]] = []
+    prior: Optional[dict[str, Any]] = None
+    for e in entries:
+        if e.get('repo') == repo_coords and e.get('pr_number') == pr_number:
+            prior = e
+            continue
+        kept.append(e)
+    first_for_head = prior is None or prior.get('head_sha') != head_sha
+    kept.append({
+        'repo': repo_coords,
+        'pr_number': pr_number,
+        'pr_url': pr_url,
+        'task_id': task_id,
+        'head_sha': head_sha,
+        'held_at': datetime.now(timezone.utc).isoformat(),
+    })
+    _save_deep_review_held(kept)
+    return first_for_head
+
+
+def _clear_deep_review_held(repo_coords: str, pr_number: int) -> bool:
+    """Drop any held entry for (repo, pr). Returns True if one was removed."""
+    entries = _load_deep_review_held()
+    kept = [
+        e for e in entries
+        if not (e.get('repo') == repo_coords and e.get('pr_number') == pr_number)
+    ]
+    if len(kept) != len(entries):
+        _save_deep_review_held(kept)
+        return True
+    return False
+
+
+def _deep_review_hold_suppresses_dispatch(
+    pr_url: Optional[str], current_head_sha: Optional[str],
+) -> bool:
+    """True iff a Mirror review for `pr_url` should be SKIPPED because the PR
+    is parked in deep-review-hold at this SAME `current_head_sha`.
+
+    The keystone suppression check shared by `_dispatch_mirror_review` and
+    `_dispatch_mirror_review_rerun`. Self-healing, in priority order:
+
+      1. No held entry → not held → allow (return False).
+      2. PR no longer OPEN (merged/closed) → clear the stale entry, allow.
+         (Verified with a live gh check so a since-merged PR never stays
+         suppressed; fail-OPEN — an undeterminable state does NOT clear and
+         does NOT suppress, so a transient gh hiccup can't strand a review.)
+      3. Held head != current head → a genuine new push deserves re-review;
+         clear the stale entry, allow. The deep-review gate will legitimately
+         re-hold (and re-record) at merge time for the new head.
+      4. Held head == current head → suppress (return True). Re-reviewing an
+         unchanged head only re-PASSes and re-holds; that is the wasteful
+         loop this fix breaks.
+
+    A `current_head_sha` of None (caller couldn't resolve it) never
+    suppresses — without a head to compare we cannot prove it's the same
+    parked commit, so fail-OPEN and let the existing dedup handle it.
+    """
+    if not pr_url:
+        return False
+    parsed = _parse_pr_url(pr_url)
+    if parsed is None:
+        return False
+    repo_coords, pr_number = parsed
+    held = _find_deep_review_held(repo_coords, pr_number)
+    if held is None:
+        return False
+    # Self-heal: a merged/closed PR gates nothing; drop the record and allow.
+    if _gh_pr_is_open(repo_coords, pr_number) is False:
+        _clear_deep_review_held(repo_coords, pr_number)
+        log(
+            f'deep-review-held entry cleared for {pr_url} '
+            f'(PR no longer OPEN); review dispatch not suppressed',
+            'INFO',
+        )
+        return False
+    if not current_head_sha:
+        return False
+    # Self-heal: a new head is a genuine revision — clear + allow re-review.
+    if held.get('head_sha') != current_head_sha:
+        _clear_deep_review_held(repo_coords, pr_number)
+        log(
+            f'deep-review-held entry cleared for {pr_url} (head advanced '
+            f'{held.get("head_sha")} -> {current_head_sha}); re-review allowed',
+            'INFO',
+        )
+        return False
+    return True
+
+
 def _queue_update_entry(pr_number: int, repo_coords: str, updates: dict[str, Any]) -> None:
     """In-place merge `updates` onto the matching queue entry. No-op if
     the entry is absent (caller may have already removed it).
@@ -9197,9 +9399,28 @@ def _attempt_auto_merge_with_gates(
         # can never be left queued (which would re-fire the gate + DM every
         # sweep) regardless of caller, exactly as held_conflict does.
         _queue_remove_pr(pr_number, repo_coords)
-        _dm_larry_deep_review_hold(
-            pr_url, pr_number, repo_coords, task_id, chat_id, summary,
+        # Persist the held state (keyed by the reviewed head) so every
+        # review-dispatch path can suppress a re-review of THIS unchanged head
+        # — the wasteful loop (review -> PASS -> re-hold -> re-DM) this fix
+        # closes. `_record_deep_review_held` returns True only on the FIRST
+        # hold for (repo, pr, head): a repeat hold of the same head records the
+        # refreshed entry but does NOT re-DM Larry. A genuine new push (a
+        # different head) counts as a first hold — it re-notifies, as it should.
+        held_head_sha = _gh_pr_head_sha(repo_coords, pr_number)
+        first_hold_for_head = _record_deep_review_held(
+            repo_coords, pr_number, pr_url, task_id, held_head_sha,
         )
+        if first_hold_for_head:
+            _dm_larry_deep_review_hold(
+                pr_url, pr_number, repo_coords, task_id, chat_id, summary,
+            )
+        else:
+            log(
+                f'AUTO_MERGE_HELD_DEEP_REVIEW repeat hold for pr={pr_url} at '
+                f'unchanged head={held_head_sha}; Larry already DMed for this '
+                f'head — not re-notifying',
+                'INFO',
+            )
         log(
             f'AUTO_MERGE_HELD_DEEP_REVIEW task={task_id} pr={pr_url} '
             f'(critical-path change with no deep-review stamp; held for '

@@ -168,12 +168,14 @@ class _GateTestBase(unittest.TestCase):
         self._orig = {
             'AGENTS_ROOT': on.AGENTS_ROOT,
             'AUTO_MERGE_QUEUE_FILE': on.AUTO_MERGE_QUEUE_FILE,
+            'DEEP_REVIEW_HELD_FILE': on.DEEP_REVIEW_HELD_FILE,
             'LOG_FILE': on.LOG_FILE,
             'BLACKBOARD': on.BLACKBOARD,
             'CFG_PATH': on._DEEP_REVIEW_PATHS_CONFIG_PATH,
         }
         on.AGENTS_ROOT = self._root
         on.AUTO_MERGE_QUEUE_FILE = self._root / 'state' / 'auto-merge-queue.json'
+        on.DEEP_REVIEW_HELD_FILE = self._root / 'state' / 'deep-review-held-prs.json'
         on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
         on.BLACKBOARD = self._root / 'blackboard'
         for sub in ('state', 'logs', 'blackboard'):
@@ -442,6 +444,27 @@ class ConfigConstantSyncTest(unittest.TestCase):
         data = json.loads(cfg_path.read_text(encoding='utf-8'))
         self.assertEqual(data.get('paths'),
                          list(on._DEFAULT_DEEP_REVIEW_PATHS))
+
+
+class DeepReviewHeldDmOnceTest(_GateTestBase):
+    """review-dispatch-post-auto-merge-held: a repeat hold of the SAME head
+    records the held state but does NOT re-DM Larry; a new head re-notifies."""
+
+    def test_dm_fires_once_per_head(self):
+        cf = ['scripts/decision_resolve.py']  # code-default critical fileset
+        # First hold -> held, DM #1.
+        r1 = self._attempt(70, changed_files=cf)
+        self.assertEqual(r1['merge_outcome'], 'held_deep_review')
+        self.assertEqual(len(self._read_alerts()), 1)
+        held = self.on._find_deep_review_held(REPO, 70)
+        self.assertIsNotNone(held)
+        self.assertEqual(held['head_sha'], 'head000000000070')  # fake gh head
+        # Second hold at the SAME (unchanged) head -> still held, but no re-DM.
+        r2 = self._attempt(70, changed_files=cf)
+        self.assertEqual(r2['merge_outcome'], 'held_deep_review')
+        self.assertEqual(len(self._read_alerts()), 1)          # NOT 2
+        self.assertIn('repeat hold', self._log_text())
+        self.assertEqual(self.gh.merge_calls, [])              # never merged
 
 
 if __name__ == '__main__':

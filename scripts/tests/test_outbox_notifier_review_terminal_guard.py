@@ -97,6 +97,7 @@ class _ReviewDispatchSandbox(unittest.TestCase):
         for name in [
             'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT', 'BLACKBOARD',
             'LOG_FILE', 'DEAD_LETTER_STATE', 'EMERGENCY_HALT_FLAG',
+            'DEEP_REVIEW_HELD_FILE',
         ]:
             self._originals[name] = getattr(on, name)
         on.AGENTS_ROOT = self._root
@@ -106,6 +107,7 @@ class _ReviewDispatchSandbox(unittest.TestCase):
         on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
         on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
         on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        on.DEEP_REVIEW_HELD_FILE = self._root / 'state' / 'deep-review-held-prs.json'
         self._swi_originals = {
             'AGENTS_ROOT': swi.AGENTS_ROOT,
             'INBOXES_ROOT': swi.INBOXES_ROOT,
@@ -196,6 +198,132 @@ class TargetIsTerminalHelperTest(unittest.TestCase):
             self.assertFalse(on._mirror_review_target_is_terminal(_PR_URL))
         with mock.patch.object(on, '_gh_pr_is_open', return_value=None):
             self.assertFalse(on._mirror_review_target_is_terminal(_PR_URL))
+
+
+_HELD_REPO = 'x/y'   # _parse_pr_url(_PR_URL) -> ('x/y', 1)
+_HELD_PR = 1
+
+
+class FirstReviewDeepReviewHeldSuppressionTest(_ReviewDispatchSandbox):
+    """review-dispatch-post-auto-merge-held: `_dispatch_mirror_review` must not
+    re-review a PR parked in deep-review-hold at the SAME head, but must allow a
+    genuine new head and self-heal on a merged/closed PR."""
+
+    def _data(self, head_sha='abc123'):
+        d = {
+            'task_id': 'held-task',
+            'target_repo': 'ourliberty-agent-core',
+            'branch': 'forge/held-task',
+        }
+        if head_sha is not None:
+            d['head_sha'] = head_sha
+        return d
+
+    def _log(self):
+        p = on.LOG_FILE
+        return p.read_text(encoding='utf-8') if p.exists() else ''
+
+    def test_same_head_is_suppressed(self):
+        # Held at exactly the head the dispatch will carry -> no new review.
+        on._record_deep_review_held(
+            _HELD_REPO, _HELD_PR, _PR_URL, 'held-task', 'abc123')
+        with mock.patch.object(on, '_gh_pr_is_open', return_value=True):
+            on._dispatch_mirror_review(self._data('abc123'), _PR_URL)
+        self.assertEqual(self._reviews(), [])
+        self.assertIn('MIRROR_REVIEW_SUPPRESSED_DEEP_REVIEW_HELD', self._log())
+        # The entry survives (the PR is still parked at that head).
+        self.assertIsNotNone(on._find_deep_review_held(_HELD_REPO, _HELD_PR))
+
+    def test_new_head_is_allowed_and_clears_stale_entry(self):
+        # Held at an OLD head; the PR was pushed to -> re-review the new head.
+        on._record_deep_review_held(
+            _HELD_REPO, _HELD_PR, _PR_URL, 'held-task', 'oldhead000000')
+        with mock.patch.object(on, '_gh_pr_is_open', return_value=True):
+            on._dispatch_mirror_review(self._data('abc123'), _PR_URL)
+        self.assertEqual(len(self._reviews()), 1)
+        # Stale (old-head) entry is cleared so it can't suppress the new head.
+        self.assertIsNone(on._find_deep_review_held(_HELD_REPO, _HELD_PR))
+
+    def test_merged_pr_clears_held_entry_and_no_dispatch(self):
+        on._record_deep_review_held(
+            _HELD_REPO, _HELD_PR, _PR_URL, 'held-task', 'abc123')
+        with mock.patch.object(on, '_gh_pr_is_open', return_value=False):
+            on._dispatch_mirror_review(self._data('abc123'), _PR_URL)
+        # A merged PR gates nothing: no review, and the stale entry is gone.
+        self.assertEqual(self._reviews(), [])
+        self.assertIsNone(on._find_deep_review_held(_HELD_REPO, _HELD_PR))
+
+    def test_not_held_dispatches_normally(self):
+        # No held record -> the suppression guard is a no-op; review goes out.
+        with mock.patch.object(on, '_gh_pr_is_open', return_value=True):
+            on._dispatch_mirror_review(self._data('abc123'), _PR_URL)
+        self.assertEqual(len(self._reviews()), 1)
+        self.assertNotIn(
+            'MIRROR_REVIEW_SUPPRESSED_DEEP_REVIEW_HELD', self._log())
+
+
+class RereviewDeepReviewHeldSuppressionTest(_ReviewDispatchSandbox):
+    """Same suppression contract for the re-review path
+    (`_dispatch_mirror_review_rerun`)."""
+
+    def _data(self, head_sha='abc123'):
+        d = {
+            'task_id': 'held-task',
+            'target_repo': 'ourliberty-agent-core',
+            'branch': 'forge/held-task',
+            'pr_url': _PR_URL,
+            'max_revisions': 3,
+        }
+        if head_sha is not None:
+            d['head_sha'] = head_sha
+        return d
+
+    def test_same_head_rereview_is_suppressed(self):
+        on._record_deep_review_held(
+            _HELD_REPO, _HELD_PR, _PR_URL, 'held-task', 'abc123')
+        with mock.patch.object(on, '_gh_pr_is_open', return_value=True):
+            on._dispatch_mirror_review_rerun(self._data('abc123'), 1, 'fixed it')
+        self.assertEqual(self._reviews(), [])
+        self.assertIsNotNone(on._find_deep_review_held(_HELD_REPO, _HELD_PR))
+
+    def test_new_head_rereview_allowed_and_clears(self):
+        on._record_deep_review_held(
+            _HELD_REPO, _HELD_PR, _PR_URL, 'held-task', 'oldhead000000')
+        with mock.patch.object(on, '_gh_pr_is_open', return_value=True):
+            on._dispatch_mirror_review_rerun(self._data('abc123'), 1, 'fixed it')
+        self.assertEqual(len(self._reviews()), 1)
+        self.assertIsNone(on._find_deep_review_held(_HELD_REPO, _HELD_PR))
+
+
+class DeepReviewHeldStateHelperTest(_ReviewDispatchSandbox):
+    """Unit-level record/find/clear + first-hold-per-head semantics."""
+
+    def test_first_hold_true_then_repeat_false_then_new_head_true(self):
+        # First hold for this head -> True (DM fires).
+        self.assertTrue(on._record_deep_review_held(
+            _HELD_REPO, _HELD_PR, _PR_URL, 'held-task', 'h1'))
+        # Repeat hold at the SAME head -> False (no re-DM).
+        self.assertFalse(on._record_deep_review_held(
+            _HELD_REPO, _HELD_PR, _PR_URL, 'held-task', 'h1'))
+        # A NEW head (genuine push) -> True again (re-DM is correct).
+        self.assertTrue(on._record_deep_review_held(
+            _HELD_REPO, _HELD_PR, _PR_URL, 'held-task', 'h2'))
+        # Only one entry per (repo, pr) is ever kept.
+        self.assertEqual(len(on._load_deep_review_held()), 1)
+        self.assertEqual(
+            on._find_deep_review_held(_HELD_REPO, _HELD_PR)['head_sha'], 'h2')
+
+    def test_clear_removes_entry(self):
+        on._record_deep_review_held(
+            _HELD_REPO, _HELD_PR, _PR_URL, 'held-task', 'h1')
+        self.assertTrue(on._clear_deep_review_held(_HELD_REPO, _HELD_PR))
+        self.assertIsNone(on._find_deep_review_held(_HELD_REPO, _HELD_PR))
+        self.assertFalse(on._clear_deep_review_held(_HELD_REPO, _HELD_PR))
+
+    def test_corrupt_file_treated_as_empty(self):
+        on.DEEP_REVIEW_HELD_FILE.parent.mkdir(parents=True, exist_ok=True)
+        on.DEEP_REVIEW_HELD_FILE.write_text('{not json', encoding='utf-8')
+        self.assertEqual(on._load_deep_review_held(), [])
 
 
 if __name__ == "__main__":
