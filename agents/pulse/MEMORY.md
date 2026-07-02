@@ -412,8 +412,14 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-02T19:17Z UTC (Iter ~3589, Tier 1, consecutive_clean=0)
+## G-rule pulse-rotation-check-source-tier4-001 — 1/3 (new, iter ~3590)
 
-**Iter ~3589 summary (2026-07-02T19:17Z):** ✅ Nominal. 0 new alerts. PR #812 AUTO_MERGE_HELD (held_deep_review, mirror-review=SUCCESS). Pipeline idle. Watermark=1078. All daemons healthy (heal-daemon 19:05:49Z, watchdog 19:16:59Z, outbox-notifier PID 3409769 Ss, beacon bot PID 3154043 Ss). **Larry: run `scripts/merge_reviewed_pr.sh 812` to release PR #812.** §4.6 rotation DM sent: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (51 days). DM dedup written to ~/agents/state/pulse-rotation-window-dms.json.
+**Rule:** `source=pulse-rotation-check, kind=notification, intent=rotation-window` alerts classify Tier-4 (novel, no translation match). Fires when Pulse appends a rotation-window alert to larry-alerts.jsonl and the NEXT cycle iter sees it as new. The bot already delivered it (outbox-notifier picks it up immediately); Pulse's second-seen triage returns Tier-4 because `source=pulse-rotation-check` is not in alert-translations.json. The completed G-rule `pulse-source-alert-delivery-confirm-tier4-001` added `source=pulse` but not `source=pulse-rotation-check`. Fix: add `source=pulse-rotation-check, intent=rotation-window` → Tier-3 entry to alert-translations.json. Dispatch to Beacon at 3/3. First occurrence iter ~3590 (line 1079, ts=2026-07-02T19:18:12Z).
+
+---
+
+## Status snapshot — updated 2026-07-02T19:28Z UTC (Iter ~3590, Tier 1, consecutive_clean=0)
+
+**Iter ~3590 summary (2026-07-02T19:28Z):** 1 new alert (pulse-rotation-check delivery confirm, tier-4 triaged, no DM — already delivered at idx=1078 13:21 MDT). PR #812 AUTO_MERGE_HELD (held_deep_review, mirror-review=SUCCESS). Pipeline idle. Watermark=1079. All daemons healthy (heal-daemon 19:16:15Z, watchdog 19:22:16Z, outbox-notifier PID 3409769 Ss, beacon bot PID 3154043 Ss). **Larry: run `scripts/merge_reviewed_pr.sh 812` to release PR #812.** New G-rule: pulse-rotation-check-source-tier4-001 [1/3].
 
 
