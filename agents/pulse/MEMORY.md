@@ -400,8 +400,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-02T06:19Z UTC (Iter ~3490, Tier 3, consecutive_clean=5)
+## Status snapshot — updated 2026-07-02T06:48Z UTC (Iter ~3491, Tier 3, consecutive_clean=6)
 
-**Iter ~3490 summary (2026-07-02T06:19Z):** ✅ Nominal. 0 new alerts. PRs #806, #809, #811 all merged. Active Mirror reviews: PR #810 (REVIEW_ESCALATE round 1, round 2 in inbox), PR #812 (fix notifier null-chat), dashboard PR #102 (CEO chip). Pending approval for PR #810 has chat_id=None (G-rule vp, review IS dispatched). All checks clean. Watchdog=healthy. Tier 3 consecutive_clean 4→5 (steady-state). 30-min cadence.
+**Iter ~3491 summary (2026-07-02T06:48Z):** ✅ Nominal. 1 new alert (doorbell L1098 Tier-3 silence). Dashboard PR #102 MERGED 06:20Z. PR #810 (retire parked_capture projection): round-2 Mirror review in inbox (REVIEW_ESCALATE on first pass, auto-re-dispatched). PR #812 (fix notifier null-chat): Mirror gave REVIEW_REVISION → Forge applied revision-1 → Mirror has 2 re-review tasks queued. Pending approval for PR #810 has chat_id=None (G-rule vp, review IS dispatched). All checks clean. Watchdog=healthy. Tier 3 consecutive_clean 5→6 (steady-state). 30-min cadence.
 
 
