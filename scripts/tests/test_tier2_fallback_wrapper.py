@@ -371,6 +371,16 @@ class CallBeaconTier2Test(unittest.TestCase):
         _p = mock.patch.object(self.bot, '_append_bot_quota_event')
         self.quota_mock = _p.start()
         self.addCleanup(_p.stop)
+        # #780 added a pre-flight tier gate to call_beacon: it calls
+        # active_tier.select_dispatch_tier(...) and returns a canned
+        # "All accounts are rate-limited" reply when that yields None — which
+        # it does under the sandbox (no live tier state), short-circuiting
+        # before the tier1->tier2 fallback branch these tests exercise. Pin a
+        # healthy primary so call_beacon reaches the fallback path.
+        _pt = mock.patch.object(self.bot.active_tier, 'select_dispatch_tier',
+                                return_value='tier1')
+        _pt.start()
+        self.addCleanup(_pt.stop)
 
     def tearDown(self):
         if self._prev_t2 is None:
@@ -492,6 +502,12 @@ class CallBeaconTier2SetupTokenTest(unittest.TestCase):
         _p = mock.patch.object(self.bot, '_append_bot_quota_event')
         self.quota_mock = _p.start()
         self.addCleanup(_p.stop)
+        # See CallBeaconTier2Test.setUp — #780 pre-flight tier gate. Pin a
+        # healthy primary so call_beacon reaches the tier1->tier2 fallback.
+        _pt = mock.patch.object(self.bot.active_tier, 'select_dispatch_tier',
+                                return_value='tier1')
+        _pt.start()
+        self.addCleanup(_pt.stop)
 
     def tearDown(self):
         if self._prev_t2 is None:

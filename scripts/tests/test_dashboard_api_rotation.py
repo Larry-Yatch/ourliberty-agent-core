@@ -298,9 +298,25 @@ class PostRotationTest(_RotationBase):
         self.assertEqual(r.json()['pinned_tier'], 'tier1')
         self.assertEqual(self._override_path().read_text().strip(), 'tier1')
 
-    def test_off_invalid_pinned_tier_400_no_file(self):
+    def test_off_with_pinned_tier3_writes_contents_and_audits(self):
+        # #765 widened ROTATION_VALID_TIERS to include tier3 (droplet became a
+        # valid pin target), so {mode:'off',pinned_tier:'tier3'} now succeeds —
+        # mirrors the tier2 case above.
         r = self.c.post('/api/system/rotation', headers=AUTH,
                         json={'mode': 'off', 'pinned_tier': 'tier3'})
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(body['mode'], 'off')
+        self.assertEqual(body['pinned_tier'], 'tier3')
+        self.assertEqual(self._override_path().read_text().strip(), 'tier3')
+        row = self.client_stub.calls[0]['upsert_rows'][0]
+        self.assertEqual(row['payload']['pinned_tier'], 'tier3')
+
+    def test_off_invalid_pinned_tier_400_no_file(self):
+        # A genuinely invalid tier (not in ROTATION_VALID_TIERS) is still
+        # rejected 400 with no override file written — the guard is preserved.
+        r = self.c.post('/api/system/rotation', headers=AUTH,
+                        json={'mode': 'off', 'pinned_tier': 'tier4'})
         self.assertEqual(r.status_code, 400)
         self.assertFalse(self._override_path().exists())
 

@@ -299,8 +299,15 @@ class DeadLetterTest(_DrainTestBase):
     def test_unreadable_config_fails_open_and_authors(self):
         # Fail open: if repo_paths can't be read (empty valid set), the drain
         # does NOT dead-letter — it authors as before, so a transient config
-        # read miss never blocks otherwise-fine work.
-        with mock.patch.object(lqd, '_valid_repos', return_value=frozenset()):
+        # read miss never blocks otherwise-fine work. There are TWO repo seams:
+        # the early `_valid_repos()` gate AND the author-time
+        # `routing_validator.allowed_repos_for('forge')` gate in
+        # `_resolve_target_repo`. On the droplet config/agent-models.json is
+        # present, so the un-mocked author-time gate would still reject
+        # 'ol-work'; empty BOTH to exercise the fail-open path.
+        with mock.patch.object(lqd, '_valid_repos', return_value=frozenset()), \
+                mock.patch.object(lqd.routing_validator, 'allowed_repos_for',
+                                  return_value=[]):
             self._queue(_entry('aging-idea', repo='ol-work'))
             result = self._drain()
         self.assertEqual(result.launched, ['aging-idea'])
@@ -358,9 +365,18 @@ class TargetRepoGuardTest(_DrainTestBase):
     def test_short_form_alias_maps_to_canonical(self):
         # `dashboard` is the bare short form of the canonical `ourliberty-
         # dashboard` — it normalizes to the canonical name (the alias can only
-        # ever resolve onto an already-allowed repo).
-        self._queue(_entry('aliased', project_id='aliased', repo='dashboard'))
-        result = self._drain()
+        # ever resolve onto an already-allowed repo). The early `_valid_repos()`
+        # gate keys on the canonical repo_paths names (so the bare `dashboard`
+        # would trip it before the author-time alias resolver runs); include the
+        # alias in the mocked valid set so the entry reaches the resolver, which
+        # maps it onto the real `ourliberty-dashboard` allow-list entry.
+        with mock.patch.object(
+            lqd, '_valid_repos',
+            return_value=frozenset({'ourliberty-agent-core',
+                                    'ourliberty-dashboard', 'dashboard'}),
+        ):
+            self._queue(_entry('aliased', project_id='aliased', repo='dashboard'))
+            result = self._drain()
         self.assertEqual(result.launched, ['aliased'])
         self.assertEqual(result.dead_lettered, [])
         seq = self._read_seq('aliased')
@@ -370,7 +386,16 @@ class TargetRepoGuardTest(_DrainTestBase):
         # 'ol-work' is a one-off bad value with no alias scheme — it must be
         # rejected at author time: dead-lettered (no sequence authored, no
         # Mirror dispatch) AND surfaced to Larry naming the phase + bad repo.
-        with mock.patch.object(lqd.larry_alerts, 'append_alert') as alert:
+        # To reach the AUTHOR-time seam this test is about, 'ol-work' must first
+        # survive the earlier `_valid_repos()` gate (which would otherwise dead-
+        # letter it silently, with no alert); admit it there so it fails at
+        # `_resolve_target_repo` → routing_validator.allowed_repos_for('forge'),
+        # which (real config) has no 'ol-work' and no 'ourliberty-ol-work' alias.
+        with mock.patch.object(
+            lqd, '_valid_repos',
+            return_value=frozenset({'ourliberty-agent-core',
+                                    'ourliberty-dashboard', 'ol-work'}),
+        ), mock.patch.object(lqd.larry_alerts, 'append_alert') as alert:
             qpath = self._queue(
                 _entry('badrepo', project_id='badrepo', repo='ol-work'))
             result = self._drain()

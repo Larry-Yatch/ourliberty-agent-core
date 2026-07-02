@@ -58,24 +58,41 @@ def _main_block(tree: ast.Module) -> ast.If | None:
     return None
 
 
-def _imports_run_check_from_heartbeat(block: ast.If) -> bool:
+def _heartbeat_run_check_name(block: ast.If) -> str | None:
+    """Local name bound to ``pulse_check_heartbeat.run_check`` in the block.
+
+    Checks import it either bare (``import run_check``) or aliased
+    (``import run_check as _hb_run_check``); return whichever local name the
+    liveness wrapper is actually bound to so calls can be matched against it.
+    """
     for node in ast.walk(block):
         if isinstance(node, ast.ImportFrom) \
                 and node.module == 'pulse_check_heartbeat':
-            if any(alias.name == 'run_check' for alias in node.names):
-                return True
-    return False
+            for alias in node.names:
+                if alias.name == 'run_check':
+                    return alias.asname or alias.name
+    return None
 
 
-def _run_check_call_id(block: ast.If) -> str | None:
-    """First-positional-arg string of a run_check(...) call in the block."""
+def _run_check_call_id(block: ast.If, call_name: str) -> str | None:
+    """First-positional-arg string of a ``call_name(...)`` call in the block."""
     for node in ast.walk(block):
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) \
-                and node.func.id == 'run_check' and node.args:
+                and node.func.id == call_name and node.args:
             first = node.args[0]
             if isinstance(first, ast.Constant) and isinstance(first.value, str):
                 return first.value
     return None
+
+
+def _normalize_id(check_id: str) -> str:
+    """Canonicalize a check id for comparison (hyphen/underscore agnostic).
+
+    ``_check_id`` derives the id from the filename (e.g. ``retrospective_author``)
+    while the canonical id used in config/cadence and the run_check call is
+    hyphenated (``retrospective-author``); treat the two as equivalent.
+    """
+    return check_id.replace('-', '_')
 
 
 class RunCheckEnforcementTest(unittest.TestCase):
@@ -91,20 +108,21 @@ class RunCheckEnforcementTest(unittest.TestCase):
                 self.assertIsNotNone(
                     block, f'{path.name} has no `if __name__ == "__main__"` block',
                 )
-                self.assertTrue(
-                    _imports_run_check_from_heartbeat(block),
+                call_name = _heartbeat_run_check_name(block)
+                self.assertIsNotNone(
+                    call_name,
                     f'{path.name} __main__ does not import run_check from '
                     'pulse_check_heartbeat — its liveness heartbeat will never '
                     'fire',
                 )
-                called_id = _run_check_call_id(block)
+                called_id = _run_check_call_id(block, call_name)
                 self.assertIsNotNone(
                     called_id,
-                    f'{path.name} __main__ does not call run_check(<id>, main, '
+                    f'{path.name} __main__ does not call {call_name}(<id>, main, '
                     '...)',
                 )
                 self.assertEqual(
-                    called_id, _check_id(path),
+                    _normalize_id(called_id), _normalize_id(_check_id(path)),
                     f'{path.name} wraps run_check with id {called_id!r}, '
                     f'expected {_check_id(path)!r}',
                 )
