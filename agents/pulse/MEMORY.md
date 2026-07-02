@@ -394,14 +394,14 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## G-rule review-dispatch-post-auto-merge-held-001 — 1/3 (new, iter ~3482)
+## G-rule review-dispatch-post-auto-merge-held-001 — 2/3 (updated iter ~3493)
 
-**Rule:** Beacon re-dispatches a Mirror review for PR #809 at 02:35:18Z UTC after AUTO_MERGE_HELD (blocker=#806). The PR already had REVIEW_PASS (02:30:58Z UTC) from a first Mirror review on the same SHA. Second review on same commit SHA appears duplicative while the blocker (#806) is still open. May be intentional (pre-positioning a fresh review for when blocker clears) or a bug. First occurrence iter ~3482. Monitor for recurrence; dispatch Beacon direction-ask at 3/3 if confirmed bug pattern.
+**Rule:** Outbox-notifier re-dispatches Mirror reviews for a PR that is in AUTO_MERGE_HELD state — Mirror passes each time, notifier re-holds and re-dispatches, creating a review loop that burns cost without progress. Observed pattern: PR #812 (`fix(notifier)`) HELD for `/code-review high` stamp; notifier dispatched to Mirror at 01:15:32Z, Mirror REVIEW_PASS at 01:24:50Z, notifier HELD again. Fix: notifier should NOT re-dispatch to Mirror when PR is in HELD_DEEP_REVIEW state (suppress until deep-review stamp is applied or Larry manually clears hold). Dispatch to Beacon at 3/3. Occurrences: iter ~3482 (1/3, PR #809 post-AUTO_MERGE_HELD re-dispatch while blocker #806 open); iter ~3493 (2/3, PR #812 review-dispatch loop confirmed — 01:15:32Z dispatch → 01:24:50Z REVIEW_PASS → 01:24:53Z HELD again; also observed 07:15:32Z dispatch cycle earlier same session).
 
 ---
 
-## Status snapshot — updated 2026-07-02T07:20Z UTC (Iter ~3492, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-02T07:29Z UTC (Iter ~3493, Tier 1, consecutive_clean=0)
 
-**Iter ~3492 summary (2026-07-02T07:20Z):** ⚠️ Action needed. PR #810 MERGED 06:56:50Z UTC (chain-events: retire parked_capture projection). 8 new alerts: 7 heal-stale-daemon auto-restarts (Tier-3 silence, expected post-PR#810 merge) + 1 deep-review-hold for PR #812 (Tier-2, escalated [yellow] to Larry). PR #812 (fix(notifier): primary-chat fallback): Mirror REVIEW_PASS rev1 at 07:13Z but AUTO_MERGE_HELD — Larry needs `/code-review high` + `scripts/merge_reviewed_pr.sh 812`. PR #813 (test: green the base final): Mirror review dispatched 07:05Z, pipeline flowing. Tier reset 3→1 (signal: PR #812 deep-review-hold).
+**Iter ~3493 summary (2026-07-02T07:25-29Z):** ⚠️ Action needed. 2 new alerts: L1107 beacon/pr-810-reject-moot (Tier-4, bot DM'd Larry, informational — reject was moot, PR #810 already merged), L1108 pulse/pr-812-deep-review-hold (Tier-4, Pulse's own carry, no new DM). PR #812 still HELD; Mirror reviewed it a 4th time (01:24:50Z REVIEW_PASS), notifier HELD again — review-dispatch loop G-rule advanced to 2/3. PR #813 review still in progress (dispatched 01:05Z). No new stalls. All daemons healthy. Larry still needs `/code-review high` + `scripts/merge_reviewed_pr.sh 812`.
 
 
