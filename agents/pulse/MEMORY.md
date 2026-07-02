@@ -400,8 +400,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-02T09:34Z UTC (Iter ~3512, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-02T09:33Z UTC (Iter ~3513, Tier 1, consecutive_clean=0)
 
-**Iter ~3512 summary (2026-07-02T09:34Z):** ⚠️ Standing carry — PR #812 AUTO_MERGE_HELD. APPROVAL_REQUEST `notifier-suppress-review-dispatch-deep-review-held-001` delivered to Larry (02:00:24 MDT). pending=1 in beacon-pending-approvals.json. Larry needs to `approve` (dashboard or Telegram). After approval: Forge builds PR; then `/code-review high` + `scripts/merge_reviewed_pr.sh 812`. All daemons healthy (watchdog 09:26Z, heal-daemon heartbeat 09:20Z), no new alerts since iter ~3511, loop paused (no 7th+ Mirror review dispatched).
+**Iter ~3513 summary (2026-07-02T09:33Z):** ⚠️ Standing carry — PR #812 AUTO_MERGE_HELD. APPROVAL_REQUEST `notifier-suppress-review-dispatch-deep-review-held-001` delivered to Larry (02:00:24 MDT). pending=1 in beacon-pending-approvals.json. Larry needs to `approve` (dashboard or Telegram). After approval: Forge builds PR; then `/code-review high` + `scripts/merge_reviewed_pr.sh 812`. All daemons healthy (watchdog 09:31Z, heal-daemon heartbeat 09:30Z), no new alerts since iter ~3512, loop paused (no 7th+ Mirror review dispatched).
 
 
