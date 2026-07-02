@@ -412,8 +412,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-02T18:12Z UTC (Iter ~3581, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-02T18:22Z UTC (Iter ~3582, Tier 1, consecutive_clean=0)
 
-**Iter ~3581 summary (2026-07-02T18:12Z):** ✅ Nominal. 0 new alerts. PR#812 AUTO_MERGE_HELD (held_deep_review, Mirror REVIEW_PASS 01:48 MDT 2026-07-01). Pipeline idle. Watermark=1075. All daemons healthy (heal-daemon 18:05:08Z, watchdog 18:10:49Z, beacon PID 3154043, outbox-notifier PID 3409769). **Larry: run `/code-review high` + `scripts/merge_reviewed_pr.sh 812` to release PR #812.**
+**Iter ~3582 summary (2026-07-02T18:22Z):** ✅ Nominal. 0 new alerts. PR#812 AUTO_MERGE_HELD (held_deep_review, Mirror REVIEW_PASS 01:48 MDT 2026-07-01). Pipeline idle. Watermark=1075. All daemons healthy (heal-daemon 18:15:19Z, watchdog 18:20:55Z, outbox-notifier running since 10:54 MDT). **Larry: run `/code-review high` + `scripts/merge_reviewed_pr.sh 812` to release PR #812.**
 
 
