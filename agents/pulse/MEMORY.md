@@ -394,8 +394,14 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-02T02:28Z UTC (Iter ~3481, Tier 1, consecutive_clean=2)
+## G-rule review-dispatch-post-auto-merge-held-001 — 1/3 (new, iter ~3482)
 
-**Iter ~3481 summary (2026-07-02T02:28Z):** ✅ Nominal. 0 new alerts. PR #808 MERGED (02:19:36Z UTC). PR #809 Mirror review started (wt-809 active). 8/8 daemons healthy (watchdog overall=healthy 02:22Z). No stalls. pending=1 (PR #805, chat_id=None, escalated idx=1091). consecutive_clean 1→2 (need 3 for Tier 2). Mirror pipeline: wt-805 (2nd review) + wt-809 (new). Queue clear.
+**Rule:** Beacon re-dispatches a Mirror review for PR #809 at 02:35:18Z UTC after AUTO_MERGE_HELD (blocker=#806). The PR already had REVIEW_PASS (02:30:58Z UTC) from a first Mirror review on the same SHA. Second review on same commit SHA appears duplicative while the blocker (#806) is still open. May be intentional (pre-positioning a fresh review for when blocker clears) or a bug. First occurrence iter ~3482. Monitor for recurrence; dispatch Beacon direction-ask at 3/3 if confirmed bug pattern.
+
+---
+
+## Status snapshot — updated 2026-07-02T02:39Z UTC (Iter ~3482, Tier 2, consecutive_clean=0)
+
+**Iter ~3482 summary (2026-07-02T02:39Z):** ✅ Nominal. 0 new alerts. PR #809 REVIEW_PASS + AUTO_MERGE_HELD (blocker=#806) + 2nd Mirror review dispatched. PR #805 2nd review in-flight (~61 min). 8/8 daemons healthy. All checks clean → **Tier 1→2 de-escalation** (consecutive_clean 2→3→reset). pending=1 (PR #805, chat_id=None, escalated idx=1091). Mirror pipeline: wt-805 (2nd review, long-running) + wt-809 (2nd dispatch, new). Tier 2 = 15-min cadence.
 
 
