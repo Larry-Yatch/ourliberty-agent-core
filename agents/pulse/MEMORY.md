@@ -388,8 +388,14 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-02T01:52Z UTC (Iter ~3476, Tier 1, consecutive_clean=2)
+## G-rule inbox-watcher-tier-pool-all-unavailable-tier4-001 — 1/3 (new, iter ~3477)
 
-**Iter ~3476 summary (2026-07-02T01:51Z):** ✅ Nominal. 0 new alerts. PR #807 MERGED (Mirror REVIEW_PASS + AUTO_MERGE 01:43Z). PR #805 approval carry (chat_id=null, escalated idx=1091); 2nd Mirror review in progress (~17 min at check). PR #806 open, no auto-review label (unreviewed-merge risk, Beacon dispatch awaiting Larry). Mirror pipeline: #808/#809/dashboard-101 queued. pending=1 (carry). 8/8 daemons healthy. Tier 1 consecutive_clean=2.
+**Rule:** `source=inbox-watcher, subject=tier-pool-all-unavailable` alerts classify Tier-4 (novel, no translation match). Fires when all dispatch tiers are simultaneously in cooldown (brief burst-backpressure after a cluster of dispatches). Alert itself says "no action needed unless this persists" — tiers free automatically. Self-resolved within ~8 min (02:00Z freed tier3, 02:02Z freed tier1/2). Demote to Tier-3 per WARN-vs-INFO calibration. Dispatch to Beacon at 3/3 to add Tier-3 translation entry. First occurrence iter ~3477 (all tiers in cooldown at 01:53:34Z after Mirror 4-task burst; freed 02:00-02:02Z).
+
+---
+
+## Status snapshot — updated 2026-07-02T02:03Z UTC (Iter ~3477, Tier 1, consecutive_clean=0)
+
+**Iter ~3477 summary (2026-07-02T02:02Z):** ⚠️ Signal. 1 new Tier-4 alert: inbox-watcher tier-pool-all-unavailable (01:53Z, self-resolved 02:00Z, DM idx=1092 already delivered). G-rule 1/3. Tier-reset: consecutive_clean 2→0. Mirror pipeline: dashboard-101 in review (02:00Z start); PR #805 2nd review starting ~02:02Z; #808/#809 queued. PR #806 open, no label. 8/8 daemons healthy. pending=1 (PR #805 escalation carry). Tier 1.
 
 
