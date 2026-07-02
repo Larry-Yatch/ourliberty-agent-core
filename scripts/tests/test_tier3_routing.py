@@ -1,5 +1,10 @@
 """Tier-3 N-tier routing: recognition, home resolution, and the
 fallback-priority pool (fallback_tier). Pure unit tests over a tmp agents-root."""
+try:  # engage the test sandbox before any production import reads env/paths
+    from . import _bootstrap  # noqa: F401
+except ImportError:  # discover loads this module top-level (no package parent)
+    import _bootstrap  # noqa: F401
+
 import os
 import shutil
 import sys

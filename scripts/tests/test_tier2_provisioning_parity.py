@@ -1,6 +1,11 @@
 """Tests for the Tier-2 provisioning-parity check folded into the weekly
 Tier-2 health probe. Pure read-only inspection — exercised against tmp
 homes/units so it never touches the real droplet state."""
+try:  # engage the test sandbox before any production import reads env/paths
+    from . import _bootstrap  # noqa: F401
+except ImportError:  # discover loads this module top-level (no package parent)
+    import _bootstrap  # noqa: F401
+
 import json
 import os
 import sys

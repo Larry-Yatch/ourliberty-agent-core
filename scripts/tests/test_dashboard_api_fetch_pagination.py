@@ -6,6 +6,11 @@ the in_review/done_today lanes then dropped closing events or review_requests
 once an agent exceeded 1000 events in the window. These tests prove the fetch
 now returns the COMPLETE window by paging under a stable order.
 """
+try:  # engage the test sandbox before any production import reads env/paths
+    from . import _bootstrap  # noqa: F401
+except ImportError:  # discover loads this module top-level (no package parent)
+    import _bootstrap  # noqa: F401
+
 import os
 import sys
 import unittest

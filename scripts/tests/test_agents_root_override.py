@@ -11,6 +11,11 @@ env; this test stops the gap reopening by requiring every state-root line to
 read that override on the same line (the `... or Path.home()/'agents'` idiom,
 or the `Path(override) if override else ...` form).
 """
+try:  # engage the test sandbox before any production import reads env/paths
+    from . import _bootstrap  # noqa: F401
+except ImportError:  # discover loads this module top-level (no package parent)
+    import _bootstrap  # noqa: F401
+
 import os
 import re
 import unittest
