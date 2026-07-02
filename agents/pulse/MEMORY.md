@@ -400,8 +400,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-02T06:48Z UTC (Iter ~3491, Tier 3, consecutive_clean=6)
+## Status snapshot — updated 2026-07-02T07:20Z UTC (Iter ~3492, Tier 1, consecutive_clean=0)
 
-**Iter ~3491 summary (2026-07-02T06:48Z):** ✅ Nominal. 1 new alert (doorbell L1098 Tier-3 silence). Dashboard PR #102 MERGED 06:20Z. PR #810 (retire parked_capture projection): round-2 Mirror review in inbox (REVIEW_ESCALATE on first pass, auto-re-dispatched). PR #812 (fix notifier null-chat): Mirror gave REVIEW_REVISION → Forge applied revision-1 → Mirror has 2 re-review tasks queued. Pending approval for PR #810 has chat_id=None (G-rule vp, review IS dispatched). All checks clean. Watchdog=healthy. Tier 3 consecutive_clean 5→6 (steady-state). 30-min cadence.
+**Iter ~3492 summary (2026-07-02T07:20Z):** ⚠️ Action needed. PR #810 MERGED 06:56:50Z UTC (chain-events: retire parked_capture projection). 8 new alerts: 7 heal-stale-daemon auto-restarts (Tier-3 silence, expected post-PR#810 merge) + 1 deep-review-hold for PR #812 (Tier-2, escalated [yellow] to Larry). PR #812 (fix(notifier): primary-chat fallback): Mirror REVIEW_PASS rev1 at 07:13Z but AUTO_MERGE_HELD — Larry needs `/code-review high` + `scripts/merge_reviewed_pr.sh 812`. PR #813 (test: green the base final): Mirror review dispatched 07:05Z, pipeline flowing. Tier reset 3→1 (signal: PR #812 deep-review-hold).
 
 
