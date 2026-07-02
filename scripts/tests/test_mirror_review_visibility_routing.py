@@ -330,6 +330,117 @@ class RouteNoSessionReviewTest(unittest.TestCase):
         ids = sorted(e['id'] for e in self._pending())
         self.assertEqual(ids, ['mirror-review-t1-abc', 'mirror-review-t1-def'])
 
+    # ---- null-chat fallback (2026-07-02 PR #805 incident) ----
+
+    def _set_allowed_chats(self, value):
+        orig = os.environ.get('TELEGRAM_ALLOWED_CHAT_IDS')
+        if value is None:
+            os.environ.pop('TELEGRAM_ALLOWED_CHAT_IDS', None)
+        else:
+            os.environ['TELEGRAM_ALLOWED_CHAT_IDS'] = value
+
+        def _restore():
+            if orig is None:
+                os.environ.pop('TELEGRAM_ALLOWED_CHAT_IDS', None)
+            else:
+                os.environ['TELEGRAM_ALLOWED_CHAT_IDS'] = orig
+        self.addCleanup(_restore)
+
+    def test_null_chat_falls_back_to_primary(self):
+        # No reply_chat_id on the envelope (the #805 stranding shape): the
+        # approval must route to Larry's primary chat, not chat_id=None.
+        self._set_allowed_chats('7998341473 12345')  # primary = lowest
+        on._route_no_session_review(
+            self._data(), self._decision('review_escalate'))
+        entry = self._pending()[0]
+        self.assertEqual(entry['chat_id'], 12345)
+
+    def test_null_chat_no_allowed_chats_preserves_none(self):
+        # env unset → _primary_chat_id() is None → durable tab-only (no crash).
+        self._set_allowed_chats(None)
+        on._route_no_session_review(
+            self._data(), self._decision('review_escalate'))
+        entry = self._pending()[0]
+        self.assertIsNone(entry['chat_id'])
+
+    def test_valid_reply_chat_id_unchanged(self):
+        # A present, valid reply_chat_id still wins over the primary fallback.
+        self._set_allowed_chats('12345')
+        on._route_no_session_review(
+            self._data(reply_chat_id=555), self._decision('review_escalate'))
+        entry = self._pending()[0]
+        self.assertEqual(entry['chat_id'], 555)
+
+
+class ReconcileNoSessionDecisionOnMergeTest(unittest.TestCase):
+    """`_reconcile_no_session_decision_on_merge` — Fix 2 (PR #805 incident).
+
+    A session-less escalation's decision approval must be resolved to 'expired'
+    when the PR later merges by any path, so it stops ghosting the doorbell.
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        root = Path(self._tmp.name)
+        self._orig_pending = approval.PENDING_APPROVALS_PATH
+        approval.PENDING_APPROVALS_PATH = root / 'beacon-pending-approvals.json'
+        self.addCleanup(
+            setattr, approval, 'PENDING_APPROVALS_PATH', self._orig_pending)
+
+    def _seed(self, approval_id, chat_id=12345):
+        approval.add_pending(
+            {'task_id': approval_id, 'summary': 's', 'target_agent': 'forge',
+             'prompt': 'p'},
+            chat_id=chat_id,
+        )
+
+    def _state(self):
+        return approval.load_state()
+
+    def test_merge_resolves_pending_to_expired(self):
+        task_id = 'pr-ourliberty-agent-core-805'
+        self._seed(f'mirror-review-{task_id}-deadbeef')
+        on._reconcile_no_session_decision_on_merge(task_id)
+        s = self._state()
+        self.assertEqual(s.get('pending', []), [])
+        hist = s.get('history', [])
+        self.assertEqual(len(hist), 1)
+        self.assertEqual(hist[0]['status'], 'expired')
+        self.assertEqual(hist[0]['id'], f'mirror-review-{task_id}-deadbeef')
+
+    def test_matches_bare_prefix_without_head_sha(self):
+        task_id = 'pr-ourliberty-agent-core-805'
+        self._seed(f'mirror-review-{task_id}')
+        on._reconcile_no_session_decision_on_merge(task_id)
+        self.assertEqual(self._state().get('pending', []), [])
+
+    def test_idempotent_second_merge_is_noop(self):
+        task_id = 'pr-ourliberty-agent-core-805'
+        self._seed(f'mirror-review-{task_id}-deadbeef')
+        on._reconcile_no_session_decision_on_merge(task_id)
+        # Second merge event for the same PR finds nothing pending — no raise,
+        # no second history entry.
+        on._reconcile_no_session_decision_on_merge(task_id)
+        s = self._state()
+        self.assertEqual(s.get('pending', []), [])
+        self.assertEqual(len(s.get('history', [])), 1)
+
+    def test_no_match_leaves_other_approvals_pending(self):
+        self._seed('mirror-review-pr-ourliberty-agent-core-999-cafe')
+        on._reconcile_no_session_decision_on_merge(
+            'pr-ourliberty-agent-core-805')
+        pending = self._state().get('pending', [])
+        self.assertEqual(len(pending), 1)
+        self.assertEqual(
+            pending[0]['id'], 'mirror-review-pr-ourliberty-agent-core-999-cafe')
+
+    def test_unknown_task_id_is_noop(self):
+        self._seed('mirror-review-unknown-cafe')
+        on._reconcile_no_session_decision_on_merge('unknown')
+        # A guard skips the 'unknown' sentinel so it can't mass-expire.
+        self.assertEqual(len(self._state().get('pending', [])), 1)
+
 
 if __name__ == '__main__':
     unittest.main()
