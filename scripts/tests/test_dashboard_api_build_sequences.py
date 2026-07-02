@@ -25,6 +25,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_REPO_SCRIPTS) not in sys.path:
@@ -106,8 +107,19 @@ def _write_archived_seq(blackboard_root: Path, ym: str, seq_id: str, **overrides
     return path
 
 
-def _client(agents_root: Path) -> TestClient:
-    da._agents_root = lambda: agents_root  # type: ignore[assignment]
+def _client(testcase: unittest.TestCase, agents_root: Path) -> TestClient:
+    """Build a TestClient with da._agents_root pointed at the test's tmpdir.
+
+    Patched via ``mock.patch.object`` and restored via
+    ``testcase.addCleanup`` so the original resolver is put back at the
+    end of each test. A bare ``da._agents_root = lambda: ...`` with no
+    restore leaks the (soon-deleted) tmpdir into every later-discovered
+    module under ``unittest discover`` (e.g. heal_orphan_autoregister's
+    queue-dir parity check would read the stale path instead of its env).
+    """
+    p = mock.patch.object(da, '_agents_root', lambda: agents_root)
+    p.start()
+    testcase.addCleanup(p.stop)
     return TestClient(da.app)
 
 
@@ -132,7 +144,7 @@ class _SequenceTestBase(_TokenSetMixin, unittest.TestCase):
         self.agents_root = self.tmp / 'agents'
         self.agents_root.mkdir(parents=True, exist_ok=True)
         self.blackboard = self.agents_root / 'blackboard' / 'build-sequences'
-        self.client = _client(self.agents_root)
+        self.client = _client(self, self.agents_root)
 
 
 # ==================== auth ====================
