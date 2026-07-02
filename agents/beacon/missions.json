@@ -6794,7 +6794,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-02T17:50:02.121339+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-25T05:25:45.303586+00:00"
+      "orphan_last_activity_ts": "2026-06-25T05:25:45.303586+00:00",
+      "briefing": {
+        "what": "A piece of work the team already started needs a quick refresh to line up with the latest changes before it can be finished and put into use.",
+        "why": "It's stuck and can't move forward on its own, so leaving it stalls work you already asked for and lets it fall out of date the longer it waits.",
+        "suggest": "Give it the go-ahead to be brought up to date and wrapped up, but have someone confirm it still lines up cleanly before it goes live."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-02T17:55:08.351873+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-catalog-drift-sync-cadence-001",
@@ -6811,7 +6825,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-02T17:50:02.121339+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-22T10:52:13.758734+00:00"
+      "orphan_last_activity_ts": "2026-06-22T10:52:13.758734+00:00",
+      "briefing": {
+        "what": "The team started tuning how often your product catalog syncs so listings stay consistent, but it isn't yet attached to a formal project.",
+        "why": "Out-of-date or mismatched listings can cost sales and erode customer trust, so getting the refresh timing right protects revenue.",
+        "suggest": "Give it a quick review and fold it into a named project before it goes further, so the effort stays accountable and on track."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-02T17:55:08.351873+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-catalog-accuracy-drift-grule-001",
@@ -6828,7 +6856,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-02T17:50:02.121339+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-22T10:35:51.635677+00:00"
+      "orphan_last_activity_ts": "2026-06-22T10:35:51.635677+00:00",
+      "briefing": {
+        "what": "The team started work on fixing product listings that have been slowly becoming inaccurate over time.",
+        "why": "Wrong product details erode customer trust and can cost you sales, so keeping the catalog accurate protects revenue and reputation.",
+        "suggest": "Worth pursuing, but have the team tie it to a clear owner and goal before they go further so the effort stays focused."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-02T17:55:08.351873+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
