@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-02T21:03Z UTC (Iter ~3604, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-02T21:13Z UTC (Iter ~3606, Tier 1, consecutive_clean=0)
 
-**Iter ~3604 summary (2026-07-02T21:03Z):** 0 new alerts. PR #812 AUTO_MERGE_HELD (held_deep_review, mirror-review=SUCCESS, UNKNOWN transient GH API). PR #804 confirmed MERGED 2026-07-01T23:43:29Z (fix(heal-bind-drift)). Pipeline idle ~6h (outbox-notifier idle since 10:54 MDT post-PR#814-merge). Watermark=1082. All daemons healthy (heal-daemon 20:57:44Z, watchdog 20:59:16Z UTC, outbox-notifier PID 3409769, beacon bot PID 3154043). **Larry: run `scripts/merge_reviewed_pr.sh 812` to release PR #812.**
+**Iter ~3606 summary (2026-07-02T21:13Z):** 0 new alerts. PR #812 OPEN AUTO_MERGE_HELD (held_deep_review, mirror-review=SUCCESS, UNKNOWN transient GH API). PR #814 MERGED 2026-07-02T16:51:49Z UTC (stall healer bypass — G-rule review-dispatch-post-auto-merge-held-001 COMPLETE). Pipeline idle ~6.3h (outbox-notifier idle since 10:54 MDT). Watermark=1082. All daemons healthy (heal-daemon 21:08:03Z, watchdog 21:09:18Z UTC, outbox-notifier PID 3409769, beacon bot PID 3154043). **Larry: run `scripts/merge_reviewed_pr.sh 812` to release PR #812.**
 
 
