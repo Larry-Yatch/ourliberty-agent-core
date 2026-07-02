@@ -400,8 +400,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-02T03:33Z UTC (Iter ~3485, Tier 3, consecutive_clean=0)
+## Status snapshot — updated 2026-07-02T04:09Z UTC (Iter ~3486, Tier 3, consecutive_clean=1)
 
-**Iter ~3485 summary (2026-07-02T03:33Z):** ✅ Nominal. 0 new alerts. PR #806 UNKNOWN (GitHub recomputing post-cycle-commit) — no auto-review label, blocking PR #809. PR #809 2nd Mirror REVIEW_PASS (02:44Z), AUTO_MERGE_HELD blocker=#806. All inboxes empty. 8/8 daemons healthy. **Tier 2→3 de-escalation** (consecutive_clean 2→3 threshold met). Now at 30-min cadence.
+**Iter ~3486 summary (2026-07-02T04:09Z):** ✅ Nominal. 0 new alerts. PR #806 MERGEABLE (resolved from UNKNOWN) — no auto-review label, blocking PR #809. PR #809 2nd+3rd Mirror REVIEW_PASS (02:30Z + 02:44Z UTC), AUTO_MERGE_HELD blocker=#806. All inboxes empty. 8/8 daemons healthy. Tier 3 consecutive_clean 0→1. 30-min cadence.
 
 
