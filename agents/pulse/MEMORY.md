@@ -400,8 +400,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-02T13:02Z UTC (Iter ~3540, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-02T13:12Z UTC (Iter ~3541, Tier 1, consecutive_clean=0)
 
-**Iter ~3540 summary (2026-07-02T13:02Z):** ⚠️ Standing carry — PR #812 AUTO_MERGE_HELD. APPROVAL_REQUEST `notifier-suppress-review-dispatch-deep-review-held-001` delivered to Larry (02:00:24 MDT / 08:00:24Z, ~5h02min elapsed). pending=1 in beacon-pending-approvals.json. Larry needs to `approve` (dashboard or Telegram). After approval: Forge builds PR; then `/code-review high` + `scripts/merge_reviewed_pr.sh 812`. Sync status=no-change (clean). All daemons healthy (watchdog 12:57:49Z, heal-daemon heartbeat 12:52:17Z). No new alerts (wm=1070=file_length=1070). Loop paused (no Mirror dispatch since APPROVAL_REQUEST queued 07:59:59Z UTC). PR #812 mergeable=UNKNOWN (GitHub API transient).
+**Iter ~3541 summary (2026-07-02T13:12Z):** ⚠️ Standing carry — PR #812 AUTO_MERGE_HELD. APPROVAL_REQUEST `notifier-suppress-review-dispatch-deep-review-held-001` delivered to Larry (02:00:24 MDT / 08:00:24Z, ~5h12min elapsed). pending=1 in beacon-pending-approvals.json. Larry needs to `approve` (dashboard or Telegram). After approval: Forge builds PR; then `/code-review high` + `scripts/merge_reviewed_pr.sh 812`. Sync status=no-change (clean). All daemons healthy (watchdog 13:08:20Z, heal-daemon heartbeat 13:02:17Z). No new alerts (wm=1070=file_length=1070). Loop paused (no Mirror dispatch since APPROVAL_REQUEST queued 07:59:59Z UTC). PR #812 mergeable=UNKNOWN (GitHub API transient).
 
 
