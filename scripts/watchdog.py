@@ -49,6 +49,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import signal
 import subprocess
 import sys
 import time
@@ -126,6 +128,34 @@ PROC_MEM_RESTART_COOLDOWN_SEC = 15 * 60
 # Disk + system-memory thresholds.
 USAGE_WARN_PCT = 80
 USAGE_CRITICAL_PCT = 90
+
+# Orphaned `journalctl --follow` reaper grace age. Ephemeral sessions (an old
+# post-cycle / Pulse anti-pattern) spawned backgrounded
+# `journalctl -fu <unit> ... | grep <marker>` pipes to wait for an event, then
+# exited WITHOUT killing the follower; the follower and its bash wrapper
+# reparent to init (ppid==1) and run forever with no reader — a pure leak
+# (12 procs / ~215 MB observed 2026-07-01, oldest 37d, silently carried as an
+# "ask-then-do" note for 5+ weeks). A follower whose parent chain has collapsed
+# to init has nobody consuming its output, so reaping it has no side effects.
+# Daemon-owned followers (e.g. chain_event_shipper's
+# `journalctl -fu ... --output=json`) are children of the LIVE daemon
+# (ppid != 1) and are never matched. The grace age avoids racing a
+# just-exited parent whose child is about to be cleaned up elsewhere.
+ORPHAN_FOLLOWER_MIN_AGE_SEC = 6 * 3600
+
+# A `journalctl` invocation carrying a follow flag: bare -f, a combined short
+# cluster containing f (-fu/-fn/-fen), or --follow. The negated class stops the
+# scan at the first shell command separator (| ; & or newline) so a follow flag
+# that belongs to a *different* command in the same `bash -c '...'` wrapper is
+# never misattributed to journalctl — e.g. `journalctl -u x ; tail -f log`,
+# `journalctl -u x && systemctl -f restart y`, or `journalctl -u x | grep -f p`
+# must NOT match. `-F`/`--file`/`--field`/`--flush` etc. don't match either: the
+# short branch requires a lowercase 'f', and journalctl's only lowercase-f short
+# option is -f (follow). Real leaked wrappers put -f before the `2>&1` redirect,
+# so the lazy scan matches the follow flag before ever reaching a separator.
+_JOURNALCTL_FOLLOW_RE = re.compile(
+    r'\bjournalctl\b[^|;&\n]*?(?:\s-[A-Za-z]*f[A-Za-z]*|\s--follow)\b'
+)
 
 
 def log(message: str, level: str = 'INFO') -> None:
@@ -972,6 +1002,111 @@ def reconcile_bot_desired_state() -> dict:
     return {'status': overall, 'bots': results}
 
 
+def _enumerate_processes() -> list[dict]:
+    """Snapshot of running processes: pid, ppid, elapsed-seconds, args.
+
+    Uses `ps -eo pid=,ppid=,etimes=,args=` (etimes = whole seconds since the
+    process started, Linux procps). Returns [] on any failure so the caller
+    degrades to a no-op rather than raising.
+    """
+    try:
+        r = subprocess.run(
+            ['ps', '-eo', 'pid=,ppid=,etimes=,args='],
+            capture_output=True, text=True, timeout=15,
+        )
+    except Exception as e:  # noqa: BLE001 — ps must never take watchdog down
+        log(f'orphan-reaper: ps failed: {e}', 'WARN')
+        return []
+    procs: list[dict] = []
+    for line in r.stdout.splitlines():
+        # pid ppid etimes then the rest is the (space-containing) command.
+        parts = line.split(None, 3)
+        if len(parts) < 4:
+            continue
+        pid_s, ppid_s, etimes_s, args = parts
+        try:
+            procs.append({
+                'pid': int(pid_s),
+                'ppid': int(ppid_s),
+                'etimes': int(etimes_s),
+                'args': args,
+            })
+        except ValueError:
+            continue
+    return procs
+
+
+def check_orphaned_journalctl_followers() -> dict:
+    """Reap init-reparented `journalctl --follow` leaks and their descendants.
+
+    See ORPHAN_FOLLOWER_MIN_AGE_SEC for the rationale. This is a benign,
+    fully-reversible self-heal — a reader-less follower has no state to flush —
+    so it NEVER pages Larry; it only logs and records a count. Reversible
+    reconciliation stays off the operator's desk (alert-toil principle); a
+    recurring cleanup should never decay behind a manual "ask-then-do" carry.
+    """
+    try:
+        procs = _enumerate_processes()
+        if not procs:
+            return {'status': 'ok', 'reaped': 0}
+
+        children: dict[int, list[int]] = {}
+        for p in procs:
+            children.setdefault(p['ppid'], []).append(p['pid'])
+
+        # Orphan roots: reparented to init, journalctl-follow in the cmdline,
+        # aged past the grace window. Catches both the bash-wrapper form
+        # (`bash -c 'journalctl -f ... | grep ...'`, comm=bash) and a bare
+        # backgrounded `journalctl -f` (comm=journalctl).
+        roots = [
+            p for p in procs
+            if p['ppid'] == 1
+            and p['etimes'] >= ORPHAN_FOLLOWER_MIN_AGE_SEC
+            and _JOURNALCTL_FOLLOW_RE.search(p['args'])
+        ]
+        if not roots:
+            return {'status': 'ok', 'reaped': 0}
+
+        # Collect each root plus its whole subtree from the pre-kill snapshot:
+        # the wrapper does not forward SIGTERM to its journalctl child, so every
+        # pid is signalled explicitly rather than relying on propagation.
+        to_kill: list[int] = []
+        seen: set[int] = set()
+        for root in roots:
+            stack = [root['pid']]
+            while stack:
+                pid = stack.pop()
+                if pid in seen or pid == 1:
+                    continue
+                seen.add(pid)
+                to_kill.append(pid)
+                stack.extend(children.get(pid, []))
+
+        reaped: list[int] = []
+        for pid in to_kill:
+            try:
+                os.kill(pid, signal.SIGTERM)
+                reaped.append(pid)
+            except ProcessLookupError:
+                continue  # already gone (e.g. died with its reaped parent)
+            except OSError as e:
+                log(f'orphan-reaper: kill {pid} failed: {e}', 'WARN')
+
+        log(
+            f'orphan-reaper: SIGTERM {len(reaped)} orphaned journalctl-follow '
+            f'proc(s) across {len(roots)} leaked watcher(s): {sorted(reaped)}'
+        )
+        return {
+            'status': 'recovered' if reaped else 'ok',
+            'reaped': len(reaped),
+            'roots': len(roots),
+            'pids': sorted(reaped),
+        }
+    except Exception as e:  # noqa: BLE001 — never let the reaper break the run
+        log(f'orphan-reaper: unexpected error: {e}', 'ERROR')
+        return {'status': 'error', 'error': str(e)}
+
+
 # ---------- orchestration ----------
 
 
@@ -987,6 +1122,7 @@ def run_all_checks() -> dict:
             'disk': check_disk(),
             'memory': check_memory(),
             'log_growth': check_log_growth(),
+            'orphaned_journalctl_followers': check_orphaned_journalctl_followers(),
             'bots': reconcile_bot_desired_state(),
         },
     }
