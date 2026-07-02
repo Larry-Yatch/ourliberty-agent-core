@@ -388,8 +388,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-02T01:45Z UTC (Iter ~3475, Tier 1, consecutive_clean=1)
+## Status snapshot — updated 2026-07-02T01:52Z UTC (Iter ~3476, Tier 1, consecutive_clean=2)
 
-**Iter ~3475 summary (2026-07-02T01:45Z):** ✅ Nominal. 0 new alerts. PR #805 approval carry (chat_id=null, escalated idx=1092 at iter ~3474, second Mirror review queued behind #807). PR #806 open with no auto-review label (unreviewed-merge risk, Beacon dispatch awaiting Larry). Mirror pipeline active: PR #807 IN REVIEW (~14 min in), #808/#809/dashboard-101 queued. pending=1 (carry). 8/8 daemons healthy. Tier 1 consecutive_clean=1.
+**Iter ~3476 summary (2026-07-02T01:51Z):** ✅ Nominal. 0 new alerts. PR #807 MERGED (Mirror REVIEW_PASS + AUTO_MERGE 01:43Z). PR #805 approval carry (chat_id=null, escalated idx=1091); 2nd Mirror review in progress (~17 min at check). PR #806 open, no auto-review label (unreviewed-merge risk, Beacon dispatch awaiting Larry). Mirror pipeline: #808/#809/dashboard-101 queued. pending=1 (carry). 8/8 daemons healthy. Tier 1 consecutive_clean=2.
 
 
