@@ -394,14 +394,14 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## G-rule review-dispatch-post-auto-merge-held-001 — 2/3 (updated iter ~3493)
+## G-rule review-dispatch-post-auto-merge-held-001 → DISPATCHED ✅ (iter ~3497), vp
 
-**Rule:** Outbox-notifier re-dispatches Mirror reviews for a PR that is in AUTO_MERGE_HELD state — Mirror passes each time, notifier re-holds and re-dispatches, creating a review loop that burns cost without progress. Observed pattern: PR #812 (`fix(notifier)`) HELD for `/code-review high` stamp; notifier dispatched to Mirror at 01:15:32Z, Mirror REVIEW_PASS at 01:24:50Z, notifier HELD again. Fix: notifier should NOT re-dispatch to Mirror when PR is in HELD_DEEP_REVIEW state (suppress until deep-review stamp is applied or Larry manually clears hold). Dispatch to Beacon at 3/3. Occurrences: iter ~3482 (1/3, PR #809 post-AUTO_MERGE_HELD re-dispatch while blocker #806 open); iter ~3493 (2/3, PR #812 review-dispatch loop confirmed — 01:15:32Z dispatch → 01:24:50Z REVIEW_PASS → 01:24:53Z HELD again; also observed 07:15:32Z dispatch cycle earlier same session).
+**Rule:** Outbox-notifier re-dispatches Mirror reviews for a PR that is in AUTO_MERGE_HELD state — Mirror passes each time, notifier re-holds and re-dispatches, creating a review loop that burns cost without progress. PR #812 accumulated 6 Mirror REVIEW_PASS results. Fix: notifier should NOT re-dispatch to Mirror when PR is in HELD_DEEP_REVIEW state. Dispatched `direction-ask-review-dispatch-post-auto-merge-held-001.json` to Beacon inbox at 2026-07-02T07:53:57Z (iter ~3497). Occurrences: iter ~3482 (1/3, PR #809); iter ~3493 (2/3, PR #812 5th pass); iter ~3497 (3/3, PR #812 6th pass at 01:48:49 MDT → 3/3 → dispatch). verification_pending.
 
 ---
 
-## Status snapshot — updated 2026-07-02T07:47Z UTC (Iter ~3496, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-02T07:54Z UTC (Iter ~3497, Tier 1, consecutive_clean=0)
 
-**Iter ~3496 summary (2026-07-02T07:47Z):** ⚠️ Action needed. 1 new alert L1110 (Tier-4: outbox-notifier promoted hold persistence:3-cycles for PR #812; bot delivered DM at 01:45:16 MDT; no Pulse DM added). PR #812 still HELD (5th Mirror REVIEW_PASS; review-dispatch loop paused since 01:24:53Z, ~23 min quiet). PR #813 MERGED confirmed. No new stalls. All daemons healthy. Larry needs `/code-review high` + `scripts/merge_reviewed_pr.sh 812`.
+**Iter ~3497 summary (2026-07-02T07:54Z):** ⚠️ Action needed. No new alerts (wm=1110). PR #812 HELD (6th Mirror REVIEW_PASS at 01:48:49 MDT, 6th HELD at 01:48:53 MDT; now MERGEABLE). G-rule review-dispatch-post-auto-merge-held-001 hit 3/3 → dispatched direction-ask to Beacon. All daemons healthy. No stalls. Larry needs `/code-review high` + `scripts/merge_reviewed_pr.sh 812`.
 
 
