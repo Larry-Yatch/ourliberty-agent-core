@@ -337,7 +337,23 @@ def _mcp_servers(home: str) -> set:
 def check_provisioning_parity() -> list:
     """Return a list of human-readable Tier-2 capability-drift findings
     (empty list == at parity). Never raises — pure read-only inspection so a
-    bug here can never break the OAuth probe."""
+    bug here can never break the OAuth probe.
+
+    OBSOLETE UNDER THE PER-TASK TIER POOL (docs/specs/tier-dispatch-spec.md):
+    when Tier-2 has a long-lived SETUP TOKEN, a Tier-2 dispatch authenticates
+    via that token and — under the decoupled auth<->HOME model (#760) — runs
+    with HOME = TIER1_HOME, NOT TIER2_HOME. So it uses Tier-1's ~/.claude.json
+    (MCP servers), Tier-1's credentials, and the already-carved real home (no
+    EROFS). Every facet this function checks (TIER2_HOME MCP parity, TIER2_HOME
+    creds, TIER2_HOME in ReadWritePaths) only matters on the creds.json fallback
+    path, which is unreachable while the token is configured. So skip the check
+    — return no drift — when the token is present; that retires the weekly false
+    SOON alert the time-sliced-rotation model produced. (Tier-2 credential
+    health is still covered by the OAuth liveness probe above; a MISSING token
+    is a credential-drift concern, not a provisioning-parity one.) The check
+    still runs for the no-token creds-fallback case, where parity applies."""
+    if active_tier._setup_token_for_tier('tier2'):
+        return []
     drift = []
     # 1. Tier-2 OAuth credentials present at all.
     cred = Path(TIER2_HOME) / '.claude' / '.credentials.json'

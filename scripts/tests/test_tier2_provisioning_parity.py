@@ -11,6 +11,7 @@ import os
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -43,6 +44,13 @@ class TestTier2ProvisioningParity(unittest.TestCase):
         active_tier.TIER1_HOME = self.t1
         probe.TIER2_HOME = self.t2
         probe.REPO_SYSTEMD = self.sysd
+        # Default: NO tier-2 setup token, so the parity check RUNS (these tests
+        # exercise the creds-fallback path where TIER2_HOME parity applies).
+        # test_setup_token_skips_parity overrides this.
+        _p = mock.patch.object(active_tier, '_setup_token_for_tier',
+                               return_value=None)
+        _p.start()
+        self.addCleanup(_p.stop)
 
     def tearDown(self):
         active_tier.TIER1_HOME, probe.TIER2_HOME, probe.REPO_SYSTEMD = self._saved
@@ -69,6 +77,16 @@ class TestTier2ProvisioningParity(unittest.TestCase):
         self.assertTrue(
             any(probe.SESSION_UNITS[0] in d and "ReadWritePaths" in d for d in drift),
             drift)
+
+    def test_setup_token_skips_parity(self):
+        # With a Tier-2 setup token, a Tier-2 dispatch runs under TIER1_HOME
+        # (decoupled), so TIER2_HOME parity is moot — the check returns no drift
+        # even when MCP is missing / creds absent / RWP dropped (all obsolete).
+        Path(self.t2, ".claude.json").write_text(json.dumps({"mcpServers": {}}))
+        (Path(self.t2, ".claude", ".credentials.json")).unlink()
+        with mock.patch.object(active_tier, '_setup_token_for_tier',
+                               return_value='sk-ant-oat01-t2'):
+            self.assertEqual(probe.check_provisioning_parity(), [])
 
     def test_check_never_raises(self):
         # Point at a nonexistent systemd dir + unreadable homes: still a list.
