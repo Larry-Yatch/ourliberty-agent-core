@@ -406,9 +406,9 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## G-rule forge-notifier-tests-production-state-pollution-001 — 1/3 (new, iter ~3558)
+## G-rule forge-notifier-tests-production-state-pollution-001 — 2/3 (updated iter ~3623)
 
-**Rule:** Forge build tests for notifier code write fixture data to production state files. beacon-pending-approvals.json received 2 fake pending entries (chat_id=12345, NOT Larry's real ID 7998341473): `mirror-review-pr-ourliberty-agent-core-760` (PR #760 already MERGED 2026-06-30) and `mirror-review-real-rev` (fixture name, refs PR #42). Production outbox-notifier processed fixture tasks (`silent-red`, `owner/repo` PR #7) on 5-min sweep at 09:07 + 09:12 MDT. Root cause: notifier tests use production state file paths instead of isolated temp-dir paths. No immediate pipeline impact (fake entries can't DM Larry; notifier WARNs are clean), but pollutes pending-approvals state. Fix: notifier tests should use isolated state paths. Dispatch to Beacon at 3/3. First occurrence iter ~3558.
+**Rule:** Forge build tests for notifier code write fixture data to production state files. beacon-pending-approvals.json received 2 fake pending entries (chat_id=12345, NOT Larry's real ID 7998341473): `mirror-review-pr-ourliberty-agent-core-760` (PR #760 already MERGED 2026-06-30) and `mirror-review-real-rev` (fixture name, refs PR #42). Production outbox-notifier processed fixture tasks on 5-min sweep at 09:07 + 09:12 MDT. Root cause: notifier tests use production state file paths instead of isolated temp-dir paths. Fix: notifier tests should use isolated state paths. Dispatch to Beacon at 3/3. **2nd occurrence (iter ~3623):** fixture entries triggered a REAL doorbell DM to Larry (chat_id=7998341473) at 23:35:51Z UTC / 17:38:45 MDT — "2 items need your call" about MERGED PR #760 and fixture `real-rev`. Phantom approval DM reached Larry. Entries remain in pending-approvals.json and will keep firing doorbells. First occurrence iter ~3558.
 
 ---
 
@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-02T23:31Z UTC (Iter ~3622, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-02T23:43Z UTC (Iter ~3623, Tier 1, consecutive_clean=0)
 
-**Iter ~3622 summary (2026-07-02T23:31Z):** 0 new alerts. PR #812 OPEN AUTO_MERGE_HELD (held_deep_review, MIRROR_PASS_UNMERGED_SKIP confirmed). Pipeline idle ~14h (outbox-notifier idle since 10:54 MDT). Watermark=1083. All daemons healthy (heal-daemon 23:30:10Z, watchdog 23:28:10Z UTC, outbox-notifier PID 3409769, beacon bot PID 3154043). Stall ×2 (PRs 812, 814 task branches). **Larry: run `scripts/merge_reviewed_pr.sh 812` to release PR #812.**
+**Iter ~3623 summary (2026-07-02T23:43Z):** 1 new alert (doorbell Tier 3 silenced — but spurious fixture DM reached Larry). PR #812 OPEN AUTO_MERGE_HELD (held_deep_review, MIRROR_PASS_UNMERGED_SKIP confirmed). Pipeline idle ~15h. Watermark=1084. All daemons healthy (heal-daemon 23:40:15Z, watchdog 23:38:20Z UTC, outbox-notifier PID 3409769, beacon bot PID 3154043). Stall ×2 (PRs 812, 814 task branches). forge-notifier-tests-production-state-pollution-001 escalated to 2/3 (fixture entries triggered phantom approval DM to Larry). **Larry: run `scripts/merge_reviewed_pr.sh 812` to release PR #812.**
 
 
