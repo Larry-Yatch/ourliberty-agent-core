@@ -412,8 +412,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-02T17:33Z UTC (Iter ~3576, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-02T17:43Z UTC (Iter ~3577, Tier 1, consecutive_clean=0)
 
-**Iter ~3576 summary (2026-07-02T17:33Z):** ✅ Nominal. PR#812 AUTO_MERGE_HELD carry (held_deep_review, Mirror REVIEW_PASS 01:48 MDT 2026-07-01). G-rule `review-dispatch-post-auto-merge-held-001` COMPLETE + re-confirmed — notifier post-restart (10:54 MDT PR#814 code) shows zero re-review dispatches. Pipeline idle. 0 new alerts. Watermark=1073. All daemons healthy. **Larry: run `/code-review high` + `scripts/merge_reviewed_pr.sh 812` to release PR #812.**
+**Iter ~3577 summary (2026-07-02T17:43Z):** ✅ Nominal. 2 new alerts (L1074/L1075: sync push failed race, both Tier-3 silenced; bot already DM'd Larry at 11:35 MDT). PR#812 AUTO_MERGE_HELD carry (held_deep_review, Mirror REVIEW_PASS 01:48 MDT 2026-07-01). Pipeline idle. Watermark=1075. All daemons healthy. **Larry: run `/code-review high` + `scripts/merge_reviewed_pr.sh 812` to release PR #812.**
 
 
