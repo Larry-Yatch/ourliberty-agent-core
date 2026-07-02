@@ -388,8 +388,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-02T00:11Z UTC (Iter ~3470, Tier 2, clean)
+## Status snapshot — updated 2026-07-02T00:47Z UTC (Iter ~3472, Tier 2, clean)
 
-**Iter ~3470 summary (2026-07-02T00:11Z):** ✅ Nominal. 0 new alerts. 0 open PRs. 0 stalls. pending=0. All daemons healthy. **Tier 1→2 (de-escalated — 3 consecutive clean iters; consecutive_clean reset to 0). Next de-escalation to Tier 3 at consecutive_clean=3 from Tier 2.**
+**Iter ~3472 summary (2026-07-02T00:47Z):** ✅ Nominal. 0 new alerts. 0 open PRs. 0 stalls. pending=0. All daemons healthy. **Tier 2, consecutive_clean=2. 1 more clean iter for de-escalation to Tier 3.**
 
 
