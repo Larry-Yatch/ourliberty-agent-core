@@ -5566,12 +5566,19 @@ def _reconcile_no_session_decision_on_merge(task_id: str) -> None:
     """
     if not task_id or task_id == 'unknown':
         return
+    # Word-boundary match, NOT an unbounded prefix: task_id is PR-number-suffixed
+    # (e.g. pr-ourliberty-agent-core-42), so a bare startswith would let PR #42's
+    # merge expire PR #421's still-pending approval ('421' startswith '42') —
+    # silently erasing a legitimate decision, the exact ghosting this fix
+    # prevents. Approval ids are `mirror-review-{task_id}[-{head8}]`: the head8
+    # form always carries the '-' delimiter, the bare form is an exact match.
     prefix = f'mirror-review-{task_id}'
     try:
         pending = approval.load_state().get('pending', [])
         stale_ids = [
             e.get('id') for e in pending
-            if isinstance(e.get('id'), str) and e['id'].startswith(prefix)
+            if isinstance(e.get('id'), str)
+            and (e['id'] == prefix or e['id'].startswith(prefix + '-'))
         ]
         for approval_id in stale_ids:
             resolved = approval.resolve(

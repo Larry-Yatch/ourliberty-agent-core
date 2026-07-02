@@ -441,6 +441,17 @@ class ReconcileNoSessionDecisionOnMergeTest(unittest.TestCase):
         # A guard skips the 'unknown' sentinel so it can't mass-expire.
         self.assertEqual(len(self._state().get('pending', [])), 1)
 
+    def test_digit_prefix_task_id_does_not_cross_expire(self):
+        # PR #42 and PR #421 are same-repo; '421' starts with '42'. Merging #42
+        # must NOT expire #421's still-pending approval (word-boundary guard).
+        self._seed('mirror-review-pr-ourliberty-agent-core-42-aaaa')
+        self._seed('mirror-review-pr-ourliberty-agent-core-421-bbbb')
+        on._reconcile_no_session_decision_on_merge('pr-ourliberty-agent-core-42')
+        pending = self._state().get('pending', [])
+        self.assertEqual(
+            [e['id'] for e in pending],
+            ['mirror-review-pr-ourliberty-agent-core-421-bbbb'])
+
 
 if __name__ == '__main__':
     unittest.main()
