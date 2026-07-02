@@ -400,8 +400,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-02T08:00Z UTC (Iter ~3498, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-02T08:04Z UTC (Iter ~3499, Tier 1, consecutive_clean=0)
 
-**Iter ~3498 summary (2026-07-02T08:00Z):** ⚠️ Standing carry — PR #812 AUTO_MERGE_HELD (no /code-review high stamp; 6th Mirror REVIEW_PASS at 01:48:49 MDT; loop paused since iter ~3497 dispatch). All checks nominal. No new alerts (wm=1110). No new stalls. No new dispatches. PR #806 confirmed 7th unreviewed-larry-merge (G-rule vp carry). Recent merges: #810 (watchdog journalctl), #811 (chain-events retire). Larry needs `/code-review high` + `scripts/merge_reviewed_pr.sh 812`.
+**Iter ~3499 summary (2026-07-02T08:04Z):** ⚠️ Standing carry — PR #812 AUTO_MERGE_HELD. G-rule fix pipeline advancing: Beacon processed direction-ask (iter ~3497), APPROVAL_REQUEST `notifier-suppress-review-dispatch-deep-review-held-001` queued for Forge preflight and delivered to Larry (02:00:24 MDT). pending=1 in beacon-pending-approvals.json. Larry needs to `approve` (dashboard or Telegram). After approval: Forge builds PR; then `/code-review high` + `scripts/merge_reviewed_pr.sh 812`.
 
 
