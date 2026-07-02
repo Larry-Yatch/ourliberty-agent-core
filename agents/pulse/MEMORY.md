@@ -372,7 +372,7 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 **Rule:** Larry-Yatch merges his own docs/spec/fix PRs before Mirror has reviewed them. Root causes: (1) outbox-notifier defers Mirror dispatch when PR mergeable=UNKNOWN (PR #772 class), (2) PR has NO `auto-review` label at all, never dispatch-eligible (PR #766, #768 class — Option 2/optimistic dispatch would NOT fix these). Three occurrences: PR #766 (no label), PR #768 (no label), PR #772 (UNKNOWN mergeable). Dispatched `direction-ask-unreviewed-merge-larry-prs-3of3-001.json` to Beacon inbox at iter ~3372.
 
-**Beacon recommendation (returned ~2026-06-30T21:00Z):** Phased path — (1) extend `merge_reviewed_pr.sh` to POST mirror-review state=success (pure upside, prevents deadlock when required check exists); (2) default desktop PR-open to `open_pr_for_team.sh` so unlabeled PRs always get `auto-review` label; (3) flip `enforce_admins=true` — operator's call only (adds ~3-5 min Mirror wait on EVERY PR). Awaiting Larry's response on whether to spec + dispatch Steps 1-2 now. Option 2 (optimistic UNKNOWN dispatch) dropped — branch protection makes timing race moot once gate is live. verification_pending (Larry response). **4th occurrence: PR #789 merged without Mirror review (iter ~3436, 2026-07-01T15:45Z). 5th occurrence: PR #797 merged 2026-07-01T20:08:09Z (iter ~3451). 6th occurrence: PR #802 merged ~2026-07-01T20:15Z (iter ~3452). Steps 1-2 still unimplemented. Larry response still pending. PR #806 currently open with no auto-review label (watch for merge).** 7th+ watch ongoing.
+**Beacon recommendation (returned ~2026-06-30T21:00Z):** Phased path — (1) extend `merge_reviewed_pr.sh` to POST mirror-review state=success (pure upside, prevents deadlock when required check exists); (2) default desktop PR-open to `open_pr_for_team.sh` so unlabeled PRs always get `auto-review` label; (3) flip `enforce_admins=true` — operator's call only (adds ~3-5 min Mirror wait on EVERY PR). Awaiting Larry's response on whether to spec + dispatch Steps 1-2 now. Option 2 (optimistic UNKNOWN dispatch) dropped — branch protection makes timing race moot once gate is live. verification_pending (Larry response). **4th occurrence: PR #789 merged without Mirror review (iter ~3436, 2026-07-01T15:45Z). 5th occurrence: PR #797 merged 2026-07-01T20:08:09Z (iter ~3451). 6th occurrence: PR #802 merged ~2026-07-01T20:15Z (iter ~3452). 7th occurrence: PR #806 (fix(tier2-probe): retire the tier2 provisioning-parity alert) merged 2026-07-02T05:44:58Z, 0 reviews (iter ~3498). Steps 1-2 still unimplemented. Larry response still pending.** 8th+ watch ongoing.
 
 ---
 
@@ -400,8 +400,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-02T07:54Z UTC (Iter ~3497, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-02T08:00Z UTC (Iter ~3498, Tier 1, consecutive_clean=0)
 
-**Iter ~3497 summary (2026-07-02T07:54Z):** ⚠️ Action needed. No new alerts (wm=1110). PR #812 HELD (6th Mirror REVIEW_PASS at 01:48:49 MDT, 6th HELD at 01:48:53 MDT; now MERGEABLE). G-rule review-dispatch-post-auto-merge-held-001 hit 3/3 → dispatched direction-ask to Beacon. All daemons healthy. No stalls. Larry needs `/code-review high` + `scripts/merge_reviewed_pr.sh 812`.
+**Iter ~3498 summary (2026-07-02T08:00Z):** ⚠️ Standing carry — PR #812 AUTO_MERGE_HELD (no /code-review high stamp; 6th Mirror REVIEW_PASS at 01:48:49 MDT; loop paused since iter ~3497 dispatch). All checks nominal. No new alerts (wm=1110). No new stalls. No new dispatches. PR #806 confirmed 7th unreviewed-larry-merge (G-rule vp carry). Recent merges: #810 (watchdog journalctl), #811 (chain-events retire). Larry needs `/code-review high` + `scripts/merge_reviewed_pr.sh 812`.
 
 
