@@ -3,6 +3,11 @@
 Cover the pure ``evaluate`` decision matrix (the risky logic) and ``run_cycle``
 wiring with injected fetch/derive/emit so no Supabase/gh/fastapi is touched.
 """
+try:  # engage the test sandbox before any production import reads env/paths
+    from . import _bootstrap  # noqa: F401
+except ImportError:  # discover loads this module top-level (no package parent)
+    import _bootstrap  # noqa: F401
+
 import os
 import sys
 import unittest
