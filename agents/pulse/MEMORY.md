@@ -394,8 +394,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-02T02:03Z UTC (Iter ~3477, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-02T02:07Z UTC (Iter ~3478, Tier 1, consecutive_clean=1)
 
-**Iter ~3477 summary (2026-07-02T02:02Z):** ⚠️ Signal. 1 new Tier-4 alert: inbox-watcher tier-pool-all-unavailable (01:53Z, self-resolved 02:00Z, DM idx=1092 already delivered). G-rule 1/3. Tier-reset: consecutive_clean 2→0. Mirror pipeline: dashboard-101 in review (02:00Z start); PR #805 2nd review starting ~02:02Z; #808/#809 queued. PR #806 open, no label. 8/8 daemons healthy. pending=1 (PR #805 escalation carry). Tier 1.
+**Iter ~3478 summary (2026-07-02T02:07Z):** ✅ Nominal. 1 doorbell alert Tier-3 silenced. 8/8 daemons healthy. No stalls. Mirror pipeline active: wt-pr-805 (2nd review) + wt-dashboard-101 in progress; #808/#809 queued. PR #806 open, no label (G-rule carry). pending=1 (PR #805, chat_id=None, already escalated idx=1091). consecutive_clean 0→1. Tier 1.
 
 
