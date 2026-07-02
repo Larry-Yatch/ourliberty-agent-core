@@ -56,6 +56,7 @@ ALLOWLIST: dict[str, set[str]] = {
         'ceo_digest_generator.py',  # generate_ceo_voice
         'dashboard_api.py',         # _cleanup_review_verify_uncertain
         'missions_narrator.py',     # generate_briefing_voice (Phase 4 Narrator)
+        'pulse_check_retrospective_author.py',  # _claude_classify (bounded retro author, #784)
     },
     'telegram': {
         'agent_telegram_bot.py',    # telegram_send

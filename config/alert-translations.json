@@ -303,6 +303,13 @@
       "tier": "FYI",
       "plain_language_summary": "The wedged-review-session healer's Case-2 (silent, no-terminal-marker sessions) confidence streak crossed the promotion threshold, so it graduated from alert-only to auto-reap. From now on it will reap genuinely-wedged silent sessions automatically instead of only alerting (wedged-review-silent). By-design milestone confirmation, not a failure — the inverse event (a false positive demoting it back to alert-only) is logged as DEMOTED but not alerted.",
       "recommended_action": "None — by-design confirmation that Case-2 auto-reap is now active after enough consecutive correct alerts. If you'd rather it stay alert-only, lower the confidence or reset the streak per runbooks/heal-wedged-review-sessions.md."
+    },
+    "wedged-review-verdict-undelivered": {
+      "severity": "URGENT",
+      "tier": "NOW",
+      "never_silence": true,
+      "plain_language_summary": "A wedged Mirror review actually finished with a real verdict, but that verdict was NEVER posted to the PR, and the reaper could not auto-deliver it (either it couldn't extract the marker or the delivery write failed). The healer killed the stuck process but PRESERVED the worktree so the verdict is not lost. Net effect: a PR is sitting with a completed-but-unposted review — the chain is stalled on that PR until someone recovers the verdict by hand. The subject carries the worktree name after the colon (wedged-review-verdict-undelivered:<wt-name>).",
+      "recommended_action": "Recover the verdict by hand. Open the preserved worktree and the session log named in the alert body, read off the Mirror verdict (pass / revision / escalate), and re-post the PR review or merge accordingly. The wedged process is already killed and the worktree is intentionally NOT removed — do not delete it until the verdict is recovered. Runbook: runbooks/heal-wedged-review-sessions.md."
     }
   },
   "watchdog": {
@@ -673,6 +680,12 @@
       "never_silence": true,
       "plain_language_summary": "An inbox envelope was dropped to <agent>/.invalid because the layer-2 routing table denied its (source -> target) pair, even though it passed layer-1 source validation. A control surface lost this action silently -- its API call may have returned success while the work was discarded. This is the standing tripwire for the 2026-05-28 dashboard gap (dashboard Approve/Reject envelopes passed source validation but had no FRESH_DISPATCH_ROUTES entry). The subject carries the source->target route after the colon; the body carries the dropped envelope id. No auto-replay -- the envelope is gone, not retried.",
       "recommended_action": "Check whether the source legitimately should reach the target. If yes, add the route to routing_validator.FRESH_DISPATCH_ROUTES (the test_dispatch_route_parity guard exists for exactly this) and re-issue the dropped action manually (its id is in the alert body). If the denial is correct (a genuinely unlisted source), no action -- the alert confirms the gate held. Look in ~/agents/inboxes/<agent>/.invalid/ for the dropped envelope and its .reason sidecar."
+    },
+    "tier-pool-all-unavailable": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "No dispatch tier is currently available, so new work is holding in the inbox instead of starting. Every tier is in cooldown or otherwise blocked (the alert body names the per-tier reason). This usually self-clears the moment any tier frees up — dispatches resume automatically. It only needs attention if it persists, which points at a stuck rotation or every tier hitting quota at once.",
+      "recommended_action": "First confirm it hasn't already cleared (new work resumes on its own when a tier frees). If it's persisting, inspect the live tier state with `cat ~/agents/blackboard/active-tier.json` and read each tier's block reason from the alert body. To force progress, pin a healthy tier via the dashboard rotation control (set rotation mode to off with a pinned tier) — the same override the /rotation endpoint writes. No action if it has already recovered — the alert only fires after the pool has been fully held past the hold-alert threshold."
     }
   },
   "ourliberty-health": {
