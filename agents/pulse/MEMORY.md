@@ -400,8 +400,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-02T02:39Z UTC (Iter ~3482, Tier 2, consecutive_clean=0)
+## Status snapshot — updated 2026-07-02T02:59Z UTC (Iter ~3483, Tier 2, consecutive_clean=1)
 
-**Iter ~3482 summary (2026-07-02T02:39Z):** ✅ Nominal. 0 new alerts. PR #809 REVIEW_PASS + AUTO_MERGE_HELD (blocker=#806) + 2nd Mirror review dispatched. PR #805 2nd review in-flight (~61 min). 8/8 daemons healthy. All checks clean → **Tier 1→2 de-escalation** (consecutive_clean 2→3→reset). pending=1 (PR #805, chat_id=None, escalated idx=1091). Mirror pipeline: wt-805 (2nd review, long-running) + wt-809 (2nd dispatch, new). Tier 2 = 15-min cadence.
+**Iter ~3483 summary (2026-07-02T02:59Z):** ✅ Nominal. 0 new alerts. PR #805 MERGED 02:41:49Z (2nd Mirror REVIEW_PASS + auto-merge). PR #809 2nd Mirror REVIEW_PASS (02:44Z), AUTO_MERGE_HELD blocker=#806 (test file overlap). PR #806 OPEN, no auto-review label, stall cooldown active. All inboxes empty. 8/8 daemons healthy. Tier 2 consecutive_clean 0→1. Next clean iter needed: 2 more for Tier 3 de-escalation.
 
 
