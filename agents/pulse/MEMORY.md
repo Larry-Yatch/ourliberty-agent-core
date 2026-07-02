@@ -412,8 +412,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-02T16:35Z UTC (Iter ~3569, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-02T16:43Z UTC (Iter ~3570, Tier 1, consecutive_clean=0)
 
-**Iter ~3569 summary (2026-07-02T16:35Z):** ⚠️ Standing carry. PR #812 AUTO_MERGE_HELD (deep-review; Mirror REVIEW_PASS at 01:48 MDT 2026-07-01). PR #814 OPEN — G-rule `review-dispatch-post-auto-merge-held-001` fix — 3 REVIEW_PASSes, re-held by #812. **Loop self-limited confirmed**: no 4th Mirror dispatch in 6+ hours after 3rd REVIEW_PASS at 10:12:30 MDT (notifier silent; Mirror inbox empty). Cost burn paused. 0 new alerts. Watermark=1072. Sync=no-change (last_sync=15:34:50Z). All daemons healthy. **Larry: run `/code-review high` + `scripts/merge_reviewed_pr.sh 812` to release PR #812 deep-review hold. #814 auto-merges on blocker clear (deploys the G-rule fix).**
+**Iter ~3570 summary (2026-07-02T16:43Z):** ⚠️ Standing carry. PR #812 AUTO_MERGE_HELD (deep-review; Mirror REVIEW_PASS at 01:48 MDT 2026-07-01). PR #814 OPEN — G-rule `review-dispatch-post-auto-merge-held-001` fix — 3 REVIEW_PASSes, re-held by #812. **Loop self-limited confirmed**: no 4th Mirror dispatch in 6.5h+ after 3rd REVIEW_PASS at 10:12:30 MDT (notifier silent; Mirror inbox empty). Cost burn paused. 0 new alerts. Watermark=1072. Sync fresh (last_sync=16:34:56Z, status=no-change). All daemons healthy. **Larry: run `/code-review high` + `scripts/merge_reviewed_pr.sh 812` to release PR #812 deep-review hold. #814 auto-merges on blocker clear (deploys the G-rule fix).**
 
 
