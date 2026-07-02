@@ -412,8 +412,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-02T16:00Z UTC (Iter ~3564, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-02T16:18Z UTC (Iter ~3566, Tier 1, consecutive_clean=0)
 
-**Iter ~3564 summary (2026-07-02T16:00Z):** ⚠️ Standing carry. PR #812 AUTO_MERGE_HELD (deep-review; Mirror REVIEW_PASS at 01:48 MDT 2026-07-01). PR #814 OPEN/MERGEABLE — G-rule `review-dispatch-post-auto-merge-held-001` fix — Mirror actively reviewing (~31 min in at check time). 0 new alerts. Watermark=1072. Sync=no-change (last_sync=15:34:50Z). All daemons healthy. **Larry: run `/code-review high` + `scripts/merge_reviewed_pr.sh 812` to release PR #812 deep-review hold.**
+**Iter ~3566 summary (2026-07-02T16:18Z):** ⚠️ Standing carry. PR #812 AUTO_MERGE_HELD (deep-review; Mirror REVIEW_PASS at 01:48 MDT 2026-07-01). PR #814 OPEN — G-rule `review-dispatch-post-auto-merge-held-001` fix — completed 3rd REVIEW_PASS at 10:12:30 MDT, re-held by #812 (8th loop occurrence). Mirror inbox empty; 3rd re-dispatch expected at next 5-min sweep. 0 new alerts. Watermark=1072. Sync=no-change (last_sync=15:34:50Z). All daemons healthy. **Larry: run `/code-review high` + `scripts/merge_reviewed_pr.sh 812` to release PR #812 deep-review hold. This ends the loop and deploys the fix.**
 
 
