@@ -412,8 +412,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-02T16:54Z UTC (Iter ~3571, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-02T17:01Z UTC (Iter ~3572, Tier 1, consecutive_clean=0)
 
-**Iter ~3571 summary (2026-07-02T16:54Z):** ✅ G-rule `review-dispatch-post-auto-merge-held-001` COMPLETE — PR #814 MERGED at 16:51:49Z (8b8cfac8). Stall healer's mirror_pass_unmerged recovery triggered auto-merge when cooldown expired. Fix deployed: notifier now suppresses Mirror re-review for HELD_DEEP_REVIEW PRs. Repo fast-forwarded. PR #812 still OPEN AUTO_MERGE_HELD (deep-review; Mirror REVIEW_PASS 01:48 MDT 2026-07-01). 0 new alerts. Watermark=1072. All daemons healthy. **Larry: run `/code-review high` + `scripts/merge_reviewed_pr.sh 812` to release PR #812. With #814's fix live, no re-review loop will fire.**
+**Iter ~3572 summary (2026-07-02T17:01Z):** ✅ G-rule `review-dispatch-post-auto-merge-held-001` COMPLETE + VERIFIED — PR#814 code live in notifier (auto-restarted 16:54:25Z by heal-stale-daemon-code). Pipeline stall confirms no re-review loop: PR#812 still correctly MIRROR_PASS_UNMERGED_SKIP held_deep_review. 1 Tier-3 alert silenced (heal-stale-daemon auto-restart, route=digest). Watermark=1073. All daemons healthy. **Larry: run `/code-review high` + `scripts/merge_reviewed_pr.sh 812` to release PR #812. Fix is live.**
 
 
