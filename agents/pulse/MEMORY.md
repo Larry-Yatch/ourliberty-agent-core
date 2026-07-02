@@ -412,8 +412,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-02T18:31Z UTC (Iter ~3583, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-02T18:38Z UTC (Iter ~3584, Tier 1, consecutive_clean=0)
 
-**Iter ~3583 summary (2026-07-02T18:31Z):** ⚠️ Drift. 1 new Tier-4 alert — ourliberty-health sync-push-fail (outbox-notifier already DM'd Larry at 12:31 MDT; no dup DM). PR#812 AUTO_MERGE_HELD (held_deep_review, Mirror REVIEW_PASS 01:48 MDT 2026-07-01). Pipeline idle. Watermark=1076. All daemons healthy (heal-daemon 18:25:22Z, watchdog 18:31:01Z, outbox-notifier running since 10:54 MDT). **Larry: run `/code-review high` + `scripts/merge_reviewed_pr.sh 812` to release PR #812.** Note: G-rule ourliberty-health-clean-tree-dirty-tier4-001 still vp (dispatched 3/3 at iter ~3012; Tier-3 translation not yet landed in alert-translations.json).
+**Iter ~3584 summary (2026-07-02T18:38Z):** ✅ Nominal. 2 new Tier-3 alerts — both sync-push-fail (ourliberty-health + sync.service), both known-pattern/silenced. PR #812 AUTO_MERGE_HELD (held_deep_review, Mirror REVIEW_PASS 01:48 MDT 2026-07-01). Pipeline idle. Watermark=1078. All daemons healthy (heal-daemon 18:35:22Z, watchdog 18:36:16Z, outbox-notifier PID 3409769 running since 10:54 MDT). **Larry: run `/code-review high` + `scripts/merge_reviewed_pr.sh 812` to release PR #812.** Note: `sync_agent_core: auto-commit push failed` variant of ourliberty-health alerts now Tier-3 (PR #728 translation live); `health: N issue(s) need attention` variant still Tier-4 (G-rule ourliberty-health-clean-tree-dirty-tier4-001 still vp).
 
 
