@@ -406,8 +406,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-02T14:54Z UTC (Iter ~3555, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-02T14:59Z UTC (Iter ~3556, Tier 1, consecutive_clean=0)
 
-**Iter ~3555 summary (2026-07-02T14:54Z):** ⚠️ Standing carry — PR #812 AUTO_MERGE_HELD. APPROVAL_REQUEST `notifier-suppress-review-dispatch-deep-review-held-001` pending (~7h elapsed since 07:59:59Z UTC). 6h reminder sent at 14:03:38Z UTC (reminders_sent=[6]). 12h reminder fires ~19:59:59Z UTC. pending=1 in beacon-pending-approvals.json. Larry needs to `approve` (dashboard or Telegram). After approval: Forge builds PR; then `/code-review high` + `scripts/merge_reviewed_pr.sh 812`. Sync status=no-change (last_sync=14:34:49Z). All daemons healthy (watchdog 14:50:51Z, heal-daemon heartbeat 14:43:19Z). No new alerts (wm=1070≈file_length). Earlier push failures at 09:36Z and 11:37Z UTC resolved. Loop paused. PR #812 mergeable=UNKNOWN (GitHub API transient).
+**Iter ~3556 summary (2026-07-02T14:59Z):** ⚠️ Standing carry — PR #812 AUTO_MERGE_HELD (deep-review stamp absent; Mirror REVIEW_PASS already posted at 01:48 MDT). KEY CHANGE: `notifier-suppress-review-dispatch-deep-review-held-001` APPROVED at 14:51:18Z UTC (via dashboard); Forge preflight PROCEED at 14:57Z; build task `build-notifier-suppress-review-dispatch-deep-review-held-001.json` in Forge inbox. pending=0. No new alerts (wm=1068=file_length). Sync=no-change (last_sync=14:34:49Z). All daemons healthy. **Larry action needed: `/code-review high` + `scripts/merge_reviewed_pr.sh 812` to release PR #812 deep-review hold.**
 
 
