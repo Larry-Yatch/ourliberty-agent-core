@@ -6778,6 +6778,57 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-rebase-pr-687-post-open-mergeable-001",
+      "name": "Rebase PR 687 Post Open Mergeable 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `rebase-pr-687-post-open-mergeable-001`. Last activity 2026-06-25T05:25:45.303586+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "rebase-pr-687-post-open-mergeable-001"
+      ],
+      "repo": null,
+      "created": "2026-07-02",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-02T17:50:02.121339+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-25T05:25:45.303586+00:00"
+    },
+    {
+      "id": "proposed-catalog-drift-sync-cadence-001",
+      "name": "Catalog Drift Sync Cadence 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `catalog-drift-sync-cadence-001`. Last activity 2026-06-22T10:52:13.758734+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "catalog-drift-sync-cadence-001"
+      ],
+      "repo": null,
+      "created": "2026-07-02",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-02T17:50:02.121339+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-22T10:52:13.758734+00:00"
+    },
+    {
+      "id": "proposed-catalog-accuracy-drift-grule-001",
+      "name": "Catalog Accuracy Drift Grule 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `catalog-accuracy-drift-grule-001`. Last activity 2026-06-22T10:35:51.635677+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "catalog-accuracy-drift-grule-001"
+      ],
+      "repo": null,
+      "created": "2026-07-02",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-02T17:50:02.121339+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-22T10:35:51.635677+00:00"
     }
   ]
 }
