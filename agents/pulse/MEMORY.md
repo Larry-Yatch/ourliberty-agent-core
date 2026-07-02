@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-02T23:43Z UTC (Iter ~3623, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-02T23:49Z UTC (Iter ~3624, Tier 1, consecutive_clean=0)
 
-**Iter ~3623 summary (2026-07-02T23:43Z):** 1 new alert (doorbell Tier 3 silenced — but spurious fixture DM reached Larry). PR #812 OPEN AUTO_MERGE_HELD (held_deep_review, MIRROR_PASS_UNMERGED_SKIP confirmed). Pipeline idle ~15h. Watermark=1084. All daemons healthy (heal-daemon 23:40:15Z, watchdog 23:38:20Z UTC, outbox-notifier PID 3409769, beacon bot PID 3154043). Stall ×2 (PRs 812, 814 task branches). forge-notifier-tests-production-state-pollution-001 escalated to 2/3 (fixture entries triggered phantom approval DM to Larry). **Larry: run `scripts/merge_reviewed_pr.sh 812` to release PR #812.**
+**Iter ~3624 summary (2026-07-02T23:49Z):** 0 new alerts. PR #812 OPEN AUTO_MERGE_HELD (held_deep_review, MIRROR_PASS_UNMERGED_SKIP confirmed). Pipeline idle ~15h. Watermark=1084. All daemons healthy (heal-daemon 23:40:15Z, watchdog 23:43:31Z UTC, outbox-notifier PID 3409769, beacon bot PID 3154043). Stall ×2 (PRs 812, 814 task branches). forge-notifier-tests-production-state-pollution-001 at 2/3 (next phantom doorbell to Larry triggers Beacon dispatch). **Larry: run `scripts/merge_reviewed_pr.sh 812` to release PR #812.**
 
 
