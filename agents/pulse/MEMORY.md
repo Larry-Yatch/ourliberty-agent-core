@@ -372,7 +372,7 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 **Rule:** Larry-Yatch merges his own docs/spec/fix PRs before Mirror has reviewed them. Root causes: (1) outbox-notifier defers Mirror dispatch when PR mergeable=UNKNOWN (PR #772 class), (2) PR has NO `auto-review` label at all, never dispatch-eligible (PR #766, #768 class — Option 2/optimistic dispatch would NOT fix these). Three occurrences: PR #766 (no label), PR #768 (no label), PR #772 (UNKNOWN mergeable). Dispatched `direction-ask-unreviewed-merge-larry-prs-3of3-001.json` to Beacon inbox at iter ~3372.
 
-**Beacon recommendation (returned ~2026-06-30T21:00Z):** Phased path — (1) extend `merge_reviewed_pr.sh` to POST mirror-review state=success (pure upside, prevents deadlock when required check exists); (2) default desktop PR-open to `open_pr_for_team.sh` so unlabeled PRs always get `auto-review` label; (3) flip `enforce_admins=true` — operator's call only (adds ~3-5 min Mirror wait on EVERY PR). Awaiting Larry's response on whether to spec + dispatch Steps 1-2 now. Option 2 (optimistic UNKNOWN dispatch) dropped — branch protection makes timing race moot once gate is live. verification_pending (Larry response). **4th occurrence: PR #789 merged without Mirror review (iter ~3436, 2026-07-01T15:45Z). 5th occurrence: PR #797 merged 2026-07-01T20:08:09Z (iter ~3451). 6th occurrence: PR #802 'chore(tier-pool): CUTOVER — retire time-sliced rotation' merged ~2026-07-01T20:15Z (iter ~3452) with reviews=[]. heal-unreviewed-merge-detector DM delivered idx=1073. Steps 1-2 still unimplemented. Larry response still pending.** 7th occurrence: watch next iters.
+**Beacon recommendation (returned ~2026-06-30T21:00Z):** Phased path — (1) extend `merge_reviewed_pr.sh` to POST mirror-review state=success (pure upside, prevents deadlock when required check exists); (2) default desktop PR-open to `open_pr_for_team.sh` so unlabeled PRs always get `auto-review` label; (3) flip `enforce_admins=true` — operator's call only (adds ~3-5 min Mirror wait on EVERY PR). Awaiting Larry's response on whether to spec + dispatch Steps 1-2 now. Option 2 (optimistic UNKNOWN dispatch) dropped — branch protection makes timing race moot once gate is live. verification_pending (Larry response). **4th occurrence: PR #789 merged without Mirror review (iter ~3436, 2026-07-01T15:45Z). 5th occurrence: PR #797 merged 2026-07-01T20:08:09Z (iter ~3451). 6th occurrence: PR #802 merged ~2026-07-01T20:15Z (iter ~3452). Steps 1-2 still unimplemented. Larry response still pending. PR #806 currently open with no auto-review label (watch for merge).** 7th+ watch ongoing.
 
 ---
 
@@ -388,8 +388,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-02T01:08Z UTC (Iter ~3473, Tier 3, fresh)
+## Status snapshot — updated 2026-07-02T01:39Z UTC (Iter ~3474, Tier 1, signal)
 
-**Iter ~3473 summary (2026-07-02T01:08Z):** ✅ Nominal. 0 new alerts. 2 open PRs: #805 (auto-review label, Mirror dispatch pending) and #806 (no auto-review label, unreviewed-merge risk). 0 stalls. pending=0. 8/8 daemons healthy. **Tier 2→3 de-escalation. Tier 3, consecutive_clean=0. 30-min cadence.**
+**Iter ~3474 summary (2026-07-02T01:39Z):** ⚠️ Signal. PR #805 REVIEW_ESCALATE approval_request pending (chat_id=null, DM undelivered) — Pulse escalated idx=1092. Second Mirror review queued. PRs #806/#807/#808/#809 + dashboard-101 open (Mirror pipeline active). pending=1. 8/8 daemons healthy. **Tier 3→1 reset.** G-rule `decision-needed-approval-forge-dispatch-no-target-repo-001` now 8th occurrence (fix dispatched v2 at iter ~3278, verification_pending).
 
 
