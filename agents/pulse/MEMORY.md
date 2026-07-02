@@ -412,8 +412,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-02T15:17Z UTC (Iter ~3558, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-02T15:38Z UTC (Iter ~3561, Tier 1, consecutive_clean=0)
 
-**Iter ~3558 summary (2026-07-02T15:17Z):** ⚠️ Standing carry + NEW finding. PR #812 AUTO_MERGE_HELD (deep-review; Mirror REVIEW_PASS at 01:48 MDT). Forge build active: `build-notifier-suppress-review-dispatch-deep-review-held-001.json` (~20 min). NEW: Forge build tests polluting production state — 2 fixture approvals in beacon-pending-approvals.json (chat_id=12345), fixture tasks appearing in outbox-notifier.log on each 5-min sweep. No new alerts (wm=1068=file_length). Sync=no-change (last_sync=14:34:49Z). All daemons healthy. **Larry: run `/code-review high` + `scripts/merge_reviewed_pr.sh 812` to release PR #812 deep-review hold.**
+**Iter ~3561 summary (2026-07-02T15:38Z):** ⚠️ Standing carry. PR #812 AUTO_MERGE_HELD (deep-review; Mirror REVIEW_PASS at 01:48 MDT). PR #814 OPEN/UNKNOWN — G-rule `review-dispatch-post-auto-merge-held-001` fix — Mirror actively reviewing (~13 min in). 2 new alerts (L1070 heal-pipeline-stall retry-exhausted Tier3; L1071 doorbell fixture-leaks Tier3) — both silenced. Watermark=1071. Sync=no-change (last_sync=15:34:50Z). All daemons healthy. **Larry: run `/code-review high` + `scripts/merge_reviewed_pr.sh 812` to release PR #812 deep-review hold.**
 
 
