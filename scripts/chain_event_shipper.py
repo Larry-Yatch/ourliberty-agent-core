@@ -194,18 +194,26 @@ KNOWN_EVENT_TYPES: frozenset[str] = frozenset({
     # audit (heal_chain_event_type_audit.py).
     'autonomy_decision',
     # approval-sync Phase 3a (approval-sync-phase3-spec.md §3a.1): the two
-    # "needs-you" stragglers that weren't yet projected into chain_events, so
-    # the dashboard can read ONE substrate. `parked_capture` is push-emitted
-    # when a capture enters the parked backlog (agent='dashboard', task_id=
-    # `capture-<id>`, needs_larry=False — calm backlog, lane='parked'), and
-    # cleared when it leaves parked. `sequence_needs_you` is push-emitted by
-    # build_sequence_advancer when a sequence is paused or a step is stuck
-    # (agent='build_sequence_advancer', task_id=`seq-<id>`, lane='steer'),
-    # and cleared when it resumes/clears. Both are event-driven (emitted at the
-    # state transition, not on a poll tick). The shipper never produces these
-    # rows; listing them here admits them to the weekly chain-event-type audit
-    # (heal_chain_event_type_audit.py).
+    # "needs-you" stragglers that were projected into chain_events so the
+    # dashboard could read ONE substrate.
+    #
+    # `parked_capture` — RETIRED 2026-07-01. The dashboard dropped the Parked
+    # lane from the Needs-You surface (ourliberty-dashboard#101; the parked
+    # backlog lives only on the Missions tab), so nothing consumes these rows
+    # and heal_missions_card_gc no longer projects them. RETAINED in this
+    # whitelist deliberately: residual rows already in chain_events (with a ts
+    # inside the audit's 7-day lookback) plus the ones cleared once by
+    # scripts/retire_parked_capture_rows.py must NOT trip the weekly
+    # chain-event-type audit (heal_chain_event_type_audit.py) as an "unknown
+    # type" false alarm. Safe to drop from this set once no parked_capture row's
+    # ts falls within the audit lookback window.
     'parked_capture',
+    # `sequence_needs_you` is push-emitted by build_sequence_advancer when a
+    # sequence is paused or a step is stuck (agent='build_sequence_advancer',
+    # task_id=`seq-<id>`, lane='steer'), and cleared when it resumes/clears.
+    # Event-driven (emitted at the state transition, not on a poll tick). The
+    # shipper never produces these rows; listing the type here admits it to the
+    # weekly chain-event-type audit (heal_chain_event_type_audit.py).
     'sequence_needs_you',
 })
 
