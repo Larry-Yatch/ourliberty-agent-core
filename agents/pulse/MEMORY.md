@@ -400,8 +400,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-02T05:43Z UTC (Iter ~3489, Tier 3, consecutive_clean=4)
+## Status snapshot — updated 2026-07-02T06:19Z UTC (Iter ~3490, Tier 3, consecutive_clean=5)
 
-**Iter ~3489 summary (2026-07-02T05:43Z):** ✅ Nominal. 1 new alert (doorbell Tier-3, MOOT). Larry approved PR #806 Mirror dispatch at 23:35 MDT; Mirror review task now in Mirror inbox (active). PR #809 AUTO_MERGE_HELD blocker=#806, will auto-merge when #806 clears. PR #810 NEW (05:40:59Z, auto-review + deep-review-passed, retire parked_capture projection) — outbox-notifier will dispatch Mirror on next sweep. All other inboxes empty. Watchdog=healthy. Tier 3 consecutive_clean 3→4 (steady-state). 30-min cadence.
+**Iter ~3490 summary (2026-07-02T06:19Z):** ✅ Nominal. 0 new alerts. PRs #806, #809, #811 all merged. Active Mirror reviews: PR #810 (REVIEW_ESCALATE round 1, round 2 in inbox), PR #812 (fix notifier null-chat), dashboard PR #102 (CEO chip). Pending approval for PR #810 has chat_id=None (G-rule vp, review IS dispatched). All checks clean. Watchdog=healthy. Tier 3 consecutive_clean 4→5 (steady-state). 30-min cadence.
 
 
