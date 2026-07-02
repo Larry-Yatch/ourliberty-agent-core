@@ -412,8 +412,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-02T19:07Z UTC (Iter ~3588, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-02T19:17Z UTC (Iter ~3589, Tier 1, consecutive_clean=0)
 
-**Iter ~3588 summary (2026-07-02T19:07Z):** ✅ Nominal. 0 new alerts. PR #812 AUTO_MERGE_HELD (held_deep_review, Mirror REVIEW_PASS 01:48 MDT 2026-07-01). Pipeline idle. Watermark=1078. All daemons healthy (heal-daemon 19:05:49Z, watchdog 19:01:45Z, outbox-notifier PID 3409769 Ss, beacon bot PID 3154043 Ss). **Larry: run `scripts/merge_reviewed_pr.sh 812` to release PR #812** (Mirror already passed — no `/code-review high` re-run needed). Note: PR #812 mergeable=UNKNOWN this iter (transient GH API recompute; was MERGEABLE at iter ~3587).
+**Iter ~3589 summary (2026-07-02T19:17Z):** ✅ Nominal. 0 new alerts. PR #812 AUTO_MERGE_HELD (held_deep_review, mirror-review=SUCCESS). Pipeline idle. Watermark=1078. All daemons healthy (heal-daemon 19:05:49Z, watchdog 19:16:59Z, outbox-notifier PID 3409769 Ss, beacon bot PID 3154043 Ss). **Larry: run `scripts/merge_reviewed_pr.sh 812` to release PR #812.** §4.6 rotation DM sent: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (51 days). DM dedup written to ~/agents/state/pulse-rotation-window-dms.json.
 
 
