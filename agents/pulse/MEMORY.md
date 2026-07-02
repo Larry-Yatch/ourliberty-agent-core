@@ -388,8 +388,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-02T01:39Z UTC (Iter ~3474, Tier 1, signal)
+## Status snapshot — updated 2026-07-02T01:45Z UTC (Iter ~3475, Tier 1, consecutive_clean=1)
 
-**Iter ~3474 summary (2026-07-02T01:39Z):** ⚠️ Signal. PR #805 REVIEW_ESCALATE approval_request pending (chat_id=null, DM undelivered) — Pulse escalated idx=1092. Second Mirror review queued. PRs #806/#807/#808/#809 + dashboard-101 open (Mirror pipeline active). pending=1. 8/8 daemons healthy. **Tier 3→1 reset.** G-rule `decision-needed-approval-forge-dispatch-no-target-repo-001` now 8th occurrence (fix dispatched v2 at iter ~3278, verification_pending).
+**Iter ~3475 summary (2026-07-02T01:45Z):** ✅ Nominal. 0 new alerts. PR #805 approval carry (chat_id=null, escalated idx=1092 at iter ~3474, second Mirror review queued behind #807). PR #806 open with no auto-review label (unreviewed-merge risk, Beacon dispatch awaiting Larry). Mirror pipeline active: PR #807 IN REVIEW (~14 min in), #808/#809/dashboard-101 queued. pending=1 (carry). 8/8 daemons healthy. Tier 1 consecutive_clean=1.
 
 
