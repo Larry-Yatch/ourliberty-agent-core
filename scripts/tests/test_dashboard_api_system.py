@@ -26,6 +26,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_REPO_SCRIPTS) not in sys.path:
@@ -119,10 +120,26 @@ def _write_in_flight(agents_root: Path, *, task_stem: str, agent_id: str,
     p.write_text(json.dumps(entry))
 
 
-def _client(agents_root: Path, cgroup_base: Path, worktrees_root: Path) -> TestClient:
-    da._agents_root = lambda: agents_root  # type: ignore[assignment]
-    da._cgroup_base = lambda: cgroup_base  # type: ignore[assignment]
-    da._worktrees_root = lambda: worktrees_root  # type: ignore[assignment]
+def _client(testcase: unittest.TestCase, agents_root: Path, cgroup_base: Path,
+            worktrees_root: Path) -> TestClient:
+    """Build a TestClient with da's path resolvers pointed at the test's
+    synthetic trees.
+
+    The resolvers are patched via ``mock.patch.object`` and restored via
+    ``testcase.addCleanup`` so the originals are put back at the end of
+    each test. A bare ``da._agents_root = lambda: ...`` with no restore
+    leaks the (soon-deleted) tmpdir into every later-discovered module
+    under ``unittest discover`` (e.g. heal_orphan_autoregister's queue-dir
+    parity check would read the stale path instead of its own env).
+    """
+    for attr, val in (
+        ('_agents_root', agents_root),
+        ('_cgroup_base', cgroup_base),
+        ('_worktrees_root', worktrees_root),
+    ):
+        p = mock.patch.object(da, attr, lambda v=val: v)
+        p.start()
+        testcase.addCleanup(p.stop)
     return TestClient(da.app)
 
 
@@ -136,7 +153,7 @@ class SystemAuthTest(_TokenSetMixin, unittest.TestCase):
         self.agents_root = _build_agents_root(self.tmp / 'agents')
         self.cg = _build_cgroup(self.tmp, pids=[])
         self.wt = _build_worktrees_root(self.tmp, [])
-        self.c = _client(self.agents_root, self.cg, self.wt)
+        self.c = _client(self, self.agents_root, self.cg, self.wt)
 
     def test_active_sessions_requires_token(self):
         r = self.c.get('/api/system/active-sessions')
@@ -169,7 +186,7 @@ class ActiveSessionsTest(_TokenSetMixin, unittest.TestCase):
     def test_empty_slice(self):
         cg = _build_cgroup(self.tmp, pids=[])
         wt = _build_worktrees_root(self.tmp, [])
-        c = _client(self.agents_root, cg, wt)
+        c = _client(self, self.agents_root, cg, wt)
         r = c.get('/api/system/active-sessions', headers=AUTH)
         self.assertEqual(r.status_code, 200)
         body = r.json()
@@ -189,7 +206,7 @@ class ActiveSessionsTest(_TokenSetMixin, unittest.TestCase):
         )
         cg = _build_cgroup(self.tmp, pids=[my_pid])
         wt = _build_worktrees_root(self.tmp, [])
-        c = _client(self.agents_root, cg, wt)
+        c = _client(self, self.agents_root, cg, wt)
         r = c.get('/api/system/active-sessions', headers=AUTH)
         self.assertEqual(r.status_code, 200)
         body = r.json()
@@ -212,7 +229,7 @@ class ActiveSessionsTest(_TokenSetMixin, unittest.TestCase):
         dead_pid = 999999999
         cg = _build_cgroup(self.tmp, pids=[dead_pid])
         wt = _build_worktrees_root(self.tmp, [])
-        c = _client(self.agents_root, cg, wt)
+        c = _client(self, self.agents_root, cg, wt)
         r = c.get('/api/system/active-sessions', headers=AUTH)
         self.assertEqual(r.status_code, 200)
         # PID has no in-flight entry AND cmdline read fails → omitted.
@@ -222,7 +239,7 @@ class ActiveSessionsTest(_TokenSetMixin, unittest.TestCase):
         # Point cgroup_base at a path that doesn't exist.
         missing = self.tmp / 'no-such-cgroup'
         wt = _build_worktrees_root(self.tmp, [])
-        c = _client(self.agents_root, missing, wt)
+        c = _client(self, self.agents_root, missing, wt)
         r = c.get('/api/system/active-sessions', headers=AUTH)
         self.assertEqual(r.status_code, 503)
         detail = r.json()['detail']
@@ -253,7 +270,7 @@ class CgroupStatsTest(_TokenSetMixin, unittest.TestCase):
             cpu_system_usec=891234567,
         )
         wt = _build_worktrees_root(self.tmp, [])
-        c = _client(self.agents_root, cg, wt)
+        c = _client(self, self.agents_root, cg, wt)
         r = c.get('/api/system/cgroup-stats', headers=AUTH)
         self.assertEqual(r.status_code, 200)
         body = r.json()
@@ -270,7 +287,7 @@ class CgroupStatsTest(_TokenSetMixin, unittest.TestCase):
     def test_memory_max_sentinel_surfaces_as_null(self):
         cg = _build_cgroup(self.tmp, pids=[], memory_max='max', memory_high='max')
         wt = _build_worktrees_root(self.tmp, [])
-        c = _client(self.agents_root, cg, wt)
+        c = _client(self, self.agents_root, cg, wt)
         r = c.get('/api/system/cgroup-stats', headers=AUTH)
         self.assertEqual(r.status_code, 200)
         body = r.json()
@@ -280,7 +297,7 @@ class CgroupStatsTest(_TokenSetMixin, unittest.TestCase):
     def test_slice_stopped_returns_503_structured_body(self):
         missing = self.tmp / 'no-such-cgroup'
         wt = _build_worktrees_root(self.tmp, [])
-        c = _client(self.agents_root, missing, wt)
+        c = _client(self, self.agents_root, missing, wt)
         r = c.get('/api/system/cgroup-stats', headers=AUTH)
         self.assertEqual(r.status_code, 503)
         detail = r.json()['detail']
@@ -300,7 +317,7 @@ class WorktreesTest(_TokenSetMixin, unittest.TestCase):
     def test_empty_worktrees_root(self):
         cg = _build_cgroup(self.tmp, pids=[])
         wt = _build_worktrees_root(self.tmp, [])
-        c = _client(self.agents_root, cg, wt)
+        c = _client(self, self.agents_root, cg, wt)
         r = c.get('/api/system/worktrees', headers=AUTH)
         self.assertEqual(r.status_code, 200)
         body = r.json()
@@ -321,7 +338,7 @@ class WorktreesTest(_TokenSetMixin, unittest.TestCase):
             pid=999999,
             started_at='2026-05-26T07:00:00+00:00',
         )
-        c = _client(self.agents_root, cg, wt)
+        c = _client(self, self.agents_root, cg, wt)
         r = c.get('/api/system/worktrees', headers=AUTH)
         self.assertEqual(r.status_code, 200)
         body = r.json()
@@ -340,7 +357,7 @@ class WorktreesTest(_TokenSetMixin, unittest.TestCase):
     def test_worktrees_root_missing_returns_empty_not_500(self):
         cg = _build_cgroup(self.tmp, pids=[])
         missing = self.tmp / 'no-such-worktrees-root'
-        c = _client(self.agents_root, cg, missing)
+        c = _client(self, self.agents_root, cg, missing)
         r = c.get('/api/system/worktrees', headers=AUTH)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['worktrees'], [])
@@ -360,7 +377,7 @@ class UncachedTest(_TokenSetMixin, unittest.TestCase):
     def test_cgroup_stats_re_reads_each_request(self):
         cg = _build_cgroup(self.tmp, pids=[], memory_current=100)
         wt = _build_worktrees_root(self.tmp, [])
-        c = _client(self.agents_root, cg, wt)
+        c = _client(self, self.agents_root, cg, wt)
         r1 = c.get('/api/system/cgroup-stats', headers=AUTH)
         self.assertEqual(r1.json()['memory_current_bytes'], 100)
         # Mutate the file mid-flight; second request must reflect it.
@@ -371,7 +388,7 @@ class UncachedTest(_TokenSetMixin, unittest.TestCase):
     def test_worktrees_re_reads_each_request(self):
         cg = _build_cgroup(self.tmp, pids=[])
         wt = _build_worktrees_root(self.tmp, [])
-        c = _client(self.agents_root, cg, wt)
+        c = _client(self, self.agents_root, cg, wt)
         r1 = c.get('/api/system/worktrees', headers=AUTH)
         self.assertEqual(r1.json()['worktrees'], [])
         (wt / 'wt-forge-new-task-001').mkdir()
