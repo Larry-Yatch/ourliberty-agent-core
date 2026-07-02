@@ -406,8 +406,14 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-02T15:04Z UTC (Iter ~3557, Tier 1, consecutive_clean=0)
+## G-rule forge-notifier-tests-production-state-pollution-001 — 1/3 (new, iter ~3558)
 
-**Iter ~3557 summary (2026-07-02T15:02Z):** ⚠️ Standing carry — PR #812 AUTO_MERGE_HELD (deep-review stamp absent; Mirror REVIEW_PASS already posted at 01:48 MDT). Forge build active: `build-notifier-suppress-review-dispatch-deep-review-held-001.json` in Forge inbox (dispatched 08:57:03 MDT, G-rule fix for review-dispatch-post-auto-merge-held-001). pending=0. No new alerts (wm=1068=file_length). Sync=no-change (last_sync=14:34:49Z). All daemons healthy. **Larry action needed: `/code-review high` + `scripts/merge_reviewed_pr.sh 812` to release PR #812 deep-review hold.**
+**Rule:** Forge build tests for notifier code write fixture data to production state files. beacon-pending-approvals.json received 2 fake pending entries (chat_id=12345, NOT Larry's real ID 7998341473): `mirror-review-pr-ourliberty-agent-core-760` (PR #760 already MERGED 2026-06-30) and `mirror-review-real-rev` (fixture name, refs PR #42). Production outbox-notifier processed fixture tasks (`silent-red`, `owner/repo` PR #7) on 5-min sweep at 09:07 + 09:12 MDT. Root cause: notifier tests use production state file paths instead of isolated temp-dir paths. No immediate pipeline impact (fake entries can't DM Larry; notifier WARNs are clean), but pollutes pending-approvals state. Fix: notifier tests should use isolated state paths. Dispatch to Beacon at 3/3. First occurrence iter ~3558.
+
+---
+
+## Status snapshot — updated 2026-07-02T15:17Z UTC (Iter ~3558, Tier 1, consecutive_clean=0)
+
+**Iter ~3558 summary (2026-07-02T15:17Z):** ⚠️ Standing carry + NEW finding. PR #812 AUTO_MERGE_HELD (deep-review; Mirror REVIEW_PASS at 01:48 MDT). Forge build active: `build-notifier-suppress-review-dispatch-deep-review-held-001.json` (~20 min). NEW: Forge build tests polluting production state — 2 fixture approvals in beacon-pending-approvals.json (chat_id=12345), fixture tasks appearing in outbox-notifier.log on each 5-min sweep. No new alerts (wm=1068=file_length). Sync=no-change (last_sync=14:34:49Z). All daemons healthy. **Larry: run `/code-review high` + `scripts/merge_reviewed_pr.sh 812` to release PR #812 deep-review hold.**
 
 
