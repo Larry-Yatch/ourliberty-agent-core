@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-02T19:34Z UTC (Iter ~3591, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-02T19:39Z UTC (Iter ~3592, Tier 1, consecutive_clean=0)
 
-**Iter ~3591 summary (2026-07-02T19:34Z):** 1 new Tier-4 alert (ourliberty-health sync-freshness push-fail race; bot already DM'd Larry at 13:31 MDT; no second DM). PR #812 AUTO_MERGE_HELD (held_deep_review, mirror-review=SUCCESS). Pipeline idle. Watermark=1080. All daemons healthy (heal-daemon 19:26:15Z, watchdog 19:27:16Z, outbox-notifier PID 3409769 Ss, beacon bot PID 3154043 Ss). **Larry: run `scripts/merge_reviewed_pr.sh 812` to release PR #812.** G-rule `ourliberty-health-clean-tree-dirty-tier4-001` vp carry (sync-freshness Tier-4 recurring; fix not yet live).
+**Iter ~3592 summary (2026-07-02T19:39Z):** 1 new Tier-3 alert (doorbell fixture-leaks, known-pattern silenced). Sync **recovered** (status=no-change; push-fail race cleared). PR #812 AUTO_MERGE_HELD (held_deep_review, mirror-review=SUCCESS). Pipeline idle. Watermark=1081. All daemons healthy (heal-daemon 19:36:19Z, watchdog 19:32:19Z, outbox-notifier PID 3409769 Ss, beacon bot PID 3154043 Ss). **Larry: run `scripts/merge_reviewed_pr.sh 812` to release PR #812.**
 
 
