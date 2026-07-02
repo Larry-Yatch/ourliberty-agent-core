@@ -400,8 +400,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-02T12:17Z UTC (Iter ~3534, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-02T12:29Z UTC (Iter ~3535, Tier 1, consecutive_clean=0)
 
-**Iter ~3534 summary (2026-07-02T12:17Z):** ⚠️ Standing carry — PR #812 AUTO_MERGE_HELD. APPROVAL_REQUEST `notifier-suppress-review-dispatch-deep-review-held-001` delivered to Larry (02:00:24 MDT, ~4h17min elapsed). pending=1 in beacon-pending-approvals.json. Larry needs to `approve` (dashboard or Telegram). After approval: Forge builds PR; then `/code-review high` + `scripts/merge_reviewed_pr.sh 812`. All daemons healthy (watchdog 12:12:16Z, heal-daemon heartbeat 12:12:00Z). No new alerts (wm=1069=file_length). Sync status=error (push race, self-heals; alert already delivered Larry). Loop paused (no Mirror dispatch since APPROVAL_REQUEST queued 07:59:59Z UTC).
+**Iter ~3535 summary (2026-07-02T12:29Z):** ⚠️ Standing carry — PR #812 AUTO_MERGE_HELD. APPROVAL_REQUEST `notifier-suppress-review-dispatch-deep-review-held-001` delivered to Larry (02:00:24 MDT / 08:00:24Z, ~4h29min elapsed). pending=1 in beacon-pending-approvals.json. Larry needs to `approve` (dashboard or Telegram). After approval: Forge builds PR; then `/code-review high` + `scripts/merge_reviewed_pr.sh 812`. PR #813 (test: sweep da._agents_root leakers) auto-merged at 07:36:20Z UTC. All daemons healthy (watchdog 12:22:16Z, heal-daemon heartbeat 12:22:08Z). No new alerts (wm=1069=file_length). Sync status=error (push race, self-heals). Loop paused (no Mirror dispatch since APPROVAL_REQUEST queued 07:59:59Z UTC).
 
 
