@@ -388,8 +388,8 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## Status snapshot — updated 2026-07-01T23:55Z UTC (Iter ~3468, Tier 1, clean)
+## Status snapshot — updated 2026-07-02T00:11Z UTC (Iter ~3470, Tier 2, clean)
 
-**Iter ~3468 summary (2026-07-01T23:55Z):** ✅ Nominal. Dashboard PR #100 (`approval-sync Phase 3b (PR-2): the Needs-You UI in the Approvals tab`) MERGED at 23:53:42Z UTC (Mirror REVIEW_PASS, auto-merged; in-process self-validate resolved per PR #732). 0 open PRs. 0 stalls. pending=0. All daemons healthy. **Tier 1, consecutive_clean=0→1.** Next de-escalation to Tier 2 at consecutive_clean=3.
+**Iter ~3470 summary (2026-07-02T00:11Z):** ✅ Nominal. 0 new alerts. 0 open PRs. 0 stalls. pending=0. All daemons healthy. **Tier 1→2 (de-escalated — 3 consecutive clean iters; consecutive_clean reset to 0). Next de-escalation to Tier 3 at consecutive_clean=3 from Tier 2.**
 
 
