@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-03T06:12Z UTC (Iter ~3659, **Tier 3**, consecutive_clean=2)
+## Status snapshot — updated 2026-07-03T06:43Z UTC (Iter ~3660, **Tier 3**, consecutive_clean=3)
 
-**Iter ~3659 summary (2026-07-03T06:12Z):** 0 new alerts. All checks nominal. Tier 3 (consecutive_clean=2; 1 more clean iter to reset). Beacon APPROVAL_REQUEST `notifier-test-state-isolation-guard-001` still pending Larry's approval. pending-approvals=3 (2 fixture leaks chat_id=12345 + 1 real APPROVAL_REQUEST). 0 open PRs. Daemons healthy (PID 3595521 outbox-notifier, 3154043 beacon-bot). Sync no-change (last_sync=05:37:29Z). Watermark=1100. PRIME ratio: 13.4625 (worsening). Tier 3 (30-min cadence).
+**Iter ~3660 summary (2026-07-03T06:43Z):** 1 new alert (Check I digest L1101, Tier-3 silenced). All checks nominal. Tier 3 (consecutive_clean=3; steady state). Beacon APPROVAL_REQUEST `notifier-test-state-isolation-guard-001` still pending Larry's approval. pending-approvals=3 (2 fixture leaks chat_id=12345 + 1 real APPROVAL_REQUEST). 0 open PRs. Daemons healthy (PID 3595521 outbox-notifier, 3154043 beacon-bot). Sync no-change (last_sync=06:37:37Z). Watermark=1101. PRIME ratio: 13.4125 (worsening trend). Tier 3 (30-min cadence). `notifier-null-chat-escalation-reconcile-001` no longer appearing in pipeline stall (PR #812 fully resolved).
 
 
