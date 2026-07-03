@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-03T02:48Z UTC (Iter ~3647, Tier 1, consecutive_clean=2)
+## Status snapshot — updated 2026-07-03T02:53Z UTC (Iter ~3648, **Tier 2**, consecutive_clean=0)
 
-**Iter ~3647 summary (2026-07-03T02:48Z):** 0 new alerts. All mandatory+additive checks nominal. 0 open PRs. Daemons healthy (outbox-notifier PID 3595521, beacon-bot PID 3154043). Sync status=success (last_sync=02:37:36Z). Watermark=1094. consecutive_clean=2 (1 more clean iter to Tier 2 de-escalation). forge-notifier-tests-production-state-pollution-001 at 2/3 (fixture doorbells currently failing silently — HTTP 400 for chat_id=12345). decision-needed-approval-forge-dispatch-no-target-repo-001: field vp for PR #812. PRIME ratio: ~13.8 (worsening).
+**Iter ~3648 summary (2026-07-03T02:53Z):** 0 new alerts. All mandatory+additive checks nominal. 0 open PRs. Daemons healthy (outbox-notifier PID 3595521, beacon-bot PID 3154043). Sync status=success (last_sync=02:37:36Z). Watermark=1094. **TIER DE-ESCALATION: Tier 1→2 at consecutive_clean=3** (now consecutive_clean=0 at Tier 2, 15-min cadence). forge-notifier-tests-production-state-pollution-001 at 2/3 (fixture doorbells failing silently — HTTP 400 for chat_id=12345). decision-needed-approval-forge-dispatch-no-target-repo-001: field vp for PR #812. PRIME ratio: ~13.75 (worsening).
 
 
