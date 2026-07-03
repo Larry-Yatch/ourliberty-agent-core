@@ -406,9 +406,9 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## G-rule forge-notifier-tests-production-state-pollution-001 — 2/3 (updated iter ~3623)
+## G-rule forge-notifier-tests-production-state-pollution-001 → DISPATCHED ✅ (iter ~3651)
 
-**Rule:** Forge build tests for notifier code write fixture data to production state files. beacon-pending-approvals.json received 2 fake pending entries (chat_id=12345, NOT Larry's real ID 7998341473): `mirror-review-pr-ourliberty-agent-core-760` (PR #760 already MERGED 2026-06-30) and `mirror-review-real-rev` (fixture name, refs PR #42). Production outbox-notifier processed fixture tasks on 5-min sweep at 09:07 + 09:12 MDT. Root cause: notifier tests use production state file paths instead of isolated temp-dir paths. Fix: notifier tests should use isolated state paths. Dispatch to Beacon at 3/3. **2nd occurrence (iter ~3623):** fixture entries triggered a REAL doorbell DM to Larry (chat_id=7998341473) at 23:35:51Z UTC / 17:38:45 MDT — "2 items need your call" about MERGED PR #760 and fixture `real-rev`. Phantom approval DM reached Larry. Entries remain in pending-approvals.json and will keep firing doorbells. First occurrence iter ~3558.
+**Rule:** Forge build tests for notifier code write fixture data to production state files. beacon-pending-approvals.json received 2 fake pending entries (chat_id=12345, NOT Larry's real ID 7998341473): `mirror-review-pr-ourliberty-agent-core-760` (PR #760 already MERGED 2026-06-30) and `mirror-review-real-rev` (fixture name, refs PR #42). 3rd phantom doorbell delivered to Larry (chat_id=7998341473) at 03:40:57Z UTC 2026-07-03 (idx=1095, "2 items need your call"). Dispatched `direction-ask-forge-notifier-tests-state-isolation-3of3-001.json` to Beacon inbox at iter ~3651. Fix: notifier tests must use isolated temp-dir state paths instead of production ~/agents/state/beacon-pending-approvals.json; clear 2 fixture entries after fix merges. Verification pending Forge build + merge. Ask-then-do available: Larry can say "go" to manually clear fixture entries now.
 
 ---
 
@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-03T03:30Z UTC (Iter ~3650, **Tier 2**, consecutive_clean=2)
+## Status snapshot — updated 2026-07-03T03:51Z UTC (Iter ~3651, **Tier 1**, consecutive_clean=0)
 
-**Iter ~3650 summary (2026-07-03T03:30Z):** 0 new alerts. All mandatory+additive checks nominal. 0 open PRs. Daemons healthy (outbox-notifier PID 3595521, beacon-bot PID 3154043). Sync status=success (last_sync=02:37:36Z). Watermark=1094. Tier 2, consecutive_clean=2 (1 more clean iter → Tier 3). forge-notifier-tests-production-state-pollution-001 at 2/3 (fixture doorbells failing silently — HTTP 400 for chat_id=12345). decision-needed-approval-forge-dispatch-no-target-repo-001: field vp for PR #812. PRIME ratio: ~13.69 (worsening).
+**Iter ~3651 summary (2026-07-03T03:51Z):** 2 new alerts (both Tier-3 silenced). Mandatory checks nominal. G-rule forge-notifier-tests-production-state-pollution-001 hit 3/3 — 3rd phantom doorbell (idx=1095) delivered to Larry at 03:40:57Z UTC. Direction-ask dispatched to Beacon. Tier reset 2→1 (additive-check G finding). 0 open PRs. Daemons healthy (PID 3595521 outbox-notifier, 3154043 beacon-bot). Sync no-change (last_sync=03:37:08Z). Watermark=1096. PRIME ratio: ~13.7 (worsening). decision-needed-approval-forge-dispatch-no-target-repo-001: field vp for PR #812.
 
 
