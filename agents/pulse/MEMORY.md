@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-03T19:32Z UTC (Iter ~3688, **Tier 3**, consecutive_clean=3)
+## Status snapshot — updated 2026-07-03T20:07Z UTC (Iter ~3689, **Tier 3**, consecutive_clean=4)
 
-**Iter ~3688 summary (2026-07-03T19:32Z):** 0 new alerts. ✅ NOMINAL: repo clean (HEAD=dbc57a58, on main), watchdog healthy (5-min cadence through 19:28:59Z UTC), all daemons alive (outbox-notifier=3919207 Ss, inbox-watcher=3919058 Ssl, beacon-bot=3918608 Ss — same PIDs post-18:45Z restart), 0 open PRs, 0 stalls. Sync last_sync=18:38:19Z (~54 min old). pending-approvals=4 (2 fixture leaks chat_id=12345 + notifier-test-state-isolation-guard-001 + watchdog-log-growth-idle-alive-gate-001). Check I Friday mode=digest, cooldown-suppressed. Tier 3, consecutive_clean=3 (max tier, stable). PRIME ratio: 12.15 (systemic_fixes=80; trend: worsening).
+**Iter ~3689 summary (2026-07-03T20:07Z):** 0 new alerts. ✅ NOMINAL: repo clean (HEAD=ef316d54, on main), watchdog healthy (5-min cadence through 20:04:30Z UTC), all daemons alive (outbox-notifier=3919207 Ss, inbox-watcher=3919058 Ssl, beacon-bot=3918608 Ss — same PIDs post-18:45Z restart), 0 open PRs, 0 stalls. Sync last_sync=19:38:59Z (~29 min old). pending-approvals=4 (2 fixture leaks chat_id=12345 + notifier-test-state-isolation-guard-001 + watchdog-log-growth-idle-alive-gate-001). Check I Friday mode=digest, cooldown-suppressed. Tier 3, consecutive_clean=4 (max tier, stable). PRIME ratio: 12.0875 (systemic_fixes=80; trend: worsening).
 
 
