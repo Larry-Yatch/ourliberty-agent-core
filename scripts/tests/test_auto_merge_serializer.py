@@ -963,5 +963,54 @@ class ReleaseRegressionGateRunnerTest(unittest.TestCase):
         self.assertEqual(verdict, 'error')
 
 
+class MergeReconcilesNoSessionDecisionTest(SerializerTestBase):
+    """Fix 2 (PR #805 incident): a merged PR resolves any still-pending
+    session-less decision approval to 'expired', wired at the auto-merge
+    chokepoint so every merge path funnels through it."""
+
+    def setUp(self):
+        super().setUp()
+        import beacon_approval_handler as approval
+        self.approval = approval
+        self._orig_pending = approval.PENDING_APPROVALS_PATH
+        approval.PENDING_APPROVALS_PATH = (
+            self._root / 'state' / 'beacon-pending-approvals.json'
+        )
+        self.addCleanup(
+            setattr, approval, 'PENDING_APPROVALS_PATH', self._orig_pending)
+
+    def _seed(self, approval_id):
+        self.approval.add_pending(
+            {'task_id': approval_id, 'summary': 's', 'target_agent': 'forge',
+             'prompt': 'p'},
+            chat_id=12345,
+        )
+
+    def test_merged_pr_expires_pending_decision(self):
+        task_id = 'pr-ourliberty-agent-core-42'
+        self._seed(f'mirror-review-{task_id}-deadbeef')
+        self.gh.open_prs[REPO] = []
+        self.gh.pr_mergeable[(REPO, 42)] = 'MERGEABLE'
+        result = self._attempt(
+            42, task_id=task_id, changed_files=['scripts/foo.py'])
+        self.assertEqual(result['merge_outcome'], 'merged')
+        s = self.approval.load_state()
+        self.assertEqual(s.get('pending', []), [])
+        hist = s.get('history', [])
+        self.assertEqual(len(hist), 1)
+        self.assertEqual(hist[0]['status'], 'expired')
+
+    def test_merge_without_matching_approval_is_noop(self):
+        # An unrelated pending approval must survive an unrelated PR merge.
+        self._seed('mirror-review-pr-ourliberty-agent-core-999-cafe')
+        self.gh.open_prs[REPO] = []
+        self.gh.pr_mergeable[(REPO, 42)] = 'MERGEABLE'
+        result = self._attempt(
+            42, task_id='pr-ourliberty-agent-core-42',
+            changed_files=['scripts/foo.py'])
+        self.assertEqual(result['merge_outcome'], 'merged')
+        self.assertEqual(len(self.approval.load_state().get('pending', [])), 1)
+
+
 if __name__ == '__main__':
     unittest.main()

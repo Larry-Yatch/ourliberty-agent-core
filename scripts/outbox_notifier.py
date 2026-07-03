@@ -5543,8 +5543,14 @@ def _emit_no_session_decision_approval(
         'target_agent': 'forge',
         'prompt': summary,
     }
+    # Null-chat fallback (2026-07-02 PR #805 incident): a session-less
+    # escalation whose envelope carries no valid reply_chat_id was stored with
+    # chat_id=None, so the DM never reached Larry — only the tab fired. Fall
+    # back to the primary chat (mirrors the post-merge-finish-step emit ~L7215).
+    # If _primary_chat_id() is also None (env unset), keep None: durable
+    # tab-only, preserving today's behavior rather than crashing.
     reply_chat = data.get('reply_chat_id')
-    chat_id = reply_chat if isinstance(reply_chat, int) else None
+    chat_id = reply_chat if isinstance(reply_chat, int) else _primary_chat_id()
     try:
         approval.add_pending(payload, chat_id=chat_id)
     except Exception as e:  # noqa: BLE001 — best-effort durable store
@@ -5566,6 +5572,54 @@ def _emit_no_session_decision_approval(
         f'no-session decision-needed → approval_request emitted '
         f'(task={task_id}, approval={approval_task_id})'
     )
+
+
+def _reconcile_no_session_decision_on_merge(task_id: str) -> None:
+    """Resolve any still-pending session-less decision approval for a PR that
+    just merged (2026-07-02 PR #805 incident).
+
+    A session-less Mirror escalation emits a `mirror-review-<task_id>[-<head8>]`
+    decision approval (see `_emit_no_session_decision_approval`). If the PR is
+    later merged by ANY path (a second Mirror PASS auto-merge, or a manual
+    merge), that first approval was never resolved and ghosted on the Approvals
+    tab / doorbell forever. On the auto-merge success path we resolve any
+    matching pending entry to 'expired' — NOT approved/rejected: Larry never
+    acted, the merge made the decision moot.
+
+    Best-effort + idempotent: no matching pending entry ⇒ silent no-op; a second
+    merge event finds nothing. NEVER raises — must not abort the merge path.
+    """
+    if not task_id or task_id == 'unknown':
+        return
+    # Word-boundary match, NOT an unbounded prefix: task_id is PR-number-suffixed
+    # (e.g. pr-ourliberty-agent-core-42), so a bare startswith would let PR #42's
+    # merge expire PR #421's still-pending approval ('421' startswith '42') —
+    # silently erasing a legitimate decision, the exact ghosting this fix
+    # prevents. Approval ids are `mirror-review-{task_id}[-{head8}]`: the head8
+    # form always carries the '-' delimiter, the bare form is an exact match.
+    prefix = f'mirror-review-{task_id}'
+    try:
+        pending = approval.load_state().get('pending', [])
+        stale_ids = [
+            e.get('id') for e in pending
+            if isinstance(e.get('id'), str)
+            and (e['id'] == prefix or e['id'].startswith(prefix + '-'))
+        ]
+        for approval_id in stale_ids:
+            resolved = approval.resolve(
+                approval_id, 'expired', note='PR merged; decision moot',
+            )
+            if resolved is not None:
+                log(
+                    f'no-session decision reconciled on merge → expired '
+                    f'(task={task_id}, approval={approval_id})'
+                )
+    except Exception as e:  # noqa: BLE001 — reconcile must never abort the merge
+        log(
+            f'no-session decision merge-reconcile failed (task={task_id}): '
+            f'{type(e).__name__}: {e}',
+            'WARN',
+        )
 
 
 def _route_no_session_review(
@@ -9228,6 +9282,7 @@ def _attempt_auto_merge_with_gates(
             _teardown_worktrees_for_task(
                 task_id=task_id, repo_coords=repo_coords,
             )
+            _reconcile_no_session_decision_on_merge(task_id)
         return bypass_result
 
     # Fail-closed gate (highest priority — never merge when queue is corrupt).
@@ -9471,6 +9526,10 @@ def _attempt_auto_merge_with_gates(
         # instant the PR merges — the branch is gone and the task is terminal.
         # Best-effort; the hourly GC sweep is the backstop if this misses.
         _teardown_worktrees_for_task(task_id=task_id, repo_coords=repo_coords)
+        # null-chat-escalation-reconcile: if a prior session-less Mirror
+        # escalation left a pending decision approval for this PR, the merge
+        # made it moot — resolve it to 'expired' so it leaves the doorbell.
+        _reconcile_no_session_decision_on_merge(task_id)
 
     # Post-merge release: if this PR merged successfully, re-attempt every
     # queue entry that was blocked behind it.
