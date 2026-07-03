@@ -49,7 +49,13 @@ def atomic_write_bytes(
     same directory, fsyncs it, then ``os.replace``s it onto ``path``. Returns the
     final path. Re-raises on failure after removing the temp file.
     """
+    # test-jail Layer B (state channel): fail LOUD if a test process is about
+    # to write LIVE production state under the real agents tree because its
+    # sandbox root-redirect failed open. Destination-aware, so a correctly
+    # redirected sandbox write (and every production write) passes through.
+    from test_isolation_guard import refuse_live_state_write
     path = Path(path)
+    refuse_live_state_write(path, 'atomic-io-write')
     directory = path.parent
     directory.mkdir(parents=True, exist_ok=True)
     # Unique tmp in the destination dir so os.replace is a same-filesystem rename
