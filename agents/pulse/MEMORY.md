@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-03T22:14Z UTC (Iter ~3693, **Tier 3**, consecutive_clean=8)
+## Status snapshot — updated 2026-07-03T22:47Z UTC (Iter ~3694, **Tier 1**, reset from 3)
 
-**Iter ~3693 summary (2026-07-03T22:14Z):** 3 new alerts (L1102-L1104: sync push-fail ×2 + Check I digest) — all Tier-3 silenced. ✅ NOMINAL: repo clean (HEAD=4a88d097 PR #817 merged 22:01Z, on main), watchdog healthy (5-min cadence through 22:08:16Z UTC), all daemons alive (outbox-notifier=3919207 Ss, inbox-watcher=3919058 Ssl, beacon-bot=3918608 Ss), 0 open PRs, 0 stalls. Sync last_sync=21:39:04Z status=error (push-fail self-heal known-pattern; repo up-to-date confirms recovery). pending-approvals=4 (2 fixture leaks chat_id=12345 + notifier-test-state-isolation-guard-001 + watchdog-log-growth-idle-alive-gate-001). Check I Friday mode=digest, cooldown-suppressed (key=1d373ae896). Tier 3, consecutive_clean=8 (max tier, stable). PRIME ratio: ~11.99 (systemic_fixes=80; trend: worsening).
+**Iter ~3694 summary (2026-07-03T22:47Z):** 0 new alerts. ⚠️ NEW FINDING: zombie bash PID 1834248 (May28, 35+ days) polling for check-viii build that will never arrive — ask-then-do (`kill 1834248` pending Larry ok). Active pipeline: PR #818 + PR #103 rev1 + PR #104 in Mirror review queue. Larry approved watchdog-log-growth-idle-alive-gate-001 → Forge built PR #818. pending-approvals=3 (2 fixtures + notifier-test-state-isolation-guard-001). repo clean (HEAD=225d2b58), sync no-change 22:39Z, all daemons alive, 0 stalls. Tier 3→1 (script resets on --checks-clean false). PRIME ratio: ~11.99 (systemic_fixes=80; trend: worsening).
 
 
