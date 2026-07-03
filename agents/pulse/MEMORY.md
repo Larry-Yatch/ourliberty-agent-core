@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-03T04:13Z UTC (Iter ~3654, **Tier 2**, consecutive_clean=0)
+## Status snapshot — updated 2026-07-03T04:32Z UTC (Iter ~3655, **Tier 2**, consecutive_clean=1)
 
-**Iter ~3654 summary (2026-07-03T04:13Z):** 1 new alert (Tier-3 doorbell silenced). All checks nominal. **Tier de-escalated 1→2** (3 consecutive clean iters). Beacon APPROVAL_REQUEST `notifier-test-state-isolation-guard-001` still pending Larry's approval. pending-approvals=3 (2 fixture leaks chat_id=12345 + 1 real APPROVAL_REQUEST). 0 open PRs. Daemons healthy (PID 3595521 outbox-notifier, 3154043 beacon-bot). Sync no-change (last_sync=03:37:08Z). Watermark=1098. PRIME ratio: 13.65 (worsening). Tier 2 (15-min cadence; 3 clean iters to Tier 3).
+**Iter ~3655 summary (2026-07-03T04:32Z):** 0 new alerts. All checks nominal. Tier 2 (consecutive_clean=1; 2 more clean iters to Tier 3). Beacon APPROVAL_REQUEST `notifier-test-state-isolation-guard-001` still pending Larry's approval. pending-approvals=3 (2 fixture leaks chat_id=12345 + 1 real APPROVAL_REQUEST). 0 open PRs. Daemons healthy (PID 3595521 outbox-notifier, 3154043 beacon-bot). Sync no-change (last_sync=03:37:08Z). Watermark=1098. PRIME ratio: 13.6125 (worsening). Tier 2 (15-min cadence; 2 clean iters to Tier 3).
 
 
