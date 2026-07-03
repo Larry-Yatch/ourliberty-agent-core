@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-03T16:51Z UTC (Iter ~3680, **Tier 1**, consecutive_clean=2)
+## Status snapshot — updated 2026-07-03T16:57Z UTC (Iter ~3681, **Tier 2**, consecutive_clean=0)
 
-**Iter ~3680 summary (2026-07-03T16:51Z):** 0 new alerts (watermark=1086). ✅ NOMINAL: repo clean, watchdog healthy (5-min cadence), all daemons alive (PIDs 3595521/3158031/3154043), PR #815 Mirror review in progress (~18 min at scan). pending-approvals=4 (2 fixture leaks chat_id=12345 + notifier-test-state-isolation-guard-001 + watchdog-log-growth-idle-alive-gate-001). Sync no-change (last_sync=16:38:16Z). PRIME ratio: 12.3875 (interventions=991, trend: worsening). Tier 1 (consecutive_clean=2; 1 more clean iter to Tier 2). Check I Friday mode=digest, cooldown-suppressed. G-rule watchdog-log-growth APPROVAL_REQUEST queued (vp). G-rule forge-notifier-tests DISPATCHED vp.
+**Iter ~3681 summary (2026-07-03T16:57Z):** 0 new alerts (watermark=1086). ✅ NOMINAL: repo clean, watchdog healthy (5-min cadence), all daemons alive (PIDs 3595521/3158031/3154043), PR #815 Mirror review in progress (~30 min at scan). pending-approvals=4 (2 fixture leaks chat_id=12345 + notifier-test-state-isolation-guard-001 + watchdog-log-growth-idle-alive-gate-001). Sync no-change (last_sync=16:38:16Z). PRIME ratio: 12.3875 (interventions=991, trend: worsening). **Tier 1→2 de-escalated** (consecutive_clean hit 3; reset to 0; 15-min cadence now). Check I Friday mode=digest, cooldown-suppressed. G-rule watchdog-log-growth APPROVAL_REQUEST queued (vp). G-rule forge-notifier-tests DISPATCHED vp.
 
 
