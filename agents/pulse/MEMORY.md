@@ -309,9 +309,9 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## G-rule watchdog-log-growth-idle-overnight-001 — 2/3 (updated iter ~3358)
+## G-rule watchdog-log-growth-idle-overnight-001 → DISPATCHED ✅ (iter ~3678)
 
-**Rule:** Watchdog `log_growth` fires when outbox-notifier.log is quiet with no pipeline activity. Root: outbox-notifier IS running but writes nothing when the pipeline is genuinely idle. Prior fixes (PR #649, PR #694, PR #717) addressed stale-log during Mirror reviews; pure pipeline-idle path is not suppressed. Per WARN-vs-INFO calibration this is an idle-state INFO observation — system not worse off. Dispatch to Beacon at 3/3 to add Tier-3 translation or raise watchdog log_growth threshold for extended idle state. Occurrences: iter ~3148 (seconds_since_write=43316, outbox-notifier last wrote 17:01:33 UTC 2026-06-27, 1/3); iter ~3358 (seconds_since_write=13611, idle since 07:50:22 MDT 2026-06-30, watchdog overall=warning, 2/3).
+**Rule:** Watchdog `log_growth` fires when outbox-notifier.log is quiet with no pipeline activity. outbox-notifier IS running (alive Ss) but writes nothing when pipeline is genuinely idle. Watchdog fires `overall=warning` even though no action is needed. Direction-ask `direction-ask-watchdog-log-growth-threshold-001.json` dispatched to Beacon inbox at iter ~3678 (16:35Z 2026-07-03). Proposed fix: process-alive gate — if process alive AND log stale → demote to INFO (WARNING only when process dead). Also check larry-alerts.jsonl integration for Tier-3 translation. Occurrences: iter ~3148 (1/3); iter ~3358 (2/3); iter ~3678 (3/3 → dispatched). verification_pending (Beacon spec + Forge build).
 
 ## Watchdog timer stopped (iter ~3363, 2026-06-30) → MOOT ✅ (iter ~3364)
 
@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-03T15:54Z UTC (Iter ~3677, **Tier 3**, consecutive_clean=20)
+## Status snapshot — updated 2026-07-03T16:35Z UTC (Iter ~3678, **Tier 1**, consecutive_clean=0)
 
-**Iter ~3677 summary (2026-07-03T15:54Z):** 0 new alerts (watermark=file_length=1083). All checks nominal. Tier 3 (consecutive_clean=20; steady state). forge-notifier-tests-production-state-pollution-001 G-rule DISPATCHED ✅ still awaiting Larry approval; 24h reminders for fixture items firing HTTP 400 "chat not found" (chat_id=12345 undeliverable — expected). pending-approvals=3 (2 fixture leaks chat_id=12345 + 1 real APPROVAL_REQUEST notifier-test-state-isolation-guard-001). 0 open PRs. 0 inbox tasks. Daemons healthy (PID 3595521 outbox-notifier, 3158031 inbox-watcher, 3154043 beacon-bot). Sync no-change (last_sync=15:38:16Z). PRIME ratio: 12.475 (improvement vs 12.5375; trend: worsening overall). Tier 3 (30-min cadence). Check I Friday mode=digest, DM cooldown-suppressed (week=2026-06-29 already present).
+**Iter ~3678 summary (2026-07-03T16:35Z):** 2 alerts (L1084 doorbell Tier-3, L1085 Check-I Tier-3; watermark=1085). ⚠️ FINDINGS: (1) Dirty tree — agents/beacon/captures.json modified 16:24Z by Beacon desktop-chat (never-auto, watching); (2) watchdog overall=warning since 09:59 MDT — outbox-notifier.log idle >12h (log_growth G-rule 3/3 → DISPATCHED); (3) PR #815 opened 16:24Z, Mirror dispatched 16:30Z. Tier reset 3→1 on signals. pending-approvals=3 (2 fixture + 1 real APPROVAL_REQUEST notifier-test-state-isolation-guard-001). Daemons healthy (PID 3595521 outbox-notifier, 3158031 inbox-watcher, 3154043 beacon-bot). Sync no-change (last_sync=15:38:16Z). PRIME ratio: 12.4125 (trend: worsening). Tier 1 (5-min cadence). Check I Friday mode=digest, cooldown-suppressed.
 
 
