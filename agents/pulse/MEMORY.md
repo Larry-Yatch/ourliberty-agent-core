@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-03T02:23Z UTC (Iter ~3644, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-03T02:34Z UTC (Iter ~3645, Tier 1, consecutive_clean=0)
 
-**Iter ~3644 summary (2026-07-03T02:23Z):** 0 new alerts. Watermark stable at 1091. PR #812 OPEN AUTO_MERGE_HELD (held_deep_review). Pipeline idle ~19h. All daemons healthy (heal-daemon 02:11:20Z UTC, watchdog 02:18:21Z UTC, outbox-notifier PID 3409769 Ss, beacon bot PID 3154043 Ss). Sync status=no-change, last_sync=01:36:10Z. Check I: Friday firing day, mode=digest, DM-suppressed, auto-dispatch dedup skip, wrote check-i-2026-07-03.json. forge-notifier-tests-production-state-pollution-001 at 2/3. PRIME ratio: ~13.8 (worsening). **Larry: run `scripts/merge_reviewed_pr.sh 812` to release PR #812.**
+**Iter ~3645 summary (2026-07-03T02:34Z):** 1 new alert (line 1092: source=pulse check-i digest → Tier-3 silence, watermark advanced to 1092). PR #812 OPEN MERGEABLE (GH API resolved UNKNOWN transient), still AUTO_MERGE_HELD (held_deep_review). Pipeline idle ~21h. All daemons healthy (heal-daemon 02:21:26Z UTC, watchdog 02:28:49Z UTC, outbox-notifier PID 3409769 Ss, beacon bot PID 3154043 Ss). Sync status=no-change, last_sync=01:36:10Z. Check I: Friday firing day, mode=digest, DM-suppressed, auto-dispatch dedup skip, wrote check-i-2026-07-03.json. Larry queried Telegram at 02:27-02:28Z UTC ('status', 'where is 812?') — Beacon handled both. forge-notifier-tests-production-state-pollution-001 at 2/3. PRIME ratio: ~13.8 (worsening). **Larry: run `scripts/merge_reviewed_pr.sh 812` to release PR #812.**
 
 
