@@ -483,6 +483,17 @@ class CheckLogGrowthTest(_IsolatedRootsTest):
         stale = _time.time() - 600  # age > 5 min, well under 12h
         _os.utime(f, (stale, stale))
 
+    def _very_stale_log(self):
+        # Age well past the retired 12h backstop (43200s) — mtime = now-50000.
+        log_dir = self._tmp_path / 'logs'
+        log_dir.mkdir(parents=True, exist_ok=True)
+        f = log_dir / 'inbox_watcher.log'
+        f.write_text('old\n')
+        import os as _os
+        import time as _time
+        stale = _time.time() - 50000  # ~13.9h > 12h
+        _os.utime(f, (stale, stale))
+
     def _inbox_task(self, agent: str, task_id: str):
         inbox = self._tmp_path / 'inboxes' / agent
         inbox.mkdir(parents=True, exist_ok=True)
@@ -632,6 +643,33 @@ class CheckLogGrowthTest(_IsolatedRootsTest):
         self._dispatch_lease('mirror', pid=999999)
         with mock.patch.object(watchdog, 'is_service_alive', return_value=True), \
                 mock.patch.object(watchdog, '_pid_alive', return_value=False):
+            result = watchdog.check_log_growth()
+        self.assertEqual(result['status'], 'warning')
+        self.assertEqual(result['queued_inboxes'], 1)
+
+    # ---- process-alive gate past the retired 12h backstop ----
+
+    def test_idle_over_12h_alive_watcher_is_ok(self):
+        # G-rule regression guard (watchdog-log-growth-idle-overnight-001):
+        # a >12h-stale log with a live watcher and empty inboxes is expected
+        # overnight idle, not a stall -> ok, and must NOT flip to warning.
+        self._very_stale_log()
+        # An inboxes root that exists but is empty -> live_files == 0.
+        (self._tmp_path / 'inboxes' / 'forge').mkdir(parents=True, exist_ok=True)
+        with mock.patch.object(watchdog, 'is_service_alive', return_value=True), \
+                mock.patch.object(watchdog, 'log') as logged:
+            result = watchdog.check_log_growth()
+        self.assertEqual(result['status'], 'ok')
+        self.assertIn('idle', result['reason'])
+        for call in logged.call_args_list:
+            self.assertNotIn('Watcher log stale', call.args[0])
+
+    def test_queued_work_over_12h_alive_watcher_still_warns(self):
+        # Guardrail: the stall path must NOT be blinded past 12h. A >12h-stale
+        # log with a genuinely-queued (non-in-flight) task still warns.
+        self._very_stale_log()
+        self._inbox_task('forge', 'task-queued-over-12h')
+        with mock.patch.object(watchdog, 'is_service_alive', return_value=True):
             result = watchdog.check_log_growth()
         self.assertEqual(result['status'], 'warning')
         self.assertEqual(result['queued_inboxes'], 1)

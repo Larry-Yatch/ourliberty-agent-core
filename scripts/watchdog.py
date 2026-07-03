@@ -711,9 +711,12 @@ def check_memory() -> dict:
 
 
 def check_log_growth() -> dict:
-    """inbox_watcher.log freshness. Idle-aware: under 5 min always ok;
-    over 5 min only flag if work is queued AND watcher service is down,
-    or if log is stale > 12h regardless of inboxes.
+    """inbox_watcher.log freshness. Idle-aware, process-alive gated: under
+    5 min always ok. Over 5 min, a dead watcher is critical; otherwise a live
+    in-flight session or held dispatch lease is ok. Past those, the only
+    distinction is queued work: empty inboxes with a live watcher are ok at
+    any age (a quiet log from a living, idle process is expected, not a
+    stall), while queued work with a stale log is a warning at any age.
     """
     log_file = LOG_DIR / 'inbox_watcher.log'
     if not log_file.exists():
@@ -781,7 +784,7 @@ def check_log_growth() -> dict:
     except OSError:
         live_files = -1
 
-    if live_files == 0 and age <= 43200:
+    if live_files == 0:
         reason = (
             'work in progress (active build, watcher healthy)'
             if any_inflight
@@ -791,12 +794,6 @@ def check_log_growth() -> dict:
             'status': 'ok',
             'seconds_since_write': int(age),
             'reason': reason,
-        }
-    if age > 43200:
-        return {
-            'status': 'warning',
-            'seconds_since_write': int(age),
-            'reason': 'idle >12h',
         }
     log(
         f'Watcher log stale {int(age)}s with {live_files} non-empty inbox(es)',
