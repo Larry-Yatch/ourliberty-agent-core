@@ -38,6 +38,7 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 import file_lock  # noqa: E402
+from test_isolation_guard import refuse_live_state_write  # noqa: E402
 
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT') or Path.home() / 'agents')
 
@@ -758,6 +759,7 @@ def _clear_cooldown_locked(tier):
 
 def _write(state):
     path = _state_path()
+    refuse_live_state_write(path, 'active-tier-write')
     path.parent.mkdir(parents=True, exist_ok=True)
     # Per-writer-unique temp (pid+thread) so a locked writer and an unlocked-
     # degrade writer never share a temp path -> no torn file (see
@@ -803,6 +805,7 @@ def _atomic_write_json(path, obj, indent=None):
     torn/garbled file after replace. Worst case is a benign last-writer-wins on
     the final replace, never corruption."""
     path = Path(path)
+    refuse_live_state_write(path, 'tier-state-write')
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(f'{path.name}.{os.getpid()}.{threading.get_native_id()}.tmp')
     tmp.write_text(json.dumps(obj, indent=indent))
@@ -1032,8 +1035,9 @@ def append_cost_row(account, *, model='', cost_usd=None, usage=None,
         'duration_sec': duration_sec,
         'source': source,
     }
+    path = _costs_path()
+    refuse_live_state_write(path, 'tier-costs-write')
     try:
-        path = _costs_path()
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, 'a') as f:
             f.write(json.dumps(row) + '\n')

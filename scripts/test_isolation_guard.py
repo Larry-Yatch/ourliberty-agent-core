@@ -39,6 +39,7 @@ test stays DENY.
 import contextlib
 import os
 import subprocess
+from pathlib import Path
 
 _SENTINEL_VAR = 'OURLIBERTY_TEST_RUN_SENTINEL'
 
@@ -60,6 +61,65 @@ def refuse_under_test(channel: str) -> None:
             f'this call in the test, or wrap a legitimate real call in '
             f'test_isolation_guard.allow().'
         )
+
+
+def _real_agents_roots():
+    """The REAL production agents tree(s) a test must never write: the
+    HOME-derived default (``~/agents``) and the hardcoded ``/home/larry/agents``
+    that several modules embed literally. Resolved so a symlinked/relative
+    path can't slip a live target past the check."""
+    roots = []
+    try:
+        roots.append((Path.home() / 'agents').resolve())
+    except (OSError, RuntimeError):
+        pass
+    try:
+        roots.append(Path('/home/larry/agents').resolve())
+    except (OSError, RuntimeError):
+        pass
+    out = []
+    for r in roots:
+        if r not in out:
+            out.append(r)
+    return out
+
+
+def refuse_live_state_write(path, channel: str) -> None:
+    """Destination-AWARE state-write guard (test-jail Layer B, state channel).
+
+    Under a test process (run sentinel set), RAISE ``TestIsolationBreach`` iff
+    ``path`` resolves UNDER the real agents tree — i.e. the sandbox root
+    redirect failed OPEN and a test is about to write LIVE production state
+    (the 2026-07-02 active-tier.json tier-bench outage class). Unlike
+    ``refuse_under_test`` (destination-BLIND — for network/spawn/paging sinks
+    that must be mocked), this ALLOWS a write to a correctly-redirected sandbox
+    tmpdir, so the many tests that legitimately drive tier-state transitions
+    against ``OURLIBERTY_AGENTS_ROOT=<tmpdir>`` keep passing with no ``allow()``
+    wrapper. Pure pass-through in production: the sentinel is never set there.
+
+    The guard runs BEFORE any mkdir/write in each caller, so a refused write
+    never creates a directory or file in the live tree."""
+    if not os.environ.get(_SENTINEL_VAR):
+        return
+    try:
+        target = Path(path).resolve()
+    except (OSError, ValueError, RuntimeError):
+        return
+    # Invariant: the test sandbox root (bootstrap/gate ``mkdtemp``) lives under
+    # /tmp, NEVER beneath a real agents tree. If a future harness ever pins
+    # TMPDIR under ~/agents, a legitimate sandbox write would be misclassified
+    # as live and refused — treat that as a harness misconfiguration, not a
+    # reason to relax this check.
+    for root in _real_agents_roots():
+        if target == root or root in target.parents:
+            raise TestIsolationBreach(
+                f'{channel}: a test process is about to write LIVE production '
+                f'state at {target} (under real agents root {root}) — the '
+                f'sandbox root redirect failed OPEN. This is the tier-bench '
+                f'leak class. Ensure OURLIBERTY_AGENTS_ROOT points at a tmpdir '
+                f'in this test, or wrap a deliberate real-tree write in '
+                f'test_isolation_guard.allow({channel!r}).'
+            )
 
 
 @contextlib.contextmanager

@@ -115,7 +115,9 @@ def _validate(data: Any) -> Optional[dict[str, Any]]:
 
 def _atomic_write(state: dict[str, Any]) -> None:
     """Atomic tmp + replace. Never partial; never overwrites with garbage."""
+    from test_isolation_guard import refuse_live_state_write  # sibling; test-jail guard
     path = _state_path()
+    refuse_live_state_write(path, 'cycle-tier-state-write')
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + '.tmp')
     tmp.write_text(json.dumps(state, indent=2))
