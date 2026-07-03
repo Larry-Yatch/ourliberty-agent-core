@@ -129,6 +129,28 @@ class CycleTierStateWriteGuardTest(unittest.TestCase):
         cycle_tier_state._atomic_write({'tier': 2})  # must NOT raise
         self.assertTrue((sandbox / 'state' / 'cycle-tier.json').exists())
 
+    def test_log_refuses_live(self):
+        tmp = Path(self.enterContext(_tmp()))
+        fake_real = tmp / 'agents'
+        _patch(self, tig, '_real_agents_roots', lambda: [fake_real.resolve()])
+        _patch_env(self, 'OURLIBERTY_AGENTS_ROOT', str(fake_real))
+        with self.assertRaises(TestIsolationBreach):
+            cycle_tier_state._log('corruption', 'WARN')
+        self.assertFalse((fake_real / 'logs' / 'cycle-tier-state.log').exists())
+
+    def test_read_tier_state_corrupt_refuses_live(self):
+        # Reviewer-found gap: a corrupt LIVE state file makes read_tier_state
+        # call _log (live log write) BEFORE the guarded _atomic_write.
+        tmp = Path(self.enterContext(_tmp()))
+        fake_real = tmp / 'agents'
+        _patch(self, tig, '_real_agents_roots', lambda: [fake_real.resolve()])
+        _patch_env(self, 'OURLIBERTY_AGENTS_ROOT', str(fake_real))
+        sp = fake_real / 'state' / 'cycle-tier.json'
+        sp.parent.mkdir(parents=True, exist_ok=True)
+        sp.write_text('{ not valid json')
+        with self.assertRaises(TestIsolationBreach):
+            cycle_tier_state.read_tier_state()
+
 
 # ---- tiny helpers (stdlib only; no external deps) --------------------------
 
