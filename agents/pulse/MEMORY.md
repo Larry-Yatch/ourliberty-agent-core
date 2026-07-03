@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-03T02:43Z UTC (Iter ~3646, Tier 1, consecutive_clean=1)
+## Status snapshot — updated 2026-07-03T02:48Z UTC (Iter ~3647, Tier 1, consecutive_clean=2)
 
-**Iter ~3646 summary (2026-07-03T02:39-02:43Z):** PR #812 MERGED 02:37:00Z UTC (fix(notifier): primary-chat fallback + merge reconciliation for null-chat session-less escalations). Yellow carry resolved. 2 new alerts (lines 1093-1094: sync push fail ×2 → Tier-3 silence). 0 open PRs. All checks clean. Outbox-notifier restarted to new PID 3595521 (PR #812 code pickup via stale-daemon healer). Sync status=error (push failed non-FF; self-heals). Watermark=1094. consecutive_clean=1 (need 2 more for Tier 2 de-escalation). forge-notifier-tests-production-state-pollution-001 at 2/3. decision-needed-approval-forge-dispatch-no-target-repo-001: PR #812 shipped, field vp. PRIME ratio: ~13.8 (worsening).
+**Iter ~3647 summary (2026-07-03T02:48Z):** 0 new alerts. All mandatory+additive checks nominal. 0 open PRs. Daemons healthy (outbox-notifier PID 3595521, beacon-bot PID 3154043). Sync status=success (last_sync=02:37:36Z). Watermark=1094. consecutive_clean=2 (1 more clean iter to Tier 2 de-escalation). forge-notifier-tests-production-state-pollution-001 at 2/3 (fixture doorbells currently failing silently — HTTP 400 for chat_id=12345). decision-needed-approval-forge-dispatch-no-target-repo-001: field vp for PR #812. PRIME ratio: ~13.8 (worsening).
 
 
