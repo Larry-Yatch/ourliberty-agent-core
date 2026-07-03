@@ -406,9 +406,9 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## G-rule forge-notifier-tests-production-state-pollution-001 → DISPATCHED ✅ (iter ~3651)
+## G-rule forge-notifier-tests-production-state-pollution-001 → REJECTED (iter ~3697)
 
-**Rule:** Forge build tests for notifier code write fixture data to production state files. beacon-pending-approvals.json received 2 fake pending entries (chat_id=12345, NOT Larry's real ID 7998341473): `mirror-review-pr-ourliberty-agent-core-760` (PR #760 already MERGED 2026-06-30) and `mirror-review-real-rev` (fixture name, refs PR #42). 3rd phantom doorbell delivered to Larry (chat_id=7998341473) at 03:40:57Z UTC 2026-07-03 (idx=1095, "2 items need your call"). Dispatched `direction-ask-forge-notifier-tests-state-isolation-3of3-001.json` to Beacon inbox at iter ~3651. Fix: notifier tests must use isolated temp-dir state paths instead of production ~/agents/state/beacon-pending-approvals.json; clear 2 fixture entries after fix merges. Verification pending Forge build + merge. Ask-then-do available: Larry can say "go" to manually clear fixture entries now.
+**Rule:** Forge build tests for notifier code write fixture data to production state files. beacon-pending-approvals.json received 2 fake pending entries (chat_id=12345, NOT Larry's real ID 7998341473): `mirror-review-pr-ourliberty-agent-core-760` (PR #760 already MERGED 2026-06-30) and `mirror-review-real-rev` (fixture name, refs PR #42). 3rd phantom doorbell delivered to Larry (chat_id=7998341473) at 03:40:57Z UTC 2026-07-03 (idx=1095, "2 items need your call"). Dispatched `direction-ask-forge-notifier-tests-state-isolation-3of3-001.json` to Beacon inbox at iter ~3651. APPROVAL_REQUEST `notifier-test-state-isolation-guard-001` was REJECTED by Larry at iter ~3697. 2 fixture entries (chat_id=12345, undeliverable) remain in pending-approvals — benign. Standing-by for Larry direction before re-dispatching.
 
 ---
 
@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-03T23:04Z UTC (Iter ~3696, **Tier 1**)
+## Status snapshot — updated 2026-07-03T23:09Z UTC (Iter ~3697, **Tier 1**)
 
-**Iter ~3696 summary (2026-07-03T23:04Z):** 0 new alerts. ⚠️ STANDING: zombie bash PID 1834248 (36d+) still alive, kill pending Larry ok. Dashboard PRs #103 + #104 MERGED ✅. New dashboard PR #105 opened 22:59:20Z (auto-review label, awaiting notifier pick-up). Agent-core 0 open PRs. pending-approvals=3 (2 fixtures + notifier-test-state-isolation-guard-001). repo clean (HEAD=eec64065), sync no-change 22:39Z, all daemons alive, 0 stalls. Tier 1 (consecutive_clean=0). PRIME ratio: 12.0125 (systemic_fixes=80; trend: worsening).
+**Iter ~3697 summary (2026-07-03T23:09Z):** Watermark rotation-gap auto-repaired (1104→1103). 0 new alerts. ⚠️ STANDING: zombie bash PID 1834248 (36d+) still alive, kill pending Larry ok. Dashboard PR #105 AUTO_MERGED 23:09:12Z UTC ✅. Agent-core 0 open PRs. pending-approvals=2 (2 fixture leaks chat_id=12345 only; notifier-test-state-isolation-guard-001 REJECTED by Larry). repo clean (HEAD=9bd88b43), sync no-change 22:39Z, all daemons alive, 0 stalls. Tier 1 (consecutive_clean=0). PRIME ratio: 12.0375 (systemic_fixes=80; trend: worsening).
 
 
