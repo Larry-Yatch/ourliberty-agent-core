@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-03T22:58Z UTC (Iter ~3695, **Tier 1**)
+## Status snapshot — updated 2026-07-03T23:04Z UTC (Iter ~3696, **Tier 1**)
 
-**Iter ~3695 summary (2026-07-03T22:58Z):** 0 new alerts. ⚠️ STANDING: zombie bash PID 1834248 (36+ days) still alive, kill pending Larry ok. PR #818 MERGED ✅ (watchdog-log-growth-idle-overnight-001 COMPLETE). Dashboard PR #103 also MERGED ✅. Dashboard PR #104 in Mirror review. pending-approvals=3 (2 fixtures + notifier-test-state-isolation-guard-001). repo clean (HEAD=10f1a377), sync no-change 22:39Z, all daemons alive, 0 stalls. Tier 1 (consecutive_clean=0). PRIME ratio: 12.0 (systemic_fixes=80; trend: worsening).
+**Iter ~3696 summary (2026-07-03T23:04Z):** 0 new alerts. ⚠️ STANDING: zombie bash PID 1834248 (36d+) still alive, kill pending Larry ok. Dashboard PRs #103 + #104 MERGED ✅. New dashboard PR #105 opened 22:59:20Z (auto-review label, awaiting notifier pick-up). Agent-core 0 open PRs. pending-approvals=3 (2 fixtures + notifier-test-state-isolation-guard-001). repo clean (HEAD=eec64065), sync no-change 22:39Z, all daemons alive, 0 stalls. Tier 1 (consecutive_clean=0). PRIME ratio: 12.0125 (systemic_fixes=80; trend: worsening).
 
 
