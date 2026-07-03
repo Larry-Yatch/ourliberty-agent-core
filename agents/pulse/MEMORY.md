@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-03T12:43Z UTC (Iter ~3671, **Tier 3**, consecutive_clean=14)
+## Status snapshot — updated 2026-07-03T13:12Z UTC (Iter ~3672, **Tier 3**, consecutive_clean=15)
 
-**Iter ~3671 summary (2026-07-03T12:43Z):** 2 new alerts (L1080 doorbell Tier-3 silenced, L1081 Check I digest Tier-3 silenced). Watermark=1081. All checks nominal. Tier 3 (consecutive_clean=14; steady state). forge-notifier-tests-production-state-pollution-001 G-rule DISPATCHED ✅ still awaiting Larry approval; phantom doorbells ongoing (2 delivered today: 08:08:18Z + 12:10:25Z UTC, each showing 3 items). pending-approvals=3 (2 fixture leaks chat_id=12345 + 1 real APPROVAL_REQUEST notifier-test-state-isolation-guard-001). 0 open PRs. Daemons healthy (PID 3595521 outbox-notifier, 3158031 inbox-watcher, 3154043 beacon-bot). Sync no-change (last_sync=12:37:57Z). PRIME ratio: 12.8125 (slight improvement; worsening trend overall). Tier 3 (30-min cadence). Check I Friday mode=digest, DM cooldown-suppressed. Week-of-2026-06-29 ledger: $1,184.79 (+37.9%), 285 σ-anomalies, 1% retry overhead, 1 small proposal.
+**Iter ~3672 summary (2026-07-03T13:12Z):** 0 new alerts. Watermark=1081. All checks nominal. Tier 3 (consecutive_clean=15; steady state). forge-notifier-tests-production-state-pollution-001 G-rule DISPATCHED ✅ still awaiting Larry approval; phantom doorbells continuing (next 6h reminder ~15:59Z UTC). pending-approvals=3 (2 fixture leaks chat_id=12345 + 1 real APPROVAL_REQUEST notifier-test-state-isolation-guard-001). 0 open PRs. Daemons healthy (PID 3595521 outbox-notifier, 3158031 inbox-watcher, 3154043 beacon-bot). Sync no-change (last_sync=12:37:57Z). PRIME ratio: 12.75 (slight improvement; worsening trend overall). Tier 3 (30-min cadence). Check I Friday mode=digest, DM cooldown-suppressed. /loop /cycle active (self-pacing dynamic mode).
 
 
