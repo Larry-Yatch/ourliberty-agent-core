@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-03T02:34Z UTC (Iter ~3645, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-03T02:43Z UTC (Iter ~3646, Tier 1, consecutive_clean=1)
 
-**Iter ~3645 summary (2026-07-03T02:34Z):** 1 new alert (line 1092: source=pulse check-i digest → Tier-3 silence, watermark advanced to 1092). PR #812 OPEN MERGEABLE (GH API resolved UNKNOWN transient), still AUTO_MERGE_HELD (held_deep_review). Pipeline idle ~21h. All daemons healthy (heal-daemon 02:21:26Z UTC, watchdog 02:28:49Z UTC, outbox-notifier PID 3409769 Ss, beacon bot PID 3154043 Ss). Sync status=no-change, last_sync=01:36:10Z. Check I: Friday firing day, mode=digest, DM-suppressed, auto-dispatch dedup skip, wrote check-i-2026-07-03.json. Larry queried Telegram at 02:27-02:28Z UTC ('status', 'where is 812?') — Beacon handled both. forge-notifier-tests-production-state-pollution-001 at 2/3. PRIME ratio: ~13.8 (worsening). **Larry: run `scripts/merge_reviewed_pr.sh 812` to release PR #812.**
+**Iter ~3646 summary (2026-07-03T02:39-02:43Z):** PR #812 MERGED 02:37:00Z UTC (fix(notifier): primary-chat fallback + merge reconciliation for null-chat session-less escalations). Yellow carry resolved. 2 new alerts (lines 1093-1094: sync push fail ×2 → Tier-3 silence). 0 open PRs. All checks clean. Outbox-notifier restarted to new PID 3595521 (PR #812 code pickup via stale-daemon healer). Sync status=error (push failed non-FF; self-heals). Watermark=1094. consecutive_clean=1 (need 2 more for Tier 2 de-escalation). forge-notifier-tests-production-state-pollution-001 at 2/3. decision-needed-approval-forge-dispatch-no-target-repo-001: PR #812 shipped, field vp. PRIME ratio: ~13.8 (worsening).
 
 
