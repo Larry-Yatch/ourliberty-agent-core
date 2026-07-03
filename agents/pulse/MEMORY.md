@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-03T17:14Z UTC (Iter ~3683, **Tier 2**, consecutive_clean=1)
+## Status snapshot — updated 2026-07-03T17:28Z UTC (Iter ~3684, **Tier 2**, consecutive_clean=2)
 
-**Iter ~3683 summary (2026-07-03T17:14Z):** 1 new alert (L1087 doorbell Tier-3). ✅ NOMINAL: repo clean, watchdog healthy (5-min cadence through 17:10Z UTC), all daemons alive (PIDs 3595521/3158031/3154043), PR #815 MERGED ✅ 17:01:53Z UTC (fix(test-jail) test-jail destination-aware guard). pending-approvals=4 (2 fixture leaks chat_id=12345 + notifier-test-state-isolation-guard-001 + watchdog-log-growth-idle-alive-gate-001). Sync no-change (last_sync=16:38:16Z). PRIME ratio: 12.3625 (systemic_fixes=80; trend: worsening). Tier 2, consecutive_clean=1 (2 more clean iters to Tier 3). Check I Friday mode=digest, cooldown-suppressed.
+**Iter ~3684 summary (2026-07-03T17:28Z):** 8 new alerts (L1088–L1095) all Tier-3 heal-stale-daemon-code bulk fleet restart (PR #815 `active_tier.py` mtime change triggered restart of all 8 services at 17:14Z). ✅ NOMINAL: repo clean, watchdog healthy (5-min cadence through 17:25Z UTC), all daemons alive with new PIDs (outbox-notifier=3872399, inbox-watcher=3872247, beacon-bot=3871621), 0 open PRs. pending-approvals=4 (2 fixture leaks chat_id=12345 + notifier-test-state-isolation-guard-001 + watchdog-log-growth-idle-alive-gate-001). Sync no-change (last_sync=16:38:16Z ~50 min old). PRIME ratio: 12.325 (systemic_fixes=80; trend: worsening). Tier 2, consecutive_clean=2 (1 more clean iter to Tier 3). Check I Friday mode=digest, cooldown-suppressed.
 
 
