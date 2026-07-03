@@ -4320,7 +4320,10 @@
         "at": "2026-06-19T20:00:47.362051+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-03T00:08:38.654811+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "the-empty-state-hint-and-unchanged-populated-view-still-need-to-be-confirmed-live-on-the-board-since-the-done-gate-is-browser-checkable-only",
@@ -4347,7 +4350,10 @@
         "at": "2026-06-19T20:00:47.362051+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-03T00:08:38.654811+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "this-phase-was-the-first-live-trial-of-the-build-completion-closeout-so-confirm-live-that-the-building-to-done-flip-the-card-closeout-the-completion-message-and-any-suggested-follow-ups-all-actually-fired",
@@ -4374,7 +4380,10 @@
         "at": "2026-06-19T20:00:47.362051+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-03T00:08:38.654811+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "the-full-browser-done-gate-live-status-rollup-stuck-badge-click-through-graceful-degrade-no-new-ping-and-the-p4-enriched-completion-dm-still-needs-to-be-confirmed-live-on-the-board-since-it-couldn-t-run-from-the-build-sandbox",
@@ -4401,7 +4410,10 @@
         "at": "2026-06-19T23:43:20.212106+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-03T00:08:38.654811+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "system-self-awareness-the-standing-brain",
