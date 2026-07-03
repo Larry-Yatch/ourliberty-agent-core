@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-03T00:27Z UTC (Iter ~3629, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-03T00:34Z UTC (Iter ~3630, Tier 1, consecutive_clean=0)
 
-**Iter ~3629 summary (2026-07-03T00:27Z):** 0 new alerts. All mandatory checks nominal. Check I re-invoked (still Friday UTC, 4th time today), mode=digest, DM cooldown-suppressed, 0 auto-dispatches. PR #812 OPEN AUTO_MERGE_HELD (held_deep_review, MIRROR_PASS_UNMERGED_SKIP confirmed). Pipeline idle. Watermark=1087. All daemons healthy (heal-daemon 00:20:18Z UTC, watchdog 00:25:16Z UTC MDT-converted, outbox-notifier PID 3409769, beacon bot PID 3154043). forge-notifier-tests-production-state-pollution-001 at 2/3. **Larry: run `scripts/merge_reviewed_pr.sh 812` to release PR #812.**
+**Iter ~3630 summary (2026-07-03T00:34Z):** 0 new alerts. All mandatory checks nominal. Check I re-invoked (still Friday UTC, 5th time today), mode=digest, DM cooldown-suppressed, 0 auto-dispatches. PR #812 OPEN AUTO_MERGE_HELD (held_deep_review, MIRROR_PASS_UNMERGED_SKIP confirmed). Pipeline idle. Watermark=1087. All daemons healthy (heal-daemon 00:30:18Z UTC, watchdog 00:30:16Z UTC, outbox-notifier PID 3409769, beacon bot PID 3154043). probe-blind:ourliberty-cycle.service alert (idx=1081 ts=20:24Z) verified not live — cycle running normally. forge-notifier-tests-production-state-pollution-001 at 2/3. **Larry: run `scripts/merge_reviewed_pr.sh 812` to release PR #812.**
 
 
