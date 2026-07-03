@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-03T09:54Z UTC (Iter ~3666, **Tier 3**, consecutive_clean=9)
+## Status snapshot — updated 2026-07-03T10:28Z UTC (Iter ~3667, **Tier 3**, consecutive_clean=10)
 
-**Iter ~3666 summary (2026-07-03T09:54Z):** 0 new alerts. All checks nominal. Tier 3 (consecutive_clean=9; steady state). forge-notifier-tests-production-state-pollution-001 G-rule DISPATCHED ✅ still awaiting Larry approval. pending-approvals=3 (2 fixture leaks chat_id=12345 + 1 real APPROVAL_REQUEST notifier-test-state-isolation-guard-001). 0 open PRs. Daemons healthy (PID 3595521 outbox-notifier, 3158031 inbox-watcher, 3154043 beacon-bot). Sync no-change (last_sync=09:37:51Z). Watermark=1077. PRIME ratio: 13.1 (slight improvement; worsening trend overall). Tier 3 (30-min cadence). Check I Friday DM cooldown-suppressed.
+**Iter ~3667 summary (2026-07-03T10:26Z):** 1 new alert (L1078 Check I digest, Tier-3 silenced). All checks nominal. Tier 3 (consecutive_clean=10; steady state). forge-notifier-tests-production-state-pollution-001 G-rule DISPATCHED ✅ still awaiting Larry approval (6h reminder sent 09:59:16Z UTC). pending-approvals=3 (2 fixture leaks chat_id=12345 + 1 real APPROVAL_REQUEST notifier-test-state-isolation-guard-001). 0 open PRs. Daemons healthy (PID 3595521 outbox-notifier, 3158031 inbox-watcher, 3154043 beacon-bot). Sync no-change (last_sync=09:37:51Z). Watermark=1078. PRIME ratio: 13.0375 (slight improvement; worsening trend overall). Tier 3 (30-min cadence). Check I Friday mode=digest, DM queued (route=digest, outbox-notifier skips DM — already delivered this week). Week-of-2026-06-29 ledger: $1,184.79 (+37.9%), 285 σ-anomalies, 1% retry overhead, 1 small proposal.
 
 
