@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-03T00:02Z UTC (Iter ~3626, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-03T00:12Z UTC (Iter ~3627, Tier 1, consecutive_clean=0)
 
-**Iter ~3626 summary (2026-07-03T00:02Z):** 0 new alerts. Check I fired Friday UTC: mode=digest, 1 proposal (review high-σ anomaly task reconcile-675-contract-c-promote-alerts-001, 36.2σ, $1.58 vs $0.29 baseline), auto-dispatch dedup skip (already dispatched 2026-06-29), DM queued, check-i-2026-07-03.json written. PR #812 OPEN AUTO_MERGE_HELD (held_deep_review, MIRROR_PASS_UNMERGED_SKIP confirmed). Pipeline idle. Watermark=1084. All daemons healthy (heal-daemon 00:00:17Z UTC, watchdog 23:59:20Z UTC, outbox-notifier PID 3409769, beacon bot PID 3154043). forge-notifier-tests-production-state-pollution-001 at 2/3 (next phantom doorbell triggers Beacon dispatch). **Larry: run `scripts/merge_reviewed_pr.sh 812` to release PR #812.**
+**Iter ~3627 summary (2026-07-03T00:12Z):** 3 new alerts — all Tier-3 silenced (ledger-weekly-2026-06-29 DM delivered by notifier, pulse-check-i-2026-06-29 digest-skipped, missions-autoregister proposed:needs-decision digest-skipped). Check I re-invoked (still Friday UTC), mode=digest, DM cooldown-suppressed, no new dispatch. PR #812 OPEN AUTO_MERGE_HELD (held_deep_review, MIRROR_PASS_UNMERGED_SKIP confirmed). Pipeline idle. Watermark=1087. All daemons healthy (heal-daemon 00:10:17Z UTC, watchdog 00:04:20Z UTC, outbox-notifier PID 3409769, beacon bot PID 3154043). forge-notifier-tests-production-state-pollution-001 at 2/3. **Larry: run `scripts/merge_reviewed_pr.sh 812` to release PR #812.**
 
 
