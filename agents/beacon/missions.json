@@ -6934,7 +6934,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-03T09:28:31.658956+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-26T08:48:27.32317+00:00"
+      "orphan_last_activity_ts": "2026-06-26T08:48:27.32317+00:00",
+      "briefing": {
+        "what": "Your team has started some work on their own, but it isn't attached to any of your active projects yet.",
+        "why": "Untethered work can quietly eat time and money without moving anything you actually care about forward.",
+        "suggest": "Have them pause and tie this to a real goal before going further \u2014 if it doesn't map to one, set it aside."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-03T09:38:49.959736+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-wire-agent-core-health-notify-001",
