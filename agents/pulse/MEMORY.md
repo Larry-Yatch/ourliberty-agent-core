@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-03T23:29Z UTC (Iter ~3700, **Tier 1**)
+## Status snapshot — updated 2026-07-03T23:34Z UTC (Iter ~3701, **Tier 1**)
 
-**Iter ~3700 summary (2026-07-03T23:29Z):** 0 new alerts. ⚠️ STANDING: zombie bash PID 1834248 (36d+) still alive, kill pending Larry ok. Dashboard PR #106 revision cycle: Mirror REVIEW_REVISION → Forge rev1 completed → Mirror re-review dispatched 23:25:38Z (2 Mirror inbox files, same task_id, stall healer clean). Agent-core 0 open PRs. pending-approvals=2 (2 fixture leaks chat_id=12345 only). repo clean (HEAD=75c914ea), sync no-change 22:39Z (within 2h), all daemons alive, 0 stalls. Check I: cooldown-suppressed (block 2026-06-29 present). Tier 1 (consecutive_clean=0). PRIME ratio: 12.0625 (systemic_fixes=80; trend: worsening).
+**Iter ~3701 summary (2026-07-03T23:34Z):** 0 new alerts. ⚠️ STANDING: zombie bash PID 1834248 (36d+) still alive, kill pending Larry ok. Dashboard PR #106 MERGED 23:32:48Z UTC (Mirror REVIEW_PASS rev1, AUTO_MERGE). Agent-core 0 open PRs. pending-approvals=2 (2 fixture leaks chat_id=12345 only). repo clean (HEAD=cc98765b), sync no-change 22:39Z (within 2h), all daemons alive, 0 stalls. Check I: cooldown-suppressed (block 2026-06-29 present). Mirror inbox: 1 post-merge leftover (review-pr-ourliberty-dashboard-106-rev1.json, expected self-clear). Tier 1 (consecutive_clean=0). PRIME ratio: 12.075 (systemic_fixes=80; trend: worsening).
 
 
