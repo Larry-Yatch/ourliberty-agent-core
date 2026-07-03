@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-03T14:48Z UTC (Iter ~3675, **Tier 3**, consecutive_clean=18)
+## Status snapshot — updated 2026-07-03T15:17Z UTC (Iter ~3676, **Tier 3**, consecutive_clean=19)
 
-**Iter ~3675 summary (2026-07-03T14:48Z):** 0 new alerts (watermark=1082, file_length=1082). All checks nominal. Tier 3 (consecutive_clean=18; steady state). forge-notifier-tests-production-state-pollution-001 G-rule DISPATCHED ✅ still awaiting Larry approval; phantom doorbells continuing (next 6h reminder ~15:59Z UTC). pending-approvals=3 (2 fixture leaks chat_id=12345 + 1 real APPROVAL_REQUEST notifier-test-state-isolation-guard-001). 0 open PRs. 0 inbox tasks. Daemons healthy (PID 3595521 outbox-notifier, 3158031 inbox-watcher, 3154043 beacon-bot). Sync no-change (last_sync=14:38:15Z). PRIME ratio: 12.5875 (slight improvement; worsening trend overall). Tier 3 (30-min cadence). Check I Friday mode=digest, DM cooldown-suppressed (week=2026-06-29). Check I weekly cost: $1184.79 (+$325.75 +37.9%); 285 σ-anomalies; 1 small proposal dedup-skipped.
+**Iter ~3676 summary (2026-07-03T15:17Z):** 1 new alert L1083 (Check I digest Tier-3 silenced). Watermark 1082→1083. All checks nominal. Tier 3 (consecutive_clean=19; steady state). forge-notifier-tests-production-state-pollution-001 G-rule DISPATCHED ✅ still awaiting Larry approval; 24h reminders for fixture items now firing HTTP 400 "chat not found" (chat_id=12345 undeliverable — expected). pending-approvals=3 (2 fixture leaks chat_id=12345 + 1 real APPROVAL_REQUEST notifier-test-state-isolation-guard-001). 0 open PRs. 0 inbox tasks. Daemons healthy (PID 3595521 outbox-notifier, 3158031 inbox-watcher, 3154043 beacon-bot). Sync no-change (last_sync=14:38:15Z). PRIME ratio: 12.5375 (slight improvement; worsening trend overall). Tier 3 (30-min cadence). Check I Friday mode=digest, DM queued route=digest (week=2026-06-29 cooldown-suppressed). Check I weekly cost: $1184.79 (+$325.75 +37.9%); 285 σ-anomalies; 1 small proposal dedup-skipped.
 
 
