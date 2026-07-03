@@ -1350,6 +1350,36 @@
         "from_state": "parked"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "cap-fast-follow-guard-cycle-tier-state-log-on-corrup-00a7",
+      "title": "Fast-follow: guard cycle_tier_state._log on corrupt-state recovery (PR #815 follow-up)",
+      "note": "Adversarial review of PR #815 (tier-bench seal) found ONE minor non-blocking gap: cycle_tier_state.read_tier_state() calls _log() (writes live logs/cycle-tier-state.log) BEFORE the guarded _atomic_write, on the corrupt/unreadable-state recovery branch only. Benign log append, NOT the active-tier.json outage class, and the sibling _dm_corruption_once() DM path is already guarded via larry_alerts refuse_under_test. Fix: route _log_path()/_log through refuse_live_state_write, or add the guard at the top of read_tier_state. Small. Part of the broader fail-closed consolidation (option a) \u2014 see ~/worktrees/test-seal-resume/RESUME.md and memory active-tier-write-choke-and-failopen-classes.md. Also latent (documented in code): sandbox root must never be placed under ~/agents or the guard would wrongly refuse it.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": null,
+        "branch": null,
+        "captured_at": "2026-07-03T16:24:27.808675+00:00"
+      },
+      "last_touched": "2026-07-03T16:24:27.808675+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A small cleanup to make sure that when the system recovers from a scrambled internal state, a leftover bit of test activity can't accidentally scribble into our live records.",
+        "why": "It keeps our safety net fully sealed so test runs never bleed into real operations \u2014 the kind of gap that's harmless today but erodes trust in the numbers if left open.",
+        "suggest": "Worth doing soon as a quick tidy-up, but there's no fire here \u2014 slot it into the next round of housekeeping rather than interrupting anything in flight."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-03T16:33:29.194907+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
