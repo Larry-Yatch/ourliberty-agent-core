@@ -72,8 +72,10 @@ def _now_iso() -> str:
 def _log(msg: str, level: str = 'INFO') -> None:
     line = f'[{_now_iso()}] [{level}] {msg}'
     print(line, flush=True)
+    from test_isolation_guard import refuse_live_state_write  # sibling; test-jail guard
+    path = _log_path()
+    refuse_live_state_write(path, 'cycle-tier-log-write')
     try:
-        path = _log_path()
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, 'a', encoding='utf-8') as fh:
             fh.write(line + '\n')
