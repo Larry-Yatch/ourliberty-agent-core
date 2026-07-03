@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-03T01:13Z UTC (Iter ~3635, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-03T01:27Z UTC (Iter ~3637, Tier 1, consecutive_clean=0)
 
-**Iter ~3635 summary (2026-07-03T01:13Z):** 0 new alerts (watermark=1089). Repo HEAD=682a8d71=origin/main clean/up-to-date. Check I re-invoked (Friday UTC), mode=digest, DM route=digest queued, 0 auto-dispatches. PR #812 OPEN AUTO_MERGE_HELD (held_deep_review, MIRROR_PASS_UNMERGED_SKIP confirmed). Pipeline idle. All daemons healthy (heal-daemon 01:10:46Z UTC, watchdog 01:10:46Z UTC, outbox-notifier PID 3409769, beacon bot PID 3154043). forge-notifier-tests-production-state-pollution-001 at 2/3 (doorbell reminder bouncing HTTP 400 to chat_id=12345). PRIME ratio: 13.6 (worsening). **Larry: run `scripts/merge_reviewed_pr.sh 812` to release PR #812.**
+**Iter ~3637 summary (2026-07-03T01:27Z):** 0 new alerts (watermark=1090 unchanged). Repo HEAD=23e24576=origin/main clean/up-to-date. Check I/III not firing (Thursday UTC). PR #812 OPEN AUTO_MERGE_HELD (held_deep_review, MIRROR_PASS_UNMERGED_SKIP confirmed). Pipeline idle. All daemons healthy (heal-daemon 01:20:49Z UTC, watchdog 01:26:12Z UTC, outbox-notifier PID 3409769, beacon bot PID 3154043). forge-notifier-tests-production-state-pollution-001 at 2/3 (fixture entries unchanged, no new phantom doorbell). PRIME ratio: 13.6 (worsening). **Larry: run `scripts/merge_reviewed_pr.sh 812` to release PR #812.**
 
 
