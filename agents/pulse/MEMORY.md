@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-03T13:47Z UTC (Iter ~3673, **Tier 3**, consecutive_clean=16)
+## Status snapshot — updated 2026-07-03T14:20Z UTC (Iter ~3674, **Tier 3**, consecutive_clean=17)
 
-**Iter ~3673 summary (2026-07-03T13:47Z):** 1 new alert (L1082 Check-I digest Tier-3 silenced). Watermark=1082. All checks nominal. Tier 3 (consecutive_clean=16; steady state). forge-notifier-tests-production-state-pollution-001 G-rule DISPATCHED ✅ still awaiting Larry approval; phantom doorbells continuing (next 6h reminder ~15:59Z UTC). pending-approvals=3 (2 fixture leaks chat_id=12345 + 1 real APPROVAL_REQUEST notifier-test-state-isolation-guard-001). 0 open PRs. 0 inbox tasks. Daemons healthy (PID 3595521 outbox-notifier, 3158031 inbox-watcher, 3154043 beacon-bot). Sync no-change (last_sync=13:38:15Z). PRIME ratio: 12.6875 (slight improvement; worsening trend overall). Tier 3 (30-min cadence). Check I Friday mode=digest, DM cooldown-suppressed (week=2026-06-29). Check I weekly cost: $1184.79 (+$325.75 +37.9%); 285 σ-anomalies; 1 small proposal dedup-skipped.
+**Iter ~3674 summary (2026-07-03T14:16Z):** 0 new alerts (watermark=1082, file_length=1082). All checks nominal. Tier 3 (consecutive_clean=17; steady state). forge-notifier-tests-production-state-pollution-001 G-rule DISPATCHED ✅ still awaiting Larry approval; phantom doorbells continuing (next 6h reminder ~15:59Z UTC). pending-approvals=3 (2 fixture leaks chat_id=12345 + 1 real APPROVAL_REQUEST notifier-test-state-isolation-guard-001). 0 open PRs. 0 inbox tasks. Daemons healthy (PID 3595521 outbox-notifier, 3158031 inbox-watcher, 3154043 beacon-bot). Sync no-change (last_sync=13:38:15Z). PRIME ratio: 12.6375 (slight improvement; worsening trend overall). Tier 3 (30-min cadence). Check I Friday mode=digest, DM cooldown-suppressed (week=2026-06-29). Check I weekly cost: $1184.79 (+$325.75 +37.9%); 285 σ-anomalies; 1 small proposal dedup-skipped.
 
 
