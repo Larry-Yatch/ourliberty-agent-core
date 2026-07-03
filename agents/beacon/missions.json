@@ -6851,7 +6851,11 @@
         "at": "2026-07-02T17:55:08.351873+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-03T09:28:31.658956+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-catalog-accuracy-drift-grule-001",
@@ -6914,6 +6918,45 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-direction-ask-no-session-revision-active-mirror-fix-001",
+      "name": "Direction Ask No Session Revision Active Mirror Fix 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `direction-ask-no-session-revision-active-mirror-fix-001`. Last activity 2026-06-26T08:48:27.32317+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "direction-ask-no-session-revision-active-mirror-fix-001"
+      ],
+      "repo": null,
+      "created": "2026-07-03",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-03T09:28:31.658956+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-26T08:48:27.32317+00:00"
+    },
+    {
+      "id": "proposed-wire-agent-core-health-notify-001",
+      "name": "Wire Agent Core Health Notify 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `wire-agent-core-health-notify-001`. Last activity 2026-06-25T02:48:30.666827+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "wire-agent-core-health-notify-001"
+      ],
+      "repo": null,
+      "created": "2026-07-03",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-03T09:28:31.658956+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-25T02:48:30.666827+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-03T09:28:31.658956+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#696"
     }
   ]
 }
