@@ -1320,6 +1320,36 @@
         "from_state": "parked"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-test-isolation-seal-ship-corrected-l2-bounded-fa-5c57",
+      "title": "Test-isolation seal: ship corrected L2 + bounded fail-closed project",
+      "note": "Adversarial review DONE (4 agents, all empirical). Decision = option (a): ship L2 now + bounded fail-closed project. BUILD NOT STARTED. Full self-contained brief on droplet: ~/worktrees/test-seal-resume/RESUME.md. TL;DR \u2014 PR-1 (surgical, incident-killer): refuse_under_test guard on the REAL active-tier writers \u2014 active_tier._write (NOT _atomic_write_json; draft named wrong fn), _atomic_write_json, append_cost_row, cycle_tier_state._atomic_write; reuses proven mechanism (82 uses); add deliberate-leak test. PR-2 (optional): narrow L1, proven patch at ~/worktrees/test-seal-resume/L1-narrow-proven.patch \u2014 needs opt-out sentinel OURLIBERTY_ALLOW_LIVE_AGENTS_ROOT set by gate; full suite green 7030/0-fail WITH it; only helps env-honoring modules. L3+L4 as-specced CUT (state-write census allowlist would be half the tree/80-of-165 files; L4 sentinel permanently poisons live active-tier.json). CLASS-CLOSING work (option a): consolidate ~9 private _atomic_write_json copies behind atomic_io.py (39 importers) w/ guard inside; convert 13 hardcoded /home/larry/agents modules to honor env var; fix or retire the bwrap wall that DEGRADES TO UNWALLED on droplet; extend bootstrap-first gate to tests/** + review/**. Build workspace ready: ~/worktrees/test-seal-review (droplet, clean @origin/main).",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": null,
+        "branch": null,
+        "captured_at": "2026-07-03T03:15:19.290106+00:00"
+      },
+      "last_touched": "2026-07-03T03:15:19.290106+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A safeguard that stops our automated quality checks from accidentally overwriting the system's real, live operating data.",
+        "why": "Without it, a routine internal test can silently corrupt production data and trigger an outage or bad automated decisions before anyone notices.",
+        "suggest": "Ship the small, already-proven fix now to close the immediate gap, then scope the wider cleanup carefully before committing to it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-03T03:22:16.128113+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
