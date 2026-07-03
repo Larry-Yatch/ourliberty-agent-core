@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-03T01:39Z UTC (Iter ~3638, Tier 1, consecutive_clean=0)
+## Status snapshot — updated 2026-07-03T01:45Z UTC (Iter ~3639, Tier 1, consecutive_clean=0)
 
-**Iter ~3638 summary (2026-07-03T01:39Z):** 1 new alert (line 1091 — ourliberty-health health check re-alert for 00:36Z sync push-fail; Tier-4; bot already DM'd Larry at 19:34 MDT; condition self-resolved: repo clean/up-to-date). Watermark advanced 1090→1091. PR #812 OPEN AUTO_MERGE_HELD (held_deep_review). Pipeline idle. All daemons healthy (heal-daemon 01:30:49Z UTC, watchdog 01:36:56Z UTC, outbox-notifier PID 3409769, beacon bot PID 3154043). Check I: Friday firing day, mode=digest, DM cooldown-suppressed. **Note: iter ~3637 misclassified Friday as Thursday and skipped Check I — harmless since iter ~3636 had already fired it.** forge-notifier-tests-production-state-pollution-001 at 2/3. G-rule ourliberty-health-clean-tree-dirty-tier4-001 vp (new recurrence). PRIME ratio: 13.6 (worsening). **Larry: run `scripts/merge_reviewed_pr.sh 812` to release PR #812.**
+**Iter ~3639 summary (2026-07-03T01:45Z):** 0 new alerts. Watermark stable at 1091. PR #812 OPEN AUTO_MERGE_HELD (held_deep_review). Pipeline idle. All daemons healthy (heal-daemon 01:40:49Z UTC, watchdog 01:42:00Z UTC, outbox-notifier PID 3409769, beacon bot PID 3154043). Sync status=no-change (no longer error — last_sync=01:36:10Z). Check I: Friday firing day, mode=digest, DM cooldown-suppressed, wrote check-i-2026-07-03.json. forge-notifier-tests-production-state-pollution-001 at 2/3. PRIME ratio: 13.6 (worsening). **Larry: run `scripts/merge_reviewed_pr.sh 812` to release PR #812.**
 
 
