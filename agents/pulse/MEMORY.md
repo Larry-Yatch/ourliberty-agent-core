@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-03T08:48Z UTC (Iter ~3664, **Tier 3**, consecutive_clean=7)
+## Status snapshot — updated 2026-07-03T09:22Z UTC (Iter ~3665, **Tier 3**, consecutive_clean=8)
 
-**Iter ~3664 summary (2026-07-03T08:48Z):** 0 new alerts. All checks nominal. Tier 3 (consecutive_clean=7; steady state). forge-notifier-tests-production-state-pollution-001 G-rule DISPATCHED ✅ still awaiting Larry approval. pending-approvals=3 (2 fixture leaks chat_id=12345 + 1 real APPROVAL_REQUEST notifier-test-state-isolation-guard-001). 0 open PRs. Daemons healthy (PID 3595521 outbox-notifier, 3154043 beacon-bot). Sync no-change (last_sync=08:37:48Z). Watermark=1103. PRIME ratio: 13.2125 (slight improvement; worsening trend overall). Tier 3 (30-min cadence). Check I Friday cooldown-suppressed.
+**Iter ~3665 summary (2026-07-03T09:22Z):** 1 new alert (Check I digest, Tier-3 silenced). All checks nominal. Tier 3 (consecutive_clean=8; steady state). forge-notifier-tests-production-state-pollution-001 G-rule DISPATCHED ✅ still awaiting Larry approval. pending-approvals=3 (2 fixture leaks chat_id=12345 + 1 real APPROVAL_REQUEST notifier-test-state-isolation-guard-001). 0 open PRs. Daemons healthy (PID 3595521 outbox-notifier, 3154043 beacon-bot). Sync no-change (last_sync=08:37:48Z). Watermark=1104. PRIME ratio: 13.1625 (slight improvement; worsening trend overall). Tier 3 (30-min cadence). Check I Friday digest queued (route=digest, cooldown expired).
 
 
