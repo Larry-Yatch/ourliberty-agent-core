@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-03T20:37Z UTC (Iter ~3690, **Tier 3**, consecutive_clean=5)
+## Status snapshot — updated 2026-07-03T21:08Z UTC (Iter ~3691, **Tier 3**, consecutive_clean=6)
 
-**Iter ~3690 summary (2026-07-03T20:37Z):** 2 new alerts (L1098 pulse check-i digest, L1099 dispatch-branch-cleanup) — both Tier-3 silenced. ✅ NOMINAL: repo clean (HEAD=7964af13, on main), watchdog healthy (5-min cadence through 20:35:16Z UTC), all daemons alive (outbox-notifier=3919207 Ss, inbox-watcher=3919058 Ssl, beacon-bot=3918608 Ss — same PIDs post-18:45Z restart), 0 open PRs, 0 stalls. Sync last_sync=19:38:59Z (~58 min old). pending-approvals=4 (2 fixture leaks chat_id=12345 + notifier-test-state-isolation-guard-001 + watchdog-log-growth-idle-alive-gate-001). Check I Friday mode=digest, cooldown-suppressed. Tier 3, consecutive_clean=5 (max tier, stable). PRIME ratio: 12.025 (systemic_fixes=80; trend: worsening).
+**Iter ~3691 summary (2026-07-03T21:08Z):** 1 new alert (L1100 pulse check-i digest) — Tier-3 silenced. ✅ NOMINAL: repo clean (HEAD=40b52838, on main), watchdog healthy (5-min cadence through 21:06:09Z UTC), all daemons alive (outbox-notifier=3919207 Ss, inbox-watcher=3919058 Ssl, beacon-bot=3918608 Ss — same PIDs post-18:45Z restart), 0 open PRs, 0 stalls. Sync last_sync=20:39:01Z (no-change). pending-approvals=4 (2 fixture leaks chat_id=12345 + notifier-test-state-isolation-guard-001 + watchdog-log-growth-idle-alive-gate-001). Check I Friday mode=digest, dedup-suppressed (key=1d373ae896). Ledger context: $1184.79 week (+37.9%), 285 σ-anomalies, 1 small proposal. Tier 3, consecutive_clean=6 (max tier, stable). PRIME ratio: 12.0 (systemic_fixes=80; trend: worsening).
 
 
