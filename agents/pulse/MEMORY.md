@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-03T03:51Z UTC (Iter ~3651, **Tier 1**, consecutive_clean=0)
+## Status snapshot — updated 2026-07-03T03:59Z UTC (Iter ~3652, **Tier 1**, consecutive_clean=1)
 
-**Iter ~3651 summary (2026-07-03T03:51Z):** 2 new alerts (both Tier-3 silenced). Mandatory checks nominal. G-rule forge-notifier-tests-production-state-pollution-001 hit 3/3 — 3rd phantom doorbell (idx=1095) delivered to Larry at 03:40:57Z UTC. Direction-ask dispatched to Beacon. Tier reset 2→1 (additive-check G finding). 0 open PRs. Daemons healthy (PID 3595521 outbox-notifier, 3154043 beacon-bot). Sync no-change (last_sync=03:37:08Z). Watermark=1096. PRIME ratio: ~13.7 (worsening). decision-needed-approval-forge-dispatch-no-target-repo-001: field vp for PR #812.
+**Iter ~3652 summary (2026-07-03T03:56Z):** 1 new alert (Tier-3 silenced — outbox-notifier approval_request delivery confirmation). All checks nominal. Beacon APPROVAL_REQUEST `notifier-test-state-isolation-guard-001` queued — delivered to Larry at 03:56:05Z UTC (fix: runtime write-guard on beacon_approval_handler.py). pending-approvals=3 (2 fixture leaks chat_id=12345 + 1 real APPROVAL_REQUEST). 0 open PRs. Daemons healthy (PID 3595521 outbox-notifier, 3154043 beacon-bot). Sync no-change (last_sync=03:37:08Z). Watermark=1097. PRIME ratio: ~13.66 (worsening). consecutive_clean=1.
 
 
