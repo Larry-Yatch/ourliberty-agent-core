@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-03T16:35Z UTC (Iter ~3678, **Tier 1**, consecutive_clean=0)
+## Status snapshot — updated 2026-07-03T16:43Z UTC (Iter ~3679, **Tier 1**, consecutive_clean=1)
 
-**Iter ~3678 summary (2026-07-03T16:35Z):** 2 alerts (L1084 doorbell Tier-3, L1085 Check-I Tier-3; watermark=1085). ⚠️ FINDINGS: (1) Dirty tree — agents/beacon/captures.json modified 16:24Z by Beacon desktop-chat (never-auto, watching); (2) watchdog overall=warning since 09:59 MDT — outbox-notifier.log idle >12h (log_growth G-rule 3/3 → DISPATCHED); (3) PR #815 opened 16:24Z, Mirror dispatched 16:30Z. Tier reset 3→1 on signals. pending-approvals=3 (2 fixture + 1 real APPROVAL_REQUEST notifier-test-state-isolation-guard-001). Daemons healthy (PID 3595521 outbox-notifier, 3158031 inbox-watcher, 3154043 beacon-bot). Sync no-change (last_sync=15:38:16Z). PRIME ratio: 12.4125 (trend: worsening). Tier 1 (5-min cadence). Check I Friday mode=digest, cooldown-suppressed.
+**Iter ~3679 summary (2026-07-03T16:43Z):** 1 alert (L1086 outbox-notifier approval_request Tier-3; watermark=1086). ✅ NOMINAL: dirty tree RESOLVED (captures.json committed 10ee464b), watchdog HEALED (healthy since 10:34 MDT). G-rule watchdog-log-growth-idle-overnight-001 APPROVAL_REQUEST queued (watchdog-log-growth-idle-alive-gate-001, pending[3], force_ask 10:40 MDT). PR #815 in Mirror review (dispatched 16:30Z). pending-approvals=4 (2 fixture + notifier-test-state-isolation-guard-001 + watchdog-log-growth-idle-alive-gate-001). Daemons healthy (PID 3595521 outbox-notifier, 3158031 inbox-watcher, 3154043 beacon-bot). Sync no-change (last_sync=16:38:16Z). PRIME ratio: 12.4125 (trend: worsening). Tier 1 (consecutive_clean=1; 2 more clean iters to Tier 2). Check I Friday mode=digest, cooldown-suppressed.
 
 
