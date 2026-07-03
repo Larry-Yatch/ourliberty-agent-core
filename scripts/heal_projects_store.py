@@ -187,20 +187,10 @@ def read_registry(path: Path) -> Optional[dict[str, Any]]:
 
 
 def _atomic_write_json(path: Path, data: dict[str, Any]) -> None:
-    """tmp-in-same-dir + os.replace, so a concurrent reader (the derive) never
-    sees a partial file. Mirrors heal_missions_card_gc._atomic_write_json."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=path.name + '.', suffix='.tmp')
-    try:
-        with os.fdopen(fd, 'w') as fh:
-            fh.write(json.dumps(data, indent=2) + '\n')
-        os.replace(tmp_name, path)
-    except BaseException:
-        try:
-            os.unlink(tmp_name)
-        except OSError:
-            pass
-        raise
+    """Delegates to the shared guarded atomic_io writer. Byte-identical to the
+    prior inline writer: pretty JSON (indent=2) + trailing newline."""
+    import atomic_io
+    atomic_io.atomic_write_json(path, data, trailing_newline=True)
 
 
 # ---------- git helpers (never raise) ----------

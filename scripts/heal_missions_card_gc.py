@@ -593,21 +593,10 @@ def age_parked_captures(registry: dict[str, Any], now: datetime,
 
 
 def _atomic_write_json(path: Path, data: dict[str, Any]) -> None:
-    """tmp-in-same-dir + os.replace. Mirrors dashboard_api._atomic_write_captures
-    so a reader never sees a partial file."""
-    import tempfile
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=path.name + '.', suffix='.tmp')
-    try:
-        with os.fdopen(fd, 'w') as fh:
-            fh.write(json.dumps(data, indent=2) + '\n')
-        os.replace(tmp_name, path)
-    except BaseException:
-        try:
-            os.unlink(tmp_name)
-        except OSError:
-            pass
-        raise
+    """Delegates to the shared guarded atomic_io writer. Byte-identical to the
+    prior inline writer: pretty JSON (indent=2) + trailing newline."""
+    import atomic_io
+    atomic_io.atomic_write_json(path, data, trailing_newline=True)
 
 
 def atomic_write_captures(path: Path, registry: dict[str, Any]) -> None:

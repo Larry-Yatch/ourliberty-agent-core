@@ -142,21 +142,10 @@ def _truncate_filename(filename: str) -> tuple[str, bool]:
 
 
 def _atomic_write_json(dest: Path, task_dict: dict[str, Any]) -> None:
-    """Write JSON via tempfile + os.replace for atomicity."""
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_path = tempfile.mkstemp(
-        prefix=f'.{dest.name}.', suffix='.tmp', dir=str(dest.parent)
-    )
-    try:
-        with os.fdopen(fd, 'w') as f:
-            json.dump(task_dict, f, indent=2)
-        os.replace(tmp_path, dest)
-    except Exception:
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
-        raise
+    """Delegates to the shared guarded atomic_io writer. Byte-identical to the
+    prior inline writer: pretty JSON (indent=2), no trailing newline."""
+    import atomic_io
+    atomic_io.atomic_write_json(dest, task_dict, trailing_newline=False)
 
 
 def _log_routing_event(record: dict[str, Any]) -> None:

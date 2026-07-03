@@ -229,22 +229,11 @@ _LAUNCH_QUEUE_LOCK = __import__('threading').Lock()
 
 
 def _atomic_write_json(path: Path, obj: Any) -> None:
-    """Write `obj` as pretty JSON atomically (unique tmp in the same dir +
-    os.replace) so a concurrent reader — the draining healer — never sees a
-    partial file."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_name = tempfile.mkstemp(
-        dir=str(path.parent), prefix=path.name + '.', suffix='.tmp')
-    try:
-        with os.fdopen(fd, 'w') as fh:
-            fh.write(json.dumps(obj, indent=2) + '\n')
-        os.replace(tmp_name, path)
-    except BaseException:
-        try:
-            os.unlink(tmp_name)
-        except OSError:
-            pass
-        raise
+    """Write `obj` as pretty JSON atomically via the shared atomic_io helper
+    (the guarded state-write chokepoint). Byte-identical to the prior inline
+    writer: pretty JSON (indent=2) + trailing newline."""
+    import atomic_io
+    atomic_io.atomic_write_json(path, obj, trailing_newline=True)
 
 
 # ---- agent + healer registries ----

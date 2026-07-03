@@ -290,23 +290,10 @@ def build_sequence(entry: dict[str, Any], now: Optional[datetime] = None) -> dic
 
 
 def _atomic_write_json(path: Path, obj: Any) -> None:
-    """Write `obj` as pretty JSON atomically (tmp + os.replace) — the same
-    shape the outbox notifier uses for sequence files, so a concurrent reader
-    (the notifier on Mirror PASS) never sees a partial file."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_name = tempfile.mkstemp(
-        dir=str(path.parent), prefix=path.name + '.', suffix='.tmp')
-    try:
-        with os.fdopen(fd, 'w', encoding='utf-8') as fh:
-            json.dump(obj, fh, indent=2)
-            fh.write('\n')
-        os.replace(tmp_name, path)
-    except BaseException:
-        try:
-            os.unlink(tmp_name)
-        except OSError:
-            pass
-        raise
+    """Delegates to the shared guarded atomic_io writer. Byte-identical to the
+    prior inline writer: pretty JSON (indent=2) + trailing newline."""
+    import atomic_io
+    atomic_io.atomic_write_json(path, obj, trailing_newline=True)
 
 
 # --------------------------------------------------------------------------- #
