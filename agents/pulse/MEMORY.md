@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-04T00:17Z UTC (Iter ~3707, **Tier 1**)
+## Status snapshot — updated 2026-07-04T00:25Z UTC (Iter ~3708, **Tier 1**)
 
-**Iter ~3707 summary (2026-07-04T00:17Z):** 8 new alerts (L1105-L1112), all `source=heal-stale-daemon-code, subject=auto-restarted:<service>` Tier 3 (known pattern, route=digest, no DM). All 8 daemons (dashboard-api, beacon-bot, chain-event-shipper, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot) restarted by healer at 18:09-18:14 MDT because safe_write_inbox.py updated in PR #819 merge. New daemon PIDs: 4078238, 4079442, 4079818. ⚠️ STANDING: zombie bash PID 1834248 (36d+) still alive, kill pending Larry ok. 0 open PRs. All inboxes empty. HEAD=107bca73=origin/main, sync no-change 23:39Z (within 2h), 0 stalls. Check I/III: UTC Saturday (weekday=5), not firing days. Tier 1 (consecutive_clean=0). PRIME ratio: 12.29 (systemic_fixes=79; vp=33; trend: worsening).
+**Iter ~3708 summary (2026-07-04T00:25Z):** 0 new alerts. All mandatory checks nominal. Dashboard PR #108 ("live: move System Health + Worktrees to Live System (IA step 4b)") opened at 00:21:03Z UTC, MERGEABLE, `auto-review` label; review dispatch pending next outbox-notifier sweep (PID 4079818 active). ⚠️ STANDING: zombie bash PID 1834248 (36d 05:05+) still alive, kill pending Larry ok. 0 open agent-core PRs. All inboxes empty. HEAD=47f89a74=origin/main, sync no-change 23:39Z (~46 min), 0 stalls. Check I/III: UTC Saturday (weekday=5), not firing days. Tier 1 (consecutive_clean=0). PRIME ratio: 12.28 (systemic_fixes=79; vp=33; trend: worsening).
 
 
