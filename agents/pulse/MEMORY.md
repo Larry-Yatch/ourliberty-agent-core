@@ -424,8 +424,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-04T02:43Z UTC (Iter ~3728, **Tier 1**)
+## Status snapshot — updated 2026-07-04T02:47Z UTC (Iter ~3729, **Tier 1**)
 
-**Iter ~3728 summary (2026-07-04T02:43Z):** 0 new alerts. PR #112 (dashboard "nav: collapse to the four-tab structure — IA finale step 6") MERGED 20:38:48 MDT (02:38:48Z UTC) — dashboard IA finale complete (step 6/6). Both repos at 0 open PRs. All daemons alive. Watchdog healthy through 20:38:04 MDT. HEAD=8fa2fbaf=origin/main. Transient sync error (race during iter ~3727 auto-commit window; self-heals). Beacon offered to clear 2 fixture-leak pending approvals at 20:23:03 MDT — Larry response still pending. STANDING: zombie bash PID 1834248 (36d 07:29+) still alive. forge-notifier-tests-production-state-pollution-001 G-rule REJECTED; Larry/Beacon engaging cleanup. Check I/III: Saturday UTC, not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 12.59 (systemic_fixes=78; vp=33; trend: worsening).
+**Iter ~3729 summary (2026-07-04T02:47Z):** 0 new alerts. Both repos at 0 open PRs. All daemons alive. Watchdog healthy through 20:43:16 MDT (02:43:16Z UTC). HEAD=bceb9d7b=origin/main. Transient sync error (race during prior auto-commit window; tree clean, self-heals). Beacon offered to clear 2 fixture-leak pending approvals — Larry still no response. STANDING: zombie bash PID 1834248 (36d 07:28+) still alive. forge-notifier-tests-production-state-pollution-001 G-rule REJECTED; standby. Check I/III: Saturday UTC, not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 12.59 (systemic_fixes=78; vp=33; trend: worsening).
 
 
