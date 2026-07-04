@@ -408,7 +408,7 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ## G-rule forge-notifier-tests-production-state-pollution-001 → REJECTED (iter ~3697)
 
-**Rule:** Forge build tests for notifier code write fixture data to production state files. beacon-pending-approvals.json received 2 fake pending entries (chat_id=12345, NOT Larry's real ID 7998341473): `mirror-review-pr-ourliberty-agent-core-760` (PR #760 already MERGED 2026-06-30) and `mirror-review-real-rev` (fixture name, refs PR #42). 3rd phantom doorbell delivered to Larry (chat_id=7998341473) at 03:40:57Z UTC 2026-07-03 (idx=1095, "2 items need your call"). **4th phantom doorbell** at 2026-07-04T01:11:43Z UTC (idx=1113, line 1114, iter ~3716) — doorbell fires approximately daily while fixture entries persist. Dispatched `direction-ask-forge-notifier-tests-state-isolation-3of3-001.json` to Beacon inbox at iter ~3651. APPROVAL_REQUEST `notifier-test-state-isolation-guard-001` was REJECTED by Larry at iter ~3697. 2 fixture entries (chat_id=12345, undeliverable) remain in pending-approvals — benign. Standing-by for Larry direction before re-dispatching.
+**Rule:** Forge build tests for notifier code write fixture data to production state files. beacon-pending-approvals.json received 2 fake pending entries (chat_id=12345, NOT Larry's real ID 7998341473): `mirror-review-pr-ourliberty-agent-core-760` (PR #760 already MERGED 2026-06-30) and `mirror-review-real-rev` (fixture name, refs PR #42). 3rd phantom doorbell delivered to Larry (chat_id=7998341473) at 03:40:57Z UTC 2026-07-03 (idx=1095, "2 items need your call"). **4th phantom doorbell** at 2026-07-04T01:11:43Z UTC (idx=1113, line 1114, iter ~3716). **5th phantom doorbell** at 2026-07-04T05:12:16Z UTC (idx=1117, line 1118, iter ~3748) — only ~4h gap from 4th (vs ~21h 3rd→4th); frequency uptick post-PR#822. Doorbell Tier-3 silenced by triage helper (known-pattern). Dispatched `direction-ask-forge-notifier-tests-state-isolation-3of3-001.json` to Beacon inbox at iter ~3651. APPROVAL_REQUEST `notifier-test-state-isolation-guard-001` was REJECTED by Larry at iter ~3697. 2 fixture entries (chat_id=12345, undeliverable) remain in pending-approvals — benign. Standing-by for Larry direction before re-dispatching.
 
 ---
 
@@ -424,8 +424,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-04T05:11Z UTC (Iter ~3747, **Tier 1**)
+## Status snapshot — updated 2026-07-04T05:22Z UTC (Iter ~3748, **Tier 1**)
 
-**Iter ~3747 summary (2026-07-04T05:11Z):** 0 new alerts. 0 open PRs (agent-core + dashboard). All daemons alive (beacon-bot=4078238, inbox-watcher=4079442, outbox-notifier=4079818). Watchdog healthy through 23:07:17 MDT (05:07:17Z). Sync no-change. HEAD=3f5eb626=origin/main. Pending approvals: 2 fixture leaks (chat_id=12345, undeliverable). STANDING: zombie bash PID 1834248 (36d 09:52+) still alive; Larry kill-authorization pending. System at full quiesce post-PR #822 (bwrap wall). Check I/III: Saturday UTC (weekday=5), not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 12.78 (systemic_fixes=78; vp=33; trend: worsening).
+**Iter ~3748 summary (2026-07-04T05:22Z):** 1 new alert (doorbell Tier-3 silenced — 5th phantom doorbell, ~4h gap from 4th). 0 open PRs (agent-core + dashboard). All daemons alive (beacon-bot=4078238, inbox-watcher=4079442, outbox-notifier=4079818). Watchdog healthy through 23:17:19 MDT (05:17:19Z). Sync no-change. HEAD=c6eb92a9=origin/main. Pending approvals: 2 fixture leaks (chat_id=12345, undeliverable). STANDING: zombie bash PID 1834248 (36d 10:02+) still alive; Larry kill-authorization pending. System at full quiesce post-PR #822 (bwrap wall). Check I/III: Saturday UTC (weekday=5), not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 12.81 (systemic_fixes=78; vp=33; trend: worsening).
 
 
