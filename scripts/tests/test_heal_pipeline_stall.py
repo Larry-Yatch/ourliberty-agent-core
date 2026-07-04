@@ -3853,7 +3853,11 @@ class TestMergeTruthGate(_TempAgentsRootMixin, unittest.TestCase):
                           return_value=(False, None)), \
              patch.object(self.hps, '_gh_pr_state', return_value='MERGED'), \
              patch.object(self.hps.larry_alerts, 'append_alert',
-                          return_value=True) as mock_alert:
+                          return_value=True) as mock_alert, \
+             patch.object(self.hps, 'check_retry_exhausted', return_value=[]):
+            # check_retry_exhausted reads the LIVE systemd journal (journalctl),
+            # which no agents-root redirect covers; isolate it so this
+            # alert-count gate can't flake on a real retry-exhausted task.
             self.hps.run()
         mock_alert.assert_not_called()
 

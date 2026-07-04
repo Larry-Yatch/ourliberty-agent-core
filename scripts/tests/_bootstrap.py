@@ -238,17 +238,20 @@ def engage() -> None:
     #   AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
     # AT IMPORT; without an import-time default a test that imports such a
     # module and then triggers an inbox/blackboard/state write hits the REAL
-    # ~/agents tree. setdefault so an outer harness or an intentional delenv
-    # still wins.
-    if not os.environ.get('OURLIBERTY_AGENTS_ROOT'):
+    # ~/agents tree. FORCE-OVERRIDE (not setdefault): the 2026-07-02 tier-bench
+    # outage happened because a child unittest INHERITED a live OURLIBERTY_AGENTS_ROOT
+    # and setdefault refused to override it, so every writer resolved live. We now
+    # unconditionally redirect to a fresh sandbox UNLESS the caller explicitly opts
+    # out via OURLIBERTY_ALLOW_LIVE_AGENTS_ROOT (the regression gate sets it — it
+    # pins its own coordinated AGENTS_ROOT/LOG_DIR/WORKTREES tree and must not be
+    # split-brained by a fresh mkdtemp here).
+    if not os.environ.get('OURLIBERTY_ALLOW_LIVE_AGENTS_ROOT'):
         _sandbox_agents_root = tempfile.mkdtemp(
             prefix='ourliberty-test-agents-root-')
         os.makedirs(os.path.join(_sandbox_agents_root, 'logs'), exist_ok=True)
         os.environ['OURLIBERTY_AGENTS_ROOT'] = _sandbox_agents_root
-        os.environ.setdefault(
-            'OURLIBERTY_WORKTREES_ROOT',
-            os.path.join(_sandbox_agents_root, 'worktrees'),
-        )
+        os.environ['OURLIBERTY_WORKTREES_ROOT'] = os.path.join(
+            _sandbox_agents_root, 'worktrees')
 
     # Test-isolation guard (2026-06-02 live-DB leak): block the chain-event
     # emitter from ever building a live Supabase client during a test run.

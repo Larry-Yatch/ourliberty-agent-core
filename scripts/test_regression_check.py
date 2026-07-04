@@ -257,6 +257,10 @@ def build_sandbox_env(
     worktrees_root.mkdir(parents=True, exist_ok=True)
 
     env['OURLIBERTY_AGENTS_ROOT'] = str(sandbox_root)
+    # Opt out of the bootstrap/conftest force-override: this sandbox root is a
+    # coordinated tree (AGENTS_ROOT/LOG_DIR/WORKTREES all under it); a fresh
+    # mkdtemp override would split-brain it. See _bootstrap.py force-override.
+    env['OURLIBERTY_ALLOW_LIVE_AGENTS_ROOT'] = '1'
     env['OURLIBERTY_WORKTREES_ROOT'] = str(worktrees_root)
     env['OURLIBERTY_LOG_DIR'] = str(log_dir)
     env['OURLIBERTY_DISABLE_LIVE_EMIT'] = '1'

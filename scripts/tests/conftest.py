@@ -47,11 +47,13 @@ import pytest
 # per test; this default only catches import-time path captures.
 _SANDBOX_AGENTS_ROOT = tempfile.mkdtemp(prefix='ol-test-agents-root-')
 os.makedirs(os.path.join(_SANDBOX_AGENTS_ROOT, 'logs'), exist_ok=True)
-os.environ.setdefault('OURLIBERTY_AGENTS_ROOT', _SANDBOX_AGENTS_ROOT)
-os.environ.setdefault(
-    'OURLIBERTY_WORKTREES_ROOT',
-    os.path.join(_SANDBOX_AGENTS_ROOT, 'worktrees'),
-)
+# FORCE-OVERRIDE (not setdefault) so an inherited LIVE root cannot defeat the
+# sandbox — the 2026-07-02 tier-bench outage. The regression gate opts out via
+# OURLIBERTY_ALLOW_LIVE_AGENTS_ROOT (it pins its own coordinated tree).
+if not os.environ.get('OURLIBERTY_ALLOW_LIVE_AGENTS_ROOT'):
+    os.environ['OURLIBERTY_AGENTS_ROOT'] = _SANDBOX_AGENTS_ROOT
+    os.environ['OURLIBERTY_WORKTREES_ROOT'] = os.path.join(
+        _SANDBOX_AGENTS_ROOT, 'worktrees')
 os.environ.setdefault(
     'OURLIBERTY_LOG_DIR', os.path.join(_SANDBOX_AGENTS_ROOT, 'logs'),
 )
