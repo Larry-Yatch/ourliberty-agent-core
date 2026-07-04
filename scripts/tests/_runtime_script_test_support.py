@@ -65,6 +65,21 @@ def scrub_run_sentinel(env: dict) -> dict:
     return env
 
 
+def redirect_agents_root(env: dict) -> dict:
+    """Point OURLIBERTY_AGENTS_ROOT at the child's redirected $HOME/agents so a
+    HOME-sandboxed subprocess writes alerts where the harness reads them.
+
+    The test bootstrap (#820 force-override) pins OURLIBERTY_AGENTS_ROOT to a
+    /tmp sandbox in the PARENT process, and an ``os.environ.copy()`` subprocess
+    inherits it -- so the child larry_alerts.py resolves AGENTS_ROOT to that
+    inherited sandbox instead of the $HOME the harness overrode, dropping the
+    alert off-tree where _read_alerts never looks. Realign it to $HOME/agents
+    (larry_alerts' own default) AFTER HOME has been set in env. Mutates and
+    returns env for chaining."""
+    env["OURLIBERTY_AGENTS_ROOT"] = str(Path(env["HOME"]) / "agents")
+    return env
+
+
 def install_timeout_shim(bin_dir: Path) -> None:
     """If the platform lacks GNU `timeout` (macOS), drop a pass-through shim on
     `bin_dir` (which the caller must prepend to the subprocess PATH). The shim
