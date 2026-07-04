@@ -436,8 +436,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-04T20:05Z UTC (Iter ~3863, **Tier 1**)
+## Status snapshot — updated 2026-07-04T20:07Z UTC (Iter ~3864, **Tier 1**)
 
-**Iter ~3863 summary (2026-07-04T20:05Z):** 0 new alerts (watermark=1081=file_length). PR #823 OPEN (MERGEABLE+CLEAN, Mirror REVIEW_PASS, AUTO_MERGE_HELD for /code-review high; Larry DM'd 13:25:06 MDT — action pending). All daemons alive (beacon-bot=4078238, inbox-watcher=4079442, outbox-notifier=4079818). Watchdog healthy (19:57:19Z UTC). Heal-daemon heartbeat 19:52:16Z UTC. Sync: status=success, last_sync=19:40:48Z UTC. HEAD=d47aa43d=origin/main. **Pending approvals: 0.** STANDING: zombie bash PID 1834248 (~37.05d) still alive; kill-authorization pending (escalation #19). Check I/III: Saturday UTC (weekday=5), not firing. Tier 1 (consecutive_clean=0). PRIME ratio: ~15.08 (systemic_fixes=73; vp=33; interventions=1102; trend: worsening). **ACTIVE G-rules:** ourliberty-health-subject-key-mismatch-001 [1/3]; merge-held-deep-review-notifier-tier4-001 [1/3]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3].
+**Iter ~3864 summary (2026-07-04T20:07Z):** 0 new alerts (watermark=1081=file_length). PR #823 OPEN (MERGEABLE+CLEAN, Mirror REVIEW_PASS, AUTO_MERGE_HELD for /code-review high; Larry DM'd 13:25:06 MDT — action pending). All daemons alive (beacon-bot=4078238, inbox-watcher=4079442, outbox-notifier=4079818). Watchdog healthy (20:02:20Z UTC). Heal-daemon heartbeat 20:02:20Z UTC. Sync: status=success, last_sync=19:40:48Z UTC. HEAD=1bd5d2a9=origin/main. **Pending approvals: 0.** STANDING: zombie bash PID 1834248 (~37.04d) still alive; kill-authorization pending (escalation #19). Check I/III: Saturday UTC (weekday=5), not firing. Tier 1 (consecutive_clean=0). PRIME ratio: ~15.10 (systemic_fixes=73; vp=33; interventions=1103; trend: worsening). **ACTIVE G-rules:** ourliberty-health-subject-key-mismatch-001 [1/3]; merge-held-deep-review-notifier-tier4-001 [1/3]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3].
 
 
