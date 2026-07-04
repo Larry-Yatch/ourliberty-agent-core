@@ -155,6 +155,75 @@ def scan_roots_for_sentinel(roots, sentinel: str,
     return hits
 
 
+# Defense-in-depth ledger (Gap-2 closure): atomic_io JSON/state writes do NOT
+# carry the log-line sentinel, so the content-sentinel scan is structurally blind
+# to a leaked state file (beacon-pending-approvals.json, for-larry-escalations
+# .json, missions.json, ...). We close that by recording, at the atomic_io
+# chokepoint, any write that ACTUALLY LANDS under the real ~/agents tree during a
+# test — a path-based attribution that is content-independent. This sits BEHIND
+# the #816 refuse_live_state_write guard (which raises BEFORE such a write), so
+# in normal operation the ledger stays empty: zero overhead, zero false
+# positives. If that guard is ever removed/weakened, or a state write reaches the
+# real tree by some other atomic_io path, the session-end tripwire still
+# attributes it. Process-global (each runner process has its own); reset every
+# session end.
+_ATOMIC_IO_REAL_TREE_WRITES: list[str] = []
+
+
+def _instrument_atomic_io(sentinel: str) -> list:
+    """Wrap ``atomic_io.atomic_write_bytes`` so a write that lands under the real
+    ~/agents tree during a test is recorded to the ledger. Returns undo
+    callables. Fail-open: if atomic_io / the guard can't be imported, the
+    tripwire still runs (log-helper stamping unaffected).
+
+    Recording is POST-write (only reached when the write succeeded and actually
+    landed) and gated on the LIVE run sentinel — so ``allow()``, which clears the
+    sentinel for its duration, exempts sanctioned real-tree writes, and a
+    correctly-redirected sandbox write (not under a real root) is never
+    recorded. atomic_write_text/json both funnel through atomic_write_bytes via
+    the module global, so wrapping this one function covers all three."""
+    undo: list = []
+    try:
+        import atomic_io
+        import test_isolation_guard as guard
+    except Exception:
+        return undo
+
+    _orig = atomic_io.atomic_write_bytes
+    try:
+        _roots = guard._real_agents_roots()
+    except Exception:
+        _roots = []
+
+    def _wrapped(path, data, *args, _orig=_orig, _roots=_roots, **kwargs):
+        result = _orig(path, data, *args, **kwargs)
+        # Reached only when the write actually landed. Record iff we are inside a
+        # test run (live sentinel set — NOT cleared by an allow() block) and the
+        # final path resolves under a real agents root.
+        if os.environ.get('OURLIBERTY_TEST_RUN_SENTINEL'):
+            try:
+                target = Path(result).resolve()
+                for root in _roots:
+                    if target == root or root in target.parents:
+                        _ATOMIC_IO_REAL_TREE_WRITES.append(str(target))
+                        break
+            except (OSError, ValueError, RuntimeError):
+                pass
+        return result
+
+    atomic_io.atomic_write_bytes = _wrapped
+    undo.append(lambda: setattr(atomic_io, 'atomic_write_bytes', _orig))
+    return undo
+
+
+def _drain_atomic_io_ledger() -> list:
+    """Return the recorded real-tree atomic_io writes as tripwire hit dicts and
+    reset the ledger for the next session."""
+    hits = [{'path': path, 'via': 'atomic_io'} for path in _ATOMIC_IO_REAL_TREE_WRITES]
+    _ATOMIC_IO_REAL_TREE_WRITES.clear()
+    return hits
+
+
 def instrument_log_helpers(sentinel: str) -> list:
     """Monkeypatch the known production log() helpers so every test-originated
     log line carries `sentinel`. Returns a list of zero-arg undo callables the
@@ -190,6 +259,9 @@ def instrument_log_helpers(sentinel: str) -> list:
         bot.log = _wrapped_bot
         undo.append(lambda: setattr(bot, 'log', _orig_bot))
 
+    # Also record atomic_io state writes that land in the real tree (Gap-2
+    # defense-in-depth behind the #816 refuse_live_state_write guard).
+    undo.extend(_instrument_atomic_io(sentinel))
     return undo
 
 
@@ -223,6 +295,9 @@ def run_session_end_tripwire(sentinel: str, session_start: float,
         except Exception:
             pass
     hits = scan_roots_for_sentinel(production_roots(), sentinel, session_start)
+    # Merge the atomic_io real-tree-write ledger (content-independent Gap-2
+    # attribution) into the content-sentinel scan hits.
+    hits = hits + _drain_atomic_io_ledger()
     return hits, (format_tripwire_failure(hits, runner) if hits else None)
 
 
