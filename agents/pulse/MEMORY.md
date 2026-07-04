@@ -424,8 +424,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-04T15:22Z UTC (Iter ~3826, **Tier 1**)
+## Status snapshot — updated 2026-07-04T15:27Z UTC (Iter ~3827, **Tier 1**)
 
-**Iter ~3826 summary (2026-07-04T15:22Z):** 0 new alerts. 0 open PRs (agent-core + dashboard). All daemons alive (beacon-bot=4078238, inbox-watcher=4079442, outbox-notifier=4079818). Watchdog healthy (last 09:17:18 MDT = 15:17:18Z UTC, 5-min cadence intact). Heal-daemon heartbeat 15:19:47Z UTC. Sync last 14:39:58Z. HEAD=cb79ef04=origin/main. Pending approvals: 2 fixture leaks (chat_id=12345, undeliverable) — Larry response still pending (escalation #21). STANDING: zombie bash PID 1834248 (etimes=3182565s ~36.84d) still alive; Larry kill-authorization pending (escalation #19). Last phantom doorbell idx=1071 at 13:16:47Z UTC; next expected ~17:16Z UTC. Pipeline idle ~11.5h since PR #822 merged 03:51Z Jul 4. Check I/III: Saturday UTC (weekday=5), not firing. Tier 1 (consecutive_clean=0). PRIME ratio: ~14.28 (systemic_fixes=75; vp=33; interventions=1071+; trend: worsening). NOTE: watchdog uses system-scope systemd timer (not user-scope).
+**Iter ~3827 summary (2026-07-04T15:27Z):** 0 new alerts. 0 open PRs (agent-core + dashboard). All daemons alive (beacon-bot=4078238, inbox-watcher=4079442, outbox-notifier=4079818). Watchdog healthy (last 09:22:20 MDT = 15:22:20Z UTC, 5-min cadence intact). Heal-daemon heartbeat 15:19:47Z UTC. Sync last 14:39:58Z. HEAD=9e816592=origin/main. Pending approvals: 2 fixture leaks (chat_id=12345, undeliverable) — Larry response still pending (escalation #21). STANDING: zombie bash PID 1834248 (etimes=3182871s ~36.84d) still alive; Larry kill-authorization pending (escalation #19). Last phantom doorbell idx=1071 at 13:16:47Z UTC; next expected ~17:16Z UTC. Pipeline idle ~11.6h since PR #822 merged 03:51Z Jul 4. Check I/III: Saturday UTC (weekday=5), not firing. Tier 1 (consecutive_clean=0). PRIME ratio: ~14.29 (systemic_fixes=75; vp=33; interventions=1072+; trend: worsening). NOTE: watchdog uses system-scope systemd timer (not user-scope).
 
 
