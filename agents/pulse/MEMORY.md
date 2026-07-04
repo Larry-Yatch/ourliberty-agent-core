@@ -424,8 +424,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-04T02:47Z UTC (Iter ~3729, **Tier 1**)
+## Status snapshot — updated 2026-07-04T03:12Z UTC (Iter ~3732, **Tier 1**)
 
-**Iter ~3729 summary (2026-07-04T02:47Z):** 0 new alerts. Both repos at 0 open PRs. All daemons alive. Watchdog healthy through 20:43:16 MDT (02:43:16Z UTC). HEAD=bceb9d7b=origin/main. Transient sync error (race during prior auto-commit window; tree clean, self-heals). Beacon offered to clear 2 fixture-leak pending approvals — Larry still no response. STANDING: zombie bash PID 1834248 (36d 07:28+) still alive. forge-notifier-tests-production-state-pollution-001 G-rule REJECTED; standby. Check I/III: Saturday UTC, not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 12.59 (systemic_fixes=78; vp=33; trend: worsening).
+**Iter ~3732 summary (2026-07-04T03:12Z):** 0 new alerts. PR #821 in Mirror review (~17 min at scan; dispatched 20:55:15 MDT). Dashboard at 0 open PRs. All daemons alive. Watchdog healthy through 21:09:06 MDT (03:09:06Z UTC). HEAD=ad927880=origin/main. Transient sync error (race during prior auto-commit window; tree clean, self-heals). Pending approvals: 2 fixture leaks (chat_id=12345, undeliverable) — Larry still no response to Beacon's offer. STANDING: zombie bash PID 1834248 (36d 07:52+) still alive. forge-notifier-tests-production-state-pollution-001 G-rule REJECTED; standby. Check I/III: Saturday UTC, not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 12.63 (systemic_fixes=78; vp=33; trend: worsening).
 
 
