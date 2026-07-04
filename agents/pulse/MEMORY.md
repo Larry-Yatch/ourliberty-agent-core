@@ -424,8 +424,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-04T09:04Z UTC (Iter ~3776, **Tier 1**)
+## Status snapshot — updated 2026-07-04T09:08Z UTC (Iter ~3777, **Tier 1**)
 
-**Iter ~3776 summary (2026-07-04T09:04Z):** 0 new alerts. 0 open PRs (agent-core + dashboard). All daemons alive (beacon-bot=4078238, inbox-watcher=4079442, outbox-notifier=4079818). PIDs consistent with heal-stale-daemon-code mass-restart at 00:14:49Z UTC 2026-07-04 (7 services restarted, idx=1105–1111, all triaged in prior iters). Watchdog system-scope timer healthy (last 03:02:59 MDT = 09:02:59Z UTC). Heal-daemon heartbeat 08:54:20Z. Sync no-change (08:39:19Z, ~25 min). HEAD=2794d4b2=origin/main. Pending approvals: 2 fixture leaks (chat_id=12345, undeliverable). STANDING: zombie bash PID 1834248 (36d 13h42m+) still alive; Larry kill-authorization pending. System at full quiesce (5h13m+ since PR #822 merged 03:51Z). Check I/III: Saturday UTC (weekday=5), not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 13.61 (systemic_fixes=75; vp=33; trend: worsening). NOTE: watchdog uses system-scope systemd timer (not user-scope); verified via `systemctl list-timers` (no --user).
+**Iter ~3777 summary (2026-07-04T09:08Z):** 0 new alerts. 0 open PRs (agent-core + dashboard). All daemons alive (beacon-bot=4078238, inbox-watcher=4079442, outbox-notifier=4079818). Watchdog system-scope timer healthy (last 03:08:06 MDT = 09:08:06Z UTC). Heal-daemon heartbeat 09:04:22Z. Sync no-change (08:39:19Z, ~29 min). HEAD=e73066db=origin/main. Pending approvals: 2 fixture leaks (chat_id=12345, undeliverable). STANDING: zombie bash PID 1834248 (36d 13h54m+) still alive; Larry kill-authorization pending. System at full quiesce (5h17m+ since PR #822 merged 03:51Z). Check I/III: Saturday UTC (weekday=5), not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 13.63 (systemic_fixes=75; vp=33; trend: worsening). NOTE: watchdog uses system-scope systemd timer (not user-scope); verified via `systemctl list-timers` (no --user).
 
 
