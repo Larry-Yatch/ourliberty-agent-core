@@ -424,8 +424,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-04T01:23Z UTC (Iter ~3717, **Tier 1**)
+## Status snapshot — updated 2026-07-04T01:38Z UTC (Iter ~3719, **Tier 1**)
 
-**Iter ~3717 summary (2026-07-04T01:23Z):** 0 new alerts. PR #110 (ourliberty-dashboard, "live: fold Tasks + Costs + Healers into Live System") opened 01:18:44Z by Larry + Claude Opus 4.8; auto-review label present, Mirror dispatch in flight. Watchdog healthy through 19:16:48 MDT. HEAD=4f4eefc0=origin/main. STANDING: zombie bash PID 1834248 (36d 06:02+) still alive. forge-notifier-tests-production-state-pollution-001 G-rule REJECTED; standby. Check I/III: Saturday UTC, not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 12.38 (interventions=978; systemic_fixes=79; vp=33; trend: worsening).
+**Iter ~3719 summary (2026-07-04T01:38Z):** 0 new alerts. 0 open PRs (PR #110 dashboard merged at 01:29:55Z iter ~3718). Watchdog healthy through 19:32:24 MDT. HEAD=8a3fdc6c=origin/main. STANDING: zombie bash PID 1834248 (36d 06:18+) still alive. forge-notifier-tests-production-state-pollution-001 G-rule REJECTED; standby. Check I/III: Saturday UTC, not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 12.39 (interventions=980; systemic_fixes=79; vp=33; trend: worsening).
 
 
