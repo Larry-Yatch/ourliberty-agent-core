@@ -424,8 +424,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-04T03:41Z UTC (Iter ~3735, **Tier 1**)
+## Status snapshot — updated 2026-07-04T03:46Z UTC (Iter ~3736, **Tier 1**)
 
-**Iter ~3735 summary (2026-07-04T03:41Z):** 1 new alert (Tier-4: ourliberty-health sync-error transient race; G-rule vp; outbox-notifier delivering DM). PR #822 "feat(test-jail): kernel-enforced bwrap wall" pipeline active — Mirror round-0 REVIEW_REVISION, Forge revision-1 completed 60s, Mirror re-review started 03:40:21Z. Dashboard at 0 open PRs. All daemons alive. Watchdog healthy through 21:40:16 MDT (03:40:16Z UTC). HEAD=0c29386e=origin/main. Transient sync error (race; tree clean, self-heals). Pending approvals: 2 fixture leaks (chat_id=12345, undeliverable) — Larry no response to Beacon's offer. STANDING: zombie bash PID 1834248 (36d 08h+) still alive. forge-notifier-tests-production-state-pollution-001 G-rule REJECTED; PR #822 bwrap wall is architectural fix path. Check I/III: Saturday UTC, not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 12.67 (systemic_fixes=78; vp=33; trend: worsening).
+**Iter ~3736 summary (2026-07-04T03:46Z):** 0 new alerts. Sync transient race self-healed (status=no-change, vs. prior iters status=error). PR #822 "feat(test-jail): kernel-enforced bwrap wall" pipeline active — Mirror round-1 re-review running since 21:40:15 MDT (Forge revision-1 applied in 60s). Dashboard at 0 open PRs. All daemons alive (beacon-bot=4078238, inbox-watcher=4079442, outbox-notifier=4079818). Watchdog healthy through 21:45:17 MDT. HEAD=589ec691=origin/main. Pending approvals: 2 fixture leaks (chat_id=12345, undeliverable). STANDING: zombie bash PID 1834248 (36d 08h+) still alive. forge-notifier-tests-production-state-pollution-001 G-rule REJECTED; PR #822 bwrap wall is architectural fix path. Check I/III: Saturday UTC, not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 12.68 (systemic_fixes=78; vp=33; trend: worsening).
 
 
