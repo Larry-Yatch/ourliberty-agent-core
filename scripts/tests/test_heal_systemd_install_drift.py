@@ -2085,10 +2085,20 @@ class TriggeredEntrypointTest(_IsolatedAgentsRoot):
         # End-to-end through real run_once: kill-switch present -> clean exit,
         # zero DMs, still exactly one tick. Proves the entrypoint doesn't bypass
         # the gate.
-        h.KILL_SWITCH.parent.mkdir(parents=True, exist_ok=True)
-        h.KILL_SWITCH.write_text('disabled')
-        self.addCleanup(lambda: h.KILL_SWITCH.unlink(missing_ok=True))
-        with mock.patch.object(h, 'dm_larry', return_value=True) as dm:
+        # KILL_SWITCH is a module constant frozen at import from
+        # OURLIBERTY_AGENTS_ROOT; if an earlier test in the run delenv'd that
+        # var, the constant froze to the LIVE /home/larry/agents default, so
+        # writing/unlinking h.KILL_SWITCH directly would touch the live healers
+        # kill switch (order-fragile — and blocked EROFS under the isolation
+        # wall). Patch it to a private tmp path like the sibling kill-switch
+        # tests (test_kill_switch_exits_clean) so this test is order-independent
+        # and never resolves the live tree.
+        _kstmp = tempfile.mkdtemp()
+        self.addCleanup(lambda: shutil.rmtree(_kstmp, ignore_errors=True))
+        kill = Path(_kstmp) / 'healers.disabled'
+        kill.write_text('disabled')
+        with mock.patch.object(h, 'KILL_SWITCH', kill), \
+                mock.patch.object(h, 'dm_larry', return_value=True) as dm:
             rc = h.main(['--triggered'])
         self.assertEqual(rc, 0)
         self.assertEqual(dm.call_count, 0)

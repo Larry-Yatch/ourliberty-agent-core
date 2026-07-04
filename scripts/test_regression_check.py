@@ -148,6 +148,14 @@ _FAILURE_LINE_RE = re.compile(
 # stay in parity.
 _TEST_RUN_SENTINEL_PREFIX = 'OL-TEST-RUN-SENTINEL-'
 
+# Mirror of scripts/test_isolation_wall.WALL_ACTIVE_ENV. Set in the discover
+# subprocess's env (via bwrap --setenv / unshare export) so that subprocess's
+# _bootstrap sees it is ALREADY inside the wall and does NOT nest a second bwrap
+# inside this one. Kept as a literal (not imported) so this production gate
+# takes no import dependency on the wall module; parity is asserted by
+# scripts/tests/test_gate_wall_parity.py.
+_WALL_ACTIVE_ENV = 'OURLIBERTY_TEST_WALL_ACTIVE'
+
 
 # Synthetic failure id for a suite that exited non-zero while printing a clean
 # "Ran N tests" summary with no FAIL/ERROR lines — a session-level guard
@@ -298,7 +306,9 @@ def _unshare_wall_prefix(ro_targets: list[Path]) -> list[str]:
         quoted = shlex.quote(str(target))
         mount_steps.append(f'mount --bind {quoted} {quoted}')
         mount_steps.append(f'mount -o remount,ro,bind {quoted} {quoted}')
-    inner = (' && '.join(mount_steps) + ' && exec "$@"') if mount_steps else 'exec "$@"'
+    _body = (' && '.join(mount_steps) + ' && exec "$@"') if mount_steps else 'exec "$@"'
+    # Signal the wrapped test process it is already walled (no nested bwrap).
+    inner = 'export ' + _WALL_ACTIVE_ENV + '=1; ' + _body
     return ['unshare', '--user', '--map-root-user', '--mount',
             'sh', '-c', inner, 'sh']
 
@@ -323,6 +333,9 @@ def _discover_wall_prefix(workdir: Path) -> list[str]:
         bwrap_prefix = [bwrap, '--dev-bind', '/', '/', '--chdir', str(workdir)]
         for target in ro_targets:
             bwrap_prefix += ['--ro-bind', str(target), str(target)]
+        # Signal the discover subprocess's _bootstrap that it is already walled
+        # (prevents a nested bwrap inside this one).
+        bwrap_prefix += ['--setenv', _WALL_ACTIVE_ENV, '1']
         if _probe(bwrap_prefix + ['--', '/bin/true']):
             return bwrap_prefix + ['--']
 
@@ -334,7 +347,12 @@ def _discover_wall_prefix(workdir: Path) -> list[str]:
         return unshare_prefix
 
     # (c) no namespace primitive (today's droplet; always macOS): warn + unwalled.
-    print(_WALL_UNAVAILABLE_WARNING, file=sys.stderr)
+    # Suppress the warning when THIS process is ALREADY inside the wall (e.g. the
+    # gate-parity meta-test calls this from within the walled suite, where a
+    # nested bwrap can't be created): bwrap isn't unavailable there, it just
+    # can't nest, so the "install bubblewrap" message would be misleading noise.
+    if os.environ.get(_WALL_ACTIVE_ENV) != '1':
+        print(_WALL_UNAVAILABLE_WARNING, file=sys.stderr)
     return []
 
 
