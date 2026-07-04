@@ -424,8 +424,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-04T09:27Z UTC (Iter ~3779, **Tier 1**)
+## Status snapshot — updated 2026-07-04T09:32Z UTC (Iter ~3780, **Tier 1**)
 
-**Iter ~3779 summary (2026-07-04T09:27Z):** 0 new alerts. 0 open PRs (agent-core + dashboard). All daemons alive (beacon-bot=4078238, inbox-watcher=4079442, outbox-notifier=4079818). Watchdog healthy (last 03:23:45 MDT = 09:23:45Z UTC). Heal-daemon heartbeat 09:24:22Z. Sync no-change (08:39:19Z, ~47 min). HEAD=735b09f7=origin/main. Pending approvals: 2 fixture leaks (chat_id=12345, undeliverable) — generating ~4h doorbell cadence; manual cleanup ask-then-do pending Larry direction (escalation #21). STANDING: zombie bash PID 1834248 (36d 14h07m+) still alive; Larry kill-authorization pending (escalation #19). System at full quiesce (5h36m+ since PR #822 merged 03:51Z). Check I/III: Saturday UTC (weekday=5), not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 13.65 (systemic_fixes=75; vp=33; trend: worsening). NOTE: watchdog uses system-scope systemd timer (not user-scope).
+**Iter ~3780 summary (2026-07-04T09:32Z):** 0 new alerts. 0 open PRs (agent-core + dashboard). All daemons alive (beacon-bot=4078238, inbox-watcher=4079442, outbox-notifier=4079818). Watchdog healthy (last 03:28:47 MDT = 09:28:47Z UTC). Heal-daemon heartbeat 09:24:22Z. Sync no-change (08:39:19Z, ~53 min). HEAD=a2ba0d62=origin/main. Pending approvals: 2 fixture leaks (chat_id=12345, undeliverable) — generating ~4h doorbell cadence; manual cleanup ask-then-do pending Larry direction (escalation #21). STANDING: zombie bash PID 1834248 (36d 14h12m+) still alive; Larry kill-authorization pending (escalation #19). System at full quiesce (5h41m+ since PR #822 merged 03:51Z). Check I/III: Saturday UTC (weekday=5), not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 13.67 (systemic_fixes=75; vp=33; trend: worsening). NOTE: watchdog uses system-scope systemd timer (not user-scope).
 
 
