@@ -2,10 +2,17 @@
 reexec_under_wall(), the process runs inside the bwrap namespace and the REAL
 ~/agents tree is read-only — for the process itself AND any child it spawns.
 
-Skipped when bwrap is unavailable (macOS dev / hosts without bubblewrap): there
-is no kernel wall to assert there, and the fail-open path is covered by the unit
-tests. Writes are attempted only in the spawned child and are self-cleaning, so
-a broken wall fails loudly without leaving state in ~/agents.
+Skipped when the kernel wall cannot be ESTABLISHED — not merely when bwrap is
+absent (macOS dev), but also where bwrap is present-but-non-functional: e.g. the
+gate/CI environment runs under NoNewPrivileges + apparmor_restrict_unprivileged_
+userns=1, which suppresses bwrap's setuid so it cannot create the namespace.
+There reexec_under_wall() correctly fails-open to UNWALLED, so the read-only
+assertion would spuriously fail. We gate the skip on ``wall.bwrap_prefix()``
+returning non-None (it probes ``bwrap --dev-bind / / -- /bin/true``), so the
+read-only assertion only runs where a real kernel wall actually holds; the
+fail-open path is covered by the unit tests. Writes are attempted only in the
+spawned child and are self-cleaning, so a broken wall fails loudly without
+leaving state in ~/agents.
 """
 try:
     from . import _bootstrap  # noqa: F401  bootstrap-first-import
@@ -13,7 +20,6 @@ except ImportError:  # pragma: no cover
     import _bootstrap  # noqa: F401
 
 import os
-import shutil
 import subprocess
 import sys
 import unittest
@@ -45,8 +51,15 @@ DRIVER = (
 )
 
 
-@unittest.skipIf(shutil.which('bwrap') is None,
-                 'bwrap unavailable — no kernel wall to assert')
+# Skip unless a kernel wall can actually be ESTABLISHED here: bwrap_prefix()
+# returns None when bwrap is absent OR present-but-non-functional (setuid
+# suppressed under NoNewPrivileges / apparmor_restrict_unprivileged_userns=1, as
+# in the gate/CI env), and only non-None when the ``bwrap --dev-bind / / --
+# /bin/true`` probe succeeds. Gating on mere presence would run the read-only
+# assertion in environments where reexec_under_wall() legitimately fails-open to
+# unwalled, spuriously failing the test (and the regression gate) every run.
+@unittest.skipIf(wall.bwrap_prefix() is None,
+                 'kernel wall unavailable — bwrap absent or non-functional here')
 class WallEndToEndTest(unittest.TestCase):
     def test_reexec_makes_real_agents_readonly(self):
         # Scrub the guards so the child does a FRESH wall decision (unless it is
