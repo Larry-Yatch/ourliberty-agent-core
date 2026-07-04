@@ -92,12 +92,10 @@ def log_divergence(msg):
 
 
 def _atomic_write(path, data):
-    tmp = path.with_suffix(path.suffix + f'.tmp.{os.getpid()}')
-    with open(tmp, 'w') as f:
-        json.dump(data, f)
-        f.flush()
-        os.fsync(f.fileno())
-    os.rename(tmp, path)
+    # Delegates to the shared guarded atomic_io writer. Byte-identical to the
+    # prior compact json.dump (indent=None, no trailing newline).
+    import atomic_io
+    atomic_io.atomic_write_json(path, data, indent=None, trailing_newline=False)
 
 
 def _read_lease(path):

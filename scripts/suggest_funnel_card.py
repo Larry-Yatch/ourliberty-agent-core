@@ -79,22 +79,10 @@ def _kebab_case(name: str) -> str:
 
 
 def _atomic_write_json(path: Path, obj: Any) -> None:
-    """Write `obj` as pretty JSON atomically (unique tmp in the same dir +
-    os.replace) so the draining healer never sees a partial file. Mirrors
-    dashboard_api._atomic_write_json."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_name = tempfile.mkstemp(
-        dir=str(path.parent), prefix=path.name + '.', suffix='.tmp')
-    try:
-        with os.fdopen(fd, 'w') as fh:
-            fh.write(json.dumps(obj, indent=2) + '\n')
-        os.replace(tmp_name, path)
-    except BaseException:
-        try:
-            os.unlink(tmp_name)
-        except OSError:
-            pass
-        raise
+    """Delegates to the shared guarded atomic_io writer. Byte-identical to the
+    prior inline writer: pretty JSON (indent=2) + trailing newline."""
+    import atomic_io
+    atomic_io.atomic_write_json(path, obj, trailing_newline=True)
 
 
 def build_suggested_entry(

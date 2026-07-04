@@ -123,22 +123,10 @@ DEFAULT_PARKED_STATE_FILE = _AGENTS / "state" / "pulse-check-i-parked.json"
 
 
 def _atomic_write(path: Path, content: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(
-        prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent)
-    )
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(content)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp, path)
-    except Exception:
-        try:
-            os.unlink(tmp)
-        except OSError:
-            pass
-        raise
+    # Delegates to the shared guarded atomic_io writer. Byte-identical to the
+    # prior inline text writer.
+    import atomic_io
+    atomic_io.atomic_write_text(path, content)
 
 
 def _default_week_ending(now: Optional[datetime] = None) -> datetime:
