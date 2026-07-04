@@ -64,6 +64,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 import atomic_io  # noqa: E402
 import file_lock  # noqa: E402
+import prod_write_guard  # noqa: E402  # refuse live-tree writes under pytest
 
 
 def _decision_key_for(record_id: Optional[str], pr_url: Optional[str]) -> Optional[str]:
@@ -175,6 +176,7 @@ def _save(rows: list[dict[str, Any]], now: datetime) -> None:
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         doc = {}
     doc['escalations'] = _prune(rows, now)
+    prod_write_guard.guard_no_prod_write_under_test(path)
     atomic_io.atomic_write_json(path, doc, sort_keys=True)
 
 

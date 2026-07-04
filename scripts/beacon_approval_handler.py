@@ -68,6 +68,7 @@ if str(_SCRIPT_DIR) not in sys.path:
 import atomic_io        # noqa: E402  # shared durable atomic write (PR-E #366)
 import chain_event_shipper as _ces  # noqa: E402  # imported read-only for compute_event_id
 import file_lock         # noqa: E402  # shared advisory flock (PR-E2 #48)
+import prod_write_guard  # noqa: E402  # refuse live-tree writes under pytest
 import safe_write_inbox  # noqa: E402
 import trust_policy      # noqa: E402
 from decision_identity import canonical_decision_key  # noqa: E402
@@ -473,6 +474,7 @@ def save_state(state: dict[str, Any]) -> None:
     # the WRITE is crash-safe and tmp-collision-free; serializing the surrounding
     # load→mutate→save (the lost-update fix) is the job of state_lock(), which the
     # mutators take on their state=None path and external batch callers must hold.
+    prod_write_guard.guard_no_prod_write_under_test(PENDING_APPROVALS_PATH)
     atomic_io.atomic_write_json(PENDING_APPROVALS_PATH, state, indent=2)
 
 
