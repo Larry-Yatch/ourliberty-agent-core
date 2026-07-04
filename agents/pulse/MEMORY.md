@@ -424,8 +424,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-04T02:27Z UTC (Iter ~3726, **Tier 1**)
+## Status snapshot — updated 2026-07-04T02:36Z UTC (Iter ~3727, **Tier 1**)
 
-**Iter ~3726 summary (2026-07-04T02:27Z):** 0 new alerts. Both repos at 0 open PRs — PR #111 (dashboard "live: migrate Where-Are-We panels + retire the tab") MERGED at 02:21:24Z UTC since iter ~3725 (clean REVIEW_PASS → AUTO_MERGE → BASELINE_WARM → WORKTREE_TEARDOWN). Pipeline session today: PRs #109, #110, #820, #111 all merged cleanly. All daemons alive. Watchdog healthy through 20:22:57 MDT. HEAD=0ea47f3b=origin/main. Larry/Beacon interaction 20:21-20:23 MDT re: clearing 2 fixture-leak pending approvals — Beacon offering to resolve both to `expired`. STANDING: zombie bash PID 1834248 (36d 07:07+) still alive. forge-notifier-tests-production-state-pollution-001 G-rule REJECTED; Larry/Beacon engaging cleanup. Check I/III: Saturday UTC, not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 12.43 (interventions≈983; systemic_fixes=79; vp=33; trend: worsening).
+**Iter ~3727 summary (2026-07-04T02:36Z):** 0 new alerts. PR #112 (dashboard "nav: collapse to the four-tab structure — IA finale step 6") opened and dispatched to Mirror at 02:35Z UTC. Agent-core at 0 open PRs. All daemons alive. Watchdog healthy through 20:33:01 MDT. HEAD=6230efe6=origin/main. Beacon offered to clear 2 fixture-leak pending approvals at 20:23:03 MDT — Larry response still pending. STANDING: zombie bash PID 1834248 (36d 07:17+) still alive. forge-notifier-tests-production-state-pollution-001 G-rule REJECTED; Larry/Beacon engaging cleanup. Check I/III: Saturday UTC, not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 12.59 (systemic_fixes=78; vp=33; trend: worsening).
 
 
