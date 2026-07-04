@@ -279,9 +279,15 @@ PR #732 (fix(mirror): in-process verdict-marker self-validation gate to kill res
 
 ---
 
-## G-rule ourliberty-health-clean-tree-dirty-tier4-001 → COMPLETE ✅ (iter ~3839)
+## G-rule ourliberty-health-clean-tree-dirty-tier4-001 → STALE ⚠️ (re-opened iter ~3849)
 
-Triage helper returned Tier-3 "known-pattern match in alert-translations.json" for subject="ourliberty-agent-core health: 1 issue(s) need attention" at iter ~3839 (L1076). Fix confirmed live. Moving to Completed G-rules.
+Previously marked COMPLETE at iter ~3839 (Tier-3 confirmed). RE-VERIFIED iter ~3849: triage helper returns Tier-4 for subject "ourliberty-agent-core health: 1 issue(s) need attention". ROOT CAUSE: alert-translations.json ourliberty-health entry sub-key is "sync_agent_core: auto-commit push failed" which does NOT match actual alert subject. Translation gap. Tracking as G-rule ourliberty-health-subject-key-mismatch-001 [1/3].
+
+---
+
+## G-rule ourliberty-health-subject-key-mismatch-001 — 1/3 (new, iter ~3849)
+
+**Rule:** `source=ourliberty-health, subject="ourliberty-agent-core health: N issue(s) need attention"` alerts classify Tier-4 (helper: "novel: no registry template and no translation match"). alert-translations.json has an `ourliberty-health` entry but its only sub-key is `"sync_agent_core: auto-commit push failed"` — the actual alert subject doesn't match. Fix: add sub-entry for `"ourliberty-agent-core health:"` prefix, or make the ourliberty-health entry a wildcard catch-all. Alert content is self-healing (sync push transient); companion sync.service digest already covers it. Dispatch to Beacon at 3/3. First occurrence iter ~3849 (L1080, ts=18:12:35Z UTC).
 
 ---
 
@@ -424,8 +430,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-04T18:12Z UTC (Iter ~3848, **Tier 1**)
+## Status snapshot — updated 2026-07-04T18:20Z UTC (Iter ~3849, **Tier 1**)
 
-**Iter ~3848 summary (2026-07-04T18:12Z):** 0 new alerts, watermark 1079 (no change). 0 open PRs (agent-core + dashboard). All daemons alive (beacon-bot=4078238, inbox-watcher=4079442, outbox-notifier=4079818). Watchdog healthy (last 12:11:00 MDT = 18:11:00Z UTC). Heal-daemon heartbeat 18:10:39Z UTC. Sync: status=error from 17:40Z (push failed, carry); HEAD=b7c3f46f=origin/main (wrapper iter ~3847 push). ~/worktrees/: 2 registered git worktrees (test-seal-bwrap-wall, test-seal-review) + 1 plain dir (test-seal-resume — PR #822 planning docs, not a git worktree, harmless). **Pending approvals: 0** (fixture cleanup resolved iter ~3847). STANDING: zombie bash PID 1834248 (~36.96d+) still alive; kill-authorization pending (escalation #19). Pipeline idle ~20h+ since PR #822 merged 03:51Z Jul 4. Check I/III: Saturday UTC (weekday=5), not firing. Tier 1 (consecutive_clean=0). PRIME ratio: ~14.48 (systemic_fixes=75; vp=33; interventions≈1091+; trend: worsening).
+**Iter ~3849 summary (2026-07-04T18:20Z):** 1 new alert (L1080 ourliberty-health Tier-4, translation subject-key mismatch, self-healed, already delivered by notifier 18:14Z). Watermark advanced to 1080. 0 open PRs (agent-core + dashboard). All daemons alive (beacon-bot=4078238, inbox-watcher=4079442, outbox-notifier=4079818). Watchdog healthy (last 12:16:03 MDT = 18:16:03Z UTC). Heal-daemon heartbeat 18:10:39Z UTC. Sync: status=error from 17:40Z (push failed, carry); HEAD=931d1f17=origin/main (wrapper iter ~3848 push). ~/worktrees/: 2 registered git worktrees (test-seal-bwrap-wall, test-seal-review) + 1 plain dir (test-seal-resume). **Pending approvals: 0.** STANDING: zombie bash PID 1834248 (~36.97d+) still alive; kill-authorization pending (escalation #19). Pipeline idle ~20h+ since PR #822 merged 03:51Z Jul 4. Check I/III: Saturday UTC (weekday=5), not firing. Tier 1 (consecutive_clean=0). PRIME ratio: ~14.49 (systemic_fixes=75; vp=33; interventions≈1093+; trend: worsening). **NEW G-rule:** ourliberty-health-subject-key-mismatch-001 [1/3]. **STALE MEMORY:** ourliberty-health-clean-tree-dirty-tier4-001 re-opened (translation not working).
 
 
