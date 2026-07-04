@@ -424,8 +424,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-04T03:22Z UTC (Iter ~3733, **Tier 1**)
+## Status snapshot — updated 2026-07-04T03:33Z UTC (Iter ~3734, **Tier 1**)
 
-**Iter ~3733 summary (2026-07-04T03:22Z):** 0 new alerts. PR #821 in Mirror review (~27 min at scan; dispatched 20:55:15 MDT). PR #822 NEW — "feat(test-jail): kernel-enforced bwrap wall" (Larry-authored, capstone of test-isolation project), Mirror review dispatched 21:20:51 MDT. Dashboard at 0 open PRs. All daemons alive. Watchdog healthy through 21:19:19 MDT (03:19:19Z UTC). HEAD=b3361111=origin/main. Transient sync error (race; tree clean, self-heals). Pending approvals: 2 fixture leaks (chat_id=12345, undeliverable) — Larry no response to Beacon's offer. STANDING: zombie bash PID 1834248 (36d 08h+) still alive. forge-notifier-tests-production-state-pollution-001 G-rule REJECTED; PR #822 bwrap wall is architectural fix path. Check I/III: Saturday UTC, not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 12.65 (systemic_fixes=78; vp=33; trend: worsening).
+**Iter ~3734 summary (2026-07-04T03:33Z):** 1 new alert (Tier-3 silence: wedged-review-silent PR #821 known pattern; session completed 65s after alert). Repo fast-forwarded ce978c07→20e3f5a2 (PR #821 merge commit). PR #821 MERGED 03:25:29Z ("test: fix sync_agent_core alert-isolation bug (inherited OURLIBERTY_AGENTS_ROOT)") — redirect_agents_root() helper now live. PR #822 "feat(test-jail): kernel-enforced bwrap wall" in Mirror review (~1h12m at scan). Dashboard at 0 open PRs. All daemons alive. Watchdog healthy through 21:29:54 MDT (03:29:54Z UTC). HEAD=20e3f5a2=origin/main. Transient sync error (race; tree clean, self-heals). Pending approvals: 2 fixture leaks (chat_id=12345, undeliverable) — Larry no response to Beacon's offer. STANDING: zombie bash PID 1834248 (36d 08h+) still alive. forge-notifier-tests-production-state-pollution-001 G-rule REJECTED; PR #822 bwrap wall is architectural fix path. Check I/III: Saturday UTC, not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 12.67 (systemic_fixes=78; vp=33; trend: worsening).
 
 
