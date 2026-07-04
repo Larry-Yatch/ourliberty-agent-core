@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-04T00:05Z UTC (Iter ~3705, **Tier 1**)
+## Status snapshot — updated 2026-07-04T00:12Z UTC (Iter ~3706, **Tier 1**)
 
-**Iter ~3705 summary (2026-07-04T00:05Z):** 0 new alerts. ⚠️ STANDING: zombie bash PID 1834248 (36d+) still alive, kill pending Larry ok. ALWAYS-FIX: repo was 1 behind origin (PR #819 squash-merge 00:01Z); fast-forwarded 52d6d463→85124ccc. Agent-core PR #819 MERGED ✅ (Mirror REVIEW_PASS, auto-merged, 00:01:06Z UTC). Dashboard PR #107 ("live: move Forge + Mirror queues to Live System") in Mirror review (dispatched 23:50:19Z, ~15 min in). pending-approvals=2 (2 fixture leaks chat_id=12345 only). HEAD=85124ccc=origin/main, sync no-change 23:39Z (within 2h), all daemons alive, 0 stalls. Check I: UTC Saturday (weekday=5), not a firing day. Tier 1 (consecutive_clean=0). PRIME ratio: 12.28 (systemic_fixes=79; vp=33; trend: worsening).
+**Iter ~3706 summary (2026-07-04T00:12Z):** 0 new alerts. ⚠️ STANDING: zombie bash PID 1834248 (36d+) still alive, kill pending Larry ok. Pipeline fully drained: dashboard PR #107 MERGED ✅ (Mirror REVIEW_PASS, auto-merged 00:07:58Z UTC); agent-core PR #819 MERGED ✅ (iter ~3705). 0 open PRs in either T0 repo. All inboxes empty. HEAD=818a8d4e=origin/main, sync no-change 23:39Z (within 2h), all daemons alive, 0 stalls. Check I: UTC Saturday (weekday=5), not a firing day. Tier 1 (consecutive_clean=0). PRIME ratio: 12.27 (systemic_fixes=79; vp=33; trend: worsening).
 
 
