@@ -436,8 +436,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-04T22:37Z UTC (Iter ~3883, **Tier 1**)
+## Status snapshot — updated 2026-07-04T22:42Z UTC (Iter ~3884, **Tier 1**)
 
-**Iter ~3883 summary (2026-07-04T22:37Z):** 0 new alerts (watermark=1081=file_length). PR #823 OPEN (mergeable=UNKNOWN transient oscillation; Mirror REVIEW_PASS; AUTO_MERGE_HELD for /code-review high; Larry DM'd 13:25:06 MDT — action pending). All daemons alive (beacon-bot=4078238, inbox-watcher=4079442, outbox-notifier=4079818). Watchdog healthy (22:35:22Z UTC). Heal-daemon heartbeat 22:35:00Z UTC. Sync: status=no-change, last_sync=21:40:16Z UTC. HEAD=6322532c=origin/main. **Pending approvals: 0.** STANDING: zombie bash PID 1834248 (~37.16d) still alive; kill-authorization pending (escalation #19). Check I/III: Saturday UTC (weekday=5), not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 15.54 (interventions=1119; systemic_fixes=72; vp=32; trend: worsening). **ACTIVE G-rules:** ourliberty-health-subject-key-mismatch-001 [1/3]; merge-held-deep-review-notifier-tier4-001 [1/3]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3].
+**Iter ~3884 summary (2026-07-04T22:42Z):** 0 new alerts (watermark=1081=file_length). PR #823 OPEN (mergeable=UNKNOWN transient oscillation; Mirror REVIEW_PASS; AUTO_MERGE_HELD for /code-review high; Larry DM'd 13:25:06 MDT — action pending). All daemons alive (beacon-bot=4078238, inbox-watcher=4079442, outbox-notifier=4079818). Watchdog healthy (22:40:22Z UTC). Heal-daemon heartbeat 22:35:00Z UTC. Sync: status=no-change, last_sync=22:40:19Z UTC. HEAD=ecd9509a=origin/main. **Pending approvals: 0.** STANDING: zombie bash PID 1834248 (~37.16d) still alive; kill-authorization pending (escalation #19). Check I/III: Saturday UTC (weekday=5), not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 15.56 (interventions=1120; systemic_fixes=72; vp=32; trend: worsening). **ACTIVE G-rules:** ourliberty-health-subject-key-mismatch-001 [1/3]; merge-held-deep-review-notifier-tier4-001 [1/3]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3].
 
 
