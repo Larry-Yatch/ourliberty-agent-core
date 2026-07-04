@@ -164,6 +164,18 @@ class _MirrorFetchFailsClient(_ChainEventsClient):
 
 # ---------- fixtures ----------
 
+def _today_noon() -> datetime:
+    """Noon-UTC anchor for done-today chain_events fixtures. Using real now()
+    makes ``now - timedelta(hours=N)`` cross into yesterday in the 00:00-0N:00
+    UTC window; the done-today lane filters by EXACT calendar date, so those
+    rows are dropped and the test fails only between midnight and ~05:00 UTC.
+    Noon today keeps every ``now - hours`` fixture on today's date while
+    preserving relative ordering (the filter is date-based, not ``<= now``, so a
+    fixture stamped at noon is still included when the real clock is pre-noon)."""
+    return datetime.now(timezone.utc).replace(
+        hour=12, minute=0, second=0, microsecond=0)
+
+
 def _build_agents_root(tmp: Path) -> Path:
     (tmp / 'state' / 'in-flight').mkdir(parents=True, exist_ok=True)
     for a in ('beacon', 'forge', 'mirror', 'pulse'):
@@ -682,7 +694,7 @@ class DoneTodayLaneTest(_Base):
                 'ts': ts.isoformat()}
 
     def test_mirror_join_three_outcomes_and_exclusions(self):
-        now = datetime.now(timezone.utc)
+        now = _today_noon()
         yesterday = now - timedelta(days=1)
         rows = [
             # forge's sessions today define the taskset.
@@ -756,7 +768,7 @@ class DoneTodayLaneTest(_Base):
         # taskset/failure gating depends on. The stub now honors the
         # projection, so a query that drops 'agent' yields an empty taskset
         # and this test fails — exactly as production did.
-        now = datetime.now(timezone.utc)
+        now = _today_noon()
         rows = [
             self._session('m1', now - timedelta(hours=2)),
             self._session('c1', now - timedelta(hours=2)),
@@ -828,7 +840,7 @@ class BuilderRegressionTest(_Base):
     `archetype` and the always-present (empty for builder) `active` lane."""
 
     def test_forge_done_item_shape_unchanged_and_active_empty(self):
-        now = datetime.now(timezone.utc)
+        now = _today_noon()
         rows = [
             {'agent': 'forge', 'task_id': 'm1', 'event_type': 'session_start',
              'pr_url': None, 'ts': (now - timedelta(hours=2)).isoformat()},
@@ -894,7 +906,7 @@ class WorkerDoneTodayLaneTest(_Base):
                 'payload': {'success': success, 'message': message}}
 
     def test_succeeded_and_failed_via_payload_success(self):
-        now = datetime.now(timezone.utc)
+        now = _today_noon()
         yesterday = now - timedelta(days=1)
         rows = [
             self._done('jobS', True, now - timedelta(hours=1), 'all good'),

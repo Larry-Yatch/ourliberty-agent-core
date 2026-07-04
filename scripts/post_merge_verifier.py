@@ -42,7 +42,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 from atomic_io import atomic_write_json  # noqa: E402
 from test_isolation_guard import gh_write  # noqa: E402
 
-AGENTS_ROOT = Path('/home/larry/agents')
+AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT') or '/home/larry/agents')
 STATE_FILE = AGENTS_ROOT / 'blackboard' / 'post-merge-verifications.json'
 LOG_FILE = AGENTS_ROOT / 'blackboard' / 'post-merge-verifier.log'
 # TODO(Larry): re-target inbox to whichever agent verifies merges in Phase D.
