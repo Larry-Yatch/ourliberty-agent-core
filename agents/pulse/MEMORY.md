@@ -424,8 +424,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-04T02:03Z UTC (Iter ~3722, **Tier 1**)
+## Status snapshot — updated 2026-07-04T02:08Z UTC (Iter ~3723, **Tier 1**)
 
-**Iter ~3722 summary (2026-07-04T02:03Z):** 0 new alerts. Active pipeline: PR #820 agent-core in Mirror review; PR #111 dashboard just opened (02:00:08Z, notifier pick-up pending). Dashboard PR #110 completed cleanly (Mirror PASS + auto-merge 19:29:56 MDT). Watchdog healthy through 19:57:43 MDT. HEAD=f67e0ddd=origin/main. STANDING: zombie bash PID 1834248 (36d 06:43+) still alive. forge-notifier-tests-production-state-pollution-001 G-rule REJECTED; standby. Check I/III: Saturday UTC, not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 12.41 (interventions≈983; systemic_fixes=79; vp=33; trend: worsening).
+**Iter ~3723 summary (2026-07-04T02:08Z):** 0 new alerts. Active pipeline: PR #820 agent-core + PR #111 dashboard both in Mirror review (dispatched 20:00 and 20:05 MDT). All daemons alive. Watchdog healthy through 20:02:47 MDT. HEAD=fdb87563=origin/main. STANDING: zombie bash PID 1834248 (36d 06:47+) still alive. forge-notifier-tests-production-state-pollution-001 G-rule REJECTED; standby. Check I/III: Saturday UTC, not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 12.42 (interventions≈984; systemic_fixes=79; vp=33; trend: worsening). Verify-before-reassert correction applied: PR #108 notifier log entries at 18:35 MDT already counted as G-rule 1/3 by iter ~3710; not a new occurrence.
 
 
