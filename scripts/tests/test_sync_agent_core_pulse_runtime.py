@@ -57,12 +57,14 @@ try:  # dotted/pytest path: relative import within the scripts.tests package
         copy_larry_alerts_cli,
         install_timeout_shim,
         scrub_run_sentinel,
+        redirect_agents_root,
     )
 except ImportError:  # discover loads this module top-level (no package parent)
     from _runtime_script_test_support import (
         copy_larry_alerts_cli,
         install_timeout_shim,
         scrub_run_sentinel,
+        redirect_agents_root,
     )
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -182,6 +184,7 @@ class _SyncResilienceBase(unittest.TestCase):
         # test_isolation_guard.allow()); without this the inherited run sentinel
         # makes the choke guard raise and the alert is silently dropped.
         scrub_run_sentinel(env)
+        redirect_agents_root(env)
         return subprocess.run(
             ['bash', str(self.scripts_dir / 'sync_agent_core.sh')],
             env=env, cwd=self.repo_dir,
