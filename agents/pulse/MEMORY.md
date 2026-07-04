@@ -424,8 +424,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-04T05:36Z UTC (Iter ~3750, **Tier 1**)
+## Status snapshot — updated 2026-07-04T05:40Z UTC (Iter ~3751, **Tier 1**)
 
-**Iter ~3750 summary (2026-07-04T05:36Z):** 0 new alerts. 0 open PRs (agent-core + dashboard). All daemons alive (beacon-bot=4078238, inbox-watcher=4079442, outbox-notifier=4079818). Watchdog healthy through 23:32:26 MDT (05:32:26Z). Heal-daemon heartbeat 05:32:15Z. Sync no-change (04:39:16Z, ~57 min). HEAD=fa6e3f9c=origin/main. Pending approvals: 2 fixture leaks (chat_id=12345, undeliverable). STANDING: zombie bash PID 1834248 (36d 10:18+) still alive; Larry kill-authorization pending. System at full quiesce post-PR #822 (bwrap wall). Check I/III: Saturday UTC (weekday=5), not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 12.82 (systemic_fixes=78; vp=33; trend: worsening).
+**Iter ~3751 summary (2026-07-04T05:40Z):** 0 new alerts. 0 open PRs (agent-core + dashboard). All daemons alive (beacon-bot=4078238, inbox-watcher=4079442, outbox-notifier=4079818). Watchdog healthy through 23:38:02 MDT (05:38:02Z). Heal-daemon heartbeat 05:32:15Z. Sync no-change (05:39:18Z, ~1.5 min). HEAD=6017c1e4=origin/main. Pending approvals: 2 fixture leaks (chat_id=12345, undeliverable). STANDING: zombie bash PID 1834248 (36d 10:22+) still alive; Larry kill-authorization pending. Mirror marker WARNs dashboard-106/108 within 24h — both PRs resolved; sub-threshold; G-rule 1/3 carry. System at full quiesce post-PR #822 (bwrap wall). Check I/III: Saturday UTC (weekday=5), not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 12.82 (systemic_fixes=78; vp=33; trend: worsening).
 
 
