@@ -424,8 +424,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-04T00:58Z UTC (Iter ~3713, **Tier 1**)
+## Status snapshot — updated 2026-07-04T01:11Z UTC (Iter ~3715, **Tier 1**)
 
-**Iter ~3713 summary (2026-07-04T00:58Z):** 0 new alerts. System fully idle — pipeline drained (0 open PRs, 0 inboxes). Watchdog healthy through 18:51:26 MDT. HEAD=7ff44663=origin/main. STANDING: zombie bash PID 1834248 (36d 05:38+) still alive. Check I/III: Saturday UTC, not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 12.34 (systemic_fixes=79; vp=33; trend: worsening).
+**Iter ~3715 summary (2026-07-04T01:11Z):** 0 new alerts. System fully idle — pipeline drained (0 open PRs, 0 inboxes). Watchdog healthy through 19:06:41 MDT. HEAD=470a39e3=origin/main. STANDING: zombie bash PID 1834248 (36d 05:52+) still alive. Check I/III: Saturday UTC, not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 12.37 (systemic_fixes=79; vp=33; trend: worsening).
 
 
