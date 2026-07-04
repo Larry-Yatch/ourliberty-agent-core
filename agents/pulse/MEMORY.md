@@ -424,8 +424,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-04T03:46Z UTC (Iter ~3736, **Tier 1**)
+## Status snapshot — updated 2026-07-04T03:52Z UTC (Iter ~3737, **Tier 1**)
 
-**Iter ~3736 summary (2026-07-04T03:46Z):** 0 new alerts. Sync transient race self-healed (status=no-change, vs. prior iters status=error). PR #822 "feat(test-jail): kernel-enforced bwrap wall" pipeline active — Mirror round-1 re-review running since 21:40:15 MDT (Forge revision-1 applied in 60s). Dashboard at 0 open PRs. All daemons alive (beacon-bot=4078238, inbox-watcher=4079442, outbox-notifier=4079818). Watchdog healthy through 21:45:17 MDT. HEAD=589ec691=origin/main. Pending approvals: 2 fixture leaks (chat_id=12345, undeliverable). STANDING: zombie bash PID 1834248 (36d 08h+) still alive. forge-notifier-tests-production-state-pollution-001 G-rule REJECTED; PR #822 bwrap wall is architectural fix path. Check I/III: Saturday UTC, not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 12.68 (systemic_fixes=78; vp=33; trend: worsening).
+**Iter ~3737 summary (2026-07-04T03:52Z):** 0 new alerts. PR #822 "feat(test-jail): kernel-enforced bwrap wall" MERGED 03:51:07Z UTC (Mirror round-1 REVIEW_PASS, AUTO_MERGE squash+delete-branch). Architectural fix for test→prod write-leak class is now live. Repo fast-forwarded 0836619b→00fcf623. Dashboard at 0 open PRs. All daemons alive (beacon-bot=4078238, inbox-watcher=4079442, outbox-notifier=4079818). Watchdog healthy through 21:50:19 MDT. HEAD=00fcf623=origin/main. Pending approvals: 2 fixture leaks (chat_id=12345, undeliverable). STANDING: zombie bash PID 1834248 (36d 08h+) still alive. forge-notifier-tests-production-state-pollution-001 REJECTED; PR #822 bwrap wall MERGED — architecture resolves new-test leak class. Check I/III: Saturday UTC, not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 12.69 (systemic_fixes=78; vp=33; trend: worsening).
 
 
