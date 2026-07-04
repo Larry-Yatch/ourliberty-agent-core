@@ -430,8 +430,14 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-04T19:17Z UTC (Iter ~3858, **Tier 1**)
+## G-rule merge-held-deep-review-notifier-tier4-001 — 1/3 (new, iter ~3859)
 
-**Iter ~3858 summary (2026-07-04T19:17Z):** 0 new alerts (watermark=1080=file_length). PR #823 OPEN (Mirror review in-flight since 19:08:47Z, ~9 min at scan). All daemons alive (beacon-bot=4078238, inbox-watcher=4079442, outbox-notifier=4079818). Watchdog healthy (13:16:32 MDT = 19:16:32Z UTC). Heal-daemon heartbeat 19:11:32Z UTC. Sync: status=no-change, last_sync=18:40:01Z UTC. HEAD=259b7665=origin/main ("Pulse cycle 20260704T191610Z"). **Pending approvals: 0.** STANDING: zombie bash PID 1834248 (~37.0d) still alive; kill-authorization pending (escalation #19). **PR #823 in-flight:** Mirror reviewing; no verdict yet. Check I/III: Saturday UTC (weekday=5), not firing. Tier 1 (consecutive_clean=0). PRIME ratio: ~15.01 (systemic_fixes=73; vp=33; interventions=1095; trend: worsening). **ACTIVE G-rule:** ourliberty-health-subject-key-mismatch-001 [1/3] (translation sub-key mismatch for "ourliberty-agent-core health: N issue(s) need attention").
+**Rule:** `source=outbox-notifier, kind=notification, intent=merge_held_deep_review` alerts classify Tier-4 (novel, no registry template, no translation match). These are delivery-confirmation notifications — outbox-notifier already DMs Larry via Telegram when AUTO_MERGE_HELD_DEEP_REVIEW fires. Pulse duplicate DM is noise per actionable-only discipline. Fix: add `source=outbox-notifier, intent=merge_held_deep_review` → Tier-3 entry to `config/alert-translations.json`. Dispatch to Beacon at 3/3. First occurrence iter ~3859 (PR #823, approval-store-test-write-guard-001, outbox-notifier DM confirmed at 13:25:06 MDT).
+
+---
+
+## Status snapshot — updated 2026-07-04T19:26Z UTC (Iter ~3859, **Tier 1**)
+
+**Iter ~3859 summary (2026-07-04T19:26Z):** 1 new alert (line 1081 — outbox-notifier merge_held_deep_review PR#823, Tier-4, journal-note only; outbox-notifier already DM'd Larry). Watermark advanced to 1081. PR #823 OPEN (MERGEABLE, Mirror REVIEW_PASS, AUTO_MERGE_HELD for /code-review high; Larry DM'd at 13:25:06 MDT). PR #824 OPEN (feat: tripwire attributes atomic_io state writes, Mirror in-flight since 19:25:30Z UTC). All daemons alive (beacon-bot=4078238, inbox-watcher=4079442, outbox-notifier=4079818). Watchdog healthy (19:26:32Z UTC). Heal-daemon heartbeat 19:21:33Z UTC. Sync: status=no-change, last_sync=18:40:01Z UTC. HEAD=c44c2294=origin/main. **Pending approvals: 0.** STANDING: zombie bash PID 1834248 (~37.0d) still alive; kill-authorization pending (escalation #19). Check I/III: Saturday UTC (weekday=5), not firing. Tier 1 (consecutive_clean=0). PRIME ratio: ~15.03 (systemic_fixes=73; vp=33; interventions=1098; trend: worsening). **ACTIVE G-rules:** ourliberty-health-subject-key-mismatch-001 [1/3]; merge-held-deep-review-notifier-tier4-001 [1/3] (NEW).
 
 
