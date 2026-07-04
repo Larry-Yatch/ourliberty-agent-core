@@ -418,8 +418,14 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-04T00:29Z UTC (Iter ~3709, **Tier 1**)
+## G-rule notifier-concurrent-scan-duplicate-review-dispatch-001 — 1/3 (new, iter ~3710)
 
-**Iter ~3709 summary (2026-07-04T00:29Z):** 0 new alerts. All mandatory checks nominal. Dashboard PR #108 ("live: move System Health + Worktrees to Live System (IA step 4b)") review dispatched to Mirror at 00:25:57Z UTC; pipeline flowing. ⚠️ STANDING: zombie bash PID 1834248 (36d 05:10+) still alive, kill pending Larry ok. 0 open agent-core PRs. HEAD=711820f3=origin/main, sync no-change 23:39Z (~50 min), 0 stalls. Check I/III: UTC Saturday (weekday=5), not firing days. Tier 1 (consecutive_clean=0). PRIME ratio: 12.29 (systemic_fixes=79; vp=33; trend: worsening).
+**Rule:** outbox-notifier dispatched a second `review-request` to Mirror for the same task_id just 4 seconds after classifying the first REVIEW_PASS marker. Root cause hypothesis: notifier's PR-scan loop raced with marker-processing loop — scan saw `reviewDecision=""` (GitHub API propagation lag of ~3s) and dispatched redundant review before auto-merge status propagated. Result: orphan review task in Mirror inbox + wedged Mirror session reaped by heal-wedged-review-sessions healer. Fix: add a short-circuit in outbox-notifier's PR-scan dispatch gate — skip dispatch if a REVIEW_PASS marker for the same task_id was classified in the last N seconds (or if the PR scan's GitHub status refresh trails marker-processing by a race window). Dispatch to Beacon at 3/3. First occurrence iter ~3710 (PR #108, notifier log 18:35:02→18:35:06 MDT 2026-07-04).
+
+---
+
+## Status snapshot — updated 2026-07-04T00:40Z UTC (Iter ~3710, **Tier 1**)
+
+**Iter ~3710 summary (2026-07-04T00:40Z):** 1 new alert (L1113: heal-wedged-review-sessions, Tier 3 silence). Dashboard PR #108 MERGED 00:35:08Z UTC ✅. NEW: stale Mirror inbox `review-pr-ourliberty-dashboard-108.json` (orphan from second notifier dispatch — race condition). ask-then-do: archive file. ⚠️ STANDING: zombie bash PID 1834248 (36d 05:17+) still alive. 0 open PRs. HEAD=73dbe98d=origin/main. Check I/III: Saturday UTC, not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 12.29 (systemic_fixes=79; vp=33; trend: worsening).
 
 
