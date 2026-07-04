@@ -213,6 +213,36 @@ def _arm_runtime_tripwire():
 def engage() -> None:
     """Establish the test sandbox AT IMPORT. Idempotent across calls and across
     the dual module identity (guarded by a process-global env flag)."""
+    # KERNEL-ENFORCED WALL (scripts/test_isolation_wall) - re-exec THIS process
+    # under a bwrap read-only bind over the real ~/agents + ~/agent-worktrees
+    # BEFORE any other setup, so an ad-hoc ``python3 -m unittest`` run in a
+    # Forge/Mirror dispatch worktree (the actual incident vector - a command
+    # typed into a shell, with no code chokepoint) is *physically* unable to
+    # write live state. This is the one place every test file is guaranteed to
+    # reach first (the enforced bootstrap-first-import), and the mount namespace
+    # is inherited by children, so this single wrap covers the whole test run
+    # and everything it shells out to - closing the subprocess / C-level /
+    # hardcoded-literal write classes the env redirects below structurally
+    # cannot. Fail-open: skipped under pytest (conftest owns that path and
+    # pytest is not the incident vector), when already walled, when the #820
+    # live opt-out is set, or when bwrap is unavailable. On success os.execvp
+    # does NOT return - the process is replaced by its walled self, which
+    # re-enters engage() with the wall active (is_walled() short-circuits the
+    # re-exec) and proceeds through the normal setup below.
+    if "pytest" not in sys.modules:
+        try:
+            _here = os.path.dirname(os.path.abspath(__file__))
+            _scripts_dir = os.path.dirname(_here)
+            if _scripts_dir not in sys.path:
+                sys.path.insert(0, _scripts_dir)
+            import test_isolation_wall
+            test_isolation_wall.reexec_under_wall()
+        except Exception as _wall_exc:  # never let the wall break a test run
+            print(
+                f"[test-isolation-wall] setup skipped ({_wall_exc!r})",
+                file=sys.stderr,
+            )
+
     if _is_this_process(_ENGAGE_GUARD):
         return
     os.environ[_ENGAGE_GUARD] = str(os.getpid())

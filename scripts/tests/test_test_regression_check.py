@@ -741,7 +741,16 @@ class HardWallFallThroughTest(_IsolatedAgentsRoot):
 
     def test_falls_through_to_unwalled_with_warning(self):
         stderr = io.StringIO()
-        with patch.object(trc.shutil, 'which', return_value=None), \
+        # Simulate the PRODUCTION top-level gate invocation, which runs UNWALLED
+        # (OURLIBERTY_TEST_WALL_ACTIVE unset). The wall-unavailable warning is
+        # deliberately suppressed when _discover_wall_prefix is called from
+        # INSIDE an active wall (e.g. this very suite, which re-execs under
+        # bwrap) — there bwrap isn't absent, it just can't nest. Clear the flag
+        # so we exercise the genuine "no namespace primitive" path.
+        env_no_wall = {k: v for k, v in trc.os.environ.items()
+                       if k != trc._WALL_ACTIVE_ENV}
+        with patch.dict(trc.os.environ, env_no_wall, clear=True), \
+             patch.object(trc.shutil, 'which', return_value=None), \
              patch.object(trc, '_probe', return_value=False):
             with redirect_stderr(stderr):
                 prefix = trc._discover_wall_prefix(Path('/tmp/wt'))
