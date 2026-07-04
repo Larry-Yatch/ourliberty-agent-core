@@ -424,8 +424,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-04T00:40Z UTC (Iter ~3710, **Tier 1**)
+## Status snapshot — updated 2026-07-04T00:47Z UTC (Iter ~3711, **Tier 1**)
 
-**Iter ~3710 summary (2026-07-04T00:40Z):** 1 new alert (L1113: heal-wedged-review-sessions, Tier 3 silence). Dashboard PR #108 MERGED 00:35:08Z UTC ✅. NEW: stale Mirror inbox `review-pr-ourliberty-dashboard-108.json` (orphan from second notifier dispatch — race condition). ask-then-do: archive file. ⚠️ STANDING: zombie bash PID 1834248 (36d 05:17+) still alive. 0 open PRs. HEAD=73dbe98d=origin/main. Check I/III: Saturday UTC, not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 12.29 (systemic_fixes=79; vp=33; trend: worsening).
+**Iter ~3711 summary (2026-07-04T00:47Z):** 0 new alerts. Dashboard PR #109 "live: Active Sessions + Chain Feed + PR Pipeline → Live; Operations = controls (IA step 4c)" opened 00:40:33Z; Mirror review dispatched 00:45:07Z (pipeline flowing). Iter ~3710 stale-mirror-inbox finding SELF-RESOLVED (system auto-archived via marker-error flow). STANDING: zombie bash PID 1834248 (36d 05:26+) still alive. 0 open agent-core PRs. HEAD=c0b4e0e0=origin/main. Check I/III: Saturday UTC, not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 12.32 (systemic_fixes=79; vp=33; trend: worsening).
 
 
