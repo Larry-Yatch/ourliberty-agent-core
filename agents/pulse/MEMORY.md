@@ -418,8 +418,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-04T00:25Z UTC (Iter ~3708, **Tier 1**)
+## Status snapshot — updated 2026-07-04T00:29Z UTC (Iter ~3709, **Tier 1**)
 
-**Iter ~3708 summary (2026-07-04T00:25Z):** 0 new alerts. All mandatory checks nominal. Dashboard PR #108 ("live: move System Health + Worktrees to Live System (IA step 4b)") opened at 00:21:03Z UTC, MERGEABLE, `auto-review` label; review dispatch pending next outbox-notifier sweep (PID 4079818 active). ⚠️ STANDING: zombie bash PID 1834248 (36d 05:05+) still alive, kill pending Larry ok. 0 open agent-core PRs. All inboxes empty. HEAD=47f89a74=origin/main, sync no-change 23:39Z (~46 min), 0 stalls. Check I/III: UTC Saturday (weekday=5), not firing days. Tier 1 (consecutive_clean=0). PRIME ratio: 12.28 (systemic_fixes=79; vp=33; trend: worsening).
+**Iter ~3709 summary (2026-07-04T00:29Z):** 0 new alerts. All mandatory checks nominal. Dashboard PR #108 ("live: move System Health + Worktrees to Live System (IA step 4b)") review dispatched to Mirror at 00:25:57Z UTC; pipeline flowing. ⚠️ STANDING: zombie bash PID 1834248 (36d 05:10+) still alive, kill pending Larry ok. 0 open agent-core PRs. HEAD=711820f3=origin/main, sync no-change 23:39Z (~50 min), 0 stalls. Check I/III: UTC Saturday (weekday=5), not firing days. Tier 1 (consecutive_clean=0). PRIME ratio: 12.29 (systemic_fixes=79; vp=33; trend: worsening).
 
 
