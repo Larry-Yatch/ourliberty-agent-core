@@ -1380,6 +1380,36 @@
         "from_state": "parked"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "cap-capstone-build-the-bwrap-kernel-wall-closes-test-cbb6",
+      "title": "Capstone: build the bwrap kernel wall \u2014 closes test-fixture isolation for good",
+      "note": "FRESH-CHAT handoff. All prior seal work merged (#815/#816/#817/#819) + #820 (force-override redirect root-cause fix + 2 hardcoded modules + 2 nightly flake fixes) in review/auto-merge. LAST PIECE = build the bwrap kernel-enforced read-only wall so a test can NEVER write live ~/agents (covers subprocess + C-level + hardcoded-literal modules that software guards can't). Self-contained build brief on droplet: ~/worktrees/test-seal-resume/BWRAP_WALL_PLAN.md. PROVEN this session (re-verify): bwrap is setuid-root, works unprivileged NO sudo (only unshare fails \u2014 AppArmor); invocation 'bwrap --ro-bind / / --tmpfs /tmp --dev /dev --proc /proc -- python3 -m unittest ...' blocks ~/agents writes (Read-only FS), real tree clean, daemons unaffected, ZERO induced test failures; bwrap namespace IS inherited by children (unlike the audit hook). Adversarial review demoted the audit-hook to optional-backstop; force-override (#820) is primary; bwrap = the hard guarantee. Precondition: #820 merged (has the clock fix needed for a clean under-wall suite run). Build in a persistent droplet worktree, adversarially review the BUILD, ship via /code-review high + open_pr_for_team.sh (auto-review). When done = test-fixture isolation closed for good. Memory: active-tier-write-choke-and-failopen-classes.md.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": null,
+        "branch": null,
+        "captured_at": "2026-07-04T02:09:18.552837+00:00"
+      },
+      "last_touched": "2026-07-04T02:09:18.552837+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A permanent safety wall that makes it physically impossible for our automated quality checks to accidentally touch or damage the real, live system while they run.",
+        "why": "Right now those checks rely on soft guardrails that can be bypassed; one slip could corrupt live data and cause an outage \u2014 this closes that gap for good, not just patches it.",
+        "suggest": "Green-light it as the final piece of the safety work, but have the team prove it out and double-check it doesn't disrupt anything before we lock it in."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-04T02:10:18.511314+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
