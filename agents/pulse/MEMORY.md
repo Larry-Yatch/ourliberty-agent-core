@@ -408,7 +408,7 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ## G-rule forge-notifier-tests-production-state-pollution-001 → REJECTED (iter ~3697)
 
-**Rule:** Forge build tests for notifier code write fixture data to production state files. beacon-pending-approvals.json received 2 fake pending entries (chat_id=12345, NOT Larry's real ID 7998341473): `mirror-review-pr-ourliberty-agent-core-760` (PR #760 already MERGED 2026-06-30) and `mirror-review-real-rev` (fixture name, refs PR #42). 3rd phantom doorbell delivered to Larry (chat_id=7998341473) at 03:40:57Z UTC 2026-07-03 (idx=1095, "2 items need your call"). Dispatched `direction-ask-forge-notifier-tests-state-isolation-3of3-001.json` to Beacon inbox at iter ~3651. APPROVAL_REQUEST `notifier-test-state-isolation-guard-001` was REJECTED by Larry at iter ~3697. 2 fixture entries (chat_id=12345, undeliverable) remain in pending-approvals — benign. Standing-by for Larry direction before re-dispatching.
+**Rule:** Forge build tests for notifier code write fixture data to production state files. beacon-pending-approvals.json received 2 fake pending entries (chat_id=12345, NOT Larry's real ID 7998341473): `mirror-review-pr-ourliberty-agent-core-760` (PR #760 already MERGED 2026-06-30) and `mirror-review-real-rev` (fixture name, refs PR #42). 3rd phantom doorbell delivered to Larry (chat_id=7998341473) at 03:40:57Z UTC 2026-07-03 (idx=1095, "2 items need your call"). **4th phantom doorbell** at 2026-07-04T01:11:43Z UTC (idx=1113, line 1114, iter ~3716) — doorbell fires approximately daily while fixture entries persist. Dispatched `direction-ask-forge-notifier-tests-state-isolation-3of3-001.json` to Beacon inbox at iter ~3651. APPROVAL_REQUEST `notifier-test-state-isolation-guard-001` was REJECTED by Larry at iter ~3697. 2 fixture entries (chat_id=12345, undeliverable) remain in pending-approvals — benign. Standing-by for Larry direction before re-dispatching.
 
 ---
 
@@ -424,8 +424,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-04T01:11Z UTC (Iter ~3715, **Tier 1**)
+## Status snapshot — updated 2026-07-04T01:18Z UTC (Iter ~3716, **Tier 1**)
 
-**Iter ~3715 summary (2026-07-04T01:11Z):** 0 new alerts. System fully idle — pipeline drained (0 open PRs, 0 inboxes). Watchdog healthy through 19:06:41 MDT. HEAD=470a39e3=origin/main. STANDING: zombie bash PID 1834248 (36d 05:52+) still alive. Check I/III: Saturday UTC, not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 12.37 (systemic_fixes=79; vp=33; trend: worsening).
+**Iter ~3716 summary (2026-07-04T01:18Z):** 1 new alert (phantom doorbell, Tier-3 silenced, 4th occurrence). Pipeline drained (0 open PRs, 0 inboxes). Watchdog healthy through 19:11:41 MDT. HEAD=ad429b20=origin/main. STANDING: zombie bash PID 1834248 (36d 05:58+) still alive. forge-notifier-tests-production-state-pollution-001 G-rule REJECTED; 4th doorbell fired. Check I/III: Saturday UTC, not firing. Tier 1 (consecutive_clean=0). PRIME ratio: 12.37 (systemic_fixes=79; vp=33; trend: worsening).
 
 
