@@ -6987,7 +6987,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-04T18:44:36.781228+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-04T18:35:33.551661+00:00"
+      "orphan_last_activity_ts": "2026-07-04T18:35:33.551661+00:00",
+      "briefing": {
+        "what": "The team started building a safeguard that keeps test runs from accidentally writing fake data into your live approvals and escalations records.",
+        "why": "Those two files drive what reaches you and what gets approved, so test data leaking in could trigger false alerts or bad approvals you'd have to untangle.",
+        "suggest": "Worth doing, but have them confirm it doesn't disrupt the live approvals flow before it goes in \u2014 then let it proceed."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-04T18:51:23.362909+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
