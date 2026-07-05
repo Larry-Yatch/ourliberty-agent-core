@@ -285,9 +285,9 @@ Previously marked COMPLETE at iter ~3839 (Tier-3 confirmed). RE-VERIFIED iter ~3
 
 ---
 
-## G-rule ourliberty-health-subject-key-mismatch-001 — 1/3 (new, iter ~3849)
+## G-rule ourliberty-health-subject-key-mismatch-001 — 2/3 (updated iter ~3921)
 
-**Rule:** `source=ourliberty-health, subject="ourliberty-agent-core health: N issue(s) need attention"` alerts classify Tier-4 (helper: "novel: no registry template and no translation match"). alert-translations.json has an `ourliberty-health` entry but its only sub-key is `"sync_agent_core: auto-commit push failed"` — the actual alert subject doesn't match. Fix: add sub-entry for `"ourliberty-agent-core health:"` prefix, or make the ourliberty-health entry a wildcard catch-all. Alert content is self-healing (sync push transient); companion sync.service digest already covers it. Dispatch to Beacon at 3/3. First occurrence iter ~3849 (L1080, ts=18:12:35Z UTC).
+**Rule:** `source=ourliberty-health, subject="ourliberty-agent-core health: N issue(s) need attention"` alerts classify Tier-4 (helper: "novel: no registry template and no translation match"). alert-translations.json has an `ourliberty-health` entry but its only sub-key is `"sync_agent_core: auto-commit push failed"` — the actual alert subject doesn't match. Fix: add sub-entry for `"ourliberty-agent-core health:"` prefix, or make the ourliberty-health entry a wildcard catch-all. Alert content is self-healing (sync push transient); companion sync.service digest already covers it. Dispatch to Beacon at 3/3. Occurrences: iter ~3849 (L1080, ts=18:12:35Z UTC, 1/3); iter ~3921 (L1087, ts=03:14:19Z UTC 2026-07-05, 2/3 — same 02:40:44Z push-fail event, health checker re-scanned stale error).
 
 ---
 
@@ -436,8 +436,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-05T03:12Z UTC (Iter ~3920, **Tier 1**)
+## Status snapshot — updated 2026-07-05T03:19Z UTC (Iter ~3921, **Tier 1**)
 
-**Iter ~3920 summary (2026-07-05T03:12Z):** 0 new alerts (watermark=1086, file_length=1086). agent-core-sync.json status=error (02:40:44Z stale transient push fail; HEAD=origin/main=2a9aa7ab confirmed). PR #823 OPEN (mergeable NOW=**MERGEABLE** — resolved from prior UNKNOWN oscillation; Mirror REVIEW_PASS 13:21 MDT 2026-07-04; AUTO_MERGE_HELD for /code-review high; Larry DM'd 13:25:06 MDT — action pending). All daemons alive (beacon-bot=4078238, inbox-watcher=4079442, outbox-notifier=4079818). Watchdog healthy (03:06:17Z UTC). Heal-daemon heartbeat 03:07:39Z UTC. HEAD=2a9aa7ab=origin/main. **Pending approvals: 0.** STANDING: zombie bash PID 1834248 (~37.33d, etimes=3225153s) still alive; kill-authorization pending (escalation #19). Check I: already fired Sunday UTC in iter ~3901 (check-i-2026-07-05.json confirmed). Check III: last run 2026-06-27, 8d ago, 14d gate not met, skip. Tier 1 (consecutive_clean=0). PRIME ratio: 16.0 (systemic_fixes=72; vp=32; interventions=1153+; trend: worsening). **ACTIVE G-rules:** ourliberty-health-subject-key-mismatch-001 [1/3]; merge-held-deep-review-notifier-tier4-001 [1/3]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3].
+**Iter ~3921 summary (2026-07-05T03:19Z):** 1 new alert — L1087 ourliberty-health Tier-4 (G-rule ourliberty-health-subject-key-mismatch-001 now 2/3; underlying event same push-fail 02:40:44Z, DM suppressed actionable-only). Watermark=1087. agent-core-sync.json status=error (02:40:44Z stale transient push fail; HEAD=origin/main=49fd82de confirmed). PR #823 OPEN (mergeable=UNKNOWN — oscillation resumed after transient MERGEABLE at iter ~3920; Mirror REVIEW_PASS 13:21 MDT 2026-07-04; AUTO_MERGE_HELD for /code-review high; Larry DM'd 13:25:06 MDT — action pending). All daemons alive (beacon-bot=4078238, inbox-watcher=4079442, outbox-notifier=4079818). Watchdog healthy (03:16:20Z UTC). Heal-daemon heartbeat 03:07:39Z UTC. HEAD=49fd82de=origin/main. **Pending approvals: 0.** STANDING: zombie bash PID 1834248 (~37.34d, etimes=3225468s) still alive; kill-authorization pending (escalation #19). Check I: already fired Sunday UTC in iter ~3901 (check-i-2026-07-05.json confirmed). Check III: last run 2026-06-27, 8d ago, 14d gate not met, skip. Tier 1 (consecutive_clean=0). PRIME ratio: 16.04 (systemic_fixes=72; vp=32; interventions=1155+; trend: worsening). **ACTIVE G-rules:** ourliberty-health-subject-key-mismatch-001 [**2/3**]; merge-held-deep-review-notifier-tier4-001 [1/3]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3].
 
 
