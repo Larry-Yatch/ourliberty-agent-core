@@ -448,8 +448,8 @@ PR #828 (`gate: delegate JS/TS repo regression checks to GitHub Actions (Piece 2
 
 ---
 
-## Status snapshot — updated 2026-07-06T21:42Z UTC (Iter ~4263, **Tier 1**)
+## Status snapshot — updated 2026-07-06T21:51Z UTC (Iter ~4264, **Tier 1**)
 
-**Iter ~4263 summary (2026-07-06T21:42Z):** 0 new alerts. watermark=1072. pending=0. **Agent-core:** PR #823 AUTO_MERGE_HELD. HEAD=807c15ef=origin/main. Sync: no-change (20:45Z). Daemons: all alive (beacon-bot 1156346 Ss ~4.1h, inbox-watcher 4079442 Ssl ~2d21.5h, outbox-notifier 1156495 Ss ~4.1h). Watchdog healthy 21:37:49Z UTC. Heal-daemon 21:36:25Z UTC. STANDING: zombie bash PID 1834248 (~39.14d) kill-auth pending. Dashboard: 0 open PRs. Tier 1 (consecutive_clean=0). PRIME ratio: ~19.847x (trend: worsening). **ACTIVE G-rules:** ourliberty-health-subject-key-mismatch-001 [DISPATCHED vp]; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [2/3]; merge-held-deep-review-notifier-tier4-001 [1/3]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3]. Check I Monday: check-i-2026-07-06.json on disk ($1046.42 -11.7% vs prior); dm_route same-week block active.
+**Iter ~4264 summary (2026-07-06T21:51Z):** 0 new alerts. watermark=1072. pending=0. **Agent-core:** PR #823 AUTO_MERGE_HELD. HEAD=2e3a9176=origin/main. Sync: no-change (21:45Z). Daemons: all alive (beacon-bot 1156346 Ss ~4.26h, inbox-watcher 4079442 Ssl ~2d21.68h, outbox-notifier 1156495 Ss ~4.26h). Watchdog healthy 21:48:02Z UTC. Heal-daemon 21:46:53Z UTC. STANDING: zombie bash PID 1834248 (~39.16d) kill-auth pending. Dashboard: 0 open PRs. Tier 1 (consecutive_clean=0). PRIME ratio: ~19.847x (trend: worsening). **ACTIVE G-rules:** ourliberty-health-subject-key-mismatch-001 [DISPATCHED vp]; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [2/3]; merge-held-deep-review-notifier-tier4-001 [1/3]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3]. Check I Monday: check-i-2026-07-06.json on disk ($1046.42 -11.7% vs prior); dm_route same-week block active.
 
 
