@@ -7156,7 +7156,11 @@
         "at": "2026-07-06T17:14:51.456338+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-06T17:38:29.253586+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-pr-ourliberty-dashboard-113",
@@ -7187,7 +7191,11 @@
         "at": "2026-07-06T17:24:56.507634+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-06T17:38:29.253586+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-pr-ourliberty-dashboard-114",
@@ -7219,6 +7227,23 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-pr-ourliberty-dashboard-115",
+      "name": "PR Ourliberty Dashboard 115",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-ourliberty-dashboard-115`. Last activity 2026-07-06T17:25:09.17017+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-ourliberty-dashboard-115"
+      ],
+      "repo": null,
+      "created": "2026-07-06",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-06T17:38:29.253586+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-06T17:25:09.17017+00:00"
     }
   ]
 }
