@@ -7076,7 +7076,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-06T16:53:20.170028+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-06T16:52:03.339209+00:00"
+      "orphan_last_activity_ts": "2026-07-06T16:52:03.339209+00:00",
+      "briefing": {
+        "what": "The team started cleaning up duplicate entries in the Ourliberty health summaries so the same items stop showing up twice.",
+        "why": "Duplicated health information erodes trust in the numbers and makes it harder for you and the team to rely on what the summaries say.",
+        "suggest": "Give it a quick look and approve it to move forward, since it's a sensible cleanup but worth a glance before it goes live."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-06T16:54:36.551776+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-heal-cycle-timer-stuck-false-positive-001",
@@ -7093,7 +7107,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-06T16:53:20.170028+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-06T16:48:27.424978+00:00"
+      "orphan_last_activity_ts": "2026-07-06T16:48:27.424978+00:00",
+      "briefing": {
+        "what": "The team is fixing a false alarm where a routine health check wrongly reports a timer as stuck when it isn't.",
+        "why": "False alarms waste attention and erode trust in the alerts, so real problems can get lost in the noise.",
+        "suggest": "Let the team finish and confirm the fix quiets the false alarm without hiding any genuine issues before signing off."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-06T16:54:36.551776+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
