@@ -31,6 +31,7 @@ import sys
 import tempfile
 import time
 import unittest
+import contextlib
 from contextlib import redirect_stdout, redirect_stderr
 from pathlib import Path
 from unittest.mock import patch
@@ -943,6 +944,235 @@ class DiffInertSkipTest(_IsolatedAgentsRoot):
             ['docs/x.md'], extra=('--no-skip-inert',))
         self.assertNotIn('gate_skipped', report)
         self.assertTrue(collect.called)
+
+
+# -------------------- CI-delegated gate (JS/TS repos) --------------------
+
+class IsCiDelegatedRepoTest(_IsolatedAgentsRoot):
+    def _mk(self, pkg=None, with_scripts_tests=False):
+        d = Path(tempfile.mkdtemp(prefix='ci-detect-'))
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        if pkg is not None:
+            (d / 'package.json').write_text(pkg, encoding='utf-8')
+        if with_scripts_tests:
+            (d / 'scripts' / 'tests').mkdir(parents=True)
+        return d
+
+    def test_js_repo_with_test_script_is_delegated(self):
+        d = self._mk('{"scripts": {"test": "vitest run"}}')
+        self.assertTrue(trc.is_ci_delegated_repo(d))
+
+    def test_no_package_json_is_not_delegated(self):
+        self.assertFalse(trc.is_ci_delegated_repo(self._mk(None)))
+
+    def test_package_json_without_test_script_is_not_delegated(self):
+        d = self._mk('{"scripts": {"build": "next build"}}')
+        self.assertFalse(trc.is_ci_delegated_repo(d))
+
+    def test_non_vitest_test_script_is_not_delegated(self):
+        # a JS repo whose runner is not vitest must not be routed to a check
+        # named 'vitest' that will never exist
+        d = self._mk('{"scripts": {"test": "jest --ci"}}')
+        self.assertFalse(trc.is_ci_delegated_repo(d))
+
+    def test_scripts_tests_dir_forces_unittest_path(self):
+        # a python repo that also carries a package.json stays on unittest
+        d = self._mk('{"scripts": {"test": "vitest run"}}', with_scripts_tests=True)
+        self.assertFalse(trc.is_ci_delegated_repo(d))
+
+    def test_malformed_package_json_is_not_delegated(self):
+        self.assertFalse(trc.is_ci_delegated_repo(self._mk('{not valid json')))
+
+
+class RepoSlugTest(_IsolatedAgentsRoot):
+    def _slug_for(self, url):
+        completed = subprocess.CompletedProcess([], 0, stdout=url + '\n', stderr='')
+        with patch.object(trc.subprocess, 'run', return_value=completed):
+            return trc._repo_slug(Path('/tmp/x'))
+
+    def test_ssh_url(self):
+        self.assertEqual(
+            self._slug_for('git@github.com:Larry-Yatch/ourliberty-dashboard.git'),
+            'Larry-Yatch/ourliberty-dashboard')
+
+    def test_https_url_with_suffix(self):
+        self.assertEqual(
+            self._slug_for('https://github.com/Larry-Yatch/ourliberty-dashboard.git'),
+            'Larry-Yatch/ourliberty-dashboard')
+
+    def test_https_url_without_suffix(self):
+        self.assertEqual(
+            self._slug_for('https://github.com/Larry-Yatch/ourliberty-dashboard'),
+            'Larry-Yatch/ourliberty-dashboard')
+
+    def test_git_failure_returns_none(self):
+        with patch.object(trc.subprocess, 'run', side_effect=OSError):
+            self.assertIsNone(trc._repo_slug(Path('/tmp/x')))
+
+
+class FetchCiCheckTest(_IsolatedAgentsRoot):
+    def _fetch(self, ndjson):
+        completed = subprocess.CompletedProcess([], 0, stdout=ndjson, stderr='')
+        with patch.object(trc.subprocess, 'run', return_value=completed):
+            return trc._fetch_ci_check('o/r', 'sha')
+
+    def test_picks_the_named_check(self):
+        nd = '\n'.join([
+            json.dumps({'name': 'Vercel', 'status': 'completed',
+                        'conclusion': 'success', 'started_at': '2026-01-01T00:00:00Z'}),
+            json.dumps({'name': 'vitest', 'status': 'completed',
+                        'conclusion': 'success', 'started_at': '2026-01-01T00:00:00Z'}),
+        ])
+        self.assertEqual(self._fetch(nd)['name'], 'vitest')
+
+    def test_newest_rerun_wins_by_id(self):
+        # the re-run has a HIGHER id but an EARLIER started_at — id must win, so
+        # started_at ordering can't let a stale run mask the re-run
+        nd = '\n'.join([
+            json.dumps({'name': 'vitest', 'id': 10, 'status': 'completed',
+                        'conclusion': 'failure', 'started_at': '2026-01-02T00:00:00Z'}),
+            json.dumps({'name': 'vitest', 'id': 20, 'status': 'completed',
+                        'conclusion': 'success', 'started_at': '2026-01-01T00:00:00Z'}),
+        ])
+        self.assertEqual(self._fetch(nd)['conclusion'], 'success')
+
+    def test_null_started_at_does_not_mask_newer_by_id(self):
+        # a newer RED run with a missing started_at must not be masked by an
+        # older green run — id ordering (not started_at) decides
+        nd = '\n'.join([
+            json.dumps({'name': 'vitest', 'id': 5, 'status': 'completed',
+                        'conclusion': 'success', 'started_at': '2026-01-01T00:00:00Z'}),
+            json.dumps({'name': 'vitest', 'id': 9, 'status': 'completed',
+                        'conclusion': 'failure'}),  # no started_at
+        ])
+        self.assertEqual(self._fetch(nd)['conclusion'], 'failure')
+
+    def test_ignores_non_github_actions_app(self):
+        # a 'vitest' check posted by a foreign app is not trusted
+        nd = '\n'.join([
+            json.dumps({'name': 'vitest', 'id': 30, 'status': 'completed',
+                        'conclusion': 'success',
+                        'app': {'slug': 'some-third-party-bot'}}),
+        ])
+        self.assertIsNone(self._fetch(nd))
+
+    def test_trusts_github_actions_app(self):
+        nd = json.dumps({'name': 'vitest', 'id': 30, 'status': 'completed',
+                         'conclusion': 'success', 'app': {'slug': 'github-actions'}})
+        self.assertEqual(self._fetch(nd)['conclusion'], 'success')
+
+    def test_absent_check_returns_none(self):
+        nd = json.dumps({'name': 'Vercel', 'status': 'completed', 'conclusion': 'success'})
+        self.assertIsNone(self._fetch(nd))
+
+    def test_gh_failure_returns_none(self):
+        with patch.object(trc.subprocess, 'run',
+                          side_effect=subprocess.SubprocessError):
+            self.assertIsNone(trc._fetch_ci_check('o/r', 'sha'))
+
+
+class RunCiDelegatedGateTest(_IsolatedAgentsRoot):
+    def _run(self, fetch, output='json', timeout=None):
+        slug = patch.object(trc, '_repo_slug', return_value='o/r')
+        sleep = patch.object(trc.time, 'sleep', return_value=None)
+        if isinstance(fetch, list):
+            fpatch = patch.object(trc, '_fetch_ci_check', side_effect=fetch)
+        else:
+            fpatch = patch.object(trc, '_fetch_ci_check', return_value=fetch)
+        stdout, stderr = io.StringIO(), io.StringIO()
+        ctxs = [slug, sleep, fpatch]
+        if timeout is not None:
+            ctxs.append(patch.object(trc, 'CI_CHECK_POLL_TIMEOUT_S', timeout))
+        with contextlib.ExitStack() as stack:
+            for c in ctxs:
+                stack.enter_context(c)
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                code = trc.run_ci_delegated_gate('p', 'h', Path('/tmp/x'), output)
+        return code, stdout.getvalue(), stderr.getvalue()
+
+    def test_success_is_pass(self):
+        code, out, _ = self._run(
+            {'status': 'completed', 'conclusion': 'success', 'html_url': 'u'})
+        self.assertEqual(code, trc.EXIT_PASS)
+        rpt = json.loads(out)
+        self.assertEqual(rpt['verdict'], 'PASS')
+        self.assertEqual(rpt['gate_mode'], 'ci-delegated')
+
+    def test_failure_is_block(self):
+        code, out, _ = self._run(
+            {'status': 'completed', 'conclusion': 'failure', 'html_url': 'u'})
+        self.assertEqual(code, trc.EXIT_BLOCK)
+        rpt = json.loads(out)
+        self.assertEqual(rpt['verdict'], 'BLOCK')
+        self.assertEqual(rpt['regressions'], ['ci:vitest=failure'])
+
+    def test_skipped_is_analysis_fail_not_pass(self):
+        # 'skipped' means tests did not run — never a silent PASS
+        code, out, _ = self._run(
+            {'status': 'completed', 'conclusion': 'skipped', 'html_url': 'u'})
+        self.assertEqual(code, trc.EXIT_ANALYSIS_FAIL)
+        self.assertEqual(out, '')  # no PASS/BLOCK report emitted
+
+    def test_neutral_is_analysis_fail_not_pass(self):
+        code, out, _ = self._run(
+            {'status': 'completed', 'conclusion': 'neutral', 'html_url': 'u'})
+        self.assertEqual(code, trc.EXIT_ANALYSIS_FAIL)
+        self.assertEqual(out, '')
+
+    def test_cancelled_is_block(self):
+        code, _, _ = self._run(
+            {'status': 'completed', 'conclusion': 'cancelled', 'html_url': 'u'})
+        self.assertEqual(code, trc.EXIT_BLOCK)
+
+    def test_missing_check_after_timeout_is_analysis_fail(self):
+        code, _, err = self._run(None, timeout=0)
+        self.assertEqual(code, trc.EXIT_ANALYSIS_FAIL)
+        self.assertIn('no', err.lower())
+
+    def test_still_pending_after_timeout_is_analysis_fail(self):
+        code, _, _ = self._run(
+            {'status': 'in_progress', 'conclusion': None}, timeout=0)
+        self.assertEqual(code, trc.EXIT_ANALYSIS_FAIL)
+
+    def test_pending_then_completes_passes(self):
+        code, out, _ = self._run([
+            {'status': 'in_progress', 'conclusion': None},
+            {'status': 'completed', 'conclusion': 'success', 'html_url': 'u'},
+        ])
+        self.assertEqual(code, trc.EXIT_PASS)
+        self.assertEqual(json.loads(out)['verdict'], 'PASS')
+
+    def test_no_slug_is_analysis_fail(self):
+        with patch.object(trc, '_repo_slug', return_value=None):
+            with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                code = trc.run_ci_delegated_gate('p', 'h', Path('/tmp/x'))
+        self.assertEqual(code, trc.EXIT_ANALYSIS_FAIL)
+
+    def test_text_output_renders(self):
+        code, out, _ = self._run(
+            {'status': 'completed', 'conclusion': 'failure', 'html_url': 'u'},
+            output='text')
+        self.assertEqual(code, trc.EXIT_BLOCK)
+        self.assertIn('verdict:    BLOCK', out)
+
+
+class MainRoutesJsRepoTest(_IsolatedAgentsRoot):
+    def test_js_repo_routes_to_ci_gate_not_unittest(self):
+        d = Path(tempfile.mkdtemp(prefix='ci-main-'))
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        (d / 'package.json').write_text('{"scripts":{"test":"vitest run"}}')
+        argv = ['--parent-sha', 'p', '--head-sha', 'h', '--repo-root', str(d)]
+        with patch.object(trc, 'resolve_sha', side_effect=lambda s, r: s * 8), \
+             patch.object(trc, 'run_ci_delegated_gate',
+                          return_value=trc.EXIT_PASS) as gate, \
+             patch.object(trc, 'collect_failures_at_sha') as collect:
+            with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                code = trc.main(argv)
+        self.assertEqual(code, trc.EXIT_PASS)
+        gate.assert_called_once()
+        # head canonical ('h'*8) is forwarded; the unittest path is never taken
+        self.assertEqual(gate.call_args[0][1], 'h' * 8)
+        self.assertFalse(collect.called)
 
 
 if __name__ == '__main__':
