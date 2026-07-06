@@ -143,6 +143,22 @@ def persisted_issues(issues, prior_names):
     return [(name, result) for name, result in issues if name in prior_names]
 
 
+def _is_push_fail_only(persisted) -> bool:
+    """True when the persisted issues are EXACTLY the sync push-fail signal.
+
+    The push-fail is origin_sync in its 'ahead/unpushed-commits' shape — the same
+    routine hiccup the sync.service sync-blocked digest already DMs Larry. When
+    that's the sole persisted issue, the summary escalate DM is a duplicate and is
+    suppressed. Any other persisted issue, or origin_sync in a different shape
+    (diverged, fetch-failed) which the digest does NOT cover, returns False so the
+    DM still fires.
+    """
+    if len(persisted) != 1:
+        return False
+    name, result = persisted[0]
+    return name == 'origin_sync' and result.get('signal') == 'unpushed-commits'
+
+
 def check_branch() -> dict:
     rc, branch, _ = git('rev-parse', '--abbrev-ref', 'HEAD')
     if rc != 0:
@@ -225,6 +241,10 @@ def check_origin_sync(autofix: bool) -> dict:
     if is_ahead and not is_behind:
         return {
             'ok': False,
+            # Stable machine key: this is the push-fail shape already surfaced to
+            # Larry by the sync.service sync-blocked digest, so the summary-alert
+            # guard in main() suppresses the duplicate DM when it's the only issue.
+            'signal': 'unpushed-commits',
             'detail': 'local ahead of origin/main (unpushed commits)',
             'autofix': None,
             'remediation': (
@@ -362,7 +382,16 @@ def main() -> int:
         if not args.dry_run:
             write_issue_names(current_names)
         persisted = persisted_issues(issues, prior_names)
-        if persisted:
+        if persisted and _is_push_fail_only(persisted):
+            # De-dup guard: the ONLY persisted issue is the sync push-fail
+            # (origin_sync ahead/unpushed), which the sync.service sync-blocked
+            # digest already reported to Larry. Skip the summary escalate DM so
+            # he isn't pinged twice for the same routine hiccup. Any other
+            # persisted issue (or a different origin_sync shape) still DMs below.
+            log('Persisted issue is ONLY the sync push-fail (origin_sync unpushed-'
+                'commits) already covered by the sync-blocked digest — intentionally '
+                'skipping duplicate summary DM (dedup guard)', quiet=quiet)
+        elif persisted:
             sections = []
             for name, result in persisted:
                 detail = result.get('detail', 'unknown')

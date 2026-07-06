@@ -41,6 +41,51 @@ class TestPersistedIssuesGate(unittest.TestCase):
         self.assertEqual(health.persisted_issues(issues, {'clean_tree'}), [])
 
 
+class TestPushFailOnlyDedup(unittest.TestCase):
+    """The sync push-fail (origin_sync ahead/unpushed) is already DM'd via the
+    sync.service sync-blocked digest; when it's the SOLE persisted issue, the
+    summary escalate DM is a duplicate and must be suppressed. Every other case
+    still DMs.
+    """
+
+    _UNPUSHED = {
+        'signal': 'unpushed-commits',
+        'detail': 'local ahead of origin/main (unpushed commits)',
+    }
+
+    def test_only_push_fail_is_suppressed(self):
+        persisted = [('origin_sync', dict(self._UNPUSHED))]
+        self.assertTrue(health._is_push_fail_only(persisted))
+
+    def test_push_fail_plus_other_issue_still_dms(self):
+        # Mixed set: the digest doesn't cover clean_tree, so the summary must fire.
+        persisted = [
+            ('origin_sync', dict(self._UNPUSHED)),
+            ('clean_tree', {'detail': '1 untracked'}),
+        ]
+        self.assertFalse(health._is_push_fail_only(persisted))
+
+    def test_origin_sync_diverged_shape_still_dms(self):
+        # Divergence is NOT the digest-covered push-fail shape (no signal key).
+        diverged = {'detail': 'local and origin/main have DIVERGED'}
+        self.assertFalse(health._is_push_fail_only([('origin_sync', diverged)]))
+
+    def test_non_push_fail_issue_still_dms(self):
+        self.assertFalse(
+            health._is_push_fail_only([('branch', {'detail': 'on feature'})])
+        )
+
+    def test_empty_persisted_is_not_push_fail(self):
+        self.assertFalse(health._is_push_fail_only([]))
+
+    def test_check_origin_sync_stamps_signal_on_ahead(self):
+        # Guard against a rename of the 'ahead/unpushed' return shape that the
+        # dedup keys on: the branch must carry signal='unpushed-commits'.
+        import inspect
+        src = inspect.getsource(health.check_origin_sync)
+        self.assertIn("'signal': 'unpushed-commits'", src)
+
+
 class TestStateRoundTrip(unittest.TestCase):
     def setUp(self):
         self._saved = health.HEALTH_STATE_FILE
