@@ -4564,7 +4564,10 @@
         "model": "claude-opus-4-8",
         "at": "2026-06-22T01:41:11.385855+00:00",
         "from_state": "proposed"
-      }
+      },
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-06T00:00:16.313472+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "the-dashboard-view-of-the-itemized-waiting-list-and-the-approve-reject-promote-actions-were-deferred-to-the-next-slice",
@@ -4590,7 +4593,10 @@
         "model": "claude-opus-4-8",
         "at": "2026-06-22T01:41:11.385855+00:00",
         "from_state": "proposed"
-      }
+      },
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-06T00:00:16.313472+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "the-for-larry-escalations-source-contributes-nothing-in-production-today-because-no-canonical-for-larry-signal-exists-yet-it-needs-to-be-wired-up-once-such-a-signal-lands",
@@ -4617,7 +4623,10 @@
         "at": "2026-06-22T01:41:11.385855+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-06T00:00:16.313472+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "system-self-awareness-slice-2b-waiting-on-larry-render",
@@ -4665,7 +4674,10 @@
         "at": "2026-06-22T05:14:16.088196+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-06T00:00:16.313472+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-stale-test-sweep-timezone-medic-001",
@@ -4767,7 +4779,10 @@
         "at": "2026-06-22T05:44:49.823638+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-06T00:00:16.313472+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-delegate-cap-orphan-lane-show-desktop-chat-title-fallback-rep-dd23",
@@ -4798,7 +4813,10 @@
         "at": "2026-06-22T05:44:49.823638+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-06T00:00:16.313472+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-delegate-cap-phantom-build-phase-after-marker-error-retry-pr-4d78",
@@ -4829,7 +4847,10 @@
         "at": "2026-06-22T05:44:49.823638+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-06T00:00:16.313472+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-projects-stale-gc-archive-completed-001",
