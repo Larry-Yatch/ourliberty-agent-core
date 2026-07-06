@@ -448,8 +448,8 @@ PR #828 (`gate: delegate JS/TS repo regression checks to GitHub Actions (Piece 2
 
 ---
 
-## Status snapshot — updated 2026-07-06T22:47Z UTC (Iter ~4272, **Tier 1**)
+## Status snapshot — updated 2026-07-06T22:52Z UTC (Iter ~4273, **Tier 1**)
 
-**Iter ~4272 summary (2026-07-06T22:47Z):** 0 new alerts. watermark=1072. pending=0. **Agent-core:** PR #823 AUTO_MERGE_HELD (now MERGEABLE — GitHub API resolved from UNKNOWN; HELD state unchanged). HEAD=d43e264c=origin/main. Sync: no-change (22:45Z). Daemons: all alive (beacon-bot 1156346 Ss ~5.17h, inbox-watcher 4079442 Ssl ~2d22.59h, outbox-notifier 1156495 Ss ~5.16h). Watchdog healthy 22:44:16Z UTC. Heal-daemon 22:37:19Z UTC. STANDING: zombie bash PID 1834248 (~39d3h27m) kill-auth pending. Dashboard: 0 open PRs. Tier 1 (consecutive_clean=0). PRIME ratio: ~19.847x (trend: worsening). **ACTIVE G-rules:** ourliberty-health-subject-key-mismatch-001 [DISPATCHED vp]; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [2/3]; merge-held-deep-review-notifier-tier4-001 [1/3]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3]. Check I Monday: check-i-2026-07-06.json on disk ($1046.42 -11.7% vs prior); dm_route same-week block active.
+**Iter ~4273 summary (2026-07-06T22:52Z):** 0 new alerts. watermark=1072. pending=0. **Agent-core:** PR #823 AUTO_MERGE_HELD (UNKNOWN — reverted from MERGEABLE at iter ~4272; GitHub API fluctuating). HEAD=47e3008d=origin/main. Sync: no-change (22:45Z, ~7 min). Daemons: all alive (beacon-bot 1156346 Ss ~5.27h, inbox-watcher 4079442 Ssl ~2d22.75h, outbox-notifier 1156495 Ss ~5.27h). Watchdog healthy 22:49:20Z UTC. Heal-daemon 22:47:33Z UTC. STANDING: zombie bash PID 1834248 (~39.15d) kill-auth pending. Dashboard: 0 open PRs. Tier 1 (consecutive_clean=0). PRIME ratio: ~19.847x (trend: worsening). **ACTIVE G-rules:** ourliberty-health-subject-key-mismatch-001 [DISPATCHED vp]; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [2/3]; merge-held-deep-review-notifier-tier4-001 [1/3]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3]. Check I Monday: check-i-2026-07-06.json on disk ($1046.42 -11.7% vs prior); dm_route same-week block active.
 
 
