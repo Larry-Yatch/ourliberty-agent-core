@@ -7173,7 +7173,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-06T17:23:20.343161+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-06T17:10:15.979623+00:00"
+      "orphan_last_activity_ts": "2026-07-06T17:10:15.979623+00:00",
+      "briefing": {
+        "what": "A new update to the Ourliberty dashboard is finished and waiting for a sign-off before it goes live.",
+        "why": "It's completed work sitting idle, and until someone approves it the effort delivers no value to the business.",
+        "suggest": "Have someone give it a quick look-over before green-lighting it, since it isn't yet connected to a clear goal and deserves a second set of eyes."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-06T17:24:56.507634+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-ourliberty-dashboard-114",
@@ -7190,7 +7204,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-06T17:23:20.343161+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-06T17:10:12.954607+00:00"
+      "orphan_last_activity_ts": "2026-07-06T17:10:12.954607+00:00",
+      "briefing": {
+        "what": "Someone on the team built an update to your dashboard and is asking for a sign-off before it goes live.",
+        "why": "It's finished work sitting idle, and until someone looks at it, the effort doesn't turn into anything you or your customers can use.",
+        "suggest": "Have someone give it a careful once-over before approving, since it isn't yet tied to a clear goal \u2014 worth confirming it's something you actually want before it ships."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-06T17:24:56.507634+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
