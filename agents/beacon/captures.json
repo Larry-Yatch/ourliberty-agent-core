@@ -1171,7 +1171,8 @@
         "at": "2026-06-26T14:55:50.087187+00:00",
         "from_state": "parked"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "aging": true
     },
     {
       "id": "cap-forensic-29-mirror-malformed-marker-pr-stranding-7378",
@@ -1201,7 +1202,8 @@
         "at": "2026-06-26T14:55:50.087187+00:00",
         "from_state": "parked"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "aging": true
     },
     {
       "id": "cap-mirror-review-wedge-replace-unbounded-until-poll-aa33",
@@ -1231,7 +1233,8 @@
         "at": "2026-06-26T17:47:39.933351+00:00",
         "from_state": "parked"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "aging": true
     },
     {
       "id": "cap-ping-a935",
