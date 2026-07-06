@@ -7060,6 +7060,40 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-ourliberty-health-summary-dedup-001",
+      "name": "Ourliberty Health Summary Dedup 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `ourliberty-health-summary-dedup-001`. Last activity 2026-07-06T16:52:03.339209+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "ourliberty-health-summary-dedup-001"
+      ],
+      "repo": null,
+      "created": "2026-07-06",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-06T16:53:20.170028+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-06T16:52:03.339209+00:00"
+    },
+    {
+      "id": "proposed-heal-cycle-timer-stuck-false-positive-001",
+      "name": "Heal Cycle Timer Stuck False Positive 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `heal-cycle-timer-stuck-false-positive-001`. Last activity 2026-07-06T16:48:27.424978+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "heal-cycle-timer-stuck-false-positive-001"
+      ],
+      "repo": null,
+      "created": "2026-07-06",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-06T16:53:20.170028+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-06T16:48:27.424978+00:00"
     }
   ]
 }
