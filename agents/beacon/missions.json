@@ -7230,7 +7230,11 @@
         "at": "2026-07-06T17:24:56.507634+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-06T18:08:30.658053+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-pr-ourliberty-dashboard-115",
@@ -7261,7 +7265,11 @@
         "at": "2026-07-06T17:45:10.206100+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-06T18:08:30.658053+00:00",
+      "retired_reason": "orphan-terminal"
     }
   ]
 }
