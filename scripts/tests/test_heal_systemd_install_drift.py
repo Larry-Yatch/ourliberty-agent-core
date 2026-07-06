@@ -664,6 +664,144 @@ class JustFiredGuardTest(_IsolatedAgentsRoot):
             h._recently_triggered('Sun 2026-11-01 01:30:00 MDT', now=now))
 
 
+class TriggeredUnitActiveGuardTest(_IsolatedAgentsRoot):
+    """The triggered-unit-active guard: a `.timer` reads the infinity anchor for
+    the ENTIRE duration its triggered `Unit=` service runs (systemd computes no
+    next elapse while the triggered unit is active). ourliberty-cycle.service is
+    Type=simple and a /cycle runs 3-20min, far past JUST_FIRED_GRACE_S=120, so
+    any tick landing mid-cycle misread the normal running state as stuck. While
+    the triggered unit is active/activating we must NOT classify the timer stuck;
+    a genuinely wedged timer (triggered unit inactive/dead) still must.
+    """
+
+    # Well past the 120s just-fired grace so the just-fired filter never fires;
+    # the triggered-unit guard is what's under test. Naive-local to match the
+    # trap timestamps below.
+    NOW = datetime(2026, 7, 6, 6, 0, 5)
+
+    def _trap_props(self, last_trigger, triggered_unit='ourliberty-cycle.service'):
+        return {
+            'ActiveState': 'active',
+            'NextElapseUSecRealtime': '',
+            'NextElapseUSecMonotonic': 'infinity',
+            'LastTriggerUSec': last_trigger,
+            'Unit': triggered_unit,
+        }
+
+    def _detect(self, trap_props, triggered_state):
+        with tempfile.TemporaryDirectory() as td:
+            i = _make_installed(Path(td), ['ourliberty-cycle.timer'])
+            per = {'ourliberty-cycle.timer': trap_props}
+            with mock.patch.object(
+                h, '_systemctl_show', side_effect=lambda u: per.get(u)
+            ), mock.patch.object(
+                h, '_triggered_unit_active_state',
+                return_value=triggered_state,
+            ):
+                return h.detect_stuck_timers(i, now=self.NOW)
+
+    def test_triggered_unit_active_is_not_stuck(self):
+        # In-flight cycle: infinity anchor is expected, not a stall. Even though
+        # the last trigger is well past the grace, the running service suppresses.
+        stuck = self._detect(
+            self._trap_props('Mon 2026-07-06 06:05:10 MDT'), 'active')
+        self.assertEqual(stuck, [])
+
+    def test_triggered_unit_activating_is_not_stuck(self):
+        stuck = self._detect(
+            self._trap_props('Mon 2026-07-06 06:05:10 MDT'), 'activating')
+        self.assertEqual(stuck, [])
+
+    def test_triggered_unit_inactive_still_stuck(self):
+        # Triggered service is dead AND the anchor is gone AND last trigger is
+        # stale — a genuine 2026-05-31-class wedge; must still classify stuck.
+        stuck = self._detect(
+            self._trap_props('Mon 2026-07-05 00:00:00 MDT'), 'inactive')
+        self.assertEqual([s['unit'] for s in stuck], ['ourliberty-cycle.timer'])
+
+    def test_triggered_unit_failed_still_stuck(self):
+        stuck = self._detect(
+            self._trap_props('Mon 2026-07-05 00:00:00 MDT'), 'failed')
+        self.assertEqual([s['unit'] for s in stuck], ['ourliberty-cycle.timer'])
+
+    def test_triggered_unit_probe_failure_falls_back_to_stuck(self):
+        # ActiveState can't be read (shell-out failure -> None): do NOT suppress;
+        # fall back to the prior predicate so a real stall is never hidden.
+        stuck = self._detect(
+            self._trap_props('Mon 2026-07-05 00:00:00 MDT'), None)
+        self.assertEqual([s['unit'] for s in stuck], ['ourliberty-cycle.timer'])
+
+    def test_no_triggered_unit_prop_falls_back_to_stuck(self):
+        # Timer with no resolvable Unit= (empty prop): _triggered_unit_active_state
+        # is never consulted; fall back to classify stuck.
+        with tempfile.TemporaryDirectory() as td:
+            i = _make_installed(Path(td), ['t.timer'])
+            per = {'t.timer': self._trap_props(
+                'Mon 2026-07-05 00:00:00 MDT', triggered_unit='')}
+            with mock.patch.object(
+                h, '_systemctl_show', side_effect=lambda u: per.get(u)
+            ), mock.patch.object(
+                h, '_triggered_unit_active_state',
+            ) as probe:
+                stuck = h.detect_stuck_timers(i, now=self.NOW)
+            probe.assert_not_called()
+            self.assertEqual([s['unit'] for s in stuck], ['t.timer'])
+
+    def test_just_fired_skips_before_triggered_unit_probe(self):
+        # A just-fired timer is skipped by the earlier filter; the triggered-unit
+        # probe must not even run (order + short-circuit intact).
+        with tempfile.TemporaryDirectory() as td:
+            i = _make_installed(Path(td), ['ourliberty-cycle.timer'])
+            per = {'ourliberty-cycle.timer': self._trap_props(
+                'Mon 2026-07-06 06:00:00 MDT')}
+            with mock.patch.object(
+                h, '_systemctl_show', side_effect=lambda u: per.get(u)
+            ), mock.patch.object(
+                h, '_triggered_unit_active_state',
+            ) as probe:
+                stuck = h.detect_stuck_timers(i, now=self.NOW)
+            probe.assert_not_called()
+            self.assertEqual(stuck, [])
+
+
+class TriggeredUnitActiveStateProbeTest(_IsolatedAgentsRoot):
+    """_triggered_unit_active_state shell-out adapter: parses ActiveState; on
+    rc != 0, shell failure, or absent property returns None (guard falls back).
+    """
+
+    def test_parses_active_state(self):
+        completed = mock.MagicMock()
+        completed.returncode = 0
+        completed.stdout = 'ActiveState=active\n'
+        completed.stderr = ''
+        with mock.patch.object(h.subprocess, 'run', return_value=completed):
+            self.assertEqual(
+                h._triggered_unit_active_state('ourliberty-cycle.service'),
+                'active')
+
+    def test_nonzero_rc_returns_none(self):
+        completed = mock.MagicMock()
+        completed.returncode = 1
+        completed.stdout = ''
+        completed.stderr = 'Unit not found'
+        with mock.patch.object(h.subprocess, 'run', return_value=completed):
+            self.assertIsNone(h._triggered_unit_active_state('bogus.service'))
+
+    def test_timeout_returns_none(self):
+        def fake_run(*args, **kwargs):
+            raise h.subprocess.TimeoutExpired(cmd=args[0], timeout=10)
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run):
+            self.assertIsNone(h._triggered_unit_active_state('any.service'))
+
+    def test_absent_property_returns_none(self):
+        completed = mock.MagicMock()
+        completed.returncode = 0
+        completed.stdout = 'SomethingElse=x\n'
+        completed.stderr = ''
+        with mock.patch.object(h.subprocess, 'run', return_value=completed):
+            self.assertIsNone(h._triggered_unit_active_state('any.service'))
+
+
 class SystemctlShowParserTest(_IsolatedAgentsRoot):
     """_systemctl_show shell-out adapter: parses the KEY=VALUE block; on
     rc != 0 or shell failure returns None + INFO log.
