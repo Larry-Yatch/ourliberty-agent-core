@@ -7045,7 +7045,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-06T09:34:44.389058+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-26T08:51:25.07554+00:00"
+      "orphan_last_activity_ts": "2026-06-26T08:51:25.07554+00:00",
+      "briefing": {
+        "what": "One of your quality alarms keeps going off even when a review is already underway, so it's crying wolf.",
+        "why": "False alarms train the team to tune out warnings, which means a real problem could slip by unnoticed.",
+        "suggest": "Fix this alarm together with a nearly identical one already in the queue so it's handled once \u2014 but have someone confirm the two are truly the same issue before merging them."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-06T09:39:45.039902+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
