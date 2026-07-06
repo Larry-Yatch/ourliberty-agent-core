@@ -133,6 +133,25 @@ EXIT_PASS = 0
 EXIT_BLOCK = 1
 EXIT_ANALYSIS_FAIL = 2
 
+# CI-delegated gate (JS/TS repos). This gate is Python/unittest-only and cannot
+# run vitest on the droplet (a fresh sandboxed worktree has no node_modules and
+# the npm cache is read-only under the isolation wall → EROFS). So for a repo
+# whose tests run via npm — detected by a package.json `scripts.test` with no
+# python `scripts/tests` discovery dir — we do NOT run the suite here. Instead we
+# consume the repo's own GitHub Actions check (named CI_DELEGATED_CHECK_NAME),
+# which runs `npm ci && vitest run` in a clean GitHub-hosted env. The check is
+# absolute (green-at-head) rather than parent-vs-head; that subsumes
+# no-new-regressions as long as main stays green, which the same workflow
+# enforces on push:main. Keep the name in sync with the dashboard's
+# .github/workflows/test.yml job name.
+CI_DELEGATED_CHECK_NAME = 'vitest'
+# Bounded, in-process, foreground wait for an in-flight CI check to conclude
+# (the gate is usually invoked well after CI has finished, so this rarely
+# sleeps). A wall-clock deadline — never a pgrep/proc poll loop (see
+# _emit_foreground_warning for why those hung Mirror for ~100 min).
+CI_CHECK_POLL_TIMEOUT_S = 600
+CI_CHECK_POLL_INTERVAL_S = 20
+
 # Matches unittest verbose FAIL/ERROR lines:
 #   FAIL: test_method (scripts.tests.test_x.TestY)
 #   ERROR: test_method (scripts.tests.test_x.TestY)
@@ -702,6 +721,208 @@ def render_text(report: dict) -> str:
     return '\n'.join(lines).rstrip() + '\n'
 
 
+def is_ci_delegated_repo(repo_root: Path) -> bool:
+    """True iff `repo_root` is a JS/TS repo whose tests are delegated to CI.
+
+    Signal: a package.json that defines a `scripts.test`, AND the absence of the
+    python unittest discovery dir (scripts/tests). The second clause keeps
+    agent-core (which has scripts/tests and no package.json) firmly on the
+    unittest path, and defends against a hybrid repo that carries a package.json
+    but is really python-gated. A missing or malformed package.json is treated as
+    not-delegated (fall through to the unittest gate) — fail-safe.
+    """
+    pkg = repo_root / 'package.json'
+    if not pkg.is_file():
+        return False
+    if (repo_root / 'scripts' / 'tests').is_dir():
+        return False
+    try:
+        data = json.loads(pkg.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return False
+    if not (isinstance(data, dict) and isinstance(data.get('scripts'), dict)):
+        return False
+    test_script = data['scripts'].get('test')
+    # Only delegate for repos whose test runner is vitest — the check we consume
+    # is named CI_DELEGATED_CHECK_NAME. A JS/polyglot repo with a non-vitest test
+    # script (jest, a python service that also ships a JS tooling package.json,
+    # …) must NOT be routed here: it would consult a 'vitest' check that never
+    # exists and, worse, skip its real suite. Ties detection to the runner whose
+    # check this gate reads.
+    return isinstance(test_script, str) and 'vitest' in test_script
+
+
+def _repo_slug(repo_root: Path) -> Optional[str]:
+    """`owner/name` parsed from the origin remote; None on any failure."""
+    try:
+        url = subprocess.run(
+            ['git', '-C', str(repo_root), 'remote', 'get-url', 'origin'],
+            capture_output=True, text=True, timeout=10, check=True,
+        ).stdout.strip()
+    except (subprocess.SubprocessError, OSError):
+        return None
+    # git@github.com:owner/repo.git | https://github.com/owner/repo(.git)
+    match = re.search(r'[:/]([^/:]+/[^/]+?)(?:\.git)?/?$', url)
+    return match.group(1) if match else None
+
+
+def _fetch_ci_check(slug: str, sha: str) -> Optional[dict]:
+    """Return the newest check-run named CI_DELEGATED_CHECK_NAME for `sha`.
+
+    None if the check is absent for that SHA or the `gh` call fails (both are
+    handled by the caller as "cannot conclude" — a poll, then ANALYSIS_FAIL,
+    never PASS). A re-run creates a fresh check-run for the same SHA, so the
+    newest one wins.
+
+    Reads the SHA-keyed check-runs REST endpoint rather than the PR-centric
+    `statusCheckRollup` used by heal_pr_auto_merge / heal_pipeline_stall,
+    because this gate's contract is SHA-based (--head-sha) and it is not always
+    invoked with a PR number in hand. The vitest check is a GitHub Actions
+    check-run (not a legacy commit status), so this endpoint sees it.
+    """
+    try:
+        out = subprocess.run(
+            ['gh', 'api', f'repos/{slug}/commits/{sha}/check-runs',
+             '--paginate', '-q', '.check_runs[]'],
+            capture_output=True, text=True, timeout=30, check=True,
+        ).stdout
+    except (subprocess.SubprocessError, OSError) as exc:
+        # Distinguish a gh/infra failure from a genuinely-absent check so the
+        # caller (and any human it re-pages) can tell flake from a missing
+        # workflow. Both still fail safe — this only sharpens the diagnosis.
+        detail = (getattr(exc, 'stderr', '') or '').strip().splitlines()
+        print(
+            f'test_regression_check: gh check-runs lookup failed for '
+            f'{slug}@{sha[:12]}: {type(exc).__name__}'
+            f'{" — " + detail[-1] if detail else ""}',
+            file=sys.stderr,
+        )
+        return None
+    runs: list[dict] = []
+    for line in out.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(obj, dict) or obj.get('name') != CI_DELEGATED_CHECK_NAME:
+            continue
+        # Defense-in-depth: trust only a check-run produced by GitHub Actions,
+        # not an arbitrary third-party app that posted a same-named check. (A
+        # same-repo workflow could still post one; the PR diff Mirror reviews is
+        # the backstop against a maliciously-added workflow.)
+        app_slug = (obj.get('app') or {}).get('slug')
+        if app_slug not in (None, 'github-actions'):
+            continue
+        runs.append(obj)
+    if not runs:
+        return None
+    # Newest re-run wins. Order by check-run id — monotonically increasing and
+    # always present — NOT started_at, which can be null on a run and let a
+    # stale green mask a newer red.
+    runs.sort(key=lambda r: r.get('id') or 0, reverse=True)
+    return runs[0]
+
+
+def run_ci_delegated_gate(
+    parent_sha: str,
+    head_sha: str,
+    repo_root: Path,
+    output: str = 'json',
+) -> int:
+    """Consume the repo's GitHub `vitest` check instead of running the suite.
+
+    Returns EXIT_PASS when the check is green, EXIT_BLOCK when it concluded
+    not-green, and EXIT_ANALYSIS_FAIL when it cannot be concluded (no slug, the
+    check never appears, or it is still running past CI_CHECK_POLL_TIMEOUT_S).
+    Analysis-fail is the honest "gate could not conclude" signal — never a silent
+    PASS (which would defeat the gate) nor a false BLOCK of correct code.
+    """
+    slug = _repo_slug(repo_root)
+    if slug is None:
+        print(
+            'test_regression_check: ci-delegated gate could not determine the '
+            'GitHub repo slug from the origin remote — cannot read the '
+            f'{CI_DELEGATED_CHECK_NAME!r} check',
+            file=sys.stderr,
+        )
+        return EXIT_ANALYSIS_FAIL
+
+    deadline = time.time() + CI_CHECK_POLL_TIMEOUT_S
+    check = _fetch_ci_check(slug, head_sha)
+    while (check is None or check.get('status') != 'completed') and \
+            time.time() < deadline:
+        print(
+            f'test_regression_check: ci-delegated gate waiting for '
+            f'{CI_DELEGATED_CHECK_NAME!r} on {head_sha[:12]} '
+            f'(status={(check or {}).get("status") or "absent"}) — '
+            f'polling every {CI_CHECK_POLL_INTERVAL_S}s',
+            file=sys.stderr,
+        )
+        time.sleep(CI_CHECK_POLL_INTERVAL_S)
+        check = _fetch_ci_check(slug, head_sha)
+
+    if check is None:
+        print(
+            f'test_regression_check: ci-delegated gate could not conclude — no '
+            f'{CI_DELEGATED_CHECK_NAME!r} check found for {head_sha[:12]} on '
+            f'{slug} within {CI_CHECK_POLL_TIMEOUT_S}s '
+            '(is .github/workflows/test.yml present and triggering?)',
+            file=sys.stderr,
+        )
+        return EXIT_ANALYSIS_FAIL
+    if check.get('status') != 'completed':
+        print(
+            f'test_regression_check: ci-delegated gate could not conclude — '
+            f'{CI_DELEGATED_CHECK_NAME!r} still {check.get("status")} for '
+            f'{head_sha[:12]} after {CI_CHECK_POLL_TIMEOUT_S}s',
+            file=sys.stderr,
+        )
+        return EXIT_ANALYSIS_FAIL
+
+    conclusion = (check.get('conclusion') or '').lower()
+    # Only an actual green run PASSes. 'skipped'/'neutral' mean the tests did not
+    # assert green (a path-filtered or conditionally-skipped job, a neutral app
+    # conclusion) — that is "cannot conclude", never a silent PASS. Everything
+    # else on a completed run (failure/timed_out/cancelled/…) BLOCKs.
+    if conclusion in ('skipped', 'neutral'):
+        print(
+            f'test_regression_check: ci-delegated gate could not conclude — '
+            f'{CI_DELEGATED_CHECK_NAME!r} concluded {conclusion!r} (tests did '
+            f'not run green) for {head_sha[:12]}',
+            file=sys.stderr,
+        )
+        return EXIT_ANALYSIS_FAIL
+    passing = conclusion == 'success'
+    verdict = 'PASS' if passing else 'BLOCK'
+    report = {
+        'parent_sha': parent_sha,
+        'head_sha': head_sha,
+        'gate_mode': 'ci-delegated',
+        'ci_check_name': CI_DELEGATED_CHECK_NAME,
+        'ci_check_conclusion': conclusion or None,
+        'ci_check_url': check.get('html_url'),
+        'regressions': [] if passing
+        else [f'ci:{CI_DELEGATED_CHECK_NAME}={conclusion or "unknown"}'],
+        'fixed': [],
+        'pre_existing_unaffected': [],
+        'invariant_failures': [],
+        'verdict': verdict,
+        'summary': (
+            f'CI-delegated gate: GitHub {CI_DELEGATED_CHECK_NAME!r} check '
+            f'concluded {conclusion or "unknown"} — '
+            + ('green, no regression.' if passing else 'not green, blocking.')
+        ),
+    }
+    if output == 'json':
+        print(json.dumps(report, indent=2))
+    else:
+        print(render_text(report), end='')
+    return EXIT_PASS if passing else EXIT_BLOCK
+
+
 def _emit_foreground_warning() -> None:
     """Print a foreground-only-invocation warning to stderr at startup.
 
@@ -776,6 +997,20 @@ def main(argv: Optional[list[str]] = None) -> int:
     except AnalysisError as exc:
         print(f'test_regression_check: {exc}', file=sys.stderr)
         return EXIT_ANALYSIS_FAIL
+
+    # JS/TS repos delegate to their own GitHub Actions vitest check — the droplet
+    # cannot run vitest under the isolation wall. This runs in the orchestrator
+    # (before any walled subprocess), so `gh` uses the normal environment/auth.
+    if is_ci_delegated_repo(repo_root):
+        print(
+            'test_regression_check: repo is JS/TS (package.json test script, no '
+            'scripts/tests) — delegating to the GitHub '
+            f'{CI_DELEGATED_CHECK_NAME!r} check instead of running unittest',
+            file=sys.stderr,
+        )
+        return run_ci_delegated_gate(
+            parent_canonical, head_canonical, repo_root, args.output,
+        )
 
     # Diff-scoped skip: if every changed file is test-inert (pure docs/, excl
     # docs/runbooks/), the head failure-set is identical to the parent's, so the
