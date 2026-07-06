@@ -448,8 +448,8 @@ PR #828 (`gate: delegate JS/TS repo regression checks to GitHub Actions (Piece 2
 
 ---
 
-## Status snapshot — updated 2026-07-06T23:12Z UTC (Iter ~4275, **Tier 1**)
+## Status snapshot — updated 2026-07-06T23:16Z UTC (Iter ~4276, **Tier 1**)
 
-**Iter ~4275 summary (2026-07-06T23:12Z):** 0 new alerts. watermark=1072. pending=0. **Agent-core:** PR #823 AUTO_MERGE_HELD (UNKNOWN — GitHub API still fluctuating). HEAD=6ba3f28c=origin/main. Sync: no-change (22:45Z, ~27 min). Daemons: all alive (beacon-bot 1156346 Ss ~5.59h, inbox-watcher 4079442 Ssl ~2d23.07h, outbox-notifier 1156495 Ss ~5.59h). Watchdog healthy 23:09:59Z UTC. Heal-daemon 23:07:48Z UTC. STANDING: zombie bash PID 1834248 (~39.17d) kill-auth pending. Dashboard: 0 open PRs. Tier 1 (consecutive_clean=0). PRIME ratio: ~19.847x (trend: worsening). **ACTIVE G-rules:** ourliberty-health-subject-key-mismatch-001 [DISPATCHED vp]; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [2/3]; merge-held-deep-review-notifier-tier4-001 [1/3]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3]. Check I Monday: check-i-2026-07-06.json on disk ($1046.42 -11.7% vs prior); dm_route same-week block active.
+**Iter ~4276 summary (2026-07-06T23:16Z):** 0 new alerts. watermark=1072. pending=0. **Agent-core:** PR #823 AUTO_MERGE_HELD (UNKNOWN — GitHub API still fluctuating). HEAD=e323c280=origin/main. Sync: no-change (22:45Z, ~31 min). Daemons: all alive (beacon-bot 1156346 Ss ~5.68h, inbox-watcher 4079442 Ssl ~2d23.18h, outbox-notifier 1156495 Ss ~5.68h). Watchdog healthy 23:15:03Z UTC. Heal-daemon 23:07:48Z UTC. STANDING: zombie bash PID 1834248 (~39.18d) kill-auth pending. Dashboard: 0 open PRs. Tier 1 (consecutive_clean=0). PRIME ratio: ~19.847x (trend: worsening). **ACTIVE G-rules:** ourliberty-health-subject-key-mismatch-001 [DISPATCHED vp]; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [2/3]; merge-held-deep-review-notifier-tier4-001 [1/3]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3]. Check I Monday: check-i-2026-07-06.json on disk ($1046.42 -11.7% vs prior); dm_route same-week block active.
 
 
