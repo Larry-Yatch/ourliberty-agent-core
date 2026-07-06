@@ -364,6 +364,11 @@ _STUCK_TIMER_PROPS = (
     'NextElapseUSecRealtime',
     'NextElapseUSecMonotonic',
     'LastTriggerUSec',
+    # The service (or other unit) this timer activates. While that unit is
+    # itself active/activating, systemd deliberately leaves the timer's next
+    # elapse at infinity — that is expected, not a stall (see the triggered-unit
+    # guard in detect_stuck_timers).
+    'Unit',
 )
 
 
@@ -486,6 +491,46 @@ def _recently_triggered(
     return abs((ref - parsed).total_seconds()) <= grace_s
 
 
+def _triggered_unit_active_state(unit: str) -> Optional[str]:
+    """Return the ActiveState of `unit` (a timer's triggered service), or None.
+
+    Used by detect_stuck_timers to tell an expected infinity anchor (the
+    triggered unit is running, so systemd hasn't computed the next elapse) from
+    a genuine stall. Wraps the same TimeoutExpired/FileNotFoundError/OSError
+    handling as _systemctl_show, returning None on any shell-out failure, rc!=0,
+    or absent property so the caller falls back to the prior predicate rather
+    than suppressing a real stuck timer on a probe failure.
+    """
+    try:
+        result = subprocess.run(
+            [
+                'systemctl', 'show', unit,
+                '--property=ActiveState',
+                '--no-pager',
+            ],
+            capture_output=True, text=True, timeout=SYSTEMCTL_TIMEOUT_S,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        log(
+            f'systemctl show {unit} (triggered-unit ActiveState) raised '
+            f'{type(e).__name__}: {e}',
+            'INFO',
+        )
+        return None
+    if result.returncode != 0:
+        log(
+            f'systemctl show {unit} (triggered-unit ActiveState) '
+            f'rc={result.returncode} stderr={(result.stderr or "").strip()!r}',
+            'INFO',
+        )
+        return None
+    for line in result.stdout.splitlines():
+        key, sep, value = line.partition('=')
+        if sep and key.strip() == 'ActiveState':
+            return value.strip()
+    return None
+
+
 def detect_stuck_timers(
     installed_dir: Path = INSTALLED_SYSTEMD_DIR,
     now: Optional[datetime] = None,
@@ -496,7 +541,7 @@ def detect_stuck_timers(
     AND NextElapseUSecMonotonic=infinity. Both empty-realtime and infinity-
     monotonic are required — either alone is a normal transient state.
 
-    False-positive guard (the just-fired filter): the same infinity-anchor
+    False-positive guard 1 (the just-fired filter): the same infinity-anchor
     reading appears *transiently* when a daemon-reload lands in the sub-second
     window a timer is firing at the top of its period. This bites at 00:00 /
     12:00, when many timers fire at once and this healer issues its own
@@ -507,6 +552,25 @@ def detect_stuck_timers(
     NOT fix this — the transient hits OnCalendar timers too. So a timer that
     triggered within JUST_FIRED_GRACE_S is treated as healthy; a genuinely
     wedged timer's last trigger is far older and still classifies as stuck.
+
+    False-positive guard 2 (the triggered-unit-active filter): a `.timer`
+    reports NextElapseUSecRealtime empty + NextElapse=infinity for the ENTIRE
+    duration its triggered `Unit=` service is active — systemd does not compute
+    a next elapse while the triggered unit runs. ourliberty-cycle.service is
+    Type=simple and runs a full /cycle (3-20 min, RuntimeMaxSec=1200), so the
+    infinity-anchor state persists far past JUST_FIRED_GRACE_S=120: any tick
+    landing >120s into a cycle misread the normal running state as stuck (G-rule
+    heal-systemd-install-drift-stuck-cycle-timer, ~daily near 06:00Z 2026-07-04..
+    07-06). So after the just-fired filter, resolve the timer's triggered unit
+    (its `Unit=` prop) and read its ActiveState: while that unit is
+    active/activating, the infinity anchor is expected — skip. A genuinely
+    wedged timer's triggered unit is inactive/failed/dead, so it still
+    classifies as stuck.
+
+    Probe-failure fallback: if the triggered unit is unknown (no `Unit=` prop)
+    or its ActiveState can't be read, the guard does NOT suppress — it falls back
+    to the prior predicate so a real stuck timer is never hidden by a probe
+    failure.
 
     Per-unit shell-out failures are logged INFO and the unit is skipped;
     the function never raises.
@@ -536,6 +600,21 @@ def detect_stuck_timers(
                 'INFO',
             )
             continue
+        # Triggered-unit-active guard: while the service this timer activates is
+        # itself running, the infinity anchor is expected systemd behavior, not
+        # a stall. On a probe failure (unknown Unit= / unreadable ActiveState)
+        # fall through to classify stuck so a real wedge is never hidden.
+        triggered_unit = props.get('Unit')
+        if triggered_unit:
+            triggered_state = _triggered_unit_active_state(triggered_unit)
+            if triggered_state in ('active', 'activating'):
+                log(
+                    f'{unit}: NextElapse=infinity but its triggered unit '
+                    f'{triggered_unit!r} is {triggered_state} — expected while '
+                    f'the triggered unit runs, not stuck; skipping',
+                    'INFO',
+                )
+                continue
         stuck.append({
             'unit': unit,
             'last_trigger': last_trigger or None,
