@@ -102,9 +102,9 @@
 
 ---
 
-## auto-dispatch-APPROVAL_REQUEST-task-id-mismatch (observed iter ~1910)
+## auto-dispatch-APPROVAL_REQUEST-task-id-mismatch — 2/3 (updated iter ~4086)
 
-**Rule:** When Pulse sends a Check I auto-dispatch envelope, outbox-notifier WARNs `APPROVAL_REQUEST task_id mismatch`. Dispatch STILL SUCCEEDS via fallback. G-rule: **1/3** as of iter ~1910. Dispatch to Beacon at 3/3.
+**Rule:** When Pulse sends a Check I auto-dispatch envelope, outbox-notifier WARNs `APPROVAL_REQUEST task_id mismatch`. Dispatch STILL SUCCEEDS via fallback. Fires on every Check I auto-dispatch (envelope task_id ≠ APPROVAL_REQUEST marker name). Occurrences: iter ~1910 (1/3); iter ~4086 (2/3, envelope=pulse-auto-2960a494ad-20260706 marker='notify-tasktype-split-001'). Dispatch to Beacon at 3/3 to fix outbox-notifier's task_id matching logic for pulse-auto-dispatch envelopes.
 
 ---
 
@@ -442,8 +442,8 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## Status snapshot — updated 2026-07-06T00:06Z UTC (Iter ~4085, **Tier 1**)
+## Status snapshot — updated 2026-07-06T00:13Z UTC (Iter ~4086, **Tier 1**)
 
-**Iter ~4085 summary (2026-07-06T00:06Z):** 1 new alert (missions-autoregister, proposed:needs-decision, Tier 3 — 7 stale proposed cards need keep/drop in Missions Proposed lane; route=digest, no DM). watermark=1078. HEAD=4fd7c72c=origin/main ("chore(missions): autoregister healer — reconcile proposed lane" — new since iter ~4084). agent-core-sync.json last_sync=23:42:36Z (~24 min), status=no-change. PR #823 OPEN (mergeable=UNKNOWN oscillating; Mirror REVIEW_PASS 13:21 MDT 2026-07-04; AUTO_MERGE_HELD for /code-review high; Larry DM'd 19:25:06Z UTC 2026-07-04 — ~28.7h action pending). All daemons alive (beacon-bot=4078238 Ss ~47.9h, inbox-watcher=4079442 Ssl, outbox-notifier=4079818 Ss). Watchdog overall=healthy 23:56:34Z UTC. Heal-daemon heartbeat 23:52:49Z UTC. **Pending approvals: 0.** STANDING: zombie bash PID 1834248 (~38.2d) still alive; kill-authorization pending (escalation #19). **Check I fired (Mon 2026-07-06, new ISO week 28):** $1046.42 (-11.7% vs $1184.79 prior), 255 anomalies, 1 auto-dispatch to Beacon (notify-p3a-retro-prep 98.0σ). DM en route. Check III: 9d ago, 14d gate not met, skip. Tier 1 (consecutive_clean=0). PRIME ratio: ~18.46x (interventions=1310; systemic_fixes=71; vp=32; trend: worsening). **ACTIVE G-rules:** ourliberty-health-subject-key-mismatch-001 [**2/3**]; heal-systemd-install-drift-stuck-cycle-timer-001 [**2/3**]; merge-held-deep-review-notifier-tier4-001 [1/3]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3].
+**Iter ~4086 summary (2026-07-06T00:10Z):** 2 new alerts (ledger weekly-2026-07-06 + pulse check-i-2026-07-06, both Tier 3 — known patterns, journal-note only). watermark=1080. HEAD=ae610ba7=origin/main ("Pulse cycle 20260706T000947Z" — wrapper auto-commit from iter ~4085). agent-core-sync.json last_sync=23:42:36Z (~29 min at scan), status=no-change. PR #823 OPEN (mergeable=UNKNOWN oscillating; Mirror REVIEW_PASS 13:21 MDT 2026-07-04; AUTO_MERGE_HELD for /code-review high; Larry action pending ~31h from 19:25:06Z 2026-07-04). All daemons alive (beacon-bot=4078238 Ss ~48h, inbox-watcher=4079442 Ssl, outbox-notifier=4079818 Ss). Watchdog overall=healthy 00:11:50Z UTC. Heal-daemon heartbeat 00:02:53Z UTC. **Pending approvals: 0.** STANDING: zombie bash PID 1834248 (~38.2d) still alive; kill-authorization pending (escalation #19). Check I: skip (artifact check-i-2026-07-06.json exists from iter ~4085, dm_route block active). Check III: 9d ago, 14d gate not met, skip. Tier 1 (consecutive_clean=0). PRIME ratio: ~18.49x (interventions=1311; systemic_fixes=71; vp=32; trend: worsening). **ACTIVE G-rules:** ourliberty-health-subject-key-mismatch-001 [**2/3**]; heal-systemd-install-drift-stuck-cycle-timer-001 [**2/3**]; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [**2/3**]; merge-held-deep-review-notifier-tier4-001 [1/3]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3].
 
 
