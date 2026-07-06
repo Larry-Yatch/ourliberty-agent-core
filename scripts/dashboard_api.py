@@ -886,6 +886,16 @@ class CaptureMessageResponse(BaseModel):
     doorbell_resolved: bool = False
 
 
+class ApprovalThreadResponse(BaseModel):
+    # GET /api/approvals/{event_id}/thread — the approval card's team
+    # conversation, oldest-first (approval-sync Phase 4). Same card_message
+    # store + shape as the capture/mission threads, keyed on the approval's
+    # chain_event event_id. Reuses CaptureMessageRequest/Response for the write.
+    approval_event_id: str
+    messages: list[CaptureThreadMessage] = Field(default_factory=list)
+    last_synced_at: str
+
+
 class CaptureDelegateRequest(BaseModel):
     # POST /api/missions/captures/{id}/delegate body (delegate-fix spec § 2).
     # Optional — defaults to the capture's recommended_action, else "delegate".
@@ -6316,6 +6326,7 @@ def _handle_capture_thread(
 _CARD_KIND_CAPTURE = 'capture'
 _CARD_KIND_MISSION = 'mission'
 _CARD_KIND_PHASE = 'phase'
+_CARD_KIND_APPROVAL = 'approval'
 _CARD_KIND_META: dict[str, dict[str, str]] = {
     _CARD_KIND_CAPTURE: {
         'id_key': 'capture_id',
@@ -6337,6 +6348,17 @@ _CARD_KIND_META: dict[str, dict[str, str]] = {
         'id_key': 'phase_ref',
         'noun': 'brainstorm phase',
         'thread_url': '/api/projects/phases/{id}/thread',
+    },
+    # approval-sync Phase 4 — a decision card (approval_request / clarify /
+    # needs_attention on the Approvals tab) gets the SAME team-chat thread as a
+    # parked/mission card, so Larry can ask the team about an approval instead
+    # of deciding blind. The join key is the approval's chain_event event_id
+    # (the same source_event_id the approve/reject buttons use). Beacon answers
+    # via the generic single-voice envelope — no approval-specific responder.
+    _CARD_KIND_APPROVAL: {
+        'id_key': 'approval_event_id',
+        'noun': 'approval request',
+        'thread_url': '/api/approvals/{id}/thread',
     },
 }
 
@@ -6480,6 +6502,79 @@ def _handle_capture_message(
         item_id=capture_id,
         item_title=cap.get('title'),
         item_kind=_CARD_KIND_CAPTURE,
+        text=text,
+        actor=actor,
+        agents_root=agents_root,
+        supabase_client=supabase_client,
+        now=now,
+    )
+
+
+def _approval_headline(ev: dict[str, Any]) -> Optional[str]:
+    """A short human title for an approval chain_event — the first human-text
+    payload field, capped, else the task_id. Used only to caption Beacon's
+    envelope prompt, so a miss is harmless."""
+    payload = ev.get('payload') if isinstance(ev.get('payload'), dict) else {}
+    for key in ('headline', 'summary', 'prompt', 'question', 'message'):
+        v = payload.get(key)
+        if isinstance(v, str) and v.strip():
+            return v.strip()[:200]
+    tid = ev.get('task_id')
+    return tid if isinstance(tid, str) and tid else None
+
+
+def _handle_approval_thread(
+    *,
+    event_id: str,
+    supabase_client: Any,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """GET /api/approvals/{event_id}/thread (approval-sync Phase 4) — the
+    approval card's team conversation, oldest-first. 404 if the approval's
+    chain_event is gone (only checked when Supabase is reachable); degrades to
+    an empty thread when Supabase is unavailable, mirroring the capture/mission
+    thread. Read-only."""
+    now = now or datetime.now(timezone.utc)
+    if supabase_client is not None and _select_source_event(supabase_client, event_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail='approval not found',
+        )
+    return {
+        'approval_event_id': event_id,
+        'messages': _card_thread_messages(event_id, supabase_client),
+        'last_synced_at': now.isoformat(),
+    }
+
+
+def _handle_approval_message(
+    *,
+    event_id: str,
+    text: str,
+    actor: str,
+    agents_root: Path,
+    supabase_client: Any,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """POST /api/approvals/{event_id}/message (approval-sync Phase 4) — Larry
+    posts on an approval card. Finds the approval's chain_event (404 if absent)
+    then defers to the store-agnostic `_post_card_message` core (same three
+    effects as the capture/mission message). Note: chatting is NOT deciding — a
+    message never resolves the approval itself, only threads the conversation."""
+    ev = (
+        _select_source_event(supabase_client, event_id)
+        if supabase_client is not None
+        else None
+    )
+    if supabase_client is not None and ev is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail='approval not found',
+        )
+    return _post_card_message(
+        item_id=event_id,
+        item_title=_approval_headline(ev) if ev else None,
+        item_kind=_CARD_KIND_APPROVAL,
         text=text,
         actor=actor,
         agents_root=agents_root,
@@ -9884,6 +9979,48 @@ def post_capture_message(
         text=body.text,
         actor=actor,
         captures_path=_captures_json_path(),
+        agents_root=_agents_root(),
+        supabase_client=_get_larry_action_supabase_client(),
+    )
+
+
+# GET /api/approvals/{event_id}/thread — a decision card's async team
+# conversation (approval-sync Phase 4). Reads back the approval's card_message
+# chain_events, oldest-first, keyed on the approval's event_id. Read-only →
+# X-Dashboard-Token suffices (no actor mutation).
+@app.get(
+    '/api/approvals/{event_id}/thread',
+    response_model=ApprovalThreadResponse,
+    dependencies=[Depends(_require_token)],
+)
+def get_approval_thread(event_id: str) -> dict[str, Any]:
+    return _handle_approval_thread(
+        event_id=event_id,
+        supabase_client=_get_larry_action_supabase_client(),
+    )
+
+
+# POST /api/approvals/{event_id}/message — Larry asks the team about an approval
+# (approval-sync Phase 4). Emits a card_message event (direction larry_to_team),
+# drops a resume envelope in Beacon's inbox, and clears any blocked-on-you
+# doorbell. Same auth as the capture message route: X-Dashboard-Token +
+# allowlisted X-Actor. Chatting is not deciding — this never resolves the
+# approval itself.
+@app.post(
+    '/api/approvals/{event_id}/message',
+    response_model=CaptureMessageResponse,
+    response_model_exclude_none=True,
+    dependencies=[Depends(_require_token)],
+)
+def post_approval_message(
+    event_id: str,
+    body: CaptureMessageRequest,
+    actor: str = Depends(_require_actor),
+) -> dict[str, Any]:
+    return _handle_approval_message(
+        event_id=event_id,
+        text=body.text,
+        actor=actor,
         agents_root=_agents_root(),
         supabase_client=_get_larry_action_supabase_client(),
     )
