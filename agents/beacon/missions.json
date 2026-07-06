@@ -7243,7 +7243,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-06T17:38:29.253586+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-06T17:25:09.17017+00:00"
+      "orphan_last_activity_ts": "2026-07-06T17:25:09.17017+00:00",
+      "briefing": {
+        "what": "The team has built an update to your Ourliberty dashboard that's ready for a look before it goes live.",
+        "why": "The dashboard is how you keep an eye on the operation, so changes to it affect what you can see and trust day to day.",
+        "suggest": "Have someone give it a careful once-over before it ships, since it isn't yet tied to a clear goal and touches something you rely on."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-06T17:45:10.206100+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
