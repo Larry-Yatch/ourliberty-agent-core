@@ -510,6 +510,42 @@ def record_action_template_execution(
     return record
 
 
+def record_clean_execution_if_registered(template: str, *,
+                                         verified: bool = True) -> None:
+    """Registry-gated, best-effort, never-raise wrapper around
+    ``record_action_template_execution`` for ACT-TIME executors.
+
+    This is the single shared home for the "observe an action that already
+    happened, feed its outcome to Check V's graduation streak, but never affect
+    whether/how the action runs" contract (the PR #832 pattern). Every act-time
+    recorder — Medic (restart/retrigger/silence), the auto-merge paths
+    (outbox_notifier / heal_pr_auto_merge), and the agent-run ledger tools
+    (cycle_prime_ledger) — delegates here so the load-bearing rules live in ONE
+    place instead of drifting across copies:
+
+      * The registry-membership gate MUST run before recording, because
+        ``record_action_template_execution`` appends unconditionally — a
+        non-registry action must be a silent no-op, not a streak row.
+      * ``verified`` maps to the outcome vocabulary (success/failure). An adverse
+        (``verified=False``) execution of an already-graduated template triggers
+        the immediate ungated demotion inside the recorder — so pass
+        ``verified=False`` ONLY for a RELIABLE action-quality failure (a restart
+        that didn't come back active, a silence file that didn't persist), never
+        for a transient/infra failure (a network blip, a still-running required
+        check) which would revoke earned trust on noise.
+      * It must never raise: a track-record write failing cannot be allowed to
+        fail the action it is merely observing.
+    """
+    try:
+        if template not in load_registry():
+            return
+        record_action_template_execution(
+            template, outcome='success' if verified else 'failure')
+    except Exception as e:  # noqa: BLE001 — track-record must never break caller
+        _log(f'clean-execution record for {template!r} failed: '
+             f'{type(e).__name__}: {e}', 'WARN')
+
+
 # -------------------- data-driven § 6.6 classification (Phase B) --------------------
 
 
