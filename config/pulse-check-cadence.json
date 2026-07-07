@@ -8,19 +8,19 @@
       "grace_hours": "Slack added to cadence before alerting, to absorb a cycle that fires a few hours late. Defaults to 0 if absent.",
       "event_driven": "true => the check fires on an external trigger (not a clock), so time-based staleness does not apply; the watcher skips it. It still emits heartbeats and failure envelopes.",
       "label": "Human-readable check name (for the alert body).",
-      "firing": "Which scheduler fires the check (the systemd timer unit and its OnCalendar cadence). Documentation only — the watcher reads cadence_hours/grace_hours."
+      "firing": "Which scheduler fires the check (the systemd timer unit; exact wall-clock time lives ONLY in the unit file to avoid drift). Documentation only — the watcher reads cadence_hours/grace_hours."
     },
     "tuning_note": "As of 2026-07-07 every periodic check fires from its own systemd timer (ourliberty-pulse-check-<id>.timer) — agent-invoked /cycle scheduling is retired (the agent chronically missed late runbook sections; journal G-rules check-iii-invoke-gap-sunday-001 and check-ix-x-invoke-gap-monday-001). Grace absorbs a slow run or a Persistent catch-up after downtime; Check I is the tightest because it is the most frequent canary. These are conservative starting points and are Pulse-tunable (Check III self-tunes thresholds over time)."
   },
   "checks": {
-    "i":    {"cadence_hours": 48,  "grace_hours": 24, "label": "Optimization digest",        "firing": "Mon/Wed/Fri/Sun 08:10 droplet-local (systemd timer: ourliberty-pulse-check-i)"},
-    "iii":  {"cadence_hours": 336, "grace_hours": 48, "label": "Stuck-threshold review",      "firing": "Every Sunday 04:41 droplet-local (systemd timer: ourliberty-pulse-check-iii; a 13-day ExecCondition on the heartbeat enforces the 14-day cadence)"},
+    "i":    {"cadence_hours": 48,  "grace_hours": 24, "label": "Optimization digest",        "firing": "Mon/Wed/Fri/Sun, after Ledger's Monday run (systemd timer: ourliberty-pulse-check-i)"},
+    "iii":  {"cadence_hours": 336, "grace_hours": 48, "label": "Stuck-threshold review",      "firing": "Every Sunday (systemd timer: ourliberty-pulse-check-iii; the analyzer's artifact-anchored gate skips the off week of the 14-day cadence)"},
     "iv":   {"cadence_hours": 168, "grace_hours": 36, "label": "Marker-drift analyzer",       "firing": "Weekly (systemd timer: ourliberty-pulse-check-iv)"},
-    "v":    {"cadence_hours": 840, "grace_hours": 96, "label": "Action-template trust",       "firing": "Monthly, first Monday 04:49 droplet-local (systemd timer: ourliberty-pulse-check-v)"},
-    "vi":   {"cadence_hours": 840, "grace_hours": 96, "label": "PRIME DIRECTIVE posture",     "firing": "Monthly, first Monday 04:53 droplet-local (systemd timer: ourliberty-pulse-check-vi)"},
-    "viii": {"cadence_hours": 168, "grace_hours": 36, "label": "Burn-rate signal validity",   "firing": "Weekly Monday 05:01 droplet-local (systemd timer: ourliberty-pulse-check-viii)"},
-    "ix":   {"cadence_hours": 168, "grace_hours": 36, "label": "Operator-friction signals",   "firing": "Weekly Monday 05:05 droplet-local (systemd timer: ourliberty-pulse-check-ix)"},
-    "x":    {"cadence_hours": 168, "grace_hours": 36, "label": "Chain-quality regression",    "firing": "Weekly Monday 05:09 droplet-local (systemd timer: ourliberty-pulse-check-x)"},
+    "v":    {"cadence_hours": 840, "grace_hours": 96, "label": "Action-template trust",       "firing": "Monthly, first Monday (systemd timer: ourliberty-pulse-check-v)"},
+    "vi":   {"cadence_hours": 840, "grace_hours": 96, "label": "PRIME DIRECTIVE posture",     "firing": "Monthly, first Monday (systemd timer: ourliberty-pulse-check-vi)"},
+    "viii": {"cadence_hours": 168, "grace_hours": 36, "label": "Burn-rate signal validity",   "firing": "Weekly Monday (systemd timer: ourliberty-pulse-check-viii)"},
+    "ix":   {"cadence_hours": 168, "grace_hours": 36, "label": "Operator-friction signals",   "firing": "Weekly Monday (systemd timer: ourliberty-pulse-check-ix)"},
+    "x":    {"cadence_hours": 168, "grace_hours": 36, "label": "Chain-quality regression",    "firing": "Weekly Monday (systemd timer: ourliberty-pulse-check-x)"},
     "xi":   {"cadence_hours": 24,  "grace_hours": 12, "label": "Catalog accuracy meter",      "firing": "Daily (systemd timer: ourliberty-pulse-check-xi)"},
     "retrospective":        {"cadence_hours": 168, "grace_hours": 48, "label": "Elevation retrospective (Stage A)",  "firing": "Weekly Monday (systemd timer: ourliberty-retrospective-weekly)"},
     "retrospective-author": {"cadence_hours": 168, "grace_hours": 48, "label": "Elevation retrospective author (Stage B)", "firing": "Weekly Monday (systemd timer: ourliberty-retrospective-weekly)"}

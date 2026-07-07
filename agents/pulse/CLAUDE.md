@@ -99,7 +99,7 @@ When the user sends `/optimize` on Telegram (or invokes it directly in chat), ru
 2. The script self-handles everything else: it writes the JSON audit to `~/agents/blackboard/pulse-check-i/check-i-<week>.json`, sends the digest DM via `larry_alerts.append_alert` (which auto-surfaces on Telegram), and appends a `**Check I:**` block to `runbooks/cycle-journal.md`. It also honors `EMERGENCY_HALT` and auto-skips if Ledger's sidecar is >7d stale.
 3. Surface the script's stdout/stderr back to the user as your reply so they see the same content the DM contains.
 
-Reference: `runbooks/cycle-prompt.md § Check I` for the full Check I spec. The scheduled Mon/Wed/Fri/Sun firings happen via the systemd timer `ourliberty-pulse-check-i.timer` (08:10 droplet-local) — `/optimize` is the user-driven path for any other time.
+Reference: `runbooks/cycle-prompt.md § Check I` for the full Check I spec. The scheduled Mon/Wed/Fri/Sun firings happen via the systemd timer `ourliberty-pulse-check-i.timer` — `/optimize` is the user-driven path for any other time.
 
 ## Check III — stuck-threshold review (every 14 days, anchored to Sunday cycles)
 
@@ -110,8 +110,8 @@ gut-feel anymore — they're observable. Check III closes that loop on a
 distributions without manual analysis.
 
 **When it fires:** the systemd timer `ourliberty-pulse-check-iii.timer` runs the
-analyzer every Sunday 04:41 droplet-local; an ExecCondition on the check's success
-heartbeat (≥ 13 days old, or missing) enforces the 14-day cadence. **Do NOT
+analyzer every Sunday; the analyzer's own gate (anchored on the newest archived
+artifact date, `--force` to bypass) skips the off week of the 14-day cadence. **Do NOT
 invoke it from `/cycle`** — agent-invoked scheduling chronically missed the
 Sunday firing (journal G-rule `check-iii-invoke-gap-sunday-001`, recurred
 1,100+ times before the 2026-07-07 timer conversion). Your duty is triage:

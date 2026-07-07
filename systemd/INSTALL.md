@@ -102,13 +102,18 @@ sudo systemctl enable --now ourliberty-pulse-check-xi.timer
 # late runbook sections; timers never miss). Cadences mirror
 # config/pulse-check-cadence.json; each is watched for liveness by
 # heal-pulse-check-staleness. Check IV's timer predates these (same pattern).
-sudo systemctl enable --now ourliberty-pulse-check-i.timer     # Mon/Wed/Fri/Sun 08:10 droplet-local (after Ledger's Monday run)
-sudo systemctl enable --now ourliberty-pulse-check-iii.timer   # Sundays 04:41 droplet-local; 13-day ExecCondition = 14-day cadence
-sudo systemctl enable --now ourliberty-pulse-check-v.timer     # first Monday 04:49 droplet-local
-sudo systemctl enable --now ourliberty-pulse-check-vi.timer    # first Monday 04:53 droplet-local
-sudo systemctl enable --now ourliberty-pulse-check-viii.timer  # Mondays 05:01 droplet-local
-sudo systemctl enable --now ourliberty-pulse-check-ix.timer    # Mondays 05:05 droplet-local
-sudo systemctl enable --now ourliberty-pulse-check-x.timer     # Mondays 05:09 droplet-local
+sudo systemctl enable --now ourliberty-pulse-check-i.timer     # Mon/Wed/Fri/Sun, after Ledger's Monday run
+sudo systemctl enable --now ourliberty-pulse-check-iii.timer   # Sundays; analyzer self-gates to the 14-day cadence
+sudo systemctl enable --now ourliberty-pulse-check-v.timer     # first Monday of the month
+sudo systemctl enable --now ourliberty-pulse-check-vi.timer    # first Monday of the month
+sudo systemctl enable --now ourliberty-pulse-check-viii.timer  # Mondays
+sudo systemctl enable --now ourliberty-pulse-check-ix.timer    # Mondays
+sudo systemctl enable --now ourliberty-pulse-check-x.timer     # Mondays
+# One-time catch-up: if a check's scheduled day already passed when you enable
+# (e.g. enabling after the first Monday leaves V/VI dark until NEXT month while
+# the staleness watcher's cadence+grace expires), run the missed check once by
+# hand — its internal sentinel/gate makes this idempotent:
+#   sudo systemctl start ourliberty-pulse-check-v.service ourliberty-pulse-check-vi.service
 ```
 
 ### Self-healing healers (Phase D2.5 + E1.3 + E1.5.2 + E2.1 + E2.2)

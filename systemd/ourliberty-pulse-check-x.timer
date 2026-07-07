@@ -6,8 +6,9 @@ Description=Weekly (Monday) run of Pulse Check X — chain-quality regression wa
 # Monday mirrors the cadence-config entry (cadence_hours=168). The analyzer's
 # own week-Monday sentinel (check-x-<monday>.json) makes a Persistent
 # catch-up or ad-hoc re-run within the same week a clean no-op.
-# 05:09 droplet-local: off-peak, offset from the other pulse-check timers.
-OnCalendar=Mon *-*-* 05:09:00
+# 05:29 droplet-local: off-peak; >=10 min from check-ix (05:19) so the 300s
+# RandomizedDelaySec jitter cannot overlap the stagger.
+OnCalendar=Mon *-*-* 05:29:00
 Persistent=true
 RandomizedDelaySec=300
 Unit=ourliberty-pulse-check-x.service

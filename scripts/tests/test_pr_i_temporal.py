@@ -5,8 +5,9 @@
   * #28 pulse_check_iii.fetch_durations_from_supabase — pair the LATEST start
         with the EARLIEST done after it (one clean session span), not the
         earliest start with the latest done (inflated multi-session span).
-  * #30 pulse_check_vii — the per-date artifact sentinel must be content-aware
-        so a SECOND qualifying proposal the same calendar day isn't lost.
+  (#30 pulse_check_vii sentinel tests were removed 2026-07-07 with the
+   Check VII retirement — the module and its content-aware sentinel are gone;
+   revive both from git history together if Check VII ever ships again.)
   * #38 ledger_weekly — a missing/corrupt prior sidecar must not be labelled
         'vs prior week' nor trip the drift gate against the wrong window.
 
@@ -36,7 +37,6 @@ if str(_REPO_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_REPO_SCRIPTS))
 
 import pulse_check_iii as p3  # noqa: E402
-import pulse_check_vii as p7  # noqa: E402
 import ledger_weekly as lw  # noqa: E402
 
 
@@ -139,92 +139,6 @@ class TestSessionPairing(unittest.TestCase):
             _ev('session_done', 't1', '2026-06-01T10:01:00Z'),
         ]
         self.assertEqual(self._durations(rows), {'t1': 60.0})
-
-
-# ----------------------------- #30 -----------------------------
-
-def _prop(rule, band):
-    return p7.Proposal(
-        rule=rule, band=band, current_threshold_usd=50.0,
-        proposed_threshold_usd=60.0, rationale='r', detail={})
-
-
-def _result(proposals, anchor_date='2026-06-01'):
-    return p7.CheckVIIResult(
-        proposals=proposals, as_of_iso='2026-06-01T00:00:00+00:00',
-        anchor_date=anchor_date, rows_total=len(proposals))
-
-
-class TestCheckViiContentAwareSentinel(unittest.TestCase):
-
-    def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp())
-        self._orig_dir = p7.PROPOSALS_DIR
-        self._orig_run = p7.run_check
-        self._orig_dm = p7.dm_digest
-        self._orig_read = p7._read_log
-        p7.PROPOSALS_DIR = self.tmp / 'proposals'
-        p7._read_log = lambda *a, **k: []
-        self.dm_calls = []
-        p7.dm_digest = lambda artifact: self.dm_calls.append(artifact) or True
-
-    def tearDown(self):
-        p7.PROPOSALS_DIR = self._orig_dir
-        p7.run_check = self._orig_run
-        p7.dm_digest = self._orig_dm
-        p7._read_log = self._orig_read
-        shutil.rmtree(self.tmp, ignore_errors=True)
-
-    def _persisted(self):
-        path = p7.artifact_path_for_date('2026-06-01')
-        return p7._persisted_proposal_keys(path)
-
-    def test_persisted_keys_helper(self):
-        path = p7.artifact_path_for_date('2026-06-01')
-        self.assertEqual(p7._persisted_proposal_keys(path), set())  # missing
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text('{ corrupt')
-        self.assertEqual(p7._persisted_proposal_keys(path), set())  # corrupt
-
-    def test_persisted_keys_tolerates_malformed_shapes(self):
-        path = p7.artifact_path_for_date('2026-06-01')
-        path.parent.mkdir(parents=True, exist_ok=True)
-        # explicit null proposals must NOT crash the gate (review fix)
-        path.write_text(json.dumps({'proposals': None}))
-        self.assertEqual(p7._persisted_proposal_keys(path), set())
-        # top-level non-dict
-        path.write_text(json.dumps([1, 2, 3]))
-        self.assertEqual(p7._persisted_proposal_keys(path), set())
-        # non-dict entries inside the list are skipped
-        path.write_text(json.dumps({'proposals': ['x', {'rule': 'raise',
-                                                        'band': 'low'}]}))
-        self.assertEqual(
-            p7._persisted_proposal_keys(path), {('raise', 'low')})
-
-    def test_second_same_day_proposal_is_not_lost(self):
-        # First run: low-band raise fires → artifact written, DM sent.
-        p7.run_check = lambda **k: _result([_prop('raise', 'low')])
-        self.assertEqual(p7.main([]), 0)
-        self.assertEqual(self._persisted(), {('raise', 'low')})
-        self.assertEqual(len(self.dm_calls), 1)
-
-        # Later same day: a high-band remove becomes eligible too. The OLD
-        # date-only sentinel skipped this entirely. It must now be persisted
-        # and DM'd.
-        p7.run_check = lambda **k: _result(
-            [_prop('raise', 'low'), _prop('remove', 'high')])
-        self.assertEqual(p7.main([]), 0)
-        self.assertEqual(
-            self._persisted(), {('raise', 'low'), ('remove', 'high')})
-        self.assertEqual(len(self.dm_calls), 2)
-
-    def test_identical_proposals_same_day_are_skipped(self):
-        p7.run_check = lambda **k: _result([_prop('raise', 'low')])
-        self.assertEqual(p7.main([]), 0)
-        self.assertEqual(len(self.dm_calls), 1)
-        # Re-run with the SAME proposal set → no new keys → skip, no re-DM.
-        self.assertEqual(p7.main([]), 0)
-        self.assertEqual(len(self.dm_calls), 1)
 
 
 # ----------------------------- #38 -----------------------------

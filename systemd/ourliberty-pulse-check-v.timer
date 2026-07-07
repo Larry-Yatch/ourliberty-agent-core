@@ -6,7 +6,9 @@ Description=Monthly (first Monday) run of Pulse Check V — action-template trus
 # First Monday of the month mirrors the cadence-config entry (cadence_hours=840).
 # The analyzer's own month-sentinel (check-v-<YYYY-MM>.json) makes a Persistent
 # catch-up or ad-hoc re-run within the same month a clean no-op.
-# 04:49 droplet-local: off-peak, offset from check-xi (04:17) / check-iv (04:25) / check-iii (04:41).
+# 04:49 droplet-local: off-peak; >=10 min beyond check-iv (Mon 04:25) plus
+# its 300s jitter. check-xi (04:17 daily) and check-iii (Sun 04:41) do not
+# share the first-Monday slot.
 OnCalendar=Mon *-*-01..07 04:49:00
 Persistent=true
 RandomizedDelaySec=300

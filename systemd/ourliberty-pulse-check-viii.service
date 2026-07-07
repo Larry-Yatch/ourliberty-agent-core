@@ -2,6 +2,10 @@
 Description=Pulse Check VIII — burn-rate-signal validity analyzer (token-gate calibration)
 Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/pulse_check_viii.py
 After=network.target
+# System-wide halt: when the operator trips EMERGENCY_HALT the unit is skipped
+# (condition-failed, not error) — replaces the halt gate the /cycle agent
+# enforced before invoking these checks.
+ConditionPathExists=!/home/larry/agents/blackboard/EMERGENCY_HALT
 
 [Service]
 Type=oneshot

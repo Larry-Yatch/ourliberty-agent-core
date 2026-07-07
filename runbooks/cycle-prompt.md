@@ -517,7 +517,7 @@ This check is additive — it fires every cycle and adds at most one line to the
 
 These checks fire on specific weekdays, on top of the always-run mandatory + additive checks above. They do NOT gate tier de-escalation (a quiet conditional check is just quiet) — they're parallel observation surfaces with their own DM cadence.
 
-**Scheduling change (2026-07-07): every periodic check (I, III, IV, V, VI, VIII, IX, X, XI) now fires from its own systemd timer (`ourliberty-pulse-check-<id>.timer`). Do NOT invoke any of them from /cycle.** Agent-invoked scheduling chronically missed late runbook sections (journal G-rules `check-iii-invoke-gap-sunday-001`, `check-ix-x-invoke-gap-monday-001`); timers never miss (IV and XI proved the pattern). Your §5 duties are now **triage and journaling only**: read each check's new artifacts / journal blocks since your last iter, fold them into your cycle entry, and triage any `pulse-check-failed:<id>` alert per Check 0. The §5.0 self-gating one-shots below are the exception — they remain agent-run every cycle.
+**Scheduling change (2026-07-07): every periodic check (I, III, IV, V, VI, VIII, IX, X, XI) now fires from its own systemd timer (`ourliberty-pulse-check-<id>.timer`). Do NOT invoke any of them from /cycle.** Agent-invoked scheduling chronically missed late runbook sections (journal G-rules `check-iii-invoke-gap-sunday-001`, `check-ix-x-invoke-gap-monday-001`); timers never miss (IV and XI proved the pattern). Every unit carries `ConditionPathExists=!/home/larry/agents/blackboard/EMERGENCY_HALT`, so a tripped halt skips all of them at the systemd layer. Your §5 duties are now **triage and journaling only**: read each check's new artifacts / journal blocks since your last iter, fold them into your cycle entry, and triage any `pulse-check-failed:<id>` alert per Check 0. The §5.0 self-gating one-shots below are the exception — they remain agent-run every cycle.
 
 #### 5.0 Bug-hunt gate Phase-2 — audit-due nudge + distill detector + audit-cadence signal (self-gating one-shots)
 
@@ -568,7 +568,7 @@ Spec: memory `mirror-bughunt-gate-project`; the approve leg is the Beacon
 
 Check I is **additive to all mandatory + additive checks, not a replacement**. It fires Mon/Wed/Fri/Sun, re-reading Ledger's most recent weekly sidecar each time.
 
-**Scheduling:** `ourliberty-pulse-check-i.timer` fires the analyzer Mon/Wed/Fri/Sun 08:10 droplet-local (after Ledger's Monday 07:00 UTC = 00:00/01:00 local run). Do NOT invoke it from /cycle. The analyzer self-gates on weekday, EMERGENCY_HALT, and the Ledger sentinel (`~/agents/blackboard/ledger/ledger-ready-<most-recent-Monday>`), journaling its own one-line skip note when a condition fails.
+**Scheduling:** `ourliberty-pulse-check-i.timer` fires the analyzer Mon/Wed/Fri/Sun, deliberately hours after Ledger's Monday run (exact times live in the unit files). Do NOT invoke it from /cycle. The analyzer self-gates on weekday, EMERGENCY_HALT, and the Ledger sentinel (`~/agents/blackboard/ledger/ledger-ready-<most-recent-Monday>`), journaling its own one-line skip note when a condition fails.
 
 Ledger itself remains weekly (Monday). Check I reads the same sidecar across all 4 firings of a given week; this gives the loop more chances to surface or escalate signals as the week progresses without making Ledger any chattier.
 
@@ -582,7 +582,7 @@ Behaviors you can rely on:
 | Firing day + sentinel + sidecar present, no proposals **but some signal** (σ anomalies, high-repeat tasks, or retry overhead ≥ 15%) | Emits heartbeat DM ("chain shapes nominal") + journal block | Note Check I heartbeat fired |
 | Firing day + sentinel + sidecar present, **no signal** (no proposals, no anomalies, no repeats, retry overhead < 15%) + not `--force` | Skips DM; writes audit JSON (`mode='no-signal'`) + journal one-liner | Note Check I no-signal day, no DM |
 | Firing day + sidecar missing/stale | Skips with journal note; no DM | Note Check I skipped: Ledger report unavailable |
-| EMERGENCY_HALT tripped | Exits 0 silently; no DM, no journal | Same as during halt |
+| EMERGENCY_HALT tripped | Unit skipped (ConditionPathExists halt gate); the script's own halt gate is a second net | Same as during halt |
 | Tue/Thu/Sat (off day) | Timer does not fire (and the analyzer's weekday gate exits 0 if run by hand) | Journal nothing for Check I |
 
 **On-demand `/optimize` path:** the Telegram bot (or you, manually) invokes `python3 ~/agent-core/scripts/pulse_check_i.py --force`. The `--force` flag skips the Mon/Wed/Fri/Sun weekday gate **and** bypasses the no-signal DM suppression, so on-demand callers always get a reply even when the week looks quiet. If the bot determines Ledger's sidecar is >24h old, it should refresh Ledger first (run `bash ~/agent-core/scripts/run_ledger.sh`), then invoke the analyzer.
@@ -598,7 +598,7 @@ When the analyzer surfaces proposals, you may add an interpretation paragraph af
 
 Check VIII fires on **Mondays only**, alongside Check I. It observes the `heal-claude-max-burn-rate` DM stream against the `anthropic-quota-events.jsonl` ground-truth ledger and proposes adjustments to the dollar gate when the signal turns out to be miscalibrated. Spec: `docs/check-viii-burn-rate-signal-brief.md` § 2 PR-2b.
 
-**Scheduling:** `ourliberty-pulse-check-viii.timer` fires the analyzer Mondays 05:01 droplet-local. Do NOT invoke it from /cycle. The analyzer's own week-Monday sentinel (`~/agents/blackboard/pulse-check-viii-proposals/check-viii-<this-week-Monday>.json`) makes any same-week re-run a clean no-op.
+**Scheduling:** `ourliberty-pulse-check-viii.timer` fires the analyzer Mondays. Do NOT invoke it from /cycle. The analyzer's own week-Monday sentinel (`~/agents/blackboard/pulse-check-viii-proposals/check-viii-<this-week-Monday>.json`) makes any same-week re-run a clean no-op.
 
 **Mechanism:** the timer invokes the deterministic analyzer. It reads `larry-alerts.jsonl` (trailing 4w of burn-rate DMs), `anthropic-quota-events.jsonl` (trailing 4w, plus 8w for the deprecate rule), and `costs.jsonl` (for rolling-5h spend at FN-event timestamps); classifies DMs as TP/FP and events as FN per the 2h proximity window; computes precision + recall; and applies the proposal-firing rules (priority: deprecate > defer > raise > lower).
 
@@ -612,7 +612,7 @@ Behaviors you can rely on:
 | Monday + sentinel missing, `defer` (precision + recall both below floor) | Writes artifact + DMs tension digest (no shortcut) | Note Check VIII defer in journal |
 | Monday + sentinel missing, `none` or `insufficient_signal` | Writes artifact, no DM | Note Check VIII quiet in journal |
 | Monday + sentinel exists for this week's Monday | Skips silently (idempotent — analyzer's own gate handles this) | No journal note needed |
-| EMERGENCY_HALT tripped | Exits 0 silently | Same as other checks |
+| EMERGENCY_HALT tripped | Unit skipped (ConditionPathExists halt gate) | Same as other checks |
 | Tue–Sun (non-firing day) | Timer does not fire | Journal nothing for Check VIII |
 
 **First-data-month limitation:** Check VIII needs ≥5 burn-rate DMs and ≥3 quota-events in the trailing 4w to fire a real proposal (otherwise `insufficient_signal`). For the first ~4 weeks after PR-2a + PR-2b ship, expect quiet output. That's expected, not a regression.
@@ -621,7 +621,7 @@ Behaviors you can rely on:
 
 Check IX fires on **Mondays only**, alongside Check I + Check VIII. It scans four operator-friction signals across the trailing 7d (catch-me-up gap from beacon-bot logs, time-to-action gap from `chain_events`, alert-ignored repeats from `larry-alerts.jsonl`, and out-of-chain rescue burden from outbox-notifier logs) and registers a `phase: drafting` mission for each signal that crosses its threshold. Registration goes through `POST /api/system/missions/new` so the audit trail matches Larry's manual `+ New mission` flow. Spec: `agents/beacon/specs/pulse-check-ix-operator-friction.md`.
 
-**Scheduling:** `ourliberty-pulse-check-ix.timer` fires the analyzer Mondays 05:05 droplet-local. Do NOT invoke it from /cycle. The analyzer's own week-Monday sentinel (`~/agents/blackboard/pulse-check-ix-proposals/check-ix-<this-week-Monday>.json`) makes any same-week re-run a clean no-op.
+**Scheduling:** `ourliberty-pulse-check-ix.timer` fires the analyzer Mondays. Do NOT invoke it from /cycle. The analyzer's own week-Monday sentinel (`~/agents/blackboard/pulse-check-ix-proposals/check-ix-<this-week-Monday>.json`) makes any same-week re-run a clean no-op.
 
 **Mechanism:** the timer invokes the deterministic analyzer. It loads the 4 input streams, classifies each per spec § 2, and POSTs to the missions endpoint when any signal crosses its threshold. Idempotency (spec § 3): before POSTing, the analyzer queries `GET /api/system/missions` and skips registration when a `phase: drafting` mission with the `pulse-check-ix-<signal>-` prefix already exists. The analyzer requires `DASHBOARD_API_TOKEN` (already on the droplet) and, for the time-to-action signal, `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (already on the droplet); a missing Supabase env just drops the time-to-action signal for the run.
 
@@ -635,7 +635,7 @@ Behaviors you can rely on:
 | Monday + sentinel missing, signal fires + existing drafting mission for that signal | Skips POST; artifact records `skipped` entry per spec § 3 | Note Check IX deduped (no new mission this week) |
 | Monday + sentinel missing, no signals cross threshold | Writes artifact with empty `findings` | Note Check IX quiet in journal |
 | Monday + sentinel exists for this week's Monday | Skips silently (idempotent — analyzer's own gate handles this) | No journal note needed |
-| EMERGENCY_HALT tripped | Exits without side effects | Same as other checks |
+| EMERGENCY_HALT tripped | Unit skipped (ConditionPathExists halt gate) | Same as other checks |
 | Tue–Sun (non-firing day) | Timer does not fire | Journal nothing for Check IX |
 
 **False-positive discipline (Mirror review focus):** Check IX never auto-promotes a drafting mission to `ready` — Larry's manual review on the kanban is the human gate. A false-positive signal lands as a drafting card and Larry rejects it; no chain dispatch fires until promotion. The signal thresholds are deliberately conservative starting points; Check III's self-tuning (per spec § 8) will revise once 8 cycles of data are accumulated.
@@ -644,7 +644,7 @@ Behaviors you can rely on:
 
 Check X fires on **Mondays only**, alongside Check I + Check VIII + Check IX. It watches the Forge/Mirror auto-merge chain for a QUALITY regression since a model/prompt cutover (default `cutover_date` 2026-06-01, the Opus 4.8 Forge/Mirror roll-forward in PR #233). A same-family model bump doesn't show in routine chat — it shows on hard build/review tasks — so this is the objective early-warning, not a vibes check. It compares a trailing 28d window against the 28d baseline immediately before the cutover and DMs Larry only when a regression is suspected. Read-only analyzer; it NEVER edits config. Brief: `docs/check-x-chain-quality-regression-brief.md`. Config: `config/agent-models.json:check_x_regression`.
 
-**Scheduling:** `ourliberty-pulse-check-x.timer` fires the analyzer Mondays 05:09 droplet-local. Do NOT invoke it from /cycle. The analyzer's own week-Monday sentinel (`~/agents/blackboard/pulse-check-x-proposals/check-x-<this-week-Monday>.json`) makes any same-week re-run a clean no-op.
+**Scheduling:** `ourliberty-pulse-check-x.timer` fires the analyzer Mondays. Do NOT invoke it from /cycle. The analyzer's own week-Monday sentinel (`~/agents/blackboard/pulse-check-x-proposals/check-x-<this-week-Monday>.json`) makes any same-week re-run a clean no-op.
 
 **Mechanism:** the timer invokes the deterministic analyzer. It reads `clarify_request` rows from `chain_events` (Forge only) plus the local `~/agents/blackboard/costs.jsonl` for the Forge build-work task universe, computes two active relative-increase metrics per window (clarify-rounds-per-task and a revision-rounds-per-task proxy), and fires only when a configured threshold is breached AND both windows clear `min_tasks_per_window` (default 8 — below that it logs `insufficient_signal` and stays silent rather than crying wolf on thin data). Two further metrics (Mirror PASS/REVISION/ESCALATE mix) are DEFERRED: their config keys are retained but the data isn't in `chain_events` yet, so the analyzer renders them deferred in the artifact and skips them in firing. The analyzer requires `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (already on the droplet); the supabase SDK is lazy-imported.
 
@@ -658,7 +658,7 @@ Behaviors you can rely on:
 | Monday + sentinel missing, no threshold breaches | Writes artifact (`outcome: none`), no DM | Note Check X quiet in journal |
 | Monday + sentinel missing, either window below min_tasks | Writes artifact (`outcome: insufficient_signal`), no DM | Note Check X insufficient signal, no DM |
 | Monday + sentinel exists for this week's Monday | Skips silently (analyzer's own same-week gate) | No journal note needed |
-| EMERGENCY_HALT tripped | Exits without side effects | Same as other checks |
+| EMERGENCY_HALT tripped | Unit skipped (ConditionPathExists halt gate) | Same as other checks |
 | Tue–Sun (non-firing day) | Timer does not fire | Journal nothing for Check X |
 
 **Scope discipline (Mirror review focus):** Check X is observability only (dial-3) — it proposes, Larry disposes; there is no auto-revert and no config write. The thresholds are conservative starting points tuned in `check_x_regression`; re-point `cutover_date` for any future model/prompt change to re-baseline.
@@ -667,14 +667,14 @@ Behaviors you can rely on:
 
 Four Checks share the same self-tuning pattern. § 5.1 already documents Check I (the optimization-mode digest); the table below names the self-tuning Checks and their role in the cycle's self-optimization loop. Every one fires from its own systemd timer (see the § 5 scheduling note) — you triage their artifacts, you do not invoke them.
 
-(**Check VII retired 2026-07-07.** It was to tune the Decision III cost-ceiling thresholds from Pulse's escalation-response log, but the producer for its substrate — `~/agents/state/pulse-cost-escalations.jsonl` — never shipped, the check never ran once, and its `event_driven` cadence entry made the staleness watcher skip it forever. `scripts/pulse_check_vii.py` and its cadence entry were removed; revive both from git history if a deterministic escalation-response producer ever ships.)
+(**Check VII retired 2026-07-07.** It was to tune the Decision III cost-ceiling thresholds from Pulse's escalation-response log, but the producer for its substrate never shipped — and the two path names never even agreed (the analyzer read `~/agents/state/pulse-cost-escalations.jsonl` while the § 6.8 doctrine logs responses to `~/agents/state/cost-escalation-responses.jsonl`; neither file was ever created) — so the check never ran once, and its `event_driven` cadence entry made the staleness watcher skip it forever. `scripts/pulse_check_vii.py` and its cadence entry were removed; revive both from git history if a deterministic escalation-response producer ever ships.)
 
 | Check | What it tunes | Cadence (systemd timer) | Data substrate | Silent until | Analyzer script |
 |---|---|---|---|---|---|
-| III | Stuck-detection thresholds | 14-day Sunday-anchored (`ourliberty-pulse-check-iii`, Sun 04:41 droplet-local + 13-day ExecCondition) | `chain_events` (live now) | Live (Sun 2026-05-31 first run) | `scripts/pulse_check_iii.py` |
-| IV | Marker-drift enforcement strictness AND known-pattern allowlist tuning | Weekly (`ourliberty-pulse-check-iv`, Mon 04:25 UTC) | `chain_events` query for `mirror_marker_invisible:*` PLUS `alert-triage.json` triage_decisions | Live immediately (has data now); allowlist tuning silent until ~50 triage decisions accumulate | `scripts/pulse_check_iv.py` |
-| V | Tier-1 action-template trust list (guard-list graduation per Decision I) | Monthly (`ourliberty-pulse-check-v`, first Monday 04:49 droplet-local) | `cycle-prime-ledger.jsonl` + `alert-triage.json` | ~30d of cycle ledger data | `scripts/pulse_check_v.py` |
-| VI | PRIME DIRECTIVE posture (Generous / Neutral / Strict) per Decision II | Monthly (`ourliberty-pulse-check-vi`, first Monday 04:53 droplet-local) | `cycle-prime-ledger.jsonl` `verification_pending` rates + auto-promote ratios + ratio-trend | ~30d of cycle ledger data | `scripts/pulse_check_vi.py` |
+| III | Stuck-detection thresholds | 14-day Sunday-anchored (`ourliberty-pulse-check-iii`, every Sunday; the analyzer skips the off week) | `chain_events` (live now) | Live (Sun 2026-05-31 first run) | `scripts/pulse_check_iii.py` |
+| IV | Marker-drift enforcement strictness AND known-pattern allowlist tuning | Weekly (`ourliberty-pulse-check-iv`, Mondays) | `chain_events` query for `mirror_marker_invisible:*` PLUS `alert-triage.json` triage_decisions | Live immediately (has data now); allowlist tuning silent until ~50 triage decisions accumulate | `scripts/pulse_check_iv.py` |
+| V | Tier-1 action-template trust list (guard-list graduation per Decision I) | Monthly (`ourliberty-pulse-check-v`, first Monday) | `cycle-prime-ledger.jsonl` + `alert-triage.json` | ~30d of cycle ledger data | `scripts/pulse_check_v.py` |
+| VI | PRIME DIRECTIVE posture (Generous / Neutral / Strict) per Decision II | Monthly (`ourliberty-pulse-check-vi`, first Monday) | `cycle-prime-ledger.jsonl` `verification_pending` rates + auto-promote ratios + ratio-trend | ~30d of cycle ledger data | `scripts/pulse_check_vi.py` |
 
 Each of Checks III, IV, V, VI follows the same five-step pattern per doctrine #48 (`feedback_self_optimizing_config_via_pulse_check_pattern`):
 
@@ -999,6 +999,8 @@ Verbatim adoption of spec § 12.2 Decision III, the doctrine that handles cumula
 >
 > The $50/$100 thresholds are themselves self-tuning via Check VII (see § 5.4).
 
+*(The blockquote above is the spec verbatim; its Check VII self-tuning leg was retired 2026-07-07 — see the cross-reference note below. The escalation-DM behavior itself is unchanged and live.)*
+
 **Operational binding.** Pulse reads cumulative daily LLM spend from `costs.jsonl` (the canonical chain-wide cost ledger written by every Claude session via `scripts/costs_ledger.py`). The "day" boundary is UTC midnight to UTC midnight, matching the chain's existing day-rollover semantics.
 
 - At each iter's end (after § 13 journal write, before § 14 actions-log write), Pulse computes the sum of `cost_usd` rows in `costs.jsonl` for today UTC.
@@ -1017,7 +1019,7 @@ Verbatim adoption of spec § 12.2 Decision III, the doctrine that handles cumula
 
 **No silent throttle.** Spec § 12.2 Decision III explicitly bans silent throttle on the silence case. Pulse does NOT slow down or skip dispatches when Larry hasn't responded; she keeps going. The DM is the only behavior change at the $50/$100 bands. This avoids a failure mode where Larry assumes the system is dispatching but Pulse has quietly throttled — silent state changes are the worst kind of state changes.
 
-**Worked example — $50 escalation + Larry approves keep-going + Check VII learns.** Iter 312 (14:22 UTC). Pulse computes today's cumulative spend at $51.40, crossing the $50 band. Decision III fires: Pulse emits the cost-escalation DM (example rendering 2.5 in § 6.10). Larry replies `keep going` at 14:35 UTC. Pulse logs the response in `cost-escalation-responses.jsonl`: `{"ts": "2026-05-30T14:35:00Z", "iter": 312, "band": "$50", "response": "keep-going", "preceding_spend_usd": 51.40}`. Pulse continues dispatching at normal cadence. By UTC midnight, today's spend totals $87.15 (didn't cross $100, so no second escalation DM fired). The next 9 days each see similar patterns: $50 band crossed, Larry replies `keep going`, Pulse continues. On day 10, Check VII observes 10 consecutive `keep-going` responses at the $50 band. The analyzer fires trigger 1 (per § 5.4) and emits a proposal artifact: `{"current_threshold": 50, "proposed_threshold": 75, "rationale": "10 consecutive keep-going responses at the $50 band — Larry's pattern suggests $50 is too tight"}`. Larry approves via `approve check-vii-update-<date>`; a config-only PR raises the threshold to $75 in `config/cost-ceiling.json`. Future iters fire the first escalation at $75/day instead. The self-tuning loop closed.
+**Worked example — $50 escalation + Larry approves keep-going + Check VII learns.** Iter 312 (14:22 UTC). Pulse computes today's cumulative spend at $51.40, crossing the $50 band. Decision III fires: Pulse emits the cost-escalation DM (example rendering 2.5 in § 6.10). Larry replies `keep going` at 14:35 UTC. Pulse logs the response in `cost-escalation-responses.jsonl`: `{"ts": "2026-05-30T14:35:00Z", "iter": 312, "band": "$50", "response": "keep-going", "preceding_spend_usd": 51.40}`. Pulse continues dispatching at normal cadence. By UTC midnight, today's spend totals $87.15 (didn't cross $100, so no second escalation DM fired). The next 9 days each see similar patterns: $50 band crossed, Larry replies `keep going`, Pulse continues. (Retired design from here: on day 10, Check VII *would have* observed 10 consecutive `keep-going` responses and proposed raising the threshold to $75 via `approve check-vii-update-<date>`. Check VII was retired 2026-07-07 before ever running — do NOT expect or hunt for check-vii artifacts. The response log is still written so a future revival has data; until then, a consistent pattern like this is something YOU surface to Larry in a digest, and he adjusts the thresholds in this doctrine directly.)
 
 **Worked example — $100 escalation + Larry throttles + hot-loop discovery.** Iter 488. Today's cumulative spend hits $50 at 11:00 UTC (Larry `keep going`); $100 at 16:30 UTC. Decision III fires the second escalation DM at the $100 band. Larry replies `throttle` at 16:34 UTC. Pulse logs the response + manually pauses new auto-dispatches per Larry's directive (NOT silent throttle — Pulse explicitly journals the throttle and confirms in a follow-up DM: `Pulse triaged: throttle ack'd at the $100/day band. Acting: pausing new auto-dispatches until UTC midnight; in-flight work continues unaffected. Status: dispatched. Detail: <expandable>`). Investigation of the high spend reveals a Tier-1 hot loop driven by a fixture-pattern shape that slipped past the § 12 fixture allowlist + caused 18 redundant Forge revision rounds on the same PR. Larry decides to: 1) extend the fixture allowlist (one-line PR via Claude-as-Forge); 2) re-tune Check III's stall-detection threshold to catch the hot loop earlier. The $100 throttle was the load-bearing intervention; the systemic fix is the fixture-pattern extension.
 
@@ -1079,7 +1081,7 @@ After the digest fires, every digested row gets `dm_pending: false` + `dm_sent_t
 
 #### 6.10 The plain-language DM template
 
-The single canonical Pulse → Larry message format. All DMs Pulse sends — Check 0 triage outcomes, Decision III cost escalations, Decision IV immediate DMs and the daily digest, Check III-VII proposal artifacts, Check 0 Tier-2 guarded-category gates, Check 0 Tier-4 novel-alert guidance requests — use this template verbatim. **No other DM shape is canonical for Pulse.** Earlier α₁ DM examples that used a different format must be re-rendered through this template; mirror's α₂ review checks this explicitly per brief Mirror-focus item #5.
+The single canonical Pulse → Larry message format. All DMs Pulse sends — Check 0 triage outcomes, Decision III cost escalations, Decision IV immediate DMs and the daily digest, Check III-VI proposal artifacts, Check 0 Tier-2 guarded-category gates, Check 0 Tier-4 novel-alert guidance requests — use this template verbatim. **No other DM shape is canonical for Pulse.** Earlier α₁ DM examples that used a different format must be re-rendered through this template; mirror's α₂ review checks this explicitly per brief Mirror-focus item #5.
 
 **The template (verbatim from spec § 12.2 Decision IV final paragraph):**
 
@@ -1161,7 +1163,7 @@ Pulse triaged: SUPABASE_SERVICE_ROLE_KEY is in the 60-day rotation window per co
 - Do NOT use markdown headers (`### Status:`) instead of inline fields. The template's inline shape (`Status: dispatched.`) is what makes it scannable across the four-line rendering Telegram applies.
 - Do NOT skip the `Pulse triaged:` opener. The opener is the grep handle Larry uses to filter Pulse DMs from healer / agent / chain DMs.
 
-**Composition with Check VIII / Check IX (existing producer-side DMs).** Check VIII and Check IX already DM Larry per α₁'s § 5.2 and § 5.3 respectively. The plain-language template applies prospectively to NEW Pulse DM surfaces (Check 0, Decision III escalations, Decision IV immediate + digest, Check III-VII proposals); Check VIII's existing burn-rate-signal DM shape and Check IX's mission-registration flow continue to operate per their existing contracts. If the brief surfaces an inconsistency post-α₂, the resolution path is a small follow-up PR to update Check VIII / IX DM rendering — NOT an inline α₂ modification of § 5.2 / § 5.3 (those sections are NOT in the α₂ extend list per the brief).
+**Composition with Check VIII / Check IX (existing producer-side DMs).** Check VIII and Check IX already DM Larry per α₁'s § 5.2 and § 5.3 respectively. The plain-language template applies prospectively to NEW Pulse DM surfaces (Check 0, Decision III escalations, Decision IV immediate + digest, Check III-VI proposals); Check VIII's existing burn-rate-signal DM shape and Check IX's mission-registration flow continue to operate per their existing contracts. If the brief surfaces an inconsistency post-α₂, the resolution path is a small follow-up PR to update Check VIII / IX DM rendering — NOT an inline α₂ modification of § 5.2 / § 5.3 (those sections are NOT in the α₂ extend list per the brief).
 
 **Telegram rendering specifics.** The template's quote-block `Detail:` field uses Telegram's standard `>` block quote shape. In practice the rendering pipeline (Pulse's DM emitter via `larry_alerts.append_notification`) writes the body to `larry-alerts.jsonl` with the `Detail:` content prefixed by `> ` on each line; the beacon-bot's sweep reads the line and delivers via Telegram's MarkdownV2 mode (so the block quote renders as collapsible). The opener (`Pulse triaged:`) + the `Acting:` + `Status:` fields render as plain bold text. The four-field order is fixed.
 
@@ -1293,7 +1295,7 @@ When the conditions above hold, evaluate three lever surfaces in order:
 
 1. **Spec backlog.** Are there spec docs at `agents/beacon/specs/*.md` with sub-phases unimplemented? (E.g., open multi-step build sequences with the next-step dispatchable.) Check the missions registry at `agents/beacon/missions.json` for active missions whose next step isn't yet in-flight.
 2. **Recurring-stall surface.** Any `~/agents/blackboard/pulse-escalations.json` entries with `needs_response: true` older than 24h?
-3. **Self-optimization backlog.** Any Check III/IV/V/VI/VII proposal that's been queued for >7 days without Larry's approve/reject? (Read the relevant `pulse-<check>-proposals.json` artifacts.)
+3. **Self-optimization backlog.** Any Check III/IV/V/VI proposal that's been queued for >7 days without Larry's approve/reject? (Read the relevant `pulse-<check>-proposals.json` artifacts.)
 
 If any of (1)-(3) yields a clear next-leverage candidate, write a proposal artifact to `~/agents/blackboard/pulse-leverage-proposals.json`:
 
@@ -1325,7 +1327,7 @@ Iter 120 (Tier 2, 15-min cadence). All mandatory checks clean. Additive checks c
 Pulse evaluates leverage candidates:
 1. **Spec backlog.** `agents/beacon/missions.json` lists mission `pulse-cycle-upgrade-pending` with `phase: active`. Next step in the build-sequence file is PR-α₂ (healer-triage doctrine), `depends_on: [alpha-1]`. PR-α₁ merged 4 hours ago. Candidate.
 2. **Recurring-stall surface.** `pulse-escalations.json` has 0 entries with `needs_response: true` over 24h. No candidate from this surface.
-3. **Self-optimization backlog.** No Check III/IV/V/VI/VII proposal artifacts older than 7 days without an applied/rejected flag. No candidate from this surface.
+3. **Self-optimization backlog.** No Check III/IV/V/VI proposal artifacts older than 7 days without an applied/rejected flag. No candidate from this surface.
 
 Pulse writes to `~/agents/blackboard/pulse-leverage-proposals.json`:
 ```json
@@ -1718,10 +1720,10 @@ For every alert claimed or classified during Check 0 (§ 3.0), Pulse records a r
 | 1. Check 0 alert-triage scan | § 3.0 | § 6.6 (tier classification), § 6.11 (allowlist matching), § 14.1 (state file writes) | § 12.1 |
 | 2. Decision I — Tier-1 alert handling autonomy | § 6.6 | § 3.0 (Check 0 binding), § 5.4 (Check V graduation), § 6.10 (gate request DM) | § 12.2 Decision I |
 | 3. Decision II — PRIME DIRECTIVE starting posture | § 6.7 | § 6.4 (ledger row schema), § 6.2 (verification gating), § 5.4 (Check VI tuning), § 8 (Phase 4 anchor) | § 12.2 Decision II |
-| 4. Decision III — Soft cost ceiling | § 6.8 | § 6.10 (escalation DM rendering), § 5.4 (Check VII tuning) | § 12.2 Decision III |
+| 4. Decision III — Soft cost ceiling | § 6.8 | § 6.10 (escalation DM rendering), § 5.4 (Check VII tuning — retired 2026-07-07) | § 12.2 Decision III |
 | 5. Decision IV — Post-hoc DM threshold logic | § 6.9 | § 6.6 (guarded-always-immediate carve-out), § 6.10 (template), § 14.1 (dm_pending state) | § 12.2 Decision IV |
 | 6. Plain-language DM template | § 6.10 | every DM-emitting subsection (§ 3.0, § 6.6-6.9, § 5.4) | § 12.2 Decision IV final paragraph |
-| 7. 5-Check family overview | § 5.4 | § 6.6 (Check V → guard list), § 6.7 (Check VI → posture), § 6.8 (Check VII → cost ceiling), § 6.11 (Check IV → allowlist) | § 12.3 |
+| 7. 5-Check family overview | § 5.4 | § 6.6 (Check V → guard list), § 6.7 (Check VI → posture), § 6.8 (Check VII → cost ceiling — retired 2026-07-07), § 6.11 (Check IV → allowlist) | § 12.3 |
 | 8. Known-pattern allowlist semantics | § 6.11 | § 3.0 (Tier-3 silence path), § 5.4 (Check IV tuning), § 14.1 (cache schema) | § 12.1 last bullet |
 | 9. actions-log extension (triage_decisions) | § 14.1 | § 3.0 (lifecycle), § 13 (Triage: line) | § 12.1 lifecycle |
 
@@ -1763,10 +1765,10 @@ PR-β ships `scripts/alert_triage_state.py` and `scripts/cost_escalation_ledger.
 - `alert_triage_state.read_known_patterns_cache() -> list[dict]` — returns the cached allowlist; refreshes from `config/alert-translations.json` if cache age > iter-start.
 - `alert_triage_state.record_action_template_execution(template: str, alert_id: str, outcome: str, larry_correction_signal: str | None) -> None` — appends to `action_templates[].executions[]` for Check V.
 
-- `cost_escalation_ledger.append_response(band: str, response: str, preceding_spend_usd: float, iter_n: int, ts: str) -> None` — appends to `cost-escalation-responses.jsonl` for Check VII.
+- `cost_escalation_ledger.append_response(band: str, response: str, preceding_spend_usd: float, iter_n: int, ts: str) -> None` — appends to `cost-escalation-responses.jsonl` (was Check VII's planned training data; the check is retired, the log stays).
 - `cost_escalation_ledger.cumulative_spend_today_utc() -> float` — reads `costs.jsonl`, returns today's UTC cumulative.
 - `cost_escalation_ledger.escalation_dm_fired_today(band: str) -> bool` — true if a `$50` or `$100` escalation DM has already fired today.
-- `cost_escalation_ledger.read_recent_responses(window_days: int = 30) -> list[dict]` — returns the trailing-window response log for Check VII to compute the consistency triggers per § 5.4.
+- `cost_escalation_ledger.read_recent_responses(window_days: int = 30) -> list[dict]` — returns the trailing-window response log (was for Check VII's consistency triggers; retired 2026-07-07).
 
 **The helper API stability invariant.** Once PR-β ships these helpers, the function signatures + return shapes become a contract. Future changes to the helpers (adding fields, renaming, etc.) require a coordinated doctrine PR that updates both cycle-prompt.md AND the helper module in the same change. The discipline mirrors § 16's no-direct-commit doctrine for prompt edits: the contract is shared between α₂ (the doctrine) and β (the implementation); evolving either requires evolving both.
 
@@ -1780,7 +1782,7 @@ Pulse's cycle script imports these helpers + calls them in the protocol order do
 
 **Axis 1 — the per-iter execution order.** α₁'s order was: read continuity (§ 1) → tier state (§ 2) → mandatory 5 checks (§ 3.1-3.5) → additive checks (§ 4) → conditional checks (§ 5) → PRIME DIRECTIVE accounting (§ 6) → pipeline-driver (§ 7) → Phase 4 verification (§ 8) → journal (§ 13) → actions log (§ 14) → escalations (§ 15) → end (§ 16). α₂ inserts Check 0 (§ 3.0) BEFORE Check 1 (§ 3.1) — making the new order: read continuity → tier state → **Check 0 alert-triage** → mandatory 5 checks → additive checks → conditional checks → PRIME DIRECTIVE → pipeline-driver → Phase 4 → journal → actions log → escalations → end. The insertion is one step; every other ordering is preserved.
 
-**Axis 2 — the DM doctrine.** α₁'s DM surfaces were Check I (Mon/Wed/Fri/Sun digest), Check VIII (Monday burn-rate proposal), Check IX (Monday operator-friction missions), and the § 15 escalations. α₂ adds: Check 0 Tier-1/2/4 DMs (per Decision IV thresholds), Check III-VII proposal DMs (per § 5.4 five-step pattern), Decision III $50/$100 cost-escalation DMs, the daily 8:00 AM MDT digest. All α₂ DMs use the § 6.10 plain-language template; α₁'s existing DM shapes continue per their existing contracts (Check VIII / Check IX explicitly retain their existing shapes for backward compatibility per the brief's § 5 non-modification of § 5.2 / § 5.3).
+**Axis 2 — the DM doctrine.** α₁'s DM surfaces were Check I (Mon/Wed/Fri/Sun digest), Check VIII (Monday burn-rate proposal), Check IX (Monday operator-friction missions), and the § 15 escalations. α₂ adds: Check 0 Tier-1/2/4 DMs (per Decision IV thresholds), Check III-VI proposal DMs (per § 5.4 five-step pattern), Decision III $50/$100 cost-escalation DMs, the daily 8:00 AM MDT digest. All α₂ DMs use the § 6.10 plain-language template; α₁'s existing DM shapes continue per their existing contracts (Check VIII / Check IX explicitly retain their existing shapes for backward compatibility per the brief's § 5 non-modification of § 5.2 / § 5.3).
 
 **Axis 3 — the state-file landscape.** α₁'s state-file surfaces were `~/agents/state/cycle-tier.json` (tier state machine), `~/agents/state/pulse-fixture-suppressions.jsonl` (fixture suppression log), `~/agents/blackboard/cycle-prime-ledger.jsonl` (PRIME DIRECTIVE ledger). α₂ adds: `~/agents/state/alert-triage.json` (Check 0 lifecycle + triage_decisions), `cost-escalation-responses.jsonl` (Decision III response log). All state files are gitignored; PR-β ships the helper libraries that manage them atomically. Pulse never writes any of them via raw `json.dump`.
 
