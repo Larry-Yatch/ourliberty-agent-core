@@ -175,6 +175,64 @@ class FailSafeTest(_IsolatedLedger):
             state_dir.chmod(0o755)
 
 
+class RecordBuildOutcomeTest(_IsolatedLedger):
+    def test_records_build_outcome_row(self) -> None:
+        self.assertTrue(dol.record_build_outcome(
+            'pr-repo-42', 'merged', pr_number=42, notes='clean'))
+        rows = dol.read_recent(10)
+        self.assertEqual(len(rows), 1)
+        r = rows[0]
+        self.assertEqual(r['kind'], 'build_outcome')
+        self.assertEqual(r['decision_key'], 'pr-repo-42')
+        self.assertEqual(r['build_outcome'], 'merged')
+        self.assertEqual(r['pr_number'], 42)
+        self.assertEqual(r['actor'], 'reconcile')
+
+    def test_unknown_build_outcome_refused(self) -> None:
+        self.assertFalse(dol.record_build_outcome('pr-repo-1', 'exploded'))
+        self.assertEqual(dol.read_recent(10), [])
+
+    def test_empty_key_refused(self) -> None:
+        self.assertFalse(dol.record_build_outcome('', 'merged'))
+        self.assertEqual(dol.read_recent(10), [])
+
+    def test_has_build_outcome(self) -> None:
+        self.assertFalse(dol.has_build_outcome('pr-repo-7'))
+        dol.record_build_outcome('pr-repo-7', 'closed_unmerged')
+        self.assertTrue(dol.has_build_outcome('pr-repo-7'))
+        self.assertFalse(dol.has_build_outcome('pr-repo-8'))
+
+
+class KindSeparationTest(_IsolatedLedger):
+    def test_build_outcome_rows_excluded_from_outcome_counts(self) -> None:
+        dol.record_decision('pr-repo-1', 'approved', actor='dashboard', cleared=1)
+        dol.record_build_outcome('pr-repo-1', 'merged', pr_number=1)
+        # only the decision row is tallied
+        self.assertEqual(dol.outcome_counts(), {'approved': 1})
+
+    def test_decision_rows_carry_kind(self) -> None:
+        dol.record_decision('k', 'approved', actor='x', cleared=1)
+        self.assertEqual(dol.read_recent(1)[0]['kind'], 'decision')
+
+
+class DecisionKeysWithoutOutcomeTest(_IsolatedLedger):
+    def test_returns_unresolved_decision_keys_only(self) -> None:
+        dol.record_decision('pr-repo-1', 'approved', actor='x', cleared=1)
+        dol.record_decision('pr-repo-2', 'approved', actor='x', cleared=1)
+        dol.record_build_outcome('pr-repo-1', 'merged', pr_number=1)
+        # pr-repo-1 is resolved; only pr-repo-2 remains
+        self.assertEqual(dol.decision_keys_without_outcome(), ['pr-repo-2'])
+
+    def test_excludes_empty_keys_and_dedupes(self) -> None:
+        dol.record_decision('', 'approved', actor='x', cleared=1)
+        dol.record_decision('pr-repo-9', 'approved', actor='x', cleared=1)
+        dol.record_decision('pr-repo-9', 'modified', actor='y', cleared=1)
+        self.assertEqual(dol.decision_keys_without_outcome(), ['pr-repo-9'])
+
+    def test_missing_file_returns_empty(self) -> None:
+        self.assertEqual(dol.decision_keys_without_outcome(), [])
+
+
 class ResolveDecisionWiringTest(_IsolatedLedger):
     """Prove the hook in decision_resolve.resolve_decision actually writes a
     ledger row on a genuine resolution — and stays silent on a no-op. Patches

@@ -18,18 +18,34 @@ result (merged-clean / reverted / gate-failed) onto a decision is a SEPARATE,
 later step keyed on `decision_key`; this module does not reach for that here.
 
 Storage: append-only JSONL at ~/agents/state/decision-outcome-ledger.jsonl.
-One JSON object per line.
+One JSON object per line. Two row KINDS share the file, joined on decision_key:
 
-Record shape::
+  DECISION row (slice 1) — Larry's click, written by record_decision::
 
     {
       "ts": "<ISO 8601 UTC>",
+      "kind": "decision",
       "decision_key": "<canonical_decision_key or ''>",
       "outcome": "approved|rejected|modified|expired",
       "actor": "<resolving surface: dashboard|telegram|heal_stale_approvals|...>",
       "cleared": <int — store-legs the resolution actually cleared>,
       "notes": "<optional short string>"
     }
+
+  BUILD_OUTCOME row (slice 2) — how the authorized work turned out, written by
+  record_build_outcome (from decision_outcome_reconcile, GitHub ground truth)::
+
+    {
+      "ts": "<ISO 8601 UTC>",
+      "kind": "build_outcome",
+      "decision_key": "<same key as the decision it joins>",
+      "build_outcome": "merged|merged_regressed|closed_unmerged",
+      "pr_number": <int, optional>,
+      "actor": "reconcile",
+      "notes": "<optional short string>"
+    }
+
+A pre-`kind` row (none exist in prod yet) is read as a DECISION row.
 
 Discipline (mirrors scripts/medic_ledger.py — the proven ledger pattern here):
 
@@ -81,6 +97,12 @@ LOG_FILE = AGENTS_ROOT / 'logs' / 'decision-outcome-ledger.log'
 # Mirrors decision_resolve.VALID_OUTCOMES — kept as a literal here so the ledger
 # has no import-time dependency on decision_resolve (which imports this module).
 VALID_OUTCOMES = ('approved', 'rejected', 'modified', 'expired')
+
+# Build outcomes joined onto a decision AFTER the fact (slice 2), by
+# decision_outcome_reconcile.py from GitHub ground truth. 'pending' is never
+# RECORDED (a non-terminal PR is simply re-checked next pass); it exists only as
+# a classifier return value. A recorded build_outcome row is terminal.
+VALID_BUILD_OUTCOMES = ('merged', 'merged_regressed', 'closed_unmerged')
 
 
 def _log(level: str, msg: str) -> None:
@@ -145,6 +167,7 @@ def record_decision(
         cleared_int = 0
     record = {
         'ts': datetime.now(timezone.utc).isoformat(),
+        'kind': 'decision',
         'decision_key': key,
         'outcome': out,
         'actor': actor if isinstance(actor, str) and actor else '?',
@@ -152,6 +175,55 @@ def record_decision(
     }
     if notes:
         record['notes'] = str(notes)[:500]
+    return _append(record, key)
+
+
+def record_build_outcome(
+    decision_key: str,
+    build_outcome: str,
+    *,
+    pr_number: Optional[int] = None,
+    actor: str = 'reconcile',
+    notes: Optional[str] = None,
+) -> bool:
+    """Append one build-outcome row, joining a team build result onto the
+    decision that authorized it (slice 2). Keyed by the SAME `decision_key` the
+    decision row carries, so the govern loop can pair "Larry approved X" with
+    "the team's build for X turned out <build_outcome>". Returns True on success,
+    False on any failure. Never raises.
+
+    `build_outcome` is normalized to a VALID_BUILD_OUTCOMES value; an unknown
+    value is dropped (returns False) rather than coerced — unlike a decision
+    row, a miscoded build result is worse than a missing one for the assessor,
+    so we refuse it. An empty `decision_key` is refused for the same reason (a
+    build outcome with no join target is useless). Callers gate on
+    `has_build_outcome` first so a terminal PR is recorded at most once.
+    """
+    if not isinstance(decision_key, str) or not decision_key:
+        _log('WARN', 'record_build_outcome refused: empty decision_key')
+        return False
+    if build_outcome not in VALID_BUILD_OUTCOMES:
+        _log('WARN', f'record_build_outcome refused: unknown build_outcome='
+                     f'{build_outcome!r} for key={decision_key!r}')
+        return False
+    record = {
+        'ts': datetime.now(timezone.utc).isoformat(),
+        'kind': 'build_outcome',
+        'decision_key': decision_key,
+        'build_outcome': build_outcome,
+        'actor': actor if isinstance(actor, str) and actor else 'reconcile',
+    }
+    if isinstance(pr_number, int):
+        record['pr_number'] = pr_number
+    if notes:
+        record['notes'] = str(notes)[:500]
+    return _append(record, decision_key)
+
+
+def _append(record: dict, key: str) -> bool:
+    """Serialize one record to the ledger file. Returns True on success, False on
+    any OSError. Never raises. Shared by record_decision / record_build_outcome
+    so both go through one write path."""
     try:
         LEDGER_FILE.parent.mkdir(parents=True, exist_ok=True)
         with open(LEDGER_FILE, 'a', encoding='utf-8') as f:
@@ -160,6 +232,19 @@ def record_decision(
         _log('WARN', f'ledger append failed for key={key!r}: {e}')
         return False
     return True
+
+
+def has_build_outcome(decision_key: str) -> bool:
+    """True if a build_outcome row already exists for this key. Empty key or
+    missing/malformed file -> False. The reconciler's idempotency guard: a
+    terminal PR's outcome is recorded at most once."""
+    if not isinstance(decision_key, str) or not decision_key:
+        return False
+    for rec in _iter_records():
+        if rec.get('kind') == 'build_outcome' \
+                and rec.get('decision_key') == decision_key:
+            return True
+    return False
 
 
 def records_for_key(decision_key: str) -> list[dict]:
@@ -178,12 +263,48 @@ def outcome_counts(actor: Optional[str] = None) -> dict:
     plain dict (not a Counter) so callers/tests compare cleanly."""
     counts: Counter = Counter()
     for rec in _iter_records():
+        if rec.get('kind') == 'build_outcome':
+            continue  # only decision rows carry an `outcome` tally
         if actor is not None and rec.get('actor') != actor:
             continue
         out = rec.get('outcome')
         if isinstance(out, str) and out:
             counts[out] += 1
     return dict(counts)
+
+
+def decision_keys_without_outcome(limit: int = 500) -> list[str]:
+    """Distinct decision_keys from DECISION rows (kind 'decision' or, for
+    forward-compat with pre-`kind` rows, missing) that do NOT yet have a
+    build_outcome row — the reconciler's work-list. Empty keys are excluded (a
+    build outcome needs a join target). Scans at most the last `limit` rows for
+    bounded cost; oldest-first among the returned distinct keys. Missing /
+    malformed file -> [].
+
+    KNOWN LIMITATION: a decision whose row scrolls past the last `limit` rows
+    before its PR reaches a terminal state is never reconciled (missing data, not
+    wrong data — `has_build_outcome` scans the whole file, so idempotency is
+    unaffected). At current approval volume `limit=500` spans far longer than a
+    PR stays open, so this is theoretical; if volume rises or PRs stay open for
+    weeks, raise `limit` or walk unresolved decisions regardless of recency."""
+    recent = read_recent(limit)
+    if not recent:
+        return []
+    resolved = {r.get('decision_key') for r in recent
+                if r.get('kind') == 'build_outcome'}
+    out: list[str] = []
+    seen: set = set()
+    for rec in recent:
+        if rec.get('kind') == 'build_outcome':
+            continue
+        key = rec.get('decision_key')
+        if not isinstance(key, str) or not key:
+            continue
+        if key in resolved or key in seen:
+            continue
+        seen.add(key)
+        out.append(key)
+    return out
 
 
 def read_recent(limit: int = 50) -> list[dict]:
