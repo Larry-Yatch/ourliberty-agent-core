@@ -255,6 +255,20 @@ def resolve_decision(
         key, entry_id, outcome, actor, result['pending'],
         result['chain_events'], result['escalations'], result['alerts'],
     )
+    # Record the resolution to the Operator's decision-outcome ledger, so the
+    # govern loop can later learn where Larry has consistently approved and
+    # propose widening autonomy there. Gated on total>0 so this fires once per
+    # GENUINE resolution: a healer re-driving an already-cleared decision clears
+    # nothing and appends no duplicate. Fire-and-forget — the audit trail must
+    # never break a resolution (mirrors the leg-level isolation above).
+    if result['total'] > 0:
+        try:
+            import decision_outcome_ledger as dol
+            dol.record_decision(key, outcome, actor=actor,
+                                cleared=result['total'], notes=note or None)
+        except Exception as e:  # noqa: BLE001 — ledger is best-effort
+            log.warning('resolve_decision: ledger record failed (key=%s): %s: %s',
+                        key, type(e).__name__, e)
     return result
 
 
