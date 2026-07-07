@@ -309,9 +309,9 @@ PR #757 (chore(alerts): Tier-3 silence sync.service deploy-restart-storm) MERGED
 
 ---
 
-## G-rule check-iii-invoke-gap-sunday-001 — 1/3 (new, iter ~3125)
+## G-rule check-iii-invoke-gap-sunday-001 → COMPLETE ✅ (iter ~4439)
 
-**Rule:** Check III missed its Sunday 2026-06-22 gate. heal-pulse-check-staleness fired Tier-4 escalation (387.9h since last run, past 336h+48h=384h grace). Root cause: the Pulse /cycle apparently didn't invoke `pulse_check_iii.py` on Sunday 2026-06-22. Pulse ran Check III off-schedule (Saturday 2026-06-27) to clear staleness. Fix: ensure Sunday cycles reliably invoke Check III when conditions hold; may need explicit gate logging or a staleness pre-check in the cycle invoker. Dispatch to Beacon at 3/3 (post-HOLD). First occurrence iter ~3125. Cannot dispatch under HOLD.
+**Rule (historical):** Check III chronically missed its Sunday gate (recurred 1,123+ times) because the Pulse /cycle agent-invoked scheduling path never reliably reached the late runbook sections. **COMPLETE:** PR #829 (`Pulse checks I/III/V/VI/VIII/IX/X to systemd timers; retire Check VII`) MERGED 2026-07-07T19:39:01Z UTC. `ourliberty-pulse-check-iii.timer` installed at `/etc/systemd/system/`, verified active/waiting at iter ~4439. Root cause eliminated — timer fires every Sunday, agent is triage-only. First occurrence iter ~3125.
 
 ---
 
@@ -454,14 +454,14 @@ PR #828 (`gate: delegate JS/TS repo regression checks to GitHub Actions (Piece 2
 
 ---
 
-## G-rule check-ix-x-invoke-gap-monday-001 — 1/3 (new, iter ~4426)
+## G-rule check-ix-x-invoke-gap-monday-001 → COMPLETE ✅ (iter ~4439)
 
-**Rule:** Check IX (Operator-friction signals) and Check X (Chain-quality regression) missed their Monday 2026-07-06 gate. heal-pulse-check-staleness fired Tier-4 escalation (209.6h since last run, past 168h cadence + 36h grace). Scripts ran healthy when invoked manually: IX fired=2, registered=0, skipped=2, errors=0 (existing drafting missions deduped); X outcome=none, 0 breaches. Root cause: cycle-prompt.md §5.3 / §5.3a are at line 644+ — not reached when reading only the first 200 lines of cycle-prompt.md in a /cycle session. Same structural root cause as check-iii-invoke-gap-sunday-001. Fix: ensure cycle sessions invoke Check IX/X on Monday gates regardless of cycle-prompt read depth (sentinel-based skip logic already in scripts). Dispatch to Beacon at 3/3 (same dispatch as check-iii-invoke-gap-sunday-001 if same fix path applies). First occurrence iter ~4426.
+**Rule (historical):** Check IX and Check X missed their Monday 2026-07-06 gate (209.6h since last run, past 168h cadence + 36h grace). Same root cause as check-iii-invoke-gap-sunday-001: agent-invoked scheduling in /cycle never reliably reached late runbook sections. **COMPLETE:** PR #829 MERGED 2026-07-07T19:39:01Z UTC. `ourliberty-pulse-check-ix.timer` and `ourliberty-pulse-check-x.timer` installed at `/etc/systemd/system/`, both verified active/waiting at iter ~4439. Root cause eliminated — timers fire every Monday, agent is triage-only. First (and only) occurrence iter ~4426.
 
 ---
 
-## Status snapshot — updated 2026-07-07T19:32Z UTC (Iter ~4438, **Tier 1**)
+## Status snapshot — updated 2026-07-07T19:44Z UTC (Iter ~4439, **Tier 1**)
 
-**Iter ~4438 summary (2026-07-07T19:32Z):** 0 new alerts. watermark=990. pending=0. **Agent-core:** PR #829 OPEN ("Pulse checks I/III/V/VI/VIII/IX/X to systemd timers; retire Check VII" — UNKNOWN mergeable (propagating), Mirror review in progress since 19:15:35Z, review-pr-ourliberty-agent-core-829.json in mirror inbox). HEAD=88ab6a8e=origin/main. Sync: no-change (18:47:02Z). Daemons: all alive (beacon-bot=1489057 ~434m, inbox-watcher=1489096 ~434m, outbox-notifier=1489097 ~434m). Watchdog healthy 19:29:41Z UTC. Heal-daemon 19:22:53Z UTC. STANDING: zombie bash PID 1834248 (~40.03d) kill-auth pending. Dashboard: 0 open PRs. Tier 1 (consecutive_clean=0). PRIME ratio=19.86 (1430/72, worsening). **ACTIVE G-rules:** ourliberty-health-subject-key-mismatch-001 [DISPATCHED vp]; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [2/3]; merge-held-deep-review-notifier-tier4-001 [1/3]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3]; mirror-malformed-verdict-heal-reap-path-001 [1/3]; check-ix-x-invoke-gap-monday-001 [1/3]. Tuesday — no firing-day gates.
+**Iter ~4439 summary (2026-07-07T19:44Z):** 0 new alerts. watermark=990. pending=0. **Agent-core:** PR #829 MERGED 19:39:01Z UTC ("Pulse checks I/III/V/VI/VIII/IX/X to systemd timers; retire Check VII"). HEAD=a769c7e4=origin/main. Sync: no-change (18:47:02Z). Daemons: all alive (beacon-bot=1489057 ~444m, inbox-watcher=1489096 ~444m, outbox-notifier=1489097 ~444m). Watchdog healthy 19:39:46Z UTC. Heal-daemon 19:32:53Z UTC. STANDING: zombie bash PID 1834248 (~40.04d) kill-auth pending. Dashboard: 0 open PRs. Tier 1 (consecutive_clean=0). PRIME ratio=19.86 (1430/72, worsening). **NEW TIMERS ACTIVE:** ourliberty-pulse-check-i/iii/viii/ix/x all active/waiting. Check I next: 2026-07-08 08:14 MDT (Wed). **G-rules COMPLETED this iter:** check-iii-invoke-gap-sunday-001 ✅, check-ix-x-invoke-gap-monday-001 ✅. **ACTIVE G-rules remaining:** ourliberty-health-subject-key-mismatch-001 [DISPATCHED vp]; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [2/3]; merge-held-deep-review-notifier-tier4-001 [1/3]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3]; mirror-malformed-verdict-heal-reap-path-001 [1/3]. Tuesday — no firing-day gates.
 
 
