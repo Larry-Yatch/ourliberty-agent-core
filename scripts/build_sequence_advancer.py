@@ -86,6 +86,20 @@ HEARTBEAT_FILE = AGENTS_ROOT / 'blackboard' / 'build-sequence-advancer.heartbeat
 KILL_SWITCH = AGENTS_ROOT / 'healers.disabled'
 BLACKBOARD_DIR = AGENTS_ROOT / 'blackboard' / 'build-sequences'
 BEACON_INBOX = AGENTS_ROOT / 'inboxes' / 'beacon'
+# The advancer's OWN inbox. `approve sequence <id>` via the Telegram bot routes
+# a kickoff APPROVAL_REQUEST (target_agent=build_sequence_advancer) here through
+# beacon_approval_handler.dispatch_approved → safe_write_inbox. Nothing consumed
+# this inbox before — the kickoff special-casing existed only on the file-outbox
+# path (outbox_notifier._handle_build_sequence_advancer_kickoff), which the
+# in-process chat bot does NOT use. So a chat-issued kickoff orphaned here and
+# the sequence stalled at `pending` (observed live on seq `pulse-check-xii`,
+# 2026-07-07). `_drain_kickoff_inbox` closes that gap source-agnostically.
+ADVANCER_INBOX = AGENTS_ROOT / 'inboxes' / 'build_sequence_advancer'
+
+# Canonical kickoff wording per build-sequence-orchestrator spec § 5.5
+# discipline 2 (`prompt: kickoff <seq-id>`). Same shape outbox_notifier's
+# kickoff handler parses, so both kickoff paths accept exactly the same marker.
+_KICKOFF_PROMPT_RE = re.compile(r'^\s*kickoff\s+([A-Za-z0-9._-]+)\s*$')
 
 ACTIVATION_ENV = 'OURLIBERTY_BUILD_SEQUENCE_ADVANCER_ENABLED'
 
@@ -295,6 +309,184 @@ def _iter_sequence_files() -> Iterable[Path]:
     for entry in sorted(BLACKBOARD_DIR.iterdir()):
         if entry.is_file() and entry.suffix == '.json' and not entry.name.startswith('.'):
             yield entry
+
+
+# -------------------- kickoff-inbox drain (chat-path routing gap fix) --------------------
+
+
+def _seq_id_from_kickoff_envelope(env: dict[str, Any]) -> Optional[str]:
+    """Extract the target seq_id from a kickoff envelope, or None if the
+    envelope is not a kickoff marker.
+
+    Mirrors outbox_notifier._handle_build_sequence_advancer_kickoff: prefer the
+    canonical `prompt: kickoff <seq-id>`, fall back to a `task_id` of shape
+    `kickoff-<seq-id>`. Returning None means "not a kickoff" — the caller
+    leaves the file untouched rather than consuming an envelope it can't act on.
+    """
+    prompt = env.get('prompt')
+    if isinstance(prompt, str):
+        m = _KICKOFF_PROMPT_RE.match(prompt)
+        if m:
+            return m.group(1)
+    task_id = env.get('task_id')
+    if isinstance(task_id, str) and task_id.startswith('kickoff-'):
+        return task_id[len('kickoff-'):].strip() or None
+    return None
+
+
+def _drain_kickoff_inbox(logger: logging.Logger) -> int:
+    """Consume kickoff APPROVAL_REQUEST envelopes addressed to the advancer.
+
+    Closes the chat-path routing gap: `approve sequence <id>` sent to Beacon
+    via Telegram dispatches a kickoff marker to ADVANCER_INBOX (target_agent=
+    build_sequence_advancer), but historically nothing read it, so a
+    chat-issued kickoff stalled the sequence at `pending`. This drain performs
+    the same `pending → active` transition the file-outbox path already does in
+    outbox_notifier — source-agnostically, since any envelope landing in this
+    inbox is by construction addressed to us.
+
+    Idempotent and safe:
+      - Only envelopes that parse as a kickoff (`kickoff <seq-id>`) are acted
+        on; anything else is left in place (logged) rather than deleted.
+      - A `pending` sequence is transitioned to `active`; a non-`pending`
+        sequence is a no-op (already kicked / terminal) — either way the
+        envelope is consumed so it never reprocesses.
+      - The envelope is deleted ONLY after a successful transition-or-no-op.
+        A failed sequence-file write leaves the envelope for the next tick.
+      - Malformed envelopes / missing / invalid target sequences DM Larry once
+        (subject-bucketed) and the envelope is dropped so it can't loop.
+
+    Returns the number of sequences transitioned `pending → active` this tick.
+    """
+    if not ADVANCER_INBOX.is_dir():
+        return 0
+    kicked = 0
+    for env_path in sorted(ADVANCER_INBOX.iterdir()):
+        if not (env_path.is_file() and env_path.suffix == '.json'
+                and not env_path.name.startswith('.')):
+            continue
+        try:
+            env = json.loads(env_path.read_text())
+        except (OSError, json.JSONDecodeError) as e:
+            logger.warning(f'kickoff-inbox: unreadable envelope {env_path.name}: {e}')
+            _dm_larry(
+                message=(
+                    f'Build-sequence advancer got an unreadable kickoff envelope '
+                    f'at `{env_path}` ({e}). Dropping it so the inbox does not '
+                    f'loop; re-issue `approve sequence <id>` if a kickoff was '
+                    f'intended.'
+                ),
+                subject=f'kickoff-inbox-unreadable:{env_path.name}',
+            )
+            _unlink_quietly(env_path)
+            continue
+        if not isinstance(env, dict):
+            logger.warning(f'kickoff-inbox: non-object envelope {env_path.name}; dropping')
+            _unlink_quietly(env_path)
+            continue
+
+        seq_id = _seq_id_from_kickoff_envelope(env)
+        if seq_id is None:
+            # Not a kickoff marker. Nothing else routes here today, but do not
+            # delete an envelope we don't understand — surface it and move on.
+            logger.warning(
+                f'kickoff-inbox: envelope {env_path.name} is not a kickoff '
+                f'marker (prompt={env.get("prompt")!r} task_id='
+                f'{env.get("task_id")!r}); leaving in place'
+            )
+            continue
+
+        seq_path = BLACKBOARD_DIR / f'{seq_id}.json'
+        seq, err = _read_sequence(seq_path)
+        if seq is None:
+            reason = 'missing' if not seq_path.exists() else (err or 'unreadable')
+            logger.warning(
+                f'kickoff-inbox: kickoff for seq `{seq_id}` but sequence file '
+                f'{reason} at {seq_path}; dropping envelope'
+            )
+            _dm_larry(
+                message=(
+                    f'`approve sequence {seq_id}` was received but its sequence '
+                    f'file is {reason} at `{seq_path}`. No kickoff performed. '
+                    f'Author the sequence file, then re-issue the approval.'
+                ),
+                subject=f'kickoff-inbox-seq-{reason}:{seq_id}',
+            )
+            _unlink_quietly(env_path)
+            continue
+
+        validation = bsv.validate_dag(seq)
+        if not validation.valid:
+            first_errs = '; '.join(validation.errors[:3])
+            logger.warning(
+                f'kickoff-inbox: seq `{seq_id}` fails DAG validation '
+                f'({first_errs}); dropping envelope, leaving sequence untouched'
+            )
+            _dm_larry(
+                message=(
+                    f'`approve sequence {seq_id}` was received but the sequence '
+                    f'file fails validation: {first_errs}. No kickoff performed. '
+                    f'Fix the file (see `python3 scripts/build_sequence_'
+                    f'validator.py validate {seq_id}`), then re-issue.'
+                ),
+                subject=f'kickoff-inbox-seq-invalid:{seq_id}',
+            )
+            _unlink_quietly(env_path)
+            continue
+
+        status = seq.get('status')
+        if status != 'pending':
+            # Idempotent: already kicked (active/paused) or terminal. Consume
+            # the envelope without a second transition or a duplicate audit
+            # entry — mirrors the outbox handler's WARN no-op contract.
+            logger.info(
+                f'kickoff-inbox: seq `{seq_id}` already status={status!r}; '
+                f'no-op, consuming envelope'
+            )
+            _unlink_quietly(env_path)
+            continue
+
+        seq['status'] = 'active'
+        if not isinstance(seq.get('audit_log'), list):
+            seq['audit_log'] = []
+        seq['audit_log'].append(_audit_entry(
+            'kickoff-acknowledged',
+            note='chat-path kickoff consumed from advancer inbox',
+            kickoff_task_id=env.get('task_id'),
+        ))
+        try:
+            _atomic_write_sequence(seq_path, seq)
+        except OSError as e:
+            # Leave the envelope in place so the next tick retries the write.
+            logger.warning(
+                f'kickoff-inbox: seq `{seq_id}` write failed ({e}); leaving '
+                f'envelope for retry'
+            )
+            _dm_larry(
+                message=(
+                    f'`approve sequence {seq_id}` could not be applied — writing '
+                    f'the sequence file at `{seq_path}` failed ({e}). Will retry '
+                    f'next tick.'
+                ),
+                subject=f'kickoff-inbox-write-error:{seq_id}',
+            )
+            continue
+
+        _unlink_quietly(env_path)
+        kicked += 1
+        logger.info(
+            f'kickoff-inbox: seq `{seq_id}` transitioned pending → active '
+            f'(chat-path kickoff); first step dispatches this tick'
+        )
+    return kicked
+
+
+def _unlink_quietly(path: Path) -> None:
+    """Best-effort unlink; a failed delete is logged, never raised."""
+    try:
+        path.unlink()
+    except OSError as e:
+        _setup_logging().warning(f'kickoff-inbox: could not unlink {path}: {e}')
 
 
 # -------------------- gate-check primitives (spec § 5.3) --------------------
@@ -2102,6 +2294,20 @@ def tick(now: Optional[datetime] = None) -> int:
             f'systemd override to activate after PR-S3 + PR-S4 ship). The '
             f'terminal-state reconciliation pass still runs this tick.'
         )
+    # Consume any chat-path kickoff markers BEFORE walking the sequence files,
+    # so a sequence transitioned pending → active this tick gets its first step
+    # dispatched in the same tick's forward-dispatch loop below. Gated on the
+    # activation flag like forward-dispatch: with dispatch off, kicking a
+    # sequence active would be inert, so leave the envelope queued until the
+    # advancer is enabled (it persists in the inbox, idempotent when drained).
+    if advancer_on:
+        try:
+            _drain_kickoff_inbox(logger)
+        except Exception as e:  # never let a bad envelope abort the whole tick
+            logger.warning(
+                f'kickoff-inbox drain raised {type(e).__name__}: {e}; '
+                f'continuing with sequence processing'
+            )
     supabase_client = _connect_supabase() if advancer_on else None
     if advancer_on and supabase_client is None:
         logger.warning(
