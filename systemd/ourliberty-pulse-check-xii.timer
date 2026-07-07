@@ -1,0 +1,17 @@
+[Unit]
+Description=Weekly (Monday) run of Pulse Check XII — delivery-effectiveness meter
+
+[Timer]
+# OnCalendar (absolute wall-clock) per the OnUnitActiveSec-dies lesson. Weekly
+# Monday mirrors the cadence-config entry (cadence_hours=168). The meter's own
+# retro-computed baseline plus atomic per-run artifact make a Persistent
+# catch-up or ad-hoc re-run within the same week a clean overwrite (idempotent).
+# 05:39 droplet-local: off-peak; >=10 min from check-viii (05:09) so the 300s
+# RandomizedDelaySec jitter cannot overlap the stagger.
+OnCalendar=Mon *-*-* 05:39:00
+Persistent=true
+RandomizedDelaySec=300
+Unit=ourliberty-pulse-check-xii.service
+
+[Install]
+WantedBy=timers.target
