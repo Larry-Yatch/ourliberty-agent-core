@@ -17,9 +17,26 @@ The advancer is a polling daemon that drives multi-step build sequences. Every 5
 | `~/agents/blackboard/build-sequences/<seq-id>.json` | One file per sequence; the authoritative state. | **No.** `~/agents/blackboard/` is a runtime-only mount — the daemon creates the dir on first tick. |
 | `~/agents/blackboard/build-sequence-advancer.heartbeat` | Text file with the last-tick ISO timestamp. Healer reads mtime. | No (runtime-only). |
 | `~/agents/inboxes/beacon/<step-task-id>.json` | Where the advancer writes step-dispatch envelopes when a step's deps reach merged. | No (runtime-only inbox). |
+| `~/agents/inboxes/build_sequence_advancer/kickoff-<seq-id>.json` | The advancer's OWN inbox. A chat-issued `approve sequence <id>` routes a kickoff `APPROVAL_REQUEST` here (via `beacon_approval_handler.dispatch_approved` → `safe_write_inbox`). `_drain_kickoff_inbox` consumes it at the top of each tick and transitions the named sequence `pending → active`. | No (runtime-only inbox). |
 | `~/agents/logs/build-sequence-advancer.log` | Daemon log; mirror copy in `journalctl -u ourliberty-build-sequence-advancer.service`. | No. |
 
 The dispatch envelope's `source` is `orchestrator` (matches `routing_validator.SYSTEM_SOURCES`); its `prompt` is a self-contained instruction to Beacon to synthesize one standard `APPROVAL_REQUEST` marker for Forge whose body is the step's `dispatch_text` verbatim. PR-S4 lands first-class `target_agent: build_sequence_advancer` routing; until then the `orchestrator → beacon` envelope path is what fires.
+
+## Kickoff-inbox drain (chat-path `approve sequence`)
+
+There are **two** ways a `pending` sequence reaches `active`, and they use different transport:
+
+1. **File-outbox path** — a Beacon session dispatched with `source ∈ {larry, orchestrator}` emits the kickoff marker into her outbox, and `outbox_notifier._handle_build_sequence_advancer_kickoff` performs the transition.
+2. **Chat path** — `approve sequence <id>` typed to Beacon in Telegram. The bot runs in-process and dispatches the kickoff `APPROVAL_REQUEST` (`target_agent: build_sequence_advancer`) via `beacon_approval_handler.dispatch_approved` → `safe_write_inbox`, which lands it in `~/agents/inboxes/build_sequence_advancer/kickoff-<seq-id>.json`.
+
+Path 2 has no outbox entry the notifier ever sees, so before the fix the chat kickoff **orphaned** in the advancer's inbox and the sequence stalled at `pending` (observed on `pulse-check-xii`, 2026-07-07 — Beacon had to flip the status by hand). `_drain_kickoff_inbox` closes that: at the top of every tick (gated on the activation flag, like forward-dispatch), the advancer drains its own inbox, transitions each named `pending` sequence to `active` (appending a `kickoff-acknowledged` audit entry), and deletes the envelope. It is idempotent — a non-`pending` sequence is a consumed no-op; a missing / DAG-invalid target sequence DMs Larry (subject-bucketed) and drops the envelope; an envelope that doesn't parse as `kickoff <seq-id>` is left in place, not deleted. A newly-activated sequence dispatches its first step **in the same tick**, because the drain runs before the sequence-file loop.
+
+Inspect a stuck chat kickoff:
+
+```bash
+ls -la ~/agents/inboxes/build_sequence_advancer/       # envelopes waiting to drain
+journalctl -u ourliberty-build-sequence-advancer.service --since "10 min ago" | grep kickoff-inbox
+```
 
 ## Reading sequence-file state
 

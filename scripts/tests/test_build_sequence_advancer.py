@@ -2200,5 +2200,150 @@ def tearDownModule():  # noqa: N802 — unittest hook
     _chokepoint_optout.reengage_guards(_CHOKEPOINT_SAVED_SENTINEL)
 
 
+class TestKickoffInboxDrain(_AdvancerHarness):
+    """The chat-path routing-gap fix: `approve sequence <id>` via the Telegram
+    bot lands a kickoff APPROVAL_REQUEST in the advancer's OWN inbox
+    (~/agents/inboxes/build_sequence_advancer/). The drain consumes it and
+    transitions the named sequence pending → active so its first step
+    dispatches — the transition the file-outbox path already does, but which
+    the in-process chat bot never reached."""
+
+    def _inbox_dir(self):
+        return self.agents_root / 'inboxes' / 'build_sequence_advancer'
+
+    def _write_kickoff_envelope(self, seq_id, *, task_id=None, prompt='__default__',
+                                name=None, extra=None):
+        d = self._inbox_dir()
+        d.mkdir(parents=True, exist_ok=True)
+        env = {
+            'task_id': task_id if task_id is not None else f'kickoff-{seq_id}',
+            'target_agent': 'build_sequence_advancer',
+            'summary': f'Kick off {seq_id}',
+            'source': 'beacon',
+        }
+        if prompt == '__default__':
+            env['prompt'] = f'kickoff {seq_id}'
+        elif prompt is not None:
+            env['prompt'] = prompt
+        if extra:
+            env.update(extra)
+        path = d / (name or f'{env["task_id"]}.json')
+        path.write_text(json.dumps(env, indent=2))
+        return path
+
+    def _drain(self):
+        return self.bsa._drain_kickoff_inbox(self.bsa._setup_logging())
+
+    def test_pending_sequence_kicked_active_and_envelope_consumed(self):
+        self._write_sequence(_make_sequence('seq-xii', status='pending'))
+        env_path = self._write_kickoff_envelope('seq-xii')
+        kicked = self._drain()
+        self.assertEqual(kicked, 1)
+        seq = self._read_sequence('seq-xii')
+        self.assertEqual(seq['status'], 'active')
+        events = [e['event'] for e in seq['audit_log']]
+        self.assertIn('kickoff-acknowledged', events)
+        self.assertFalse(env_path.exists(), 'envelope should be consumed')
+
+    def test_tick_dispatches_first_step_after_chat_kickoff(self):
+        # End-to-end: a pending sequence + an inbox kickoff → one tick both
+        # activates it AND dispatches its first (dep-free) step.
+        self._patch_gates()
+        self._write_sequence(_make_sequence(
+            'seq-xii', status='pending', steps=[_make_step('only')],
+        ))
+        self._write_kickoff_envelope('seq-xii')
+        self.bsa.tick()
+        seq = self._read_sequence('seq-xii')
+        self.assertEqual(seq['status'], 'active')
+        dispatched_steps = [e['task_id'] for e in self.dispatched_envelopes]
+        self.assertTrue(dispatched_steps, 'first step should dispatch this tick')
+
+    def test_task_id_fallback_when_prompt_absent(self):
+        self._write_sequence(_make_sequence('seq-xii', status='pending'))
+        # No prompt field; seq_id derived from `kickoff-<seq-id>` task_id.
+        self._write_kickoff_envelope('seq-xii', prompt=None)
+        self.assertEqual(self._drain(), 1)
+        self.assertEqual(self._read_sequence('seq-xii')['status'], 'active')
+
+    def test_already_active_is_idempotent_noop(self):
+        seq = _make_sequence('seq-xii', status='active',
+                             audit_log=[{'event': 'kickoff-acknowledged'}])
+        self._write_sequence(seq)
+        env_path = self._write_kickoff_envelope('seq-xii')
+        kicked = self._drain()
+        self.assertEqual(kicked, 0)
+        after = self._read_sequence('seq-xii')
+        # No SECOND kickoff-acknowledged entry appended.
+        self.assertEqual(
+            sum(1 for e in after['audit_log']
+                if e.get('event') == 'kickoff-acknowledged'),
+            1,
+        )
+        self.assertFalse(env_path.exists(), 'stale kickoff still consumed')
+
+    def test_missing_sequence_dms_and_drops_envelope(self):
+        env_path = self._write_kickoff_envelope('seq-ghost')
+        kicked = self._drain()
+        self.assertEqual(kicked, 0)
+        self.assertFalse(env_path.exists())
+        self.assertTrue(
+            any('kickoff-inbox-seq-missing' in dm['subject'] for dm in self.dms),
+            f'expected a missing-sequence DM, got {[d["subject"] for d in self.dms]}',
+        )
+
+    def test_non_kickoff_envelope_left_in_place(self):
+        # An envelope that isn't a kickoff (no parseable seq_id) is NOT deleted
+        # — we don't consume mail we can't act on.
+        env_path = self._write_kickoff_envelope(
+            'seq-xii', task_id='some-other-task', prompt='do something else',
+        )
+        self.assertEqual(self._drain(), 0)
+        self.assertTrue(env_path.exists(), 'unknown envelope must be preserved')
+
+    def test_invalid_dag_dms_and_does_not_activate(self):
+        bad = _make_sequence('seq-bad', status='pending')
+        bad['steps'] = []  # empty steps → validate_dag fails
+        self._write_sequence(bad)
+        env_path = self._write_kickoff_envelope('seq-bad')
+        self.assertEqual(self._drain(), 0)
+        self.assertEqual(self._read_sequence('seq-bad')['status'], 'pending')
+        self.assertFalse(env_path.exists())
+        self.assertTrue(
+            any('kickoff-inbox-seq-invalid' in dm['subject'] for dm in self.dms),
+        )
+
+    def test_gated_off_leaves_envelope_queued(self):
+        # Activation flag off → drain does not run in tick(); the envelope
+        # persists for when the advancer is enabled.
+        os.environ['OURLIBERTY_BUILD_SEQUENCE_ADVANCER_ENABLED'] = 'false'
+        self._write_sequence(_make_sequence('seq-xii', status='pending'))
+        env_path = self._write_kickoff_envelope('seq-xii')
+        self.bsa.tick()
+        self.assertEqual(self._read_sequence('seq-xii')['status'], 'pending')
+        self.assertTrue(env_path.exists(), 'envelope queued until advancer on')
+
+    def test_no_inbox_dir_is_safe_noop(self):
+        # Fresh systems have no advancer inbox until the first dispatch_approved.
+        self.assertFalse(self._inbox_dir().exists())
+        self.assertEqual(self._drain(), 0)
+
+    def test_traversal_task_id_is_rejected(self):
+        # The task_id fallback must not smuggle a path-separator seq_id past the
+        # prompt regex's charset — else the drain could write `active` outside
+        # the build-sequences dir. A traversal task_id parses to no seq_id, so
+        # it's treated as a non-kickoff envelope (left in place, not acted on).
+        outside = self.agents_root / 'inboxes' / 'beacon' / 'evil.json'
+        outside.write_text(json.dumps(_make_sequence('evil', status='pending')))
+        env_path = self._write_kickoff_envelope(
+            'x', task_id='kickoff-../beacon/evil', prompt=None,
+            name='kickoff-traversal.json',
+        )
+        self.assertEqual(self._drain(), 0)
+        # The out-of-dir sequence was NOT flipped to active.
+        self.assertEqual(json.loads(outside.read_text())['status'], 'pending')
+        self.assertTrue(env_path.exists(), 'unparseable-seq envelope left in place')
+
+
 if __name__ == '__main__':
     unittest.main()
