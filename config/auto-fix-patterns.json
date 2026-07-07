@@ -204,21 +204,6 @@
         "action": "Write a suppression file so the confirmed false positive stops looping in the inbox, and post exactly one Approve/Reject decision to the Approvals tab so the unfixed root cause still reaches Larry.",
         "why_safe": "Silencing writes a suppression file only — it mutates nothing on the system, is reversible via larry_alerts.unsilence(fingerprint), and Medic may only silence pre-approved benign CLASSES, never an arbitrary alert."
       }
-    },
-    {
-      "template": "retrigger-inbox",
-      "state": "probation",
-      "reversible": true,
-      "permanent_guard": false,
-      "clean_streak": 0,
-      "total_dispatches": 0,
-      "last_larry_correction_at": null,
-      "graduated_at": null,
-      "plain_language": {
-        "what": "An inbox-watcher has stalled and its target is on Medic's retrigger_inbox_targets allowlist.",
-        "action": "Re-trigger the stalled inbox by restarting the inbox-watcher (the repo's existing, idempotent re-trigger mechanism).",
-        "why_safe": "A watcher restart is idempotent and reversible — it comes back on the same config, is allowlist-gated, and a failed restart surfaces immediately rather than silently."
-      }
     }
   ]
 }

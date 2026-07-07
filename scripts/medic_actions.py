@@ -398,10 +398,13 @@ def _record_template_execution(action: str, *, verified: bool) -> None:
     Medic action is the clean-execution signal (docs/pulse-triage-phase-c-brief).
     Recorded ONLY when ``action`` names a real registry template
     (config/auto-fix-patterns.json); a non-registry action is a silent no-op.
-    Once an action IS enrolled it accrues a track record here — including
-    ``retrigger-inbox`` (this call fires from ``_act_restart``, its executor) and
-    ``silence-false-positive`` (from ``silence_false_positive``) now that both are
-    registry templates.
+    Once an action IS enrolled it accrues a track record here — e.g.
+    ``silence-false-positive`` (from ``silence_false_positive``) now that it is a
+    registry template. (``retrigger-inbox`` is deliberately NOT enrolled: it runs
+    through ``_act_restart``, which Stage 2's ``_graduation_gate`` (#837) would
+    then REFUSE while probation, downgrading a working autonomous retrigger to an
+    ask — so it stays a non-template action until approved-probation recording
+    exists.)
 
     Thin delegate: the registry-gate + record + never-raise contract is
     single-sourced in ``alert_triage_state.record_clean_execution_if_registered``
