@@ -448,8 +448,8 @@ PR #828 (`gate: delegate JS/TS repo regression checks to GitHub Actions (Piece 2
 
 ---
 
-## Status snapshot — updated 2026-07-07T00:26Z UTC (Iter ~4286, **Tier 1**)
+## Status snapshot — updated 2026-07-07T00:33Z UTC (Iter ~4287, **Tier 1**)
 
-**Iter ~4286 summary (2026-07-07T00:26Z):** 0 new alerts. watermark=1073. pending=0. **Agent-core:** PR #823 AUTO_MERGE_HELD (UNKNOWN — GitHub API still fluctuating, ~53.3h old; 72h threshold ~2026-07-07T19:08Z UTC). HEAD=fbeed1e1=origin/main. Sync: no-change (23:45Z, ~41 min). Daemons: all alive (beacon-bot 1156346 Ss ~6.85h, inbox-watcher 4079442 Ssl ~3d0.27h, outbox-notifier 1156495 Ss ~6.85h). Watchdog healthy 00:21:36Z UTC. Heal-daemon 00:18:35Z UTC. STANDING: zombie bash PID 1834248 (~39.28d) kill-auth pending. Dashboard: 0 open PRs. Tier 1 (consecutive_clean=0). PRIME ratio: ~19.847x (trend: worsening). **ACTIVE G-rules:** ourliberty-health-subject-key-mismatch-001 [DISPATCHED vp]; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [2/3]; merge-held-deep-review-notifier-tier4-001 [1/3]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3]. Check I week 2026-07-06 done (Tuesday not a firing day).
+**Iter ~4287 summary (2026-07-07T00:33Z):** 0 new alerts. watermark=1073. pending=0. **Agent-core:** PR #823 AUTO_MERGE_HELD (UNKNOWN — GitHub API still fluctuating, ~54.4h old; 72h threshold ~2026-07-07T19:08Z UTC). HEAD=2b9fff3d=origin/main. Sync: no-change (23:45Z, ~48 min). Daemons: all alive (beacon-bot 1156346 Ss ~6.93h, inbox-watcher 4079442 Ssl ~3d0.31h, outbox-notifier 1156495 Ss ~6.93h). Watchdog healthy 00:31:50Z UTC. Heal-daemon 00:28:58Z UTC. STANDING: zombie bash PID 1834248 (~39.29d) kill-auth pending. Dashboard: 0 open PRs. Tier 1 (consecutive_clean=0). PRIME ratio: ~19.847x (trend: worsening). **ACTIVE G-rules:** ourliberty-health-subject-key-mismatch-001 [DISPATCHED vp]; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [2/3]; merge-held-deep-review-notifier-tier4-001 [1/3]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3]. Check I week 2026-07-06 done (Tuesday not a firing day).
 
 
