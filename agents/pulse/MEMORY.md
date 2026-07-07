@@ -460,8 +460,8 @@ PR #828 (`gate: delegate JS/TS repo regression checks to GitHub Actions (Piece 2
 
 ---
 
-## Status snapshot — updated 2026-07-07T19:01Z UTC (Iter ~4434, **Tier 1**)
+## Status snapshot — updated 2026-07-07T19:12Z UTC (Iter ~4435, **Tier 1**)
 
-**Iter ~4434 summary (2026-07-07T19:01Z):** 0 new alerts. watermark=990. pending=0. **Agent-core:** 0 open PRs. HEAD=4a265aa0=origin/main ("Pulse cycle 20260707T185901Z"). Sync: no-change (18:47:02Z). Daemons: all alive (beacon-bot=1489057 ~404m, inbox-watcher=1489096 ~404m, outbox-notifier=1489097 ~404m). Watchdog healthy 18:59:25Z UTC. Heal-daemon 18:52:46Z UTC. STANDING: zombie bash PID 1834248 (~39.99d) kill-auth pending. Dashboard: 0 open PRs. Tier 1 (consecutive_clean=0). **ACTIVE G-rules:** ourliberty-health-subject-key-mismatch-001 [DISPATCHED vp]; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [2/3]; merge-held-deep-review-notifier-tier4-001 [1/3]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3]; mirror-malformed-verdict-heal-reap-path-001 [1/3]; check-ix-x-invoke-gap-monday-001 [1/3]. Tuesday — no firing-day gates.
+**Iter ~4435 summary (2026-07-07T19:12Z):** 0 new alerts. watermark=990. pending=0. **Agent-core:** PR #829 OPEN ("Pulse checks I/III/V/VI/VIII/IX/X to systemd timers; retire Check VII" — MERGEABLE, auto-review, created 19:08:48Z, entering Mirror pipeline). HEAD=8f8a1f12=origin/main. Sync: no-change (18:47:02Z). Daemons: all alive (beacon-bot=1489057 ~414m, inbox-watcher=1489096 ~414m, outbox-notifier=1489097 ~414m). Watchdog healthy 19:09:30Z UTC. Heal-daemon 19:02:51Z UTC. STANDING: zombie bash PID 1834248 (~40.00d) kill-auth pending. Dashboard: 0 open PRs. Tier 1 (consecutive_clean=0). **ACTIVE G-rules:** ourliberty-health-subject-key-mismatch-001 [DISPATCHED vp]; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [2/3]; merge-held-deep-review-notifier-tier4-001 [1/3]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3]; mirror-malformed-verdict-heal-reap-path-001 [1/3]; check-ix-x-invoke-gap-monday-001 [1/3]. Tuesday — no firing-day gates.
 
 
