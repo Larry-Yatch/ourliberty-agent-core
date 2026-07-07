@@ -448,8 +448,14 @@ PR #828 (`gate: delegate JS/TS repo regression checks to GitHub Actions (Piece 2
 
 ---
 
-## Status snapshot — updated 2026-07-07T01:42Z UTC (Iter ~4296, **Tier 1**)
+## G-rule mirror-malformed-verdict-heal-reap-path-001 — 1/3 (new, iter ~4297)
 
-**Iter ~4296 summary (2026-07-07T01:42Z):** 0 new alerts. watermark=1073. pending=0. **Agent-core:** PR #823 AUTO_MERGE_HELD (UNKNOWN — GitHub API still fluctuating, ~54.6h old; 72h threshold ~2026-07-07T19:08Z UTC, ~17.4h remaining). HEAD=b621dc49=origin/main. Sync: no-change (00:45Z, ~57 min). Daemons: all alive (beacon-bot 1156346 Ss ~8.1h, inbox-watcher 4079442 Ssl ~3d+, outbox-notifier 1156495 Ss ~8.1h). Watchdog healthy 01:39:16Z UTC. Heal-daemon 01:40:02Z UTC. STANDING: zombie bash PID 1834248 (~39.30d) kill-auth pending. Dashboard: 0 open PRs. Tier 1 (consecutive_clean=0). PRIME ratio: ~19.847x (trend: worsening). **ACTIVE G-rules:** ourliberty-health-subject-key-mismatch-001 [DISPATCHED vp]; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [2/3]; merge-held-deep-review-notifier-tier4-001 [1/3]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3]. Check I week 2026-07-06 done (Tuesday not a firing day).
+**Rule:** Mirror produced a malformed marker (no canonical verdict) on PR #114 (ourliberty-dashboard) at 12:01:43 MDT 2026-07-06. Worktree `wt-mirror-pr-ourliberty-dashboard-114` was reaped by heal-wedged-review-sessions at 12:00:27 MDT (kill path). outbox-notifier wrote retry 1/3. PR #114 subsequently CLOSED. PR #732 added in-process self-validation gate for the restart/SIGTERM path — but the heal-reap SIGTERM kill may bypass the gate if the subprocess is killed before validation runs. First occurrence. Watch for 2 more before dispatching to Beacon.
+
+---
+
+## Status snapshot — updated 2026-07-07T01:49Z UTC (Iter ~4297, **Tier 1**)
+
+**Iter ~4297 summary (2026-07-07T01:49Z):** 0 new alerts. watermark=1073. pending=0. **Agent-core:** PR #823 AUTO_MERGE_HELD (UNKNOWN — GitHub API still fluctuating, ~59h old; 72h threshold ~2026-07-07T19:08Z UTC, ~17h remaining). HEAD=5121f0b4=origin/main. Sync: no-change (01:45Z, ~4 min). Daemons: all alive (beacon-bot 1156346 Ss ~8.2h, inbox-watcher 4079442 Ssl ~3.06d, outbox-notifier 1156495 Ss ~8.2h). Watchdog healthy 01:44:17Z UTC. Heal-daemon 01:40:02Z UTC. STANDING: zombie bash PID 1834248 (~39.27d) kill-auth pending. Dashboard: 0 open PRs (PR #114 CLOSED). Tier 1 (consecutive_clean=0). PRIME ratio: ~19.847x (no change). **ACTIVE G-rules:** ourliberty-health-subject-key-mismatch-001 [DISPATCHED vp]; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [2/3]; merge-held-deep-review-notifier-tier4-001 [1/3]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3]; mirror-malformed-verdict-heal-reap-path-001 [1/3]. Check I week 2026-07-06 done (Tuesday not a firing day).
 
 
