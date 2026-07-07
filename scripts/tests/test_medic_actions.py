@@ -785,5 +785,92 @@ def tearDownModule():  # noqa: N802 — unittest hook
     _chokepoint_optout.reengage_guards(_CHOKEPOINT_SAVED_SENTINEL)
 
 
+class GraduationExecutionRecordTest(_IsolatedActions):
+    """Stage 1 of the Check-V graduation unify: a verified Medic action whose
+    name matches a registry template records a clean/failed execution into the
+    executions store Check V reads — the streak input the loop was missing.
+    Non-template actions and refusals record nothing."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        # Own our registry fixture rather than reading the real worktree
+        # config/auto-fix-patterns.json (whose path is Path(__file__)-anchored,
+        # not env-scoped): 'restart-daemon' present + probation, 'retrigger-
+        # inbox' absent. Repointing BOTH module constants also guarantees the
+        # failure-path demotion hook can never touch the real registry.
+        import alert_triage_state
+        import pulse_check_v
+        reg = self.repo_dir / 'config' / 'auto-fix-patterns.json'
+        reg.write_text(json.dumps({'patterns': [{
+            'template': 'restart-daemon', 'state': 'probation',
+            'reversible': True, 'permanent_guard': False,
+        }]}))
+        for mod, attr in ((alert_triage_state, 'AUTO_FIX_PATTERNS_FILE'),
+                          (pulse_check_v, 'REGISTRY_FILE')):
+            p = mock.patch.object(mod, attr, reg)
+            p.start()
+            self.addCleanup(p.stop)
+
+    def _executions(self) -> dict:
+        import alert_triage_state
+        return alert_triage_state.load_executions()
+
+    def test_verified_restart_records_success_execution(self) -> None:
+        # restart-daemon IS a registry template, so a verified restart accrues
+        # a clean execution toward its graduation streak.
+        restart_p, active_p = self._patch_subprocess(rc=0, active='active')
+        with restart_p, active_p:
+            res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
+        self.assertTrue(res['ok'])
+        execs = self._executions().get('restart-daemon', [])
+        self.assertEqual(len(execs), 1)
+        self.assertEqual(execs[0]['outcome'], 'success')
+        self.assertFalse(execs[0]['larry_correction_signal'])
+
+    def test_unverified_restart_records_failure_execution(self) -> None:
+        # Ran but did not verify -> 'acted-failed' -> a FAILURE execution
+        # (breaks the streak; the recorder's demotion hook no-ops on a
+        # probation template).
+        restart_p, active_p = self._patch_subprocess(rc=0, active='activating')
+        with restart_p, active_p:
+            res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
+        self.assertFalse(res['ok'])
+        execs = self._executions().get('restart-daemon', [])
+        self.assertEqual(len(execs), 1)
+        self.assertEqual(execs[0]['outcome'], 'failure')
+
+    def test_two_verified_restarts_accrue_two_executions(self) -> None:
+        # The point of the feature: successive clean restarts build a streak.
+        # Distinct fingerprints so the one-action-per-fingerprint recurrence
+        # gate does not block the second act.
+        restart_p, active_p = self._patch_subprocess(rc=0, active='active')
+        with restart_p, active_p:
+            r1 = medic_actions.restart_daemon(ALLOWED_DAEMON, 'watchdog:fp-1')
+            r2 = medic_actions.restart_daemon(ALLOWED_DAEMON, 'watchdog:fp-2')
+        self.assertTrue(r1['ok'] and r2['ok'])
+        execs = self._executions().get('restart-daemon', [])
+        self.assertEqual(len(execs), 2)
+        self.assertTrue(all(e['outcome'] == 'success' for e in execs))
+
+    def test_non_template_action_records_no_execution(self) -> None:
+        # retrigger-inbox is a real Medic action but NOT a registry template,
+        # so it must not create a track record (registry gate).
+        restart_p, active_p = self._patch_subprocess(rc=0, active='active')
+        with restart_p, active_p:
+            res = medic_actions.retrigger_inbox(
+                ALLOWED_DAEMON, 'watchdog:retrigger-probe')
+        self.assertTrue(res['ok'])
+        self.assertNotIn('retrigger-inbox', self._executions())
+
+    def test_refused_restart_records_no_execution(self) -> None:
+        # An allowlist refusal never ran the action, so nothing is recorded.
+        restart_p, active_p = self._patch_subprocess()
+        with restart_p, active_p:
+            res = medic_actions.restart_daemon(
+                'ourliberty-not-a-real-unit.service', ALERT_FP)
+        self.assertFalse(res['ok'])
+        self.assertEqual(self._executions(), {})
+
+
 if __name__ == '__main__':
     unittest.main()

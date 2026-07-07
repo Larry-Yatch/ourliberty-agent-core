@@ -387,6 +387,44 @@ def _refuse(action: str, target: str, fingerprint: str, attempt: int,
                    outcome='skipped', reason=reason, detail=detail)
 
 
+# ---------- graduation track-record (Phase-C unify, Stage 1) ----------
+
+
+def _record_template_execution(action: str, *, verified: bool) -> None:
+    """Record one action-template execution toward Check V's graduation streak.
+
+    This is the streak INPUT the promotion loop was missing: Medic is the actual
+    executor of the reversible auto-fixes the registry graduates, so a verified
+    Medic action is the clean-execution signal (docs/pulse-triage-phase-c-brief).
+    Recorded ONLY when ``action`` names a real registry template
+    (config/auto-fix-patterns.json) — Medic's non-template actions
+    (retrigger-inbox, silence-false-positive) never accrue a track record here.
+
+    Additive and best-effort by contract: it observes an action that already
+    happened; it must NEVER change whether/how Medic acts, and must never raise
+    (a track-record write failing cannot be allowed to fail a restart). It is
+    naturally start-clean — only acts performed after this ships are recorded.
+
+    NOTE (Stage 1 of the unify): Medic still self-governs via its own allowlist;
+    graduation does not yet gate Medic's acting (that is Stage 2 — Medic reads
+    the registry state before auto-acting). Until then this only builds the
+    track record so Check V has real data to surface graduation proposals from.
+    """
+    try:
+        import alert_triage_state  # lazy: avoids import coupling at module load
+        registry = alert_triage_state.load_registry()
+        if action not in registry:
+            return
+        alert_triage_state.record_action_template_execution(
+            action, outcome='success' if verified else 'failure')
+    except Exception as e:  # noqa: BLE001 — track-record must never break Medic
+        try:
+            _log('WARN', f'graduation-execution record for {action!r} failed: '
+                         f'{type(e).__name__}: {e}')
+        except Exception:  # even the log must not surface into Medic's act path
+            pass
+
+
 # ---------- core handler ----------
 
 
@@ -468,6 +506,7 @@ def _act_restart(action: str, target: str, fingerprint: str, attempt: int,
                 source=rec_source, subject=rec_subject,
                 classification='reversible', outcome='acted',
                 attempt=attempt_int, notes=notes)
+            _record_template_execution(action, verified=True)
             _log('INFO', notes)
             return _result(action, target, fp, ok=True, outcome='acted',
                            reason='acted',
@@ -480,6 +519,7 @@ def _act_restart(action: str, target: str, fingerprint: str, attempt: int,
         medic_ledger.append_record(
             source=rec_source, subject=rec_subject, classification='reversible',
             outcome='acted-failed', attempt=attempt_int, notes=notes)
+        _record_template_execution(action, verified=False)
         _log('WARN', notes)
         return _result(
             action, target, fp, ok=False, outcome='acted-failed', reason=reason,
