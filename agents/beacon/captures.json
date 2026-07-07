@@ -1441,6 +1441,11 @@
         "model": "claude-opus-4-8",
         "at": "2026-07-07T22:54:20.983495+00:00",
         "from_state": "parked"
+      },
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-slice-2-reconciler-hardening-closed-unmerged-ter-8d9e",
+        "stamped_at": "2026-07-07T23:01:36.784195+00:00"
       }
     }
   ]
