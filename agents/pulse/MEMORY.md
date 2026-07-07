@@ -448,8 +448,8 @@ PR #828 (`gate: delegate JS/TS repo regression checks to GitHub Actions (Piece 2
 
 ---
 
-## Status snapshot — updated 2026-07-06T23:57Z UTC (Iter ~4282, **Tier 1**)
+## Status snapshot — updated 2026-07-07T00:02Z UTC (Iter ~4283, **Tier 1**)
 
-**Iter ~4282 summary (2026-07-06T23:57Z):** 0 new alerts. watermark=1072. pending=0. **Agent-core:** PR #823 AUTO_MERGE_HELD (UNKNOWN — GitHub API still fluctuating, ~52.8h old). HEAD=7633c123=origin/main. Sync: no-change (23:45Z, ~12 min). Daemons: all alive (beacon-bot 1156346 Ss ~6.35h, inbox-watcher 4079442 Ssl ~2d23.87h, outbox-notifier 1156495 Ss ~6.35h). Watchdog healthy 23:55:53Z UTC. Heal-daemon 23:48:16Z UTC. STANDING: zombie bash PID 1834248 (~39.24d) kill-auth pending. Dashboard: 0 open PRs. Tier 1 (consecutive_clean=0). PRIME ratio: ~19.847x (trend: worsening). **ACTIVE G-rules:** ourliberty-health-subject-key-mismatch-001 [DISPATCHED vp]; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [2/3]; merge-held-deep-review-notifier-tier4-001 [1/3]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3]. Check I Monday: check-i-2026-07-06.json on disk ($1046.42 -11.7% vs prior); dm_route same-week block active.
+**Iter ~4283 summary (2026-07-07T00:02Z):** 0 new alerts. watermark=1072. pending=0. **Agent-core:** PR #823 AUTO_MERGE_HELD (UNKNOWN — GitHub API still fluctuating, ~53h old). HEAD=9c3f6180=origin/main. Sync: no-change (23:45Z, ~17 min). Daemons: all alive (beacon-bot 1156346 Ss ~6.43h, inbox-watcher 4079442 Ssl ~2d23.91h, outbox-notifier 1156495 Ss ~6.43h). Watchdog healthy 00:01:10Z UTC. Heal-daemon 23:58:19Z UTC. STANDING: zombie bash PID 1834248 (~39.25d) kill-auth pending. Dashboard: 0 open PRs. Tier 1 (consecutive_clean=0). PRIME ratio: ~19.847x (trend: worsening). **ACTIVE G-rules:** ourliberty-health-subject-key-mismatch-001 [DISPATCHED vp]; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [2/3]; merge-held-deep-review-notifier-tier4-001 [1/3]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3]. Check I week 2026-07-06 done (not a firing day Tuesday).
 
 
