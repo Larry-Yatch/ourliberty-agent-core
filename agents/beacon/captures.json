@@ -1413,6 +1413,35 @@
         "from_state": "parked"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "cap-slice-2-reconciler-hardening-closed-unmerged-ter-8d9e",
+      "title": "Slice-2 reconciler hardening: closed_unmerged terminal gap + cleanups (from PR #833 review)",
+      "note": "decision_outcome_reconcile.py records a CLOSED-unmerged PR as terminal build_outcome='closed_unmerged', but a closed PR can be reopened+merged on GitHub \u2014 has_build_outcome() then locks in the wrong 'abandoned' signal forever, misleading the future govern-loop assessor. Fix when the assessor that consumes these outcomes is built (options: treat CLOSED as re-checkable / add a settle period / let a later merged row supersede closed_unmerged). Bundle these non-blocking cleanups from the same /code-review high on #833: (1) decision_keys_without_outcome docstring claims bounded scan but read_recent lists whole file then slices; (2) its resolved-set is window-scoped now that build_outcome rows share the file \u2014 consider whole-file scan; (3) reconcile calls full-file has_build_outcome per key = O(keys x rows), pass the computed resolved set down; (4) classify()'s 'pending' is a magic string not in a named non-recordable set. All judged non-blocking: reconciler is manual --once, not timer-wired, no consumer yet.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-07T22:46:18.759028+00:00"
+      },
+      "last_touched": "2026-07-07T22:46:18.759028+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A parked cleanup to a bookkeeping tool that tracks whether proposed changes ended up shipped or dropped.",
+        "why": "One case can silently mislabel a dropped item as 'abandoned' forever even if it's later revived, which would feed bad signals into future automated decision-making.",
+        "suggest": "No rush \u2014 it's low-stakes and nothing depends on it yet, so shelve it until we build the piece that actually reads these signals, then fix it as part of that work."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-07T22:54:20.983495+00:00",
+        "from_state": "parked"
+      }
     }
   ]
 }
