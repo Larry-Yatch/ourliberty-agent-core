@@ -454,8 +454,14 @@ PR #828 (`gate: delegate JS/TS repo regression checks to GitHub Actions (Piece 2
 
 ---
 
-## Status snapshot — updated 2026-07-07T17:55Z UTC (Iter ~4425, **Tier 1**)
+## G-rule check-ix-x-invoke-gap-monday-001 — 1/3 (new, iter ~4426)
 
-**Iter ~4425 summary (2026-07-07T17:55Z):** 0 new alerts. watermark=988. pending=0. **Agent-core:** PR #823 **UNKNOWN** (API lag). AUTO_MERGE_HELD_DEEP_REVIEW (no /code-review high stamp). 72h threshold 2026-07-07T19:08:24Z UTC (~1.21h remaining — IMMINENT). HEAD=21dda138=origin/main. Sync: no-change (17:46:59Z). Daemons: all alive (beacon-bot=1489057 ~339m, inbox-watcher=1489096 ~339m, outbox-notifier=1489097 ~339m). Watchdog healthy 17:53:36Z UTC. Heal-daemon 17:52:35Z UTC. STANDING: zombie bash PID 1834248 (~39.94d) kill-auth pending. Dashboard: 0 open PRs. Tier 1 (consecutive_clean=0). PRIME ratio: ~19.847x (trend: worsening). **ACTIVE G-rules:** ourliberty-health-subject-key-mismatch-001 [DISPATCHED vp]; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [2/3]; merge-held-deep-review-notifier-tier4-001 [1/3]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3]; mirror-malformed-verdict-heal-reap-path-001 [1/3]. Tuesday not a firing day for Check I/III.
+**Rule:** Check IX (Operator-friction signals) and Check X (Chain-quality regression) missed their Monday 2026-07-06 gate. heal-pulse-check-staleness fired Tier-4 escalation (209.6h since last run, past 168h cadence + 36h grace). Scripts ran healthy when invoked manually: IX fired=2, registered=0, skipped=2, errors=0 (existing drafting missions deduped); X outcome=none, 0 breaches. Root cause: cycle-prompt.md §5.3 / §5.3a are at line 644+ — not reached when reading only the first 200 lines of cycle-prompt.md in a /cycle session. Same structural root cause as check-iii-invoke-gap-sunday-001. Fix: ensure cycle sessions invoke Check IX/X on Monday gates regardless of cycle-prompt read depth (sentinel-based skip logic already in scripts). Dispatch to Beacon at 3/3 (same dispatch as check-iii-invoke-gap-sunday-001 if same fix path applies). First occurrence iter ~4426.
+
+---
+
+## Status snapshot — updated 2026-07-07T18:10Z UTC (Iter ~4426, **Tier 1**)
+
+**Iter ~4426 summary (2026-07-07T18:10Z):** 2 new alerts (Check IX/X stale, Tier 4, DM'd 18:05:13Z, cleared by running scripts). watermark=990. pending=0. **Agent-core:** PR #823 **UNKNOWN** (API lag). AUTO_MERGE_HELD_DEEP_REVIEW (no /code-review high stamp). 72h threshold 2026-07-07T19:08:24Z UTC (~58m remaining — CRITICAL IMMINENT). HEAD=66588e53=origin/main. Sync: no-change (17:46:59Z). Daemons: all alive (beacon-bot=1489057 ~348m, inbox-watcher=1489096 ~348m, outbox-notifier=1489097 ~348m). Watchdog healthy 18:03:41Z UTC. Heal-daemon 18:02:38Z UTC. STANDING: zombie bash PID 1834248 (~39.94d) kill-auth pending. Dashboard: 0 open PRs. Tier 1 (consecutive_clean=0). PRIME ratio: ~19.861x (trend: worsening). **ACTIVE G-rules:** ourliberty-health-subject-key-mismatch-001 [DISPATCHED vp]; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [2/3]; merge-held-deep-review-notifier-tier4-001 [1/3]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3]; mirror-malformed-verdict-heal-reap-path-001 [1/3]; check-ix-x-invoke-gap-monday-001 [1/3 NEW]. Monday not a firing day (Tuesday). PR #823 threshold ~58m away.
 
 
