@@ -1,0 +1,21 @@
+[Unit]
+Description=Pulse Check IX — operator-friction signal analyzer (registers drafting missions)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/pulse_check_ix.py
+After=network.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+# DASHBOARD_API_TOKEN (missions API) and SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY
+# (time-to-action signal) come from the env file; a missing Supabase env only
+# drops the time-to-action signal for the run, per the analyzer's spec.
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/pulse_check_ix.py
+TimeoutStartSec=900
+Nice=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-pulse-check-ix

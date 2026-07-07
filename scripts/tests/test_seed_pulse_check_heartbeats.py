@@ -48,11 +48,25 @@ NOW = 1_750_000_000.0
 
 
 def _full_cadence() -> dict:
-    """A cadence config covering every canonical check; vii event-driven."""
+    """A cadence config covering every canonical check; 'ev' event-driven.
+
+    'ev' is a synthetic event-driven check (the shape the retired Check VII
+    had) patched into CANONICAL_CHECKS by _patch_ev_canonical so the seed's
+    event-driven skip path keeps real coverage.
+    """
     cfg = {cid: {'cadence_hours': 168, 'grace_hours': 36}
-           for cid in w.CANONICAL_CHECKS}
-    cfg['vii'] = {'event_driven': True}
+           for cid in w.CANONICAL_CHECKS if cid != 'ev'}
+    cfg['ev'] = {'event_driven': True}
     return cfg
+
+
+def _patch_ev_canonical(test_case: unittest.TestCase) -> None:
+    """Extend the canonical set with the synthetic event-driven 'ev' check for
+    the duration of a test (seed_all iterates watcher.CANONICAL_CHECKS)."""
+    patcher = mock.patch.object(
+        w, 'CANONICAL_CHECKS', list(w.CANONICAL_CHECKS) + ['ev'])
+    patcher.start()
+    test_case.addCleanup(patcher.stop)
 
 
 class _SpyModule:
@@ -78,6 +92,7 @@ class SeedSafetyTest(unittest.TestCase):
         self._td = tempfile.TemporaryDirectory()
         self.bb = Path(self._td.name) / 'blackboard'
         self.bb.mkdir(parents=True)
+        _patch_ev_canonical(self)
 
     def tearDown(self):
         self._td.cleanup()
@@ -96,16 +111,16 @@ class SeedSafetyTest(unittest.TestCase):
             run_check_fn=spy_run_check,
             import_fn=lambda name: modules[name],
         )
-        # vii (event-driven) is skipped; every OTHER check is invoked, and ONLY
+        # ev (event-driven) is skipped; every OTHER check is invoked, and ONLY
         # ever with --dry-run — the side-effect-free contract.
         self.assertTrue(seen_argv)
         for check_id, argv in seen_argv:
             self.assertEqual(argv, ['--dry-run'],
                              f'{check_id} invoked with {argv!r}, not --dry-run')
-        self.assertNotIn('vii', {cid for cid, _ in seen_argv})
+        self.assertNotIn('ev', {cid for cid, _ in seen_argv})
         # All non-event-driven checks ran cleanly.
         ran = {r['check'] for r in rows if r['action'] == 'ran'}
-        self.assertEqual(ran, set(w.CANONICAL_CHECKS) - {'vii'})
+        self.assertEqual(ran, set(w.CANONICAL_CHECKS) - {'ev'})
 
     def test_no_dry_run_check_is_baseline_seeded_not_run(self):
         # A check whose main rejects --dry-run (argparse SystemExit) must be
@@ -120,12 +135,12 @@ class SeedSafetyTest(unittest.TestCase):
             import_fn=lambda name: modules[name],
         )
         seeded = {r['check'] for r in rows if r['action'] == 'baseline-seeded'}
-        self.assertEqual(seeded, set(w.CANONICAL_CHECKS) - {'vii'})
+        self.assertEqual(seeded, set(w.CANONICAL_CHECKS) - {'ev'})
         # No heartbeat files were written by the seed itself.
         self.assertEqual(list(self.bb.glob('*.heartbeat')), [])
         # The baseline now records monitoring_since for the seeded checks.
         baseline = w.load_baseline(self.bb)
-        for cid in set(w.CANONICAL_CHECKS) - {'vii'}:
+        for cid in set(w.CANONICAL_CHECKS) - {'ev'}:
             self.assertEqual(baseline[cid], NOW)
 
     def test_nonzero_run_surfaces_and_does_not_baseline_seed(self):
@@ -143,7 +158,7 @@ class SeedSafetyTest(unittest.TestCase):
             import_fn=lambda name: modules[name],
         )
         for r in rows:
-            if r['check'] == 'vii':
+            if r['check'] == 'ev':
                 continue
             self.assertEqual(r['action'], 'ran')
             self.assertEqual(r['rc'], 1)
@@ -176,9 +191,9 @@ class SeedSafetyTest(unittest.TestCase):
             run_check_fn=lambda *a, **k: 0,
             import_fn=lambda name: _SpyModule(),
         )
-        vii = next(r for r in rows if r['check'] == 'vii')
-        self.assertEqual(vii['action'], 'skipped')
-        self.assertIn('event-driven', vii['detail'])
+        ev = next(r for r in rows if r['check'] == 'ev')
+        self.assertEqual(ev['action'], 'skipped')
+        self.assertIn('event-driven', ev['detail'])
 
 
 class _FaithfulRunCheck:
@@ -217,6 +232,7 @@ class EnvAwarenessTest(unittest.TestCase):
         self._td = tempfile.TemporaryDirectory()
         self.bb = Path(self._td.name) / 'blackboard'
         self.bb.mkdir(parents=True)
+        _patch_ev_canonical(self)
 
     def tearDown(self):
         self._td.cleanup()
@@ -238,11 +254,11 @@ class EnvAwarenessTest(unittest.TestCase):
                 run_check_fn=runner,
                 import_fn=lambda name: modules[name],
             )
-        non_vii = set(w.CANONICAL_CHECKS) - {'vii'}
+        non_ev = set(w.CANONICAL_CHECKS) - {'ev'}
         unvalidated = {r['check'] for r in rows if r['action'] == 'unvalidated'}
-        self.assertEqual(unvalidated, non_vii)
+        self.assertEqual(unvalidated, non_ev)
         for r in rows:
-            if r['check'] in non_vii:
+            if r['check'] in non_ev:
                 self.assertIsNone(r['rc'])
                 self.assertFalse(r['baseline_changed'])
                 self.assertIn('env absent', r['detail'])
@@ -264,12 +280,12 @@ class EnvAwarenessTest(unittest.TestCase):
             run_check_fn=runner,
             import_fn=lambda name: modules[name],
         )
-        non_vii = set(w.CANONICAL_CHECKS) - {'vii'}
+        non_ev = set(w.CANONICAL_CHECKS) - {'ev'}
         for r in rows:
-            if r['check'] in non_vii:
+            if r['check'] in non_ev:
                 self.assertEqual(r['action'], 'ran')
                 self.assertEqual(r['rc'], 1)
-        self.assertEqual({c for c, _ in runner.alerts}, non_vii)
+        self.assertEqual({c for c, _ in runner.alerts}, non_ev)
         self.assertEqual(runner.heartbeats, [])
 
     def test_missing_message_but_env_present_is_not_unvalidated(self):
@@ -289,12 +305,12 @@ class EnvAwarenessTest(unittest.TestCase):
                 run_check_fn=runner,
                 import_fn=lambda name: modules[name],
             )
-        non_vii = set(w.CANONICAL_CHECKS) - {'vii'}
+        non_ev = set(w.CANONICAL_CHECKS) - {'ev'}
         for r in rows:
-            if r['check'] in non_vii:
+            if r['check'] in non_ev:
                 self.assertEqual(r['action'], 'ran')
                 self.assertEqual(r['rc'], 1)
-        self.assertEqual({c for c, _ in runner.alerts}, non_vii)
+        self.assertEqual({c for c, _ in runner.alerts}, non_ev)
 
 
 class LoadEnvFileTest(unittest.TestCase):

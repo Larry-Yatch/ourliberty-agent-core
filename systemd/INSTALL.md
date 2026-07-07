@@ -96,6 +96,19 @@ sudo systemctl enable --now ourliberty-watchdog.timer
 # (set OURLIBERTY_GRAPH_DIR in the .service to override). Watched for liveness
 # by heal-pulse-check-staleness via its "xi" cadence entry.
 sudo systemctl enable --now ourliberty-pulse-check-xi.timer
+
+# Pulse Checks I, III, V, VI, VIII, IX, X — all deterministic analyzers, moved
+# off agent-invoked /cycle scheduling 2026-07-07 (the agent chronically missed
+# late runbook sections; timers never miss). Cadences mirror
+# config/pulse-check-cadence.json; each is watched for liveness by
+# heal-pulse-check-staleness. Check IV's timer predates these (same pattern).
+sudo systemctl enable --now ourliberty-pulse-check-i.timer     # Mon/Wed/Fri/Sun 08:10 droplet-local (after Ledger's Monday run)
+sudo systemctl enable --now ourliberty-pulse-check-iii.timer   # Sundays 04:41 droplet-local; 13-day ExecCondition = 14-day cadence
+sudo systemctl enable --now ourliberty-pulse-check-v.timer     # first Monday 04:49 droplet-local
+sudo systemctl enable --now ourliberty-pulse-check-vi.timer    # first Monday 04:53 droplet-local
+sudo systemctl enable --now ourliberty-pulse-check-viii.timer  # Mondays 05:01 droplet-local
+sudo systemctl enable --now ourliberty-pulse-check-ix.timer    # Mondays 05:05 droplet-local
+sudo systemctl enable --now ourliberty-pulse-check-x.timer     # Mondays 05:09 droplet-local
 ```
 
 ### Self-healing healers (Phase D2.5 + E1.3 + E1.5.2 + E2.1 + E2.2)

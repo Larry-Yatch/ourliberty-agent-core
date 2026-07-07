@@ -101,9 +101,11 @@ class StalenessMathTest(unittest.TestCase):
             self.assertEqual(alert['subject'], 'pulse-check-no-cadence:v')
 
     def test_event_driven_never_stale(self):
-        # No heartbeat at all, yet event-driven => no alert.
+        # No heartbeat at all, yet event-driven => no alert. ('ev' is synthetic:
+        # no canonical check is event-driven since VII's 2026-07-07 retirement,
+        # but the config schema still supports the shape.)
         entry = {'event_driven': True, 'label': 'Cost ceiling'}
-        self.assertIsNone(w.evaluate_check('vii', entry, self.bb, NOW))
+        self.assertIsNone(w.evaluate_check('ev', entry, self.bb, NOW))
 
     def test_no_signal_first_observation_is_quiet(self):
         # monitoring_since=None => the watcher only just started observing this
@@ -320,9 +322,11 @@ class MainEmitTest(unittest.TestCase):
             self.assertEqual(call['source'], 'heal-pulse-check-staleness')
             self.assertEqual(call['severity'], 'warning')
         subjects = {c['subject'] for c in self._fake.calls}
-        # vii is event-driven => never time-stale; all others should fire.
         self.assertIn('pulse-check-stale:ix', subjects)
+        # vii retired 2026-07-07 (substrate producer never shipped) — it must
+        # not resurface in either the stale or the no-cadence alert stream.
         self.assertNotIn('pulse-check-stale:vii', subjects)
+        self.assertNotIn('pulse-check-no-cadence:vii', subjects)
 
     def test_kill_switch_short_circuits(self):
         (Path(self._td.name) / 'healers.disabled').write_text('')

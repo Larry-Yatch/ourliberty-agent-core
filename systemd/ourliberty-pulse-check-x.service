@@ -1,0 +1,20 @@
+[Unit]
+Description=Pulse Check X — chain-quality regression watch (post-cutover Forge/Mirror metrics)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/pulse_check_x.py
+After=network.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+# SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY (chain_events queries) come from the
+# env file; the supabase SDK is lazy-imported by the analyzer.
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/pulse_check_x.py
+TimeoutStartSec=900
+Nice=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-pulse-check-x

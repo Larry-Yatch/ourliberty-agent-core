@@ -1,0 +1,24 @@
+[Unit]
+Description=Pulse Check III — 14-day stuck-threshold review analyzer
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/pulse_check_iii.py
+After=network.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+# The analyzer has NO internal cadence gate (every invocation runs fully: writes
+# the proposal artifact + queues a digest DM), so the 14-day Sunday-anchored
+# cadence lives here: run only when the success heartbeat is missing (bootstrap)
+# or >= 13 days old (1123200s). ExecCondition exit 1 = skipped-not-failed, so
+# off-week Sundays leave no failure residue.
+ExecCondition=/usr/bin/bash -c 'hb=/home/larry/agents/blackboard/pulse-check-iii.heartbeat; [ ! -f "$hb" ] || [ $(( $(date +%%s) - $(stat -c %%Y "$hb") )) -ge 1123200 ]'
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/pulse_check_iii.py
+TimeoutStartSec=900
+Nice=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-pulse-check-iii

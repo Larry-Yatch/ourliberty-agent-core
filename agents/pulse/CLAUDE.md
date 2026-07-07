@@ -94,12 +94,12 @@ When the user sends `/optimize` on Telegram (or invokes it directly in chat), ru
    python3 /home/larry/agent-core/scripts/pulse_check_i.py --force
    ```
 
-   The `--force` flag skips the Monday weekday gate so the on-demand path works any day.
+   The `--force` flag skips the Mon/Wed/Fri/Sun weekday gate so the on-demand path works any day.
 
 2. The script self-handles everything else: it writes the JSON audit to `~/agents/blackboard/pulse-check-i/check-i-<week>.json`, sends the digest DM via `larry_alerts.append_alert` (which auto-surfaces on Telegram), and appends a `**Check I:**` block to `runbooks/cycle-journal.md`. It also honors `EMERGENCY_HALT` and auto-skips if Ledger's sidecar is >7d stale.
 3. Surface the script's stdout/stderr back to the user as your reply so they see the same content the DM contains.
 
-Reference: `runbooks/cycle-prompt.md § Check I` (line 185 documents this on-demand path) for the full Check I spec. The scheduled Monday firing happens via your normal `/cycle` on Monday — `/optimize` is the user-driven path for any other day.
+Reference: `runbooks/cycle-prompt.md § Check I` for the full Check I spec. The scheduled Mon/Wed/Fri/Sun firings happen via the systemd timer `ourliberty-pulse-check-i.timer` (08:10 droplet-local) — `/optimize` is the user-driven path for any other time.
 
 ## Check III — stuck-threshold review (every 14 days, anchored to Sunday cycles)
 
@@ -109,20 +109,14 @@ gut-feel anymore — they're observable. Check III closes that loop on a
 14-day cadence so thresholds stay aligned with real production duration
 distributions without manual analysis.
 
-**When it fires (during your normal `/cycle`):**
-
-1. Today must be Sunday (cycle-prompt's Check I gate already runs Sundays).
-2. EITHER no prior Check III artifact exists in `~/agents/blackboard/pulse-check-iii/`,
-   OR the most-recent artifact's `as_of` is ≥ 14 days old.
-3. If both conditions hold, fire Check III alongside Check I (they don't
-   compete — Check I queries the cost sidecar, Check III queries
-   `chain_events`).
-
-**What you run:**
-
-```bash
-python3 /home/larry/agent-core/scripts/pulse_check_iii.py
-```
+**When it fires:** the systemd timer `ourliberty-pulse-check-iii.timer` runs the
+analyzer every Sunday 04:41 droplet-local; an ExecCondition on the check's success
+heartbeat (≥ 13 days old, or missing) enforces the 14-day cadence. **Do NOT
+invoke it from `/cycle`** — agent-invoked scheduling chronically missed the
+Sunday firing (journal G-rule `check-iii-invoke-gap-sunday-001`, recurred
+1,100+ times before the 2026-07-07 timer conversion). Your duty is triage:
+read the newest artifact under `~/agents/blackboard/pulse-check-iii/` when one
+appeared since your last iter.
 
 The script:
 1. Queries Supabase `chain_events` for the last 30 days of session_start +
@@ -232,7 +226,7 @@ When I wake up for a cycle iter, here's the order I operate in. This is the pers
 2. **Read tier state** — what tier am I in this iter (§ 2)? Cadence + scope follow from tier.
 3. **Run the MANDATORY 5 checks** — in order, every iter (§ 3). Do not skip, do not reorder.
 4. **Run additive checks** — every iter, after the mandatory 5 (§ 4).
-5. **Run conditional / periodic checks** — only when the weekday-gate / cadence-gate fires (§ 5). Check I (Sunday), Check III (14d anchored to Sunday), etc.
+5. **Triage conditional / periodic check output** (§ 5). Every periodic check (I, III, IV, V, VI, VIII, IX, X, XI) fires from its own systemd timer as of 2026-07-07 — I never invoke them. I read their new artifacts / journal blocks and fold them into my cycle entry. The § 5.0 self-gating one-shots are the exception: those I still run every cycle.
 6. **PRIME DIRECTIVE accounting** — for each finding this iter, record an `intervention` row and (if I dispatched a permanent fix) a `systemic_fix` or `verification_pending` row to the cycle-prime ledger (§ 6).
 7. **Write journal + ledger rows** — journal entry to `runbooks/cycle-journal.md`; ledger rows via `scripts/cycle_prime_ledger.py:append_action(...)`.
 8. **Send escalations** — Larry-facing alerts via `larry_alerts.append_alert`; Beacon/Forge/Mirror dispatches via inbox envelopes (§ 15).

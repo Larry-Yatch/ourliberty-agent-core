@@ -1,0 +1,16 @@
+[Unit]
+Description=Monthly (first Monday) run of Pulse Check VI — PRIME DIRECTIVE posture
+
+[Timer]
+# OnCalendar (absolute wall-clock) per the OnUnitActiveSec-dies lesson.
+# First Monday of the month mirrors the cadence-config entry (cadence_hours=840).
+# The analyzer's own month-sentinel (check-vi-<YYYY-MM>.json) makes a Persistent
+# catch-up or ad-hoc re-run within the same month a clean no-op.
+# 04:53 droplet-local: off-peak, offset from the other pulse-check timers.
+OnCalendar=Mon *-*-01..07 04:53:00
+Persistent=true
+RandomizedDelaySec=300
+Unit=ourliberty-pulse-check-vi.service
+
+[Install]
+WantedBy=timers.target

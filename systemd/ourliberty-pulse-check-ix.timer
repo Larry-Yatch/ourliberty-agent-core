@@ -1,0 +1,16 @@
+[Unit]
+Description=Weekly (Monday) run of Pulse Check IX — operator-friction signals
+
+[Timer]
+# OnCalendar (absolute wall-clock) per the OnUnitActiveSec-dies lesson. Weekly
+# Monday mirrors the cadence-config entry (cadence_hours=168). The analyzer's
+# own week-Monday sentinel (check-ix-<monday>.json) makes a Persistent
+# catch-up or ad-hoc re-run within the same week a clean no-op.
+# 05:05 droplet-local: off-peak, offset from the other pulse-check timers.
+OnCalendar=Mon *-*-* 05:05:00
+Persistent=true
+RandomizedDelaySec=300
+Unit=ourliberty-pulse-check-ix.service
+
+[Install]
+WantedBy=timers.target
