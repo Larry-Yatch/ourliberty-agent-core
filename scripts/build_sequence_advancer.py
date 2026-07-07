@@ -100,6 +100,12 @@ ADVANCER_INBOX = AGENTS_ROOT / 'inboxes' / 'build_sequence_advancer'
 # discipline 2 (`prompt: kickoff <seq-id>`). Same shape outbox_notifier's
 # kickoff handler parses, so both kickoff paths accept exactly the same marker.
 _KICKOFF_PROMPT_RE = re.compile(r'^\s*kickoff\s+([A-Za-z0-9._-]+)\s*$')
+# A seq_id becomes a filename under BLACKBOARD_DIR, so it must be a bare stem.
+# The prompt regex already enforces this charset; the `task_id` fallback path
+# does NOT, so a `task_id: kickoff-../../beacon/foo` would otherwise resolve
+# `BLACKBOARD_DIR / '../../beacon/foo.json'` and let the drain write `active`
+# outside the sequences dir. Both extraction paths funnel through this guard.
+_KICKOFF_SEQ_ID_RE = re.compile(r'^[A-Za-z0-9._-]+$')
 
 ACTIVATION_ENV = 'OURLIBERTY_BUILD_SEQUENCE_ADVANCER_ENABLED'
 
@@ -322,16 +328,24 @@ def _seq_id_from_kickoff_envelope(env: dict[str, Any]) -> Optional[str]:
     canonical `prompt: kickoff <seq-id>`, fall back to a `task_id` of shape
     `kickoff-<seq-id>`. Returning None means "not a kickoff" — the caller
     leaves the file untouched rather than consuming an envelope it can't act on.
+
+    Both extraction paths funnel through `_KICKOFF_SEQ_ID_RE` so the fallback
+    can't smuggle a path-separator seq_id past the prompt regex's charset (the
+    traversal guard — the seq_id is used to build a path under BLACKBOARD_DIR).
     """
+    candidate: Optional[str] = None
     prompt = env.get('prompt')
     if isinstance(prompt, str):
         m = _KICKOFF_PROMPT_RE.match(prompt)
         if m:
-            return m.group(1)
-    task_id = env.get('task_id')
-    if isinstance(task_id, str) and task_id.startswith('kickoff-'):
-        return task_id[len('kickoff-'):].strip() or None
-    return None
+            candidate = m.group(1)
+    if candidate is None:
+        task_id = env.get('task_id')
+        if isinstance(task_id, str) and task_id.startswith('kickoff-'):
+            candidate = task_id[len('kickoff-'):].strip() or None
+    if candidate is None or not _KICKOFF_SEQ_ID_RE.match(candidate):
+        return None
+    return candidate
 
 
 def _drain_kickoff_inbox(logger: logging.Logger) -> int:
@@ -378,11 +392,11 @@ def _drain_kickoff_inbox(logger: logging.Logger) -> int:
                 ),
                 subject=f'kickoff-inbox-unreadable:{env_path.name}',
             )
-            _unlink_quietly(env_path)
+            _unlink_quietly(env_path, logger)
             continue
         if not isinstance(env, dict):
             logger.warning(f'kickoff-inbox: non-object envelope {env_path.name}; dropping')
-            _unlink_quietly(env_path)
+            _unlink_quietly(env_path, logger)
             continue
 
         seq_id = _seq_id_from_kickoff_envelope(env)
@@ -412,7 +426,7 @@ def _drain_kickoff_inbox(logger: logging.Logger) -> int:
                 ),
                 subject=f'kickoff-inbox-seq-{reason}:{seq_id}',
             )
-            _unlink_quietly(env_path)
+            _unlink_quietly(env_path, logger)
             continue
 
         validation = bsv.validate_dag(seq)
@@ -431,7 +445,7 @@ def _drain_kickoff_inbox(logger: logging.Logger) -> int:
                 ),
                 subject=f'kickoff-inbox-seq-invalid:{seq_id}',
             )
-            _unlink_quietly(env_path)
+            _unlink_quietly(env_path, logger)
             continue
 
         status = seq.get('status')
@@ -443,7 +457,7 @@ def _drain_kickoff_inbox(logger: logging.Logger) -> int:
                 f'kickoff-inbox: seq `{seq_id}` already status={status!r}; '
                 f'no-op, consuming envelope'
             )
-            _unlink_quietly(env_path)
+            _unlink_quietly(env_path, logger)
             continue
 
         seq['status'] = 'active'
@@ -472,7 +486,7 @@ def _drain_kickoff_inbox(logger: logging.Logger) -> int:
             )
             continue
 
-        _unlink_quietly(env_path)
+        _unlink_quietly(env_path, logger)
         kicked += 1
         logger.info(
             f'kickoff-inbox: seq `{seq_id}` transitioned pending → active '
@@ -481,12 +495,12 @@ def _drain_kickoff_inbox(logger: logging.Logger) -> int:
     return kicked
 
 
-def _unlink_quietly(path: Path) -> None:
+def _unlink_quietly(path: Path, logger: logging.Logger) -> None:
     """Best-effort unlink; a failed delete is logged, never raised."""
     try:
         path.unlink()
     except OSError as e:
-        _setup_logging().warning(f'kickoff-inbox: could not unlink {path}: {e}')
+        logger.warning(f'kickoff-inbox: could not unlink {path}: {e}')
 
 
 # -------------------- gate-check primitives (spec § 5.3) --------------------

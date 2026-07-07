@@ -2328,6 +2328,22 @@ class TestKickoffInboxDrain(_AdvancerHarness):
         self.assertFalse(self._inbox_dir().exists())
         self.assertEqual(self._drain(), 0)
 
+    def test_traversal_task_id_is_rejected(self):
+        # The task_id fallback must not smuggle a path-separator seq_id past the
+        # prompt regex's charset — else the drain could write `active` outside
+        # the build-sequences dir. A traversal task_id parses to no seq_id, so
+        # it's treated as a non-kickoff envelope (left in place, not acted on).
+        outside = self.agents_root / 'inboxes' / 'beacon' / 'evil.json'
+        outside.write_text(json.dumps(_make_sequence('evil', status='pending')))
+        env_path = self._write_kickoff_envelope(
+            'x', task_id='kickoff-../beacon/evil', prompt=None,
+            name='kickoff-traversal.json',
+        )
+        self.assertEqual(self._drain(), 0)
+        # The out-of-dir sequence was NOT flipped to active.
+        self.assertEqual(json.loads(outside.read_text())['status'], 'pending')
+        self.assertTrue(env_path.exists(), 'unparseable-seq envelope left in place')
+
 
 if __name__ == '__main__':
     unittest.main()
