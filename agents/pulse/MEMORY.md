@@ -368,9 +368,9 @@ PR #782 (`fix(heal-stale-daemon): treat queued restart job (After= ordering) as 
 
 ---
 
-## G-rule auto-merge-conflict-promoted-merged-pr-001 — 1/3 (new, iter ~3317)
+## G-rule auto-merge-conflict-promoted-merged-pr-001 — **2/3** (updated iter ~4449)
 
-**Rule:** Promoted `auto-merge-conflict:...:promoted` alert (persistence:3-cycles) fired for PR #764 which was already MERGED. The alert promoter doesn't check PR state before promoting. L1113 (04:09:07Z). Tier-4 (novel — `::promoted` suffix has no translation template). outbox-notifier DM'd Larry about a stale conflict. Dispatch Beacon at 3/3 to add Tier-3 translation for `auto-merge-conflict:...:promoted` when the named PR is MERGED/CLOSED. First occurrence iter ~3317.
+**Rule:** Promoted `::promoted` alerts (persistence:3-cycles) fire for PRs that are already MERGED. The promoter does not check PR state before promoting. Scope broadened at iter ~4449: covers any `::promoted` suffix (`auto-merge-conflict:`, `auto-merge-deep-review-hold:`, etc.) where the named PR is MERGED/CLOSED. Dispatch Beacon at 3/3 to add a promoter merge-state gate (skip promotion if PR MERGED/CLOSED for ANY `::promoted` alert shape). Occurrences: iter ~3317 (PR #764, `auto-merge-conflict:...:promoted`, L1113); iter ~4449 (PR #830, `auto-merge-deep-review-hold:...:promoted`, L1004 — PR merged 20:56:16Z UTC).
 
 ---
 
@@ -460,8 +460,8 @@ PR #828 (`gate: delegate JS/TS repo regression checks to GitHub Actions (Piece 2
 
 ---
 
-## Status snapshot — updated 2026-07-07T21:01Z UTC (Iter ~4448, **Tier 1**)
+## Status snapshot — updated 2026-07-07T21:09Z UTC (Iter ~4449, **Tier 1**)
 
-**Iter ~4448 summary (2026-07-07T21:01Z):** 1 new alert: line 1000=Tier-3 (doorbell kickoff-pulse-check-xii, silenced). Watermark=1000. Pending approvals=0. **Agent-core:** HEAD=798d6ea5=origin/main. Clean. Sync: status=error (20:47Z push-fail; self-healed; Tier-3 per PR #728). Daemons: all alive (beacon-bot=1489057, inbox-watcher=1489096, outbox-notifier=1489097, ~520m). Watchdog healthy 20:55:29Z UTC. Heal-daemon 20:53:26Z UTC. **PIPELINE:** PR #830 MERGED ✅ (f2343794, Larry ran /code-review high + merge_reviewed_pr.sh 830). PR #831 MERGED ✅ (f1a3a199). PR #832 NEW (20:54:29Z, MERGEABLE, auto-review label, sweep pending). PR #833 NEW (20:57:58Z, MERGEABLE, auto-review label, sweep pending). kickoff-pulse-check-xii in build_sequence_advancer inbox (20:54Z). STANDING: zombie bash PID 1834248 (~40.08d) kill-auth pending. Check VI/VIII proposals awaiting Larry's approve/reject (idx=990,991). Dashboard: 0 open PRs. Tier 1 (consecutive_clean=0). PRIME ratio=19.93. **ACTIVE G-rules remaining:** ourliberty-health-subject-key-mismatch-001 [DISPATCHED vp]; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [2/3]; merge-held-deep-review-notifier-tier4-001 [**2/3**]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3]; mirror-malformed-verdict-heal-reap-path-001 [1/3]. Tuesday — no firing-day gates.
+**Iter ~4449 summary (2026-07-07T21:09Z):** 4 new alerts: L1001-L1003=Tier-3 (heal-daemon auto-restarted beacon-bot/dashboard-api/outbox-notifier for PR #830 decision_outcome_ledger.py). L1004=Tier-4 FP (auto-merge-deep-review-hold:830::promoted on already-merged PR). Watermark=1004. Pending approvals=0. **Agent-core:** HEAD=39cf3d83=origin/main. Clean. Sync: status=error (20:47Z push-fail; self-healed; Tier-3 per PR #728). Daemons: inbox-watcher=1489096 (~8.8h). beacon-bot=1701399 (~3 min, restarted 21:03:54Z). outbox-notifier=1701758 (~3 min, restarted 21:04:05Z). All alive. Watchdog healthy 21:05:34Z UTC. Heal-daemon 21:03:47Z UTC. **PIPELINE:** PR #830 MERGED ✅. PR #831 MERGED ✅. PR #832 Mirror review active. PR #833 OPEN auto-review. PR #834 NEW (21:01:11Z) auto-review. kickoff-pulse-check-xii in advancer inbox (~13 min, not stale). STANDING: zombie bash PID 1834248 (~40.09d) kill-auth pending. Check VI/VIII proposals awaiting Larry's approve/reject (idx=990,991). Dashboard: 0 open PRs. Tier 1 (consecutive_clean=0). **ACTIVE G-rules remaining:** ourliberty-health-subject-key-mismatch-001 [DISPATCHED vp]; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [2/3]; merge-held-deep-review-notifier-tier4-001 [**2/3**]; auto-merge-conflict-promoted-merged-pr-001 [**2/3**]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3]; mirror-malformed-verdict-heal-reap-path-001 [1/3]. Tuesday — no firing-day gates.
 
 
