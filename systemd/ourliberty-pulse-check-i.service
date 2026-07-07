@@ -1,0 +1,26 @@
+[Unit]
+Description=Pulse Check I — optimization digest (Ledger sidecar + engineering signals)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/pulse_check_i.py
+After=network.target
+# System-wide halt: when the operator trips EMERGENCY_HALT the unit is skipped
+# (condition-failed, not error) — replaces the halt gate the /cycle agent
+# enforced before invoking these checks.
+ConditionPathExists=!/home/larry/agents/blackboard/EMERGENCY_HALT
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+# No --force: the analyzer's internal Mon/Wed/Fri/Sun gate stays authoritative,
+# so an operator's ad-hoc `systemctl start` on an off day is a clean no-op.
+# The journal append lands in git-tracked runbooks/cycle-journal.md; that dirt
+# class is tolerated by sync_agent_core.sh and committed by the next /cycle.
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/pulse_check_i.py
+TimeoutStartSec=900
+Nice=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-pulse-check-i

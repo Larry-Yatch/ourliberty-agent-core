@@ -1,0 +1,17 @@
+[Unit]
+Description=Biweekly (Sunday) run of Pulse Check III — stuck-threshold review
+
+[Timer]
+# OnCalendar (absolute wall-clock) per the OnUnitActiveSec-dies lesson. systemd
+# cannot express "every other Sunday" natively, so the timer fires EVERY Sunday
+# and the analyzer's own artifact-anchored gate skips the off week (a failed
+# run leaves no fresh artifact, so it retries the very next Sunday instead of
+# silently slipping a fortnight).
+# 04:41 droplet-local: off-peak, offset from check-xi (04:17) and check-iv (04:25).
+OnCalendar=Sun *-*-* 04:41:00
+Persistent=true
+RandomizedDelaySec=300
+Unit=ourliberty-pulse-check-iii.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,26 @@
+[Unit]
+Description=Pulse Check III — 14-day stuck-threshold review analyzer
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/pulse_check_iii.py
+After=network.target
+# System-wide halt: when the operator trips EMERGENCY_HALT the unit is skipped
+# (condition-failed, not error) — replaces the halt gate the /cycle agent
+# enforced before invoking these checks.
+ConditionPathExists=!/home/larry/agents/blackboard/EMERGENCY_HALT
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+# The 14-day Sunday-anchored cadence is enforced INSIDE the analyzer (gate
+# anchored on the newest archived artifact date; --force bypasses), so the
+# timer just fires every Sunday and the off week is a clean gate-skip exit 0 —
+# same shape as the sibling checks' sentinel gates.
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/pulse_check_iii.py
+TimeoutStartSec=900
+Nice=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-pulse-check-iii

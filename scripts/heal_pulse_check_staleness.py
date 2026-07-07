@@ -47,8 +47,13 @@ from typing import Optional
 
 # Canonical check set. Independent of the config on purpose: a check present
 # here but absent from the registry is a fail-closed alert, not a silent skip.
-# (Check II was a deprecated draft that never shipped — the gap is by design.)
-CANONICAL_CHECKS = ['i', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x']
+# (Check II was a deprecated draft that never shipped — the gap is by design.
+# Check VII was retired 2026-07-07: the producer for its substrate
+# ~/agents/state/pulse-cost-escalations.jsonl never shipped, so the check never
+# ran once, and event_driven=true made this watcher skip it forever. Revive the
+# script + cadence entry from git history if escalation-response logging ever
+# ships.)
+CANONICAL_CHECKS = ['i', 'iii', 'iv', 'v', 'vi', 'viii', 'ix', 'x']
 
 # Bootstrap liveness fallback. Before the heartbeat-emitting check code has run
 # even once (first deploy), use each check's existing dated proposal/audit

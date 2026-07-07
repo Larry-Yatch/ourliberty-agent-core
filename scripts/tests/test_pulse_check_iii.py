@@ -518,5 +518,51 @@ class TestFormatDigest(unittest.TestCase):
         self.assertIn('(mirror, feature-development)', digest)
 
 
+class TestCadenceGate(unittest.TestCase):
+    """The 14-day gate (2026-07-07 timer conversion) is anchored on the newest
+    archived artifact date — never the liveness heartbeat, which refreshes on
+    any clean exit including --dry-run and the heartbeat seeder."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        self._orig = p3.PROPOSALS_HISTORY_DIR
+        p3.PROPOSALS_HISTORY_DIR = self.tmp
+        self.addCleanup(setattr, p3, 'PROPOSALS_HISTORY_DIR', self._orig)
+
+    def _write_artifact(self, days_ago: int):
+        d = (datetime.now(timezone.utc) - timedelta(days=days_ago)).date()
+        (self.tmp / f'check-iii-{d.isoformat()}.json').write_text('{}')
+
+    def test_no_artifact_means_run(self):
+        self.assertIsNone(p3.days_since_last_artifact())
+
+    def test_age_anchors_on_newest(self):
+        self._write_artifact(30)
+        self._write_artifact(5)
+        age = p3.days_since_last_artifact()
+        self.assertIsNotNone(age)
+        self.assertLess(abs(age - 5), 1.5)
+
+    def test_unparseable_names_ignored(self):
+        (self.tmp / 'check-iii-not-a-date.json').write_text('{}')
+        self.assertIsNone(p3.days_since_last_artifact())
+
+    def test_main_skips_inside_cadence(self):
+        # Fresh artifact => gate skips before any Supabase / config access.
+        self._write_artifact(5)
+        self.assertEqual(p3.main([]), 0)
+
+    def test_main_runs_when_due_and_force_bypasses(self):
+        # 14-day-old artifact => gate passes; the run proceeds past the gate
+        # (with no fixture it hits the Supabase fetch guard => rc 1, which
+        # proves the gate did NOT short-circuit). --force with a fresh
+        # artifact must do the same.
+        self._write_artifact(14)
+        self.assertEqual(p3.main([]), 1)
+        self._write_artifact(2)
+        self.assertEqual(p3.main(['--force']), 1)
+
+
 if __name__ == '__main__':
     unittest.main()

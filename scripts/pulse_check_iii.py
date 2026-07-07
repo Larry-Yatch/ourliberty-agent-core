@@ -53,6 +53,14 @@ THRESHOLDS_CONFIG = REPO_ROOT / 'config' / 'system_tab_thresholds.json'
 
 LOOKBACK_DAYS = 30
 SAMPLE_SIZE_FLOOR = 10
+
+# 14-day Sunday-anchored cadence, self-enforced (2026-07-07 timer conversion):
+# the systemd timer fires every Sunday and this gate skips the off week. It is
+# anchored on the newest archived artifact's date — NOT the liveness heartbeat,
+# which refreshes on any clean exit including --dry-run and the one-time
+# heartbeat seeder, so heartbeat age can look fresh when no analysis ran.
+# 13 (not 14) tolerates timer jitter on the due Sunday.
+CADENCE_MIN_DAYS = 13
 BOUNDED_DELTA_RATIO = 0.50           # >50% change → high-attention flag
 ROLLBACK_WINDOW_DAYS = 7
 ROLLBACK_FALSE_POSITIVE_THRESHOLD = 3
@@ -579,6 +587,33 @@ def run_check(
     return build_proposal_artifact(proposals, as_of=as_of)
 
 
+def days_since_last_artifact(now: Optional[datetime] = None) -> Optional[float]:
+    """Days since the newest archived check-iii-<date>.json, or None if none.
+
+    The archive date is the cadence anchor: it moves only when a real analysis
+    ran (write_proposal_artifact), never on --dry-run or heartbeat seeding.
+    Unreadable dir or unparseable names count as "no artifact" (fail toward
+    running — a missed off-week skip is cheaper than a silently dead check).
+    """
+    newest: Optional[datetime] = None
+    try:
+        for f in PROPOSALS_HISTORY_DIR.glob('check-iii-*.json'):
+            try:
+                d = datetime.strptime(
+                    f.name[len('check-iii-'):-len('.json')], '%Y-%m-%d',
+                ).replace(tzinfo=timezone.utc)
+            except ValueError:
+                continue
+            if newest is None or d > newest:
+                newest = d
+    except OSError:
+        return None
+    if newest is None:
+        return None
+    now = now or datetime.now(timezone.utc)
+    return (now - newest).total_seconds() / 86400.0
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--fixture',
@@ -587,7 +622,17 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument('--dry-run', action='store_true',
                         help='Compute + print but do not write artifact or '
                              'send DM.')
+    parser.add_argument('--force', action='store_true',
+                        help='Skip the 14-day cadence gate (on-demand run).')
     args = parser.parse_args(argv)
+
+    if not args.force and not args.dry_run:
+        age = days_since_last_artifact()
+        if age is not None and age < CADENCE_MIN_DAYS:
+            log(f'newest Check III artifact is {age:.1f}d old '
+                f'(< {CADENCE_MIN_DAYS}d) — inside the 14-day cadence; '
+                'skipping (use --force to re-run).')
+            return 0
 
     config = load_thresholds_config()
 

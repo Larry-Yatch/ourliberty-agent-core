@@ -1,0 +1,19 @@
+[Unit]
+Description=Mon/Wed/Fri/Sun run of Pulse Check I — optimization digest
+
+[Timer]
+# OnCalendar (absolute wall-clock) per the OnUnitActiveSec-dies lesson: keeps
+# firing even if a run is missed/slow. Mon/Wed/Fri/Sun mirrors the cadence-config
+# entry (cadence_hours=48, max 2-day gap); the script's own weekday gate agrees.
+# 08:10 droplet-local (America/Denver): hours AFTER ourliberty-ledger's Monday 07:00 UTC (= 00:00/01:00 local) run, so the Monday firing
+# reads THIS week's sidecar instead of skipping on a missing ledger-ready sentinel.
+# Note: the analyzer's weekday gate uses the UTC weekday, so a Persistent
+# catch-up landing in the local evening (next UTC day) no-ops harmlessly —
+# the next scheduled firing is at most 2 days out and cadence+grace absorbs it.
+OnCalendar=Mon,Wed,Fri,Sun *-*-* 08:10:00
+Persistent=true
+RandomizedDelaySec=300
+Unit=ourliberty-pulse-check-i.service
+
+[Install]
+WantedBy=timers.target

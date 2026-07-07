@@ -37,8 +37,10 @@ Three outcomes per check:
 Safety is structural, not a hardcoded allowlist: we only ever invoke a check
 with ``['--dry-run']``. A check that does not recognise that flag makes argparse
 exit before it does any work, which we catch and treat as "unprovable" →
-baseline-seed. Event-driven checks (VII) are skipped: the watcher does not track
-their staleness, so a seed signal would be meaningless.
+baseline-seed. Event-driven checks are skipped: the watcher does not track
+their staleness, so a seed signal would be meaningless. (No canonical check is
+event-driven since VII's retirement on 2026-07-07; the skip branch stays
+because it is config-driven.)
 
 HARD CONSTRAINT: never POST a mission, send a DM, or edit config. The only
 writes are heartbeat files (via run_check on a proven dry-run) and the

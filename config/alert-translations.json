@@ -521,14 +521,6 @@
       "recommended_action": "Review the proposals and reply `approve check-vi-update-<date>` or `reject check-vi-update-<date> <reason>` on Telegram. No action leaves the current posture unchanged."
     }
   },
-  "pulse-check-vii": {
-    "check-vii-update": {
-      "severity": "INFO",
-      "tier": "FYI",
-      "plain_language_summary": "The cost-ceiling check proposes tuning the spend-escalation thresholds based on recent escalation-response history. This is a proposal awaiting your call, not a failure.",
-      "recommended_action": "Review the proposals and reply `approve check-vii-update-<date>` or `reject check-vii-update-<date> <reason>` on Telegram. No action leaves the current thresholds unchanged."
-    }
-  },
   "rotate-active-tier": {
     "rotation_auth_gate_blocked": {
       "severity": "WARNING",
