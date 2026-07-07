@@ -435,12 +435,17 @@ def load_registry(path: Optional[Path] = None) -> dict[str, Any]:
 
 
 def save_registry(doc: dict[str, Any], path: Optional[Path] = None) -> None:
-    """Atomically write the registry document (tmp + replace)."""
+    """Atomically write the registry document via the shared atomic_io helper.
+
+    Uses a UNIQUE tmp (not the fixed ``<name>.tmp``) so a concurrent writer
+    cannot clobber the temp mid-write — now reachable since Medic's adverse-
+    execution demote (the record_action_template_execution hook) can run
+    alongside the monthly promotion loop's reconcile_streaks. Byte-identical
+    output to the prior fixed-tmp write (indent=2, trailing newline)."""
+    from atomic_io import atomic_write_json  # scripts/ is on sys.path at runtime
     path = path or REGISTRY_FILE
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + '.tmp')
-    tmp.write_text(json.dumps(doc, indent=2) + '\n')
-    tmp.replace(path)
+    atomic_write_json(path, doc, indent=2, trailing_newline=True)
 
 
 def _find_pattern(doc: dict[str, Any], template: str) -> Optional[dict[str, Any]]:
