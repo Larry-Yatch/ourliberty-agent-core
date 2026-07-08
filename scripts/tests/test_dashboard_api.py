@@ -588,23 +588,47 @@ class HealersStatusTest(unittest.TestCase):
 # ==================== path isolation ====================
 
 class PathIsolationTest(unittest.TestCase):
-    """Belt-and-suspenders check: nothing under /home/larry/agents is
-    touched by the entire test module run."""
+    """dashboard_api must operate entirely under the sandbox agents-root, never
+    the real tree.
 
-    def test_no_writes_to_prod_logs(self):
-        prod = Path('/home/larry/agents/logs/dashboard-api.log')
-        # If module init or any earlier test polluted this, fail loudly.
-        if not prod.exists():
-            return  # nothing to compare; fine.
-        before_mtime = prod.stat().st_mtime
+    Real-tree WRITE isolation is enforced structurally and process-wide by the
+    #822 bwrap wall (any write under the real ~/agents becomes EROFS), the #816
+    refuse_live_state_write guard, and the #824 tripwire. Those are the
+    load-bearing mechanisms; this class keeps a lightweight, race-immune check
+    that dashboard_api's path resolution redirects into the tmp sandbox.
+
+    History: this test used to snapshot the mtime of the real
+    /home/larry/agents/logs/dashboard-api.log and assert it stayed constant
+    across a few requests. That FALSE-BLOCKED the regression gate. dashboard_api
+    has NO code that writes that file -- it is owned by the systemd unit's
+    ``StandardOutput=append:/home/larry/agents/logs/dashboard-api.log`` -- and on
+    the live droplet where the gate runs, the running uvicorn service
+    continuously appends access-log lines to it. The file is root-owned 0644, so
+    the larry-run suite can never write it, and the bwrap wall's --ro-bind is
+    transparent to that external writer (same inode), so its mtime bumps inside
+    the test window regardless of what the test does. The old check was
+    unattributable on a live host (a race with an external daemon, not a test
+    leak); it is replaced by the redirection check below.
+    """
+
+    def test_agents_root_redirects_into_sandbox(self):
         tmp = Path(tempfile.mkdtemp(prefix='dash-iso-'))
         _fresh_root(tmp)
         c = _client(tmp, self)
-        for path in ('/health', '/agents/status', '/tasks/recent', '/costs/today'):
+        # Path resolution must redirect into the tmp sandbox, never the real tree.
+        self.assertEqual(da._agents_root(), tmp)
+        self.assertFalse(
+            str(da._agents_root()).startswith('/home/larry/agents'),
+            'dashboard_api must not resolve to the real agents tree under test',
+        )
+        r = c.get('/health', headers=AUTH)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['agents_root'], str(tmp))
+        for path in ('/agents/status', '/tasks/recent', '/costs/today'):
             with mock.patch.object(da, '_systemctl_is_active', return_value=None), \
                  mock.patch.object(da, '_list_timer_next', return_value=None):
-                c.get(path, headers=AUTH)
-        self.assertEqual(prod.stat().st_mtime, before_mtime)
+                self.assertEqual(
+                    c.get(path, headers=AUTH).status_code, 200, msg=path)
 
 
 # ==================== docs/openapi auth-gating ====================
