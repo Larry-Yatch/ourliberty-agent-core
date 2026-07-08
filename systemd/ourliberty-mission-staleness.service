@@ -16,3 +16,23 @@ Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/mission_staleness.py --once
 
 TimeoutStartSec=300
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-mission-staleness
+
+# Memory cap: read-only scan of the ~232-item proposed-missions pile; small.
+MemoryMax=256M
+MemoryHigh=128M
+
+# Hardening — read-only data producer: opens missions.json READ-ONLY, writes
+# ONLY its ranked stale-candidates state + logs under ~/agents.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
