@@ -69078,3 +69078,110 @@ NOMINAL ✅
 
 ---
 
+## Iteration ~4522 — 2026-07-08T06:20Z UTC (Larry /cycle via chat, Tier 1)
+
+**Health:** ✅ Nominal. 1 new alert (L1045 — Tier-3 silenced). outbox-notifier + beacon_bot restarted cleanly (heal-stale-daemon-code SIGTERM at 06:16Z; both running under new PIDs). PR #856 REVIEW_ESCALATE (new pending[6]) and harden-specdoc approval delivered (new pending[5]). No stalls. No always-fix actions needed.
+
+**VERIFY-BEFORE-REASSERT (corrections from iter ~4521):**
+- **"Check A HEAD=87e9c51f=origin/main":** UPDATED ✅ — HEAD=b4e5d4ff (wrapper committed 20260708T061525Z). [updated]
+- **"Zombie PID 1834248 (40d 10h 50m 16s+)":** RE-VERIFIED ⚠️ — ps alive (40d 10h 59m 25s, Ss). CONFIRMED [carry]
+- **"Sync last_sync=2026-07-08T06:04:36Z (~20 min)":** CONFIRMED ✅ — unchanged, ~16 min ago, <2h. NOMINAL [unchanged]
+- **"Mirror queue=16":** UPDATED ✅ — 15 (one review consumed since ~4521). [updated]
+- **"pending=5":** UPDATED ✅ — now 7. Two new: [5] harden-specdoc-originmain-flaky-tests-001 + [6] mirror-review-pr-ourliberty-agent-core-856. [updated]
+- **"outbox_notifier PID 2258153 (Ss)":** UPDATED ✅ — restarted; new PID 2664032 (Ss, ~4 min uptime). [updated]
+- **"beacon_bot PID 2258448 (Ss)":** UPDATED ✅ — restarted; new PID 2663456 (Ss, ~4 min uptime). [updated]
+
+**Check 0 — Alert triage:** repair-watermark `{"repaired": false, "old_watermark": 1044, "file_length": 1045}` → 1 new alert.
+- L1045: `source=outbox-notifier, kind=approval_request, approval_id=harden-specdoc-originmain-flaky-tests-001` → triage-alert → Tier-3 silenced (known-pattern match in alert-translations.json). `route=digest` confirmed. Journal-note only. Watermark 1044→1045. NOMINAL ✅
+
+**Check 1 — Log noise:** New since ~4521:
+- 00:13:59 MDT: WARN `MIRROR_DAG_PREFLIGHT seq=completeness-program verdict=PASS WARN already-kicked-off status=active task=review-sequence-dag-completeness-program; no-op` — correct behavior (sequence already active); no-op as intended. Sub-threshold WARN. [note only]
+- 00:15:06 MDT: review-request dispatched for PR #856 round=2. Normal.
+- 00:16:55 MDT: outbox-notifier SIGTERM (signal 15, exiting cleanly). 00:16:56 MDT: outbox-notifier starting. [restart — nominal]
+- Post-restart: no new log entries. Agent idle. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** Bot restarted at 00:16:46 MDT (06:16:46Z). Last Larry message: "status" at 22:40:36 MDT July 7 (unchanged). No new messages. No directives or distress. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** dry-run 06:16:33Z → "no stalls detected." All FORGE_NO_PR_SKIP operating. NOMINAL ✅
+
+**Check 4 — Pending Larry directives:** pending=7 (was 5 from ~4521). Two new this iter:
+- [0] `mirror-review-pr-ourliberty-agent-core-845` — STALE. PR #845 MERGED. [carry stale]
+- [1] `pr3-sentinel-self-arming-approval-001` — spec amendment. Awaiting Larry. [carry]
+- [2] `mirror-review-pr-ourliberty-agent-core-851` — PR #851 flaky gate. Re-review in queue. [carry]
+- [3] `mirror-review-pr-ourliberty-agent-core-849` — PR #849 flaky gate. Re-review in queue (3rd). [carry]
+- [4] `mirror-review-pr-ourliberty-agent-core-852` — PR #852 flaky gate. Re-review in queue (2nd). [carry]
+- [5] `harden-specdoc-originmain-flaky-tests-001` — **NEW** (created 06:10:42Z, DM delivered 06:12:30Z). Approval to harden check_spec_doc/origin-main flaky tests. Permanent fix for flaky-specdoc-originmain-gate-falseblock. Awaiting Larry's `approve` / `go`. [new, positive]
+- [6] `mirror-review-pr-ourliberty-agent-core-856` — **NEW** (created 06:12:42Z). PR #856 "docs(completeness): adopt PR-3 fan-out sentinel spec (v2, build-ready)" got Mirror REVIEW_ESCALATE. No-session decision-needed. Re-review also dispatched (round=2, 06:15:06Z). [new, carry — re-review in queue]
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-08T06:16:38Z (~4 min from 06:20:20Z). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=b4e5d4ff=origin/main. Clean tree. On main. ✅
+**Check B — Sync health:** last_sync=2026-07-08T06:04:36Z (~16 min, <2h), status=no-change. NOMINAL ✅
+**Check C — Agent liveness:** outbox_notifier PID 2664032 (Ss, ~4 min — restarted 06:16:56Z) ✅. beacon_bot PID 2663456 (Ss, ~4 min — restarted 06:16:46Z) ✅. inbox_watcher PID 2263256 (Ssl, 03:01+) ✅. Zombie PID 1834248 (Ss, 40d 10h 59m 25s+) ⚠️ [carry].
+**Check D — Inbox state:** Forge: 0 active ✅. Mirror: 15 queued (was 16). Beacon: 1 (`card-message-e92e3829...` — routine notification) ✅.
+**Check E — PR state:** 13 open agent-core PRs (#846–#852, #854, #856–#861). PR #846 REVIEW_PASS AUTO_MERGE_HELD blocker=#852. PR #850 REVIEW_PASS AUTO_MERGE_HELD blocker=#857. PR #856 REVIEW_ESCALATE — re-review dispatched 06:15:06Z (round=2). All others UNKNOWN mergeable. None >72h. NOMINAL ✅
+
+**§5.0 — audit_due_nudge:** no committed baseline; no-op. ✅
+**§5.0 — distill_detector:** no un-distilled audits; no-op. ✅
+**§5.0 — audit_cadence_signal:** no post-seed decision-grade distill artifacts; no-op. ✅
+
+**Conditional checks — UTC Wednesday 2026-07-08:**
+- **Check I:** Timer fires 08:13 MDT (14:13Z, ~8h away). Systemd handles. [watch]
+- **Check III:** Sunday gate. Skip. ✅
+- **Check IX/X:** Monday gate. Skip. ✅
+- **Check VI/VIII:** Proposals idx=990,991 carry — awaiting Larry. [carry]
+
+**G-rule assessment:**
+- **flaky-specdoc-originmain-gate-falseblock:** `harden-specdoc-originmain-flaky-tests-001` APPROVAL_REQUEST delivered to Larry at 06:12:30Z — permanent fix in the approval chain. Pending Larry's `approve`. [carry — approval pending, positive]
+- **notifier-concurrent-scan-dup [vp]:** PR #847 in Mirror queue (15 items). No new occurrence. [carry]
+- **forge-marker-task-id-mismatch-xii-v1 [2/3]:** No new occurrence. [confirmed carry]
+- **sentinel-inflight-stall-tier4 [vp]:** PR #854 rev1 dispatched Forge; Mirror re-review round=1 queued. [carry vp]
+- **sequence-invalid-completeness-pr3-fanout-sentinel [1/3]:** No new alert. Larry DM'd 23:42 MDT July 7. [carry]
+- **auto-merge-conflict-promoted-merged-pr-001 [2/3]:** No new occurrence. [carry]
+- All other active G-rules carry unchanged from ~4521.
+
+**New findings since ~4521:**
+1. ✅ **L1045 Tier-3 silenced** — outbox-notifier approval_request delivery confirm for `harden-specdoc-originmain-flaky-tests-001`. Known pattern. Watermark 1044→1045. [new, nominal]
+2. ✅ **outbox-notifier + beacon_bot auto-restarted** at 06:16Z UTC — heal-stale-daemon-code SIGTERM path. Both running cleanly under new PIDs (2664032, 2663456). heal-stale-daemon-code working as designed. [new, positive — nominal]
+3. ✅ **pending[5] harden-specdoc approval** — DM delivered to Larry at 06:12:30Z. Permanent fix for flaky-specdoc-originmain-gate-falseblock is in Larry's hands for approval. [new, positive]
+4. ⚠️ **pending[6] PR #856 REVIEW_ESCALATE** — Mirror escalated "docs(completeness): adopt PR-3 fan-out sentinel spec (v2, build-ready)". No-session decision-needed. Re-review dispatched (round=2, 06:15:06Z). Awaiting Mirror re-review result. [new, carry]
+5. ✅ **Mirror queue 16→15** — one review completed since ~4521. [new, nominal]
+
+**Actions taken:**
+1. Check 0: triage L1045 → Tier-3 silence. Watermark 1044→1045. ✅
+2. §5.0: all no-ops. ✅
+3. PRIME ledger: intervention appended (1 Tier-3 alert; restarts nominal; PR #856 REVIEW_ESCALATE new pending; zombie carry; pending=7). ✅
+4. Tier state: `record --checks-clean false` → Tier 1 (consecutive_clean=0; new pending signal). ✅
+
+**Escalations:** 0 new Pulse DMs. 0 new Pulse-authored alerts.
+
+**Standing findings (carry-verified this iter):**
+- [yellow] **zombie-bash-pid-1834248** — PID 1834248 (40d 10h 59m+, Ss). ask-then-do: `kill 1834248`. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07` or `reject`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [yellow] **unreviewed-merge-larry-authored-pr-001** — 8th+ occurrences. Steps 1-2 unimplemented. [carry]
+- [yellow] **pending[0] mirror-review-pr-ourliberty-agent-core-845** — STALE (PR #845 MERGED). [carry stale]
+- [yellow] **pending[1] pr3-sentinel-self-arming-approval-001** — Awaiting Larry. [carry]
+- [yellow] **pending[2] mirror-review-pr-ourliberty-agent-core-851** — Flaky gate; Mirror re-review in queue. [carry]
+- [yellow] **pending[3] mirror-review-pr-ourliberty-agent-core-849** — Mirror re-review in queue (3rd). [carry]
+- [yellow] **pending[4] mirror-review-pr-ourliberty-agent-core-852** — Mirror re-review in queue (2nd). [carry]
+- [yellow] **pending[5] harden-specdoc-originmain-flaky-tests-001** — APPROVAL_REQUEST delivered 06:12:30Z. Awaiting Larry `approve`. [new carry]
+- [yellow] **pending[6] mirror-review-pr-ourliberty-agent-core-856** — PR #856 REVIEW_ESCALATE. Re-review dispatched round=2. [new carry]
+- [blue] **PR #846** — REVIEW_PASS. AUTO_MERGE_HELD blocker=#852. [carry]
+- [blue] **PR #847** — Mirror rev1 queued (15 items). [carry]
+- [blue] **PR #849** — 3rd ESCALATE; Mirror re-review in queue. [carry]
+- [blue] **PR #850** — REVIEW_PASS. AUTO_MERGE_HELD blocker=#857. [carry]
+- [blue] **PR #851** — 2nd ESCALATE; Mirror re-review in queue. [carry]
+- [blue] **PR #852** — 2nd ESCALATE; Mirror re-review in queue. [carry]
+- [blue] **PR #854** — REVIEW_REVISION rev1 to Forge; Mirror re-review round=1 queued. [carry]
+- [blue] **PR #856** — REVIEW_ESCALATE; re-review round=2 in queue. [new carry]
+- [blue] **PRs #857–#861** — Mirror queued or pending. [carry]
+- [blue] **Check I** — Wednesday firing day. Timer fires 08:13 MDT (14:13Z). [watch]
+- [blue] **G-rules (dispatched, vp):** sentinel-inflight-stall-tier4 (PR #854 rev1); notifier-concurrent-scan-dup (PR #847 rev1); ourliberty-health-subject-key-mismatch-001 (3/3); forge-wip-redispatch-digest-tier4-001; no-session-revision-active-mirror-session-fp-001; forge-revision-preamble-missing-pr711-001; forge-wip-redispatch-exhausted-pr-exists-fp-001; decision-needed-approval-forge-dispatch-no-target-repo-001. [carry vp]
+- [blue] **G-rule 1/3: sequence-invalid-completeness-pr3-fanout-sentinel** — Larry DM'd. [carry]
+
+**PRIME DIRECTIVE:** ratio=20.23 (worsening trend). Intervention appended.
+**Tier end-of-iter:** Tier **1** (consecutive_clean=0; new pending signal from PR #856 REVIEW_ESCALATE + pending count 5→7).
+
+---
+
