@@ -8701,11 +8701,16 @@ def _dm_larry_deep_review_hold(
         except Exception:  # noqa: BLE001 — daemon-never-wedge on DM failure
             pass
     try:
+        # Explicit route='escalate' overrides the graduated default for this
+        # source ('outbox-notifier' migrated to 'hold'), which the bot skips at
+        # read-time. severity='warning' won't trip the critical-forces-escalate
+        # guard, so without this the deep-review hold would silently not DM.
         larry_alerts.append_alert(
             source='outbox-notifier',
             severity='warning',
             message=body,
             subject=f'auto-merge-deep-review-hold:{repo_coords}:{pr_number}',
+            route='escalate',
         )
     except Exception:  # noqa: BLE001 — daemon-never-wedge
         pass
