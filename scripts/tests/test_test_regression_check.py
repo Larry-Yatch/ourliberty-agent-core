@@ -253,6 +253,64 @@ class AbsoluteInvariantVerdictTest(_IsolatedAgentsRoot):
         self.assertEqual(v['fixed'], [self._invariant_id])
 
 
+class ReverifyWithFreshParentTest(_IsolatedAgentsRoot):
+    """A would-be BLOCK against a CACHED parent baseline is recomputed against a
+    freshly re-run parent. reverify_verdict_with_fresh_parent is the pure core:
+    given head, the (stale) cached parent set, and the fresh parent set, it must
+    tolerate a flake that fails in BOTH fresh runs and KEEP a genuine regression."""
+
+    def test_deterministic_flake_cleared(self):
+        # The flake failed at head but the cache missed it at parent; a fresh
+        # parent run shows it fails there too → not this PR's regression.
+        head = {'a.B.flake'}
+        cached_parent: set = set()          # cache missed the flake
+        fresh_parent = {'a.B.flake'}        # fresh run reproduces it at parent
+        vb, flakes = trc.reverify_verdict_with_fresh_parent(
+            head, cached_parent, fresh_parent)
+        self.assertEqual(vb['verdict'], 'PASS')
+        self.assertEqual(vb['regressions'], [])
+        self.assertEqual(flakes, ['a.B.flake'])
+
+    def test_genuine_regression_still_blocks(self):
+        # Fails at head, absent from BOTH the cached and the fresh parent run.
+        head = {'a.B.real'}
+        vb, flakes = trc.reverify_verdict_with_fresh_parent(head, set(), set())
+        self.assertEqual(vb['verdict'], 'BLOCK')
+        self.assertEqual(vb['regressions'], ['a.B.real'])
+        self.assertEqual(flakes, [])
+
+    def test_newly_added_broken_test_still_blocks(self):
+        # Regression-guard for the isolation-approach false-PASS this design
+        # replaced: a brand-new failing test does not exist at parent, so it is
+        # absent from the fresh parent failure-set and stays a regression.
+        head = {'new_mod.T.test_broken'}
+        vb, flakes = trc.reverify_verdict_with_fresh_parent(head, set(), set())
+        self.assertEqual(vb['verdict'], 'BLOCK')
+        self.assertEqual(vb['regressions'], ['new_mod.T.test_broken'])
+        self.assertEqual(flakes, [])
+
+    def test_mixed_flake_and_real_regression(self):
+        head = {'a.B.flake', 'a.B.real'}
+        cached_parent: set = set()
+        fresh_parent = {'a.B.flake'}   # flake reproduces at fresh parent, real does not
+        vb, flakes = trc.reverify_verdict_with_fresh_parent(
+            head, cached_parent, fresh_parent)
+        self.assertEqual(vb['verdict'], 'BLOCK')
+        self.assertEqual(vb['regressions'], ['a.B.real'])
+        self.assertEqual(flakes, ['a.B.flake'])
+
+    def test_reverified_flakes_only_counts_vanished_candidates(self):
+        # A pre-existing failure present in the cached parent is NOT a candidate,
+        # so it is never reported as reverified even though it is in fresh_parent.
+        head = {'a.B.flake', 'a.B.old'}
+        cached_parent = {'a.B.old'}
+        fresh_parent = {'a.B.flake', 'a.B.old'}
+        vb, flakes = trc.reverify_verdict_with_fresh_parent(
+            head, cached_parent, fresh_parent)
+        self.assertEqual(vb['verdict'], 'PASS')
+        self.assertEqual(flakes, ['a.B.flake'])  # not 'a.B.old'
+
+
 # -------------------- collect_failures_at_sha (test-runner branch) --------------------
 
 class RunTestsInDirTest(_IsolatedAgentsRoot):
@@ -456,14 +514,57 @@ class MainBaselineCacheTest(_MainHarness):
         self.assertEqual(report['parent_failures'], ['a.B.test_old'])  # from cache
         self.assertEqual(report['verdict'], 'PASS')  # head == cached parent
 
-    def test_cache_hit_still_detects_a_real_regression(self):
+    def test_cache_hit_real_regression_reverified_still_blocks(self):
+        # A cached baseline that would BLOCK re-runs the parent fresh to verify.
+        # The fresh parent (wired here as the accurate parent set) confirms
+        # test_new is genuinely new → still BLOCK. This is the safety property:
+        # the fresh-parent re-run cannot clear a real regression.
         baseline_cache.store(self.PARENT, {'a.B.test_old'})
         code, report, ran = self._invoke_counting(
-            {'unused'}, {'a.B.test_old', 'a.B.test_new'},
+            {'a.B.test_old'}, {'a.B.test_old', 'a.B.test_new'},
         )
-        self.assertEqual(ran, [self.HEAD])
+        self.assertEqual(ran, [self.HEAD, self.PARENT])  # head, then fresh parent
         self.assertEqual(code, trc.EXIT_BLOCK)
         self.assertEqual(report['regressions'], ['a.B.test_new'])
+        self.assertTrue(report['parent_reverified'])
+        self.assertEqual(report['reverified_flakes'], [])
+
+    def test_cache_hit_flake_cleared_by_fresh_parent(self):
+        # The stale cache MISSED a deterministic full-suite flake; head has it,
+        # so it looks like a new regression. The fresh parent re-run reproduces
+        # the flake → it is present at BOTH SHAs → not this PR's regression → the
+        # would-be BLOCK is corrected to PASS. This is the false-BLOCK class fix.
+        baseline_cache.store(self.PARENT, set())          # cache missed the flake
+        code, report, ran = self._invoke_counting(
+            {'a.B.flake'}, {'a.B.flake'},                 # fresh parent has it too
+        )
+        self.assertEqual(ran, [self.HEAD, self.PARENT])
+        self.assertEqual(code, trc.EXIT_PASS)
+        self.assertEqual(report['regressions'], [])
+        self.assertEqual(report['reverified_flakes'], ['a.B.flake'])
+        self.assertTrue(report['parent_reverified'])
+
+    def test_cache_hit_no_regression_does_not_rerun_parent(self):
+        # The green path: a cache hit with no regression never pays for a re-run.
+        baseline_cache.store(self.PARENT, {'a.B.test_old'})
+        code, report, ran = self._invoke_counting(
+            {'a.B.test_old'}, {'a.B.test_old'},
+        )
+        self.assertEqual(ran, [self.HEAD])  # parent NOT re-run
+        self.assertEqual(code, trc.EXIT_PASS)
+        self.assertFalse(report['parent_reverified'])
+
+    def test_no_flake_reverify_flag_keeps_cached_baseline_block(self):
+        # Escape hatch: with --no-flake-reverify the cached-baseline BLOCK stands
+        # (no fresh parent re-run), preserving the pre-fix behavior on demand.
+        baseline_cache.store(self.PARENT, set())
+        code, report, ran = self._invoke_counting(
+            {'a.B.flake'}, {'a.B.flake'}, extra_argv=['--no-flake-reverify'],
+        )
+        self.assertEqual(ran, [self.HEAD])  # parent NOT re-run
+        self.assertEqual(code, trc.EXIT_BLOCK)
+        self.assertFalse(report['parent_reverified'])
+        self.assertEqual(report['regressions'], ['a.B.flake'])
 
     def test_no_cache_flag_forces_both_runs(self):
         baseline_cache.store(self.PARENT, {'a.B.test_old'})
