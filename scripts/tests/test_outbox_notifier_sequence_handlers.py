@@ -694,15 +694,30 @@ class KickoffFailureModes(_KickoffHandlerHarness):
 
     def test_spec_doc_not_authored_fails_kickoff_with_genuine_message(self):
         """The genuine missing-spec case (absent locally AND on origin/main)
-        still reports the real 'author + merge it first' error. Driven by
-        the real classifier against a spec_doc that exists nowhere."""
+        still reports the real 'author + merge it first' error. The spec-doc
+        classifier is patched to simulate the not-authored state — the same
+        hermetic pattern as the sibling behind-origin test above. It can't be
+        reproduced live: when origin/main is transiently unresolvable on the
+        droplet the real classifier returns SPEC_DOC_INDETERMINATE (not
+        SPEC_DOC_NOT_AUTHORED), which flipped these assertions non-
+        deterministically under the full-suite regression gate."""
         seq = _make_sequence(seq_id='pulse-upgrade-001', status='pending')
         seq['spec_doc'] = 'agents/beacon/specs/__never_authored_spec__.md'
         self._write_sequence(seq)
-        body = self._make_envelope()
-        result = on._handle_build_sequence_advancer_kickoff(
-            body, body['result'],
+        fake = bsv.SpecDocPresence(
+            status=bsv.SPEC_DOC_NOT_AUTHORED,
+            spec_doc='agents/beacon/specs/__never_authored_spec__.md',
+            message=('spec_doc is absent locally and on origin/main; author '
+                     'it and merge to origin/main first, then re-dispatch the '
+                     'kickoff.'),
         )
+        body = self._make_envelope()
+        with mock.patch.object(
+            bsv_handler_mod, 'check_spec_doc_presence', return_value=fake,
+        ):
+            result = on._handle_build_sequence_advancer_kickoff(
+                body, body['result'],
+            )
         self.assertIsNotNone(result)
         self.assertIn('spec-not-authored', result)
         self.assertEqual(self._read_sequence('pulse-upgrade-001')['status'],
