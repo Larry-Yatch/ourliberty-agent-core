@@ -1,0 +1,38 @@
+[Unit]
+Description=Factory utilization KPI — busy%% + constraint diagnosis from trip-wire ticks (Operator Feed Loop slice 6b)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/factory_utilization.py
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/factory_utilization.py --once
+
+TimeoutStartSec=300
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-factory-utilization
+
+# Memory cap: pure-stdlib merge over a <=3000-row tick ledger; small.
+MemoryMax=256M
+MemoryHigh=128M
+
+# Hardening — read-only over its inputs (readiness-trip-wire.json,
+# mission-rank.json); writes ONLY its own state + log under ~/agents.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
