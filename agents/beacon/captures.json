@@ -1569,6 +1569,93 @@
         "at": "2026-07-08T03:15:20.936075+00:00",
         "from_state": "parked"
       }
+    },
+    {
+      "id": "cap-build-flip-readiness-gauge-5-completeness-gate-m-a453",
+      "title": "Build flip-readiness gauge: 5 completeness gate metrics, self-firing",
+      "note": "Larry decided the default-deny flip is gated on 5 measurable criteria (completeness-architecture-design.md v2 SS3: escalation precision >=90% 30d; zero backstop-caught misses 4wk; >=3 auto-fix templates verifier-confirmed >=95% over >=20 runs; over-silence audit green; projected post-flip approval volume <= current ask-rate). NOTHING computes these today. Build a small weekly gauge (order-fragile-gauge precedent: weekly timer, DMs only on state change) that computes all 5 from the decision ledger + XIV artifacts + Check-V executions, and emits ONE approval when all 5 go green: the flip-ready doorbell. Depends on PR-1 (ledger live) + XIV landing. Without this, Phase 3 relies on someone remembering.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-08T03:17:36.766229+00:00"
+      },
+      "last_touched": "2026-07-08T03:17:36.766229+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A small weekly scorecard that automatically tracks the 5 conditions we agreed must all be true before we let the system act on its own, and rings a single doorbell the moment they're all met.",
+        "why": "Right now nothing measures those conditions, so the go-ahead depends on someone remembering to check \u2014 this makes readiness self-announcing instead of easy to miss.",
+        "suggest": "Worth building, but only after the two pieces it relies on are in place \u2014 it's low-stakes and mostly saves us from human forgetfulness, so no rush."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-08T03:25:23.242248+00:00",
+        "from_state": "parked"
+      }
+    },
+    {
+      "id": "cap-spec-build-xiv-b-tier-4-alert-write-back-loop-f78b",
+      "title": "Spec + build XIV-b: tier-4 alert write-back loop",
+      "note": "Roadmap item from pulse-check-xiv spec SS1 + alert-system-default-deny-northstar memory: record what Larry did with each surfaced tier-4 alert (actioned/dismissed/expired -> resolution/resolved_at on the triage row; all 350+ rows are null today). This is the substrate that makes true action-rate measurable and gates XIV-c guarded auto-tune. Natural trigger: after XIV V1 has ~4 weeks of reports and the sort-once backlog cleanup is done. Spec via the standard spec->adversarial-review->team pipeline.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-08T03:17:37.180416+00:00"
+      },
+      "last_touched": "2026-07-08T03:17:37.180416+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A way to record what you actually did with each alert we send you \u2014 acted on it, ignored it, or let it lapse.",
+        "why": "Right now none of that is tracked, so we can't tell you how useful your alerts really are or safely let the system tune itself later.",
+        "suggest": "Worth doing, but no rush \u2014 let the current alert setup run about a month first, then start this once things settle."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-08T03:25:23.242248+00:00",
+        "from_state": "parked"
+      }
+    },
+    {
+      "id": "cap-verify-pr-3-sentinel-has-self-firing-arming-appr-b272",
+      "title": "Verify PR-3 sentinel has self-firing arming approval after report-only window",
+      "note": "Insurance: completeness-pr3-fanout-sentinel-spec.md SS8 was amended (2026-07-08) so the sentinel ITSELF emits one approval when its 48h report-only window completes (arm me? N would-closes, M wrong) \u2014 arming must never rely on someone remembering. If the handoff session copied the spec to agents/beacon/specs/ BEFORE the amendment, the landed doc lacks this line \u2014 verify the built sentinel includes the window-complete approval, else add it as a follow-up.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-08T03:17:51.997907+00:00"
+      },
+      "last_touched": "2026-07-08T03:17:51.997907+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A new automated safety monitor watches quietly for two days and is supposed to ask for your go-ahead before it switches itself fully on.",
+        "why": "If that built-in reminder to ask for approval is missing, the monitor could either sit idle forever or rely on someone remembering to flip the switch \u2014 undercutting the whole point of having it.",
+        "suggest": "Worth a quick, low-stakes confirmation that the 'ask before turning on' step is actually in place, and adding it if it isn't \u2014 no rush, but don't leave it to chance."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-08T03:25:23.242248+00:00",
+        "from_state": "parked"
+      }
     }
   ]
 }
