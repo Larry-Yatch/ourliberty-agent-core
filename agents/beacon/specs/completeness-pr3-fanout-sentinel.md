@@ -58,7 +58,11 @@ A backstop "miss" counts ONLY when: `gh_terminal_ts + one full sentinel period +
 
 ## 8. Rollout: report-only first (non-negotiable)
 
-First **48h / minimum 4 passes**: full would-close artifact (item, evidence grade, terminal type, ancestry, guard results) — **zero writes** — diffed against what the backstops actually close over the same window. Arm fan-out only after the diff shows zero would-have-been-wrong closes. (The template healer ships dry-run-by-default with `--apply`; the sentinel copies that posture.) Post-arming first pass: resulting approvals/digests batched into ONE grouped first-run digest.
+First **48h / minimum 4 passes**: full would-close artifact (item, evidence grade, terminal type, ancestry, guard results) — **zero writes** — diffed against what the backstops actually close over the same window. (The template healer ships dry-run-by-default with `--apply`; the sentinel copies that posture.)
+
+**Window-complete arming approval (self-firing — arming MUST NOT rely on a human remembering to flip a flag):** on the first pass where the report-only window is complete (>=48h elapsed since the first recorded pass AND >=4 passes recorded), the sentinel ITSELF emits exactly ONE arming approval to Larry — `"PR-terminal fan-out sentinel finished its 48h report-only window: N would-closes, of which M diverged from what the backstops actually closed. Arm fan-out? (approve -> switch to live fan-out; reject -> stay report-only)."` The M (would-have-been-wrong) count is the sec-8 arming signal, surfaced so the decision is evidence-backed: if M > 0 the body recommends AGAINST arming, but Larry still decides. Idempotency: the emit is gated by a durable `arming_requested` flag in the sentinel's state so re-runs after the window do NOT re-emit; the single approval sits durably in the Approvals queue until acted on (the queue IS the reminder — no silent dependence on memory, no 15-min spam). Approve flips a durable `armed` flag (persisted in sentinel state / the arm config the passes read); reject records the reason and the sentinel stays report-only (a later re-arm is a deliberate operator action, not an automatic re-ask). Until `armed` is true, every pass stays artifact-only. **Enforcement:** the `arming_requested` durable flag (one-shot emit) plus the `armed` durable flag gating every fan-out write; acceptance sec-10.10.
+
+**Post-arming first pass:** resulting approvals/digests batched into ONE grouped first-run digest.
 
 ## 9. Riders (both small, both "closes mean the right thing")
 
@@ -76,7 +80,7 @@ First **48h / minimum 4 passes**: full would-close artifact (item, evidence grad
 7. Parity join: seeded true-miss detected; seeded lost-race NOT counted as miss.
 8. R1: simulated wedged committer under an active writer fires exactly one escalation (first-observed-dirty, not mtime); nominal slow tick (15–20min) stays silent.
 9. R2: mission with one CLOSED-unmerged task_id → `retired` + surface, not `shipped`; all-MERGED → `shipped` unchanged.
-10. Report-only mode verified: 48h artifact-only run on the droplet, then the arm step is a deliberate flag flip.
+10. Report-only mode + self-firing arming verified: (a) 48h/>=4-pass artifact-only run writes zero live-tree state; (b) on the first post-window pass the sentinel emits EXACTLY ONE arming approval carrying the N would-close / M would-have-been-wrong counts, gated by a durable `arming_requested` flag so re-runs do not re-emit; (c) approve flips the durable `armed` flag and subsequent passes fan-out for real; reject leaves it report-only; (d) no pass performs a fan-out write while `armed` is false. Arming never depends on a human remembering to flip a flag.
 11. unittest (not pytest), sentinel-armed, zero live-tree writes from tests.
 
 ## 11. Out of scope
