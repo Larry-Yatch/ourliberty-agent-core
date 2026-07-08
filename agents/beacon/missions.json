@@ -7625,6 +7625,40 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-pr-ourliberty-agent-core-877",
+      "name": "PR Ourliberty Agent Core 877",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-ourliberty-agent-core-877`. Last activity 2026-07-08T20:44:29.527226+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-ourliberty-agent-core-877"
+      ],
+      "repo": null,
+      "created": "2026-07-08",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-08T20:44:46.116335+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-08T20:44:29.527226+00:00"
+    },
+    {
+      "id": "proposed-direction-ask-notifier-gh-rate-limit-no-backoff-3of3-001",
+      "name": "Direction Ask Notifier GH Rate Limit No Backoff 3of3 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `direction-ask-notifier-gh-rate-limit-no-backoff-3of3-001`. Last activity 2026-07-08T20:32:10.817779+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "direction-ask-notifier-gh-rate-limit-no-backoff-3of3-001"
+      ],
+      "repo": null,
+      "created": "2026-07-08",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-08T20:44:46.116335+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-08T20:32:10.817779+00:00"
     }
   ]
 }
