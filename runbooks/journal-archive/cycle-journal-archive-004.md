@@ -73111,3 +73111,92 @@ NOMINAL ✅ (cooldowns in effect post-02:48Z MDT firing)
 
 ---
 
+## Iteration ~4568 — 2026-07-08T11:16Z UTC (Larry /cycle via chat, Tier 1)
+
+**Health:** ⚠️ Signal. New finding: PR #857 rev1 REVIEW_ESCALATE from Mirror (11:11:47Z UTC). pending 7→8. Mirror inbox 2→1. All 5 services healthy (~65 min uptime). 0 new alerts. Sync fresh (11:05:20Z, no-change). GH API rate limit still persisting (carry/unverified from prior iters; expected recovery ~11:30Z UTC).
+
+**VERIFY-BEFORE-REASSERT (from iter ~4567):**
+- **"zombie PID 1834248 (40d 15h 51m+)"**: RE-VERIFIED ⚠️ — ps shows 40d 15h 56m (Ss, bash loop waiting for build-check-viii-pr-2b archive). CONFIRMED [carry]
+- **"HEAD=93140625=origin/main"**: RE-VERIFIED ✅ — HEAD=3d7e1a30 (Pulse cycle 20260708T111307Z, iter ~4567 auto-commit). On main, clean, in sync. NOMINAL
+- **"Sync 11:05:20Z (<2h)"**: CONFIRMED ✅ — still 11:05:20Z (~11 min ago). NOMINAL (<2h)
+- **"pending=7"**: UPDATED ✅ → **pending=8** — new approval_request for PR #857 REVIEW_ESCALATE added at 11:11:49Z UTC (pending[7]).
+- **"PR #847 AUTO_MERGE_HELD"**: CANNOT VERIFY — GH API sandbox-blocked this iter. [carry/unverified]
+- **"PR #858 AUTO_MERGE_HELD"**: CONFIRMED via notifier log ✅ — AUTO_MERGE_HELD at 04:44:34Z and 04:57:59Z (blocker=#854). [carry]
+- **"PR #860 CONFLICTING"**: CANNOT VERIFY — GH API sandbox-blocked. [carry/unverified]
+- **"Mirror queue 2 tasks"**: UPDATED ✅ → **1 task** — review-pr-ourliberty-agent-core-857-rev1.json processed (REVIEW_ESCALATE → archived); review-completeness-pr1.json remains.
+- **"L978 forge-wip-redispatch EXHAUSTED"**: CONFIRMED — file_length=978=watermark; last entry still idx=977. [carry]
+- **"GH API rate limit persisting"**: CARRY — sandbox prevents `gh api rate_limit` call; last confirmed rate-limit errors were at 04:36:57 MDT (10:36:57Z UTC). Recovery expected ~11:30Z UTC. [carry]
+
+**Check 0 — Alert triage:** repair-watermark: `{"repaired": false, "old_watermark": 978, "file_length": 978}` — **0 new alerts**. Watermark=978, file_length=978. NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier last entries:
+- 04:44:30Z UTC: MIRROR_REVIEW_STATUS completeness-pr1 state=success (7th dup review REVIEW_PASS) → AUTO_MERGE_HELD (blocker=#854)
+- 04:57:57Z UTC: Another Mirror REVIEW_PASS on completeness-pr1 (session a611e718) → AUTO_MERGE_HELD (blocker=#854) — 8th notifier-concurrent-scan-dup occurrence (PR #847 preflight still in-flight)
+- 05:11:47Z UTC: Mirror REVIEW_ESCALATE on PR #857 rev1 (session 93268cf9) → state=failure, approval_request emitted
+Watchdog last: 05:10:21 MDT (11:10:21Z UTC), overall=healthy. No novel ERROR/WARN above threshold. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** Last bot delivery 05:15:02 MDT (11:15:02Z UTC) — reminder for mirror-review-pr-852. No new Larry messages. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN 11:14Z: "0 alert(s) would fire, 0 recovery(ies)." FORGE_NO_PR_SKIP ×17. MIRROR_PASS_UNMERGED_SKIP for notifier-concurrent-scan-dup (held_deep_review). NO_SESSION_REVISION for PR #857 suppressed (human-authored). mirror_pass_unmerged:xiv-b under cooldown. NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=8 (was 7; new entry [7] at 11:11:49Z for PR #857 REVIEW_ESCALATE — DM reminder delivered at 11:15:02Z UTC). All chat_id=7998341473. No new Larry messages. [signal]
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-08T11:10:19Z (~6 min at check time). Watchdog overall=healthy. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=3d7e1a30 (iter ~4567 auto-commit). On main, clean, in sync (git fetch dry-run confirms). ✅
+**Check B — Sync health:** last_sync=2026-07-08T11:05:20Z (~11 min), status=no-change. NOMINAL ✅
+**Check C — Agent liveness:** All 5 services alive (beacon_bot=3141996 ~65m, chain_event_shipper=3142298 ~65m, dashboard_api=3142538 ~65m, inbox_watcher=3144305 ~63m, outbox_notifier=3144306 ~63m). Zombie PID 1834248 (Ss, 40d 15h 56m) ⚠️ [carry].
+**Check D — Inbox state:** Mirror: 1 task (review-completeness-pr1.json, dispatched 04:45 MDT). Beacon: 0. Forge: 0. [reduced from 2→1 this iter] ✅
+**Check E — PR state:** GH API rate limit / sandbox prevents verification. All PR states carried from iter ~4565 (last confirmed): #847 AUTO_MERGE_HELD, #858 AUTO_MERGE_HELD (blocker=#854), #857 REVIEW_ESCALATE (new this iter), #860 CONFLICTING, #854/#852/#851/#846/#850 various states. [carry/unverified GH API]
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅.
+
+**Conditional checks — UTC Wednesday 2026-07-08:**
+- **Check I:** Wed firing day; timer fires ~14:11Z UTC (~2h55m remaining from check time). Systemd handles. ✅
+- **Check III:** Sunday gate. Skip. ✅
+- **Check IX/X:** Monday gate. Skip. ✅
+- **Check VI/VIII:** Proposals idx=990,991 carry — awaiting Larry. [carry]
+
+**New findings:**
+1. ⚠️ **PR #857 rev1 REVIEW_ESCALATE** — Mirror session 93268cf9 reviewed revision-1 at 05:11:47 MDT (11:11:47Z UTC) and returned review_escalate. outbox-notifier posted state=failure to GitHub, emitted no-session decision-needed → approval_request (mirror-review-pr-ourliberty-agent-core-857) at 11:11:49Z. DM reminder delivered at 11:15:02Z UTC. pending[7] added. This is the 2nd REVIEW_ESCALATE for PR #857 (rev0 was pending[1] already; rev1 now pending[7]). G-rule decision-needed-approval-forge-dispatch-no-target-repo-001 VP pattern: if chat_id=None, DM would not deliver; log confirms chat_id=7998341473 on this pending entry, so DM IS deliverable. ask-then-do: Larry's decision queued in Approvals tab. No duplicate Pulse DM (outbox-notifier already delivered).
+2. ℹ️ **Mirror inbox 2→1** — review-pr-ourliberty-agent-core-857-rev1.json completed (REVIEW_ESCALATE, archived). review-completeness-pr1.json remains (dispatched again at 04:45 MDT / 10:45Z for 8th dup review pass). [info]
+3. ℹ️ **8th notifier-concurrent-scan-dup occurrence on completeness-pr1** — Mirror REVIEW_PASS at 04:57:57Z UTC (session a611e718), AUTO_MERGE_HELD (blocker=#854). PR #847 preflight still in-flight (MEMORY: fix preflight VP). [info, ongoing G-rule VP]
+
+**Actions taken:**
+1. Check 0: watermark confirmed at 978, 0 new alerts. ✅
+2. §5.0: all no-ops. ✅
+3. PRIME ledger: intervention appended (tier=1, kind=intervention, template=iter-routine; ts=11:16:22Z). ✅
+4. Tier state: `record --checks-clean false` → Tier 1, consecutive_clean=0, last_signal_at=11:16:23Z. ✅
+
+**Escalations:** None new from Pulse. PR #857 REVIEW_ESCALATE DM already delivered by outbox-notifier (reminder at 11:15:02Z UTC). Discipline 2: no duplicate Pulse DMs.
+
+**Standing findings (carry-verified this iter):**
+- [yellow] **PR #857 REVIEW_ESCALATE (rev1)** — NEW pending[7] at 11:11:49Z. DM delivered 11:15:02Z. Larry decision needed for REVIEW_ESCALATE. [new this iter]
+- [yellow] **PR #847 AUTO_MERGE_HELD** — Mirror REVIEW_PASS round-2. Needs `/code-review high` then `merge_reviewed_pr.sh 847`. [carry/unverified GH API]
+- [yellow] **PR #858 AUTO_MERGE_HELD** — Mirror REVIEW_PASS (8th, notifier-concurrent-scan-dup). Blocked by PR #854. Self-resolves when #854 merges. [carry]
+- [yellow] **L978: forge-wip-redispatch EXHAUSTED — review-sequence-dag-completeness-program** — No PR. DM delivered idx=977. [carry]
+- [yellow] **zombie-bash-pid-1834248** — PID 1834248 (40d 15h 56m+, bash loop). ask-then-do: `kill 1834248`. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07` or `reject`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [yellow] **unreviewed-merge-larry-authored-pr-001** — 8th+ occurrences. Steps 1-2 unimplemented. [carry]
+- [yellow] **PR #854 REVIEW_ESCALATE** — Blocking #847 and #858. No APPROVAL_REQUEST entry match (G-rule VP). [carry]
+- [yellow] **PR #852 REVIEW_ESCALATE** — APPROVAL_REQUEST in pending[3]. [carry]
+- [yellow] **pending[1]: mirror-review-pr-ourliberty-agent-core-851** — REVIEW_ESCALATE. DM delivered. [carry]
+- [yellow] **pending[5]: advancer-suppress-paused-invalid-realert-001** — Sequence-invalid APPROVAL_REQUEST. DM delivered. [carry]
+- [yellow] **pending[6]: mirror-review-pr-ourliberty-agent-core-850** — PR #850 Mirror REVIEW_FAILURE; no-session approval_request. DM delivered. [carry]
+- [yellow] **pending[0]: mirror-review-pr-ourliberty-agent-core-845** — STALE (PR #845 MERGED). [carry/stale]
+- [yellow] **pending[2]: mirror-review-pr-ourliberty-agent-core-849** — STALE (PR #849 MERGED). [carry/stale]
+- [yellow] **pending[4]: mirror-review-pr-ourliberty-agent-core-856** — STALE (PR #856 MERGED). [carry/stale]
+- [yellow] **PR #860 (xiv-b-alert-write-back)** — CONFLICTING. Larry rebase needed. [carry/unverified GH API]
+- [blue] **PR #846** — REVIEW_PASS. AUTO_MERGE_HELD. [carry]
+- [blue] **PR #851, #854** — Mirror escalated. [carry]
+- [blue] **Check I** — Wed firing day, timer ~14:11Z UTC (~2h55m remaining). Systemd handles. [watch]
+- [blue] **G-rules (dispatched, vp):** notifier-concurrent-scan-dup [8th occ, preflight VP]; ourliberty-health-subject-key-mismatch-001; forge-wip-redispatch-digest-tier4-001; no-session-revision-active-mirror-session-fp-001; forge-revision-preamble-missing-pr711-001; forge-wip-redispatch-exhausted-pr-exists-fp-001; decision-needed-approval-forge-dispatch-no-target-repo-001; sentinel-inflight-stall-tier4-translation-001; sequence-invalid-completeness-pr3-fanout-sentinel. [carry vp]
+- [blue] **G-rules (2/3):** check-i-force-bypass-dm-route; outbox-notifier-notification-intent-reject-tier4-001; heal-daemon-restart-manifest-drift-regenerated-tier4; review-escalate-approval-dedup-by-old-build-approval-001; no-session-revision-merged-pr-fp-001; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch; auto-merge-conflict-promoted-merged-pr-001; forge-marker-task-id-mismatch-xii-v1. [carry]
+- [blue] **G-rules (1/3):** inbox-watcher-tier-pool-all-unavailable-tier4-001; larry-approval-beacon-hash-mismatch; heal-credential-registry-drift-origin-unreachable-tier4-001; mirror-runner-missing-worktree-retry-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001; mirror-malformed-verdict-heal-reap-path-001; outbox-notifier-merge-held-deep-review-tier4-001. [carry]
+
+**PRIME DIRECTIVE:** ratio=20.86 (1524 interventions / 73 systemic_fixes, trend worsening). Intervention appended (now 1524).
+**Tier end-of-iter:** Tier **1** (consecutive_clean=0; PR #857 REVIEW_ESCALATE + zombie PID + pending=8 + AUTO_MERGE_HELD findings carry).
+
+---
+
