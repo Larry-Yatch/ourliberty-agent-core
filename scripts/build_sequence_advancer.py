@@ -994,6 +994,39 @@ def _check_in_flight_step(
     # Mismatch persists. Has it exceeded the timeout?
     age_sec = (now - first_mismatch).total_seconds()
     if age_sec >= GATE_MISMATCH_TIMEOUT_SEC:
+        # gh is the authoritative merge source: the step's own recorded
+        # `pr_url` showing MERGED means *that exact PR* merged (the URL was
+        # captured for this task at pr-open time). So when the only laggard is
+        # our chain_events log — gh_merged is True but chain_merged is still
+        # False past the tolerance window — believe gh and COMPLETE, rather
+        # than pausing + paging Larry for a self-resolving bookkeeping lag (the
+        # recurring chain_events ingestion-lag class; observed on
+        # `pulse-check-xii`, 2026-07-08). The belt-and-suspenders fast path is
+        # unchanged: a normal merge still completes immediately when both gates
+        # agree (above); this only changes the >30-min stalemate's resolution.
+        # The opposite, genuinely-ambiguous direction (chain says merged but gh
+        # does NOT confirm — e.g. closed-unmerged, or a chain false positive)
+        # still pauses for manual verification.
+        if gh_merged is True:
+            audit_events.append(_audit_entry(
+                'step-merged', step_id=step_id,
+                pr_url=pr_url, task_id=task_id,
+                gate_resolution='gh-authoritative',
+                note=(
+                    f'chain_events did not confirm merge within '
+                    f'{GATE_MISMATCH_TIMEOUT_SEC}s (chain_merged=False); '
+                    f'gh pr view=MERGED is authoritative — completing instead '
+                    f'of pausing.'
+                ),
+            ))
+            return {
+                'transition': 'merged',
+                'reason': (
+                    f'gh_merged=True authoritative; chain_events lagged past '
+                    f'{GATE_MISMATCH_TIMEOUT_SEC}s (chain_merged=False)'
+                ),
+                'audit_events': audit_events,
+            }
         audit_events.append(_audit_entry(
             'gate-mismatch-timeout', step_id=step_id,
             age_sec=int(age_sec),

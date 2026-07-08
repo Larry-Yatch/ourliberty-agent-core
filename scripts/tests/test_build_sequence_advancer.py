@@ -373,6 +373,71 @@ class TestGateMismatchTimeout(_AdvancerHarness):
         paused_dms = [d for d in self.dms if 'paused' in d['subject']]
         self.assertGreaterEqual(len(paused_dms), 1)
 
+    def test_old_mismatch_gh_merged_completes_not_pauses(self):
+        # The XII case: gh says MERGED but chain_events lagged past the 30-min
+        # window. gh is authoritative, so the step COMPLETES — no pause, no
+        # page. (Previously this false-paused the sequence and DMed Larry.)
+        old_ts = (datetime.now(timezone.utc) - timedelta(minutes=31)).isoformat()
+        seq = _make_sequence(
+            steps=[
+                _make_step(
+                    'alpha', status='dispatched',
+                    pr_url='https://github.com/x/y/pull/1',
+                    dispatched_at='2026-05-27T00:00:00+00:00',
+                ),
+            ],
+            current_steps=['alpha'],
+            audit_log=[
+                {'ts': old_ts, 'event': 'gate-mismatch',
+                 'actor': 'advancer', 'step_id': 'alpha',
+                 'chain_merged': False, 'gh_merged': True},
+            ],
+        )
+        self._write_sequence(seq)
+        self._patch_gates(chain_merged=False, gh_merged=True)
+        self.bsa.tick()
+        seq2 = self._read_sequence('seq-001')
+        self.assertEqual(seq2['steps'][0]['status'], 'merged')
+        self.assertEqual(seq2['status'], 'complete')
+        events = [e['event'] for e in seq2['audit_log']]
+        self.assertNotIn('gate-mismatch-timeout', events)
+        self.assertNotIn('sequence-paused', events)
+        # The merge is recorded as gh-authoritative for the audit trail.
+        merged = [e for e in seq2['audit_log'] if e['event'] == 'step-merged']
+        self.assertTrue(
+            any(e.get('gate_resolution') == 'gh-authoritative' for e in merged),
+            'expected a gh-authoritative step-merged audit entry',
+        )
+        # No pause DM — the whole point of the fix.
+        self.assertEqual([d for d in self.dms if 'paused' in d['subject']], [])
+
+    def test_recent_mismatch_gh_merged_waits_for_timeout(self):
+        # gh=merged but the mismatch is only 10 min old → do NOT trust gh yet;
+        # give chain_events its grace window first (belt-and-suspenders fast
+        # path intact — gh is only the tiebreaker at the >30-min stalemate).
+        recent_ts = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
+        seq = _make_sequence(
+            steps=[
+                _make_step(
+                    'alpha', status='dispatched',
+                    pr_url='https://github.com/x/y/pull/1',
+                    dispatched_at='2026-05-27T00:00:00+00:00',
+                ),
+            ],
+            current_steps=['alpha'],
+            audit_log=[
+                {'ts': recent_ts, 'event': 'gate-mismatch',
+                 'actor': 'advancer', 'step_id': 'alpha',
+                 'chain_merged': False, 'gh_merged': True},
+            ],
+        )
+        self._write_sequence(seq)
+        self._patch_gates(chain_merged=False, gh_merged=True)
+        self.bsa.tick()
+        seq2 = self._read_sequence('seq-001')
+        self.assertEqual(seq2['steps'][0]['status'], 'dispatched')
+        self.assertEqual(seq2['status'], 'active')
+
     def test_recent_mismatch_does_not_pause(self):
         recent_ts = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
         seq = _make_sequence(

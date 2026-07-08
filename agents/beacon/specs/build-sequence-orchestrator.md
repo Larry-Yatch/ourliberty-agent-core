@@ -153,7 +153,12 @@ Per decision H, advancing a step from `dispatched` (or `building` or `reviewing`
 1. **chain_events confirmation.** Query Supabase for `chain_events` rows where `task_id` matches this step's dispatch envelope `task_id` AND `event_type = 'auto_merge_success'` AND `ts >= dispatched_at`. At least one matching row required.
 2. **gh pr view confirmation.** Run `gh pr view <pr_url> --json state` and confirm `state == "MERGED"`. PR URL is recorded in the step's `pr_url` field at PR-open time (extracted from the `pr-opened` chain_events row).
 
-If only one confirms but not the other, the advancer logs a `gate-mismatch` event in audit_log and waits for the next tick. After 30 minutes of mismatch, the advancer treats it as a failure mode and DMs Larry: `Sequence <seq-id> step <step_id> shows gate-mismatch: chain_events says merged but gh pr view says <state> (or vice versa). Sequence paused. Manual verification needed.`
+If only one confirms but not the other, the advancer logs a `gate-mismatch` event in audit_log and waits for the next tick. After 30 minutes of mismatch, the resolution is **asymmetric on which side confirms the merge** (added 2026-07-08 after `pulse-check-xii` false-paused on a clean merge):
+
+- **gh confirms, chain_events lags (`gh_merged=True`, `chain_merged=False`).** gh is the authoritative merge source — the step's own recorded `pr_url` showing `MERGED` means *that exact PR* merged. The chain_events `auto_merge_success` row is a known-laggy secondary signal (the recurring ingestion-lag class). So the advancer **completes the step** (`step-merged`, `gate_resolution: gh-authoritative`) rather than pausing. No DM. This is *not* "trusting chain_events over gh" — it is trusting gh, the authoritative side, when the unreliable side is merely behind.
+- **chain_events confirms, gh does NOT (`chain_merged=True`, `gh_merged` is `False`/`None`).** This is the genuinely ambiguous direction — gh is not vouching for the merge (the PR may be closed-unmerged, or chain_events emitted a false positive). The advancer **pauses** and DMs Larry: `Sequence <seq-id> step <step_id> gate-mismatch: chain_events says merged but gh pr view says <state>. Sequence paused. Manual verification needed.`
+
+The belt-and-suspenders fast path is unchanged: a normal merge completes immediately the moment both gates agree; gh only becomes the tiebreaker at the >30-min stalemate.
 
 ### 5.4 Failure handling
 
