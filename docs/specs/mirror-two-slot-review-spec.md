@@ -1,8 +1,11 @@
 # Mirror Two-Slot Adversarial Review — spec
 
-Status: CONFIRMED design, ready to build. Activation is gated (see §6) — the code
-lands inert (slots=1) and slot 2 turns on only after the tier-pool dispatch
-wiring (docs/specs/tier-dispatch-spec.md §W1–W4) is live and verified.
+Status: CONFIRMED design, ready to build. The tier-pool prerequisite (§6) is
+ALREADY MET — the dispatch wiring landed as #776/#778/#780/#784/#789/#793/#797
+with cutover #802, and was verified live on the droplet 2026-07-08 (round-robin
+alternating dispatch_tier=tier1/tier3, account-stamped costs, calibration timer
+self-tuned from a real rate-limit wall). Code still lands inert (slots=1);
+slot 2 turns on via the §6 rollout steps.
 
 ## 1. Problem (measured, 2026-07-08)
 
@@ -127,9 +130,13 @@ identity, same routing. N comes from config; default 1 (inert).
 ## 6. Activation gate + rollout
 
 1. PR1, PR2 merge any time (inert; slot count still 1).
-2. **Gate:** tier-dispatch wiring W1–W2 live and verified (concurrent dispatches
-   observed on distinct tiers per its §14.2). Tracked by the tier-wiring chip
-   (task_5e0ab441 kicked 2026-07-08).
+2. **Gate: MET (2026-07-08).** Tier-dispatch wiring W1–W4 landed
+   (#776/#778/#780/#784, inbox gate #789, calibration #793, hardening #797,
+   cutover #802) and verified live: rotation pin removed, round-robin
+   alternating tier1/tier3 in same-day logs, session→tier map binding both
+   tiers, costs.jsonl account-stamped, calibration self-tuned tier1's 5h budget
+   from a real wall. Per-tier pool observability on GET /api/system/rotation is
+   #876 (in review) — nice-to-have for the §5 quota watch, not blocking.
 3. PR3 merges → `review_slots: 2`. First 48h: watch double-claim counter (must
    be 0), lost-verdict markers (0 new), droplet load, queue-wait trend.
 4. Rollback = set `review_slots: 1` (or delete the key) + restart the watcher.
