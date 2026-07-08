@@ -1,0 +1,27 @@
+[Unit]
+Description=Weekly (Monday) run of Pulse Check XIV — alert-precision meter
+
+[Timer]
+# OnCalendar (absolute wall-clock) per the OnUnitActiveSec-dies lesson. Weekly
+# Monday mirrors the cadence-config entry (cadence_hours=168). The meter's own
+# same-day artifact sentinel (check-xiv-<date>.json) makes a Persistent
+# catch-up or ad-hoc re-run within the same day a clean no-op.
+# 05:49 droplet-local: the Monday-cluster tail (iv 04:25 / v 04:49 / vi 04:59 /
+# viii 05:09 / ix 05:19 / x 05:29 / xii 05:39 / xiv 05:49), >=10 min from its
+# neighbors so the 300s RandomizedDelaySec jitter cannot overlap the stagger;
+# clears the 06:00 CEO digest.
+OnCalendar=Mon *-*-* 05:49:00
+Persistent=true
+RandomizedDelaySec=300
+Unit=ourliberty-pulse-check-xiv.service
+
+[Install]
+WantedBy=timers.target
+
+# Decommission order (leaves zero alerts on the next healer run):
+#   1. sudo systemctl disable --now ourliberty-pulse-check-xiv.timer
+#   2. remove the "xiv" entry from config/pulse-check-cadence.json (else the
+#      staleness watcher fires pulse-check-no-cadence / stale for a check that
+#      no longer runs)
+#   3. rm ~/agents/blackboard/pulse-check-xiv.heartbeat
+# EMERGENCY_HALT is honored live via the service's ConditionPathExists.

@@ -23,6 +23,7 @@
     "x":    {"cadence_hours": 168, "grace_hours": 36, "label": "Chain-quality regression",    "firing": "Weekly Monday (systemd timer: ourliberty-pulse-check-x)"},
     "xi":   {"cadence_hours": 24,  "grace_hours": 12, "label": "Catalog accuracy meter",      "firing": "Daily (systemd timer: ourliberty-pulse-check-xi)"},
     "xii":  {"cadence_hours": 168, "grace_hours": 36, "label": "Delivery-effectiveness meter", "firing": "Weekly (systemd timer: ourliberty-pulse-check-xii)"},
+    "xiv":  {"cadence_hours": 168, "grace_hours": 36, "label": "Alert-precision meter",        "firing": "Weekly Monday (systemd timer: ourliberty-pulse-check-xiv)"},
     "retrospective":        {"cadence_hours": 168, "grace_hours": 48, "label": "Elevation retrospective (Stage A)",  "firing": "Weekly Monday (systemd timer: ourliberty-retrospective-weekly)"},
     "retrospective-author": {"cadence_hours": 168, "grace_hours": 48, "label": "Elevation retrospective author (Stage B)", "firing": "Weekly Monday (systemd timer: ourliberty-retrospective-weekly)"}
   }
