@@ -436,9 +436,9 @@ Occurrences: iter ~3710 (PR #108, 1/3); iter ~4482 (PR #840/kickoff, 2/3); iter 
 
 ---
 
-## G-rule merge-held-deep-review-notifier-tier4-001 — DISPATCHED ✅ (iter ~4456)
+## G-rule merge-held-deep-review-notifier-tier4-001 → COMPLETE ✅ (iter ~4489)
 
-**Rule:** `source=outbox-notifier, subject^=auto-merge-deep-review-hold:` alerts classify Tier-4 (novel, no registry template, no translation match). CONFIRMED: route=hold causes the Telegram bot to SKIP the DM entirely ("alert idx=N route=hold; skipping DM"). Larry is NOT notified via Telegram when AUTO_MERGE_HELD_DEEP_REVIEW fires. Fix dispatched at 3/3 (iter ~4456): direction-ask-merge-held-deep-review-notifier-delivery-fix-001.json to Beacon inbox. Fix: change AUTO_MERGE_HELD_DEEP_REVIEW alert write path in outbox_notifier.py from route=hold → route=escalate. Compensating Pulse DM path (larry_alerts route=escalate) serves as interim control until fix merges. Occurrences: iter ~3859 (PR #823, 1/3); iter ~4446 (PR #830, 2/3); iter ~4456 (PR #833, 3/3). verification_pending (Forge build).
+PR #843 (`fix(notifier): escalate-route the deep-review-hold broadcast alert so Larry is DMed`) MERGED 2026-07-08T02:04:55Z UTC. AUTO_MERGE_HELD_DEEP_REVIEW alerts now use route=escalate so Larry receives Telegram DM. Moving to Completed G-rules.
 
 ---
 
@@ -472,8 +472,8 @@ PR #828 (`gate: delegate JS/TS repo regression checks to GitHub Actions (Piece 2
 
 ---
 
-## Status snapshot — updated 2026-07-08T02:07Z UTC (Iter ~4488, **Tier 1**)
+## Status snapshot — updated 2026-07-08T02:14Z UTC (Iter ~4489, **Tier 1**)
 
-**Iter ~4488 summary (2026-07-08T02:07Z):** 1 new alert (L1027, ourliberty-health dirty-tree, Tier-4, STALE — tree self-cleaned at 02:00:03Z; bot DM already delivered). G-rule `ourliberty-health-subject-key-mismatch-001` reached 3/3 → DISPATCHED to Beacon. **pulse-check-xii sequence COMPLETE** (auto-resolved at 02:03:57Z between iters). Pending approvals=2 (sentinel-inflight-stall-translation-001 + govern-loop-assessor-spec-001). **6 open PRs (#840,#841,#843-#846) all UNKNOWN mergeable.** PR #843 REVIEW_PASS AUTO_MERGE_HELD by #840. Mirror queue=5 (kickoff-rev1, 841-rev1, 844, 845, 846 — race-dups archived). G-rule notifier-concurrent-scan-dup: BUILD IN PROGRESS (Forge build-phase since 01:54Z, no PR yet). **Check XIV systemd timer NOT INSTALLED.** Watermark=1027. **Agent-core:** HEAD=f4697bc4=origin/main. CLEAN. Sync: 01:40:03Z. Watchdog 01:57:16Z healthy. Heal-daemon 01:55:02Z. **STANDING:** zombie PID 1834248 (40d 6h+); VI/VIII proposals idx=990,991; Check I timer 08:13 MDT today (14:13Z); 401 WARN isolated (carry). **ACTIVE G-rules:** sentinel-inflight-stall-tier4 [APPROVAL_REQUEST pending=1]; merge-held-deep-review-notifier-tier4-001 [PR #843 REVIEW_PASS held by #840]; notifier-concurrent-scan-dup [BUILD IN PROGRESS]; auto-merge-conflict-promoted-merged-pr-001 [2/3]; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [2/3]; forge-marker-task-id-mismatch-xii-v1 [1/3]; ourliberty-health-subject-key-mismatch-001 [DISPATCHED ✅ 3/3, vp]; mirror-malformed-verdict-heal-reap-path-001 [1/3].
+**Iter ~4489 summary (2026-07-08T02:14Z):** 0 new alerts. **PR #843 MERGED (02:04:55Z) → G-rule merge-held-deep-review-notifier-tier4-001 COMPLETE ✅.** PR #844 MERGED (02:05:14Z). G-rule notifier-concurrent-scan-dup: PR #847 OPENED, Mirror reviewing. Pending approvals=2 (sentinel-inflight-stall-translation-001 + govern-loop-assessor-spec-001). **5 open PRs (#840,#841,#845,#846,#847) all UNKNOWN mergeable.** Mirror queue=6. inbox_watcher PID 2140155 (restarted 20:10 MDT). **Check XIV systemd timer NOT INSTALLED.** Watermark=1027. **Agent-core:** HEAD=f096fcc1=origin/main. CLEAN. Sync: 01:40:03Z. Watchdog 02:07:19Z healthy. Heal-daemon 02:05:09Z. **STANDING:** zombie PID 1834248 (40d 6h+); VI/VIII proposals idx=990,991; Check I timer 08:13 MDT today (14:13Z); 401 WARN isolated (carry). **ACTIVE G-rules:** sentinel-inflight-stall-tier4 [APPROVAL_REQUEST pending=1]; notifier-concurrent-scan-dup [PR #847 Mirror reviewing]; auto-merge-conflict-promoted-merged-pr-001 [2/3]; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [2/3]; forge-marker-task-id-mismatch-xii-v1 [1/3]; ourliberty-health-subject-key-mismatch-001 [DISPATCHED ✅ 3/3, vp]; mirror-malformed-verdict-heal-reap-path-001 [1/3].
 
 
