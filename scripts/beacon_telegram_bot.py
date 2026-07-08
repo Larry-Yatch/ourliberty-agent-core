@@ -1178,7 +1178,11 @@ def _check_due_reminders() -> None:
     due = approval.due_reminders()
     for entry, hours in due:
         chat_id = entry.get('chat_id')
-        if chat_id is None:
+        # Falsy-skip, not just None: the suite-guardian batches its proposals with
+        # chat_id=0 (headless, dashboard-only — no originating DM thread). A
+        # `telegram_send(0, ...)` would 400 on every reminder tick, so treat 0 the
+        # same as a missing chat and let the dashboard Approvals tab carry it.
+        if not chat_id:
             continue
         telegram_send(chat_id, approval.format_reminder_dm(entry, hours))
         approval.record_reminder_sent(entry['id'], hours)
