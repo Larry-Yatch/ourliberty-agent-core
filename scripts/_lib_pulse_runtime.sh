@@ -34,6 +34,12 @@
 
 PULSE_RUNTIME_PATHS=(
     "runbooks/cycle-journal.md"
+    # Overflow chunks from rotate_cycle_journal.py (2026-07-07 gc-overload fix).
+    # run_cycle.sh trims cycle-journal.md every cycle and moves older entries
+    # here; the chunks must ride the same Pulse-owned auto-commit so the tree
+    # returns clean. Chunks are append-only and freeze once full — run_cycle.sh
+    # is their sole committer, same as the journal itself.
+    "runbooks/journal-archive/"
     "runbooks/cycle-actions.jsonl"
     "agents/pulse/MEMORY.md"
     "agents/pulse/memory/"

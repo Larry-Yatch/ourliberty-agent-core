@@ -1,0 +1,5 @@
+Placeholder so runbooks/journal-archive/ (and this tracked path) always exists.
+rotate_cycle_journal.py writes cycle-journal-archive-NNN.md chunks here; keeping
+one tracked file guarantees `git add -- runbooks/journal-archive/` in
+run_cycle.sh never hits git's missing-pathspec abort (which would strand the
+other Pulse-owned files dirty and wedge sync).
