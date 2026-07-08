@@ -70095,3 +70095,102 @@ NOMINAL ✅ (pipeline progress, no errors)
 
 ---
 
+## Iteration ~4533 — 2026-07-08T07:30Z UTC (Larry /cycle via chat, Tier 1)
+
+**Health:** ✅ Nominal. Pipeline in-flight (PR #847 Mirror round=2, PR #862 Mirror, harden-specdoc-originmain build). PR #851 REVIEW_ESCALATE (expected per flaky-specdoc memory). 0 new alerts. Zombie carry.
+
+**VERIFY-BEFORE-REASSERT (corrections from iter ~4532):**
+- **"Check A HEAD=fb4667fb=origin/main":** CONFIRMED ✅ — wrapper committed fb4667fb (Pulse cycle 20260708T072111Z); HEAD=fb4667fb=origin/main. [confirmed]
+- **"Zombie PID 1834248 (~40d 11h 59m, Ss)":** RE-VERIFIED ⚠️ — ps shows 40d 12h 7m 34s, Ss. CONFIRMED [carry]
+- **"Sync last_sync=2026-07-08T07:04:58Z (~13 min)":** CONFIRMED ✅ — still 07:04:58Z (~25 min from 07:30Z), <2h. NOMINAL [unchanged]
+- **"outbox_notifier PID 2664032 (~1h 2m)":** CONFIRMED ✅ — still PID 2664032 (~1h 9m). [confirmed]
+- **"beacon_bot PID 2663456 (~1h 2m)":** CONFIRMED ✅ — still PID 2663456 (~1h 9m). [confirmed]
+- **"pending=5":** CONFIRMED ✅ — still 5, same IDs/timestamps: mirror-pr-845, mirror-pr-851, mirror-pr-849, mirror-pr-852, mirror-pr-856. [confirmed]
+- **"PR #847 revision-2 in-flight (Forge)":** UPDATED ✅ — Forge completed revision-2 (preamble-missing WARN at 01:18:37 MDT / 07:18:37Z + retry 1/3); Mirror re-review round=2 dispatched at 01:19:07Z. PR #847 still OPEN, MERGEABLE. [updated: Mirror round=2 in-flight]
+- **"PR #856 REVIEW_ESCALATE; re-review round=2 Mirror-in-progress":** CARRY — no completion in notifier log since 01:19Z. [carry]
+- **"PR #857 REVIEW_PASS AUTO_MERGE_HELD blocker=#847":** CARRY — #847 still open. [carry]
+- **"PR #862 Mirror review dispatched 07:17:56Z":** CARRY — Mirror review in-progress; no completion yet. [carry]
+- **"harden-specdoc-originmain approval pending":** NOT present in pending list. Already resolved (PROCEED marker processed at 01:24:31Z). [resolved prior iter]
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 1047, "file_length": 1047}` — no rotation gap. 0 new alerts at watermark 1047. NOMINAL ✅
+
+**Check 1 — Log noise:** New since ~4532 (after 01:19 MDT / 07:19Z UTC):
+- 01:18:37 MDT (07:18:37Z): WARN `forge revision-phase outbox without "Revision N applied:" preamble: notifier-concurrent-scan-dup-review-dispatch-001.json; treating as marker-error` → retry 1/3. **G-rule forge-revision-preamble-missing-pr711-001: 5th occurrence, already dispatched at 3/3, vp.** Journal-note only.
+- 01:18:44 MDT (07:18:44Z): Mirror `review_escalate` marker for PR #851 (`pr-ourliberty-agent-core-851`). PR #851 = "fix(tests): stop regression-gate false-BLOCK on dashboard prod-log mtime race." REVIEW_ESCALATE expected per MEMORY (flaky-specdoc/origin-main unattributable BLOCKs → ESCALATE not REVISION). [yellow: needs Larry's review of Mirror's escalation comment]
+- 01:19:07 MDT (07:19:07Z): Mirror re-review round=2 dispatched for notifier-concurrent-scan-dup (PR #847 fix). NOMINAL ✅
+- 01:24:31 MDT (07:24:31Z): harden-specdoc-originmain-flaky-tests-001 PROCEED marker processed → build-phase dispatched to Forge. NOMINAL ✅ (pipeline progress)
+
+**Check 2 — Telegram sweep:** Bot log last entry: `catch_me_up delivered to 7998341473` at 22:40:37 MDT July 7. Last Larry message: "status" at 22:40:36 MDT July 7 (04:40:36Z July 8). No new messages. No distress keywords. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** dry-run 07:26:22Z → "no stalls detected." All 14 FORGE_NO_PR_SKIP operating (same set as ~4532). NOMINAL ✅
+
+**Check 4 — Pending directives:** No new Larry directives since "status" at 22:40:36 MDT July 7. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-08T07:17:19Z (~13 min from 07:30Z). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=fb4667fb=origin/main. Clean tree. On main. ✅
+**Check B — Sync health:** last_sync=2026-07-08T07:04:58Z (~25 min, <2h), status=no-change. NOMINAL ✅
+**Check C — Agent liveness:** inbox_watcher PID 2263256 (Ssl, 4h+) ✅. beacon_bot PID 2663456 (Ss, ~1h 9m) ✅. outbox_notifier PID 2664032 (Ss, ~1h 9m) ✅. Zombie PID 1834248 (Ss, ~40d 12h 7m) ⚠️ [carry].
+**Check D — Inbox state:** pending=5 (same as ~4532). Active: PR #847 Mirror round=2 in-flight; PR #856 Mirror round=2 in-progress (carry); PR #862 Mirror in-progress; harden-specdoc-originmain Forge build dispatched 01:24:31Z.
+**Check E — PR state:** 13 open PRs (#846–#852, #854, #856–#862). All UNKNOWN mergeable. No reviewDecision for any. NOMINAL ✅
+
+**§5.0 — audit_due_nudge:** no committed baseline; no-op. ✅
+**§5.0 — distill_detector:** no un-distilled audits; no-op. ✅
+**§5.0 — audit_cadence_signal:** no-op. ✅
+
+**Conditional checks — UTC Wednesday 2026-07-08:**
+- **Check I:** Timer fires 08:13 MDT (14:13Z, ~6h43m). Systemd handles. [watch]
+- **Check III:** Sunday gate. Skip. ✅
+- **Check IX/X:** Monday gate. Skip. ✅
+- **Check VI/VIII:** Proposals idx=990,991 carry — awaiting Larry. [carry]
+
+**G-rule assessment:** No new G-rule occurrences beyond the preamble-missing 5th hit (already dispatched). All active G-rules carry unchanged from ~4532.
+
+**New findings since ~4532:**
+1. [blue] **PR #847 revision-2 complete** — Mirror re-review round=2 dispatched 01:19:07Z. Preamble-missing 5th occurrence (G-rule dispatched, vp). [pipeline progress]
+2. [yellow] **PR #851 REVIEW_ESCALATE** (01:18:44Z) — "fix(tests): stop regression-gate false-BLOCK on dashboard prod-log mtime race." ESCALATE expected per MEMORY flaky-specdoc discipline. Larry needs to review Mirror's escalation comment on PR #851. [needs Larry's attention]
+3. [blue] **harden-specdoc-originmain-flaky-tests-001 build dispatched** (01:24:31Z) — Forge building. [pipeline progress]
+
+**Actions taken:**
+1. Check 0: watermark 1047→1047 (no change). 0 new alerts. ✅
+2. §5.0: all no-ops. ✅
+3. PRIME ledger: intervention appended (zombie carry; PR #851 REVIEW_ESCALATE new pipeline event; PR #847 rev-2 complete Mirror round=2; harden-specdoc build dispatched; 0 new alerts). ✅
+4. Tier state: `record --checks-clean false` → Tier 1 (consecutive_clean=0; zombie carry). ✅
+
+**Escalations:** 0 new Pulse DMs. 0 new Pulse-authored alerts.
+
+**Standing findings (carry-verified this iter):**
+- [yellow] **zombie-bash-pid-1834248** — PID 1834248 (~40d 12h 7m, Ss). ask-then-do: `kill 1834248`. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07` or `reject`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [yellow] **unreviewed-merge-larry-authored-pr-001** — 9th+ occurrences. Steps 1-2 still unimplemented. [carry]
+- [yellow] **sequence-invalid-completeness-pr3-fanout-sentinel [2/3]** — dispatch_text 565>500; paused; Larry DM'd. [carry]
+- [yellow] **PR #851 REVIEW_ESCALATE** — Mirror escalated "fix(tests): stop regression-gate false-BLOCK." Larry to review Mirror's comment on PR #851. Expected ESCALATE shape per MEMORY (flaky-specdoc unattributable BLOCKs). [new carry]
+- [yellow] **mirror-review-pr-856** — pending[4] created 06:12:42Z. REVIEW_ESCALATE. Re-review round=2 Mirror-in-progress. [carry]
+- [yellow] **mirror-review-pr-845** — pending[0] created 03:55:28Z. PR #845 MERGED. Stale — should auto-resolve. [carry]
+- [yellow] **mirror-review-pr-849** — pending[2] created 04:59:36Z. PR #849 MERGED. Stale — should auto-resolve. [carry]
+- [yellow] **mirror-review-pr-851** — pending[1] created 04:33:54Z. PR #851 REVIEW_ESCALATE (01:18:44Z). Awaiting Larry decision. [updated]
+- [yellow] **mirror-review-pr-852** — pending[3] created 05:14:21Z. PR #852 still open. [carry]
+- [blue] **PR #846** — REVIEW_PASS. AUTO_MERGE_HELD blocker=#852. [carry]
+- [blue] **PR #847** — Mirror round=2 in-flight (dispatched 01:19:07Z). Fix for notifier-concurrent-scan-dup. [updated]
+- [blue] **PR #850** — REVIEW_PASS. AUTO_MERGE_HELD blocker=#857. [carry]
+- [blue] **PR #851** — REVIEW_ESCALATE (01:18:44Z). Awaiting Larry/Beacon decision. [updated]
+- [blue] **PR #852** — Mirror re-review in queue. [carry]
+- [blue] **PR #854** — REVIEW_REVISION rev1 to Forge; Mirror re-review round=1 queued. [carry]
+- [blue] **PR #856** — REVIEW_ESCALATE; re-review round=2 Mirror-in-progress. [carry]
+- [blue] **PR #857** — REVIEW_PASS AUTO_MERGE_HELD blocker=#847. [carry]
+- [blue] **PR #858–#861** — Mirror queued or pending. [carry]
+- [blue] **PR #862** — fix(tests): SpecDocCliTest hermetic. Mirror review in-progress. [carry]
+- [blue] **harden-specdoc-originmain-flaky-tests-001** — Forge build dispatched 01:24:31Z. In-flight. [new]
+- [blue] **Check I** — Wednesday firing day. Timer fires 08:13 MDT (14:13Z). [watch]
+- [blue] **G-rules (dispatched, vp):** sentinel-inflight-stall-tier4 (PR #854 rev1); notifier-concurrent-scan-dup (PR #847 Mirror round=2 in-flight); ourliberty-health-subject-key-mismatch-001 (3/3 vp); forge-wip-redispatch-digest-tier4-001; no-session-revision-active-mirror-session-fp-001; forge-revision-preamble-missing-pr711-001 (5th occurrence); forge-wip-redispatch-exhausted-pr-exists-fp-001; decision-needed-approval-forge-dispatch-no-target-repo-001. [carry vp]
+- [blue] **G-rule 2/3: sequence-invalid-completeness-pr3-fanout-sentinel** — 3rd needed for dispatch. [carry]
+- [blue] **G-rule 2/3: auto-merge-conflict-promoted-merged-pr-001** — no new occurrence. [carry]
+- [blue] **G-rule 2/3: forge-marker-task-id-mismatch-xii-v1** — no new occurrence. [carry]
+- [blue] **G-rule 1/1 watch: phantom-build-terminal-check-repo-format-001** — no new occurrence. [carry]
+
+**PRIME DIRECTIVE:** ratio=20.38 (interventions=1489+, systemic_fixes=73, vp=33; trend: worsening). Intervention appended.
+**Tier end-of-iter:** Tier **1** (consecutive_clean=0; zombie carry).
+
+---
+
