@@ -465,14 +465,20 @@ def write_ledger(
     signatures: dict[str, dict[str, Any]], path: Path = LEDGER_FILE,
     *, surfaced_verifications: Optional[Iterable[str]] = None,
 ) -> Path:
+    # G5: the surfaced set is what makes the retrospective surface each expired
+    # row ONCE, not weekly forever. Stage A and Stage B (the author) both commit
+    # this shared ledger in the same weekly window; Stage B calls write_ledger
+    # without the kwarg. Default None must therefore PRESERVE the on-disk set,
+    # not clobber it with [] — otherwise the last committer silently drops what
+    # its sibling just persisted and every expired row re-surfaces next week.
+    # An explicit iterable (including an empty one) still overrides.
+    if surfaced_verifications is None:
+        surfaced_verifications = load_surfaced_verifications(path)
     payload = {
         'version': 1,
         'updated_at': datetime.now(timezone.utc).isoformat(),
         'signatures': signatures,
-        # G5: the set of cycle-ledger verification_pending intervention_ids
-        # already surfaced as expired — persisting it here is what makes the
-        # retrospective surface each expired row ONCE, not weekly forever.
-        'surfaced_verifications': sorted(set(surfaced_verifications or ())),
+        'surfaced_verifications': sorted(set(surfaced_verifications)),
     }
     return atomic_write_json(path, payload, indent=2)
 

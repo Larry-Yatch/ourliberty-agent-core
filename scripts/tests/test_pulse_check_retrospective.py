@@ -625,6 +625,23 @@ class TestSurfacedVerificationLedger(unittest.TestCase):
         # signatures survive alongside surfaced ids.
         self.assertIn('healer::boom', pr.load_ledger(self.ledger))
 
+    def test_default_write_preserves_on_disk_surfaced(self):
+        # Stage A persists the surfaced set with the explicit kwarg...
+        pr.write_ledger({'healer::boom': {'weeks': ['2026-06-08']}},
+                        self.ledger, surfaced_verifications=['x1', 'x2'])
+        # ...then Stage B (the author) commits the same shared ledger WITHOUT
+        # the kwarg. The set must survive (surface-once), not reset to [].
+        pr.write_ledger({'healer::boom': {'weeks': ['2026-06-08']}}, self.ledger)
+        self.assertEqual(pr.load_surfaced_verifications(self.ledger),
+                         {'x1', 'x2'})
+
+    def test_explicit_empty_still_clears_surfaced(self):
+        # An explicit (even empty) iterable overrides the on-disk value, so a
+        # caller that means to clear can still do so.
+        pr.write_ledger({}, self.ledger, surfaced_verifications=['x1'])
+        pr.write_ledger({}, self.ledger, surfaced_verifications=[])
+        self.assertEqual(pr.load_surfaced_verifications(self.ledger), set())
+
     def test_missing_file_is_empty_set(self):
         self.assertEqual(
             pr.load_surfaced_verifications(self.tmp / 'nope.json'), set())
