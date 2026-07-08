@@ -318,7 +318,11 @@
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "needs_decision": true,
       "needs_decision_since": "2026-06-26T00:03:45.435494+00:00",
-      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop",
+      "acknowledged": true,
+      "retired_by": "retire_aged_orphan_mints",
+      "retired_at": "2026-07-08T18:00:00+00:00",
+      "retired_reason": "aged-out-operator-sweep"
     },
     {
       "id": "proposed-p3-dashboard-proposed-lane",
@@ -564,7 +568,11 @@
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "needs_decision": true,
       "needs_decision_since": "2026-06-26T00:03:45.435494+00:00",
-      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop",
+      "acknowledged": true,
+      "retired_by": "retire_aged_orphan_mints",
+      "retired_at": "2026-07-08T18:00:00+00:00",
+      "retired_reason": "aged-out-operator-sweep"
     },
     {
       "id": "proposed-fix-headless-approval-dedup-spawn-failure-wedge-002",
@@ -809,7 +817,11 @@
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "needs_decision": true,
       "needs_decision_since": "2026-06-26T00:03:45.435494+00:00",
-      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop",
+      "acknowledged": true,
+      "retired_by": "retire_aged_orphan_mints",
+      "retired_at": "2026-07-08T18:00:00+00:00",
+      "retired_reason": "aged-out-operator-sweep"
     },
     {
       "id": "proposed-medic-diagnosis",
@@ -1792,7 +1804,11 @@
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "needs_decision": true,
       "needs_decision_since": "2026-06-26T00:03:45.435494+00:00",
-      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop",
+      "acknowledged": true,
+      "retired_by": "retire_aged_orphan_mints",
+      "retired_at": "2026-07-08T18:00:00+00:00",
+      "retired_reason": "aged-out-operator-sweep"
     },
     {
       "id": "proposed-fix-notifier-review-dispatch-reliability",
@@ -1898,7 +1914,11 @@
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "needs_decision": true,
       "needs_decision_since": "2026-06-26T00:03:45.435494+00:00",
-      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop",
+      "acknowledged": true,
+      "retired_by": "retire_aged_orphan_mints",
+      "retired_at": "2026-07-08T18:00:00+00:00",
+      "retired_reason": "aged-out-operator-sweep"
     },
     {
       "id": "proposed-build-forge-queue-ui-move-20260604T042018Z",
@@ -1975,7 +1995,11 @@
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "needs_decision": true,
       "needs_decision_since": "2026-06-26T00:03:45.435494+00:00",
-      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop",
+      "acknowledged": true,
+      "retired_by": "retire_aged_orphan_mints",
+      "retired_at": "2026-07-08T18:00:00+00:00",
+      "retired_reason": "aged-out-operator-sweep"
     },
     {
       "id": "proposed-step-digest-generator",
@@ -2995,7 +3019,11 @@
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "needs_decision": true,
       "needs_decision_since": "2026-06-26T00:03:45.435494+00:00",
-      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop",
+      "acknowledged": true,
+      "retired_by": "retire_aged_orphan_mints",
+      "retired_at": "2026-07-08T18:00:00+00:00",
+      "retired_reason": "aged-out-operator-sweep"
     },
     {
       "id": "proposed-ceo-digest-daily-2026-06-11",
@@ -3289,7 +3317,11 @@
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "needs_decision": true,
       "needs_decision_since": "2026-06-26T00:03:45.435494+00:00",
-      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop",
+      "acknowledged": true,
+      "retired_by": "retire_aged_orphan_mints",
+      "retired_at": "2026-07-08T18:00:00+00:00",
+      "retired_reason": "aged-out-operator-sweep"
     },
     {
       "id": "proposed-alert-triage-intent-fallback-001",
@@ -3344,7 +3376,11 @@
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "needs_decision": true,
       "needs_decision_since": "2026-06-26T00:03:45.435494+00:00",
-      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop",
+      "acknowledged": true,
+      "retired_by": "retire_aged_orphan_mints",
+      "retired_at": "2026-07-08T18:00:00+00:00",
+      "retired_reason": "aged-out-operator-sweep"
     },
     {
       "id": "proposed-build-test-suite-green-001",
@@ -3623,7 +3659,11 @@
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "needs_decision": true,
       "needs_decision_since": "2026-06-29T00:10:17.803323+00:00",
-      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop",
+      "acknowledged": true,
+      "retired_by": "retire_aged_orphan_mints",
+      "retired_at": "2026-07-08T18:00:00+00:00",
+      "retired_reason": "aged-out-operator-sweep"
     },
     {
       "id": "proposed-larry-approval-8aa50bfa8aec52113f9405772937021ca0fa7689",
@@ -4065,7 +4105,11 @@
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "needs_decision": true,
       "needs_decision_since": "2026-07-02T00:10:51.321683+00:00",
-      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop",
+      "acknowledged": true,
+      "retired_by": "retire_aged_orphan_mints",
+      "retired_at": "2026-07-08T18:00:00+00:00",
+      "retired_reason": "aged-out-operator-sweep"
     },
     {
       "id": "proposed-dag-preflight-projects-v3-p3-followup2",
@@ -4677,7 +4721,11 @@
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "needs_decision": true,
       "needs_decision_since": "2026-07-06T00:00:16.313472+00:00",
-      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop",
+      "acknowledged": true,
+      "retired_by": "retire_aged_orphan_mints",
+      "retired_at": "2026-07-08T18:00:00+00:00",
+      "retired_reason": "aged-out-operator-sweep"
     },
     {
       "id": "proposed-stale-test-sweep-timezone-medic-001",
@@ -4782,7 +4830,11 @@
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "needs_decision": true,
       "needs_decision_since": "2026-07-06T00:00:16.313472+00:00",
-      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop",
+      "acknowledged": true,
+      "retired_by": "retire_aged_orphan_mints",
+      "retired_at": "2026-07-08T18:00:00+00:00",
+      "retired_reason": "aged-out-operator-sweep"
     },
     {
       "id": "proposed-delegate-cap-orphan-lane-show-desktop-chat-title-fallback-rep-dd23",
@@ -4816,7 +4868,11 @@
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "needs_decision": true,
       "needs_decision_since": "2026-07-06T00:00:16.313472+00:00",
-      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop",
+      "acknowledged": true,
+      "retired_by": "retire_aged_orphan_mints",
+      "retired_at": "2026-07-08T18:00:00+00:00",
+      "retired_reason": "aged-out-operator-sweep"
     },
     {
       "id": "proposed-delegate-cap-phantom-build-phase-after-marker-error-retry-pr-4d78",
@@ -4850,7 +4906,11 @@
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "needs_decision": true,
       "needs_decision_since": "2026-07-06T00:00:16.313472+00:00",
-      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop",
+      "acknowledged": true,
+      "retired_by": "retire_aged_orphan_mints",
+      "retired_at": "2026-07-08T18:00:00+00:00",
+      "retired_reason": "aged-out-operator-sweep"
     },
     {
       "id": "proposed-projects-stale-gc-archive-completed-001",
@@ -4954,7 +5014,11 @@
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "needs_decision": true,
       "needs_decision_since": "2026-07-07T00:11:47.048909+00:00",
-      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop",
+      "acknowledged": true,
+      "retired_by": "retire_aged_orphan_mints",
+      "retired_at": "2026-07-08T18:00:00+00:00",
+      "retired_reason": "aged-out-operator-sweep"
     },
     {
       "id": "proposed-projects-v3-sequence-rollup-done-flip-001",
@@ -5087,7 +5151,11 @@
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "needs_decision": true,
       "needs_decision_since": "2026-07-08T00:07:42.926032+00:00",
-      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop",
+      "acknowledged": true,
+      "retired_by": "retire_aged_orphan_mints",
+      "retired_at": "2026-07-08T18:00:00+00:00",
+      "retired_reason": "aged-out-operator-sweep"
     },
     {
       "id": "mirror-review-visibility",
@@ -5202,7 +5270,11 @@
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "needs_decision": true,
       "needs_decision_since": "2026-07-08T00:07:42.926032+00:00",
-      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop",
+      "acknowledged": true,
+      "retired_by": "retire_aged_orphan_mints",
+      "retired_at": "2026-07-08T18:00:00+00:00",
+      "retired_reason": "aged-out-operator-sweep"
     },
     {
       "id": "operator-needs-you-feed",
@@ -5259,7 +5331,11 @@
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
       "needs_decision": true,
       "needs_decision_since": "2026-07-08T00:07:42.926032+00:00",
-      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop",
+      "acknowledged": true,
+      "retired_by": "retire_aged_orphan_mints",
+      "retired_at": "2026-07-08T18:00:00+00:00",
+      "retired_reason": "aged-out-operator-sweep"
     },
     {
       "id": "proposed-health-notify-wire-vs-silence-001",
@@ -5293,7 +5369,11 @@
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
       "needs_decision": true,
       "needs_decision_since": "2026-07-08T00:07:42.926032+00:00",
-      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop",
+      "acknowledged": true,
+      "retired_by": "retire_aged_orphan_mints",
+      "retired_at": "2026-07-08T18:00:00+00:00",
+      "retired_reason": "aged-out-operator-sweep"
     },
     {
       "id": "proposed-forge-post-open-mergeable-rebase-001",
