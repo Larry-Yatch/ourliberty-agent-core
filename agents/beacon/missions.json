@@ -8905,6 +8905,19 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "xiv-b-tier-4-alert-write-back-loop",
+      "name": "Tier-4 Alert Write-Back Loop",
+      "phase": "deferred",
+      "brief": "Record the outcome of every Larry-facing (tier-4) alert -- acted / ignored / lapsed / auto_resolved -- in a sibling append-only outcome ledger keyed by a stable alert_id. Explicit capture via NOW/SOON Telegram inline buttons; derived capture via a lapse sweep + resolve_alert(). Exposes an aggregate outcome-rate read-model so alert usefulness is measurable and a future auto-tuning loop (XIV-c) can consume it. v1 records + exposes only; tuning is out of scope.",
+      "spec_docs": [
+        "agents/beacon/specs/xiv-b-tier-4-alert-write-back-loop.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-07-07",
+      "deferred_reason": "Build deferred ~1 month per Larry's briefing (target kickoff ~2026-08-07): let the NOW/SOON/FYI alert taxonomy stabilize and accumulate ~1 month of real traffic before instrumenting outcomes, so the lapse window and outcome buckets are set against a real distribution, not a moving target."
     }
   ]
 }
