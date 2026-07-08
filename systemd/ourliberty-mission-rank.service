@@ -1,0 +1,42 @@
+[Unit]
+Description=Operator rank brain — score + rank the live proposed-missions pile (Operator Feed Loop slice 4 cadence)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/mission_rank.py
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# Wrapper handles concurrency lock + EMERGENCY_HALT gate + logging.
+ExecStart=/usr/bin/bash /home/larry/agent-core/scripts/run_mission_rank.sh
+
+# Worst-case pass: DEFAULT_LLM_CAP (40) claude calls x CLAUDE_TIMEOUT_SEC
+# (180s) = 2h; typical pass is minutes. Bound at 2h10m so a hung pass dies
+# before the next scheduled run rather than piling up.
+TimeoutStartSec=7800
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-mission-rank
+
+# Hardening (matches ourliberty-ceo-digest-daily.service). ReadWritePaths
+# includes ~/.claude ~/.claude.json ~/.local ~/.cache so the claude CLI can
+# authenticate + cache (the EROFS-under-ProtectHome class), and ~/agents for
+# state/mission-rank.json + logs. No MemoryMax: the pass spawns claude CLI
+# children that legitimately use hundreds of MB.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /home/larry/agent-core /home/larry/credentials /home/larry/.claude /home/larry/.claude.json /home/larry/.local /home/larry/.cache /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+Nice=10
