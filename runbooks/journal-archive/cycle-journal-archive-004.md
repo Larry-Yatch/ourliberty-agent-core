@@ -73690,3 +73690,87 @@ No novel ERROR/WARN patterns above threshold. Watchdog: ~05:25Z MDT (11:25Z UTC)
 
 ---
 
+## Iteration ~4575 — 2026-07-08T12:05Z UTC (Larry /loop /cycle via chat, Tier 1)
+
+**Health:** ⚠️ Signal. 4 PRs merged since iter ~4574 (#858, #861, #862, #863). Fast-forward applied. New: silence-file-auditor systemd timer not installed. All 5 mandatory checks nominal. 0 new alerts.
+
+**VERIFY-BEFORE-REASSERT (from iter ~4574):**
+- **"zombie PID 1834248 (40.7d+)"**: RE-VERIFIED ⚠️ — ps shows 40-16:43:42 (Ss, bash loop awaiting MISSING archive file). CONFIRMED [carry]
+- **"HEAD=c3ebd8e5=origin/main"**: UPDATED — HEAD was c3ebd8e5, but origin/main=aaea171e (PR #858 merged). Fast-forward applied this iter. HEAD now=aaea171e=origin/main. ✅
+- **"Sync 11:05:20Z (<2h)"**: CONFIRMED ✅ — still 11:05:20Z (~57 min at check time). NOMINAL
+- **"pending=8"**: CONFIRMED ✅ — 8 entries unchanged. CARRY
+- **"GH API rate limit persisting"**: UPDATED — No new rate-limit WARNs in outbox-notifier.log since burst at 05:36:33-56Z MDT (~30 min before this iter). Likely recovered. [carry/improving]
+- **"Watchdog overall=healthy"**: CONFIRMED ✅ — watchdog at 06:01:11 MDT (12:01:11Z UTC), overall=healthy. 5-min cadence intact. NOMINAL
+- **"All inboxes clear"**: CONFIRMED ✅ — mirror/beacon/forge/pulse all empty. NOMINAL
+- **"PR #858 mirror_pass_unmerged stall cooldown expired"**: RESOLVED ✅ — PR #858 MERGED. Check 3 dry-run: 0 alerts. [closed]
+
+**Check 0 — Alert triage:** repair-watermark: `{"repaired": false, "old_watermark": 979, "file_length": 979}` — **0 new alerts**. NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier last entry at 05:40:27Z MDT (11:40:27Z UTC) — MIRROR_REVIEW_STATUS PR #857 REVIEW_ESCALATE. No new entries since. GH API rate-limit WARNs: last burst 05:36:33-56Z MDT (~30 min before check), no new occurrences — likely recovered. Watchdog: 06:01:11Z MDT overall=healthy, 5-min cadence. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** Bot last delivery 05:35:13 MDT (11:35:13Z UTC) — idx=978 (doorbell). No new Larry messages. pending=8 unchanged. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN 12:01Z: **0 alert(s) would fire, 0 recovery(ies)** — PR #858 completeness-pr1 stall self-resolved (merged). FORGE_NO_PR_SKIP ×17 tasks. MIRROR_PASS_UNMERGED_SKIP for notifier-concurrent-scan-dup (held_deep_review). xiv-b cooldown active. NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=8 (unchanged). No new Larry messages in last 24h. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-08T12:00:49Z UTC (~4 min at check time). NOMINAL ✅
+
+**Check A — Source repo:** HEAD was c3ebd8e5, behind origin/main by 1 commit (aaea171e = PR #858). **always-fix applied**: `git pull --ff-only` → Fast-forwarded c3ebd8e5..aaea171e. HEAD=origin/main. ✅
+**Check B — Sync health:** last_sync=2026-07-08T11:05:20Z (~57 min), status=no-change. Within 2h threshold. NOMINAL ✅
+**Check C — Agent liveness:** All 5 services alive (beacon_bot=3141996 ~1h52m, chain_event_shipper=3142298, dashboard_api=3142538, inbox_watcher=3144305, outbox_notifier=3144306). Watchdog healthy. Zombie PID 1834248 (40-16:43:42 ≈ 40.7d, Ss bash loop awaiting MISSING archive file build-check-viii-pr-2b-analyzer-001.json) ⚠️ [carry].
+**Check D — Inbox state:** Mirror: 0. Beacon: 0. Forge: 0. Pulse: 0. All inboxes clear. ✅
+**Check E — PR state:** 8 open PRs — #860, #857, #854, #852, #851, #850, #847, #846 — all mergeable=UNKNOWN (GH API rate limit, improving). PR #857: state=OPEN, mergeStateStatus=UNSTABLE, mirror-review=FAILURE (REVIEW_ESCALATE rev2). **Newly merged since iter ~4574: PR #858 (completeness-pr1), PR #861 (flip-readiness-gauge spec), PR #862 (fix tests: SpecDocCliTest hermetic), PR #863 (fix tests: spec-doc not-authored hermetic).** PR #862 and #863 are fixes for the flaky spec-doc/origin-main gate tests (MEMORY: "Flaky spec-doc/origin-main tests false-BLOCK the gate") — positive signal.
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅.
+
+**Conditional checks — UTC Wednesday 2026-07-08:**
+- **Check I:** Wed firing day. Timer fires ~14:10:15Z UTC (~2h remaining at 12:05Z). Systemd handles. ✅
+- **Check III:** Sunday gate. Skip. ✅
+- **Check IX/X:** Monday gate. Skip. ✅
+- **Check VI/VIII:** Proposals idx=990,991 carry — awaiting Larry. [carry]
+
+**New findings:**
+1. ✅ **4 PRs merged since iter ~4574** — #858 (completeness-pr1, +1024 lines), #861 (flip-readiness-gauge spec), #862 (SpecDocCliTest hermetic), #863 (spec-doc not-authored hermetic). PRs #862/#863 fix the flaky gate tests flagged in MEMORY.
+2. ⚠️ **silence-file-auditor systemd timer not installed** — PR #858 added `ourliberty-silence-file-auditor.service` and `.timer` to `systemd/` (daily 07:00, G8 silence-file check). Units exist in repo but NOT installed in /etc/systemd/system/. Timer is inactive. `never-auto` — Pulse cannot install systemd units. Install commands: `sudo cp /home/larry/agent-core/systemd/ourliberty-silence-file-auditor.{service,timer} /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now ourliberty-silence-file-auditor.timer`.
+
+**Actions taken:**
+1. Check 0: watermark confirmed at 979, 0 new alerts. ✅
+2. Check A always-fix: fast-forward c3ebd8e5 → aaea171e. Logged to cycle-actions.jsonl. ✅
+3. §5.0: all no-ops. ✅
+4. PRIME ledger: intervention appended (tier=1, kind=intervention, template=iter-routine; ts=12:04:59Z). ✅
+5. Tier state: `record --checks-clean false` → Tier 1, consecutive_clean=0, last_signal_at=12:05:00Z. ✅
+
+**Escalations:** None sent. silence-file-auditor install is noted in journal for Larry's awareness — not a system-down condition, Larry can install at next convenient moment. All other standing escalations previously delivered. Discipline 2: no duplicate Pulse DMs for carried findings.
+
+**Standing findings (carry-verified this iter):**
+- [yellow] **silence-file-auditor timer not installed** — PR #858 added systemd/ourliberty-silence-file-auditor.{service,timer}; not yet in /etc/systemd/system/. [new]
+- [yellow] **PR #857 REVIEW_ESCALATE (rev2 — 2nd consecutive)** — Code correct, gate BLOCK is provable FP (fixed by PRs #862/#863 now merged). Mirror: merge manually. pending[7]=mirror-review-pr-857. [carry]
+- [yellow] **PR #847 AUTO_MERGE_HELD** — Needs `/code-review high` then `merge_reviewed_pr.sh 847`. [carry/unverified GH API]
+- [yellow] **L978: forge-wip-redispatch EXHAUSTED — review-sequence-dag-completeness-program** — No PR. DM delivered idx=977. [carry]
+- [yellow] **zombie-bash-pid-1834248** — PID 1834248 (40.7d+, bash loop awaiting MISSING build-check-viii-pr-2b-analyzer-001.json archive). ask-then-do: `kill 1834248`. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07` or `reject`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [yellow] **unreviewed-merge-larry-authored-pr-001** — 8th+ occurrences. Steps 1-2 unimplemented. [carry]
+- [yellow] **PR #854 REVIEW_ESCALATE** — Blocking #847. [carry]
+- [yellow] **PR #852 REVIEW_ESCALATE** — pending[3]. [carry]
+- [yellow] **pending[1]: mirror-review-pr-851** — REVIEW_ESCALATE. DM delivered. [carry]
+- [yellow] **pending[5]: advancer-suppress-paused-invalid-realert-001** — Sequence-invalid APPROVAL_REQUEST. DM delivered. [carry]
+- [yellow] **pending[6]: mirror-review-pr-850** — PR #850 Mirror REVIEW_FAILURE. DM delivered. [carry]
+- [yellow] **pending[0]: mirror-review-pr-845** — STALE (PR #845 MERGED). [carry/stale]
+- [yellow] **pending[2]: mirror-review-pr-849** — STALE (PR #849 MERGED). [carry/stale]
+- [yellow] **pending[4]: mirror-review-pr-856** — STALE (PR #856 MERGED). [carry/stale]
+- [yellow] **PR #860 (xiv-b-alert-write-back)** — mirror-review=SUCCESS; mergeable=UNKNOWN. [carry/unverified GH API]
+- [blue] **PR #846** — mirror-review=SUCCESS. AUTO_MERGE_HELD. [carry]
+- [blue] **GH API rate limit** — last WARNs 05:36Z MDT; likely recovered (~30 min clear). [carry/improving]
+- [blue] **Check I** — Wed firing day, timer ~14:10Z UTC (~2h remaining). Systemd handles. [watch]
+- [blue] **PRs #862/#863 merged** — SpecDoc/origin-main gate flake fixes. Watch for PR #857 and other REVIEW_ESCALATE PRs to retry cleanly once merged code is in baseline. [info]
+- [blue] **G-rules (dispatched, vp):** notifier-concurrent-scan-dup [9th+ occ, preflight VP]; ourliberty-health-subject-key-mismatch-001; forge-wip-redispatch-digest-tier4-001; no-session-revision-active-mirror-session-fp-001; forge-revision-preamble-missing-pr711-001; forge-wip-redispatch-exhausted-pr-exists-fp-001; decision-needed-approval-forge-dispatch-no-target-repo-001; sentinel-inflight-stall-tier4-translation-001; sequence-invalid-completeness-pr3-fanout-sentinel. [carry vp]
+- [blue] **G-rules (2/3):** check-i-force-bypass-dm-route; outbox-notifier-notification-intent-reject-tier4-001; heal-daemon-restart-manifest-drift-regenerated-tier4; review-escalate-approval-dedup-by-old-build-approval-001; no-session-revision-merged-pr-fp-001; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch; auto-merge-conflict-promoted-merged-pr-001; forge-marker-task-id-mismatch-xii-v1. [carry]
+- [blue] **G-rules (1/3):** inbox-watcher-tier-pool-all-unavailable-tier4-001; larry-approval-beacon-hash-mismatch; heal-credential-registry-drift-origin-unreachable-tier4-001; mirror-runner-missing-worktree-retry-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001; mirror-malformed-verdict-heal-reap-path-001; outbox-notifier-merge-held-deep-review-tier4-001. [carry]
+
+**PRIME DIRECTIVE:** ratio=20.96 (trend worsening). Intervention appended (ts=12:04:59Z).
+**Tier end-of-iter:** Tier **1** (consecutive_clean=0; zombie PID + pending=8 + REVIEW_ESCALATE findings + silence-file-auditor not installed).
+
+---
+
