@@ -49,6 +49,19 @@ AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', str(HOME / 'agents')
 INBOXES_ROOT = AGENTS_ROOT / 'inboxes'
 ROUTING_EVENTS_LOG = AGENTS_ROOT / 'logs' / 'routing-events.jsonl'
 
+# Subdirectory of an agent's `<inbox>/.archive/` holding envelopes whose run
+# COMPLETED but whose outbox could not be persisted (inbox_watcher's
+# outbox-write-failure paths) — the result is LOST, so no downstream consumer
+# ever saw it. Archiving there is a rename-only POSITIVE marker (works even
+# when data writes are failing, e.g. disk-full) that distinguishes "concluded,
+# result routed" (plain `.archive/`) from "died verdict-less". Consumer:
+# outbox_notifier._review_request_already_dispatched re-dispatches a Mirror
+# review whose same-head envelope is marked lost (debounced + capped), while a
+# plain archived envelope keeps deduping forever. A subdirectory (not a name
+# suffix) so `.archive/` existence checks and `<stem>.*.json` variant globs
+# can never accidentally match a lost-result envelope.
+LOST_RESULT_SUBDIR = '.lost-result'
+
 MAX_FILENAME_BYTES = 200  # leaves margin under NAME_MAX (255)
 
 # Characters that are STRUCTURALLY dangerous in a single path component:

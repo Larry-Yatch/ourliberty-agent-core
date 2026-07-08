@@ -18,8 +18,10 @@ except ImportError:
     import _bootstrap  # noqa: F401
 
 import json
+import os
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -32,6 +34,8 @@ import safe_write_inbox  # noqa: E402
 
 
 class _DedupBase(unittest.TestCase):
+    LOST_SUB = f'.archive/{safe_write_inbox.LOST_RESULT_SUBDIR}'
+
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.root = Path(self._tmp.name)
@@ -56,6 +60,12 @@ class _DedupBase(unittest.TestCase):
             body['head_sha'] = head_sha
         (d / name).write_text(json.dumps(body))
         return d / name
+
+    @staticmethod
+    def _age(path, seconds):
+        """Backdate `path`'s mtime by `seconds`."""
+        old = time.time() - seconds
+        os.utime(path, (old, old))
 
 
 class TestRecordedReviewHeadSha(_DedupBase):
@@ -143,6 +153,109 @@ class TestHeadAwareDedup(_DedupBase):
         self.assertTrue(check('review-cpu[high].json', 'head-B'))  # variant hit
         self.assertTrue(check('review-cpu[high].json', 'head-A'))  # exact hit
         self.assertFalse(check('review-cpu[high].json', 'head-C'))  # re-review
+
+
+class TestDiedVerdictlessRedispatch(_DedupBase):
+    """died-verdictless-review-redispatch (post-#850).
+
+    Pre-#850, a review session pushed a [WIP][session-start] commit at pickup,
+    so a session that died verdict-less moved the PR head and the head-aware
+    dedup re-dispatched it by accident. Post-#850 the head never moves; the
+    deliberate replacement is inbox_watcher's POSITIVE lost-result marker
+    (`.archive/.lost-result/`, written when a run's outbox could not be
+    persisted). A same-head lost-result envelope must NOT dedup — after the
+    grace debounce and under the attempts cap — while a PLAIN archived
+    same-head envelope keeps deduping forever (fail closed).
+    """
+
+    STALE = ob.REVIEW_REDISPATCH_GRACE_SECONDS + 600
+
+    def _check(self, head='h1'):
+        return ob._review_request_already_dispatched('review-t.json', head)
+
+    def _lost(self, name='review-t.json', head='h1', age=None):
+        p = self._write(self.LOST_SUB, name, head_sha=head)
+        self._age(p, self.STALE if age is None else age)
+        return p
+
+    # --- the fix: same-head lost-result marker → re-dispatchable ---
+    def test_lost_result_past_grace_redispatches(self):
+        self._lost()
+        self.assertFalse(self._check())
+
+    def test_lost_result_within_grace_debounces(self):
+        self._lost(age=60)  # failed round dispatched a minute ago
+        self.assertTrue(self._check())
+
+    def test_lost_result_other_head_does_not_redispatch_this_head(self):
+        # A lost round of an OLDER head neither dedups nor re-dispatches the
+        # current head — absent any current-head record the answer is simply
+        # "never dispatched" (False), same as before this change.
+        self._lost(head='old')
+        self.assertFalse(self._check('new'))
+
+    def test_uniquified_lost_variants_counted(self):
+        # move_to() uniquifies repeat losses: review-t.json, review-t.1.json.
+        self._lost()
+        self._lost(name='review-t.1.json')
+        self.assertFalse(self._check())  # 2 < cap, past grace → re-dispatch
+
+    # --- the cap: repeated lost rounds return to permanent dedup ---
+    def test_lost_rounds_at_cap_dedup_permanently(self):
+        for i in range(ob.REVIEW_REDISPATCH_MAX_ATTEMPTS):
+            self._lost(name=f'review-t.{i}.json' if i else 'review-t.json')
+        self.assertTrue(self._check())
+
+    def test_cap_counts_only_matching_head(self):
+        # Two lost rounds of an old head + one of the current head: the
+        # current head has 1 lost round (< cap) → still re-dispatchable.
+        self._lost(name='review-t.json', head='old')
+        self._lost(name='review-t.1.json', head='old')
+        self._lost(name='review-t.2.json', head='h1')
+        self.assertFalse(self._check('h1'))
+
+    # --- fail-closed semantics preserved everywhere else ---
+    def test_plain_archived_same_head_dedups_forever(self):
+        # No lost-result marker → a concluded review dedups regardless of age
+        # (the pre-fix guarantee; naming drift / retention can't cause loops).
+        p = self._write('.archive', 'review-t.json', head_sha='h1')
+        self._age(p, self.STALE * 10)
+        self.assertTrue(self._check())
+
+    def test_archived_envelope_wins_over_lost_marker(self):
+        # A later round CONCLUDED (plain archive) → its dedup outranks an
+        # earlier round's lost marker for the same head.
+        self._lost()
+        p = self._write('.archive', 'review-t.1.json', head_sha='h1')
+        self._age(p, self.STALE)
+        self.assertTrue(self._check())
+
+    def test_invalid_leg_still_blocks(self):
+        # Validator rejection is deterministic; re-dispatch would re-reject.
+        p = self._write('.invalid', 'review-t.json', head_sha='h1')
+        self._age(p, self.STALE)
+        self.assertTrue(self._check())
+
+    def test_live_inbox_blocks_regardless_of_lost_marker(self):
+        self._lost()
+        self._write('', 'review-t.json', head_sha='h1')
+        self.assertTrue(self._check())
+
+    def test_none_head_existence_only_ignores_lost_marker(self):
+        # Existence-only callers (reconcile sweep, replan rounds) keep their
+        # exact prior contract: the lost-result subdir is invisible to them.
+        self._lost()
+        self.assertFalse(
+            ob._review_request_already_dispatched('review-t.json', None))
+
+    def test_lost_sibling_task_not_matched(self):
+        # review-t-extra.json in .lost-result must not re-dispatch task t...
+        self._lost(name='review-t-extra.json', head='h1')
+        self.assertFalse(self._check('h1'))
+        # ...nor be miscounted toward t's cap (glob is dot-variant only).
+        for i in range(1, ob.REVIEW_REDISPATCH_MAX_ATTEMPTS + 1):
+            self._lost(name=f'review-t-extra.{i}.json', head='h1')
+        self.assertFalse(self._check('h1'))
 
 
 if __name__ == '__main__':

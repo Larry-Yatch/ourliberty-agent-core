@@ -215,6 +215,22 @@ def move_to(path: Path, dest_dir: Path) -> Path:
     return dest
 
 
+def _archive_dir(agent: str, *, lost_result: bool = False) -> Path:
+    """The archive destination for a processed task envelope.
+
+    `lost_result=True` selects `.archive/.lost-result/` — the POSITIVE marker
+    for a run whose outbox could not be persisted, so its result is LOST and
+    no downstream consumer (verdict routing, marker-error cascade) ever saw
+    it. Pure renames, so the marker lands even when data writes are failing
+    (disk-full). Consumer: outbox_notifier's review-request dedup re-dispatches
+    a Mirror review whose same-head envelope carries this marker (debounced +
+    capped), while a plain `.archive/` envelope dedups forever."""
+    d = INBOXES_ROOT / agent / ".archive"
+    if lost_result:
+        d = d / safe_write_inbox.LOST_RESULT_SUBDIR
+    return d
+
+
 def write_invalid(task_file: Path, reason: str) -> None:
     agent = task_file.parent.name
     dest = move_to(task_file, INBOXES_ROOT / agent / ".invalid")
@@ -896,13 +912,19 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
             OUTBOXES_ROOT / safe_write_inbox.sanitize_component(agent),
             safe_write_inbox.sanitize_component(f"{task_id}.json"),
         )
+        outbox_written = False
         try:
             outbox_path.parent.mkdir(parents=True, exist_ok=True)
             outbox_path.write_text(json.dumps(outbox, indent=2))
+            outbox_written = True
         except OSError as oe:
             log(f"[{agent}] outbox write also failed: {oe}")
         try:
-            move_to(task_file, INBOXES_ROOT / agent / ".archive")
+            # No outbox persisted → archive under the lost-result marker so
+            # the review-dedup can tell "died verdict-less, re-dispatchable"
+            # from a concluded run (see _archive_dir / LOST_RESULT_SUBDIR).
+            move_to(task_file, _archive_dir(agent,
+                                            lost_result=not outbox_written))
         except OSError:
             pass
         return
@@ -961,15 +983,19 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
         # re-run; the lost outbox is recovered by the reconcile/heal layer
         # (missing-outbox sweeps), which is strictly safer than a double-bill.
         log(f"[{agent}] outbox write failed for {task_file.name}: {e}; "
-            f"archiving task WITHOUT requeue to avoid a paid re-run "
-            f"(result lost — reconcile/heal recovers the chain)")
+            f"archiving task under the lost-result marker WITHOUT requeue "
+            f"to avoid a paid re-run (result lost — for a phase=review task "
+            f"the review-dedup re-dispatches off the marker, bounded)")
         # The run already PAID — record the spend before archiving so the
         # budget/quota ledger stays accurate even though the outbox is lost.
         # (The old re-run path eventually costed it on a successful retry; this
         # path never retries, so record it here.)
         _record_outbox_cost(agent, task_id, outbox)
         try:
-            move_to(task_file, INBOXES_ROOT / agent / ".archive")
+            # Lost-result marker (rename-only, see _archive_dir): the result
+            # was never persisted, so downstream recovery that keys off the
+            # outbox can never fire for this run.
+            move_to(task_file, _archive_dir(agent, lost_result=True))
         except OSError as me:
             log(f"[{agent}] archive after outbox-write failure also failed "
                 f"for {task_file}: {me}")

@@ -115,10 +115,19 @@ class OutboxWriteFailureArchivesTest(unittest.TestCase):
         bump.assert_not_called()
         # It is gone from the live inbox …
         self.assertFalse(task_file.exists())
-        # … and now in .archive, so the next poll cannot pick it up again.
-        archived = list((iw.INBOXES_ROOT / self.AGENT / '.archive').glob('*.json'))
+        # … and now under the LOST-RESULT marker (.archive/.lost-result/): the
+        # next poll cannot pick it up again, AND the loss is positively
+        # recorded — the review-dedup's bounded re-dispatch keys off exactly
+        # this location (died-verdictless-review-redispatch, post-#850).
+        lost_dir = (iw.INBOXES_ROOT / self.AGENT / '.archive'
+                    / iw.safe_write_inbox.LOST_RESULT_SUBDIR)
+        archived = list(lost_dir.glob('*.json'))
         self.assertEqual(len(archived), 1)
         self.assertEqual(json.loads(archived[0].read_text())['task_id'], 'real-paid-001')
+        # Nothing lands in the PLAIN archive — that would read as "concluded"
+        # to the review-dedup and permanently mask the lost verdict.
+        self.assertEqual(
+            list((iw.INBOXES_ROOT / self.AGENT / '.archive').glob('*.json')), [])
         # No outbox was persisted (the write failed).
         self.assertEqual(
             list((iw.OUTBOXES_ROOT / self.AGENT).glob('*.json')), [],
@@ -130,6 +139,93 @@ class OutboxWriteFailureArchivesTest(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]['task_id'], 'real-paid-001')
         self.assertEqual(rows[0]['cost_usd'], 0.05)
+
+
+class RunClaudeExceptionArchiveDestTest(unittest.TestCase):
+    """The run_claude-raised path writes a failure outbox then archives the
+    task. WHERE it archives now encodes whether that outbox persisted: plain
+    `.archive/` when it landed (downstream recovery — e.g. the marker-error
+    cascade for a phase=review task — can fire off it), `.archive/.lost-result/`
+    when even the outbox write failed (nothing downstream can ever see this
+    run, so the loss must be positively marked)."""
+
+    AGENT = 'beacon'
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self._orig = {k: getattr(iw, k) for k in
+                      ('INBOXES_ROOT', 'OUTBOXES_ROOT', 'BLACKBOARD',
+                       'COSTS_FILE', 'LOG_FILE')}
+        iw.INBOXES_ROOT = self.root / 'inboxes'
+        iw.OUTBOXES_ROOT = self.root / 'outboxes'
+        iw.BLACKBOARD = self.root / 'blackboard'
+        iw.COSTS_FILE = iw.BLACKBOARD / 'costs.jsonl'
+        iw.LOG_FILE = self.root / 'logs' / 'inbox_watcher.log'
+        (iw.INBOXES_ROOT / self.AGENT).mkdir(parents=True, exist_ok=True)
+        (iw.OUTBOXES_ROOT / self.AGENT).mkdir(parents=True, exist_ok=True)
+
+    def tearDown(self):
+        for k, v in self._orig.items():
+            setattr(iw, k, v)
+        self.tmp.cleanup()
+
+    def _run(self, fail_outbox_write: bool) -> Path:
+        task_file = iw.INBOXES_ROOT / self.AGENT / 'crash-001.json'
+        task_file.write_text(json.dumps(
+            {'task_id': 'crash-001', 'prompt': 'work', 'source': 'beacon'}))
+        models_config = {'agents': {self.AGENT: {'inbox_model': 'claude-sonnet-4-6'}}}
+
+        real_write_text = Path.write_text
+
+        def selective_write(self_path, *a, **k):
+            if (fail_outbox_write
+                    and str(self_path).startswith(str(iw.OUTBOXES_ROOT))):
+                raise OSError('simulated ENOSPC on outbox write')
+            return real_write_text(self_path, *a, **k)
+
+        with mock.patch.object(
+            iw.agent_runner, 'run_claude',
+            side_effect=RuntimeError('runner exploded'),
+        ), mock.patch.object(iw, 'dispatch_validator') as dv, \
+                mock.patch.object(iw, 'routing_validator') as rvm, \
+                mock.patch.object(iw, '_rotation_gate_block_reason',
+                                  return_value=None), \
+                mock.patch.object(Path, 'write_text', selective_write):
+            dv.validate_task.return_value = (True, '')
+            rvm.check_hard_topology.return_value = (True, '')
+            rvm.check_target_repo.return_value = (True, '')
+            iw.process_task(self.AGENT, task_file, models_config)
+        return task_file
+
+    def test_exception_with_outbox_persisted_archives_plain(self):
+        task_file = self._run(fail_outbox_write=False)
+        self.assertFalse(task_file.exists())
+        # The failure outbox landed → downstream sees the run → plain archive.
+        self.assertEqual(
+            len(list((iw.OUTBOXES_ROOT / self.AGENT).glob('*.json'))), 1)
+        self.assertEqual(
+            len(list((iw.INBOXES_ROOT / self.AGENT / '.archive')
+                     .glob('*.json'))), 1)
+        lost_dir = (iw.INBOXES_ROOT / self.AGENT / '.archive'
+                    / iw.safe_write_inbox.LOST_RESULT_SUBDIR)
+        self.assertEqual(list(lost_dir.glob('*.json'))
+                         if lost_dir.exists() else [], [])
+
+    def test_exception_with_outbox_write_failed_archives_lost(self):
+        task_file = self._run(fail_outbox_write=True)
+        self.assertFalse(task_file.exists())
+        # No outbox → the run is invisible downstream → lost-result marker.
+        self.assertEqual(
+            list((iw.OUTBOXES_ROOT / self.AGENT).glob('*.json')), [])
+        self.assertEqual(
+            list((iw.INBOXES_ROOT / self.AGENT / '.archive').glob('*.json')),
+            [])
+        lost = list((iw.INBOXES_ROOT / self.AGENT / '.archive'
+                     / iw.safe_write_inbox.LOST_RESULT_SUBDIR).glob('*.json'))
+        self.assertEqual(len(lost), 1)
+        self.assertEqual(json.loads(lost[0].read_text())['task_id'],
+                         'crash-001')
 
 
 class ProcessTaskTierHoldTest(unittest.TestCase):
