@@ -167,6 +167,15 @@ def ensure_dirs() -> None:
     for a in AGENTS:
         (INBOXES_ROOT / a).mkdir(parents=True, exist_ok=True)
         (INBOXES_ROOT / a / ".archive").mkdir(parents=True, exist_ok=True)
+        # Pre-create the lost-result subdir so archiving a run whose outbox
+        # could not be persisted is a PURE RENAME into an existing directory
+        # (see _archive_dir). Creating it lazily at failure time would require
+        # a fresh inode/dir-block mkdir under the exact disk-full condition
+        # that triggers the lost-result path — a mkdir that can itself fail
+        # and leave the task in the live inbox for a paid re-run.
+        (INBOXES_ROOT / a / ".archive" / safe_write_inbox.LOST_RESULT_SUBDIR).mkdir(
+            parents=True, exist_ok=True
+        )
         (INBOXES_ROOT / a / ".invalid").mkdir(parents=True, exist_ok=True)
         (OUTBOXES_ROOT / a).mkdir(parents=True, exist_ok=True)
     BLACKBOARD.mkdir(parents=True, exist_ok=True)
