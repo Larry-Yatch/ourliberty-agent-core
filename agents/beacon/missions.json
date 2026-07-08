@@ -5050,7 +5050,10 @@
         "model": "claude-opus-4-8",
         "at": "2026-06-24T04:30:16.047044+00:00",
         "from_state": "proposed"
-      }
+      },
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-08T00:07:42.926032+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-soft-gate-block-upgrade-decision",
@@ -5081,7 +5084,10 @@
         "at": "2026-06-24T09:35:07.192091+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-08T00:07:42.926032+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "mirror-review-visibility",
@@ -5193,7 +5199,10 @@
         "at": "2026-06-24T18:54:19.900437+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-08T00:07:42.926032+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "operator-needs-you-feed",
@@ -5247,7 +5256,10 @@
         "at": "2026-06-24T23:48:10.481374+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-08T00:07:42.926032+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-health-notify-wire-vs-silence-001",
@@ -5278,7 +5290,10 @@
         "at": "2026-06-24T23:58:11.814610+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-08T00:07:42.926032+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-forge-post-open-mergeable-rebase-001",
