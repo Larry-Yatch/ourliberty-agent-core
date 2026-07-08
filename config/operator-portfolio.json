@@ -1,0 +1,31 @@
+{
+  "_doc": "Larry's portfolio dial (Operator Feed Loop slice 4). One entry per project the factory builds/maintains. `weight` = the percentage-split throughput allocation (should sum to ~1.0) — retune weekly, no code change. `north_star` is what 'benefit' means for that project's cards; the rank brain scores each card's contribution to ITS project's north star, times the project weight, minus build cost. `repos` maps a mission card (its `repo` field) to its project; the `default: true` project catches unmapped/None repos. `stage`: active-build | steady-maintenance | exploration | handed-off (handed-off leaves active scope).",
+  "updated": "2026-07-07",
+  "projects": [
+    {
+      "key": "rsdpm",
+      "name": "RSDPM (first external product)",
+      "repos": [],
+      "stage": "active-build",
+      "weight": 0.7,
+      "north_star": "Deliver RSDPM to first customer value: working product features, delivery infrastructure (bootstrap, auth/RLS, ingestion, CI), and anything on the critical path to a client using it. Repo TBD — add it to `repos` the day it exists."
+    },
+    {
+      "key": "factory",
+      "name": "Factory (agent-core + surfaces)",
+      "repos": ["ourliberty-agent-core", "ourliberty-dashboard", "ourliberty-graph"],
+      "stage": "steady-maintenance",
+      "weight": 0.2,
+      "north_star": "Keep the factory able to deliver the portfolio hands-free: build throughput, earned autonomy (operator loops), less Larry toil, less alert noise. Factory work earns rank through its leverage on product delivery, not for its own sake."
+    },
+    {
+      "key": "exploration",
+      "name": "Exploration / unassigned",
+      "repos": [],
+      "stage": "exploration",
+      "weight": 0.1,
+      "default": true,
+      "north_star": "Ideas that open a future product or a step-change in factory capability. Default bucket for cards whose repo maps to no project."
+    }
+  ]
+}
