@@ -421,10 +421,17 @@ def evaluate_item(
 
     if combined == tts.MERGED:
         # Guard 4 — MERGED ancestry: the merge must be reachable from origin/main
-        # (defeats stacked-PR-orphan: MERGED while content never landed).
-        head_sha = chosen.get('headRefOid') or (chosen.get('mergeCommit') or {}).get('oid')
-        anc = is_ancestor_fn(head_sha)
-        if anc is not True:
+        # (defeats stacked-PR-orphan: MERGED while content never landed). Either
+        # the branch tip OR the merge commit reachable satisfies 3.4 — for a
+        # squash/rebase merge (the system default) headRefOid is the pre-merge
+        # branch tip and is NOT an ancestor, so mergeCommit.oid is the only proof
+        # that lands.
+        candidate_shas = [
+            chosen.get('headRefOid'),
+            (chosen.get('mergeCommit') or {}).get('oid'),
+        ]
+        anc = any(sha and is_ancestor_fn(sha) is True for sha in candidate_shas)
+        if not anc:
             return Decision('unknown', grade=grade, cause=CAUSE_AMBIGUOUS,
                             reason='MERGED but ancestry unverified')
         return Decision('fanout', terminal=tts.MERGED, terminal_ts=term_dt.isoformat(),
@@ -786,7 +793,8 @@ def enumerate_pending_approvals(path: Optional[Path] = None) -> list[dict[str, A
             continue
         key = canonical_decision_key(tid, pr_url)
         out.append({'item_key': f'decision:{key}', 'store': 'decision',
-                    'task_id': tid, 'pr_url': pr_url, 'since': entry.get('created'),
+                    'task_id': tid, 'pr_url': pr_url,
+                    'since': entry.get('created_at') or entry.get('created'),
                     'entry_id': entry.get('id'), 'decision_key': key})
     return out
 

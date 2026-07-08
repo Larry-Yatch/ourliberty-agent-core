@@ -42,9 +42,10 @@ def _item(task_id='t-1', pr_num=42, since=None, store='inreview', entry_id=None)
 
 
 def _pr(number=42, state='OPEN', head_ref='forge/t-1', head_oid='sha-1',
-        merged_at=None, closed_at=None):
+        merged_at=None, closed_at=None, merge_oid=None):
     return {'number': number, 'state': state, 'headRefName': head_ref,
             'headRefOid': head_oid, 'mergedAt': merged_at, 'closedAt': closed_at,
+            'mergeCommit': {'oid': merge_oid} if merge_oid else None,
             'url': _GH + str(number)}
 
 
@@ -96,6 +97,22 @@ class GuardsTest(unittest.TestCase):
         prs = [_pr(state='MERGED', merged_at=_iso(_NOW))]
         d = ptf.evaluate_item(item, prs, now=_NOW, is_ancestor_fn=_yes_ancestor,
                               liveness_fn=_no_liveness)
+        self.assertEqual(d.action, 'fanout')
+        self.assertEqual(d.terminal, tts.MERGED)
+        self.assertTrue(d.ancestry_verified)
+
+    def test_squash_merge_uses_merge_commit_ancestry(self):
+        # § 3.4: for a squash/rebase merge (system default) the branch tip
+        # (headRefOid) is NOT an ancestor of origin/main — only mergeCommit.oid
+        # is. Ancestry must verify off the merge commit, else the real MERGED
+        # path never fans out.
+        item = _item()
+        prs = [_pr(state='MERGED', merged_at=_iso(_NOW),
+                   head_oid='branch-tip', merge_oid='merge-sha')]
+        d = ptf.evaluate_item(
+            item, prs, now=_NOW,
+            is_ancestor_fn=lambda sha: sha == 'merge-sha',
+            liveness_fn=_no_liveness)
         self.assertEqual(d.action, 'fanout')
         self.assertEqual(d.terminal, tts.MERGED)
         self.assertTrue(d.ancestry_verified)
