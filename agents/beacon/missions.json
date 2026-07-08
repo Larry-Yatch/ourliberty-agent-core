@@ -7293,6 +7293,20 @@
       "retired_by": "heal_orphan_autoregister",
       "retired_at": "2026-07-06T18:08:30.658053+00:00",
       "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "govern-loop-assessor",
+      "name": "Govern-Loop Assessor (operator-layer ROI/rank)",
+      "phase": "drafting",
+      "brief": "Shadow-first read-only assessor over the decision-outcome ledger that ranks where Larry's approvals pay off (merged vs regressed vs abandoned); mirrors the mission_staleness scorer pattern, auto-acts on nothing.",
+      "spec_docs": [
+        "agents/beacon/specs/govern-loop-assessor.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-07-07",
+      "deferred_reason": null,
+      "archived": false
     }
   ]
 }
