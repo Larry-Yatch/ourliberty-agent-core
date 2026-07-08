@@ -1,0 +1,18 @@
+[Unit]
+Description=Operator rank brain — twice daily (fresh queue before the 6am digest + an afternoon refresh)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/mission_rank.py
+
+[Timer]
+# Twice a day, Larry-local (America/Denver — same single-edit-point convention
+# as the ceo-digest timers). 05:30 puts a fresh ranked queue on the Approvals
+# tab before the 6:00 daily digest and Larry's morning; 13:30 refreshes it
+# after the morning's merges/launches have moved the pile. Cost bound:
+# 2 runs/day x LLM cap 40 = 80 claude calls/day worst case, typically ~20/run.
+OnCalendar=*-*-* 05:30:00 America/Denver
+OnCalendar=*-*-* 13:30:00 America/Denver
+Persistent=true
+RandomizedDelaySec=300
+Unit=ourliberty-mission-rank.service
+
+[Install]
+WantedBy=timers.target
