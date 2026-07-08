@@ -1607,6 +1607,11 @@
         "model": "claude-opus-4-8",
         "at": "2026-07-08T03:25:23.242248+00:00",
         "from_state": "parked"
+      },
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-build-flip-readiness-gauge-5-completeness-gate-m-a453",
+        "stamped_at": "2026-07-08T03:59:16.019090+00:00"
       }
     },
     {
@@ -1636,6 +1641,11 @@
         "model": "claude-opus-4-8",
         "at": "2026-07-08T03:25:23.242248+00:00",
         "from_state": "parked"
+      },
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-spec-build-xiv-b-tier-4-alert-write-back-loop-f78b",
+        "stamped_at": "2026-07-08T03:59:16.028451+00:00"
       }
     },
     {
