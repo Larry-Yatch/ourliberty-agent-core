@@ -10600,6 +10600,128 @@ def _openapi_json():
     return app.openapi()
 
 
+import math  # noqa: E402 — finiteness guard for the operator-queue sanitizer
+
+# ---- GET /api/approvals/operator-queue (Operator Feed Loop slice 5) ----
+# The operator's ranked shadow queue. The rank brain (scripts/mission_rank.py)
+# scores each post-staleness proposed card against Larry's portfolio dial
+# (config/operator-portfolio.json) and writes state/mission-rank.json; this
+# endpoint serves that file to the Approvals tab. Pure fail-safe file read:
+# absent / unreadable / malformed → available=False + empty ranked (the tab
+# renders a quiet empty state), NEVER a 500. Rows are sanitized one-by-one so
+# a single bad row never breaks the queue. `mode` stays 'shadow' (the brain
+# launches nothing) until the govern loop earns auto-launch; `scored=False`
+# means the card was fallback-ranked (LLM voice unavailable) — the UI MUST
+# badge that, or a neutral rank reads as confident judgment.
+
+class OperatorQueueEntry(BaseModel):
+    # One ranked card — field-for-field the shape mission_rank.score_card emits.
+    id: Optional[str] = None
+    name: str
+    repo: Optional[str] = None
+    project: Optional[str] = None
+    stage: Optional[str] = None
+    weight: float = 0.0
+    benefit: int = 5
+    cost: int = 5
+    rank_score: float = 0.0
+    scored: bool = False        # False = fallback-ranked; UI must badge it
+    risk: str = 'careful'
+    brief: dict[str, str] = {}  # plain-language what/why/suggest
+
+
+class OperatorQueueResponse(BaseModel):
+    available: bool = False     # rank file present + parsed
+    mode: str = 'shadow'
+    generated_at: Optional[str] = None
+    summary: dict[str, Any] = {}
+    ranked: list[OperatorQueueEntry] = []
+
+
+def _operator_rank_path() -> Path:
+    """state/mission-rank.json under `_agents_root()` (OURLIBERTY_AGENTS_ROOT)
+    so tests redirect it to a tmpdir."""
+    return _agents_root() / 'state' / 'mission-rank.json'
+
+
+def _sanitize_operator_entry(e: Any) -> Optional[dict[str, Any]]:
+    """One ranked row → the OperatorQueueEntry shape, or None to skip. Manual
+    (version-agnostic) sanitization so a wrong-typed field degrades to its
+    default instead of tripping response-model validation into a 500."""
+    if not isinstance(e, dict):
+        return None
+    name = e.get('name')
+    if not isinstance(name, str) or not name:
+        return None
+
+    def _s(v: Any) -> Optional[str]:
+        return v if isinstance(v, str) and v else None
+
+    def _num(v: Any, default: float) -> float:
+        # bool is an int subclass; json.loads also admits NaN/Infinity literals
+        # and 1e400→inf — int(nan)/int(inf) raise, so non-finite → default
+        # (closes the 500 path AND the null-in-non-Optional type-drift class).
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
+            return default
+        if isinstance(v, float) and not math.isfinite(v):
+            return default
+        return v
+
+    raw_brief = e.get('brief')
+    brief = (
+        {k: v for k, v in raw_brief.items()
+         if isinstance(k, str) and isinstance(v, str)}
+        if isinstance(raw_brief, dict) else {}
+    )
+    return {
+        'id': _s(e.get('id')),
+        'name': name,
+        'repo': _s(e.get('repo')),
+        'project': _s(e.get('project')),
+        'stage': _s(e.get('stage')),
+        'weight': float(_num(e.get('weight'), 0.0)),
+        'benefit': int(_num(e.get('benefit'), 5)),
+        'cost': int(_num(e.get('cost'), 5)),
+        'rank_score': float(_num(e.get('rank_score'), 0.0)),
+        'scored': e.get('scored') is True,
+        'risk': _s(e.get('risk')) or 'careful',
+        'brief': brief,
+    }
+
+
+@app.get(
+    '/api/approvals/operator-queue',
+    response_model=OperatorQueueResponse,
+    dependencies=[Depends(_require_token)],
+)
+def get_approvals_operator_queue() -> dict[str, Any]:
+    empty: dict[str, Any] = {'available': False, 'mode': 'shadow',
+                             'generated_at': None, 'summary': {}, 'ranked': []}
+    try:
+        with open(_operator_rank_path(), encoding='utf-8') as f:
+            data = json.load(f)
+    except (OSError, ValueError, RecursionError):
+        # RecursionError: pathologically-nested JSON escapes ValueError —
+        # still "malformed file", still the quiet empty state, never a 500.
+        return empty
+    if not isinstance(data, dict):
+        return empty
+    raw = data.get('ranked')
+    if not isinstance(raw, list):
+        return empty
+    ranked = [row for row in (_sanitize_operator_entry(e) for e in raw)
+              if row is not None]
+    gen = data.get('generated_at')
+    summary = data.get('summary')
+    return {
+        'available': True,
+        'mode': data.get('mode') if isinstance(data.get('mode'), str) else 'shadow',
+        'generated_at': gen if isinstance(gen, str) else None,
+        'summary': summary if isinstance(summary, dict) else {},
+        'ranked': ranked,
+    }
+
+
 if __name__ == '__main__':
     # Direct `python3 -m scripts.dashboard_api` invocation; production
     # goes through uvicorn in the systemd unit.
