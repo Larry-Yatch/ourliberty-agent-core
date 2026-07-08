@@ -1475,6 +1475,11 @@
         "model": "claude-opus-4-8",
         "at": "2026-07-08T00:04:21.515203+00:00",
         "from_state": "parked"
+      },
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-govern-loop-assessor-operator-layer-roi-rank-bra-28b0",
+        "stamped_at": "2026-07-08T00:24:58.269184+00:00"
       }
     },
     {
