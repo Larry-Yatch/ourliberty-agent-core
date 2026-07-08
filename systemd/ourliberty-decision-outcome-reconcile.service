@@ -1,0 +1,18 @@
+[Unit]
+Description=Join the team build result onto Larry's decisions — reconcile PR-coordinate decisions in the decision-outcome ledger against GitHub truth (Operator Feed Loop slice 2)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/decision_outcome_reconcile.py
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/decision_outcome_reconcile.py --once
+
+TimeoutStartSec=180
