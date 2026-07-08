@@ -133,6 +133,30 @@ def log(msg: str, level: str = 'INFO') -> None:
         pass
 
 
+# The registry template (config/auto-fix-patterns.json) this backstop merge
+# path records for. Shares the template with outbox_notifier's primary
+# auto-merge path; a given PR is merged by exactly one path, so recording in
+# both captures every auto-merge without double-counting.
+_AUTO_MERGE_TEMPLATE = 'auto-merge-clean-pr'
+
+
+def _record_auto_merge_success() -> None:
+    """Record one clean ``auto-merge-clean-pr`` execution toward Check V's
+    graduation streak (delegates to the shared, registry-gated, never-raise
+    ``alert_triage_state.record_clean_execution_if_registered``, PR #832 pattern).
+    SUCCESS-ONLY, matching outbox_notifier — a gh merge failure is an unreliable
+    action-quality signal (transient / infra), so the streak grows only on a
+    verified landed merge and demotion comes from a Larry-correction. Additive/
+    best-effort: it observes a merge that already happened and must never affect
+    it (or the healer's retry loop)."""
+    try:
+        import alert_triage_state  # lazy: keep import surface light
+        alert_triage_state.record_clean_execution_if_registered(
+            _AUTO_MERGE_TEMPLATE)
+    except Exception:  # never let a track-record write surface into heal
+        pass
+
+
 def heartbeat() -> None:
     try:
         HEARTBEAT_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -673,6 +697,11 @@ def process_pr(pr: dict, mirror_passed: dict[str, dict[str, str]],
     outcome, detail = merge_pr(repo, pr_num, title)
     save_state(state)
     if outcome in ('merged', 'already_merged'):
+        # Only a fresh merge THIS backstop performed is a clean execution;
+        # 'already_merged' means another path (outbox_notifier) landed it and
+        # recorded it there — skip to avoid double-counting.
+        if outcome == 'merged':
+            _record_auto_merge_success()
         log(f'HEALED: {outcome} {repo}#{pr_num} (attempt '
             f'{pr_state["attempts"]}/{MAX_RETRIES_PER_PR}) — {detail}')
         # Stop tracking — clear the entry so a future PR re-using this URL
@@ -689,6 +718,7 @@ def process_pr(pr: dict, mirror_passed: dict[str, dict[str, str]],
             severity='warning',
         )
         return 'merged'
+    # No graduation record on failure (success-only; see _record_auto_merge_success).
     log(f'PR {repo}#{pr_num} merge attempt '
         f'{pr_state["attempts"]}/{MAX_RETRIES_PER_PR} failed: {detail}',
         'WARN')

@@ -6616,6 +6616,36 @@ def _spawn_post_merge_baseline_warm(task_id: str, pr_url: str) -> None:
         )
 
 
+# The registry template (config/auto-fix-patterns.json) this executor is the
+# act-time recorder for. Auto-merge is by far the highest-frequency reversible
+# automation the system performs; recording its verified successes/failures is
+# the streak INPUT Check V's promotion loop needs to ever surface an auto-merge
+# graduation proposal.
+_AUTO_MERGE_TEMPLATE = 'auto-merge-clean-pr'
+
+
+def _record_auto_merge_success() -> None:
+    """Record one clean ``auto-merge-clean-pr`` execution toward Check V's
+    graduation streak (delegates to the shared, registry-gated, never-raise
+    ``alert_triage_state.record_clean_execution_if_registered``, PR #832 pattern).
+
+    SUCCESS-ONLY by design. A ``gh pr merge`` failure is recorded NOWHERE: gh
+    returns non-zero for transient/infra causes too (a still-running required
+    check, a GitHub 5xx, a mid-flight rebase race), and recording those as a
+    graduation ``failure`` would ungatedly demote a graduated auto-merge template
+    on noise. The reliable "this auto-merge was a mistake" signal is a
+    Larry-correction (a rollback of a bad merge), not a gh exit code — so the
+    streak only ever grows on a verified landed merge. Additive/best-effort: it
+    observes a merge that already happened and must never affect it.
+    """
+    try:
+        import alert_triage_state  # lazy: keep the module's import surface light
+        alert_triage_state.record_clean_execution_if_registered(
+            _AUTO_MERGE_TEMPLATE)
+    except Exception:  # never let a track-record write surface into the merge
+        pass
+
+
 def _auto_merge_pr(pr_url: str, task_id: str) -> dict[str, Any]:
     """Fire `gh pr merge <N> --squash --delete-branch` for a Mirror-PASSed PR.
 
@@ -6736,6 +6766,7 @@ def _auto_merge_pr(pr_url: str, task_id: str) -> dict[str, Any]:
         # Off-path: warm the new main HEAD's regression baseline so the next
         # PR's first review hits the cache (spec PR 2). Fire-and-forget.
         _spawn_post_merge_baseline_warm(task_id, pr_url)
+        _record_auto_merge_success()
         return {
             'merge_outcome': 'merged',
             'merge_reason': 'squash-merged + branch deleted',
@@ -6777,6 +6808,9 @@ def _auto_merge_pr(pr_url: str, task_id: str) -> dict[str, Any]:
         f'stderr={stderr_text[:300]!r}) agent=forge',
         'WARN',
     )
+    # No graduation record on failure — see _record_auto_merge_success: a gh
+    # non-zero exit is an unreliable action-quality signal (transient / infra),
+    # so the streak is success-only and demotion comes from a Larry-correction.
     return {
         'merge_outcome': 'failed',
         'merge_reason': reason_short,

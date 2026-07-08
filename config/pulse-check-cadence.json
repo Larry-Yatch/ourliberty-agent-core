@@ -1,7 +1,7 @@
 {
   "_schema": {
     "version": 1,
-    "purpose": "Expected firing cadence + grace per Pulse check (I-X), driving scripts/heal_pulse_check_staleness.py. The watcher alerts (pulse-check-stale:<id>) when a check's last success heartbeat is older than cadence_hours + grace_hours.",
+    "purpose": "Expected firing cadence + grace per Pulse check (I-XII), driving scripts/heal_pulse_check_staleness.py. The watcher alerts (pulse-check-stale:<id>) when a check's last success heartbeat is older than cadence_hours + grace_hours.",
     "fail_closed": "A check the watcher knows about (canonical set, or any pulse-check-<id>.heartbeat on disk) with NO entry here, or a malformed entry, gets a pulse-check-no-cadence:<id> alert rather than being silently unmonitored. Every rule earns enforcement.",
     "fields": {
       "cadence_hours": "Expected max gap between successful firings, in hours. Required unless event_driven.",
@@ -22,6 +22,7 @@
     "ix":   {"cadence_hours": 168, "grace_hours": 36, "label": "Operator-friction signals",   "firing": "Weekly Monday (systemd timer: ourliberty-pulse-check-ix)"},
     "x":    {"cadence_hours": 168, "grace_hours": 36, "label": "Chain-quality regression",    "firing": "Weekly Monday (systemd timer: ourliberty-pulse-check-x)"},
     "xi":   {"cadence_hours": 24,  "grace_hours": 12, "label": "Catalog accuracy meter",      "firing": "Daily (systemd timer: ourliberty-pulse-check-xi)"},
+    "xii":  {"cadence_hours": 168, "grace_hours": 36, "label": "Delivery-effectiveness meter", "firing": "Weekly (systemd timer: ourliberty-pulse-check-xii)"},
     "xiv":  {"cadence_hours": 168, "grace_hours": 36, "label": "Alert-precision meter",        "firing": "Weekly Monday (systemd timer: ourliberty-pulse-check-xiv)"},
     "retrospective":        {"cadence_hours": 168, "grace_hours": 48, "label": "Elevation retrospective (Stage A)",  "firing": "Weekly Monday (systemd timer: ourliberty-retrospective-weekly)"},
     "retrospective-author": {"cadence_hours": 168, "grace_hours": 48, "label": "Elevation retrospective author (Stage B)", "firing": "Weekly Monday (systemd timer: ourliberty-retrospective-weekly)"}

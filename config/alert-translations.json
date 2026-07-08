@@ -551,6 +551,26 @@
       "recommended_action": "Review the recent Forge/Mirror PRs from the trailing window (the DM names the metric and shows the before -> after numbers). If the regression looks real, revert the affected agent to claude-opus-4-7 by flipping its routing value in config/agent-models.json and restarting the inbox-watcher (it caches config at startup, inbox_watcher.py:778). No automated action is taken; the full metric table is in ~/agents/blackboard/pulse-check-x-proposals/check-x-<Monday>.json."
     }
   },
+  "pulse-check-xii": {
+    "pulse-check-xii-monthly-digest": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "The monthly delivery-effectiveness digest (Check XII) — a plain-language readout of how the factory delivered over the trailing 4 weeks: merges (mission-linked vs unlinked), dispatch-to-merge lead time, and cost per mission shipped. This is observe-only: Check XII has NO firing rules yet, so this is a baseline snapshot for calibration, not an alert about anything wrong.",
+      "recommended_action": "No action required — this is an informational baseline. The full metric table (throughput split, lead time, rework, survival, cost, demand) is in ~/agents/blackboard/pulse-check-xii/. Read it if you want the delivery picture; the numbers are what V1.1's firing rules will eventually calibrate against."
+    },
+    "pulse-check-xii-source-dark": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "One of Check XII's four data sources (github / chain_events / costs / missions) has failed to load for 2 consecutive weekly runs, so the delivery metrics that depend on it are reporting insufficient_signal instead of real numbers. A single run's blip is suppressed by design; two in a row means it is not self-resolving. The subject carries the dark source name after the colon.",
+      "recommended_action": "Investigate the named source before the next Monday firing. github = the `gh` CLI / auth; chain_events + missions = Supabase reachability/credentials; costs = ~/agents/blackboard cost ledger. Run `python3 ~/agent-core/scripts/pulse_check_xii.py --dry-run` to see which source raises and why; the artifact's `sources` block records per-source status."
+    },
+    "pulse-check-xii-rule": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "A Check XII delivery-effectiveness firing rule has tripped: a delivery metric moved past its calibrated threshold over the trailing window. This is a V1.1+ signal (V1 is observe-only, so it does not fire yet). The subject carries the rule number after the colon.",
+      "recommended_action": "Review the named metric's before -> after numbers in the DM and the full table in ~/agents/blackboard/pulse-check-xii/. The rule is a heads-up about a delivery-throughput/quality/cost shift, not an automated change — decide whether it reflects a real regression worth acting on."
+    }
+  },
   "pulse-cycle": {
     "cycle-blocked": {
       "severity": "WARNING",

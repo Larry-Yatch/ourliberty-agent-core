@@ -237,9 +237,9 @@ PR #728 (chore(alerts): Tier-3 silence ourliberty-health-sync-push-failed duplic
 
 ---
 
-## G-rule sentinel-inflight-stall-mirror-tier4 — 2/3 (updated iter ~2964)
+## G-rule sentinel-inflight-stall-tier4 — DISPATCHED ✅ (iter ~4474, 3/3)
 
-**Rule:** `source=sentinel, subject^=in-flight-stall:` alerts classify Tier-4 (novel, no translation match). Fired when Mirror session exceeds 60-min in-flight threshold. Sentinel message says heal_wedged_review_sessions auto-recovers; kill PID unblocks sooner. outbox-notifier delivers route=escalate DM to Larry; Pulse suppresses duplicate DM (journal-note only). Fix: add `source=sentinel, subject^=in-flight-stall:` → Tier-3 (if healer reliably self-recovers) OR Tier-2 (kill-PID action needed). Dispatch to Beacon at 3/3. Occurrences: iter ~2892 (1/3); iter ~2964 (2/3, Mirror PR #717 watchdog-mirror-active-stale-suppression-001.json, 1.13h in-flight).
+**Rule:** `source=sentinel, subject^=in-flight-stall:` alerts classify Tier-4 (novel, no translation match). Fired when Mirror OR Forge in-flight session exceeds 60-min threshold. Sentinel message says heal_wedged_review_sessions auto-recovers; kill PID unblocks sooner. outbox-notifier delivers route=escalate DM to Larry; Pulse suppresses duplicate DM (journal-note only). Fix dispatched at 3/3 (iter ~4474): direction-ask-sentinel-inflight-stall-tier4-translation-001 to Beacon inbox — add `source=sentinel, subject^=in-flight-stall:` → Tier-3 (or Tier-2 if Forge stalls don't auto-recover). Occurrences: iter ~2892 (1/3, Mirror PR #717, 1.13h); iter ~2964 (2/3, Mirror 1.13h); iter ~4474 (3/3, Forge xiv-v1 1.18h+). verification_pending.
 
 ---
 
@@ -285,9 +285,9 @@ Previously marked COMPLETE at iter ~3839 (Tier-3 confirmed). RE-VERIFIED iter ~3
 
 ---
 
-## G-rule ourliberty-health-subject-key-mismatch-001 → COMPLETE ✅ (iter ~4452)
+## G-rule ourliberty-health-subject-key-mismatch-001 → RE-OPENED ⚠️ (iter ~4473)
 
-**Rule (historical):** `source=ourliberty-health, subject="ourliberty-agent-core health: N issue(s) need attention"` alerts classified Tier-4. Fix was dispatched to Beacon at iter ~4129. **COMPLETE:** triage helper confirmed Tier-3 (known-pattern, last_updated=2026-06-24) at iter ~4452 for L1011. Translation was already live in alert-translations.json before the dispatch; fix is confirmed working. Note: bot still delivers route=escalate for this alert type (healer sets route=escalate independently of Pulse triage); Pulse avoids duplicate DM. Moved to Completed G-rules.
+**Rule:** `source=ourliberty-health, subject="ourliberty-agent-core health: N issue(s) need attention"` alerts classify Tier-4 (no translation match). The alert-translations.json `ourliberty-health` entry keys on `"sync_agent_core: auto-commit push failed"` — this does NOT match the `"clean_tree: 1 modified"` dirty-tree subject variant. MEMORY COMPLETE claim (iter ~4452) was stale — the Tier-3 confirmation at iter ~4452 may have been a different subject shape. Re-opened: Tier-4 confirmed at iter ~4473 (L1018, dirty-tree subject). Fix: add a `"ourliberty-agent-core health:*"` catch-all OR a `"clean_tree"` sub-key to alert-translations.json. Dispatch to Beacon at 3/3. Occurrences: iter ~3839 (1st, re-open from ~3849); iter ~4473 (L1018, 2nd confirmed Tier-4 return for dirty-tree shape).
 
 ---
 
@@ -460,8 +460,14 @@ PR #828 (`gate: delegate JS/TS repo regression checks to GitHub Actions (Piece 2
 
 ---
 
-## Status snapshot — updated 2026-07-07T22:41Z UTC (Iter ~4462, **Tier 1**)
+## G-rule forge-marker-task-id-mismatch-xii-v1 — 1/3 (new, iter ~4464)
 
-**Iter ~4462 summary (2026-07-07T22:41Z):** 0 net new alerts (L1016 heal-wedged-review-sessions Tier-3 silence; watermark stays 1016). Pending approvals=0 (merge-held-deep-review-escalate-route-001 RESOLVED 22:33:48Z). **Major events since iter ~4461:** PR #833 MERGED 22:39:57Z ("Operator Feed Loop slice 2: build-outcome join" — c3b813f4). Sync auto-ran 22:40:33Z pulling PR #833 merge commit. Forge fix task `merge-held-deep-review-escalate-route-001.json` dispatched to Forge inbox at 22:35Z (route=hold→escalate fix, G-rule ADVANCING). **Agent-core:** HEAD=c3b813f4=origin/main. Clean. Sync: status=success at 22:40:33Z. Daemons: all 6 active (outbox-notifier + beacon-bot restarted cleanly 22:34Z + 22:40Z via heal-stale-daemon-code deploy cycle). Watchdog 22:41:13Z healthy. **PIPELINE:** PR #837/838/839 Mirror reviews active (~36/26/21 min). Forge inbox: kickoff-routing-gap-001 (~65min ⚠️ watch), merge-held-deep-review-escalate-route-001 (~6min new), xiv-v1 (~56min). STANDING: zombie bash PID 1834248 (~40.16d). Check VI/VIII awaiting explicit approve. Dashboard: 0 open PRs. Tier 1 (consecutive_clean=0). **ACTIVE G-rules:** auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [2/3]; merge-held-deep-review-notifier-tier4-001 [DISPATCHED vp ADVANCING — Forge task queued]; auto-merge-conflict-promoted-merged-pr-001 [2/3 — watch: PR #833 MERGED, may re-promote]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3]; mirror-malformed-verdict-heal-reap-path-001 [1/3]; pulse-source-novel-pr-specific-subject-tier4-001 [1/3]. Tuesday — no firing-day gates.
+**Rule:** `forge marker error in xii-v1.json: MalformedForgeMarker: marker task_id ('pulse-check-xii-v1') does not match envelope task_id ('xii-v1')` at 2026-07-07 15:33:18 MDT. Forge emitted its PROCEED/build markers with a `task_id` field that doesn't match the inbox envelope's `task_id`. outbox-notifier logs a WARN but the build still completes (PR #838 opened). Pattern: envelope task_id is the short slug (`xii-v1`) while the marker task_id is the full canonical name (`pulse-check-xii-v1`). Fix: Forge should use the envelope's exact task_id in its marker output, OR outbox-notifier should tolerate task_id being a suffix/prefix match. Dispatch to Beacon at 3/3. First occurrence iter ~4464.
+
+---
+
+## Status snapshot — updated 2026-07-08T01:08Z UTC (Iter ~4481, **Tier 1**)
+
+**Iter ~4481 summary (2026-07-08T01:08Z):** 1 new alert (doorbell L1024, Tier-3 silenced). Watermark=1024. Pending approvals=2 (sentinel-inflight-stall-translation-001 + govern-loop-assessor-spec-001). **PR #845** (journal rotation) Mirror review DISPATCHED at 19:00:14 MDT — now in queue. Mirror queue: 7 items (kickoff in-flight, 6 waiting: merge-held-deep-review, pr-841, pr-844, pr-845, xii-v1, xiv-v1). PR #840 kickoff Mirror regression check in-flight (PID 2002820, ~19 min). PR #839 REVIEW_ESCALATE: Beacon processed; outcome TBD. PR #837 REVIEW_PASS HELD (blocker #839). **Agent-core:** HEAD=6fd4a0d3=origin/main. CLEAN TREE. Sync: 00:40:03Z. Watchdog healthy (01:01:39Z). Heal-daemon 01:04:39Z. **STANDING:** zombie PID 1834248 (40d+) — kill 1834248 ask-then-do pending Larry. Check VI/VIII proposals (idx=990,991) carry. 9 open PRs (#837-845). Check I timer fires 08:13 MDT today (Wed, 14:13Z). GitHub 401 WARN: 1 isolated July 7 instance, no recurrence. Tier 1 (consecutive_clean=0). **ACTIVE G-rules:** sentinel-inflight-stall-tier4 [APPROVAL_REQUEST pending=1, ADVANCING]; merge-held-deep-review-notifier-tier4-001 [PR #843 Mirror queued, ADVANCING]; auto-merge-conflict-promoted-merged-pr-001 [2/3]; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [2/3]; forge-marker-task-id-mismatch-xii-v1 [1/3, watch PR #838 re-review]; ourliberty-health-subject-key-mismatch-001 [RE-OPENED 2/3]; notifier-concurrent-scan-duplicate-review-dispatch-001 [1/3]; mirror-malformed-verdict-heal-reap-path-001 [1/3].
 
 

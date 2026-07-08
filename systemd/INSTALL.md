@@ -109,6 +109,7 @@ sudo systemctl enable --now ourliberty-pulse-check-vi.timer    # first Monday of
 sudo systemctl enable --now ourliberty-pulse-check-viii.timer  # Mondays
 sudo systemctl enable --now ourliberty-pulse-check-ix.timer    # Mondays
 sudo systemctl enable --now ourliberty-pulse-check-x.timer     # Mondays
+sudo systemctl enable --now ourliberty-pulse-check-xii.timer   # Mondays (05:39; delivery-effectiveness meter, observe-only V1)
 sudo systemctl enable --now ourliberty-pulse-check-xiv.timer   # Mondays (05:49) — alert-precision meter
 # One-time catch-up: if a check's scheduled day already passed when you enable
 # (e.g. enabling after the first Monday leaves V/VI dark until NEXT month while

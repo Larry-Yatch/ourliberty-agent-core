@@ -1413,6 +1413,104 @@
         "from_state": "parked"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "cap-slice-2-reconciler-hardening-closed-unmerged-ter-8d9e",
+      "title": "Slice-2 reconciler hardening: closed_unmerged terminal gap + cleanups (from PR #833 review)",
+      "note": "decision_outcome_reconcile.py records a CLOSED-unmerged PR as terminal build_outcome='closed_unmerged', but a closed PR can be reopened+merged on GitHub \u2014 has_build_outcome() then locks in the wrong 'abandoned' signal forever, misleading the future govern-loop assessor. Fix when the assessor that consumes these outcomes is built (options: treat CLOSED as re-checkable / add a settle period / let a later merged row supersede closed_unmerged). Bundle these non-blocking cleanups from the same /code-review high on #833: (1) decision_keys_without_outcome docstring claims bounded scan but read_recent lists whole file then slices; (2) its resolved-set is window-scoped now that build_outcome rows share the file \u2014 consider whole-file scan; (3) reconcile calls full-file has_build_outcome per key = O(keys x rows), pass the computed resolved set down; (4) classify()'s 'pending' is a magic string not in a named non-recordable set. All judged non-blocking: reconciler is manual --once, not timer-wired, no consumer yet.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-07T22:46:18.759028+00:00"
+      },
+      "last_touched": "2026-07-07T22:46:18.759028+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A parked cleanup to a bookkeeping tool that tracks whether proposed changes ended up shipped or dropped.",
+        "why": "One case can silently mislabel a dropped item as 'abandoned' forever even if it's later revived, which would feed bad signals into future automated decision-making.",
+        "suggest": "No rush \u2014 it's low-stakes and nothing depends on it yet, so shelve it until we build the piece that actually reads these signals, then fix it as part of that work."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-07T22:54:20.983495+00:00",
+        "from_state": "parked"
+      },
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-slice-2-reconciler-hardening-closed-unmerged-ter-8d9e",
+        "stamped_at": "2026-07-07T23:01:36.784195+00:00"
+      }
+    },
+    {
+      "id": "cap-govern-loop-assessor-operator-layer-roi-rank-bra-28b0",
+      "title": "Govern-loop assessor (operator-layer ROI/rank brain) \u2014 consumes decision-outcome ledger",
+      "note": "INITIATIVE placeholder so the build-outcome work has a home. Build the assessor that READS ~/agents/state/decision-outcome-ledger.jsonl (decision rows joined to build_outcome rows on decision_key, written by scripts/decision_outcome_ledger.py + scripts/decision_outcome_reconcile.py, shipped in PR #833 as Operator Feed Loop slice 2) and turns it into 'where do Larry's approvals pay off' \u2014 the triage/ROI/rank brain (ship shadow-first per operator-layer-readiness). GATING PREREQUISITE \u2014 do this FIRST, it travels with this initiative: capture cap-slice-2-reconciler-hardening-closed-unmerged-ter-8d9e \u2014 the reconciler currently records a CLOSED-unmerged PR as a PERMANENT 'closed_unmerged' outcome, but closed PRs can be reopened+merged, so has_build_outcome() locks in a wrong 'abandoned' signal the assessor would then learn from. Decide the fix (re-checkable CLOSED / settle-period / let a later merged row supersede) in the context of how the assessor weights outcomes; that card also bundles bounded-scan + efficiency + magic-string cleanups. Also note the reconciler is manual --once, not timer-wired, and only joins PR-coordinate decision keys (task_id-keyed decisions not joined yet).",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-07T23:54:54.826103+00:00"
+      },
+      "last_touched": "2026-07-07T23:54:54.826103+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A scorekeeping tool that watches the decisions you approve and reports back on which ones actually paid off, so you can see where your attention delivers the most value.",
+        "why": "It turns your day-to-day approvals into a clear picture of what's working and what isn't, so your time goes to the choices that move the business instead of ones that quietly fizzle.",
+        "suggest": "Worth pursuing, but first close a data-accuracy gap that can wrongly brand a paused decision as a failure even when it later succeeds \u2014 then run it quietly in watch-only mode before trusting its rankings."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-08T00:04:21.515203+00:00",
+        "from_state": "parked"
+      },
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-govern-loop-assessor-operator-layer-roi-rank-bra-28b0",
+        "stamped_at": "2026-07-08T00:24:58.269184+00:00"
+      }
+    },
+    {
+      "id": "cap-rotate-the-cycle-journal-31mb-file-committed-eve-69e7",
+      "title": "Rotate the /cycle journal \u2014 31MB file committed every Pulse iteration bloats git",
+      "note": "ROOT CAUSE of the 2026-07-07 droplet overload: the cycle journal markdown is a 31MB append-only file re-committed every ~15min Pulse cycle; each commit stores a full ~4.5MB-compressed blob. ~8000 loose objects / 3.9GB piled up in agent-core/.git, git gc --auto fired and starved the box (load 9, Mirror review timeouts on PRs 838/839). Fix: rotate the journal \u2014 keep last N entries in the committed file (cycle-prompt.md only reads last 5-10), archive older entries outside git or compressed. Also: gc.auto is now 0 on the droplet agent-core clone (throttled one-shot repack draining the backlog 2026-07-07, log ~/agents/logs/agentcore-repack-oneshot.log); after rotation lands, decide gc policy (re-enable gc.auto or scheduled off-hours repack).",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": null,
+        "branch": null,
+        "captured_at": "2026-07-08T00:07:48.149511+00:00"
+      },
+      "last_touched": "2026-07-08T00:07:48.149511+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A background housekeeping file has quietly grown huge and is being re-saved every few minutes, which recently overloaded the server and slowed things down.",
+        "why": "Left alone it keeps piling up storage and can stall the whole system at random moments, exactly like the slowdown we just hit today.",
+        "suggest": "Trim the file down to only the recent entries it actually needs and tuck the rest away \u2014 worth doing soon, but carefully and tested first since it touches the running system."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-08T00:14:30.501617+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
