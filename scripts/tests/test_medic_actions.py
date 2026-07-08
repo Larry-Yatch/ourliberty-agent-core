@@ -92,6 +92,46 @@ class _IsolatedActions(unittest.TestCase):
         importlib.reload(medic_actions)
         self.assertTrue(str(medic_actions.AGENTS_ROOT).startswith(self._tmpdir))
         self.assertTrue(str(medic_actions.REPO_DIR).startswith(self._tmpdir))
+        self._isolate_registry()
+
+    # --- auto-fix registry isolation (Stage-2 graduation gate) ---
+    #
+    # The Stage-2 graduation gate (medic_actions._graduation_gate) reads the
+    # auto-fix registry (config/auto-fix-patterns.json), whose real path is
+    # Path(__file__)-anchored in alert_triage_state, NOT env-scoped. Left
+    # unpatched, every act-path test would read the REAL worktree registry
+    # (where restart-daemon is PROBATION) and the gate would refuse the
+    # restart. So we own a tmp registry and repoint BOTH module constants at
+    # it. Default: restart-daemon GRADUATED, so the act-mechanics tests
+    # (allowlist, recurrence, verify, watchdog-coordination) exercise Medic's
+    # ACTING path; a test that wants the ask-path re-seeds probation via
+    # _write_registry. Repointing pulse_check_v.REGISTRY_FILE too keeps the
+    # recorder's adverse demotion hook off the real registry (a graduated
+    # template's failed act demotes it -> a registry write).
+
+    def _registry_path(self) -> Path:
+        return self.repo_dir / 'config' / 'auto-fix-patterns.json'
+
+    def _write_registry(self, patterns: list) -> None:
+        reg = self._registry_path()
+        reg.parent.mkdir(parents=True, exist_ok=True)
+        reg.write_text(json.dumps({'patterns': patterns}))
+
+    def _write_registry_graduated(self) -> None:
+        self._write_registry([{
+            'template': 'restart-daemon', 'state': 'graduated',
+            'reversible': True, 'permanent_guard': False}])
+
+    def _isolate_registry(self) -> None:
+        import alert_triage_state
+        import pulse_check_v
+        self._write_registry_graduated()
+        reg = self._registry_path()
+        for mod, attr in ((alert_triage_state, 'AUTO_FIX_PATTERNS_FILE'),
+                          (pulse_check_v, 'REGISTRY_FILE')):
+            p = mock.patch.object(mod, attr, reg)
+            p.start()
+            self.addCleanup(p.stop)
 
     def tearDown(self) -> None:
         for k, v in self._env_snapshot.items():
@@ -789,27 +829,12 @@ class GraduationExecutionRecordTest(_IsolatedActions):
     """Stage 1 of the Check-V graduation unify: a verified Medic action whose
     name matches a registry template records a clean/failed execution into the
     executions store Check V reads — the streak input the loop was missing.
-    Non-template actions and refusals record nothing."""
+    Non-template actions and refusals record nothing.
 
-    def setUp(self) -> None:
-        super().setUp()
-        # Own our registry fixture rather than reading the real worktree
-        # config/auto-fix-patterns.json (whose path is Path(__file__)-anchored,
-        # not env-scoped): 'restart-daemon' present + probation, 'retrigger-
-        # inbox' absent. Repointing BOTH module constants also guarantees the
-        # failure-path demotion hook can never touch the real registry.
-        import alert_triage_state
-        import pulse_check_v
-        reg = self.repo_dir / 'config' / 'auto-fix-patterns.json'
-        reg.write_text(json.dumps({'patterns': [{
-            'template': 'restart-daemon', 'state': 'probation',
-            'reversible': True, 'permanent_guard': False,
-        }]}))
-        for mod, attr in ((alert_triage_state, 'AUTO_FIX_PATTERNS_FILE'),
-                          (pulse_check_v, 'REGISTRY_FILE')):
-            p = mock.patch.object(mod, attr, reg)
-            p.start()
-            self.addCleanup(p.stop)
+    Uses the inherited GRADUATED restart-daemon fixture: post Stage-2, Medic
+    only reaches the recorder for a template it is allowed to ACT on, i.e. a
+    graduated one (a probation template is refused by the graduation gate
+    before it runs — that path is covered by GraduationGateTest)."""
 
     def _executions(self) -> dict:
         import alert_triage_state
@@ -829,8 +854,10 @@ class GraduationExecutionRecordTest(_IsolatedActions):
 
     def test_unverified_restart_records_failure_execution(self) -> None:
         # Ran but did not verify -> 'acted-failed' -> a FAILURE execution
-        # (breaks the streak; the recorder's demotion hook no-ops on a
-        # probation template).
+        # (breaks the streak). On the graduated fixture this also fires the
+        # recorder's adverse demotion hook (graduated -> probation), which is
+        # isolated to the tmp registry by _isolate_registry; the assertion here
+        # only checks the recorded execution outcome.
         restart_p, active_p = self._patch_subprocess(rc=0, active='activating')
         with restart_p, active_p:
             res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
@@ -870,6 +897,127 @@ class GraduationExecutionRecordTest(_IsolatedActions):
                 'ourliberty-not-a-real-unit.service', ALERT_FP)
         self.assertFalse(res['ok'])
         self.assertEqual(self._executions(), {})
+
+
+class GraduationGateTest(_IsolatedActions):
+    """Stage 2 of the Check-V graduation unify: the registry now GOVERNS
+    whether Medic auto-acts. For an action whose name IS a registry template
+    (restart-daemon): graduated + not-guard -> auto-act; probation OR
+    permanent_guard -> refuse + escalate diagnose-only (no subprocess, ledger
+    'skipped', recurrence gate un-armed). Actions that are NOT registry
+    templates and an unreadable registry both keep current behavior
+    (fail-safe: a registry read error must never block a legitimate action)."""
+
+    def _executions(self) -> dict:
+        import alert_triage_state
+        return alert_triage_state.load_executions()
+
+    def test_probation_template_refused_and_no_subprocess(self) -> None:
+        # The core Stage-2 behavior change: restart-daemon ships PROBATION, so
+        # Medic must ASK (escalate diagnose-only) instead of auto-restarting.
+        self._write_registry([{
+            'template': 'restart-daemon', 'state': 'probation',
+            'reversible': True, 'permanent_guard': False}])
+        restart_p, active_p = self._patch_subprocess()
+        with restart_p as restart_m, active_p as active_m:
+            res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
+        self.assertFalse(res['ok'])
+        self.assertEqual(res['outcome'], 'skipped')
+        self.assertEqual(res['reason'], 'not-graduated')
+        # No actuation on an un-graduated class.
+        restart_m.assert_not_called()
+        active_m.assert_not_called()
+        # 'skipped' -> recurrence gate NOT armed; Medic may act on a later cycle
+        # once Larry graduates the class.
+        self.assertFalse(medic_ledger.has_acted(ALERT_FP))
+        # The action never ran, so no execution accrues.
+        self.assertEqual(self._executions(), {})
+
+    def test_graduated_template_auto_acts(self) -> None:
+        # Larry graduated the class -> Medic auto-acts (inherited default is
+        # graduated; assert the happy path explicitly through the gate).
+        restart_p, active_p = self._patch_subprocess(rc=0, active='active')
+        with restart_p as restart_m, active_p:
+            res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
+        self.assertTrue(res['ok'])
+        self.assertEqual(res['outcome'], 'acted')
+        restart_m.assert_called_once_with(ALLOWED_DAEMON)
+
+    def test_permanent_guard_never_auto_acts(self) -> None:
+        # Defensive floor: even a (mislabeled) graduated + permanent_guard
+        # template must NOT auto-act.
+        self._write_registry([{
+            'template': 'restart-daemon', 'state': 'graduated',
+            'reversible': True, 'permanent_guard': True}])
+        restart_p, active_p = self._patch_subprocess()
+        with restart_p as restart_m, active_p:
+            res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
+        self.assertFalse(res['ok'])
+        self.assertEqual(res['reason'], 'not-graduated')
+        restart_m.assert_not_called()
+
+    def test_action_not_in_registry_proceeds(self) -> None:
+        # A registry that does NOT list restart-daemon -> the action is not a
+        # governed template -> keep current (allowlist-governed) behavior.
+        self._write_registry([{
+            'template': 'some-other-template', 'state': 'probation',
+            'reversible': True, 'permanent_guard': False}])
+        restart_p, active_p = self._patch_subprocess(rc=0, active='active')
+        with restart_p as restart_m, active_p:
+            res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
+        self.assertTrue(res['ok'])
+        restart_m.assert_called_once_with(ALLOWED_DAEMON)
+
+    def test_retrigger_inbox_not_gated_by_graduation(self) -> None:
+        # retrigger-inbox is never a registry template, so the graduation gate
+        # never governs it even when the registry is present (probation
+        # restart-daemon seeded to prove the gate is consulted, not blanket).
+        self._write_registry([{
+            'template': 'restart-daemon', 'state': 'probation',
+            'reversible': True, 'permanent_guard': False}])
+        restart_p, active_p = self._patch_subprocess(rc=0, active='active')
+        with restart_p as restart_m, active_p:
+            res = medic_actions.retrigger_inbox(ALLOWED_DAEMON, ALERT_FP)
+        self.assertTrue(res['ok'])
+        self.assertEqual(res['action'], 'retrigger-inbox')
+        restart_m.assert_called_once_with(ALLOWED_DAEMON)
+
+    def test_unreadable_registry_proceeds_fail_safe(self) -> None:
+        # A registry read error must NEVER block a legitimate Medic action:
+        # load_registry raising -> the gate's try/except -> proceed per the
+        # allowlist (current behavior).
+        restart_p, active_p = self._patch_subprocess(rc=0, active='active')
+        import alert_triage_state
+        with restart_p as restart_m, active_p, \
+                mock.patch.object(alert_triage_state, 'load_registry',
+                                  side_effect=OSError('simulated read error')):
+            res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
+        self.assertTrue(res['ok'])
+        restart_m.assert_called_once_with(ALLOWED_DAEMON)
+
+    def test_corrupt_registry_proceeds_fail_safe(self) -> None:
+        # A malformed registry file degrades to {} in load_registry (-> action
+        # not found -> proceed), the same current-behavior fall-through.
+        self._registry_path().write_text('{not valid json')
+        restart_p, active_p = self._patch_subprocess(rc=0, active='active')
+        with restart_p as restart_m, active_p:
+            res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
+        self.assertTrue(res['ok'])
+        restart_m.assert_called_once_with(ALLOWED_DAEMON)
+
+    def test_gate_runs_after_allowlist(self) -> None:
+        # Ordering: a probation template on a NON-allowlisted target is refused
+        # by the earlier allowlist gate ('not-permitted'), confirming the
+        # graduation gate sits after the allowlist.
+        self._write_registry([{
+            'template': 'restart-daemon', 'state': 'probation',
+            'reversible': True, 'permanent_guard': False}])
+        restart_p, active_p = self._patch_subprocess()
+        with restart_p as restart_m, active_p:
+            res = medic_actions.restart_daemon(
+                'ourliberty-not-a-real-unit.service', ALERT_FP)
+        self.assertEqual(res['reason'], 'not-permitted')
+        restart_m.assert_not_called()
 
 
 if __name__ == '__main__':

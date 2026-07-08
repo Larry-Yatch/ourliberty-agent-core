@@ -26,6 +26,16 @@ Each handler, in strict order:
       config/medic-reversible-targets.json; a target not in the allowlist is
       REFUSED (not-permitted, escalate instead) -- Medic never acts on an
       arbitrary unit.
+  (b2) GRADUATION gate (Phase-C unify, Stage 2) -- when the ACTION name IS a
+      registry template (config/auto-fix-patterns.json), Medic auto-acts only
+      once Larry has GRADUATED that template (state='graduated', not a
+      permanent_guard). A probation / permanent_guard template is REFUSED
+      (not-graduated, escalate diagnose-only) so Larry decides -- graduation
+      is what earns hands-free trust, and it now GOVERNS Medic instead of
+      Medic self-governing via its allowlist alone. Actions that are not
+      registry templates (retrigger-inbox) and an unreadable registry both
+      fall through to current behavior (fail-safe: a registry read error must
+      never block a legitimate Medic action). See _graduation_gate.
   (c) HARD one-action-per-fingerprint gate -- if the ledger holds any prior
       outcome='acted' record for this fingerprint, refuse (already acted once,
       escalate recurrence). Prevents restart loops.
@@ -219,6 +229,11 @@ _RECONCILE_WINDOW_SEC = 30 * 60
 # NOT reset systemd backoff -- a human sees a genuinely-stuck unit instead.
 REASON_FLAPPING = 'flapping-defer-to-systemd'
 REASON_RECENTLY_RESTARTED = 'recently-restarted'
+
+# Graduation-gate refusal reason (Phase-C unify, Stage 2). Diagnose-only
+# escalation: the action's class has not (yet) earned -- or can never earn, for
+# a permanent_guard floor -- hands-free trust, so Medic asks instead of acting.
+REASON_NOT_GRADUATED = 'not-graduated'
 
 
 # Name transforms are delegated to the shared module so watchdog and medic
@@ -417,10 +432,13 @@ def _record_template_execution(action: str, *, verified: bool) -> None:
     (a track-record write failing cannot be allowed to fail a restart). It is
     naturally start-clean — only acts performed after this ships are recorded.
 
-    NOTE (Stage 1 of the unify): Medic still self-governs via its own allowlist;
-    graduation does not yet gate Medic's acting (that is Stage 2 — Medic reads
-    the registry state before auto-acting). Until then this only builds the
-    track record so Check V has real data to surface graduation proposals from.
+    NOTE (Stage 2 of the unify is now live -- see _graduation_gate): graduation
+    now GOVERNS whether Medic auto-acts. Because the gate refuses a probation
+    template BEFORE the action runs, this recorder is in practice only reached
+    for a GRADUATED template (a verified/failed act) -- a graduated template's
+    failed act records a 'failure' here, which the recorder's own adverse hook
+    demotes graduated->probation. The ``action not in registry`` guard is still
+    the defensive floor for Medic's non-template actions (retrigger-inbox).
     """
     try:
         import alert_triage_state  # lazy: avoids import coupling at module load
@@ -434,13 +452,80 @@ def _record_template_execution(action: str, *, verified: bool) -> None:
             pass
 
 
+# ---------- graduation gate (Phase-C unify, Stage 2) ----------
+
+
+def _graduation_gate(action: str) -> tuple[bool, str, str]:
+    """Consult the auto-fix registry (config/auto-fix-patterns.json) BEFORE
+    Medic auto-acts on an action whose name IS a registry template. Returns
+    ``(block, reason, detail)`` -- ``block=True`` means REFUSE + escalate.
+
+    This is Stage 2 of the Check-V unify: the graduation loop now GOVERNS what
+    Medic does hands-free (Stage 1 only fed it a track record). Policy:
+
+      * ``action`` not in the registry            -> ``(False, ...)`` keep
+        current behavior. Medic self-governs via its own allowlist; a
+        non-template action (retrigger-inbox) is not a graduatable class.
+      * ``state == 'graduated'`` AND not
+        ``permanent_guard``                        -> ``(False, ...)`` AUTO-ACT
+        -- Larry has approved this class for hands-free execution.
+      * otherwise (probation, or a permanent_guard
+        floor even if mislabeled graduated)        -> ``(True, reason, detail)``
+        do NOT auto-act; escalate diagnose-only so Larry decides. A probation
+        class has not yet EARNED hands-free trust; a permanent_guard class can
+        NEVER earn it.
+
+    FAIL-SAFE: ANY error reading the registry -> ``(False, ...)`` KEEP CURRENT
+    BEHAVIOR. A registry read failure must NEVER block a legitimate Medic
+    action -- Medic's allowlist + recurrence + watchdog-coordination gates
+    remain the active brakes. ``alert_triage_state.load_registry`` already
+    degrades an unreadable/corrupt file to ``{}`` (-> action-not-found ->
+    proceed); the try/except is the belt-and-suspenders guarantee that even an
+    unexpected error can never raise into Medic's act path."""
+    try:
+        import alert_triage_state  # lazy: avoids import coupling at module load
+        registry = alert_triage_state.load_registry()
+        rec = registry.get(action)
+        if not isinstance(rec, dict):
+            return (False, '', '')  # not a governed template -> current behavior
+        # Canonical auto-fix-eligible predicate -- the exact negation of Check
+        # 0's guarded test in alert_triage_state.classify() (state != 'graduated'
+        # OR permanent_guard -> Tier 2/ask). Kept in lock-step with that twin so
+        # Medic's hands-free boundary never disagrees with Check 0's. Like
+        # classify(), this does NOT re-check `reversible`: apply_graduation is
+        # the sole path to 'graduated' and already enforces the reversibility /
+        # permanent_guard floor, so a graduated record is reversible by
+        # construction.
+        graduated = (rec.get('state') == 'graduated'
+                     and not rec.get('permanent_guard'))
+        if graduated:
+            return (False, '', '')  # Larry approved hands-free -> auto-act
+        state = rec.get('state', 'probation')
+        guard = ', permanent_guard floor' if rec.get('permanent_guard') else ''
+        detail = (
+            f'Action template {action!r} is not graduated for hands-free '
+            f'execution (registry state={state!r}{guard}); Medic will NOT '
+            f'auto-act. Escalate diagnose-only so Larry decides -- this class '
+            f'earns hands-free trust via Check V graduation '
+            f'(config/auto-fix-patterns.json), not here.')
+        return (True, REASON_NOT_GRADUATED, detail)
+    except Exception as e:  # never raise into Medic's act path -> fail-safe
+        try:
+            _log('WARN', f'graduation gate for {action!r} failed '
+                         f'({type(e).__name__}: {e}); proceeding per allowlist '
+                         f'(fail-safe to current behavior)')
+        except Exception:  # even the log must not surface into the act path
+            pass
+        return (False, '', '')
+
+
 # ---------- core handler ----------
 
 
 def _act_restart(action: str, target: str, fingerprint: str, attempt: int,
                  allowed_units: list) -> dict:
     """Shared body for both reversible handlers: gates -> allowlist ->
-    recurrence -> restart -> verify -> record. Never raises."""
+    graduation -> recurrence -> restart -> verify -> record. Never raises."""
     try:
         if not isinstance(target, str) or not target:
             return _result(action, str(target), str(fingerprint), ok=False,
@@ -468,6 +553,20 @@ def _act_restart(action: str, target: str, fingerprint: str, attempt: int,
                 f'Target {target} is not in the reversible-targets '
                 f'allowlist for {action}; refusing to act. Escalate '
                 f'diagnose-only instead.')
+
+        # (b2) graduation gate (Phase-C unify, Stage 2). Medic auto-acts on an
+        # action-template only once Larry has GRADUATED it (state='graduated',
+        # not a permanent_guard); a probation template is refused + escalated
+        # diagnose-only so graduation actually governs what Medic does hands-
+        # free. Actions that are not registry templates (retrigger-inbox) and
+        # an unreadable registry both fall through to the existing allowlist-
+        # governed behavior (fail-safe). Recorded 'skipped' (no subprocess, the
+        # recurrence gate stays un-armed), so Medic can act on a later cycle
+        # once Larry graduates the class. See _graduation_gate.
+        block, grad_reason, grad_detail = _graduation_gate(action)
+        if block:
+            return _refuse(action, target, fp, attempt_int, grad_reason,
+                           grad_detail)
 
         # (c) one-action-per-fingerprint recurrence gate
         if medic_ledger.has_acted(fp):
