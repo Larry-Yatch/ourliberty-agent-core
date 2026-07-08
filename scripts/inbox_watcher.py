@@ -844,12 +844,22 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
         branch = task.get("branch") or worktree_manager.derive_branch_name(
             agent, task_id,
         )
+        # Mirror reviews carry the PR branch in the envelope so the reviewer
+        # can check it out and run tests — but the reviewer must never PUSH
+        # to it. The default checkpoint push lands an empty [WIP] commit on
+        # the PR branch, moving the PR head SHA: that defeats head-SHA
+        # review dedup (the reconcile sweep sees an "unreviewed" head and
+        # dispatches a duplicate round-0 review), posts commit statuses on
+        # the throwaway WIP sha, and merges [WIP] noise into main's history.
+        # Observed on PR #841 2026-07-08. Read-only checkout instead.
+        is_mirror_review = agent == "mirror" and task.get("phase") == "review"
         wt_path, wt_branch = worktree_manager.ensure_worktree_for_task(
             agent_id=agent,
             task_id=task_id,
             canonical_repo=canonical_path,
             branch=branch,
             log_fn=lambda m: log(f"[{agent}] worktree: {m}"),
+            push_checkpoint=not is_mirror_review,
         )
         if wt_path is None:
             log(

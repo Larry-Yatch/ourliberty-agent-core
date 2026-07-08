@@ -341,6 +341,7 @@ def setup_branch_checkpoint(
     branch: str,
     task_id: str,
     log_fn: Optional[LogFn] = None,
+    push: bool = True,
 ) -> Optional[str]:
     """Pre-create the branch on origin with an empty WIP commit.
 
@@ -355,6 +356,14 @@ def setup_branch_checkpoint(
       - ``git push -u origin <branch>`` may say "everything up-to-date";
         treated as success. Falls back to ``--force-with-lease`` on
         divergence.
+
+    ``push=False`` is the READ-ONLY mode for dispatches that must never
+    mutate origin/<branch> (Mirror reviews: the branch is the PR branch
+    under review, and pushing the WIP commit changes the PR head SHA —
+    which retriggers review dispatch, defeats head-SHA review dedup, and
+    lands empty [WIP] commits in the PR's merge history). It still runs
+    the fetch + checkout -B + reset --hard so the worktree sits exactly
+    at origin/<branch>, but skips the WIP commit and the push entirely.
 
     Returns the branch name on success, None on bad input or push failure
     (logged but non-fatal — caller still uses the worktree, just without a
@@ -483,6 +492,16 @@ def setup_branch_checkpoint(
                 )
             return None
 
+        if not push:
+            # Read-only checkout complete: worktree is exactly at the
+            # branch tip, nothing committed, nothing pushed.
+            if log_fn:
+                log_fn(
+                    f'setup_branch_checkpoint: read-only checkout of '
+                    f'{branch} (no WIP commit, no push)'
+                )
+            return branch
+
         # 4b review fix: skip the empty WIP commit when HEAD is already a
         # WIP checkpoint for this task. Without this gate, each re-dispatch
         # of the same task (preflight → CLARIFY → build) stacks another
@@ -578,6 +597,7 @@ def ensure_worktree_for_task(
     canonical_repo: Path,
     branch: Optional[str] = None,
     log_fn: Optional[LogFn] = None,
+    push_checkpoint: bool = True,
 ) -> Tuple[Optional[Path], Optional[str]]:
     """High-level entry: ensure a worktree for (agent_id, task_id) exists,
     and if ``branch`` is set, ensure its checkpoint is on origin.
@@ -589,6 +609,11 @@ def ensure_worktree_for_task(
         failed. The worktree path is still returned in the push-failure
         case so dispatch proceeds; Forge will retry push during her build
         phase.
+
+    ``push_checkpoint=False`` selects the read-only branch checkout (no
+    WIP commit, no push) — required for Mirror review dispatches, where
+    ``branch`` is the PR branch under review and any push moves the PR
+    head SHA out from under the review pipeline's dedup and history.
 
     Idempotent: safe to call every dispatch. Reuses existing worktree for
     matching (agent_id, task_id) and treats branch checkpoint as a no-op
@@ -602,6 +627,6 @@ def ensure_worktree_for_task(
     if not branch:
         return path, None
     actual_branch = setup_branch_checkpoint(
-        path, branch, task_id, log_fn=log_fn,
+        path, branch, task_id, log_fn=log_fn, push=push_checkpoint,
     )
     return path, actual_branch

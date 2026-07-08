@@ -465,6 +465,81 @@ class WorktreeLifecycleTest(unittest.TestCase):
         self.assertIsNotNone(path)
         self.assertIsNone(branch)
 
+    def _make_origin_pr_branch(self, branch: str) -> str:
+        """Create `branch` on origin with one real commit; return its sha."""
+        _git(
+            'config', 'receive.denyCurrentBranch', 'updateInstead',
+            cwd=self.origin,
+        )
+        _git('checkout', '-b', branch, cwd=self.origin)
+        (self.origin / 'feature.py').write_text('print("the PR content")\n')
+        _git('add', 'feature.py', cwd=self.origin)
+        _git('commit', '-q', '-m', 'feat: the PR content', cwd=self.origin)
+        tip = _git('rev-parse', 'HEAD', cwd=self.origin).stdout.strip()
+        _git('checkout', 'main', cwd=self.origin)
+        return tip
+
+    def test_setup_branch_checkpoint_readonly_no_push(self):
+        """Mirror-review mode (push=False): the worktree checks out the PR
+        branch exactly at the origin tip — no [WIP] commit, no push. A push
+        here moves the PR head SHA, which retriggers review dispatch and
+        defeats head-SHA review dedup (PR #841 dup-review, 2026-07-08)."""
+        tip = self._make_origin_pr_branch('work/pr-under-review')
+        path = worktree_manager.create_or_reuse_worktree_for_task(
+            'mirror', 'pr-review-ro', self.canonical, log_fn=self._log_fn,
+        )
+        branch = worktree_manager.setup_branch_checkpoint(
+            path, 'work/pr-under-review', 'pr-review-ro',
+            log_fn=self._log_fn, push=False,
+        )
+        self.assertEqual(branch, 'work/pr-under-review')
+        # Worktree sits exactly at the origin tip — no WIP commit on top.
+        wt_head = _git('rev-parse', 'HEAD', cwd=path).stdout.strip()
+        self.assertEqual(wt_head, tip)
+        self.assertTrue((path / 'feature.py').exists())
+        # Origin tip unchanged — the reviewer pushed NOTHING.
+        origin_tip = _git(
+            'rev-parse', 'work/pr-under-review', cwd=self.origin,
+        ).stdout.strip()
+        self.assertEqual(origin_tip, tip)
+        self.assertTrue(any('read-only checkout' in m for m in self.logs))
+
+    def test_ensure_worktree_push_checkpoint_false_is_readonly(self):
+        tip = self._make_origin_pr_branch('work/pr-under-review-2')
+        path, branch = worktree_manager.ensure_worktree_for_task(
+            'mirror', 'pr-review-ro-2', self.canonical,
+            branch='work/pr-under-review-2', log_fn=self._log_fn,
+            push_checkpoint=False,
+        )
+        self.assertIsNotNone(path)
+        self.assertEqual(branch, 'work/pr-under-review-2')
+        origin_tip = _git(
+            'rev-parse', 'work/pr-under-review-2', cwd=self.origin,
+        ).stdout.strip()
+        self.assertEqual(origin_tip, tip, 'read-only checkout must not push')
+        head_subject = _git(
+            'log', '-1', '--pretty=%s', 'work/pr-under-review-2',
+            cwd=self.origin,
+        ).stdout.strip()
+        self.assertNotIn('[WIP]', head_subject)
+
+    def test_setup_branch_checkpoint_readonly_absent_branch_local_only(self):
+        """push=False with no origin/<branch>: creates the local branch from
+        HEAD and stops — still nothing pushed to origin."""
+        path = worktree_manager.create_or_reuse_worktree_for_task(
+            'mirror', 'pr-review-ro-3', self.canonical, log_fn=self._log_fn,
+        )
+        branch = worktree_manager.setup_branch_checkpoint(
+            path, 'work/vanished-branch', 'pr-review-ro-3',
+            log_fn=self._log_fn, push=False,
+        )
+        self.assertEqual(branch, 'work/vanished-branch')
+        r = _git(
+            'branch', '--list', 'work/vanished-branch',
+            cwd=self.origin, check=False,
+        )
+        self.assertNotIn('work/vanished-branch', r.stdout)
+
     def test_ensure_worktree_idempotent_reuse(self):
         # Calling twice with same task_id reuses the worktree.
         _git(
