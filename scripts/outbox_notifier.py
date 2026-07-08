@@ -50,6 +50,7 @@ import fnmatch
 import glob
 import json
 import os
+import random
 import re
 import shlex
 import shutil
@@ -366,6 +367,145 @@ DEFAULT_COST_PER_TASK_USD_CAP = 5.0
 # allows for slow GitHub API + auth-token refresh; longer would risk the
 # notifier blocking past its 5s poll cadence on degraded gh CLI behavior.
 _AUTO_MERGE_TIMEOUT_S = 30
+
+# ── GitHub API rate-limit backoff gate ──────────────────────────────────────
+# outbox-notifier-gh-ratelimit-backoff-001. When a `gh` shell-out returns the
+# GitHub rate-limit signature (exit != 0 + stderr containing "rate limit
+# already exceeded", seen as both the REST and GraphQL wording), the daemon
+# used to re-hit the API on the very next 5s scan cycle with zero delay — a
+# WARN storm that compounds the exhaustion and stalls auto-merge. This gate
+# holds a module-level backoff window that every `gh` wrapper consults at
+# entry: while the window is open the wrapper short-circuits WITHOUT shelling
+# out (returning the same degraded value it already returns on a transport
+# error), and a completed call routes its outcome through the note fns so a
+# rate-limit hit arms/extends the window (exponential, jittered) and any
+# success clears it. Non-rate-limit failures (timeout, 404, auth) never arm.
+_GH_RATE_LIMIT_FLOOR_S = 60.0     # first backoff after a single rate-limit hit
+_GH_RATE_LIMIT_CEILING_S = 300.0  # max window regardless of consecutive count
+_GH_RATE_LIMIT_JITTER_S = 15.0    # +/- up to this many seconds of jitter
+
+# The rate-limit signature. GitHub emits this for both REST ("API rate limit
+# already exceeded ...") and GraphQL ("GraphQL: API rate limit already
+# exceeded for user ID ..."); the shared "rate limit already exceeded"
+# substring matches both. Case-insensitive for robustness.
+_GH_RATE_LIMIT_SIGNATURE_RE = re.compile(
+    r'rate limit already exceeded', re.IGNORECASE,
+)
+
+# Injectable seams for tests. Production leaves these at the stdlib defaults;
+# tests swap in a fake monotonic clock + fixed jitter so the backoff math is
+# deterministic and no real time passes / no real gh is hit.
+_gh_backoff_clock = time.monotonic       # () -> float seconds (monotonic)
+_gh_backoff_jitter = random.uniform      # (low, high) -> float
+
+# Module state. `_gh_backoff_until` is the monotonic timestamp before which no
+# `gh` call should shell out (0.0 == no active backoff). The consecutive count
+# drives the exponential growth. `_gh_backoff_skip_logged` throttles the
+# "skipping gh call" line to at most one per backoff window.
+_gh_backoff_until: float = 0.0
+_gh_consecutive_rate_limit: int = 0
+_gh_backoff_skip_logged: bool = False
+
+
+def _gh_is_rate_limit_error(returncode: int, stderr: Optional[str]) -> bool:
+    """True iff a *completed* `gh` call is the GitHub rate-limit signature.
+
+    Requires a non-zero exit AND stderr matching the rate-limit wording, so a
+    plain 404 / auth failure / conflict (non-zero exit, different stderr) does
+    NOT count — those must not arm the backoff (success criterion 4).
+    """
+    if returncode == 0:
+        return False
+    if not stderr:
+        return False
+    return bool(_GH_RATE_LIMIT_SIGNATURE_RE.search(stderr))
+
+
+def _gh_backoff_remaining() -> float:
+    """Seconds until the current backoff window expires (0.0 if none)."""
+    return max(0.0, _gh_backoff_until - _gh_backoff_clock())
+
+
+def _gh_backoff_active() -> bool:
+    """True while a rate-limit backoff window is open.
+
+    Wrappers call this at entry and short-circuit (skip the shell-out) when it
+    returns True, so the daemon stops re-hitting an exhausted API every poll.
+    """
+    return _gh_backoff_clock() < _gh_backoff_until
+
+
+def _gh_note_rate_limit(stderr: Optional[str]) -> None:
+    """Arm/extend the backoff window after a rate-limit hit.
+
+    Grows exponentially from a 60s floor (min(300, 60 * 2**count)) with +/- up
+    to ~15s of jitter, clamped to the 300s ceiling, and increments the
+    consecutive-hit count. Idempotent w.r.t. logging via the skip-log reset so
+    each fresh window emits its skip line exactly once.
+    """
+    global _gh_backoff_until, _gh_consecutive_rate_limit, _gh_backoff_skip_logged
+    base = _GH_RATE_LIMIT_FLOOR_S * (2 ** _gh_consecutive_rate_limit)
+    window = min(_GH_RATE_LIMIT_CEILING_S, base)
+    jitter = _gh_backoff_jitter(-_GH_RATE_LIMIT_JITTER_S, _GH_RATE_LIMIT_JITTER_S)
+    # Clamp the jittered window to [0, ceiling]; never negative, never over cap.
+    window = max(0.0, min(_GH_RATE_LIMIT_CEILING_S, window + jitter))
+    _gh_backoff_until = _gh_backoff_clock() + window
+    _gh_consecutive_rate_limit += 1
+    _gh_backoff_skip_logged = False
+    log(
+        f'gh rate-limit hit #{_gh_consecutive_rate_limit}; backing off '
+        f'{window:.0f}s (stderr: {(stderr or "").strip()[:160]})',
+        'WARN',
+    )
+
+
+def _gh_note_success() -> None:
+    """Clear the backoff window and reset the consecutive count.
+
+    Any 2xx `gh` result routes here, so a single success resets the gate to
+    zero (success criterion 3).
+    """
+    global _gh_backoff_until, _gh_consecutive_rate_limit, _gh_backoff_skip_logged
+    if _gh_backoff_until or _gh_consecutive_rate_limit:
+        _gh_backoff_until = 0.0
+        _gh_consecutive_rate_limit = 0
+        _gh_backoff_skip_logged = False
+
+
+def _gh_note_result(returncode: int, stderr: Optional[str]) -> None:
+    """Route a *completed* `gh` call through the note fns.
+
+    Success (exit 0) clears the window; a rate-limit signature arms/extends it;
+    any other non-zero exit is left alone (neither arms nor clears — a 404 or
+    auth error is not a throttling signal, and the still-open window from an
+    earlier rate-limit hit must persist).
+    """
+    if returncode == 0:
+        _gh_note_success()
+    elif _gh_is_rate_limit_error(returncode, stderr):
+        _gh_note_rate_limit(stderr)
+
+
+def _gh_backoff_skip(context: str) -> bool:
+    """Entry gate for a `gh` wrapper: True == skip the shell-out.
+
+    Logs a single throttled 'skipping gh call' line per backoff window (not one
+    per wrapper per poll — success criterion 5). Returns False when no window is
+    open, so the caller proceeds to shell out normally.
+    """
+    global _gh_backoff_skip_logged
+    if not _gh_backoff_active():
+        return False
+    if not _gh_backoff_skip_logged:
+        _gh_backoff_skip_logged = True
+        log(
+            f'skipping gh call ({context}); in rate-limit backoff for '
+            f'{_gh_backoff_remaining():.0f}s more '
+            f'(consecutive={_gh_consecutive_rate_limit})',
+            'WARN',
+        )
+    return True
+
 
 # regression-gate-steady-state-warmer (spec PR 2). The canonical regression-
 # baseline cache dir. The post-merge warmer (here) and the Mirror review gate
@@ -4852,6 +4992,8 @@ def _fetch_pr_body(pr_url: Optional[str]) -> Optional[str]:
     if parsed is None:
         return None
     repo_coords, pr_number = parsed
+    if _gh_backoff_skip('pr-body-fetch'):
+        return None
     try:
         proc = subprocess.run(
             ['gh', 'pr', 'view', str(pr_number),
@@ -4862,6 +5004,7 @@ def _fetch_pr_body(pr_url: Optional[str]) -> Optional[str]:
         log(f'gh pr view {pr_number} ({repo_coords}) body lookup FAILED: '
             f'{type(e).__name__}: {e}', 'WARN')
         return None
+    _gh_note_result(proc.returncode, proc.stderr)
     if proc.returncode != 0:
         log(f'gh pr view {pr_number} ({repo_coords}) body returned '
             f'{proc.returncode}: {(proc.stderr or "").strip()[:200]}', 'WARN')
@@ -6052,6 +6195,8 @@ def _pr_url_existence_state(
     merge is bounded to "Larry runs `gh pr merge` manually" which is the
     same cost as the existing `_AUTO_MERGE_FN_OVERRIDE`-less failure path).
     """
+    if _gh_backoff_skip('pr-url-existence'):
+        return None, 'gh rate-limit backoff active'
     try:
         proc = subprocess.run(
             ['gh', 'pr', 'view', str(pr_number),
@@ -6063,6 +6208,7 @@ def _pr_url_existence_state(
         return None, f'timeout after {_PR_URL_EXISTENCE_TIMEOUT_S}s'
     except (FileNotFoundError, OSError) as e:
         return None, f'{type(e).__name__}: {e}'
+    _gh_note_result(proc.returncode, proc.stderr)
     if proc.returncode != 0:
         stderr = (proc.stderr or '').strip().replace('\n', ' ')[:200]
         return None, f'gh exit={proc.returncode}: {stderr or "no stderr"}'
@@ -6113,6 +6259,8 @@ def _gh_pr_state(repo_coords: str, pr_number: int) -> Optional[str]:
 
     State values per GitHub API: 'OPEN', 'CLOSED', 'MERGED'.
     """
+    if _gh_backoff_skip('pr-state-recheck'):
+        return None
     try:
         proc = subprocess.run(
             ['gh', 'pr', 'view', str(pr_number),
@@ -6129,6 +6277,7 @@ def _gh_pr_state(repo_coords: str, pr_number: int) -> Optional[str]:
             'WARN',
         )
         return None
+    _gh_note_result(proc.returncode, proc.stderr)
     if proc.returncode != 0:
         log(
             f'gh pr view {pr_number} ({repo_coords}) returned {proc.returncode} '
@@ -6168,6 +6317,8 @@ def _gh_terminal_pr_state_for_branch(
     sibling `_gh_pr_state` / `_gh_open_prs_for_repo` helpers. State enum per
     GitHub: 'OPEN' | 'CLOSED' | 'MERGED'.
     """
+    if _gh_backoff_skip('terminal-state-for-branch'):
+        return None
     try:
         proc = subprocess.run(
             ['gh', 'pr', 'list', '--repo', repo_coords,
@@ -6182,6 +6333,7 @@ def _gh_terminal_pr_state_for_branch(
             'WARN',
         )
         return None
+    _gh_note_result(proc.returncode, proc.stderr)
     if proc.returncode != 0:
         log(
             f'gh pr list --head {branch} ({repo_coords}) returned '
@@ -6243,6 +6395,8 @@ def _gh_pr_head_sha(repo_coords: str, pr_number: int) -> Optional[str]:
     None on any transport error / non-zero exit / parse failure — the caller
     treats that as "couldn't resolve the head SHA; skip the status POST."
     """
+    if _gh_backoff_skip('pr-head-sha'):
+        return None
     try:
         proc = subprocess.run(
             ['gh', 'pr', 'view', str(pr_number),
@@ -6256,6 +6410,7 @@ def _gh_pr_head_sha(repo_coords: str, pr_number: int) -> Optional[str]:
             'WARN',
         )
         return None
+    _gh_note_result(proc.returncode, proc.stderr)
     if proc.returncode != 0:
         log(
             f'gh pr view {pr_number} ({repo_coords}) headRefOid returned '
@@ -6445,6 +6600,8 @@ def _gh_find_mirror_findings_comment(
     returns None, so the caller posts a fresh comment — at worst a duplicate on
     a degraded gh, never a crash.
     """
+    if _gh_backoff_skip('mirror-findings-comment-lookup'):
+        return None
     try:
         proc = subprocess.run(
             ['gh', 'api', '--paginate',
@@ -6454,6 +6611,7 @@ def _gh_find_mirror_findings_comment(
         )
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         return None
+    _gh_note_result(proc.returncode, proc.stderr)
     if proc.returncode != 0:
         return None
     # `--paginate --jq` emits one JSON object per line (per matched element).
@@ -6780,6 +6938,20 @@ def _auto_merge_pr(pr_url: str, task_id: str) -> dict[str, Any]:
             'repo_coords': '?',
         }
     repo_coords, pr_number = parsed
+    if _gh_backoff_skip('auto-merge'):
+        # Defer the merge (not fail it): the GH API is exhausted, a merge
+        # attempt would just re-hit the rate limit and re-arm the window. The
+        # auto-merge healer (heal_pr_auto_merge) retries a 'failed' outcome
+        # once the window expires, so the PR still merges — just not this poll.
+        return {
+            'merge_outcome': 'failed',
+            'merge_reason': (
+                f'deferred: gh rate-limit backoff active '
+                f'({_gh_backoff_remaining():.0f}s remaining)'
+            ),
+            'pr_number': pr_number,
+            'repo_coords': repo_coords,
+        }
     try:
         proc = gh_write(
             ['gh', 'pr', 'merge', str(pr_number),
@@ -6826,6 +6998,12 @@ def _auto_merge_pr(pr_url: str, task_id: str) -> dict[str, Any]:
             'pr_number': pr_number,
             'repo_coords': repo_coords,
         }
+
+    # Route the completed merge through the backoff gate: a rate-limit stderr
+    # arms the window (so the state-recheck below and the next poll skip gh),
+    # a clean merge clears it; a plain conflict/branch-protection exit is left
+    # alone (not a throttling signal).
+    _gh_note_result(proc.returncode, proc.stderr)
 
     if proc.returncode == 0:
         merge_msg = (
@@ -8325,6 +8503,8 @@ def _gh_pr_mergeable_status(repo_coords: str, pr_number: int) -> str:
     treat 'unknown' with defer-then-proceed semantics so transient API
     quirks don't stall the queue forever.
     """
+    if _gh_backoff_skip('pr-mergeable-status'):
+        return 'unknown'
     try:
         proc = subprocess.run(
             ['gh', 'pr', 'view', str(pr_number),
@@ -8339,6 +8519,7 @@ def _gh_pr_mergeable_status(repo_coords: str, pr_number: int) -> str:
             'WARN',
         )
         return 'unknown'
+    _gh_note_result(proc.returncode, proc.stderr)
     if proc.returncode != 0:
         log(
             f'gh pr view {pr_number} ({repo_coords}) --json mergeable exit='
@@ -8387,10 +8568,17 @@ def _poll_pr_mergeable(
     never strands a PR.
 
     `sleep` is injectable so tests exercise the poll/settle logic without real
-    delay. No sleep after the final attempt."""
+    delay. No sleep after the final attempt.
+
+    Honors the GH rate-limit backoff gate: if a window is open the loop returns
+    'unknown' immediately rather than burning its poll budget (and sleeping
+    ~30s) against an exhausted API — the underlying `_gh_pr_mergeable_status`
+    would short-circuit to 'unknown' every attempt anyway."""
     status = 'unknown'
     attempts = max(1, max_polls)
     for attempt in range(attempts):
+        if _gh_backoff_active():
+            return status
         status = _gh_pr_mergeable_status(repo_coords, pr_number)
         if status in ('mergeable', 'conflicting'):
             return status
@@ -8429,6 +8617,8 @@ def _gh_pr_merge_freshness(
     baseRefOid/headRefOid (baseRefOid tracks main's tip, so comparing it to
     the SHA recorded when the PR was held tells us whether the base moved).
     """
+    if _gh_backoff_skip('pr-merge-freshness'):
+        return None
     try:
         proc = subprocess.run(
             ['gh', 'pr', 'view', str(pr_number),
@@ -8443,6 +8633,7 @@ def _gh_pr_merge_freshness(
             'WARN',
         )
         return None
+    _gh_note_result(proc.returncode, proc.stderr)
     if proc.returncode != 0:
         log(
             f'gh pr view {pr_number} ({repo_coords}) freshness lookup exit='
@@ -8475,6 +8666,8 @@ def _gh_open_prs_for_repo(repo_coords: str) -> list[dict[str, Any]]:
     that have already opened but haven't reached Mirror PASS yet — those
     can still merge before this one and create overlap conflicts.
     """
+    if _gh_backoff_skip('open-prs-for-repo'):
+        return []
     try:
         proc = subprocess.run(
             ['gh', 'pr', 'list', '--repo', repo_coords, '--state', 'open',
@@ -8488,6 +8681,7 @@ def _gh_open_prs_for_repo(repo_coords: str) -> list[dict[str, Any]]:
             'WARN',
         )
         return []
+    _gh_note_result(proc.returncode, proc.stderr)
     if proc.returncode != 0:
         log(
             f'gh pr list {repo_coords} --state open exit={proc.returncode}: '
