@@ -283,6 +283,7 @@ _DEFAULT_DEEP_REVIEW_PATHS: tuple[str, ...] = (
     'scripts/trust_policy.py',
     'scripts/outbox_notifier.py',
     'config/trust-policy.json',
+    'config/suite-guardian.json',
 )
 _DEEP_REVIEW_PATHS_CONFIG_PATH = (
     Path(__file__).resolve().parent.parent / 'config' / 'deep-review-paths.json'

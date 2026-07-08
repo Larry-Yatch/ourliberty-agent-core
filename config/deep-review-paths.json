@@ -10,6 +10,7 @@
     "scripts/chain_event_emit.py",
     "scripts/trust_policy.py",
     "scripts/outbox_notifier.py",
-    "config/trust-policy.json"
+    "config/trust-policy.json",
+    "config/suite-guardian.json"
   ]
 }

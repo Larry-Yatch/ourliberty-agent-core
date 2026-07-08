@@ -449,6 +449,71 @@ def run_tests_in_dir(
     return failures
 
 
+def run_single_test_in_dir(
+    workdir: Path,
+    test_id: str,
+    env: dict,
+    timeout_s: int,
+) -> tuple[bool, str]:
+    """Re-run ONE test id in isolation and report (passed, combined_output).
+
+    Used by the Main-Suite Green Guardian to re-run each suite-red test alone at
+    the SAME pinned SHA (no diff to attribute), so an order-dependent flake
+    (fails in the suite, passes alone) is separable from a genuine break. This
+    isolation is sound HERE precisely because the guardian pins one origin/main
+    SHA — unlike the regression gate's parent-vs-head diff, where #866 correctly
+    rejected per-test isolation because it can't attribute a failure to the diff.
+
+    ``test_id`` is a dotted id as emitted by ``parse_unittest_failures`` /
+    ``collect_failures_at_sha`` (e.g. ``scripts.tests.test_foo.TestBar.test_x``).
+    Isolation runs from ``<workdir>/scripts/tests`` where each ``test_*.py``
+    self-adds ``scripts/`` to ``sys.path``, so the ``scripts.tests.`` prefix is
+    stripped to a bare module id before invoking unittest.
+
+    Fail-closed like ``run_tests_in_dir``: raises AnalysisError on timeout, a
+    kill signal, or malformed output (no "Ran N tests" summary and no FAIL/ERROR
+    lines), so a broken isolation run can never masquerade as "passed alone".
+    """
+    bare_id = test_id
+    prefix = TEST_DISCOVERY_TARGET + '.'  # 'scripts.tests.'
+    if bare_id.startswith(prefix):
+        bare_id = bare_id[len(prefix):]
+    tests_dir = Path(workdir) / 'scripts' / 'tests'
+    wall_prefix = _discover_wall_prefix(tests_dir)
+    cmd = ['python3', '-m', 'unittest', '-v', bare_id]
+    try:
+        result = subprocess.run(
+            wall_prefix + cmd,
+            cwd=str(tests_dir),
+            capture_output=True, text=True, timeout=timeout_s,
+            env=env,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise AnalysisError(
+            f'isolation run of {test_id!r} timed out after {timeout_s}s'
+        ) from exc
+    except (subprocess.SubprocessError, OSError) as exc:
+        raise AnalysisError(
+            f'failed to invoke isolation run of {test_id!r}: {exc}'
+        ) from exc
+
+    combined = (result.stdout or '') + '\n' + (result.stderr or '')
+    if result.returncode < 0:
+        raise AnalysisError(
+            f'isolation run of {test_id!r} was killed by signal '
+            f'{-result.returncode}'
+        )
+    failures = parse_unittest_failures(combined)
+    if not failures and 'Ran ' not in combined:
+        raise AnalysisError(
+            f'isolation run of {test_id!r} produced malformed output '
+            f'(no "Ran N tests" summary, no FAIL/ERROR lines); '
+            f'exit={result.returncode}'
+        )
+    passed = result.returncode == 0 and not failures
+    return passed, combined
+
+
 def add_worktree(repo_root: Path, sha: str, dest: Path) -> None:
     try:
         result = subprocess.run(

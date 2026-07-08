@@ -117,6 +117,23 @@ def baseline_dir() -> Path:
     return _DEFAULT_BASELINE_DIR
 
 
+# Single-flight warm lock, pinned to an ABSOLUTE path on the real agents state
+# tree — NOT Path.home()/gettempdir(). The lock must be the same host-wide file
+# for EVERY warmer process regardless of what HOME each one runs under: the #755
+# HOME-swap class showed that a Path.home()-derived path silently forks into
+# per-jail files when a caller has mutated HOME, which would defeat single-flight
+# and let overlapping warms stack N suite runs (the fork-bomb this lock exists to
+# stop). A fixed absolute path is immune to that. OL_REGBASELINE_LOCK_PATH still
+# overrides so tests can point the lock at a scratch file.
+REGBASELINE_LOCK_PATH = Path('/home/larry/agents/state/ol-regbaseline-warm.lock')
+
+
+def regbaseline_lock_path() -> Path:
+    """Absolute path to the single-flight warm lock (override-or-default)."""
+    override = os.environ.get('OL_REGBASELINE_LOCK_PATH')
+    return Path(override) if override else REGBASELINE_LOCK_PATH
+
+
 def _is_journal_path(path: str) -> bool:
     """True iff ``path`` is a per-cycle Pulse machine-journal (excluded from the
     content key). Matches an exact file or anything under a journal directory."""
@@ -322,10 +339,11 @@ def warm(repo_root: Path, sha: Optional[str], timeout_s: int) -> int:
     # critical path, so a warm that cannot take the host lock simply skips; the
     # holder populates the cache for everyone. OL_REGBASELINE_LOCK_PATH lets
     # tests point the lock at a scratch file.
-    lock_path = Path(
-        os.environ.get('OL_REGBASELINE_LOCK_PATH')
-        or (Path(tempfile.gettempdir()) / 'ol-regbaseline-warm.lock')
-    )
+    lock_path = regbaseline_lock_path()
+    try:
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
     lock_fh = open(lock_path, 'w')
     try:
         try:
