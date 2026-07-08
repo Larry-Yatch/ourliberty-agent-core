@@ -288,13 +288,36 @@ class RunGuardianTest(_TmpRegistryTest):
         self.assertEqual(res['status'], g.RUN_GREEN)
 
     def test_step_change_skips_isolation(self):
+        # Seed a prior completed run so completed_runs_before >= 1; the
+        # step-change branch is suppressed on the first-ever run (a standing
+        # backlog is debt, not a mass break — see run_guardian).
+        _run(FakeInvoker(sha='a' * 40, red_sets=[set()]), self.registry_path)
         reds = {f't{n}.C.m' for n in range(6)}  # 6 new reds > threshold 5
-        inv = FakeInvoker(red_sets=[reds])
+        inv = FakeInvoker(sha='b' * 40, red_sets=[reds])
         res = _run(inv, self.registry_path)
         self.assertEqual(res['status'], g.RUN_STEP_CHANGE)
         self.assertEqual(len(res['new_reds']), 6)
         # per-test bookkeeping suspended during a step-change episode
         self.assertEqual(self._load()['tests'], {})
+
+    def test_first_run_backlog_catalogs_not_step_change(self):
+        # First-ever run with a big standing backlog (> step-change threshold):
+        # must catalog every red as backlog and advance completed_runs, NOT
+        # trip step-change and stall at completed_runs=0 forever.
+        reds = {f't{n}.C.m' for n in range(8)}  # 8 reds > threshold 5
+        inv = FakeInvoker(
+            sha='a' * 40, red_sets=[reds],
+            single_results={t: (False, 'AssertionError') for t in reds},
+        )
+        res = _run(inv, self.registry_path)
+        self.assertEqual(res['status'], g.RUN_RED)
+        reg = self._load()
+        self.assertEqual(reg['_meta']['completed_runs'], 1)
+        self.assertEqual(len(reg['tests']), 8)
+        self.assertTrue(
+            all(e['classification'] == g.CLS_BACKLOG
+                for e in reg['tests'].values())
+        )
 
     def test_normal_run_classifies_and_records(self):
         reds = {'flake.C.m', 'break.C.m'}

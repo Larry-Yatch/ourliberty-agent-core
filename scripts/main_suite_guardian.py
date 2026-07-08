@@ -506,8 +506,14 @@ def run_guardian(
 
         # Step-change branch: a mass break is triaged by SHA range, not by 40
         # isolation re-runs (D1.4). Suspend per-test bookkeeping this cycle.
+        # Gated on completed_runs_before >= 1: on the first-ever completed run
+        # every red is "new" (no prior entry), so a standing backlog (~13 env
+        # fails per the L5 scar) would trip step-change and return without
+        # cataloguing — leaving completed_runs stuck at 0 and repeating forever.
+        # Per L5 a red at first-ever observation is backlog debt, never a break,
+        # so the first completed run always does full per-test cataloguing.
         new_reds = select_new_reds(red_set, registry)
-        if is_step_change(new_reds):
+        if completed_runs_before >= 1 and is_step_change(new_reds):
             meta['last_sha'] = sha
             meta['last_run_result'] = RUN_STEP_CHANGE
             meta['last_run_at'] = now_iso
