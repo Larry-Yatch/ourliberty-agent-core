@@ -4249,6 +4249,22 @@ def _recorded_review_head_sha(path: Path) -> Optional[str]:
     return None
 
 
+# died-verdictless-review-redispatch (2026-07-07, post-#850). Bounds on
+# re-dispatching a review whose run's result was positively marked LOST
+# (inbox_watcher archived the envelope under `.archive/.lost-result/` because
+# the run's outbox could not be persisted — see LOST_RESULT_SUBDIR in
+# safe_write_inbox). The grace is measured on the lost envelope's mtime, which
+# `move_to()`'s rename preserves from dispatch time — so "one re-dispatch per
+# grace per (task, head)" is really "no re-dispatch until the failed round is
+# at least this old". The attempts cap counts lost-result copies for the same
+# (task, head): past it the predicate returns to PERMANENT dedup (the pre-fix
+# fail-safe) with an ERROR log, so a persistently-failing environment (e.g.
+# disk-full making every outbox write fail) costs at most
+# REVIEW_REDISPATCH_MAX_ATTEMPTS paid review runs, never an unbounded loop.
+REVIEW_REDISPATCH_GRACE_SECONDS = 3600
+REVIEW_REDISPATCH_MAX_ATTEMPTS = 3
+
+
 def _review_request_already_dispatched(
     review_filename: str, current_head_sha: Optional[str] = None,
 ) -> bool:
@@ -4271,7 +4287,23 @@ def _review_request_already_dispatched(
     Callers that pass None (the reconcile sweep) keep the exact prior
     existence-only behavior. `move_to()` uniquifies archive collisions as
     `<stem>.<i><suffix>`, so a task accrues one archived copy per reviewed head
-    — all are scanned for a head match."""
+    — all are scanned for a head match.
+
+    Died-verdictless recovery (2026-07-07, post-#850): a same-head envelope in
+    `.archive/.lost-result/` — inbox_watcher's POSITIVE marker that the run's
+    outbox could not be persisted, so the review produced no verdict and no
+    downstream recovery (marker-error cascade, timeout escalate) could fire —
+    does NOT dedup: after a REVIEW_REDISPATCH_GRACE_SECONDS debounce the head
+    is re-dispatchable, bounded by REVIEW_REDISPATCH_MAX_ATTEMPTS lost rounds
+    before the predicate returns to permanent dedup. Before #850 a review
+    session pushed a `[WIP][session-start]` commit at pickup, so a died-
+    verdictless review moved the PR head past the envelope's recorded head_sha
+    and this head-aware dedup re-dispatched it — an ACCIDENTAL retry backstop.
+    #850's read-only detached review checkout removed that push; the
+    lost-result marker replaces it deliberately. Only the marked class
+    re-dispatches — a PLAIN archived same-head envelope still dedups forever
+    (fail CLOSED: naming drift, retention, or any unforeseen state keeps the
+    old at-most-one-dispatch guarantee rather than looping paid reviews)."""
     mirror_inbox = safe_write_inbox.INBOXES_ROOT / 'mirror'
     # A live in-flight review blocks regardless of head (anti-storm).
     if (mirror_inbox / review_filename).exists():
@@ -4302,6 +4334,48 @@ def _review_request_already_dispatched(
         for p in candidates:
             if p.exists() and _recorded_review_head_sha(p) == current_head_sha:
                 return True
+    # No live/archived/.invalid envelope covers this head. A same-head
+    # LOST-RESULT envelope (run happened, outbox unpersistable, verdict lost)
+    # deliberately does not dedup — but it debounces and caps the re-dispatch.
+    lost_dir = mirror_inbox / '.archive' / safe_write_inbox.LOST_RESULT_SUBDIR
+    if not lost_dir.exists():
+        return False
+    lost = [
+        p for p in (
+            lost_dir / review_filename,
+            *sorted(lost_dir.glob(f'{glob.escape(stem)}.*.json')),
+        )
+        if p.exists() and _recorded_review_head_sha(p) == current_head_sha
+    ]
+    if not lost:
+        return False
+    if len(lost) >= REVIEW_REDISPATCH_MAX_ATTEMPTS:
+        # Every allowed retry round ALSO lost its result — almost certainly an
+        # environment fault (e.g. outboxes/ unwritable), not review flakiness.
+        # Return to the pre-fix permanent dedup so a broken environment can't
+        # loop paid Mirror runs; the ERROR line is the operator signal.
+        log(
+            f'died-verdictless review CAPPED for {review_filename} '
+            f'(head {current_head_sha[:12]}): {len(lost)} lost-result rounds '
+            f'>= {REVIEW_REDISPATCH_MAX_ATTEMPTS}; deduping permanently — '
+            f'investigate why mirror outbox writes keep failing, then '
+            f're-dispatch manually',
+            'ERROR',
+        )
+        return True
+    try:
+        newest = max(p.stat().st_mtime for p in lost)
+    except OSError:
+        return True  # unreadable state → fail toward dedup (conservative)
+    if time.time() - newest < REVIEW_REDISPATCH_GRACE_SECONDS:
+        return True  # debounce: latest lost round dispatched under 1h ago
+    log(
+        f'died-verdictless review detected for {review_filename} '
+        f'(head {current_head_sha[:12]}): {len(lost)} lost-result round(s), '
+        f'no verdict; treating as NOT dispatched (re-dispatch attempt '
+        f'{len(lost) + 1}/{REVIEW_REDISPATCH_MAX_ATTEMPTS})',
+        'WARN',
+    )
     return False
 
 

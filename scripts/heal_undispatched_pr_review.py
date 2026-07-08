@@ -504,6 +504,15 @@ def select_orphaned_prs(
         task_id = task_id_for_branch(head, pr.get('number'), pr.get('_repo'))
         if not task_id:
             continue  # degenerate branch → no dispatchable task_id
+        # Died-verdictless coverage note (post-#850 read-only review checkout):
+        # pre-#850, the [WIP][session-start] push moved the PR head, so this
+        # head-aware check accidentally re-dispatched a review whose session
+        # died without a verdict. That recovery is now deliberate and lives in
+        # the shared predicate: a run whose outbox could not be persisted is
+        # archived under `.archive/.lost-result/` (inbox_watcher's positive
+        # marker), and _review_request_already_dispatched treats a same-head
+        # lost-result envelope as re-dispatchable (debounced + capped) — see
+        # its docstring for the full coverage map of the other death shapes.
         try:
             if already_dispatched(task_id, pr.get('headRefOid')):
                 continue  # CURRENT head already in inbox / archive / .invalid
@@ -679,7 +688,12 @@ def main() -> int:
 
         # Verify the dispatch took (the inner call swallows DispatchRejected /
         # RoutingDenied as a WARN). If the review task is now present, success.
-        if _already_dispatched(pr['task_id']):
+        # HEAD-AWARE on purpose: with no head, the stale archived envelope
+        # that made this PR selectable in the first place would itself satisfy
+        # an existence-only check — recording a FAILED dispatch as success and
+        # permanently suppressing the escalation below. A dispatch that
+        # actually landed passes regardless (live inbox file blocks any head).
+        if _already_dispatched(pr['task_id'], pr.get('headRefOid')):
             dispatched += 1
             failed.pop(url, None)  # clear any prior failure record
             continue
