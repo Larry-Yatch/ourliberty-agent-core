@@ -1,0 +1,12 @@
+[Unit]
+Description=Run mission-staleness scorer hourly (read-only reconcile of the proposed-missions pile)
+
+[Timer]
+OnBootSec=25min
+OnUnitActiveSec=1h
+RandomizedDelaySec=300
+Unit=ourliberty-mission-staleness.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

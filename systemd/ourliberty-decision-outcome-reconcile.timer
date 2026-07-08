@@ -1,0 +1,12 @@
+[Unit]
+Description=Run decision-outcome-reconcile every 30 minutes (join team build results onto Larry's decisions)
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=30min
+RandomizedDelaySec=120
+Unit=ourliberty-decision-outcome-reconcile.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target
