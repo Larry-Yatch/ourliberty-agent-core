@@ -48,6 +48,11 @@ except ImportError:  # discover loads this module top-level (no package parent)
 _PULSE_RUNTIME_SEED = (
     'runbooks/cycle-journal.md',
     'runbooks/cycle-actions.jsonl',
+    # journal-archive/ joined PULSE_RUNTIME_PATHS with the journal rotator; prod
+    # carries a committed .gitkeep so this all-or-nothing pathspec always
+    # resolves. Seed it here too — otherwise the auto-commit `git add` matches no
+    # file for this path, stages nothing, and the "Pulse cycle" commit is skipped.
+    'runbooks/journal-archive/.gitkeep',
     'agents/pulse/MEMORY.md',
     'agents/pulse/memory/.keep',
     'agents/pulse/.claude/settings.json',

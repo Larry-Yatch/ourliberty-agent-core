@@ -76,7 +76,7 @@ _PULSE_JOURNAL_FILES = frozenset({
     'agents/pulse/MEMORY.md',
     'agents/pulse/.claude/settings.json',
 })
-_PULSE_JOURNAL_DIRS = ('agents/pulse/memory/',)
+_PULSE_JOURNAL_DIRS = ('agents/pulse/memory/', 'runbooks/journal-archive/')
 # Keep the newest N baselines; older ones GC away (main advances, old parents
 # stop being anyone's merge-base). Bounds the dir to a handful of small files.
 DEFAULT_KEEP = 40

@@ -222,6 +222,20 @@ fi
 REPO_DIR="${HOME}/agent-core"
 if [ "$CYCLE_OK" = "1" ] && [ -d "$REPO_DIR/.git" ]; then
     cd "$REPO_DIR"
+
+    # --- rotate the cycle journal before committing (2026-07-07 gc-overload fix) ---
+    # cycle-journal.md is rewritten and committed every cycle; left unbounded it
+    # grew to ~30MB and its per-commit git blob (~90 commits/day) choked git gc,
+    # spiking droplet load to 9. Trim the live journal to the most-recent entries
+    # and move older ones into immutable runbooks/journal-archive/ chunks. Both
+    # the trimmed journal and any new chunk are Pulse-owned paths, so the
+    # auto-commit below stages them in the same commit (one-writer invariant
+    # preserved). Best-effort: a rotation failure must never abort the cycle.
+    if [ -f "$REPO_DIR/scripts/rotate_cycle_journal.py" ]; then
+        python3 "$REPO_DIR/scripts/rotate_cycle_journal.py" >>"$LOG_FILE" 2>&1 \
+            || log "rotate_cycle_journal: failed (non-fatal; see log)"
+    fi
+
     if ! git diff --quiet -- "${PULSE_RUNTIME_PATHS[@]}" 2>/dev/null \
        || ! git diff --quiet --cached -- "${PULSE_RUNTIME_PATHS[@]}" 2>/dev/null \
        || git ls-files --others --exclude-standard -- "${PULSE_RUNTIME_PATHS[@]}" | grep -q .; then

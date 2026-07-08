@@ -112,6 +112,12 @@ class _SyncResilienceBase(unittest.TestCase):
         runbooks.mkdir()
         (runbooks / 'cycle-journal.md').write_text('seed journal\n')
         (runbooks / 'cycle-actions.jsonl').write_text('')
+        # journal-archive/ is a PULSE_RUNTIME_PATHS member (rotate_cycle_journal.py
+        # overflow). Seed its tracked .gitkeep so sync's atomic
+        # `git add -- <allowlist paths>` never aborts on a missing pathspec —
+        # same treatment as agents/pulse/memory/ above.
+        (runbooks / 'journal-archive').mkdir()
+        (runbooks / 'journal-archive' / '.gitkeep').write_text('')
         pulse_dir = self.repo_dir / 'agents' / 'pulse'
         pulse_dir.mkdir(parents=True)
         (pulse_dir / 'MEMORY.md').write_text('seed memory\n')
