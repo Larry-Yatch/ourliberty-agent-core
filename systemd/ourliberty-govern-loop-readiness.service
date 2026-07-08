@@ -1,0 +1,38 @@
+[Unit]
+Description=Slice-7 kickoff trip-wire — nudge Larry when the decision ledger is thick enough for the govern-loop assessor
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/govern_loop_readiness.py
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+EnvironmentFile=-/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/govern_loop_readiness.py --once
+
+TimeoutStartSec=120
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-govern-loop-readiness
+
+# Memory cap: one small JSONL scan; tiny.
+MemoryMax=256M
+MemoryHigh=128M
+
+# Hardening — read-only over the ledger; writes ONLY its own state + the
+# larry_alerts pipeline files under ~/agents.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
