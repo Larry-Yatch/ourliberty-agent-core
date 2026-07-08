@@ -158,3 +158,94 @@ identity, same routing. N comes from config; default 1 (inert).
 Burst merge latency. Baseline 2026-07-08: 5-PR burst waited 3.5–11.5h. Target:
 same-shape burst clears in <2h end-to-end, with per-PR review p99 unchanged
 (we're removing queue-wait, not rushing reviews).
+
+## 9. Build sequence (staged, not yet live)
+
+The 3-PR plan in §4 is authored below as a schema-valid
+`build_sequence_validator.validate_dag`-passing sequence file, ready to drop
+into `~/agents/blackboard/build-sequences/`. It is intentionally staged here
+rather than placed live: the orchestrator enforces exactly one live
+(`pending`/`active`) sequence at a time
+(`build_sequence_validator.validate_no_concurrent_active`), and
+`suite-green-guardian-001` is the currently-active sequence.
+
+**Activation checklist** (both required):
+1. This spec PR merges.
+2. `suite-green-guardian-001` reaches a terminal status (`complete`, `failed`,
+   or `paused`).
+
+Then: place the JSON below at
+`~/agents/blackboard/build-sequences/mirror-two-slot-review-001.json` and call
+`launch_queue_drain.dispatch_mirror_preflight("mirror-two-slot-review-001")` to
+fire the DAG-preflight to Mirror. On PASS, the outbox notifier auto-flips
+`pending` → `active` and the advancer dispatches step 1 — no further manual
+step.
+
+```json
+
+{
+  "seq_id": "mirror-two-slot-review-001",
+  "label": "Mirror two-slot adversarial review — burst-latency fix (gated on tier-pool wiring, MET 2026-07-08)",
+  "spec_doc": "docs/specs/mirror-two-slot-review-spec.md",
+  "created_at": "2026-07-08T00:00:00+00:00",
+  "created_by": "claude-desktop",
+  "status": "pending",
+  "current_steps": [],
+  "steps": [
+    {
+      "step_id": "pr1-slot-plumbing",
+      "label": "PR1 — rename-based atomic claim + slot-indexed lease plumbing (inert)",
+      "depends_on": [],
+      "dispatch_text": "Build mirror-two-slot-review step 1 per spec §4 PR1 (agent-core, docs/specs/mirror-two-slot-review-spec.md): atomic rename-based task claim (inbox/.claimed/<slot>/) + orphan-claim sweep in inbox_watcher.py; slot-indexed dispatch_lease ids (inbox:mirror:<n>, slot0=legacy inbox:mirror); review_slots config key spawns N watcher threads (absent=1, inert). Include §3.5 $HOME shared-state audit. Mirror focus: two threads never double-claim; orphan claim re-queues once; slot0 lease spelling unchanged.",
+      "target_repo": "ourliberty-agent-core",
+      "task_type": "feature-development",
+      "status": "pending",
+      "dispatched_at": null,
+      "merged_at": null,
+      "pr_url": null,
+      "current_actor": null,
+      "failure_reason": null
+    },
+    {
+      "step_id": "pr2-slot-aware-healers",
+      "label": "PR2 — make every Mirror-lease-assuming healer/dedup slot-aware",
+      "depends_on": [
+        "pr1-slot-plumbing"
+      ],
+      "dispatch_text": "Build mirror-two-slot-review step 2 per spec §4 PR2 (agent-core, docs/specs/mirror-two-slot-review-spec.md): make every Mirror-lease consumer slot-aware — heal_wedged_review_sessions (per-slot reap), reap-before-harvest, heal_review_ceiling_fit (per-slot durations), dispatch_sentinel (verify Forge-scoped, leave), duplicate-review dedup (same-PR-head guard at claim time). Seed: grep -rn \"inbox:mirror\" scripts/. Mirror focus: no shared-lease gap unaudited; same-head double-review impossible.",
+      "target_repo": "ourliberty-agent-core",
+      "task_type": "feature-development",
+      "status": "pending",
+      "dispatched_at": null,
+      "merged_at": null,
+      "pr_url": null,
+      "current_actor": null,
+      "failure_reason": null
+    },
+    {
+      "step_id": "pr3-activation",
+      "label": "PR3 — activate review_slots=2 + observability + ConcurrencyGuard check",
+      "depends_on": [
+        "pr2-slot-aware-healers"
+      ],
+      "dispatch_text": "Build mirror-two-slot-review step 3 per spec §4 PR3 (agent-core, docs/specs/mirror-two-slot-review-spec.md): set review_slots=2 for mirror in agent-models.json; log review_slot=<n> + dispatch_tier=<t> on review start-lines; emit PR-open→review-start queue-wait into chain events; add a Mirror queue-wait signal to the readiness trip-wire (or sibling gauge). Verify concurrency_guard.py headroom under a 2-slot burst per §5. Mirror focus: burst p95 queue-wait drops per §8; guard never pins at 6.",
+      "target_repo": "ourliberty-agent-core",
+      "task_type": "feature-development",
+      "status": "pending",
+      "dispatched_at": null,
+      "merged_at": null,
+      "pr_url": null,
+      "current_actor": null,
+      "failure_reason": null
+    }
+  ],
+  "audit_log": [
+    {
+      "ts": "2026-07-08T00:00:00+00:00",
+      "event": "sequence-authored",
+      "actor": "claude-desktop",
+      "note": "Per spec mirror-two-slot-review-spec.md §4 (3-PR plan). Staged, NOT dropped live: orchestrator enforces one live (pending/active) sequence at a time (validate_no_concurrent_active) and suite-green-guardian-001 is currently active. Blocked on: (1) spec PR #875 merging, (2) suite-green-guardian reaching a terminal status. Activate by placing this file at ~/agents/blackboard/build-sequences/mirror-two-slot-review-001.json and calling launch_queue_drain.dispatch_mirror_preflight(seq_id) — Mirror DAG-preflight PASS auto-flips pending->active."
+    }
+  ]
+}
+```
