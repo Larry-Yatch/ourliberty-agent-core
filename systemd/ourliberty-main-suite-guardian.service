@@ -1,0 +1,41 @@
+[Unit]
+Description=Ourliberty Main-Suite Green Guardian — nightly full-suite run + isolation classification at one pinned origin/main SHA (shadow mode)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/agents/beacon/specs/main-suite-green-guardian.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# Wrapper handles the warmer single-flight lock + EMERGENCY_HALT + hard kill +
+# heartbeat. See run_main_suite_guardian.sh.
+ExecStart=/usr/bin/bash /home/larry/agent-core/scripts/run_main_suite_guardian.sh
+
+# A full-suite run was MEASURED at ~537s and per-test isolation of the standing
+# reds adds more; the in-process wall cap is 90 min and the wrapper hard-kills
+# at 2x. TimeoutStartSec must clear both (L7 — the template's 300s would kill
+# the first suite run mid-pass).
+TimeoutStartSec=10800
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-main-suite-guardian
+
+# Hardening (matches ourliberty-ledger.service pattern). ReadWritePaths MUST
+# cover the absolute warmer lock at /home/larry/agents/state (L7).
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /home/larry/agent-core /home/larry/credentials /home/larry/.claude /home/larry/.claude.json /home/larry/.local /home/larry/.cache /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+Nice=10
