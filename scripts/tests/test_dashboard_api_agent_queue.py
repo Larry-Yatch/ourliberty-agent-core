@@ -933,10 +933,76 @@ class WorkerDoneTodayLaneTest(_Base):
         self.assertEqual(by_task['jobS']['outcome'], 'succeeded')
         self.assertEqual(by_task['jobS']['message'], 'all good')
         self.assertEqual(by_task['jobF']['outcome'], 'failed')
-        # Exact worker done-item key set — no builder pr_url/reason fields.
-        self.assertEqual(set(done[0]), {'task_id', 'outcome', 'at', 'message'})
+        # Exact worker done-item key set — no builder `reason` field.
+        self.assertEqual(
+            set(done[0]),
+            {'task_id', 'outcome', 'at', 'message', 'verdict', 'pr_url'},
+        )
+        # Non-mirror workers never emit review verdicts: fields stay None.
+        self.assertIsNone(by_task['jobS']['verdict'])
         # sorted by `at` desc: jobF (now) is newest.
         self.assertEqual(done[0]['task_id'], 'jobF')
+
+    def test_mirror_verdict_joined_onto_done_card(self):
+        # A Mirror review session that SUCCEEDED but sent the PR back for
+        # fixes must carry verdict=review_revision (+ the PR url) so the
+        # card doesn't read as contradictory next to the queued -revN
+        # re-review of the same PR.
+        now = _today_noon()
+        pr = 'https://github.com/x/y/pull/841'
+
+        def ev(event_type, ts, task_id='pr-841', pr_url=pr, payload=None):
+            return {'agent': 'mirror', 'task_id': task_id,
+                    'event_type': event_type, 'pr_url': pr_url,
+                    'ts': ts.isoformat(), 'payload': payload}
+
+        rows = [
+            # round-0: session succeeded, verdict = revision.
+            ev('review_revision', now - timedelta(hours=2)),
+            ev('session_done', now - timedelta(hours=2),
+               payload={'success': True, 'message': 'round 0 done'}),
+            # a verdict-less mirror session on another task stays bare.
+            ev('session_done', now, task_id='audit-1', pr_url=None,
+               payload={'success': True, 'message': 'no verdict here'}),
+            # yesterday's verdict for pr-841 must NOT leak into today.
+            ev('review_pass', now - timedelta(days=1),
+               task_id='pr-other'),
+        ]
+        c = _client(self.agents_root, self.worktrees_root,
+                    _ChainEventsClient(rows))
+        r = c.get('/api/system/agent-queue', headers=AUTH,
+                  params={'agent': 'mirror'})
+        self.assertEqual(r.status_code, 200)
+        by_task = {d['task_id']: d for d in r.json()['done_today']}
+        self.assertEqual(by_task['pr-841']['verdict'], 'review_revision')
+        self.assertEqual(by_task['pr-841']['pr_url'], pr)
+        self.assertIsNone(by_task['audit-1']['verdict'])
+
+    def test_mirror_latest_verdict_today_wins(self):
+        # Two rounds in one day (round-0 REVISION then rev1 PASS): the kept
+        # card is the latest session, and the verdict must match that round.
+        now = _today_noon()
+        pr = 'https://github.com/x/y/pull/841'
+
+        def ev(event_type, ts, payload=None):
+            return {'agent': 'mirror', 'task_id': 'pr-841',
+                    'event_type': event_type, 'pr_url': pr,
+                    'ts': ts.isoformat(), 'payload': payload}
+
+        rows = [
+            ev('review_revision', now - timedelta(hours=3)),
+            ev('session_done', now - timedelta(hours=3),
+               payload={'success': True}),
+            ev('review_pass', now - timedelta(hours=1)),
+            ev('session_done', now - timedelta(hours=1),
+               payload={'success': True}),
+        ]
+        c = _client(self.agents_root, self.worktrees_root,
+                    _ChainEventsClient(rows))
+        r = c.get('/api/system/agent-queue', headers=AUTH,
+                  params={'agent': 'mirror'})
+        by_task = {d['task_id']: d for d in r.json()['done_today']}
+        self.assertEqual(by_task['pr-841']['verdict'], 'review_pass')
 
     def test_message_truncated(self):
         now = datetime.now(timezone.utc)
