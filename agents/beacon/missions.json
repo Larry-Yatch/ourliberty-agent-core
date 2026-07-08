@@ -7307,6 +7307,57 @@
       "created": "2026-07-07",
       "deferred_reason": null,
       "archived": false
+    },
+    {
+      "id": "proposed-card-message-db29b29d2b55a2b1fb0d3b20344d321ecb25c657",
+      "name": "Card Message Db29b29d2b55a2b1fb0d3b20344d321ecb25c657",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `card-message-db29b29d2b55a2b1fb0d3b20344d321ecb25c657`. Last activity 2026-07-08T07:37:58.558419+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "card-message-db29b29d2b55a2b1fb0d3b20344d321ecb25c657"
+      ],
+      "repo": null,
+      "created": "2026-07-08",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-08T07:40:02.985622+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-08T07:37:58.558419+00:00"
+    },
+    {
+      "id": "proposed-card-message-8f4384fb2ee7c9ff297d3c69401e2fb3dfb64929",
+      "name": "Card Message 8f4384fb2ee7c9ff297d3c69401e2fb3dfb64929",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `card-message-8f4384fb2ee7c9ff297d3c69401e2fb3dfb64929`. Last activity 2026-07-08T07:33:42.691783+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "card-message-8f4384fb2ee7c9ff297d3c69401e2fb3dfb64929"
+      ],
+      "repo": null,
+      "created": "2026-07-08",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-08T07:40:02.985622+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-08T07:33:42.691783+00:00"
+    },
+    {
+      "id": "proposed-mirror-review-pr-ourliberty-agent-core-845",
+      "name": "Mirror Review PR Ourliberty Agent Core 845",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `mirror-review-pr-ourliberty-agent-core-845`. Last activity 2026-07-08T03:55:28.566366+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "mirror-review-pr-ourliberty-agent-core-845"
+      ],
+      "repo": null,
+      "created": "2026-07-08",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-08T07:40:02.985622+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-08T03:55:28.566366+00:00"
     }
   ]
 }
