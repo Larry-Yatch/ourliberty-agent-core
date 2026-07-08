@@ -7400,6 +7400,57 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-direction-ask-build-seq-advancer-refire-paused-3of3-001",
+      "name": "Direction Ask Build Seq Advancer Refire Paused 3of3 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `direction-ask-build-seq-advancer-refire-paused-3of3-001`. Last activity 2026-07-08T07:54:15.29223+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "direction-ask-build-seq-advancer-refire-paused-3of3-001"
+      ],
+      "repo": null,
+      "created": "2026-07-08",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-08T07:55:11.939691+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-08T07:54:15.29223+00:00"
+    },
+    {
+      "id": "proposed-harden-specdoc-originmain-flaky-tests-001",
+      "name": "Harden Specdoc Originmain Flaky Tests 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `harden-specdoc-originmain-flaky-tests-001`. Last activity 2026-07-08T07:47:46.481165+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "harden-specdoc-originmain-flaky-tests-001"
+      ],
+      "repo": null,
+      "created": "2026-07-08",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-08T07:55:11.939691+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-08T07:47:46.481165+00:00"
+    },
+    {
+      "id": "proposed-proposed-pile-monthly-digest-001",
+      "name": "Proposed Pile Monthly Digest 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `proposed-pile-monthly-digest-001`. Last activity 2026-07-08T07:44:46.327668+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "proposed-pile-monthly-digest-001"
+      ],
+      "repo": null,
+      "created": "2026-07-08",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-08T07:55:11.939691+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-08T07:44:46.327668+00:00"
     }
   ]
 }
