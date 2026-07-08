@@ -1189,6 +1189,11 @@ class RotationModeResponse(BaseModel):
     override_active: bool
     config_enabled: bool
     as_of: str
+    # Per-tier dispatch-pool snapshot (tier-dispatch spec § 15): pool config
+    # (primary/fallback), the operator pin, and per-tier {usable, benched,
+    # cooldown_until, near_cap, burn_5h, budget_5h}. Best-effort — null when
+    # the pool probe fails, so the mode switch above keeps rendering.
+    pool: Optional[dict[str, Any]] = None
 
 
 class RotationModeRequest(BaseModel):
@@ -9024,6 +9029,23 @@ def _reader_rotation_mode(
     }
 
 
+def _read_tier_pool_status() -> Optional[dict[str, Any]]:
+    """Per-tier dispatch-pool snapshot for GET /api/system/rotation
+    (tier-dispatch spec § 15): active_tier.tier_pool_status() — a pure read
+    that never mutates the near_cap hysteresis latch — plus a derived
+    ``benched`` (= not usable) per tier, the vocabulary the spec and the
+    rotation UI use. Best-effort: None on ANY failure so a broken pool probe
+    can never take down the mode switch this endpoint primarily serves."""
+    try:
+        import active_tier  # noqa: PLC0415 — lazy, matches the other bridges
+        snapshot = active_tier.tier_pool_status()
+        for info in (snapshot.get('tiers') or {}).values():
+            info.setdefault('benched', not info.get('usable', False))
+        return snapshot
+    except Exception:  # noqa: BLE001 — observability must never 500 the GET
+        return None
+
+
 def _handle_rotation_mode_post(
     *,
     mode: str,
@@ -10479,7 +10501,9 @@ def get_larry_allowlist() -> dict[str, Any]:
     dependencies=[Depends(_require_token)],
 )
 def get_system_rotation() -> dict[str, Any]:
-    return _reader_rotation_mode(_agents_root(), _agent_models_json_path())
+    out = _reader_rotation_mode(_agents_root(), _agent_models_json_path())
+    out['pool'] = _read_tier_pool_status()
+    return out
 
 
 @app.post(
