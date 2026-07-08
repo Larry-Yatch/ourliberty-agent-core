@@ -424,9 +424,15 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 ---
 
-## G-rule notifier-concurrent-scan-duplicate-review-dispatch-001 → DISPATCHED ✅ (iter ~4483), vp
+## G-rule notifier-concurrent-scan-duplicate-review-dispatch-001 → FORGE PREFLIGHT IN FLIGHT (iter ~4483 dispatched; Beacon spec returned ~01:30Z 2026-07-08)
 
-**Rule:** outbox-notifier dispatches a duplicate mirror-review after REVIEW_REVISION — PR-scan loop fires 4–12s after revision-to-forge dispatch, before Forge completes. Creates race-dup + legitimate re-review in Mirror inbox simultaneously. Fix dispatched to Beacon at 3/3 (iter ~4483): direction-ask-notifier-concurrent-scan-dup-review-dispatch-001.json. Fix: short-circuit gate in PR-scan review-dispatch — skip if revision-to-forge fired for same task_id within last 300s. Occurrences: iter ~3710 (PR #108, 1/3); iter ~4482 (PR #840/kickoff, 2/3); iter ~4483 (PR #841, 3/3). verification_pending.
+**Rule:** outbox-notifier dispatches a duplicate mirror-review after REVIEW_REVISION — PR-scan loop fires 4–12s after revision-to-forge dispatch, before Forge completes (all three round-0 sites funnel through `_dispatch_mirror_review`; live-Mirror-proc guard misses post-exit window). Creates race-dup + legitimate re-review in Mirror inbox simultaneously.
+
+**Fix (Beacon-specced):** Durable-state-flag with staleness TTL at top of `_dispatch_mirror_review`. Set after successful write in `_dispatch_revision_to_forge`; cleared in `_dispatch_mirror_review_rerun`. Single guard covers all three round-0 sites. **Time-window approach (300s) rejected** — revision builds can exceed 5 min; in-memory state dies on restart.
+
+**Chain:** `phase=preflight` APPROVAL_REQUEST dispatched to Forge. Trust policy routing — Larry DM expected unless carve-out auto-approves. verification_pending Forge preflight (PROCEED/CLARIFY/REJECT).
+
+Occurrences: iter ~3710 (PR #108, 1/3); iter ~4482 (PR #840/kickoff, 2/3); iter ~4483 (PR #841, 3/3).
 
 ---
 
@@ -466,8 +472,8 @@ PR #828 (`gate: delegate JS/TS repo regression checks to GitHub Actions (Piece 2
 
 ---
 
-## Status snapshot — updated 2026-07-08T01:23Z UTC (Iter ~4483, **Tier 1**)
+## Status snapshot — updated 2026-07-08T01:32Z UTC (Iter ~4484, **Tier 1**)
 
-**Iter ~4483 summary (2026-07-08T01:23Z):** 0 new alerts. Watermark=1024. Pending approvals=2 (sentinel-inflight-stall-translation-001 + govern-loop-assessor-spec-001). **Service restart at 19:14 MDT** via heal-stale-daemon-code (SIGTERM clean); all 4 core services new PIDs (outbox-notifier=2046437, beacon_bot=2046765, chain_event_shipper=2046972, inbox_watcher=2048756). **6 open PRs (#840-845).** PR #841 REVIEW_REVISION → rev1 built → Mirror re-review queued (race-dup also in inbox). Mirror inbox=8 items (2 race-dups for kickoff+#841). **G-rule notifier-concurrent-scan-dup-review-dispatch-001 → DISPATCHED ✅** (3/3, direction-ask to Beacon). **Agent-core:** HEAD=d2ac4f38=origin/main. CLEAN TREE. Sync: 00:40:03Z. Watchdog healthy (01:16:42Z). Heal-daemon 01:14:39Z. **STANDING:** zombie PID 1834248 (40d+) — kill ask-then-do pending Larry. Check VI/VIII proposals (idx=990,991) carry. Check I timer fires 08:13 MDT today (Wed, 14:13Z). GitHub 401 WARN: 1 isolated July 7 instance, no recurrence. Tier 1 (consecutive_clean=0). **ACTIVE G-rules:** sentinel-inflight-stall-tier4 [APPROVAL_REQUEST pending=1, ADVANCING]; merge-held-deep-review-notifier-tier4-001 [PR #843 Mirror queued, ADVANCING]; auto-merge-conflict-promoted-merged-pr-001 [2/3]; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [2/3]; notifier-concurrent-scan-dup-review-dispatch-001 [DISPATCHED ✅ vp]; forge-marker-task-id-mismatch-xii-v1 [1/3]; ourliberty-health-subject-key-mismatch-001 [RE-OPENED 2/3]; mirror-malformed-verdict-heal-reap-path-001 [1/3].
+**Iter ~4484 summary (2026-07-08T01:32Z):** 0 new alerts. Watermark=1024. Pending approvals=2 (sentinel-inflight-stall-translation-001 + govern-loop-assessor-spec-001). **7 open PRs (#840-846).** PR #843 REVIEW_PASS (19:29 MDT) AUTO_MERGE_HELD by #840 (outbox_notifier.py overlap). PR #846 NEW (OFL slice 5a, auto-review, MERGEABLE). G-rule notifier-concurrent-scan-dup: Beacon designed durable-state-flag fix but Forge preflight APPROVAL_REQUEST NOT captured in outbox result text — chain gap (Forge inbox empty, no new pending approval). Mirror inbox=8. **Agent-core:** HEAD=ebeaa33e=origin/main. CLEAN TREE. Sync: 00:40:03Z (~52 min). Watchdog 01:26:44Z healthy. Heal-daemon 01:24:42Z. **STANDING:** zombie PID 1834248 (40d 6h+); VI/VIII proposals idx=990,991; Check I 08:13 MDT today (14:13Z); 401 WARN 1 isolated (carry). **ACTIVE G-rules:** sentinel-inflight-stall-tier4 [APPROVAL_REQUEST pending=1]; merge-held-deep-review-notifier-tier4-001 [PR #843 REVIEW_PASS held by #840]; notifier-concurrent-scan-dup-review-dispatch-001 [DISPATCHED ✅ CHAIN GAP — Forge preflight not captured]; auto-merge-conflict-promoted-merged-pr-001 [2/3]; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [2/3]; forge-marker-task-id-mismatch-xii-v1 [1/3]; ourliberty-health-subject-key-mismatch-001 [RE-OPENED 2/3]; mirror-malformed-verdict-heal-reap-path-001 [1/3].
 
 
