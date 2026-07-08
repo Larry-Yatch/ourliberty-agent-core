@@ -3,8 +3,14 @@
 
 Covers: the audit() listing (key, age, TTL disposition, suppressed volume from
 the sidecar counter), the newest-file sorting, the notable-selection gate, and
-the no-DM-when-nothing-notable path. Sentinel-armed, tmp-root isolated, no live
-gh / no live-tree writes.
+the no-DM-when-nothing-notable path. Sentinel-armed, no live gh / no live-tree
+writes.
+
+Hermetic under full-suite ordering: like the sibling test_larry_alerts.py, this
+mock.patch.object's larry_alerts' SILENCE_ROOT / SILENCE_COUNTER_ROOT onto tmp
+paths for the duration of each test rather than reloading the module + mutating
+os.environ globally (which corrupts shared module state under `unittest
+discover`).
 """
 from __future__ import annotations
 
@@ -13,9 +19,6 @@ try:  # engage the test sandbox before any production import reads env/paths
 except ImportError:
     import _bootstrap  # noqa: F401
 
-import importlib
-import os
-import shutil
 import sys
 import tempfile
 import time
@@ -32,21 +35,23 @@ import silence_file_auditor as sfa  # noqa: E402
 
 
 class _IsolatedAuditor(unittest.TestCase):
-    def setUp(self) -> None:
-        self._tmpdir = tempfile.mkdtemp(prefix='silence-audit-')
-        self._env_orig = os.environ.get('OURLIBERTY_AGENTS_ROOT')
-        os.environ['OURLIBERTY_AGENTS_ROOT'] = self._tmpdir
-        importlib.reload(larry_alerts)
-        importlib.reload(sfa)  # rebinds its `larry_alerts` ref to the reload
+    """Point the silence + counter roots at a tempdir via patch (no reload, no
+    env mutation) so state stays local and full-suite ordering is unaffected."""
 
-    def tearDown(self) -> None:
-        if self._env_orig is None:
-            os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
-        else:
-            os.environ['OURLIBERTY_AGENTS_ROOT'] = self._env_orig
-        importlib.reload(larry_alerts)
-        importlib.reload(sfa)
-        shutil.rmtree(self._tmpdir, ignore_errors=True)
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        tmp = Path(self._tmp.name)
+        self.addCleanup(self._tmp.cleanup)
+        self._patches = [
+            mock.patch.object(larry_alerts, 'AGENTS_ROOT', tmp),
+            mock.patch.object(larry_alerts, 'SILENCE_ROOT',
+                              tmp / 'state' / 'alert-silenced'),
+            mock.patch.object(larry_alerts, 'SILENCE_COUNTER_ROOT',
+                              tmp / 'state' / 'alert-silenced-counts'),
+        ]
+        for p in self._patches:
+            p.start()
+            self.addCleanup(p.stop)
 
     def _suppress(self, key: str, n: int) -> None:
         for _ in range(n):
