@@ -129,6 +129,81 @@
         "action": "ASK Larry — never auto-execute destructive actions. Irreversible actions are a permanent_guard floor.",
         "why_safe": "By definition there is no clean undo; a human must decide."
       }
+    },
+    {
+      "template": "auto-merge-clean-pr",
+      "state": "probation",
+      "reversible": true,
+      "permanent_guard": false,
+      "clean_streak": 0,
+      "total_dispatches": 0,
+      "last_larry_correction_at": null,
+      "graduated_at": null,
+      "plain_language": {
+        "what": "A PR has passed every required CI check AND a Mirror review (REVIEW_PASS), and the mergeability gate is satisfied.",
+        "action": "Squash-merge the PR and delete its branch (the merge outbox_notifier / heal_pr_auto_merge already perform once a PR is green + reviewed).",
+        "why_safe": "The merge only fires after all checks and a review pass; a bad landing is reversible with a git revert, and the upstream gate refuses stale/conflicting/regressing PRs rather than forcing them."
+      }
+    },
+    {
+      "template": "ff-main-when-behind",
+      "state": "probation",
+      "reversible": true,
+      "permanent_guard": false,
+      "clean_streak": 0,
+      "total_dispatches": 0,
+      "last_larry_correction_at": null,
+      "graduated_at": null,
+      "plain_language": {
+        "what": "The droplet's local ~/agent-core checkout is on a clean main that is behind an already-merged origin/main.",
+        "action": "Fast-forward the local checkout to origin/main (git pull --ff-only). Nothing is pushed and no code is authored.",
+        "why_safe": "A fast-forward only advances the local pointer to commits that already exist upstream; it is fully reversible (git reset back) and touches only the local checkout, never origin."
+      }
+    },
+    {
+      "template": "enable-pr-auto-merge",
+      "state": "probation",
+      "reversible": true,
+      "permanent_guard": false,
+      "clean_streak": 0,
+      "total_dispatches": 0,
+      "last_larry_correction_at": null,
+      "graduated_at": null,
+      "plain_language": {
+        "what": "A T0 PR has been clean + green for more than 30 minutes and GitHub's auto-merge flag is not yet enabled.",
+        "action": "Arm GitHub's native auto-merge on the PR (gh pr merge <num> --auto --squash).",
+        "why_safe": "It only ARMS the merge gate — GitHub still withholds the merge until all required checks pass, and the flag is trivially reversible (gh pr merge --disable-auto). It authorizes nothing the review/CI gates don't already require."
+      }
+    },
+    {
+      "template": "archive-duplicate-inbox-task",
+      "state": "probation",
+      "reversible": true,
+      "permanent_guard": false,
+      "clean_streak": 0,
+      "total_dispatches": 0,
+      "last_larry_correction_at": null,
+      "graduated_at": null,
+      "plain_language": {
+        "what": "Two inbox tasks collide on the same dedup_identity, both are readable, and the older one is not currently being processed.",
+        "action": "Move the older duplicate task file into the inbox's .archive/ directory so the watcher processes the collision once.",
+        "why_safe": "It archives (moves) rather than deletes; the file is preserved and can be restored, and only a confirmed duplicate that is not in flight is touched."
+      }
+    },
+    {
+      "template": "silence-false-positive",
+      "state": "probation",
+      "reversible": true,
+      "permanent_guard": false,
+      "clean_streak": 0,
+      "total_dispatches": 0,
+      "last_larry_correction_at": null,
+      "graduated_at": null,
+      "plain_language": {
+        "what": "A recurring alert fingerprint matches a proven-benign silenceable class (Medic's silenceable_subjects allowlist).",
+        "action": "Write a suppression file so the confirmed false positive stops looping in the inbox, and post exactly one Approve/Reject decision to the Approvals tab so the unfixed root cause still reaches Larry.",
+        "why_safe": "Silencing writes a suppression file only — it mutates nothing on the system, is reversible via larry_alerts.unsilence(fingerprint), and Medic may only silence pre-approved benign CLASSES, never an arbitrary alert."
+      }
     }
   ]
 }

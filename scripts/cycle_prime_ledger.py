@@ -87,6 +87,26 @@ TREND_HALF_DAYS = 15        # trailing 15d vs prior 15d for trend direction
 PROMOTE_WINDOW_DAYS = 7     # Decision II auto-promote window
 TREND_RATIO_DELTA = 0.10    # ±10% band for "flat" classification
 
+# Agent-run always_allowed tools (agents/pulse/TOOLS.md) that are modeled as
+# graduatable registry templates (config/auto-fix-patterns.json). These are the
+# high-frequency, reversible, benign automations the cycle agent performs by
+# hand — unlike Medic's Python-executed actions (restart-daemon etc., recorded
+# at act-time in medic_actions._record_template_execution, PR #832), the agent
+# is the executor and its at-act-time event IS the intervention row it appends
+# here. So the ledger append is the correct single instrument point for their
+# graduation track record. The agent appends an intervention/systemic_fix row
+# only when the tool SUCCEEDED (a failure is a different slug / carry), so this
+# is a success-only signal by construction. Membership is checked BEFORE any
+# registry read, so the hot iter_clean heartbeat and every non-graduation
+# intervention pay nothing. Auto-merge is deliberately NOT here — its executor
+# is Python (outbox_notifier / heal_pr_auto_merge), recorded there, so listing
+# it would double-count.
+GRADUATION_LEDGER_TEMPLATES = frozenset({
+    'ff-main-when-behind',
+    'enable-pr-auto-merge',
+    'archive-duplicate-inbox-task',
+})
+
 
 def _ledger_path() -> Path:
     root = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', str(Path.home() / 'agents')))
@@ -143,6 +163,44 @@ def _atomic_append(record: dict[str, Any]) -> bool:
     except OSError as e:
         _log(f'append failed: {type(e).__name__}: {e}', 'WARN')
         return False
+
+
+def _record_graduation_execution(kind: str, intervention_id: str) -> None:
+    """Record a clean action-template execution for the agent-run graduatable
+    tools (see ``GRADUATION_LEDGER_TEMPLATES``) toward Check V's promotion loop.
+
+    This is the streak INPUT the loop was missing for the *agent's* high-frequency
+    reversible automations — the mirror of ``medic_actions._record_template_execution``
+    (PR #832) for the actions Medic does not execute. Success-only by construction:
+    the agent appends an intervention/systemic_fix row only when the tool worked.
+
+    Additive and best-effort by contract: it observes a row that was just written;
+    it must NEVER change whether/how the ledger row is written, and must never
+    raise (a track-record write failing cannot be allowed to fail an append). It
+    is naturally start-clean — only actions recorded after this ships are counted.
+    The cheap frozenset guard runs BEFORE any I/O so the hot iter_clean heartbeat
+    and every non-graduation intervention pay nothing; the registry-membership
+    gate + record + never-raise contract is single-sourced in
+    ``alert_triage_state.record_clean_execution_if_registered``.
+
+    Success-only by construction (the agent appends a row only on success). NOTE
+    the exactly-one-owner invariant: templates listed here are AGENT-run tools
+    that reach the ledger by appending here DIRECTLY. They must never ALSO be
+    alert-triage Tier-1/2 templates — ``alert_triage_state.triage_alert`` records
+    those itself right after its own ``append_action`` call, which would
+    double-count. The two template namespaces are disjoint today; keep them so.
+    """
+    try:
+        if kind not in TEMPLATE_REQUIRED_KINDS:
+            return
+        template = str(intervention_id or '').split(':', 1)[0]
+        if template not in GRADUATION_LEDGER_TEMPLATES:
+            return
+        import alert_triage_state  # lazy: avoids import coupling at module load
+        alert_triage_state.record_clean_execution_if_registered(template)
+    except Exception as e:  # noqa: BLE001 — track-record must never break ledger
+        _log(f'graduation-execution record for {intervention_id!r} failed: '
+             f'{type(e).__name__}: {e}', 'WARN')
 
 
 def canonical_intervention_id(template: str, detail: str = '') -> str:
@@ -222,7 +280,8 @@ def append_action(tier: int, kind: str, payload: dict[str, Any],
         'verified_at': payload.get('verified_at'),
         'verification_anchor': payload.get('verification_anchor'),
     }
-    _atomic_append(record)
+    if _atomic_append(record):
+        _record_graduation_execution(kind, intervention_id)
     return record
 
 

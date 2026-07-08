@@ -397,8 +397,20 @@ def _record_template_execution(action: str, *, verified: bool) -> None:
     executor of the reversible auto-fixes the registry graduates, so a verified
     Medic action is the clean-execution signal (docs/pulse-triage-phase-c-brief).
     Recorded ONLY when ``action`` names a real registry template
-    (config/auto-fix-patterns.json) — Medic's non-template actions
-    (retrigger-inbox, silence-false-positive) never accrue a track record here.
+    (config/auto-fix-patterns.json); a non-registry action is a silent no-op.
+    Once an action IS enrolled it accrues a track record here — e.g.
+    ``silence-false-positive`` (from ``silence_false_positive``) now that it is a
+    registry template. (``retrigger-inbox`` is deliberately NOT enrolled: it runs
+    through ``_act_restart``, which Stage 2's ``_graduation_gate`` (#837) would
+    then REFUSE while probation, downgrading a working autonomous retrigger to an
+    ask — so it stays a non-template action until approved-probation recording
+    exists.)
+
+    Thin delegate: the registry-gate + record + never-raise contract is
+    single-sourced in ``alert_triage_state.record_clean_execution_if_registered``
+    so it can't drift across the executors that share it. ``verified=False`` is
+    passed only for a RELIABLE action-quality failure (a restart that didn't come
+    back active, a silence file that didn't persist), never for infra flakiness.
 
     Additive and best-effort by contract: it observes an action that already
     happened; it must NEVER change whether/how Medic acts, and must never raise
@@ -412,11 +424,8 @@ def _record_template_execution(action: str, *, verified: bool) -> None:
     """
     try:
         import alert_triage_state  # lazy: avoids import coupling at module load
-        registry = alert_triage_state.load_registry()
-        if action not in registry:
-            return
-        alert_triage_state.record_action_template_execution(
-            action, outcome='success' if verified else 'failure')
+        alert_triage_state.record_clean_execution_if_registered(
+            action, verified=verified)
     except Exception as e:  # noqa: BLE001 — track-record must never break Medic
         try:
             _log('WARN', f'graduation-execution record for {action!r} failed: '
@@ -737,6 +746,10 @@ def silence_false_positive(fingerprint: str, reason: str = '',
         # legitimately-expired silence as a write failure).
         expect_active = ttl_sec is None or ttl_sec > 0
         if not wrote or (expect_active and not larry_alerts.is_silenced(fp)):
+            # The silence write was attempted and did not persist — a real
+            # action failure. Record it toward the graduation streak (a no-op
+            # unless silence-false-positive is a live registry template).
+            _record_template_execution(ACTION_SILENCE, verified=False)
             return _refuse(
                 ACTION_SILENCE, fp, fp, attempt_int, 'silence-write-failed',
                 f'Could not persist a silence for {fp}; escalate diagnose-only.')
@@ -747,6 +760,10 @@ def silence_false_positive(fingerprint: str, reason: str = '',
         medic_ledger.append_record(
             source=rec_source, subject=rec_subject, classification='reversible',
             outcome='acted', attempt=attempt_int, notes=notes)
+        # Verified fresh silence -> a clean execution toward the graduation
+        # streak. The (c) idempotence branch returned earlier, so this never
+        # fires on an already-silenced no-op.
+        _record_template_execution(ACTION_SILENCE, verified=True)
         _log('INFO', notes)
 
         # (g) couple the silence with ONE Approve/Reject decision on Larry's
