@@ -1447,6 +1447,35 @@
         "task_id": "delegate-cap-slice-2-reconciler-hardening-closed-unmerged-ter-8d9e",
         "stamped_at": "2026-07-07T23:01:36.784195+00:00"
       }
+    },
+    {
+      "id": "cap-govern-loop-assessor-operator-layer-roi-rank-bra-28b0",
+      "title": "Govern-loop assessor (operator-layer ROI/rank brain) \u2014 consumes decision-outcome ledger",
+      "note": "INITIATIVE placeholder so the build-outcome work has a home. Build the assessor that READS ~/agents/state/decision-outcome-ledger.jsonl (decision rows joined to build_outcome rows on decision_key, written by scripts/decision_outcome_ledger.py + scripts/decision_outcome_reconcile.py, shipped in PR #833 as Operator Feed Loop slice 2) and turns it into 'where do Larry's approvals pay off' \u2014 the triage/ROI/rank brain (ship shadow-first per operator-layer-readiness). GATING PREREQUISITE \u2014 do this FIRST, it travels with this initiative: capture cap-slice-2-reconciler-hardening-closed-unmerged-ter-8d9e \u2014 the reconciler currently records a CLOSED-unmerged PR as a PERMANENT 'closed_unmerged' outcome, but closed PRs can be reopened+merged, so has_build_outcome() locks in a wrong 'abandoned' signal the assessor would then learn from. Decide the fix (re-checkable CLOSED / settle-period / let a later merged row supersede) in the context of how the assessor weights outcomes; that card also bundles bounded-scan + efficiency + magic-string cleanups. Also note the reconciler is manual --once, not timer-wired, and only joins PR-coordinate decision keys (task_id-keyed decisions not joined yet).",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-07T23:54:54.826103+00:00"
+      },
+      "last_touched": "2026-07-07T23:54:54.826103+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A scorekeeping tool that watches the decisions you approve and reports back on which ones actually paid off, so you can see where your attention delivers the most value.",
+        "why": "It turns your day-to-day approvals into a clear picture of what's working and what isn't, so your time goes to the choices that move the business instead of ones that quietly fizzle.",
+        "suggest": "Worth pursuing, but first close a data-accuracy gap that can wrongly brand a paused decision as a failure even when it later succeeds \u2014 then run it quietly in watch-only mode before trusting its rankings."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-08T00:04:21.515203+00:00",
+        "from_state": "parked"
+      }
     }
   ]
 }
