@@ -2301,6 +2301,89 @@ class TestCheckRevisionDispatchedWithNoSession(_TempAgentsRootMixin, unittest.Te
             self._nsl.get_obligation('unknown-1')['status'], self._nsl.OPEN,
         )
 
+    # ----- skip-on-terminal reconciliation (no-session-revision-merged-pr-fp) -----
+
+    def test_skip_when_task_correlates_to_merged_union_pr(self):
+        # The task's PR already MERGED out-of-band (the #865 completeness-pr3-build
+        # FP): correlating against the merged union via `_pr_matches_task` is FREE
+        # (no gh call), so the stuck obligation must produce ZERO alerts and the
+        # ledger row must be resolved — even with an EMPTY stored pr_url (the
+        # stored-url recovery path could never have caught this).
+        self._open('skip-merged-union-1', minutes_ago=60, pr_url='')
+        merged = [{
+            'number': 865,
+            'headRefName': 'forge/skip-merged-union-1',
+            'title': 'completeness pr3',
+            'mergedAt': '2026-07-08T17:44:10Z',
+            'state': 'MERGED',
+        }]
+        # `_gh_pr_state` must NOT be consulted — the free union match resolves it.
+        with patch.object(self.hps, '_gh_pr_state') as gh:
+            alerts = self.hps.check_revision_dispatched_with_no_session(
+                {}, merged_prs=merged)
+        self.assertEqual(alerts, [])
+        gh.assert_not_called()
+        ob = self._nsl.get_obligation('skip-merged-union-1')
+        self.assertEqual(ob['status'], self._nsl.RESOLVED)
+        self.assertEqual(ob['resolution'], 'merged')
+
+    def test_skip_when_stored_pr_url_merged(self):
+        # No union match (the merge is outside the recent-merged fetch window),
+        # but the obligation carries a real stored pr_url that gh confirms MERGED:
+        # at most ONE `_gh_pr_state` call catches it → ZERO alerts, ledger cleared.
+        self._open('skip-stored-merged-1', minutes_ago=60,
+                   pr_url='https://gh/o/r/pull/900')
+        with patch.object(self.hps, '_gh_pr_state',
+                          return_value='MERGED') as gh:
+            alerts = self.hps.check_revision_dispatched_with_no_session(
+                {}, merged_prs=[], closed_prs=[])
+        self.assertEqual(alerts, [])
+        gh.assert_called_once_with('https://gh/o/r/pull/900')
+        self.assertEqual(
+            self._nsl.get_obligation('skip-stored-merged-1')['status'],
+            self._nsl.RESOLVED,
+        )
+
+    def test_open_pr_still_fires_exactly_one_alert(self):
+        # Regression / fail-safe: a task that correlates ONLY to an OPEN PR is a
+        # genuine stall — the skip must NOT swallow it. The merged+closed union is
+        # empty (we never scan open PRs) and gh confirms the stored url OPEN, so
+        # exactly one alert fires and it carries `pr_url` for the main-loop
+        # merge-truth gate (defense-in-depth).
+        self._open('genuine-stuck-1', minutes_ago=60,
+                   pr_url='https://gh/o/r/pull/42')
+        open_prs = [{
+            'number': 42,
+            'headRefName': 'forge/genuine-stuck-1',
+            'title': 'still open',
+            'state': 'OPEN',
+        }]
+        with patch.object(self.hps, '_gh_pr_state', return_value='OPEN'):
+            alerts = self.hps.check_revision_dispatched_with_no_session(
+                {}, open_prs=open_prs, merged_prs=[], closed_prs=[])
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(
+            alerts[0]['subject'],
+            'pipeline-stall:no-session-revision:genuine-stuck-1',
+        )
+        self.assertEqual(alerts[0]['pr_url'], 'https://gh/o/r/pull/42')
+        self.assertEqual(
+            self._nsl.get_obligation('genuine-stuck-1')['status'],
+            self._nsl.OPEN,
+        )
+
+    def test_no_pr_at_all_still_fires_one_alert(self):
+        # Fail-safe: no correlating PR anywhere AND no stored pr_url → the state
+        # is unverifiable, so the genuine-stall alert is preserved (never a silent
+        # swallow). No gh call is spent (empty stored url short-circuits it).
+        self._open('no-pr-stuck-1', minutes_ago=60, pr_url='')
+        with patch.object(self.hps, '_gh_pr_state') as gh:
+            alerts = self.hps.check_revision_dispatched_with_no_session(
+                {}, open_prs=[], merged_prs=[], closed_prs=[])
+        self.assertEqual(len(alerts), 1)
+        self.assertNotIn('pr_url', alerts[0])  # no real url to expose to the gate
+        gh.assert_not_called()
+
 
 class TestCheckRebaseObligationStuck(_TempAgentsRootMixin, unittest.TestCase):
     """forge-post-open-mergeable-rebase-001 Check 10. The post-open auto-rebase
