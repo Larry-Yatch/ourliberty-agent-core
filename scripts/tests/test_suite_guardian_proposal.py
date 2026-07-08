@@ -445,12 +445,13 @@ class ObservableResolutionTest(_TmpStateTest):
 
 class AbandonedAgeOutTest(_TmpStateTest):
 
-    def test_approved_but_dead_ages_out(self):
+    def test_dispatched_but_verdictless_ages_out(self):
         old = _T0 - timedelta(days=8)
         ledger.open_proposal('a', run_task_id='b', poison_test_name='pa',
                              now=old, path=self.ledger_path)
         ledger.set_decision('a', ledger.DEC_APPROVED, now=old,
                             path=self.ledger_path)
+        ledger.mark_dispatched('a', 'fix-a', now=old, path=self.ledger_path)
         deps = RecordingDeps()
         run = {'status': g.RUN_RED, 'classifications': {}}
         summary = self._cycle(run, deps.as_deps())
@@ -458,15 +459,37 @@ class AbandonedAgeOutTest(_TmpStateTest):
         row = ledger.get('a', path=self.ledger_path)
         self.assertEqual(row['status'], ledger.ABANDONED)
 
-    def test_fresh_approved_does_not_age_out(self):
+    def test_dispatched_dead_ages_out_despite_nightly_observation(self):
+        # The empirical class Mirror flagged: a dead dispatch observed EVERY
+        # night (record_observation touches last_activity_at) must still age out
+        # — the abandonment clock is dispatched_at, not activity — else three
+        # dead dispatches permanently wedge the serial drain.
+        start = _T0
         ledger.open_proposal('a', run_task_id='b', poison_test_name='pa',
-                             now=_T0, path=self.ledger_path)
-        ledger.set_decision('a', ledger.DEC_APPROVED, now=_T0,
+                             now=start, path=self.ledger_path)
+        ledger.set_decision('a', ledger.DEC_APPROVED, now=start,
                             path=self.ledger_path)
-        deps = RecordingDeps()
-        run = {'status': g.RUN_RED, 'classifications': {}}
-        summary = self._cycle(run, deps.as_deps())
-        self.assertEqual(summary['abandoned'], [])
+        ledger.mark_dispatched('a', 'fix-a', now=start, path=self.ledger_path)
+        for day in range(1, 15):  # victim still red, poison absent, 14 nights
+            ledger.record_observation(
+                'a', green_streak=0, poison_present=False,
+                now=start + timedelta(days=day), path=self.ledger_path)
+        aged = ledger.age_out_abandoned(now=start + timedelta(days=14),
+                                        path=self.ledger_path)
+        self.assertEqual(aged, ['a'])
+
+    def test_approved_queued_behind_cap_never_ages_out(self):
+        # approved but NEVER dispatched (waiting for a drain slot) — not dead,
+        # even when old.
+        old = _T0 - timedelta(days=30)
+        ledger.open_proposal('a', run_task_id='b', poison_test_name='pa',
+                             now=old, path=self.ledger_path)
+        ledger.set_decision('a', ledger.DEC_APPROVED, now=old,
+                            path=self.ledger_path)
+        aged = ledger.age_out_abandoned(now=_T0, path=self.ledger_path)
+        self.assertEqual(aged, [])
+        self.assertEqual(ledger.get('a', path=self.ledger_path)['status'],
+                         ledger.OPEN)
 
     def test_abandoned_is_reeligible_once(self):
         old = _T0 - timedelta(days=8)
@@ -474,6 +497,7 @@ class AbandonedAgeOutTest(_TmpStateTest):
                              now=old, path=self.ledger_path)
         ledger.set_decision('a', ledger.DEC_APPROVED, now=old,
                             path=self.ledger_path)
+        ledger.mark_dispatched('a', 'fix-a', now=old, path=self.ledger_path)
         ledger.age_out_abandoned(now=_T0, path=self.ledger_path)
         # re-proposing after abandonment opens a fresh, re-eligible obligation
         row = ledger.open_proposal('a', run_task_id='b2', poison_test_name='pa',

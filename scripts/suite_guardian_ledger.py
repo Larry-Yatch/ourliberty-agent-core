@@ -420,11 +420,19 @@ def age_out_abandoned(
     days: int = _ABANDON_AFTER_DAYS,
     path: Optional[Path] = None,
 ) -> list[str]:
-    """Terminate approved-but-dead obligations (no fix-PR activity for ``days``)
-    as ``abandoned`` (the verdictless-death class, D2.6). Only fires on rows
-    whose fix was consented (``approved``) but never produced PR activity — a
-    still-``proposed`` row is waiting on Larry, not dead. Returns the list of
-    aged-out test_ids. Never raises."""
+    """Terminate verdictless-dead fix obligations as ``abandoned`` (the
+    verdictless-Forge-death class, D2.6). The dead class is a fix that WAS
+    dispatched to Forge (``fix_task_id`` set) but produced no PR activity
+    (``fix_pr`` None) for ``days`` after dispatch — Forge died without a verdict.
+
+    The clock is ``dispatched_at``, NOT ``last_activity_at``: the nightly
+    observable poll (:func:`record_observation`) touches every open dispatched
+    obligation each cycle, so keying abandonment off activity would keep a dead
+    dispatch alive forever and permanently hold one of the serial-drain slots.
+    An approved obligation still QUEUED behind the drain cap (consented but never
+    dispatched) is waiting for a slot, not dead, so it never ages out — only a
+    dispatched-then-silent fix does. A still-``proposed`` row waits on Larry.
+    Returns the list of aged-out test_ids. Never raises."""
     p = path or default_ledger_path()
     n = _now(now)
     cutoff = n - timedelta(days=days)
@@ -437,10 +445,12 @@ def age_out_abandoned(
                 continue
             if row.get('decision') != DEC_APPROVED:
                 continue
+            if not row.get('fix_task_id'):
+                continue  # never dispatched — queued behind the cap, not dead
             if row.get('fix_pr'):
                 continue  # PR activity exists — not dead
-            last = _parse_iso(row.get('last_activity_at')) or _parse_iso(row.get('opened_at'))
-            if last is None or last > cutoff:
+            dispatched = _parse_iso(row.get('dispatched_at'))
+            if dispatched is None or dispatched > cutoff:
                 continue
             row['status'] = ABANDONED
             row['resolved_at'] = _iso(n)
