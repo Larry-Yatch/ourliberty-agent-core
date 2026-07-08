@@ -66,6 +66,7 @@ if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
 import atomic_io        # noqa: E402  # shared durable atomic write (PR-E #366)
+import build_sequence_kickoff  # noqa: E402  # shared kickoff transition (single-sourced)
 import chain_event_shipper as _ces  # noqa: E402  # imported read-only for compute_event_id
 import file_lock         # noqa: E402  # shared advisory flock (PR-E2 #48)
 import safe_write_inbox  # noqa: E402
@@ -1094,6 +1095,34 @@ def dispatch_approved(entry: dict[str, Any]) -> Path:
     """
     payload = entry['dispatch_payload']
     target = entry.get('target_agent') or payload.get('target_agent', 'forge')
+    # Build-sequence kickoffs (target == 'build_sequence_advancer') must NOT
+    # take the plain inbox write below: inboxes/build_sequence_advancer/ has
+    # no consumer (the advancer daemon reads sequence files under
+    # blackboard/build-sequences/, not that inbox), so a chat/dashboard-approved
+    # kickoff would strand there and the sequence would sit at status=pending
+    # forever (kickoff-approve-routing-gap-001; observed on pulse-check-xii
+    # 2026-07-07). Route it to the SAME transition the autonomous outbox path
+    # uses (`outbox_notifier._handle_build_sequence_advancer_kickoff`), so the
+    # sequence flips pending->active with a `kickoff-acknowledged` audit entry
+    # and the advancer dispatches the first step on its next tick. Idempotent:
+    # re-approving an already-active sequence is a WARN no-op. Failure modes
+    # (missing/malformed/invalid sequence file) DM Larry and do not crash,
+    # mirroring the notifier handler. `dispatch_approved` still returns a Path
+    # (its contract) — the sequence-file path rather than an inbox-write path.
+    if target == build_sequence_kickoff.SEQUENCE_KICKOFF_TARGET_AGENT:
+        marker_task_id = payload.get('task_id')
+        outcome = build_sequence_kickoff.apply_kickoff_transition(
+            prompt=payload.get('prompt'),
+            marker_task_id=marker_task_id,
+            dispatch_task_id=marker_task_id or 'unknown',
+            agents_root=AGENTS_ROOT,
+        )
+        # seq_path is populated for every outcome except no-seq-id (which the
+        # helper already DM'd about). Fall back to the sequences directory so
+        # the Path contract holds even in that near-impossible case.
+        return outcome.seq_path or (
+            AGENTS_ROOT / 'blackboard' / 'build-sequences'
+        )
     # Self-targeted approvals (target == 'beacon', e.g. a binary direction-ask
     # APPROVAL_REQUEST) must NOT carry source='beacon': routing_validator's
     # hard-topology check denies source==target *before* consulting the route
