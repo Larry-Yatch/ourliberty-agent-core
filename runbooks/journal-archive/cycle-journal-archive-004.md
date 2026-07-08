@@ -69820,3 +69820,94 @@ NOMINAL ✅ (pipeline progress, no errors)
 
 ---
 
+## Iteration ~4530 — 2026-07-08T07:09Z UTC (Larry /cycle via chat, Tier 1)
+
+**Health:** ✅ Nominal. 0 new alerts. No stalls. All agents alive. Sync <2h. Revision-2 in-flight for PR #847 (notifier-concurrent-scan-dup fix). Zombie carry.
+
+**VERIFY-BEFORE-REASSERT (corrections from iter ~4529):**
+- **"Check A HEAD=f0c70679=origin/main":** UPDATED ✅ — wrapper committed f058ab62 (Pulse cycle 20260708T070404Z); HEAD=f058ab62=origin/main. [updated]
+- **"Zombie PID 1834248 (~40d 11h 42m, Ss)":** RE-VERIFIED ⚠️ — ps shows 40d 11h 47m, Ss. CONFIRMED [carry]
+- **"Sync last_sync=2026-07-08T06:04:36Z (~62 min)":** UPDATED ✅ — sync ran between iters; now last_sync=2026-07-08T07:04:58Z (~4 min from 07:09Z). [updated]
+- **"outbox_notifier PID 2664032 (~44m)":** CONFIRMED ✅ — still PID 2664032 (~49m). [confirmed]
+- **"beacon_bot PID 2663456 (~44m)":** CONFIRMED ✅ — still PID 2663456 (~49m). [confirmed]
+- **"pending=6":** CONFIRMED ✅ — still 6, same timestamps. [confirmed]
+- **"Check 1: No new outbox-notifier.log entries since iter ~4528 (last entry 06:54:48Z UTC)":** CORRECTED ⚠️ — iter ~4529's Check 1 was STALE. Log has entries at 07:05:00-07:05:04Z UTC (01:05 MDT) that were not captured: Mirror REVIEW_REVISION (session 6f390c34) for notifier-concurrent-scan-dup-review-dispatch-001 PR #847 → REVISION-2 dispatched to Forge at 07:05:04Z UTC ($6.49 task cost). PR #847 is on revision-2, not revision-1. [correction applied]
+- **"PR #847 revision-1 building (Forge)":** CORRECTED — revision-1 was reviewed by Mirror (REVIEW_REVISION at 07:05:00Z), revision-2 dispatched to Forge (07:05:04Z). Forge building revision-2. [corrected]
+- **"harden-specdoc-cli-origin-main-flake-001 build dispatched":** CARRY — build in-progress; no completion visible in notifier log. [carry]
+- **"PR #856 REVIEW_ESCALATE; re-review round=2 in queue":** CARRY — no resolution. [carry]
+- **"PR #857 REVIEW_PASS AUTO_MERGE_HELD blocker=#847":** CARRY — unchanged. [carry]
+
+**Check 0 — Alert triage:** repair-watermark `{"repaired": false, "old_watermark": 1048, "file_length": 1048}` → 0 new alerts. NOMINAL ✅
+
+**Check 1 — Log noise:** Correction from ~4529 applied above. No new notifier entries after 01:05:04 MDT (07:05:04Z UTC). Last event: revision-2 dispatched for PR #847. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** Bot log last entry 00:52:06 MDT (06:52:06Z UTC). Last Larry message: "status" at 22:40:36 MDT July 7 = 04:40:36Z July 8. No new messages. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** dry-run 07:06:20Z → "no stalls detected." All FORGE_NO_PR_SKIP operating (same 14 tasks as ~4529). NOMINAL ✅
+
+**Check 4 — Pending directives:** No new Larry directives since "status" at 22:40:36 MDT July 7. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-08T07:07:18Z (~2 min from 07:09Z). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=f058ab62=origin/main. Clean tree. On main. ✅
+**Check B — Sync health:** last_sync=2026-07-08T07:04:58Z (~4 min, <2h), status=no-change. NOMINAL ✅
+**Check C — Agent liveness:** inbox_watcher PID 2263256 (Ssl, 3h48m+) ✅. beacon_bot PID 2663456 (Ss, ~49m) ✅. outbox_notifier PID 2664032 (Ss, ~49m) ✅. Zombie PID 1834248 (Ss, ~40d 11h 47m) ⚠️ [carry].
+**Check D — Inbox state:** pending=6 (unchanged, same timestamps). Pipeline: Forge building PR #847 revision-2 + harden-specdoc build. Mirror queue: PR #856 round=2; pr3-sentinel-self-arming (since 00:44Z); PR #857 re-review; others.
+**Check E — PR state:** 12 open PRs (#846–#852, #854, #856–#861). PR #847 MERGEABLE; all others UNKNOWN mergeable. No reviewDecision for any. NOMINAL ✅
+
+**§5.0 — audit_due_nudge:** no committed baseline; no-op. ✅
+**§5.0 — distill_detector:** no un-distilled audits; no-op. ✅
+**§5.0 — audit_cadence_signal:** no-op. ✅
+
+**Conditional checks — UTC Wednesday 2026-07-08:**
+- **Check I:** Timer fires 08:13 MDT (14:13Z). Systemd handles. [watch]
+- **Check III:** Sunday gate. Skip. ✅
+- **Check IX/X:** Monday gate. Skip. ✅
+- **Check VI/VIII:** Proposals idx=990,991 carry — awaiting Larry. [carry]
+
+**G-rule assessment:** No new G-rule occurrences this iter. notifier-concurrent-scan-dup revision-2 in-flight (PR #847 fix progressing). All active G-rules carry unchanged from ~4529.
+
+**New findings since ~4529:**
+1. [blue] **PR #847 REVIEW_REVISION → revision-2 dispatched** (07:05:04Z UTC, missed by ~4529's Check 1). Mirror found issues in revision-1 (session 6f390c34); revision-2 now building with Forge. Task cost=$6.49. [verify-before-reassert correction / new note]
+
+**Actions taken:**
+1. Check 0: watermark 1048→1048 (no change). 0 new alerts. ✅
+2. §5.0: all no-ops. ✅
+3. PRIME ledger: intervention appended (zombie carry; pending=6; PR #847 revision-2 in-flight; harden-specdoc in-flight). ✅
+4. Tier state: `record --checks-clean false` → Tier 1 (consecutive_clean=0; zombie carry). ✅
+
+**Escalations:** 0 new Pulse DMs. 0 new Pulse-authored alerts.
+
+**Standing findings (carry-verified this iter):**
+- [yellow] **zombie-bash-pid-1834248** — PID 1834248 (~40d 11h 47m, Ss). ask-then-do: `kill 1834248`. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07` or `reject`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [yellow] **unreviewed-merge-larry-authored-pr-001** — 9th+ occurrences. Steps 1-2 still unimplemented. [carry]
+- [yellow] **sequence-invalid-completeness-pr3-fanout-sentinel [2/3]** — dispatch_text 565>500; paused; Larry DM'd. At 3/3 will dispatch to Beacon. [carry]
+- [yellow] **harden-specdoc-originmain-flaky-tests-001** — pending[4] created 06:10:42Z. Build in-progress. [carry]
+- [yellow] **mirror-review-pr-856** — pending[5] created 06:12:42Z. REVIEW_ESCALATE. Re-review round=2 in Mirror queue. [carry]
+- [yellow] **mirror-review-pr-845** — pending[0] created 03:55:28Z. PR #845 MERGED. Stale — should auto-resolve. [carry]
+- [yellow] **mirror-review-pr-849** — pending[2] created 04:59:36Z. PR #849 MERGED. Stale — should auto-resolve. [carry]
+- [yellow] **mirror-review-pr-851** — pending[1] created 04:33:54Z. PR #851 still open. [carry]
+- [yellow] **mirror-review-pr-852** — pending[3] created 05:14:21Z. PR #852 still open. [carry]
+- [blue] **PR #846** — REVIEW_PASS. AUTO_MERGE_HELD blocker=#852. [carry]
+- [blue] **PR #847** — revision-2 in-flight (Forge; 07:05:04Z). Fix for notifier-concurrent-scan-dup. [corrected from ~4529]
+- [blue] **PR #850** — REVIEW_PASS. AUTO_MERGE_HELD blocker=#857. [carry]
+- [blue] **PR #851** — Mirror re-review in queue. [carry]
+- [blue] **PR #852** — Mirror re-review in queue. [carry]
+- [blue] **PR #854** — REVIEW_REVISION rev1 to Forge; Mirror re-review round=1 queued. [carry]
+- [blue] **PR #856** — REVIEW_ESCALATE; re-review round=2 in queue. [carry]
+- [blue] **PR #857** — REVIEW_PASS AUTO_MERGE_HELD blocker=#847. [carry]
+- [blue] **PRs #858–#861** — Mirror queued or pending. [carry]
+- [blue] **Check I** — Wednesday firing day. Timer fires 08:13 MDT (14:13Z). [watch]
+- [blue] **G-rules (dispatched, vp):** sentinel-inflight-stall-tier4 (PR #854 rev1); notifier-concurrent-scan-dup (PR #847 rev2 in-flight); ourliberty-health-subject-key-mismatch-001 (3/3 vp); forge-wip-redispatch-digest-tier4-001; no-session-revision-active-mirror-session-fp-001; forge-revision-preamble-missing-pr711-001; forge-wip-redispatch-exhausted-pr-exists-fp-001; decision-needed-approval-forge-dispatch-no-target-repo-001. [carry vp]
+- [blue] **G-rule 2/3: sequence-invalid-completeness-pr3-fanout-sentinel** — 3rd needed for dispatch. [carry]
+- [blue] **G-rule 2/3: auto-merge-conflict-promoted-merged-pr-001** — no new occurrence. [carry]
+- [blue] **G-rule 2/3: forge-marker-task-id-mismatch-xii-v1** — no new occurrence. [carry]
+- [blue] **G-rule new 1/1: phantom-build-terminal-check-repo-format-001** — WARN sub-threshold, watch. [carry]
+
+**PRIME DIRECTIVE:** ratio=20.34 (interventions≈1485, systemic_fixes=73, vp=33; trend: worsening). Intervention appended.
+**Tier end-of-iter:** Tier **1** (consecutive_clean=0; zombie carry).
+
+---
+
