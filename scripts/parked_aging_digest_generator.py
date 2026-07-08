@@ -258,16 +258,28 @@ def _read_json_safe(path: Path) -> Optional[Any]:
 
 
 def _proposed_missions(missions_data: Any) -> list[dict[str, Any]]:
-    """Live proposed cards: phase == 'proposed' and not archived. Mirrors the
-    filter in mission_staleness/mission_rank so the pile counts the same set."""
+    """Live proposed cards: phase == 'proposed', not archived, and NOT already
+    retired (dismissed / healer retire-with-audit). Reuses the one shared
+    retire semantic (mission_staleness.proposed_is_retired) so this pile counts
+    exactly the set mission_staleness scores — otherwise actionable_count
+    (proposed − candidates) inflates, since candidates already excludes retired
+    rows but proposed would still include them."""
     if not isinstance(missions_data, dict):
         return []
     missions = missions_data.get('missions')
     if not isinstance(missions, list):
         return []
+    if str(_SCRIPT_DIR) not in sys.path:
+        sys.path.insert(0, str(_SCRIPT_DIR))
+    try:
+        import mission_staleness as ms
+        is_retired = ms.proposed_is_retired
+    except Exception:  # noqa: BLE001 — degrade to the pre-filter behavior
+        is_retired = lambda m: False  # noqa: E731
     return [m for m in missions
             if isinstance(m, dict)
-            and m.get('phase') == 'proposed' and not m.get('archived')]
+            and m.get('phase') == 'proposed' and not m.get('archived')
+            and not is_retired(m)]
 
 
 def _created_age_days(mission: dict[str, Any], now: datetime) -> Optional[int]:

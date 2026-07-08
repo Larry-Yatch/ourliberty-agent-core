@@ -291,8 +291,8 @@ def rank(
     missions_narrator/trust_policy lazily. LLM calls stop at `llm_cap`; capped
     cards still rank via the deterministic fallback and the cap is reported.
     """
-    summary = {'proposed': 0, 'stale_excluded': 0, 'ranked': 0,
-               'unmapped': 0, 'llm_scored': 0, 'llm_capped': False}
+    summary = {'proposed': 0, 'retired_excluded': 0, 'stale_excluded': 0,
+               'ranked': 0, 'unmapped': 0, 'llm_scored': 0, 'llm_capped': False}
 
     projects = load_portfolio(portfolio_path)
     if projects is None:
@@ -305,10 +305,24 @@ def rank(
     if not isinstance(missions, list):
         _log('WARN', 'missions.json unusable')
         return summary
-    proposed = [m for m in missions
-                if isinstance(m, dict)
-                and m.get('phase') == 'proposed' and not m.get('archived')]
+    # `proposed` = LIVE cards only. Dismissed / healer-retired rows (the
+    # additive `acknowledged` flag + retirement provenance) are decisions
+    # already made — counting them made the queue summary read "247 proposed"
+    # when the true shelf was ~20. One retire-semantic, owned by
+    # mission_staleness.proposed_is_retired.
+    import mission_staleness as ms
+    dead = 0
+    proposed = []
+    for m in missions:
+        if not (isinstance(m, dict) and m.get('phase') == 'proposed'
+                and not m.get('archived')):
+            continue
+        if ms.proposed_is_retired(m):
+            dead += 1
+            continue
+        proposed.append(m)
     summary['proposed'] = len(proposed)
+    summary['retired_excluded'] = dead
 
     stale_ids: set = set()
     staleness = _read_json(STALENESS_FILE)

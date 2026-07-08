@@ -94,6 +94,20 @@ def _norm(s: Any) -> str:
     return re.sub(r'[^a-z0-9]', '', s.lower())
 
 
+def proposed_is_retired(mission: dict) -> bool:
+    """A proposed card whose decision has ALREADY been made: dismissed from the
+    dashboard or retired-with-audit by heal_orphan_autoregister (both set the
+    additive `acknowledged` flag), or carrying retirement provenance / a
+    terminal phase. Mirrors the dashboard funnel's `_proposed_mission_is_dead`
+    — one semantic, referenced from mission_rank too, so the operator pipeline
+    and the board agree on what "live proposed" means."""
+    if mission.get('acknowledged') is True:
+        return True
+    if mission.get('retired_at'):
+        return True
+    return (mission.get('phase') or '') in ('retired', 'archived', 'closed')
+
+
 def _age_days(mission: dict, today: date) -> Optional[int]:
     """Whole days since the card was created. None if `created` is unparseable."""
     raw = mission.get('created')
@@ -244,8 +258,8 @@ def reconcile(
     cost); the cap and how many cards were skipped by it are reported + logged.
     """
     day = today or date.today()
-    summary = {'proposed': 0, 'candidates': 0, 'terminal_checks': 0,
-               'terminal_capped': False}
+    summary = {'proposed': 0, 'retired_excluded': 0, 'candidates': 0,
+               'terminal_checks': 0, 'terminal_capped': False}
 
     data = _load_missions()
     if data is None:
@@ -255,10 +269,21 @@ def reconcile(
         _log('WARN', 'missions.json has no missions[] list')
         return summary
 
-    proposed = [m for m in missions
-                if isinstance(m, dict)
-                and m.get('phase') == 'proposed' and not m.get('archived')]
+    live, retired = [], 0
+    for m in missions:
+        if not (isinstance(m, dict) and m.get('phase') == 'proposed'
+                and not m.get('archived')):
+            continue
+        if proposed_is_retired(m):
+            retired += 1
+            continue
+        live.append(m)
+    proposed = live
+    # `proposed` counts only LIVE cards; retired rows are already-handled
+    # (dismissed / healer retire-with-audit), so scoring them would re-flag
+    # decisions that were made and waste the bounded terminal probes.
     summary['proposed'] = len(proposed)
+    summary['retired_excluded'] = retired
 
     # Cross-card context (one scan, no external calls).
     name_counts: dict = {}
