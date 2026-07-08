@@ -582,6 +582,15 @@ class WorkerDoneItem(BaseModel):
     outcome: str
     at: Optional[str]
     message: Optional[str]
+    # Mirror only: the review verdict this session emitted (review_pass /
+    # review_revision / review_escalate), joined from the agent's own
+    # verdict events by task_id. A SUCCEEDED session whose verdict was
+    # review_revision is "run finished, PR sent back for fixes" — without
+    # this the card reads as contradictory next to the queued -revN
+    # re-review of the same PR. None for non-mirror workers and for
+    # sessions with no verdict event today.
+    verdict: Optional[str] = None
+    pr_url: Optional[str] = None
 
 
 class AgentQueueResponse(BaseModel):
@@ -2902,10 +2911,36 @@ def _derive_worker_done_today(
     """DONE_TODAY lane (WORKER): today's `session_done` events for `agent`
     (UTC day boundary, per `_reader_costs_today`), classified by
     `payload.success`: True -> 'succeeded', else -> 'failed'. Item:
-    `{task_id, outcome, at, message}` (message truncated). Dedup by task_id
-    keeping the latest ts; sort by `at` descending."""
+    `{task_id, outcome, at, message, verdict, pr_url}` (message truncated).
+    `verdict`/`pr_url` join the agent's own review-verdict events
+    (_QUEUE_VERDICT_EVENT_TYPES) by task_id, latest-today wins — only
+    Mirror emits these, so they stay None for other workers. Dedup by
+    task_id keeping the latest ts; sort by `at` descending."""
     now = now or datetime.now(timezone.utc)
     today = now.date()
+
+    # task_id -> (ts, {verdict, pr_url}) for today's verdict events. Latest
+    # wins: a task reviewed twice today (round-0 REVISION, then rev1 PASS)
+    # shows the verdict of the round its kept session_done card belongs to
+    # (dedup below also keeps the latest session).
+    verdicts: dict[str, tuple[datetime, dict[str, Any]]] = {}
+    for r in rows:
+        if (r.get('agent') != agent
+                or r.get('event_type') not in _QUEUE_VERDICT_EVENT_TYPES):
+            continue
+        tid = r.get('task_id')
+        dt = _ts_to_dt(r.get('ts'))
+        if not tid or dt is None:
+            continue
+        dt = dt.astimezone(timezone.utc)
+        if dt.date() != today:
+            continue
+        if tid not in verdicts or dt > verdicts[tid][0]:
+            verdicts[tid] = (dt, {
+                'verdict': r.get('event_type'),
+                'pr_url': r.get('pr_url'),
+            })
+
     candidates: list[tuple[datetime, dict[str, Any]]] = []
     for r in rows:
         if r.get('agent') != agent or r.get('event_type') != 'session_done':
@@ -2925,11 +2960,15 @@ def _derive_worker_done_today(
                 msg = msg[:_WORKER_DONE_MESSAGE_MAXLEN]
         else:
             msg = None
+        tid = r.get('task_id')
+        _vdt, vinfo = verdicts.get(tid, (None, {}))
         candidates.append((dt, {
-            'task_id': r.get('task_id'),
+            'task_id': tid,
             'outcome': outcome,
             'at': r.get('ts'),
             'message': msg,
+            'verdict': vinfo.get('verdict'),
+            'pr_url': vinfo.get('pr_url') or r.get('pr_url'),
         }))
 
     # Dedup by task_id keeping the latest ts; None task_ids never collapse.
