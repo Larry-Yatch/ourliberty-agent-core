@@ -967,6 +967,67 @@
         "done_at": "2026-06-25T02:30:10.795255+00:00",
         "window_sec": 172800
       }
+    },
+    {
+      "id": "govern-loop-assessor",
+      "title": "Govern-Loop Assessor (operator-layer ROI/rank)",
+      "north_star_ref": null,
+      "repo": "ourliberty-agent-core",
+      "state": "active",
+      "phases": [
+        {
+          "id": "govern-loop-assessor",
+          "title": "Govern-Loop Assessor (operator-layer ROI/rank)",
+          "desired_end_state": "Shadow-first read-only assessor over the decision-outcome ledger that ranks where Larry's approvals pay off (merged vs regressed vs abandoned); mirrors the mission_staleness scorer pattern, auto-acts on nothing.",
+          "lifecycle_state": "brainstorm",
+          "order": 0,
+          "spec_ref": "agents/beacon/specs/govern-loop-assessor.md",
+          "sequence_ref": null,
+          "created_at": "2026-07-08T06:16:38.415287+00:00",
+          "updated_at": "2026-07-08T06:16:38.415287+00:00",
+          "brainstorm": {
+            "is_ai_draft": true,
+            "draft": {
+              "end_state": "When this phase is done, there is a read-only assessor that looks across the record of decisions Larry has approved and their eventual outcomes, and scores where his approvals actually paid off versus where they didn't. It groups outcomes into clear buckets \u2014 decisions that merged and stuck, decisions that later regressed, and decisions that were abandoned \u2014 and produces a ranking that shows which kinds of approvals are worth Larry's attention. It runs in shadow mode only: it observes and reports, and takes no action of its own. It follows the same shape as the existing staleness scorer so it feels familiar and predictable, and it never changes, dispatches, or auto-acts on anything.",
+              "why_now": "The govern loop now accumulates enough decision-and-outcome history that the payoff of Larry's approvals can finally be measured rather than guessed. The forcing function is the desire to spend Larry's limited approval attention where it matters \u2014 to see which approvals reliably lead to good outcomes and which repeatedly regress or get abandoned. Building the assessor now, while it can safely run in shadow and only report, lets us learn the signal before anyone considers wiring it into real routing. (Open question: whether there is a specific recent incident or capacity pressure driving the timing, or whether this is planned groundwork \u2014 the facts don't say.)",
+              "scope": "IN: a read-only assessor over the existing decision-outcome ledger; classifying past decisions by outcome (merged/stuck, regressed, abandoned); producing an ROI-style ranking of where approvals pay off; running strictly in shadow mode with output for Larry to read; reusing the established scorer pattern so structure and behavior match what already exists. OUT: any automated action, routing, gating, or dispatch based on the scores; changing how approvals are requested or granted; writing back to or mutating the ledger; new data collection or instrumentation beyond what the ledger already records; any always-on production wiring in this phase.",
+              "constraints_reuse": "Reuse, don't rebuild: model this on the existing staleness scorer \u2014 same overall structure, invocation shape, and reporting conventions \u2014 rather than inventing a new framework. Read from the decision-outcome ledger as it already exists; do not change its schema or write to it. Must not break: the existing scorer it mirrors, the ledger and anything that writes to it, and the guarantee that this component is observe-only. Because it is shadow-first and read-only, it must have no side effects on the govern loop or on approval flow. (Open question: the exact fields the ledger exposes for the merged/regressed/abandoned distinction need to be confirmed against the real data before scoring logic is fixed.)",
+              "options_decision": "Fork A \u2014 Outcome classification source: derive the merged/regressed/abandoned buckets purely from fields already in the ledger (simplest, fully read-only, but limited to whatever the ledger currently captures) versus joining against other existing signals to enrich the classification (richer, but more coupling and more ways to be wrong). Fork B \u2014 Ranking metric: a simple pay-off rate per category (transparent, easy to trust in shadow) versus a weighted ROI score that accounts for cost/impact (more decision-useful, but introduces judgment calls and tuning that are premature in shadow). Fork C \u2014 Output surface: a plain periodic report Larry reads versus an interactive/queryable view (more useful long-term, more build). Recommendation: start with ledger-only classification (Fork A), a simple transparent pay-off rate (Fork B), delivered as a plain shadow report (Fork C). Prove the signal is meaningful before adding weighting or enrichment.",
+              "risks_guardrails": "Risk: the ledger doesn't cleanly distinguish merged/regressed/abandoned, so buckets are miscounted \u2014 guardrail: validate the classification against a hand-checked sample of real decisions before trusting any ranking. Risk: scope creep from shadow reporting into auto-acting \u2014 guardrail: keep it strictly read-only this phase, with no code path that dispatches or gates on scores. Risk: a misleading ranking causes Larry to over- or under-trust certain approvals \u2014 guardrail: present it explicitly as a shadow signal under evaluation, with counts and definitions visible, not as a directive. Risk: divergence from the scorer pattern it mirrors creates maintenance drift \u2014 guardrail: match the existing scorer's structure and conventions rather than introducing new ones. Risk: small or skewed sample makes early scores noisy \u2014 guardrail: report sample size and flag low-confidence categories rather than ranking on thin data.",
+              "done_gate": "It is done when: the assessor reads the decision-outcome ledger and, without writing to it, classifies decisions into merged/stuck, regressed, and abandoned; it emits a ranking of where approvals pay off; it runs in shadow only and can be shown to take no action; and its structure matches the existing scorer pattern. Checks: classification verified against a hand-labeled sample of real decisions; confirmation of zero side effects (no writes to the ledger, no dispatch/gate/action triggered); the report renders with bucket counts, sample sizes, and clear definitions; and behavior parity with the mirrored scorer where applicable. Tests should cover classification correctness on known cases, the read-only guarantee, and graceful handling of thin or missing data.",
+              "breakdown": "Step 1: Confirm what the decision-outcome ledger actually records and whether merged/regressed/abandoned can be derived from existing fields; hand-label a small sample as ground truth. Step 2: Stand up the assessor skeleton mirroring the existing scorer's structure and invocation, read-only. Step 3: Implement outcome classification into the three buckets and validate against the labeled sample. Step 4: Compute the pay-off ranking (simple transparent metric first) with sample-size and confidence flags. Step 5: Produce the shadow report surface Larry reads, with counts and definitions visible. Step 6: Verify the read-only/no-action guarantee end to end and add tests for classification, side-effect-freeness, and thin-data handling. Step 7: Run in shadow, review output quality with Larry, and record what the signal is worth before any consideration of future wiring."
+            },
+            "decisions": [
+              "Classification source: derive outcomes only from the existing ledger, or also enrich by joining other signals?",
+              "Ranking metric now: simple pay-off rate, or a weighted ROI score that accounts for cost/impact?",
+              "How the shadow output reaches you: a periodic plain report, or a queryable/interactive view?",
+              "Minimum sample size before a category's ranking is shown as trustworthy versus flagged low-confidence.",
+              "What 'regressed' must mean to count as a bad outcome \u2014 where you want the line drawn."
+            ],
+            "decisions_overflow": false,
+            "handoff": {
+              "spec_target_path": "agents/beacon/specs/govern-loop-assessor.md",
+              "target_repo": "ourliberty-agent-core",
+              "north_star_ref": null,
+              "prior_closeout_summary": null,
+              "directive": "Work with Larry to finalize this brainstorm and author the spec at agents/beacon/specs/govern-loop-assessor.md in ourliberty-agent-core; he will mark it Ready to spec."
+            }
+          },
+          "brainstorm_provenance": {
+            "by": "beacon",
+            "model": "claude-opus-4-8",
+            "at": "2026-07-08T06:16:38.415287+00:00",
+            "from_state": "brainstorm"
+          }
+        }
+      ],
+      "one_off": true,
+      "created_at": "2026-07-08T06:16:38.415287+00:00",
+      "updated_at": "2026-07-08T06:16:38.415287+00:00",
+      "promoted_from": {
+        "kind": "mission",
+        "mission_id": "govern-loop-assessor"
+      }
     }
   ]
 }
