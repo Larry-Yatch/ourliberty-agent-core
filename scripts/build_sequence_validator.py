@@ -52,6 +52,15 @@ DEFAULT_BLACKBOARD_DIR = AGENTS_ROOT / 'blackboard' / 'build-sequences'
 # the authoring Mac and the droplet, unlike cwd.
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
+# Test seam for the `check-spec-doc` CLI's repo-root anchor. UNSET (the
+# production default) preserves REPO_ROOT behavior exactly — Mirror's DAG
+# preflight and ad-hoc validation never set it, so their `origin/main`
+# resolution is unchanged. SpecDocCliTest sets it to a throwaway /tmp git
+# fixture whose `origin/main` deterministically resolves, so the CLI's
+# behind-origin-vs-not-authored classification no longer depends on the
+# ambient checkout's fetch state (the recurring regression-gate flake).
+SPEC_DOC_REPO_ROOT_ENV = 'OURLIBERTY_SPEC_DOC_REPO_ROOT'
+
 # Per spec § 5.1: sequence-level status enum.
 VALID_SEQUENCE_STATUS = frozenset({
     'pending', 'active', 'paused', 'complete', 'failed', 'archived',
@@ -723,6 +732,13 @@ def _cli_check_spec_doc(seq_id_or_path: str) -> int:
          not-a-synced-checkout both land here and shouldn't fail kickoff)
       1  not_authored — genuinely missing; author + merge first
       3  behind_origin — spec exists on main; run sync, don't re-author
+
+    Repo-root seam: when SPEC_DOC_REPO_ROOT_ENV is set in the environment, the
+    presence check anchors local-file resolution and its `git -C <root>` probes
+    at that path instead of REPO_ROOT. UNSET (the production default) is inert —
+    `repo_root=None` falls through to REPO_ROOT, so production callers behave
+    exactly as before. Only SpecDocCliTest sets it, to a hermetic /tmp git
+    fixture with a resolvable `origin/main`.
     """
     token = seq_id_or_path
     if token.endswith('.json') or '/' in token or os.sep in token:
@@ -733,7 +749,9 @@ def _cli_check_spec_doc(seq_id_or_path: str) -> int:
     if seq is None:
         return rc
     spec_doc = seq.get('spec_doc') if isinstance(seq, dict) else None
-    presence = check_spec_doc_presence(spec_doc)
+    root_override = os.environ.get(SPEC_DOC_REPO_ROOT_ENV)
+    repo_root = Path(root_override) if root_override else None
+    presence = check_spec_doc_presence(spec_doc, repo_root=repo_root)
     if presence.status == SPEC_DOC_PRESENT:
         sys.stdout.write(f'OK: {presence.message}\n')
         return 0
