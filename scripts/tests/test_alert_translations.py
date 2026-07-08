@@ -533,7 +533,7 @@ class LookupRuleTest(unittest.TestCase):
         # (the reaper auto-recovers both wt-mirror-* and wt-forge-* stalls).
         t = larry_alerts.translate_alert(
             'sentinel',
-            'in-flight-stall:/home/larry/agents/state/in-flight/build-xyz.json',
+            'in-flight-stall:/tmp/in-flight/build-xyz.json',
         )
         self.assertIsNotNone(t)
         self.assertEqual(t['severity'], 'INFO')
