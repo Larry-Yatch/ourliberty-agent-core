@@ -553,6 +553,205 @@ class TestReconcileTerminalApprovals(_TerminalBase):
         self.assertEqual(counts2['kept'], 1)
 
 
+# ---- mirror-review PR-coordinate reconcile (out-of-band merge phantoms) ----
+
+MR_REPO = 'owner/zz-fixture-repo'
+MR_ID = 'mirror-review-pr-zz-fixture-repo-845'
+# The head8-suffixed shape outbox_notifier mints when a head SHA is present.
+MR_ID_HEAD8 = 'mirror-review-pr-zz-fixture-repo-846-a1b2c3d4'
+
+
+def _mr_entry(created_at=OLD_TS, *, approval_id=MR_ID, payload_task_id=None):
+    """A session-less mirror-review PR approval as beacon registers it: add_pending
+    sets entry id := dispatch_payload['task_id'], so by default the payload
+    task_id equals the id (a genuine card). `payload_task_id` overrides only the
+    payload to exercise the same-work guard."""
+    tid = approval_id if payload_task_id is None else payload_task_id
+    return _entry(approval_id, created_at, task_id=tid)
+
+
+class _MirrorReviewBase(_Base):
+    """_Base + the known-repo pin `parse_pr_coordinate` validates against, so
+    the fixture coordinate resolves hermetically (no dependence on the real
+    default repo list)."""
+
+    def setUp(self):
+        super().setUp()
+        self._prev_repos = os.environ.get('OURLIBERTY_TERMINAL_STATE_REPOS')
+        os.environ['OURLIBERTY_TERMINAL_STATE_REPOS'] = MR_REPO
+
+    def tearDown(self):
+        if self._prev_repos is None:
+            os.environ.pop('OURLIBERTY_TERMINAL_STATE_REPOS', None)
+        else:
+            os.environ['OURLIBERTY_TERMINAL_STATE_REPOS'] = self._prev_repos
+        super().tearDown()
+
+    @staticmethod
+    def _no_generic_probe(_tid):
+        raise AssertionError('generic probe must not be consulted')
+
+    @staticmethod
+    def _no_coord_probe(_repo, _number):
+        raise AssertionError('direct coordinate probe must not be consulted')
+
+
+class TestClassifyMirrorReviewCoordinate(_MirrorReviewBase):
+    """The 2026-07-08 gap: an approval id shaped mirror-review-pr-<repo>-<num>
+    names its PR by NUMBER, which the generic token probe can never match — six
+    cards kept DM-ing reminders for 4-11h after their PRs merged out-of-band.
+    The direct path asks gh for that exact PR and is AUTHORITATIVE (no fall-through
+    to the generic probe); the id-prefix + same-work guard keeps it scoped to
+    Mirror's PR-decision cards. coord_probe signature is (repo, number)."""
+
+    GRACE = 2.0
+
+    def test_merged_pr_retires_with_state_and_sha_in_reason(self):
+        retire, reason = self.mod.classify_terminal_approval(
+            _mr_entry(), NOW, self.GRACE, self._no_generic_probe,
+            coord_probe=lambda _r, _n: (tts.MERGED, 'abc123def456'))
+        self.assertTrue(retire)
+        self.assertIn('MERGED', reason)
+        self.assertIn('abc123def456', reason)
+        self.assertIn('#845', reason)
+
+    def test_closed_pr_retires(self):
+        retire, reason = self.mod.classify_terminal_approval(
+            _mr_entry(), NOW, self.GRACE, self._no_generic_probe,
+            coord_probe=lambda _r, _n: (tts.CLOSED, None))
+        self.assertTrue(retire)
+        self.assertIn('CLOSED', reason)
+
+    def test_head8_suffixed_id_resolves_and_retires(self):
+        # The hex-suffixed shape must take the direct path too (an all-digit
+        # regex anchor would miss it → phantom recurs).
+        got = []
+        retire, reason = self.mod.classify_terminal_approval(
+            _mr_entry(approval_id=MR_ID_HEAD8), NOW, self.GRACE,
+            self._no_generic_probe,
+            coord_probe=lambda r, n: (got.append((r, n)) or (tts.MERGED, 'sha9')))
+        self.assertTrue(retire)
+        self.assertEqual(got, [('owner/zz-fixture-repo', 846)])
+        self.assertIn('#846', reason)
+
+    def test_open_pr_kept(self):
+        retire, reason = self.mod.classify_terminal_approval(
+            _mr_entry(), NOW, self.GRACE, self._no_generic_probe,
+            coord_probe=lambda _r, _n: (tts.OPEN, None))
+        self.assertFalse(retire)
+        self.assertIn('OPEN', reason)
+
+    def test_gh_failure_keeps_without_consulting_generic_probe(self):
+        # UNKNOWN (gh outage) keeps — and the coordinate probe is AUTHORITATIVE:
+        # it must NOT fall through to a second, redundant generic gh probe.
+        retire, reason = self.mod.classify_terminal_approval(
+            _mr_entry(), NOW, self.GRACE, self._no_generic_probe,
+            coord_probe=lambda _r, _n: (tts.UNKNOWN, None))
+        self.assertFalse(retire)
+        self.assertIn('UNKNOWN', reason)
+
+    def test_within_grace_kept_even_if_pr_merged(self):
+        retire, reason = self.mod.classify_terminal_approval(
+            _mr_entry(FRESH_TS), NOW, self.GRACE, self._no_generic_probe,
+            coord_probe=lambda _r, _n: (tts.MERGED, 'abc'))
+        self.assertFalse(retire)
+        self.assertIn('within grace', reason)
+
+    def test_payload_targeting_other_work_skips_direct_probe(self):
+        # GUARD: the id carries the wrapper but dispatch_payload.task_id names
+        # different work (id != payload.task_id) -> never expire via the direct
+        # path; falls through to the generic probe (here UNKNOWN -> keep).
+        entry = _mr_entry(payload_task_id='zz-fixture-unrelated-task')
+        retire, _ = self.mod.classify_terminal_approval(
+            entry, NOW, self.GRACE, lambda _tid: tts.UNKNOWN,
+            coord_probe=self._no_coord_probe)
+        self.assertFalse(retire)
+
+    def test_missing_payload_skips_direct_probe(self):
+        entry = _mr_entry()
+        entry['dispatch_payload'] = {}  # no task_id -> not a genuine card
+        retire, _ = self.mod.classify_terminal_approval(
+            entry, NOW, self.GRACE, lambda _tid: tts.UNKNOWN,
+            coord_probe=self._no_coord_probe)
+        self.assertFalse(retire)
+
+    def test_bare_coordinate_id_without_wrapper_skips_direct_probe(self):
+        # GUARD: a plain approval whose id merely looks coordinate-shaped
+        # (`pr-<repo>-<num>`, no `mirror-review-` wrapper) is NOT a Mirror
+        # PR-decision card and must never take the coordinate path.
+        entry = _entry('pr-zz-fixture-repo-845', OLD_TS,
+                       task_id='pr-zz-fixture-repo-845')
+        retire, _ = self.mod.classify_terminal_approval(
+            entry, NOW, self.GRACE, lambda _tid: tts.UNKNOWN,
+            coord_probe=self._no_coord_probe)
+        self.assertFalse(retire)
+
+    def test_non_pr_approval_untouched_by_coord_path(self):
+        # A plain approval (non-coordinate id) never consults the direct probe.
+        retire, _ = self.mod.classify_terminal_approval(
+            _entry('zz-fixture-plain', OLD_TS, task_id='zz-fixture-plain'),
+            NOW, self.GRACE, lambda _tid: tts.UNKNOWN,
+            coord_probe=self._no_coord_probe)
+        self.assertFalse(retire)
+
+
+class TestReconcileMirrorReviewEndToEnd(_MirrorReviewBase):
+    """End-to-end against a tmp beacon-pending-approvals.json: the merged-PR
+    card leaves pending[] as `expired` (no revision dispatched, card leaves the
+    Approvals tab) with the PR state + merge sha journaled in the note; a live
+    PR card and a non-PR approval stay pending."""
+
+    def setUp(self):
+        super().setUp()
+        import beacon_approval_handler as approval
+        self.approval = importlib.reload(approval)
+        self.pending_path = self.approval.PENDING_APPROVALS_PATH
+
+    def _write_state(self, pending):
+        self.pending_path.write_text(json.dumps(
+            {'version': 1, 'pending': pending, 'history': []}))
+
+    def _load(self):
+        return json.loads(self.pending_path.read_text())
+
+    def test_out_of_band_merge_expires_only_that_card(self):
+        open_id = 'mirror-review-pr-zz-fixture-repo-847'
+        self._write_state([
+            _mr_entry(),
+            _mr_entry(approval_id=open_id),
+            _entry('zz-fixture-plain', OLD_TS, task_id='zz-fixture-plain'),
+        ])
+        # coord_probe keyed by (repo, number) as classify calls it.
+        coord_states = {
+            ('owner/zz-fixture-repo', 845): (tts.MERGED, 'abc123def456'),
+            ('owner/zz-fixture-repo', 847): (tts.OPEN, None),
+        }
+        counts = self.mod.reconcile_terminal_approvals(
+            now=NOW, probe=lambda _tid: tts.UNKNOWN,
+            coord_probe=lambda r, n: coord_states[(r, n)])
+
+        self.assertEqual(counts['pending'], 3)
+        self.assertEqual(counts['retired'], 1)
+        self.assertEqual(counts['kept'], 2)
+
+        state = self._load()
+        self.assertEqual({e['id'] for e in state['pending']},
+                         {open_id, 'zz-fixture-plain'})
+        history = {e['id']: e for e in state['history']}
+        self.assertEqual(history[MR_ID]['status'], 'expired')
+        note = history[MR_ID].get('resolution_note', '')
+        self.assertIn('MERGED', note)
+        self.assertIn('abc123def456', note)
+
+    def test_gh_outage_expires_nothing(self):
+        self._write_state([_mr_entry()])
+        counts = self.mod.reconcile_terminal_approvals(
+            now=NOW, probe=lambda _tid: tts.UNKNOWN,
+            coord_probe=lambda _r, _n: (tts.UNKNOWN, None))
+        self.assertEqual(counts['retired'], 0)
+        self.assertEqual([e['id'] for e in self._load()['pending']], [MR_ID])
+
+
 # -------- resolved-in-supabase reconciliation (approval-sync §3.2) --------
 
 def _action_row(task_id, action, ts=OLD_TS):
