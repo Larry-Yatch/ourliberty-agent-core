@@ -341,7 +341,7 @@ def setup_branch_checkpoint(
     branch: str,
     task_id: str,
     log_fn: Optional[LogFn] = None,
-    push: bool = True,
+    readonly: bool = False,
 ) -> Optional[str]:
     """Pre-create the branch on origin with an empty WIP commit.
 
@@ -357,17 +357,24 @@ def setup_branch_checkpoint(
         treated as success. Falls back to ``--force-with-lease`` on
         divergence.
 
-    ``push=False`` is the READ-ONLY mode for dispatches that must never
-    mutate origin/<branch> (Mirror reviews: the branch is the PR branch
-    under review, and pushing the WIP commit changes the PR head SHA —
-    which retriggers review dispatch, defeats head-SHA review dedup, and
-    lands empty [WIP] commits in the PR's merge history). It still runs
-    the fetch + checkout -B + reset --hard so the worktree sits exactly
-    at origin/<branch>, but skips the WIP commit and the push entirely.
+    ``readonly=True`` is for dispatches that must never mutate
+    origin/<branch> — Mirror reviews, where ``branch`` is someone else's
+    PR branch. Pushing the WIP commit there moves the PR head SHA, which
+    retriggers review dispatch and defeats head-SHA review dedup
+    (duplicate round-0 reviews, observed PR #841 2026-07-08), posts
+    commit statuses on a throwaway sha, and merges [WIP] noise into
+    main's history. Read-only mode does a forced DETACHED checkout of
+    origin/<branch>: no WIP commit, no push, and no local branch ref
+    either — a ref would collide across worktrees sharing this .git
+    (git refuses ``checkout -B`` of a branch checked out elsewhere,
+    e.g. Forge's revision worktree on the same PR branch) and invites
+    accidental pushes. A branch absent on origin is a refusal (return
+    None): for a reviewer that means "nothing to review", and silently
+    proceeding would review whatever the worktree happens to contain.
 
-    Returns the branch name on success, None on bad input or push failure
-    (logged but non-fatal — caller still uses the worktree, just without a
-    remote checkpoint).
+    Returns the branch name on success, None on bad input or push/checkout
+    failure (logged but non-fatal — caller decides; see
+    ensure_worktree_for_task).
     """
     if not worktree_path or not worktree_path.exists():
         if log_fn:
@@ -439,6 +446,40 @@ def setup_branch_checkpoint(
                 )
             return None
 
+        if readonly:
+            # See the docstring: detached forced checkout at the origin
+            # tip — no local branch ref, no WIP commit, no push. --force
+            # absorbs a dirty reused worktree (the reset --hard below
+            # covers that for the checkpoint path). Absent branch = refuse.
+            if not branch_exists_on_origin:
+                if log_fn:
+                    log_fn(
+                        f'setup_branch_checkpoint: readonly checkout of '
+                        f'{branch} refused — branch missing on origin '
+                        f'(nothing to review)'
+                    )
+                return None
+            r_ro = subprocess.run(
+                ['git', 'checkout', '--force', '--detach',
+                 f'origin/{branch}'],
+                cwd=str(worktree_path),
+                capture_output=True, text=True,
+                timeout=WORKTREE_OP_TIMEOUT_SEC,
+            )
+            if r_ro.returncode != 0:
+                if log_fn:
+                    log_fn(
+                        f'setup_branch_checkpoint: readonly checkout of '
+                        f'{branch} failed: {r_ro.stderr[:200]}'
+                    )
+                return None
+            if log_fn:
+                log_fn(
+                    f'setup_branch_checkpoint: read-only detached checkout '
+                    f'of {branch} at origin tip'
+                )
+            return branch
+
         # If origin/<branch> exists, base the local branch on it so the
         # WIP commit lands ON TOP of any existing remote work. If it
         # doesn't exist (confirmed by fetch returncode 128), fall through
@@ -491,16 +532,6 @@ def setup_branch_checkpoint(
                     f'failed: {r_reset.stderr[:200]}'
                 )
             return None
-
-        if not push:
-            # Read-only checkout complete: worktree is exactly at the
-            # branch tip, nothing committed, nothing pushed.
-            if log_fn:
-                log_fn(
-                    f'setup_branch_checkpoint: read-only checkout of '
-                    f'{branch} (no WIP commit, no push)'
-                )
-            return branch
 
         # 4b review fix: skip the empty WIP commit when HEAD is already a
         # WIP checkpoint for this task. Without this gate, each re-dispatch
@@ -597,7 +628,7 @@ def ensure_worktree_for_task(
     canonical_repo: Path,
     branch: Optional[str] = None,
     log_fn: Optional[LogFn] = None,
-    push_checkpoint: bool = True,
+    readonly: bool = False,
 ) -> Tuple[Optional[Path], Optional[str]]:
     """High-level entry: ensure a worktree for (agent_id, task_id) exists,
     and if ``branch`` is set, ensure its checkpoint is on origin.
@@ -605,15 +636,17 @@ def ensure_worktree_for_task(
     Returns ``(worktree_path, branch_set_or_None)``:
 
       - ``worktree_path`` is None if creation failed; caller skips dispatch.
-      - ``branch_set_or_None`` is None if ``branch`` was None or the push
-        failed. The worktree path is still returned in the push-failure
-        case so dispatch proceeds; Forge will retry push during her build
-        phase.
+      - ``branch_set_or_None`` is None if ``branch`` was None or the
+        checkpoint push / readonly checkout failed. The worktree path is
+        still returned in that case; the CALLER decides whether a None
+        branch is tolerable (Forge retries the push during her build
+        phase) or a dispatch blocker (a Mirror review must not run
+        against the wrong tree — see inbox_watcher).
 
-    ``push_checkpoint=False`` selects the read-only branch checkout (no
-    WIP commit, no push) — required for Mirror review dispatches, where
-    ``branch`` is the PR branch under review and any push moves the PR
-    head SHA out from under the review pipeline's dedup and history.
+    ``readonly=True`` selects the read-only detached checkout of
+    origin/<branch> (no WIP commit, no push, no local branch ref) — for
+    Mirror reviews, where ``branch`` is the PR branch under review; see
+    setup_branch_checkpoint.
 
     Idempotent: safe to call every dispatch. Reuses existing worktree for
     matching (agent_id, task_id) and treats branch checkpoint as a no-op
@@ -627,6 +660,6 @@ def ensure_worktree_for_task(
     if not branch:
         return path, None
     actual_branch = setup_branch_checkpoint(
-        path, branch, task_id, log_fn=log_fn, push=push_checkpoint,
+        path, branch, task_id, log_fn=log_fn, readonly=readonly,
     )
     return path, actual_branch

@@ -9,10 +9,15 @@ dispatched a duplicate round-0 review; head-SHA review dedup can't catch
 it because the SHA genuinely differs. The WIP commit also lands in the
 PR's merge history and receives the mirror-review commit status.
 
-Fix: `inbox_watcher.process_task` passes `push_checkpoint=False` to
-`worktree_manager.ensure_worktree_for_task` for `agent=mirror` +
-`phase=review` dispatches (read-only checkout), and `True` for everything
-else (Forge builds rely on the checkpoint for crash-recoverable branches).
+Fix: `inbox_watcher.process_task` passes `readonly=True` to
+`worktree_manager.ensure_worktree_for_task` for mirror dispatches that
+name someone else's branch in the envelope and look review-shaped
+(phase=review OR a pr_url present — healers can rewrite phase on
+re-dispatch, e.g. heal_resume_paused_on_tier1 forces 'preflight').
+Builder dispatches and mirror tasks on their own derived branch keep the
+checkpoint push (crash-recoverable branches). A failed readonly checkout
+(branch gone from origin / fetch failure) requeues the task instead of
+reviewing the wrong tree.
 
 Run:
     cd /home/larry/agent-core && python3 -m unittest \
@@ -111,54 +116,97 @@ class MirrorReadonlyCheckoutTest(unittest.TestCase):
             p.stop()
         shutil.rmtree(self.tmp, ignore_errors=True)
 
-    def _write_task(self, agent: str, phase: str, task_id: str,
-                    branch: str) -> Path:
+    def _write_task(self, agent: str, phase, task_id: str,
+                    branch, pr_url=_PR_URL) -> Path:
         task = {
             "task_id": task_id,
             "prompt": "do the thing",
             "source": "beacon",
-            "phase": phase,
             "target_repo": "ourliberty-agent-core",
-            "branch": branch,
-            "pr_url": _PR_URL,
         }
-        f = self.inboxes / agent / f"{phase}-{task_id}.json"
+        if phase is not None:
+            task["phase"] = phase
+        if branch is not None:
+            task["branch"] = branch
+        if pr_url is not None:
+            task["pr_url"] = pr_url
+        f = self.inboxes / agent / f"{phase or 'task'}-{task_id}.json"
         f.write_text(json.dumps(task))
         return f
 
     def _models_config(self, agent: str) -> dict:
         return {"agents": {agent: {"worktree_enabled": True}}}
 
+    def _readonly_arg(self):
+        self.ensure_worktree.assert_called_once()
+        return self.ensure_worktree.call_args.kwargs.get("readonly")
+
     def test_mirror_review_uses_readonly_checkout(self):
         tf = self._write_task("mirror", "review", "pr-841",
                               "work/operator-timers")
         inbox_watcher.process_task("mirror", tf,
                                    models_config=self._models_config("mirror"))
-        self.ensure_worktree.assert_called_once()
-        kwargs = self.ensure_worktree.call_args.kwargs
-        self.assertEqual(kwargs.get("push_checkpoint"), False,
-                         "mirror review must NOT push a checkpoint to the "
-                         "PR branch under review")
+        self.assertIs(self._readonly_arg(), True,
+                      "mirror review must NOT push to the PR branch "
+                      "under review")
         self.run_claude.assert_called_once()
+
+    def test_mirror_phaseless_pr_envelope_is_readonly(self):
+        # Healers can rewrite phase on re-dispatch (heal_resume_paused_on_
+        # tier1 forces 'preflight') and ad-hoc review envelopes may omit
+        # it; a pr_url + someone else's branch is review-shaped enough.
+        tf = self._write_task("mirror", "preflight", "pr-841",
+                              "work/operator-timers")
+        inbox_watcher.process_task("mirror", tf,
+                                   models_config=self._models_config("mirror"))
+        self.assertIs(self._readonly_arg(), True)
 
     def test_forge_build_keeps_checkpoint_push(self):
         tf = self._write_task("forge", "build", "task-b1", "forge/task-b1")
         inbox_watcher.process_task("forge", tf,
                                    models_config=self._models_config("forge"))
-        self.ensure_worktree.assert_called_once()
-        kwargs = self.ensure_worktree.call_args.kwargs
-        self.assertEqual(kwargs.get("push_checkpoint"), True,
-                         "forge builds rely on the crash-recovery checkpoint")
+        self.assertIs(self._readonly_arg(), False,
+                      "forge builds rely on the crash-recovery checkpoint")
 
-    def test_mirror_non_review_keeps_checkpoint_push(self):
-        # Mirror occasionally runs build-style tasks on its own branch;
-        # only phase=review is read-only.
-        tf = self._write_task("mirror", "build", "task-m1", "mirror/task-m1")
+    def test_mirror_own_branch_keeps_checkpoint_push(self):
+        # No envelope branch: the derived mirror/<task_id> branch is
+        # mirror-owned scratch space — heal_forge_wip_only_redispatch's
+        # WIP-on-origin signal relies on the checkpoint existing there.
+        tf = self._write_task("mirror", "review", "audit-1", branch=None)
         inbox_watcher.process_task("mirror", tf,
                                    models_config=self._models_config("mirror"))
-        self.ensure_worktree.assert_called_once()
-        kwargs = self.ensure_worktree.call_args.kwargs
-        self.assertEqual(kwargs.get("push_checkpoint"), True)
+        self.assertIs(self._readonly_arg(), False)
+
+    def test_mirror_build_task_keeps_checkpoint_push(self):
+        # Mirror build-style task on an explicit feature branch with no
+        # pr_url and a non-review phase: not review-shaped, stays writable.
+        tf = self._write_task("mirror", "build", "task-m1",
+                              "mirror/task-m1", pr_url=None)
+        inbox_watcher.process_task("mirror", tf,
+                                   models_config=self._models_config("mirror"))
+        self.assertIs(self._readonly_arg(), False)
+
+    def test_mirror_review_failed_checkout_requeues(self):
+        # Readonly checkout failure (branch gone from origin, fetch error):
+        # the review must NOT run against whatever tree the worktree holds.
+        # The task stays in the inbox with requeue_count bumped.
+        self.ensure_worktree.return_value = (self.worktree, None)
+        tf = self._write_task("mirror", "review", "pr-841",
+                              "work/operator-timers")
+        inbox_watcher.process_task("mirror", tf,
+                                   models_config=self._models_config("mirror"))
+        self.run_claude.assert_not_called()
+        self.assertTrue(tf.exists(), "task must stay queued for retry")
+        self.assertEqual(json.loads(tf.read_text()).get("requeue_count"), 1)
+
+    def test_forge_none_branch_still_proceeds(self):
+        # Push-failure tolerance for builders is unchanged: Forge retries
+        # the push during her build phase.
+        self.ensure_worktree.return_value = (self.worktree, None)
+        tf = self._write_task("forge", "build", "task-b2", "forge/task-b2")
+        inbox_watcher.process_task("forge", tf,
+                                   models_config=self._models_config("forge"))
+        self.run_claude.assert_called_once()
 
 
 if __name__ == "__main__":

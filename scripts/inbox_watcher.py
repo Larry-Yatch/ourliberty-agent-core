@@ -820,9 +820,10 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
     # worktree_enabled in agent-models.json, dispatch happens inside a
     # /tmp/wt-<agent>-<task_id>/ worktree keyed by task_id so multi-dispatch
     # tasks (preflight → CLARIFY → build under --resume) hit the same
-    # worktree across all dispatches. The branch checkpoint is set up on
-    # origin with an empty WIP commit so a session that times out mid-build
-    # still has the branch reachable for resume.
+    # worktree across all dispatches. For BUILDER dispatches the branch
+    # checkpoint is set up on origin with an empty WIP commit so a session
+    # that times out mid-build still has the branch reachable for resume;
+    # mirror REVIEWS get a read-only detached checkout instead (see below).
     agents_block = models_config.get("agents", {})
     agent_block = agents_block.get(agent, {})
     working_dir = str(AGENTS_DIR / agent)
@@ -841,30 +842,52 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
                 f"worktree: no canonical path for target_repo={target_repo!r}",
             )
             return
-        branch = task.get("branch") or worktree_manager.derive_branch_name(
+        envelope_branch = task.get("branch")
+        branch = envelope_branch or worktree_manager.derive_branch_name(
             agent, task_id,
         )
-        # Mirror reviews carry the PR branch in the envelope so the reviewer
-        # can check it out and run tests — but the reviewer must never PUSH
-        # to it. The default checkpoint push lands an empty [WIP] commit on
-        # the PR branch, moving the PR head SHA: that defeats head-SHA
-        # review dedup (the reconcile sweep sees an "unreviewed" head and
-        # dispatches a duplicate round-0 review), posts commit statuses on
-        # the throwaway WIP sha, and merges [WIP] noise into main's history.
-        # Observed on PR #841 2026-07-08. Read-only checkout instead.
-        is_mirror_review = agent == "mirror" and task.get("phase") == "review"
+        # A mirror envelope that names someone ELSE's branch (review-shaped:
+        # phase=review, or a pr_url riding the envelope) gets a READ-ONLY
+        # detached checkout — the reviewer must never push to the PR branch
+        # under review (WIP push moves the PR head SHA → duplicate round-0
+        # reviews past the head-SHA dedup, statuses on a throwaway sha,
+        # [WIP] noise merged to main; PR #841 2026-07-08 — see
+        # worktree_manager.setup_branch_checkpoint). Keyed on phase OR
+        # pr_url because healers may rewrite phase on re-dispatch
+        # (heal_resume_paused_on_tier1 forces 'preflight') and ad-hoc
+        # review envelopes may omit it; a derived mirror/<task_id> branch
+        # (no envelope branch) stays writable — it's mirror-owned scratch
+        # space that heal_forge_wip_only_redispatch's WIP signal relies on.
+        is_mirror_review = (
+            agent == "mirror"
+            and bool(envelope_branch)
+            and (task.get("phase") == "review" or bool(task.get("pr_url")))
+        )
         wt_path, wt_branch = worktree_manager.ensure_worktree_for_task(
             agent_id=agent,
             task_id=task_id,
             canonical_repo=canonical_path,
             branch=branch,
             log_fn=lambda m: log(f"[{agent}] worktree: {m}"),
-            push_checkpoint=not is_mirror_review,
+            readonly=is_mirror_review,
         )
         if wt_path is None:
             log(
                 f"[{agent}] WORKTREE FAILED for {task_file.name}; "
                 f"bumping requeue, leaving task in inbox"
+            )
+            bump_requeue(task_file, task)
+            return
+        if is_mirror_review and wt_branch is None:
+            # For a review the checkout IS the load-bearing step: a None
+            # branch means the worktree is NOT at the PR head (branch gone
+            # from origin, or fetch/checkout failed) and reviewing whatever
+            # tree it holds instead can pass unfixed code. Requeue (capped
+            # by bump_requeue) rather than review the wrong tree.
+            log(
+                f"[{agent}] readonly checkout of {branch} failed for "
+                f"{task_file.name}; bumping requeue (won't review the "
+                f"wrong tree)"
             )
             bump_requeue(task_file, task)
             return
