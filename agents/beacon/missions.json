@@ -7323,7 +7323,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-08T07:40:02.985622+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-08T07:37:58.558419+00:00"
+      "orphan_last_activity_ts": "2026-07-08T07:37:58.558419+00:00",
+      "briefing": {
+        "what": "A piece of work the team has quietly started but hasn't yet connected to any clear goal or project.",
+        "why": "Effort is going into something with no defined purpose, which risks wasting time or drifting off track without you noticing.",
+        "suggest": "Before it goes further, ask the team to tie this to a concrete goal or pause it until you can confirm it's worth the effort."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-08T07:47:48.457688+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-card-message-8f4384fb2ee7c9ff297d3c69401e2fb3dfb64929",
@@ -7340,7 +7354,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-08T07:40:02.985622+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-08T07:33:42.691783+00:00"
+      "orphan_last_activity_ts": "2026-07-08T07:33:42.691783+00:00",
+      "briefing": {
+        "what": "Your team kicked off a piece of work on its own that isn't attached to any current project.",
+        "why": "Untracked work can quietly pull time and focus away from your real priorities if no one claims it.",
+        "suggest": "Take a quick look to decide whether it belongs on the roadmap or should be set aside \u2014 worth a moment's review before it grows."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-08T07:47:48.457688+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-mirror-review-pr-ourliberty-agent-core-845",
@@ -7357,7 +7385,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-08T07:40:02.985622+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-08T03:55:28.566366+00:00"
+      "orphan_last_activity_ts": "2026-07-08T03:55:28.566366+00:00",
+      "briefing": {
+        "what": "A piece of work your team kicked off on its own that's now waiting for your go-ahead before it can move forward.",
+        "why": "It isn't tied to any current priority yet, so approving it commits time and attention that could otherwise go toward planned goals.",
+        "suggest": "Hold off on a blanket yes \u2014 ask what problem this solves and how it fits your priorities before letting it proceed."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-08T07:47:48.457688+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
